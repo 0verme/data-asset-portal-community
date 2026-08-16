@@ -1,7 +1,7 @@
 {
   "name": "data-asset-portal",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.1.0",
   "type": "module",
   "workspaces": [
     "packages/lineage-viewer",
@@ -26,7 +26,10 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^5.4.10"
+    "@vitejs/plugin-react": "^5.1.4",
+    "vite": "^7.3.6"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }
