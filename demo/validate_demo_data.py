@@ -59,12 +59,15 @@ PUBLIC_FRONTEND_FILES = [
 MINIMUM_COUNTS = {
     "systems.json": 8,
     "data_sources.json": 8,
-    "assets.json": 16,
+    "assets.json": 30,
+    "fields.json": 150,
     "roots.json": 40,
     "indicators.json": 16,
     "mappings.json": 8,
     "lineage.json": 7,
     "api_assets.json": 10,
+    "common_codes.json": 8,
+    "indicator_paths.json": 8,
     "reports.json": 8,
     "push_systems.json": 6,
 }
@@ -107,17 +110,58 @@ def validate_relations(datasets):
     return risks
 
 
+def _dataset_size(datasets: dict, name: str) -> int:
+    """Row count for plain lists; total field count for the field plan."""
+    items = datasets.get(name, [])
+    if name == "fields.json":
+        return sum(len(spec.get("fields", [])) for spec in items)
+    return len(items)
+
+
 def validate_demo_surfaces():
     """Original demo + frontend data validation. Returns list of risk strings."""
     risks = []
     manifest, datasets = load_datasets()
-    if manifest.get("version") != 2 or "全渠道零售" not in manifest.get("theme", ""):
-        risks.append("manifest.json: expected version 2 full-channel retail theme")
+    if manifest.get("version") != 3 or "全渠道零售" not in manifest.get("theme", ""):
+        risks.append("manifest.json: expected version 3 full-channel retail theme")
     for name, minimum in MINIMUM_COUNTS.items():
-        actual = len(datasets.get(name, []))
+        actual = _dataset_size(datasets, name)
         if actual < minimum:
             risks.append(f"datasets/{name}: expected at least {minimum}, got {actual}")
     risks.extend(validate_relations(datasets))
+
+    # Field plan must reference asset tables that exist and keep unique names.
+    asset_tables = {item["table"] for item in datasets["assets.json"]}
+    for spec in datasets.get("fields.json", []):
+        table = spec.get("table")
+        if table not in asset_tables:
+            risks.append(f"fields.json: unknown asset table {table}")
+        names = [field.get("name") for field in spec.get("fields", [])]
+        if len(names) != len(set(names)):
+            risks.append(f"fields.json: duplicate field name in {table}")
+
+    # Common-code categories and items must stay internally consistent.
+    for category in datasets.get("common_codes.json", []):
+        codes = [item.get("code") for item in category.get("items", [])]
+        if len(codes) != len(set(codes)):
+            risks.append(
+                f"common_codes.json: duplicate item code in {category.get('categoryCode')}"
+            )
+
+    # Indicator paths must form a single root with stable full paths.
+    paths = datasets.get("indicator_paths.json", [])
+    root_ids = [p.get("id") for p in paths if p.get("parentId") is None]
+    if len(root_ids) != 1:
+        risks.append(f"indicator_paths.json: expected exactly one root, got {len(root_ids)}")
+    path_codes = [p.get("pathCode") for p in paths]
+    if len(path_codes) != len(set(path_codes)):
+        risks.append("indicator_paths.json: duplicate pathCode")
+    for path in paths:
+        expected = path.get("fullPath", "").split("/")[-1]
+        if expected != path.get("pathCode"):
+            risks.append(
+                f"indicator_paths.json: fullPath tail {expected!r} != pathCode {path.get('pathCode')!r}"
+            )
 
     dataset_files = [ROOT / relative for relative in manifest["datasets"]]
     seed_files = [ROOT / "seed_postgres.py", ROOT / "seed_sqlite.py"]

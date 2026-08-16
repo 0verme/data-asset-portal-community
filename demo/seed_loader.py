@@ -133,13 +133,84 @@ def community_seed_plan() -> dict[str, dict]:
         seen_layers.add(code)
         layers.append((code, code, len(layers) + 1, "Y", "N"))
 
+    # Field plan keyed by table name; field ids are stable so re-seeding is
+    # deterministic and idempotent (INSERT OR IGNORE on p_asset_field.field_id).
+    field_plan = load_dataset("fields.json")
+    asset_id_by_table = {item["table"]: index for index, item in enumerate(assets, start=1)}
+    field_counts = {spec_item["table"]: len(spec_item["fields"]) for spec_item in field_plan}
+    asset_field_rows = []
+    field_id = 1
+    for spec_item in field_plan:
+        asset_id = asset_id_by_table[spec_item["table"]]
+        for order, field in enumerate(spec_item["fields"], start=1):
+            asset_field_rows.append(
+                (
+                    field_id, asset_id, field["name"], field["cn"], field["type"],
+                    order,
+                    "Y" if field.get("nullable") else "N",
+                    "Y" if field.get("pk") else "N",
+                    "Y" if field.get("part") else "N",
+                    field.get("enum"),
+                    field.get("desc"),
+                )
+            )
+            field_id += 1
+
+    def _cycle_desc(table_name, layer_code):
+        if "_DI" in table_name:
+            return "每日增量"
+        if "_DD" in table_name:
+            return "每日全量"
+        return "每日汇总" if layer_code == "DWS" else "每日"
+
+    grain_by_layer = {
+        "DWD": "一行一条虚构业务明细记录",
+        "DWM": "一行一个虚构业务维度组合",
+        "DWS": "一行一个虚构统计维度组合",
+    }
+
     asset_tables = [
         (
             index, item["table"], item["name"], f"DWS_{item['layer']}",
             item["layer"], DOMAIN_CODE_BY_NAME[item["domain"]],
-            "演示数据维护组", "按虚构业务标识", "每日", 0,
+            "演示数据维护组", grain_by_layer.get(item["layer"], "虚构演示数据"),
+            _cycle_desc(item["table"], item["layer"]),
+            item.get("desc"),
+            field_counts.get(item["table"], 0),
         )
         for index, item in enumerate(assets, start=1)
+    ]
+
+    code_categories = load_dataset("common_codes.json")
+    code_category_rows = [
+        (
+            index, category["categoryCode"], category["categoryName"],
+            category.get("categoryDesc"), index, "Y",
+        )
+        for index, category in enumerate(code_categories, start=1)
+    ]
+    code_item_rows = []
+    code_item_id = 1
+    for category in code_categories:
+        for order, item in enumerate(category.get("items", []), start=1):
+            code_item_rows.append(
+                (
+                    code_item_id, category["categoryCode"], item["code"],
+                    item["name"], item.get("value"), item.get("desc"),
+                    order, "Y",
+                )
+            )
+            code_item_id += 1
+
+    indicator_paths = load_dataset("indicator_paths.json")
+    indicator_path_rows = [
+        (
+            path["id"], path.get("parentId"), path["pathCode"], path["pathName"],
+            path["dimensionCode"], path["pathLevel"], path["fullPath"],
+            path.get("sortOrder", 0), path.get("status", "enabled"),
+            path.get("remark"),
+        )
+        for path in indicator_paths
     ]
 
     root_items = [
@@ -217,9 +288,38 @@ def community_seed_plan() -> dict[str, dict]:
             (
                 "asset_id", "table_name", "table_cn_name", "schema_name",
                 "layer_code", "domain_code", "owner_name", "grain_desc",
-                "cycle_desc", "field_count",
+                "cycle_desc", "table_desc", "field_count",
             ),
             asset_tables,
+        ),
+        "p_asset_field": spec(
+            (
+                "field_id", "asset_id", "field_name", "field_cn_name",
+                "data_type", "field_order", "nullable_flag", "pk_flag",
+                "partition_flag", "enum_desc", "field_desc",
+            ),
+            asset_field_rows,
+        ),
+        "p_code_category": spec(
+            (
+                "category_id", "category_code", "category_name",
+                "category_desc", "display_order", "is_active",
+            ),
+            code_category_rows,
+        ),
+        "p_code_item": spec(
+            (
+                "item_id", "category_code", "item_code", "item_name",
+                "item_value", "item_desc", "display_order", "is_active",
+            ),
+            code_item_rows,
+        ),
+        "p_indicator_path_config": spec(
+            (
+                "id", "parent_id", "path_code", "path_name", "dimension_code",
+                "path_level", "full_path", "sort_order", "status", "remark",
+            ),
+            indicator_path_rows,
         ),
         "p_root_category": spec(
             ("category_id", "category_name", "display_order"),
