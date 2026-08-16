@@ -1,0 +1,9 @@
+[
+  {"source":"POS_RECEIPT","target":"DWD_TRADE_ORDER","type":"table"},
+  {"source":"ORDER_HEADER","target":"DWD_TRADE_ORDER","type":"table"},
+  {"source":"DWD_TRADE_ORDER","target":"DWM_TRADE_ORDER_DETAIL_DI","type":"table"},
+  {"source":"DWM_TRADE_ORDER_DETAIL_DI","target":"DWS_TRADE_SALES_STAT_1D","type":"table"},
+  {"source":"DWS_TRADE_SALES_STAT_1D.gross_sales_amount","target":"ORD00001","type":"indicator"},
+  {"source":"ORD00001","target":"RPT_RETAIL_DAILY","type":"report"},
+  {"source":"DWS_TRADE_SALES_STAT_1D","target":"JOB_BI_01","type":"push"}
+]

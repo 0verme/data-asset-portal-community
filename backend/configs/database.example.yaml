@@ -1,0 +1,32 @@
+# Supported database types:
+#   - sqlite    (Community/local isolated operation)
+#   - postgres  (PostgreSQL)
+#   - gaussdb   (private GaussDB / DWS via optional JDBC dependencies)
+
+defaults:
+  type: postgres
+  connect_timeout: 30
+  statement_timeout_ms: 120000
+  socket_timeout: 120
+  driver: com.huawei.gauss200.jdbc.Driver
+  # JDBC 驱动不随仓库分发（商业软件，自行从官方渠道获取）。
+  # 通过环境变量 ASSET_DB_JAR_PATH 或 profile 的 jar_path 指定实际驱动路径。
+  # 见 backend/resources/jars/README.md。
+  jar_path: /opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
+
+profiles:
+  # Host/user/password/JDBC URL may be supplied by ASSET_DB_* environment overrides.
+  primary:
+    type: postgres
+    host: 127.0.0.1
+    port: 5432
+    database: asset_portal
+    schema: dwp
+    user: change_me
+    password: change_me
+
+  gauss_primary:
+    type: gaussdb
+    jdbc_url: jdbc:gaussdb://127.0.0.1:25308/asset_portal?currentSchema=dwp
+    user: change_me
+    password: change_me

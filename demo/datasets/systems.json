@@ -1,0 +1,10 @@
+[
+  {"id":1,"code":"MEMBER_CENTER","name":"会员中心","shortName":"会员","type":"business","department":"会员运营部","description":"管理虚构会员档案、等级和成长记录","status":"enabled"},
+  {"id":2,"code":"PRODUCT_CENTER","name":"商品中心","shortName":"商品","type":"business","department":"商品运营部","description":"管理虚构商品、类目、价格与上下架信息","status":"enabled"},
+  {"id":3,"code":"ORDER_CENTER","name":"订单中心","shortName":"订单","type":"business","department":"交易运营部","description":"管理线上与门店零售订单","status":"enabled"},
+  {"id":4,"code":"STORE_POS","name":"门店 POS","shortName":"门店","type":"business","department":"门店运营部","description":"采集虚构门店小票和客流信息","status":"enabled"},
+  {"id":5,"code":"INVENTORY_CENTER","name":"库存中心","shortName":"库存","type":"business","department":"供应链部","description":"管理仓店库存、异动和补货建议","status":"enabled"},
+  {"id":6,"code":"MARKETING_PLATFORM","name":"营销平台","shortName":"营销","type":"business","department":"市场营销部","description":"管理虚构活动、触点和优惠券","status":"enabled"},
+  {"id":7,"code":"FULFILLMENT_PLATFORM","name":"履约平台","shortName":"履约","type":"business","department":"履约运营部","description":"管理包裹、配送轨迹和门店自提","status":"enabled"},
+  {"id":8,"code":"SERVICE_CENTER","name":"售后中心","shortName":"售后","type":"business","department":"客户服务部","description":"管理退货、退款、工单与商品评价","status":"disabled"}
+]

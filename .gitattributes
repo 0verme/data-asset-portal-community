@@ -1,0 +1,16 @@
+# Line-ending policy: normalize everything to LF in the repository.
+# This file prevents CRLF/LF churn across checkouts; a one-time renormalize
+# (git add --renormalize .) is intentionally NOT part of this commit.
+* text=auto eol=lf
+
+# Files that must keep their exact bytes (never normalized).
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary

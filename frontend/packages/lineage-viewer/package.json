@@ -1,0 +1,69 @@
+{
+  "name": "lineage-viewer",
+  "version": "1.1.0",
+  "description": "A lightweight, framework-free Web Component for interactive table-level and column-level data lineage visualization.",
+  "homepage": "https://lineage.overme.cn",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0verme/lineage-viewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/0verme/lineage-viewer/issues"
+  },
+  "type": "module",
+  "license": "Apache-2.0",
+  "keywords": [
+    "data-lineage",
+    "column-lineage",
+    "metadata",
+    "data-catalog",
+    "web-component",
+    "svg"
+  ],
+  "sideEffects": [
+    "./dist/define.js"
+  ],
+  "main": "./dist/lineage-viewer.js",
+  "module": "./dist/lineage-viewer.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/lineage-viewer.js"
+    },
+    "./define": {
+      "types": "./dist/define.d.ts",
+      "import": "./dist/define.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "docs",
+    "examples",
+    "README.md",
+    "README.en.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "NOTICE",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "vite.config.ts",
+    "tsconfig.json",
+    "tsconfig.build.json"
+  ],
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.4"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}

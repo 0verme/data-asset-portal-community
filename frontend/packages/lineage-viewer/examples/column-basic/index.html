@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Column lineage: basic mapping</title>
+    <link rel="stylesheet" href="../column-lineage.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Basic column lineage</h1>
+      <p>Click a field to highlight its complete upstream and downstream mapping.</p>
+      <div class="toolbar">
+        <button data-action="fit">Fit view</button>
+        <button data-action="clear">Clear selection</button>
+      </div>
+      <div class="viewer-shell"><lineage-viewer></lineage-viewer></div>
+      <p class="status" aria-live="polite">Select a field to inspect its lineage.</p>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

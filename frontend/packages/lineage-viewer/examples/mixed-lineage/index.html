@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mixed table and column lineage</title>
+    <link rel="stylesheet" href="../column-lineage.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Mixed lineage explorer</h1>
+      <p>Switch views and search tables or fields without changing the source data.</p>
+      <div class="toolbar">
+        <label
+          >View
+          <select data-action="view">
+            <option value="mixed">Mixed</option>
+            <option value="table">Table</option>
+            <option value="column">Column</option>
+          </select>
+        </label>
+        <label
+          >Name
+          <input data-action="query" type="search" placeholder="table or field" />
+        </label>
+        <label
+          >Data type
+          <select data-action="type">
+            <option value="">All types</option>
+            <option value="bigint">bigint</option>
+            <option value="timestamp">timestamp</option>
+            <option value="decimal(18,2)">decimal(18,2)</option>
+          </select>
+        </label>
+        <button data-action="clear">Clear search</button>
+      </div>
+      <div class="viewer-shell"><lineage-viewer></lineage-viewer></div>
+      <p class="status" aria-live="polite">Mixed view · no active search</p>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

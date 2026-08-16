@@ -1,0 +1,12 @@
+[
+  {"id":1,"code":"PRODUCT_QUERY","name":"商品详情查询 API","method":"GET","path":"/demo/products/{skuId}","version":"v1","systemId":2,"type":"query","status":"enabled","ownerDepartment":"零售数据开放组","owner":"演示数据维护组","description":"查询虚构商品摘要"},
+  {"id":2,"code":"PRODUCT_SEARCH","name":"商品检索 API","method":"GET","path":"/demo/products","version":"v1","systemId":2,"type":"query","status":"enabled","ownerDepartment":"零售数据开放组","owner":"演示数据维护组","description":"检索虚构商品目录"},
+  {"id":3,"code":"MEMBER_PROFILE","name":"会员画像查询 API","method":"GET","path":"/demo/members/{memberId}","version":"v1","systemId":1,"type":"query","status":"enabled","ownerDepartment":"零售数据开放组","owner":"演示数据维护组","description":"查询虚构会员画像"},
+  {"id":4,"code":"ORDER_QUERY","name":"订单详情查询 API","method":"GET","path":"/demo/orders/{orderId}","version":"v1","systemId":3,"type":"query","status":"enabled","ownerDepartment":"零售数据开放组","owner":"演示数据维护组","description":"查询虚构订单详情"},
+  {"id":5,"code":"STORE_SALES","name":"门店销售汇总 API","method":"GET","path":"/demo/stores/{storeId}/sales","version":"v1","systemId":4,"type":"query","status":"enabled","ownerDepartment":"零售数据开放组","owner":"演示数据维护组","description":"查询虚构门店销售汇总"},
+  {"id":6,"code":"STOCK_QUERY","name":"商品库存查询 API","method":"GET","path":"/demo/inventory/{skuId}","version":"v1","systemId":5,"type":"query","status":"enabled","ownerDepartment":"零售数据开放组","owner":"演示数据维护组","description":"查询虚构仓店库存"},
+  {"id":7,"code":"CAMPAIGN_RESULT","name":"活动效果查询 API","method":"GET","path":"/demo/campaigns/{campaignId}/result","version":"v1","systemId":6,"type":"query","status":"enabled","ownerDepartment":"零售数据开放组","owner":"演示数据维护组","description":"查询虚构营销活动效果"},
+  {"id":8,"code":"PACKAGE_TRACK","name":"包裹轨迹查询 API","method":"GET","path":"/demo/packages/{packageId}/events","version":"v1","systemId":7,"type":"query","status":"enabled","ownerDepartment":"零售数据开放组","owner":"演示数据维护组","description":"查询虚构包裹轨迹"},
+  {"id":9,"code":"RETURN_CREATE","name":"退货申请 API","method":"POST","path":"/demo/returns","version":"v1","systemId":8,"type":"command","status":"enabled","ownerDepartment":"零售数据开放组","owner":"演示数据维护组","description":"创建虚构退货申请"},
+  {"id":10,"code":"REVIEW_SUMMARY","name":"商品评价汇总 API","method":"GET","path":"/demo/products/{skuId}/reviews","version":"v1","systemId":8,"type":"query","status":"disabled","ownerDepartment":"零售数据开放组","owner":"演示数据维护组","description":"查询虚构商品评价汇总"}
+]

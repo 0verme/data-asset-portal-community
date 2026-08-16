@@ -1,0 +1,8 @@
+[
+  {"id":1,"code":"DEMO_BI","name":"零售经营看板","department":"经营分析部","protocol":"HTTP","status":"enabled"},
+  {"id":2,"code":"DEMO_REPL","name":"智能补货工作台","department":"供应链部","protocol":"HTTP","status":"enabled"},
+  {"id":3,"code":"DEMO_CDP","name":"会员运营工作台","department":"会员运营部","protocol":"OSS","status":"enabled"},
+  {"id":4,"code":"DEMO_MKT","name":"营销触达中心","department":"市场营销部","protocol":"HTTP","status":"enabled"},
+  {"id":5,"code":"DEMO_FUL","name":"履约监控中心","department":"履约运营部","protocol":"HTTP","status":"enabled"},
+  {"id":6,"code":"DEMO_VOC","name":"客户声音分析台","department":"客户服务部","protocol":"OSS","status":"disabled"}
+]

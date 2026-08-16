@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "nodes": [
+    {
+      "id": "orders",
+      "label": "orders",
+      "type": "table",
+      "fields": [{ "id": "user_id" }, { "id": "amount" }]
+    },
+    {
+      "id": "order_summary",
+      "label": "order_summary",
+      "type": "view",
+      "fields": [{ "id": "user_id" }, { "id": "total_amount" }]
+    }
+  ],
+  "edges": [
+    {
+      "source": "orders",
+      "target": "order_summary",
+      "sourceField": "user_id",
+      "targetField": "user_id",
+      "label": "passthrough",
+      "transformType": "passthrough",
+      "expression": "user_id"
+    },
+    {
+      "source": "orders",
+      "target": "order_summary",
+      "sourceField": "amount",
+      "targetField": "total_amount",
+      "label": "aggregate",
+      "transformType": "aggregate",
+      "expression": "SUM(amount)"
+    }
+  ]
+}

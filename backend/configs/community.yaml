@@ -1,0 +1,25 @@
+edition: community
+modules:
+  enabled:
+    - portal
+    - dwm
+    - mapping
+    - lineage
+    - root
+    - indicator
+    - apiAsset
+    - system
+  disabled:
+    - upstream
+    - push
+    - report
+    - codeTable
+database:
+  allowed_types:
+    - sqlite
+    - postgres
+features:
+  lineage_collector: false
+  audit_integration: false
+  asset_risks: false
+  enterprise_connectors: false

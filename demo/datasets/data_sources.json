@@ -1,0 +1,10 @@
+[
+  {"id":1,"code":"MEMBER_PROFILE","name":"会员档案数据源","type":"relational","description":"虚构会员档案与等级数据","status":"enabled"},
+  {"id":2,"code":"PRODUCT_CATALOG","name":"商品目录数据源","type":"relational","description":"虚构商品与类目数据","status":"enabled"},
+  {"id":3,"code":"ONLINE_ORDER","name":"线上订单数据源","type":"relational","description":"虚构线上订单与订单商品数据","status":"enabled"},
+  {"id":4,"code":"POS_RECEIPT","name":"门店小票数据源","type":"relational","description":"虚构门店 POS 小票数据","status":"enabled"},
+  {"id":5,"code":"STOCK_SNAPSHOT","name":"库存快照数据源","type":"relational","description":"虚构仓店库存快照","status":"enabled"},
+  {"id":6,"code":"CAMPAIGN_EVENT","name":"营销互动数据源","type":"event_stream","description":"虚构营销曝光和点击事件","status":"enabled"},
+  {"id":7,"code":"PACKAGE_EVENT","name":"履约轨迹数据源","type":"event_stream","description":"虚构包裹轨迹事件","status":"enabled"},
+  {"id":8,"code":"SERVICE_FEEDBACK","name":"售后反馈数据源","type":"object_storage","description":"虚构退货、工单与评价数据","status":"disabled"}
+]

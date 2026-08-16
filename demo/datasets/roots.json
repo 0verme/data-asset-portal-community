@@ -1,0 +1,12 @@
+[
+  {"code":"SKU","name":"商品 SKU"},{"code":"SPU","name":"标准商品"},{"code":"PRD","name":"商品"},{"code":"CAT","name":"类目"},
+  {"code":"MEM","name":"会员"},{"code":"ORD","name":"订单"},{"code":"ITEM","name":"订单商品"},{"code":"STORE","name":"门店"},
+  {"code":"WH","name":"仓库"},{"code":"STOCK","name":"库存"},{"code":"CAMP","name":"营销活动"},{"code":"COUPON","name":"优惠券"},
+  {"code":"PKG","name":"包裹"},{"code":"RETURN","name":"退货"},{"code":"REFUND","name":"退款"},{"code":"TICKET","name":"客服工单"},
+  {"code":"AMT","name":"金额"},{"code":"QTY","name":"数量"},{"code":"CNT","name":"计数"},{"code":"RATE","name":"比率"},
+  {"code":"PRICE","name":"价格"},{"code":"COST","name":"成本"},{"code":"SALES","name":"销售"},{"code":"TRAFFIC","name":"客流"},
+  {"code":"STATUS","name":"状态"},{"code":"FLAG","name":"标识"},{"code":"LEVEL","name":"等级"},{"code":"TYPE","name":"类型"},
+  {"code":"REASON","name":"原因"},{"code":"CHANNEL","name":"渠道"},{"code":"DT","name":"日期分区"},{"code":"HR","name":"小时分区"},
+  {"code":"TIME","name":"时间"},{"code":"SNAP","name":"快照"},{"code":"DETAIL","name":"明细"},{"code":"STAT","name":"统计"},
+  {"code":"DI","name":"日增量后缀"},{"code":"DD","name":"日全量后缀"},{"code":"1D","name":"日汇总后缀"},{"code":"1H","name":"小时汇总后缀"}
+]

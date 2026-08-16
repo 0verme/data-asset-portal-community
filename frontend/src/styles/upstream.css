@@ -1,0 +1,261 @@
+/* Upstream module styles. */
+.upstream-page .tcard,
+  .upstream-page .tcard-foot,
+  .upstream-page .time-chips {
+    min-width: 0;
+  }
+  .upstream-page .tcard-foot {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .upstream-page .tcard-meta {
+    justify-content: flex-start;
+  }
+  .upstream-page .tcard-foot > :last-child {
+    align-self: flex-end;
+  }
+
+  .flow-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--surface);
+    border: 0.5px solid var(--line-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 18px 20px;
+    margin-bottom: 18px;
+  }
+
+  .flow-node {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .fn-abbr {
+    min-width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    font-family: var(--mono);
+    font-weight: 700;
+    background: var(--surface-3);
+    color: var(--ink);
+  }
+
+  .fn-abbr.lake {
+    background: var(--accent);
+    color: #04140d;
+  }
+
+  .fn-k {
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+
+  .fn-v {
+    font-size: 13px;
+    color: var(--ink);
+  }
+
+  .flow-arrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink-3);
+  }
+
+  .fa-label {
+    font-size: 12.5px;
+  }
+
+  .up-mark {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: var(--surface-3);
+  }
+
+  /* ===== 上游系统页作用域覆盖（不影响其他页） ===== */
+  .upstream-page table.dt thead th {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-2);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .upstream-page table.dt tbody tr { border-bottom: 0.5px solid var(--line); }
+  .upstream-page table.dt tbody tr:last-child { border-bottom: none; }
+  .upstream-page table.dt tbody tr:hover { background: var(--surface-2); }
+
+  .sched {
+    padding-top: 10px;
+  }
+
+  .sched-track {
+    position: relative;
+    height: 50px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--surface-2), var(--surface-3));
+    border: 1px solid var(--line);
+  }
+
+  .sched-mark {
+    position: absolute;
+    top: 8px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .sm-flag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-2);
+  }
+
+  .sm-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .sched-hours {
+    position: relative;
+    height: 20px;
+    margin-top: 8px;
+  }
+
+  .sh {
+    position: absolute;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: var(--ink-3);
+    font-family: var(--mono);
+  }
+
+  .sched-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+
+  .next-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .np-k {
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+
+  .np-v {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  .time-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .time-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .tr-idx {
+    width: 22px;
+    color: var(--ink-3);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .time-input {
+    height: 38px;
+    min-width: 170px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0 12px;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+  }
+
+  .time-input:focus {
+    border-color: var(--accent-line);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .time-input:disabled {
+    background: var(--surface-2);
+    color: var(--ink-3);
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 900px) {
+
+    .flow-card,
+    .sched-foot {
+      flex-direction: column;
+      align-items: flex-start;
+    }}
+
+  /* ===== Mobile ≤ 768px ===== */
+  @media (max-width: 768px) {
+
+    .upstream-page .tcard-foot > :last-child {
+      align-self: stretch;
+    }
+
+    .upstream-page .tcard .row-actions {
+      width: 100%;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+    }
+
+    .upstream-page .tcard .row-actions .btn {
+      min-height: 44px;
+      flex: 1 1 92px;
+      justify-content: center;
+    }}
+
+  /* ===== Small phone ≤ 480px ===== */
+  @media (max-width: 480px) {
+
+    .upstream-page .head-actions {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .upstream-page .head-actions .seg {
+      width: 100%;
+    }
+
+    .upstream-page .head-actions .seg button {
+      flex: 1 1 0;
+      justify-content: center;
+    }}

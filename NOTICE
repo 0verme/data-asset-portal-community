@@ -1,0 +1,18 @@
+Data Asset Portal
+Copyright 2025 Jearhe (overme.cn)
+
+This product bundles lineage-viewer, Copyright 2026 0verme, licensed under the
+Apache License, Version 2.0. The bundled source is vendored into this repository
+under frontend/packages/ as npm workspaces:
+
+  - packages/lineage-viewer                (package name: lineage-viewer)
+  - packages/lineage-viewer-react          (package name: @lineage-viewer/react)
+  - packages/lineage-viewer-domain-adapter (package name: @lineage-viewer/domain-adapter)
+
+Each package keeps its own LICENSE and NOTICE alongside its source. The upstream
+project is https://github.com/0verme/lineage-viewer (version 1.1.0); the vendored
+copy is what the frontend builds against, so no npm registry dependency is
+required for these packages.
+
+This product includes software developed at
+Jearhe (overme.cn).

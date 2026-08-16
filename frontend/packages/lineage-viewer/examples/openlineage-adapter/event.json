@@ -1,0 +1,85 @@
+{
+  "eventType": "COMPLETE",
+  "eventTime": "2026-07-19T08:00:00Z",
+  "producer": "https://example.test/lineage-viewer",
+  "schemaURL": "https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/RunEvent",
+  "run": {
+    "runId": "00000000-0000-7000-8000-000000000001"
+  },
+  "job": {
+    "namespace": "analytics",
+    "name": "build.order_summary"
+  },
+  "inputs": [
+    {
+      "namespace": "warehouse",
+      "name": "public.orders",
+      "facets": {
+        "schema": {
+          "_producer": "https://example.test/lineage-viewer",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-1-1/SchemaDatasetFacet.json",
+          "fields": [
+            { "name": "user_id", "type": "bigint" },
+            { "name": "amount", "type": "decimal(18,2)" }
+          ]
+        }
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "namespace": "warehouse",
+      "name": "analytics.order_summary",
+      "facets": {
+        "schema": {
+          "_producer": "https://example.test/lineage-viewer",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-1-1/SchemaDatasetFacet.json",
+          "fields": [
+            { "name": "customer_id", "type": "bigint" },
+            { "name": "total_amount", "type": "decimal(18,2)" }
+          ]
+        },
+        "columnLineage": {
+          "_producer": "https://example.test/lineage-viewer",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-2-0/ColumnLineageDatasetFacet.json",
+          "fields": {
+            "customer_id": {
+              "inputFields": [
+                {
+                  "namespace": "warehouse",
+                  "name": "public.orders",
+                  "field": "user_id",
+                  "transformations": [
+                    {
+                      "type": "DIRECT",
+                      "subtype": "IDENTITY",
+                      "description": "user_id AS customer_id",
+                      "masking": false
+                    }
+                  ]
+                }
+              ]
+            },
+            "total_amount": {
+              "inputFields": [
+                {
+                  "namespace": "warehouse",
+                  "name": "public.orders",
+                  "field": "amount",
+                  "transformations": [
+                    {
+                      "type": "DIRECT",
+                      "subtype": "AGGREGATION",
+                      "description": "SUM(amount)",
+                      "masking": false
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

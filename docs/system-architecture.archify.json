@@ -1,0 +1,250 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "数据资产门户 · 高层系统架构",
+    "subtitle": "模块化单体的主要请求路径、外部依赖与信任边界",
+    "output": "system-architecture.html",
+    "quality_profile": "showcase",
+    "visual_preset": "editorial",
+    "repository": {
+      "url": "https://github.com/0verme/data-asset-portal",
+      "revision": "e7cc1735ae6f5e97939a16ea0834eb93eabea086"
+    },
+    "views": [
+      {
+        "id": "primary-request",
+        "label": "主要资产查询路径",
+        "focus": ["portal-user", "web-entry", "react-portal", "api-client", "flask-runtime", "domain-routes", "domain-services", "db-adapter", "metadata-store"],
+        "note": "从浏览器读取资产列表，经同源 /api 进入数据库并返回 JSON。"
+      },
+      {
+        "id": "trust-boundaries",
+        "label": "归属与信任边界",
+        "focus": ["portal-user", "web-entry", "react-portal", "flask-runtime", "session-guard", "metadata-store"],
+        "note": "区分用户设备、门户运行环境和数据平台，并突出会话控制点。"
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [40, 120],
+    "cols": 9,
+    "gapX": 58,
+    "gapY": 86,
+    "cellW": 142,
+    "cellH": 72
+  },
+  "components": [
+    {
+      "id": "portal-user",
+      "type": "external",
+      "label": "门户用户",
+      "sublabel": "浏览器",
+      "row": 1,
+      "col": 0
+    },
+    {
+      "id": "web-entry",
+      "type": "cloud",
+      "label": "Nginx / Vite",
+      "sublabel": "静态托管 + /api 代理",
+      "row": 1,
+      "col": 1,
+      "sources": [
+        { "path": "DEPLOYMENT.md", "line": 109, "end_line": 130, "label": "生产反向代理" },
+        { "path": "frontend/vite.config.js", "line": 28, "end_line": 45, "label": "开发代理与模式" }
+      ]
+    },
+    {
+      "id": "react-portal",
+      "type": "frontend",
+      "label": "React SPA",
+      "sublabel": "模块化资产门户",
+      "row": 1,
+      "col": 2,
+      "sources": [
+        { "path": "frontend/package.json", "line": 16, "end_line": 25, "label": "React + Vite 依赖" },
+        { "path": "frontend/src/App.jsx", "line": 108, "end_line": 110, "label": "应用状态入口" }
+      ]
+    },
+    {
+      "id": "api-client",
+      "type": "frontend",
+      "label": "前端 API 层",
+      "sublabel": "fetch + credentials",
+      "row": 1,
+      "col": 3,
+      "sources": [
+        { "path": "frontend/src/api/http.js", "line": 23, "end_line": 74, "label": "统一 HTTP 客户端" },
+        { "path": "frontend/src/api/assets.js", "line": 180, "end_line": 195, "label": "资产列表请求" }
+      ]
+    },
+    {
+      "id": "flask-runtime",
+      "type": "backend",
+      "label": "Flask 应用",
+      "sublabel": "应用工厂 + 运行配置",
+      "row": 1,
+      "col": 4,
+      "sources": [
+        { "path": "backend/run.py", "line": 21, "end_line": 29, "label": "进程入口" },
+        { "path": "backend/app/__init__.py", "line": 42, "end_line": 75, "label": "工厂与模块装配" }
+      ]
+    },
+    {
+      "id": "domain-routes",
+      "type": "backend",
+      "label": "领域蓝图",
+      "sublabel": "capability 驱动的 /api 路由",
+      "row": 1,
+      "col": 5,
+      "sources": [
+        { "path": "backend/app/core/blueprint_registry.py", "line": 35, "end_line": 48, "label": "公共路由" },
+        { "path": "backend/app/core/blueprint_registry.py", "line": 145, "end_line": 178, "label": "按能力注册" },
+        { "path": "backend/app/routes/assets.py", "line": 30, "end_line": 67, "label": "资产查询端点" }
+      ]
+    },
+    {
+      "id": "domain-services",
+      "type": "backend",
+      "label": "领域服务层",
+      "sublabel": "校验、查询、事务与审计",
+      "row": 1,
+      "col": 6,
+      "sources": [
+        { "path": "backend/app/services/assets_service.py", "line": 823, "end_line": 889, "label": "资产查询服务" },
+        { "path": "backend/app/services/assets_service.py", "line": 921, "end_line": 931, "label": "写操作审计" }
+      ]
+    },
+    {
+      "id": "db-adapter",
+      "type": "backend",
+      "label": "DB Facade / Adapter",
+      "sublabel": "profile 驱动连接与 SQL",
+      "row": 1,
+      "col": 7,
+      "sources": [
+        { "path": "backend/app/db/facade.py", "line": 267, "end_line": 278, "label": "按类型选适配器" },
+        { "path": "backend/app/db/facade.py", "line": 336, "end_line": 350, "label": "统一查询门面" },
+        { "path": "backend/app/db/registry.py", "line": 3, "end_line": 8, "label": "版本适配器边界" }
+      ]
+    },
+    {
+      "id": "metadata-store",
+      "type": "database",
+      "label": "元数据存储",
+      "sublabel": "PostgreSQL / GaussDB·DWS",
+      "row": 1,
+      "col": 8,
+      "sources": [
+        { "path": "backend/app/db/facade.py", "line": 190, "end_line": 236, "label": "数据库 profile 校验" },
+        { "path": "backend/requirements.txt", "line": 1, "end_line": 4, "label": "PostgreSQL 驱动" },
+        { "path": "backend/requirements-gaussdb.txt", "line": 1, "end_line": 3, "label": "GaussDB JDBC 依赖" }
+      ]
+    },
+    {
+      "id": "session-guard",
+      "type": "security",
+      "label": "会话与访问控制",
+      "sublabel": "签名 Cookie + 维护者门禁",
+      "row": 0,
+      "col": 5,
+      "sources": [
+        { "path": "backend/app/auth.py", "line": 28, "end_line": 47, "label": "会话用户" },
+        { "path": "backend/app/auth.py", "line": 55, "end_line": 86, "label": "角色门禁" },
+        { "path": "backend/app/routes/auth.py", "line": 33, "end_line": 59, "label": "登录与审计" }
+      ]
+    },
+    {
+      "id": "lineage-viewer",
+      "type": "external",
+      "label": "Lineage Viewer",
+      "sublabel": "npm 1.1.0 客户端依赖",
+      "row": 2,
+      "col": 2,
+      "sources": [
+        { "path": "frontend/src/components/lineage/LineageCanvas.jsx", "line": 1, "end_line": 5, "label": "血缘组件集成" },
+        { "path": "frontend/package.json", "line": 16, "end_line": 21, "label": "固定依赖版本" }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "用户设备 / 不受信任客户端",
+      "wraps": ["portal-user"],
+      "pad": 22
+    },
+    {
+      "kind": "region",
+      "label": "浏览器运行时归属边界",
+      "wraps": ["react-portal", "api-client", "lineage-viewer"],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "门户应用运行环境",
+      "wraps": ["web-entry", "flask-runtime", "domain-routes", "domain-services", "db-adapter", "session-guard"],
+      "pad": 28
+    },
+    {
+      "kind": "security-group",
+      "label": "认证 API 信任边界",
+      "wraps": ["flask-runtime", "domain-routes", "domain-services", "session-guard"],
+      "pad": 18
+    },
+    {
+      "kind": "region",
+      "label": "数据平台归属边界",
+      "wraps": ["metadata-store"],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    { "id": "path-user-entry", "from": "portal-user", "to": "web-entry", "label": "HTTPS", "variant": "emphasis" },
+    { "id": "path-entry-spa", "from": "web-entry", "to": "react-portal", "variant": "emphasis" },
+    { "id": "path-spa-client", "from": "react-portal", "to": "api-client", "variant": "emphasis" },
+    { "id": "path-client-flask", "from": "api-client", "to": "flask-runtime", "label": "/api + Cookie", "variant": "emphasis" },
+    { "id": "path-flask-routes", "from": "flask-runtime", "to": "domain-routes", "variant": "emphasis" },
+    { "id": "path-routes-services", "from": "domain-routes", "to": "domain-services", "variant": "emphasis" },
+    { "id": "path-services-adapter", "from": "domain-services", "to": "db-adapter", "variant": "emphasis" },
+    { "id": "path-adapter-store", "from": "db-adapter", "to": "metadata-store", "label": "SQL", "variant": "emphasis" },
+    { "id": "support-session", "from": "flask-runtime", "to": "session-guard", "label": "会话校验", "variant": "security" },
+    { "id": "support-lineage", "from": "react-portal", "to": "lineage-viewer", "label": "渲染图谱", "variant": "dashed", "labelAt": [500, 352] }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "运行形态",
+      "items": [
+        "生产：Nginx 托管静态文件，并将 /api 同源代理到 Flask :5099",
+        "开发：Vite 可代理 /api；VITE_API_MODE=mock 时请求停留在浏览器内"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "模块化单体",
+      "items": [
+        "公共与业务蓝图按 capability 注册，但仍运行在单个 Flask 应用中",
+        "领域服务集中处理输入校验、事务、查询与操作审计"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "安全与信任",
+      "items": [
+        "远程模式通过携带凭据的 fetch 使用签名 Session Cookie",
+        "写接口由 admin / maintainer 门禁保护；生产 Cookie 使用 Secure、HttpOnly、SameSite=Lax"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "数据与外部依赖",
+      "items": [
+        "私有版 profile 可选 PostgreSQL、GaussDB/DWS；Community 允许 SQLite 与 PostgreSQL",
+        "Lineage Viewer 1.1.0 在客户端渲染；门户维护元数据，不执行真实采集、调度或文件推送"
+      ]
+    }
+  ]
+}

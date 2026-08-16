@@ -1,0 +1,121 @@
+{
+  "schemaVersion": "1.0",
+  "nodes": [
+    {
+      "id": "job:analytics:build.order_summary",
+      "label": "build.order_summary",
+      "type": "job",
+      "subtitle": "analytics",
+      "metadata": {
+        "openLineage": {
+          "namespace": "analytics",
+          "name": "build.order_summary",
+          "eventType": "COMPLETE",
+          "runId": "00000000-0000-7000-8000-000000000001"
+        }
+      }
+    },
+    {
+      "id": "dataset:warehouse:public.orders",
+      "label": "public.orders",
+      "type": "dataset",
+      "subtitle": "warehouse",
+      "fields": [
+        {
+          "id": "user_id",
+          "dataType": "bigint"
+        },
+        {
+          "id": "amount",
+          "dataType": "decimal(18,2)"
+        }
+      ],
+      "metadata": {
+        "openLineage": {
+          "namespace": "warehouse",
+          "name": "public.orders",
+          "roles": ["input"]
+        }
+      }
+    },
+    {
+      "id": "dataset:warehouse:analytics.order_summary",
+      "label": "analytics.order_summary",
+      "type": "dataset",
+      "subtitle": "warehouse",
+      "fields": [
+        {
+          "id": "customer_id",
+          "dataType": "bigint"
+        },
+        {
+          "id": "total_amount",
+          "dataType": "decimal(18,2)"
+        }
+      ],
+      "metadata": {
+        "openLineage": {
+          "namespace": "warehouse",
+          "name": "analytics.order_summary",
+          "roles": ["output"]
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "dataset:warehouse:public.orders",
+      "target": "job:analytics:build.order_summary",
+      "label": "reads",
+      "type": "dependency"
+    },
+    {
+      "source": "job:analytics:build.order_summary",
+      "target": "dataset:warehouse:analytics.order_summary",
+      "label": "writes",
+      "type": "dependency"
+    },
+    {
+      "source": "dataset:warehouse:public.orders",
+      "target": "dataset:warehouse:analytics.order_summary",
+      "sourceField": "user_id",
+      "targetField": "customer_id",
+      "label": "rename",
+      "transformType": "rename",
+      "metadata": {
+        "openLineage": {
+          "transformations": [
+            {
+              "type": "DIRECT",
+              "subtype": "IDENTITY",
+              "description": "user_id AS customer_id",
+              "masking": false
+            }
+          ]
+        }
+      },
+      "expression": "user_id AS customer_id"
+    },
+    {
+      "source": "dataset:warehouse:public.orders",
+      "target": "dataset:warehouse:analytics.order_summary",
+      "sourceField": "amount",
+      "targetField": "total_amount",
+      "label": "aggregate",
+      "transformType": "aggregate",
+      "metadata": {
+        "openLineage": {
+          "transformations": [
+            {
+              "type": "DIRECT",
+              "subtype": "AGGREGATION",
+              "description": "SUM(amount)",
+              "masking": false
+            }
+          ]
+        }
+      },
+      "expression": "SUM(amount)"
+    }
+  ]
+}

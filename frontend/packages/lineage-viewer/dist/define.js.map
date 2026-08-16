@@ -1,0 +1,1 @@
+{"version":3,"file":"define.js","names":[],"sources":["../src/define.ts"],"sourcesContent":["import { defineLineageViewer } from \"./registration.js\";\n\nexport { LineageViewerElement } from \"./element/index.js\";\nexport { defineLineageViewer } from \"./registration.js\";\n\ndefineLineageViewer();\n"],"mappings":";;AAKA,EAAoB"}

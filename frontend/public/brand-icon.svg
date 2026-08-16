@@ -1,0 +1,20 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glowD" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#5fe3d6" stop-opacity="0.9"></stop>
+      <stop offset="40%" stop-color="#32d6c6" stop-opacity="0.5"></stop>
+      <stop offset="100%" stop-color="#32d6c6" stop-opacity="0"></stop>
+    </radialGradient>
+    <linearGradient id="barD" x1="0" y1="0" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#32d6c6" stop-opacity="0"></stop>
+      <stop offset="50%" stop-color="#5fe3d6" stop-opacity="1"></stop>
+      <stop offset="100%" stop-color="#32d6c6" stop-opacity="0"></stop>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0c0d10"></rect>
+  <ellipse cx="32" cy="38" rx="22" ry="11" fill="url(#glowD)"></ellipse>
+  <path d="M16 38 A16 16 0 0 1 48 38" fill="none" stroke="#ededf0" stroke-width="3" stroke-linecap="round"></path>
+  <path d="M21 38 A11 11 0 0 1 43 38" fill="none" stroke="#5fe3d6" stroke-width="2.2" stroke-linecap="round" opacity="0.85"></path>
+  <rect x="7" y="37.3" width="50" height="1.6" fill="url(#barD)"></rect>
+  <circle cx="32" cy="38" r="2" fill="#5fe3d6"></circle>
+</svg>

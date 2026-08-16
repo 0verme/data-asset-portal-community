@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SQLGlot adapter: SQL to column lineage</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Independent Python adapter</p>
+      <h1>SQL → lineage-viewer JSON</h1>
+      <p>
+        The committed graph below is generated from this SQL with
+        <code>lineage-viewer-sqlglot</code>.
+      </p>
+      <div class="grid">
+        <section>
+          <h2>SQL input</h2>
+          <pre><code data-sql>Loading SQL…</code></pre>
+        </section>
+        <section>
+          <h2>Generated field lineage</h2>
+          <div class="viewer-shell"><lineage-viewer></lineage-viewer></div>
+        </section>
+      </div>
+      <p class="status" aria-live="polite">Loading adapter output…</p>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

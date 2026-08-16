@@ -1,0 +1,16 @@
+defaults:
+  type: sqlite
+
+profiles:
+  community_sqlite:
+    type: sqlite
+    database: instance/community.db
+
+  community_postgres:
+    type: postgres
+    host: 127.0.0.1
+    port: 5432
+    database: asset_portal_community
+    schema: dwp
+    user: community
+    password: configure_via_environment

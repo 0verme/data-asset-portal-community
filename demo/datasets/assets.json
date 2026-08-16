@@ -1,0 +1,18 @@
+[
+  {"layer":"DWD","domain":"商品","table":"DWD_PRODUCT_SKU","name":"商品 SKU 明细"},
+  {"layer":"DWD","domain":"会员","table":"DWD_MEMBER_PROFILE","name":"会员档案明细"},
+  {"layer":"DWD","domain":"交易","table":"DWD_TRADE_ORDER","name":"统一订单明细"},
+  {"layer":"DWD","domain":"交易","table":"DWD_TRADE_ORDER_ITEM","name":"订单商品明细"},
+  {"layer":"DWD","domain":"门店","table":"DWD_STORE_POS_ORDER","name":"门店 POS 小票明细"},
+  {"layer":"DWD","domain":"库存","table":"DWD_INVENTORY_STOCK","name":"仓店库存明细"},
+  {"layer":"DWD","domain":"营销","table":"DWD_MARKETING_INTERACTION","name":"活动互动明细"},
+  {"layer":"DWD","domain":"履约","table":"DWD_FULFILLMENT_PACKAGE","name":"履约包裹明细"},
+  {"layer":"DWD","domain":"售后","table":"DWD_SERVICE_RETURN","name":"退货申请明细"},
+  {"layer":"DWM","domain":"商品","table":"DWM_PRODUCT_SKU_DETAIL_DI","name":"商品 SKU 明细中间表"},
+  {"layer":"DWM","domain":"会员","table":"DWM_MEMBER_ACTIVITY_STAT_1D","name":"会员活跃统计日表"},
+  {"layer":"DWM","domain":"交易","table":"DWM_TRADE_ORDER_DETAIL_DI","name":"零售订单明细中间表"},
+  {"layer":"DWM","domain":"库存","table":"DWM_INVENTORY_STOCK_SNAP_DD","name":"仓店库存快照日表"},
+  {"layer":"DWS","domain":"交易","table":"DWS_TRADE_SALES_STAT_1D","name":"全渠道销售汇总日表"},
+  {"layer":"DWS","domain":"营销","table":"DWS_MARKETING_CONVERSION_STAT_1D","name":"营销转化统计日表"},
+  {"layer":"DWS","domain":"履约","table":"DWS_FULFILLMENT_DELIVERY_STAT_1D","name":"履约时效统计日表"}
+]

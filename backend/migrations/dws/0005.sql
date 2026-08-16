@@ -1,0 +1,121 @@
+-- Community core runtime for GaussDB / DWS.
+-- Canonical schema mirrors postgresql/0005.sql (see backend/migrations/README.md);
+-- DWS dialect differences: explicit BIGINT PKs (the application allocates ids),
+-- DISTRIBUTE BY clauses, and a sequence for p_operation_log because that table
+-- relies on database-generated ids.
+
+CREATE SCHEMA IF NOT EXISTS dwp;
+
+CREATE TABLE IF NOT EXISTS dwp.p_admin_user (
+  id BIGINT NOT NULL PRIMARY KEY, username VARCHAR(64) NOT NULL,
+  password_hash VARCHAR(512) NOT NULL, display_name VARCHAR(128),
+  role VARCHAR(16) NOT NULL DEFAULT 'admin', status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  last_login_at TIMESTAMP, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+DISTRIBUTE BY REPLICATION;
+
+CREATE TABLE IF NOT EXISTS dwp.p_asset_domain (
+  domain_code VARCHAR(64) NOT NULL PRIMARY KEY, domain_name VARCHAR(256) NOT NULL,
+  display_order INTEGER NOT NULL DEFAULT 0, is_active CHAR(1) NOT NULL DEFAULT 'Y',
+  is_deleted CHAR(1) NOT NULL DEFAULT 'N'
+)
+DISTRIBUTE BY REPLICATION;
+
+CREATE TABLE IF NOT EXISTS dwp.p_asset_layer (
+  layer_code VARCHAR(32) NOT NULL PRIMARY KEY, layer_name VARCHAR(128) NOT NULL,
+  display_order INTEGER NOT NULL DEFAULT 0, is_active CHAR(1) NOT NULL DEFAULT 'Y',
+  is_deleted CHAR(1) NOT NULL DEFAULT 'N'
+)
+DISTRIBUTE BY REPLICATION;
+
+CREATE TABLE IF NOT EXISTS dwp.p_asset_table (
+  asset_id BIGINT NOT NULL PRIMARY KEY, table_name VARCHAR(256) NOT NULL UNIQUE,
+  table_cn_name VARCHAR(256), schema_name VARCHAR(128) NOT NULL DEFAULT 'dwp',
+  layer_code VARCHAR(32), domain_code VARCHAR(64), owner_name VARCHAR(128),
+  grain_desc VARCHAR(1000), cycle_desc VARCHAR(1000), table_desc VARCHAR(2000),
+  field_count INTEGER NOT NULL DEFAULT 0, is_deleted CHAR(1) NOT NULL DEFAULT 'N',
+  created_by VARCHAR(64) NOT NULL DEFAULT 'system',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+DISTRIBUTE BY HASH (asset_id);
+
+CREATE TABLE IF NOT EXISTS dwp.p_asset_field (
+  field_id BIGINT NOT NULL PRIMARY KEY, asset_id BIGINT NOT NULL,
+  field_name VARCHAR(256) NOT NULL, field_cn_name VARCHAR(256),
+  data_type VARCHAR(128), field_order INTEGER NOT NULL DEFAULT 0,
+  nullable_flag CHAR(1) NOT NULL DEFAULT 'Y', pk_flag CHAR(1) NOT NULL DEFAULT 'N',
+  partition_flag CHAR(1) NOT NULL DEFAULT 'N', enum_desc VARCHAR(2000),
+  field_desc VARCHAR(2000), is_deleted CHAR(1) NOT NULL DEFAULT 'N',
+  created_by VARCHAR(64) NOT NULL DEFAULT 'system',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+DISTRIBUTE BY HASH (field_id);
+
+CREATE TABLE IF NOT EXISTS dwp.p_asset_change_log (
+  change_id BIGINT NOT NULL PRIMARY KEY, asset_id BIGINT, table_name VARCHAR(256) NOT NULL,
+  change_type VARCHAR(64) NOT NULL, change_summary VARCHAR(1000),
+  before_json TEXT, after_json TEXT, operator_name VARCHAR(64) NOT NULL DEFAULT 'system',
+  change_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+DISTRIBUTE BY HASH (change_id);
+
+CREATE TABLE IF NOT EXISTS dwp.p_root_category (
+  category_id BIGINT NOT NULL PRIMARY KEY, category_name VARCHAR(64) NOT NULL UNIQUE,
+  display_order INTEGER NOT NULL DEFAULT 0, is_deleted CHAR(1) NOT NULL DEFAULT 'N',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+DISTRIBUTE BY REPLICATION;
+
+CREATE TABLE IF NOT EXISTS dwp.p_root_item (
+  root_id BIGINT NOT NULL PRIMARY KEY, root_abbr VARCHAR(64) NOT NULL UNIQUE,
+  root_en_name VARCHAR(256), root_cn_name VARCHAR(256) NOT NULL,
+  category_name VARCHAR(64) NOT NULL, root_desc VARCHAR(2000),
+  is_deleted CHAR(1) NOT NULL DEFAULT 'N', created_by VARCHAR(64) NOT NULL DEFAULT 'system',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+DISTRIBUTE BY HASH (root_id);
+
+CREATE TABLE IF NOT EXISTS dwp.p_indicator_item (
+  indicator_pk BIGINT NOT NULL PRIMARY KEY, indicator_id VARCHAR(64) NOT NULL UNIQUE,
+  indicator_name VARCHAR(256) NOT NULL, meaning_desc VARCHAR(4000),
+  result_table_name VARCHAR(256), result_field_name VARCHAR(256),
+  dimension_code VARCHAR(16) NOT NULL, caliber_desc VARCHAR(1000),
+  path_desc VARCHAR(1000), status_code VARCHAR(32) NOT NULL,
+  registrar_name VARCHAR(64) NOT NULL, registered_date VARCHAR(10) NOT NULL,
+  is_deleted CHAR(1) NOT NULL DEFAULT 'N', created_by VARCHAR(64) NOT NULL DEFAULT 'system',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+DISTRIBUTE BY HASH (indicator_pk);
+
+CREATE TABLE IF NOT EXISTS dwp.p_indicator_path_config (
+  id BIGINT NOT NULL PRIMARY KEY, parent_id BIGINT, path_code VARCHAR(64) NOT NULL UNIQUE,
+  path_name VARCHAR(256) NOT NULL, dimension_code VARCHAR(16) NOT NULL,
+  path_level SMALLINT NOT NULL, full_path VARCHAR(1000) NOT NULL UNIQUE,
+  sort_order INTEGER NOT NULL DEFAULT 0, status VARCHAR(32) NOT NULL DEFAULT 'enabled',
+  remark VARCHAR(1000), created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+DISTRIBUTE BY REPLICATION;
+
+CREATE SEQUENCE IF NOT EXISTS dwp.p_operation_log_id_seq;
+CREATE TABLE IF NOT EXISTS dwp.p_operation_log (
+  id BIGINT NOT NULL DEFAULT nextval('dwp.p_operation_log_id_seq') PRIMARY KEY,
+  user_id VARCHAR(64), user_name VARCHAR(128), dept_name VARCHAR(128),
+  module_name VARCHAR(64) NOT NULL, operation_type VARCHAR(32) NOT NULL,
+  operation_object VARCHAR(512), operation_desc VARCHAR(1024),
+  request_method VARCHAR(16), request_url VARCHAR(512), request_params TEXT,
+  result_status VARCHAR(16) NOT NULL DEFAULT 'success', error_message TEXT,
+  ip_address VARCHAR(64), user_agent VARCHAR(512), cost_time_ms INTEGER NOT NULL DEFAULT 0,
+  remark VARCHAR(512), created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+DISTRIBUTE BY HASH (id);

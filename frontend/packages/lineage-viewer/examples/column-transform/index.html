@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Column lineage: transformations</title>
+    <link rel="stylesheet" href="../column-lineage.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Column transformations</h1>
+      <p>Field mappings include rename, transform, and aggregate metadata.</p>
+      <div class="toolbar">
+        <button data-action="fit">Fit view</button>
+        <button data-action="clear">Clear selection</button>
+      </div>
+      <div class="viewer-shell"><lineage-viewer></lineage-viewer></div>
+      <p class="status" aria-live="polite">
+        Select a field or click an edge to inspect its transformation.
+      </p>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

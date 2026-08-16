@@ -1,0 +1,10 @@
+[
+  {"id":1,"code":"RPT_RETAIL_DAILY","name":"全渠道零售经营日报","type":"经营分析","domain":"交易","status":"enabled"},
+  {"id":2,"code":"RPT_STORE_WEEKLY","name":"门店经营周报","type":"经营分析","domain":"门店","status":"enabled"},
+  {"id":3,"code":"RPT_PRODUCT_WEEKLY","name":"商品运营周报","type":"运营分析","domain":"商品","status":"enabled"},
+  {"id":4,"code":"RPT_MEMBER_MONTHLY","name":"会员增长月报","type":"运营分析","domain":"会员","status":"enabled"},
+  {"id":5,"code":"RPT_INVENTORY_DAILY","name":"库存健康日报","type":"供应链分析","domain":"库存","status":"enabled"},
+  {"id":6,"code":"RPT_CAMPAIGN","name":"营销活动复盘报告","type":"营销分析","domain":"营销","status":"enabled"},
+  {"id":7,"code":"RPT_FULFILLMENT","name":"履约服务质量周报","type":"服务分析","domain":"履约","status":"enabled"},
+  {"id":8,"code":"RPT_AFTERSALE","name":"售后体验月报","type":"服务分析","domain":"售后","status":"disabled"}
+]

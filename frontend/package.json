@@ -1,0 +1,32 @@
+{
+  "name": "data-asset-portal",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/lineage-viewer",
+    "packages/lineage-viewer-react",
+    "packages/lineage-viewer-domain-adapter"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "dev:log": "powershell -ExecutionPolicy Bypass -File ./scripts/dev-frontend.ps1",
+    "dev:backend": "powershell -ExecutionPolicy Bypass -File ../backend/scripts/dev-backend.ps1",
+    "dev:backend:sh": "bash ../backend/scripts/dev-backend.sh",
+    "build": "vite build",
+    "test": "node --test src/**/*.test.js",
+    "preview": "vite preview",
+    "export:assets": "node scripts/export-assets.mjs"
+  },
+  "dependencies": {
+    "@lineage-viewer/domain-adapter": "1.1.0",
+    "@lineage-viewer/react": "1.1.0",
+    "lineage-viewer": "1.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.10"
+  }
+}

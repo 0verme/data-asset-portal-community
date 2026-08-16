@@ -1,0 +1,18 @@
+[
+  {"code":"PRD00001","name":"在售商品数","table":"DWS_PRODUCT_LISTING_STATUS_DD","field":"listing_status"},
+  {"code":"PRD00002","name":"商品动销率","table":"DWS_PRODUCT_SKU_DETAIL_DI","field":"sale_price"},
+  {"code":"MEM00001","name":"新增会员数","table":"DWS_MEMBER_PROFILE_FULL_DD","field":"join_date"},
+  {"code":"MEM00002","name":"活跃会员数","table":"DWS_MEMBER_ACTIVITY_STAT_1D","field":"active_flag"},
+  {"code":"MEM00003","name":"会员复购率","table":"DWS_MEMBER_ACTIVITY_STAT_1D","field":"order_count"},
+  {"code":"ORD00001","name":"销售额","table":"DWS_TRADE_SALES_STAT_1D","field":"gross_sales_amount"},
+  {"code":"ORD00003","name":"有效订单数","table":"DWS_TRADE_SALES_STAT_1D","field":"order_count"},
+  {"code":"ORD00004","name":"平均客单价","table":"DWS_TRADE_ORDER_DETAIL_DI","field":"paid_amount"},
+  {"code":"STR00002","name":"门店目标达成率","table":"DWS_STORE_TARGET_PROGRESS_1D","field":"achievement_rate"},
+  {"code":"INV00001","name":"可售库存量","table":"DWS_INVENTORY_STOCK_SNAP_DD","field":"available_quantity"},
+  {"code":"INV00002","name":"缺货商品数","table":"DWS_INVENTORY_STOCK_SNAP_DD","field":"available_quantity"},
+  {"code":"MKT00003","name":"活动转化率","table":"DWS_MARKETING_CONVERSION_STAT_1D","field":"conversion_rate"},
+  {"code":"FUL00002","name":"准时履约率","table":"DWS_FULFILLMENT_DELIVERY_STAT_1D","field":"on_time_rate"},
+  {"code":"FUL00004","name":"物流异常包裹数","table":"DWS_FULFILLMENT_ROUTE_EVENT_DI","field":"exception_flag"},
+  {"code":"SVC00002","name":"商品退货率","table":"DWS_SERVICE_RETURN_REQUEST_DI","field":"return_quantity"},
+  {"code":"SVC00005","name":"商品平均评分","table":"DWS_SERVICE_REVIEW_DI","field":"rating_score"}
+]

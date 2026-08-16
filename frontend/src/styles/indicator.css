@@ -1,0 +1,360 @@
+/* Indicator module styles. */
+.indicator-id-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .indicator-id {
+    color: var(--ink);
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .indicator-name {
+    color: var(--ink);
+    font-weight: 600;
+    margin-bottom: 5px;
+  }
+  .indicator-summary-btn {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    font-family: var(--sans);
+  }
+  .indicator-summary-btn:hover .indicator-name {
+    color: var(--accent);
+  }
+  .indicator-summary-btn .indicator-name,
+  .indicator-summary-btn .indicator-meaning {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .indicator-summary-btn .indicator-name {
+    -webkit-line-clamp: 1;
+  }
+  .indicator-meaning {
+    color: var(--ink-2);
+    font-size: 12.5px;
+    line-height: 1.55;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .indicator-caliber {
+    color: var(--ink);
+    font-size: 12.5px;
+    margin-bottom: 5px;
+  }
+  .indicator-path {
+    color: var(--ink-3);
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+  .indicator-date {
+    color: var(--ink-2);
+    font-size: 12.5px;
+  }
+  .indicator-btn-disabled:disabled {
+    opacity: 0.62;
+    cursor: not-allowed;
+  }
+  .indicator-dim-code {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    line-height: 1;
+    padding: 3px 5px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--ink-2);
+  }
+
+  /* ===== 指标管理页作用域覆盖（不影响其他页） ===== */
+  .indicator-page .pt-code { background: var(--surface-3); color: var(--ink); }
+  .indicator-page .seg button.active { color: var(--ink); }
+  .indicator-page .chip-active { background: var(--surface-2); color: var(--ink-2); border-color: var(--line); }
+  .indicator-page .chip-active button:hover { background: var(--chip); }
+  .indicator-page .filter-bar .clear-all:hover { color: var(--ink); }
+
+  .indicator-tbl table.dt thead th {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-2);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .indicator-tbl table.dt tbody tr { border-bottom: 0.5px solid var(--line); }
+  .indicator-tbl table.dt tbody tr:last-child { border-bottom: none; }
+  .indicator-tbl table.dt tbody tr:hover { background: var(--surface-2); }
+
+  .indicator-detail-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    justify-content: flex-end;
+    background: color-mix(in srgb, var(--bg) 42%, transparent);
+  }
+  .indicator-detail-drawer {
+    width: min(640px, 100vw);
+    height: 100%;
+    background: var(--bg);
+    border-left: 0.5px solid var(--line-strong);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    animation: indicator-drawer-in 0.18s ease-out;
+  }
+  .indicator-detail-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 24px 28px 18px;
+    border-bottom: 0.5px solid var(--line);
+    background: var(--surface);
+  }
+  .indicator-detail-body {
+    flex: 1;
+    overflow: auto;
+    padding: 20px 24px 8px;
+  }
+  .indicator-detail-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 24px 18px;
+    border-top: 0.5px solid var(--line);
+    background: var(--surface);
+  }
+  .indicator-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 18px;
+  }
+  .indicator-detail-item {
+    min-width: 0;
+  }
+  .indicator-detail-item.full {
+    grid-column: 1 / -1;
+  }
+  .indicator-detail-label {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    font-weight: 500;
+    margin-bottom: 7px;
+  }
+  .indicator-detail-value {
+    min-height: 38px;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    border: 0.5px solid var(--line);
+    padding: 10px 12px;
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .indicator-detail-value.mono {
+    font-family: var(--mono);
+    font-size: 12.5px;
+  }
+
+  .indicator-path-cascader {
+    position: relative;
+  }
+
+  .indicator-path-trigger {
+    width: 100%;
+    min-height: 38px;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface-2);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .indicator-path-trigger:hover {
+    border-color: var(--line-strong);
+  }
+
+  .indicator-path-trigger.open,
+  .indicator-path-trigger:focus-visible {
+    border-color: var(--accent-line);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    outline: none;
+  }
+
+  .indicator-path-trigger-text {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.5;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .indicator-path-trigger-text.placeholder {
+    color: var(--ink-3);
+  }
+
+  .indicator-path-trigger-actions {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink-3);
+  }
+
+  .indicator-path-clear {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    display: inline-grid;
+    place-items: center;
+    color: var(--ink-3);
+  }
+
+  .indicator-path-clear:hover {
+    background: var(--chip);
+    color: var(--ink);
+  }
+
+  .indicator-path-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 30;
+    width: min(720px, 100vw - 32px);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+  }
+
+  .indicator-path-panel-empty {
+    padding: 18px 20px;
+    color: var(--ink-3);
+    font-size: 13px;
+  }
+
+  .indicator-path-panel-empty.error {
+    color: var(--danger);
+  }
+
+  .indicator-path-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font-size: 12.5px;
+  }
+
+  .indicator-path-columns {
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+  }
+
+  .indicator-path-column {
+    min-width: 200px;
+    border-right: 1px solid var(--line);
+  }
+
+  .indicator-path-column:last-child {
+    border-right: none;
+  }
+
+  .indicator-path-column-title {
+    padding: 10px 14px 8px;
+    color: var(--ink-3);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .indicator-path-option-list {
+    padding: 0 8px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+
+  .indicator-path-option {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ink-2);
+    font-family: var(--sans);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .indicator-path-option:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+
+  .indicator-path-option.active {
+    border-color: var(--accent-line);
+    background: var(--accent-soft);
+    color: var(--accent-soft-color);
+  }
+
+  .indicator-path-option.selected {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* ===== Mobile ≤ 768px ===== */
+  @media (max-width: 768px) {
+
+    .indicator-detail-drawer {
+      width: 100vw;
+    }
+
+    .indicator-detail-head {
+      padding: 20px 16px 16px;
+    }
+
+    .indicator-detail-body {
+      padding: 16px 14px 8px;
+    }
+
+    .indicator-detail-grid {
+      grid-template-columns: 1fr;
+    }}
+
+  /* ===== Small phone ≤ 480px ===== */
+  @media (max-width: 480px) {
+
+    .indicator-path-panel {
+      width: min(100vw - 24px, 720px);
+    }}
