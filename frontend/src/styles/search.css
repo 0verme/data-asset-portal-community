@@ -133,7 +133,7 @@
   font-size: 12px; color: var(--ink-2); flex: 0 0 auto;
   background: var(--surface-2); border: 0.5px solid var(--line);
   border-radius: var(--radius-sm); padding: 3px 8px;
-  max-width: 32%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 48%; white-space: normal; line-height: 1.45;
 }
 .sp-hit-go { color: var(--ink-3); flex: 0 0 auto; display: grid; place-items: center; }
 .sp-hit:hover .sp-hit-go { color: var(--accent); }
