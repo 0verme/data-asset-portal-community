@@ -22,6 +22,15 @@ import sys
 import tempfile
 from pathlib import Path
 
+# The runner may live on a GBK Windows console while checks print CJK and
+# UTF-8 text; force UTF-8 stdout/stderr so progress stays readable.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        if _stream.encoding and _stream.encoding.lower() not in {"utf-8", "utf8"}:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 FRONTEND = ROOT / "frontend"
@@ -60,7 +69,12 @@ def run(cmd, cwd=None, check_result=True, label=None, env=None) -> subprocess.Co
     run_env = dict(os.environ)
     if env:
         run_env.update(env)
-    result = subprocess.run(cmd, cwd=cwd or ROOT, text=True, capture_output=True, env=run_env)
+    # UTF-8 with replace: the local runner may live on a GBK Windows console
+    # while subprocesses emit UTF-8 (e.g. npm progress or CJK seed output).
+    result = subprocess.run(
+        cmd, cwd=cwd or ROOT, capture_output=True, text=True,
+        encoding="utf-8", errors="replace", env=run_env,
+    )
     if result.stdout:
         print(result.stdout.rstrip())
     if result.stderr:
