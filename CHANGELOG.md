@@ -19,6 +19,13 @@
 
 ### 新增（Added）
 
+- **CI 质量门禁（GitHub Actions）**：`pull_request` + `main` 推送自动运行——仓库数据安全 Guard（BLOCKER / SUSPICIOUS 必须为 0）、后端单元测试（Python 3.11 / 3.13）、PostgreSQL 16 集成（fresh migration → seed → integration → repeat apply no-op）、前端 `npm ci` / test / build（Node 22 / 24）、SQLite Community 迁移契约与物理边界检查（Private 表不得出现）。
+- **依赖安全策略**：`SECURITY.md`（漏洞私下报告流程）、`Dependabot`（npm / pip / GitHub Actions 每周更新）、npm audit 门禁（Critical / High = 0）。
+- **贡献模板**：Issue（bug / feature）与 Pull Request 模板（含敏感数据与 Community 边界自查项）。
+- **本地发布检查**：`python scripts/release_check.py fast|full`，一条命令复现 CI 关键检查。
+
+### 新增（Added）
+
 - **数据仓库**：DWM 表资产列表、详情、字段、DDL，支持新增 / 编辑 / 删除。
 - **字段映射**：字段视图、表视图、统计卡片、CSV 导出（以查询治理为主，无前端编辑入口）。
 - **词根管理**：列表、分类、新增 / 编辑 / 删除、批量导入（含预览）。
@@ -34,6 +41,8 @@
 ### 优化（Changed）
 
 - **运行模式精简（4 → 1）**：前端收敛为唯一开关 `VITE_API_MODE=mock|remote`，同时决定数据来源与认证方式（`src/auth.js` 的 `AUTH_MODE` 跟随它）；后端始终连库、无模式开关。
+- **前端构建链升级**：Vite 5 → 7、`@vitejs/plugin-react` 4 → 5（修复 vite/esbuild 安全公告，`npm audit` 清零），并声明 Node engines `>=22.13.0`。
+- **版本元数据对齐**：`frontend/package.json` 与 README / CHANGELOG 统一为 `0.1.0`。
 
 ### 移除（Removed）
 

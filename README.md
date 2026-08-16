@@ -8,10 +8,10 @@ A lightweight metadata management portal for data warehouses: browse table asset
 trace field/table mappings, and maintain word roots, indicators, and upstream/downstream systems.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
-![Frontend](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite%205-61dafb)
+![Frontend](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite%207-61dafb)
 ![Backend](https://img.shields.io/badge/Backend-Flask%203-000000)
-![Database](https://img.shields.io/badge/Database-PostgreSQL%20%7C%20GaussDB%2FDWS-336791)
-![Version](https://img.shields.io/badge/Version-V1.0.0-brightgreen)
+![Database](https://img.shields.io/badge/Database-SQLite%20%7C%20PostgreSQL%20%7C%20GaussDB%2FDWS-336791)
+![Version](https://img.shields.io/badge/Version-v0.1.0-brightgreen)
 
 [快速开始](#-快速开始) · [功能模块](#-功能模块) · [架构](#-架构) · [文档](#-文档导航) · [路线图](#-路线图)
 
@@ -33,6 +33,13 @@ trace field/table mappings, and maintain word roots, indicators, and upstream/do
 
 > 它专注于"**元数据可见、可查、可维护**"，**不是**调度执行平台——不负责真实采集、任务编排或文件推送执行。
 
+### Community Edition 与完整版
+
+- **Community Edition**（本仓库默认）：开箱即用的元数据管理门户。支持 **SQLite**（零依赖本地演示 / 开发 / CI）与 **PostgreSQL**，数据库初始化走受管迁移 + 零售虚构演示数据 seed，无任何真实业务数据依赖。
+- **完整版（Enterprise）**：在 Community 能力之外增加报表资产、上游卸数、下游推送、码值表维护等私有/企业能力（需对应部署与数据库支持，GaussDB / DWS）。
+
+两者共享同一代码库：Community 通过 `backend/configs/community.yaml` 声明启用的模块集，完整版按需部署对应模块。本仓库定位为 Community Edition，完整版模块的接口与数据表以文档形式保留参考。
+
 ### 适用团队
 
 数仓建模与开发团队 · 数据治理 / 元数据治理团队 · 数据产品 / 数据运营 / BI 支撑团队 · 需要维护上下游元数据口径的平台团队
@@ -41,20 +48,23 @@ trace field/table mappings, and maintain word roots, indicators, and upstream/do
 
 ## 🧩 功能模块
 
-| 模块 | 能力 |
-|------|------|
-| **数据仓库** | 全部已配置层级的表资产列表、详情、字段、DDL，支持 DWM / DWA / DM 等层级筛选及新增 / 编辑 / 删除 |
-| **字段映射** | 字段视图、表视图、统计、CSV 导出 |
-| **血缘分析** | 表/任务血缘子图、上下游影响、关系证据与快照发布 |
-| **词根管理** | 列表、分类、新增 / 编辑 / 删除、批量导入 |
-| **指标维护** | 列表、详情、新增 / 编辑 / 启停 / 删除 |
-| **报表资产** | 报表台账、归属与关联资产维护 |
-| **API 资产** | API 元数据、参数、响应字段与资产关系维护 |
-| **上游卸数** | 系统列表、详情、新增 / 编辑 / 启停 / 删除 |
-| **下游推送** | 系统管理、作业管理、作业字段管理 |
-| **码值表维护** | 湖仓手工码值表元数据维护与导出 |
-| **系统管理** | 用户管理、菜单管理（启停 / 排序）、参数字典、用户状态切换、重置密码 |
-| **认证** | 登录、当前用户、登出（mock 演示登录 / db 真实登录） |
+> 标注：✅ = Community 版可用；🔒 = 完整版（含私有/企业能力）专属。
+> Community 版运行时默认只启用 ✅ 模块，其余模块的菜单与接口在 Community 配置下处于关闭状态（源码仍随仓库提供，见 [Edition 说明](#-community-edition--完整版))。
+
+| 模块 | 能力 | 版本 |
+|------|------|------|
+| **数据仓库** | 全部已配置层级的表资产列表、详情、字段、DDL，支持 DWM / DWA / DM 等层级筛选及新增 / 编辑 / 删除 | ✅ |
+| **字段映射** | 字段视图、表视图、统计、CSV 导出 | ✅ |
+| **血缘分析** | 表/任务血缘子图、上下游影响、关系证据与快照发布 | ✅ |
+| **词根管理** | 列表、分类、新增 / 编辑 / 删除、批量导入 | ✅ |
+| **指标维护** | 列表、详情、新增 / 编辑 / 启停 / 删除 | ✅ |
+| **API 资产** | API 元数据、参数、响应字段与资产关系维护 | ✅ |
+| **系统管理** | 用户管理、菜单管理（启停 / 排序）、参数字典、用户状态切换、重置密码 | ✅ |
+| **认证** | 登录、当前用户、登出（mock 演示登录 / db 真实登录） | ✅ |
+| **报表资产** | 报表台账、归属与关联资产维护 | 🔒 |
+| **上游卸数** | 系统列表、详情、新增 / 编辑 / 启停 / 删除 | 🔒 |
+| **下游推送** | 系统管理、作业管理、作业字段管理 | 🔒 |
+| **码值表维护** | 湖仓手工码值表元数据维护与导出 | 🔒 |
 
 > 各模块接口与数据表明细见 [模块清单](./docs/modules.md)。
 
@@ -62,12 +72,9 @@ trace field/table mappings, and maintain word roots, indicators, and upstream/do
 
 ## 📸 项目预览
 
-> 界面截图将在社区版正式发布前，使用虚构零售演示数据（`demo/datasets/`）重新拍摄后补充。
-> 此前拍摄于早期内测环境的 32 张截图已从仓库移除，不对外发布。
-> 当前可运行演示：`demo/datasets/`（全渠道零售虚构数据）与前端 mock 模式
+> 界面截图将在正式发布前使用虚构零售演示数据（`demo/datasets/`）重新拍摄后补充。
+> 当前可直接体验：`demo/datasets/`（全渠道零售虚构数据）与前端 mock 模式
 > （`VITE_API_MODE=mock`，演示登录 `admin / admin123`）。
->
-> 待办见 [docs/todo.md](./docs/todo.md)「社区版发布准备」。
 
 ---
 
@@ -250,7 +257,7 @@ flowchart LR
   R -.->|"mock 模式"| M["内置 mock 数据<br/>frontend/src/data/*"]
 ```
 
-- **前端** `frontend/` —— React 18 + Vite 5 单页应用，API 层按模块拆分，`VITE_API_MODE` 决定走 mock 数据还是远程 `/api`
+- **前端** `frontend/` —— React 18 + Vite 7 单页应用，API 层按模块拆分，`VITE_API_MODE` 决定走 mock 数据还是远程 `/api`
 - **后端** `backend/` —— Flask 3 API，服务层统一读写数据库，按模块划分蓝图（`/api/assets`、`/api/field-mappings` …）
 - **数据库** —— 后端通过 profile 的 `type` 切换驱动，支持 **SQLite**（Community 本地演示/开发/CI）、**PostgreSQL**（Community 与完整版）与 **GaussDB / DWS**（`gaussdb`，仅完整版，需可选 JDBC 驱动），实现见 `backend/app/db/`。**Community schema 的唯一初始化入口是 `backend/migrations`（受管迁移 + demo seed）**；`docs/pg/` 与 `docs/dws/` 的模块 DDL 作为完整版参考文档，每模块含主表、明细表与变更日志表
 
@@ -371,7 +378,7 @@ data-asset-portal/
 
 ## 🗺 路线图
 
-V1.0.0 当前**不包含**以下能力，欢迎讨论与共建：
+v0.1.0 当前**不包含**以下能力，欢迎讨论与共建：
 
 - [ ] 真实采集调度执行、任务编排、失败重试
 - [ ] 真实下游文件推送执行链路

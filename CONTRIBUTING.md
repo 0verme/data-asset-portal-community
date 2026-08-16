@@ -15,12 +15,21 @@
 2. 保持改动聚焦单一主题，提交信息清晰
 3. 本地自测通过后提交 PR，并在描述中说明动机与影响范围
 4. 涉及接口或数据库结构变更时，请同步更新 `docs/` 下相关文档
+5. 提交前建议运行本地发布检查（与 CI 同一套命令）：
+
+```bash
+python scripts/release_check.py fast
+```
+
+> CI（`.github/workflows/ci.yml`）会在 PR 上自动运行仓库数据安全 Guard、后端测试、
+> PostgreSQL 集成、前端测试 / 构建与 Community 迁移契约；保持 CI 绿色是合并前提。
+> PR 模板含敏感数据与 Community 边界自查项，请逐项确认。
 
 ## 本地开发
 
 请参考 [快速开始](./README.md#-快速开始) 与 [开发指南](./DEVELOPMENT.md)。
 
-- 前端：React 18 + Vite 5，视图在 `frontend/src/components/views/`、业务逻辑在 `frontend/src/hooks/`、API 层按模块拆分于 `frontend/src/api/`
+- 前端：React 18 + Vite 7，视图在 `frontend/src/components/views/`、业务逻辑在 `frontend/src/hooks/`、API 层按模块拆分于 `frontend/src/api/`
 - 后端：Flask 3，服务层位于 `backend/app/services/`，蓝图位于 `backend/app/routes/`
 - 推荐先用 `VITE_API_MODE=mock` 快速验证前端改动
 

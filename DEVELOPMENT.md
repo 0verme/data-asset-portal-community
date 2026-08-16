@@ -185,6 +185,43 @@ PostgreSQL 同理：`apply --profile community_postgres` + `demo/seed_postgres.p
 > 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。
 > Community seed 会创建 `community_demo` 演示管理员；手动建库时请自行插入 `p_admin_user`。
 
+## 测试与质量检查
+
+### 本地发布检查（与 CI 同一套命令）
+
+仓库提供与 CI 对齐的本地检查脚本，提交 / 发版前建议运行：
+
+```bash
+# 快速检查：Public Data Guard + 后端单元测试 + migration offline verify + packaging + 前端测试
+python scripts/release_check.py fast
+
+# 完整检查：fast + SQLite fresh 迁移/seed/重复 apply + 前端 npm ci/build/audit
+# 如需 PostgreSQL 集成（16 个 integration 测试）再设置：
+#   TEST_DATABASE_PROFILE=<profile> TEST_DATABASE_CONFIG_PATH=<config>
+python scripts/release_check.py full
+```
+
+> 注意：本地机器若全局设置了 `NODE_ENV=production`，`release_check.py` 会自动净化 npm 环境；
+> 手动跑 `npm ci` 时请自行确认没有 `NODE_ENV=production` 污染（否则 devDependencies 会被跳过）。
+
+### CI（GitHub Actions）
+
+`.github/workflows/ci.yml` 在 `pull_request` 与 `main` 推送时运行：
+
+1. **Repository Guard** —— `python demo/validate_demo_data.py --strict`（BLOCKER / SUSPICIOUS 必须为 0）、二进制 / dump / 环境文件检查、workflow YAML 自检；
+2. **Backend / Python 3.11 + 3.13** —— `python -m unittest discover -s backend/tests` + migration offline verify（sqlite / postgresql / dws）+ packaging contract tests；
+3. **PostgreSQL Integration（PG 16 service）** —— fresh migration → seed → integration tests（16 个不再 skip）→ repeat apply no-op → Private 表物理边界检查；
+4. **Frontend / Node 22 + 24** —— `npm ci` → `npm test` → `npm run build` → `npm audit --audit-level=high`；
+5. **Community Migration（SQLite）** —— fresh apply → verify → plan → seed → repeat apply no-op → Private 表物理边界检查。
+
+CI 权限为只读、仅用 GitHub 官方 Actions、无生产连接。
+
+### 数据库集成测试
+
+PostgreSQL integration 测试（16 个）通过 `TEST_DATABASE_PROFILE` + `TEST_DATABASE_CONFIG_PATH`
+环境变量启用（详见 `backend/tests/db_test_support.py`），指向**专用隔离测试库**，
+绝不使用默认 `database.yaml` 或生产库。未设置时这些测试自动 skip。
+
 ## 开发期常用脚本
 
 | 脚本 | 作用 |
