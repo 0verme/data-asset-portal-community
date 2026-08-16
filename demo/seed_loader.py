@@ -221,6 +221,7 @@ def community_seed_plan() -> dict[str, dict]:
         (
             index, item["code"], item["name"], "完全虚构的零售演示指标",
             item["table"], item["field"], item["code"][:3].lower(),
+            item.get("caliber", ""), item.get("pathDesc", ""),
             "enabled", "演示数据维护组", "2026-07-01",
         )
         for index, item in enumerate(load_dataset("indicators.json"), start=1)
@@ -333,6 +334,7 @@ def community_seed_plan() -> dict[str, dict]:
             (
                 "indicator_pk", "indicator_id", "indicator_name", "meaning_desc",
                 "result_table_name", "result_field_name", "dimension_code",
+                "caliber_desc", "path_desc",
                 "status_code", "registrar_name", "registered_date",
             ),
             indicator_items,

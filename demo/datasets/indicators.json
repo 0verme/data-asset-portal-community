@@ -1,18 +1,130 @@
 [
-  {"code":"PRD00001","name":"在售商品数","table":"DWS_PRODUCT_LISTING_STATUS_DD","field":"listing_status"},
-  {"code":"PRD00002","name":"商品动销率","table":"DWS_PRODUCT_SKU_DETAIL_DI","field":"sale_price"},
-  {"code":"MEM00001","name":"新增会员数","table":"DWS_MEMBER_PROFILE_FULL_DD","field":"join_date"},
-  {"code":"MEM00002","name":"活跃会员数","table":"DWS_MEMBER_ACTIVITY_STAT_1D","field":"active_flag"},
-  {"code":"MEM00003","name":"会员复购率","table":"DWS_MEMBER_ACTIVITY_STAT_1D","field":"order_count"},
-  {"code":"ORD00001","name":"销售额","table":"DWS_TRADE_SALES_STAT_1D","field":"gross_sales_amount"},
-  {"code":"ORD00003","name":"有效订单数","table":"DWS_TRADE_SALES_STAT_1D","field":"order_count"},
-  {"code":"ORD00004","name":"平均客单价","table":"DWS_TRADE_ORDER_DETAIL_DI","field":"paid_amount"},
-  {"code":"STR00002","name":"门店目标达成率","table":"DWS_STORE_TARGET_PROGRESS_1D","field":"achievement_rate"},
-  {"code":"INV00001","name":"可售库存量","table":"DWS_INVENTORY_STOCK_SNAP_DD","field":"available_quantity"},
-  {"code":"INV00002","name":"缺货商品数","table":"DWS_INVENTORY_STOCK_SNAP_DD","field":"available_quantity"},
-  {"code":"MKT00003","name":"活动转化率","table":"DWS_MARKETING_CONVERSION_STAT_1D","field":"conversion_rate"},
-  {"code":"FUL00002","name":"准时履约率","table":"DWS_FULFILLMENT_DELIVERY_STAT_1D","field":"on_time_rate"},
-  {"code":"FUL00004","name":"物流异常包裹数","table":"DWS_FULFILLMENT_ROUTE_EVENT_DI","field":"exception_flag"},
-  {"code":"SVC00002","name":"商品退货率","table":"DWS_SERVICE_RETURN_REQUEST_DI","field":"return_quantity"},
-  {"code":"SVC00005","name":"商品平均评分","table":"DWS_SERVICE_REVIEW_DI","field":"rating_score"}
+  {
+    "code": "PRD00001",
+    "name": "在售商品数",
+    "table": "DWS_PRODUCT_LISTING_STATUS_DD",
+    "field": "listing_status",
+    "caliber": "统计当前处于上架状态的 SKU 数量。",
+    "pathDesc": "PRD 商品维度 > 商品运营 > 规模"
+  },
+  {
+    "code": "PRD00002",
+    "name": "商品动销率",
+    "table": "DWS_PRODUCT_SKU_DETAIL_DI",
+    "field": "sale_price",
+    "caliber": "统计周期内发生销售的商品占全部在售商品的比例。",
+    "pathDesc": "PRD 商品维度 > 商品运营 > 动销"
+  },
+  {
+    "code": "MEM00001",
+    "name": "新增会员数",
+    "table": "DWS_MEMBER_PROFILE_FULL_DD",
+    "field": "join_date",
+    "caliber": "统计周期内新加入的虚构会员数量。",
+    "pathDesc": "MEM 会员维度 > 会员增长 > 新增"
+  },
+  {
+    "code": "MEM00002",
+    "name": "活跃会员数",
+    "table": "DWS_MEMBER_ACTIVITY_STAT_1D",
+    "field": "active_flag",
+    "caliber": "统计当天发生访问、互动或下单行为的会员数量。",
+    "pathDesc": "MEM 会员维度 > 会员活跃 > 活跃"
+  },
+  {
+    "code": "MEM00003",
+    "name": "会员复购率",
+    "table": "DWS_MEMBER_ACTIVITY_STAT_1D",
+    "field": "order_count",
+    "caliber": "统计周期内完成两次及以上购买的会员占比。",
+    "pathDesc": "MEM 会员维度 > 会员价值 > 复购"
+  },
+  {
+    "code": "ORD00001",
+    "name": "销售额",
+    "table": "DWS_TRADE_SALES_STAT_1D",
+    "field": "gross_sales_amount",
+    "caliber": "统计有效订单产生的含优惠前销售总额。",
+    "pathDesc": "ORD 交易维度 > 销售分析 > 规模"
+  },
+  {
+    "code": "ORD00003",
+    "name": "有效订单数",
+    "table": "DWS_TRADE_SALES_STAT_1D",
+    "field": "order_count",
+    "caliber": "统计已支付且未关闭的有效订单数量。",
+    "pathDesc": "ORD 交易维度 > 销售分析 > 订单"
+  },
+  {
+    "code": "ORD00004",
+    "name": "平均客单价",
+    "table": "DWS_TRADE_ORDER_DETAIL_DI",
+    "field": "paid_amount",
+    "caliber": "按净销售额除以有效订单数计算平均客单价。",
+    "pathDesc": "ORD 交易维度 > 销售分析 > 效率"
+  },
+  {
+    "code": "STR00002",
+    "name": "门店目标达成率",
+    "table": "DWS_STORE_TARGET_PROGRESS_1D",
+    "field": "achievement_rate",
+    "caliber": "统计门店实际销售额相对销售目标的完成比例。",
+    "pathDesc": "STR 门店维度 > 门店经营 > 目标"
+  },
+  {
+    "code": "INV00001",
+    "name": "可售库存量",
+    "table": "DWS_INVENTORY_STOCK_SNAP_DD",
+    "field": "available_quantity",
+    "caliber": "统计仓库和门店当前可用于销售的库存数量。",
+    "pathDesc": "INV 库存维度 > 库存健康 > 库存"
+  },
+  {
+    "code": "INV00002",
+    "name": "缺货商品数",
+    "table": "DWS_INVENTORY_STOCK_SNAP_DD",
+    "field": "available_quantity",
+    "caliber": "统计可售库存为零的在售商品数量。",
+    "pathDesc": "INV 库存维度 > 库存健康 > 缺货"
+  },
+  {
+    "code": "MKT00003",
+    "name": "活动转化率",
+    "table": "DWS_MARKETING_CONVERSION_STAT_1D",
+    "field": "conversion_rate",
+    "caliber": "按活动带来的订单数除以有效点击数计算转化率。",
+    "pathDesc": "MKT 营销维度 > 活动效果 > 转化"
+  },
+  {
+    "code": "FUL00002",
+    "name": "准时履约率",
+    "table": "DWS_FULFILLMENT_DELIVERY_STAT_1D",
+    "field": "on_time_rate",
+    "caliber": "统计在承诺时间内完成送达或自提的包裹比例。",
+    "pathDesc": "FUL 履约维度 > 配送效率 > 时效"
+  },
+  {
+    "code": "FUL00004",
+    "name": "物流异常包裹数",
+    "table": "DWS_FULFILLMENT_ROUTE_EVENT_DI",
+    "field": "exception_flag",
+    "caliber": "统计出现延迟、退回或轨迹中断事件的包裹数。",
+    "pathDesc": "FUL 履约维度 > 履约质量 > 异常"
+  },
+  {
+    "code": "SVC00002",
+    "name": "商品退货率",
+    "table": "DWS_SERVICE_RETURN_REQUEST_DI",
+    "field": "return_quantity",
+    "caliber": "按退货商品件数除以已售商品件数计算。",
+    "pathDesc": "SVC 售后维度 > 退换货 > 质量"
+  },
+  {
+    "code": "SVC00005",
+    "name": "商品平均评分",
+    "table": "DWS_SERVICE_REVIEW_DI",
+    "field": "rating_score",
+    "caliber": "统计有效商品评价的平均星级。",
+    "pathDesc": "SVC 售后维度 > 客户声音 > 评价"
+  }
 ]
