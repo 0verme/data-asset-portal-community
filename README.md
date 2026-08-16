@@ -33,12 +33,12 @@ trace field/table mappings, and maintain word roots, indicators, and upstream/do
 
 > 它专注于"**元数据可见、可查、可维护**"，**不是**调度执行平台——不负责真实采集、任务编排或文件推送执行。
 
-### Community Edition 与完整版
+### Community Edition 与可选模块
 
 - **Community Edition**（本仓库默认）：开箱即用的元数据管理门户。支持 **SQLite**（零依赖本地演示 / 开发 / CI）与 **PostgreSQL**，数据库初始化走受管迁移 + 零售虚构演示数据 seed，无任何真实业务数据依赖。
-- **完整版（Enterprise）**：在 Community 能力之外增加报表资产、上游卸数、下游推送、码值表维护等私有/企业能力（需对应部署与数据库支持，GaussDB / DWS）。
+- **可选模块（Optional Modules）**：报表资产、上游卸数、下游推送、码值表维护。源码随仓库提供（Apache-2.0），但 Community 默认 profile **不启用**（disabled by default）；如需部署需对应数据库支持（PostgreSQL / GaussDB / DWS）。
 
-两者共享同一代码库：Community 通过 `backend/configs/community.yaml` 声明启用的模块集，完整版按需部署对应模块。本仓库定位为 Community Edition，完整版模块的接口与数据表以文档形式保留参考。
+两者共享同一代码库：Community 通过 `backend/configs/community.yaml` 声明启用的模块集，可选模块按需部署对应模块。本仓库定位为 Community Edition，可选模块的接口与数据表以文档形式保留参考。
 
 ### 适用团队
 
@@ -48,8 +48,8 @@ trace field/table mappings, and maintain word roots, indicators, and upstream/do
 
 ## 🧩 功能模块
 
-> 标注：✅ = Community 版可用；🔒 = 完整版（含私有/企业能力）专属。
-> Community 版运行时默认只启用 ✅ 模块，其余模块的菜单与接口在 Community 配置下处于关闭状态（源码仍随仓库提供，见 [Edition 说明](#-community-edition--完整版))。
+> 标注：✅ = Community 版可用；🔒 = 可选模块（源码随仓库提供，Community 默认禁用）。
+> Community 版运行时默认只启用 ✅ 模块，其余模块的菜单与接口在 Community 配置下处于关闭状态（源码仍随仓库提供，见 [Edition 说明](#-community-edition--可选模块))。
 
 | 模块 | 能力 | 版本 |
 |------|------|------|
@@ -145,7 +145,7 @@ python backend/run.py
 
 > **Schema Source of Truth = `backend/migrations`（manifest + 方言 SQL）。**
 > Community 新安装的唯一官方初始化路径是 migration → seed（下方 **Community 本地运行**）；
-> `docs/pg|dws` 的模块 DDL 仅作为完整版（含 Private 模块）的参考文档，
+> `docs/pg|dws` 的模块 DDL 仅作为可选模块的参考文档，
 > 不再作为 Community 初始化机制。
 
 <details>
@@ -179,14 +179,14 @@ PostgreSQL 的 Community 初始化同理：`schema_migrate.py apply --profile co
 </details>
 
 <details>
-<summary><b>完整版（含 Private 模块：upstream / push / report / codeTable）</b></summary>
+<summary><b>可选模块（默认禁用：upstream / push / report / codeTable）</b></summary>
 
 > ⚠️ **没有"一键初始化"脚本，也不要让后端去初始化数据库。** 请按需手动、逐个执行
 > 模块 DDL，自己掌控对哪个库、跑哪些表，避免误清生产数据。
 
 按 profile 的数据库类型选择脚本目录：PostgreSQL 用 [`docs/pg/`](./docs/pg/)，
 GaussDB / DWS 用 [`docs/dws/`](./docs/dws/)。这些 DDL 同时创建 Private 模块表
-与血缘快照表，是完整版部署的初始化参考；Community 初始化请走上方 migration 路径。
+与血缘快照表，是可选模块部署的初始化参考；Community 初始化请走上方 migration 路径。
 Cloudflare D1 不在支持范围内。配置缺失或类型非法时后端必须启动失败，不会回退到本地文件库。
 每个模块一份 DDL（建表 + 基础数据，均为幂等的 `IF NOT EXISTS` / `INSERT ... WHERE NOT EXISTS`，可安全重复执行）：
 
@@ -214,7 +214,7 @@ psql "<连接串>" -f docs/pg/menus-app-pg-ddl.sql
 > 默认输出到 git-ignored 的 `tmp/demo-sql/`）。
 >
 > 管理员账号：Community demo seed 会创建 `community_demo / demo-change-me` 演示管理员；
-> 完整版手动建库时，首个 admin 账号请在 `p_admin_user` 中手动插入（密码需用
+> 可选模块手动建库时，首个 admin 账号请在 `p_admin_user` 中手动插入（密码需用
 > `backend/app/services/auth_service.py::build_password_hash` 生成哈希）。
 
 ```bash
@@ -259,7 +259,7 @@ flowchart LR
 
 - **前端** `frontend/` —— React 18 + Vite 7 单页应用，API 层按模块拆分，`VITE_API_MODE` 决定走 mock 数据还是远程 `/api`
 - **后端** `backend/` —— Flask 3 API，服务层统一读写数据库，按模块划分蓝图（`/api/assets`、`/api/field-mappings` …）
-- **数据库** —— 后端通过 profile 的 `type` 切换驱动，支持 **SQLite**（Community 本地演示/开发/CI）、**PostgreSQL**（Community 与完整版）与 **GaussDB / DWS**（`gaussdb`，仅完整版，需可选 JDBC 驱动），实现见 `backend/app/db/`。**Community schema 的唯一初始化入口是 `backend/migrations`（受管迁移 + demo seed）**；`docs/pg/` 与 `docs/dws/` 的模块 DDL 作为完整版参考文档，每模块含主表、明细表与变更日志表
+- **数据库** —— 后端通过 profile 的 `type` 切换驱动，支持 **SQLite**（Community 本地演示/开发/CI）、**PostgreSQL**（Community 与可选模块）与 **GaussDB / DWS**（`gaussdb`，可选模块，需可选 JDBC 驱动），实现见 `backend/app/db/`。**Community schema 的唯一初始化入口是 `backend/migrations`（受管迁移 + demo seed）**；`docs/pg/` 与 `docs/dws/` 的模块 DDL 作为可选模块参考文档，每模块含主表、明细表与变更日志表
 
 > 完整架构、数据流与数据库结构见 [docs/architecture.md](./docs/architecture.md)。
 

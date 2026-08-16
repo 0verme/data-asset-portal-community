@@ -1,10 +1,11 @@
 # Edition Decision Report — Private Module Source Publication
 
-> 状态：**信息报告，不代替 Owner 决策**。本文回答「技术上是否安全、License 是否允许」，
-> 最终「源码留在公开仓库还是发布前移除」由仓库 Owner 决定（见文末 OWNER DECISION REQUIRED）。
+> 状态：**Owner 决策已确定 — ALLOW IN PUBLIC REPO**（见文末 Decision）。
+> 本文回答「技术上是否安全、License 是否允许」，并记录最终 Edition 决策。
 >
 > 生成时间：P4（CI / Open Source Guardrails & Release Readiness）
-> 数据来源：当前候选仓库 HEAD `47710fa`（community-candidate）
+> 决策时间：Release Closure（首次公开发布）
+> 数据来源：当前候选仓库 HEAD `ec84c99`（community-candidate）
 
 ## 背景
 
@@ -91,31 +92,45 @@ Community 边界（`backend/configs/community.yaml`）把以下 4 个模块标�
 - 4 个模块的代码为项目自产（Copyright 2025 Jearhe），非第三方闭源代码。
 - 未发现需单独授权才能公开的第三方代码、字体、图标或数据。
 
-## Product Strategy（Owner 决策）
+## Product Strategy（Owner 决策 — 已确定）
 
-模块是否公开是**产品策略 / IP 策略**问题，不是技术或 License 问题：
+**Decision：ALLOW IN PUBLIC REPO**
 
-- 「Community feature disabled」—— 即代码随仓库公开、运行时默认关闭，靠配置与边界守护；
-- 或「Commercial/private source 不应公开」—— 发布前从公开仓库移除（保留在内部仓库）。
+`upstream` / `report` / `push` / `codeTable` 四个模块的源码**随公开仓库提供**，
+Edition 策略为 **Source Available but Disabled**：
 
-扫描器不会替 Owner 做这个决定。当前 P4 保持现状（源码保留、配置禁用、边界守护），
-不自动删除。
+- 源码随仓库发布（Apache-2.0）；
+- Community 默认 profile（`backend/configs/community.yaml`）**disabled** 这 4 个模块；
+- Community 迁移不创建 Private 表，seed 不写 Private 表，启动不 import Private 实现；
+- Private 路由在 Community 运行时不可达（404）；
+- 搜索 / 统计不访问 disabled 模块。
+
+决策依据：
+
+1. **Public Data Guard**：BLOCKER = 0，SUSPICIOUS = 0。
+2. **License**：Apache-2.0，源码为项目自产（Copyright 2025 Jearhe）。
+3. **Community Runtime 不依赖**：Community migration / seed / startup 完全不依赖这些模块的 implementation。
+4. **通用能力**：这些模块属于通用数据资产管理能力，不属于敏感业务实现。
+
+> 这些模块源码随仓库提供，但默认 Community profile 不启用。
 
 ---
 
-# OWNER DECISION REQUIRED
+# Owner Decision — 已确定
 
-**Private Module Source Publication**
+**Private Module Source Publication: ALLOW IN PUBLIC REPO**
 
-> 候选仓库当前包含 `upstream` / `report` / `push` / `codeTable` 四个模块的源码。
+Edition Strategy：**Source Available but Disabled**
 
-- 技术结论：**安全**（无敏感数据、无私有依赖、运行时边界干净）。
-- License 结论：**明确**（Apache-2.0 允许公开）。
-- 产品策略：**未决定**。
+- 已决定：`upstream` / `report` / `push` / `codeTable` 源码保留在公开仓库。
+- Community 默认 profile：disabled（`backend/configs/community.yaml`）。
+- 不再删除这 4 个模块。
 
-请 Owner 选择：
+决策依据：
 
-- [ ] **ALLOW IN PUBLIC REPO** —— 保留源码，Community 运行时默认禁用（当前状态）
-- [ ] **REMOVE BEFORE RELEASE** —— 发布前从公开仓库移除这 4 个模块的实现源码
+1. Public Data Guard：BLOCKER = 0，SUSPICIOUS = 0。
+2. License：Apache-2.0，允许公开。
+3. Community Runtime 完全不依赖这些 implementation。
+4. 通用数据资产管理能力，非敏感业务实现。
 
-此决策是 Final Release 的唯一人工 gate 之一（与「首次真实 GitHub Actions 运行」并列）。
+决策时间：Release Closure（首次公开发布）。
