@@ -9,6 +9,12 @@ Community-owned tables only; the canonical column set comes from
 from __future__ import annotations
 
 import argparse
+import sys
+
+# The generated SQL contains CJK demo text; force UTF-8 stdout so piping the
+# seed into a database works identically on Windows and POSIX terminals.
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in {"utf-8", "utf8"}:
+    sys.stdout.reconfigure(encoding="utf-8")
 
 try:
     from seed_loader import community_seed_plan  # noqa: E402

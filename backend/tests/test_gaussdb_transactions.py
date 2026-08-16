@@ -1,4 +1,8 @@
+import importlib.util
+import sys
+import types
 import unittest
+from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 from backend.app.db.facade import (
@@ -8,6 +12,28 @@ from backend.app.db.facade import (
     database_transaction,
     execute_statements,
 )
+
+
+_HAS_JAYDEBEAPI = importlib.util.find_spec("jaydebeapi") is not None
+
+
+def _jaydebeapi_connect_patch(conn):
+    """Patch jaydebeapi.connect even when optional JDBC deps are absent.
+
+    These tests are pure mock tests; the optional GaussDB/JDBC dependencies
+    (requirements-gaussdb.txt) must not be required to run the Community unit
+    suite. When jaydebeapi is missing we inject a fake module into sys.modules
+    so the guarded import inside backend.app.db.gaussdb_adapter succeeds.
+    """
+    stack = ExitStack()
+    if not _HAS_JAYDEBEAPI:
+        fake = types.ModuleType("jaydebeapi")
+        fake.connect = MagicMock(return_value=conn)
+        stack.enter_context(patch.dict(sys.modules, {"jaydebeapi": fake}))
+    stack.enter_context(
+        patch("backend.app.db.gaussdb_adapter.jaydebeapi.connect", return_value=conn)
+    )
+    return stack
 
 
 GAUSS_CONFIG = {
@@ -24,7 +50,7 @@ class GaussDbConnectionTests(unittest.TestCase):
         conn = MagicMock()
         conn.jconn.getAutoCommit.return_value = False
 
-        with patch("backend.app.db.gaussdb_adapter.jaydebeapi.connect", return_value=conn):
+        with _jaydebeapi_connect_patch(conn):
             result = _connect_gaussdb(GAUSS_CONFIG)
 
         self.assertIs(result, conn)
@@ -36,7 +62,7 @@ class GaussDbConnectionTests(unittest.TestCase):
         conn = MagicMock()
         conn.jconn.setAutoCommit.side_effect = RuntimeError("unsupported")
 
-        with patch("backend.app.db.gaussdb_adapter.jaydebeapi.connect", return_value=conn):
+        with _jaydebeapi_connect_patch(conn):
             with self.assertRaisesRegex(RuntimeError, "unsupported"):
                 _connect_gaussdb(GAUSS_CONFIG)
 
@@ -46,7 +72,7 @@ class GaussDbConnectionTests(unittest.TestCase):
         conn = MagicMock()
         conn.jconn.getAutoCommit.return_value = True
 
-        with patch("backend.app.db.gaussdb_adapter.jaydebeapi.connect", return_value=conn):
+        with _jaydebeapi_connect_patch(conn):
             with self.assertRaisesRegex(RuntimeError, "remained in auto-commit mode"):
                 _connect_gaussdb(GAUSS_CONFIG)
 

@@ -168,9 +168,27 @@ def run_public_data_guard():
     return findings, len(files)
 
 
+def _mask_detail(detail: str, keep: int = 60) -> str:
+    """Mask a finding detail so CI logs never print full suspected secrets.
+
+    Keeps a short prefix/suffix for context and replaces the middle with
+    `***`. Matching keywords (password, token, ...) are short already, but
+    this is a deliberate log-safety layer for the CI surface.
+    """
+    if len(detail) <= keep:
+        return detail
+    half = max(8, keep // 2)
+    return f"{detail[:half]}***{detail[-half:]}"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Validate public demo surfaces.")
     parser.add_argument("--dirs-only", action="store_true", help="Only validate demo datasets (skip whole-repo guard).")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail on any SUSPICIOUS finding too (CI gate), not only BLOCKER.",
+    )
     args = parser.parse_args()
 
     risks = validate_demo_surfaces()
@@ -197,16 +215,19 @@ def main():
     if suspicious:
         print("\n-- SUSPICIOUS --")
         for f in suspicious[:50]:
-            print(f"  [{f['severity']}] {f['label']}: {f['detail']}")
+            print(f"  [{f['severity']}] {f['label']} [{f['category']}]: {_mask_detail(f['detail'])}")
     if blockers:
         print("\n-- BLOCKER --")
         for f in blockers[:50]:
-            print(f"  [{f['severity']}] {f['label']}: {f['detail']}")
+            print(f"  [{f['severity']}] {f['label']} [{f['category']}]: {_mask_detail(f['detail'])}")
 
     print(f"\nRepository Public Data Guard: 高置信风险(BLOCKER) = {len(blockers)}")
     if blockers:
         print("FAIL：存在 BLOCKER 级别发现，请先处理再提交。")
         return 2
+    if args.strict and suspicious:
+        print(f"FAIL（--strict）：存在 {len(suspicious)} 个 SUSPICIOUS 发现，请处理或人工确认后再提交。")
+        return 3
     print("PASS：无 BLOCKER 级别发现。")
     return 0
 
