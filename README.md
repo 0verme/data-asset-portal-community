@@ -73,12 +73,24 @@ trace field/table mappings, and maintain word roots, indicators, and upstream/do
 
 ## 📸 项目预览
 
-> 界面截图计划在后续版本中基于虚构零售演示数据（`demo/datasets/`）补充拍摄后再恢复本节引用。
-> 当前可直接体验两条路径：
-> 1. **Community Demo（推荐）**：`demo/seed_sqlite.py` 写入真实数据库后，前端以 `VITE_API_MODE=remote`
->    走正常 DB → API → 前端链路，见 [Community Demo](#-community-demo完整演示环境)。
-> 2. **前端 mock 模式（零依赖）**：`VITE_API_MODE=mock`，演示登录 `admin / admin123`。
->    仅用于前端开发与快速体验，不属于数据库数据链路。
+> 以下截图来自 **Community Demo**（虚构零售数据 `demo/datasets/`）真实运行的 DB → Service → API → 前端链路，
+> 无任何前端假数据。完整截图见 [docs/screenshots.md](./docs/screenshots.md)。
+
+### 资产门户总览
+
+![资产门户总览](./docs/images/demo-portal-overview.png)
+
+### 数据资产（主题表）
+
+![数据资产列表](./docs/images/demo-data-assets.png)
+
+### 表资产详情与字段元数据
+
+![表资产详情](./docs/images/demo-table-detail.png)
+
+### 统一搜索：一个关键词跨多种资产
+
+![统一搜索](./docs/images/demo-global-search.png)
 
 ---
 
@@ -516,6 +528,7 @@ v0.1.0 当前**不包含**以下能力，欢迎讨论与共建：
 | [资产风险联动设计](./docs/asset-risk-integration-design.md) | 当前风险展示边界与外部审计接入提案 |
 | [智能问数与语义推荐](./docs/semantic-recommendation-roadmap.md) | 问数底座定位、技术候选与落地前置条件 |
 | [待确认事项](./docs/todo.md) | 当前尚未完成或待决策事项 |
+| [界面截图画廊](./docs/screenshots.md) | Community Demo 全量界面截图 |
 | [更新日志](./CHANGELOG.md) | 阶段性变更 |
 | [贡献指南](./CONTRIBUTING.md) | 参与共建 |
 
