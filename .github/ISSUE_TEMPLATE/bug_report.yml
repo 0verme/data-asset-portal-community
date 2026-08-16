@@ -1,0 +1,93 @@
+name: Bug Report
+description: Report a reproducible problem in the Community Edition
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please fill in as much as you can — the
+        more context, the faster we can reproduce and fix it.
+
+        ⚠️ **Do not paste secrets, tokens, passwords, connection strings,
+        or internal host names.** If a log contains such data, redact it first.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: Which version (tag) or commit hash are you running?
+      placeholder: "e.g. v0.1.0 or 47710fa"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      description: Which backend database were you using?
+      options:
+        - SQLite (Community local)
+        - PostgreSQL
+        - GaussDB / DWS
+        - Not applicable / unknown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Backend API
+        - Frontend UI
+        - Lineage viewer
+        - Migrations / schema
+        - Demo / seed data
+        - Installation / build
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: What did you do, and what happened?
+      placeholder: |
+        1. Start the backend with ...
+        2. Open the page ...
+        3. See the error ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / error output
+      description: Paste relevant logs (redact anything sensitive).
+      render: shell
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / Node / Python (if relevant)
+      placeholder: "e.g. Chrome 126, Node 22.13, Python 3.13"
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I have searched existing issues for a duplicate
+        - label: I have redacted all secrets and personal data from this report
+    validations:
+      required: true
