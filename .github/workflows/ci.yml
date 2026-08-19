@@ -94,7 +94,7 @@ jobs:
               "actions/first-interaction",
               "actions/labeler",
           }
-          sha_ref = re.compile(r"^[^@\\s]+@[0-9a-f]{40}$")
+          sha_ref = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
           ok = True
           for path in pathlib.Path(".github/workflows").glob("*.yml"):
               try:
