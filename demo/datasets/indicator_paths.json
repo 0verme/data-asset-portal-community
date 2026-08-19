@@ -1,0 +1,12 @@
+[
+  {"id":1,"parentId":null,"pathCode":"RETL","pathName":"零售经营分析","dimensionCode":"retail","pathLevel":1,"fullPath":"RETL","sortOrder":1,"status":"enabled","remark":"零售全渠道经营分析根路径"},
+  {"id":2,"parentId":1,"pathCode":"RETL_SALES","pathName":"销售分析","dimensionCode":"sales","pathLevel":2,"fullPath":"RETL/RETL_SALES","sortOrder":1,"status":"enabled","remark":"销售达成与结构分析"},
+  {"id":3,"parentId":1,"pathCode":"RETL_MEMBER","pathName":"会员分析","dimensionCode":"member","pathLevel":2,"fullPath":"RETL/RETL_MEMBER","sortOrder":2,"status":"enabled","remark":"会员规模与价值分析"},
+  {"id":4,"parentId":1,"pathCode":"RETL_PRODUCT","pathName":"商品分析","dimensionCode":"product","pathLevel":2,"fullPath":"RETL/RETL_PRODUCT","sortOrder":3,"status":"enabled","remark":"商品动销与毛利分析"},
+  {"id":5,"parentId":1,"pathCode":"RETL_STORE","pathName":"门店分析","dimensionCode":"store","pathLevel":2,"fullPath":"RETL/RETL_STORE","sortOrder":4,"status":"enabled","remark":"门店经营与目标达成分析"},
+  {"id":6,"parentId":1,"pathCode":"RETL_FULFILLMENT","pathName":"履约分析","dimensionCode":"fulfillment","pathLevel":2,"fullPath":"RETL/RETL_FULFILLMENT","sortOrder":5,"status":"enabled","remark":"物流时效与履约质量分析"},
+  {"id":7,"parentId":1,"pathCode":"RETL_MARKETING","pathName":"营销分析","dimensionCode":"marketing","pathLevel":2,"fullPath":"RETL/RETL_MARKETING","sortOrder":6,"status":"enabled","remark":"营销活动效果分析"},
+  {"id":8,"parentId":2,"pathCode":"RETL_SALES_DAILY","pathName":"日销售分析","dimensionCode":"sales_daily","pathLevel":3,"fullPath":"RETL/RETL_SALES/RETL_SALES_DAILY","sortOrder":1,"status":"enabled","remark":"全渠道日销售趋势"},
+  {"id":9,"parentId":3,"pathCode":"RETL_MEMBER_VALUE","pathName":"会员价值分析","dimensionCode":"member_value","pathLevel":3,"fullPath":"RETL/RETL_MEMBER/RETL_MEMBER_VALUE","sortOrder":1,"status":"enabled","remark":"会员分层与复购价值"},
+  {"id":10,"parentId":4,"pathCode":"RETL_PRODUCT_SALES","pathName":"商品销售分析","dimensionCode":"product_sales","pathLevel":3,"fullPath":"RETL/RETL_PRODUCT/RETL_PRODUCT_SALES","sortOrder":1,"status":"enabled","remark":"商品销售与毛利排名"}
+]

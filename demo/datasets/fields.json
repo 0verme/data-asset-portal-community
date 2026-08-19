@@ -1,0 +1,313 @@
+[
+  {"table":"DWD_PRODUCT_SKU","fields":[
+    {"name":"sku_id","cn":"商品SKU标识","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"虚构商品 SKU 的唯一标识"},
+    {"name":"product_id","cn":"商品ID","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"标准商品（SPU）唯一标识"},
+    {"name":"spu_id","cn":"标准商品ID","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"商品类目下的标准商品标识"},
+    {"name":"category_code","cn":"类目编码","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"商品所属末级类目编码"},
+    {"name":"sku_name","cn":"SKU名称","type":"VARCHAR(128)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"虚构 SKU 的展示名称"},
+    {"name":"sale_price","cn":"销售单价","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"SKU 当前零售价（元）"},
+    {"name":"listing_status","cn":"上下架状态","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"ON_SALE-在售 / OFF_SHELF-下架 / SUSPENDED-停售","desc":"商品上下架状态"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWD_MEMBER_PROFILE","fields":[
+    {"name":"member_id","cn":"会员ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"虚构会员唯一标识"},
+    {"name":"member_code","cn":"会员编号","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"对外展示的会员编号"},
+    {"name":"member_level","cn":"会员等级","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"NORMAL-普通 / SILVER-银卡 / GOLD-金卡 / BLACK-黑金","desc":"会员当前等级"},
+    {"name":"phone_masked","cn":"脱敏手机号","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"演示环境脱敏后的手机号"},
+    {"name":"register_time","cn":"注册时间","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"会员注册时刻"},
+    {"name":"join_date","cn":"入会日期","type":"DATE","pk":false,"nullable":false,"part":false,"enum":null,"desc":"成为正式会员的日期"},
+    {"name":"active_flag","cn":"活跃标识","type":"BOOLEAN","pk":false,"nullable":false,"part":false,"enum":null,"desc":"近 30 天是否有消费或登录"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWD_TRADE_ORDER","fields":[
+    {"name":"order_id","cn":"订单ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"虚构订单唯一标识"},
+    {"name":"order_code","cn":"订单编号","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"对外订单号"},
+    {"name":"member_id","cn":"会员ID","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"下单会员标识"},
+    {"name":"store_id","cn":"门店ID","type":"BIGINT","pk":false,"nullable":true,"part":false,"enum":null,"desc":"门店渠道订单关联的门店标识"},
+    {"name":"channel_code","cn":"渠道编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"ONLINE-线上 / STORE-门店 / MINI_APP-小程序 / LIVE-直播","desc":"订单来源渠道"},
+    {"name":"order_status","cn":"订单状态","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"PENDING-待支付 / PAID-已支付 / SHIPPED-已发货 / COMPLETED-已完成 / CANCELED-已取消 / AFTER_SALE-售后中","desc":"订单当前状态"},
+    {"name":"order_amount","cn":"订单金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"订单应付金额（元）"},
+    {"name":"discount_amount","cn":"优惠金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"订单优惠总金额（元）"},
+    {"name":"payment_amount","cn":"实付金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"订单实际支付金额（元）"},
+    {"name":"order_time","cn":"下单时间","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"订单创建时刻"},
+    {"name":"province_code","cn":"省份编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"收货地址所在省份编码"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWD_TRADE_ORDER_ITEM","fields":[
+    {"name":"item_id","cn":"订单明细ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"订单商品明细唯一标识"},
+    {"name":"order_id","cn":"订单ID","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"所属订单标识"},
+    {"name":"sku_id","cn":"商品SKU标识","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"商品 SKU 标识"},
+    {"name":"product_id","cn":"商品ID","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"标准商品标识"},
+    {"name":"item_qty","cn":"购买数量","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"该 SKU 购买件数"},
+    {"name":"item_amount","cn":"明细金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"该 SKU 应付金额（元）"},
+    {"name":"item_discount","cn":"明细优惠","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"该 SKU 优惠金额（元）"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWD_STORE_POS_ORDER","fields":[
+    {"name":"receipt_id","cn":"小票ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"门店小票唯一标识"},
+    {"name":"store_code","cn":"门店编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"虚构门店编码"},
+    {"name":"pos_no","cn":"收银机编号","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"收银 POS 机编号"},
+    {"name":"cashier_code","cn":"收银员编号","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"收银员工编号"},
+    {"name":"receipt_time","cn":"小票时间","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"小票开单时刻"},
+    {"name":"order_amount","cn":"小票金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"小票应收金额（元）"},
+    {"name":"item_count","cn":"商品件数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"小票商品总件数"},
+    {"name":"payment_method","cn":"支付方式","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"CASH-现金 / WECHAT-微信 / ALIPAY-支付宝 / UNIONPAY-银联","desc":"小票支付方式"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWD_INVENTORY_STOCK","fields":[
+    {"name":"stock_id","cn":"库存记录ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"库存明细唯一标识"},
+    {"name":"sku_id","cn":"商品SKU标识","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"商品 SKU 标识"},
+    {"name":"warehouse_code","cn":"仓库编码","type":"VARCHAR(32)","pk":false,"nullable":true,"part":false,"enum":null,"desc":"仓配库存所在仓库编码"},
+    {"name":"store_code","cn":"门店编码","type":"VARCHAR(32)","pk":false,"nullable":true,"part":false,"enum":null,"desc":"门店库存所在门店编码"},
+    {"name":"available_qty","cn":"可售库存","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当前可售库存数量"},
+    {"name":"locked_qty","cn":"锁定库存","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"已锁定待履约数量"},
+    {"name":"stock_status","cn":"库存状态","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"NORMAL-正常 / LOW-低库存 / OUT-缺货","desc":"库存健康状态"},
+    {"name":"stock_time","cn":"库存时点","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"库存记录生效时刻"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWD_MARKETING_INTERACTION","fields":[
+    {"name":"event_id","cn":"互动事件ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"营销互动事件唯一标识"},
+    {"name":"campaign_code","cn":"活动编码","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"营销活动编码"},
+    {"name":"channel_code","cn":"渠道编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"ONLINE-线上 / MINI_APP-小程序 / LIVE-直播","desc":"互动发生渠道"},
+    {"name":"interaction_type","cn":"互动类型","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"EXPOSURE-曝光 / CLICK-点击 / COLLECT-收藏 / SHARE-分享","desc":"互动行为类型"},
+    {"name":"member_id","cn":"会员ID","type":"BIGINT","pk":false,"nullable":true,"part":false,"enum":null,"desc":"参与互动的会员标识"},
+    {"name":"exposure_count","cn":"曝光次数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"本次会话曝光次数"},
+    {"name":"click_count","cn":"点击次数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"本次会话点击次数"},
+    {"name":"event_time","cn":"事件时间","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"互动发生时刻"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWD_FULFILLMENT_PACKAGE","fields":[
+    {"name":"package_id","cn":"包裹ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"履约包裹唯一标识"},
+    {"name":"order_code","cn":"订单编号","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"关联订单号"},
+    {"name":"express_code","cn":"运单号","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"虚构快递运单号"},
+    {"name":"carrier_code","cn":"承运商编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"SF-顺丰 / YTO-圆通 / ZTO-中通 / JDL-京东物流","desc":"承运商编码"},
+    {"name":"route_node","cn":"当前路由节点","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"包裹当前所在物流节点"},
+    {"name":"package_status","cn":"包裹状态","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"CREATED-已创建 / SHIPPED-运输中 / DELIVERING-派送中 / SIGNED-已签收 / EXCEPTION-异常","desc":"包裹履约状态"},
+    {"name":"exception_flag","cn":"异常标识","type":"BOOLEAN","pk":false,"nullable":false,"part":false,"enum":null,"desc":"是否发生物流异常"},
+    {"name":"package_time","cn":"包裹时间","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"包裹状态变更时刻"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWD_SERVICE_RETURN","fields":[
+    {"name":"return_id","cn":"退货单ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"退货申请唯一标识"},
+    {"name":"order_code","cn":"订单编号","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"关联订单号"},
+    {"name":"sku_id","cn":"商品SKU标识","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"退货商品 SKU 标识"},
+    {"name":"return_qty","cn":"退货数量","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"退货商品件数"},
+    {"name":"return_amount","cn":"退款金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"预计退款金额（元）"},
+    {"name":"reason_code","cn":"退货原因","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"QUALITY-质量问题 / NOT_AS_DESC-与描述不符 / CHANGE_MIND-七天无理由 / DAMAGE-破损","desc":"退货原因编码"},
+    {"name":"return_status","cn":"退货状态","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"APPLIED-已申请 / APPROVED-已通过 / REFUNDED-已退款 / REJECTED-已拒绝","desc":"退货流程状态"},
+    {"name":"apply_time","cn":"申请时间","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"退货申请时刻"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWM_PRODUCT_SKU_DETAIL_DI","fields":[
+    {"name":"sku_id","cn":"商品SKU标识","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"商品 SKU 唯一标识"},
+    {"name":"category_code","cn":"类目编码","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"商品所属类目编码"},
+    {"name":"sku_name","cn":"SKU名称","type":"VARCHAR(128)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"SKU 展示名称"},
+    {"name":"sale_price","cn":"销售单价","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当前零售价（元）"},
+    {"name":"cost_price","cn":"成本单价","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当前成本价（元）"},
+    {"name":"gross_margin","cn":"毛利率","type":"NUMERIC(18,4)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"毛利率（小数）"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWM_MEMBER_ACTIVITY_STAT_1D","fields":[
+    {"name":"stat_date","cn":"统计日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"统计日期"},
+    {"name":"member_id","cn":"会员ID","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"会员唯一标识"},
+    {"name":"active_flag","cn":"活跃标识","type":"BOOLEAN","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日是否活跃"},
+    {"name":"login_count","cn":"登录次数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日登录次数"},
+    {"name":"order_count","cn":"下单次数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日有效下单次数"},
+    {"name":"consume_amount","cn":"消费金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日实付金额（元）"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按统计日期分区"}
+  ]},
+  {"table":"DWM_TRADE_ORDER_DETAIL_DI","fields":[
+    {"name":"order_id","cn":"订单ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"订单唯一标识"},
+    {"name":"order_code","cn":"订单编号","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"对外订单号"},
+    {"name":"member_id","cn":"会员ID","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"下单会员标识"},
+    {"name":"store_id","cn":"门店ID","type":"BIGINT","pk":false,"nullable":true,"part":false,"enum":null,"desc":"门店渠道订单门店标识"},
+    {"name":"channel_code","cn":"渠道编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"ONLINE-线上 / STORE-门店 / MINI_APP-小程序 / LIVE-直播","desc":"订单来源渠道"},
+    {"name":"order_status","cn":"订单状态","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"PENDING-待支付 / PAID-已支付 / SHIPPED-已发货 / COMPLETED-已完成 / CANCELED-已取消 / AFTER_SALE-售后中","desc":"订单当前状态"},
+    {"name":"order_amount","cn":"订单金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"订单应付金额（元）"},
+    {"name":"paid_amount","cn":"实付金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"订单实际支付金额（元）"},
+    {"name":"order_time","cn":"下单时间","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"订单创建时刻"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWM_STORE_DAILY_STAT_1D","fields":[
+    {"name":"stat_date","cn":"统计日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"统计日期"},
+    {"name":"store_code","cn":"门店编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"门店编码"},
+    {"name":"order_count","cn":"订单数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日有效订单数"},
+    {"name":"sales_amount","cn":"销售额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日销售金额（元）"},
+    {"name":"member_count","cn":"到店会员数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日消费会员数"},
+    {"name":"avg_receipt_amount","cn":"平均客单价","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日平均小票金额（元）"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按统计日期分区"}
+  ]},
+  {"table":"DWM_INVENTORY_STOCK_SNAP_DD","fields":[
+    {"name":"snap_date","cn":"快照日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"库存快照日期"},
+    {"name":"sku_id","cn":"商品SKU标识","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"商品 SKU 标识"},
+    {"name":"warehouse_code","cn":"仓库编码","type":"VARCHAR(32)","pk":false,"nullable":true,"part":false,"enum":null,"desc":"仓配库存仓库编码"},
+    {"name":"store_code","cn":"门店编码","type":"VARCHAR(32)","pk":false,"nullable":true,"part":false,"enum":null,"desc":"门店库存门店编码"},
+    {"name":"available_qty","cn":"可售库存","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"快照时点可售数量"},
+    {"name":"locked_qty","cn":"锁定库存","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"快照时点锁定数量"},
+    {"name":"stock_status","cn":"库存状态","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"NORMAL-正常 / LOW-低库存 / OUT-缺货","desc":"库存健康状态"},
+    {"name":"snap_time","cn":"快照时点","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"快照生成时刻"}
+  ]},
+  {"table":"DWM_MARKETING_CAMPAIGN_1D","fields":[
+    {"name":"stat_date","cn":"统计日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"统计日期"},
+    {"name":"campaign_code","cn":"活动编码","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"营销活动编码"},
+    {"name":"channel_code","cn":"渠道编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"ONLINE-线上 / MINI_APP-小程序 / LIVE-直播","desc":"活动渠道"},
+    {"name":"exposure_count","cn":"曝光次数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日累计曝光"},
+    {"name":"click_count","cn":"点击次数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日累计点击"},
+    {"name":"order_count","cn":"转化订单数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日活动转化订单数"},
+    {"name":"conversion_rate","cn":"转化率","type":"NUMERIC(18,4)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"点击到订单转化率"},
+    {"name":"cost_amount","cn":"活动成本","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日活动成本（元）"}
+  ]},
+  {"table":"DWM_FULFILLMENT_DELIVERY_1D","fields":[
+    {"name":"stat_date","cn":"统计日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"统计日期"},
+    {"name":"carrier_code","cn":"承运商编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"SF-顺丰 / YTO-圆通 / ZTO-中通 / JDL-京东物流","desc":"承运商编码"},
+    {"name":"package_count","cn":"包裹数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日揽收包裹数"},
+    {"name":"on_time_count","cn":"准时包裹数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日准时送达包裹数"},
+    {"name":"on_time_rate","cn":"准时率","type":"NUMERIC(18,4)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"准时送达比例"},
+    {"name":"avg_delivery_hours","cn":"平均时效","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"平均送达小时数"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按统计日期分区"}
+  ]},
+  {"table":"DWM_SERVICE_AFTER_SALE_1D","fields":[
+    {"name":"stat_date","cn":"统计日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"统计日期"},
+    {"name":"service_type","cn":"服务类型","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"RETURN-退货 / REFUND-退款 / TICKET-工单 / REVIEW-评价","desc":"售后业务类型"},
+    {"name":"ticket_count","cn":"工单数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日受理工单数"},
+    {"name":"resolved_count","cn":"已解决数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日解决工单数"},
+    {"name":"avg_resolve_hours","cn":"平均解决时长","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"平均解决小时数"},
+    {"name":"satisfaction_score","cn":"满意度评分","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日平均满意度"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按统计日期分区"}
+  ]},
+  {"table":"DWS_PRODUCT_LISTING_STATUS_DD","fields":[
+    {"name":"stat_date","cn":"统计日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"统计日期"},
+    {"name":"category_code","cn":"类目编码","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"商品类目编码"},
+    {"name":"listing_status","cn":"上下架状态","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"ON_SALE-在售 / OFF_SHELF-下架 / SUSPENDED-停售","desc":"商品上下架状态"},
+    {"name":"sku_count","cn":"SKU数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"该状态下 SKU 数"},
+    {"name":"on_sale_count","cn":"在售SKU数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"在售 SKU 数"},
+    {"name":"off_sale_count","cn":"下架SKU数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"下架 SKU 数"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按统计日期分区"}
+  ]},
+  {"table":"DWS_PRODUCT_SKU_DETAIL_DI","fields":[
+    {"name":"sku_id","cn":"商品SKU标识","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"商品 SKU 唯一标识"},
+    {"name":"category_code","cn":"类目编码","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"商品所属类目编码"},
+    {"name":"sku_name","cn":"SKU名称","type":"VARCHAR(128)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"SKU 展示名称"},
+    {"name":"sale_price","cn":"销售单价","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当前零售价（元）"},
+    {"name":"cost_price","cn":"成本单价","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当前成本价（元）"},
+    {"name":"sales_qty","cn":"销量","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日销量"},
+    {"name":"sales_amount","cn":"销售额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日销售额（元）"},
+    {"name":"gross_margin","cn":"毛利率","type":"NUMERIC(18,4)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"毛利率（小数）"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWS_MEMBER_PROFILE_FULL_DD","fields":[
+    {"name":"member_id","cn":"会员ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"会员唯一标识"},
+    {"name":"member_code","cn":"会员编号","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"对外会员编号"},
+    {"name":"member_level","cn":"会员等级","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"NORMAL-普通 / SILVER-银卡 / GOLD-金卡 / BLACK-黑金","desc":"会员当前等级"},
+    {"name":"join_date","cn":"入会日期","type":"DATE","pk":false,"nullable":false,"part":false,"enum":null,"desc":"入会日期"},
+    {"name":"register_channel","cn":"注册渠道","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"ONLINE-线上 / STORE-门店 / MINI_APP-小程序","desc":"注册来源渠道"},
+    {"name":"total_consume_amount","cn":"累计消费金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"累计实付金额（元）"},
+    {"name":"last_active_date","cn":"最近活跃日期","type":"DATE","pk":false,"nullable":false,"part":false,"enum":null,"desc":"最近一次活跃日期"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按全量日期分区"}
+  ]},
+  {"table":"DWS_MEMBER_ACTIVITY_STAT_1D","fields":[
+    {"name":"stat_date","cn":"统计日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"统计日期"},
+    {"name":"member_level","cn":"会员等级","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"NORMAL-普通 / SILVER-银卡 / GOLD-金卡 / BLACK-黑金","desc":"会员等级分组"},
+    {"name":"active_member_count","cn":"活跃会员数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日活跃会员数"},
+    {"name":"new_member_count","cn":"新增会员数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日新增会员数"},
+    {"name":"repurchase_count","cn":"复购会员数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日复购会员数"},
+    {"name":"repurchase_rate","cn":"复购率","type":"NUMERIC(18,4)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"复购会员占比"},
+    {"name":"avg_order_count","cn":"人均订单数","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"活跃会员人均订单数"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按统计日期分区"}
+  ]},
+  {"table":"DWS_TRADE_SALES_STAT_1D","fields":[
+    {"name":"stat_date","cn":"统计日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"统计日期"},
+    {"name":"channel_code","cn":"渠道编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"ONLINE-线上 / STORE-门店 / MINI_APP-小程序 / LIVE-直播","desc":"销售渠道"},
+    {"name":"province_code","cn":"省份编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"收货省份编码"},
+    {"name":"order_count","cn":"有效订单数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日有效订单数"},
+    {"name":"sales_amount","cn":"销售额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日实付销售金额（元）"},
+    {"name":"gross_sales_amount","cn":"订单总额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日订单应付总额（元）"},
+    {"name":"discount_amount","cn":"优惠金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日优惠总额（元）"},
+    {"name":"member_count","cn":"消费会员数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日消费会员数"},
+    {"name":"avg_order_amount","cn":"平均客单价","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日平均订单金额（元）"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按统计日期分区"}
+  ]},
+  {"table":"DWS_TRADE_ORDER_DETAIL_DI","fields":[
+    {"name":"order_id","cn":"订单ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"订单唯一标识"},
+    {"name":"order_code","cn":"订单编号","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"对外订单号"},
+    {"name":"member_id","cn":"会员ID","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"下单会员标识"},
+    {"name":"store_id","cn":"门店ID","type":"BIGINT","pk":false,"nullable":true,"part":false,"enum":null,"desc":"门店渠道订单门店标识"},
+    {"name":"channel_code","cn":"渠道编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"ONLINE-线上 / STORE-门店 / MINI_APP-小程序 / LIVE-直播","desc":"订单来源渠道"},
+    {"name":"order_amount","cn":"订单金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"订单应付金额（元）"},
+    {"name":"paid_amount","cn":"实付金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"订单实际支付金额（元）"},
+    {"name":"order_status","cn":"订单状态","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"PENDING-待支付 / PAID-已支付 / SHIPPED-已发货 / COMPLETED-已完成 / CANCELED-已取消 / AFTER_SALE-售后中","desc":"订单当前状态"},
+    {"name":"order_time","cn":"下单时间","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"订单创建时刻"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWS_STORE_TARGET_PROGRESS_1D","fields":[
+    {"name":"stat_date","cn":"统计日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"统计日期"},
+    {"name":"store_code","cn":"门店编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"门店编码"},
+    {"name":"target_amount","cn":"目标销售额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日销售目标（元）"},
+    {"name":"actual_amount","cn":"实际销售额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日实际销售（元）"},
+    {"name":"achievement_rate","cn":"目标达成率","type":"NUMERIC(18,4)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"实际与目标之比"},
+    {"name":"rank","cn":"达成排名","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日门店达成率排名"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按统计日期分区"}
+  ]},
+  {"table":"DWS_INVENTORY_STOCK_SNAP_DD","fields":[
+    {"name":"snap_date","cn":"快照日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"库存快照日期"},
+    {"name":"sku_id","cn":"商品SKU标识","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"商品 SKU 标识"},
+    {"name":"store_code","cn":"门店编码","type":"VARCHAR(32)","pk":false,"nullable":true,"part":false,"enum":null,"desc":"门店库存门店编码"},
+    {"name":"warehouse_code","cn":"仓库编码","type":"VARCHAR(32)","pk":false,"nullable":true,"part":false,"enum":null,"desc":"仓配库存仓库编码"},
+    {"name":"available_qty","cn":"可售库存","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"快照时点可售数量"},
+    {"name":"locked_qty","cn":"锁定库存","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"快照时点锁定数量"},
+    {"name":"safety_stock_qty","cn":"安全库存","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"安全库存阈值"},
+    {"name":"stock_status","cn":"库存状态","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"NORMAL-正常 / LOW-低库存 / OUT-缺货","desc":"库存健康状态"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按快照日期分区"}
+  ]},
+  {"table":"DWS_MARKETING_CONVERSION_STAT_1D","fields":[
+    {"name":"stat_date","cn":"统计日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"统计日期"},
+    {"name":"campaign_code","cn":"活动编码","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"营销活动编码"},
+    {"name":"channel_code","cn":"渠道编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"ONLINE-线上 / MINI_APP-小程序 / LIVE-直播","desc":"活动渠道"},
+    {"name":"exposure_count","cn":"曝光次数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日累计曝光"},
+    {"name":"click_count","cn":"点击次数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日累计点击"},
+    {"name":"order_count","cn":"转化订单数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日活动转化订单数"},
+    {"name":"conversion_rate","cn":"转化率","type":"NUMERIC(18,4)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"点击到订单转化率"},
+    {"name":"roi","cn":"投入产出比","type":"NUMERIC(18,4)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"活动 ROI"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按统计日期分区"}
+  ]},
+  {"table":"DWS_FULFILLMENT_DELIVERY_STAT_1D","fields":[
+    {"name":"stat_date","cn":"统计日期","type":"DATE","pk":true,"nullable":false,"part":false,"enum":null,"desc":"统计日期"},
+    {"name":"channel_code","cn":"渠道编码","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"ONLINE-线上 / STORE-门店 / MINI_APP-小程序 / LIVE-直播","desc":"销售渠道"},
+    {"name":"package_count","cn":"包裹数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日揽收包裹数"},
+    {"name":"on_time_count","cn":"准时包裹数","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"当日准时送达包裹数"},
+    {"name":"on_time_rate","cn":"准时率","type":"NUMERIC(18,4)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"准时送达比例"},
+    {"name":"avg_delivery_hours","cn":"平均时效","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"平均送达小时数"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按统计日期分区"}
+  ]},
+  {"table":"DWS_FULFILLMENT_ROUTE_EVENT_DI","fields":[
+    {"name":"event_id","cn":"路由事件ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"物流路由事件唯一标识"},
+    {"name":"package_id","cn":"包裹ID","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"包裹标识"},
+    {"name":"express_code","cn":"运单号","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"虚构快递运单号"},
+    {"name":"route_node","cn":"路由节点","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"事件发生物流节点"},
+    {"name":"event_status","cn":"事件状态","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"NORMAL-正常 / DELAY-延误 / DAMAGE-破损 / LOST-丢失","desc":"路由事件状态"},
+    {"name":"exception_flag","cn":"异常标识","type":"BOOLEAN","pk":false,"nullable":false,"part":false,"enum":null,"desc":"是否为异常事件"},
+    {"name":"exception_type","cn":"异常类型","type":"VARCHAR(32)","pk":false,"nullable":true,"part":false,"enum":"DELAY-延误 / DAMAGE-破损 / LOST-丢失 / ADDRESS_ERROR-地址异常","desc":"异常细分类型"},
+    {"name":"event_time","cn":"事件时间","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"路由事件发生时刻"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWS_SERVICE_RETURN_REQUEST_DI","fields":[
+    {"name":"return_id","cn":"退货单ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"退货申请唯一标识"},
+    {"name":"order_code","cn":"订单编号","type":"VARCHAR(64)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"关联订单号"},
+    {"name":"sku_id","cn":"商品SKU标识","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"退货商品 SKU 标识"},
+    {"name":"return_qty","cn":"退货数量","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"退货商品件数"},
+    {"name":"return_amount","cn":"退款金额","type":"NUMERIC(18,2)","pk":false,"nullable":false,"part":false,"enum":null,"desc":"退款金额（元）"},
+    {"name":"reason_code","cn":"退货原因","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"QUALITY-质量问题 / NOT_AS_DESC-与描述不符 / CHANGE_MIND-七天无理由 / DAMAGE-破损","desc":"退货原因编码"},
+    {"name":"return_status","cn":"退货状态","type":"VARCHAR(32)","pk":false,"nullable":false,"part":false,"enum":"APPLIED-已申请 / APPROVED-已通过 / REFUNDED-已退款 / REJECTED-已拒绝","desc":"退货流程状态"},
+    {"name":"apply_time","cn":"申请时间","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"退货申请时刻"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]},
+  {"table":"DWS_SERVICE_REVIEW_DI","fields":[
+    {"name":"review_id","cn":"评价ID","type":"BIGINT","pk":true,"nullable":false,"part":false,"enum":null,"desc":"商品评价唯一标识"},
+    {"name":"sku_id","cn":"商品SKU标识","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"被评价商品 SKU 标识"},
+    {"name":"member_id","cn":"会员ID","type":"BIGINT","pk":false,"nullable":false,"part":false,"enum":null,"desc":"评价会员标识"},
+    {"name":"rating_score","cn":"评分","type":"INTEGER","pk":false,"nullable":false,"part":false,"enum":null,"desc":"1-5 星评分"},
+    {"name":"review_content","cn":"评价内容","type":"TEXT","pk":false,"nullable":true,"part":false,"enum":null,"desc":"评价文本内容"},
+    {"name":"review_time","cn":"评价时间","type":"TIMESTAMP","pk":false,"nullable":false,"part":false,"enum":null,"desc":"评价提交时刻"},
+    {"name":"dt","cn":"数据日期分区","type":"DATE","pk":false,"nullable":false,"part":true,"enum":null,"desc":"按业务日期分区"}
+  ]}
+]

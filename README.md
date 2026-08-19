@@ -73,15 +73,104 @@ trace field/table mappings, and maintain word roots, indicators, and upstream/do
 
 ## 📸 项目预览
 
-> 界面截图计划在后续版本中基于虚构零售演示数据（`demo/datasets/`）补充拍摄后再恢复本节引用。
-> 当前可直接体验：`demo/datasets/`（全渠道零售虚构数据）与前端 mock 模式
-> （`VITE_API_MODE=mock`，演示登录 `admin / admin123`）。
+> 以下截图来自 **Community Demo**（虚构零售数据 `demo/datasets/`）真实运行的 DB → Service → API → 前端链路，
+> 无任何前端假数据。完整截图见 [docs/screenshots.md](./docs/screenshots.md)。
+
+### 资产门户总览
+
+![资产门户总览](./docs/images/demo-portal-overview.png)
+
+### 数据资产（主题表）
+
+![数据资产列表](./docs/images/demo-data-assets.png)
+
+### 表资产详情与字段元数据
+
+![表资产详情](./docs/images/demo-table-detail.png)
+
+### 统一搜索：一个关键词跨多种资产
+
+![统一搜索](./docs/images/demo-global-search.png)
+
+---
+
+## 🧪 Community Demo（完整演示环境）
+
+Community Demo 是一套**完全虚构的全渠道零售数据治理演示环境**：克隆、初始化、启动后即可在浏览器中
+看到内容完整、关系合理、适合公开截图与新人体验的演示数据。所有数据均真实写入数据库，
+经正常 Service / API / 前端链路展示，前端无任何写死的演示假数据。
+
+### 演示数据是什么
+
+虚构企业「星河零售集团（Nova Retail）」的全渠道零售数据资产：
+
+| 资产 | 数量 | 说明 |
+|------|------|------|
+| 业务系统 / 数据源 | 8 + 8 | 会员、商品、订单、门店、库存、营销、履约、售后 |
+| 主题表 | 30 | DWD / DWM / DWS 三层，覆盖 8 个主题域 |
+| 字段 | 251 | 含中文名、类型、主键、分区、枚举与描述 |
+| 数据标准（词根） | 40 | 零售标准词根 |
+| 指标 | 16 | 每个指标的结果表均存在于主题表清单 |
+| 字段映射 | 8 张源表 / 48 字段 | 源表 → DWD 目标表 |
+| API 资产 | 10 | 虚构零售数据开放 API |
+| 参数字典 | 9 类 / 33 项 | 订单状态、渠道、会员等级等 |
+| 指标路径 | 10 | 零售经营分析路径树 |
+
+> 所有系统、表、字段、指标、标签均为虚构，不包含任何真实银行、公司、员工、账号、
+> IP、数据库地址或业务数据；`demo/validate_demo_data.py --strict`（Public Data Guard）
+> 持续保证仓库 BLOCKER = 0、SUSPICIOUS = 0。
+
+### 如何初始化（SQLite，零依赖）
+
+```bash
+# 1. 后端依赖
+python -m venv backend/.venv
+source backend/.venv/bin/activate          # Windows: .\backend\.venv\Scripts\Activate.ps1
+pip install -r backend/requirements.txt
+
+# 2. 复制模板并设置必填的随机 Session 密钥
+cp backend/.env.example backend/.env.local
+# backend/.env.local 中设置：
+#   FLASK_SECRET_KEY=<generate-a-strong-random-value>
+#   FLASK_ENV=development
+#   ASSET_RUNTIME_PROFILE=community          # 加载 backend/configs/community.yaml
+#   ASSET_DB_PROFILE=community_sqlite        # 对应 backend/configs/database.community.yaml
+#   ASSET_DB_DATABASE=<绝对路径>/community.db
+
+# 3. 初始化数据库（受管迁移 → Community Demo seed）
+python backend/scripts/schema_migrate.py apply --profile community_sqlite
+python demo/seed_sqlite.py --database <绝对路径>/community.db
+
+# 4. 启动后端（默认 127.0.0.1:5099）
+python backend/run.py
+
+# 5. 前端以 remote 模式连接后端
+cp frontend/.env.example frontend/.env.local
+# frontend/.env.local 中设置：VITE_API_MODE=remote
+npm --prefix frontend run dev
+```
+
+打开浏览器访问前端地址，使用演示管理员账号登录：`community_demo / demo-change-me`。
+
+### 如何重置 Demo
+
+删除数据库文件后重新执行第 3 步即可恢复出厂演示数据；seed 使用固定主键 + `INSERT OR IGNORE`
+（SQLite）/ `ON CONFLICT DO NOTHING`（PostgreSQL），**可安全重复执行，不会追加重复数据**。
+
+### 支持什么数据库
+
+- **SQLite**：零依赖，Community 本地演示 / 开发 / CI 主路径（已验证）。
+- **PostgreSQL**：`schema_migrate.py apply --profile community_postgres` 后执行
+  `python demo/seed_postgres.py --dialect postgres`（输出 SQL 到目标库）；CI 已在 PostgreSQL 16
+  上验证 fresh migration → seed → 集成测试链路。
+- **GaussDB / DWS**：`--dialect dws` 渲染语法，未接入真实环境验证。
 
 ---
 
 ## 📑 目录
 
 - [快速开始](#-快速开始)
+- [Community Demo（完整演示环境）](#-community-demo完整演示环境)
 - [功能模块](#-功能模块)
 - [界面预览](#-界面预览)
 - [架构](#-架构)
@@ -99,6 +188,8 @@ trace field/table mappings, and maintain word roots, indicators, and upstream/do
 ## 🚀 快速开始
 
 > 推荐**首次体验先用纯 mock 模式**：无需数据库、无需后端，前端开箱即跑（演示登录 `admin / admin123`）。
+> ⚠️ mock 模式仅用于前端开发与零依赖体验，数据不落库；需要完整演示数据链路时请走
+> [Community Demo](#-community-demo完整演示环境)。
 
 **环境要求：** Node.js 22.13+（推荐 24）· npm 10+。
 
@@ -437,6 +528,7 @@ v0.1.0 当前**不包含**以下能力，欢迎讨论与共建：
 | [资产风险联动设计](./docs/asset-risk-integration-design.md) | 当前风险展示边界与外部审计接入提案 |
 | [智能问数与语义推荐](./docs/semantic-recommendation-roadmap.md) | 问数底座定位、技术候选与落地前置条件 |
 | [待确认事项](./docs/todo.md) | 当前尚未完成或待决策事项 |
+| [界面截图画廊](./docs/screenshots.md) | Community Demo 全量界面截图 |
 | [更新日志](./CHANGELOG.md) | 阶段性变更 |
 | [贡献指南](./CONTRIBUTING.md) | 参与共建 |
 

@@ -39,9 +39,20 @@ from .operation_log_service import (
 
 INDICATOR_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-ALLOWED_DIMENSIONS = {"cus", "con", "due", "emp", "org"}
-DIMENSION_CODE_MAP = {"CUS": "cus", "CON": "con", "DUE": "due", "EMP": "emp", "ORG": "org"}
-DIMENSION_LABEL_MAP = {"客户维度": "cus", "合同维度": "con", "借据维度": "due", "员工维度": "emp", "机构维度": "org"}
+ALLOWED_DIMENSIONS = {
+    "cus", "con", "due", "emp", "org",  # finance/corporate dimensions
+    "prd", "mem", "ord", "str", "inv", "mkt", "ful", "svc",  # retail demo dimensions
+}
+DIMENSION_CODE_MAP = {
+    "CUS": "cus", "CON": "con", "DUE": "due", "EMP": "emp", "ORG": "org",
+    "PRD": "prd", "MEM": "mem", "ORD": "ord", "STR": "str",
+    "INV": "inv", "MKT": "mkt", "FUL": "ful", "SVC": "svc",
+}
+DIMENSION_LABEL_MAP = {
+    "客户维度": "cus", "合同维度": "con", "借据维度": "due", "员工维度": "emp", "机构维度": "org",
+    "商品维度": "prd", "会员维度": "mem", "交易维度": "ord", "门店维度": "str",
+    "库存维度": "inv", "营销维度": "mkt", "履约维度": "ful", "售后维度": "svc",
+}
 DEFAULT_STATUS = {"enabled", "disabled"}
 TABLE_INDICATOR_ITEM = "dwp.p_indicator_item"
 TABLE_INDICATOR_CHANGE_LOG = "dwp.p_indicator_change_log"
