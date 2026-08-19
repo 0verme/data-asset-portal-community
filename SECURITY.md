@@ -18,8 +18,8 @@ in an older release, please report it and we will evaluate backporting.
 the vulnerability to everyone before it is fixed.
 
 Please report privately through **GitHub Security Advisories**. Use the
-   *Report a vulnerability* button on the repository's
-   **Security** tab (private, visible only to maintainers).
+*Report a vulnerability* button on the repository's **Security** tab
+(private, visible only to maintainers).
 
 The project does not currently advertise an alternative private security
 inbox. If GitHub's private reporting form is temporarily unavailable, do not
