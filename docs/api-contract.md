@@ -1,4 +1,4 @@
-# 见远而行数据资产管理与血缘分析软件 API 契约
+# 数据资产门户 API 契约
 
 > 本文是 `data-asset-portal` 的**唯一 API 主文档**，描述全部后端接口的统一约定与各模块端点。
 > 模块的页面、数据表对照见 [modules.md](./modules.md)；本文与实现以 `backend/app/routes/` 和前端 `frontend/src/api/` 为准。

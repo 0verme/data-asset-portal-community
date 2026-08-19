@@ -1,6 +1,6 @@
 # 贡献指南 · Contributing
 
-感谢你对见远而行数据资产管理与血缘分析软件的关注！欢迎通过 Issue 与 Pull Request 参与共建。
+感谢你对数据资产门户的关注！欢迎通过 Issue 与 Pull Request 参与共建。
 
 ## 提交 Issue
 

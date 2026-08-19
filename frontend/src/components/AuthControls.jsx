@@ -89,11 +89,11 @@ export function LoginModal({ open, busy, error, onClose, onSubmit }) {
         </button>
         <div className="login-brand">
           <div className="brand-mark auth-brand-mark">
-            <img src="/brand-icon.svg?v=20260609" alt="见远而行" />
+            <img src="/brand-icon.svg?v=20260609" alt="数据资产门户" />
           </div>
           <div>
-            <div className="lb-name">见远而行</div>
-            <div className="lb-sub">Horizon Joins Journey</div>
+            <div className="lb-name">数据资产门户</div>
+            <div className="lb-sub">Data Asset Portal</div>
           </div>
         </div>
         <h2 className="login-title">管理员登录</h2>

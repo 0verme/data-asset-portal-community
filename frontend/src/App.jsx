@@ -702,7 +702,7 @@ export default function App() {
 
           <div className="brand" onClick={() => switchModule("portal")}>
             <div className="brand-mark">
-              <img src="/brand-icon.svg?v=20260609" alt="见远而行" />
+              <img src="/brand-icon.svg?v=20260609" alt="数据资产门户" />
             </div>
             <div className="brand-name">数据资产门户<small>Data Asset Portal</small></div>
           </div>
