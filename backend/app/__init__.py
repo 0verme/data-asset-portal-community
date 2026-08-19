@@ -18,10 +18,25 @@ import logging
 
 from flask import Flask, g, jsonify
 from flask_cors import CORS
+from werkzeug.exceptions import HTTPException
 
 from .logging_config import configure_logging
 from .settings import get_auth_session_days, get_flask_runtime_config
 from .services.operation_log_service import REQUEST_START_KEY
+
+
+# Stable, non-leaking client-facing copy for framework-level HTTP errors that
+# would otherwise return Flask's default English HTML pages.
+_HTTP_ERROR_COPY = {
+    400: "请求参数不合法",
+    401: "未授权，请先登录",
+    403: "无权限执行此操作",
+    404: "请求的资源不存在",
+    405: "请求方法不被允许",
+    413: "请求体过大",
+    415: "不支持的媒体类型",
+    429: "请求过于频繁，请稍后再试",
+}
 
 
 def create_app(*, capabilities=None):
@@ -85,6 +100,18 @@ def create_app(*, capabilities=None):
             resources={r"/api/*": {"origins": cors_origins}},
             supports_credentials=True,
         )
+
+    @app.after_request
+    def _apply_security_headers(response):
+        for header, value in app.config.get("SECURITY_HEADERS", {}).items():
+            response.headers.setdefault(header, value)
+        return response
+
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(error):
+        code = error.code if isinstance(error.code, int) else 500
+        message = _HTTP_ERROR_COPY.get(code, str(error.description or "").strip() or "请求失败")
+        return jsonify({"error": {"code": "HTTP_%d" % code, "message": message}}), code
 
     @app.errorhandler(404)
     def handle_not_found(_error):

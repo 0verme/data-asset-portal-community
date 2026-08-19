@@ -63,13 +63,13 @@ class FieldMappingService:
         try:
             columns, rows = fetch_all(self._profile(), sql)
         except FileNotFoundError as error:
-            raise FieldMappingDataSourceError(f"database config file not found: {error.filename}") from error
+            raise FieldMappingDataSourceError("数据库配置文件不存在") from error
         except KeyError as error:
-            raise FieldMappingDataSourceError(str(error)) from error
+            raise FieldMappingDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except RuntimeError as error:
-            raise FieldMappingDataSourceError(str(error)) from error
+            raise FieldMappingDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
-            raise FieldMappingDataSourceError(f"database query failed: {error}") from error
+            raise FieldMappingDataSourceError("数据库查询失败") from error
         return [dict(zip(columns, row)) for row in rows]
 
     def _fetch_rows_logged(self, sql, *, purpose, method, page=None, page_size=None, keyword=None):

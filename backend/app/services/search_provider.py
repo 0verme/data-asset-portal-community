@@ -84,13 +84,13 @@ class KeywordSearchProvider(SearchProvider):
         try:
             columns, rows = fetch_all(self._profile(), sql, params=params)
         except FileNotFoundError as error:
-            raise SearchDataSourceError(f"Database config file not found: {error.filename}") from error
+            raise SearchDataSourceError("数据库配置文件不存在") from error
         except KeyError as error:
-            raise SearchDataSourceError(str(error)) from error
+            raise SearchDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except RuntimeError as error:
-            raise SearchDataSourceError(str(error)) from error
+            raise SearchDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
-            raise SearchDataSourceError(f"Database query failed: {error}") from error
+            raise SearchDataSourceError("数据库查询失败") from error
         return [dict(zip(columns, row)) for row in rows]
 
     @contextmanager
@@ -100,13 +100,13 @@ class KeywordSearchProvider(SearchProvider):
             conn = connect_with_profile(self._profile())
             yield conn
         except FileNotFoundError as error:
-            raise SearchDataSourceError(f"Database config file not found: {error.filename}") from error
+            raise SearchDataSourceError("数据库配置文件不存在") from error
         except KeyError as error:
-            raise SearchDataSourceError(str(error)) from error
+            raise SearchDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except RuntimeError as error:
-            raise SearchDataSourceError(str(error)) from error
+            raise SearchDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
-            raise SearchDataSourceError(f"Database query failed: {error}") from error
+            raise SearchDataSourceError("数据库查询失败") from error
         finally:
             try:
                 if conn is not None:
@@ -129,7 +129,7 @@ class KeywordSearchProvider(SearchProvider):
         except SearchDataSourceError:
             raise
         except Exception as error:
-            raise SearchDataSourceError(f"Database query failed: {error}") from error
+            raise SearchDataSourceError("数据库查询失败") from error
         finally:
             try:
                 if curs is not None:
@@ -219,13 +219,13 @@ class KeywordSearchProvider(SearchProvider):
         try:
             return get_enabled_module_codes()
         except Exception as error:
-            raise SearchDataSourceError(f"Module capability query failed: {error}") from error
+            raise SearchDataSourceError("搜索服务暂不可用，请稍后重试") from error
 
     def _enabled_menu_codes(self):
         try:
             return system_management_service.get_enabled_menu_codes()
         except Exception as error:
-            raise SearchDataSourceError(f"Menu visibility query failed: {error}") from error
+            raise SearchDataSourceError("搜索服务暂不可用，请稍后重试") from error
 
     def _registered_configs(self):
         """Configs for capability-enabled modules only — never query disabled tables."""

@@ -113,6 +113,16 @@ def get_flask_debug() -> bool:
     return parse_bool(os.getenv("FLASK_DEBUG"))
 
 
+def get_trust_proxy_headers() -> bool:
+    """Return whether the app trusts client-supplied proxy/forwarded headers.
+
+    Security default is ``False``. Reverse-proxy deployments (Nginx) that want
+    accurate client IPs in audit logs must explicitly opt in, so that a client
+    cannot forge ``X-Forwarded-For`` on a direct connection.
+    """
+    return parse_bool(os.getenv("ASSET_TRUST_PROXY_HEADERS"))
+
+
 def get_flask_runtime_config() -> dict[str, object]:
     """Build the small, security-sensitive Flask configuration surface."""
     secret_key = os.getenv("FLASK_SECRET_KEY")
@@ -122,12 +132,26 @@ def get_flask_runtime_config() -> dict[str, object]:
         )
 
     environment = os.getenv("FLASK_ENV", "production").strip().lower()
+    if environment == "production" and get_flask_debug():
+        raise RuntimeError(
+            "FLASK_DEBUG must be disabled in production; the Werkzeug debugger must never run there."
+        )
+
+    max_content_length = (
+        get_int_env("FLASK_MAX_CONTENT_LENGTH_MB", 16, minimum=1, maximum=512) * 1024 * 1024
+    )
     return {
         "SECRET_KEY": secret_key,
         "SESSION_COOKIE_HTTPONLY": True,
         "SESSION_COOKIE_SAMESITE": "Lax",
         "SESSION_COOKIE_SECURE": environment != "development",
         "CORS_ORIGINS": parse_comma_separated_values(os.getenv("FLASK_CORS_ORIGINS")),
+        "MAX_CONTENT_LENGTH": max_content_length,
+        "SECURITY_HEADERS": {
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "SAMEORIGIN",
+            "Referrer-Policy": "strict-origin-when-cross-origin",
+        },
     }
 
 

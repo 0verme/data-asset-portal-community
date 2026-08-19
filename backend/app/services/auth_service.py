@@ -88,7 +88,7 @@ class AuthService:
         try:
             columns, rows = fetch_all(selected_profile, sql)
         except Exception as error:
-            raise AuthDataSourceError(f"认证查询失败: {error}") from error
+            raise AuthDataSourceError("认证服务暂不可用，请稍后重试") from error
         return [dict(zip(columns, row)) for row in rows]
 
     def _fetch_user(self, username: str) -> dict | None:
@@ -128,7 +128,7 @@ WHERE username = {self._quote(normalized_user)}
 """.strip(),
             )
         except Exception as error:
-            raise AuthDataSourceError(f"更新登录时间失败: {error}") from error
+            raise AuthDataSourceError("认证服务暂不可用，请稍后重试") from error
 
         return {
             "role": user.get("role") if user.get("role") in {ADMIN_ROLE, MAINTAINER_ROLE} else ADMIN_ROLE,

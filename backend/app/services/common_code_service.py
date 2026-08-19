@@ -128,13 +128,13 @@ class CommonCodeService:
         try:
             columns, rows = fetch_all(self._profile(), sql)
         except FileNotFoundError as error:
-            raise CommonCodeDataSourceError(f"Database config file not found: {error.filename}") from error
+            raise CommonCodeDataSourceError("数据库配置文件不存在") from error
         except KeyError as error:
-            raise CommonCodeDataSourceError(str(error)) from error
+            raise CommonCodeDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except RuntimeError as error:
-            raise CommonCodeDataSourceError(str(error)) from error
+            raise CommonCodeDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
-            raise CommonCodeDataSourceError(f"Database query failed: {error}") from error
+            raise CommonCodeDataSourceError("数据库查询失败") from error
         return [dict(zip(columns, row)) for row in rows]
 
     def _quote(self, value):

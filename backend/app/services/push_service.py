@@ -153,13 +153,13 @@ class PushService:
         try:
             columns, rows = fetch_all(self._db_profile or resolve_db_profile_name(), sql)
         except FileNotFoundError as error:
-            raise PushDataSourceError(f"数据库配置文件不存在: {error.filename}") from error
+            raise PushDataSourceError("数据库配置文件不存在") from error
         except KeyError as error:
-            raise PushDataSourceError(str(error)) from error
+            raise PushDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except RuntimeError as error:
-            raise PushDataSourceError(str(error)) from error
+            raise PushDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
-            raise PushDataSourceError(f"数据库查询失败: {error}") from error
+            raise PushDataSourceError("数据库查询失败") from error
         return [dict(zip(columns, row)) for row in rows]
 
     def _fetch_rows_logged(self, sql, *, purpose, method, page=None, page_size=None, keyword=None):
@@ -182,13 +182,13 @@ class PushService:
         try:
             return execute_statements(self._db_profile or resolve_db_profile_name(), statements)
         except FileNotFoundError as error:
-            raise PushDataSourceError(f"数据库配置文件不存在: {error.filename}") from error
+            raise PushDataSourceError("数据库配置文件不存在") from error
         except KeyError as error:
-            raise PushDataSourceError(str(error)) from error
+            raise PushDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except RuntimeError as error:
-            raise PushDataSourceError(str(error)) from error
+            raise PushDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
-            raise PushDataSourceError(f"数据库执行失败: {error}") from error
+            raise PushDataSourceError("数据库执行失败") from error
 
     def _quote(self, value):
         if value is None:

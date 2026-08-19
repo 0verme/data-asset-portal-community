@@ -52,13 +52,13 @@ class ApiAssetService:
             columns, rows = fetch_all(self._profile_name(), sql, params=params)
             return [dict(zip(columns, row)) for row in rows]
         except Exception as error:
-            raise ApiAssetError(f"Database query failed: {error}") from error
+            raise ApiAssetError("数据库查询失败") from error
 
     def _execute(self, statements):
         try:
             return execute_statements(self._profile_name(), statements)
         except Exception as error:
-            raise ApiAssetError(f"Database execution failed: {error}") from error
+            raise ApiAssetError("数据库执行失败") from error
 
     def _next(self, table, column):
         return int(self._rows(f"SELECT COALESCE(MAX({column}), 0) + 1 AS id FROM {table}")[0]["id"])

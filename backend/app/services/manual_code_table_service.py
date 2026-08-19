@@ -78,9 +78,9 @@ class ManualCodeTableService:
         try:
             columns, rows = fetch_all(self._profile(), sql)
         except (FileNotFoundError, KeyError, RuntimeError) as error:
-            raise ManualCodeTableDataSourceError(str(error)) from error
+            raise ManualCodeTableDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
-            raise ManualCodeTableDataSourceError(f"Database query failed: {error}") from error
+            raise ManualCodeTableDataSourceError("数据库查询失败") from error
         return [dict(zip(columns, row)) for row in rows]
 
     def _execute(self, statements):
@@ -88,9 +88,9 @@ class ManualCodeTableService:
             normalized = [statements] if isinstance(statements, str) else statements
             return execute_statements(self._profile(), normalized)
         except (FileNotFoundError, KeyError, RuntimeError) as error:
-            raise ManualCodeTableDataSourceError(str(error)) from error
+            raise ManualCodeTableDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
-            raise ManualCodeTableDataSourceError(f"Database execution failed: {error}") from error
+            raise ManualCodeTableDataSourceError("数据库执行失败") from error
 
     @staticmethod
     def _quote(value):
