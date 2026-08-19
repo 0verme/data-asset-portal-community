@@ -62,13 +62,15 @@ representative at an online or offline event.
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement.
+Instances of abusive, harassing, or otherwise unacceptable behavior should be
+reported through a dedicated private conduct channel. That channel is still
+being prepared, so the project cannot currently promise private intake for
+conduct reports. GitHub Security Advisories are reserved for software
+vulnerabilities and must not be used for conduct complaints.
 
-Contact the maintainers **privately** through GitHub (the repository owner
-`0verme`); see [SECURITY.md](./SECURITY.md) for the private-reporting channels
-this project supports. Do not post enforcement reports as public issues, and do
-not include secrets or personal data in such reports.
+Until a project conduct channel is published here, use GitHub's platform-level
+reporting and blocking tools for violations of GitHub policy. Do not post
+conduct reports as public Issues, and do not publish personal data.
 
 All complaints will be reviewed and investigated promptly and fairly.
 
@@ -137,8 +139,9 @@ Community Impact Guidelines were inspired by
 ## 中文摘要
 
 本项目承诺为所有参与者提供无骚扰的社区环境。不当行为（骚扰、人身攻击、
-未经许可公开他人隐私信息、其他不专业行为等）可通过 GitHub 私密渠道向维护者
-（仓库所有者 `0verme`）报告——不要公开发 Issue 报告行为问题，也不要附带机密信息。
+未经许可公开他人隐私信息、其他不专业行为等）不应通过公开 Issue 报告。
+项目专用的私密行为投诉渠道尚在筹备；安全漏洞报告渠道不用于行为投诉。
+在专用渠道公布前，对违反 GitHub 平台政策的行为请使用 GitHub 平台的举报与屏蔽工具。
 维护者将依据 Contributor Covenant 2.1 的惩戒阶梯（更正 / 警告 / 临时封禁 / 永久封禁）
 公正处理，并保护举报者的隐私与安全。
 

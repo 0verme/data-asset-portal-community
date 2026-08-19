@@ -17,14 +17,14 @@ in an older release, please report it and we will evaluate backporting.
 **Do not open a public issue** for security problems — a public issue reveals
 the vulnerability to everyone before it is fixed.
 
-Please report privately through one of the channels below:
+Please report privately through **GitHub Security Advisories**. Use the
+*Report a vulnerability* button on the repository's **Security** tab
+(private, visible only to maintainers).
 
-1. **GitHub Security Advisories** — the preferred channel. Use the
-   *Report a vulnerability* button on the repository's
-   **Security** tab (private, visible only to maintainers).
-2. If a private-advisory workflow is not yet available on the repository,
-   open a private support conversation with the maintainers through GitHub's
-   built-in *Security* reporting instead.
+The project does not currently advertise an alternative private security
+inbox. If GitHub's private reporting form is temporarily unavailable, do not
+disclose the vulnerability in an Issue or Discussion; retry the Security tab
+later.
 
 ### What to include
 

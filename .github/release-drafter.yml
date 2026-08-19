@@ -1,0 +1,44 @@
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+categories:
+  - title: "🚀 Features"
+    labels:
+      - "enhancement"
+  - title: "🐛 Bug Fixes"
+    labels:
+      - "bug"
+  - title: "📚 Documentation"
+    labels:
+      - "area/docs"
+  - title: "🧰 Maintenance"
+    labels:
+      - "dependencies"
+      - "area/ci"
+  - title: "📦 Other Changes"
+    labels:
+      - "area/backend"
+      - "area/frontend"
+      - "area/database"
+      - "area/demo"
+change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+change-title-escapes: "\\<*_&"
+version-resolver:
+  major:
+    labels:
+      - "breaking-change"
+  minor:
+    labels:
+      - "enhancement"
+  patch:
+    labels:
+      - "bug"
+      - "dependencies"
+  default: patch
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  ## New Contributors
+
+  $CONTRIBUTORS
