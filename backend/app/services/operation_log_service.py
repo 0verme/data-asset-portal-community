@@ -34,7 +34,7 @@ from ..db.gaussdb import (
     fetch_all,
     resolve_db_profile_name,
 )
-from ..settings import get_page_size_limits
+from ..settings import get_page_size_limits, get_trust_proxy_headers
 
 
 logger = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ class OperationLogService:
         except FileNotFoundError as error:
             raise OperationLogDataSourceError("Database config file not found") from error
         except (KeyError, RuntimeError) as error:
-            raise OperationLogDataSourceError(str(error)) from error
+            raise OperationLogDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
             raise OperationLogDataSourceError("Database query failed") from error
         return [dict(zip(columns, row)) for row in rows]
@@ -130,7 +130,7 @@ class OperationLogService:
         except FileNotFoundError as error:
             raise OperationLogDataSourceError("Database config file not found") from error
         except (KeyError, RuntimeError) as error:
-            raise OperationLogDataSourceError(str(error)) from error
+            raise OperationLogDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
             raise OperationLogDataSourceError("Database execution failed") from error
 
@@ -232,7 +232,14 @@ class OperationLogService:
             return ctx
         ctx["requestMethod"] = (request.method or "")[:16]
         ctx["requestUrl"] = (request.path or "")[:512]
-        forwarded = request.headers.get("X-Forwarded-For", "")
+        # Only honour a client-supplied X-Forwarded-For when the deployment has
+        # explicitly opted in via ASSET_TRUST_PROXY_HEADERS. By default the
+        # header is ignored so a direct client cannot forge the audit IP.
+        forwarded = (
+            request.headers.get("X-Forwarded-For", "")
+            if get_trust_proxy_headers()
+            else ""
+        )
         ctx["ipAddress"] = (forwarded.split(",")[0].strip() if forwarded else (request.remote_addr or ""))[:64]
         ctx["userAgent"] = request.headers.get("User-Agent", "")[:512]
         user = get_session_user()
