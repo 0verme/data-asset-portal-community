@@ -74,23 +74,34 @@ trace field/table mappings, and maintain word roots, indicators, and upstream/do
 ## 📸 项目预览
 
 > 以下截图来自 **Community Demo**（虚构零售数据 `demo/datasets/`）真实运行的 DB → Service → API → 前端链路，
-> 无任何前端假数据。完整截图见 [docs/screenshots.md](./docs/screenshots.md)。
+> 无任何前端假数据。完整界面截图与功能演示见 [docs/screenshots.md](./docs/screenshots.md)。
 
-### 资产门户总览
-
-![资产门户总览](./docs/images/demo-portal-overview.png)
-
-### 数据资产（主题表）
-
-![数据资产列表](./docs/images/demo-data-assets.png)
-
-### 表资产详情与字段元数据
-
-![表资产详情](./docs/images/demo-table-detail.png)
-
-### 统一搜索：一个关键词跨多种资产
-
-![统一搜索](./docs/images/demo-global-search.png)
+<table>
+  <tr>
+    <td width="50%" valign="top" align="center">
+      <img src="./docs/images/demo-global-search.png" alt="资产搜索与发现" width="100%">
+      <br>
+      <sub><b>资产搜索与发现</b></sub>
+    </td>
+    <td width="50%" valign="top" align="center">
+      <img src="./docs/images/demo-data-assets.png" alt="数据资产管理" width="100%">
+      <br>
+      <sub><b>数据资产管理</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top" align="center">
+      <img src="./docs/images/demo-field-metadata.png" alt="字段映射" width="100%">
+      <br>
+      <sub><b>字段映射</b></sub>
+    </td>
+    <td width="50%" valign="top" align="center">
+      <img src="./docs/images/demo-table-detail.png" alt="资产详情" width="100%">
+      <br>
+      <sub><b>资产详情</b></sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
