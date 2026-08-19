@@ -1,15 +1,18 @@
 {
-  "version": 2,
+  "version": 3,
   "theme": "完全虚构的全渠道零售数据治理",
   "datasets": [
     "datasets/systems.json",
     "datasets/data_sources.json",
     "datasets/assets.json",
+    "datasets/fields.json",
     "datasets/roots.json",
     "datasets/indicators.json",
     "datasets/mappings.json",
     "datasets/lineage.json",
     "datasets/api_assets.json",
+    "datasets/common_codes.json",
+    "datasets/indicator_paths.json",
     "datasets/reports.json",
     "datasets/push_systems.json"
   ]
