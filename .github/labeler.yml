@@ -1,0 +1,29 @@
+area/backend:
+  - changed-files:
+      - any-glob-to-any-file: "backend/**"
+
+area/frontend:
+  - changed-files:
+      - any-glob-to-any-file: "frontend/**"
+
+area/database:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "backend/migrations/**"
+          - "backend/**/migration/**"
+          - "backend/**/*schema*"
+          - "backend/**/*.sql"
+
+area/docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**"
+
+area/ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+
+area/demo:
+  - changed-files:
+      - any-glob-to-any-file: "demo/**"
