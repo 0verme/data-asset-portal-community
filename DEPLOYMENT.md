@@ -54,16 +54,31 @@ ASSET_DB_JAR_PATH=/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
 
 ## 二、后端部署
 
+`backend/run.py` 使用 Flask 内建的 development server，**仅用于本地开发/联调**，不作为生产承载。
+生产环境应在 Nginx 反代之后，用生产级 WSGI server（如 `waitress` 或 `gunicorn`）加载
+`backend.run:app` 实例：
+
 ```bash
 cd /opt/data-asset-portal/backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python run.py
+pip install waitress
+# 加载并启动生产 WSGI 实例 (backend/run.py 顶层构建的 app)
+waitress-serve --host=127.0.0.1 --port=5099 --call backend.run:app
 ```
 
-- 默认代码值为 `127.0.0.1:5099`
-- 若提供了 `.env.local` 或系统环境变量，则以环境变量为准
+- 默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）
+- 若提供了 `.env.local` 或系统环境变量，则以环境变量为准；`run.py` 顶层已加载它们
+
+### 安全默认值（生产）
+
+- `FLASK_DEBUG` 默认关闭；**生产环境显式开启 debug 会在启动时失败**（fail-fast），禁止 Werkzeug debugger 运行
+- Session Cookie：`HttpOnly=True`、`SameSite=Lax`、`Secure=True`（仅 `FLASK_ENV=development` 本地 HTTP 开发关闭 `Secure`）
+- 请求体上限：`FLASK_MAX_CONTENT_LENGTH_MB`（默认 16，上限存在时超限返回统一 JSON 413）
+- 响应安全头：`X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy: strict-origin-when-cross-origin`
+- 4xx/5xx 错误响应统一为 JSON 结构，不向客户端泄露内部路径/连接串/底层驱动异常
+- 转发头信任：**默认不受信任**。审计日志如需真实客户端 IP，仅当请求只经受信反代（如 Nginx）时设置 `ASSET_TRUST_PROXY_HEADERS=true`；否则客户端可直接伪造 `X-Forwarded-For`。Nginx 已设置 `X-Forwarded-For` 的同源部署请开启该项
 
 ## 三、前端构建
 
