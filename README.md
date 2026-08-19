@@ -12,6 +12,7 @@ trace field/table mappings, and maintain word roots, indicators, and upstream/do
 ![Backend](https://img.shields.io/badge/Backend-Flask%203-000000)
 ![Database](https://img.shields.io/badge/Database-SQLite%20%7C%20PostgreSQL%20%7C%20GaussDB%2FDWS-336791)
 ![Version](https://img.shields.io/badge/Version-v0.1.0-brightgreen)
+[![CI](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml)
 
 [快速开始](#-快速开始) · [功能模块](#-功能模块) · [架构](#-架构) · [文档](#-文档导航) · [路线图](#-路线图)
 
@@ -72,7 +73,7 @@ trace field/table mappings, and maintain word roots, indicators, and upstream/do
 
 ## 📸 项目预览
 
-> 界面截图将在正式发布前使用虚构零售演示数据（`demo/datasets/`）重新拍摄后补充。
+> 界面截图计划在后续版本中基于虚构零售演示数据（`demo/datasets/`）补充拍摄后再恢复本节引用。
 > 当前可直接体验：`demo/datasets/`（全渠道零售虚构数据）与前端 mock 模式
 > （`VITE_API_MODE=mock`，演示登录 `admin / admin123`）。
 
@@ -103,7 +104,8 @@ trace field/table mappings, and maintain word roots, indicators, and upstream/do
 
 ```bash
 # 1. 克隆并进入项目
-cd data-asset-portal
+git clone https://github.com/0verme/data-asset-portal-community.git
+cd data-asset-portal-community
 
 # 2. 安装前端依赖（lineage-viewer 等为仓库内 npm workspaces，npm ci 从本地源码链接）
 cd frontend
@@ -302,7 +304,7 @@ Nginx 托管 `frontend/dist` 静态产物，并将 `/api` 反代到 Flask。
 ## 📂 项目结构
 
 ```text
-data-asset-portal/
+data-asset-portal-community/
 ├── frontend/                 # React + Vite 单页应用（npm workspace root）
 │   ├── packages/             # 内置 npm workspaces：lineage-viewer 三包源码（前端直接构建，无需外部 npm 包）
 │   │   ├── lineage-viewer/            # lineage-viewer 核心 Web Component
@@ -348,6 +350,14 @@ data-asset-portal/
 ---
 
 ## ❓ 常见问题
+
+<details>
+<summary>支持哪些数据库？验证到什么程度？</summary>
+
+- **SQLite**：Community 本地演示 / 开发 / CI 使用，迁移 → seed → 重复应用（no-op）已完整验证。
+- **PostgreSQL**：Community 与可选模块的主要目标库，CI 上通过 GitHub PostgreSQL 16 集成（fresh migration → seed → integration → repeat apply no-op）验证。
+- **GaussDB / DWS**：迁移脚本兼容性通过静态验证（`schema_migrate.py verify --offline --dialect dws`），迁移方言与 `docs/dws/` 模块 DDL 均已提供；但当前不存在真实的公共 DWS 云端集成环境，端到端集成不在 CI 中，尚未标记为 Fully Verified。
+</details>
 
 <details>
 <summary>如何判断当前是 mock 还是 remote 模式？</summary>

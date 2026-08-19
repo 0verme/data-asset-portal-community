@@ -97,7 +97,12 @@ Community 边界（`backend/configs/community.yaml`）把以下 4 个模块标�
 **Decision：ALLOW IN PUBLIC REPO**
 
 `upstream` / `report` / `push` / `codeTable` 四个模块的源码**随公开仓库提供**，
-Edition 策略为 **Source Available but Disabled**：
+Edition 策略为 **Open Source but Disabled in Community Edition**（开源但 Community 版默认禁用）：
+
+这里明确区分两个独立的维度：
+
+- **Source / License 维度**：这些模块的源码包含在公开仓库中，依据仓库 Apache-2.0 License 提供，用户可以查看、修改、分发源码。
+- **Product Edition / Runtime 维度**：Community Edition 默认 profile 不注册这些模块，对应产品能力默认不可用；这是运行时边界，不是许可证限制。
 
 - 源码随仓库发布（Apache-2.0）；
 - Community 默认 profile（`backend/configs/community.yaml`）**disabled** 这 4 个模块；
@@ -120,7 +125,7 @@ Edition 策略为 **Source Available but Disabled**：
 
 **Private Module Source Publication: ALLOW IN PUBLIC REPO**
 
-Edition Strategy：**Source Available but Disabled**
+Edition Strategy: **Open Source but Disabled in Community Edition**
 
 - 已决定：`upstream` / `report` / `push` / `codeTable` 源码保留在公开仓库。
 - Community 默认 profile：disabled（`backend/configs/community.yaml`）。
