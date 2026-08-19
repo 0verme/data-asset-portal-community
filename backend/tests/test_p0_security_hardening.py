@@ -143,7 +143,7 @@ class ProxyTrustBoundaryTests(unittest.TestCase):
             app.secret_key = _SECRET
             with app.test_request_context(
                 "/api/x",
-                headers={"X-Forwarded-For": "203.0.113.66, 10.0.0.1", "User-Agent": "ua"},
+                headers={"X-Forwarded-For": "203.0.113.66, 198.51.100.1", "User-Agent": "ua"},
                 environ_base={"REMOTE_ADDR": "127.0.0.1"},
             ):
                 ip = operation_log_service._request_context()["ipAddress"]
@@ -151,7 +151,7 @@ class ProxyTrustBoundaryTests(unittest.TestCase):
 
 
 class ErrorSanitizationTests(unittest.TestCase):
-    _SENSITIVE = "[internal] /opt/data-asset-portal secret: password=topsecret host=10.20.30.40"
+    _SENSITIVE = "[internal] /opt/data-asset-portal secret: password=topsecret host=198.51.100.66"
 
     def test_data_source_error_does_not_leak_internal_details(self):
         def _boom(profile, sql, params=None):
@@ -165,7 +165,7 @@ class ErrorSanitizationTests(unittest.TestCase):
                 service._fetch_rows("SELECT 1")
             message = str(ctx.exception)
         self.assertNotIn("topsecret", message)
-        self.assertNotIn("10.20.30.40", message)
+        self.assertNotIn("198.51.100.66", message)
         self.assertNotIn("/opt/data-asset-portal", message)
 
     def test_auth_data_source_error_is_sanitized(self):
@@ -173,7 +173,7 @@ class ErrorSanitizationTests(unittest.TestCase):
         from backend.app.services.auth_service import AuthError, auth_service
 
         def _boom(profile, sql):
-            raise RuntimeError("connect failed host=10.20.30.40 password=topsecret")
+            raise RuntimeError("connect failed host=198.51.100.66 password=topsecret")
 
         with patch("backend.app.services.auth_service.load_db_profiles", return_value={"primary": {"type": "postgres"}}), \
                 patch("backend.app.services.auth_service.fetch_all", side_effect=_boom):
@@ -181,7 +181,7 @@ class ErrorSanitizationTests(unittest.TestCase):
                 auth_service.authenticate("admin", "wrong")
         message = str(ctx.exception)
         self.assertNotIn("topsecret", message)
-        self.assertNotIn("10.20.30.40", message)
+        self.assertNotIn("198.51.100.66", message)
 
 
 class DependencySecurityVersionTests(unittest.TestCase):
