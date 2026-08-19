@@ -131,7 +131,7 @@ FROM dwp.p_lineage_edge WHERE snapshot_id = ? ORDER BY edge_id
     except LineageNoActiveSnapshotError:
         raise
     except Exception as error:
-        raise LineageDataSourceError(f"lineage database graph is unavailable: {error}") from error
+        raise LineageDataSourceError("血缘数据图谱暂不可用，请稍后重试") from error
 
     def decode(value, fallback):
         try: return json.loads(value) if value else fallback

@@ -112,26 +112,26 @@ class SystemManagementService:
         try:
             columns, rows = fetch_all(self._profile(), sql, params=params)
         except FileNotFoundError as error:
-            raise SystemDataSourceError(f"Database config file not found: {error.filename}") from error
+            raise SystemDataSourceError("数据库配置文件不存在") from error
         except KeyError as error:
-            raise SystemDataSourceError(str(error)) from error
+            raise SystemDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except RuntimeError as error:
-            raise SystemDataSourceError(str(error)) from error
+            raise SystemDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
-            raise SystemDataSourceError(f"Database query failed: {error}") from error
+            raise SystemDataSourceError("数据库查询失败") from error
         return [dict(zip(columns, row)) for row in rows]
 
     def _execute(self, sql: str, params=None):
         try:
             return execute_sql(self._profile(), sql, params=params)
         except FileNotFoundError as error:
-            raise SystemDataSourceError(f"Database config file not found: {error.filename}") from error
+            raise SystemDataSourceError("数据库配置文件不存在") from error
         except KeyError as error:
-            raise SystemDataSourceError(str(error)) from error
+            raise SystemDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except RuntimeError as error:
-            raise SystemDataSourceError(str(error)) from error
+            raise SystemDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
-            raise SystemDataSourceError(f"Database execution failed: {error}") from error
+            raise SystemDataSourceError("数据库执行失败") from error
 
     def _now_text(self):
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
