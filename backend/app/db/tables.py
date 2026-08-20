@@ -234,7 +234,6 @@ root_change_log = _table(
     Column("operator_name", String(64), nullable=False),
     Column("change_time", DateTime),
 )
-
 system_table = _table(
     "p_system",
     Column("system_id", Integer, primary_key=True),
