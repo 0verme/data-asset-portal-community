@@ -336,3 +336,37 @@ class ManualCodeTableRequest(ContractModel):
 
 class ManualCodeTableListResponse(ItemsResponse[ManualCodeTableItem]):
     pass
+
+
+class ApiAssetItem(ContractModel):
+    code: str
+    name: str
+    method: str = ""
+    path: str = ""
+    status: str = ""
+    params: list[Any] = Field(default_factory=list)
+    responseFields: list[Any] = Field(default_factory=list)
+    relations: list[Any] = Field(default_factory=list)
+
+
+class ApiAssetRequest(ContractModel):
+    code: str | None = None
+    name: str | None = None
+    method: str | None = None
+    path: str | None = None
+    version: str | None = None
+    systemId: int | str | None = None
+    status: str | None = None
+    ownerDept: str | None = None
+    ownerName: str | None = None
+    maintainerName: str | None = None
+    description: str | None = None
+    remark: str | None = None
+    items: list[dict[str, Any]] | None = None
+    params: list[dict[str, Any]] | None = None
+    responseFields: list[dict[str, Any]] | None = None
+    relations: list[dict[str, Any]] | None = None
+
+
+class ApiAssetListResponse(ItemsResponse[ApiAssetItem]):
+    pass
