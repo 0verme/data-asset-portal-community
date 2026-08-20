@@ -17,7 +17,7 @@ from .facade import (
     get_db_profile,
     get_engine,
 )
-from .metadata import LOGICAL_SCHEMA, metadata
+from .metadata import LOGICAL_SCHEMA
 from .registry import get_provider
 _SCHEMA_TOKEN_RE = re.compile(r"__\[SCHEMA___app__\]")
 
@@ -66,7 +66,6 @@ def fetch_all_core(profile: str, statement):
     """Execute a SQLAlchemy Select and return the facade's columns/rows shape."""
     statement = _normalize_core_statement(statement)
     config = get_db_profile(profile)
-    provider = get_provider(config["type"])
     shared = active_transaction_connection(profile)
     engine = get_engine(profile, config=config)
     if engine is not None and shared is None:
