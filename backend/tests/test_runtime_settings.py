@@ -69,15 +69,17 @@ class RuntimeSettingsTestCase(unittest.TestCase):
         os.environ["ASSET_OPERATOR"] = "batch-agent"
         service = SystemManagementService()
         statements = []
-        service._execute = lambda sql, params=None: statements.append((sql, params))
+        service._core_execute = lambda items: statements.extend(items)
         service._ensure_db_category_exists = lambda _: 1
         service.get_param_dict_categories = lambda: [{"code": "test"}]
 
         with patch.object(common_code_service, "invalidate") as invalidate:
             service._update_param_category_status("test", "enabled")
 
-        self.assertIn("updated_by = ?", statements[0][0])
-        self.assertEqual(["Y", "batch-agent", 1], statements[0][1])
+        compiled = statements[0].compile()
+        self.assertIn("updated_by", str(compiled))
+        self.assertEqual("batch-agent", compiled.params["updated_by"])
+        self.assertEqual("Y", compiled.params["is_active"])
         invalidate.assert_called_once_with(["test"])
 
 
