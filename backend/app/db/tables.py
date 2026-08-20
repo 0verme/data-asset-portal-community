@@ -4,6 +4,8 @@ from sqlalchemy import Column, DateTime, Integer, String, Table, Text
 
 from .metadata import metadata
 
+# pyright: reportMissingImports=false
+
 
 def _table(name, *columns):
     return Table(name, metadata, *columns)
@@ -86,6 +88,40 @@ asset_change_log = _table(
     Column("table_name", String(256), nullable=False),
     Column("change_type", String(64), nullable=False),
     Column("change_summary", String(1000)),
+    Column("before_json", Text),
+    Column("after_json", Text),
+    Column("operator_name", String(64), nullable=False),
+    Column("change_time", DateTime),
+)
+
+indicator_item = _table(
+    "p_indicator_item",
+    Column("indicator_pk", Integer, primary_key=True),
+    Column("indicator_id", String(64), nullable=False),
+    Column("indicator_name", String(256), nullable=False),
+    Column("meaning_desc", String(4000)),
+    Column("result_table_name", String(256)),
+    Column("result_field_name", String(256)),
+    Column("dimension_code", String(16), nullable=False),
+    Column("caliber_desc", String(1000)),
+    Column("path_desc", String(1000)),
+    Column("status_code", String(32), nullable=False),
+    Column("registrar_name", String(64), nullable=False),
+    Column("registered_date", String(10), nullable=False),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+indicator_change_log = _table(
+    "p_indicator_change_log",
+    Column("change_id", Integer, primary_key=True),
+    Column("indicator_pk", Integer),
+    Column("indicator_id", String(64), nullable=False),
+    Column("change_type", String(64), nullable=False),
+    Column("change_summary", String(512)),
     Column("before_json", Text),
     Column("after_json", Text),
     Column("operator_name", String(64), nullable=False),

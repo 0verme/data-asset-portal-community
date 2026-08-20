@@ -36,6 +36,7 @@ from backend.app import create_app
 from backend.app.settings import get_trust_proxy_headers
 from backend.app.services.indicator_service import IndicatorService
 
+# pyright: reportMissingImports=false
 
 BACKEND = Path(__file__).resolve().parents[1]
 REQUIREMENTS = BACKEND / "requirements.txt"
@@ -119,11 +120,10 @@ class ProxyTrustBoundaryTests(unittest.TestCase):
 
     def test_audit_ip_ignores_forged_xff_by_default(self):
         from backend.app.services.operation_log_service import operation_log_service
-        from unittest.mock import ANY
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("ASSET_TRUST_PROXY_HEADERS", None)
-            from flask import Flask, request as flask_request
+            from flask import Flask
             app = Flask(__name__)
             app.secret_key = _SECRET
             with app.test_request_context(
@@ -158,27 +158,28 @@ class ErrorSanitizationTests(unittest.TestCase):
             raise RuntimeError(self._SENSITIVE)
 
         service = IndicatorService()
-        with patch(
-            "backend.app.services.indicator_service.fetch_all", side_effect=_boom
-        ):
-            with self.assertRaises(Exception) as ctx:
-                service._fetch_rows("SELECT 1")
-            message = str(ctx.exception)
+        message = ""
+        with patch.object(service._db, "fetch_rows", side_effect=_boom):
+            try:
+                service._fetch_rows(object())
+            except Exception as error:
+                message = str(error)
+            else:
+                self.fail("expected a sanitized data-source error")
         self.assertNotIn("topsecret", message)
         self.assertNotIn("198.51.100.66", message)
         self.assertNotIn("/opt/data-asset-portal", message)
 
     def test_auth_data_source_error_is_sanitized(self):
-        from backend.app.db import gaussdb as db_gaussdb
         from backend.app.services.auth_service import AuthError, auth_service
 
         def _boom(profile, sql):
             raise RuntimeError("connect failed host=198.51.100.66 password=topsecret")
 
         with patch("backend.app.services.auth_service.load_db_profiles", return_value={"primary": {"type": "postgres"}}), \
-                patch("backend.app.services.auth_service.fetch_all", side_effect=_boom):
-            with self.assertRaises(AuthError) as ctx:
-                auth_service.authenticate("admin", "wrong")
+                patch("backend.app.services.auth_service.fetch_all", side_effect=_boom), \
+                self.assertRaises(AuthError) as ctx:
+            auth_service.authenticate("admin", "wrong")
         message = str(ctx.exception)
         self.assertNotIn("topsecret", message)
         self.assertNotIn("198.51.100.66", message)
@@ -200,10 +201,14 @@ class DependencySecurityVersionTests(unittest.TestCase):
         parts = [int(p) for p in version.split(".")]
         self.assertGreaterEqual(parts[:3], [3, 1, 3])
 
+    @staticmethod
+    def _version_parts(version):
+        return [int(part) for part in (version or "").split(".")]
+
     def test_werkzeug_is_pinned_at_security_floor(self):
         version = self._parse_requirements().get("werkzeug")
         self.assertIsNotNone(version, "Werkzeug must be explicitly pinned")
-        parts = [int(p) for p in version.split(".")]
+        parts = self._version_parts(version)
         self.assertGreaterEqual(parts[:3], [3, 1, 8])
 
     def test_flask_cors_is_at_or_above_security_floor(self):

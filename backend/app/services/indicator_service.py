@@ -20,13 +20,16 @@ import re
 from copy import deepcopy
 from datetime import date
 
+from sqlalchemy import and_, func, insert, or_, select, update
+
+from ..db.service import CoreAccess
+from ..db.tables import indicator_change_log, indicator_item
+from ..settings import get_default_operator
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
     common_code_service,
 )
-from ..db.gaussdb import execute_statements, fetch_all, resolve_db_profile_name
-from ..settings import get_default_operator
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
     OPERATION_TYPE_DELETE,
@@ -36,6 +39,7 @@ from .operation_log_service import (
     operation_log_service,
 )
 
+# pyright: reportMissingImports=false
 
 INDICATOR_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -54,8 +58,6 @@ DIMENSION_LABEL_MAP = {
     "库存维度": "inv", "营销维度": "mkt", "履约维度": "ful", "售后维度": "svc",
 }
 DEFAULT_STATUS = {"enabled", "disabled"}
-TABLE_INDICATOR_ITEM = "dwp.p_indicator_item"
-TABLE_INDICATOR_CHANGE_LOG = "dwp.p_indicator_change_log"
 
 
 class IndicatorNotFoundError(Exception):
@@ -98,40 +100,25 @@ class IndicatorService:
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
         self._default_operator = get_default_operator()
+        self._db = CoreAccess(
+            profile_getter=lambda: self._db_profile,
+            error_factory=IndicatorDataSourceError,
+        )
 
-    def _fetch_rows(self, sql):
-        try:
-            columns, rows = fetch_all(self._db_profile or resolve_db_profile_name(), sql)
-        except FileNotFoundError as error:
-            raise IndicatorDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise IndicatorDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise IndicatorDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise IndicatorDataSourceError("数据库查询失败") from error
-        return [dict(zip(columns, row)) for row in rows]
+    def _fetch_rows(self, statement):
+        return self._db.fetch_rows(statement)
 
     def _execute(self, statements):
+        return self._db.execute_statements(statements)
+
+    def _next_id(self, table, column):
+        return self._db.next_pk(table, column)
+
+    def _row_int(self, rows, key):
         try:
-            return execute_statements(self._db_profile or resolve_db_profile_name(), statements)
-        except FileNotFoundError as error:
-            raise IndicatorDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise IndicatorDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise IndicatorDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise IndicatorDataSourceError("数据库执行失败") from error
-
-    def _quote(self, value):
-        if value is None:
-            return "NULL"
-        return "'" + str(value).replace("'", "''") + "'"
-
-    def _next_id(self, table_name, id_column):
-        rows = self._fetch_rows(f"SELECT COALESCE(MAX({id_column}), 0) + 1 AS next_id FROM {table_name}")
-        return int(rows[0]["next_id"])
+            return int(rows[0][key])
+        except (IndexError, KeyError, TypeError, ValueError) as error:
+            raise IndicatorDataSourceError("数据库查询失败") from error
 
     def _allowed_status_values(self):
         try:
@@ -210,51 +197,34 @@ class IndicatorService:
             "registeredAt": registered_at,
         }
 
-    def _filter_items(self, items, keyword=None, dimension=None, status=None):
-        next_items = items
-        normalized_dimension = self._normalize_dimension(dimension)
+    def _build_indicator_filters(self, keyword=None, dimension=None, status=None):
+        clauses = [indicator_item.c.is_deleted == "N"]
         if dimension:
-            next_items = [item for item in next_items if item["dimension"] == normalized_dimension]
+            clauses.append(func.lower(indicator_item.c.dimension_code) == self._normalize_dimension(dimension))
         if status:
-            next_items = [item for item in next_items if item["status"] == status]
+            clauses.append(indicator_item.c.status_code == status)
         if keyword:
-            query = keyword.strip().lower()
-            next_items = [
-                item for item in next_items
-                if any(
-                    query in str(item[key] or "").lower()
-                    for key in ("id", "name", "meaning", "resultTableName", "resultFieldName", "caliber", "path", "registrar")
-                )
-            ]
-        return next_items
+            query = str(keyword).strip().lower()
+            escaped_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped_query}%"
+            searchable = (
+                indicator_item.c.indicator_id,
+                indicator_item.c.indicator_name,
+                indicator_item.c.meaning_desc,
+                indicator_item.c.result_table_name,
+                indicator_item.c.result_field_name,
+                indicator_item.c.caliber_desc,
+                indicator_item.c.path_desc,
+                indicator_item.c.registrar_name,
+            )
+            clauses.append(or_(*(
+                func.lower(func.coalesce(column, "")).like(pattern, escape="\\")
+                for column in searchable
+            )))
+        return clauses
 
-    def _db_items(self, keyword=None, dimension=None, status=None):
-        where = ["is_deleted = 'N'"]
-        if dimension:
-            normalized_dimension = self._normalize_dimension(dimension)
-            where.append(f"LOWER(dimension_code) = {self._quote(normalized_dimension)}")
-        if status:
-            where.append(f"status_code = {self._quote(status)}")
-        sql = f"""
-SELECT
-    indicator_pk,
-    indicator_id,
-    indicator_name,
-    meaning_desc,
-    result_table_name,
-    result_field_name,
-    dimension_code,
-    caliber_desc,
-    path_desc,
-    status_code,
-    registrar_name,
-    registered_date
-FROM {TABLE_INDICATOR_ITEM}
-WHERE {' AND '.join(where)}
-ORDER BY indicator_id
-"""
-        rows = self._fetch_rows(sql)
-        items = [{
+    def _row_to_item(self, row):
+        return {
             "id": row["indicator_id"],
             "name": row["indicator_name"],
             "meaning": row.get("meaning_desc") or "",
@@ -266,8 +236,24 @@ ORDER BY indicator_id
             "status": row["status_code"],
             "registrar": row["registrar_name"],
             "registeredAt": row["registered_date"],
-        } for row in rows]
-        return self._filter_items(items, keyword=keyword)
+        }
+
+    def _db_items(self, keyword=None, dimension=None, status=None):
+        statement = select(
+            indicator_item.c.indicator_pk,
+            indicator_item.c.indicator_id,
+            indicator_item.c.indicator_name,
+            indicator_item.c.meaning_desc,
+            indicator_item.c.result_table_name,
+            indicator_item.c.result_field_name,
+            indicator_item.c.dimension_code,
+            indicator_item.c.caliber_desc,
+            indicator_item.c.path_desc,
+            indicator_item.c.status_code,
+            indicator_item.c.registrar_name,
+            indicator_item.c.registered_date,
+        ).where(*self._build_indicator_filters(keyword, dimension, status)).order_by(indicator_item.c.indicator_id)
+        return [self._row_to_item(row) for row in self._fetch_rows(statement)]
 
     def get_indicators(self, keyword=None, dimension=None, status=None):
         return self._db_items(keyword=keyword, dimension=dimension, status=status)
@@ -277,6 +263,42 @@ ORDER BY indicator_id
         if not item:
             raise IndicatorNotFoundError(indicator_id)
         return deepcopy(item)
+
+    def _insert_item(self, item, indicator_pk):
+        return insert(indicator_item).values(
+            indicator_pk=indicator_pk,
+            indicator_id=item["id"],
+            indicator_name=item["name"],
+            meaning_desc=item["meaning"],
+            result_table_name=item["resultTableName"],
+            result_field_name=item["resultFieldName"],
+            dimension_code=item["dimension"],
+            caliber_desc=item["caliber"],
+            path_desc=item["path"],
+            status_code=item["status"],
+            registrar_name=item["registrar"],
+            registered_date=item["registeredAt"],
+            is_deleted="N",
+            created_by=self._default_operator,
+            updated_by=self._default_operator,
+        )
+
+    def _insert_change_log(self, *, change_id, indicator_pk, indicator_id, change_type, before=None, after=None):
+        return insert(indicator_change_log).values(
+            change_id=change_id,
+            indicator_pk=indicator_pk,
+            indicator_id=indicator_id,
+            change_type=change_type,
+            change_summary={
+                "CREATE_INDICATOR": "create indicator",
+                "UPDATE_INDICATOR": "update indicator",
+                "UPDATE_STATUS": "update indicator status",
+                "DELETE_INDICATOR": "delete indicator",
+            }[change_type],
+            before_json=json.dumps(before, ensure_ascii=False) if before is not None else None,
+            after_json=json.dumps(after, ensure_ascii=False) if after is not None else None,
+            operator_name=self._default_operator,
+        )
 
     def create_indicator(self, payload):
         with operation_log_service.audit(
@@ -295,30 +317,18 @@ ORDER BY indicator_id
         if any(current["id"] == item["id"] for current in self.get_indicators()):
             raise IndicatorAlreadyExistsError(item["id"])
 
-        indicator_pk = self._next_id(TABLE_INDICATOR_ITEM, "indicator_pk")
-        change_id = self._next_id(TABLE_INDICATOR_CHANGE_LOG, "change_id")
-        statements = [
-            f"""
-INSERT INTO {TABLE_INDICATOR_ITEM} (
-  indicator_pk, indicator_id, indicator_name, meaning_desc, result_table_name, result_field_name, dimension_code, caliber_desc, path_desc,
-  status_code, registrar_name, registered_date, created_by, updated_by
-) VALUES (
-  {indicator_pk}, {self._quote(item['id'])}, {self._quote(item['name'])}, {self._quote(item['meaning'])},
-  {self._quote(item['resultTableName'])}, {self._quote(item['resultFieldName'])}, {self._quote(item['dimension'])}, {self._quote(item['caliber'])}, {self._quote(item['path'])},
-  {self._quote(item['status'])}, {self._quote(item['registrar'])}, {self._quote(item['registeredAt'])},
-  {self._quote(self._default_operator)}, {self._quote(self._default_operator)}
-)
-""".strip(),
-            f"""
-INSERT INTO {TABLE_INDICATOR_CHANGE_LOG} (
-  change_id, indicator_pk, indicator_id, change_type, change_summary, after_json, operator_name
-) VALUES (
-  {change_id}, {indicator_pk}, {self._quote(item['id'])}, 'CREATE_INDICATOR', 'create indicator',
-  {self._quote(json.dumps(item, ensure_ascii=False))}, {self._quote(self._default_operator)}
-)
-""".strip(),
-        ]
-        self._execute(statements)
+        indicator_pk = self._next_id(indicator_item, indicator_item.c.indicator_pk)
+        change_id = self._next_id(indicator_change_log, indicator_change_log.c.change_id)
+        self._execute([
+            self._insert_item(item, indicator_pk),
+            self._insert_change_log(
+                change_id=change_id,
+                indicator_pk=indicator_pk,
+                indicator_id=item["id"],
+                change_type="CREATE_INDICATOR",
+                after=item,
+            ),
+        ])
         return item
 
     def update_indicator(self, indicator_id, payload):
@@ -336,46 +346,44 @@ INSERT INTO {TABLE_INDICATOR_CHANGE_LOG} (
 
     def _update_indicator(self, indicator_id, payload):
         item = self._normalize_payload(payload)
-        rows = self._fetch_rows(f"SELECT indicator_pk FROM {TABLE_INDICATOR_ITEM} WHERE indicator_id = {self._quote(indicator_id)} AND is_deleted = 'N'")
+        rows = self._fetch_rows(
+            select(indicator_item.c.indicator_pk).where(
+                and_(indicator_item.c.indicator_id == indicator_id, indicator_item.c.is_deleted == "N")
+            )
+        )
         if not rows:
             raise IndicatorNotFoundError(indicator_id)
         if item["id"] != indicator_id and any(current["id"] == item["id"] for current in self.get_indicators()):
             raise IndicatorAlreadyExistsError(item["id"])
 
         current = self.get_indicator_detail(indicator_id)
-        indicator_pk = int(rows[0]["indicator_pk"])
-        change_id = self._next_id(TABLE_INDICATOR_CHANGE_LOG, "change_id")
-        statements = [
-            f"""
-UPDATE {TABLE_INDICATOR_ITEM}
-SET
-  indicator_id = {self._quote(item['id'])},
-  indicator_name = {self._quote(item['name'])},
-  meaning_desc = {self._quote(item['meaning'])},
-  result_table_name = {self._quote(item['resultTableName'])},
-  result_field_name = {self._quote(item['resultFieldName'])},
-  dimension_code = {self._quote(item['dimension'])},
-  caliber_desc = {self._quote(item['caliber'])},
-  path_desc = {self._quote(item['path'])},
-  status_code = {self._quote(item['status'])},
-  registrar_name = {self._quote(item['registrar'])},
-  registered_date = {self._quote(item['registeredAt'])},
-  updated_by = {self._quote(self._default_operator)},
-  updated_at = CURRENT_TIMESTAMP
-WHERE indicator_pk = {indicator_pk}
-""".strip(),
-            f"""
-INSERT INTO {TABLE_INDICATOR_CHANGE_LOG} (
-  change_id, indicator_pk, indicator_id, change_type, change_summary, before_json, after_json, operator_name
-) VALUES (
-  {change_id}, {indicator_pk}, {self._quote(item['id'])}, 'UPDATE_INDICATOR', 'update indicator',
-  {self._quote(json.dumps(current, ensure_ascii=False))},
-  {self._quote(json.dumps(item, ensure_ascii=False))},
-  {self._quote(self._default_operator)}
-)
-""".strip(),
-        ]
-        self._execute(statements)
+        indicator_pk = self._row_int(rows, "indicator_pk")
+        change_id = self._next_id(indicator_change_log, indicator_change_log.c.change_id)
+        self._execute([
+            update(indicator_item).where(indicator_item.c.indicator_pk == indicator_pk).values(
+                indicator_id=item["id"],
+                indicator_name=item["name"],
+                meaning_desc=item["meaning"],
+                result_table_name=item["resultTableName"],
+                result_field_name=item["resultFieldName"],
+                dimension_code=item["dimension"],
+                caliber_desc=item["caliber"],
+                path_desc=item["path"],
+                status_code=item["status"],
+                registrar_name=item["registrar"],
+                registered_date=item["registeredAt"],
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            ),
+            self._insert_change_log(
+                change_id=change_id,
+                indicator_pk=indicator_pk,
+                indicator_id=item["id"],
+                change_type="UPDATE_INDICATOR",
+                before=current,
+                after=item,
+            ),
+        ])
         return current, item
 
     def patch_status(self, indicator_id, status):
@@ -390,24 +398,30 @@ INSERT INTO {TABLE_INDICATOR_CHANGE_LOG} (
             operation_object=indicator_id,
             operation_desc=f"{operation_type}指标",
         ) as audit:
-            rows = self._fetch_rows(f"SELECT indicator_pk FROM {TABLE_INDICATOR_ITEM} WHERE indicator_id = {self._quote(indicator_id)} AND is_deleted = 'N'")
+            rows = self._fetch_rows(
+                select(indicator_item.c.indicator_pk).where(
+                    and_(indicator_item.c.indicator_id == indicator_id, indicator_item.c.is_deleted == "N")
+                )
+            )
             if not rows:
                 raise IndicatorNotFoundError(indicator_id)
-            indicator_pk = int(rows[0]["indicator_pk"])
+            indicator_pk = self._row_int(rows, "indicator_pk")
             item = {**current, "status": normalized}
-            change_id = self._next_id(TABLE_INDICATOR_CHANGE_LOG, "change_id")
+            change_id = self._next_id(indicator_change_log, indicator_change_log.c.change_id)
             self._execute([
-                f"UPDATE {TABLE_INDICATOR_ITEM} SET status_code = {self._quote(normalized)}, updated_by = {self._quote(self._default_operator)}, updated_at = CURRENT_TIMESTAMP WHERE indicator_pk = {indicator_pk}",
-                f"""
-INSERT INTO {TABLE_INDICATOR_CHANGE_LOG} (
-  change_id, indicator_pk, indicator_id, change_type, change_summary, before_json, after_json, operator_name
-) VALUES (
-  {change_id}, {indicator_pk}, {self._quote(indicator_id)}, 'UPDATE_STATUS', 'update indicator status',
-  {self._quote(json.dumps(current, ensure_ascii=False))},
-  {self._quote(json.dumps(item, ensure_ascii=False))},
-  {self._quote(self._default_operator)}
-)
-""".strip(),
+                update(indicator_item).where(indicator_item.c.indicator_pk == indicator_pk).values(
+                    status_code=normalized,
+                    updated_by=self._default_operator,
+                    updated_at=func.current_timestamp(),
+                ),
+                self._insert_change_log(
+                    change_id=change_id,
+                    indicator_pk=indicator_pk,
+                    indicator_id=indicator_id,
+                    change_type="UPDATE_STATUS",
+                    before=current,
+                    after=item,
+                ),
             ])
             audit.operation_object = item["id"]
             audit.before = current
@@ -424,28 +438,30 @@ INSERT INTO {TABLE_INDICATOR_CHANGE_LOG} (
             audit.before = self._delete_indicator(indicator_id)
 
     def _delete_indicator(self, indicator_id):
-        rows = self._fetch_rows(f"SELECT indicator_pk FROM {TABLE_INDICATOR_ITEM} WHERE indicator_id = {self._quote(indicator_id)} AND is_deleted = 'N'")
+        rows = self._fetch_rows(
+            select(indicator_item.c.indicator_pk).where(
+                and_(indicator_item.c.indicator_id == indicator_id, indicator_item.c.is_deleted == "N")
+            )
+        )
         if not rows:
             raise IndicatorNotFoundError(indicator_id)
         current = self.get_indicator_detail(indicator_id)
-        indicator_pk = int(rows[0]["indicator_pk"])
-        change_id = self._next_id(TABLE_INDICATOR_CHANGE_LOG, "change_id")
-        statements = [
-            f"""
-UPDATE {TABLE_INDICATOR_ITEM}
-SET is_deleted = 'Y', updated_by = {self._quote(self._default_operator)}, updated_at = CURRENT_TIMESTAMP
-WHERE indicator_pk = {indicator_pk}
-""".strip(),
-            f"""
-INSERT INTO {TABLE_INDICATOR_CHANGE_LOG} (
-  change_id, indicator_pk, indicator_id, change_type, change_summary, before_json, operator_name
-) VALUES (
-  {change_id}, {indicator_pk}, {self._quote(indicator_id)}, 'DELETE_INDICATOR', 'delete indicator',
-  {self._quote(json.dumps(current, ensure_ascii=False))}, {self._quote(self._default_operator)}
-)
-""".strip(),
-        ]
-        self._execute(statements)
+        indicator_pk = self._row_int(rows, "indicator_pk")
+        change_id = self._next_id(indicator_change_log, indicator_change_log.c.change_id)
+        self._execute([
+            update(indicator_item).where(indicator_item.c.indicator_pk == indicator_pk).values(
+                is_deleted="Y",
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            ),
+            self._insert_change_log(
+                change_id=change_id,
+                indicator_pk=indicator_pk,
+                indicator_id=indicator_id,
+                change_type="DELETE_INDICATOR",
+                before=current,
+            ),
+        ])
         return current
 
 
