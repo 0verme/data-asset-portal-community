@@ -1,7 +1,11 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from sqlalchemy.dialects import sqlite
+
 from backend.app.services.indicator_service import IndicatorService, IndicatorValidationError
+
+# pyright: reportMissingImports=false
 
 
 class IndicatorStatusUpdateTestCase(unittest.TestCase):
@@ -27,15 +31,18 @@ class IndicatorStatusUpdateTestCase(unittest.TestCase):
             result = self.service.patch_status("CUST001", "disabled")
 
         statements = self.service._execute.call_args.args[0]
-        self.assertIn("SET status_code = 'disabled'", statements[0])
-        self.assertNotIn("indicator_name", statements[0])
+        compiled = statements[0].compile(dialect=sqlite.dialect())
+        self.assertIn("UPDATE __app__.p_indicator_item", str(compiled))
+        self.assertIn("status_code", compiled.params)
+        self.assertEqual(compiled.params["status_code"], "disabled")
+        self.assertNotIn("indicator_name", str(compiled))
         self.assertEqual(result["status"], "disabled")
         self.assertEqual(result["name"], self.current["name"])
 
     def test_invalid_status_is_rejected_before_update(self):
-        with patch.object(self.service, "_allowed_status_values", return_value={"enabled", "disabled"}):
-            with self.assertRaises(IndicatorValidationError):
-                self.service.patch_status("CUST001", "archived")
+        with patch.object(self.service, "_allowed_status_values", return_value={"enabled", "disabled"}), \
+                self.assertRaises(IndicatorValidationError):
+            self.service.patch_status("CUST001", "archived")
         self.service._execute.assert_not_called()
 
 
