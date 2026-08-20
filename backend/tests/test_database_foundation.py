@@ -13,7 +13,7 @@ class DatabaseFoundationTests(unittest.TestCase):
         self.assertEqual(LOGICAL_SCHEMA, metadata.schema)
         self.assertEqual("p_admin_user", admin_user.name)
         self.assertEqual(
-            {"id", "username", "password_hash", "display_name", "status", "role", "last_login_at", "updated_at"},
+            {"id", "username", "password_hash", "display_name", "status", "role", "last_login_at", "created_at", "updated_at"},
             {column.name for column in admin_user.columns},
         )
 

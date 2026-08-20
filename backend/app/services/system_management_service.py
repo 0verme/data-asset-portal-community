@@ -19,7 +19,11 @@ import re
 import unicodedata
 from datetime import datetime
 
+from sqlalchemy import delete, func, insert, select, update
+
 from ..db.gaussdb import execute_sql, fetch_all, resolve_db_profile_name
+from ..db.service import CoreAccess
+from ..db.tables import admin_user
 from ..settings import get_default_operator
 from .auth_service import build_password_hash
 from .common_code_service import common_code_service
@@ -104,6 +108,10 @@ class SystemManagementService:
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
         self._default_operator = get_default_operator()
+        self._core = CoreAccess(
+            profile_getter=lambda: self._db_profile,
+            error_factory=SystemDataSourceError,
+        )
 
     def _profile(self):
         return self._db_profile or resolve_db_profile_name()
@@ -132,6 +140,15 @@ class SystemManagementService:
             raise SystemDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
             raise SystemDataSourceError("数据库执行失败") from error
+
+    def _core_fetch(self, statement):
+        return self._core.fetch_rows(statement)
+
+    def _core_execute(self, statements):
+        return self._core.execute_statements(statements)
+
+    def _core_next_pk(self):
+        return self._core.next_pk(admin_user, admin_user.c.id)
 
     def _now_text(self):
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -242,12 +259,16 @@ class SystemManagementService:
         return int(rows[0]["category_id"])
 
     def get_users(self):
-        rows = self._fetch_rows(
-            f"""
-SELECT id, username, display_name, status, role, last_login_at, created_at
-FROM {TABLE_ADMIN_USER}
-ORDER BY created_at DESC, username
-""".strip()
+        rows = self._core_fetch(
+            select(
+                admin_user.c.id,
+                admin_user.c.username,
+                admin_user.c.display_name,
+                admin_user.c.status,
+                admin_user.c.role,
+                admin_user.c.last_login_at,
+                admin_user.c.created_at,
+            ).order_by(admin_user.c.created_at.desc(), admin_user.c.username)
         )
         return [
             {
@@ -278,33 +299,23 @@ ORDER BY created_at DESC, username
 
     def _create_user(self, payload):
         user = self._normalize_user_payload(payload)
-        existing = self._fetch_rows(
-            f"SELECT 1 FROM {TABLE_ADMIN_USER} WHERE username = ? LIMIT 1",
-            [user["username"]],
+        existing = self._core_fetch(
+            select(admin_user.c.id).where(admin_user.c.username == user["username"])
         )
         if existing:
             raise SystemUserAlreadyExistsError(f"User already exists: {user['username']}")
 
-        next_id = self._next_pk(TABLE_ADMIN_USER, "id")
-        self._execute(
-            f"""
-INSERT INTO {TABLE_ADMIN_USER} (
-  id, username, password_hash, display_name, status, role, created_at, updated_at
-) VALUES (
-  ?, ?, ?, ?, ?, ?,
-  CURRENT_TIMESTAMP,
-  CURRENT_TIMESTAMP
-)
-""".strip(),
-            [
-                next_id,
-                user["username"],
-                build_password_hash(user["username"]),
-                user["displayName"],
-                self._user_status_to_db_status(user["status"]),
-                user["role"],
-            ],
-        )
+        next_id = self._core_next_pk()
+        self._core_execute([
+            insert(admin_user).values(
+                id=next_id,
+                username=user["username"],
+                password_hash=build_password_hash(user["username"]),
+                display_name=user["displayName"],
+                status=self._user_status_to_db_status(user["status"]),
+                role=user["role"],
+            )
+        ])
         return next((item for item in self.get_users() if item["username"] == user["username"]), None)
 
     def update_user(self, username: str, payload):
@@ -322,42 +333,32 @@ INSERT INTO {TABLE_ADMIN_USER} (
 
     def _update_user(self, username: str, payload):
         user = self._normalize_user_payload(payload)
-        rows = self._fetch_rows(
-            f"SELECT id, role FROM {TABLE_ADMIN_USER} WHERE username = ? LIMIT 1",
-            [username],
+        rows = self._core_fetch(
+            select(admin_user.c.id, admin_user.c.role).where(admin_user.c.username == username)
         )
         if not rows:
             raise SystemUserNotFoundError(f"User not found: {username}")
         before = next((item for item in self.get_users() if item["username"] == username), None)
         if user["username"] != username:
-            duplicate = self._fetch_rows(
-                f"SELECT 1 FROM {TABLE_ADMIN_USER} WHERE username = ? LIMIT 1",
-                [user["username"]],
+            duplicate = self._core_fetch(
+                select(admin_user.c.id).where(admin_user.c.username == user["username"])
             )
             if duplicate:
                 raise SystemUserAlreadyExistsError(f"User already exists: {user['username']}")
         if rows[0].get("role") == "admin" and user["role"] != "admin":
             self._ensure_administrator_remains(exclude_username=username)
 
-        self._execute(
-            f"""
-UPDATE {TABLE_ADMIN_USER}
-SET
-  username = ?,
-  display_name = ?,
-  status = ?,
-  role = ?,
-  updated_at = CURRENT_TIMESTAMP
-WHERE id = ?
-""".strip(),
-            [
-                user["username"],
-                user["displayName"],
-                self._user_status_to_db_status(user["status"]),
-                user["role"],
-                int(rows[0]["id"]),
-            ],
-        )
+        self._core_execute([
+            update(admin_user)
+            .where(admin_user.c.id == int(rows[0]["id"]))
+            .values(
+                username=user["username"],
+                display_name=user["displayName"],
+                status=self._user_status_to_db_status(user["status"]),
+                role=user["role"],
+                updated_at=func.current_timestamp(),
+            )
+        ])
         after = next((item for item in self.get_users() if item["username"] == user["username"]), None)
         return after, before, user["username"]
 
@@ -382,14 +383,11 @@ WHERE id = ?
         normalized = self._user_status_to_db_status(status)
         if user["role"] == "admin" and normalized != "ACTIVE":
             self._ensure_administrator_remains(exclude_username=username)
-        self._execute(
-            f"""
-UPDATE {TABLE_ADMIN_USER}
-SET status = ?, updated_at = CURRENT_TIMESTAMP
-WHERE username = ?
-""".strip(),
-            [normalized, username],
-        )
+        self._core_execute([
+            update(admin_user)
+            .where(admin_user.c.username == username)
+            .values(status=normalized, updated_at=func.current_timestamp())
+        ])
         user = next((item for item in self.get_users() if item["username"] == username), None)
         if not user:
             raise SystemUserNotFoundError(f"User not found: {username}")
@@ -402,23 +400,21 @@ WHERE username = ?
             operation_object=username,
             operation_desc="重置用户密码",
         ) as audit:
-            rows = self._fetch_rows(
-                f"SELECT id, username FROM {TABLE_ADMIN_USER} WHERE username = ? LIMIT 1",
-                [username],
+            rows = self._core_fetch(
+                select(admin_user.c.id, admin_user.c.username).where(admin_user.c.username == username)
             )
             if not rows:
                 raise SystemUserNotFoundError(f"User not found: {username}")
             target_id = int(rows[0]["id"])
             current_username = str(rows[0]["username"] or "").strip()
-            self._execute(
-                f"""
-UPDATE {TABLE_ADMIN_USER}
-SET password_hash = ?,
-    updated_at = CURRENT_TIMESTAMP
-WHERE id = ?
-""".strip(),
-                [build_password_hash(current_username), target_id],
-            )
+            self._core_execute([
+                update(admin_user)
+                .where(admin_user.c.id == target_id)
+                .values(
+                    password_hash=build_password_hash(current_username),
+                    updated_at=func.current_timestamp(),
+                )
+            ])
             audit.operation_object = current_username
             audit.after = {
                 "targetUserId": target_id,
@@ -437,23 +433,28 @@ WHERE id = ?
             audit.before = self._delete_user(username)
 
     def _delete_user(self, username: str):
-        rows = self._fetch_rows(
-            f"SELECT id FROM {TABLE_ADMIN_USER} WHERE username = ? LIMIT 1",
-            [username],
+        rows = self._core_fetch(
+            select(admin_user.c.id).where(admin_user.c.username == username)
         )
         if not rows:
             raise SystemUserNotFoundError(f"User not found: {username}")
         before = next((item for item in self.get_users() if item["username"] == username), None)
         if before and before["role"] == "admin":
             self._ensure_administrator_remains(exclude_username=username)
-        self._execute(f"DELETE FROM {TABLE_ADMIN_USER} WHERE id = ?", [int(rows[0]["id"])])
+        self._core_execute([
+            delete(admin_user).where(admin_user.c.id == int(rows[0]["id"]))
+        ])
         return before
 
     def _ensure_administrator_remains(self, exclude_username: str):
-        rows = self._fetch_rows(
-            f"SELECT COUNT(*) AS count FROM {TABLE_ADMIN_USER} "
-            "WHERE role = 'admin' AND status = 'ACTIVE' AND username <> ?",
-            [exclude_username],
+        rows = self._core_fetch(
+            select(func.count().label("count"))
+            .select_from(admin_user)
+            .where(
+                admin_user.c.role == "admin",
+                admin_user.c.status == "ACTIVE",
+                admin_user.c.username != exclude_username,
+            )
         )
         if not rows or int(rows[0].get("count") or 0) < 1:
             raise SystemValidationError("User validation failed", [{"field": "role", "message": "at least one active administrator must remain"}])
