@@ -1,419 +1,143 @@
-# Good First Issue backlog 提案
+# Good First Issue 候选池
 
-本文件是经过仓库审计后的本地提案，不会自动创建公开 Issue。每个候选都应在创建前由 maintainer 再确认当前代码状态和优先级；不要把本文件中的数量当作已创建 Issue 数量。
+本文件是 maintainer backlog，反映 `main`（OS-03 已通过 #33 合并）上的真实候选状态。
 
-这些候选刻意避开 #16、#18、#20 以及相关 FastAPI / SQLAlchemy / 数据库架构 epic。它们覆盖 frontend、backend/tests、docs 和 demo/tooling，均不需要内部基础设施。
+发布标准：任务必须有明确入口、有限文件范围、可独立 PR、可公开验证，并且不要求贡献者先做架构设计。公开 Issue 以中文为主，GitHub labels 使用仓库已有英文标签。
 
-## 1. Improve unified-search no-result recovery
+## 已发布
 
-- **Category**：frontend
-- **Title**：`feat(frontend): improve unified search no-result recovery`
+### #34 优化搜索无结果时的恢复提示
 
-### Background
+- Area: `area/frontend`
+- 状态: Open，未认领
+- GitHub: <https://github.com/0verme/data-asset-portal-community/issues/34>
+- Labels: `good first issue`, `area/frontend`
+- 入口: `frontend/src/components/SearchPortalPage.jsx`
+- 备注: 保留当前搜索请求、URL 同步和 scope 行为；使用 Community Demo 可复现。
 
-统一搜索在没有结果时只有文字提示；首次使用者无法直接清空查询或回到可搜索状态，尤其是在 scope 筛选后不容易发现下一步。
+### #35 为关联资产搜索框补充 accessibility label
 
-### Files to start
+- Area: `area/frontend`
+- 状态: Open，未认领
+- GitHub: <https://github.com/0verme/data-asset-portal-community/issues/35>
+- Labels: `good first issue`, `area/frontend`
+- 入口: `frontend/src/components/common/AssetReferenceSelector.jsx`
+- 备注: 共享 picker 同时服务 API 资产和报表引用；Community Demo 的 API 资产页面可验证。
 
-- `frontend/src/components/SearchPortalPage.jsx`
-- `frontend/src/styles/search.css`
-- `frontend/src/components/SearchPortalPage.test.js`（新测试文件）
+### #36 为统一搜索补充参数边界测试
 
-### Scope
+- Area: `area/backend`
+- 状态: Open，未认领
+- GitHub: <https://github.com/0verme/data-asset-portal-community/issues/36>
+- Labels: `good first issue`, `area/backend`
+- 入口: `backend/app/services/search_provider.py`、`backend/tests/test_search_visibility.py`
+- 备注: 只补充 query、limit 和 scope alias 的 regression/boundary tests，不改变 production behavior。
 
-为 no-result state 增加一个可访问的“清空搜索”操作，保留当前 scope；补充一个 source-level regression test，覆盖按钮文案、事件和 `aria` 语义。
+### #37 为 API 契约补充可复制的请求与响应示例
 
-### Out of scope
+- Area: `area/docs`
+- 状态: Open，未认领
+- GitHub: <https://github.com/0verme/data-asset-portal-community/issues/37>
+- Labels: `good first issue`, `area/docs`
+- 入口: `docs/api-contract.md`，以 `backend/app/routes/assets.py`、`backend/app/routes/search.py` 和 frontend API client 为 source of truth。
+- 备注: 只读文档改动，不新增接口或真实数据。
 
-不改变搜索 API、后端查询语义、scope 列表、搜索结果排序或视觉 token。
+### #38 补充 PostgreSQL migration 验证 checklist
 
-### Acceptance Criteria
+- Area: `area/docs`
+- 状态: Open，未认领
+- GitHub: <https://github.com/0verme/data-asset-portal-community/issues/38>
+- Labels: `good first issue`, `area/docs`
+- 入口: `backend/migrations/README.md`、`backend/scripts/schema_migrate.py`、`docs/first-contribution.md`。
+- 备注: 只记录当前 CLI 和隔离数据库验证顺序，不修改 migration 或数据库架构。
 
-- 无结果状态清楚说明查询词和下一步操作。
-- 点击操作后输入框、已提交查询和结果状态一致清空。
-- 按钮有可见中文文案和可访问名称。
-- 现有搜索结果和错误状态不受影响。
+### #39 为生成的 Demo SQL 补充 manifest 覆盖测试
 
-### How to test
+- Area: `area/demo`
+- 状态: Open，未认领
+- GitHub: <https://github.com/0verme/data-asset-portal-community/issues/39>
+- Labels: `good first issue`, `area/demo`
+- 入口: `demo/generate_demo_sql.py`、`demo/manifest.json`、新测试 `backend/tests/test_demo_sql_generation.py`。
+- 备注: OS-03 已覆盖 bootstrap 幂等性和 runtime 隔离；本 Issue 只测试 manifest 与生成 SQL 文件的覆盖关系。
 
-```bash
-npm --prefix frontend test
-npm --prefix frontend run build
-```
+## 待发布候选
 
-### Maintainer notes
+这些候选经过当前 `main` 审计，问题仍然存在且范围基本清楚，但没有放入首批六项；后续发布前仍需再次确认是否已有相似 Issue 或 PR。
 
-复用现有 `EmptyState` 或 `search.css` 的 token，不新建颜色/圆角变量；不要为了这个 Issue 引入 React testing library 或其他依赖。
+### 统一操作日志空状态复用共享组件
 
-## 2. Add accessible labels to asset-reference pickers
+- Area: `area/frontend`
+- 当前入口: `frontend/src/components/OperationLog/OperationLogPage.jsx`、`frontend/src/components/common/StateCards.jsx`
+- 状态: 待排期
+- 原因: 当前仍直接渲染 `.empty`，而共享 `EmptyState` 已存在；可独立修改，但首批优先选择了搜索恢复和 accessibility 任务。
 
-- **Category**：frontend
-- **Title**：`fix(frontend): label asset reference search inputs`
+### 优化 API 资产空状态提示
 
-### Background
+- Area: `area/frontend`
+- 当前入口: `frontend/src/components/views/ApiAssetView.jsx`、`frontend/src/components/common/StateCards.jsx`
+- 状态: 待排期
+- 原因: 当前 `ApiEmptyState` 只传标题，筛选无结果与真正没有资产的下一步提示仍可改善；与其他 Empty State 任务相近，暂不与首批混发。
 
-报表和 API 资产编辑器中的关联表/关联指标搜索框主要依赖 placeholder 识别，屏幕阅读器用户缺少稳定的字段名称。
+### 补充 Community Demo seed 关系完整性回归测试
 
-### Files to start
+- Area: `area/backend`
+- 当前入口: `backend/tests/test_demo_seed.py`、`demo/seed_loader.py`、`demo/datasets/api_assets.json`、`demo/datasets/mappings.json`
+- 状态: 待重新拆分
+- 原因: `demo/validate_demo_data.py` 已有静态关系校验，OS-03 又新增了 seed 幂等性和 Community 边界测试；若继续发布，应只补充数据库落库后的 API → system、mapping → data source 断言，避免与现有覆盖重复。
 
-- `frontend/src/components/common/AssetReferenceSelector.jsx`
-- `frontend/src/components/views/ApiAssetView.test.js`
-- `frontend/src/components/report/ReportEditor.jsx`
+## 已跳过 / 不作为 Good First Issue
 
-### Scope
+### 原候选 10：仓库内 Markdown 相对链接检查
 
-为两个 picker 搜索 input 增加稳定的 `label` 或等价 `aria-label`，并在 disabled/readonly 状态保持现有行为；增加 source-level regression assertions。
+原因：需要同时新增 Python parser、修改 CI workflow、补充贡献文档并定义仓库级链接语义，文件面和 CI 边界偏大，不适合作为首批第一次贡献。后续如拆成独立的标准库脚本测试 Issue，可重新审计。
 
-### Out of scope
+### 原候选中的数据库 / 架构方向
 
-不改变候选项过滤算法、关联数据 payload、接口或 picker 的布局。
+FastAPI migration、DB Provider / SQLAlchemy redesign、Alembic migration architecture、MySQL Provider、RBAC 和认证架构均继续由现有架构 Issue 或 maintainer backlog 处理，不标记为 `good first issue`。
 
-### Acceptance Criteria
+## 原 10 个候选审计记录
 
-- “关联表”和“关联指标”搜索框均有唯一、准确的可访问名称。
-- 名称不依赖动态候选数量或用户输入。
-- 正常、disabled、readonly 三种状态仍可构建。
-- 测试能在缺少浏览器和私有数据的环境运行。
+1. **frontend：统一搜索无结果恢复** — `REWRITE → #34`
+   - 当前问题仍存在；`SearchPortalPage.jsx` 只有 no-result 文案，没有恢复操作。
+   - 原提案引用的测试文件不存在，已改为明确的 source-level test 方向和真实 Demo 验证方式。
 
-### How to test
+2. **frontend：关联资产搜索框 accessibility label** — `REWRITE → #35`
+   - 当前共享 `Picker` 的搜索 input 没有 `label` 或 `aria-label`。
+   - 原提案的入口和测试范围不准确，已收敛到共享组件和 API 资产公开 Demo 入口。
 
-```bash
-npm --prefix frontend test
-npm --prefix frontend run build
-```
+3. **frontend：操作日志复用共享空状态** — `KEEP，待发布`
+   - `OperationLogPage.jsx` 仍复制 `.empty` markup，`StateCards.jsx` 已提供 `EmptyState`。
+   - 范围清楚，但与首批 frontend 空状态任务相近，暂缓发布。
 
-### Maintainer notes
+4. **frontend：API 资产空状态提示** — `KEEP，待发布`
+   - `ApiEmptyState` 当前只有标题，仍可区分筛选无结果和无资产两种场景。
+   - 任务可做但优先级和首批容量有限，暂缓发布。
 
-优先使用原生 `label` / `aria-label`；不要引入无障碍依赖或重写公共 picker。
+5. **backend/tests：统一搜索参数边界测试** — `REWRITE → #36`
+   - 当前已有 visibility、alias 和 disabled module 测试，但缺少空 query、无效/越界 limit 的直接断言。
+   - 原提案对未知 scope 的期望与当前实现不一致，已移除该设计争议，只固定现有参数归一化行为。
 
-## 3. Reuse the shared empty state in operation logs
+6. **backend/tests：Demo 关系完整性回归测试** — `REWRITE，待重新拆分`
+   - 当前 static guard 和 OS-03 测试已覆盖部分关系/seed 边界。
+   - 仍可能补充落库后的关系断言，但必须避免与既有测试重复，因此不放入首批。
 
-- **Category**：frontend
-- **Title**：`refactor(frontend): use shared empty state for operation logs`
+7. **docs：API 请求/响应示例** — `REWRITE → #37`
+   - `docs/api-contract.md` 缺少可直接复制的最小 HTTP 请求示例。
+   - 已依据当前 routes 和 frontend API client 收敛为只读、脱敏、文档-only 任务。
 
-### Background
+8. **docs：PostgreSQL migration 验证 checklist** — `REWRITE → #38`
+   - 当前流程分散在 migration README、首次贡献指南和开发指南中，缺少短 checklist。
+   - CLI 命令已在当前 `schema_migrate.py` 中确认存在；Issue 明确隔离数据库和不使用生产库。
 
-`OperationLogPage` 目前直接复制 `.empty` markup，而其他页面使用公共 `EmptyState`。重复结构容易造成按钮、语义和文案行为漂移。
+9. **demo/tooling：生成 SQL 与 manifest 覆盖测试** — `REWRITE → #39`
+   - `demo/generate_demo_sql.py` 和 `demo/manifest.json` 当前没有对应的自动覆盖测试。
+   - OS-03 没有覆盖该关系，保留为独立、标准库、临时目录测试任务。
 
-### Files to start
+10. **demo/tooling：仓库内 Markdown 相对链接检查** — `SKIP`
+    - 需要脚本、CI 和文档联动，超出首批 Good First Issue 的小 PR 边界；不是当前发布阻塞。
 
-- `frontend/src/components/OperationLog/OperationLogPage.jsx`
-- `frontend/src/components/common/StateCards.jsx`
-- `frontend/src/components/OperationLog/operationLogQuery.test.js`
+## 审计边界
 
-### Scope
-
-将操作日志无结果分支改为使用现有 `EmptyState`，保留当前中文文案；如果需要，补充 reset-filter action，但不要改变加载和错误分支。
-
-### Out of scope
-
-不修改操作日志 API、分页、筛选字段、详情弹窗或 CSS token。
-
-### Acceptance Criteria
-
-- 无日志时使用共享空态组件，不再复制 `.empty` 结构。
-- 筛选无结果和真正没有日志都不会显示错误状态。
-- 现有 reset filter 行为（如实现 action）可验证。
-- frontend tests 和 build 通过。
-
-### How to test
-
-```bash
-npm --prefix frontend test
-npm --prefix frontend run build
-```
-
-### Maintainer notes
-
-先阅读 `StateCards.jsx` 的公共 API；保持项目现有中文文案和 React 代码风格，不新增组件变体。
-
-## 4. Make API-asset empty states actionable
-
-- **Category**：frontend
-- **Title**：`fix(frontend): clarify API asset empty-state guidance`
-
-### Background
-
-API 资产页对“没有数据”和“筛选没有结果”都只显示标题，首次贡献者和使用者无法判断应该清空筛选还是新增资产。
-
-### Files to start
-
-- `frontend/src/components/views/ApiAssetView.jsx`
-- `frontend/src/components/views/ApiAssetView.test.js`
-- `frontend/src/components/common/StateCards.jsx`
-
-### Scope
-
-区分 query/filter empty 与 truly empty 的说明；在已有 `EmptyState` 能力范围内补充最小的下一步文案或新增操作入口。
-
-### Out of scope
-
-不修改 API 资产数据模型、筛选参数、保存接口、权限模型或通用卡片组件结构。
-
-### Acceptance Criteria
-
-- 有筛选词时提示如何调整或清空筛选。
-- 无任何 API 资产时提示当前用户可执行的合法下一步。
-- 不改变列表、卡片和分组视图的结果集合。
-- 有对应 regression test，`npm test` 和 build 通过。
-
-### How to test
-
-```bash
-npm --prefix frontend test
-npm --prefix frontend run build
-```
-
-### Maintainer notes
-
-只使用 `app.css` 已有 token 和公共 `EmptyState` API；如果新增按钮，必须遵循现有权限和 `apiAsset.create` 入口。
-
-## 5. Cover unified-search query validation with backend tests
-
-- **Category**：backend/tests
-- **Title**：`test(search): cover empty scope and limit validation`
-
-### Background
-
-统一搜索路由接受 `q`、scope alias 和 limit。现有测试覆盖 disabled visibility 与 module alias，但对空查询、未知 scope 和边界 limit 的行为缺少直接回归约束。
-
-### Files to start
-
-- `backend/app/routes/search.py`
-- `backend/app/services/search_provider.py`
-- `backend/tests/test_search_visibility.py`
-
-### Scope
-
-根据当前实现确认并补充 route/provider tests，明确空查询、未知 scope、非数字 limit、超过最大 limit 的返回结构或错误状态；如实现当前行为不一致，只做最小修复。
-
-### Out of scope
-
-不改搜索 SQL、排序、索引、Provider 注册机制或 disabled module policy。
-
-### Acceptance Criteria
-
-- 每个边界输入都有一个可读的测试名称。
-- 测试断言 status code、`scope`、`groups`/`total` 或统一 error contract。
-- 不连接真实数据库，不依赖环境变量以外的私有服务。
-- 完整 backend tests 通过。
-
-### How to test
-
-```bash
-python -m unittest discover -s backend/tests -p "test_search_visibility.py"
-python -m unittest discover -s backend/tests
-```
-
-### Maintainer notes
-
-先以测试固定仓库当前意图，再判断是否需要修复；不要把未知 scope 静默映射成全量搜索。
-
-## 6. Strengthen demo seed relation regression coverage
-
-- **Category**：backend/tests
-- **Title**：`test(demo): cover API and mapping relation integrity`
-
-### Background
-
-`demo/validate_demo_data.py` 已有关系检查，但 SQLite seed 测试还可以更直接地证明 API 资产引用已存在系统、字段映射引用已存在数据源，避免“静态 guard 通过、seed 后关系断裂”。
-
-### Files to start
-
-- `backend/tests/test_demo_seed.py`
-- `demo/seed_loader.py`
-- `demo/datasets/api_assets.json`
-- `demo/datasets/mappings.json`
-
-### Scope
-
-在现有临时 SQLite 流程中增加 relation assertions，覆盖 API → system、mapping → data source，以及现有 Community-only 表边界。
-
-### Out of scope
-
-不新增 demo 数据、不修改 seed schema、不把可选模块 dataset 写入 Community 表，也不修改 demo 账号。
-
-### Acceptance Criteria
-
-- 关系断裂时测试给出包含业务 key 的失败信息。
-- 重复 seed 后关系测试仍通过。
-- 可选模块表边界断言保持不变。
-- strict guard 和 backend demo tests 通过。
-
-### How to test
-
-```bash
-python -m unittest discover -s backend/tests -p "test_demo_seed.py"
-python demo/validate_demo_data.py --strict
-```
-
-### Maintainer notes
-
-复用 `test_demo_seed.py` 的临时数据库和 dataset helper；不要连接 PostgreSQL 或任何共享数据库。
-
-## 7. Add focused API request/response examples
-
-- **Category**：docs
-- **Title**：`docs(api): add copyable asset and search examples`
-
-### Background
-
-`docs/api-contract.md` 已描述统一格式和端点，但新贡献者仍需要在多个 frontend API 文件之间来回寻找一个最小请求/响应示例。
-
-### Files to start
-
-- `docs/api-contract.md`
-- `frontend/src/api/assets.js`
-- `frontend/src/api/search.js`
-- `backend/app/routes/assets.py`
-- `backend/app/routes/search.py`
-
-### Scope
-
-为一个只读 asset endpoint 和 unified search endpoint 增加脱敏、可复制的 HTTP 请求与最小响应示例，并链接到现有章节。
-
-### Out of scope
-
-不扩展 API、不改变 response shape、不添加真实连接串、真实业务数据或巨型 JSON fixture。
-
-### Acceptance Criteria
-
-- 示例中的 method、path、query parameter 与实现一致。
-- 示例 JSON 与现有 API contract 一致，所有数据均为仓库虚构数据或通用占位符。
-- 文档链接、代码块和中英文术语保持一致。
-
-### How to test
-
-```bash
-git diff --check
-python demo/validate_demo_data.py --strict
-```
-
-### Maintainer notes
-
-实现前先以 route 和 frontend client 为 source of truth；示例不应承诺未验证的认证或数据库行为。
-
-## 8. Document PostgreSQL migration verification checklist
-
-- **Category**：docs
-- **Title**：`docs(database): document PostgreSQL migration verification checklist`
-
-### Background
-
-PostgreSQL 是 Community 与完整部署的主要目标库，仓库已有 migration CLI、方言 SQL 和测试，但贡献者需要一份短 checklist 判断“offline verify 通过”与“隔离数据库 apply 通过”的区别。
-
-### Files to start
-
-- `backend/migrations/README.md`
-- `DEVELOPMENT.md`
-- `docs/architecture.md`
-- `backend/scripts/schema_migrate.py`
-
-### Scope
-
-补充 PostgreSQL 贡献验证顺序：offline verify → plan → fresh apply → seed → repeat apply no-op，并明确 profile、隔离库、凭据脱敏和 PostgreSQL integration 的前置条件。
-
-### Out of scope
-
-不修改 migration runner、SQL、数据库支持范围或新增数据库方言。
-
-### Acceptance Criteria
-
-- 每个命令都存在于当前 CLI，参数与实现一致。
-- 文档明确不得使用生产库，且不要求提交配置文件。
-- 与现有 `docs/first-contribution.md`、`DEVELOPMENT.md` 互相链接而不复制完整环境变量表。
-
-### How to test
-
-```bash
-git diff --check
-python backend/scripts/schema_migrate.py verify --offline --dialect postgresql
-python demo/validate_demo_data.py --strict
-```
-
-### Maintainer notes
-
-只记录仓库已经支持的流程；不要把 SQLAlchemy/Alembic 或 OS-03 demo 作为前置依赖。
-
-## 9. Test generated demo SQL against the manifest
-
-- **Category**：demo/tooling
-- **Title**：`test(demo): verify generated SQL covers every manifest dataset`
-
-### Background
-
-`demo/generate_demo_sql.py` 和 `demo/manifest.json` 共同定义 SQL demo 输出，但当前没有直接测试确保每个 manifest dataset 都生成对应 SQL 文件和 `all-datasets.sql` include。
-
-### Files to start
-
-- `demo/generate_demo_sql.py`
-- `demo/manifest.json`
-- `backend/tests/test_demo_seed.py` 或新的 `backend/tests/test_demo_sql_generation.py`
-
-### Scope
-
-在临时输出目录运行 generator，并断言 manifest 中每个 dataset 都有对应 `.sql` 文件，入口 SQL 引用了这些文件；同时覆盖空/损坏 manifest 的明确失败行为（如当前 CLI 已定义）。
-
-### Out of scope
-
-不改变 SQL 方言渲染、不写入 tracked `demo/` 文件、不改变 seed dataset 或生成一键启动脚本。
-
-### Acceptance Criteria
-
-- 测试不污染仓库，不依赖 PostgreSQL。
-- manifest 新增 dataset 时测试能发现遗漏。
-- 生成器现有命令行输出和默认 git-ignored 目录行为不变。
-
-### How to test
-
-```bash
-python -m unittest discover -s backend/tests -p "test_demo_sql_generation.py"
-python demo/generate_demo_sql.py --output tmp/gfi-demo-sql
-python demo/validate_demo_data.py --strict
-```
-
-### Maintainer notes
-
-使用 Python 标准库 `tempfile`/`pathlib`；不要为该测试引入第三方包，也不要把输出目录提交进 Git。
-
-## 10. Add a repository-local Markdown link check
-
-- **Category**：demo/tooling
-- **Title**：`chore(ci): check relative Markdown links`
-
-### Background
-
-README、贡献指南和 docs 之间的入口越来越多，手工检查容易遗漏重命名文件造成的 broken link。项目目前没有专门的 Markdown link check。
-
-### Files to start
-
-- `.github/workflows/ci.yml`
-- `scripts/`（新增标准库脚本）
-- `README.md`
-- `CONTRIBUTING.md`
-
-### Scope
-
-使用 Python 标准库实现一个只检查仓库内相对 Markdown 文件链接的轻量脚本，并在 CI 中运行；忽略外部 URL、anchor 语义解析和生成的 dist/node_modules。
-
-### Out of scope
-
-不引入 npm/Python 依赖、不访问私有网络、不修改外部链接、不重构现有 workflow 权限，也不改变 README 内容以规避失败。
-
-### Acceptance Criteria
-
-- 缺失的相对文件链接会使脚本以非零状态退出并指出源文件/目标。
-- 已存在的 `.md`、图片和模板链接通过。
-- CI job 在没有数据库、secret 或 GitHub write token 的环境可运行。
-- 本地命令和 CI 命令在 `CONTRIBUTING.md` 中有说明。
-
-### How to test
-
-```bash
-python scripts/check_markdown_links.py
-python demo/validate_demo_data.py --strict
-```
-
-### Maintainer notes
-
-必须使用标准库最小实现，先审查现有链接类型和 CI job 边界；不要把这个 Issue 扩展成全站 URL crawler。
+- 基线：`origin/main` / `55fdf50`，包含已合并的 OS-03 #33。
+- GitHub 当前未发现已有 `good first issue` 或与上述六项高度相似的 open Issue。
+- 六个已发布 Issue 均未分配给任何用户，未添加 `priority:P0`。

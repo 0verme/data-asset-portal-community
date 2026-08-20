@@ -20,12 +20,12 @@ jobs:
       - name: Post first-interaction guidance
         uses: actions/first-interaction@1c4688942c71f71d4f5502a26ea67c331730fa4d # v3
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: |
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          issue_message: |
             感谢你的首次参与！维护者会尽力审阅；如果是使用问题，也欢迎前往 Discussions 交流。
 
             Thanks for your first contribution! A maintainer will review it as time allows. Usage questions are also welcome in Discussions.
-          pr-message: |
+          pr_message: |
             感谢你的首个 Pull Request！请确保已说明测试结果，并已移除凭据、内部数据和真实连接串。
 
             Thanks for your first pull request! Please include test results and make sure no credentials, internal data, or real connection strings are present.
