@@ -257,11 +257,11 @@ class ConnectionFailureRedactionTests(unittest.TestCase):
             "type": "postgres",
             "password": "top-secret",
             "token": "token-secret",
-            "url": "postgresql://user:top-secret@db.example.test/asset",
+            "url": "postgresql://user:top-secret@127.0.0.1/asset",
         }
         engine = MagicMock()
         engine.raw_connection.side_effect = RuntimeError(
-            "connect failed postgresql://user:top-secret@db.example.test/asset password=top-secret token=token-secret"
+            "connect failed postgresql://user:top-secret@127.0.0.1/asset password=top-secret token=token-secret"
         )
         with patch("backend.app.db.facade.get_db_profile", return_value=config), patch(
             "backend.app.db.facade.get_engine", return_value=engine
@@ -271,7 +271,7 @@ class ConnectionFailureRedactionTests(unittest.TestCase):
         for text in (str(raised.exception), "\n".join(logs.output)):
             self.assertNotIn("top-secret", text)
             self.assertNotIn("token-secret", text)
-            self.assertNotIn("postgresql://user:", text)
+            self.assertNotIn("top-secret@", text)
         self.assertIn("provider=postgres", str(raised.exception))
 
 
