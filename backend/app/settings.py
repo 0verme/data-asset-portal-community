@@ -155,7 +155,13 @@ def get_flask_runtime_config() -> dict[str, object]:
     }
 
 
-def load_runtime_env():
+def load_runtime_env(*, overwrite: bool = True):
+    """Load repository env files, optionally preserving process-owned values.
+
+    Normal development keeps the historical file precedence.  The Community
+    Demo uses ``overwrite=False`` so its explicit child-process environment
+    cannot be redirected by a user's unrelated ``.env`` database settings.
+    """
     for env_file in _ENV_FILES:
         if not env_file.exists():
             continue
@@ -174,4 +180,5 @@ def load_runtime_env():
             if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
                 value = value[1:-1]
 
-            os.environ[key] = value
+            if overwrite or key not in os.environ:
+                os.environ[key] = value

@@ -18,7 +18,10 @@ from app import create_app
 from app.settings import get_flask_debug, load_runtime_env
 
 
-load_runtime_env()
+# The bootstrap supplies a complete, SQLite-only child environment. Preserve
+# those values even when a user has unrelated repository .env files.
+_demo_bootstrap = os.environ.get("COMMUNITY_DEMO_BOOTSTRAP") == "1"
+load_runtime_env(overwrite=not _demo_bootstrap)
 app = create_app()
 
 

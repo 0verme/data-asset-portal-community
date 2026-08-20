@@ -55,32 +55,42 @@ trace field/table mappings, and maintain roots, indicators, and downstream metad
 
 ## 🚀 快速开始
 
-### 只看前端（推荐首次体验）
+### Community Demo（完整数据链路，推荐首次体验）
 
-只需 Node.js 22.13+ 和 npm 10+；mock 模式不需要数据库或后端服务。
+需要 Python 3.10+、Node.js 22.13+ 和 npm 10+。脚本会在项目目录内准备后端 virtualenv、前端依赖、SQLite、migration、Community seed，并启动真实 API 与前端。
+
+Linux/macOS：
 
 ```bash
 git clone https://github.com/0verme/data-asset-portal-community.git
 cd data-asset-portal-community
+./scripts/demo.sh
+```
+
+Windows PowerShell：
+
+```powershell
+git clone https://github.com/0verme/data-asset-portal-community.git
+cd data-asset-portal-community
+.\scripts\demo.ps1
+```
+
+启动后按终端输出打开 Demo URL，使用账号 `community_demo / demo-change-me` 登录。
+初始化但不启动服务时，使用 `./scripts/demo.sh --init-only` 或
+`.\scripts\demo.ps1 -InitOnly`。详细说明见 [Community Demo 指南](./docs/community-demo.md)。
+
+### 只看前端（mock）
+
+只需 Node.js 22.13+ 和 npm 10+；mock 模式不需要数据库或后端服务。
+
+```bash
 npm --prefix frontend ci
 cp frontend/.env.example frontend/.env.local
 npm --prefix frontend run dev
 ```
 
-Windows PowerShell 可使用：
-
-```powershell
-Copy-Item frontend/.env.example frontend/.env.local
-npm --prefix frontend run dev
-```
-
-确认 `frontend/.env.local` 中为 `VITE_API_MODE=mock` 后，打开 Vite 输出的地址，使用
-`admin / admin123` 登录。mock 数据只用于前端体验，不会写入数据库。
-
-### Community Demo（完整数据链路）
-
-需要 SQLite 数据库、迁移和虚构演示数据时，按 [Community Demo 指南](./docs/community-demo.md) 操作。
-该路径是可复现的多步骤开发流程，不是本任务范围内的 one-command demo。
+确认 `frontend/.env.local` 中为 `VITE_API_MODE=mock` 后，使用 `admin / admin123` 登录。
+mock 数据只用于前端体验，不会写入数据库。
 
 ## 🤝 社区入口
 
