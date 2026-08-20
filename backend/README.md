@@ -125,7 +125,7 @@ python backend/scripts/schema_migrate.py apply --profile community_sqlite
 python demo/seed_sqlite.py --database <绝对路径>/community.db
 ```
 
-完整版（含 Private 模块）可手动逐个执行模块 DDL，没有一键脚本，后端启动也不会自动初始化：
+完整版（含可选模块）可手动逐个执行模块 DDL，没有一键脚本，后端启动也不会自动初始化：
 按数据库类型选 `docs/pg/*-app-pg-ddl.sql`（PostgreSQL）或 `docs/dws/*-app-dws-ddl.sql`（DWS / GaussDB），
 用对应客户端（`psql -f` / `gsql -f`）逐个执行。具体命令见
 [根目录 README 的「数据库初始化」](../README.md#-快速开始)。

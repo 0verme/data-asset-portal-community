@@ -8,12 +8,12 @@
 ```
 Community / Core
       ↑
-Private Extension（upstream / report / push / codeTable）
+Optional Extension（upstream / report / push / codeTable）
 ```
 
-- Core 允许被 Private 引用，但 Core **不反向依赖** Private。
-- Private 模块的表只由 docs DDL（完整版初始化）创建；Community migration
-  永不创建 Private 表。
+- Core 允许被 Optional 引用，但 Core **不反向依赖** Optional。
+- 可选模块的表只由 docs DDL（完整部署初始化）创建；Community migration
+  永不创建可选模块表。
 
 ## Community / Core（migration 0002-0006 创建，Community 与完整版共有）
 

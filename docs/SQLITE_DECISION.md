@@ -66,7 +66,7 @@ Community 隔离运行方式，但 `.env.example`、部分历史文档仍残留"
 |---|---|
 | Community 本地演示 / 开发 / CI | **SQLite**（`community_sqlite` profile） |
 | Community 正式部署 | **PostgreSQL**（`community_postgres` profile） |
-| 完整版正式部署（含 private 模块） | **PostgreSQL / GaussDB (DWS)** |
+| 完整部署（含可选模块） | **PostgreSQL / GaussDB (DWS)** |
 
 删除 SQLite 的成本（fixture 重写、PG 依赖、Community 默认配置失效）远超其
 维护成本；保留 SQLite 不污染 Service SQL，且带来 clone-to-run 与 CI 收益。
@@ -84,5 +84,5 @@ Community 隔离运行方式，但 `.env.example`、部分历史文档仍残留"
 ## 反面决策记录
 
 - Cloudflare D1 **不支持**（无 adapter、无计划）。
-- SQLite **不是**完整版（private 模块）运行目标；private 模块需要
+- SQLite **不是**完整部署（可选模块）的运行目标；可选模块需要
   PostgreSQL/GaussDB 的 schema 能力。

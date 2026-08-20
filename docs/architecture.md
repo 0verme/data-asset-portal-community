@@ -39,7 +39,7 @@ flowchart LR
 Community 和完整版复用同一模块注册机制，不维护第二套路由或搜索实现：
 
 - Community 默认启用公共目录、资产、血缘、词根和指标等核心能力，可使用 SQLite 或 PostgreSQL。
-- 完整版启用全部私人业务模块，正式部署使用 PostgreSQL 或 GaussDB/DWS。
+- 完整部署可按需启用全部可选业务模块，正式部署使用 PostgreSQL 或 GaussDB/DWS。
 - 字段映射使用公共逻辑数据源模型，不以 Upstream 作为运行依赖。
 - API 资产使用公共业务系统模型，不以 Push 连接配置作为运行依赖。
 - 关闭模块时，其蓝图、菜单、搜索 Provider 和门户统计 Provider 同步退出。
@@ -51,7 +51,7 @@ Cloudflare D1 不属于支持范围。SQLite 只用于 Community/local 隔离运
 - **Schema Source of Truth = `backend/migrations`（manifest + 方言 SQL）**。
   Community 新安装的唯一官方初始化路径：`schema_migrate.py apply` → demo seed
   （SQLite 或 PostgreSQL）；完整版在此基础上由 `docs/{pg,dws}` 参考 DDL 补建
-  Private 模块表（push/upstream/report/codeTable）与血缘快照表。
+  可选模块表（push/upstream/report/codeTable）与血缘快照表。
 - `docs/pg/` 与 `docs/dws/` 的模块 DDL 仅作为参考文档，不再作为 Community 初始化机制；
   与本轮对齐后，其 Community core 表结构与 migration 一致（见 `docs/TABLE_OWNERSHIP.md`）。
 - `backend/migrations/manifest.json` 是受管迁移清单；应用启动不会自动迁移。

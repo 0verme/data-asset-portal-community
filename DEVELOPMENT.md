@@ -172,12 +172,12 @@ python demo/seed_sqlite.py --database <绝对路径>/community.db
 
 PostgreSQL 同理：`apply --profile community_postgres` + `demo/seed_postgres.py`。
 
-完整版（含 Private 模块）开发可手动逐个执行模块 DDL，没有一键脚本，也不要让后端自动初始化：
+完整版（含可选模块）开发可手动逐个执行模块 DDL，没有一键脚本，也不要让后端自动初始化：
 
 - `postgres` → `docs/pg/*-app-pg-ddl.sql`
 - `gaussdb` / `dws` → `docs/dws/*-app-dws-ddl.sql`
 
-上述 DDL 面向完整版 PostgreSQL/GaussDB 环境，同时创建 Private 模块表与血缘快照表；
+上述 DDL 面向完整版 PostgreSQL/GaussDB 环境，同时创建可选模块表与血缘快照表；
 每个模块一份 DDL，均为幂等写法，可安全重复执行。具体执行命令与注意事项见
 [README 的「数据库初始化」](./README.md#-快速开始)。
 

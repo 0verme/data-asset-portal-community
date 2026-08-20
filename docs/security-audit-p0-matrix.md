@@ -20,7 +20,7 @@
 | H3 | Security Headers | 无 HSTS | Low | P1：部署为内网 HTTP + Nginx 终止 TLS，HSTS 应在 Nginx 层配置；在 Flask 默认开启会对本地 HTTP 开发错误生效 | ❌ |
 | S1 | Secrets / Config | 仓库无真实 secret（safety_scan + gitignore）；`.env.example`/`database.community.yaml` 均为占位符；SECRET_KEY 缺失 fail-fast | Info | 已合规，无变更 | ❌ |
 | L1 | Logging | `facade` 的 `LOGGER.exception` 会把 DB 异常 traceback 写入日志文件（可能含连接信息，但仅本地文件、不含客户端）；审计日志敏感字段脱敏已实现；LOG_FORMAT 无敏感字段 | Low | 现有的 facade 日志行为可接受（本地文件）；完整 scrub 记入 P1 | ❌ |
-| A1 | Auth / Authorization | 全部写操作有 `require_maintainer`/`require_admin`；admin 专属路由边界正确；读操作匿名是设计（门户浏览）；private 模块蓝图在 Community 不注册（`/api/upstreams`、`/api/push`、`/api/reports`、`/api/manual-code-tables` 返回 404） | Info | 已合规；跑现有 `test_disabled_modules` / `test_community_boundary` 验证 | ❌ |
+| A1 | Auth / Authorization | 全部写操作有 `require_maintainer`/`require_admin`；admin 专属路由边界正确；读操作匿名是设计（门户浏览）；可选模块蓝图在 Community 不注册（`/api/upstreams`、`/api/push`、`/api/reports`、`/api/manual-code-tables` 返回 404） | Info | 已合规；跑现有 `test_disabled_modules` / `test_community_boundary` 验证 | ❌ |
 | A2 | Auth / Authorization | SQL 使用 `_quote` 手写单引号转义模式（非 parameterized query）；抽查未发现可利用注入点，但属薄弱面 | Medium | P1：渐进迁移 parameterized query | ❌ |
 | T1 | Regression Tests | 已有 `test_flask_security_config`、`test_repo_safety_guard`、`test_disabled_modules`、`test_community_boundary` | Info | 新增：production config fail-fast、error sanitization、request limit、proxy trust、依赖安全版本约束 | ✅ |
 

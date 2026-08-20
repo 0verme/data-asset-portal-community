@@ -5,7 +5,7 @@
 are the only official schema initialization path for new **Community** installs
 (migration apply → `demo/seed_*.py` seed). The per-module DDL under
 `docs/{pg,dws}` is **reference documentation** for the full edition (it also
-creates private-module tables such as push/upstream/report/codeTable and the
+creates optional-module tables such as push/upstream/report/codeTable and the
 lineage snapshot tables); it is no longer an alternative initialization
 mechanism for Community and must not contradict the migrations.
 
