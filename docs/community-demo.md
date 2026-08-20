@@ -74,7 +74,7 @@ CI 或只想初始化数据库时，不启动常驻服务：
 .\scripts\demo.ps1 -InitOnly
 ```
 
-该模式会检查 runtime、依赖、Demo 配置、SQLite、migration、seed 和前端 remote 配置，然后退出 `0`。
+该模式会检查 runtime、依赖、Demo 配置、SQLite、migration、seed，并通过 bootstrap 注入前端 remote 配置，然后退出 `0`。
 可连续运行多次；第二次会显示 `applied=-`，seed 不会复制用户、资产或关系数据。
 
 ## Generated files and safety
@@ -85,12 +85,11 @@ CI 或只想初始化数据库时，不启动常驻服务：
 | --- | --- | --- | --- |
 | `.demo/community-demo/community.sqlite` | Community 专属 SQLite 数据库 | 是 | 否 |
 | `.demo/community-demo/database.yaml` | 仅包含上述 SQLite 路径的 profile | 是 | 否 |
-| `.demo/community-demo/frontend.env` | 生成的 frontend remote/API 配置记录 | 是 | 否 |
 | `.demo/community-demo/flask-secret.key` | 随机 development session secret | 是 | 是 |
 
 脚本不会覆盖或 merge 用户已有的 `.env`、`.env.local`、`backend/.env*` 或 `frontend/.env.local`。
 后端 Demo 子进程会显式固定 `community` + `community_sqlite` + 已知本地 SQLite 路径，并隔离继承的
-`DATABASE_URL`、`PG*`、`MYSQL_*`、`DB_*` 和 `ASSET_DB_*` 变量，因此不会因为用户 shell 或配置文件中的外部数据库设置而连接生产库。
+`LINEAGE_DB_PROFILE`、`DATABASE_URL`、`PG*`、`MYSQL_*`、`DB_*` 和 `ASSET_DB_*` 变量；血缘保持 POC/in-memory 模式，因此不会因为用户 shell 或配置文件中的外部数据库设置而连接生产库。
 
 默认不提供 destructive reset。若要重新开始，请在确认路径确实是本 bootstrap 创建的
 `.demo/community-demo/` 后，手工移除该目录，再重新运行命令；不要删除用户 `.env` 或其他 SQLite 文件。

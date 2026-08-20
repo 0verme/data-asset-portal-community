@@ -32,6 +32,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         self.assertIn("community_sqlite:", first_config)
         self.assertGreaterEqual(len(first_secret), 48)
         self.assertNotIn(first_secret, self.paths.database_config.read_text(encoding="utf-8"))
+        self.assertFalse((self.paths.runtime / "frontend.env").exists())
 
     def test_redirected_database_path_is_rejected(self):
         outside_database = self.root / "user.sqlite"
@@ -58,9 +59,12 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
     def test_external_database_environment_cannot_redirect_demo(self):
         environment = build_demo_environment(
             {
+                "LINEAGE_DB_PROFILE": "production_lineage",
                 "DATABASE_URL": "postgresql://example.invalid/test",
                 "PGHOST": "example.invalid",
+                "PGSERVICE": "production",
                 "MYSQL_HOST": "example.invalid",
+                "DB_HOST": "example.invalid",
                 "ASSET_DB_PROFILE": "primary",
                 "ASSET_DB_DATABASE": "production",
                 "VITE_API_MODE": "mock",
@@ -74,10 +78,32 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         self.assertEqual("community_sqlite", environment["ASSET_DB_PROFILE"])
         self.assertEqual(str(self.paths.database.resolve()), environment["ASSET_DB_DATABASE"])
         self.assertEqual("community_sqlite", environment["ASSET_AUTH_DB_PROFILE"])
+        self.assertEqual("", environment["LINEAGE_DB_PROFILE"])
         self.assertEqual("remote", environment["VITE_API_MODE"])
         self.assertEqual("unchanged", environment["KEEP_ME"])
-        for key in ("DATABASE_URL", "PGHOST", "MYSQL_HOST"):
+        for key in ("DATABASE_URL", "PGHOST", "PGSERVICE", "MYSQL_HOST", "DB_HOST"):
             self.assertNotIn(key, environment)
+
+    def test_non_demo_lineage_profile_still_selects_persistent_storage(self):
+        lineage_service = importlib.import_module("backend.app.services.lineage_service")
+
+        with patch.dict(
+            os.environ,
+            {
+                "FLASK_ENV": "production",
+                "ASSET_EDITION": "private",
+                "LINEAGE_DB_PROFILE": "production_lineage",
+            },
+            clear=False,
+        ):
+            self.assertEqual(
+                {
+                    "mode": "persistent",
+                    "profile": "production_lineage",
+                    "schema": "dwp",
+                },
+                lineage_service.lineage_storage_status(),
+            )
 
     def test_load_runtime_env_can_preserve_process_owned_values(self):
         settings = importlib.import_module("backend.app.settings")

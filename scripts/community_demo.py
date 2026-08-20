@@ -49,7 +49,6 @@ class DemoPaths:
     database: Path
     database_config: Path
     secret: Path
-    frontend_env: Path
     backend_venv: Path
 
     @classmethod
@@ -62,7 +61,6 @@ class DemoPaths:
             database=runtime / "community.sqlite",
             database_config=runtime / "database.yaml",
             secret=runtime / "flask-secret.key",
-            frontend_env=runtime / "frontend.env",
             backend_venv=root / "backend" / ".venv",
         )
 
@@ -141,12 +139,6 @@ def prepare_demo_runtime(paths: DemoPaths) -> str:
         "    type: sqlite\n"
         f"    database: {database_literal}\n",
     )
-    _write_generated_file(
-        paths.frontend_env,
-        "VITE_API_MODE=remote\n"
-        "VITE_API_BASE_URL=/api\n"
-        f"VITE_BACKEND_URL=http://127.0.0.1:{BACKEND_PORT}\n",
-    )
     return _load_or_create_secret(paths.secret)
 
 
@@ -199,6 +191,7 @@ def build_demo_environment(
             "FLASK_PORT",
             "FLASK_SECRET_KEY",
             "FLASK_CORS_ORIGINS",
+            "LINEAGE_DB_PROFILE",
             "COMMUNITY_DEMO_BOOTSTRAP",
         }
     }
@@ -220,6 +213,7 @@ def build_demo_environment(
             "FLASK_PORT": str(BACKEND_PORT),
             "FLASK_SECRET_KEY": secret,
             "FLASK_CORS_ORIGINS": f"http://127.0.0.1:{FRONTEND_PORT},http://localhost:{FRONTEND_PORT}",
+            "LINEAGE_DB_PROFILE": "",
             "VITE_API_MODE": "remote",
             "VITE_API_BASE_URL": "/api",
             "VITE_BACKEND_URL": f"http://127.0.0.1:{BACKEND_PORT}",
