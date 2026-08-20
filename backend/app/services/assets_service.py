@@ -21,14 +21,11 @@ import re
 from copy import deepcopy
 from time import perf_counter
 
-from ..db.gaussdb import (
-    database_transaction,
-    execute_sql,
-    execute_statements,
-    fetch_all,
-    get_db_profile,
-    resolve_db_profile_name,
-)
+from sqlalchemy import delete, exists, func, insert, or_, select, update
+
+from ..db.facade import database_transaction, get_db_profile, resolve_db_profile_name
+from ..db.service import CoreAccess
+from ..db.tables import asset_change_log, asset_domain, asset_field, asset_layer, asset_table
 from ..settings import get_default_operator, get_page_size_limits
 from ..utils.data_types import DEFAULT_DATA_TYPE, normalize_data_type
 from ..utils.ddl_generator import generate_table_ddl, get_ddl_dialect_label, normalize_db_dialect
@@ -52,13 +49,24 @@ DEFAULT_LAYER_OPTIONS = [
     {"code": "DM", "cn": "数据集市层", "active": True},
     {"code": "ADS", "cn": "应用层", "active": False},
 ]
-
-TABLE_DOMAIN = "dwp.p_asset_domain"
-TABLE_LAYER = "dwp.p_asset_layer"
-TABLE_ASSET = "dwp.p_asset_table"
-TABLE_FIELD = "dwp.p_asset_field"
-TABLE_CHANGE_LOG = "dwp.p_asset_change_log"
 LOGGER = logging.getLogger(__name__)
+
+ASSET_SORT_COLUMNS = {
+    "name": asset_table.c.table_name,
+    "table_name": asset_table.c.table_name,
+    "cn": asset_table.c.table_cn_name,
+    "table_cn_name": asset_table.c.table_cn_name,
+    "schema": asset_table.c.schema_name,
+    "schema_name": asset_table.c.schema_name,
+    "layer": asset_table.c.layer_code,
+    "layer_code": asset_table.c.layer_code,
+    "domain": asset_domain.c.domain_name,
+    "domain_code": asset_table.c.domain_code,
+    "owner": asset_table.c.owner_name,
+    "owner_name": asset_table.c.owner_name,
+    "updated_at": asset_table.c.updated_at,
+    "created_at": asset_table.c.created_at,
+}
 
 
 class AssetNotFoundError(Exception):
@@ -115,25 +123,18 @@ class AssetsService:
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
         self._default_schema_prefix = os.getenv("ASSET_SCHEMA_PREFIX", "DWS_").strip() or "DWS_"
         self._default_operator = get_default_operator()
+        self._db = CoreAccess(
+            profile_getter=lambda: self._db_profile,
+            error_factory=AssetDataSourceError,
+        )
 
-    def _fetch_rows(self, sql):
-        try:
-            columns, rows = fetch_all(self._db_profile or resolve_db_profile_name(), sql)
-        except FileNotFoundError as error:
-            raise AssetDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise AssetDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise AssetDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise AssetDataSourceError("数据库查询失败") from error
+    def _fetch_rows(self, statement):
+        return self._db.fetch_rows(statement)
 
-        return [dict(zip(columns, row)) for row in rows]
-
-    def _fetch_rows_logged(self, sql, *, purpose, method, page=None, page_size=None, keyword=None):
+    def _fetch_rows_logged(self, statement, *, purpose, method, page=None, page_size=None, keyword=None):
         started_at = perf_counter()
         try:
-            return self._fetch_rows(sql)
+            return self._fetch_rows(statement)
         finally:
             log_slow_service_call(
                 LOGGER,
@@ -146,40 +147,11 @@ class AssetsService:
                 keyword=keyword,
             )
 
-    def _execute_sql(self, sql):
-        try:
-            return execute_sql(self._db_profile or resolve_db_profile_name(), sql)
-        except FileNotFoundError as error:
-            raise AssetDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise AssetDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise AssetDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise AssetDataSourceError("数据库执行失败") from error
-
     def _execute_statements(self, statements):
-        try:
-            return execute_statements(self._db_profile or resolve_db_profile_name(), statements)
-        except FileNotFoundError as error:
-            raise AssetDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise AssetDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise AssetDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise AssetDataSourceError("数据库执行失败") from error
-
-    def _quote(self, value):
-        if value is None:
-            return "NULL"
-        return "'" + str(value).replace("'", "''") + "'"
+        return self._db.execute_statements(statements)
 
     def _flag(self, value):
-        return "'Y'" if value else "'N'"
-
-    def _escape_comment(self, value):
-        return str(value or "").replace("'", "''")
+        return "Y" if value else "N"
 
     def _normalize_layer_schema(self, layer):
         return f"{self._default_schema_prefix}{layer.upper()}"
@@ -202,31 +174,15 @@ class AssetsService:
         return normalized_page, normalized_page_size
 
     def _normalize_asset_order(self, order_by=None):
-        sort_map = {
-            "name": "t.table_name",
-            "table_name": "t.table_name",
-            "cn": "t.table_cn_name",
-            "table_cn_name": "t.table_cn_name",
-            "schema": "t.schema_name",
-            "schema_name": "t.schema_name",
-            "layer": "t.layer_code",
-            "layer_code": "t.layer_code",
-            "domain": "d.domain_name",
-            "domain_code": "t.domain_code",
-            "owner": "t.owner_name",
-            "owner_name": "t.owner_name",
-            "updated_at": "t.updated_at",
-            "created_at": "t.created_at",
-        }
         text = str(order_by or "").strip()
         if not text:
-            return "ORDER BY t.layer_code, t.table_name"
+            return (asset_table.c.layer_code.asc(), asset_table.c.table_name.asc())
         parts = text.split()
-        column = sort_map.get(parts[0].lower())
-        if not column:
-            return "ORDER BY t.layer_code, t.table_name"
-        direction = "DESC" if len(parts) > 1 and parts[1].lower() == "desc" else "ASC"
-        return f"ORDER BY {column} {direction}, t.table_name ASC"
+        column = ASSET_SORT_COLUMNS.get(parts[0].lower())
+        if column is None:
+            return (asset_table.c.layer_code.asc(), asset_table.c.table_name.asc())
+        direction = column.desc() if len(parts) > 1 and parts[1].lower() == "desc" else column.asc()
+        return (direction, asset_table.c.table_name.asc())
 
     def _resolve_active_profile_name(self):
         return self._db_profile or resolve_db_profile_name()
@@ -252,59 +208,47 @@ class AssetsService:
             )
         return value
 
-    def _get_next_id(self, table_name, id_column):
-        sql = f"SELECT COALESCE(MAX({id_column}), 0) + 1 AS next_id FROM {table_name}"
-        rows = self._fetch_rows(sql)
-        return int(rows[0]["next_id"])
+    def _get_next_id(self, table, column):
+        return self._db.next_pk(table, column)
+
+    def _like(self, column, value):
+        return func.lower(func.coalesce(column, "")).like(f"%{str(value or '').strip().lower()}%")
 
     def _load_domain_rows(self, layer=None):
-        layer_filter = ""
+        counted = select(asset_table.c.domain_code, func.count().label("table_count"))
         if str(layer or "").strip():
-            layer_filter = f"WHERE UPPER(layer_code) = {self._quote(str(layer).strip().upper())}"
-        sql = f"""
-SELECT
-    d.domain_code,
-    d.domain_name,
-    d.display_order,
-    d.is_active,
-    COALESCE(t.table_count, 0) AS table_count
-FROM {TABLE_DOMAIN} d
-LEFT JOIN (
-    SELECT domain_code, COUNT(1) AS table_count
-    FROM {TABLE_ASSET}
-    {layer_filter}
-    GROUP BY domain_code
-) t
-  ON d.domain_code = t.domain_code
-ORDER BY d.display_order, d.domain_code
-"""
-        return self._fetch_rows(sql)
+            counted = counted.where(func.upper(asset_table.c.layer_code) == str(layer).strip().upper())
+        counted = counted.group_by(asset_table.c.domain_code).subquery()
+        return self._fetch_rows(
+            select(
+                asset_domain.c.domain_code,
+                asset_domain.c.domain_name,
+                asset_domain.c.display_order,
+                asset_domain.c.is_active,
+                func.coalesce(counted.c.table_count, 0).label("table_count"),
+            )
+            .select_from(asset_domain.outerjoin(counted, asset_domain.c.domain_code == counted.c.domain_code))
+            .order_by(asset_domain.c.display_order, asset_domain.c.domain_code)
+        )
 
     def _load_layer_rows(self, domain=None):
-        domain_filter = ""
+        counted = select(asset_table.c.layer_code, func.count().label("table_count")).select_from(asset_table)
         if str(domain or "").strip():
-            domain_filter = (
-                f"JOIN {TABLE_DOMAIN} d ON d.domain_code = a.domain_code "
-                f"WHERE LOWER(d.domain_name) = {self._quote(str(domain).strip().lower())}"
+            counted = counted.join(asset_domain, asset_domain.c.domain_code == asset_table.c.domain_code).where(
+                func.lower(asset_domain.c.domain_name) == str(domain).strip().lower()
             )
-        sql = f"""
-SELECT
-    l.layer_code,
-    l.layer_name,
-    l.display_order,
-    l.is_active,
-    COALESCE(t.table_count, 0) AS table_count
-FROM {TABLE_LAYER} l
-LEFT JOIN (
-    SELECT a.layer_code, COUNT(1) AS table_count
-    FROM {TABLE_ASSET} a
-    {domain_filter}
-    GROUP BY a.layer_code
-) t
-  ON l.layer_code = t.layer_code
-ORDER BY l.display_order, l.layer_code
-"""
-        return self._fetch_rows(sql)
+        counted = counted.group_by(asset_table.c.layer_code).subquery()
+        return self._fetch_rows(
+            select(
+                asset_layer.c.layer_code,
+                asset_layer.c.layer_name,
+                asset_layer.c.display_order,
+                asset_layer.c.is_active,
+                func.coalesce(counted.c.table_count, 0).label("table_count"),
+            )
+            .select_from(asset_layer.outerjoin(counted, asset_layer.c.layer_code == counted.c.layer_code))
+            .order_by(asset_layer.c.display_order, asset_layer.c.layer_code)
+        )
 
     def _load_domain_mappings(self):
         code_to_name = {}
@@ -318,43 +262,45 @@ ORDER BY l.display_order, l.layer_code
             name_to_code[name] = code
         return code_to_name, name_to_code
 
-    def _build_asset_where(self, *, keyword=None, schema_name=None, layer=None, domain=None, owner=None):
+    def _build_asset_filters(self, *, keyword=None, schema_name=None, layer=None, domain=None, owner=None):
         code_to_name, name_to_code = self._load_domain_mappings()
-        where = []
+        clauses = []
         normalized_keyword = str(keyword or "").strip().lower()
         if normalized_keyword:
-            like = self._quote(f"%{normalized_keyword}%")
-            where.append(
-                "("
-                f"LOWER(COALESCE(t.table_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(t.table_cn_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(t.owner_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(t.schema_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(t.grain_desc, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(t.cycle_desc, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(t.table_desc, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(d.domain_name, '')) LIKE {like} OR "
-                f"EXISTS ("
-                f"SELECT 1 FROM {TABLE_FIELD} f "
-                f"WHERE f.asset_id = t.asset_id AND f.is_deleted = 'N' "
-                f"AND ("
-                f"LOWER(COALESCE(f.field_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(f.field_cn_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(f.field_desc, '')) LIKE {like}"
-                f")"
-                f")"
-                ")"
+            like = f"%{normalized_keyword}%"
+            field_match = exists(
+                select(1).where(
+                    asset_field.c.asset_id == asset_table.c.asset_id,
+                    asset_field.c.is_deleted == "N",
+                    or_(
+                        func.lower(func.coalesce(asset_field.c.field_name, "")).like(like),
+                        func.lower(func.coalesce(asset_field.c.field_cn_name, "")).like(like),
+                        func.lower(func.coalesce(asset_field.c.field_desc, "")).like(like),
+                    ),
+                )
+            )
+            clauses.append(
+                or_(
+                    self._like(asset_table.c.table_name, keyword),
+                    self._like(asset_table.c.table_cn_name, keyword),
+                    self._like(asset_table.c.owner_name, keyword),
+                    self._like(asset_table.c.schema_name, keyword),
+                    self._like(asset_table.c.grain_desc, keyword),
+                    self._like(asset_table.c.cycle_desc, keyword),
+                    self._like(asset_table.c.table_desc, keyword),
+                    self._like(asset_domain.c.domain_name, keyword),
+                    field_match,
+                )
             )
         if schema_name:
-            where.append(f"t.schema_name = {self._quote(schema_name)}")
+            clauses.append(asset_table.c.schema_name == schema_name)
         if layer:
-            where.append(f"t.layer_code = {self._quote(layer)}")
+            clauses.append(asset_table.c.layer_code == layer)
         if domain:
-            domain_code = name_to_code.get(domain, domain)
-            where.append(f"t.domain_code = {self._quote(domain_code)}")
+            clauses.append(asset_table.c.domain_code == name_to_code.get(domain, domain))
         if owner:
-            where.append(f"t.owner_name = {self._quote(owner)}")
-        return where, code_to_name
+            clauses.append(asset_table.c.owner_name == owner)
+        return clauses, code_to_name
 
     def _select_asset_rows(
         self,
@@ -371,60 +317,65 @@ ORDER BY l.display_order, l.layer_code
         paginate = page is not None or page_size is not None
         page, page_size = self._resolve_paging(page=page, page_size=page_size)
         offset = (page - 1) * page_size
-        where, code_to_name = self._build_asset_where(
+        clauses, code_to_name = self._build_asset_filters(
             keyword=keyword,
             schema_name=schema_name,
             layer=layer,
             domain=domain,
             owner=owner,
         )
-        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
         normalized_keyword = str(keyword or "").strip().lower()
-        field_match_sql = "NULL AS field_match"
+        field_match_sql = None
         if normalized_keyword:
-            field_like = self._quote(f"%{normalized_keyword}%")
-            field_match_sql = f"""
-(
-    SELECT f.field_name || ' ' || COALESCE(f.field_cn_name, f.field_desc, '')
-    FROM {TABLE_FIELD} f
-    WHERE f.asset_id = t.asset_id
-      AND f.is_deleted = 'N'
-      AND (
-        LOWER(COALESCE(f.field_name, '')) LIKE {field_like}
-        OR LOWER(COALESCE(f.field_cn_name, '')) LIKE {field_like}
-        OR LOWER(COALESCE(f.field_desc, '')) LIKE {field_like}
-      )
-    ORDER BY f.field_order, f.field_name
-    LIMIT 1
-) AS field_match
-""".strip()
-        sql = f"""
-SELECT
-    t.asset_id,
-    t.table_name,
-    t.table_cn_name,
-    t.schema_name,
-    t.layer_code,
-    t.domain_code,
-    t.owner_name,
-    t.grain_desc,
-    t.cycle_desc,
-    t.table_desc,
-    t.field_count,
-    t.created_at,
-    t.updated_at,
-    COUNT(*) OVER() AS total_count,
-    {field_match_sql}
-FROM {TABLE_ASSET} t
-LEFT JOIN {TABLE_DOMAIN} d
-  ON d.domain_code = t.domain_code
-{where_sql}
-{self._normalize_asset_order(order_by)}
-"""
+            like = f"%{normalized_keyword}%"
+            field_match_sql = (
+                select(
+                    asset_field.c.field_name.concat(" ").concat(
+                        func.coalesce(asset_field.c.field_cn_name, asset_field.c.field_desc, "")
+                    )
+                )
+                .where(
+                    asset_field.c.asset_id == asset_table.c.asset_id,
+                    asset_field.c.is_deleted == "N",
+                    or_(
+                        func.lower(func.coalesce(asset_field.c.field_name, "")).like(like),
+                        func.lower(func.coalesce(asset_field.c.field_cn_name, "")).like(like),
+                        func.lower(func.coalesce(asset_field.c.field_desc, "")).like(like),
+                    ),
+                )
+                .order_by(asset_field.c.field_order, asset_field.c.field_name)
+                .limit(1)
+                .scalar_subquery()
+                .label("field_match")
+            )
+        columns = [
+            asset_table.c.asset_id,
+            asset_table.c.table_name,
+            asset_table.c.table_cn_name,
+            asset_table.c.schema_name,
+            asset_table.c.layer_code,
+            asset_table.c.domain_code,
+            asset_table.c.owner_name,
+            asset_table.c.grain_desc,
+            asset_table.c.cycle_desc,
+            asset_table.c.table_desc,
+            asset_table.c.field_count,
+            asset_table.c.created_at,
+            asset_table.c.updated_at,
+            func.count().over().label("total_count"),
+        ]
+        if field_match_sql is not None:
+            columns.append(field_match_sql)
+        statement = select(*columns).select_from(
+            asset_table.outerjoin(asset_domain, asset_domain.c.domain_code == asset_table.c.domain_code)
+        )
+        for clause in clauses:
+            statement = statement.where(clause)
+        statement = statement.order_by(*self._normalize_asset_order(order_by))
         if paginate:
-            sql += f"\nLIMIT {page_size} OFFSET {offset}"
+            statement = statement.limit(page_size).offset(offset)
         rows = self._fetch_rows_logged(
-            sql,
+            statement,
             purpose="asset table list",
             method="_select_asset_rows",
             page=page,
@@ -436,22 +387,20 @@ LEFT JOIN {TABLE_DOMAIN} d
         return rows, page, page_size
 
     def _count_asset_rows(self, *, keyword=None, schema_name=None, layer=None, domain=None, owner=None):
-        where, _ = self._build_asset_where(
+        clauses, _ = self._build_asset_filters(
             keyword=keyword,
             schema_name=schema_name,
             layer=layer,
             domain=domain,
             owner=owner,
         )
-        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+        statement = select(func.count().label("total_count")).select_from(
+            asset_table.outerjoin(asset_domain, asset_domain.c.domain_code == asset_table.c.domain_code)
+        )
+        for clause in clauses:
+            statement = statement.where(clause)
         rows = self._fetch_rows_logged(
-            f"""
-SELECT COUNT(1) AS total_count
-FROM {TABLE_ASSET} t
-LEFT JOIN {TABLE_DOMAIN} d
-  ON d.domain_code = t.domain_code
-{where_sql}
-""",
+            statement,
             purpose="asset table count",
             method="_count_asset_rows",
             keyword=keyword,
@@ -459,32 +408,31 @@ LEFT JOIN {TABLE_DOMAIN} d
         return int(rows[0].get("total_count") or 0)
 
     def _load_table_rows(self, layer=None, domain=None):
-        # Legacy helper for explicitly small datasets only.
-        # Detail/edit/DDL flows must use precise lookup methods instead.
-        where, code_to_name = self._build_asset_where(layer=layer, domain=domain)
-        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
-        sql = f"""
-SELECT
-    t.asset_id,
-    t.table_name,
-    t.table_cn_name,
-    t.schema_name,
-    t.layer_code,
-    t.domain_code,
-    t.owner_name,
-    t.grain_desc,
-    t.cycle_desc,
-    t.table_desc,
-    t.field_count,
-    t.created_at,
-    t.updated_at
-FROM {TABLE_ASSET} t
-LEFT JOIN {TABLE_DOMAIN} d
-  ON d.domain_code = t.domain_code
-{where_sql}
-ORDER BY t.layer_code, t.table_name
-"""
-        rows = self._fetch_rows_logged(sql, purpose="legacy asset full load", method="_load_table_rows")
+        clauses, code_to_name = self._build_asset_filters(layer=layer, domain=domain)
+        statement = select(
+            asset_table.c.asset_id,
+            asset_table.c.table_name,
+            asset_table.c.table_cn_name,
+            asset_table.c.schema_name,
+            asset_table.c.layer_code,
+            asset_table.c.domain_code,
+            asset_table.c.owner_name,
+            asset_table.c.grain_desc,
+            asset_table.c.cycle_desc,
+            asset_table.c.table_desc,
+            asset_table.c.field_count,
+            asset_table.c.created_at,
+            asset_table.c.updated_at,
+        ).select_from(
+            asset_table.outerjoin(asset_domain, asset_domain.c.domain_code == asset_table.c.domain_code)
+        )
+        for clause in clauses:
+            statement = statement.where(clause)
+        rows = self._fetch_rows_logged(
+            statement.order_by(asset_table.c.layer_code, asset_table.c.table_name),
+            purpose="legacy asset full load",
+            method="_load_table_rows",
+        )
         for row in rows:
             row["domain_name"] = code_to_name.get(row.get("domain_code"), row.get("domain_code") or "")
         return rows
@@ -492,24 +440,24 @@ ORDER BY t.layer_code, t.table_name
     def _load_field_rows(self, asset_ids, *, purpose="asset field list", method="_load_field_rows"):
         if not asset_ids:
             return {}
-        ids_sql = ", ".join(str(int(asset_id)) for asset_id in asset_ids)
-        sql = f"""
-SELECT
-    asset_id,
-    field_name,
-    field_cn_name,
-    data_type,
-    field_order,
-    nullable_flag,
-    pk_flag,
-    partition_flag,
-    enum_desc,
-    field_desc
-FROM {TABLE_FIELD}
-WHERE asset_id IN ({ids_sql})
-ORDER BY asset_id, field_order, field_name
-"""
-        rows = self._fetch_rows_logged(sql, purpose=purpose, method=method)
+        rows = self._fetch_rows_logged(
+            select(
+                asset_field.c.asset_id,
+                asset_field.c.field_name,
+                asset_field.c.field_cn_name,
+                asset_field.c.data_type,
+                asset_field.c.field_order,
+                asset_field.c.nullable_flag,
+                asset_field.c.pk_flag,
+                asset_field.c.partition_flag,
+                asset_field.c.enum_desc,
+                asset_field.c.field_desc,
+            )
+            .where(asset_field.c.asset_id.in_([int(asset_id) for asset_id in asset_ids]))
+            .order_by(asset_field.c.asset_id, asset_field.c.field_order, asset_field.c.field_name),
+            purpose=purpose,
+            method=method,
+        )
         grouped = {}
         for row in rows:
             grouped.setdefault(int(row["asset_id"]), []).append(
@@ -554,38 +502,39 @@ ORDER BY asset_id, field_order, field_name
         }
 
     def _load_single_table_row(self, *, asset_id=None, table_name=None, schema_name=None):
-        where = []
+        clauses = []
         if asset_id is not None:
-            where.append(f"t.asset_id = {int(asset_id)}")
+            clauses.append(asset_table.c.asset_id == int(asset_id))
         if table_name is not None:
-            safe_name = self._ensure_safe_name(table_name, "table_name")
-            where.append(f"t.table_name = {self._quote(safe_name)}")
+            clauses.append(asset_table.c.table_name == self._ensure_safe_name(table_name, "table_name"))
         if schema_name:
-            where.append(f"t.schema_name = {self._quote(schema_name)}")
-        if not where:
+            clauses.append(asset_table.c.schema_name == schema_name)
+        if not clauses:
             raise AssetValidationError([{"field": "table", "message": "missing table lookup condition"}])
 
         code_to_name, _ = self._load_domain_mappings()
-        sql = f"""
-SELECT
-    t.asset_id,
-    t.table_name,
-    t.table_cn_name,
-    t.schema_name,
-    t.layer_code,
-    t.domain_code,
-    t.owner_name,
-    t.grain_desc,
-    t.cycle_desc,
-    t.table_desc,
-    t.field_count,
-    t.created_at,
-    t.updated_at
-FROM {TABLE_ASSET} t
-WHERE {' AND '.join(where)}
-LIMIT 1
-"""
-        rows = self._fetch_rows_logged(sql, purpose="asset table detail", method="_load_single_table_row")
+        statement = select(
+            asset_table.c.asset_id,
+            asset_table.c.table_name,
+            asset_table.c.table_cn_name,
+            asset_table.c.schema_name,
+            asset_table.c.layer_code,
+            asset_table.c.domain_code,
+            asset_table.c.owner_name,
+            asset_table.c.grain_desc,
+            asset_table.c.cycle_desc,
+            asset_table.c.table_desc,
+            asset_table.c.field_count,
+            asset_table.c.created_at,
+            asset_table.c.updated_at,
+        )
+        for clause in clauses:
+            statement = statement.where(clause)
+        rows = self._fetch_rows_logged(
+            statement.limit(1),
+            purpose="asset table detail",
+            method="_load_single_table_row",
+        )
         if not rows:
             raise AssetNotFoundError(table_name or asset_id)
         row = rows[0]
@@ -611,8 +560,7 @@ LIMIT 1
         return self._build_metadata_ddl(self.get_table_detail(table_id))
 
     def _get_db_asset_detail_row(self, table_name):
-        safe_name = self._ensure_safe_name(table_name)
-        return self._load_single_table_row(table_name=safe_name)
+        return self._load_single_table_row(table_name=self._ensure_safe_name(table_name))
 
     def _get_db_asset_detail(self, table_name):
         row = self._get_db_asset_detail_row(table_name)
@@ -625,21 +573,17 @@ LIMIT 1
 
     def _validate_fields(self, fields, details):
         names = set()
-
         for index, field in enumerate(fields):
             prefix = f"fields[{index}]"
-
             if not isinstance(field, dict):
                 details.append({"field": prefix, "message": "字段项必须为对象"})
                 continue
-
             name = field.get("name")
             cn = field.get("cn")
             field_type = field.get("type")
             nullable = field.get("nullable")
             pk = field.get("pk")
             part = field.get("part")
-
             if not isinstance(name, str) or not name.strip():
                 details.append({"field": f"{prefix}.name", "message": "字段英文名不能为空"})
             elif not NAME_PATTERN.fullmatch(name.strip()):
@@ -648,72 +592,61 @@ LIMIT 1
                 details.append({"field": f"{prefix}.name", "message": "同一张表内字段名必须唯一"})
             else:
                 names.add(name.strip())
-
             if not isinstance(cn, str) or not cn.strip():
                 details.append({"field": f"{prefix}.cn", "message": "字段中文注释不能为空"})
-
             if not isinstance(field_type, str) or not field_type.strip():
                 details.append({"field": f"{prefix}.type", "message": "字段类型不能为空"})
-
             if not isinstance(nullable, bool):
                 details.append({"field": f"{prefix}.nullable", "message": "nullable 必须为布尔值"})
-
             if not isinstance(pk, bool):
                 details.append({"field": f"{prefix}.pk", "message": "pk 必须为布尔值"})
             elif pk and nullable is not False:
                 details.append({"field": f"{prefix}.nullable", "message": "主键字段 nullable 必须为 false"})
-
             if not isinstance(part, bool):
                 details.append({"field": f"{prefix}.part", "message": "part 必须为布尔值"})
 
     def _validate_table_payload(self, payload, current_name=None):
         details = []
-
         if not isinstance(payload, dict):
             raise AssetValidationError([{"field": "body", "message": "请求体必须为 JSON 对象"}])
-
         name = payload.get("name")
         cn = payload.get("cn")
         domain = payload.get("domain")
         layer = payload.get("layer")
         fields = payload.get("fields")
-
-        if not isinstance(name, str) or not name.strip():
+        name_text = name.strip() if isinstance(name, str) else ""
+        cn_text = cn.strip() if isinstance(cn, str) else ""
+        domain_text = domain.strip() if isinstance(domain, str) else ""
+        layer_text = layer.strip() if isinstance(layer, str) else ""
+        field_items = fields if isinstance(fields, list) else []
+        if not name_text:
             details.append({"field": "name", "message": "表英文名不能为空"})
-        elif not NAME_PATTERN.fullmatch(name.strip()):
+        elif not NAME_PATTERN.fullmatch(name_text):
             details.append({"field": "name", "message": "表英文名格式不正确"})
-
-        if not isinstance(cn, str) or not cn.strip():
+        if not cn_text:
             details.append({"field": "cn", "message": "表中文名不能为空"})
-
-        if not isinstance(domain, str) or not domain.strip():
+        if not domain_text:
             details.append({"field": "domain", "message": "主题域不能为空"})
-
-        if not isinstance(layer, str) or not layer.strip():
+        if not layer_text:
             details.append({"field": "layer", "message": "分层不能为空"})
-
-        if not isinstance(fields, list) or not fields:
+        if not field_items:
             details.append({"field": "fields", "message": "字段列表至少 1 项"})
         else:
-            self._validate_fields(fields, details)
-
+            self._validate_fields(field_items, details)
         _, name_to_code = self._load_domain_mappings()
-        if isinstance(domain, str) and domain.strip() and domain.strip() not in name_to_code:
-            details.append({"field": "domain", "message": f"主题域不存在: {domain.strip()}"})
-
+        if domain_text and domain_text not in name_to_code:
+            details.append({"field": "domain", "message": f"主题域不存在: {domain_text}"})
         valid_layer_codes = {item["code"] for item in self.get_layers()}
-        if isinstance(layer, str) and layer.strip() and layer.strip() not in valid_layer_codes:
-            details.append({"field": "layer", "message": f"分层不存在: {layer.strip()}"})
-
+        if layer_text and layer_text not in valid_layer_codes:
+            details.append({"field": "layer", "message": f"分层不存在: {layer_text}"})
         if details:
             raise AssetValidationError(details)
-
         return {
-            "name": name.strip(),
-            "cn": cn.strip(),
-            "domain": domain.strip(),
-            "layer": layer.strip(),
-            "schema": (payload.get("schema") or "").strip() or self._normalize_layer_schema(layer.strip()),
+            "name": name_text,
+            "cn": cn_text,
+            "domain": domain_text,
+            "layer": layer_text,
+            "schema": (payload.get("schema") or "").strip() or self._normalize_layer_schema(layer_text),
             "owner": (payload.get("owner") or "").strip(),
             "grain": (payload.get("grain") or "").strip(),
             "cycle": (payload.get("cycle") or "").strip(),
@@ -728,20 +661,18 @@ LIMIT 1
                     "part": bool(field["part"]),
                     "enum": field.get("enum"),
                 }
-                for field in fields
+                for field in field_items
             ],
             "current_name": current_name,
         }
 
     def _ensure_db_table_absent(self, table_name, exclude_asset_id=None):
         safe_name = self._ensure_safe_name(table_name)
-        sql = f"""
-SELECT asset_id
-FROM {TABLE_ASSET}
-WHERE table_name = {self._quote(safe_name)}
-LIMIT 1
-"""
-        rows = self._fetch_rows_logged(sql, purpose="asset uniqueness check", method="_ensure_db_table_absent")
+        rows = self._fetch_rows_logged(
+            select(asset_table.c.asset_id).where(asset_table.c.table_name == safe_name).limit(1),
+            purpose="asset uniqueness check",
+            method="_ensure_db_table_absent",
+        )
         if not rows:
             return
         if exclude_asset_id is not None and int(rows[0]["asset_id"]) == int(exclude_asset_id):
@@ -749,76 +680,47 @@ LIMIT 1
         raise AssetAlreadyExistsError(table_name)
 
     def _insert_db_fields(self, asset_id, fields):
-        field_id = self._get_next_id(TABLE_FIELD, "field_id")
+        field_id = self._get_next_id(asset_field, asset_field.c.field_id)
         statements = []
         for index, field in enumerate(fields, start=1):
             statements.append(
-                f"""
-INSERT INTO {TABLE_FIELD} (
-    field_id,
-    asset_id,
-    field_name,
-    field_cn_name,
-    data_type,
-    field_order,
-    nullable_flag,
-    pk_flag,
-    partition_flag,
-    enum_desc,
-    field_desc,
-    created_by,
-    updated_by
-) VALUES (
-    {field_id},
-    {int(asset_id)},
-    {self._quote(field['name'])},
-    {self._quote(field['cn'])},
-    {self._quote(field['type'])},
-    {index},
-    {self._flag(field['nullable'])},
-    {self._flag(field['pk'])},
-    {self._flag(field['part'])},
-    {self._quote(field.get('enum'))},
-    {self._quote(field['cn'])},
-    {self._quote(self._default_operator)},
-    {self._quote(self._default_operator)}
-)
-""".strip()
+                insert(asset_field).values(
+                    field_id=field_id,
+                    asset_id=int(asset_id),
+                    field_name=field["name"],
+                    field_cn_name=field["cn"],
+                    data_type=field["type"],
+                    field_order=index,
+                    nullable_flag=self._flag(field["nullable"]),
+                    pk_flag=self._flag(field["pk"]),
+                    partition_flag=self._flag(field["part"]),
+                    enum_desc=field.get("enum"),
+                    field_desc=field["cn"],
+                    created_by=self._default_operator,
+                    updated_by=self._default_operator,
+                )
             )
             field_id += 1
         return statements
 
     def _insert_change_log(self, asset_id, table_name, change_type, before_data, after_data):
-        change_id = self._get_next_id(TABLE_CHANGE_LOG, "change_id")
-        before_json = json.dumps(before_data, ensure_ascii=False) if before_data is not None else None
-        after_json = json.dumps(after_data, ensure_ascii=False) if after_data is not None else None
+        change_id = self._get_next_id(asset_change_log, asset_change_log.c.change_id)
         summary = {
             "CREATE_TABLE": "创建资产表",
             "UPDATE_TABLE": "更新资产表",
             "UPDATE_FIELDS": "更新字段列表",
             "DELETE_TABLE": "删除资产表",
         }.get(change_type, change_type)
-        return f"""
-INSERT INTO {TABLE_CHANGE_LOG} (
-    change_id,
-    asset_id,
-    table_name,
-    change_type,
-    change_summary,
-    before_json,
-    after_json,
-    operator_name
-) VALUES (
-    {change_id},
-    {self._quote(asset_id) if asset_id is not None else 'NULL'},
-    {self._quote(table_name)},
-    {self._quote(change_type)},
-    {self._quote(summary)},
-    {self._quote(before_json)},
-    {self._quote(after_json)},
-    {self._quote(self._default_operator)}
-)
-""".strip()
+        return insert(asset_change_log).values(
+            change_id=change_id,
+            asset_id=asset_id,
+            table_name=table_name,
+            change_type=change_type,
+            change_summary=summary,
+            before_json=json.dumps(before_data, ensure_ascii=False) if before_data is not None else None,
+            after_json=json.dumps(after_data, ensure_ascii=False) if after_data is not None else None,
+            operator_name=self._default_operator,
+        )
 
     def get_asset_tables(
         self,
@@ -933,50 +835,26 @@ INSERT INTO {TABLE_CHANGE_LOG} (
     def _create_asset_table(self, payload):
         table = self._validate_table_payload(payload)
         self._ensure_db_table_absent(table["name"])
-
         _, name_to_code = self._load_domain_mappings()
-        asset_id = self._get_next_id(TABLE_ASSET, "asset_id")
+        asset_id = self._get_next_id(asset_table, asset_table.c.asset_id)
         domain_code = name_to_code[table["domain"]]
         after_data = {key: deepcopy(value) for key, value in table.items() if key != "current_name"}
-
         statements = [
-            f"""
-INSERT INTO {TABLE_ASSET} (
-    asset_id,
-    table_name,
-    table_cn_name,
-    schema_name,
-    layer_code,
-    domain_code,
-    owner_name,
-    grain_desc,
-    cycle_desc,
-    table_desc,
-    source_type,
-    storage_type,
-    status_code,
-    field_count,
-    created_by,
-    updated_by
-) VALUES (
-    {asset_id},
-    {self._quote(table['name'])},
-    {self._quote(table['cn'])},
-    {self._quote(table['schema'])},
-    {self._quote(table['layer'])},
-    {self._quote(domain_code)},
-    {self._quote(table['owner'])},
-    {self._quote(table['grain'])},
-    {self._quote(table['cycle'])},
-    {self._quote(table['desc'])},
-    'MANUAL',
-    'DWS',
-    'ACTIVE',
-    {len(table['fields'])},
-    {self._quote(self._default_operator)},
-    {self._quote(self._default_operator)}
-)
-""".strip(),
+            insert(asset_table).values(
+                asset_id=asset_id,
+                table_name=table["name"],
+                table_cn_name=table["cn"],
+                schema_name=table["schema"],
+                layer_code=table["layer"],
+                domain_code=domain_code,
+                owner_name=table["owner"],
+                grain_desc=table["grain"],
+                cycle_desc=table["cycle"],
+                table_desc=table["desc"],
+                field_count=len(table["fields"]),
+                created_by=self._default_operator,
+                updated_by=self._default_operator,
+            ),
             *self._insert_db_fields(asset_id, table["fields"]),
             self._insert_change_log(asset_id, table["name"], "CREATE_TABLE", None, after_data),
         ]
@@ -1001,30 +879,30 @@ INSERT INTO {TABLE_ASSET} (
         current_row = self._get_db_asset_detail_row(table_name)
         table = self._validate_table_payload(payload, current_name=table_name)
         self._ensure_db_table_absent(table["name"], exclude_asset_id=current_row["asset_id"])
-
         _, name_to_code = self._load_domain_mappings()
         after_data = {key: deepcopy(value) for key, value in table.items() if key != "current_name"}
-        asset_id = int(current_row["asset_id"])
-
+        try:
+            asset_id = int(current_row["asset_id"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise AssetDataSourceError("数据库查询失败") from error
         statements = [
-            f"""
-UPDATE {TABLE_ASSET}
-SET
-    table_name = {self._quote(table['name'])},
-    table_cn_name = {self._quote(table['cn'])},
-    schema_name = {self._quote(table['schema'])},
-    layer_code = {self._quote(table['layer'])},
-    domain_code = {self._quote(name_to_code[table['domain']])},
-    owner_name = {self._quote(table['owner'])},
-    grain_desc = {self._quote(table['grain'])},
-    cycle_desc = {self._quote(table['cycle'])},
-    table_desc = {self._quote(table['desc'])},
-    field_count = {len(table['fields'])},
-    updated_by = {self._quote(self._default_operator)},
-    updated_at = CURRENT_TIMESTAMP
-WHERE asset_id = {asset_id}
-""".strip(),
-            f"DELETE FROM {TABLE_FIELD} WHERE asset_id = {asset_id}",
+            update(asset_table)
+            .where(asset_table.c.asset_id == asset_id)
+            .values(
+                table_name=table["name"],
+                table_cn_name=table["cn"],
+                schema_name=table["schema"],
+                layer_code=table["layer"],
+                domain_code=name_to_code[table["domain"]],
+                owner_name=table["owner"],
+                grain_desc=table["grain"],
+                cycle_desc=table["cycle"],
+                table_desc=table["desc"],
+                field_count=len(table["fields"]),
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            ),
+            delete(asset_field).where(asset_field.c.asset_id == asset_id),
             *self._insert_db_fields(asset_id, table["fields"]),
             self._insert_change_log(asset_id, table["name"], "UPDATE_TABLE", current, after_data),
         ]
@@ -1046,16 +924,15 @@ WHERE asset_id = {asset_id}
     def _update_asset_fields(self, table_name, payload):
         if not isinstance(payload, dict):
             raise AssetValidationError([{"field": "body", "message": "请求体必须为 JSON 对象"}])
-
         fields = payload.get("fields")
+        field_items = fields if isinstance(fields, list) else []
         details = []
-        if not isinstance(fields, list) or not fields:
+        if not field_items:
             details.append({"field": "fields", "message": "字段列表至少 1 项"})
         else:
-            self._validate_fields(fields, details)
+            self._validate_fields(field_items, details)
         if details:
             raise AssetValidationError(details)
-
         current = self._get_db_asset_detail(table_name)
         current_row = self._get_db_asset_detail_row(table_name)
         normalized_fields = [
@@ -1068,22 +945,23 @@ WHERE asset_id = {asset_id}
                 "part": bool(field["part"]),
                 "enum": field.get("enum"),
             }
-            for field in fields
+            for field in field_items
         ]
         after_data = {**deepcopy(current), "fields": deepcopy(normalized_fields)}
-        asset_id = int(current_row["asset_id"])
-
+        try:
+            asset_id = int(current_row["asset_id"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise AssetDataSourceError("数据库查询失败") from error
         statements = [
-            f"DELETE FROM {TABLE_FIELD} WHERE asset_id = {asset_id}",
+            delete(asset_field).where(asset_field.c.asset_id == asset_id),
             *self._insert_db_fields(asset_id, normalized_fields),
-            f"""
-UPDATE {TABLE_ASSET}
-SET
-    field_count = {len(normalized_fields)},
-    updated_by = {self._quote(self._default_operator)},
-    updated_at = CURRENT_TIMESTAMP
-WHERE asset_id = {asset_id}
-""".strip(),
+            update(asset_table)
+            .where(asset_table.c.asset_id == asset_id)
+            .values(
+                field_count=len(normalized_fields),
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            ),
             self._insert_change_log(asset_id, table_name, "UPDATE_FIELDS", current, after_data),
         ]
         self._execute_statements(statements)
@@ -1101,14 +979,15 @@ WHERE asset_id = {asset_id}
     def _delete_asset_table(self, table_name):
         current = self._get_db_asset_detail(table_name)
         current_row = self._get_db_asset_detail_row(table_name)
-        asset_id = int(current_row["asset_id"])
-
-        statements = [
+        try:
+            asset_id = int(current_row["asset_id"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise AssetDataSourceError("数据库查询失败") from error
+        self._execute_statements([
             self._insert_change_log(asset_id, table_name, "DELETE_TABLE", current, None),
-            f"DELETE FROM {TABLE_FIELD} WHERE asset_id = {asset_id}",
-            f"DELETE FROM {TABLE_ASSET} WHERE asset_id = {asset_id}",
-        ]
-        self._execute_statements(statements)
+            delete(asset_field).where(asset_field.c.asset_id == asset_id),
+            delete(asset_table).where(asset_table.c.asset_id == asset_id),
+        ])
         return current
 
 
