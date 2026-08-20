@@ -30,5 +30,5 @@ class OptionalDatabaseDependencyTests(unittest.TestCase):
     def test_community_adapter_registry_excludes_gaussdb(self):
         from backend.app.db.registry import available_adapter_names
 
-        self.assertEqual(("sqlite", "postgres"), available_adapter_names("community"))
+        self.assertEqual(("sqlite", "postgres", "mysql"), available_adapter_names("community"))
         self.assertIn("gaussdb", available_adapter_names("private"))

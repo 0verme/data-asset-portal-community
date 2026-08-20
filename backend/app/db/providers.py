@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import create_engine
@@ -156,6 +157,54 @@ class PostgreSQLProvider:
 
 
 @dataclass(frozen=True)
+class MySQLProvider:
+    name: str = "mysql"
+    aliases: tuple[str, ...] = ("mysql+pymysql",)
+    migration_dialect: str = "mysql"
+    placeholder: str = "%s"
+    capabilities: BackendCapabilities = SQLALCHEMY_CAPABILITIES
+
+    def validate(self, profile: str, config: dict, *, config_path: Path):
+        config.setdefault("host", "127.0.0.1")
+        _port(config, profile, 3306)
+        _positive_int(config, "connect_timeout", get_db_connect_timeout_seconds(), profile)
+        _positive_int(config, "read_timeout", get_db_statement_timeout_ms() // 1000 or 1, profile)
+        _positive_int(config, "write_timeout", get_db_statement_timeout_ms() // 1000 or 1, profile)
+        _positive_int(config, "pool_size", 5, profile)
+        _positive_int(config, "pool_timeout", 30, profile)
+        _positive_int(config, "pool_recycle", 1800, profile)
+        required = [key for key in ("database", "user", "password") if not config.get(key)]
+        if required:
+            raise ValueError(f"mysql profile '{profile}' requires {', '.join(required)}")
+        config.setdefault("charset", "utf8mb4")
+        config.setdefault("collation", "utf8mb4_unicode_ci")
+        for key in ("charset", "collation"):
+            if not re.fullmatch(r"[A-Za-z0-9_]+", str(config[key])):
+                raise ValueError(f"mysql profile '{profile}' requires a safe {key} identifier")
+        return config
+
+    def create_engine(self, config: dict):
+        from .mysql_adapter import connect
+
+        return create_engine(
+            "mysql+pymysql://",
+            creator=lambda: connect(config),
+            pool_pre_ping=True,
+            pool_size=int(config.get("pool_size", 5)),
+            max_overflow=int(config.get("max_overflow", 10)),
+            pool_timeout=int(config.get("pool_timeout", 30)),
+            pool_recycle=int(config.get("pool_recycle", 1800)),
+        )
+
+    def connect(self, config: dict):
+        return self.create_engine(config).raw_connection()
+
+    def physical_schema(self, config: dict):
+        # MySQL maps the logical application schema to the selected database.
+        return ""
+
+
+@dataclass(frozen=True)
 class GaussDBProvider:
     name: str = "gaussdb"
     aliases: tuple[str, ...] = ("dws",)
@@ -201,4 +250,4 @@ class GaussDBProvider:
         return str(config.get("schema") or "dwp")
 
 
-BUILTIN_PROVIDERS = (SQLiteProvider(), PostgreSQLProvider(), GaussDBProvider())
+BUILTIN_PROVIDERS = (SQLiteProvider(), PostgreSQLProvider(), MySQLProvider(), GaussDBProvider())

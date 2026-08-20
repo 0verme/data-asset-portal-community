@@ -1,0 +1,2 @@
+# Optional MySQL provider dependency
+PyMySQL==1.1.1

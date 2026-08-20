@@ -97,6 +97,21 @@ profiles:
     password: change_me
 ```
 
+MySQL 8.0 示例（PyMySQL 为可选依赖，使用 `pip install -r backend/requirements-mysql.txt` 安装）：
+
+```yaml
+profiles:
+  mysql_primary:
+    type: mysql
+    host: 127.0.0.1
+    port: 3306
+    database: asset_portal
+    user: change_me
+    password: change_me
+    charset: utf8mb4
+    collation: utf8mb4_unicode_ci
+```
+
 GaussDB 示例（JDBC 驱动不随仓库分发，需自行获取并指定路径，见 `resources/jars/README.md`）：
 
 ```yaml
@@ -113,7 +128,7 @@ profiles:
     password: change_me
 ```
 
-完整版正式部署仅使用 `postgres` 与 `gaussdb`；Community/local 隔离 profile 还可使用 `sqlite`（定位见 `docs/SQLITE_DECISION.md`）。Cloudflare D1 不受支持。非法 `type` 或缺失连接信息会在启动/连接时 fail fast，不会静默回退到本地文件库。
+完整版正式部署支持 `postgres`、`mysql` 与 `gaussdb`；Community/local 隔离 profile 还可使用 `sqlite`（定位见 `docs/SQLITE_DECISION.md`）。Cloudflare D1 不受支持。非法 `type`、缺失连接信息或未安装可选驱动会 fail fast，不会静默回退到其他数据库。
 
 ## 初始化数据库
 
