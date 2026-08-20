@@ -38,6 +38,9 @@ from .contracts import (
     RootItem,
     RootListResponse,
     RootRequest,
+    ReportItem,
+    ReportListResponse,
+    ReportRequest,
     SourceSystemListResponse,
     IndicatorItem,
     IndicatorListResponse,
@@ -64,6 +67,13 @@ from .services.root_service import (
     RootNotFoundError,
     RootValidationError,
     root_service,
+)
+from .services.report_service import (
+    ReportAlreadyExistsError,
+    ReportDataSourceError,
+    ReportNotFoundError,
+    ReportValidationError,
+    report_service,
 )
 from .services.assets_service import (
     AssetAlreadyExistsError,
@@ -257,6 +267,114 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
         except IndicatorDataSourceError as error:
             return _service_error_response(error, 500)
         return JSONResponse(content={"message": "指标删除成功"})
+
+    app.include_router(router)
+
+
+def _register_report_routes(app: FastAPI, service: Any) -> None:
+    router = APIRouter(prefix="/api/reports", tags=["report-migration"])
+
+    def get_service() -> Any:
+        return service
+
+    def report_payload(payload: ReportRequest | None) -> dict[str, Any] | None:
+        if payload is None:
+            return None
+        return payload.model_dump(exclude_unset=True)
+
+    def error_response(error: Any, status: int) -> JSONResponse:
+        return _service_error_response(error, status)
+
+    @router.get("", response_model=None)
+    def get_reports(
+        keyword: str | None = Query(default=None),
+        report_type: str | None = Query(default=None, alias="type"),
+        domain: str | None = Query(default=None),
+        status: str | None = Query(default=None),
+        owner_dept: str | None = Query(default=None, alias="ownerDept"),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            items = current_service.get_reports(
+                keyword=keyword,
+                report_type=report_type,
+                domain=domain,
+                status=status,
+                owner_dept=owner_dept,
+            )
+        except ReportDataSourceError as error:
+            return error_response(error, 500)
+        return JSONResponse(content=validate_contract({"items": items}, ReportListResponse))
+
+    @router.get("/{report_code}", response_model=None)
+    def get_report_detail(report_code: str, current_service: Any = Depends(get_service)):
+        try:
+            data = current_service.get_report_detail(report_code)
+        except ReportNotFoundError as error:
+            return error_response(error, 404)
+        except ReportDataSourceError as error:
+            return error_response(error, 500)
+        return JSONResponse(content=validate_contract({"data": data}, DataEnvelope[ReportItem]))
+
+    @router.post("", response_model=None, status_code=201)
+    def create_report(
+        payload: ReportRequest | None = Body(default=None),
+        _context: RequestContext = Depends(require_maintainer),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.create_report(report_payload(payload))
+        except ReportValidationError as error:
+            return error_response(error, 422)
+        except ReportAlreadyExistsError as error:
+            return error_response(error, 409)
+        except ReportDataSourceError as error:
+            return error_response(error, 500)
+        return JSONResponse(
+            status_code=201,
+            content=validate_contract(
+                {"message": "报表创建成功", "data": data},
+                MessageDataResponse[ReportItem],
+            ),
+        )
+
+    @router.put("/{report_code}", response_model=None)
+    def update_report(
+        report_code: str,
+        payload: ReportRequest | None = Body(default=None),
+        _context: RequestContext = Depends(require_maintainer),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_report(report_code, report_payload(payload))
+        except ReportNotFoundError as error:
+            return error_response(error, 404)
+        except ReportValidationError as error:
+            return error_response(error, 422)
+        except ReportAlreadyExistsError as error:
+            return error_response(error, 409)
+        except ReportDataSourceError as error:
+            return error_response(error, 500)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "报表更新成功", "data": data},
+                MessageDataResponse[ReportItem],
+            )
+        )
+
+    @router.delete("/{report_code}", response_model=None)
+    def delete_report(
+        report_code: str,
+        _context: RequestContext = Depends(require_maintainer),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            current_service.delete_report(report_code)
+        except ReportNotFoundError as error:
+            return error_response(error, 404)
+        except ReportDataSourceError as error:
+            return error_response(error, 500)
+        return JSONResponse(content={"message": "报表删除成功"})
 
     app.include_router(router)
 
@@ -855,6 +973,7 @@ def create_fastapi_app(
     field_mapping_service_instance: Any | None = None,
     root_service_instance: Any | None = None,
     manual_code_table_service_instance: Any | None = None,
+    report_service_instance: Any | None = None,
 ) -> FastAPI:
     """Create the opt-in FastAPI pilot application.
 
@@ -869,6 +988,7 @@ def create_fastapi_app(
     field_mapping = field_mapping_service_instance or field_mapping_service
     root = root_service_instance or root_service
     manual_code_table = manual_code_table_service_instance or manual_code_table_service
+    report = report_service_instance or report_service
 
     @app.exception_handler(ApplicationError)
     async def handle_application_error(_request: Request, error: ApplicationError):
@@ -926,4 +1046,6 @@ def create_fastapi_app(
         _register_root_routes(app, root)
     if "codeTable" in enabled_codes:
         _register_manual_code_table_routes(app, manual_code_table)
+    if "report" in enabled_codes:
+        _register_report_routes(app, report)
     return app
