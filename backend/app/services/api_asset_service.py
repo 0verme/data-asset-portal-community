@@ -5,10 +5,19 @@ from __future__ import annotations
 import os
 import re
 
-from ..db.facade import database_transaction, execute_statements, fetch_all, resolve_db_profile_name
+from sqlalchemy import and_, delete, func, insert, or_, select, update
+
+from ..db.facade import database_transaction
+from ..db.service import CoreAccess
+from ..db.tables import (
+    api_asset,
+    api_param,
+    api_relation,
+    api_response_field,
+    system_table,
+)
+
 CODE_RE = re.compile(r"^[A-Z][A-Z0-9_-]{2,63}$")
-TABLE = "dwp.p_api_asset"
-SYSTEM_TABLE = "dwp.p_system"
 METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 RELATION_TYPES = {"table", "indicator", "system"}
 BINARY_STATUS_VALUES = {"enabled", "disabled"}
@@ -43,28 +52,28 @@ class ApiAssetValidationError(ApiAssetError):
 class ApiAssetService:
     def __init__(self):
         self._profile = os.getenv("ASSET_DB_PROFILE", "").strip()
+        self._db = CoreAccess(
+            profile_getter=lambda: self._profile,
+            error_factory=ApiAssetError,
+        )
 
-    def _profile_name(self):
-        return self._profile or resolve_db_profile_name()
-
-    def _rows(self, sql, params=None):
-        try:
-            columns, rows = fetch_all(self._profile_name(), sql, params=params)
-            return [dict(zip(columns, row)) for row in rows]
-        except Exception as error:
-            raise ApiAssetError("数据库查询失败") from error
+    def _rows(self, statement):
+        return self._db.fetch_rows(statement)
 
     def _execute(self, statements):
-        try:
-            return execute_statements(self._profile_name(), statements)
-        except Exception as error:
-            raise ApiAssetError("数据库执行失败") from error
+        return self._db.execute_statements(statements)
 
     def _next(self, table, column):
-        return int(self._rows(f"SELECT COALESCE(MAX({column}), 0) + 1 AS id FROM {table}")[0]["id"])
+        return self._db.next_pk(table, column)
 
     def _exists(self, code):
-        return bool(self._rows(f"SELECT api_code FROM {TABLE} WHERE api_code=? AND is_deleted='N'", [code]))
+        return bool(
+            self._rows(
+                select(api_asset.c.api_code).where(
+                    and_(api_asset.c.api_code == code, api_asset.c.is_deleted == "N")
+                )
+            )
+        )
 
     def _validate_asset(self, payload, include_code=True):
         if not isinstance(payload, dict):
@@ -78,7 +87,6 @@ class ApiAssetService:
             "method": str(payload.get("method") or "").strip().upper(),
             "path": str(payload.get("path") or "").strip(),
             "version": str(payload.get("version") or "").strip(),
-            # downstreamSystemId remains an accepted request alias during migration.
             "systemId": payload.get("systemId", payload.get("downstreamSystemId")),
             "type": str(payload.get("type") or "").strip(),
             "status": str(payload.get("status", "enabled")).strip(),
@@ -108,9 +116,13 @@ class ApiAssetService:
             errors.append({"field": "systemId", "message": "请选择业务系统"})
         if isinstance(item["systemId"], int):
             systems = self._rows(
-                f"SELECT system_id FROM {SYSTEM_TABLE} "
-                "WHERE system_id=? AND is_deleted='N' AND status_code='enabled'",
-                [item["systemId"]],
+                select(system_table.c.system_id).where(
+                    and_(
+                        system_table.c.system_id == item["systemId"],
+                        system_table.c.is_deleted == "N",
+                        system_table.c.status_code == "enabled",
+                    )
+                )
             )
             if not systems:
                 errors.append({"field": "systemId", "message": "业务系统不存在或未启用"})
@@ -130,18 +142,36 @@ class ApiAssetService:
                 name = str(row.get("name") or "").strip()
                 location = str(row.get("in") or "").strip()
                 dtype = str(row.get("dataType") or "").strip()
-                key, valid = (name, location), bool(name and location in {"query", "path", "header", "body"} and dtype)
-                value = {"name": name, "in": location, "dataType": dtype, "required": bool(row.get("required")), "description": str(row.get("description") or "").strip(), "example": str(row.get("example") or "").strip()}
+                key, valid = (name, location), bool(
+                    name and location in {"query", "path", "header", "body"} and dtype
+                )
+                value = {
+                    "name": name,
+                    "in": location,
+                    "dataType": dtype,
+                    "required": bool(row.get("required")),
+                    "description": str(row.get("description") or "").strip(),
+                    "example": str(row.get("example") or "").strip(),
+                }
             elif kind == "responseFields":
                 name = str(row.get("name") or "").strip()
                 dtype = str(row.get("dataType") or "").strip()
                 key, valid = name, bool(name and dtype)
-                value = {"name": name, "dataType": dtype, "description": str(row.get("description") or "").strip(), "example": str(row.get("example") or "").strip()}
+                value = {
+                    "name": name,
+                    "dataType": dtype,
+                    "description": str(row.get("description") or "").strip(),
+                    "example": str(row.get("example") or "").strip(),
+                }
             else:
                 relation_type = str(row.get("type") or "").strip()
                 code = str(row.get("targetCode") or "").strip()
                 key, valid = (relation_type, code), relation_type in RELATION_TYPES and bool(code)
-                value = {"type": relation_type, "targetCode": code, "targetName": str(row.get("targetName") or "").strip()}
+                value = {
+                    "type": relation_type,
+                    "targetCode": code,
+                    "targetName": str(row.get("targetName") or "").strip(),
+                }
             if not valid:
                 errors.append({"field": f"{kind}[{index}]", "message": "required fields are invalid"})
             elif key not in seen:
@@ -151,19 +181,70 @@ class ApiAssetService:
             raise ApiAssetValidationError("API asset validation failed", errors)
         return normalized
 
+    @staticmethod
+    def _asset_columns():
+        return (
+            api_asset.c.api_pk,
+            api_asset.c.api_code,
+            api_asset.c.api_name,
+            api_asset.c.method_code,
+            api_asset.c.path_text,
+            api_asset.c.version_text,
+            api_asset.c.system_id,
+            api_asset.c.downstream_system_id,
+            api_asset.c.api_type,
+            api_asset.c.status_code,
+            api_asset.c.owner_dept_name,
+            api_asset.c.owner_name,
+            api_asset.c.maintainer_name,
+            api_asset.c.description_text,
+            api_asset.c.remark_desc,
+            api_asset.c.updated_by,
+            api_asset.c.updated_at,
+        )
+
+    @staticmethod
+    def _asset_from():
+        return api_asset.outerjoin(
+            system_table,
+            and_(
+                system_table.c.system_id == api_asset.c.system_id,
+                system_table.c.is_deleted == "N",
+            ),
+        )
+
     def _item(self, row, params=None, fields=None, relations=None):
         code = row["api_code"]
         params = params if params is not None else self._rows(
-            "SELECT param_name,param_in,data_type,required_flag,description_text,example_value "
-            "FROM dwp.p_api_param WHERE api_code=? ORDER BY sort_no,param_pk", [code]
+            select(
+                api_param.c.param_name,
+                api_param.c.param_in,
+                api_param.c.data_type,
+                api_param.c.required_flag,
+                api_param.c.description_text,
+                api_param.c.example_value,
+            )
+            .where(api_param.c.api_code == code)
+            .order_by(api_param.c.sort_no, api_param.c.param_pk)
         )
         fields = fields if fields is not None else self._rows(
-            "SELECT field_name,data_type,description_text,example_value "
-            "FROM dwp.p_api_response_field WHERE api_code=? ORDER BY sort_no,field_pk", [code]
+            select(
+                api_response_field.c.field_name,
+                api_response_field.c.data_type,
+                api_response_field.c.description_text,
+                api_response_field.c.example_value,
+            )
+            .where(api_response_field.c.api_code == code)
+            .order_by(api_response_field.c.sort_no, api_response_field.c.field_pk)
         )
         relations = relations if relations is not None else self._rows(
-            "SELECT relation_type,target_code,target_name FROM dwp.p_api_relation "
-            "WHERE api_code=? ORDER BY sort_no,relation_pk", [code]
+            select(
+                api_relation.c.relation_type,
+                api_relation.c.target_code,
+                api_relation.c.target_name,
+            )
+            .where(api_relation.c.api_code == code)
+            .order_by(api_relation.c.sort_no, api_relation.c.relation_pk)
         )
         system_id = row.get("system_id")
         system = None if system_id is None else {
@@ -174,88 +255,237 @@ class ApiAssetService:
             "type": row.get("system_type") or "",
         }
         return {
-            "code": code, "name": row["api_name"], "method": row["method_code"],
-            "path": row["path_text"], "version": row.get("version_text") or "",
-            "systemId": system_id, "system": system,
-            # Deprecated response aliases preserve existing private frontend/API clients.
+            "code": code,
+            "name": row["api_name"],
+            "method": row["method_code"],
+            "path": row["path_text"],
+            "version": row.get("version_text") or "",
+            "systemId": system_id,
+            "system": system,
             "downstreamSystemId": system_id,
             "downstreamSystemName": row.get("system_name") or "",
             "downstreamSystemShortName": row.get("system_abbr") or "",
             "legacyPushSystemId": row.get("downstream_system_id"),
-            "type": row.get("api_type") or "", "status": row["status_code"],
-            "ownerDept": row["owner_dept_name"], "ownerName": row["owner_name"],
+            "type": row.get("api_type") or "",
+            "status": row["status_code"],
+            "ownerDept": row["owner_dept_name"],
+            "ownerName": row["owner_name"],
             "maintainerName": row.get("maintainer_name") or "",
-            "description": row.get("description_text") or "", "remark": row.get("remark_desc") or "",
-            "params": [{"name": p["param_name"], "in": p["param_in"], "dataType": p["data_type"], "required": p["required_flag"] == "Y", "description": p.get("description_text") or "", "example": p.get("example_value") or ""} for p in params],
-            "responseFields": [{"name": f["field_name"], "dataType": f["data_type"], "description": f.get("description_text") or "", "example": f.get("example_value") or ""} for f in fields],
-            "relations": [{"type": r["relation_type"], "targetCode": r["target_code"], "targetName": r.get("target_name") or ""} for r in relations],
-            "updatedBy": row.get("updated_by") or "", "updatedAt": str(row.get("updated_at") or ""),
+            "description": row.get("description_text") or "",
+            "remark": row.get("remark_desc") or "",
+            "params": [
+                {
+                    "name": p["param_name"],
+                    "in": p["param_in"],
+                    "dataType": p["data_type"],
+                    "required": p["required_flag"] == "Y",
+                    "description": p.get("description_text") or "",
+                    "example": p.get("example_value") or "",
+                }
+                for p in params
+            ],
+            "responseFields": [
+                {
+                    "name": f["field_name"],
+                    "dataType": f["data_type"],
+                    "description": f.get("description_text") or "",
+                    "example": f.get("example_value") or "",
+                }
+                for f in fields
+            ],
+            "relations": [
+                {
+                    "type": r["relation_type"],
+                    "targetCode": r["target_code"],
+                    "targetName": r.get("target_name") or "",
+                }
+                for r in relations
+            ],
+            "updatedBy": row.get("updated_by") or "",
+            "updatedAt": str(row.get("updated_at") or ""),
         }
 
     def _items(self, rows):
         codes = [row["api_code"] for row in rows]
         if not codes:
             return []
-        placeholders = ",".join("?" for _ in codes)
         queries = (
-            ("params", f"SELECT api_code,param_name,param_in,data_type,required_flag,description_text,example_value FROM dwp.p_api_param WHERE api_code IN ({placeholders}) ORDER BY api_code,sort_no,param_pk"),
-            ("fields", f"SELECT api_code,field_name,data_type,description_text,example_value FROM dwp.p_api_response_field WHERE api_code IN ({placeholders}) ORDER BY api_code,sort_no,field_pk"),
-            ("relations", f"SELECT api_code,relation_type,target_code,target_name FROM dwp.p_api_relation WHERE api_code IN ({placeholders}) ORDER BY api_code,sort_no,relation_pk"),
+            (
+                "params",
+                select(
+                    api_param.c.api_code,
+                    api_param.c.param_name,
+                    api_param.c.param_in,
+                    api_param.c.data_type,
+                    api_param.c.required_flag,
+                    api_param.c.description_text,
+                    api_param.c.example_value,
+                )
+                .where(api_param.c.api_code.in_(codes))
+                .order_by(api_param.c.api_code, api_param.c.sort_no, api_param.c.param_pk),
+            ),
+            (
+                "fields",
+                select(
+                    api_response_field.c.api_code,
+                    api_response_field.c.field_name,
+                    api_response_field.c.data_type,
+                    api_response_field.c.description_text,
+                    api_response_field.c.example_value,
+                )
+                .where(api_response_field.c.api_code.in_(codes))
+                .order_by(api_response_field.c.api_code, api_response_field.c.sort_no, api_response_field.c.field_pk),
+            ),
+            (
+                "relations",
+                select(
+                    api_relation.c.api_code,
+                    api_relation.c.relation_type,
+                    api_relation.c.target_code,
+                    api_relation.c.target_name,
+                )
+                .where(api_relation.c.api_code.in_(codes))
+                .order_by(api_relation.c.api_code, api_relation.c.sort_no, api_relation.c.relation_pk),
+            ),
         )
         grouped = {name: {code: [] for code in codes} for name, _ in queries}
-        for name, sql in queries:
-            for child in self._rows(sql, codes):
+        for name, statement in queries:
+            for child in self._rows(statement):
                 grouped[name][child["api_code"]].append(child)
-        return [self._item(row, grouped["params"][row["api_code"]], grouped["fields"][row["api_code"]], grouped["relations"][row["api_code"]]) for row in rows]
+        return [
+            self._item(
+                row,
+                grouped["params"][row["api_code"]],
+                grouped["fields"][row["api_code"]],
+                grouped["relations"][row["api_code"]],
+            )
+            for row in rows
+        ]
 
     def get_assets(self, keyword=None, status=None, method=None, downstream_system_id=None):
         if status and status not in BINARY_STATUS_VALUES:
-            raise ApiAssetValidationError("API asset validation failed", [{"field": "status", "message": "status is not allowed"}])
-        where, params = ["a.is_deleted='N'"], []
-        for column, value in (("status_code", status), ("method_code", method), ("system_id", downstream_system_id)):
-            if value:
-                where.append(f"a.{column}=?")
-                params.append(value)
-        with database_transaction():
-            rows = self._rows(
-                f"SELECT a.*,s.system_code,s.system_name,s.system_abbr,s.system_type FROM {TABLE} a "
-                f"LEFT JOIN {SYSTEM_TABLE} s ON s.system_id=a.system_id AND s.is_deleted='N' "
-                f"WHERE {' AND '.join(where)} ORDER BY a.api_code", params
+            raise ApiAssetValidationError(
+                "API asset validation failed",
+                [{"field": "status", "message": "status is not allowed"}],
             )
-            items = self._items(rows)
+        clauses = [api_asset.c.is_deleted == "N"]
+        if status:
+            clauses.append(api_asset.c.status_code == status)
+        if method:
+            clauses.append(api_asset.c.method_code == method)
+        if downstream_system_id:
+            clauses.append(api_asset.c.system_id == downstream_system_id)
         if keyword:
-            query = keyword.strip().lower()
-            items = [item for item in items if any(query in str(item[key]).lower() for key in ("code", "name", "path", "description", "ownerName", "ownerDept", "downstreamSystemName", "downstreamSystemShortName"))]
-        return items
+            escaped = str(keyword).strip().lower().replace("\\", "\\\\")
+            escaped = escaped.replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            searchable = (
+                api_asset.c.api_code,
+                api_asset.c.api_name,
+                api_asset.c.path_text,
+                api_asset.c.description_text,
+                api_asset.c.owner_name,
+                api_asset.c.owner_dept_name,
+                system_table.c.system_name,
+                system_table.c.system_abbr,
+            )
+            clauses.append(
+                or_(
+                    *(
+                        func.lower(func.coalesce(column, "")).like(pattern, escape="\\")
+                        for column in searchable
+                    )
+                )
+            )
+        statement = (
+            select(
+                *self._asset_columns(),
+                system_table.c.system_code,
+                system_table.c.system_name,
+                system_table.c.system_abbr,
+                system_table.c.system_type,
+            )
+            .select_from(self._asset_from())
+            .where(*clauses)
+            .order_by(api_asset.c.api_code)
+        )
+        with database_transaction():
+            return self._items(self._rows(statement))
 
     def get_downstream_systems(self, keyword=None):
+        clauses = [system_table.c.is_deleted == "N"]
         query = str(keyword or "").strip().lower()
-        condition = "1=1" if not query else "(LOWER(system_name) LIKE ? OR LOWER(system_abbr) LIKE ?)"
-        params = [] if not query else [f"%{query}%", f"%{query}%"]
-        return self._rows(
-            f"SELECT system_id AS id,system_code AS code,system_name AS name,"
-            f"system_abbr AS short_name,system_type AS type,status_code AS status "
-            f"FROM {SYSTEM_TABLE} WHERE is_deleted='N' AND {condition} ORDER BY system_name",
-            params,
+        if query:
+            escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            clauses.append(
+                or_(
+                    func.lower(system_table.c.system_name).like(pattern, escape="\\"),
+                    func.lower(system_table.c.system_abbr).like(pattern, escape="\\"),
+                )
+            )
+        statement = (
+            select(
+                system_table.c.system_id.label("id"),
+                system_table.c.system_code.label("code"),
+                system_table.c.system_name.label("name"),
+                system_table.c.system_abbr.label("short_name"),
+                system_table.c.system_type.label("type"),
+                system_table.c.status_code.label("status"),
+            )
+            .where(*clauses)
+            .order_by(system_table.c.system_name)
         )
+        return self._rows(statement)
 
     def get_asset(self, code):
-        rows = self._rows(
-            f"SELECT a.*,s.system_code,s.system_name,s.system_abbr,s.system_type FROM {TABLE} a "
-            f"LEFT JOIN {SYSTEM_TABLE} s ON s.system_id=a.system_id AND s.is_deleted='N' "
-            "WHERE a.api_code=? AND a.is_deleted='N'", [str(code).strip().upper()]
+        statement = (
+            select(
+                *self._asset_columns(),
+                system_table.c.system_code,
+                system_table.c.system_name,
+                system_table.c.system_abbr,
+                system_table.c.system_type,
+            )
+            .select_from(self._asset_from())
+            .where(
+                and_(
+                    api_asset.c.api_code == str(code).strip().upper(),
+                    api_asset.c.is_deleted == "N",
+                )
+            )
         )
+        rows = self._rows(statement)
         if not rows:
             raise ApiAssetNotFoundError("API asset not found")
         return self._item(rows[0])
+
+    def _insert_asset(self, item, api_pk):
+        return insert(api_asset).values(
+            api_pk=api_pk,
+            api_code=item["code"],
+            api_name=item["name"],
+            method_code=item["method"],
+            path_text=item["path"],
+            version_text=item["version"],
+            system_id=item["systemId"],
+            api_type=item["type"],
+            status_code=item["status"],
+            owner_dept_name=item["ownerDept"],
+            owner_name=item["ownerName"],
+            maintainer_name=item["maintainerName"],
+            description_text=item["description"],
+            remark_desc=item["remark"],
+            is_deleted="N",
+            created_by="system",
+            updated_by="system",
+        )
 
     def create(self, payload):
         item = self._validate_asset(payload)
         if self._exists(item["code"]):
             raise ApiAssetExistsError("API asset already exists")
-        values = [self._next(TABLE, "api_pk"), item["code"], item["name"], item["method"], item["path"], item["version"], item["systemId"], item["type"], item["status"], item["ownerDept"], item["ownerName"], item["maintainerName"], item["description"], item["remark"]]
-        columns = "api_pk,api_code,api_name,method_code,path_text,version_text,system_id,api_type,status_code,owner_dept_name,owner_name,maintainer_name,description_text,remark_desc"
-        self._execute([(f"INSERT INTO {TABLE} ({columns}) VALUES ({','.join('?' for _ in values)})", values)])
+        self._execute([self._insert_asset(item, self._next(api_asset, api_asset.c.api_pk))])
         for key, kind in (("params", "params"), ("responseFields", "responseFields"), ("relations", "relations")):
             if key in payload:
                 self.replace_rows(item["code"], payload[key], kind)
@@ -264,8 +494,22 @@ class ApiAssetService:
     def update(self, code, payload):
         self.get_asset(code)
         item = self._validate_asset({**(payload or {}), "code": code})
-        assignments = {"api_name": item["name"], "method_code": item["method"], "path_text": item["path"], "version_text": item["version"], "system_id": item["systemId"], "api_type": item["type"], "status_code": item["status"], "owner_dept_name": item["ownerDept"], "owner_name": item["ownerName"], "maintainer_name": item["maintainerName"], "description_text": item["description"], "remark_desc": item["remark"]}
-        self._execute([(f"UPDATE {TABLE} SET {','.join(f'{key}=?' for key in assignments)},updated_at=CURRENT_TIMESTAMP WHERE api_code=?", [*assignments.values(), item["code"]])])
+        values = {
+            "api_name": item["name"],
+            "method_code": item["method"],
+            "path_text": item["path"],
+            "version_text": item["version"],
+            "system_id": item["systemId"],
+            "api_type": item["type"],
+            "status_code": item["status"],
+            "owner_dept_name": item["ownerDept"],
+            "owner_name": item["ownerName"],
+            "maintainer_name": item["maintainerName"],
+            "description_text": item["description"],
+            "remark_desc": item["remark"],
+            "updated_at": func.current_timestamp(),
+        }
+        self._execute([update(api_asset).where(api_asset.c.api_code == item["code"]).values(**values)])
         for key, kind in (("params", "params"), ("responseFields", "responseFields"), ("relations", "relations")):
             if key in payload:
                 self.replace_rows(item["code"], payload[key], kind)
@@ -275,34 +519,77 @@ class ApiAssetService:
         self.get_asset(code)
         status = str((payload or {}).get("status") or "").strip()
         if status not in BINARY_STATUS_VALUES:
-            raise ApiAssetValidationError("API asset validation failed", [{"field": "status", "message": "status is not allowed"}])
-        self._execute([(f"UPDATE {TABLE} SET status_code=?,updated_at=CURRENT_TIMESTAMP WHERE api_code=?", [status, str(code).upper()])])
+            raise ApiAssetValidationError(
+                "API asset validation failed",
+                [{"field": "status", "message": "status is not allowed"}],
+            )
+        self._execute([
+            update(api_asset)
+            .where(api_asset.c.api_code == str(code).upper())
+            .values(status_code=status, updated_at=func.current_timestamp())
+        ])
         return self.get_asset(code)
 
     def replace_rows(self, code, rows, kind):
         self.get_asset(code)
         values = self._validate_rows(rows, kind)
         code = str(code).strip().upper()
-        table, pk_column = {"params": ("dwp.p_api_param", "param_pk"), "responseFields": ("dwp.p_api_response_field", "field_pk"), "relations": ("dwp.p_api_relation", "relation_pk")}[kind]
-        statements = [(f"DELETE FROM {table} WHERE api_code=?", [code])]
+        specs = {
+            "params": (api_param, api_param.c.param_pk),
+            "responseFields": (api_response_field, api_response_field.c.field_pk),
+            "relations": (api_relation, api_relation.c.relation_pk),
+        }
+        table, pk_column = specs[kind]
         next_id = self._next(table, pk_column)
+        statements = [delete(table).where(table.c.api_code == code)]
         for index, row in enumerate(values):
             if kind == "params":
-                columns = "param_pk,api_code,param_name,param_in,data_type,required_flag,description_text,example_value,sort_no"
-                data = [next_id + index, code, row["name"], row["in"], row["dataType"], "Y" if row["required"] else "N", row["description"], row["example"], index]
+                statements.append(
+                    insert(table).values(
+                        param_pk=next_id + index,
+                        api_code=code,
+                        param_name=row["name"],
+                        param_in=row["in"],
+                        data_type=row["dataType"],
+                        required_flag="Y" if row["required"] else "N",
+                        description_text=row["description"],
+                        example_value=row["example"],
+                        sort_no=index,
+                    )
+                )
             elif kind == "responseFields":
-                columns = "field_pk,api_code,field_name,data_type,description_text,example_value,sort_no"
-                data = [next_id + index, code, row["name"], row["dataType"], row["description"], row["example"], index]
+                statements.append(
+                    insert(table).values(
+                        field_pk=next_id + index,
+                        api_code=code,
+                        field_name=row["name"],
+                        data_type=row["dataType"],
+                        description_text=row["description"],
+                        example_value=row["example"],
+                        sort_no=index,
+                    )
+                )
             else:
-                columns = "relation_pk,api_code,relation_type,target_code,target_name,sort_no"
-                data = [next_id + index, code, row["type"], row["targetCode"], row["targetName"], index]
-            statements.append((f"INSERT INTO {table} ({columns}) VALUES ({','.join('?' for _ in data)})", data))
+                statements.append(
+                    insert(table).values(
+                        relation_pk=next_id + index,
+                        api_code=code,
+                        relation_type=row["type"],
+                        target_code=row["targetCode"],
+                        target_name=row["targetName"],
+                        sort_no=index,
+                    )
+                )
         self._execute(statements)
         return self.get_asset(code)
 
     def delete(self, code):
         self.get_asset(code)
-        self._execute([(f"UPDATE {TABLE} SET is_deleted='Y',updated_at=CURRENT_TIMESTAMP WHERE api_code=?", [str(code).upper()])])
+        self._execute([
+            update(api_asset)
+            .where(api_asset.c.api_code == str(code).upper())
+            .values(is_deleted="Y", updated_at=func.current_timestamp())
+        ])
 
 
 api_asset_service = ApiAssetService()
