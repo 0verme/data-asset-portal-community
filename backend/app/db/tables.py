@@ -197,6 +197,81 @@ indicator_change_log = _table(
     Column("change_time", DateTime),
 )
 
+system_table = _table(
+    "p_system",
+    Column("system_id", Integer, primary_key=True),
+    Column("system_code", String(64), nullable=False),
+    Column("system_name", String(256), nullable=False),
+    Column("system_abbr", String(32), nullable=False),
+    Column("description_text", String(2000)),
+    Column("system_type", String(64), nullable=False),
+    Column("department_name", String(128)),
+    Column("status_code", String(32), nullable=False),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+api_asset = _table(
+    "p_api_asset",
+    Column("api_pk", Integer, primary_key=True),
+    Column("api_code", String(64), nullable=False),
+    Column("api_name", String(256), nullable=False),
+    Column("method_code", String(10), nullable=False),
+    Column("path_text", String(512), nullable=False),
+    Column("version_text", String(64)),
+    Column("system_id", Integer),
+    Column("downstream_system_id", Integer),
+    Column("api_type", String(64)),
+    Column("status_code", String(32), nullable=False),
+    Column("owner_dept_name", String(128), nullable=False),
+    Column("owner_name", String(64), nullable=False),
+    Column("maintainer_name", String(64)),
+    Column("description_text", String(2000)),
+    Column("remark_desc", String(2000)),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+api_param = _table(
+    "p_api_param",
+    Column("param_pk", Integer, primary_key=True),
+    Column("api_code", String(64), nullable=False),
+    Column("param_name", String(128), nullable=False),
+    Column("param_in", String(16), nullable=False),
+    Column("data_type", String(64), nullable=False),
+    Column("required_flag", String(1), nullable=False),
+    Column("description_text", String(1000)),
+    Column("example_value", String(1000)),
+    Column("sort_no", Integer, nullable=False),
+)
+
+api_response_field = _table(
+    "p_api_response_field",
+    Column("field_pk", Integer, primary_key=True),
+    Column("api_code", String(64), nullable=False),
+    Column("field_name", String(128), nullable=False),
+    Column("data_type", String(64), nullable=False),
+    Column("description_text", String(1000)),
+    Column("example_value", String(1000)),
+    Column("sort_no", Integer, nullable=False),
+)
+
+api_relation = _table(
+    "p_api_relation",
+    Column("relation_pk", Integer, primary_key=True),
+    Column("api_code", String(64), nullable=False),
+    Column("relation_type", String(16), nullable=False),
+    Column("target_code", String(128), nullable=False),
+    Column("target_name", String(256)),
+    Column("sort_no", Integer, nullable=False),
+)
+
 root_category = _table(
     "p_root_category",
     Column("category_id", Integer, primary_key=True),
