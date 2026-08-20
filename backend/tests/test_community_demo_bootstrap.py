@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 _demo = importlib.import_module("scripts.community_demo")
+BootstrapError = _demo.BootstrapError
 DemoPaths = _demo.DemoPaths
 build_demo_environment = _demo.build_demo_environment
 prepare_demo_runtime = _demo.prepare_demo_runtime
@@ -31,6 +32,18 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         self.assertIn("community_sqlite:", first_config)
         self.assertGreaterEqual(len(first_secret), 48)
         self.assertNotIn(first_secret, self.paths.database_config.read_text(encoding="utf-8"))
+
+    def test_redirected_database_path_is_rejected(self):
+        outside_database = self.root / "user.sqlite"
+        outside_database.write_text("user data", encoding="utf-8")
+        try:
+            self.paths.database.symlink_to(outside_database)
+        except (OSError, NotImplementedError) as error:
+            self.skipTest(f"symlinks unavailable on this platform: {error}")
+
+        with self.assertRaises(BootstrapError):
+            prepare_demo_runtime(self.paths)
+        self.assertEqual("user data", outside_database.read_text(encoding="utf-8"))
 
     def test_existing_user_config_is_not_touched(self):
         user_config = self.root / "backend" / ".env.local"

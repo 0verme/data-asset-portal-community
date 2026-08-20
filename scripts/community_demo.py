@@ -72,16 +72,32 @@ class DemoPaths:
         return self.backend_venv / ("Scripts" if os.name == "nt" else "bin") / name
 
 
+def _is_redirected_path(path: Path) -> bool:
+    is_junction = getattr(path, "is_junction", None)
+    return path.is_symlink() or bool(is_junction and is_junction())
+
+
 def _ensure_directory(path: Path) -> None:
     for candidate in (path.parent, path):
-        if candidate.exists() and candidate.is_symlink():
-            raise BootstrapError(f"Refusing to use symlinked demo runtime directory: {candidate}")
+        if candidate.exists() and _is_redirected_path(candidate):
+            raise BootstrapError(f"Refusing to use redirected demo runtime path: {candidate}")
     path.mkdir(parents=True, exist_ok=True)
 
 
+def _resolve_demo_database(paths: DemoPaths) -> Path:
+    if paths.database.exists() and _is_redirected_path(paths.database):
+        raise BootstrapError(f"Refusing to use redirected demo database path: {paths.database}")
+    database = paths.database.resolve()
+    try:
+        database.relative_to(paths.runtime.resolve())
+    except ValueError as error:
+        raise BootstrapError(f"Demo database must remain under the runtime directory: {database}") from error
+    return database
+
+
 def _write_generated_file(path: Path, content: str, *, private: bool = False) -> None:
-    if path.exists() and path.is_symlink():
-        raise BootstrapError(f"Refusing to overwrite symlinked generated file: {path}")
+    if path.exists() and _is_redirected_path(path):
+        raise BootstrapError(f"Refusing to overwrite redirected generated path: {path}")
     _ensure_directory(path.parent)
     fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     temporary = Path(temporary_name)
@@ -101,8 +117,8 @@ def _write_generated_file(path: Path, content: str, *, private: bool = False) ->
 
 def _load_or_create_secret(path: Path) -> str:
     if path.exists():
-        if path.is_symlink():
-            raise BootstrapError(f"Refusing to read symlinked demo secret: {path}")
+        if _is_redirected_path(path):
+            raise BootstrapError(f"Refusing to read redirected demo secret: {path}")
         value = path.read_text(encoding="utf-8").strip()
         if len(value) >= 48:
             return value
@@ -114,7 +130,8 @@ def _load_or_create_secret(path: Path) -> str:
 def prepare_demo_runtime(paths: DemoPaths) -> str:
     """Create only bootstrap-owned files and return the persisted secret."""
     _ensure_directory(paths.runtime)
-    database_literal = json.dumps(str(paths.database.resolve()))
+    database_path = _resolve_demo_database(paths)
+    database_literal = json.dumps(str(database_path))
     _write_generated_file(
         paths.database_config,
         "defaults:\n"
