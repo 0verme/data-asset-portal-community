@@ -17,10 +17,13 @@ from __future__ import annotations
 import json
 import os
 import re
-from uuid import uuid4
 from copy import deepcopy
+from uuid import uuid4
 
-from ..db.gaussdb import execute_statements, fetch_all, resolve_db_profile_name
+from sqlalchemy import and_, func, insert, or_, select, update
+
+from ..db.service import CoreAccess
+from ..db.tables import root_category, root_change_log, root_item
 from ..settings import get_default_operator
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
@@ -32,9 +35,6 @@ from .operation_log_service import (
 
 
 ROOT_ABBR_RE = re.compile(r"^[a-z0-9]+$")
-TABLE_ROOT_CATEGORY = "dwp.p_root_category"
-TABLE_ROOT_ITEM = "dwp.p_root_item"
-TABLE_ROOT_CHANGE_LOG = "dwp.p_root_change_log"
 
 
 class RootNotFoundError(Exception):
@@ -77,40 +77,72 @@ class RootService:
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
         self._default_operator = get_default_operator()
+        self._db = CoreAccess(
+            profile_getter=lambda: self._db_profile,
+            error_factory=RootDataSourceError,
+        )
 
-    def _fetch_rows(self, sql):
-        try:
-            columns, rows = fetch_all(self._db_profile or resolve_db_profile_name(), sql)
-        except FileNotFoundError as error:
-            raise RootDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise RootDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise RootDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise RootDataSourceError("数据库查询失败") from error
-        return [dict(zip(columns, row)) for row in rows]
+    def _fetch_rows(self, statement):
+        return self._db.fetch_rows(statement)
 
     def _execute(self, statements):
+        return self._db.execute_statements(statements)
+
+    def _next_id(self, table, column):
+        return self._db.next_pk(table, column)
+
+    @staticmethod
+    def _row_int(rows, key):
         try:
-            return execute_statements(self._db_profile or resolve_db_profile_name(), statements)
-        except FileNotFoundError as error:
-            raise RootDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise RootDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise RootDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise RootDataSourceError("数据库执行失败") from error
+            return int(rows[0][key])
+        except (IndexError, KeyError, TypeError, ValueError) as error:
+            raise RootDataSourceError("数据库查询失败") from error
 
-    def _quote(self, value):
-        if value is None:
-            return "NULL"
-        return "'" + str(value).replace("'", "''") + "'"
+    @staticmethod
+    def _columns():
+        return (
+            root_item.c.root_id,
+            root_item.c.root_abbr,
+            root_item.c.root_en_name,
+            root_item.c.root_cn_name,
+            root_item.c.category_name,
+            root_item.c.root_desc,
+        )
 
-    def _next_id(self, table_name, id_column):
-        rows = self._fetch_rows(f"SELECT COALESCE(MAX({id_column}), 0) + 1 AS next_id FROM {table_name}")
-        return int(rows[0]["next_id"])
+    @staticmethod
+    def _row_to_item(row):
+        return {
+            "abbr": row["root_abbr"],
+            "en": row.get("root_en_name") or "",
+            "cn": row["root_cn_name"],
+            "cat": row["category_name"],
+            "desc": row.get("root_desc") or "",
+        }
+
+    @staticmethod
+    def _build_item_filters(keyword=None, cat=None):
+        clauses = [root_item.c.is_deleted == "N"]
+        if cat:
+            clauses.append(root_item.c.category_name == str(cat).strip())
+        if keyword:
+            escaped = str(keyword).strip().lower().replace("\\", "\\\\")
+            escaped = escaped.replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            searchable = (
+                root_item.c.root_abbr,
+                root_item.c.root_en_name,
+                root_item.c.root_cn_name,
+                root_item.c.root_desc,
+            )
+            clauses.append(
+                or_(
+                    *(
+                        func.lower(func.coalesce(column, "")).like(pattern, escape="\\")
+                        for column in searchable
+                    )
+                )
+            )
+        return clauses
 
     def _normalize_payload(self, payload):
         details = []
@@ -147,45 +179,36 @@ class RootService:
         return [self._normalize_payload(item) for item in items]
 
     def _db_categories(self):
-        sql = f"""
-SELECT
-    c.category_name,
-    COALESCE(t.item_count, 0) AS item_count
-FROM {TABLE_ROOT_CATEGORY} c
-LEFT JOIN (
-    SELECT category_name, COUNT(1) AS item_count
-    FROM {TABLE_ROOT_ITEM}
-    WHERE is_deleted = 'N'
-    GROUP BY category_name
-) t
-  ON c.category_name = t.category_name
-WHERE c.is_deleted = 'N'
-ORDER BY c.display_order, c.category_name
-"""
-        return [{"name": row["category_name"], "count": int(row["item_count"] or 0)} for row in self._fetch_rows(sql)]
+        item_counts = (
+            select(
+                root_item.c.category_name,
+                func.count(root_item.c.root_id).label("item_count"),
+            )
+            .where(root_item.c.is_deleted == "N")
+            .group_by(root_item.c.category_name)
+            .subquery()
+        )
+        statement = (
+            select(
+                root_category.c.category_name,
+                func.coalesce(item_counts.c.item_count, 0).label("item_count"),
+            )
+            .outerjoin(item_counts, root_category.c.category_name == item_counts.c.category_name)
+            .where(root_category.c.is_deleted == "N")
+            .order_by(root_category.c.display_order, root_category.c.category_name)
+        )
+        return [
+            {"name": row["category_name"], "count": int(row["item_count"] or 0)}
+            for row in self._fetch_rows(statement)
+        ]
 
     def _db_items(self, keyword=None, cat=None):
-        where = ["is_deleted = 'N'"]
-        if cat:
-            where.append(f"category_name = {self._quote(cat)}")
-        sql = f"""
-SELECT root_id, root_abbr, root_en_name, root_cn_name, category_name, root_desc
-FROM {TABLE_ROOT_ITEM}
-WHERE {' AND '.join(where)}
-ORDER BY root_abbr
-"""
-        rows = self._fetch_rows(sql)
-        items = [{
-            "abbr": row["root_abbr"],
-            "en": row.get("root_en_name") or "",
-            "cn": row["root_cn_name"],
-            "cat": row["category_name"],
-            "desc": row.get("root_desc") or "",
-        } for row in rows]
-        if keyword:
-            query = keyword.strip().lower()
-            items = [item for item in items if any(query in str(item[key]).lower() for key in ("abbr", "en", "cn", "desc"))]
-        return items
+        statement = (
+            select(*self._columns())
+            .where(*self._build_item_filters(keyword=keyword, cat=cat))
+            .order_by(root_item.c.root_abbr)
+        )
+        return [self._row_to_item(row) for row in self._fetch_rows(statement)]
 
     def get_roots(self, keyword=None, cat=None):
         return self._db_items(keyword=keyword, cat=cat)
@@ -194,10 +217,42 @@ ORDER BY root_abbr
         return self._db_categories()
 
     def get_root_detail(self, abbr):
-        item = next((root for root in self.get_roots() if root["abbr"] == abbr), None)
-        if not item:
+        statement = select(*self._columns()).where(
+            and_(root_item.c.root_abbr == abbr, root_item.c.is_deleted == "N")
+        )
+        rows = self._fetch_rows(statement)
+        if not rows:
             raise RootNotFoundError(abbr)
-        return deepcopy(item)
+        return deepcopy(self._row_to_item(rows[0]))
+
+    def _insert_item(self, item, root_id):
+        return insert(root_item).values(
+            root_id=root_id,
+            root_abbr=item["abbr"],
+            root_en_name=item["en"],
+            root_cn_name=item["cn"],
+            category_name=item["cat"],
+            root_desc=item["desc"],
+            is_deleted="N",
+            created_by=self._default_operator,
+            updated_by=self._default_operator,
+        )
+
+    def _insert_change_log(self, *, change_id, root_id, root_abbr, change_type, before=None, after=None):
+        return insert(root_change_log).values(
+            change_id=change_id,
+            root_id=root_id,
+            root_abbr=root_abbr,
+            change_type=change_type,
+            change_summary={
+                "CREATE_ROOT": "create root",
+                "UPDATE_ROOT": "update root",
+                "DELETE_ROOT": "delete root",
+            }[change_type],
+            before_json=json.dumps(before, ensure_ascii=False) if before is not None else None,
+            after_json=json.dumps(after, ensure_ascii=False) if after is not None else None,
+            operator_name=self._default_operator,
+        )
 
     def create_root(self, payload):
         with operation_log_service.audit(
@@ -216,27 +271,20 @@ ORDER BY root_abbr
         if any(current["abbr"] == item["abbr"] for current in self.get_roots()):
             raise RootAlreadyExistsError(item["abbr"])
 
-        root_id = self._next_id(TABLE_ROOT_ITEM, "root_id")
-        change_id = self._next_id(TABLE_ROOT_CHANGE_LOG, "change_id")
-        statements = [
-            f"""
-INSERT INTO {TABLE_ROOT_ITEM} (
-  root_id, root_abbr, root_en_name, root_cn_name, category_name, root_desc, created_by, updated_by
-) VALUES (
-  {root_id}, {self._quote(item['abbr'])}, {self._quote(item['en'])}, {self._quote(item['cn'])},
-  {self._quote(item['cat'])}, {self._quote(item['desc'])}, {self._quote(self._default_operator)}, {self._quote(self._default_operator)}
-)
-""".strip(),
-            f"""
-INSERT INTO {TABLE_ROOT_CHANGE_LOG} (
-  change_id, root_id, root_abbr, change_type, change_summary, after_json, operator_name
-) VALUES (
-  {change_id}, {root_id}, {self._quote(item['abbr'])}, 'CREATE_ROOT', 'create root',
-  {self._quote(json.dumps(item, ensure_ascii=False))}, {self._quote(self._default_operator)}
-)
-""".strip(),
-        ]
-        self._execute(statements)
+        root_id = self._next_id(root_item, root_item.c.root_id)
+        change_id = self._next_id(root_change_log, root_change_log.c.change_id)
+        self._execute(
+            [
+                self._insert_item(item, root_id),
+                self._insert_change_log(
+                    change_id=change_id,
+                    root_id=root_id,
+                    root_abbr=item["abbr"],
+                    change_type="CREATE_ROOT",
+                    after=item,
+                ),
+            ]
+        )
         return item
 
     def update_root(self, abbr, payload):
@@ -254,40 +302,42 @@ INSERT INTO {TABLE_ROOT_CHANGE_LOG} (
 
     def _update_root(self, abbr, payload):
         item = self._normalize_payload(payload)
-        rows = self._fetch_rows(f"SELECT root_id FROM {TABLE_ROOT_ITEM} WHERE root_abbr = {self._quote(abbr)} AND is_deleted = 'N'")
+        rows = self._fetch_rows(
+            select(root_item.c.root_id).where(
+                and_(root_item.c.root_abbr == abbr, root_item.c.is_deleted == "N")
+            )
+        )
         if not rows:
             raise RootNotFoundError(abbr)
-        if item["abbr"] != abbr and any(root["abbr"] == item["abbr"] for root in self.get_roots()):
+        if item["abbr"] != abbr and any(current["abbr"] == item["abbr"] for current in self.get_roots()):
             raise RootAlreadyExistsError(item["abbr"])
 
         current = self.get_root_detail(abbr)
-        root_id = int(rows[0]["root_id"])
-        change_id = self._next_id(TABLE_ROOT_CHANGE_LOG, "change_id")
-        statements = [
-            f"""
-UPDATE {TABLE_ROOT_ITEM}
-SET
-  root_abbr = {self._quote(item['abbr'])},
-  root_en_name = {self._quote(item['en'])},
-  root_cn_name = {self._quote(item['cn'])},
-  category_name = {self._quote(item['cat'])},
-  root_desc = {self._quote(item['desc'])},
-  updated_by = {self._quote(self._default_operator)},
-  updated_at = CURRENT_TIMESTAMP
-WHERE root_id = {root_id}
-""".strip(),
-            f"""
-INSERT INTO {TABLE_ROOT_CHANGE_LOG} (
-  change_id, root_id, root_abbr, change_type, change_summary, before_json, after_json, operator_name
-) VALUES (
-  {change_id}, {root_id}, {self._quote(item['abbr'])}, 'UPDATE_ROOT', 'update root',
-  {self._quote(json.dumps(current, ensure_ascii=False))},
-  {self._quote(json.dumps(item, ensure_ascii=False))},
-  {self._quote(self._default_operator)}
-)
-""".strip(),
-        ]
-        self._execute(statements)
+        root_id = self._row_int(rows, "root_id")
+        change_id = self._next_id(root_change_log, root_change_log.c.change_id)
+        self._execute(
+            [
+                update(root_item)
+                .where(root_item.c.root_id == root_id)
+                .values(
+                    root_abbr=item["abbr"],
+                    root_en_name=item["en"],
+                    root_cn_name=item["cn"],
+                    category_name=item["cat"],
+                    root_desc=item["desc"],
+                    updated_by=self._default_operator,
+                    updated_at=func.current_timestamp(),
+                ),
+                self._insert_change_log(
+                    change_id=change_id,
+                    root_id=root_id,
+                    root_abbr=item["abbr"],
+                    change_type="UPDATE_ROOT",
+                    before=current,
+                    after=item,
+                ),
+            ]
+        )
         return current, item
 
     def delete_root(self, abbr):
@@ -297,32 +347,37 @@ INSERT INTO {TABLE_ROOT_CHANGE_LOG} (
             operation_object=abbr,
             operation_desc="删除词根",
         ) as audit:
-            current = self._delete_root(abbr)
-            audit.before = current
+            audit.before = self._delete_root(abbr)
 
     def _delete_root(self, abbr):
-        rows = self._fetch_rows(f"SELECT root_id FROM {TABLE_ROOT_ITEM} WHERE root_abbr = {self._quote(abbr)} AND is_deleted = 'N'")
+        rows = self._fetch_rows(
+            select(root_item.c.root_id).where(
+                and_(root_item.c.root_abbr == abbr, root_item.c.is_deleted == "N")
+            )
+        )
         if not rows:
             raise RootNotFoundError(abbr)
         current = self.get_root_detail(abbr)
-        root_id = int(rows[0]["root_id"])
-        change_id = self._next_id(TABLE_ROOT_CHANGE_LOG, "change_id")
-        statements = [
-            f"""
-UPDATE {TABLE_ROOT_ITEM}
-SET is_deleted = 'Y', updated_by = {self._quote(self._default_operator)}, updated_at = CURRENT_TIMESTAMP
-WHERE root_id = {root_id}
-""".strip(),
-            f"""
-INSERT INTO {TABLE_ROOT_CHANGE_LOG} (
-  change_id, root_id, root_abbr, change_type, change_summary, before_json, operator_name
-) VALUES (
-  {change_id}, {root_id}, {self._quote(abbr)}, 'DELETE_ROOT', 'delete root',
-  {self._quote(json.dumps(current, ensure_ascii=False))}, {self._quote(self._default_operator)}
-)
-""".strip(),
-        ]
-        self._execute(statements)
+        root_id = self._row_int(rows, "root_id")
+        change_id = self._next_id(root_change_log, root_change_log.c.change_id)
+        self._execute(
+            [
+                update(root_item)
+                .where(root_item.c.root_id == root_id)
+                .values(
+                    is_deleted="Y",
+                    updated_by=self._default_operator,
+                    updated_at=func.current_timestamp(),
+                ),
+                self._insert_change_log(
+                    change_id=change_id,
+                    root_id=root_id,
+                    root_abbr=abbr,
+                    change_type="DELETE_ROOT",
+                    before=current,
+                ),
+            ]
+        )
         return current
 
     def import_roots(self, payload):
