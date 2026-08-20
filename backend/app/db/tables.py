@@ -198,6 +198,39 @@ indicator_change_log = _table(
     Column("change_time", DateTime),
 )
 
+code_category = _table(
+    "p_code_category",
+    Column("category_id", Integer, primary_key=True),
+    Column("category_code", String(64), nullable=False),
+    Column("category_name", String(128), nullable=False),
+    Column("category_desc", Text),
+    Column("display_order", Integer, nullable=False),
+    Column("is_active", String(1), nullable=False),
+    Column("remark", String(1000)),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+code_item = _table(
+    "p_code_item",
+    Column("item_id", Integer, primary_key=True),
+    Column("category_code", String(64), nullable=False),
+    Column("item_code", String(64), nullable=False),
+    Column("item_name", String(128), nullable=False),
+    Column("item_value", String(256)),
+    Column("item_desc", String(512)),
+    Column("display_order", Integer, nullable=False),
+    Column("ext_json", Text),
+    Column("is_active", String(1), nullable=False),
+    Column("remark", String(1000)),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
 menu_table = _table(
     "p_menu",
     Column("menu_id", Integer, primary_key=True),
