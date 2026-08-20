@@ -1,93 +1,96 @@
-name: Bug Report
-description: Report a reproducible problem in the Community Edition
-title: "[Bug]: "
+name: 🐞 Bug Report / 问题反馈
+description: 报告程序异常、连接失败、查询错误、界面显示错误或其他可复现问题
+title: "[Bug] "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting! Please fill in as much as you can — the
-        more context, the faster we can reproduce and fix it.
+        感谢你的反馈！
 
-        ⚠️ **Do not paste secrets, tokens, passwords, connection strings,
-        or internal host names.** If a log contains such data, redact it first.
+        请尽量提供完整的复现步骤和环境信息，这将帮助我们更快定位问题。
+
+        ⚠️ 请勿提交密码、Token、数据库连接串、内部地址等敏感信息。
+        如日志包含敏感数据，请先脱敏。
 
   - type: input
     id: version
     attributes:
-      label: Version / commit
-      description: Which version (tag) or commit hash are you running?
-      placeholder: "e.g. v0.1.0 or 47710fa"
+      label: 版本 / Commit
+      description: 你当前使用的是哪个版本或 Commit？
+      placeholder: "例如：v0.1.0 / 47710fa"
     validations:
       required: true
 
   - type: dropdown
     id: database
     attributes:
-      label: Database
-      description: Which backend database were you using?
+      label: 数据库
+      description: 当前使用的数据源或后端数据库
       options:
-        - SQLite (Community local)
+        - SQLite
         - PostgreSQL
         - GaussDB / DWS
-        - Not applicable / unknown
+        - 不涉及 / 不确定
     validations:
       required: true
 
   - type: dropdown
     id: area
     attributes:
-      label: Area
+      label: 涉及模块
       options:
-        - Backend API
-        - Frontend UI
-        - Lineage viewer
-        - Migrations / schema
-        - Demo / seed data
-        - Installation / build
-        - Documentation
-        - Other
+        - 后端 API
+        - 前端界面
+        - 血缘可视化
+        - 数据库迁移 / Schema
+        - Demo / 示例数据
+        - 安装 / 构建
+        - 文档
+        - 其他
     validations:
       required: true
 
   - type: textarea
     id: reproduction
     attributes:
-      label: Steps to reproduce
-      description: What did you do, and what happened?
+      label: 问题复现步骤
+      description: 请说明进行了什么操作，以及出现了什么问题。
       placeholder: |
-        1. Start the backend with ...
-        2. Open the page ...
-        3. See the error ...
+        1. 启动……
+        2. 打开……
+        3. 点击……
+        4. 出现……
     validations:
       required: true
 
   - type: textarea
     id: expected
     attributes:
-      label: Expected behavior
+      label: 期望行为
+      description: 正常情况下你认为应该发生什么？
     validations:
       required: true
 
   - type: textarea
     id: logs
     attributes:
-      label: Logs / error output
-      description: Paste relevant logs (redact anything sensitive).
+      label: 日志 / 错误信息
+      description: 请粘贴相关日志，并注意删除密码、Token、连接串等敏感信息。
       render: shell
 
   - type: input
-    id: browser
+    id: environment
     attributes:
-      label: Browser / Node / Python (if relevant)
-      placeholder: "e.g. Chrome 126, Node 22.13, Python 3.13"
+      label: 环境信息
+      placeholder: "例如：Windows 11 / Chrome 151 / Node 22 / Python 3.13"
 
   - type: checkboxes
     id: checks
     attributes:
-      label: Before submitting
+      label: 提交前确认
       options:
-        - label: I have searched existing issues for a duplicate
-        - label: I have redacted all secrets and personal data from this report
+        - label: 我已搜索现有 Issue，确认没有重复问题
+        - label: 我已删除日志中的密码、Token、连接串等敏感信息
     validations:
       required: true

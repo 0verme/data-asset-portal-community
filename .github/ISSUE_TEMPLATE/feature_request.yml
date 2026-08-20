@@ -1,56 +1,58 @@
-name: Feature Request
-description: Suggest an idea for the Community Edition
-title: "[Feature]: "
+name: 💡 Feature Request / 功能建议
+description: 提议新功能、交互改进或现有功能增强
+title: "[Feature] "
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for the idea! A clear description of the problem and the
-        proposed behavior helps maintainers evaluate it quickly.
+        感谢你的建议！
+
+        请尽量说明实际使用场景、当前遇到的问题以及你期望的行为，
+        这将帮助我们更快理解和评估需求。
 
   - type: textarea
     id: problem
     attributes:
-      label: What problem does this solve?
-      description: What are you trying to do, and what gets in the way?
+      label: 你遇到了什么问题？
+      description: 请描述你的使用场景，以及当前有哪些不便。
     validations:
       required: true
 
   - type: textarea
     id: proposal
     attributes:
-      label: Proposed behavior
-      description: How should it work once implemented?
+      label: 你期望如何改进？
+      description: 请描述你希望实现后的交互或行为。
     validations:
       required: true
 
   - type: dropdown
     id: area
     attributes:
-      label: Area
+      label: 涉及模块
       options:
-        - Backend API
-        - Frontend UI
-        - Lineage viewer
-        - Migrations / schema
-        - Demo / seed data
-        - Documentation
-        - Other
+        - 后端 API
+        - 前端界面
+        - 血缘可视化
+        - 数据库迁移 / Schema
+        - Demo / 示例数据
+        - 文档
+        - 其他
     validations:
       required: true
 
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives considered
-      description: What workarounds or alternative designs did you consider?
+      label: 是否考虑过其他方案？
+      description: 如果有临时解决方案、替代方案或其他设计思路，可以在这里说明。
 
   - type: checkboxes
     id: checks
     attributes:
-      label: Before submitting
+      label: 提交前确认
       options:
-        - label: I have searched existing issues and discussions for a duplicate
+        - label: 我已搜索现有 Issue / Discussion，确认没有重复问题
     validations:
       required: true

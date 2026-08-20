@@ -2,7 +2,4 @@ blank_issues_enabled: false
 contact_links:
   - name: Questions / 使用问题
     url: https://github.com/0verme/data-asset-portal-community/discussions/categories/q-a
-    about: Ask for installation, configuration, and usage help in GitHub Discussions.
-  - name: Security vulnerability / 安全漏洞
-    url: https://github.com/0verme/data-asset-portal-community/security/advisories/new
-    about: Report vulnerabilities privately. Do not disclose security issues in a public Issue.
+    about: 安装、配置和使用问题请优先前往 GitHub Discussions。
