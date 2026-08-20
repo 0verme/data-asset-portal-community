@@ -15,10 +15,19 @@
 from __future__ import annotations
 
 import json
+from json import JSONDecodeError
 import os
 import re
 from copy import deepcopy
+from typing import Any, cast
 
+from sqlalchemy import and_, func, insert, or_, select, update
+
+# pyright: reportMissingImports=false
+
+from ..db.service import CoreAccess
+from ..db.tables import asset_domain, asset_table, indicator_item, report_asset
+from ..settings import get_default_operator
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
@@ -30,15 +39,10 @@ from .operation_log_service import (
     OPERATION_TYPE_UPDATE,
     operation_log_service,
 )
-from ..db.gaussdb import execute_statements, fetch_all, resolve_db_profile_name
-from ..settings import get_default_operator
 
 
 REPORT_CODE_RE = re.compile(r"^[A-Z][A-Z0-9_-]{2,63}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-TABLE_REPORT_ASSET = "dwp.p_report_asset"
-TABLE_ASSET = "dwp.p_asset_table"
-TABLE_INDICATOR = "dwp.p_indicator_item"
 DEFAULT_STATUS = {"enabled", "disabled"}
 REPORT_TYPE_CATEGORY = "REPORT_TYPE"
 REPORT_PERIOD_CATEGORY = "REPORT_STAT_PERIOD"
@@ -49,6 +53,12 @@ DEFAULT_REPORT_TYPES = {"经营分析", "监管报送"}
 DEFAULT_REPORT_PERIODS = {"实时", "5分钟", "15分钟", "30分钟", "小时", "日", "周", "月", "季", "年", "不定期"}
 DEFAULT_REPORT_DATE_CALIBERS = {"当日", "T-1日", "自然周", "上一自然周", "自然月", "上一自然月", "自然季", "上一自然季", "自然年", "年初至今"}
 DEFAULT_REPORT_TIMELINESS = {"实时", "T+0", "T+1", "T+2"}
+LEGACY_COLUMNS = {
+    "report_type": report_asset.c.report_type,
+    "domain_name": report_asset.c.domain_name,
+    "freq_code": report_asset.c.freq_code,
+    "owner_dept_name": report_asset.c.owner_dept_name,
+}
 
 
 class ReportNotFoundError(Exception):
@@ -91,40 +101,25 @@ class ReportService:
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
         self._default_operator = get_default_operator()
+        self._db = CoreAccess(
+            profile_getter=lambda: self._db_profile,
+            error_factory=ReportDataSourceError,
+        )
 
-    def _fetch_rows(self, sql):
-        try:
-            columns, rows = fetch_all(self._db_profile or resolve_db_profile_name(), sql)
-        except FileNotFoundError as error:
-            raise ReportDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise ReportDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise ReportDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise ReportDataSourceError("数据库查询失败") from error
-        return [dict(zip(columns, row)) for row in rows]
+    def _fetch_rows(self, statement):
+        return self._db.fetch_rows(statement)
 
     def _execute(self, statements):
+        return self._db.execute_statements(statements)
+
+    def _next_id(self, table, column):
+        return self._db.next_pk(table, column)
+
+    def _row_int(self, rows, key):
         try:
-            return execute_statements(self._db_profile or resolve_db_profile_name(), statements)
-        except FileNotFoundError as error:
-            raise ReportDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise ReportDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise ReportDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise ReportDataSourceError("数据库执行失败") from error
-
-    def _quote(self, value):
-        if value is None:
-            return "NULL"
-        return "'" + str(value).replace("'", "''") + "'"
-
-    def _next_id(self, table_name, id_column):
-        rows = self._fetch_rows(f"SELECT COALESCE(MAX({id_column}), 0) + 1 AS next_id FROM {table_name}")
-        return int(rows[0]["next_id"])
+            return int(rows[0][key])
+        except (IndexError, KeyError, TypeError, ValueError) as error:
+            raise ReportDataSourceError("数据库查询失败") from error
 
     def _allowed_status_values(self):
         try:
@@ -140,18 +135,28 @@ class ReportService:
             return set(fallback)
 
     def _domain_names(self):
-        rows = self._fetch_rows("""
-SELECT domain_name FROM dwp.p_asset_domain WHERE is_active = 'Y' ORDER BY display_order, domain_name
-""")
+        rows = self._fetch_rows(
+            select(asset_domain.c.domain_name)
+            .where(and_(asset_domain.c.is_active == "Y", asset_domain.c.is_deleted == "N"))
+            .order_by(asset_domain.c.display_order, asset_domain.c.domain_name)
+        )
         return {str(row.get("domain_name") or "").strip() for row in rows if row.get("domain_name")}
 
     def _legacy_values(self, column):
-        rows = self._fetch_rows(f"SELECT DISTINCT {column} AS value FROM {TABLE_REPORT_ASSET} WHERE is_deleted = 'N'")
+        mapped_column = LEGACY_COLUMNS[column]
+        rows = self._fetch_rows(
+            select(mapped_column.distinct().label("value")).where(report_asset.c.is_deleted == "N")
+        )
         return {str(row.get("value") or "").strip() for row in rows if row.get("value")}
 
     @staticmethod
     def _legacy_time_fields(freq, time_caliber):
-        period_map = {"日报": "日", "日": "日", "每日": "日", "每天": "日", "周报": "周", "周": "周", "每周": "周", "月报": "月", "月": "月", "每月": "月", "季报": "季", "季": "季", "每季": "季", "半年报": "半年", "年报": "年", "年": "年", "每年": "年", "实时": "实时", "不定期": "不定期"}
+        period_map = {
+            "日报": "日", "日": "日", "每日": "日", "每天": "日", "周报": "周", "周": "周",
+            "每周": "周", "月报": "月", "月": "月", "每月": "月", "季报": "季", "季": "季",
+            "每季": "季", "半年报": "半年", "年报": "年", "年": "年", "每年": "年", "实时": "实时",
+            "不定期": "不定期",
+        }
         period = period_map.get(str(freq or "").strip(), "")
         text = f"{freq or ''} {time_caliber or ''}"
         date_caliber = next((value for value in DEFAULT_REPORT_DATE_CALIBERS - {"其他"} if value in text), "")
@@ -165,21 +170,22 @@ SELECT domain_name FROM dwp.p_asset_domain WHERE is_active = 'Y' ORDER BY displa
         if isinstance(value, str) and value.strip():
             try:
                 payload = json.loads(value)
-            except json.JSONDecodeError:
+            except JSONDecodeError:
                 return []
             return payload if isinstance(payload, list) else []
         return []
 
     def _asset_lookup(self):
-        rows = self._fetch_rows(f"""
-SELECT
-  table_name,
-  table_cn_name,
-  layer_code,
-  domain_code
-FROM {TABLE_ASSET}
-ORDER BY table_name
-""")
+        rows = self._fetch_rows(
+            select(
+                asset_table.c.table_name,
+                asset_table.c.table_cn_name,
+                asset_table.c.layer_code,
+                asset_table.c.domain_code,
+            )
+            .where(asset_table.c.is_deleted == "N")
+            .order_by(asset_table.c.table_name)
+        )
         return {
             str(row["table_name"]): {
                 "tableName": str(row["table_name"]),
@@ -192,16 +198,16 @@ ORDER BY table_name
         }
 
     def _indicator_lookup(self):
-        rows = self._fetch_rows(f"""
-SELECT
-  indicator_id,
-  indicator_name,
-  dimension_code,
-  path_desc
-FROM {TABLE_INDICATOR}
-WHERE is_deleted = 'N'
-ORDER BY indicator_id
-""")
+        rows = self._fetch_rows(
+            select(
+                indicator_item.c.indicator_id,
+                indicator_item.c.indicator_name,
+                indicator_item.c.dimension_code,
+                indicator_item.c.path_desc,
+            )
+            .where(indicator_item.c.is_deleted == "N")
+            .order_by(indicator_item.c.indicator_id)
+        )
         return {
             str(row["indicator_id"]): {
                 "indicatorId": str(row["indicator_id"]),
@@ -276,6 +282,8 @@ ORDER BY indicator_id
         if details:
             raise ReportValidationError(details)
 
+        related_tables = cast(list[dict[str, Any]], related_tables)
+        related_indicators = cast(list[dict[str, Any]], related_indicators)
         asset_lookup = self._asset_lookup()
         indicator_lookup = self._indicator_lookup()
         normalized_tables = []
@@ -340,107 +348,116 @@ ORDER BY indicator_id
             "remark": str(payload.get("remark") or "").strip(),
         }
 
-    def _db_reports(self, keyword=None, report_type=None, domain=None, status=None, owner_dept=None):
-        where = ["is_deleted = 'N'"]
+    def _build_report_filters(self, keyword=None, report_type=None, domain=None, status=None, owner_dept=None):
+        clauses = [report_asset.c.is_deleted == "N"]
         if report_type:
-            where.append(f"report_type = {self._quote(report_type)}")
+            clauses.append(report_asset.c.report_type == report_type)
         if domain:
-            where.append(f"domain_name = {self._quote(domain)}")
+            clauses.append(report_asset.c.domain_name == domain)
         if status:
-            where.append(f"status_code = {self._quote(status)}")
+            clauses.append(report_asset.c.status_code == status)
         if owner_dept:
-            where.append(f"owner_dept_name = {self._quote(owner_dept)}")
-
-        rows = self._fetch_rows(f"""
-SELECT
-  report_pk,
-  report_code,
-  report_name,
-  report_alias,
-  report_type,
-  domain_name,
-  freq_code,
-  stat_period_code,
-  date_caliber_code,
-  date_caliber_other_desc,
-  data_timeliness_code,
-  data_timeliness_custom_desc,
-  status_code,
-  effective_date,
-  expire_date,
-  purpose_desc,
-  stat_object_desc,
-  stat_scope_desc,
-  time_caliber_desc,
-  filter_condition_desc,
-  special_rule_desc,
-  owner_dept_name,
-  owner_name,
-  maintainer_name,
-  related_tables_json,
-  related_indicators_json,
-  remark_desc,
-  updated_by,
-  updated_at
-FROM {TABLE_REPORT_ASSET}
-WHERE {' AND '.join(where)}
-ORDER BY report_code
-""")
-        items = []
-        for row in rows:
-            related_tables = self._normalize_json_array(row.get("related_tables_json"))
-            related_indicators = self._normalize_json_array(row.get("related_indicators_json"))
-            legacy_period, legacy_date_caliber, legacy_timeliness = self._legacy_time_fields(row.get("freq_code"), row.get("time_caliber_desc"))
-            item = {
-                "code": row["report_code"],
-                "name": row["report_name"],
-                "alias": row.get("report_alias") or "",
-                "type": row.get("report_type") or "",
-                "domain": row.get("domain_name") or "",
-                "freq": row.get("freq_code") or "",
-                "statPeriod": row.get("stat_period_code") or legacy_period,
-                "statCaliber": row.get("date_caliber_other_desc") or row.get("date_caliber_code") or legacy_date_caliber or row.get("time_caliber_desc") or "",
-                "dataDelay": row.get("data_timeliness_custom_desc") or row.get("data_timeliness_code") or legacy_timeliness,
-                "legacyFreq": row.get("freq_code") or "",
-                "legacyTimeCaliber": row.get("time_caliber_desc") or "",
-                "status": row.get("status_code") or "",
-                "effectiveDate": row.get("effective_date") or "",
-                "expireDate": row.get("expire_date") or "",
-                "purpose": row.get("purpose_desc") or "",
-                "statObject": row.get("stat_object_desc") or "",
-                "businessScopeTags": row.get("stat_scope_desc") or "",
-                "filterCondition": row.get("filter_condition_desc") or "",
-                "specialRule": row.get("special_rule_desc") or "",
-                "ownerDept": row.get("owner_dept_name") or "",
-                "ownerName": row.get("owner_name") or "",
-                "maintainerName": row.get("maintainer_name") or "",
-                "relatedTables": related_tables,
-                "relatedIndicators": related_indicators,
-                "relatedTableCount": len(related_tables),
-                "relatedIndicatorCount": len(related_indicators),
-                "remark": row.get("remark_desc") or "",
-                "updatedBy": row.get("updated_by") or "",
-                "updatedAt": str(row.get("updated_at") or ""),
-            }
-            # Temporary response aliases keep existing import/export clients and mock data compatible.
-            item["dateCaliber"] = item["statCaliber"]
-            item["dateCaliberOther"] = ""
-            item["dataTimeliness"] = item["dataDelay"]
-            item["dataTimelinessCustom"] = ""
-            item["statScope"] = item["businessScopeTags"]
-            item["timeCaliber"] = row.get("time_caliber_desc") or ""
-            items.append(item)
-
+            clauses.append(report_asset.c.owner_dept_name == owner_dept)
         if keyword:
-            query = keyword.strip().lower()
-            items = [
-                item for item in items
-                if any(
-                    query in str(item[key] or "").lower()
-                    for key in ("code", "name", "alias", "ownerName", "ownerDept", "domain", "purpose")
-                )
-            ]
-        return items
+            query = str(keyword).strip().lower()
+            escaped_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped_query}%"
+            searchable = (
+                report_asset.c.report_code,
+                report_asset.c.report_name,
+                report_asset.c.report_alias,
+                report_asset.c.owner_name,
+                report_asset.c.owner_dept_name,
+                report_asset.c.domain_name,
+                report_asset.c.purpose_desc,
+            )
+            clauses.append(or_(*(
+                func.lower(func.coalesce(column, "")).like(pattern, escape="\\")
+                for column in searchable
+            )))
+        return clauses
+
+    def _row_to_item(self, row):
+        related_tables = self._normalize_json_array(row.get("related_tables_json"))
+        related_indicators = self._normalize_json_array(row.get("related_indicators_json"))
+        legacy_period, legacy_date_caliber, legacy_timeliness = self._legacy_time_fields(
+            row.get("freq_code"), row.get("time_caliber_desc")
+        )
+        item = {
+            "code": row["report_code"],
+            "name": row["report_name"],
+            "alias": row.get("report_alias") or "",
+            "type": row.get("report_type") or "",
+            "domain": row.get("domain_name") or "",
+            "freq": row.get("freq_code") or "",
+            "statPeriod": row.get("stat_period_code") or legacy_period,
+            "statCaliber": row.get("date_caliber_other_desc") or row.get("date_caliber_code") or legacy_date_caliber or row.get("time_caliber_desc") or "",
+            "dataDelay": row.get("data_timeliness_custom_desc") or row.get("data_timeliness_code") or legacy_timeliness,
+            "legacyFreq": row.get("freq_code") or "",
+            "legacyTimeCaliber": row.get("time_caliber_desc") or "",
+            "status": row.get("status_code") or "",
+            "effectiveDate": row.get("effective_date") or "",
+            "expireDate": row.get("expire_date") or "",
+            "purpose": row.get("purpose_desc") or "",
+            "statObject": row.get("stat_object_desc") or "",
+            "businessScopeTags": row.get("stat_scope_desc") or "",
+            "filterCondition": row.get("filter_condition_desc") or "",
+            "specialRule": row.get("special_rule_desc") or "",
+            "ownerDept": row.get("owner_dept_name") or "",
+            "ownerName": row.get("owner_name") or "",
+            "maintainerName": row.get("maintainer_name") or "",
+            "relatedTables": related_tables,
+            "relatedIndicators": related_indicators,
+            "relatedTableCount": len(related_tables),
+            "relatedIndicatorCount": len(related_indicators),
+            "remark": row.get("remark_desc") or "",
+            "updatedBy": row.get("updated_by") or "",
+            "updatedAt": str(row.get("updated_at") or ""),
+        }
+        # Temporary response aliases keep existing import/export clients and mock data compatible.
+        item["dateCaliber"] = item["statCaliber"]
+        item["dateCaliberOther"] = ""
+        item["dataTimeliness"] = item["dataDelay"]
+        item["dataTimelinessCustom"] = ""
+        item["statScope"] = item["businessScopeTags"]
+        item["timeCaliber"] = row.get("time_caliber_desc") or ""
+        return item
+
+    def _db_reports(self, keyword=None, report_type=None, domain=None, status=None, owner_dept=None):
+        columns = (
+            report_asset.c.report_code,
+            report_asset.c.report_name,
+            report_asset.c.report_alias,
+            report_asset.c.report_type,
+            report_asset.c.domain_name,
+            report_asset.c.freq_code,
+            report_asset.c.stat_period_code,
+            report_asset.c.date_caliber_code,
+            report_asset.c.date_caliber_other_desc,
+            report_asset.c.data_timeliness_code,
+            report_asset.c.data_timeliness_custom_desc,
+            report_asset.c.status_code,
+            report_asset.c.effective_date,
+            report_asset.c.expire_date,
+            report_asset.c.purpose_desc,
+            report_asset.c.stat_object_desc,
+            report_asset.c.stat_scope_desc,
+            report_asset.c.time_caliber_desc,
+            report_asset.c.filter_condition_desc,
+            report_asset.c.special_rule_desc,
+            report_asset.c.owner_dept_name,
+            report_asset.c.owner_name,
+            report_asset.c.maintainer_name,
+            report_asset.c.related_tables_json,
+            report_asset.c.related_indicators_json,
+            report_asset.c.remark_desc,
+            report_asset.c.updated_by,
+            report_asset.c.updated_at,
+        )
+        statement = select(*columns).where(
+            *self._build_report_filters(keyword, report_type, domain, status, owner_dept)
+        ).order_by(report_asset.c.report_code)
+        return [self._row_to_item(row) for row in self._fetch_rows(statement)]
 
     def get_reports(self, keyword=None, report_type=None, domain=None, status=None, owner_dept=None):
         return self._db_reports(keyword=keyword, report_type=report_type, domain=domain, status=status, owner_dept=owner_dept)
@@ -464,33 +481,46 @@ ORDER BY report_code
             audit.after = item
             return item
 
+    def _insert_report(self, item, report_pk):
+        return insert(report_asset).values(
+            report_pk=report_pk,
+            report_code=item["code"],
+            report_name=item["name"],
+            report_alias=item["alias"],
+            report_type=item["type"],
+            domain_name=item["domain"],
+            freq_code=item["freq"],
+            stat_period_code=item["statPeriod"],
+            date_caliber_code=item["statCaliber"],
+            date_caliber_other_desc="",
+            data_timeliness_code=item["dataDelay"],
+            data_timeliness_custom_desc="",
+            status_code=item["status"],
+            effective_date=item["effectiveDate"],
+            expire_date=item["expireDate"],
+            purpose_desc=item["purpose"],
+            stat_object_desc=item["statObject"],
+            stat_scope_desc=item["businessScopeTags"],
+            time_caliber_desc="",
+            filter_condition_desc=item["filterCondition"],
+            special_rule_desc=item["specialRule"],
+            owner_dept_name=item["ownerDept"],
+            owner_name=item["ownerName"],
+            maintainer_name=item["maintainerName"],
+            related_tables_json=json.dumps(item["relatedTables"], ensure_ascii=False),
+            related_indicators_json=json.dumps(item["relatedIndicators"], ensure_ascii=False),
+            remark_desc=item["remark"],
+            is_deleted="N",
+            created_by=self._default_operator,
+            updated_by=self._default_operator,
+        )
+
     def _create_report(self, payload):
         item = self._normalize_payload(payload)
         if any(current["code"] == item["code"] for current in self.get_reports()):
             raise ReportAlreadyExistsError(item["code"])
-
-        report_pk = self._next_id(TABLE_REPORT_ASSET, "report_pk")
-        statements = [
-            f"""
-INSERT INTO {TABLE_REPORT_ASSET} (
-  report_pk, report_code, report_name, report_alias, report_type, domain_name, freq_code, stat_period_code, date_caliber_code, date_caliber_other_desc, data_timeliness_code, data_timeliness_custom_desc, status_code,
-  effective_date, expire_date, purpose_desc, stat_object_desc, stat_scope_desc, time_caliber_desc,
-  filter_condition_desc, special_rule_desc, owner_dept_name, owner_name, maintainer_name,
-  related_tables_json, related_indicators_json, remark_desc, created_by, updated_by
-) VALUES (
-  {report_pk}, {self._quote(item['code'])}, {self._quote(item['name'])}, {self._quote(item['alias'])},
-  {self._quote(item['type'])}, {self._quote(item['domain'])}, {self._quote(item['freq'])}, {self._quote(item['statPeriod'])}, {self._quote(item['statCaliber'])}, '', {self._quote(item['dataDelay'])}, '', {self._quote(item['status'])},
-  {self._quote(item['effectiveDate'])}, {self._quote(item['expireDate'])}, {self._quote(item['purpose'])},
-  {self._quote(item['statObject'])}, {self._quote(item['businessScopeTags'])}, '',
-  {self._quote(item['filterCondition'])}, {self._quote(item['specialRule'])}, {self._quote(item['ownerDept'])},
-  {self._quote(item['ownerName'])}, {self._quote(item['maintainerName'])},
-  {self._quote(json.dumps(item['relatedTables'], ensure_ascii=False))},
-  {self._quote(json.dumps(item['relatedIndicators'], ensure_ascii=False))},
-  {self._quote(item['remark'])}, {self._quote(self._default_operator)}, {self._quote(self._default_operator)}
-)
-""".strip(),
-        ]
-        self._execute(statements)
+        report_pk = self._next_id(report_asset, report_asset.c.report_pk)
+        self._execute([self._insert_report(item, report_pk)])
         return self.get_report_detail(item["code"])
 
     def update_report(self, report_code, payload):
@@ -510,52 +540,48 @@ INSERT INTO {TABLE_REPORT_ASSET} (
         normalized_code = str(report_code or "").strip().upper()
         current = self.get_report_detail(normalized_code)
         item = self._normalize_payload(payload)
-        rows = self._fetch_rows(f"""
-SELECT report_pk
-FROM {TABLE_REPORT_ASSET}
-WHERE report_code = {self._quote(normalized_code)} AND is_deleted = 'N'
-""")
+        rows = self._fetch_rows(
+            select(report_asset.c.report_pk).where(
+                and_(report_asset.c.report_code == normalized_code, report_asset.c.is_deleted == "N")
+            )
+        )
         if not rows:
             raise ReportNotFoundError(report_code)
         if item["code"] != normalized_code and any(current_item["code"] == item["code"] for current_item in self.get_reports()):
             raise ReportAlreadyExistsError(item["code"])
-        report_pk = int(rows[0]["report_pk"])
-        statements = [
-            f"""
-UPDATE {TABLE_REPORT_ASSET}
-SET
-  report_code = {self._quote(item['code'])},
-  report_name = {self._quote(item['name'])},
-  report_alias = {self._quote(item['alias'])},
-  report_type = {self._quote(item['type'])},
-  domain_name = {self._quote(item['domain'])},
-  freq_code = {self._quote(item['freq'])},
-  stat_period_code = {self._quote(item['statPeriod'])},
-  date_caliber_code = {self._quote(item['statCaliber'])},
-  date_caliber_other_desc = '',
-  data_timeliness_code = {self._quote(item['dataDelay'])},
-  data_timeliness_custom_desc = '',
-  status_code = {self._quote(item['status'])},
-  effective_date = {self._quote(item['effectiveDate'])},
-  expire_date = {self._quote(item['expireDate'])},
-  purpose_desc = {self._quote(item['purpose'])},
-  stat_object_desc = {self._quote(item['statObject'])},
-  stat_scope_desc = {self._quote(item['businessScopeTags'])},
-  time_caliber_desc = '',
-  filter_condition_desc = {self._quote(item['filterCondition'])},
-  special_rule_desc = {self._quote(item['specialRule'])},
-  owner_dept_name = {self._quote(item['ownerDept'])},
-  owner_name = {self._quote(item['ownerName'])},
-  maintainer_name = {self._quote(item['maintainerName'])},
-  related_tables_json = {self._quote(json.dumps(item['relatedTables'], ensure_ascii=False))},
-  related_indicators_json = {self._quote(json.dumps(item['relatedIndicators'], ensure_ascii=False))},
-  remark_desc = {self._quote(item['remark'])},
-  updated_by = {self._quote(self._default_operator)},
-  updated_at = CURRENT_TIMESTAMP
-WHERE report_pk = {report_pk}
-""".strip(),
-        ]
-        self._execute(statements)
+        report_pk = self._row_int(rows, "report_pk")
+        self._execute([
+            update(report_asset).where(report_asset.c.report_pk == report_pk).values(
+                report_code=item["code"],
+                report_name=item["name"],
+                report_alias=item["alias"],
+                report_type=item["type"],
+                domain_name=item["domain"],
+                freq_code=item["freq"],
+                stat_period_code=item["statPeriod"],
+                date_caliber_code=item["statCaliber"],
+                date_caliber_other_desc="",
+                data_timeliness_code=item["dataDelay"],
+                data_timeliness_custom_desc="",
+                status_code=item["status"],
+                effective_date=item["effectiveDate"],
+                expire_date=item["expireDate"],
+                purpose_desc=item["purpose"],
+                stat_object_desc=item["statObject"],
+                stat_scope_desc=item["businessScopeTags"],
+                time_caliber_desc="",
+                filter_condition_desc=item["filterCondition"],
+                special_rule_desc=item["specialRule"],
+                owner_dept_name=item["ownerDept"],
+                owner_name=item["ownerName"],
+                maintainer_name=item["maintainerName"],
+                related_tables_json=json.dumps(item["relatedTables"], ensure_ascii=False),
+                related_indicators_json=json.dumps(item["relatedIndicators"], ensure_ascii=False),
+                remark_desc=item["remark"],
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            )
+        ])
         return current, self.get_report_detail(item["code"])
 
     def delete_report(self, report_code):
@@ -569,23 +595,22 @@ WHERE report_pk = {report_pk}
 
     def _delete_report(self, report_code):
         normalized_code = str(report_code or "").strip().upper()
-        rows = self._fetch_rows(f"""
-SELECT report_pk
-FROM {TABLE_REPORT_ASSET}
-WHERE report_code = {self._quote(normalized_code)} AND is_deleted = 'N'
-""")
+        rows = self._fetch_rows(
+            select(report_asset.c.report_pk).where(
+                and_(report_asset.c.report_code == normalized_code, report_asset.c.is_deleted == "N")
+            )
+        )
         if not rows:
             raise ReportNotFoundError(report_code)
         current = self.get_report_detail(normalized_code)
-        report_pk = int(rows[0]["report_pk"])
-        statements = [
-            f"""
-UPDATE {TABLE_REPORT_ASSET}
-SET is_deleted = 'Y', updated_by = {self._quote(self._default_operator)}, updated_at = CURRENT_TIMESTAMP
-WHERE report_pk = {report_pk}
-""".strip(),
-        ]
-        self._execute(statements)
+        report_pk = self._row_int(rows, "report_pk")
+        self._execute([
+            update(report_asset).where(report_asset.c.report_pk == report_pk).values(
+                is_deleted="Y",
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            )
+        ])
         return current
 
 
