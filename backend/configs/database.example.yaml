@@ -1,6 +1,7 @@
 # Supported database types:
 #   - sqlite    (Community/local isolated operation)
 #   - postgres  (PostgreSQL)
+#   - mysql     (MySQL 8.0 via optional PyMySQL dependency)
 #   - gaussdb   (private GaussDB / DWS via optional JDBC dependencies)
 
 defaults:
@@ -24,6 +25,16 @@ profiles:
     schema: dwp
     user: change_me
     password: change_me
+
+  mysql_primary:
+    type: mysql
+    host: 127.0.0.1
+    port: 3306
+    database: asset_portal
+    user: change_me
+    password: change_me
+    charset: utf8mb4
+    collation: utf8mb4_unicode_ci
 
   gauss_primary:
     type: gaussdb
