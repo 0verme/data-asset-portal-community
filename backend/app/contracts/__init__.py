@@ -6,6 +6,10 @@ from .models import (
     AssetPageResponse,
     AssetTableRequest,
     DataEnvelope,
+    FieldMappingItem,
+    FieldMappingListResponse,
+    FieldMappingTableItem,
+    FieldMappingTableListResponse,
     ErrorEnvelope,
     ErrorModel,
     IndicatorItem,
@@ -16,6 +20,9 @@ from .models import (
     ReportItem,
     ReportListResponse,
     ReportRequest,
+    MappingStats,
+    SourceSystem,
+    SourceSystemListResponse,
 )
 from .validation import validate_contract
 
@@ -26,6 +33,10 @@ __all__ = [
     "AssetTableRequest",
     "DataEnvelope",
     "ErrorEnvelope",
+    "FieldMappingItem",
+    "FieldMappingListResponse",
+    "FieldMappingTableItem",
+    "FieldMappingTableListResponse",
     "ErrorModel",
     "IndicatorItem",
     "IndicatorListResponse",
@@ -35,5 +46,8 @@ __all__ = [
     "ReportItem",
     "ReportListResponse",
     "ReportRequest",
+    "MappingStats",
+    "SourceSystem",
+    "SourceSystemListResponse",
     "validate_contract",
 ]
