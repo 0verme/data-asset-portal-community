@@ -4,6 +4,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from sqlalchemy.dialects import sqlite
+
 from backend.app.db.gaussdb import get_db_profile
 from backend.app.settings import get_float_env, get_int_env, get_page_size_limits
 from backend.app.services.common_code_service import common_code_service
@@ -76,8 +78,13 @@ class RuntimeSettingsTestCase(unittest.TestCase):
         with patch.object(common_code_service, "invalidate") as invalidate:
             service._update_param_category_status("test", "enabled")
 
-        self.assertIn("updated_by = ?", statements[0][0])
-        self.assertEqual(["Y", "batch-agent", 1], statements[0][1])
+        statement = statements[0][0][0]
+        compiled = statement.compile(dialect=sqlite.dialect())
+        self.assertIn("p_code_category", str(compiled))
+        self.assertIn("__app__", str(compiled))
+        self.assertNotIn("dwp.", str(compiled))
+        self.assertEqual("batch-agent", compiled.params["updated_by"])
+        self.assertEqual("Y", compiled.params["is_active"])
         invalidate.assert_called_once_with(["test"])
 
 
