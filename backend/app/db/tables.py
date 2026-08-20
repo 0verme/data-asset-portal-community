@@ -94,6 +94,22 @@ asset_change_log = _table(
     Column("change_time", DateTime),
 )
 
+manual_code_table = _table(
+    "p_manual_code_table",
+    Column("table_id", Integer, primary_key=True),
+    Column("table_code", String(64), nullable=False),
+    Column("table_name", String(128), nullable=False),
+    Column("table_style", String(32), nullable=False),
+    Column("owner_name", String(64)),
+    Column("status_code", String(32), nullable=False),
+    Column("remark", String(1000)),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+
 indicator_item = _table(
     "p_indicator_item",
     Column("indicator_pk", Integer, primary_key=True),

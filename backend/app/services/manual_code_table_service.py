@@ -8,7 +8,10 @@ from __future__ import annotations
 import os
 import re
 
-from ..db.gaussdb import execute_statements, fetch_all, resolve_db_profile_name
+from sqlalchemy import delete, func, insert, or_, select, update
+
+from ..db.service import CoreAccess
+from ..db.tables import manual_code_table
 from ..settings import get_default_operator
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
@@ -20,7 +23,6 @@ from .operation_log_service import (
 )
 
 
-TABLE_MANUAL_CODE_TABLE = "dwp.p_manual_code_table"
 TABLE_CODE_RE = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
 TABLE_STYLES = {"enum", "dim", "status", "map", "custom"}
 TABLE_STATUSES = {"active", "draft", "disabled"}
@@ -70,33 +72,16 @@ class ManualCodeTableService:
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
         self._default_operator = get_default_operator()
+        self._db = CoreAccess(
+            profile_getter=lambda: self._db_profile,
+            error_factory=ManualCodeTableDataSourceError,
+        )
 
-    def _profile(self):
-        return self._db_profile or resolve_db_profile_name()
-
-    def _fetch_rows(self, sql):
-        try:
-            columns, rows = fetch_all(self._profile(), sql)
-        except (FileNotFoundError, KeyError, RuntimeError) as error:
-            raise ManualCodeTableDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise ManualCodeTableDataSourceError("数据库查询失败") from error
-        return [dict(zip(columns, row)) for row in rows]
+    def _fetch_rows(self, statement):
+        return self._db.fetch_rows(statement)
 
     def _execute(self, statements):
-        try:
-            normalized = [statements] if isinstance(statements, str) else statements
-            return execute_statements(self._profile(), normalized)
-        except (FileNotFoundError, KeyError, RuntimeError) as error:
-            raise ManualCodeTableDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise ManualCodeTableDataSourceError("数据库执行失败") from error
-
-    @staticmethod
-    def _quote(value):
-        if value is None:
-            return "NULL"
-        return "'" + str(value).replace("'", "''") + "'"
+        return self._db.execute_statements(statements)
 
     @staticmethod
     def _parse_id(table_id):
@@ -106,13 +91,14 @@ class ManualCodeTableService:
         return int(value)
 
     def _next_id(self):
-        rows = self._fetch_rows(f"SELECT COALESCE(MAX(table_id), 0) + 1 AS next_id FROM {TABLE_MANUAL_CODE_TABLE}")
-        return int(rows[0]["next_id"])
+        return self._db.next_pk(manual_code_table, manual_code_table.c.table_id)
 
     @staticmethod
     def _normalize_payload(payload):
         if not isinstance(payload, dict):
-            raise ManualCodeTableValidationError([{"field": "body", "message": "请求体必须是 JSON 对象"}])
+            raise ManualCodeTableValidationError(
+                [{"field": "body", "message": "请求体必须是 JSON 对象"}]
+            )
 
         item = {
             "tableCode": str(payload.get("tableCode") or "").strip().upper(),
@@ -124,7 +110,12 @@ class ManualCodeTableService:
         }
         details = []
         if not TABLE_CODE_RE.fullmatch(item["tableCode"]):
-            details.append({"field": "tableCode", "message": "表编码须以大写字母开头，只能包含大写字母、数字和下划线，长度为 2–64 位"})
+            details.append(
+                {
+                    "field": "tableCode",
+                    "message": "表编码须以大写字母开头，只能包含大写字母、数字和下划线，长度为 2–64 位",
+                }
+            )
         if not item["tableName"]:
             details.append({"field": "tableName", "message": "表名称不能为空"})
         elif len(item["tableName"]) > 128:
@@ -157,40 +148,76 @@ class ManualCodeTableService:
             "updatedAt": str(row.get("updated_at") or ""),
         }
 
+    @staticmethod
+    def _columns():
+        return (
+            manual_code_table.c.table_id,
+            manual_code_table.c.table_code,
+            manual_code_table.c.table_name,
+            manual_code_table.c.table_style,
+            manual_code_table.c.owner_name,
+            manual_code_table.c.status_code,
+            manual_code_table.c.remark,
+            manual_code_table.c.created_by,
+            manual_code_table.c.created_at,
+            manual_code_table.c.updated_by,
+            manual_code_table.c.updated_at,
+        )
+
+    @staticmethod
+    def _build_filters(keyword=None, style=None, status=None):
+        clauses = []
+        if style:
+            clauses.append(manual_code_table.c.table_style == style)
+        if status:
+            clauses.append(manual_code_table.c.status_code == status)
+        if keyword:
+            escaped = str(keyword).strip().lower().replace("\\", "\\\\")
+            escaped = escaped.replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            searchable = (
+                manual_code_table.c.table_code,
+                manual_code_table.c.table_name,
+                manual_code_table.c.owner_name,
+                manual_code_table.c.remark,
+            )
+            clauses.append(
+                or_(
+                    *(
+                        func.lower(func.coalesce(column, "")).like(
+                            pattern, escape="\\"
+                        )
+                        for column in searchable
+                    )
+                )
+            )
+        return clauses
+
     def get_tables(self, keyword=None, style=None, status=None):
         normalized_style = str(style or "").strip().lower()
         normalized_status = str(status or "").strip().lower()
         if normalized_style and normalized_style not in TABLE_STYLES:
-            raise ManualCodeTableValidationError([{"field": "style", "message": "表样式无效"}])
+            raise ManualCodeTableValidationError(
+                [{"field": "style", "message": "表样式无效"}]
+            )
         if normalized_status and normalized_status not in TABLE_STATUSES:
-            raise ManualCodeTableValidationError([{"field": "status", "message": "状态无效"}])
+            raise ManualCodeTableValidationError(
+                [{"field": "status", "message": "状态无效"}]
+            )
 
-        where = []
-        if normalized_style:
-            where.append(f"table_style = {self._quote(normalized_style)}")
-        if normalized_status:
-            where.append(f"status_code = {self._quote(normalized_status)}")
-        sql = f"""
-SELECT table_id, table_code, table_name, table_style, owner_name, status_code, remark,
-       created_by, created_at, updated_by, updated_at
-FROM {TABLE_MANUAL_CODE_TABLE}
-{f"WHERE {' AND '.join(where)}" if where else ""}
-ORDER BY updated_at DESC, table_code
-""".strip()
-        items = [self._row_to_item(row) for row in self._fetch_rows(sql)]
-        query = str(keyword or "").strip().lower()
-        if query:
-            keys = ("tableCode", "tableName", "owner", "remark")
-            items = [item for item in items if any(query in str(item[key]).lower() for key in keys)]
-        return items
+        statement = (
+            select(*self._columns())
+            .where(*self._build_filters(keyword, normalized_style, normalized_status))
+            .order_by(manual_code_table.c.updated_at.desc(), manual_code_table.c.table_code)
+        )
+        return [self._row_to_item(row) for row in self._fetch_rows(statement)]
 
     def get_table(self, table_id):
         normalized_id = self._parse_id(table_id)
-        rows = self._fetch_rows(
-            f"""SELECT table_id, table_code, table_name, table_style, owner_name, status_code, remark,
-created_by, created_at, updated_by, updated_at
-FROM {TABLE_MANUAL_CODE_TABLE} WHERE table_id = {normalized_id}"""
+        statement = select(*self._columns()).where(
+            manual_code_table.c.table_id == normalized_id
         )
+        rows = self._fetch_rows(statement)
         if not rows:
             raise ManualCodeTableNotFoundError(table_id)
         return self._row_to_item(rows[0])
@@ -205,14 +232,21 @@ FROM {TABLE_MANUAL_CODE_TABLE} WHERE table_id = {normalized_id}"""
             if any(current["tableCode"] == item["tableCode"] for current in self.get_tables()):
                 raise ManualCodeTableAlreadyExistsError(item["tableCode"])
             table_id = self._next_id()
-            self._execute(f"""
-INSERT INTO {TABLE_MANUAL_CODE_TABLE} (
-  table_id, table_code, table_name, table_style, owner_name, status_code, remark, created_by, updated_by
-) VALUES (
-  {table_id}, {self._quote(item['tableCode'])}, {self._quote(item['tableName'])},
-  {self._quote(item['style'])}, {self._quote(item['owner'])}, {self._quote(item['status'])},
-  {self._quote(item['remark'])}, {self._quote(self._default_operator)}, {self._quote(self._default_operator)}
-)""".strip())
+            self._execute(
+                [
+                    insert(manual_code_table).values(
+                        table_id=table_id,
+                        table_code=item["tableCode"],
+                        table_name=item["tableName"],
+                        table_style=item["style"],
+                        owner_name=item["owner"],
+                        status_code=item["status"],
+                        remark=item["remark"],
+                        created_by=self._default_operator,
+                        updated_by=self._default_operator,
+                    )
+                ]
+            )
             created = self.get_table(table_id)
             audit.operation_object = created["tableCode"]
             audit.after = created
@@ -228,19 +262,28 @@ INSERT INTO {TABLE_MANUAL_CODE_TABLE} (
             normalized_id = self._parse_id(table_id)
             before = self.get_table(normalized_id)
             item = self._normalize_payload(payload)
-            if any(current["id"] != str(normalized_id) and current["tableCode"] == item["tableCode"] for current in self.get_tables()):
+            if any(
+                current["id"] != str(normalized_id)
+                and current["tableCode"] == item["tableCode"]
+                for current in self.get_tables()
+            ):
                 raise ManualCodeTableAlreadyExistsError(item["tableCode"])
-            self._execute(f"""
-UPDATE {TABLE_MANUAL_CODE_TABLE}
-SET table_code = {self._quote(item['tableCode'])},
-    table_name = {self._quote(item['tableName'])},
-    table_style = {self._quote(item['style'])},
-    owner_name = {self._quote(item['owner'])},
-    status_code = {self._quote(item['status'])},
-    remark = {self._quote(item['remark'])},
-    updated_by = {self._quote(self._default_operator)},
-    updated_at = CURRENT_TIMESTAMP
-WHERE table_id = {normalized_id}""".strip())
+            self._execute(
+                [
+                    update(manual_code_table)
+                    .where(manual_code_table.c.table_id == normalized_id)
+                    .values(
+                        table_code=item["tableCode"],
+                        table_name=item["tableName"],
+                        table_style=item["style"],
+                        owner_name=item["owner"],
+                        status_code=item["status"],
+                        remark=item["remark"],
+                        updated_by=self._default_operator,
+                        updated_at=func.current_timestamp(),
+                    )
+                ]
+            )
             after = self.get_table(normalized_id)
             audit.operation_object = after["tableCode"]
             audit.before = before
@@ -250,8 +293,14 @@ WHERE table_id = {normalized_id}""".strip())
     def update_status(self, table_id, status):
         normalized_status = str(status or "").strip().lower()
         if normalized_status not in TABLE_STATUSES:
-            raise ManualCodeTableValidationError([{"field": "status", "message": "状态无效"}])
-        operation_type = OPERATION_TYPE_ENABLE if normalized_status == "active" else OPERATION_TYPE_DISABLE
+            raise ManualCodeTableValidationError(
+                [{"field": "status", "message": "状态无效"}]
+            )
+        operation_type = (
+            OPERATION_TYPE_ENABLE
+            if normalized_status == "active"
+            else OPERATION_TYPE_DISABLE
+        )
         with operation_log_service.audit(
             module_name="码值表维护",
             operation_type=operation_type,
@@ -260,12 +309,17 @@ WHERE table_id = {normalized_id}""".strip())
         ) as audit:
             normalized_id = self._parse_id(table_id)
             before = self.get_table(normalized_id)
-            self._execute(f"""
-UPDATE {TABLE_MANUAL_CODE_TABLE}
-SET status_code = {self._quote(normalized_status)},
-    updated_by = {self._quote(self._default_operator)},
-    updated_at = CURRENT_TIMESTAMP
-WHERE table_id = {normalized_id}""".strip())
+            self._execute(
+                [
+                    update(manual_code_table)
+                    .where(manual_code_table.c.table_id == normalized_id)
+                    .values(
+                        status_code=normalized_status,
+                        updated_by=self._default_operator,
+                        updated_at=func.current_timestamp(),
+                    )
+                ]
+            )
             after = self.get_table(normalized_id)
             audit.operation_object = after["tableCode"]
             audit.before = before
@@ -281,7 +335,9 @@ WHERE table_id = {normalized_id}""".strip())
         ) as audit:
             normalized_id = self._parse_id(table_id)
             before = self.get_table(normalized_id)
-            self._execute(f"DELETE FROM {TABLE_MANUAL_CODE_TABLE} WHERE table_id = {normalized_id}")
+            self._execute(
+                [delete(manual_code_table).where(manual_code_table.c.table_id == normalized_id)]
+            )
             audit.operation_object = before["tableCode"]
             audit.before = before
 
