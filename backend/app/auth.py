@@ -18,32 +18,32 @@ from functools import wraps
 
 from flask import jsonify, session
 
+from .application import (
+    ADMIN_ROLE,
+    MAINTENANCE_ROLES,
+    RequestContext,
+    identity_for_session,
+    identity_from_mapping,
+)
+from .application.errors import ApplicationError
+
 
 SESSION_KEY = "dap_auth_user"
-ADMIN_ROLE = "admin"
-MAINTAINER_ROLE = "maintainer"
-MAINTENANCE_ROLES = {ADMIN_ROLE, MAINTAINER_ROLE}
+
+
+def get_session_identity():
+    """Adapt the Flask session into the framework-neutral identity boundary."""
+    return identity_from_mapping(session.get(SESSION_KEY))
 
 
 def get_session_user() -> dict | None:
-    raw = session.get(SESSION_KEY)
-    if not isinstance(raw, dict):
-        return None
-    if raw.get("role") not in MAINTENANCE_ROLES:
-        return None
-    return {
-        "role": raw["role"],
-        "user": raw.get("user") or None,
-        "name": raw.get("name") or raw.get("user") or None,
-    }
+    identity = get_session_identity()
+    return identity.as_dict() if identity else None
 
 
 def set_session_user(user: dict, remember: bool = False):
-    session[SESSION_KEY] = {
-        "role": user.get("role") if user.get("role") in MAINTENANCE_ROLES else ADMIN_ROLE,
-        "user": user.get("user"),
-        "name": user.get("name") or user.get("user"),
-    }
+    identity = identity_for_session(user)
+    session[SESSION_KEY] = identity.as_dict()
     session.permanent = bool(remember)
 
 
@@ -55,8 +55,10 @@ def clear_session_user():
 def require_admin(view_func):
     @wraps(view_func)
     def wrapped(*args, **kwargs):
-        user = get_session_user()
-        if not user:
+        context = RequestContext(identity=get_session_identity())
+        try:
+            identity = context.require_authenticated()
+        except ApplicationError:
             return (
                 jsonify(
                     {
@@ -68,7 +70,7 @@ def require_admin(view_func):
                 ),
                 401,
             )
-        if user["role"] != ADMIN_ROLE:
+        if identity.role != ADMIN_ROLE:
             return jsonify({"error": {"code": "FORBIDDEN", "message": "仅系统管理员可执行此操作。"}}), 403
         return view_func(*args, **kwargs)
 
@@ -78,8 +80,12 @@ def require_admin(view_func):
 def require_maintainer(view_func):
     @wraps(view_func)
     def wrapped(*args, **kwargs):
-        user = get_session_user()
-        if not user:
+        context = RequestContext(identity=get_session_identity())
+        try:
+            identity = context.require_authenticated()
+        except ApplicationError:
+            return jsonify({"error": {"code": "UNAUTHORIZED", "message": "请先登录。"}}), 401
+        if identity.role not in MAINTENANCE_ROLES:
             return jsonify({"error": {"code": "UNAUTHORIZED", "message": "请先登录。"}}), 401
         return view_func(*args, **kwargs)
 
