@@ -94,6 +94,59 @@ asset_change_log = _table(
     Column("change_time", DateTime),
 )
 
+data_source = _table(
+    "p_data_source",
+    Column("source_id", Integer, primary_key=True),
+    Column("source_code", String(64), nullable=False),
+    Column("source_name", String(256), nullable=False),
+    Column("source_type", String(64), nullable=False),
+    Column("description_text", String(2000)),
+    Column("status_code", String(32), nullable=False),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+mapping_table = _table(
+    "p_field_mapping_table",
+    Column("table_pk", Integer, primary_key=True),
+    Column("data_source_id", Integer),
+    Column("upstream_system_id", Integer),
+    Column("source_table_name", String(128), nullable=False),
+    Column("source_table_cn", String(256)),
+    Column("target_layer_code", String(32), nullable=False),
+    Column("target_table_name", String(128)),
+    Column("load_mode", String(32)),
+    Column("field_total_count", Integer, nullable=False),
+    Column("mapped_field_count", Integer, nullable=False),
+    Column("latest_mapping_time", DateTime),
+    Column("table_desc", String(2000)),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+mapping_field = _table(
+    "p_field_mapping_field",
+    Column("field_pk", Integer, primary_key=True),
+    Column("table_pk", Integer, nullable=False),
+    Column("source_field_name", String(128), nullable=False),
+    Column("source_field_type", String(128)),
+    Column("source_field_comment", String(1000)),
+    Column("target_field_name", String(128)),
+    Column("mapping_rule", String(64), nullable=False),
+    Column("field_order", Integer, nullable=False),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
 manual_code_table = _table(
     "p_manual_code_table",
     Column("table_id", Integer, primary_key=True),

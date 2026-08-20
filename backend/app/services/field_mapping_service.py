@@ -20,25 +20,26 @@ import os
 import time
 from datetime import date, datetime
 
-from ..db.facade import database_transaction, fetch_all, resolve_db_profile_name
+from sqlalchemy import and_, case, distinct, func, or_, select
+
+from ..db.facade import database_transaction
+from ..db.service import CoreAccess
+from ..db.tables import data_source, mapping_field, mapping_table
 from ..settings import get_int_env, get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
 
 
-TABLE_DATA_SOURCE = "dwp.p_data_source"
-TABLE_MAPPING_TABLE = "dwp.p_field_mapping_table"
-TABLE_MAPPING_FIELD = "dwp.p_field_mapping_field"
 LOGGER = logging.getLogger(__name__)
 
 FIELD_SORT_COLUMNS = {
-    "srcSystem": "u.system_name",
-    "srcTable": "t.source_table_name",
-    "srcField": "f.source_field_name",
-    "srcType": "f.source_field_type",
-    "srcComment": "f.source_field_comment",
-    "targetTable": "t.target_table_name",
-    "targetField": "f.target_field_name",
-    "mappingRule": "f.mapping_rule",
+    "srcSystem": data_source.c.source_name,
+    "srcTable": mapping_table.c.source_table_name,
+    "srcField": mapping_field.c.source_field_name,
+    "srcType": mapping_field.c.source_field_type,
+    "srcComment": mapping_field.c.source_field_comment,
+    "targetTable": mapping_table.c.target_table_name,
+    "targetField": mapping_field.c.target_field_name,
+    "mappingRule": mapping_field.c.mapping_rule,
 }
 
 
@@ -55,27 +56,20 @@ class FieldMappingService:
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
         self._stats_cache = {}
+        self._db = CoreAccess(
+            profile_getter=lambda: self._db_profile,
+            error_factory=FieldMappingDataSourceError,
+        )
 
-    def _profile(self):
-        return self._db_profile or resolve_db_profile_name()
+    def _fetch_rows(self, statement):
+        return self._db.fetch_rows(statement)
 
-    def _fetch_rows(self, sql):
-        try:
-            columns, rows = fetch_all(self._profile(), sql)
-        except FileNotFoundError as error:
-            raise FieldMappingDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise FieldMappingDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise FieldMappingDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise FieldMappingDataSourceError("数据库查询失败") from error
-        return [dict(zip(columns, row)) for row in rows]
-
-    def _fetch_rows_logged(self, sql, *, purpose, method, page=None, page_size=None, keyword=None):
+    def _fetch_rows_logged(
+        self, statement, *, purpose, method, page=None, page_size=None, keyword=None
+    ):
         started_at = time.perf_counter()
         try:
-            return self._fetch_rows(sql)
+            return self._fetch_rows(statement)
         finally:
             log_slow_service_call(
                 LOGGER,
@@ -88,10 +82,8 @@ class FieldMappingService:
                 keyword=keyword,
             )
 
-    def _quote(self, value):
-        return "'" + str(value or "").replace("'", "''") + "'"
-
-    def _format_date(self, value):
+    @staticmethod
+    def _format_date(value):
         if isinstance(value, datetime):
             return value.strftime("%Y-%m-%d")
         if isinstance(value, date):
@@ -99,66 +91,83 @@ class FieldMappingService:
         text = str(value or "").strip()
         return text[:10] if len(text) >= 10 else text
 
-    def _base_from(self):
-        return (
-            f"FROM {TABLE_DATA_SOURCE} u "
-            f"JOIN {TABLE_MAPPING_TABLE} t "
-            "  ON u.source_id = t.data_source_id "
-            " AND t.is_deleted = 'N' "
-            f"JOIN {TABLE_MAPPING_FIELD} f "
-            "  ON t.table_pk = f.table_pk "
-            " AND f.is_deleted = 'N' "
-            "WHERE u.is_deleted = 'N'"
+    @staticmethod
+    def _base_from():
+        return data_source.join(
+            mapping_table,
+            and_(
+                data_source.c.source_id == mapping_table.c.data_source_id,
+                mapping_table.c.is_deleted == "N",
+            ),
+        ).join(
+            mapping_field,
+            and_(
+                mapping_table.c.table_pk == mapping_field.c.table_pk,
+                mapping_field.c.is_deleted == "N",
+            ),
         )
 
-    def _append_like(self, clauses, column, value):
+    @staticmethod
+    def _append_like(clauses, column, value):
         text = str(value or "").strip().lower()
         if text:
-            clauses.append(f"LOWER(COALESCE({column}, '')) LIKE {self._quote(f'%{text}%')}")
+            escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            clauses.append(
+                func.lower(func.coalesce(column, "")).like(
+                    f"%{escaped}%", escape="\\"
+                )
+            )
 
     def _build_where(self, params=None):
         params = params or {}
-        clauses = []
+        clauses = [data_source.c.is_deleted == "N"]
 
         upstream_system_id = str(params.get("upstreamSystemId") or "").strip()
         if upstream_system_id.isdigit():
-            clauses.append(f"u.source_id = {int(upstream_system_id)}")
+            clauses.append(data_source.c.source_id == int(upstream_system_id))
 
         src_system = str(params.get("srcSystem") or "").strip()
         if src_system:
-            clauses.append(f"u.source_name = {self._quote(src_system)}")
+            clauses.append(data_source.c.source_name == src_system)
 
-        self._append_like(clauses, "t.source_table_name", params.get("srcTable"))
-        self._append_like(clauses, "f.source_field_name", params.get("srcField"))
-        self._append_like(clauses, "t.target_table_name", params.get("targetTable"))
-        self._append_like(clauses, "f.target_field_name", params.get("targetField"))
+        self._append_like(clauses, mapping_table.c.source_table_name, params.get("srcTable"))
+        self._append_like(clauses, mapping_field.c.source_field_name, params.get("srcField"))
+        self._append_like(clauses, mapping_table.c.target_table_name, params.get("targetTable"))
+        self._append_like(clauses, mapping_field.c.target_field_name, params.get("targetField"))
 
         empty_comment = str(params.get("emptyComment") or "").strip()
+        comment = func.trim(func.coalesce(mapping_field.c.source_field_comment, ""))
         if empty_comment == "yes":
-            clauses.append("TRIM(COALESCE(f.source_field_comment, '')) = ''")
+            clauses.append(comment == "")
         elif empty_comment == "no":
-            clauses.append("TRIM(COALESCE(f.source_field_comment, '')) <> ''")
+            clauses.append(comment != "")
 
         keyword = str(params.get("keyword") or "").strip().lower()
         if keyword:
-            like = self._quote(f"%{keyword}%")
-            clauses.append(
-                "("
-                "LOWER(COALESCE(u.source_name, '')) LIKE {0} OR "
-                "LOWER(COALESCE(t.source_table_name, '')) LIKE {0} OR "
-                "LOWER(COALESCE(t.source_table_cn, '')) LIKE {0} OR "
-                "LOWER(COALESCE(f.source_field_name, '')) LIKE {0} OR "
-                "LOWER(COALESCE(f.source_field_type, '')) LIKE {0} OR "
-                "LOWER(COALESCE(f.source_field_comment, '')) LIKE {0} OR "
-                "LOWER(COALESCE(t.target_table_name, '')) LIKE {0} OR "
-                "LOWER(COALESCE(f.target_field_name, '')) LIKE {0} OR "
-                "LOWER(COALESCE(f.mapping_rule, '')) LIKE {0}"
-                ")".format(like)
+            escaped = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            searchable = (
+                data_source.c.source_name,
+                mapping_table.c.source_table_name,
+                mapping_table.c.source_table_cn,
+                mapping_field.c.source_field_name,
+                mapping_field.c.source_field_type,
+                mapping_field.c.source_field_comment,
+                mapping_table.c.target_table_name,
+                mapping_field.c.target_field_name,
+                mapping_field.c.mapping_rule,
             )
-
-        if not clauses:
-            return ""
-        return " AND " + " AND ".join(clauses)
+            clauses.append(
+                or_(
+                    *(
+                        func.lower(func.coalesce(column, "")).like(
+                            pattern, escape="\\"
+                        )
+                        for column in searchable
+                    )
+                )
+            )
+        return clauses
 
     def _resolve_paging(self, params=None):
         default_page_size, max_page_size = get_page_size_limits(50)
@@ -171,9 +180,7 @@ class FieldMappingService:
             page_size = int(params.get("pageSize") or params.get("limit") or default_page_size)
         except (TypeError, ValueError):
             page_size = default_page_size
-        page = max(1, page)
-        page_size = max(1, min(max_page_size, page_size))
-        return page, page_size
+        return max(1, page), max(1, min(max_page_size, page_size))
 
     def _stats_cache_key(self, params=None):
         relevant = {
@@ -193,7 +200,9 @@ class FieldMappingService:
         entry = self._stats_cache.get(key)
         if not entry:
             return None
-        if time.time() - entry["ts"] > get_int_env("FIELD_MAPPING_STATS_CACHE_TTL_SECONDS", 300, minimum=1):
+        if time.time() - entry["ts"] > get_int_env(
+            "FIELD_MAPPING_STATS_CACHE_TTL_SECONDS", 300, minimum=1
+        ):
             self._stats_cache.pop(key, None)
             return None
         return entry["value"]
@@ -204,69 +213,58 @@ class FieldMappingService:
     def clear_stats_cache(self):
         self._stats_cache.clear()
 
-    def _resolve_field_order(self, params=None):
-        params = params or {}
-        sort_key = str(params.get("sortKey") or "").strip()
-        sort_direction = "DESC" if str(params.get("sortDirection") or "").strip().lower() == "desc" else "ASC"
-        sort_column = FIELD_SORT_COLUMNS.get(sort_key)
-        if not sort_column:
-            return "ORDER BY " + ", ".join(self._field_default_order_terms())
-
-        return "ORDER BY " + ", ".join(
-            self._null_last_text_order_terms(sort_column, sort_direction)
-            + self._field_default_order_terms()
-        )
-
-    def _null_last_text_order_terms(self, column, direction="ASC"):
+    @staticmethod
+    def _null_last_text_order_terms(column, direction="ASC"):
         normalized_direction = "DESC" if str(direction).upper() == "DESC" else "ASC"
-        return [
-            f"CASE WHEN {column} IS NULL OR TRIM({column}) = '' THEN 1 ELSE 0 END ASC",
-            f"{column} {normalized_direction}",
-        ]
+        empty = or_(column.is_(None), func.trim(column) == "")
+        value = column.desc() if normalized_direction == "DESC" else column.asc()
+        return [case((empty, 1), else_=0).asc(), value]
 
-    def _null_last_numeric_order_terms(self, column):
-        return [
-            f"CASE WHEN {column} IS NULL THEN 1 ELSE 0 END ASC",
-            f"{column} ASC",
-        ]
+    @staticmethod
+    def _null_last_numeric_order_terms(column):
+        return [case((column.is_(None), 1), else_=0).asc(), column.asc()]
 
     def _table_default_order_terms(self):
         return (
-            self._null_last_text_order_terms("u.source_name")
-            + self._null_last_text_order_terms("t.source_table_name")
-            + self._null_last_text_order_terms("t.target_table_name")
+            self._null_last_text_order_terms(data_source.c.source_name)
+            + self._null_last_text_order_terms(mapping_table.c.source_table_name)
+            + self._null_last_text_order_terms(mapping_table.c.target_table_name)
         )
 
     def _field_default_order_terms(self):
         return (
-            self._null_last_text_order_terms("u.source_name")
-            + self._null_last_text_order_terms("t.source_table_name")
-            + self._null_last_numeric_order_terms("f.field_order")
-            + self._null_last_text_order_terms("f.source_field_name")
-            + self._null_last_text_order_terms("t.target_table_name")
-            + self._null_last_text_order_terms("f.target_field_name")
-            + ["t.table_pk ASC", "f.field_pk ASC"]
+            self._null_last_text_order_terms(data_source.c.source_name)
+            + self._null_last_text_order_terms(mapping_table.c.source_table_name)
+            + self._null_last_numeric_order_terms(mapping_field.c.field_order)
+            + self._null_last_text_order_terms(mapping_field.c.source_field_name)
+            + self._null_last_text_order_terms(mapping_table.c.target_table_name)
+            + self._null_last_text_order_terms(mapping_field.c.target_field_name)
+            + [mapping_table.c.table_pk.asc(), mapping_field.c.field_pk.asc()]
         )
 
-    def _field_select(self):
-        return """
-SELECT
-    u.source_id AS upstream_system_id,
-    u.source_code AS system_code,
-    u.source_name AS system_name,
-    COALESCE(u.source_type, '') AS system_abbr,
-    t.source_table_name,
-    t.source_table_cn,
-    COALESCE(t.target_layer_code, 'DWF') AS target_layer_code,
-    COALESCE(t.target_table_name, '') AS target_table_name,
-    COALESCE(t.load_mode, '') AS load_mode,
-    f.source_field_name,
-    COALESCE(f.source_field_type, '') AS source_field_type,
-    COALESCE(f.source_field_comment, '') AS source_field_comment,
-    COALESCE(f.target_field_name, '') AS target_field_name,
-    COALESCE(f.mapping_rule, '待补充') AS mapping_rule,
-    COALESCE(f.updated_at, t.updated_at, CURRENT_TIMESTAMP) AS updated_at
-"""
+    @staticmethod
+    def _field_select():
+        return (
+            data_source.c.source_id.label("upstream_system_id"),
+            data_source.c.source_code.label("system_code"),
+            data_source.c.source_name.label("system_name"),
+            func.coalesce(data_source.c.source_type, "").label("system_abbr"),
+            mapping_table.c.source_table_name,
+            mapping_table.c.source_table_cn,
+            func.coalesce(mapping_table.c.target_layer_code, "DWF").label("target_layer_code"),
+            func.coalesce(mapping_table.c.target_table_name, "").label("target_table_name"),
+            func.coalesce(mapping_table.c.load_mode, "").label("load_mode"),
+            mapping_field.c.source_field_name,
+            func.coalesce(mapping_field.c.source_field_type, "").label("source_field_type"),
+            func.coalesce(mapping_field.c.source_field_comment, "").label("source_field_comment"),
+            func.coalesce(mapping_field.c.target_field_name, "").label("target_field_name"),
+            func.coalesce(mapping_field.c.mapping_rule, "待补充").label("mapping_rule"),
+            func.coalesce(
+                mapping_field.c.updated_at,
+                mapping_table.c.updated_at,
+                func.current_timestamp(),
+            ).label("updated_at"),
+        )
 
     def _row_to_field_mapping(self, row):
         return {
@@ -289,17 +287,24 @@ SELECT
         }
 
     def get_source_systems(self):
-        sql = f"""
-SELECT
-    u.source_name AS name,
-    COUNT(*) AS count,
-    u.source_id AS upstream_system_id,
-    u.source_code AS system_code,
-    COALESCE(u.source_type, '') AS system_abbr
-{self._base_from()}
-GROUP BY u.source_id, u.source_code, u.source_name, u.source_type
-ORDER BY u.source_name
-"""
+        statement = (
+            select(
+                data_source.c.source_name.label("name"),
+                func.count().label("count"),
+                data_source.c.source_id.label("upstream_system_id"),
+                data_source.c.source_code.label("system_code"),
+                func.coalesce(data_source.c.source_type, "").label("system_abbr"),
+            )
+            .select_from(self._base_from())
+            .where(data_source.c.is_deleted == "N")
+            .group_by(
+                data_source.c.source_id,
+                data_source.c.source_code,
+                data_source.c.source_name,
+                data_source.c.source_type,
+            )
+            .order_by(data_source.c.source_name)
+        )
         return [
             {
                 "name": row["name"],
@@ -309,23 +314,59 @@ ORDER BY u.source_name
                 "systemCode": row["system_code"],
                 "systemAbbr": row["system_abbr"],
             }
-            for row in self._fetch_rows_logged(sql, purpose="mapping source systems", method="get_source_systems")
+            for row in self._fetch_rows_logged(
+                statement,
+                purpose="mapping source systems",
+                method="get_source_systems",
+            )
         ]
 
     def get_stats(self, params=None):
         cached = self._get_cached_stats(params)
         if cached is not None:
             return cached
-        sql = f"""
-SELECT
-    COUNT(DISTINCT u.source_id) AS source_system_count,
-    COUNT(DISTINCT t.table_pk) AS source_table_count,
-    COUNT(DISTINCT f.field_pk) AS field_count,
-    COUNT(DISTINCT CASE WHEN TRIM(COALESCE(f.target_field_name, '')) <> '' THEN f.field_pk END) AS mapped_field_count,
-    COUNT(DISTINCT CASE WHEN TRIM(COALESCE(f.source_field_comment, '')) = '' THEN f.field_pk END) AS empty_comment_count
-{self._base_from()}{self._build_where(params)}
-"""
-        row = (self._fetch_rows_logged(sql, purpose="mapping stats", method="get_stats", keyword=(params or {}).get("keyword")) or [{}])[0]
+        statement = (
+            select(
+                func.count(distinct(data_source.c.source_id)).label("source_system_count"),
+                func.count(distinct(mapping_table.c.table_pk)).label("source_table_count"),
+                func.count(distinct(mapping_field.c.field_pk)).label("field_count"),
+                func.count(
+                    distinct(
+                        case(
+                            (
+                                func.trim(func.coalesce(mapping_field.c.target_field_name, ""))
+                                != "",
+                                mapping_field.c.field_pk,
+                            ),
+                            else_=None,
+                        )
+                    )
+                ).label("mapped_field_count"),
+                func.count(
+                    distinct(
+                        case(
+                            (
+                                func.trim(func.coalesce(mapping_field.c.source_field_comment, ""))
+                                == "",
+                                mapping_field.c.field_pk,
+                            ),
+                            else_=None,
+                        )
+                    )
+                ).label("empty_comment_count"),
+            )
+            .select_from(self._base_from())
+            .where(*self._build_where(params))
+        )
+        row = (
+            self._fetch_rows_logged(
+                statement,
+                purpose="mapping stats",
+                method="get_stats",
+                keyword=(params or {}).get("keyword"),
+            )
+            or [{}]
+        )[0]
         total_count = int(row.get("field_count") or 0)
         mapped_count = int(row.get("mapped_field_count") or 0)
         empty_comment_count = int(row.get("empty_comment_count") or 0)
@@ -351,8 +392,13 @@ SELECT
         offset = (page - 1) * page_size
         where = self._build_where(params)
 
+        total_statement = (
+            select(func.count().label("total"))
+            .select_from(self._base_from())
+            .where(*where)
+        )
         total_rows = self._fetch_rows_logged(
-            f"SELECT COUNT(*) AS total {self._base_from()}{where}",
+            total_statement,
             purpose="mapping field total",
             method="get_field_mappings",
             page=page,
@@ -361,19 +407,18 @@ SELECT
         )
         total = int(total_rows[0]["total"]) if total_rows else 0
 
-        sql = (
-            self._field_select()
-            + "\n"
-            + self._base_from()
-            + where
-            + "\n"
-            + self._resolve_field_order(params)
-            + f"\nLIMIT {page_size} OFFSET {offset}"
+        statement = (
+            select(*self._field_select())
+            .select_from(self._base_from())
+            .where(*where)
+            .order_by(*self._resolve_field_order(params))
+            .limit(page_size)
+            .offset(offset)
         )
         items = [
             self._row_to_field_mapping(row)
             for row in self._fetch_rows_logged(
-                sql,
+                statement,
                 purpose="mapping field page",
                 method="get_field_mappings",
                 page=page,
@@ -383,6 +428,15 @@ SELECT
         ]
         return {"items": items, "total": total, "page": page, "pageSize": page_size}
 
+    def _resolve_field_order(self, params=None):
+        params = params or {}
+        sort_key = str(params.get("sortKey") or "").strip()
+        sort_direction = "DESC" if str(params.get("sortDirection") or "").strip().lower() == "desc" else "ASC"
+        sort_column = FIELD_SORT_COLUMNS.get(sort_key)
+        if not sort_column:
+            return self._field_default_order_terms()
+        return self._null_last_text_order_terms(sort_column, sort_direction) + self._field_default_order_terms()
+
     def get_table_mappings(self, params=None):
         with database_transaction():
             return self._get_table_mappings(params)
@@ -390,16 +444,18 @@ SELECT
     def _get_table_mappings(self, params=None):
         page, page_size = self._resolve_paging(params)
         offset = (page - 1) * page_size
-        count_sql = f"""
-SELECT COUNT(*) AS total
-FROM (
-    SELECT t.table_pk
-    {self._base_from()}{self._build_where(params)}
-    GROUP BY t.table_pk
-) counted
-"""
+        where = self._build_where(params)
+
+        counted = (
+            select(mapping_table.c.table_pk)
+            .select_from(self._base_from())
+            .where(*where)
+            .group_by(mapping_table.c.table_pk)
+            .subquery("counted")
+        )
+        count_statement = select(func.count().label("total")).select_from(counted)
         total_rows = self._fetch_rows_logged(
-            count_sql,
+            count_statement,
             purpose="mapping table total",
             method="get_table_mappings",
             page=page,
@@ -408,31 +464,67 @@ FROM (
         )
         total = int(total_rows[0]["total"]) if total_rows else 0
 
-        sql = f"""
-SELECT
-    u.source_id AS upstream_system_id,
-    u.source_code AS system_code,
-    u.source_name AS system_name,
-    COALESCE(u.source_type, '') AS system_abbr,
-    t.source_table_name,
-    COALESCE(t.source_table_cn, t.source_table_name) AS source_table_cn,
-    COALESCE(t.target_layer_code, 'DWF') AS target_layer_code,
-    COALESCE(t.target_table_name, '') AS target_table_name,
-    COALESCE(t.load_mode, '') AS load_mode,
-    COUNT(*) AS field_count,
-    SUM(CASE WHEN TRIM(COALESCE(f.target_field_name, '')) <> '' THEN 1 ELSE 0 END) AS mapped_count,
-    SUM(CASE WHEN TRIM(COALESCE(f.source_field_comment, '')) = '' THEN 1 ELSE 0 END) AS empty_comment_count,
-    MAX(COALESCE(f.updated_at, t.updated_at, CURRENT_TIMESTAMP)) AS updated_at
-{self._base_from()}{self._build_where(params)}
-GROUP BY
-    u.source_id, u.source_code, u.source_name, u.source_type,
-    t.source_table_name, t.source_table_cn, t.target_layer_code, t.target_table_name, t.load_mode
-ORDER BY {", ".join(self._table_default_order_terms())}
-LIMIT {page_size} OFFSET {offset}
-"""
+        source_table_cn = func.coalesce(
+            mapping_table.c.source_table_cn, mapping_table.c.source_table_name
+        ).label("source_table_cn")
+        statement = (
+            select(
+                data_source.c.source_id.label("upstream_system_id"),
+                data_source.c.source_code.label("system_code"),
+                data_source.c.source_name.label("system_name"),
+                func.coalesce(data_source.c.source_type, "").label("system_abbr"),
+                mapping_table.c.source_table_name,
+                source_table_cn,
+                func.coalesce(mapping_table.c.target_layer_code, "DWF").label("target_layer_code"),
+                func.coalesce(mapping_table.c.target_table_name, "").label("target_table_name"),
+                func.coalesce(mapping_table.c.load_mode, "").label("load_mode"),
+                func.count().label("field_count"),
+                func.sum(
+                    case(
+                        (
+                            func.trim(func.coalesce(mapping_field.c.target_field_name, "")) != "",
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("mapped_count"),
+                func.sum(
+                    case(
+                        (
+                            func.trim(func.coalesce(mapping_field.c.source_field_comment, "")) == "",
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("empty_comment_count"),
+                func.max(
+                    func.coalesce(
+                        mapping_field.c.updated_at,
+                        mapping_table.c.updated_at,
+                        func.current_timestamp(),
+                    )
+                ).label("updated_at"),
+            )
+            .select_from(self._base_from())
+            .where(*where)
+            .group_by(
+                data_source.c.source_id,
+                data_source.c.source_code,
+                data_source.c.source_name,
+                data_source.c.source_type,
+                mapping_table.c.source_table_name,
+                mapping_table.c.source_table_cn,
+                mapping_table.c.target_layer_code,
+                mapping_table.c.target_table_name,
+                mapping_table.c.load_mode,
+            )
+            .order_by(*self._table_default_order_terms())
+            .limit(page_size)
+            .offset(offset)
+        )
         items = []
         for row in self._fetch_rows_logged(
-            sql,
+            statement,
             purpose="mapping table page",
             method="get_table_mappings",
             page=page,
