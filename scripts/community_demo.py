@@ -543,7 +543,7 @@ def run_demo(paths: DemoPaths, environment: Mapping[str, str], python: Path) -> 
 
         print("Demo account:", flush=True)
         print(f"  username: {ADMIN_USER['username']}", flush=True)
-        print(f"  password: {ADMIN_USER['password']}", flush=True)
+        print("  password: see docs/community-demo.md", flush=True)
         print(f"Database:    {paths.database}", flush=True)
         print("\nStop: Ctrl+C\n", flush=True)
         while True:
