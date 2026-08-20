@@ -15,6 +15,14 @@
 from flask import Blueprint, jsonify, request
 
 from ..auth import require_maintainer
+from ..contracts import (
+    DataEnvelope,
+    ErrorEnvelope,
+    IndicatorItem,
+    IndicatorListResponse,
+    MessageDataResponse,
+    validate_contract,
+)
 from ..services.indicator_service import (
     IndicatorAlreadyExistsError,
     IndicatorDataSourceError,
@@ -27,6 +35,11 @@ from ..services.indicator_service import (
 indicator_bp = Blueprint("indicators", __name__)
 
 
+def _error_response(error, status):
+    payload = validate_contract({"error": error.to_dict()}, ErrorEnvelope)
+    return jsonify(payload), status
+
+
 @indicator_bp.get("")
 def get_indicators():
     try:
@@ -36,8 +49,8 @@ def get_indicators():
             status=request.args.get("status"),
         )
     except IndicatorDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"items": items})
+        return _error_response(error, 500)
+    return jsonify(validate_contract({"items": items}, IndicatorListResponse))
 
 
 @indicator_bp.get("/<indicator_id>")
@@ -45,10 +58,10 @@ def get_indicator_detail(indicator_id):
     try:
         data = indicator_service.get_indicator_detail(indicator_id)
     except IndicatorNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except IndicatorDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"data": data})
+        return _error_response(error, 500)
+    return jsonify(validate_contract({"data": data}, DataEnvelope[IndicatorItem]))
 
 
 @indicator_bp.post("")
@@ -57,12 +70,17 @@ def create_indicator():
     try:
         data = indicator_service.create_indicator(request.get_json(silent=True))
     except IndicatorValidationError as error:
-        return jsonify({"error": error.to_dict()}), 422
+        return _error_response(error, 422)
     except IndicatorAlreadyExistsError as error:
-        return jsonify({"error": error.to_dict()}), 409
+        return _error_response(error, 409)
     except IndicatorDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"message": "指标创建成功", "data": data}), 201
+        return _error_response(error, 500)
+    return jsonify(
+        validate_contract(
+            {"message": "指标创建成功", "data": data},
+            MessageDataResponse[IndicatorItem],
+        )
+    ), 201
 
 
 @indicator_bp.put("/<indicator_id>")
@@ -71,14 +89,19 @@ def update_indicator(indicator_id):
     try:
         data = indicator_service.update_indicator(indicator_id, request.get_json(silent=True))
     except IndicatorNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except IndicatorValidationError as error:
-        return jsonify({"error": error.to_dict()}), 422
+        return _error_response(error, 422)
     except IndicatorAlreadyExistsError as error:
-        return jsonify({"error": error.to_dict()}), 409
+        return _error_response(error, 409)
     except IndicatorDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"message": "指标更新成功", "data": data})
+        return _error_response(error, 500)
+    return jsonify(
+        validate_contract(
+            {"message": "指标更新成功", "data": data},
+            MessageDataResponse[IndicatorItem],
+        )
+    )
 
 
 @indicator_bp.patch("/<indicator_id>/status")
@@ -88,12 +111,17 @@ def patch_indicator_status(indicator_id):
     try:
         data = indicator_service.patch_status(indicator_id, payload.get("status"))
     except IndicatorNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except IndicatorValidationError as error:
-        return jsonify({"error": error.to_dict()}), 422
+        return _error_response(error, 422)
     except IndicatorDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"message": "指标状态更新成功", "data": data})
+        return _error_response(error, 500)
+    return jsonify(
+        validate_contract(
+            {"message": "指标状态更新成功", "data": data},
+            MessageDataResponse[IndicatorItem],
+        )
+    )
 
 
 @indicator_bp.delete("/<indicator_id>")
@@ -102,7 +130,7 @@ def delete_indicator(indicator_id):
     try:
         indicator_service.delete_indicator(indicator_id)
     except IndicatorNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except IndicatorDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
+        return _error_response(error, 500)
     return jsonify({"message": "指标删除成功"})

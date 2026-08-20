@@ -15,6 +15,14 @@
 from flask import Blueprint, jsonify, request
 
 from ..auth import require_maintainer
+from ..contracts import (
+    DataEnvelope,
+    ErrorEnvelope,
+    MessageDataResponse,
+    ReportItem,
+    ReportListResponse,
+    validate_contract,
+)
 from ..services.report_service import (
     ReportAlreadyExistsError,
     ReportDataSourceError,
@@ -25,6 +33,11 @@ from ..services.report_service import (
 
 
 report_bp = Blueprint("reports", __name__)
+
+
+def _error_response(error, status):
+    payload = validate_contract({"error": error.to_dict()}, ErrorEnvelope)
+    return jsonify(payload), status
 
 
 @report_bp.get("")
@@ -38,8 +51,8 @@ def get_reports():
             owner_dept=request.args.get("ownerDept"),
         )
     except ReportDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"items": items})
+        return _error_response(error, 500)
+    return jsonify(validate_contract({"items": items}, ReportListResponse))
 
 
 @report_bp.get("/<report_code>")
@@ -47,10 +60,10 @@ def get_report_detail(report_code):
     try:
         data = report_service.get_report_detail(report_code)
     except ReportNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except ReportDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"data": data})
+        return _error_response(error, 500)
+    return jsonify(validate_contract({"data": data}, DataEnvelope[ReportItem]))
 
 
 @report_bp.post("")
@@ -59,12 +72,17 @@ def create_report():
     try:
         data = report_service.create_report(request.get_json(silent=True))
     except ReportValidationError as error:
-        return jsonify({"error": error.to_dict()}), 422
+        return _error_response(error, 422)
     except ReportAlreadyExistsError as error:
-        return jsonify({"error": error.to_dict()}), 409
+        return _error_response(error, 409)
     except ReportDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"message": "报表创建成功", "data": data}), 201
+        return _error_response(error, 500)
+    return jsonify(
+        validate_contract(
+            {"message": "报表创建成功", "data": data},
+            MessageDataResponse[ReportItem],
+        )
+    ), 201
 
 
 @report_bp.put("/<report_code>")
@@ -73,14 +91,19 @@ def update_report(report_code):
     try:
         data = report_service.update_report(report_code, request.get_json(silent=True))
     except ReportNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except ReportValidationError as error:
-        return jsonify({"error": error.to_dict()}), 422
+        return _error_response(error, 422)
     except ReportAlreadyExistsError as error:
-        return jsonify({"error": error.to_dict()}), 409
+        return _error_response(error, 409)
     except ReportDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"message": "报表更新成功", "data": data})
+        return _error_response(error, 500)
+    return jsonify(
+        validate_contract(
+            {"message": "报表更新成功", "data": data},
+            MessageDataResponse[ReportItem],
+        )
+    )
 
 
 @report_bp.delete("/<report_code>")
@@ -89,7 +112,7 @@ def delete_report(report_code):
     try:
         report_service.delete_report(report_code)
     except ReportNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except ReportDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
+        return _error_response(error, 500)
     return jsonify({"message": "报表删除成功"})
