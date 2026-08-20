@@ -279,3 +279,33 @@ class FieldMappingTableListResponse(ItemsResponse[FieldMappingTableItem]):
 
 class SourceSystemListResponse(ItemsResponse[SourceSystem]):
     pass
+
+
+class RootItem(ContractModel):
+    abbr: str
+    en: str = ""
+    cn: str
+    cat: str
+    desc: str = ""
+
+
+class RootRequest(ContractModel):
+    abbr: str | None = None
+    en: str | None = None
+    cn: str | None = None
+    cat: str | None = None
+    desc: str | None = None
+    items: list[dict[str, Any]] | None = None
+
+
+class RootListResponse(ItemsResponse[RootItem]):
+    pass
+
+
+class RootCategory(ContractModel):
+    name: str
+    count: int = 0
+
+
+class RootCategoryListResponse(ItemsResponse[RootCategory]):
+    pass
