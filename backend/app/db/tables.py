@@ -20,6 +20,7 @@ admin_user = _table(
     Column("status", String(32)),
     Column("role", String(32)),
     Column("last_login_at", DateTime),
+    Column("created_at", DateTime),
     Column("updated_at", DateTime),
 )
 
