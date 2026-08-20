@@ -210,3 +210,72 @@ class AssetTableRequest(ContractModel):
 
 class AssetPageResponse(ItemsResponse[AssetItem]):
     pass
+
+
+class SourceSystem(ContractModel):
+    name: str
+    count: int = 0
+    dataSourceId: int | str | None = None
+    upstreamSystemId: int | str | None = None
+    systemCode: str | None = None
+    systemAbbr: str | None = None
+
+
+class FieldMappingItem(ContractModel):
+    dataSourceId: int | str | None = None
+    upstreamSystemId: int | str | None = None
+    systemCode: str | None = None
+    srcSystem: str | None = None
+    systemAbbr: str | None = None
+    srcTable: str
+    srcTableCn: str | None = None
+    srcField: str
+    srcType: str | None = None
+    srcComment: str | None = None
+    targetLayer: str | None = None
+    targetTable: str | None = None
+    loadMode: str | None = None
+    targetField: str | None = None
+    mappingRule: str | None = None
+    updatedAt: str | None = None
+
+
+class FieldMappingTableItem(ContractModel):
+    dataSourceId: int | str | None = None
+    upstreamSystemId: int | str | None = None
+    systemCode: str | None = None
+    srcSystem: str | None = None
+    systemAbbr: str | None = None
+    srcTable: str
+    srcTableCn: str | None = None
+    targetLayer: str | None = None
+    targetTable: str | None = None
+    loadMode: str | None = None
+    fieldCount: int = 0
+    mappedCount: int = 0
+    emptyCommentCount: int = 0
+    emptyCommentRate: int = 0
+    updatedAt: str | None = None
+
+
+class MappingStats(ContractModel):
+    sourceSystemCount: int = 0
+    sourceTableCount: int = 0
+    fieldCount: int = 0
+    mappedFieldCount: int = 0
+    unmappedFieldCount: int = 0
+    emptyCommentCount: int = 0
+    emptyCommentRate: int = 0
+    coverage: int = 0
+
+
+class FieldMappingListResponse(ItemsResponse[FieldMappingItem]):
+    pass
+
+
+class FieldMappingTableListResponse(ItemsResponse[FieldMappingTableItem]):
+    pass
+
+
+class SourceSystemListResponse(ItemsResponse[SourceSystem]):
+    pass

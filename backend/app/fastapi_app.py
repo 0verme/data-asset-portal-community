@@ -26,6 +26,10 @@ from .contracts import (
     AssetTableRequest,
     DataEnvelope,
     ErrorEnvelope,
+    FieldMappingListResponse,
+    FieldMappingTableListResponse,
+    MappingStats,
+    SourceSystemListResponse,
     IndicatorItem,
     IndicatorListResponse,
     IndicatorRequest,
@@ -34,6 +38,10 @@ from .contracts import (
     validate_contract,
 )
 from .core.capabilities import resolve_capabilities
+from .services.field_mapping_service import (
+    FieldMappingDataSourceError,
+    field_mapping_service,
+)
 from .services.assets_service import (
     AssetAlreadyExistsError,
     AssetDataSourceError,
@@ -226,6 +234,120 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
         except IndicatorDataSourceError as error:
             return _service_error_response(error, 500)
         return JSONResponse(content={"message": "指标删除成功"})
+
+    app.include_router(router)
+
+
+def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
+    router = APIRouter(prefix="/api/field-mappings", tags=["field-mapping-migration"])
+
+    def get_service() -> Any:
+        return service
+
+    def build_params(
+        keyword: str | None,
+        data_source_id: str | None,
+        upstream_system_id: str | None,
+        source_system_id: str | None,
+        src_system: str | None,
+        src_table: str | None,
+        src_field: str | None,
+        empty_comment: str | None,
+        target_table: str | None,
+        target_field: str | None,
+        page: str | None,
+        page_size: str | None,
+        sort_key: str | None,
+        sort_direction: str | None,
+    ) -> dict[str, str | None]:
+        return {
+            "keyword": keyword,
+            "upstreamSystemId": data_source_id or upstream_system_id or source_system_id,
+            "srcSystem": src_system,
+            "srcTable": src_table,
+            "srcField": src_field,
+            "emptyComment": empty_comment,
+            "targetTable": target_table,
+            "targetField": target_field,
+            "page": page,
+            "pageSize": page_size,
+            "sortKey": sort_key,
+            "sortDirection": sort_direction,
+        }
+
+    def mapping_query_parameters(
+        keyword: str | None = Query(default=None),
+        data_source_id: str | None = Query(default=None, alias="dataSourceId"),
+        upstream_system_id: str | None = Query(default=None, alias="upstreamSystemId"),
+        source_system_id: str | None = Query(default=None, alias="sourceSystemId"),
+        src_system: str | None = Query(default=None, alias="srcSystem"),
+        src_table: str | None = Query(default=None, alias="srcTable"),
+        src_field: str | None = Query(default=None, alias="srcField"),
+        empty_comment: str | None = Query(default=None, alias="emptyComment"),
+        target_table: str | None = Query(default=None, alias="targetTable"),
+        target_field: str | None = Query(default=None, alias="targetField"),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        sort_key: str | None = Query(default=None, alias="sortKey"),
+        sort_direction: str | None = Query(default=None, alias="sortDirection"),
+    ) -> dict[str, str | None]:
+        return build_params(
+            keyword,
+            data_source_id,
+            upstream_system_id,
+            source_system_id,
+            src_system,
+            src_table,
+            src_field,
+            empty_comment,
+            target_table,
+            target_field,
+            page,
+            page_size,
+            sort_key,
+            sort_direction,
+        )
+
+    @router.get("/source-systems", response_model=None)
+    def get_source_systems(current_service: Any = Depends(get_service)):
+        try:
+            items = current_service.get_source_systems()
+        except FieldMappingDataSourceError as error:
+            return _service_error_response(error, 500)
+        return JSONResponse(content=validate_contract({"items": items}, SourceSystemListResponse))
+
+    @router.get("/stats", response_model=None)
+    def get_mapping_stats(
+        params: dict[str, str | None] = Depends(mapping_query_parameters),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.get_stats(params)
+        except FieldMappingDataSourceError as error:
+            return _service_error_response(error, 500)
+        return JSONResponse(content=validate_contract({"data": data}, DataEnvelope[MappingStats]))
+
+    @router.get("/fields", response_model=None)
+    def get_field_mappings(
+        params: dict[str, str | None] = Depends(mapping_query_parameters),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.get_field_mappings(params)
+        except FieldMappingDataSourceError as error:
+            return _service_error_response(error, 500)
+        return JSONResponse(content=validate_contract(data, FieldMappingListResponse))
+
+    @router.get("/tables", response_model=None)
+    def get_table_mappings(
+        params: dict[str, str | None] = Depends(mapping_query_parameters),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.get_table_mappings(params)
+        except FieldMappingDataSourceError as error:
+            return _service_error_response(error, 500)
+        return JSONResponse(content=validate_contract(data, FieldMappingTableListResponse))
 
     app.include_router(router)
 
@@ -437,6 +559,7 @@ def create_fastapi_app(
     identity_resolver: IdentityResolver | None = None,
     indicator_service_instance: Any | None = None,
     assets_service_instance: Any | None = None,
+    field_mapping_service_instance: Any | None = None,
 ) -> FastAPI:
     """Create the opt-in FastAPI pilot application.
 
@@ -448,6 +571,7 @@ def create_fastapi_app(
     app.state.identity_resolver = identity_resolver or (lambda _request: None)
     indicator = indicator_service_instance or indicator_service
     assets = assets_service_instance or assets_service
+    field_mapping = field_mapping_service_instance or field_mapping_service
 
     @app.exception_handler(ApplicationError)
     async def handle_application_error(_request: Request, error: ApplicationError):
@@ -499,4 +623,6 @@ def create_fastapi_app(
         _register_indicator_routes(app, indicator)
     if "dwm" in enabled_codes:
         _register_asset_routes(app, assets)
+    if "mapping" in enabled_codes:
+        _register_field_mapping_routes(app, field_mapping)
     return app
