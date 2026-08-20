@@ -197,6 +197,28 @@ indicator_change_log = _table(
     Column("change_time", DateTime),
 )
 
+operation_log = _table(
+    "p_operation_log",
+    Column("id", Integer, primary_key=True),
+    Column("user_id", String(64)),
+    Column("user_name", String(128)),
+    Column("dept_name", String(128)),
+    Column("module_name", String(64), nullable=False),
+    Column("operation_type", String(32), nullable=False),
+    Column("operation_object", String(512)),
+    Column("operation_desc", String(1024)),
+    Column("request_method", String(16)),
+    Column("request_url", String(512)),
+    Column("request_params", Text),
+    Column("result_status", String(16), nullable=False),
+    Column("error_message", Text),
+    Column("ip_address", String(64)),
+    Column("user_agent", String(512)),
+    Column("cost_time_ms", Integer, nullable=False),
+    Column("remark", String(512)),
+    Column("created_at", DateTime),
+)
+
 system_table = _table(
     "p_system",
     Column("system_id", Integer, primary_key=True),
