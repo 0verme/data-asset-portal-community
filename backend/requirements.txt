@@ -5,3 +5,5 @@ SQLAlchemy==2.0.51
 psycopg[binary]==3.3.4
 PyYAML==6.0.3
 pydantic==2.10.3
+fastapi==0.129.0
+uvicorn==0.40.0
