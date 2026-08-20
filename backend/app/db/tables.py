@@ -231,6 +231,25 @@ code_item = _table(
     Column("updated_at", DateTime),
 )
 
+menu_table = _table(
+    "p_menu",
+    Column("menu_id", Integer, primary_key=True),
+    Column("menu_code", String(64), nullable=False),
+    Column("menu_name", String(128), nullable=False),
+    Column("menu_icon", String(64), nullable=False),
+    Column("menu_path", String(256)),
+    Column("display_order", Integer, nullable=False),
+    Column("nav_placement", String(16), nullable=False),
+    Column("admin_only", String(1), nullable=False),
+    Column("is_active", String(1), nullable=False),
+    Column("menu_desc", Text),
+    Column("remark", Text),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
 lineage_snapshot = _table(
     "p_lineage_snapshot",
     Column("snapshot_id", String(128), primary_key=True),

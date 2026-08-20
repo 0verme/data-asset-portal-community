@@ -23,7 +23,7 @@ from sqlalchemy import delete, func, insert, select, update
 
 from ..db.gaussdb import execute_sql, fetch_all, resolve_db_profile_name
 from ..db.service import CoreAccess
-from ..db.tables import admin_user, code_category, code_item
+from ..db.tables import admin_user, code_category, code_item, menu_table
 from ..settings import get_default_operator
 from .auth_service import build_password_hash
 from .common_code_service import common_code_service
@@ -755,12 +755,20 @@ class SystemManagementService:
         }
 
     def get_menus(self):
-        rows = self._fetch_rows(
-            f"""
-SELECT menu_id, menu_code, menu_name, menu_icon, menu_path, display_order, nav_placement, admin_only, is_active, menu_desc, updated_at
-FROM {TABLE_MENU}
-ORDER BY display_order, menu_id
-""".strip(),
+        rows = self._core_fetch(
+            select(
+                menu_table.c.menu_id,
+                menu_table.c.menu_code,
+                menu_table.c.menu_name,
+                menu_table.c.menu_icon,
+                menu_table.c.menu_path,
+                menu_table.c.display_order,
+                menu_table.c.nav_placement,
+                menu_table.c.admin_only,
+                menu_table.c.is_active,
+                menu_table.c.menu_desc,
+                menu_table.c.updated_at,
+            ).order_by(menu_table.c.display_order, menu_table.c.menu_id)
         )
         return [
             {
@@ -814,40 +822,34 @@ ORDER BY display_order, menu_id
 
     def _create_menu(self, payload):
         menu = self._normalize_menu_payload(payload)
-        duplicate = self._fetch_rows(
-            f"SELECT 1 FROM {TABLE_MENU} WHERE menu_code = ? LIMIT 1",
-            [menu["code"]],
+        duplicate = self._core_fetch(
+            select(menu_table.c.menu_id).where(menu_table.c.menu_code == menu["code"])
         )
         if duplicate:
             raise MenuAlreadyExistsError(f"Menu already exists: {menu['code']}")
         order = menu["order"]
         if order is None:
-            rows = self._fetch_rows(f"SELECT COALESCE(MAX(display_order), 0) + 10 AS next_order FROM {TABLE_MENU}")
+            rows = self._core_fetch(
+                select((func.coalesce(func.max(menu_table.c.display_order), 0) + 10).label("next_order"))
+            )
             order = int(rows[0]["next_order"])
-        next_id = self._next_pk(TABLE_MENU, "menu_id")
-        self._execute(
-            f"""
-INSERT INTO {TABLE_MENU} (
-  menu_id, menu_code, menu_name, menu_icon, menu_path, display_order, nav_placement, admin_only, is_active, menu_desc, created_by, updated_by
-) VALUES (
-  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-)
-""".strip(),
-            [
-                next_id,
-                menu["code"],
-                menu["name"],
-                menu["icon"],
-                menu["path"],
-                int(order),
-                menu["navPlacement"],
-                "Y" if menu["adminOnly"] else "N",
-                "Y" if menu["status"] == "enabled" else "N",
-                menu["desc"],
-                self._default_operator,
-                self._default_operator,
-            ],
-        )
+        next_id = self._core.next_pk(menu_table, menu_table.c.menu_id)
+        self._core_execute([
+            insert(menu_table).values(
+                menu_id=next_id,
+                menu_code=menu["code"],
+                menu_name=menu["name"],
+                menu_icon=menu["icon"],
+                menu_path=menu["path"],
+                display_order=int(order),
+                nav_placement=menu["navPlacement"],
+                admin_only="Y" if menu["adminOnly"] else "N",
+                is_active="Y" if menu["status"] == "enabled" else "N",
+                menu_desc=menu["desc"],
+                created_by=self._default_operator,
+                updated_by=self._default_operator,
+            )
+        ])
         return self._get_menu(next_id)
 
     def update_menu(self, menu_id: str, payload):
@@ -869,44 +871,32 @@ INSERT INTO {TABLE_MENU} (
         before = self._get_menu(item_id)
         if not before:
             raise MenuNotFoundError(f"Menu not found: {menu_id}")
-        duplicate = self._fetch_rows(
-            f"SELECT 1 FROM {TABLE_MENU} WHERE menu_code = ? AND menu_id <> ? LIMIT 1",
-            [menu["code"], item_id],
+        duplicate = self._core_fetch(
+            select(menu_table.c.menu_id).where(
+                menu_table.c.menu_code == menu["code"],
+                menu_table.c.menu_id != item_id,
+            )
         )
         if duplicate:
             raise MenuAlreadyExistsError(f"Menu already exists: {menu['code']}")
         order = before["order"] if menu["order"] is None else menu["order"]
-        self._execute(
-            f"""
-UPDATE {TABLE_MENU}
-SET
-  menu_code = ?,
-  menu_name = ?,
-  menu_icon = ?,
-  menu_path = ?,
-  display_order = ?,
-  nav_placement = ?,
-  admin_only = ?,
-  is_active = ?,
-  menu_desc = ?,
-  updated_by = ?,
-  updated_at = CURRENT_TIMESTAMP
-WHERE menu_id = ?
-""".strip(),
-            [
-                menu["code"],
-                menu["name"],
-                menu["icon"],
-                menu["path"],
-                int(order),
-                menu["navPlacement"],
-                "Y" if menu["adminOnly"] else "N",
-                "Y" if menu["status"] == "enabled" else "N",
-                menu["desc"],
-                self._default_operator,
-                item_id,
-            ],
-        )
+        self._core_execute([
+            update(menu_table)
+            .where(menu_table.c.menu_id == item_id)
+            .values(
+                menu_code=menu["code"],
+                menu_name=menu["name"],
+                menu_icon=menu["icon"],
+                menu_path=menu["path"],
+                display_order=int(order),
+                nav_placement=menu["navPlacement"],
+                admin_only="Y" if menu["adminOnly"] else "N",
+                is_active="Y" if menu["status"] == "enabled" else "N",
+                menu_desc=menu["desc"],
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            )
+        ])
         return self._get_menu(item_id), before
 
     def update_menu_status(self, menu_id: str, status: str):
@@ -931,14 +921,15 @@ WHERE menu_id = ?
         item_id = self._parse_menu_id(menu_id)
         if not self._get_menu(item_id):
             raise MenuNotFoundError(f"Menu not found: {menu_id}")
-        self._execute(
-            f"""
-UPDATE {TABLE_MENU}
-SET is_active = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
-WHERE menu_id = ?
-""".strip(),
-            ["Y" if normalized == "enabled" else "N", self._default_operator, item_id],
-        )
+        self._core_execute([
+            update(menu_table)
+            .where(menu_table.c.menu_id == item_id)
+            .values(
+                is_active="Y" if normalized == "enabled" else "N",
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            )
+        ])
         return self._get_menu(item_id)
 
     def move_menu(self, menu_id: str, direction: str):
@@ -962,14 +953,22 @@ WHERE menu_id = ?
             operation_desc=f"{'上移' if normalized == 'up' else '下移'}菜单",
         ) as audit:
             audit.before = current
-            self._execute(
-                f"UPDATE {TABLE_MENU} SET display_order = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE menu_id = ?",
-                [int(neighbor["order"]), self._default_operator, int(current["id"])],
-            )
-            self._execute(
-                f"UPDATE {TABLE_MENU} SET display_order = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE menu_id = ?",
-                [int(current["order"]), self._default_operator, int(neighbor["id"])],
-            )
+            self._core_execute([
+                update(menu_table)
+                .where(menu_table.c.menu_id == int(current["id"]))
+                .values(
+                    display_order=int(neighbor["order"]),
+                    updated_by=self._default_operator,
+                    updated_at=func.current_timestamp(),
+                ),
+                update(menu_table)
+                .where(menu_table.c.menu_id == int(neighbor["id"]))
+                .values(
+                    display_order=int(current["order"]),
+                    updated_by=self._default_operator,
+                    updated_at=func.current_timestamp(),
+                ),
+            ])
             result = self.get_menus()
             audit.after = self._get_menu(item_id)
             return result
@@ -990,7 +989,7 @@ WHERE menu_id = ?
         before = self._get_menu(item_id)
         if not before:
             raise MenuNotFoundError(f"Menu not found: {menu_id}")
-        self._execute(f"DELETE FROM {TABLE_MENU} WHERE menu_id = ?", [item_id])
+        self._core_execute([delete(menu_table).where(menu_table.c.menu_id == item_id)])
         return before
 
     def _update_param_category_status(self, category_code: str, status: str):
