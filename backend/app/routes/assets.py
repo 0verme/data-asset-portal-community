@@ -15,6 +15,16 @@
 from flask import Blueprint, jsonify, request
 
 from ..auth import require_maintainer
+from ..contracts import (
+    AssetField,
+    AssetItem,
+    AssetPageResponse,
+    DataEnvelope,
+    ErrorEnvelope,
+    ItemsResponse,
+    MessageDataResponse,
+    validate_contract,
+)
 from ..services.assets_service import (
     AssetAlreadyExistsError,
     AssetDataSourceError,
@@ -25,6 +35,11 @@ from ..services.assets_service import (
 
 
 assets_bp = Blueprint("assets", __name__)
+
+
+def _error_response(error, status):
+    payload = validate_contract({"error": error.to_dict()}, ErrorEnvelope)
+    return jsonify(payload), status
 
 
 @assets_bp.get("/tables")
@@ -63,8 +78,9 @@ def get_asset_tables():
                 )
             }
     except AssetDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify(payload)
+        return _error_response(error, 500)
+    response_model = AssetPageResponse if "page" in payload else ItemsResponse[AssetItem]
+    return jsonify(validate_contract(payload, response_model))
 
 
 @assets_bp.get("/tables/<table_name>")
@@ -72,10 +88,10 @@ def get_asset_detail(table_name):
     try:
         data = assets_service.get_asset_detail(table_name)
     except AssetNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except AssetDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"data": data})
+        return _error_response(error, 500)
+    return jsonify(validate_contract({"data": data}, DataEnvelope[AssetItem]))
 
 
 @assets_bp.get("/tables/<table_name>/fields")
@@ -83,10 +99,10 @@ def get_asset_fields(table_name):
     try:
         items = assets_service.get_asset_fields(table_name)
     except AssetNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except AssetDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"items": items})
+        return _error_response(error, 500)
+    return jsonify(validate_contract({"items": items}, ItemsResponse[AssetField]))
 
 
 @assets_bp.get("/tables/<table_name>/ddl")
@@ -94,10 +110,10 @@ def get_asset_ddl(table_name):
     try:
         data = assets_service.get_asset_ddl(table_name)
     except AssetNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except AssetDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"data": data})
+        return _error_response(error, 500)
+    return jsonify(validate_contract({"data": data}, DataEnvelope[object]))
 
 
 @assets_bp.get("/domains")
@@ -124,12 +140,17 @@ def create_asset_table():
     try:
         data = assets_service.create_asset_table(request.get_json(silent=True))
     except AssetValidationError as error:
-        return jsonify({"error": error.to_dict()}), 422
+        return _error_response(error, 422)
     except AssetAlreadyExistsError as error:
-        return jsonify({"error": error.to_dict()}), 409
+        return _error_response(error, 409)
     except AssetDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"message": "数据表创建成功", "data": data}), 201
+        return _error_response(error, 500)
+    return jsonify(
+        validate_contract(
+            {"message": "数据表创建成功", "data": data},
+            MessageDataResponse[AssetItem],
+        )
+    ), 201
 
 
 @assets_bp.put("/tables/<table_name>")
@@ -138,14 +159,19 @@ def update_asset_table(table_name):
     try:
         data = assets_service.update_asset_table(table_name, request.get_json(silent=True))
     except AssetNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except AssetValidationError as error:
-        return jsonify({"error": error.to_dict()}), 422
+        return _error_response(error, 422)
     except AssetAlreadyExistsError as error:
-        return jsonify({"error": error.to_dict()}), 409
+        return _error_response(error, 409)
     except AssetDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"message": "数据表更新成功", "data": data})
+        return _error_response(error, 500)
+    return jsonify(
+        validate_contract(
+            {"message": "数据表更新成功", "data": data},
+            MessageDataResponse[AssetItem],
+        )
+    )
 
 
 @assets_bp.put("/tables/<table_name>/fields")
@@ -154,12 +180,17 @@ def update_asset_fields(table_name):
     try:
         data = assets_service.update_asset_fields(table_name, request.get_json(silent=True))
     except AssetNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except AssetValidationError as error:
-        return jsonify({"error": error.to_dict()}), 422
+        return _error_response(error, 422)
     except AssetDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
-    return jsonify({"message": "字段列表更新成功", "data": data})
+        return _error_response(error, 500)
+    return jsonify(
+        validate_contract(
+            {"message": "字段列表更新成功", "data": data},
+            MessageDataResponse[object],
+        )
+    )
 
 
 @assets_bp.delete("/tables/<table_name>")
@@ -168,7 +199,7 @@ def delete_asset_table(table_name):
     try:
         assets_service.delete_asset_table(table_name)
     except AssetNotFoundError as error:
-        return jsonify({"error": error.to_dict()}), 404
+        return _error_response(error, 404)
     except AssetDataSourceError as error:
-        return jsonify({"error": error.to_dict()}), 500
+        return _error_response(error, 500)
     return jsonify({"message": "数据表删除成功"})
