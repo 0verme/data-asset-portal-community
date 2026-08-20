@@ -340,7 +340,7 @@ jobs:
         run: npm audit --audit-level=high
 
   migration-community:
-    name: Community Demo Bootstrap (SQLite)
+    name: Community Migration (SQLite)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
