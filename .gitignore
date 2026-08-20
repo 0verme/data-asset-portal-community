@@ -37,7 +37,10 @@ frontend/.env.local
 backend/configs/database.yaml
 backend/configs/database.local*.yaml
 
-# 本地数据库文件产物（项目不再支持 SQLite；防止误提交）
+# One-command Community Demo runtime (SQLite, generated config and secret)
+.demo/
+
+# 本地数据库文件产物（Community Demo / CI 使用 SQLite；防止误提交）
 backend/data/
 *.db
 *.sqlite
