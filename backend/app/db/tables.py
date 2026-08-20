@@ -197,6 +197,44 @@ indicator_change_log = _table(
     Column("change_time", DateTime),
 )
 
+root_category = _table(
+    "p_root_category",
+    Column("category_id", Integer, primary_key=True),
+    Column("category_name", String(64), nullable=False),
+    Column("display_order", Integer, nullable=False),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_at", DateTime),
+)
+
+root_item = _table(
+    "p_root_item",
+    Column("root_id", Integer, primary_key=True),
+    Column("root_abbr", String(64), nullable=False),
+    Column("root_en_name", String(256)),
+    Column("root_cn_name", String(256), nullable=False),
+    Column("category_name", String(64), nullable=False),
+    Column("root_desc", String(2000)),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+root_change_log = _table(
+    "p_root_change_log",
+    Column("change_id", Integer, primary_key=True),
+    Column("root_id", Integer),
+    Column("root_abbr", String(64), nullable=False),
+    Column("change_type", String(64), nullable=False),
+    Column("change_summary", String(512)),
+    Column("before_json", Text),
+    Column("after_json", Text),
+    Column("operator_name", String(64), nullable=False),
+    Column("change_time", DateTime),
+)
+
 report_asset = _table(
     "p_report_asset",
     Column("report_pk", Integer, primary_key=True),
