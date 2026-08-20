@@ -310,6 +310,42 @@ root_change_log = _table(
     Column("change_time", DateTime),
 )
 
+lineage_snapshot = _table(
+    "p_lineage_snapshot",
+    Column("snapshot_id", String(128), primary_key=True),
+    Column("generated_at", DateTime, nullable=False),
+    Column("generator_name", String(128), nullable=False),
+    Column("generator_version", String(64), nullable=False),
+    Column("import_batch_id", String(128), nullable=False),
+    Column("status_code", String(16), nullable=False),
+)
+
+lineage_node = _table(
+    "p_lineage_node",
+    Column("snapshot_id", String(128), nullable=False),
+    Column("node_id", String(256), nullable=False),
+    Column("kind_code", String(32), nullable=False),
+    Column("node_name", String(256), nullable=False),
+    Column("display_name", String(512), nullable=False),
+    Column("namespace_name", String(128), nullable=False),
+    Column("attributes_json", Text, nullable=False),
+)
+
+lineage_edge = _table(
+    "p_lineage_edge",
+    Column("snapshot_id", String(128), nullable=False),
+    Column("edge_id", String(256), nullable=False),
+    Column("source_node_id", String(256), nullable=False),
+    Column("target_node_id", String(256), nullable=False),
+    Column("kind_code", String(64), nullable=False),
+    Column("evidence_type", String(64), nullable=False),
+    Column("source_record_id", String(256), nullable=False),
+    Column("evidence_description", String(1000), nullable=False),
+    Column("confidence_code", String(16), nullable=False),
+    Column("generated_at", DateTime, nullable=False),
+    Column("diagnostics_json", Text, nullable=False),
+)
+
 report_asset = _table(
     "p_report_asset",
     Column("report_pk", Integer, primary_key=True),

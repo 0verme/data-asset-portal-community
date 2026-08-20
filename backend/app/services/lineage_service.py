@@ -13,7 +13,11 @@ import json
 import logging
 import os
 
-from ..db.gaussdb import database_transaction, fetch_all
+from sqlalchemy import select
+
+from ..db.gaussdb import database_transaction
+from ..db.service import CoreAccess
+from ..db.tables import lineage_edge, lineage_node, lineage_snapshot
 
 
 LOGGER = logging.getLogger(__name__)
@@ -108,49 +112,106 @@ def log_lineage_storage_status():
 
 def _database_snapshot(profile):
     """Load the active snapshot only when explicitly enabled for this service."""
+    db = CoreAccess(profile_getter=lambda: profile, error_factory=LineageDataSourceError)
     try:
         with database_transaction():
-            columns, rows = fetch_all(profile, """
-SELECT snapshot_id, generated_at, generator_name, generator_version
-FROM dwp.p_lineage_snapshot WHERE status_code = 'ACTIVE'
-ORDER BY generated_at DESC, snapshot_id DESC LIMIT 1
-""")
-            if not rows:
+            snapshot_rows = db.fetch_rows(
+                select(
+                    lineage_snapshot.c.snapshot_id,
+                    lineage_snapshot.c.generated_at,
+                    lineage_snapshot.c.generator_name,
+                    lineage_snapshot.c.generator_version,
+                )
+                .where(lineage_snapshot.c.status_code == "ACTIVE")
+                .order_by(lineage_snapshot.c.generated_at.desc(), lineage_snapshot.c.snapshot_id.desc())
+                .limit(1)
+            )
+            if not snapshot_rows:
                 raise LineageNoActiveSnapshotError("no active lineage snapshot is available")
-            snapshot = dict(zip(columns, rows[0]))
+            snapshot = snapshot_rows[0]
             snapshot_id = snapshot["snapshot_id"]
-            node_columns, node_rows = fetch_all(profile, """
-SELECT node_id, kind_code, node_name, display_name, namespace_name, attributes_json
-FROM dwp.p_lineage_node WHERE snapshot_id = ? ORDER BY node_id
-""", [snapshot_id])
-            edge_columns, edge_rows = fetch_all(profile, """
-SELECT edge_id, source_node_id, target_node_id, kind_code, evidence_type,
-       source_record_id, evidence_description, confidence_code, generated_at, diagnostics_json
-FROM dwp.p_lineage_edge WHERE snapshot_id = ? ORDER BY edge_id
-""", [snapshot_id])
+            node_rows = db.fetch_rows(
+                select(
+                    lineage_node.c.node_id,
+                    lineage_node.c.kind_code,
+                    lineage_node.c.node_name,
+                    lineage_node.c.display_name,
+                    lineage_node.c.namespace_name,
+                    lineage_node.c.attributes_json,
+                )
+                .where(lineage_node.c.snapshot_id == snapshot_id)
+                .order_by(lineage_node.c.node_id)
+            )
+            edge_rows = db.fetch_rows(
+                select(
+                    lineage_edge.c.edge_id,
+                    lineage_edge.c.source_node_id,
+                    lineage_edge.c.target_node_id,
+                    lineage_edge.c.kind_code,
+                    lineage_edge.c.evidence_type,
+                    lineage_edge.c.source_record_id,
+                    lineage_edge.c.evidence_description,
+                    lineage_edge.c.confidence_code,
+                    lineage_edge.c.generated_at,
+                    lineage_edge.c.diagnostics_json,
+                )
+                .where(lineage_edge.c.snapshot_id == snapshot_id)
+                .order_by(lineage_edge.c.edge_id)
+            )
     except LineageNoActiveSnapshotError:
         raise
     except Exception as error:
         raise LineageDataSourceError("血缘数据图谱暂不可用，请稍后重试") from error
 
     def decode(value, fallback):
-        try: return json.loads(value) if value else fallback
-        except (TypeError, json.JSONDecodeError): return fallback
+        try:
+            return json.loads(value) if value else fallback
+        except (TypeError, json.JSONDecodeError):
+            return fallback
+
     diagnostics = []
     nodes = []
-    for row in node_rows:
-        item = dict(zip(node_columns, row))
+    for item in node_rows:
         attributes = decode(item["attributes_json"], {})
         diagnostics.extend(attributes.get("diagnostics", []))
-        nodes.append({"id": item["node_id"], "kind": item["kind_code"], "name": item["node_name"], "displayName": item["display_name"], "namespace": item["namespace_name"], "attributes": attributes})
+        nodes.append({
+            "id": item["node_id"],
+            "kind": item["kind_code"],
+            "name": item["node_name"],
+            "displayName": item["display_name"],
+            "namespace": item["namespace_name"],
+            "attributes": attributes,
+        })
     edges = []
-    for row in edge_rows:
-        item = dict(zip(edge_columns, row))
+    for item in edge_rows:
         edge_diagnostics = decode(item["diagnostics_json"], [])
         diagnostics.extend(edge_diagnostics)
-        edges.append({"id": item["edge_id"], "sourceId": item["source_node_id"], "targetId": item["target_node_id"], "kind": item["kind_code"], "evidence": {"type": item["evidence_type"], "sourceRecordId": item["source_record_id"], "description": item["evidence_description"]}, "confidence": item["confidence_code"], "generatedAt": str(item["generated_at"]), "diagnostics": edge_diagnostics})
+        edges.append({
+            "id": item["edge_id"],
+            "sourceId": item["source_node_id"],
+            "targetId": item["target_node_id"],
+            "kind": item["kind_code"],
+            "evidence": {
+                "type": item["evidence_type"],
+                "sourceRecordId": item["source_record_id"],
+                "description": item["evidence_description"],
+            },
+            "confidence": item["confidence_code"],
+            "generatedAt": str(item["generated_at"]),
+            "diagnostics": edge_diagnostics,
+        })
     unique_diagnostics = list({json.dumps(item, ensure_ascii=False, sort_keys=True): item for item in diagnostics}.values())
-    return {"snapshotId": snapshot_id, "generatedAt": str(snapshot["generated_at"]), "generator": {"name": snapshot["generator_name"], "version": snapshot["generator_version"]}, "nodes": nodes, "edges": edges, "diagnostics": unique_diagnostics}
+    return {
+        "snapshotId": snapshot_id,
+        "generatedAt": str(snapshot["generated_at"]),
+        "generator": {
+            "name": snapshot["generator_name"],
+            "version": snapshot["generator_version"],
+        },
+        "nodes": nodes,
+        "edges": edges,
+        "diagnostics": unique_diagnostics,
+    }
 
 
 def _current_snapshot():
