@@ -309,3 +309,30 @@ class RootCategory(ContractModel):
 
 class RootCategoryListResponse(ItemsResponse[RootCategory]):
     pass
+
+
+class ManualCodeTableItem(ContractModel):
+    id: str
+    tableCode: str
+    tableName: str
+    style: str
+    owner: str = ""
+    status: str
+    remark: str = ""
+    createdBy: str = ""
+    createdAt: str = ""
+    updatedBy: str = ""
+    updatedAt: str = ""
+
+
+class ManualCodeTableRequest(ContractModel):
+    tableCode: str | None = None
+    tableName: str | None = None
+    style: str | None = None
+    owner: str | None = None
+    status: str | None = None
+    remark: str | None = None
+
+
+class ManualCodeTableListResponse(ItemsResponse[ManualCodeTableItem]):
+    pass
