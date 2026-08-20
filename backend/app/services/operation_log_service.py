@@ -22,6 +22,7 @@ from contextlib import contextmanager
 from datetime import datetime
 
 from flask import g, has_request_context, request
+from sqlalchemy import func, or_, select
 
 from ..auth import get_session_user
 from ..db.gaussdb import (
@@ -30,10 +31,10 @@ from ..db.gaussdb import (
     active_transaction_connection,
     connect_with_profile,
     database_transaction,
-    execute_sql,
-    fetch_all,
     resolve_db_profile_name,
 )
+from ..db.service import CoreAccess
+from ..db.tables import operation_log
 from ..settings import get_page_size_limits, get_trust_proxy_headers
 
 
@@ -104,6 +105,10 @@ class AuditLogError(RuntimeError):
 class OperationLogService:
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
+        self._db = CoreAccess(
+            profile_getter=lambda: self._db_profile,
+            error_factory=OperationLogDataSourceError,
+        )
 
     def _profile(self):
         return self._db_profile or resolve_db_profile_name()
@@ -113,26 +118,8 @@ class OperationLogService:
             return "NULL"
         return "'" + str(value).replace("'", "''") + "'"
 
-    def _fetch_rows(self, sql: str):
-        try:
-            columns, rows = fetch_all(self._profile(), sql)
-        except FileNotFoundError as error:
-            raise OperationLogDataSourceError("Database config file not found") from error
-        except (KeyError, RuntimeError) as error:
-            raise OperationLogDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise OperationLogDataSourceError("Database query failed") from error
-        return [dict(zip(columns, row)) for row in rows]
-
-    def _execute(self, sql: str):
-        try:
-            return execute_sql(self._profile(), sql)
-        except FileNotFoundError as error:
-            raise OperationLogDataSourceError("Database config file not found") from error
-        except (KeyError, RuntimeError) as error:
-            raise OperationLogDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise OperationLogDataSourceError("Database execution failed") from error
+    def _fetch_rows(self, statement):
+        return self._db.fetch_rows(statement)
 
     def _row_to_log(self, row: dict) -> dict:
         normalized = {column.lower(): value for column, value in row.items()}
@@ -146,28 +133,42 @@ class OperationLogService:
             log[field] = value if value is not None else ("" if field != "id" else value)
         return log
 
-    def _build_where(self, filters: dict) -> str:
+    def _build_where(self, filters: dict):
         clauses = []
-        keyword = str(filters.get("keyword") or "").strip()
+        keyword = str(filters.get("keyword") or "").strip().lower()
         module = str(filters.get("module") or "").strip()
         operation_type = str(filters.get("operationType") or "").strip()
         result = str(filters.get("result") or "").strip().lower()
         start_time = str(filters.get("startTime") or "").strip()
         end_time = str(filters.get("endTime") or "").strip()
         if keyword:
-            like = self._quote(f"%{keyword}%")
-            clauses.append("(user_name LIKE {0} OR module_name LIKE {0} OR operation_object LIKE {0} OR operation_desc LIKE {0})".format(like))
+            escaped = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            searchable = (
+                operation_log.c.user_name,
+                operation_log.c.module_name,
+                operation_log.c.operation_object,
+                operation_log.c.operation_desc,
+            )
+            clauses.append(
+                or_(
+                    *(
+                        func.lower(func.coalesce(column, "")).like(pattern, escape="\\")
+                        for column in searchable
+                    )
+                )
+            )
         if module:
-            clauses.append(f"module_name = {self._quote(module)}")
+            clauses.append(operation_log.c.module_name == module)
         if operation_type:
-            clauses.append(f"operation_type = {self._quote(operation_type)}")
+            clauses.append(operation_log.c.operation_type == operation_type)
         if result in RESULT_STATUSES:
-            clauses.append(f"result_status = {self._quote(result)}")
+            clauses.append(operation_log.c.result_status == result)
         if start_time:
-            clauses.append(f"created_at >= {self._quote(start_time)}")
+            clauses.append(operation_log.c.created_at >= start_time)
         if end_time:
-            clauses.append(f"created_at <= {self._quote(end_time)}")
-        return " WHERE " + " AND ".join(clauses) if clauses else ""
+            clauses.append(operation_log.c.created_at <= end_time)
+        return clauses
 
     def _resolve_paging(self, filters: dict):
         default_page_size, max_page_size = get_page_size_limits(20)
@@ -181,23 +182,37 @@ class OperationLogService:
             page_size = default_page_size
         return max(1, page), max(1, min(max_page_size, page_size))
 
+    @staticmethod
+    def _columns():
+        return tuple(operation_log.c[column] for column in COLUMN_MAP)
+
     def get_logs(self, filters: dict | None = None) -> dict:
         filters = filters or {}
         where = self._build_where(filters)
         page, page_size = self._resolve_paging(filters)
+        count_statement = select(func.count().label("total")).select_from(operation_log).where(*where)
+        page_statement = (
+            select(*self._columns())
+            .select_from(operation_log)
+            .where(*where)
+            .order_by(operation_log.c.created_at.desc(), operation_log.c.id.desc())
+            .limit(page_size)
+            .offset((page - 1) * page_size)
+        )
         with database_transaction():
-            count_rows = self._fetch_rows(f"SELECT COUNT(*) AS total FROM {TABLE_OPERATION_LOG}{where}")
-            rows = self._fetch_rows(
-                f"SELECT * FROM {TABLE_OPERATION_LOG}{where} ORDER BY created_at DESC, id DESC "
-                f"LIMIT {page_size} OFFSET {(page - 1) * page_size}"
-            )
-        return {"items": [self._row_to_log(row) for row in rows], "total": int(count_rows[0]["total"]) if count_rows else 0}
+            count_rows = self._fetch_rows(count_statement)
+            rows = self._fetch_rows(page_statement)
+        return {
+            "items": [self._row_to_log(row) for row in rows],
+            "total": int(count_rows[0]["total"]) if count_rows else 0,
+        }
 
     def get_log_detail(self, log_id) -> dict:
         value = str(log_id or "").strip()
         if not value.isdigit():
             raise OperationLogNotFoundError(f"Operation log not found: {log_id}")
-        rows = self._fetch_rows(f"SELECT * FROM {TABLE_OPERATION_LOG} WHERE id = {int(value)}")
+        statement = select(*self._columns()).where(operation_log.c.id == int(value))
+        rows = self._fetch_rows(statement)
         if not rows:
             raise OperationLogNotFoundError(f"Operation log not found: {log_id}")
         return self._row_to_log(rows[0])
@@ -366,7 +381,7 @@ class OperationLogService:
     def audit(self, *, module_name, operation_type, operation_object="", before=None, after=None, operation_desc=None, remark=None):
         """Run a required-audit management write in one database transaction."""
         handle = _AuditHandle(module_name=module_name, operation_type=operation_type, operation_object=operation_object, before=before, after=after, operation_desc=operation_desc, remark=remark)
-        with database_transaction() as transaction:
+        with database_transaction():
             try:
                 yield handle
             except Exception:

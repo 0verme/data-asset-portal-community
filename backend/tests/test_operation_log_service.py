@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from sqlalchemy.dialects import mysql, postgresql, sqlite
+
 from backend.app.services.operation_log_service import AuditLogError, OperationLogService
 from backend.tests.db_test_support import skip_without_postgres_integration
 
@@ -132,6 +134,21 @@ class OperationLogServiceUnitTests(unittest.TestCase):
         self.assertEqual(result["total"], 3)
         self.assertEqual(fetch.call_count, 2)
         tx.assert_called_once()
+
+    def test_log_queries_use_bound_core_filters_and_logical_schema(self):
+        self.service._db.fetch_rows = MagicMock(side_effect=[[{"total": 1}], [{"id": 2}]])
+
+        result = self.service.get_logs({"keyword": "root' OR 1=1", "module": "root"})
+
+        self.assertEqual(1, result["total"])
+        statements = [call.args[0] for call in self.service._db.fetch_rows.call_args_list]
+        for statement in statements:
+            for dialect in (sqlite.dialect(), postgresql.dialect(), mysql.dialect()):
+                with self.subTest(dialect=dialect.name):
+                    compiled = statement.compile(dialect=dialect)
+                    self.assertIn("p_operation_log", str(compiled))
+                    self.assertIn("__app__", str(compiled))
+                    self.assertNotIn("root' OR 1=1", str(compiled))
 
     def test_audit_context_records_on_success_using_shared_connection(self):
         self.service._db_profile = "test"
