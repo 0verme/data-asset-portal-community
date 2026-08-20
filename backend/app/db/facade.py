@@ -20,15 +20,18 @@ import logging
 from contextvars import ContextVar
 from contextlib import contextmanager
 from pathlib import Path
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import yaml
 
-from ..settings import (
-    get_db_connect_timeout_seconds,
-    get_db_profile_overrides,
-    get_db_statement_timeout_ms,
+from ..settings import get_db_profile_overrides
+from .base import (
+    CrossProfileTransactionError,
+    DatabaseConnectionError,
+    DatabaseTransactionError,
+    redact_sensitive_text,
 )
+from .providers import DEFAULT_GAUSS_DRIVER, LOGICAL_SCHEMA
+from .registry import get_provider
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
@@ -36,13 +39,14 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 # postgres -> postgresql, gaussdb -> dws.
 SUPPORTED_DB_TYPES = frozenset({"sqlite", "postgres", "gaussdb"})
 DEFAULT_DB_TYPE = "gaussdb"
-DEFAULT_DRIVER = "com.huawei.gauss200.jdbc.Driver"
+DEFAULT_DRIVER = DEFAULT_GAUSS_DRIVER
 DEFAULT_CONFIG_PATH = ROOT_DIR / "configs" / "database.yaml"
 DEFAULT_JAR = ROOT_DIR / "resources" / "jars" / "gaussdb-jdbc.jar"  # placeholder; driver is not bundled
 DEFAULT_PROFILE_ENV = "ASSET_DB_PROFILE"
 AUTH_PROFILE_ENV = "ASSET_AUTH_DB_PROFILE"
 LOGGER = logging.getLogger(__name__)
 _ACTIVE_TRANSACTION = ContextVar("active_database_transaction", default=None)
+_ENGINE_CACHE = {}
 
 
 class _DatabaseTransaction:
@@ -57,7 +61,9 @@ class _DatabaseTransaction:
             self.profile = profile
             self.connection = connect_with_profile(profile)
         elif self.profile != profile:
-            raise RuntimeError("A database transaction cannot span multiple profiles")
+            raise CrossProfileTransactionError(
+                f"A database transaction cannot span multiple profiles: {self.profile} and {profile}"
+            )
         return self.connection
 
 
@@ -69,7 +75,7 @@ def database_transaction():
     an inner operation cannot silently commit an outer operation.
     """
     if _ACTIVE_TRANSACTION.get() is not None:
-        raise RuntimeError("Nested database transactions are not supported")
+        raise DatabaseTransactionError("Nested database transactions are not supported")
     transaction = _DatabaseTransaction()
     token = _ACTIVE_TRANSACTION.set(transaction)
     try:
@@ -150,33 +156,6 @@ def load_db_profiles() -> dict:
     return merged
 
 
-def with_jdbc_timeouts(
-    jdbc_url: str,
-    *,
-    connect_timeout_seconds: int | None = None,
-    socket_timeout_seconds: int | None = None,
-) -> str:
-    raw_url = (jdbc_url or "").strip()
-    if not raw_url:
-        return raw_url
-
-    connect_timeout_seconds = connect_timeout_seconds or get_db_connect_timeout_seconds()
-    socket_timeout_seconds = socket_timeout_seconds or max(1, get_db_statement_timeout_ms() // 1000)
-
-    normalized = raw_url.replace("jdbc:", "", 1)
-    split = urlsplit(normalized)
-    params = dict(parse_qsl(split.query, keep_blank_values=True))
-    connect_timeout_ms = str(int(connect_timeout_seconds) * 1000)
-    socket_timeout_ms = str(int(socket_timeout_seconds) * 1000)
-
-    params.setdefault("loginTimeout", str(int(connect_timeout_seconds)))
-    params.setdefault("connectTimeout", connect_timeout_ms)
-    params.setdefault("socketTimeout", socket_timeout_ms)
-
-    rebuilt = urlunsplit((split.scheme, split.netloc, split.path, urlencode(params), split.fragment))
-    return f"jdbc:{rebuilt}"
-
-
 def get_db_profile(profile: str) -> dict:
     profiles = load_db_profiles()
     if profile not in profiles:
@@ -189,69 +168,15 @@ def get_db_profile(profile: str) -> dict:
         db_type = DEFAULT_DB_TYPE
     else:
         db_type = str(raw_type).strip().lower()
-    config["type"] = db_type
-
-    if db_type not in SUPPORTED_DB_TYPES:
-        supported = ", ".join(sorted(SUPPORTED_DB_TYPES))
-        raise ValueError(
-            f"Unsupported database type: {db_type}. "
-            f"Supported types: {supported}."
-        )
-
-    if db_type == "sqlite":
-        database = str(config.get("database") or "").strip()
-        if not database:
-            raise ValueError(f"sqlite profile '{profile}' requires database")
-        config["database"] = database
-        return config
-
-    if db_type == "gaussdb":
-        config.setdefault("driver", DEFAULT_DRIVER)
-        config.setdefault("connect_timeout", get_db_connect_timeout_seconds())
-        config.setdefault("socket_timeout", max(1, get_db_statement_timeout_ms() // 1000))
-        config.setdefault("statement_timeout_ms", get_db_statement_timeout_ms())
-        default_jar = _resolve_default_jar_path()
-        configured_jar_path = Path(config.get("jar_path", default_jar))
-        if not configured_jar_path.is_absolute():
-            configured_jar_path = CONFIG_PATH.parent.parent / configured_jar_path
-        jar_path = configured_jar_path if configured_jar_path.exists() else default_jar
-        if not Path(jar_path).exists():
-            raise ValueError(
-                f"gaussdb profile '{profile}' requires a JDBC driver jar that is not present. "
-                "Download the driver from the official vendor channel, then set "
-                "ASSET_DB_JAR_PATH (or `jar_path` in the profile config) to its location. "
-                "See backend/resources/jars/README.md for details."
-            )
-        config["jar_path"] = str(jar_path)
-        if not config.get("jdbc_url"):
-            raise ValueError(f"gaussdb profile '{profile}' requires jdbc_url")
-        config["jdbc_url"] = with_jdbc_timeouts(
-            config["jdbc_url"],
-            connect_timeout_seconds=int(config["connect_timeout"]),
-            socket_timeout_seconds=int(config["socket_timeout"]),
-        )
-        return config
-
-    # postgres
-    config.setdefault("host", "127.0.0.1")
-    config.setdefault("port", 5432)
-    config.setdefault("connect_timeout", get_db_connect_timeout_seconds())
-    config.setdefault("statement_timeout_ms", get_db_statement_timeout_ms())
-    if "database" not in config and "dbname" in config:
-        config["database"] = config["dbname"]
-    if not config.get("database") and not config.get("dsn"):
-        raise ValueError(f"postgres profile '{profile}' requires database or dsn")
-    return config
+    provider = get_provider(db_type)
+    config["type"] = provider.name
+    if provider.name == "gaussdb" and os.getenv("ASSET_DB_JAR_PATH"):
+        config["jar_path"] = os.environ["ASSET_DB_JAR_PATH"]
+    return provider.validate(profile, config, config_path=CONFIG_PATH)
 
 
 def _build_postgres_options(config: dict):
-    options = []
-    if config.get("schema"):
-        options.append(f"-c search_path={config['schema']}")
-    statement_timeout_ms = config.get("statement_timeout_ms")
-    if statement_timeout_ms is not None:
-        options.append(f"-c statement_timeout={int(statement_timeout_ms)}")
-    return " ".join(options) or None
+    return get_provider("postgres")._options(config)
 
 
 def _connect_gaussdb(config: dict):
@@ -274,16 +199,43 @@ def _connect_sqlite(config: dict):
 
 def connect_with_profile(profile: str):
     config = get_db_profile(profile)
-    if config["type"] == "sqlite":
-        return _connect_sqlite(config)
-    if config["type"] == "gaussdb":
-        return _connect_gaussdb(config)
-    if config["type"] == "postgres":
-        return _connect_postgres(config)
-    supported = ", ".join(sorted(SUPPORTED_DB_TYPES))
-    raise ValueError(
-        f"Unsupported database type: {config['type']}. Supported types: {supported}."
-    )
+    provider = get_provider(config["type"])
+    try:
+        engine = get_engine(profile, config=config)
+        return engine.raw_connection() if engine is not None else provider.connect(config)
+    except DatabaseConnectionError:
+        raise
+    except Exception as exc:
+        safe_reason = redact_sensitive_text(exc, config)
+        LOGGER.error(
+            "Database connection failed for profile=%s provider=%s: %s",
+            profile,
+            provider.name,
+            safe_reason,
+        )
+        raise DatabaseConnectionError(profile, provider.name, safe_reason) from None
+
+
+def get_engine(profile: str, *, config: dict | None = None):
+    """Return the cached SQLAlchemy Engine for an engine-backed profile."""
+    config = config or get_db_profile(profile)
+    provider = get_provider(config["type"])
+    fingerprint = tuple(sorted((key, repr(value)) for key, value in config.items()))
+    cached = _ENGINE_CACHE.get(profile)
+    if cached and cached[0] == fingerprint:
+        return cached[1]
+    if cached and cached[1] is not None:
+        cached[1].dispose()
+    engine = provider.create_engine(config)
+    _ENGINE_CACHE[profile] = (fingerprint, engine)
+    return engine
+
+
+def clear_engine_cache():
+    for _, engine in _ENGINE_CACHE.values():
+        if engine is not None:
+            engine.dispose()
+    _ENGINE_CACHE.clear()
 
 
 def _is_autocommit_enabled(conn) -> bool | None:
@@ -294,8 +246,12 @@ def _is_autocommit_enabled(conn) -> bool | None:
         except Exception:
             return None
 
+    get_autocommit = getattr(conn, "get_autocommit", None)
+    if callable(get_autocommit):
+        return bool(get_autocommit())
+
     auto_commit = getattr(conn, "autocommit", None)
-    if auto_commit is not None:
+    if isinstance(auto_commit, bool):
         return bool(auto_commit)
     return None
 
@@ -331,13 +287,13 @@ def _rollback_if_needed(conn):
 
 
 def _prepare_execute_args(profile: str, sql: str, params=None):
-    if not params:
-        return sql, None
-
-    normalized_sql = sql
     config = get_db_profile(profile)
-    if config["type"] == "postgres":
-        normalized_sql = sql.replace("?", "%s")
+    provider = get_provider(config["type"])
+    normalized_sql = normalize_sql_for_profile(profile, sql)
+    if not params:
+        return normalized_sql, None
+    if provider.placeholder != "?":
+        normalized_sql = normalized_sql.replace("?", provider.placeholder)
     return normalized_sql, tuple(params)
 
 
@@ -356,7 +312,7 @@ def fetch_all(profile: str, sql: str, params=None):
         columns = [desc[0] for desc in curs.description] if curs.description else []
         rows = curs.fetchall()
         return columns, rows
-    except Exception as e:
+    except Exception:
         LOGGER.exception("fetch_all failed for profile=%s", profile)
         raise
     finally:
@@ -387,7 +343,7 @@ def execute_sql(profile: str, sql: str, autocommit: bool = True, params=None):
         if autocommit and shared_connection is None:
             _commit_if_needed(conn)
         return True
-    except Exception as e:
+    except Exception:
         LOGGER.exception("execute_sql failed for profile=%s", profile)
         raise
     finally:
@@ -461,7 +417,7 @@ def execute_statements(profile: str, statements, autocommit: bool = True):
         if autocommit and shared_connection is None:
             _commit_if_needed(conn)
         return True
-    except Exception as e:
+    except Exception:
         try:
             if conn is not None and shared_connection is None:
                 _rollback_if_needed(conn)
@@ -487,6 +443,12 @@ POSTGRES_DISTRIBUTE_RE = re.compile(r"\)\s*DISTRIBUTE\s+BY\s+HASH\s*\([^)]+\)\s*
 
 def normalize_sql_for_profile(profile: str, sql_text: str) -> str:
     config = get_db_profile(profile)
+    provider = get_provider(config["type"])
+    physical_schema = provider.physical_schema(config)
+    schema_prefix = f"{physical_schema}." if physical_schema else ""
+    sql_text = sql_text.replace(f"{LOGICAL_SCHEMA}.", schema_prefix)
+    if physical_schema is None:
+        sql_text = sql_text.replace("dwp.", "")
     # Only gaussdb/DWS understands DISTRIBUTE BY HASH(...); strip it for postgres.
     if config["type"] == "gaussdb":
         return sql_text
