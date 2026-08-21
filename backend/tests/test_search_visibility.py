@@ -22,6 +22,93 @@ class SearchVisibilityTestCase(unittest.TestCase):
             "items": [{"id": config["type"]}],
         }
 
+    def _assert_empty_result(self, query, scope, expected_scope):
+        with patch.object(self.provider, "_connection") as mock_connection:
+            result = self.provider.search(query, scope=scope, limit=0)
+
+        mock_connection.assert_not_called()
+        self.assertEqual(
+            {"query": "", "scope": expected_scope, "groups": [], "total": 0},
+            result,
+        )
+
+    def _normalized_limit(self, raw_limit):
+        config = self.provider.ENTITY_CONFIGS[0]
+        with (
+            patch.dict(os.environ, {"SEARCH_DEFAULT_LIMIT": "7", "SEARCH_MAX_LIMIT": "11"}),
+            patch.object(self.provider, "_visible_configs", return_value=[config]),
+            patch.object(self.provider, "_connection", return_value=nullcontext(object())),
+            patch.object(
+                self.provider,
+                "_search_one_safe",
+                side_effect=lambda conn, current_config, query, limit: self._group(current_config),
+            ) as mock_search_one,
+        ):
+            self.provider.search("边界", scope=config["type"], limit=raw_limit)
+
+        return mock_search_one.call_args.args[3]
+
+    def _assert_scope_alias(self, raw_scope, expected_scope):
+        with (
+            patch.object(self.provider, "_visible_configs", return_value=[]) as mock_visible_configs,
+            patch.object(self.provider, "_connection") as mock_connection,
+        ):
+            result = self.provider.search("关键词", scope=raw_scope, limit=5)
+
+        mock_visible_configs.assert_called_once_with(expected_scope)
+        mock_connection.assert_not_called()
+        self.assertEqual(
+            {"query": "关键词", "scope": expected_scope, "groups": [], "total": 0},
+            result,
+        )
+
+    def test_empty_query_returns_empty_contract_without_connecting(self):
+        self._assert_empty_result("", "all", "all")
+
+    def test_whitespace_query_returns_empty_contract_without_connecting(self):
+        self._assert_empty_result(" \t\n", "metric", "indicator")
+
+    def test_valid_limit_is_forwarded_as_a_number(self):
+        self.assertEqual(3, self._normalized_limit("3"))
+
+    def test_non_numeric_limit_uses_configured_default(self):
+        self.assertEqual(7, self._normalized_limit("not-a-number"))
+
+    def test_zero_limit_uses_configured_default(self):
+        self.assertEqual(7, self._normalized_limit(0))
+
+    def test_negative_limit_uses_configured_default(self):
+        self.assertEqual(7, self._normalized_limit(-4))
+
+    def test_limit_above_configured_maximum_is_clamped(self):
+        self.assertEqual(11, self._normalized_limit(99))
+
+    def test_metric_scope_alias_maps_to_indicator(self):
+        self._assert_scope_alias("metric", "indicator")
+
+    def test_api_asset_scope_alias_maps_to_api(self):
+        self._assert_scope_alias("apiAsset", "api")
+
+    def test_search_preserves_unicode_special_characters_and_long_keywords(self):
+        config = next(item for item in self.provider.ENTITY_CONFIGS if item["type"] == "asset")
+        query = f"  {'资产' * 256}😀%_  "
+        with (
+            patch.object(self.provider, "_visible_configs", return_value=[config]),
+            patch.object(self.provider, "_connection", return_value=nullcontext(object())),
+            patch.object(
+                self.provider,
+                "_search_one_safe",
+                side_effect=lambda conn, current_config, keyword, limit: self._group(current_config),
+            ) as mock_search_one,
+        ):
+            result = self.provider.search(query, scope="asset", limit=5)
+
+        self.assertEqual(query.strip(), result["query"])
+        self.assertEqual(query.strip(), mock_search_one.call_args.args[2])
+
+    def test_like_pattern_escapes_percent_underscore_and_escape_character(self):
+        self.assertEqual("%中文!%!_!!%", self.provider._like_pattern(" 中文%_! "))
+
     @patch("backend.app.services.search_provider.system_management_service.get_enabled_menu_codes")
     def test_search_all_skips_disabled_menu_modules(self, mock_enabled_menu_codes):
         mock_enabled_menu_codes.return_value = {"dwm", "upstream", "mapping", "root", "push"}
