@@ -94,6 +94,56 @@ class P5RuntimeTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         self.assertEqual("admin", response.json()["user"]["role"])
 
+    def test_runtime_dispatch_table_covers_all_community_migrated_prefixes(self):
+        runtime = self.create_runtime_app(
+            runtime_mode="fastapi", capabilities=self.capabilities
+        )
+        self.assertEqual(
+            {
+                "/api/indicators",
+                "/api/assets",
+                "/api/field-mappings",
+                "/api/roots",
+                "/api/api-assets",
+                "/api/lineage",
+                "/api/system",
+                "/api/operation-logs",
+            },
+            runtime.migrated_prefixes,
+        )
+
+    def test_fastapi_error_mapping_and_cors_security_headers(self):
+        runtime = self.create_runtime_app(
+            runtime_mode="fastapi", capabilities=self.capabilities
+        )
+        client = TestClient(runtime)
+        validation = client.get("/api/lineage/subgraph?direction=sideways")
+        self.assertEqual(422, validation.status_code)
+        self.assertEqual("LINEAGE_VALIDATION_FAILED", validation.json()["error"]["code"])
+        not_found = client.get("/api/lineage/subgraph?rootId=table:missing:UNKNOWN")
+        self.assertEqual(404, not_found.status_code)
+        self.assertEqual("LINEAGE_NOT_FOUND", not_found.json()["error"]["code"])
+        fallback_not_found = client.get("/api/not-migrated")
+        self.assertEqual(404, fallback_not_found.status_code)
+        self.assertEqual("NOT_FOUND", fallback_not_found.json()["error"]["code"])
+
+        with patch.dict(os.environ, {"FLASK_CORS_ORIGINS": "https://portal.example.com"}):
+            cors_runtime = self.create_runtime_app(
+                runtime_mode="fastapi", capabilities=self.capabilities
+            )
+        preflight = TestClient(cors_runtime).options(
+            "/api/lineage/bootstrap",
+            headers={
+                "Origin": "https://portal.example.com",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        self.assertEqual(200, preflight.status_code)
+        self.assertEqual(
+            "https://portal.example.com",
+            preflight.headers["access-control-allow-origin"],
+        )
+
     def test_invalid_runtime_mode_fails_closed(self):
         with self.assertRaisesRegex(RuntimeError, "BACKEND_RUNTIME"):
             self.create_runtime_app(

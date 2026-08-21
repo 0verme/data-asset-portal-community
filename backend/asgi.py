@@ -32,7 +32,7 @@ FASTAPI_MODULE_PREFIXES = {
     "report": "/api/reports",
     "apiAsset": "/api/api-assets",
     "lineage": "/api/lineage",
-    "system": "/api/system",
+    "system": ("/api/system", "/api/operation-logs"),
     "upstream": "/api/upstreams",
 }
 
@@ -177,8 +177,13 @@ def create_runtime_app(
     enabled_codes = set(effective_capabilities.get("enabled_codes") or [])
     migrated_prefixes = {
         prefix
-        for code, prefix in FASTAPI_MODULE_PREFIXES.items()
+        for code, configured_prefixes in FASTAPI_MODULE_PREFIXES.items()
         if code in enabled_codes
+        for prefix in (
+            configured_prefixes
+            if isinstance(configured_prefixes, tuple)
+            else (configured_prefixes,)
+        )
     }
     return RuntimeDispatcher(
         fastapi_asgi,
