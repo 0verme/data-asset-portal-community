@@ -177,6 +177,7 @@ class UpstreamService:
 
         if details:
             raise UpstreamValidationError(details)
+        unload_times = [value.strip() for value in unload_times]
 
         return {
             "id": system_id,
