@@ -240,13 +240,13 @@ jobs:
       - name: Migration verify
         run: python backend/scripts/schema_migrate.py verify --profile pg_ci --config /tmp/pg-ci-config.yaml --modules "$COMMUNITY_MODULES"
 
-      - name: Migration status (all applied, no checksum errors)
+      - name: Migration status (Alembic head)
         run: |
           STATUS="$(python backend/scripts/schema_migrate.py status --profile pg_ci --config /tmp/pg-ci-config.yaml --modules "$COMMUNITY_MODULES")"
           echo "$STATUS"
           case "$STATUS" in
-            *"pending=-"*|*"checksum_errors=-"*) : ;;
-            *) echo "unexpected migration state"; exit 1 ;;
+            *"revision=0002_portable_asset_filter"*) : ;;
+            *) echo "unexpected Alembic migration state"; exit 1 ;;
           esac
 
       - name: Seed Community demo data (PostgreSQL)
