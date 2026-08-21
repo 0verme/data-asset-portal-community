@@ -30,14 +30,14 @@ Bootstrap 不会安装系统级 Python、Node.js、npm、Homebrew、Chocolatey �
 .\scripts\demo.ps1
 ```
 
-脚本内部使用现有的 canonical migration runner 和 Community seed，执行：
+脚本内部使用现有的 Alembic baseline CLI 和 Community seed，执行：
 
 ```text
 preflight
 → project-local dependencies
 → generated Demo config/secret
 → SQLite database
-→ backend/migrations migration
+→ backend/schema baseline + Alembic upgrade
 → demo/seed_sqlite.py
 → backend readiness
 → Vite frontend readiness

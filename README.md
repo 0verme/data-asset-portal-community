@@ -132,13 +132,13 @@ flowchart LR
 ```
 
 前端通过 `VITE_API_MODE` 选择 mock 或 remote；后端按 database profile 访问数据库。
-Community 新安装的 schema 唯一入口是 `backend/migrations`，随后使用 `demo/seed_*.py` 写入虚构数据。
-详见 [架构说明](./docs/architecture.md) 和 [数据库迁移说明](./backend/migrations/)。
+Community 新安装的 schema 唯一入口是 `backend/schema` 完整基线与 `backend/alembic` 增量 revision，随后使用 `demo/seed_*.py` 写入虚构数据。
+详见 [架构说明](./docs/architecture.md) 和 [数据库迁移说明](./backend/schema/README.md)。
 
 ## 📚 文档导航
 
 | 文档 | 内容 |
-|------|------|
+| ------ | ------ |
 | [Community Demo](./docs/community-demo.md) | SQLite / PostgreSQL 多步骤演示数据初始化 |
 | [首次贡献指南](./docs/first-contribution.md) | Fork、分支、测试和 PR walkthrough |
 | [Good First Issue 提案](./docs/good-first-issues.md) | 已审计的 contributor-friendly backlog 提案 |
@@ -148,7 +148,7 @@ Community 新安装的 schema 唯一入口是 `backend/migrations`，随后使�
 | [架构说明](./docs/architecture.md) | 前后端架构、数据流和数据库边界 |
 | [模块清单](./docs/modules.md) | 页面、接口入口和数据表对照 |
 | [API 契约](./docs/api-contract.md) | API 约定、端点和请求/响应模型 |
-| [数据库迁移](./backend/migrations/) | 受管 migration CLI 与运维规则 |
+| [数据库迁移](./backend/schema/README.md) | Alembic baseline、stamp 与 forward migration 运维规则 |
 | [截图画廊](./docs/screenshots.md) | Community Demo 全量界面截图 |
 | [资产风险联动设计](./docs/asset-risk-integration-design.md) | 外部审计结果接入边界与提案 |
 | [智能问数与语义推荐](./docs/semantic-recommendation-roadmap.md) | 问数底座与语义推荐路线 |

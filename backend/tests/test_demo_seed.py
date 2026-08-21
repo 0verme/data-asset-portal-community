@@ -9,11 +9,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend.app.db.facade import connect_with_profile
-from backend.app.migrations.runner import MigrationRunner
+from backend.app.migrations.schema import initialize, verify_database
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = ROOT.parent
-MIGRATIONS = ROOT / "migrations"
 COMMUNITY_CONFIG = ROOT / "configs" / "database.community.yaml"
 
 COMMUNITY_MODULES = ["portal", "dwm", "mapping", "lineage", "root", "indicator", "apiAsset", "system"]
@@ -69,14 +68,9 @@ class CommunityDemoSeedTests(unittest.TestCase):
         self.addCleanup(self.environment.stop)
         connection = connect_with_profile("community_sqlite")
         try:
-            runner = MigrationRunner(
-                connection,
-                "sqlite",
-                MIGRATIONS,
-                enabled_modules=COMMUNITY_MODULES,
-            )
-            self.assertEqual(["0002", "0003", "0004", "0005", "0006"], runner.apply())
-            self.assertFalse(runner.verify().pending)
+            config = {"type": "sqlite", "database": str(self.database)}
+            self.assertTrue(initialize(connection, config, "sqlite"))
+            self.assertEqual("0001_baseline", verify_database(connection, config, "sqlite"))
         finally:
             connection.close()
 

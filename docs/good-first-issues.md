@@ -48,8 +48,8 @@
 - 状态: Open，未认领
 - GitHub: <https://github.com/0verme/data-asset-portal-community/issues/38>
 - Labels: `good first issue`, `area/docs`
-- 入口: `backend/migrations/README.md`、`backend/scripts/schema_migrate.py`、`docs/first-contribution.md`。
-- 备注: 只记录当前 CLI 和隔离数据库验证顺序，不修改 migration 或数据库架构。
+- 入口: `backend/schema/README.md`、`backend/scripts/schema_migrate.py`、`docs/first-contribution.md`。
+- 备注: 只记录当前 CLI 和隔离数据库验证顺序，不修改 Alembic baseline 或数据库架构。
 
 ### #39 为生成的 Demo SQL 补充 manifest 覆盖测试
 

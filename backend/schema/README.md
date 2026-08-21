@@ -1,0 +1,30 @@
+# 数据库 Schema 与增量迁移
+
+`backend/schema/` 是新库初始化的唯一结构基线，四份 SQL 必须保持相同的 Community 表、列、索引和约束：
+
+- `sqlite.sql`
+- `postgresql.sql`
+- `dws.sql`
+- `mysql.sql`（MySQL 8.0、InnoDB、`utf8mb4_0900_ai_ci`）
+
+新库执行完整基线后会写入 Alembic revision `0001_baseline`。既有库只能在 `verify` 通过后执行 `baseline`（stamp），不会重放历史 DDL：
+
+```bash
+python backend/scripts/schema_migrate.py apply --profile <profile>
+python backend/scripts/schema_migrate.py verify --profile <profile>
+python backend/scripts/schema_migrate.py baseline --profile <profile> --dry-run
+python backend/scripts/schema_migrate.py baseline --profile <profile>
+```
+
+离线检查四类基线：
+
+```bash
+python backend/scripts/schema_migrate.py verify --offline --dialect sqlite
+python backend/scripts/schema_migrate.py verify --offline --dialect postgresql
+python backend/scripts/schema_migrate.py verify --offline --dialect mysql
+python backend/scripts/schema_migrate.py verify --offline --dialect dws
+```
+
+后续结构变更只新增 `backend/alembic/versions/` revision，不修改已发布 revision，不提供自动 downgrade。`0002_portable_asset_filter` 是第一条真实增量示例，SQLite、PostgreSQL 与 MySQL 的 fresh/upgrade 路径都会从 baseline 升级到同一 head。DWS 目前保留离线基线验证与可选集成验证；在线 Alembic 升级需要相应 Provider 支持。
+
+业务服务使用 `__app__.` 逻辑 schema 或 SQLAlchemy Core；物理 schema、参数风格和连接池由 `backend/app/db/` Provider 统一处理。禁止在服务层写 `dwp.`、数据库类型分支或手工替换占位符。

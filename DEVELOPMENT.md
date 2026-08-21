@@ -162,8 +162,8 @@ FLASK_ENV=development
 
 ## 数据库初始化
 
-**Community 的唯一官方初始化路径 = 受管迁移 + demo seed**（Schema Source of Truth 为
-`backend/migrations`）：
+**Community 的唯一官方初始化路径 = 完整 baseline + Alembic + demo seed**（Schema Source of Truth 为
+`backend/schema` 与 `backend/alembic`）：
 
 ```bash
 python backend/scripts/schema_migrate.py apply --profile community_sqlite
@@ -209,7 +209,7 @@ python scripts/release_check.py full
 `.github/workflows/ci.yml` 在 `pull_request` 与 `main` 推送时运行：
 
 1. **Repository Guard** —— `python demo/validate_demo_data.py --strict`（BLOCKER / SUSPICIOUS 必须为 0）、二进制 / dump / 环境文件检查、workflow YAML 自检；
-2. **Backend / Python 3.11 + 3.13** —— `python -m unittest discover -s backend/tests` + migration offline verify（sqlite / postgresql / dws）+ packaging contract tests；
+2. **Backend / Python 3.11 + 3.13** —— `python -m unittest discover -s backend/tests` + baseline offline verify（sqlite / postgresql / mysql / dws）+ packaging contract tests；
 3. **PostgreSQL Integration（PG 16 service）** —— fresh migration → seed → integration tests（16 个不再 skip）→ repeat apply no-op → Private 表物理边界检查；
 4. **Frontend / Node 22 + 24** —— `npm ci` → `npm test` → `npm run build` → `npm audit --audit-level=high`；
 5. **Community Migration（SQLite）** —— fresh apply → verify → plan → seed → repeat apply no-op → Private 表物理边界检查。

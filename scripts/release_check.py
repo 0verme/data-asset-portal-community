@@ -114,9 +114,9 @@ def _packaging_contracts():
     run([python(), "-m", "unittest", "discover", "-s", "backend/tests", "-p", "test_packaging_contracts.py"])
 
 
-@check("Migration offline verify", "schema_migrate.py verify --offline (sqlite/postgresql/dws)")
+@check("Migration offline verify", "schema_migrate.py verify --offline (sqlite/postgresql/mysql/dws)")
 def _migration_verify_offline():
-    for dialect in ("sqlite", "postgresql", "dws"):
+    for dialect in ("sqlite", "postgresql", "mysql", "dws"):
         run(
             [python(), "backend/scripts/schema_migrate.py", "verify", "--offline", "--dialect", dialect],
             label=f"migration verify --dialect {dialect}",
