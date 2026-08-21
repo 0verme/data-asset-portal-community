@@ -14,8 +14,12 @@
 
 import os
 
-from app import create_app
-from app.settings import get_flask_debug, load_runtime_env
+try:
+    from backend.app import create_app
+    from backend.app.settings import get_flask_debug, load_runtime_env
+except ModuleNotFoundError:  # direct `python run.py` from backend/
+    from app import create_app
+    from app.settings import get_flask_debug, load_runtime_env
 
 
 # The bootstrap supplies a complete, SQLite-only child environment. Preserve

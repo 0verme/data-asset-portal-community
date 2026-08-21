@@ -2,13 +2,16 @@
 
 ## 总体结构
 
-项目是前后端分离的模块化单体：React + Vite 提供单页应用，Flask 按领域蓝图提供 `/api`，服务层通过数据库 Adapter 访问元数据表。门户负责元数据维护和查询，不执行真实采集调度、任务编排或文件推送。
+项目是前后端分离的模块化单体：React + Vite 提供单页应用，ASGI runtime 以 FastAPI 作为已迁移 API 的 primary，并将未迁移 API 委托给 Flask WSGI fallback；服务层通过数据库 Adapter 访问元数据表。门户负责元数据维护和查询，不执行真实采集调度、任务编排或文件推送。
 
 ```mermaid
 flowchart LR
   U["Browser"] --> F["React / Vite"]
-  F -->|"remote: /api"| B["Flask blueprints"]
+  F -->|"remote: /api"| R["ASGI runtime dispatcher"]
+  R -->|"migrated prefixes"| B["FastAPI adapters"]
+  R -->|"fallback prefixes"| W["Flask WSGI adapters"]
   B --> S["Domain services"]
+  W --> S
   S --> A["Database facade"]
   A --> P["PostgreSQL"]
   A --> G["GaussDB / DWS"]
@@ -28,7 +31,8 @@ flowchart LR
 
 ## 后端
 
-- `backend/run.py` 启动应用，`backend/app/__init__.py` 创建 Flask 实例。
+- `backend/asgi.py` 是 P5 生产 runtime：FastAPI primary、Flask WSGI fallback、`/healthz` 与 runtime switch；`backend/run.py` 保留为直接 Flask fallback。
+- `backend/app/__init__.py` 创建 Flask 实例，`backend/app/fastapi_app.py` 创建 opt-in FastAPI adapter app。
 - `backend/app/core/modules.py` 定义模块、能力、版本边界和依赖；`blueprint_registry.py` 按启用模块注册蓝图。
 - `routes/` 处理 HTTP 输入输出，`services/` 承载业务与数据库操作，`services/providers/` 注册搜索和门户统计能力。
 - `db/facade.py` 提供统一访问门面，具体 Adapter 隔离 SQLite、PostgreSQL 和 GaussDB 差异。
@@ -70,4 +74,4 @@ Cloudflare D1 不属于支持范围。SQLite 只用于 Community/local 隔离运
 
 ## 部署形态
 
-正式部署由 Nginx 托管前端静态资源并将 `/api` 代理到 Flask。开发环境可使用 Vite 代理；纯前端体验使用 mock 模式。详细步骤见根目录 [DEVELOPMENT.md](../DEVELOPMENT.md) 和 [DEPLOYMENT.md](../DEPLOYMENT.md)。
+正式部署由 Nginx 托管前端静态资源并将 `/api` 代理到 ASGI runtime；默认 FastAPI 处理已迁移 prefix，其他 API 经 Flask fallback。`BACKEND_RUNTIME=flask` 可立即回退。开发环境可使用 Vite 代理；纯前端体验使用 mock 模式。详细步骤见根目录 [DEVELOPMENT.md](../DEVELOPMENT.md) 和 [DEPLOYMENT.md](../DEPLOYMENT.md)。
