@@ -160,6 +160,12 @@ jobs:
       - name: Community backend unit tests (0 failures, 0 errors)
         run: python -m unittest discover -s backend/tests
 
+      - name: Database contract tests (schema / Core / portability)
+        run: |
+          python -m unittest backend.tests.test_database_contracts
+          python -m unittest backend.tests.test_schema_reflection_contract
+          python -m unittest backend.tests.test_database_portability_contract
+
       - name: Baseline offline verify (SQLite / PostgreSQL / MySQL / DWS)
         run: |
           python backend/scripts/schema_migrate.py verify --offline --dialect sqlite
