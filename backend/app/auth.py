@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from functools import wraps
 
-from flask import jsonify, session
+from flask import jsonify, session  # pyright: ignore[reportMissingImports]
 
 from .application import (
     ADMIN_ROLE,
@@ -24,9 +24,9 @@ from .application import (
     RequestContext,
     identity_for_session,
     identity_from_mapping,
+    set_current_request_identity,
 )
 from .application.errors import ApplicationError
-
 
 SESSION_KEY = "dap_auth_user"
 
@@ -45,11 +45,13 @@ def set_session_user(user: dict, remember: bool = False):
     identity = identity_for_session(user)
     session[SESSION_KEY] = identity.as_dict()
     session.permanent = bool(remember)
+    set_current_request_identity(identity)
 
 
 def clear_session_user():
     session.pop(SESSION_KEY, None)
     session.permanent = False
+    set_current_request_identity(None)
 
 
 def require_admin(view_func):

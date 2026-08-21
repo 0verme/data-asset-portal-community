@@ -17,14 +17,13 @@ from __future__ import annotations
 import json
 import logging
 import os
-import time
 from contextlib import contextmanager
 from datetime import datetime
+from typing import Any
 
-from flask import g, has_request_context, request
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select  # pyright: ignore[reportMissingImports]
 
-from ..auth import get_session_user
+from ..application import current_request_context
 from ..db.gaussdb import (
     _commit_if_needed,
     _rollback_if_needed,
@@ -35,8 +34,7 @@ from ..db.gaussdb import (
 )
 from ..db.service import CoreAccess
 from ..db.tables import operation_log
-from ..settings import get_page_size_limits, get_trust_proxy_headers
-
+from ..settings import get_page_size_limits
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +119,13 @@ class OperationLogService:
     def _fetch_rows(self, statement):
         return self._db.fetch_rows(statement)
 
+    @staticmethod
+    def _coerce_int(value, default: int = 0) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
     def _row_to_log(self, row: dict) -> dict:
         normalized = {column.lower(): value for column, value in row.items()}
         log = {}
@@ -129,7 +134,7 @@ class OperationLogService:
             if isinstance(value, datetime):
                 value = value.strftime("%Y-%m-%d %H:%M:%S")
             if field == "costTimeMs":
-                value = int(value) if value is not None else 0
+                value = self._coerce_int(value)
             log[field] = value if value is not None else ("" if field != "id" else value)
         return log
 
@@ -204,14 +209,16 @@ class OperationLogService:
             rows = self._fetch_rows(page_statement)
         return {
             "items": [self._row_to_log(row) for row in rows],
-            "total": int(count_rows[0]["total"]) if count_rows else 0,
+            "total": self._coerce_int(count_rows[0]["total"]) if count_rows else 0,
         }
 
     def get_log_detail(self, log_id) -> dict:
         value = str(log_id or "").strip()
         if not value.isdigit():
             raise OperationLogNotFoundError(f"Operation log not found: {log_id}")
-        statement = select(*self._columns()).where(operation_log.c.id == int(value))
+        statement = select(*self._columns()).where(
+            operation_log.c.id == self._coerce_int(value)
+        )
         rows = self._fetch_rows(statement)
         if not rows:
             raise OperationLogNotFoundError(f"Operation log not found: {log_id}")
@@ -242,32 +249,32 @@ class OperationLogService:
             return None
 
     def _request_context(self) -> dict:
-        ctx = {"userId": "", "userName": "", "deptName": "", "requestMethod": "", "requestUrl": "", "ipAddress": "", "userAgent": ""}
-        if not has_request_context():
+        ctx = {
+            "userId": "",
+            "userName": "",
+            "deptName": "",
+            "requestMethod": "",
+            "requestUrl": "",
+            "ipAddress": "",
+            "userAgent": "",
+        }
+        context = current_request_context()
+        if context is None:
             return ctx
-        ctx["requestMethod"] = (request.method or "")[:16]
-        ctx["requestUrl"] = (request.path or "")[:512]
-        # Only honour a client-supplied X-Forwarded-For when the deployment has
-        # explicitly opted in via ASSET_TRUST_PROXY_HEADERS. By default the
-        # header is ignored so a direct client cannot forge the audit IP.
-        forwarded = (
-            request.headers.get("X-Forwarded-For", "")
-            if get_trust_proxy_headers()
-            else ""
-        )
-        ctx["ipAddress"] = (forwarded.split(",")[0].strip() if forwarded else (request.remote_addr or ""))[:64]
-        ctx["userAgent"] = request.headers.get("User-Agent", "")[:512]
-        user = get_session_user()
-        if user:
-            ctx["userId"] = (user.get("user") or "")[:64]
-            ctx["userName"] = (user.get("name") or user.get("user") or "")[:128]
+        ctx["requestMethod"] = (context.method or "")[:16]
+        ctx["requestUrl"] = (context.path or "")[:512]
+        ctx["ipAddress"] = (context.client_address or "")[:64]
+        ctx["userAgent"] = (context.user_agent or "")[:512]
+        if context.identity is not None:
+            ctx["userId"] = (context.identity.user or "")[:64]
+            ctx["userName"] = (
+                (context.identity.name or context.identity.user or "")[:128]
+            )
         return ctx
 
     def _cost_time_ms(self) -> int:
-        if not has_request_context():
-            return 0
-        start = getattr(g, REQUEST_START_KEY, None)
-        return max(0, int((time.perf_counter() - start) * 1000)) if start is not None else 0
+        context = current_request_context()
+        return context.elapsed_ms() if context is not None else 0
 
     def _build_audit_insert_sql(self, *, module_name, operation_type, operation_object, before=None, after=None, operation_desc=None, result_status="success", error_message=None, remark=None, user_id=None, user_name=None, request_params=None) -> str:
         ctx = self._request_context()
@@ -283,26 +290,34 @@ class OperationLogService:
         ]
         return f"INSERT INTO {TABLE_OPERATION_LOG} ({', '.join(columns)}) VALUES ({', '.join(values)})"
 
+    @staticmethod
+    def _rollback_owned_connection(conn: Any, owns_connection: bool) -> None:
+        if not owns_connection or conn is None:
+            return
+        try:
+            _rollback_if_needed(conn)
+        except Exception:
+            logger.exception("Failed to roll back internal audit transaction")
+
     def _record_audit(self, *, connection=None, cursor=None, **kwargs) -> None:
         if connection is not None and cursor is not None:
             raise ValueError("Pass either connection or cursor, not both.")
         owns_connection = connection is None and cursor is None
         owns_cursor = cursor is None
-        conn, active_cursor = connection, cursor
+        conn: Any = connection
+        active_cursor: Any = cursor
         try:
             if owns_connection:
                 conn = connect_with_profile(self._profile())
             if active_cursor is None:
+                if conn is None:
+                    raise RuntimeError("Audit connection was not initialized.")
                 active_cursor = conn.cursor()
             active_cursor.execute(self._build_audit_insert_sql(**kwargs))
             if owns_connection:
                 _commit_if_needed(conn)
         except Exception:
-            if owns_connection and conn is not None:
-                try:
-                    _rollback_if_needed(conn)
-                except Exception:
-                    logger.exception("Failed to roll back internal audit transaction")
+            self._rollback_owned_connection(conn, owns_connection)
             raise
         finally:
             if owns_cursor and active_cursor is not None:

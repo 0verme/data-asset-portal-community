@@ -1,10 +1,16 @@
+# pyright: reportMissingImports=false
+
+import inspect
 import unittest
 from unittest.mock import MagicMock, patch
 
-from sqlalchemy.dialects import mysql, postgresql, sqlite
-
-from backend.app.services.operation_log_service import AuditLogError, OperationLogService
+from backend.app.application import Identity, RequestContext, request_context_scope
+from backend.app.services.operation_log_service import (
+    AuditLogError,
+    OperationLogService,
+)
 from backend.tests.db_test_support import skip_without_postgres_integration
+from sqlalchemy.dialects import mysql, postgresql, sqlite
 
 
 class OperationLogServiceUnitTests(unittest.TestCase):
@@ -18,6 +24,34 @@ class OperationLogServiceUnitTests(unittest.TestCase):
 
     def tearDown(self):
         self.table_patch.stop()
+
+    def test_service_reads_audit_metadata_from_neutral_context(self):
+        context = RequestContext(
+            identity=Identity("maintainer", "alice", "Alice"),
+            method="POST",
+            path="/api/assets/tables",
+            client_address="203.0.113.10",
+            user_agent="neutral-test-agent",
+            elapsed_time_ms=37,
+        )
+        with request_context_scope(context):
+            self.assertEqual(
+                {
+                    "userId": "alice",
+                    "userName": "Alice",
+                    "deptName": "",
+                    "requestMethod": "POST",
+                    "requestUrl": "/api/assets/tables",
+                    "ipAddress": "203.0.113.10",
+                    "userAgent": "neutral-test-agent",
+                },
+                self.service._request_context(),
+            )
+            self.assertEqual(37, self.service._cost_time_ms())
+
+    def test_service_source_has_no_flask_request_dependency(self):
+        source = inspect.getsource(OperationLogService).lower()
+        self.assertNotIn("flask", source)
 
     def test_generated_insert_delegates_id_to_database(self):
         sql = self.service._build_audit_insert_sql(
@@ -185,13 +219,12 @@ class OperationLogServiceUnitTests(unittest.TestCase):
         ):
             tx.return_value.__enter__.return_value = MagicMock()
             tx.return_value.__exit__.return_value = None
-            with self.assertRaises(AuditLogError):
-                with self.service.audit(
-                    module_name="test",
-                    operation_type="CREATE",
-                    operation_object="item",
-                ):
-                    pass
+            with self.assertRaises(AuditLogError), self.service.audit(
+                module_name="test",
+                operation_type="CREATE",
+                operation_object="item",
+            ):
+                pass
 
 
 @skip_without_postgres_integration()

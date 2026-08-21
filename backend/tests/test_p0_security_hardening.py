@@ -33,8 +33,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend.app import create_app
-from backend.app.settings import get_trust_proxy_headers
 from backend.app.services.indicator_service import IndicatorService
+from backend.app.settings import get_trust_proxy_headers
 
 # pyright: reportMissingImports=false
 
@@ -123,31 +123,41 @@ class ProxyTrustBoundaryTests(unittest.TestCase):
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("ASSET_TRUST_PROXY_HEADERS", None)
-            from flask import Flask
-            app = Flask(__name__)
-            app.secret_key = _SECRET
-            with app.test_request_context(
-                "/api/x",
-                headers={"X-Forwarded-For": "203.0.113.66", "User-Agent": "ua"},
+            app = _make_app()
+            app.add_url_rule(
+                "/_test-audit-context",
+                endpoint="test_audit_context_default",
+                view_func=lambda: operation_log_service._request_context(),
+            )
+            response = app.test_client().get(
+                "/_test-audit-context",
+                headers={
+                    "X-Forwarded-For": "203.0.113.66",
+                    "User-Agent": "ua",
+                },
                 environ_base={"REMOTE_ADDR": "198.51.100.7"},
-            ):
-                ip = operation_log_service._request_context()["ipAddress"]
-                self.assertEqual("198.51.100.7", ip)
+            )
+            self.assertEqual("198.51.100.7", response.get_json()["ipAddress"])
 
     def test_audit_ip_uses_xff_when_trust_configured(self):
         from backend.app.services.operation_log_service import operation_log_service
 
         with patch.dict(os.environ, {"ASSET_TRUST_PROXY_HEADERS": "true"}):
-            from flask import Flask
-            app = Flask(__name__)
-            app.secret_key = _SECRET
-            with app.test_request_context(
-                "/api/x",
-                headers={"X-Forwarded-For": "203.0.113.66, 198.51.100.1", "User-Agent": "ua"},
+            app = _make_app()
+            app.add_url_rule(
+                "/_test-audit-context",
+                endpoint="test_audit_context_proxy",
+                view_func=lambda: operation_log_service._request_context(),
+            )
+            response = app.test_client().get(
+                "/_test-audit-context",
+                headers={
+                    "X-Forwarded-For": "203.0.113.66, 198.51.100.1",
+                    "User-Agent": "ua",
+                },
                 environ_base={"REMOTE_ADDR": "127.0.0.1"},
-            ):
-                ip = operation_log_service._request_context()["ipAddress"]
-                self.assertEqual("203.0.113.66", ip)
+            )
+            self.assertEqual("203.0.113.66", response.get_json()["ipAddress"])
 
 
 class ErrorSanitizationTests(unittest.TestCase):
