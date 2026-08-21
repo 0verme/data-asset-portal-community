@@ -376,3 +376,12 @@ class LineageResponse(ContractModel):
     """Envelope for the existing lineage bootstrap, search, and graph payloads."""
 
     data: Any
+
+
+class SystemResponse(ContractModel):
+    """Additive envelope for system-management and operation-log responses."""
+
+    message: str | None = None
+    data: Any = None
+    items: list[Any] | None = None
+    total: int | None = None

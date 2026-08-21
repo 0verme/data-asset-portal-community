@@ -20,7 +20,11 @@ from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .application import RequestContext
-from .application.errors import ApplicationError, AuthenticationRequiredError
+from .application.errors import (
+    ApplicationError,
+    AuthenticationRequiredError,
+    PermissionDeniedError,
+)
 from .contracts import (
     AssetField,
     AssetItem,
@@ -51,6 +55,7 @@ from .contracts import (
     ItemsResponse,
     LineageResponse,
     MessageDataResponse,
+    SystemResponse,
     validate_contract,
 )
 from .core.capabilities import resolve_capabilities
@@ -100,6 +105,25 @@ from .services.lineage import (
     get_initial_view as get_lineage_initial_view,
     get_subgraph as get_lineage_subgraph,
     search_nodes as search_lineage_nodes,
+)
+from .services.operation_log_service import (
+    OperationLogDataSourceError,
+    OperationLogNotFoundError,
+    OperationLogValidationError,
+    operation_log_service,
+)
+from .services.system_management_service import (
+    MenuAlreadyExistsError,
+    MenuNotFoundError,
+    ParamCategoryNotFoundError,
+    ParamDictAlreadyExistsError,
+    ParamDictNotFoundError,
+    SystemDataSourceError,
+    SystemManagementError,
+    SystemUserAlreadyExistsError,
+    SystemUserNotFoundError,
+    SystemValidationError,
+    system_management_service,
 )
 
 
@@ -169,6 +193,47 @@ def require_maintainer(
     if context.identity is None:
         raise AuthenticationRequiredError("请先登录。")
     return context
+
+
+def require_admin(
+    context: RequestContext = Depends(get_request_context),
+) -> RequestContext:
+    """FastAPI auth adapter retaining the current administrator gate."""
+    if context.identity is None:
+        raise AuthenticationRequiredError("请先登录管理员账号。")
+    if not context.identity.is_admin:
+        raise PermissionDeniedError("仅系统管理员可执行此操作。")
+    return context
+
+
+def _system_error_status(error: SystemManagementError) -> int:
+    if isinstance(error, (MenuNotFoundError, ParamCategoryNotFoundError, ParamDictNotFoundError, SystemUserNotFoundError)):
+        return 404
+    if isinstance(error, (MenuAlreadyExistsError, ParamDictAlreadyExistsError, SystemUserAlreadyExistsError)):
+        return 409
+    if isinstance(error, SystemValidationError):
+        return 422
+    if isinstance(error, SystemDataSourceError):
+        return 500
+    return 500
+
+
+def _system_error_response(error: SystemManagementError) -> JSONResponse:
+    return _service_error_response(error, _system_error_status(error))
+
+
+def _operation_log_error_response(error: Any) -> JSONResponse:
+    if isinstance(error, OperationLogValidationError):
+        status = 422
+    elif isinstance(error, OperationLogNotFoundError):
+        status = 404
+    else:
+        status = 500
+    return _service_error_response(error, status)
+
+
+def _system_payload(payload: Any) -> Any:
+    return payload
 
 
 def _indicator_payload(payload: IndicatorRequest | None) -> dict[str, Any] | None:
@@ -901,6 +966,386 @@ def _asset_payload(payload: AssetTableRequest | None) -> dict[str, Any] | None:
     return payload.model_dump(by_alias=True, exclude_unset=True)
 
 
+def _register_system_management_routes(
+    app: FastAPI,
+    service: Any,
+    operation_logs: Any,
+) -> None:
+    router = APIRouter(prefix="/api/system", tags=["system-management-migration"])
+
+    def get_service() -> Any:
+        return service
+
+    def get_operation_logs_service() -> Any:
+        return operation_logs
+
+    @router.get("/users", response_model=None)
+    def get_users(
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            payload = {"items": current_service.get_users()}
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract(payload, SystemResponse))
+
+    @router.post("/users", response_model=None, status_code=201)
+    def create_user(
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.create_user(_system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            status_code=201,
+            content=validate_contract(
+                {"message": "User created", "data": data}, SystemResponse
+            ),
+        )
+
+    @router.put("/users/{username}", response_model=None)
+    def update_user(
+        username: str,
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_user(username, _system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "User updated", "data": data}, SystemResponse
+            )
+        )
+
+    @router.patch("/users/{username}/status", response_model=None)
+    def patch_user_status(
+        username: str,
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        payload = payload or {}
+        try:
+            data = current_service.update_user_status(username, payload.get("status"))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "User status updated", "data": data}, SystemResponse
+            )
+        )
+
+    @router.post("/users/{username}/reset-password", response_model=None)
+    def reset_user_password(
+        username: str,
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.reset_user_password(username)
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "User reset completed", "data": data}, SystemResponse
+            )
+        )
+
+    @router.delete("/users/{username}", response_model=None)
+    def delete_user(
+        username: str,
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            current_service.delete_user(username)
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract({"message": "User deleted"}, SystemResponse)
+        )
+
+    @router.get("/menus", response_model=None)
+    def get_menus(
+        context: RequestContext = Depends(get_request_context),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            items = current_service.get_menus()
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        identity = context.identity
+        if identity is None or identity.role != "admin":
+            items = [
+                item
+                for item in items
+                if item["status"] == "enabled"
+                and (
+                    not item["adminOnly"]
+                    or (identity and identity.role == "maintainer" and item["code"] == "system")
+                )
+            ]
+        return JSONResponse(
+            content=validate_contract({"items": items}, SystemResponse)
+        )
+
+    @router.post("/menus", response_model=None, status_code=201)
+    def create_menu(
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.create_menu(_system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            status_code=201,
+            content=validate_contract(
+                {"message": "Menu created", "data": data}, SystemResponse
+            ),
+        )
+
+    @router.put("/menus/{menu_id}", response_model=None)
+    def update_menu(
+        menu_id: str,
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_menu(menu_id, _system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "Menu updated", "data": data}, SystemResponse
+            )
+        )
+
+    @router.patch("/menus/{menu_id}/status", response_model=None)
+    def patch_menu_status(
+        menu_id: str,
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        payload = payload or {}
+        try:
+            data = current_service.update_menu_status(menu_id, payload.get("status"))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "Menu status updated", "data": data}, SystemResponse
+            )
+        )
+
+    @router.patch("/menus/{menu_id}/move", response_model=None)
+    def patch_menu_move(
+        menu_id: str,
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        payload = payload or {}
+        try:
+            items = current_service.move_menu(menu_id, payload.get("direction"))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "Menu order updated", "items": items}, SystemResponse
+            )
+        )
+
+    @router.delete("/menus/{menu_id}", response_model=None)
+    def delete_menu(
+        menu_id: str,
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            current_service.delete_menu(menu_id)
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract({"message": "Menu deleted"}, SystemResponse)
+        )
+
+    @router.get("/param-dicts/categories", response_model=None)
+    def get_param_categories(
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            items = current_service.get_param_dict_categories()
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract({"items": items}, SystemResponse)
+        )
+
+    @router.patch("/param-dicts/categories/{category_code}/status", response_model=None)
+    def patch_param_category_status(
+        category_code: str,
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        payload = payload or {}
+        try:
+            data = current_service.update_param_category_status(
+                category_code, payload.get("status")
+            )
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "Category status updated", "data": data}, SystemResponse
+            )
+        )
+
+    @router.get("/param-dicts", response_model=None)
+    def get_param_dicts(
+        category_code: str | None = Query(default=None, alias="categoryCode"),
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            items = current_service.get_param_dicts(category_code)
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract({"items": items}, SystemResponse)
+        )
+
+    @router.post("/param-dicts", response_model=None, status_code=201)
+    def create_param_dict(
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.create_param_dict(_system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            status_code=201,
+            content=validate_contract(
+                {"message": "Parameter created", "data": data}, SystemResponse
+            ),
+        )
+
+    @router.put("/param-dicts/{dict_id}", response_model=None)
+    def update_param_dict(
+        dict_id: str,
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_param_dict(dict_id, _system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "Parameter updated", "data": data}, SystemResponse
+            )
+        )
+
+    @router.patch("/param-dicts/{dict_id}/status", response_model=None)
+    def patch_param_dict_status(
+        dict_id: str,
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        payload = payload or {}
+        try:
+            data = current_service.update_param_dict_status(
+                dict_id, payload.get("status")
+            )
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "Parameter status updated", "data": data}, SystemResponse
+            )
+        )
+
+    @router.delete("/param-dicts/{dict_id}", response_model=None)
+    def delete_param_dict(
+        dict_id: str,
+        _context: RequestContext = Depends(require_admin),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            current_service.delete_param_dict(dict_id)
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract({"message": "Parameter deleted"}, SystemResponse)
+        )
+
+    operation_router = APIRouter(
+        prefix="/api/operation-logs", tags=["operation-log-migration"]
+    )
+
+    @operation_router.get("", response_model=None)
+    def get_operation_logs(
+        keyword: str | None = Query(default=None),
+        module: str | None = Query(default=None),
+        operation_type: str | None = Query(default=None, alias="operationType"),
+        result: str | None = Query(default=None),
+        start_time: str | None = Query(default=None, alias="startTime"),
+        end_time: str | None = Query(default=None, alias="endTime"),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        _context: RequestContext = Depends(require_maintainer),
+        current_service: Any = Depends(get_operation_logs_service),
+    ):
+        filters = {
+            "keyword": keyword,
+            "module": module,
+            "operationType": operation_type,
+            "result": result,
+            "startTime": start_time,
+            "endTime": end_time,
+            "page": page,
+            "pageSize": page_size,
+        }
+        try:
+            payload = current_service.get_logs(filters)
+        except (OperationLogValidationError, OperationLogDataSourceError) as error:
+            return _operation_log_error_response(error)
+        return JSONResponse(content=validate_contract(payload, SystemResponse))
+
+    @operation_router.get("/{log_id}", response_model=None)
+    def get_operation_log_detail(
+        log_id: str,
+        _context: RequestContext = Depends(require_maintainer),
+        current_service: Any = Depends(get_operation_logs_service),
+    ):
+        try:
+            data = current_service.get_log_detail(log_id)
+        except (OperationLogNotFoundError, OperationLogDataSourceError) as error:
+            return _operation_log_error_response(error)
+        return JSONResponse(
+            content=validate_contract({"data": data}, SystemResponse)
+        )
+
+    app.include_router(router)
+    app.include_router(operation_router)
+
+
 def _register_lineage_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(prefix="/api/lineage", tags=["lineage-migration"])
 
@@ -1173,6 +1618,8 @@ def create_fastapi_app(
     report_service_instance: Any | None = None,
     api_asset_service_instance: Any | None = None,
     lineage_service_instance: Any | None = None,
+    system_management_service_instance: Any | None = None,
+    operation_log_service_instance: Any | None = None,
 ) -> FastAPI:
     """Create the opt-in FastAPI pilot application.
 
@@ -1190,6 +1637,8 @@ def create_fastapi_app(
     report = report_service_instance or report_service
     api_asset = api_asset_service_instance or api_asset_service
     lineage = lineage_service_instance or lineage_service
+    system_management = system_management_service_instance or system_management_service
+    operation_logs = operation_log_service_instance or operation_log_service
 
     @app.exception_handler(ApplicationError)
     async def handle_application_error(_request: Request, error: ApplicationError):
@@ -1253,4 +1702,6 @@ def create_fastapi_app(
         _register_api_asset_routes(app, api_asset)
     if "lineage" in enabled_codes:
         _register_lineage_routes(app, lineage)
+    if "system" in enabled_codes:
+        _register_system_management_routes(app, system_management, operation_logs)
     return app
