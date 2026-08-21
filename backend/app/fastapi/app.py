@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI  # pyright: ignore[reportAttributeAccessIssue]
 
 from ..core.capabilities import resolve_capabilities
 from ..services.api_asset_service import api_asset_service
@@ -17,7 +17,7 @@ from ..services.report_service import report_service
 from ..services.root_service import root_service
 from ..services.system_management_service import system_management_service
 from ..services.upstream_service import upstream_service
-from .dependencies import IdentityResolver
+from .dependencies import IdentityResolver, RequestContextMiddleware
 from .errors import register_exception_handlers
 from .routers.api_assets import _register_api_asset_routes
 from .routers.assets import _register_asset_routes
@@ -56,6 +56,10 @@ def create_fastapi_app(
     """
     app = FastAPI(title="Data Asset Portal FastAPI", version="0.1.0")
     app.state.identity_resolver = identity_resolver or (lambda _request: None)
+    app.add_middleware(
+        RequestContextMiddleware,
+        identity_resolver=app.state.identity_resolver,
+    )
     indicator = indicator_service_instance or indicator_service
     assets = assets_service_instance or assets_service
     field_mapping = field_mapping_service_instance or field_mapping_service

@@ -12,17 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import time
 from datetime import timedelta
-import logging
 
-from flask import Flask, g, jsonify
+from flask import Flask, g, jsonify, request  # pyright: ignore[reportMissingImports]
 from flask_cors import CORS
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import HTTPException  # pyright: ignore[reportMissingImports]
 
+from .application import (
+    RequestContext,
+    reset_request_context,
+    resolve_client_address,
+    set_request_context,
+)
+from .auth import get_session_identity
 from .logging_config import configure_logging
-from .settings import get_auth_session_days, get_flask_runtime_config
-from .services.operation_log_service import REQUEST_START_KEY
+from .settings import (
+    get_auth_session_days,
+    get_flask_runtime_config,
+    get_trust_proxy_headers,
+)
+
+_REQUEST_CONTEXT_TOKEN_KEY = "_request_context_token"
 
 
 # Stable, non-leaking client-facing copy for framework-level HTTP errors that
@@ -46,12 +58,12 @@ def create_app(*, capabilities=None):
     When omitted, capabilities are resolved from environment variables.
     """
     from .core.blueprint_registry import register_enabled_blueprints
-    from .core.profiles import apply_runtime_profile
     from .core.capabilities import (
         ModuleCapabilityError,
         resolve_capabilities,
         set_resolved_capabilities,
     )
+    from .core.profiles import apply_runtime_profile
     from .services.lineage import log_lineage_storage_status
 
     runtime_profile = apply_runtime_profile()
@@ -90,8 +102,28 @@ def create_app(*, capabilities=None):
     register_enabled_blueprints(app, resolved)
 
     @app.before_request
-    def _start_request_timer():
-        setattr(g, REQUEST_START_KEY, time.perf_counter())
+    def _set_request_context():
+        context = RequestContext(
+            identity=get_session_identity(),
+            request_id=request.headers.get("X-Request-ID"),
+            method=request.method or "",
+            path=request.path or "",
+            client_address=resolve_client_address(
+                request.remote_addr,
+                request.headers,
+                trust_proxy_headers=get_trust_proxy_headers(),
+            ),
+            user_agent=request.headers.get("User-Agent", ""),
+            started_at=time.perf_counter(),
+        )
+        setattr(g, _REQUEST_CONTEXT_TOKEN_KEY, set_request_context(context))
+
+    @app.teardown_request
+    def _reset_request_context(_error):
+        token = getattr(g, _REQUEST_CONTEXT_TOKEN_KEY, None)
+        if token is not None:
+            reset_request_context(token)
+            delattr(g, _REQUEST_CONTEXT_TOKEN_KEY)
 
     cors_origins = app.config["CORS_ORIGINS"]
     if cors_origins:
@@ -111,7 +143,7 @@ def create_app(*, capabilities=None):
     def handle_http_exception(error):
         code = error.code if isinstance(error.code, int) else 500
         message = _HTTP_ERROR_COPY.get(code, str(error.description or "").strip() or "请求失败")
-        return jsonify({"error": {"code": "HTTP_%d" % code, "message": message}}), code
+        return jsonify({"error": {"code": f"HTTP_{code}", "message": message}}), code
 
     @app.errorhandler(404)
     def handle_not_found(_error):
