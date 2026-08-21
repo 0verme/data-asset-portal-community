@@ -21,20 +21,20 @@ Community 隔离运行方式，但 `.env.example`、部分历史文档仍残留"
   `("sqlite", "postgres")`，SQLite 是显式声明的 Community adapter。
 - `backend/app/db/facade.py`：`SUPPORTED_DB_TYPES = {"sqlite", "postgres", "gaussdb"}`，
   SQLite 与 postgres 均为一等公民；GaussDB 通过 `_connect_gaussdb` 延迟 import。
-- `backend/migrations/sqlite/`：0002-0006 与 postgresql 镜像同构（类型方言不同）。
+- `backend/schema/sqlite.sql` 与 `postgresql.sql`：Community baseline 同构（类型方言不同）。
 - `demo/seed_sqlite.py`：Community demo 主路径。
 
 ### 测试依赖面
 
-- `test_community_boundary`（物理边界核心测试）跑在 SQLite 上：migration →
+- `test_community_boundary`（物理边界核心测试）跑在 SQLite 上：baseline →
   seed → 无 private 表 → API 全链路。
-- `test_migrations` 的 runner 协议测试使用 SQLite。
+- `test_migrations` 的 baseline lifecycle 测试使用 SQLite。
 - 16 个 PostgreSQL integration skip 需要专用 PG 实例；若删除 SQLite，这些测试
   的唯一离线覆盖就消失了。
 
 ### 文档依赖面
 
-- `backend/README.md` / `DEVELOPMENT.md` / `backend/migrations/README.md` 已把
+- `backend/README.md` / `DEVELOPMENT.md` / `backend/schema/README.md` 已把
   SQLite 定位为 Community/local 隔离运行。
 - `backend/.env.example` 残留"不支持 SQLite"（本轮已修正）。
 
@@ -42,7 +42,7 @@ Community 隔离运行方式，但 `.env.example`、部分历史文档仍残留"
 
 - SQLite 与 PostgreSQL 的 Community core 表结构完全同构，仅类型方言不同
   （TEXT vs VARCHAR/CHAR、INTEGER vs BIGINT、AUTOINCREMENT vs IDENTITY）。
-- 三方言 parity 测试（`test_migration_schema_parity.py`）已固化该结构一致性。
+- 四方言 parity 测试（`test_migration_schema_parity.py`）已固化该结构一致性。
 
 ### Community Onboarding 价值（高）
 
@@ -63,7 +63,7 @@ Community 隔离运行方式，但 `.env.example`、部分历史文档仍残留"
 **KEEP SQLite，重新定位为：**
 
 | 场景 | 推荐数据库 |
-|---|---|
+| --- | --- |
 | Community 本地演示 / 开发 / CI | **SQLite**（`community_sqlite` profile） |
 | Community 正式部署 | **PostgreSQL**（`community_postgres` profile） |
 | 完整部署（含可选模块） | **PostgreSQL / GaussDB (DWS)** |

@@ -5,8 +5,8 @@ Every Community demo seed (SQLite / PostgreSQL / DWS) draws from the same
 fictional retail datasets in ``demo/datasets/`` and plans rows only for
 Community-owned tables using the canonical migration schema.
 
-``backend/migrations`` is the schema source of truth: the columns planned here
-match the manifest SQL exactly (e.g. ``p_asset_domain`` keys on
+``backend/schema`` is the schema source of truth: the columns planned here
+match the baseline SQL exactly (e.g. ``p_asset_domain`` keys on
 ``domain_code``, not ``domain_id``). Private module tables (push / report /
 upstream / codeTable) are intentionally excluded from the Community plan.
 """
@@ -17,7 +17,7 @@ from pathlib import Path
 
 DATASETS_DIR = Path(__file__).resolve().parent / "datasets"
 
-# Canonical asset domain codes (migration 0005: p_asset_domain.domain_code PK).
+# Canonical asset domain codes (baseline: p_asset_domain.domain_code PK).
 DOMAIN_CODE_BY_NAME = {
     "商品": "PRODUCT",
     "会员": "MEMBER",

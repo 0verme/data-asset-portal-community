@@ -111,7 +111,7 @@ npm run build
 
 ## 四、数据库初始化与迁移
 
-应用启动不会自动迁移 schema。历史迁移已合并到 `docs` 初始化 DDL，当前 manifest 管理 consolidated baseline 之后的增量变更；新环境先执行模块 DDL，再按 `backend/migrations/README.md` 核对和应用待执行迁移。既有环境应先备份并检查 `status` / `verify` / `plan`，不能用初始化 DDL 覆盖升级。
+应用启动不会自动迁移 schema。新环境使用 `backend/schema/<dialect>.sql` 完整基线并由 CLI stamp `0001_baseline`；后续结构变更由 `backend/alembic` forward revision 管理。既有环境应先备份并执行 `verify`，结构一致后才能 `baseline` stamp，不能用初始化 DDL 覆盖升级。
 
 **手动逐个执行模块 DDL，无一键脚本。** 根据数据库类型选择脚本目录并用对应客户端执行：
 

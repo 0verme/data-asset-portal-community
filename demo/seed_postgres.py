@@ -3,7 +3,7 @@
 opening a database.
 
 Community-owned tables only; the canonical column set comes from
-``demo/seed_loader.py`` (aligned with ``backend/migrations``).
+``demo/seed_loader.py`` (aligned with ``backend/schema``).
 """
 
 from __future__ import annotations

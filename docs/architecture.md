@@ -52,15 +52,14 @@ Cloudflare D1 不属于支持范围。SQLite 只用于 Community/local 隔离运
 
 ## 数据库与迁移
 
-- **Schema Source of Truth = `backend/migrations`（manifest + 方言 SQL）**。
+- **Schema Source of Truth = `backend/schema` 完整基线 + `backend/alembic` 增量 revision**。
   Community 新安装的唯一官方初始化路径：`schema_migrate.py apply` → demo seed
   （SQLite 或 PostgreSQL）；完整版在此基础上由 `docs/{pg,dws}` 参考 DDL 补建
   可选模块表（push/upstream/report/codeTable）与血缘快照表。
 - `docs/pg/` 与 `docs/dws/` 的模块 DDL 仅作为参考文档，不再作为 Community 初始化机制；
-  与本轮对齐后，其 Community core 表结构与 migration 一致（见 `docs/TABLE_OWNERSHIP.md`）。
-- `backend/migrations/manifest.json` 是受管迁移清单；应用启动不会自动迁移。
-- 迁移按条目声明模块和可用方言，并通过 checksum 防止已发布脚本被静默修改；
-  需要调整 schema 时新增 forward migration，禁止修改已应用条目。
+  与本轮对齐后，其 Community core 表结构与 baseline 一致（见 `docs/TABLE_OWNERSHIP.md`）。
+- 新库执行对应方言 baseline 并 stamp `0001_baseline`；既有库结构验证通过后才能 stamp。
+  后续只新增 Alembic forward revision，禁止修改已发布 revision，也不提供自动 downgrade。
 - 演示数据统一来自 `demo/datasets/`（全渠道零售虚构数据，`demo/validate_demo_data.py` 校验）；
   SQL 形式演示数据由 `demo/generate_demo_sql.py` 从同一数据源生成，仓库不再包含任何数据库 dump 快照。
 - SQLite 定位见 `docs/SQLITE_DECISION.md`：保留为 Community 本地演示/开发/CI 后端，生产推荐 PostgreSQL 或 GaussDB/DWS。

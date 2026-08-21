@@ -132,8 +132,8 @@ profiles:
 
 ## 初始化数据库
 
-**Community 的唯一官方初始化路径 = 受管迁移 + demo seed**（Schema Source of Truth 为
-`backend/migrations`）：
+**Community 的唯一官方初始化路径 = 完整 baseline + Alembic + demo seed**（Schema Source of Truth 为
+`backend/schema` 与 `backend/alembic`）：
 
 ```bash
 python backend/scripts/schema_migrate.py apply --profile community_sqlite

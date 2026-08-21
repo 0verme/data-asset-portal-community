@@ -23,8 +23,10 @@ profile file and the Community module set without hand-written flags.
 from __future__ import annotations
 
 import os
+import sqlite3
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -53,18 +55,51 @@ def _run_cli(args, env_extra=None):
 
 
 class SchemaMigrateCliContractTests(unittest.TestCase):
+    def test_fresh_sqlite_baseline_upgrades_to_alembic_head(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "fresh.sqlite"
+            config = root / "database.yaml"
+            config.write_text(
+                "profiles:\n  fresh:\n    type: sqlite\n"
+                f"    database: {database.as_posix()}\n",
+                encoding="utf-8",
+            )
+            apply = _run_cli(["apply", "--profile", "fresh", "--config", str(config)])
+            self.assertEqual(0, apply.returncode, apply.stderr)
+            self.assertIn("applied=0001_baseline", apply.stdout)
+
+            status = _run_cli(["status", "--profile", "fresh", "--config", str(config)])
+            self.assertEqual(0, status.returncode, status.stderr)
+            self.assertIn("revision=0002_portable_asset_filter", status.stdout)
+            connection = sqlite3.connect(database)
+            try:
+                row = connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='index' "
+                    "AND name='idx_p_asset_table_filter'"
+                ).fetchone()
+            finally:
+                connection.close()
+            self.assertEqual(("idx_p_asset_table_filter",), row)
+
     def test_offline_plan_with_community_modules(self):
         proc = _run_cli(["plan", "--offline", "--dialect", "sqlite"])
         self.assertEqual(0, proc.returncode, proc.stderr)
-        self.assertIn("0002", proc.stdout)
-        self.assertIn("0005", proc.stdout)
+        self.assertIn("0001_baseline", proc.stdout)
+        self.assertIn("sqlite.sql", proc.stdout)
 
     def test_offline_verify_all_sqlite_migrations(self):
         proc = _run_cli(["verify", "--offline", "--dialect", "sqlite"])
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("verify=ok", proc.stdout)
-        self.assertIn("0002", proc.stdout)
-        self.assertIn("0006", proc.stdout)
+        self.assertIn("0001_baseline", proc.stdout)
+        self.assertIn("tables=24", proc.stdout)
+
+    def test_offline_verify_includes_mysql_baseline(self):
+        proc = _run_cli(["verify", "--offline", "--dialect", "mysql"])
+        self.assertEqual(0, proc.returncode, proc.stderr)
+        self.assertIn("verify=ok", proc.stdout)
+        self.assertIn("dialect=mysql", proc.stdout)
 
     def test_community_profile_applies_config_path(self):
         # With ASSET_RUNTIME_PROFILE=community the CLI must resolve the
@@ -77,20 +112,17 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
         self.assertIn("dialect=", proc.stdout, proc.stdout)
 
     def test_offline_plan_defaults_to_community_modules(self):
-        # --modules omitted: the declared module set (ASSET_ENABLED_MODULES)
-        # must include apiAsset (0003) and mapping (0004).
+        # Module selection is intentionally ignored after migration squashing:
+        # every fresh database receives the complete Community baseline.
         env = {"ASSET_RUNTIME_PROFILE": "community"}
         proc = _run_cli(["plan", "--offline", "--dialect", "sqlite"], env_extra=env)
         self.assertEqual(0, proc.returncode, proc.stderr)
-        self.assertIn("0003", proc.stdout)
-        self.assertIn("0004", proc.stdout)
+        self.assertIn("0001_baseline", proc.stdout)
 
     def test_module_list_flag_still_works(self):
         proc = _run_cli(["plan", "--offline", "--dialect", "sqlite", "--modules", "apiAsset"])
         self.assertEqual(0, proc.returncode, proc.stderr)
-        self.assertIn("0003", proc.stdout)
-        # mapping (0004) is not selected when --modules explicitly excludes it.
-        self.assertNotIn("0004", proc.stdout)
+        self.assertIn("0001_baseline", proc.stdout)
 
     def test_community_profile_reads_backend_env_local(self):
         # Mirror Flask startup: the CLI must load backend/.env.local so the
@@ -115,9 +147,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 timeout=120,
             )
             self.assertEqual(0, proc.returncode, proc.stderr)
-            # community module set includes apiAsset (0003) and mapping (0004).
-            self.assertIn("0003", proc.stdout)
-            self.assertIn("0004", proc.stdout)
+            self.assertIn("0001_baseline", proc.stdout)
         finally:
             if backup is None:
                 env_local.unlink(missing_ok=True)
