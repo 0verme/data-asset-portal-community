@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from sqlalchemy.dialects import mysql, postgresql, sqlite
+
 from backend.app.services.upstream_service import UpstreamService
 
 
@@ -32,9 +34,14 @@ class UpstreamStatusUpdateTestCase(unittest.TestCase):
 
         service.get_system_detail.assert_called_once_with("up_aml")
         statements = service._execute.call_args.args[0]
-        self.assertIn("SET status_code = 'disabled'", statements[0])
-        self.assertNotIn("host_name", statements[0])
-        self.assertFalse(any("DELETE FROM dwp.p_upstream_unload_time" in statement for statement in statements))
+        status_statement = str(statements[0].compile(dialect=sqlite.dialect()))
+        self.assertIn("p_upstream_system", status_statement)
+        self.assertIn("status_code", status_statement)
+        self.assertNotIn("host_name", status_statement)
+        self.assertFalse(any("DELETE" in str(statement.compile(dialect=sqlite.dialect())) for statement in statements))
+        for dialect in (sqlite.dialect(), postgresql.dialect(), mysql.dialect()):
+            for statement in statements:
+                statement.compile(dialect=dialect)
         self.assertEqual(result["status"], "disabled")
 
 

@@ -21,12 +21,16 @@ import re
 from copy import deepcopy
 from time import perf_counter
 
+from sqlalchemy import delete, func, insert, or_, select, update
+
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
     common_code_service,
 )
-from ..db.gaussdb import database_transaction, execute_statements, fetch_all, resolve_db_profile_name
+from ..db.gaussdb import database_transaction
+from ..db.service import CoreAccess
+from ..db.tables import data_source, upstream_change_log, upstream_system, upstream_unload_time
 from ..settings import get_default_operator, get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
 from .operation_log_service import (
@@ -44,9 +48,6 @@ TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 DEFAULT_UPSTREAM_STATUS = {"enabled", "disabled"}
 DEFAULT_UPSTREAM_DB_TYPES = set()
 DEFAULT_UPSTREAM_DEPTS = set()
-TABLE_UPSTREAM_SYSTEM = "dwp.p_upstream_system"
-TABLE_UPSTREAM_TIME = "dwp.p_upstream_unload_time"
-TABLE_UPSTREAM_CHANGE_LOG = "dwp.p_upstream_change_log"
 LOGGER = logging.getLogger(__name__)
 
 
@@ -90,19 +91,13 @@ class UpstreamService:
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
         self._default_operator = get_default_operator()
+        self._db = CoreAccess(
+            profile_getter=lambda: self._db_profile,
+            error_factory=UpstreamDataSourceError,
+        )
 
-    def _fetch_rows(self, sql):
-        try:
-            columns, rows = fetch_all(self._db_profile or resolve_db_profile_name(), sql)
-        except FileNotFoundError as error:
-            raise UpstreamDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise UpstreamDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise UpstreamDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise UpstreamDataSourceError("数据库查询失败") from error
-        return [dict(zip(columns, row)) for row in rows]
+    def _fetch_rows(self, statement):
+        return self._db.fetch_rows(statement)
 
     def _fetch_rows_logged(self, sql, *, purpose, method, page=None, page_size=None, keyword=None):
         started_at = perf_counter()
@@ -121,25 +116,10 @@ class UpstreamService:
             )
 
     def _execute(self, statements):
-        try:
-            return execute_statements(self._db_profile or resolve_db_profile_name(), statements)
-        except FileNotFoundError as error:
-            raise UpstreamDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise UpstreamDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise UpstreamDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise UpstreamDataSourceError("数据库执行失败") from error
+        return self._db.execute_statements(statements)
 
-    def _quote(self, value):
-        if value is None:
-            return "NULL"
-        return "'" + str(value).replace("'", "''") + "'"
-
-    def _next_id(self, table_name, id_column):
-        rows = self._fetch_rows(f"SELECT COALESCE(MAX({id_column}), 0) + 1 AS next_id FROM {table_name}")
-        return int(rows[0]["next_id"])
+    def _next_id(self, table, column):
+        return self._db.next_pk(table, column)
 
     def _get_allowed_status_values(self):
         try:
@@ -228,43 +208,39 @@ class UpstreamService:
         return normalized_page, normalized_page_size
 
     def _build_system_where(self, keyword=None, status=None, db_type=None):
-        where = ["s.is_deleted = 'N'"]
+        clauses = [upstream_system.c.is_deleted == "N"]
         if status:
-            where.append(f"s.status_code = {self._quote(status)}")
+            clauses.append(upstream_system.c.status_code == str(status).strip())
         if db_type:
-            where.append(f"s.db_type = {self._quote(db_type)}")
+            clauses.append(upstream_system.c.db_type == str(db_type).strip())
         normalized_keyword = str(keyword or "").strip().lower()
         if normalized_keyword:
-            like = self._quote(f"%{normalized_keyword}%")
-            where.append(
-                "("
-                f"LOWER(COALESCE(s.system_id, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(s.system_abbr, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(s.system_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(s.owner_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(s.dept_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(s.system_desc, '')) LIKE {like} OR "
-                f"EXISTS ("
-                f"SELECT 1 FROM {TABLE_UPSTREAM_TIME} ut "
-                f"WHERE ut.system_pk = s.system_pk AND ut.is_deleted = 'N' "
-                f"AND LOWER(COALESCE(ut.unload_time, '')) LIKE {like}"
-                f")"
-                ")"
-            )
-        return where
+            pattern = f"%{normalized_keyword}%"
+            clauses.append(or_(
+                func.lower(func.coalesce(upstream_system.c.system_id, "")).like(pattern),
+                func.lower(func.coalesce(upstream_system.c.system_abbr, "")).like(pattern),
+                func.lower(func.coalesce(upstream_system.c.system_name, "")).like(pattern),
+                func.lower(func.coalesce(upstream_system.c.owner_name, "")).like(pattern),
+                func.lower(func.coalesce(upstream_system.c.dept_name, "")).like(pattern),
+                func.lower(func.coalesce(upstream_system.c.system_desc, "")).like(pattern),
+                select(1).where(
+                    upstream_unload_time.c.system_pk == upstream_system.c.system_pk,
+                    upstream_unload_time.c.is_deleted == "N",
+                    func.lower(func.coalesce(upstream_unload_time.c.unload_time, "")).like(pattern),
+                ).exists(),
+            ))
+        return clauses
 
     def _load_unload_times(self, system_pks, *, purpose, method):
         if not system_pks:
             return {}
-        ids_sql = ", ".join(str(int(system_pk)) for system_pk in system_pks)
         rows = self._fetch_rows_logged(
-            f"""
-SELECT system_pk, unload_time
-FROM {TABLE_UPSTREAM_TIME}
-WHERE is_deleted = 'N'
-  AND system_pk IN ({ids_sql})
-ORDER BY system_pk, unload_time
-""",
+            select(upstream_unload_time.c.system_pk, upstream_unload_time.c.unload_time)
+            .where(
+                upstream_unload_time.c.is_deleted == "N",
+                upstream_unload_time.c.system_pk.in_([int(value) for value in system_pks]),
+            )
+            .order_by(upstream_unload_time.c.system_pk, upstream_unload_time.c.unload_time),
             purpose=purpose,
             method=method,
         )
@@ -297,30 +273,33 @@ ORDER BY system_pk, unload_time
     @staticmethod
     def _system_select(include_connection=False):
         columns = [
-            "s.system_pk", "s.system_id", "s.system_abbr", "s.system_name", "s.db_type",
-            "s.status_code", "s.owner_name", "s.dept_name", "s.system_desc",
+            upstream_system.c.system_pk, upstream_system.c.system_id,
+            upstream_system.c.system_abbr, upstream_system.c.system_name,
+            upstream_system.c.db_type,
         ]
         if include_connection:
-            columns[5:5] = ["s.host_name", "s.db_name", "s.schema_name"]
-        return ",\n  ".join(columns)
+            columns.extend([
+                upstream_system.c.host_name, upstream_system.c.db_name, upstream_system.c.schema_name,
+            ])
+        columns.extend([
+            upstream_system.c.status_code, upstream_system.c.owner_name,
+            upstream_system.c.dept_name, upstream_system.c.system_desc,
+        ])
+        return columns
 
     def _db_systems(self, keyword=None, status=None, db_type=None, page=None, page_size=None):
         paginate = page is not None or page_size is not None
         page, page_size = self._resolve_paging(page=page, page_size=page_size)
         offset = (page - 1) * page_size
-        where = self._build_system_where(keyword=keyword, status=status, db_type=db_type)
-        where_sql = " AND ".join(where)
-        sql = f"""
-SELECT
-  {self._system_select()}
-FROM {TABLE_UPSTREAM_SYSTEM} s
-WHERE {where_sql}
-ORDER BY s.system_abbr, s.system_id
-"""
+        statement = (
+            select(*self._system_select())
+            .where(*self._build_system_where(keyword=keyword, status=status, db_type=db_type))
+            .order_by(upstream_system.c.system_abbr, upstream_system.c.system_id)
+        )
         if paginate:
-            sql += f"\nLIMIT {page_size} OFFSET {offset}"
+            statement = statement.limit(page_size).offset(offset)
         rows = self._fetch_rows_logged(
-            sql,
+            statement,
             purpose="upstream system list",
             method="_db_systems",
             page=page,
@@ -335,16 +314,12 @@ ORDER BY s.system_abbr, s.system_id
         return [self._row_to_system(row, unload_times_by_pk.get(int(row["system_pk"]), [])) for row in rows]
 
     def _get_system_row(self, system_id, include_connection=False):
-        safe_system_id = self._quote(str(system_id or "").strip())
-        sql = f"""
-SELECT
-  {self._system_select(include_connection)}
-FROM {TABLE_UPSTREAM_SYSTEM} s
-WHERE s.is_deleted = 'N'
-  AND s.system_id = {safe_system_id}
-LIMIT 1
-"""
-        rows = self._fetch_rows_logged(sql, purpose="upstream system detail", method="_get_system_row")
+        statement = (
+            select(*self._system_select(include_connection))
+            .where(upstream_system.c.is_deleted == "N", upstream_system.c.system_id == str(system_id).strip())
+            .limit(1)
+        )
+        rows = self._fetch_rows_logged(statement, purpose="upstream system detail", method="_get_system_row")
         if not rows:
             raise UpstreamSystemNotFoundError(system_id)
         return rows[0]
@@ -402,61 +377,45 @@ LIMIT 1
     def _create_system(self, payload):
         item = self._normalize_payload(payload)
         if self._fetch_rows_logged(
-            f"SELECT system_pk FROM {TABLE_UPSTREAM_SYSTEM} WHERE system_id = {self._quote(item['id'])} AND is_deleted = 'N' LIMIT 1",
+            select(upstream_system.c.system_pk).where(
+                upstream_system.c.system_id == item["id"], upstream_system.c.is_deleted == "N"
+            ).limit(1),
             purpose="upstream uniqueness check",
             method="_create_system",
         ):
             raise UpstreamSystemAlreadyExistsError(item["id"])
 
-        system_pk = self._next_id(TABLE_UPSTREAM_SYSTEM, "system_pk")
-        data_source_id = self._next_id("dwp.p_data_source", "source_id")
-        time_pk = self._next_id(TABLE_UPSTREAM_TIME, "time_pk")
-        change_id = self._next_id(TABLE_UPSTREAM_CHANGE_LOG, "change_id")
+        system_pk = self._next_id(upstream_system, upstream_system.c.system_pk)
+        data_source_id = self._next_id(data_source, data_source.c.source_id)
+        time_pk = self._next_id(upstream_unload_time, upstream_unload_time.c.time_pk)
+        change_id = self._next_id(upstream_change_log, upstream_change_log.c.change_id)
         statements = [
-            f"""
-INSERT INTO dwp.p_data_source (
-  source_id, source_code, source_name, source_type, description_text,
-  status_code, created_by, updated_by
-) VALUES (
-  {data_source_id}, {self._quote(item['id'])}, {self._quote(item['name'])},
-  {self._quote(item['dbType'])}, {self._quote(item['desc'])},
-  {self._quote(item['status'])}, {self._quote(self._default_operator)},
-  {self._quote(self._default_operator)}
-)
-""".strip(),
-            f"""
-INSERT INTO {TABLE_UPSTREAM_SYSTEM} (
-  system_pk, data_source_id, system_id, system_abbr, system_name, db_type, host_name, db_name, schema_name,
-  status_code, owner_name, dept_name, system_desc, unload_count, created_by, updated_by
-) VALUES (
-  {system_pk}, {data_source_id}, {self._quote(item['id'])}, {self._quote(item['abbr'])}, {self._quote(item['name'])},
-  {self._quote(item['dbType'])}, {self._quote(item['host'])}, {self._quote(item['db'])}, {self._quote(item['schema'])},
-  {self._quote(item['status'])}, {self._quote(item['owner'])}, {self._quote(item['dept'])}, {self._quote(item['desc'])},
-  {len(item['unloadTimes'])}, {self._quote(self._default_operator)}, {self._quote(self._default_operator)}
-)
-""".strip()
+            insert(data_source).values(
+                source_id=data_source_id, source_code=item["id"], source_name=item["name"],
+                source_type=item["dbType"], description_text=item["desc"], status_code=item["status"],
+                is_deleted="N", created_by=self._default_operator, updated_by=self._default_operator,
+            ),
+            insert(upstream_system).values(
+                system_pk=system_pk, data_source_id=data_source_id, system_id=item["id"],
+                system_abbr=item["abbr"], system_name=item["name"], db_type=item["dbType"],
+                host_name=item["host"], db_name=item["db"], schema_name=item["schema"],
+                status_code=item["status"], owner_name=item["owner"], dept_name=item["dept"],
+                system_desc=item["desc"], unload_count=len(item["unloadTimes"]), is_deleted="N",
+                created_by=self._default_operator, updated_by=self._default_operator,
+            ),
         ]
-        for index, value in enumerate(item["unloadTimes"], start=1):
-            statements.append(
-                f"""
-INSERT INTO {TABLE_UPSTREAM_TIME} (
-  time_pk, system_pk, unload_time, display_order, created_by, updated_by
-) VALUES (
-  {time_pk + index - 1}, {system_pk}, {self._quote(value)}, {index},
-  {self._quote(self._default_operator)}, {self._quote(self._default_operator)}
-)
-""".strip()
-            )
-        statements.append(
-            f"""
-INSERT INTO {TABLE_UPSTREAM_CHANGE_LOG} (
-  change_id, system_pk, system_id, change_type, change_summary, after_json, operator_name
-) VALUES (
-  {change_id}, {system_pk}, {self._quote(item['id'])}, 'CREATE_SYSTEM', 'create upstream system',
-  {self._quote(json.dumps(item, ensure_ascii=False))}, {self._quote(self._default_operator)}
-)
-""".strip()
+        statements.extend(
+            insert(upstream_unload_time).values(
+                time_pk=time_pk + index - 1, system_pk=system_pk, unload_time=value,
+                display_order=index, is_deleted="N", created_by=self._default_operator,
+                updated_by=self._default_operator,
+            ) for index, value in enumerate(item["unloadTimes"], start=1)
         )
+        statements.append(insert(upstream_change_log).values(
+            change_id=change_id, system_pk=system_pk, system_id=item["id"],
+            change_type="CREATE_SYSTEM", change_summary="create upstream system",
+            after_json=json.dumps(item, ensure_ascii=False), operator_name=self._default_operator,
+        ))
         self._execute(statements)
         return item
 
@@ -474,87 +433,45 @@ INSERT INTO {TABLE_UPSTREAM_CHANGE_LOG} (
             return item
 
     def _update_system(self, system_id, payload):
-        # Must not open a nested database_transaction: callers run under audit().
-        current = self._load_system_detail(
-            system_id,
-            include_connection=True,
-            purpose="upstream admin detail unload times",
-            method="_update_system",
-        )
+        current = self._load_system_detail(system_id, include_connection=True,
+                                           purpose="upstream admin detail unload times", method="_update_system")
         item = self._normalize_payload(payload, current=current)
         rows = self._fetch_rows_logged(
-            f"SELECT system_pk, data_source_id FROM {TABLE_UPSTREAM_SYSTEM} WHERE system_id = {self._quote(system_id)} AND is_deleted = 'N' LIMIT 1",
-            purpose="upstream system id lookup",
-            method="_update_system",
-        )
+            select(upstream_system.c.system_pk, upstream_system.c.data_source_id).where(
+                upstream_system.c.system_id == str(system_id), upstream_system.c.is_deleted == "N"
+            ).limit(1), purpose="upstream system id lookup", method="_update_system")
         if not rows:
             raise UpstreamSystemNotFoundError(system_id)
         if item["id"] != system_id and self._fetch_rows_logged(
-            f"SELECT system_pk FROM {TABLE_UPSTREAM_SYSTEM} WHERE system_id = {self._quote(item['id'])} AND is_deleted = 'N' LIMIT 1",
-            purpose="upstream uniqueness check",
-            method="_update_system",
-        ):
+            select(upstream_system.c.system_pk).where(
+                upstream_system.c.system_id == item["id"], upstream_system.c.is_deleted == "N"
+            ).limit(1), purpose="upstream uniqueness check", method="_update_system"):
             raise UpstreamSystemAlreadyExistsError(item["id"])
         system_pk = int(rows[0]["system_pk"])
         data_source_id = int(rows[0]["data_source_id"])
-        time_pk = self._next_id(TABLE_UPSTREAM_TIME, "time_pk")
-        change_id = self._next_id(TABLE_UPSTREAM_CHANGE_LOG, "change_id")
+        time_pk = self._next_id(upstream_unload_time, upstream_unload_time.c.time_pk)
+        change_id = self._next_id(upstream_change_log, upstream_change_log.c.change_id)
         statements = [
-            f"""
-UPDATE dwp.p_data_source
-SET source_code = {self._quote(item['id'])},
-    source_name = {self._quote(item['name'])},
-    source_type = {self._quote(item['dbType'])},
-    description_text = {self._quote(item['desc'])},
-    status_code = {self._quote(item['status'])},
-    updated_by = {self._quote(self._default_operator)},
-    updated_at = CURRENT_TIMESTAMP
-WHERE source_id = {data_source_id}
-""".strip(),
-            f"""
-UPDATE {TABLE_UPSTREAM_SYSTEM}
-SET
-  system_id = {self._quote(item['id'])},
-  system_abbr = {self._quote(item['abbr'])},
-  system_name = {self._quote(item['name'])},
-  db_type = {self._quote(item['dbType'])},
-  host_name = {self._quote(item['host'])},
-  db_name = {self._quote(item['db'])},
-  schema_name = {self._quote(item['schema'])},
-  status_code = {self._quote(item['status'])},
-  owner_name = {self._quote(item['owner'])},
-  dept_name = {self._quote(item['dept'])},
-  system_desc = {self._quote(item['desc'])},
-  unload_count = {len(item['unloadTimes'])},
-  updated_by = {self._quote(self._default_operator)},
-  updated_at = CURRENT_TIMESTAMP
-WHERE system_pk = {system_pk}
-""".strip(),
-            f"DELETE FROM {TABLE_UPSTREAM_TIME} WHERE system_pk = {system_pk}",
+            update(data_source).where(data_source.c.source_id == data_source_id).values(
+                source_code=item["id"], source_name=item["name"], source_type=item["dbType"],
+                description_text=item["desc"], status_code=item["status"],
+                updated_by=self._default_operator, updated_at=func.current_timestamp()),
+            update(upstream_system).where(upstream_system.c.system_pk == system_pk).values(
+                system_id=item["id"], system_abbr=item["abbr"], system_name=item["name"],
+                db_type=item["dbType"], host_name=item["host"], db_name=item["db"],
+                schema_name=item["schema"], status_code=item["status"], owner_name=item["owner"],
+                dept_name=item["dept"], system_desc=item["desc"], unload_count=len(item["unloadTimes"]),
+                updated_by=self._default_operator, updated_at=func.current_timestamp()),
+            delete(upstream_unload_time).where(upstream_unload_time.c.system_pk == system_pk),
         ]
-        for index, value in enumerate(item["unloadTimes"], start=1):
-            statements.append(
-                f"""
-INSERT INTO {TABLE_UPSTREAM_TIME} (
-  time_pk, system_pk, unload_time, display_order, created_by, updated_by
-) VALUES (
-  {time_pk + index - 1}, {system_pk}, {self._quote(value)}, {index},
-  {self._quote(self._default_operator)}, {self._quote(self._default_operator)}
-)
-""".strip()
-            )
-        statements.append(
-            f"""
-INSERT INTO {TABLE_UPSTREAM_CHANGE_LOG} (
-  change_id, system_pk, system_id, change_type, change_summary, before_json, after_json, operator_name
-) VALUES (
-  {change_id}, {system_pk}, {self._quote(item['id'])}, 'UPDATE_SYSTEM', 'update upstream system',
-  {self._quote(json.dumps(current, ensure_ascii=False))},
-  {self._quote(json.dumps(item, ensure_ascii=False))},
-  {self._quote(self._default_operator)}
-)
-""".strip()
-        )
+        statements.extend(insert(upstream_unload_time).values(
+            time_pk=time_pk + index - 1, system_pk=system_pk, unload_time=value,
+            display_order=index, is_deleted="N", created_by=self._default_operator,
+            updated_by=self._default_operator) for index, value in enumerate(item["unloadTimes"], start=1))
+        statements.append(insert(upstream_change_log).values(
+            change_id=change_id, system_pk=system_pk, system_id=item["id"], change_type="UPDATE_SYSTEM",
+            change_summary="update upstream system", before_json=json.dumps(current, ensure_ascii=False),
+            after_json=json.dumps(item, ensure_ascii=False), operator_name=self._default_operator))
         self._execute(statements)
         return current, item
 
@@ -571,28 +488,26 @@ INSERT INTO {TABLE_UPSTREAM_CHANGE_LOG} (
             operation_desc=f"{operation_type}上游系统",
         ) as audit:
             rows = self._fetch_rows_logged(
-                f"SELECT system_pk FROM {TABLE_UPSTREAM_SYSTEM} WHERE system_id = {self._quote(system_id)} AND is_deleted = 'N' LIMIT 1",
-                purpose="upstream status id lookup",
-                method="patch_status",
-            )
+                select(upstream_system.c.system_pk).where(
+                    upstream_system.c.system_id == str(system_id), upstream_system.c.is_deleted == "N"
+                ).limit(1), purpose="upstream status id lookup", method="patch_status")
             if not rows:
                 raise UpstreamSystemNotFoundError(system_id)
             system_pk = int(rows[0]["system_pk"])
             item = {**current, "status": normalized}
-            change_id = self._next_id(TABLE_UPSTREAM_CHANGE_LOG, "change_id")
+            change_id = self._next_id(upstream_change_log, upstream_change_log.c.change_id)
             self._execute([
-                f"UPDATE {TABLE_UPSTREAM_SYSTEM} SET status_code = {self._quote(normalized)}, updated_by = {self._quote(self._default_operator)}, updated_at = CURRENT_TIMESTAMP WHERE system_pk = {system_pk}",
-                f"UPDATE dwp.p_data_source SET status_code = {self._quote(normalized)}, updated_by = {self._quote(self._default_operator)}, updated_at = CURRENT_TIMESTAMP WHERE source_code = {self._quote(system_id)}",
-                f"""
-INSERT INTO {TABLE_UPSTREAM_CHANGE_LOG} (
-  change_id, system_pk, system_id, change_type, change_summary, before_json, after_json, operator_name
-) VALUES (
-  {change_id}, {system_pk}, {self._quote(system_id)}, 'UPDATE_STATUS', 'update upstream status',
-  {self._quote(json.dumps(current, ensure_ascii=False))},
-  {self._quote(json.dumps(item, ensure_ascii=False))},
-  {self._quote(self._default_operator)}
-)
-""".strip(),
+                update(upstream_system).where(upstream_system.c.system_pk == system_pk).values(
+                    status_code=normalized, updated_by=self._default_operator,
+                    updated_at=func.current_timestamp()),
+                update(data_source).where(data_source.c.source_code == str(system_id)).values(
+                    status_code=normalized, updated_by=self._default_operator,
+                    updated_at=func.current_timestamp()),
+                insert(upstream_change_log).values(
+                    change_id=change_id, system_pk=system_pk, system_id=str(system_id),
+                    change_type="UPDATE_STATUS", change_summary="update upstream status",
+                    before_json=json.dumps(current, ensure_ascii=False),
+                    after_json=json.dumps(item, ensure_ascii=False), operator_name=self._default_operator),
             ])
             audit.operation_object = item["id"]
             audit.before = current
@@ -609,7 +524,8 @@ INSERT INTO {TABLE_UPSTREAM_CHANGE_LOG} (
             audit.before = self._delete_system(system_id)
 
     def _delete_system(self, system_id):
-        rows = self._fetch_rows(f"SELECT system_pk FROM {TABLE_UPSTREAM_SYSTEM} WHERE system_id = {self._quote(system_id)} AND is_deleted = 'N'")
+        rows = self._fetch_rows(select(upstream_system.c.system_pk).where(
+            upstream_system.c.system_id == str(system_id), upstream_system.c.is_deleted == "N"))
         if not rows:
             raise UpstreamSystemNotFoundError(system_id)
         # Must not open a nested database_transaction: callers run under audit().
@@ -620,18 +536,14 @@ INSERT INTO {TABLE_UPSTREAM_CHANGE_LOG} (
             method="_delete_system",
         )
         system_pk = int(rows[0]["system_pk"])
-        change_id = self._next_id(TABLE_UPSTREAM_CHANGE_LOG, "change_id")
+        change_id = self._next_id(upstream_change_log, upstream_change_log.c.change_id)
         statements = [
-            f"DELETE FROM {TABLE_UPSTREAM_TIME} WHERE system_pk = {system_pk}",
-            f"DELETE FROM {TABLE_UPSTREAM_SYSTEM} WHERE system_pk = {system_pk}",
-            f"""
-INSERT INTO {TABLE_UPSTREAM_CHANGE_LOG} (
-  change_id, system_pk, system_id, change_type, change_summary, before_json, operator_name
-) VALUES (
-  {change_id}, {system_pk}, {self._quote(system_id)}, 'DELETE_SYSTEM', 'delete upstream system',
-  {self._quote(json.dumps(current, ensure_ascii=False))}, {self._quote(self._default_operator)}
-)
-""".strip(),
+            delete(upstream_unload_time).where(upstream_unload_time.c.system_pk == system_pk),
+            delete(upstream_system).where(upstream_system.c.system_pk == system_pk),
+            insert(upstream_change_log).values(
+                change_id=change_id, system_pk=system_pk, system_id=str(system_id),
+                change_type="DELETE_SYSTEM", change_summary="delete upstream system",
+                before_json=json.dumps(current, ensure_ascii=False), operator_name=self._default_operator),
         ]
         self._execute(statements)
         return current
