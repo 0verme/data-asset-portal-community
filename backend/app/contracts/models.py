@@ -370,3 +370,9 @@ class ApiAssetRequest(ContractModel):
 
 class ApiAssetListResponse(ItemsResponse[ApiAssetItem]):
     pass
+
+
+class LineageResponse(ContractModel):
+    """Envelope for the existing lineage bootstrap, search, and graph payloads."""
+
+    data: Any

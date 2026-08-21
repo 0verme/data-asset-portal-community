@@ -49,6 +49,7 @@ from .contracts import (
     IndicatorListResponse,
     IndicatorRequest,
     ItemsResponse,
+    LineageResponse,
     MessageDataResponse,
     validate_contract,
 )
@@ -93,6 +94,13 @@ from .services.indicator_service import (
     IndicatorValidationError,
     indicator_service,
 )
+from .services.lineage import (
+    LineageValidationError,
+    get_bootstrap as get_lineage_bootstrap,
+    get_initial_view as get_lineage_initial_view,
+    get_subgraph as get_lineage_subgraph,
+    search_nodes as search_lineage_nodes,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -104,6 +112,29 @@ _HTTP_ERROR_COPY = {
     413: "请求体过大",
     415: "不支持的媒体类型",
 }
+
+
+class _LineageServiceAdapter:
+    """Expose the existing reader functions through the adapter seam."""
+
+    @staticmethod
+    def get_bootstrap():
+        return get_lineage_bootstrap()
+
+    @staticmethod
+    def search_nodes(name):
+        return search_lineage_nodes(name)
+
+    @staticmethod
+    def get_subgraph(root_id, direction, depth, max_nodes, view):
+        return get_lineage_subgraph(root_id, direction, depth, max_nodes, view)
+
+    @staticmethod
+    def get_initial_view(root_id, direction, depth, max_nodes, view):
+        return get_lineage_initial_view(root_id, direction, depth, max_nodes, view)
+
+
+lineage_service = _LineageServiceAdapter()
 
 
 def _error_payload(error: Any) -> dict[str, Any]:
@@ -870,6 +901,71 @@ def _asset_payload(payload: AssetTableRequest | None) -> dict[str, Any] | None:
     return payload.model_dump(by_alias=True, exclude_unset=True)
 
 
+def _register_lineage_routes(app: FastAPI, service: Any) -> None:
+    router = APIRouter(prefix="/api/lineage", tags=["lineage-migration"])
+
+    def get_service() -> Any:
+        return service
+
+    def error_response(error: LineageValidationError) -> JSONResponse:
+        return _service_error_response(error, getattr(error, "status_code", 422))
+
+    @router.get("/bootstrap", response_model=None)
+    def get_bootstrap(current_service: Any = Depends(get_service)):
+        try:
+            data = current_service.get_bootstrap()
+        except LineageValidationError as error:
+            return error_response(error)
+        return JSONResponse(content=validate_contract({"data": data}, LineageResponse))
+
+    @router.get("/assets", response_model=None)
+    def get_assets(
+        name: str | None = Query(default=None),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.search_nodes(name)
+        except LineageValidationError as error:
+            return error_response(error)
+        return JSONResponse(content=validate_contract({"data": data}, LineageResponse))
+
+    @router.get("/subgraph", response_model=None)
+    def get_subgraph(
+        root_id: str | None = Query(default=None, alias="rootId"),
+        direction: str | None = Query(default="both"),
+        depth: str | None = Query(default=None),
+        max_nodes: str | None = Query(default=None, alias="maxNodes"),
+        view: str | None = Query(default="table"),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.get_subgraph(
+                root_id, direction, depth, max_nodes, view
+            )
+        except LineageValidationError as error:
+            return error_response(error)
+        return JSONResponse(content=validate_contract({"data": data}, LineageResponse))
+
+    @router.get("/initial-view", response_model=None)
+    def get_initial_view(
+        root_id: str | None = Query(default=None, alias="rootId"),
+        direction: str | None = Query(default="both"),
+        depth: str | None = Query(default=None),
+        max_nodes: str | None = Query(default=None, alias="maxNodes"),
+        view: str | None = Query(default="table"),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.get_initial_view(
+                root_id, direction, depth, max_nodes, view
+            )
+        except LineageValidationError as error:
+            return error_response(error)
+        return JSONResponse(content=validate_contract({"data": data}, LineageResponse))
+
+    app.include_router(router)
+
+
 def _register_asset_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(prefix="/api/assets", tags=["assets-migration"])
 
@@ -1076,6 +1172,7 @@ def create_fastapi_app(
     manual_code_table_service_instance: Any | None = None,
     report_service_instance: Any | None = None,
     api_asset_service_instance: Any | None = None,
+    lineage_service_instance: Any | None = None,
 ) -> FastAPI:
     """Create the opt-in FastAPI pilot application.
 
@@ -1092,6 +1189,7 @@ def create_fastapi_app(
     manual_code_table = manual_code_table_service_instance or manual_code_table_service
     report = report_service_instance or report_service
     api_asset = api_asset_service_instance or api_asset_service
+    lineage = lineage_service_instance or lineage_service
 
     @app.exception_handler(ApplicationError)
     async def handle_application_error(_request: Request, error: ApplicationError):
@@ -1153,4 +1251,6 @@ def create_fastapi_app(
         _register_report_routes(app, report)
     if "apiAsset" in enabled_codes:
         _register_api_asset_routes(app, api_asset)
+    if "lineage" in enabled_codes:
+        _register_lineage_routes(app, lineage)
     return app
