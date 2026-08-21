@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const apiAssetViewPath = fileURLToPath(new URL("./ApiAssetView.jsx", import.meta.url));
 const indicatorEditorPath = fileURLToPath(new URL("../IndicatorEditor.jsx", import.meta.url));
 const apiClientPath = fileURLToPath(new URL("../../api/apiAssets.js", import.meta.url));
+const assetReferenceSelectorPath = fileURLToPath(new URL("../common/AssetReferenceSelector.jsx", import.meta.url));
 
 test("API asset editor reuses the binary status toggle for create and edit", async () => {
   const [apiAssetView, indicatorEditor] = await Promise.all([
@@ -29,4 +30,14 @@ test("API asset create and edit keep enabled/disabled payload values", async () 
   assert.match(apiAssetView, /const submit = \(\) => onSave\(\{ \.\.\.form,/);
   assert.match(apiClient, /body:payload/);
   assert.match(apiClient, /body:\{status\}/);
+});
+
+test("related asset pickers expose stable search accessible names", async () => {
+  const assetReferenceSelector = await readFile(assetReferenceSelectorPath, "utf8");
+
+  assert.match(assetReferenceSelector, /aria-label=\{`搜索\$\{title\}`\}/);
+  assert.match(assetReferenceSelector, /<Picker title="关联表"/);
+  assert.match(assetReferenceSelector, /<Picker title="关联指标"/);
+  assert.match(assetReferenceSelector, /const locked = disabled \|\| readonly;/);
+  assert.match(assetReferenceSelector, /<input value=\{search\} disabled=\{disabled\}/);
 });

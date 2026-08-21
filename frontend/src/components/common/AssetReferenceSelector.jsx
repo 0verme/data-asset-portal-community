@@ -48,7 +48,7 @@ function Picker({ title, items, candidates, itemKey, labelKey, subtitle, onChang
   return <div className="report-picker">
     <div className="report-picker-head"><div className="report-picker-title">{title}</div><div className="report-picker-meta">已选 {items.length}</div></div>
     <Chips items={items} itemKey={itemKey} labelKey={labelKey} onRemove={remove} disabled={disabled} empty={`暂无${title}`} />
-    <div className="report-picker-search"><Icon name="search" size={14} /><input value={search} disabled={disabled} onChange={(event) => setSearch(event.target.value)} placeholder={`搜索${title}`} /></div>
+    <div className="report-picker-search"><Icon name="search" size={14} /><input value={search} disabled={disabled} onChange={(event) => setSearch(event.target.value)} aria-label={`搜索${title}`} placeholder={`搜索${title}`} /></div>
     <div className="report-picker-list">{filtered.length ? filtered.map((item) => <button key={item[itemKey]} type="button" disabled={disabled} className={`report-picker-item${selected.has(item[itemKey]) ? " selected" : ""}`} onClick={() => add(item)}>
       <span className="report-picker-item-title">{item[itemKey]}</span><span className="report-picker-item-sub">{subtitle(item) || "-"}</span>
     </button>) : <div className="report-ref-empty">{emptyText}</div>}</div>
