@@ -159,6 +159,119 @@ Base Path: `/api/assets`
 }
 ```
 
+### 2.5 可复制的详情请求
+
+只读详情端点不要求登录态。下面的示例使用仓库 Demo 中的虚构表名；将 `http://localhost:8000` 替换为本地服务地址即可执行。
+
+```bash
+curl --get "http://localhost:8000/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D" \
+  --header "Accept: application/json"
+```
+
+成功响应（`200 OK`）：
+
+```json
+{
+  "data": {
+    "name": "DWM_MEMBER_ACTIVITY_STAT_1D",
+    "cn": "会员活跃统计日表",
+    "domain": "会员",
+    "layer": "DWM",
+    "owner": "林晓",
+    "grain": "会员与日期",
+    "cycle": "每日增量 T+1",
+    "desc": "会员当日活跃、登录与消费行为日统计",
+    "schema": "DWS_DWM",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "stat_date",
+        "cn": "统计日期",
+        "type": "DATE",
+        "nullable": false,
+        "pk": true,
+        "part": false,
+        "enum": null
+      }
+    ],
+    "assetRisks": []
+  }
+}
+```
+
+不存在的表返回统一错误格式（`404 Not Found`）：
+
+```json
+{
+  "error": {
+    "code": "ASSET_NOT_FOUND",
+    "message": "未找到数据表: missing_table"
+  }
+}
+```
+
+## 统一搜索
+
+Base Path: `/api/search`
+
+当前统一搜索只读端点不要求登录态。
+
+### 接口与查询参数
+
+- `GET /api/search`
+- `q`：搜索关键字；服务端会去除首尾空白
+- `scope`：搜索范围，默认 `all`；当前别名包括 `metric` → `indicator`、`apiAsset` → `api`
+- `limit`：每个结果分组的上限，默认 `5`，超过当前 `SEARCH_MAX_LIMIT`（默认 `50`）时截断
+
+### 返回格式
+
+成功响应包含 `query`、归一化后的 `scope`、`groups`、`total`、`estimatedTotal` 和 `hasMore`。每个分组包含 `type`、`label`、`module`、`count` 和 `items`；结果项包含 `id`、`title`、`subtitle`、`meta`、`module`、`ref`、`type`、`category` 和 `matchedFields`。
+
+### 可复制的搜索请求
+
+```bash
+curl --get "http://localhost:8000/api/search" \
+  --header "Accept: application/json" \
+  --data-urlencode "q=会员" \
+  --data-urlencode "scope=asset" \
+  --data-urlencode "limit=5"
+```
+
+成功响应（`200 OK`）：
+
+```json
+{
+  "query": "会员",
+  "scope": "asset",
+  "groups": [
+    {
+      "type": "asset",
+      "label": "资产",
+      "module": "dwm",
+      "count": 1,
+      "items": [
+        {
+          "id": "DWM_MEMBER_ACTIVITY_STAT_1D",
+          "title": "DWM_MEMBER_ACTIVITY_STAT_1D",
+          "subtitle": "会员活跃统计日表",
+          "meta": "会员 / DWM / 林晓",
+          "module": "dwm",
+          "ref": "DWM_MEMBER_ACTIVITY_STAT_1D",
+          "type": "asset",
+          "category": "资产",
+          "matchedFields": [
+            { "label": "资产中文名", "value": "会员活跃统计日表" }
+          ]
+        }
+      ]
+    }
+  ],
+  "total": 1,
+  "estimatedTotal": 1,
+  "hasMore": false
+}
+```
+
 ## 3. 字段映射模块 `field-mappings`
 
 Base Path: `/api/field-mappings`
@@ -530,6 +643,7 @@ Base Path: `/api/push`
 ```
 
 > **推送频率（`freqType` + `freq`）**：`freqType` 为类型，`freq` 为对应参数（落库分别对应 `freq_type` / `freq_desc`）。
+>
 > - `T+1` / `T+0`：日批，`freq` 为空（出数时间取决于上游，不维护时点）。
 > - `准实时`：`freq` 为间隔分钟，取 `"5"` / `"30"` / `"60"`。
 > - `每周`：`freq` 为星期,`"1"`（周一）… `"7"`（周日）。
