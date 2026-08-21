@@ -8,7 +8,8 @@
 ## 部署产物
 
 - 前端静态资源：`frontend/dist/`
-- 后端服务入口：`backend/run.py`
+- 后端服务入口：`backend/asgi.py`（FastAPI primary + Flask fallback）
+- 直接 Flask rollback 入口：`backend/run.py`
 - 数据库初始化：手动执行 `docs/pg/` 或 `docs/dws/` 下的模块 DDL（无一键脚本）
 
 ## 一、准备配置
@@ -29,6 +30,7 @@ VITE_BACKEND_URL=http://127.0.0.1:5099
 ASSET_DB_PROFILE=primary
 ASSET_AUTH_DB_PROFILE=primary
 ASSET_DB_CONFIG_PATH=/opt/data-asset-portal/backend/configs/database.yaml
+BACKEND_RUNTIME=fastapi
 FLASK_HOST=127.0.0.1
 FLASK_PORT=5099
 FLASK_DEBUG=false
@@ -55,21 +57,35 @@ ASSET_DB_JAR_PATH=/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
 ## 二、后端部署
 
 `backend/run.py` 使用 Flask 内建的 development server，**仅用于本地开发/联调**，不作为生产承载。
-生产环境应在 Nginx 反代之后，用生产级 WSGI server（如 `waitress` 或 `gunicorn`）加载
-`backend.run:app` 实例：
+P5 的默认生产入口是 `backend.asgi:app`：已迁移 API 前缀由 FastAPI 处理，未迁移 API 自动委托到现有 Flask WSGI fallback。Flask session cookie、auth identity、operation-log request context 与 security headers 在兼容边界内保持可用。
 
 ```bash
-cd /opt/data-asset-portal/backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-pip install waitress
-# 加载并启动生产 WSGI 实例 (backend/run.py 顶层构建的 app)
-waitress-serve --host=127.0.0.1 --port=5099 --call backend.run:app
+cd /opt/data-asset-portal
+python3 -m venv backend/.venv
+source backend/.venv/bin/activate
+pip install -r backend/requirements.txt
+pip install waitress  # 仅在需要直接 WSGI rollback 时使用
+# FastAPI primary；非迁移 API 保留 Flask fallback
+uvicorn backend.asgi:app --host=127.0.0.1 --port=5099
 ```
 
-- 默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）
-- 若提供了 `.env.local` 或系统环境变量，则以环境变量为准；`run.py` 顶层已加载它们
+Runtime switch：
+
+- `BACKEND_RUNTIME=fastapi`（默认）：FastAPI primary，Flask fallback
+- `BACKEND_RUNTIME=flask`：所有业务请求立即回退到 Flask；可用同一 `uvicorn backend.asgi:app`，或直接使用生产 WSGI
+- 直接 Flask WSGI rollback：
+
+```bash
+BACKEND_RUNTIME=flask waitress-serve --host=127.0.0.1 --port=5099 backend.run:app
+```
+
+健康检查：
+
+```bash
+curl --fail http://127.0.0.1:5099/healthz
+```
+
+`/healthz` 只报告进程/runtime 状态，不执行数据库查询；数据库与业务 API 的可用性仍由对应回归和监控验证。默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）。`asgi.py` 与 `run.py` 顶层都会加载仓库 runtime env 文件；系统环境变量和 demo bootstrap 规则保持现有行为。
 
 ### 安全默认值（生产）
 
@@ -152,10 +168,11 @@ server {
 - 确认 `ASSET_DB_CONFIG_PATH` 指向正确文件，且 `ASSET_DB_PROFILE` 在配置中存在
 - 如使用 GaussDB，确认 JDBC jar 可访问
 - 确认数据库 `schema` 与 SQL 脚本一致（当前为 `dwp`）
+- 确认 `/healthz` 返回 `status=ok`，并确认 runtime 为预期值
 - 确认 `/api/assets/tables` 返回 JSON 而不是 HTML
-- 确认前端为 `VITE_API_MODE=remote`，且 `/api` 已正确代理到 Flask
+- 确认前端为 `VITE_API_MODE=remote`，且 `/api` 已正确代理到 FastAPI primary / Flask fallback
 - 确认 `FLASK_SECRET_KEY` 由部署 secret store 提供，且 `FLASK_DEBUG=false`
-- HTTPS 终止后仍应保持 `FLASK_ENV=production`，以发送 Secure Cookie；本阶段未扩大 Flask 对转发头的信任范围
+- HTTPS 终止后仍应保持 `FLASK_ENV=production`，以发送 Secure Cookie；FastAPI primary 通过 Flask session compatibility boundary 读取同一 cookie；本阶段未扩大 Flask 对转发头的信任范围
 - `backend/configs/database.yaml` 与 `.env.local` 不入库（见 `.gitignore`）；请从 `backend/configs/database.example.yaml` 与 `backend/.env.example` 复制后按环境填写
 
 ## 七、配置来源
