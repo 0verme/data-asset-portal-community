@@ -385,3 +385,11 @@ class SystemResponse(ContractModel):
     data: Any = None
     items: list[Any] | None = None
     total: int | None = None
+
+
+class UpstreamResponse(ContractModel):
+    """Envelope for the existing upstream-system API shapes."""
+
+    message: str | None = None
+    data: Any = None
+    items: list[Any] | None = None
