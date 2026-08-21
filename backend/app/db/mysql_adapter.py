@@ -16,13 +16,6 @@ def _positive_int(value, key: str) -> int:
 
 
 def connect(config: dict):
-    try:
-        import pymysql
-    except ImportError as error:
-        raise RuntimeError(
-            "MySQL provider requires the optional PyMySQL dependency; install backend/requirements-mysql.txt"
-        ) from error
-
     charset = str(config.get("charset", "utf8mb4"))
     collation = str(config.get("collation", "utf8mb4_unicode_ci"))
     for key, value in (("charset", charset), ("collation", collation)):
@@ -32,6 +25,13 @@ def connect(config: dict):
     connect_timeout = _positive_int(config.get("connect_timeout", 10), "connect_timeout")
     read_timeout = _positive_int(config.get("read_timeout", 30), "read_timeout")
     write_timeout = _positive_int(config.get("write_timeout", 30), "write_timeout")
+
+    try:
+        import pymysql
+    except ImportError as error:
+        raise RuntimeError(
+            "MySQL provider requires the optional PyMySQL dependency; install backend/requirements-mysql.txt"
+        ) from error
 
     return pymysql.connect(
         host=config.get("host", "127.0.0.1"),
