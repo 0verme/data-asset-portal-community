@@ -88,8 +88,6 @@ GUARD_FILES = (
     "DEPLOYMENT.md",
     "DEVELOPMENT.md",
     "CONTRIBUTING.md",
-    "AGENTS.md",
-    "CLAUDE.md",
     "NOTICE",
     "backend/.env.example",
     "frontend/.env.example",

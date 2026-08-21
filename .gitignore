@@ -1,14 +1,11 @@
 # 依赖
 node_modules
 
-# 构建产物 / 打包文件
+# 构建产物
 frontend/dist
-frontend/dist-check
-frontend/portal-dist.tar.gz
 
 # 缓存
 .vite
-frontend/.vite
 backend/.venv/
 __pycache__/
 *.py[cod]
@@ -28,9 +25,6 @@ logs/*
 # 环境变量：仅提交 .env.example，本地配置不入库
 .env
 .env.local
-backend/.env
-backend/.env.local
-frontend/.env.local
 *.local
 
 # 数据库实连配置：仅提交 database.example.yaml 模板
@@ -41,21 +35,12 @@ backend/configs/database.local*.yaml
 .demo/
 
 # 本地数据库文件产物（Community Demo / CI 使用 SQLite；防止误提交）
-backend/data/
 *.db
 *.sqlite
 *.sqlite3
 
-# 工具临时输出
-.codex/
-.claude/
-outputs/
+# 临时输出
 tmp/
-
-# 导出工具输出（测试库内容默认写 git-ignored 目录，写仓库需显式 --allow-repository-output）
-tmp/sync-from-pg/
-tmp/db-init-sql/
-tmp/demo-sql/
 
 # 第三方商业 JDBC 驱动：自行从官方渠道获取，经 ASSET_DB_JAR_PATH 注入
 backend/resources/jars/*.jar
@@ -63,9 +48,6 @@ backend/resources/jars/*.jar
 
 # demo SQL 生成器可选输出目录（默认已写 tmp/demo-sql/）
 demo/generated/
-
-# 宣传片素材（体积大，默认不入库）
-videos/
 
 # 操作系统文件
 .DS_Store
