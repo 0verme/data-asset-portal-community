@@ -154,6 +154,7 @@
 }
 .sp-empty h4 { font-size: 15px; font-weight: 600; color: var(--ink); }
 .sp-empty p { margin-top: 8px; font-size: 13px; color: var(--ink-3); line-height: 1.6; }
+.sp-empty-action { margin-top: 16px; }
 
 @media (max-width: 860px) {
   .sp-stats-grid { grid-template-columns: repeat(3, 1fr); }

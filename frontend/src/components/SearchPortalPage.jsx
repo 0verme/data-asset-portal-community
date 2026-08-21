@@ -84,7 +84,11 @@ export function SearchPortalPage({ onNavigate, availableModules = [] }) {
       }
     } else {
       searchParams.delete("q");
-      searchParams.delete("scope");
+      if (nextScope !== DEFAULT_PORTAL_SCOPE) {
+        searchParams.set("scope", nextScope);
+      } else {
+        searchParams.delete("scope");
+      }
     }
 
     const nextUrl = `${window.location.pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
@@ -94,15 +98,21 @@ export function SearchPortalPage({ onNavigate, availableModules = [] }) {
     }
   };
 
-  const resetSearchState = () => {
+  const resetSearchState = (nextScope = scope) => {
+    const preservedScope = validScopeKeys.has(nextScope) ? nextScope : DEFAULT_PORTAL_SCOPE;
     requestSeq.current += 1;
     setQuery("");
-    setScope(DEFAULT_PORTAL_SCOPE);
+    setScope(preservedScope);
     setResult(null);
     setSearchLoading(false);
     setSearchError("");
     setSearchedTerm("");
-    syncSearchUrl("", DEFAULT_PORTAL_SCOPE);
+    syncSearchUrl("", preservedScope);
+  };
+
+  const clearSearch = (nextScope = scope) => {
+    resetSearchState(nextScope);
+    inputRef.current?.focus();
   };
 
   const runSearch = (rawQuery, rawScope = DEFAULT_PORTAL_SCOPE) => {
@@ -110,8 +120,7 @@ export function SearchPortalPage({ onNavigate, availableModules = [] }) {
     const nextScope = validScopeKeys.has(rawScope) ? rawScope : DEFAULT_PORTAL_SCOPE;
 
     if (!keyword) {
-      resetSearchState();
-      inputRef.current?.focus();
+      clearSearch(nextScope);
       return;
     }
 
@@ -270,6 +279,7 @@ export function SearchPortalPage({ onNavigate, availableModules = [] }) {
               <div className="sp-empty-ic"><Icon name="inbox" size={26} /></div>
               <h4>没有找到匹配的资产</h4>
               <p>没有与 “{searchedTerm}” 相关的资产、系统、字段、词根、指标、报表、API、码值表或下游推送。</p>
+              <button className="btn primary sp-empty-action" type="button" aria-label="清空搜索" onClick={() => clearSearch(scope)}>清空搜索</button>
             </div>
           ) : (
             <>
