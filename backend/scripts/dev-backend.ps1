@@ -6,6 +6,7 @@ $backendLogDir = Join-Path $rootDir "logs/backend"
 $venvPython = Join-Path $backendDir ".venv\\Scripts\\python.exe"
 
 # 后端固定端口，禁止自动切换到其他端口
+$backendHost = "127.0.0.1"
 $backendPort = 5099
 
 if (-not (Test-Path $venvPython)) {
@@ -51,9 +52,8 @@ New-Item -ItemType Directory -Path $backendLogDir -Force | Out-Null
 $stdoutPath = Join-Path $backendLogDir "backend.out.log"
 $stderrPath = Join-Path $backendLogDir "backend.err.log"
 
-# 固定后端监听地址与端口
-$env:FLASK_HOST = "127.0.0.1"
-$env:FLASK_PORT = "$backendPort"
+# 默认使用 FastAPI primary；Flask 仍由 backend/asgi.py 作为 compatibility fallback
+$env:BACKEND_RUNTIME = "fastapi"
 
 Write-Host "Starting backend on port $backendPort. Logs:"
 Write-Host "  STDOUT -> $stdoutPath"
@@ -62,8 +62,8 @@ Write-Host "  APP    -> $(Join-Path $backendLogDir 'app.log')"
 Write-Host "  PYTHON -> $venvPython"
 
 Start-Process -FilePath $venvPython `
-  -ArgumentList "run.py" `
-  -WorkingDirectory $backendDir `
+  -ArgumentList "-m", "uvicorn", "backend.asgi:app", "--host", $backendHost, "--port", $backendPort `
+  -WorkingDirectory $rootDir `
   -RedirectStandardOutput $stdoutPath `
   -RedirectStandardError $stderrPath `
   -WindowStyle Hidden

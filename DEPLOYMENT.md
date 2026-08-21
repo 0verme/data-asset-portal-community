@@ -57,7 +57,7 @@ ASSET_DB_JAR_PATH=/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
 ## 二、后端部署
 
 `backend/run.py` 使用 Flask 内建的 development server，**仅用于本地开发/联调**，不作为生产承载。
-P5 的默认生产入口是 `backend.asgi:app`：已迁移 API 前缀由 FastAPI 处理，未迁移 API 自动委托到现有 Flask WSGI fallback。Flask session cookie、auth identity、operation-log request context 与 security headers 在兼容边界内保持可用。
+当前默认生产入口是 `backend.asgi:app`：由 Uvicorn 启动后，已迁移 API prefix 由 FastAPI primary 处理，未迁移 API 自动委托给现有 Flask WSGI fallback。Flask signed session、auth identity、Operation Log request context 与 security headers 在兼容边界内保持可用。
 
 ```bash
 cd /opt/data-asset-portal
@@ -66,14 +66,14 @@ source backend/.venv/bin/activate
 pip install -r backend/requirements.txt
 pip install waitress  # 仅在需要直接 WSGI rollback 时使用
 # FastAPI primary；非迁移 API 保留 Flask fallback
-uvicorn backend.asgi:app --host=127.0.0.1 --port=5099
+uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
 Runtime switch：
 
-- `BACKEND_RUNTIME=fastapi`（默认）：FastAPI primary，Flask fallback
-- `BACKEND_RUNTIME=flask`：所有业务请求立即回退到 Flask；可用同一 `uvicorn backend.asgi:app`，或直接使用生产 WSGI
-- 直接 Flask WSGI rollback：
+- `BACKEND_RUNTIME=fastapi`（默认）：FastAPI primary，Flask compatibility fallback
+- `BACKEND_RUNTIME=flask`：所有业务请求立即回退到 Flask；仍可使用同一 `uvicorn backend.asgi:app`，或直接使用生产 WSGI
+- 直接 Flask WSGI rollback（仅 compatibility / emergency path）：
 
 ```bash
 BACKEND_RUNTIME=flask waitress-serve --host=127.0.0.1 --port=5099 backend.run:app
@@ -85,7 +85,7 @@ BACKEND_RUNTIME=flask waitress-serve --host=127.0.0.1 --port=5099 backend.run:ap
 curl --fail http://127.0.0.1:5099/healthz
 ```
 
-`/healthz` 只报告进程/runtime 状态，不执行数据库查询；数据库与业务 API 的可用性仍由对应回归和监控验证。默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）。`asgi.py` 与 `run.py` 顶层都会加载仓库 runtime env 文件；系统环境变量和 demo bootstrap 规则保持现有行为。
+FastAPI primary 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"`、`"fastapiPrimary":true` 和 `"flaskFallback":true`。`/healthz` 只报告进程/runtime 状态，不执行数据库查询；数据库与业务 API 的可用性仍由对应回归和监控验证。默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）。`asgi.py` 与 `run.py` 顶层都会加载仓库 runtime env 文件；系统环境变量和 demo bootstrap 规则保持现有行为。
 
 ### 安全默认值（生产）
 
@@ -120,7 +120,7 @@ npm run build
 
 覆盖模块：common-codes、assets、field-mappings、indicators、roots、upstream、push、reports、api-assets、lineage、manual-code-tables、auth、operation-logs、menus。
 每份 DDL 均为幂等（`IF NOT EXISTS` / `INSERT ... WHERE NOT EXISTS`），可安全重复执行；
-具体命令见 [README 的「数据库初始化（手动执行 SQL）」](../README.md#-快速开始)。管理员账号手动插入 `p_admin_user`。
+具体命令见 [README 的「数据库初始化（手动执行 SQL）」](./README.md#-快速开始)。管理员账号手动插入 `p_admin_user`。
 
 > 🚫 仓库不再包含整库快照（`app-*-init-data.sql` 与 `docs/*/sample/*.sql` 已从公开树移除）；
 > 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。
@@ -170,7 +170,7 @@ server {
 - 确认数据库 `schema` 与 SQL 脚本一致（当前为 `dwp`）
 - 确认 `/healthz` 返回 `status=ok`，并确认 runtime 为预期值
 - 确认 `/api/assets/tables` 返回 JSON 而不是 HTML
-- 确认前端为 `VITE_API_MODE=remote`，且 `/api` 已正确代理到 FastAPI primary / Flask fallback
+- 确认前端为 `VITE_API_MODE=remote`，且 `/api` 已正确代理到 ASGI runtime（FastAPI primary / Flask fallback）
 - 确认 `FLASK_SECRET_KEY` 由部署 secret store 提供，且 `FLASK_DEBUG=false`
 - HTTPS 终止后仍应保持 `FLASK_ENV=production`，以发送 Secure Cookie；FastAPI primary 通过 Flask session compatibility boundary 读取同一 cookie；本阶段未扩大 Flask 对转发头的信任范围
 - `backend/configs/database.yaml` 与 `.env.local` 不入库（见 `.gitignore`）；请从 `backend/configs/database.example.yaml` 与 `backend/.env.example` 复制后按环境填写

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="generator" content="archify 2.13.0">
-  <title>数据资产门户 · 高层系统架构 Diagram</title>
+  <title>数据资产门户 · FastAPI Primary Runtime Diagram</title>
   <script>
     // Resolve the theme before first paint so light-preference users don't
     // see a dark flash. The toolbar script below re-applies with UI state.
@@ -4496,13 +4496,13 @@
     <div class="header">
       <div class="header-row">
         <div class="pulse-dot"></div>
-        <h1>数据资产门户 · 高层系统架构</h1>
+        <h1>数据资产门户 · FastAPI Primary Runtime</h1>
       </div>
-      <p class="subtitle">模块化单体的主要请求路径、外部依赖与信任边界</p>
+      <p class="subtitle">ASGI 入口、Flask compatibility fallback 与共享业务边界</p>
     </div>
 
-    <script id="archify-guided-views-data" type="application/json">[{"id":"primary-request","label":"主要资产查询路径","focus":["portal-user","web-entry","react-portal","api-client","flask-runtime","domain-routes","domain-services","db-adapter","metadata-store"],"note":"从浏览器读取资产列表，经同源 /api 进入数据库并返回 JSON。"},{"id":"trust-boundaries","label":"归属与信任边界","focus":["portal-user","web-entry","react-portal","flask-runtime","session-guard","metadata-store"],"note":"区分用户设备、门户运行环境和数据平台，并突出会话控制点。"}]</script>
-    <script id="archify-source-evidence-data" type="application/json">{"schemaVersion":1,"verified":true,"repository":{"url":"https://github.com/0verme/data-asset-portal","revision":"e7cc1735ae6f5e97939a16ea0834eb93eabea086","shortRevision":"e7cc173"},"referenceCount":24,"nodes":{"web-entry":[{"path":"DEPLOYMENT.md","line":109,"endLine":130,"label":"生产反向代理","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/DEPLOYMENT.md#L109-L130"},{"path":"frontend/vite.config.js","line":28,"endLine":45,"label":"开发代理与模式","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/frontend/vite.config.js#L28-L45"}],"react-portal":[{"path":"frontend/package.json","line":16,"endLine":25,"label":"React + Vite 依赖","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/frontend/package.json#L16-L25"},{"path":"frontend/src/App.jsx","line":108,"endLine":110,"label":"应用状态入口","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/frontend/src/App.jsx#L108-L110"}],"api-client":[{"path":"frontend/src/api/http.js","line":23,"endLine":74,"label":"统一 HTTP 客户端","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/frontend/src/api/http.js#L23-L74"},{"path":"frontend/src/api/assets.js","line":180,"endLine":195,"label":"资产列表请求","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/frontend/src/api/assets.js#L180-L195"}],"flask-runtime":[{"path":"backend/run.py","line":21,"endLine":29,"label":"进程入口","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/run.py#L21-L29"},{"path":"backend/app/__init__.py","line":42,"endLine":75,"label":"工厂与模块装配","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/__init__.py#L42-L75"}],"domain-routes":[{"path":"backend/app/core/blueprint_registry.py","line":35,"endLine":48,"label":"公共路由","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/core/blueprint_registry.py#L35-L48"},{"path":"backend/app/core/blueprint_registry.py","line":145,"endLine":178,"label":"按能力注册","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/core/blueprint_registry.py#L145-L178"},{"path":"backend/app/routes/assets.py","line":30,"endLine":67,"label":"资产查询端点","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/routes/assets.py#L30-L67"}],"domain-services":[{"path":"backend/app/services/assets_service.py","line":823,"endLine":889,"label":"资产查询服务","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/services/assets_service.py#L823-L889"},{"path":"backend/app/services/assets_service.py","line":921,"endLine":931,"label":"写操作审计","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/services/assets_service.py#L921-L931"}],"db-adapter":[{"path":"backend/app/db/facade.py","line":267,"endLine":278,"label":"按类型选适配器","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/db/facade.py#L267-L278"},{"path":"backend/app/db/facade.py","line":336,"endLine":350,"label":"统一查询门面","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/db/facade.py#L336-L350"},{"path":"backend/app/db/registry.py","line":3,"endLine":8,"label":"版本适配器边界","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/db/registry.py#L3-L8"}],"metadata-store":[{"path":"backend/app/db/facade.py","line":190,"endLine":236,"label":"数据库 profile 校验","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/db/facade.py#L190-L236"},{"path":"backend/requirements.txt","line":1,"endLine":4,"label":"PostgreSQL 驱动","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/requirements.txt#L1-L4"},{"path":"backend/requirements-gaussdb.txt","line":1,"endLine":3,"label":"GaussDB JDBC 依赖","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/requirements-gaussdb.txt#L1-L3"}],"session-guard":[{"path":"backend/app/auth.py","line":28,"endLine":47,"label":"会话用户","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/auth.py#L28-L47"},{"path":"backend/app/auth.py","line":55,"endLine":86,"label":"角色门禁","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/auth.py#L55-L86"},{"path":"backend/app/routes/auth.py","line":33,"endLine":59,"label":"登录与审计","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/backend/app/routes/auth.py#L33-L59"}],"lineage-viewer":[{"path":"frontend/src/components/lineage/LineageCanvas.jsx","line":1,"endLine":5,"label":"血缘组件集成","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/frontend/src/components/lineage/LineageCanvas.jsx#L1-L5"},{"path":"frontend/package.json","line":16,"endLine":21,"label":"固定依赖版本","href":"https://github.com/0verme/data-asset-portal/blob/e7cc1735ae6f5e97939a16ea0834eb93eabea086/frontend/package.json#L16-L21"}]}}</script>
+    <script id="archify-guided-views-data" type="application/json">[{"id":"primary-request","label":"默认请求路径","focus":["browser","frontend","asgi-runtime","fastapi","services","db-provider","metadata"],"note":"默认由 Uvicorn 加载 backend/asgi.py，已迁移 prefix 进入 FastAPI。"},{"id":"compatibility-boundary","label":"兼容与回滚边界","focus":["asgi-runtime","fastapi","flask-fallback","session","services"],"note":"未迁移路径、signed session、Operation Log context 与 BACKEND_RUNTIME=flask 仍依赖 Flask。"}]</script>
+    <script id="archify-source-evidence-data" type="application/json">{"schemaVersion":1,"verified":true,"repository":{"url":"https://github.com/0verme/data-asset-portal-community","revision":"ca143e2ed501c9397f158225088ab09625179b24","shortRevision":"ca143e2"},"referenceCount":16,"nodes":{"frontend":[{"path":"frontend/package.json","line":1,"endLine":25,"label":"前端依赖","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/frontend/package.json#L1-L25"},{"path":"frontend/src/api/http.js","line":23,"endLine":74,"label":"HTTP client","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/frontend/src/api/http.js#L23-L74"}],"asgi-runtime":[{"path":"DEPLOYMENT.md","line":59,"endLine":88,"label":"生产入口","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/DEPLOYMENT.md#L59-L88"},{"path":"backend/asgi.py","line":1,"endLine":6,"label":"runtime doc","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/backend/asgi.py#L1-L6"}],"fastapi":[{"path":"backend/asgi.py","line":28,"endLine":32,"label":"prefix map","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/backend/asgi.py#L28-L32"},{"path":"backend/app/fastapi/app.py","line":1,"endLine":6,"label":"composition root","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/backend/app/fastapi/app.py#L1-L6"}],"flask-fallback":[{"path":"backend/asgi.py","line":1,"endLine":6,"label":"fallback doc","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/backend/asgi.py#L1-L6"},{"path":"backend/run.py","line":21,"endLine":29,"label":"direct WSGI","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/backend/run.py#L21-L29"}],"services":[{"path":"docs/architecture.md","line":35,"endLine":35,"label":"后端边界","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/docs/architecture.md#L35"},{"path":"backend/app/services/assets_service.py","line":823,"endLine":889,"label":"业务服务","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/backend/app/services/assets_service.py#L823-L889"}],"db-provider":[{"path":"backend/app/db/facade.py","line":267,"endLine":278,"label":"adapter selection","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/backend/app/db/facade.py#L267-L278"},{"path":"backend/app/db/registry.py","line":3,"endLine":8,"label":"provider boundary","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/backend/app/db/registry.py#L3-L8"}],"metadata":[{"path":"backend/schema/README.md","line":3,"endLine":17,"label":"schema baseline","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/backend/schema/README.md#L3-L17"},{"path":"backend/requirements.txt","line":1,"endLine":10,"label":"runtime deps","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/backend/requirements.txt#L1-L10"}],"session":[{"path":"backend/asgi.py","line":35,"endLine":61,"label":"request context","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/backend/asgi.py#L35-L61"},{"path":"docs/fastapi-flask-dependency-audit.md","line":15,"endLine":21,"label":"dependency audit","href":"https://github.com/0verme/data-asset-portal-community/blob/ca143e2ed501c9397f158225088ab09625179b24/docs/fastapi-flask-dependency-audit.md#L15-L21"}]}}</script>
     <div class="guided-views no-print" id="guided-views" hidden aria-label="Guided diagram views">
       <button id="guided-view-prev" type="button" aria-label="Previous guided view" title="Previous guided view ([)">&#8592;</button>
       <div class="guided-view-copy">
@@ -4544,9 +4544,9 @@
 
     <!-- Main Diagram -->
     <div class="diagram-container" data-detail-level="read">
-      <svg viewBox="0 0 1824 584" role="img" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="editorial" data-quality-profile="showcase">
-        <title id="archify-diagram-title">数据资产门户 · 高层系统架构</title>
-        <desc id="archify-diagram-description">模块化单体的主要请求路径、外部依赖与信任边界</desc>
+      <svg viewBox="0 0 1478 650" role="img" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="editorial" data-quality-profile="showcase">
+        <title id="archify-diagram-title">数据资产门户 · FastAPI Primary Runtime</title>
+        <desc id="archify-diagram-description">ASGI 入口、Flask compatibility fallback 与共享业务边界</desc>
         <!-- Definitions -->
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
@@ -4570,218 +4570,181 @@
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <!-- Boundaries (behind everything) -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" x="18" y="256" width="164" height="102" rx="12" class="c-region" stroke-width="1"/>
-        <text x="26" y="274" class="t-cloud" font-size="9" font-weight="600">用户设备 / 不受信任客户端</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" x="401" y="131" width="848" height="306" rx="12" class="c-region" stroke-width="1"/>
+        <text x="409" y="149" class="t-cloud" font-size="9" font-weight="600">Portal Application Runtime</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="1" x="416" y="254" width="368" height="262" rx="12" class="c-region" stroke-width="1"/>
-        <text x="424" y="272" class="t-cloud" font-size="9" font-weight="600">浏览器运行时归属边界</text>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="2" x="212" y="92" width="1376" height="266" rx="12" class="c-region" stroke-width="1"/>
-        <text x="220" y="110" class="t-cloud" font-size="9" font-weight="600">门户应用运行环境</text>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="3" x="822" y="102" width="556" height="256" rx="8" class="c-security-group" stroke-width="1"/>
-        <text x="830" y="120" class="t-security" font-size="9" font-weight="600">认证 API 信任边界</text>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="4" x="1616" y="254" width="168" height="104" rx="12" class="c-region" stroke-width="1"/>
-        <text x="1624" y="272" class="t-cloud" font-size="9" font-weight="600">数据平台归属边界</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="1" x="407" y="137" width="405" height="445" rx="8" class="c-security-group" stroke-width="1"/>
+        <text x="415" y="155" class="t-security" font-size="9" font-weight="600">Compatibility / rollback boundary</text>
 
         <!-- Connection paths (before components for correct z-order) -->
-        <path data-edge-from="portal-user" data-edge-to="web-entry" data-edge-label="HTTPS" data-edge-key="0" data-edge-id="path-user-entry" data-composition-points="160,308;240,308" d="M 160 308 L 240 308" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="web-entry" data-edge-to="react-portal" data-edge-key="1" data-edge-id="path-entry-spa" data-composition-points="360,308;440,308" d="M 360 308 L 440 308" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="react-portal" data-edge-to="api-client" data-edge-key="2" data-edge-id="path-spa-client" data-composition-points="560,308;640,308" d="M 560 308 L 640 308" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="api-client" data-edge-to="flask-runtime" data-edge-label="/api + Cookie" data-edge-key="3" data-edge-id="path-client-flask" data-composition-points="760,308;840,308" d="M 760 308 L 840 308" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="flask-runtime" data-edge-to="domain-routes" data-edge-key="4" data-edge-id="path-flask-routes" data-composition-points="960,315;984,315;984,331;1016,331;1016,308;1040,308" d="M 960 315 L 976 315 Q 984 315 984 323 L 984 323 Q 984 331 992 331 L 1008 331 Q 1016 331 1016 323 L 1016 316 Q 1016 308 1024 308 L 1040 308" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="domain-routes" data-edge-to="domain-services" data-edge-key="5" data-edge-id="path-routes-services" data-composition-points="1160,308;1240,308" d="M 1160 308 L 1240 308" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="domain-services" data-edge-to="db-adapter" data-edge-key="6" data-edge-id="path-services-adapter" data-composition-points="1360,308;1440,308" d="M 1360 308 L 1440 308" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="db-adapter" data-edge-to="metadata-store" data-edge-label="SQL" data-edge-key="7" data-edge-id="path-adapter-store" data-composition-points="1560,308;1640,308" d="M 1560 308 L 1640 308" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="flask-runtime" data-edge-to="session-guard" data-edge-label="会话校验" data-edge-key="8" data-edge-id="support-session" data-composition-points="960,301;1000,301;1000,150;1040,150" d="M 960 301 L 992 301 Q 1000 301 1000 293 L 1000 158 Q 1000 150 1008 150 L 1040 150" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="react-portal" data-edge-to="lineage-viewer" data-edge-label="渲染图谱" data-edge-key="9" data-edge-id="support-lineage" data-composition-points="500,338;500,436" d="M 500 338 L 500 436" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="browser" data-edge-to="frontend" data-edge-label="HTTPS" data-edge-key="0" data-edge-id="browser-frontend" data-composition-points="166,281;225,281" d="M 166 281 L 225 281" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="frontend" data-edge-to="asgi-runtime" data-edge-label="/api" data-edge-key="1" data-edge-id="frontend-runtime" data-composition-points="365,281;425,281" d="M 365 281 L 425 281" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="asgi-runtime" data-edge-to="fastapi" data-edge-key="2" data-edge-id="runtime-fastapi" data-composition-points="583,281;583,233.5;640,233.5;640,186" d="M 583 281 L 583 241.5 Q 583 233.5 591 233.5 L 632 233.5 Q 640 233.5 640 225.5 L 640 186" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="asgi-runtime" data-edge-to="flask-fallback" data-edge-key="3" data-edge-id="runtime-flask" data-composition-points="583,281;583,333.5;640,333.5;640,386" d="M 583 281 L 583 325.5 Q 583 333.5 591 333.5 L 632 333.5 Q 640 333.5 640 341.5 L 640 386" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="fastapi" data-edge-to="services" data-edge-label="adapter" data-edge-key="4" data-edge-id="fastapi-services" data-composition-points="794,186;827,186;827,281;860,281" d="M 794 186 L 819 186 Q 827 186 827 194 L 827 273 Q 827 281 835 281 L 860 281" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="flask-fallback" data-edge-to="services" data-edge-label="adapter" data-edge-key="5" data-edge-id="flask-services" data-composition-points="794,386;827,386;827,281;860,281" d="M 794 386 L 819 386 Q 827 386 827 378 L 827 289 Q 827 281 835 281 L 860 281" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="services" data-edge-to="db-provider" data-edge-key="6" data-edge-id="services-provider" data-composition-points="1010,281;1065,281" d="M 1010 281 L 1065 281" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="db-provider" data-edge-to="metadata" data-edge-label="SQL" data-edge-key="7" data-edge-id="provider-metadata" data-composition-points="1225,281;1280,281" d="M 1225 281 L 1280 281" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="asgi-runtime" data-edge-to="session" data-edge-key="8" data-edge-id="runtime-session" data-composition-points="583,281;583,406;425,406;425,531" d="M 583 281 L 583 398 Q 583 406 575 406 L 433 406 Q 425 406 425 414 L 425 531" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
 
         <!-- Components -->
-        <g id="node-portal-user" data-node-id="portal-user" data-node-label="门户用户" tabindex="0" role="button" aria-label="Focus 门户用户, 浏览器, 用户设备 / 不受信任客户端" aria-pressed="false" data-node-kind="external" data-node-sublabel="浏览器" data-node-context="用户设备 / 不受信任客户端">
-          <title>门户用户 · 浏览器 · 用户设备 / 不受信任客户端</title>
-          <rect x="40" y="278" width="120" height="60" rx="6" class="c-mask"/>
-          <rect x="40" y="278" width="120" height="60" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(46 284) scale(0.6875)">
+        <g id="node-browser" data-node-id="browser" data-node-label="Browser" tabindex="0" role="button" aria-label="Focus Browser, 用户设备, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="用户设备" data-node-context="Architecture component">
+          <title>Browser · 用户设备 · Architecture component</title>
+          <rect x="40" y="250" width="126" height="62" rx="6" class="c-mask"/>
+          <rect x="40" y="250" width="126" height="62" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(46 256) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-detail-anchor x="100" y="306" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">门户用户</text>
-        <text data-detail="context" x="100" y="322" class="t-muted" font-size="9" text-anchor="middle">浏览器</text>
+          <text data-detail-anchor x="103" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Browser</text>
+        <text data-detail="context" x="103" y="295" class="t-muted" font-size="9" text-anchor="middle">用户设备</text>
         </g>
 
-        <g id="node-web-entry" data-node-id="web-entry" data-node-label="Nginx / Vite" tabindex="0" role="button" aria-label="Focus Nginx / Vite, 静态托管 + /api 代理, 门户应用运行环境" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="静态托管 + /api 代理" data-node-context="门户应用运行环境">
-          <title>Nginx / Vite · 静态托管 + /api 代理 · 门户应用运行环境</title>
-          <rect x="240" y="278" width="120" height="60" rx="6" class="c-mask"/>
-          <rect x="240" y="278" width="120" height="60" rx="6" class="c-cloud" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(246 284) scale(0.6875)">
+        <g id="node-frontend" data-node-id="frontend" data-node-label="React + Vite" tabindex="0" role="button" aria-label="Focus React + Vite, SPA / /api client, Architecture component" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="SPA / /api client" data-node-context="Architecture component">
+          <title>React + Vite · SPA / /api client · Architecture component</title>
+          <rect x="225" y="250" width="140" height="62" rx="6" class="c-mask"/>
+          <rect x="225" y="250" width="140" height="62" rx="6" class="c-frontend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(231 256) scale(0.6875)">
+            <rect x="2" y="3" width="12" height="10" rx="2"/>
+            <path d="M2 6.5h12"/>
+            <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
+            <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
+          </g>
+          <text data-detail-anchor x="295" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">React + Vite</text>
+        <text data-detail="context" x="295" y="295" class="t-muted" font-size="9" text-anchor="middle">SPA / /api client</text>
+        </g>
+
+        <g id="node-asgi-runtime" data-node-id="asgi-runtime" data-node-label="ASGI Runtime" tabindex="0" role="button" aria-label="Focus ASGI Runtime, Uvicorn → backend/asgi.py, Portal Application Runtime" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="Uvicorn → backend/asgi.py" data-node-context="Portal Application Runtime">
+          <title>ASGI Runtime · Uvicorn → backend/asgi.py · Portal Application Runtime</title>
+          <rect x="425" y="250" width="158" height="62" rx="6" class="c-mask"/>
+          <rect x="425" y="250" width="158" height="62" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(431 256) scale(0.6875)">
             <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
           </g>
-          <text data-detail-anchor x="300" y="306" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Nginx / Vite</text>
-        <text data-detail="context" x="300" y="322" class="t-muted" font-size="9" text-anchor="middle">静态托管 + /api 代理</text>
+          <text data-detail-anchor x="504" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">ASGI Runtime</text>
+        <text data-detail="context" x="504" y="295" class="t-muted" font-size="9" text-anchor="middle">Uvicorn → backend/asgi.py</text>
         </g>
 
-        <g id="node-react-portal" data-node-id="react-portal" data-node-label="React SPA" tabindex="0" role="button" aria-label="Focus React SPA, 模块化资产门户, 浏览器运行时归属边界" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="模块化资产门户" data-node-context="浏览器运行时归属边界">
-          <title>React SPA · 模块化资产门户 · 浏览器运行时归属边界</title>
-          <rect x="440" y="278" width="120" height="60" rx="6" class="c-mask"/>
-          <rect x="440" y="278" width="120" height="60" rx="6" class="c-frontend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(446 284) scale(0.6875)">
-            <rect x="2" y="3" width="12" height="10" rx="2"/>
-            <path d="M2 6.5h12"/>
-            <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
-            <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
-          </g>
-          <text data-detail-anchor x="500" y="306" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">React SPA</text>
-        <text data-detail="context" x="500" y="322" class="t-muted" font-size="9" text-anchor="middle">模块化资产门户</text>
-        </g>
-
-        <g id="node-api-client" data-node-id="api-client" data-node-label="前端 API 层" tabindex="0" role="button" aria-label="Focus 前端 API 层, fetch + credentials, 浏览器运行时归属边界" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="fetch + credentials" data-node-context="浏览器运行时归属边界">
-          <title>前端 API 层 · fetch + credentials · 浏览器运行时归属边界</title>
-          <rect x="640" y="278" width="120" height="60" rx="6" class="c-mask"/>
-          <rect x="640" y="278" width="120" height="60" rx="6" class="c-frontend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(646 284) scale(0.6875)">
-            <rect x="2" y="3" width="12" height="10" rx="2"/>
-            <path d="M2 6.5h12"/>
-            <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
-            <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
-          </g>
-          <text data-detail-anchor x="700" y="306" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">前端 API 层</text>
-        <text data-detail="context" x="700" y="322" class="t-muted" font-size="9" text-anchor="middle">fetch + credentials</text>
-        </g>
-
-        <g id="node-flask-runtime" data-node-id="flask-runtime" data-node-label="Flask 应用" tabindex="0" role="button" aria-label="Focus Flask 应用, 应用工厂 + 运行配置, 门户应用运行环境 › 认证 API 信任边界" aria-pressed="false" data-node-kind="backend" data-node-sublabel="应用工厂 + 运行配置" data-node-context="门户应用运行环境 › 认证 API 信任边界">
-          <title>Flask 应用 · 应用工厂 + 运行配置 · 门户应用运行环境 › 认证 API 信任边界</title>
-          <rect x="840" y="278" width="120" height="60" rx="6" class="c-mask"/>
-          <rect x="840" y="278" width="120" height="60" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(846 284) scale(0.6875)">
+        <g id="node-fastapi" data-node-id="fastapi" data-node-label="FastAPI primary" tabindex="0" role="button" aria-label="Focus FastAPI primary, migrated prefixes, Portal Application Runtime › Compatibility / rollback boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="migrated prefixes" data-node-context="Portal Application Runtime › Compatibility / rollback boundary">
+          <title>FastAPI primary · migrated prefixes · Portal Application Runtime › Compatibility / rollback boundary</title>
+          <rect x="640" y="155" width="154" height="62" rx="6" class="c-mask"/>
+          <rect x="640" y="155" width="154" height="62" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(646 161) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-detail-anchor x="900" y="306" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Flask 应用</text>
-        <text data-detail="context" x="900" y="322" class="t-muted" font-size="9" text-anchor="middle">应用工厂 + 运行配置</text>
+          <text data-detail-anchor x="717" y="184" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">FastAPI primary</text>
+        <text data-detail="context" x="717" y="200" class="t-muted" font-size="9" text-anchor="middle">migrated prefixes</text>
         </g>
 
-        <g id="node-domain-routes" data-node-id="domain-routes" data-node-label="领域蓝图" tabindex="0" role="button" aria-label="Focus 领域蓝图, capability 驱动的 /api 路由, 门户应用运行环境 › 认证 API 信任边界" aria-pressed="false" data-node-kind="backend" data-node-sublabel="capability 驱动的 /api 路由" data-node-context="门户应用运行环境 › 认证 API 信任边界">
-          <title>领域蓝图 · capability 驱动的 /api 路由 · 门户应用运行环境 › 认证 API 信任边界</title>
-          <rect x="1040" y="278" width="120" height="60" rx="6" class="c-mask"/>
-          <rect x="1040" y="278" width="120" height="60" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(1046 284) scale(0.6875)">
+        <g id="node-flask-fallback" data-node-id="flask-fallback" data-node-label="Flask fallback" tabindex="0" role="button" aria-label="Focus Flask fallback, compatibility / rollback, Portal Application Runtime › Compatibility / rollback boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="compatibility / rollback" data-node-context="Portal Application Runtime › Compatibility / rollback boundary">
+          <title>Flask fallback · compatibility / rollback · Portal Application Runtime › Compatibility / rollback boundary</title>
+          <rect x="640" y="355" width="154" height="62" rx="6" class="c-mask"/>
+          <rect x="640" y="355" width="154" height="62" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(646 361) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-detail-anchor x="1100" y="306" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">领域蓝图</text>
-        <text data-detail="context" x="1100" y="322" class="t-muted" font-size="6.9" text-anchor="middle">capability 驱动的 /api 路由</text>
+          <text data-detail-anchor x="717" y="384" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Flask fallback</text>
+        <text data-detail="context" x="717" y="400" class="t-muted" font-size="9" text-anchor="middle">compatibility / rollback</text>
         </g>
 
-        <g id="node-domain-services" data-node-id="domain-services" data-node-label="领域服务层" tabindex="0" role="button" aria-label="Focus 领域服务层, 校验、查询、事务与审计, 门户应用运行环境 › 认证 API 信任边界" aria-pressed="false" data-node-kind="backend" data-node-sublabel="校验、查询、事务与审计" data-node-context="门户应用运行环境 › 认证 API 信任边界">
-          <title>领域服务层 · 校验、查询、事务与审计 · 门户应用运行环境 › 认证 API 信任边界</title>
-          <rect x="1240" y="278" width="120" height="60" rx="6" class="c-mask"/>
-          <rect x="1240" y="278" width="120" height="60" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(1246 284) scale(0.6875)">
+        <g id="node-services" data-node-id="services" data-node-label="Service Layer" tabindex="0" role="button" aria-label="Focus Service Layer, shared business logic, Portal Application Runtime" aria-pressed="false" data-node-kind="backend" data-node-sublabel="shared business logic" data-node-context="Portal Application Runtime">
+          <title>Service Layer · shared business logic · Portal Application Runtime</title>
+          <rect x="860" y="250" width="150" height="62" rx="6" class="c-mask"/>
+          <rect x="860" y="250" width="150" height="62" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(866 256) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-detail-anchor x="1300" y="306" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">领域服务层</text>
-        <text data-detail="context" x="1300" y="322" class="t-muted" font-size="8.4" text-anchor="middle">校验、查询、事务与审计</text>
+          <text data-detail-anchor x="935" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Service Layer</text>
+        <text data-detail="context" x="935" y="295" class="t-muted" font-size="9" text-anchor="middle">shared business logic</text>
         </g>
 
-        <g id="node-db-adapter" data-node-id="db-adapter" data-node-label="DB Facade / Adapter" tabindex="0" role="button" aria-label="Focus DB Facade / Adapter, profile 驱动连接与 SQL, 门户应用运行环境" aria-pressed="false" data-node-kind="backend" data-node-sublabel="profile 驱动连接与 SQL" data-node-context="门户应用运行环境">
-          <title>DB Facade / Adapter · profile 驱动连接与 SQL · 门户应用运行环境</title>
-          <rect x="1440" y="278" width="120" height="60" rx="6" class="c-mask"/>
-          <rect x="1440" y="278" width="120" height="60" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(1446 284) scale(0.6875)">
+        <g id="node-db-provider" data-node-id="db-provider" data-node-label="Database Provider" tabindex="0" role="button" aria-label="Focus Database Provider, facade / adapters, Portal Application Runtime" aria-pressed="false" data-node-kind="backend" data-node-sublabel="facade / adapters" data-node-context="Portal Application Runtime">
+          <title>Database Provider · facade / adapters · Portal Application Runtime</title>
+          <rect x="1065" y="250" width="160" height="62" rx="6" class="c-mask"/>
+          <rect x="1065" y="250" width="160" height="62" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(1071 256) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-detail-anchor x="1500" y="306" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">DB Facade / Adapter</text>
-        <text data-detail="context" x="1500" y="322" class="t-muted" font-size="8.4" text-anchor="middle">profile 驱动连接与 SQL</text>
+          <text data-detail-anchor x="1145" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Database Provider</text>
+        <text data-detail="context" x="1145" y="295" class="t-muted" font-size="9" text-anchor="middle">facade / adapters</text>
         </g>
 
-        <g id="node-metadata-store" data-node-id="metadata-store" data-node-label="元数据存储" tabindex="0" role="button" aria-label="Focus 元数据存储, PostgreSQL / GaussDB·DWS, 数据平台归属边界" aria-pressed="false" data-node-kind="database" data-node-sublabel="PostgreSQL / GaussDB·DWS" data-node-context="数据平台归属边界">
-          <title>元数据存储 · PostgreSQL / GaussDB·DWS · 数据平台归属边界</title>
-          <rect x="1640" y="278" width="120" height="60" rx="6" class="c-mask"/>
-          <rect x="1640" y="278" width="120" height="60" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(1646 284) scale(0.6875)">
+        <g id="node-metadata" data-node-id="metadata" data-node-label="Metadata Store" tabindex="0" role="button" aria-label="Focus Metadata Store, SQLite / PostgreSQL / DWS, Architecture component" aria-pressed="false" data-node-kind="database" data-node-sublabel="SQLite / PostgreSQL / DWS" data-node-context="Architecture component">
+          <title>Metadata Store · SQLite / PostgreSQL / DWS · Architecture component</title>
+          <rect x="1280" y="250" width="158" height="62" rx="6" class="c-mask"/>
+          <rect x="1280" y="250" width="158" height="62" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(1286 256) scale(0.6875)">
             <ellipse cx="8" cy="4" rx="5" ry="2"/>
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-detail-anchor x="1700" y="306" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">元数据存储</text>
-        <text data-detail="context" x="1700" y="322" class="t-muted" font-size="7.7" text-anchor="middle">PostgreSQL / GaussDB·DWS</text>
+          <text data-detail-anchor x="1359" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Metadata Store</text>
+        <text data-detail="context" x="1359" y="295" class="t-muted" font-size="9" text-anchor="middle">SQLite / PostgreSQL / DWS</text>
         </g>
 
-        <g id="node-session-guard" data-node-id="session-guard" data-node-label="会话与访问控制" tabindex="0" role="button" aria-label="Focus 会话与访问控制, 签名 Cookie + 维护者门禁, 门户应用运行环境 › 认证 API 信任边界" aria-pressed="false" data-node-kind="security" data-node-sublabel="签名 Cookie + 维护者门禁" data-node-context="门户应用运行环境 › 认证 API 信任边界">
-          <title>会话与访问控制 · 签名 Cookie + 维护者门禁 · 门户应用运行环境 › 认证 API 信任边界</title>
-          <rect x="1040" y="120" width="120" height="60" rx="6" class="c-mask"/>
-          <rect x="1040" y="120" width="120" height="60" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(1046 126) scale(0.6875)">
+        <g id="node-session" data-node-id="session" data-node-label="Flask compatibility seam" tabindex="0" role="button" aria-label="Focus Flask compatibility seam, signed session + request context, Compatibility / rollback boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="signed session + request context" data-node-context="Compatibility / rollback boundary">
+          <title>Flask compatibility seam · signed session + request context · Compatibility / rollback boundary</title>
+          <rect x="425" y="500" width="190" height="62" rx="6" class="c-mask"/>
+          <rect x="425" y="500" width="190" height="62" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(431 506) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-detail-anchor x="1100" y="148" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">会话与访问控制</text>
-        <text data-detail="context" x="1100" y="164" class="t-muted" font-size="7.7" text-anchor="middle">签名 Cookie + 维护者门禁</text>
-        </g>
-
-        <g id="node-lineage-viewer" data-node-id="lineage-viewer" data-node-label="Lineage Viewer" tabindex="0" role="button" aria-label="Focus Lineage Viewer, npm 1.1.0 客户端依赖, 浏览器运行时归属边界" aria-pressed="false" data-node-kind="external" data-node-sublabel="npm 1.1.0 客户端依赖" data-node-context="浏览器运行时归属边界">
-          <title>Lineage Viewer · npm 1.1.0 客户端依赖 · 浏览器运行时归属边界</title>
-          <rect x="440" y="436" width="120" height="60" rx="6" class="c-mask"/>
-          <rect x="440" y="436" width="120" height="60" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(446 442) scale(0.6875)">
-            <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
-            <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
-          </g>
-          <text data-detail-anchor x="500" y="464" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Lineage Viewer</text>
-        <text data-detail="context" x="500" y="480" class="t-muted" font-size="9" text-anchor="middle">npm 1.1.0 客户端依赖</text>
+          <text data-detail-anchor x="520" y="529" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Flask compatibility seam</text>
+        <text data-detail="context" x="520" y="545" class="t-muted" font-size="9" text-anchor="middle">signed session + request context</text>
         </g>
 
         <!-- Connection labels -->
-        <g data-detail="context" data-edge-from="portal-user" data-edge-to="web-entry" data-edge-label="HTTPS" data-edge-key="0" data-edge-id="path-user-entry">
-          <rect x="183" y="288" width="34" height="14" rx="3" class="c-mask"/>
-          <text x="200" y="298" class="t-backend" font-size="8" text-anchor="middle">HTTPS</text>
+        <g data-detail="context" data-edge-from="browser" data-edge-to="frontend" data-edge-label="HTTPS" data-edge-key="0" data-edge-id="browser-frontend">
+          <rect x="178.5" y="261" width="34" height="14" rx="3" class="c-mask"/>
+          <text x="195.5" y="271" class="t-backend" font-size="8" text-anchor="middle">HTTPS</text>
+        </g>
+        <g data-detail="context" data-edge-from="frontend" data-edge-to="asgi-runtime" data-edge-label="/api" data-edge-key="1" data-edge-id="frontend-runtime">
+          <rect x="380" y="261" width="30" height="14" rx="3" class="c-mask"/>
+          <text x="395" y="271" class="t-backend" font-size="8" text-anchor="middle">/api</text>
         </g>
 
 
-        <g data-detail="context" data-edge-from="api-client" data-edge-to="flask-runtime" data-edge-label="/api + Cookie" data-edge-key="3" data-edge-id="path-client-flask">
-          <rect x="763.8" y="288" width="72.4" height="14" rx="3" class="c-mask"/>
-          <text x="800" y="298" class="t-backend" font-size="8" text-anchor="middle">/api + Cookie</text>
+        <g data-detail="context" data-edge-from="fastapi" data-edge-to="services" data-edge-label="adapter" data-edge-key="4" data-edge-id="fastapi-services">
+          <rect x="805.2" y="213.5" width="43.6" height="14" rx="3" class="c-mask"/>
+          <text x="827" y="223.5" class="t-backend" font-size="8" text-anchor="middle">adapter</text>
+        </g>
+        <g data-detail="context" data-edge-from="flask-fallback" data-edge-to="services" data-edge-label="adapter" data-edge-key="5" data-edge-id="flask-services">
+          <rect x="805.2" y="313.5" width="43.6" height="14" rx="3" class="c-mask"/>
+          <text x="827" y="323.5" class="t-messagebus" font-size="8" text-anchor="middle">adapter</text>
         </g>
 
+        <g data-detail="context" data-edge-from="db-provider" data-edge-to="metadata" data-edge-label="SQL" data-edge-key="7" data-edge-id="provider-metadata">
+          <rect x="1237.5" y="261" width="30" height="14" rx="3" class="c-mask"/>
+          <text x="1252.5" y="271" class="t-backend" font-size="8" text-anchor="middle">SQL</text>
+        </g>
 
-
-        <g data-detail="context" data-edge-from="db-adapter" data-edge-to="metadata-store" data-edge-label="SQL" data-edge-key="7" data-edge-id="path-adapter-store">
-          <rect x="1585" y="288" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="1600" y="298" class="t-backend" font-size="8" text-anchor="middle">SQL</text>
-        </g>
-        <g data-detail="context" data-edge-from="flask-runtime" data-edge-to="session-guard" data-edge-label="会话校验" data-edge-key="8" data-edge-id="support-session">
-          <rect x="975.8" y="205.5" width="48.4" height="14" rx="3" class="c-mask"/>
-          <text x="1000" y="215.5" class="t-security" font-size="8" text-anchor="middle">会话校验</text>
-        </g>
-        <g data-detail="context" data-edge-from="react-portal" data-edge-to="lineage-viewer" data-edge-label="渲染图谱" data-edge-key="9" data-edge-id="support-lineage">
-          <rect x="475.8" y="342" width="48.4" height="14" rx="3" class="c-mask"/>
-          <text x="500" y="352" class="t-messagebus" font-size="8" text-anchor="middle">渲染图谱</text>
-        </g>
 
         <!-- Legend -->
         <g data-legend data-legend-bridge>
-          <text x="40" y="548" class="t-primary" font-size="10" font-weight="600">Legend</text>
-          <g data-legend-semantic-kind="frontend" data-legend-kind="frontend" data-legend-label="Frontend" data-legend-x="40" data-legend-baseline="568" data-legend-width="82">
-            <rect x="40" y="560" width="14" height="9" rx="2" class="c-frontend" stroke-width="1"/>
-            <text x="61" y="568" class="t-muted" font-size="8">Frontend</text>
+          <text x="40" y="614" class="t-primary" font-size="10" font-weight="600">Legend</text>
+          <g data-legend-semantic-kind="frontend" data-legend-kind="frontend" data-legend-label="Frontend" data-legend-x="40" data-legend-baseline="634" data-legend-width="82">
+            <rect x="40" y="626" width="14" height="9" rx="2" class="c-frontend" stroke-width="1"/>
+            <text x="61" y="634" class="t-muted" font-size="8">Frontend</text>
           </g>
-          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="Backend" data-legend-x="144" data-legend-baseline="568" data-legend-width="77">
-            <rect x="144" y="560" width="14" height="9" rx="2" class="c-backend" stroke-width="1"/>
-            <text x="165" y="568" class="t-muted" font-size="8">Backend</text>
+          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="Backend" data-legend-x="144" data-legend-baseline="634" data-legend-width="77">
+            <rect x="144" y="626" width="14" height="9" rx="2" class="c-backend" stroke-width="1"/>
+            <text x="165" y="634" class="t-muted" font-size="8">Backend</text>
           </g>
-          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="Database" data-legend-x="243" data-legend-baseline="568" data-legend-width="82">
-            <rect x="243" y="560" width="14" height="9" rx="2" class="c-database" stroke-width="1"/>
-            <text x="264" y="568" class="t-muted" font-size="8">Database</text>
+          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="Database" data-legend-x="243" data-legend-baseline="634" data-legend-width="82">
+            <rect x="243" y="626" width="14" height="9" rx="2" class="c-database" stroke-width="1"/>
+            <text x="264" y="634" class="t-muted" font-size="8">Database</text>
           </g>
-          <g data-legend-semantic-kind="cloud" data-legend-kind="cloud" data-legend-label="Cloud" data-legend-x="347" data-legend-baseline="568" data-legend-width="67">
-            <rect x="347" y="560" width="14" height="9" rx="2" class="c-cloud" stroke-width="1"/>
-            <text x="368" y="568" class="t-muted" font-size="8">Cloud</text>
+          <g data-legend-semantic-kind="cloud" data-legend-kind="cloud" data-legend-label="Cloud" data-legend-x="347" data-legend-baseline="634" data-legend-width="67">
+            <rect x="347" y="626" width="14" height="9" rx="2" class="c-cloud" stroke-width="1"/>
+            <text x="368" y="634" class="t-muted" font-size="8">Cloud</text>
           </g>
-          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="Security" data-legend-x="436" data-legend-baseline="568" data-legend-width="82">
-            <rect x="436" y="560" width="14" height="9" rx="2" class="c-security" stroke-width="1"/>
-            <text x="457" y="568" class="t-muted" font-size="8">Security</text>
+          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="Security" data-legend-x="436" data-legend-baseline="634" data-legend-width="82">
+            <rect x="436" y="626" width="14" height="9" rx="2" class="c-security" stroke-width="1"/>
+            <text x="457" y="634" class="t-muted" font-size="8">Security</text>
           </g>
-          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="External" data-legend-x="540" data-legend-baseline="568" data-legend-width="82">
-            <rect x="540" y="560" width="14" height="9" rx="2" class="c-external" stroke-width="1"/>
-            <text x="561" y="568" class="t-muted" font-size="8">External</text>
+          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="External" data-legend-x="540" data-legend-baseline="634" data-legend-width="82">
+            <rect x="540" y="626" width="14" height="9" rx="2" class="c-external" stroke-width="1"/>
+            <text x="561" y="634" class="t-muted" font-size="8">External</text>
           </g>
         </g>
       </svg>
@@ -4970,44 +4933,33 @@
       <div class="card">
         <div class="card-header">
           <div class="card-dot cyan"></div>
-          <h3>运行形态</h3>
+          <h3>Runtime Truth</h3>
         </div>
         <ul>
-          <li>&bull; 生产：Nginx 托管静态文件，并将 /api 同源代理到 Flask :5099</li>
-          <li>&bull; 开发：Vite 可代理 /api；VITE_API_MODE=mock 时请求停留在浏览器内</li>
-        </ul>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div class="card-dot emerald"></div>
-          <h3>模块化单体</h3>
-        </div>
-        <ul>
-          <li>&bull; 公共与业务蓝图按 capability 注册，但仍运行在单个 Flask 应用中</li>
-          <li>&bull; 领域服务集中处理输入校验、事务、查询与操作审计</li>
+          <li>&bull; 默认入口是 uvicorn backend.asgi:app，BACKEND_RUNTIME 默认值为 fastapi。</li>
+          <li>&bull; FastAPI 处理已迁移 prefix；其余路径由 Flask WSGI fallback 接管。</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div class="card-dot rose"></div>
-          <h3>安全与信任</h3>
+          <h3>Compatibility Debt</h3>
         </div>
         <ul>
-          <li>&bull; 远程模式通过携带凭据的 fetch 使用签名 Session Cookie</li>
-          <li>&bull; 写接口由 admin / maintainer 门禁保护；生产 Cookie 使用 Secure、HttpOnly、SameSite=Lax</li>
+          <li>&bull; Flask signed session、auth compatibility 和 Operation Log request context 仍被 primary runtime 使用。</li>
+          <li>&bull; Portal、Search、Auth、Capabilities 与 WAIT_DB 路径仍不能安全移除 Flask。</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <div class="card-dot amber"></div>
-          <h3>数据与外部依赖</h3>
+          <div class="card-dot emerald"></div>
+          <h3>Shared Boundary</h3>
         </div>
         <ul>
-          <li>&bull; 私有版 profile 可选 PostgreSQL、GaussDB/DWS；Community 允许 SQLite 与 PostgreSQL</li>
-          <li>&bull; Lineage Viewer 1.1.0 在客户端渲染；门户维护元数据，不执行真实采集、调度或文件推送</li>
+          <li>&bull; FastAPI 与 Flask 复用 Service、Contract 和 Database Provider。</li>
+          <li>&bull; 双 runtime 是 HTTP adapter / rollback boundary，不是两套业务实现。</li>
         </ul>
       </div>
     </div>

@@ -9,7 +9,7 @@ trace field/table mappings, and maintain roots, indicators, and downstream metad
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![CI](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml)
-![Stack](https://img.shields.io/badge/React%2018%20%2B%20Vite%207%20%7C%20Flask%203-2025?logo=react)
+![Stack](https://img.shields.io/badge/React%2018%20%2B%20Vite%207%20%7C%20FastAPI%20%2B%20Flask%20Compatibility-2025?logo=react)
 
 [快速开始](#-快速开始) · [社区入口](#-社区入口) · [功能模块](#-功能模块) · [文档](#-文档导航)
 
@@ -125,13 +125,17 @@ mock 数据只用于前端体验，不会写入数据库。
 ```mermaid
 flowchart LR
   U["用户浏览器"] --> R["React + Vite"]
-  R -->|"remote: /api"| F["Flask API"]
+  R -->|"remote: /api"| A["ASGI Runtime / Uvicorn"]
+  A --> F["FastAPI primary routes"]
+  A --> W["Flask compatibility fallback"]
   F --> S["Service Layer"]
-  S --> D[("SQLite / PostgreSQL / GaussDB-DWS")]
+  W --> S
+  S --> D["Database Provider"]
+  D --> DB[("SQLite / PostgreSQL / GaussDB-DWS")]
   R -.->|"mock"| M["受控演示数据"]
 ```
 
-前端通过 `VITE_API_MODE` 选择 mock 或 remote；后端按 database profile 访问数据库。
+默认由 Uvicorn 加载 `backend/asgi.py`；`BACKEND_RUNTIME=fastapi` 为默认值。已迁移的 API prefix 由 FastAPI primary 处理，未迁移或兼容路径由 Flask fallback 提供；两者复用 Service Layer、API Contract 和 Database Provider。前端通过 `VITE_API_MODE` 选择 mock 或 remote；后端按 database profile 访问数据库。
 Community 新安装的 schema 唯一入口是 `backend/schema` 完整基线与 `backend/alembic` 增量 revision，随后使用 `demo/seed_*.py` 写入虚构数据。
 详见 [架构说明](./docs/architecture.md) 和 [数据库迁移说明](./backend/schema/README.md)。
 

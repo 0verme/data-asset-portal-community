@@ -67,7 +67,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def handle_unexpected_error(_request: Request, error: Exception):
-        LOGGER.exception("FastAPI pilot request failed", exc_info=error)
+        LOGGER.exception("FastAPI request failed", exc_info=error)
         return JSONResponse(
             status_code=500,
             content={

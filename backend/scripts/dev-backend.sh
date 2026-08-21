@@ -7,6 +7,7 @@ backendLogDir="$rootDir/logs/backend"
 venvPython="$backendDir/.venv/bin/python"
 
 # 后端固定端口，禁止自动切换到其他端口
+backendHost="127.0.0.1"
 backendPort=5099
 
 if [ ! -x "$venvPython" ]; then
@@ -43,9 +44,8 @@ mkdir -p "$backendLogDir"
 stdoutPath="$backendLogDir/backend.out.log"
 stderrPath="$backendLogDir/backend.err.log"
 
-# 固定后端监听地址与端口
-export FLASK_HOST="127.0.0.1"
-export FLASK_PORT="$backendPort"
+# 默认使用 FastAPI primary；Flask 仍由 backend/asgi.py 作为 compatibility fallback
+export BACKEND_RUNTIME="fastapi"
 
 echo "Starting backend on port $backendPort. Logs:"
 echo "  STDOUT -> $stdoutPath"
@@ -53,5 +53,6 @@ echo "  STDERR -> $stderrPath"
 echo "  APP    -> $backendLogDir/app.log"
 echo "  PYTHON -> $venvPython"
 
-nohup "$venvPython" run.py >>"$stdoutPath" 2>>"$stderrPath" &
+cd "$rootDir"
+nohup "$venvPython" -m uvicorn backend.asgi:app --host "$backendHost" --port "$backendPort" >>"$stdoutPath" 2>>"$stderrPath" &
 echo "Backend started, PID=$!"

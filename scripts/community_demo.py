@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """One-command Community Demo bootstrap.
 
-This module intentionally orchestrates the existing migration, seed, Flask and
-Vite entry points.  It never reads an external database configuration and never
-writes the user's .env files.
+This module intentionally orchestrates the existing migration, seed, ASGI
+(FastAPI primary + Flask fallback) and Vite entry points.  It never reads an
+external database configuration and never writes the user's .env files.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
@@ -23,9 +24,10 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,7 +54,7 @@ class DemoPaths:
     backend_venv: Path
 
     @classmethod
-    def for_root(cls, root: Path = ROOT) -> "DemoPaths":
+    def for_root(cls, root: Path = ROOT) -> DemoPaths:
         root = root.resolve()
         runtime = root / ".demo" / "community-demo"
         return cls(
@@ -78,18 +80,24 @@ def _is_redirected_path(path: Path) -> bool:
 def _ensure_directory(path: Path) -> None:
     for candidate in (path.parent, path):
         if candidate.exists() and _is_redirected_path(candidate):
-            raise BootstrapError(f"Refusing to use redirected demo runtime path: {candidate}")
+            raise BootstrapError(
+                f"Refusing to use redirected demo runtime path: {candidate}"
+            )
     path.mkdir(parents=True, exist_ok=True)
 
 
 def _resolve_demo_database(paths: DemoPaths) -> Path:
     if paths.database.exists() and _is_redirected_path(paths.database):
-        raise BootstrapError(f"Refusing to use redirected demo database path: {paths.database}")
+        raise BootstrapError(
+            f"Refusing to use redirected demo database path: {paths.database}"
+        )
     database = paths.database.resolve()
     try:
         database.relative_to(paths.runtime.resolve())
     except ValueError as error:
-        raise BootstrapError(f"Demo database must remain under the runtime directory: {database}") from error
+        raise BootstrapError(
+            f"Demo database must remain under the runtime directory: {database}"
+        ) from error
     return database
 
 
@@ -161,12 +169,7 @@ def _is_database_environment_key(key: str) -> bool:
         "MYSQL_PASSWORD",
     }:
         return True
-    return (
-        upper.startswith("ASSET_DB_")
-        or upper.startswith("DB_")
-        or upper.startswith("PG_")
-        or upper.startswith("MYSQL_")
-    )
+    return upper.startswith(("ASSET_DB_", "DB_", "PG_", "MYSQL_"))
 
 
 def build_demo_environment(
@@ -180,7 +183,8 @@ def build_demo_environment(
         for key, value in (base_environment or os.environ).items()
         if not _is_database_environment_key(key)
         and not key.upper().startswith("VITE_")
-        and key.upper() not in {
+        and key.upper()
+        not in {
             "ASSET_RUNTIME_PROFILE",
             "ASSET_EDITION",
             "ASSET_ENABLED_MODULES",
@@ -191,6 +195,7 @@ def build_demo_environment(
             "FLASK_PORT",
             "FLASK_SECRET_KEY",
             "FLASK_CORS_ORIGINS",
+            "BACKEND_RUNTIME",
             "LINEAGE_DB_PROFILE",
             "COMMUNITY_DEMO_BOOTSTRAP",
         }
@@ -213,6 +218,7 @@ def build_demo_environment(
             "FLASK_PORT": str(BACKEND_PORT),
             "FLASK_SECRET_KEY": secret,
             "FLASK_CORS_ORIGINS": f"http://127.0.0.1:{FRONTEND_PORT},http://localhost:{FRONTEND_PORT}",
+            "BACKEND_RUNTIME": "fastapi",
             "LINEAGE_DB_PROFILE": "",
             "VITE_API_MODE": "remote",
             "VITE_API_BASE_URL": "/api",
@@ -222,7 +228,9 @@ def build_demo_environment(
     return environment
 
 
-def _run(command: list[str], *, cwd: Path, environment: Mapping[str, str], label: str) -> None:
+def _run(
+    command: list[str], *, cwd: Path, environment: Mapping[str, str], label: str
+) -> None:
     print(f"[demo] {label}", flush=True)
     try:
         result = subprocess.run(command, cwd=cwd, env=dict(environment), check=False)
@@ -250,7 +258,12 @@ def _parse_version(value: str, tool: str) -> tuple[int, ...]:
     match = re.search(r"(\d+)\.(\d+)(?:\.(\d+))?", value)
     if not match:
         raise BootstrapError(f"Could not determine {tool} version from: {value}")
-    return tuple(int(item or 0) for item in match.groups())
+    try:
+        return tuple(int(item or 0) for item in match.groups())
+    except (TypeError, ValueError) as error:
+        raise BootstrapError(
+            f"Could not determine {tool} version from: {value}"
+        ) from error
 
 
 def check_python() -> None:
@@ -300,7 +313,10 @@ def ensure_backend_python(paths: DemoPaths) -> Path:
     check_python()
     python = paths.backend_python
     if not python.is_file():
-        print(f"[demo] backend virtualenv not found; creating {paths.backend_venv}", flush=True)
+        print(
+            f"[demo] backend virtualenv not found; creating {paths.backend_venv}",
+            flush=True,
+        )
         _run(
             [sys.executable, "-m", "venv", str(paths.backend_venv)],
             cwd=paths.root,
@@ -308,13 +324,27 @@ def ensure_backend_python(paths: DemoPaths) -> Path:
             label="Create backend virtualenv",
         )
     code, _stdout, _stderr = _run_capture(
-        [str(python), "-c", "import flask, flask_cors, psycopg, yaml, werkzeug"],
+        [
+            str(python),
+            "-c",
+            "import fastapi, flask, flask_cors, psycopg, uvicorn, yaml, werkzeug",
+        ],
         cwd=paths.root,
     )
     if code != 0:
-        print("[demo] backend dependencies are missing; installing backend/requirements.txt", flush=True)
+        print(
+            "[demo] backend dependencies are missing; installing backend/requirements.txt",
+            flush=True,
+        )
         _run(
-            [str(python), "-m", "pip", "install", "-r", str(paths.root / "backend" / "requirements.txt")],
+            [
+                str(python),
+                "-m",
+                "pip",
+                "install",
+                "-r",
+                str(paths.root / "backend" / "requirements.txt"),
+            ],
             cwd=paths.root,
             environment=os.environ,
             label="Install backend dependencies",
@@ -333,10 +363,19 @@ def _npm_environment() -> dict[str, str]:
 
 
 def ensure_frontend_dependencies(paths: DemoPaths, npm: str) -> None:
-    vite_entry = paths.root / "frontend" / "node_modules" / ".bin" / ("vite.cmd" if os.name == "nt" else "vite")
+    vite_entry = (
+        paths.root
+        / "frontend"
+        / "node_modules"
+        / ".bin"
+        / ("vite.cmd" if os.name == "nt" else "vite")
+    )
     if vite_entry.is_file():
         return
-    print("[demo] frontend dependencies are missing; running npm ci in frontend/", flush=True)
+    print(
+        "[demo] frontend dependencies are missing; running npm ci in frontend/",
+        flush=True,
+    )
     _run(
         [npm, "ci"],
         cwd=paths.root / "frontend",
@@ -396,24 +435,35 @@ def verify_demo_database(database: Path) -> dict[str, int]:
     try:
         tables = {
             row[0]
-            for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
         }
         private_markers = ("push", "upstream", "report", "code_table", "manual_code")
-        private = sorted(name for name in tables if any(marker in name for marker in private_markers))
+        private = sorted(
+            name for name in tables if any(marker in name for marker in private_markers)
+        )
         if private:
-            raise BootstrapError(f"Community SQLite contains private tables: {', '.join(private)}")
+            raise BootstrapError(
+                f"Community SQLite contains private tables: {', '.join(private)}"
+            )
         counts: dict[str, int] = {}
         for table, spec in community_seed_plan().items():
             count = connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
             expected = len(spec["rows"])
             if count != expected:
-                raise BootstrapError(f"Unexpected Community demo count for {table}: {count} (expected {expected})")
+                raise BootstrapError(
+                    f"Unexpected Community demo count for {table}: {count} (expected {expected})"
+                )
             counts[table] = count
         admin_count = connection.execute(
-            "SELECT COUNT(*) FROM p_admin_user WHERE username = ?", (ADMIN_USER["username"],)
+            "SELECT COUNT(*) FROM p_admin_user WHERE username = ?",
+            (ADMIN_USER["username"],),
         ).fetchone()[0]
         if admin_count != 1:
-            raise BootstrapError(f"Community demo account count is {admin_count} (expected 1)")
+            raise BootstrapError(
+                f"Community demo account count is {admin_count} (expected 1)"
+            )
         counts[f"p_admin_user:{ADMIN_USER['username']}"] = admin_count
         print(
             "[demo] verified Community data: "
@@ -476,10 +526,8 @@ def _terminate_process(process, label: str) -> None:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
         if os.name != "nt":
-            try:
+            with contextlib.suppress(ProcessLookupError):
                 os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
         process.wait(timeout=5)
 
 
@@ -489,7 +537,9 @@ def _wait_for_http(url: str, process, label: str, timeout: float = 30) -> None:
     while time.monotonic() < deadline:
         return_code = process.poll()
         if return_code is not None:
-            raise BootstrapError(f"{label} exited before readiness check (exit code {return_code}).")
+            raise BootstrapError(
+                f"{label} exited before readiness check (exit code {return_code})."
+            )
         try:
             with urllib.request.urlopen(url, timeout=1) as response:
                 if 200 <= response.status < 500:
@@ -508,7 +558,16 @@ def _wait_for_http(url: str, process, label: str, timeout: float = 30) -> None:
 def run_demo(paths: DemoPaths, environment: Mapping[str, str], python: Path) -> None:
     check_ports()
     processes = []
-    backend_command = [str(python), str(paths.root / "backend" / "run.py")]
+    backend_command = [
+        str(python),
+        "-m",
+        "uvicorn",
+        "backend.asgi:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(BACKEND_PORT),
+    ]
     frontend_command = [
         shutil.which("npm") or "npm",
         "run",
@@ -522,9 +581,13 @@ def run_demo(paths: DemoPaths, environment: Mapping[str, str], python: Path) -> 
     ]
     try:
         print("[demo] starting backend", flush=True)
-        backend = subprocess.Popen(backend_command, cwd=paths.root / "backend", env=dict(environment), **_popen_kwargs())
+        backend = subprocess.Popen(
+            backend_command, cwd=paths.root, env=dict(environment), **_popen_kwargs()
+        )
         processes.append(("backend", backend))
-        _wait_for_http(f"http://127.0.0.1:{BACKEND_PORT}/api/portal/stats", backend, "Backend")
+        _wait_for_http(
+            f"http://127.0.0.1:{BACKEND_PORT}/api/portal/stats", backend, "Backend"
+        )
 
         print("[demo] starting frontend", flush=True)
         frontend = subprocess.Popen(
