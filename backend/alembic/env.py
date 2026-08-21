@@ -29,6 +29,10 @@ def _settings():
     return profile, db_config, provider
 
 
+def _version_table_schema(provider, db_config):
+    return provider.physical_schema(db_config) or None
+
+
 def run_migrations_offline():
     _, db_config, provider = _settings()
     engine = get_engine(_profile(), config=db_config)
@@ -39,7 +43,7 @@ def run_migrations_offline():
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        version_table_schema=provider.physical_schema(db_config),
+        version_table_schema=_version_table_schema(provider, db_config),
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -54,7 +58,7 @@ def run_migrations_online():
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            version_table_schema=provider.physical_schema(db_config),
+            version_table_schema=_version_table_schema(provider, db_config),
             compare_type=True,
         )
         with context.begin_transaction():

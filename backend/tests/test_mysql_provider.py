@@ -39,18 +39,45 @@ class MySQLProviderTests(unittest.TestCase):
     def test_registry_exposes_mysql_and_alias(self):
         self.assertIs(get_provider("mysql"), get_provider("mysql+pymysql"))
 
-    def test_optional_driver_error_is_explicit(self):
-        with patch.dict("sys.modules", {"pymysql": None}):
-            with self.assertRaisesRegex(RuntimeError, "optional PyMySQL dependency"):
-                from backend.app.db.mysql_adapter import connect
+    def test_adapter_rejects_unsafe_connection_identifiers(self):
+        from backend.app.db.mysql_adapter import connect
 
-                connect({
-                    "host": "127.0.0.1",
-                    "port": 3306,
+        with self.assertRaisesRegex(ValueError, "safe identifier"):
+            connect(
+                {
                     "database": "asset_portal",
                     "user": "tester",
                     "password": "secret",
-                })
+                    "collation": "utf8mb4_unicode_ci; DROP DATABASE asset_portal",
+                }
+            )
+
+    def test_adapter_rejects_invalid_timeout(self):
+        from backend.app.db.mysql_adapter import connect
+
+        with self.assertRaisesRegex(ValueError, "positive integer"):
+            connect(
+                {
+                    "database": "asset_portal",
+                    "user": "tester",
+                    "password": "secret",
+                    "connect_timeout": 0,
+                }
+            )
+
+    def test_optional_driver_error_is_explicit(self):
+        with patch.dict("sys.modules", {"pymysql": None}), self.assertRaisesRegex(
+            RuntimeError, "optional PyMySQL dependency"
+        ):
+            from backend.app.db.mysql_adapter import connect
+
+            connect({
+                "host": "127.0.0.1",
+                "port": 3306,
+                "database": "asset_portal",
+                "user": "tester",
+                "password": "secret",
+            })
 
 
 if __name__ == "__main__":

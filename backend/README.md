@@ -140,6 +140,16 @@ python backend/scripts/schema_migrate.py apply --profile community_sqlite
 python demo/seed_sqlite.py --database <绝对路径>/community.db
 ```
 
+MySQL 8.0 使用独立可选驱动和 profile：
+
+```bash
+pip install -r backend/requirements-mysql.txt
+python backend/scripts/schema_migrate.py apply --profile community_mysql
+```
+
+`community_mysql` 必须指向隔离的 MySQL 8.0 数据库；密码通过安全配置或环境变量注入，
+不得写入仓库。
+
 完整版（含可选模块）可手动逐个执行模块 DDL，没有一键脚本，后端启动也不会自动初始化：
 按数据库类型选 `docs/pg/*-app-pg-ddl.sql`（PostgreSQL）或 `docs/dws/*-app-dws-ddl.sql`（DWS / GaussDB），
 用对应客户端（`psql -f` / `gsql -f`）逐个执行。具体命令见
