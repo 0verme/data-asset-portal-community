@@ -4,8 +4,9 @@
 #   1. Repository Guard  — public data guard (BLOCKER/SUSPICIOUS = 0), repo hygiene
 #   2. Backend           — unit tests on Python 3.11 + 3.13, migration verify
 #   3. PostgreSQL        — fresh migration -> seed -> integration tests on PG 16
-#   4. Frontend          — npm ci / test / build on Node 22 + 24, audit gate
-#   5. Community Migration — SQLite fresh apply / verify / seed / repeat no-op
+#   4. MySQL             — fresh baseline + CRUD/transaction contracts on MySQL 8
+#   5. Frontend          — npm ci / test / build on Node 22 + 24, audit gate
+#   6. Community Migration — SQLite fresh apply / verify / seed / repeat no-op
 #
 # Security posture:
 #   - read-only permissions (never write / packages / actions)
@@ -159,10 +160,11 @@ jobs:
       - name: Community backend unit tests (0 failures, 0 errors)
         run: python -m unittest discover -s backend/tests
 
-      - name: Migration manifest offline verify (SQLite / PostgreSQL / DWS)
+      - name: Baseline offline verify (SQLite / PostgreSQL / MySQL / DWS)
         run: |
           python backend/scripts/schema_migrate.py verify --offline --dialect sqlite
           python backend/scripts/schema_migrate.py verify --offline --dialect postgresql
+          python backend/scripts/schema_migrate.py verify --offline --dialect mysql
           python backend/scripts/schema_migrate.py verify --offline --dialect dws
 
       - name: Packaging contract tests (clean-clone reproducibility)
@@ -290,6 +292,71 @@ jobs:
 
       - name: Backend tests with PostgreSQL integration enabled (0 skipped)
         run: python -m unittest discover -s backend/tests
+
+  mysql:
+    name: MySQL 8 Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: mysql
+          MYSQL_DATABASE: asset_portal_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pmysql"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_MYSQL_DATABASE_PROFILE: mysql_ci
+      TEST_MYSQL_DATABASE_CONFIG_PATH: /tmp/mysql-ci-config.yaml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend and MySQL requirements
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt -r backend/requirements-mysql.txt
+
+      - name: Write ephemeral MySQL test config
+        run: |
+          cat > /tmp/mysql-ci-config.yaml <<'YAML'
+          defaults:
+            type: mysql
+            driver: pymysql
+            charset: utf8mb4
+            collation: utf8mb4_0900_ai_ci
+          profiles:
+            mysql_ci:
+              type: mysql
+              host: 127.0.0.1
+              port: 3306
+              database: asset_portal_test
+              user: root
+              password: mysql
+          YAML
+
+      - name: Fresh baseline apply and verify
+        run: |
+          python backend/scripts/schema_migrate.py apply --profile mysql_ci --config /tmp/mysql-ci-config.yaml
+          python backend/scripts/schema_migrate.py verify --profile mysql_ci --config /tmp/mysql-ci-config.yaml
+
+      - name: MySQL CRUD, pagination, uniqueness and rollback contracts
+        run: python -m unittest backend.tests.test_mysql_integration
+
+      - name: Repeat migration apply must be a no-op
+        run: |
+          OUT="$(python backend/scripts/schema_migrate.py apply --profile mysql_ci --config /tmp/mysql-ci-config.yaml)"
+          echo "$OUT"
+          case "$OUT" in *"applied=-"*) ;; *) echo "repeat apply was not a no-op"; exit 1 ;; esac
 
   frontend:
     name: Frontend / Node ${{ matrix.node }}

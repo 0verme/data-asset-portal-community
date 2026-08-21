@@ -171,6 +171,7 @@ python demo/seed_sqlite.py --database <绝对路径>/community.db
 ```
 
 PostgreSQL 同理：`apply --profile community_postgres` + `demo/seed_postgres.py`。
+MySQL 8.0：先执行 `pip install -r backend/requirements-mysql.txt`，再使用 `community_mysql` profile 执行 `schema_migrate.py apply`；真实 CRUD、分页、唯一约束、中文/emoji、NULL 和 rollback 由 CI MySQL 8 integration job 验证。
 
 完整版（含可选模块）开发可手动逐个执行模块 DDL，没有一键脚本，也不要让后端自动初始化：
 
@@ -211,8 +212,9 @@ python scripts/release_check.py full
 1. **Repository Guard** —— `python demo/validate_demo_data.py --strict`（BLOCKER / SUSPICIOUS 必须为 0）、二进制 / dump / 环境文件检查、workflow YAML 自检；
 2. **Backend / Python 3.11 + 3.13** —— `python -m unittest discover -s backend/tests` + baseline offline verify（sqlite / postgresql / mysql / dws）+ packaging contract tests；
 3. **PostgreSQL Integration（PG 16 service）** —— fresh migration → seed → integration tests（16 个不再 skip）→ repeat apply no-op → Private 表物理边界检查；
-4. **Frontend / Node 22 + 24** —— `npm ci` → `npm test` → `npm run build` → `npm audit --audit-level=high`；
-5. **Community Migration（SQLite）** —— fresh apply → verify → plan → seed → repeat apply no-op → Private 表物理边界检查。
+4. **MySQL 8 Integration** —— fresh baseline → verify → SQLAlchemy Core CRUD / pagination / uniqueness / Unicode / NULL / rollback → repeat apply no-op；
+5. **Frontend / Node 22 + 24** —— `npm ci` → `npm test` → `npm run build` → `npm audit --audit-level=high`；
+6. **Community Migration（SQLite）** —— fresh apply → verify → plan → seed → repeat apply no-op → Private 表物理边界检查。
 
 CI 权限为只读、仅用 GitHub 官方 Actions、无生产连接。
 
