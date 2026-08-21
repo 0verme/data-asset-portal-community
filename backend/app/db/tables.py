@@ -95,6 +95,55 @@ asset_change_log = _table(
     Column("change_time", DateTime),
 )
 
+upstream_system = _table(
+    "p_upstream_system",
+    Column("system_pk", Integer, primary_key=True),
+    Column("data_source_id", Integer),
+    Column("system_id", String(64), nullable=False),
+    Column("system_abbr", String(32), nullable=False),
+    Column("system_name", String(256), nullable=False),
+    Column("db_type", String(64), nullable=False),
+    Column("host_name", String(256)),
+    Column("db_name", String(256)),
+    Column("schema_name", String(256)),
+    Column("status_code", String(32), nullable=False),
+    Column("owner_name", String(128)),
+    Column("dept_name", String(128)),
+    Column("system_desc", String(2000)),
+    Column("unload_count", Integer, nullable=False),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+upstream_unload_time = _table(
+    "p_upstream_unload_time",
+    Column("time_pk", Integer, primary_key=True),
+    Column("system_pk", Integer, nullable=False),
+    Column("unload_time", String(5), nullable=False),
+    Column("display_order", Integer, nullable=False),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+upstream_change_log = _table(
+    "p_upstream_change_log",
+    Column("change_id", Integer, primary_key=True),
+    Column("system_pk", Integer),
+    Column("system_id", String(64), nullable=False),
+    Column("change_type", String(64), nullable=False),
+    Column("change_summary", String(512)),
+    Column("before_json", Text),
+    Column("after_json", Text),
+    Column("operator_name", String(64), nullable=False),
+    Column("change_time", DateTime),
+)
+
 data_source = _table(
     "p_data_source",
     Column("source_id", Integer, primary_key=True),
