@@ -158,3 +158,142 @@ python backend/scripts/schema_migrate.py apply --profile community_mysql
 > 🚫 仓库不再包含整库快照（`app-*-init-data.sql` 与 `docs/*/sample/*.sql` 已从公开树移除）；
 > 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。
 > 管理员账号手动插入 `p_admin_user`。
+
+## PostgreSQL migration 验证 checklist
+
+本 checklist 针对 Community 的 `backend/scripts/schema_migrate.py`、Alembic baseline 和 `demo/seed_postgres.py`。CLI 的 `apply` 已包含 baseline 初始化以及 Alembic `head` upgrade；仓库没有另一个独立的 `upgrade` 子命令。所有验证都必须使用一次性、可丢弃的 PostgreSQL 数据库或专用测试库，不要使用生产库。
+
+以下命令中的 `DAP38_PG_CONFIG`、`DAP38_PG_PROFILE` 和 `DAP38_PG_DSN` 只代表本地未跟踪配置 / secret-store 变量，不能把真实密码、Token 或完整连接串写入仓库、Issue、PR 或日志。
+
+### 1. 准备隔离环境
+
+- 创建带备份/恢复方案的隔离 PostgreSQL 数据库，例如 `dap_38_postgresql` 对应的专用测试对象；不要复用归属不明的共享库。
+- 准备一个不在 Git 中的 profile YAML，`type` 必须是 `postgres`，并指向该隔离数据库；将 profile 名称放入 `DAP38_PG_PROFILE`，文件路径放入 `DAP38_PG_CONFIG`。
+- 为执行 `psql` 的终端准备同一个测试库的 `DAP38_PG_DSN`，密码通过 `.pgpass` 或 secret store 提供，避免出现在命令历史中。
+- 设置 `ASSET_RUNTIME_PROFILE=community`；启动应用前将 `ASSET_DB_PROFILE` 指向同一个 `DAP38_PG_PROFILE`，并设置非空的本地 `FLASK_SECRET_KEY`。环境变量和安全边界详见 [首次贡献指南](../docs/first-contribution.md) 与 [开发指南](../DEVELOPMENT.md)。
+
+### 2. 离线 baseline 检查
+
+从仓库根目录执行；这两条命令只读取 `backend/schema/`，不连接数据库：
+
+```bash
+python backend/scripts/schema_migrate.py verify --offline --dialect postgresql
+python backend/scripts/schema_migrate.py plan --offline --dialect postgresql
+```
+
+预期：`verify` 输出 `verify=ok`，`plan` 输出 `0001_baseline` 和 `postgresql.sql`。如果这一步失败，先修复 baseline 或 schema contract，不要继续连接测试库。
+
+### 3. Fresh DB：apply → verify → seed → repeat apply
+
+确认隔离数据库为空后执行：
+
+```bash
+python backend/scripts/schema_migrate.py apply \
+  --profile "$DAP38_PG_PROFILE" \
+  --config "$DAP38_PG_CONFIG"
+
+python backend/scripts/schema_migrate.py status \
+  --profile "$DAP38_PG_PROFILE" \
+  --config "$DAP38_PG_CONFIG"
+
+python backend/scripts/schema_migrate.py verify \
+  --profile "$DAP38_PG_PROFILE" \
+  --config "$DAP38_PG_CONFIG"
+```
+
+- 首次 `apply` 应报告 `applied=0001_baseline`，并把 Alembic ledger 推进到当前 head。
+- `status` 应显示已管理的 revision；`verify` 应成功完成 schema reflection/contract 对照。
+- `schema_migrate.py` 不负责写入演示数据。按当前 seed 脚本生成 SQL，并通过隔离库的 `psql` 执行：
+
+```bash
+python demo/seed_postgres.py --dialect postgres \
+  | psql --dbname "$DAP38_PG_DSN" --set=ON_ERROR_STOP=1
+```
+
+- 记录 seed 前后的代表性表/行数，并确认只创建 Community 数据；该 seed 使用 `ON CONFLICT DO NOTHING`，可在同一隔离库重复执行一次验证幂等性。
+- 再次运行完全相同的 `apply` 命令，输出必须包含 `applied=-`，证明重复 apply 是 no-op；不要用 `downgrade` 代替该验证。
+
+### 4. Existing DB：baseline verify → safe stamp → apply
+
+仅对**预期 schema 已存在但没有 Alembic ledger**的数据库使用以下流程：
+
+```bash
+python backend/scripts/schema_migrate.py status \
+  --profile "$DAP38_PG_PROFILE" \
+  --config "$DAP38_PG_CONFIG"
+
+python backend/scripts/schema_migrate.py baseline \
+  --profile "$DAP38_PG_PROFILE" \
+  --config "$DAP38_PG_CONFIG" \
+  --dry-run
+```
+
+`baseline --dry-run` 会先反射并对照 PostgreSQL baseline，预期输出 `baseline=0001_baseline dry_run=true`。只有 dry-run 成功、已完成备份且确认对象属于本次测试时，才执行实际 stamp：
+
+```bash
+python backend/scripts/schema_migrate.py baseline \
+  --profile "$DAP38_PG_PROFILE" \
+  --config "$DAP38_PG_CONFIG"
+
+python backend/scripts/schema_migrate.py apply \
+  --profile "$DAP38_PG_PROFILE" \
+  --config "$DAP38_PG_CONFIG"
+
+python backend/scripts/schema_migrate.py status \
+  --profile "$DAP38_PG_PROFILE" \
+  --config "$DAP38_PG_CONFIG"
+
+python backend/scripts/schema_migrate.py verify \
+  --profile "$DAP38_PG_PROFILE" \
+  --config "$DAP38_PG_CONFIG"
+```
+
+实际 `baseline` 会写入 `alembic_version`，因此不应对已经在当前 head 上的数据库重复执行；先看 `status`，已管理数据库直接 `verify`，不要把 ledger 重置回 `0001_baseline`。
+
+### 5. Drift rejection
+
+在隔离数据库中使用测试库的 `psql` 人为增加一个仅用于验证的 schema 差异：
+
+```bash
+psql --dbname "$DAP38_PG_DSN" --set=ON_ERROR_STOP=1 \
+  --command "ALTER TABLE dwp.p_asset_table ADD COLUMN dap38_drift_marker TEXT;"
+
+python backend/scripts/schema_migrate.py verify \
+  --profile "$DAP38_PG_PROFILE" \
+  --config "$DAP38_PG_CONFIG"
+```
+
+第二条命令必须以非零状态失败，并输出可定位的 schema mismatch；不要因为失败而执行 stamp 或 apply。验证后只清理本次创建的测试列，再重复 `verify` 确认恢复：
+
+```bash
+psql --dbname "$DAP38_PG_DSN" --set=ON_ERROR_STOP=1 \
+  --command "ALTER TABLE dwp.p_asset_table DROP COLUMN dap38_drift_marker;"
+
+python backend/scripts/schema_migrate.py verify \
+  --profile "$DAP38_PG_PROFILE" \
+  --config "$DAP38_PG_CONFIG"
+```
+
+### 6. 应用与 CI 验证
+
+在新终端使用同一个隔离 profile 启动后端并保持进程运行（端口约定见 [开发指南](../DEVELOPMENT.md)），再验证健康检查和一个只读资产请求：
+
+```bash
+python backend/run.py
+curl --fail http://127.0.0.1:5099/healthz
+curl --fail --get http://127.0.0.1:5099/api/assets/tables \
+  --data-urlencode "keyword=DWM_MEMBER_ACTIVITY_STAT_1D"
+```
+
+提交 PR 前检查：
+
+- 本地至少执行 `python backend/scripts/schema_migrate.py verify --offline --dialect postgresql` 和 `python -m unittest discover -s backend/tests`。
+- GitHub Actions 的 `PostgreSQL Integration` 必须完成 fresh migration、seed、schema contract、代表性集成测试和 repeat apply no-op。
+- 同时确认 `Backend / Python 3.11`、`Backend / Python 3.13`、`Community Migration (SQLite)` 与 `Repository Guard` 为绿色；这些 CI 结果不能用未执行的本地 PostgreSQL 验证替代。
+
+### 7. 安全边界与回滚
+
+- 不连接生产库，不把测试配置、密码、Token、cookie 或 DSN 提交到 Git。
+- 不执行生产 `DROP`、实例级 reset 或 destructive downgrade；迁移回滚以隔离库备份恢复或直接销毁本次创建的测试库为准。
+- Drift 验证、seed 验证和测试日志完成后，清理本次创建的列、对象和临时文件；保留脱敏的命令输出即可。
+- 发现 profile、schema 归属或备份状态不明确时停止，不要猜测或扩大操作范围。
