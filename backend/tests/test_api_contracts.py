@@ -1,4 +1,4 @@
-"""Contract tests for the current Flask wire format."""
+"""Contract tests for the framework-neutral API wire format."""
 
 from __future__ import annotations
 
@@ -45,7 +45,9 @@ class ApiContractTests(unittest.TestCase):
         original = {"items": [payload]}
         returned = validate_contract(original, ReportListResponse)
         self.assertIs(original, returned)
-        self.assertEqual("日", ReportListResponse.model_validate(returned).items[0].legacyFreq)
+        self.assertEqual(
+            "日", ReportListResponse.model_validate(returned).items[0].legacyFreq
+        )
         self.assertIsNone(ReportListResponse.model_validate(returned).items[0].remark)
 
     def test_report_request_accepts_missing_fields_and_legacy_extra_fields(self):
@@ -63,7 +65,9 @@ class ApiContractTests(unittest.TestCase):
         ):
             response = app.test_client().get("/api/reports")
         self.assertEqual(200, response.status_code)
-        self.assertIsInstance(ReportListResponse.model_validate(response.get_json()), ReportListResponse)
+        self.assertIsInstance(
+            ReportListResponse.model_validate(response.get_json()), ReportListResponse
+        )
 
     def test_flask_indicator_route_output_is_declared_contract(self):
         app = create_app()

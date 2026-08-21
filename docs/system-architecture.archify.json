@@ -2,248 +2,184 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "数据资产门户 · 高层系统架构",
-    "subtitle": "模块化单体的主要请求路径、外部依赖与信任边界",
+    "title": "数据资产门户 · FastAPI Primary Runtime",
+    "subtitle": "ASGI 入口、Flask compatibility fallback 与共享业务边界",
     "output": "system-architecture.html",
-    "quality_profile": "showcase",
     "visual_preset": "editorial",
+    "quality_profile": "showcase",
     "repository": {
-      "url": "https://github.com/0verme/data-asset-portal",
-      "revision": "e7cc1735ae6f5e97939a16ea0834eb93eabea086"
+      "url": "https://github.com/0verme/data-asset-portal-community",
+      "revision": "ca143e2ed501c9397f158225088ab09625179b24"
     },
     "views": [
       {
         "id": "primary-request",
-        "label": "主要资产查询路径",
-        "focus": ["portal-user", "web-entry", "react-portal", "api-client", "flask-runtime", "domain-routes", "domain-services", "db-adapter", "metadata-store"],
-        "note": "从浏览器读取资产列表，经同源 /api 进入数据库并返回 JSON。"
+        "label": "默认请求路径",
+        "focus": ["browser", "frontend", "asgi-runtime", "fastapi", "services", "db-provider", "metadata"],
+        "note": "默认由 Uvicorn 加载 backend/asgi.py，已迁移 prefix 进入 FastAPI。"
       },
       {
-        "id": "trust-boundaries",
-        "label": "归属与信任边界",
-        "focus": ["portal-user", "web-entry", "react-portal", "flask-runtime", "session-guard", "metadata-store"],
-        "note": "区分用户设备、门户运行环境和数据平台，并突出会话控制点。"
+        "id": "compatibility-boundary",
+        "label": "兼容与回滚边界",
+        "focus": ["asgi-runtime", "fastapi", "flask-fallback", "session", "services"],
+        "note": "未迁移路径、signed session、Operation Log context 与 BACKEND_RUNTIME=flask 仍依赖 Flask。"
       }
     ]
   },
-  "layout": {
-    "mode": "grid",
-    "origin": [40, 120],
-    "cols": 9,
-    "gapX": 58,
-    "gapY": 86,
-    "cellW": 142,
-    "cellH": 72
-  },
   "components": [
     {
-      "id": "portal-user",
+      "id": "browser",
       "type": "external",
-      "label": "门户用户",
-      "sublabel": "浏览器",
-      "row": 1,
-      "col": 0
+      "label": "Browser",
+      "sublabel": "用户设备",
+      "pos": [40, 250],
+      "size": [126, 62]
     },
     {
-      "id": "web-entry",
+      "id": "frontend",
+      "type": "frontend",
+      "label": "React + Vite",
+      "sublabel": "SPA / /api client",
+      "pos": [225, 250],
+      "size": [140, 62],
+      "sources": [
+        { "path": "frontend/package.json", "line": 1, "end_line": 25, "label": "前端依赖" },
+        { "path": "frontend/src/api/http.js", "line": 23, "end_line": 74, "label": "HTTP client" }
+      ]
+    },
+    {
+      "id": "asgi-runtime",
       "type": "cloud",
-      "label": "Nginx / Vite",
-      "sublabel": "静态托管 + /api 代理",
-      "row": 1,
-      "col": 1,
+      "label": "ASGI Runtime",
+      "sublabel": "Uvicorn → backend/asgi.py",
+      "pos": [425, 250],
+      "size": [158, 62],
       "sources": [
-        { "path": "DEPLOYMENT.md", "line": 109, "end_line": 130, "label": "生产反向代理" },
-        { "path": "frontend/vite.config.js", "line": 28, "end_line": 45, "label": "开发代理与模式" }
+        { "path": "DEPLOYMENT.md", "line": 59, "end_line": 88, "label": "生产入口" },
+        { "path": "backend/asgi.py", "line": 1, "end_line": 6, "label": "runtime doc" }
       ]
     },
     {
-      "id": "react-portal",
-      "type": "frontend",
-      "label": "React SPA",
-      "sublabel": "模块化资产门户",
-      "row": 1,
-      "col": 2,
-      "sources": [
-        { "path": "frontend/package.json", "line": 16, "end_line": 25, "label": "React + Vite 依赖" },
-        { "path": "frontend/src/App.jsx", "line": 108, "end_line": 110, "label": "应用状态入口" }
-      ]
-    },
-    {
-      "id": "api-client",
-      "type": "frontend",
-      "label": "前端 API 层",
-      "sublabel": "fetch + credentials",
-      "row": 1,
-      "col": 3,
-      "sources": [
-        { "path": "frontend/src/api/http.js", "line": 23, "end_line": 74, "label": "统一 HTTP 客户端" },
-        { "path": "frontend/src/api/assets.js", "line": 180, "end_line": 195, "label": "资产列表请求" }
-      ]
-    },
-    {
-      "id": "flask-runtime",
+      "id": "fastapi",
       "type": "backend",
-      "label": "Flask 应用",
-      "sublabel": "应用工厂 + 运行配置",
-      "row": 1,
-      "col": 4,
+      "label": "FastAPI primary",
+      "sublabel": "migrated prefixes",
+      "pos": [640, 155],
+      "size": [154, 62],
       "sources": [
-        { "path": "backend/run.py", "line": 21, "end_line": 29, "label": "进程入口" },
-        { "path": "backend/app/__init__.py", "line": 42, "end_line": 75, "label": "工厂与模块装配" }
+        { "path": "backend/asgi.py", "line": 28, "end_line": 32, "label": "prefix map" },
+        { "path": "backend/app/fastapi/app.py", "line": 1, "end_line": 6, "label": "composition root" }
       ]
     },
     {
-      "id": "domain-routes",
+      "id": "flask-fallback",
       "type": "backend",
-      "label": "领域蓝图",
-      "sublabel": "capability 驱动的 /api 路由",
-      "row": 1,
-      "col": 5,
+      "label": "Flask fallback",
+      "sublabel": "compatibility / rollback",
+      "pos": [640, 355],
+      "size": [154, 62],
       "sources": [
-        { "path": "backend/app/core/blueprint_registry.py", "line": 35, "end_line": 48, "label": "公共路由" },
-        { "path": "backend/app/core/blueprint_registry.py", "line": 145, "end_line": 178, "label": "按能力注册" },
-        { "path": "backend/app/routes/assets.py", "line": 30, "end_line": 67, "label": "资产查询端点" }
+        { "path": "backend/asgi.py", "line": 1, "end_line": 6, "label": "fallback doc" },
+        { "path": "backend/run.py", "line": 21, "end_line": 29, "label": "direct WSGI" }
       ]
     },
     {
-      "id": "domain-services",
+      "id": "services",
       "type": "backend",
-      "label": "领域服务层",
-      "sublabel": "校验、查询、事务与审计",
-      "row": 1,
-      "col": 6,
+      "label": "Service Layer",
+      "sublabel": "shared business logic",
+      "pos": [860, 250],
+      "size": [150, 62],
       "sources": [
-        { "path": "backend/app/services/assets_service.py", "line": 823, "end_line": 889, "label": "资产查询服务" },
-        { "path": "backend/app/services/assets_service.py", "line": 921, "end_line": 931, "label": "写操作审计" }
+        { "path": "docs/architecture.md", "line": 35, "end_line": 35, "label": "后端边界" },
+        { "path": "backend/app/services/assets_service.py", "line": 823, "end_line": 889, "label": "业务服务" }
       ]
     },
     {
-      "id": "db-adapter",
+      "id": "db-provider",
       "type": "backend",
-      "label": "DB Facade / Adapter",
-      "sublabel": "profile 驱动连接与 SQL",
-      "row": 1,
-      "col": 7,
+      "label": "Database Provider",
+      "sublabel": "facade / adapters",
+      "pos": [1065, 250],
+      "size": [160, 62],
       "sources": [
-        { "path": "backend/app/db/facade.py", "line": 267, "end_line": 278, "label": "按类型选适配器" },
-        { "path": "backend/app/db/facade.py", "line": 336, "end_line": 350, "label": "统一查询门面" },
-        { "path": "backend/app/db/registry.py", "line": 3, "end_line": 8, "label": "版本适配器边界" }
+        { "path": "backend/app/db/facade.py", "line": 267, "end_line": 278, "label": "adapter selection" },
+        { "path": "backend/app/db/registry.py", "line": 3, "end_line": 8, "label": "provider boundary" }
       ]
     },
     {
-      "id": "metadata-store",
+      "id": "metadata",
       "type": "database",
-      "label": "元数据存储",
-      "sublabel": "PostgreSQL / GaussDB·DWS",
-      "row": 1,
-      "col": 8,
+      "label": "Metadata Store",
+      "sublabel": "SQLite / PostgreSQL / DWS",
+      "pos": [1280, 250],
+      "size": [158, 62],
       "sources": [
-        { "path": "backend/app/db/facade.py", "line": 190, "end_line": 236, "label": "数据库 profile 校验" },
-        { "path": "backend/requirements.txt", "line": 1, "end_line": 4, "label": "PostgreSQL 驱动" },
-        { "path": "backend/requirements-gaussdb.txt", "line": 1, "end_line": 3, "label": "GaussDB JDBC 依赖" }
+        { "path": "backend/schema/README.md", "line": 3, "end_line": 17, "label": "schema baseline" },
+        { "path": "backend/requirements.txt", "line": 1, "end_line": 10, "label": "runtime deps" }
       ]
     },
     {
-      "id": "session-guard",
+      "id": "session",
       "type": "security",
-      "label": "会话与访问控制",
-      "sublabel": "签名 Cookie + 维护者门禁",
-      "row": 0,
-      "col": 5,
+      "label": "Flask compatibility seam",
+      "sublabel": "signed session + request context",
+      "pos": [425, 500],
+      "size": [190, 62],
       "sources": [
-        { "path": "backend/app/auth.py", "line": 28, "end_line": 47, "label": "会话用户" },
-        { "path": "backend/app/auth.py", "line": 55, "end_line": 86, "label": "角色门禁" },
-        { "path": "backend/app/routes/auth.py", "line": 33, "end_line": 59, "label": "登录与审计" }
-      ]
-    },
-    {
-      "id": "lineage-viewer",
-      "type": "external",
-      "label": "Lineage Viewer",
-      "sublabel": "npm 1.1.0 客户端依赖",
-      "row": 2,
-      "col": 2,
-      "sources": [
-        { "path": "frontend/src/components/lineage/LineageCanvas.jsx", "line": 1, "end_line": 5, "label": "血缘组件集成" },
-        { "path": "frontend/package.json", "line": 16, "end_line": 21, "label": "固定依赖版本" }
+        { "path": "backend/asgi.py", "line": 35, "end_line": 61, "label": "request context" },
+        { "path": "docs/fastapi-flask-dependency-audit.md", "line": 15, "end_line": 21, "label": "dependency audit" }
       ]
     }
   ],
   "boundaries": [
     {
       "kind": "region",
-      "label": "用户设备 / 不受信任客户端",
-      "wraps": ["portal-user"],
-      "pad": 22
-    },
-    {
-      "kind": "region",
-      "label": "浏览器运行时归属边界",
-      "wraps": ["react-portal", "api-client", "lineage-viewer"],
+      "label": "Portal Application Runtime",
+      "wraps": ["asgi-runtime", "fastapi", "flask-fallback", "services", "db-provider"],
       "pad": 24
-    },
-    {
-      "kind": "region",
-      "label": "门户应用运行环境",
-      "wraps": ["web-entry", "flask-runtime", "domain-routes", "domain-services", "db-adapter", "session-guard"],
-      "pad": 28
     },
     {
       "kind": "security-group",
-      "label": "认证 API 信任边界",
-      "wraps": ["flask-runtime", "domain-routes", "domain-services", "session-guard"],
+      "label": "Compatibility / rollback boundary",
+      "wraps": ["fastapi", "flask-fallback", "session"],
       "pad": 18
-    },
-    {
-      "kind": "region",
-      "label": "数据平台归属边界",
-      "wraps": ["metadata-store"],
-      "pad": 24
     }
   ],
   "connections": [
-    { "id": "path-user-entry", "from": "portal-user", "to": "web-entry", "label": "HTTPS", "variant": "emphasis" },
-    { "id": "path-entry-spa", "from": "web-entry", "to": "react-portal", "variant": "emphasis" },
-    { "id": "path-spa-client", "from": "react-portal", "to": "api-client", "variant": "emphasis" },
-    { "id": "path-client-flask", "from": "api-client", "to": "flask-runtime", "label": "/api + Cookie", "variant": "emphasis" },
-    { "id": "path-flask-routes", "from": "flask-runtime", "to": "domain-routes", "variant": "emphasis" },
-    { "id": "path-routes-services", "from": "domain-routes", "to": "domain-services", "variant": "emphasis" },
-    { "id": "path-services-adapter", "from": "domain-services", "to": "db-adapter", "variant": "emphasis" },
-    { "id": "path-adapter-store", "from": "db-adapter", "to": "metadata-store", "label": "SQL", "variant": "emphasis" },
-    { "id": "support-session", "from": "flask-runtime", "to": "session-guard", "label": "会话校验", "variant": "security" },
-    { "id": "support-lineage", "from": "react-portal", "to": "lineage-viewer", "label": "渲染图谱", "variant": "dashed", "labelAt": [500, 352] }
+    { "id": "browser-frontend", "from": "browser", "to": "frontend", "label": "HTTPS", "variant": "emphasis" },
+    { "id": "frontend-runtime", "from": "frontend", "to": "asgi-runtime", "label": "/api", "variant": "emphasis" },
+    { "id": "runtime-fastapi", "from": "asgi-runtime", "to": "fastapi", "variant": "emphasis", "route": "orthogonal-v" },
+    { "id": "runtime-flask", "from": "asgi-runtime", "to": "flask-fallback", "variant": "dashed", "route": "orthogonal-v" },
+    { "id": "fastapi-services", "from": "fastapi", "to": "services", "label": "adapter", "variant": "emphasis", "route": "orthogonal-h" },
+    { "id": "flask-services", "from": "flask-fallback", "to": "services", "label": "adapter", "variant": "dashed", "route": "orthogonal-h" },
+    { "id": "services-provider", "from": "services", "to": "db-provider", "variant": "emphasis" },
+    { "id": "provider-metadata", "from": "db-provider", "to": "metadata", "label": "SQL", "variant": "emphasis" },
+    { "id": "runtime-session", "from": "asgi-runtime", "to": "session", "variant": "security", "route": "orthogonal-v" }
   ],
   "cards": [
     {
       "dot": "cyan",
-      "title": "运行形态",
+      "title": "Runtime Truth",
       "items": [
-        "生产：Nginx 托管静态文件，并将 /api 同源代理到 Flask :5099",
-        "开发：Vite 可代理 /api；VITE_API_MODE=mock 时请求停留在浏览器内"
-      ]
-    },
-    {
-      "dot": "emerald",
-      "title": "模块化单体",
-      "items": [
-        "公共与业务蓝图按 capability 注册，但仍运行在单个 Flask 应用中",
-        "领域服务集中处理输入校验、事务、查询与操作审计"
+        "默认入口是 uvicorn backend.asgi:app，BACKEND_RUNTIME 默认值为 fastapi。",
+        "FastAPI 处理已迁移 prefix；其余路径由 Flask WSGI fallback 接管。"
       ]
     },
     {
       "dot": "rose",
-      "title": "安全与信任",
+      "title": "Compatibility Debt",
       "items": [
-        "远程模式通过携带凭据的 fetch 使用签名 Session Cookie",
-        "写接口由 admin / maintainer 门禁保护；生产 Cookie 使用 Secure、HttpOnly、SameSite=Lax"
+        "Flask signed session、auth compatibility 和 Operation Log request context 仍被 primary runtime 使用。",
+        "Portal、Search、Auth、Capabilities 与 WAIT_DB 路径仍不能安全移除 Flask。"
       ]
     },
     {
-      "dot": "amber",
-      "title": "数据与外部依赖",
+      "dot": "emerald",
+      "title": "Shared Boundary",
       "items": [
-        "私有版 profile 可选 PostgreSQL、GaussDB/DWS；Community 允许 SQLite 与 PostgreSQL",
-        "Lineage Viewer 1.1.0 在客户端渲染；门户维护元数据，不执行真实采集、调度或文件推送"
+        "FastAPI 与 Flask 复用 Service、Contract 和 Database Provider。",
+        "双 runtime 是 HTTP adapter / rollback boundary，不是两套业务实现。"
       ]
     }
   ]

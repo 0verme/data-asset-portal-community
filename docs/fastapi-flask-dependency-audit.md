@@ -23,7 +23,7 @@ rg -n "from flask import|import flask|create_app|flask Blueprint|WSGI|WSGIMiddle
 ### KEEP_TOOLING
 
 - backend tests 中的 `create_app`、Flask test client 与 security regression fixtures；它们固化 Flask/FastAPI parity 与 rollback。
-- `docs/community-demo.md` 的 `python backend/run.py`：Community demo/dev-only startup，不属于生产 cutover。
+- `docs/community-demo.md` 的 `uvicorn backend.asgi:app`：Community demo/dev-only startup，使用 FastAPI primary，不属于生产 cutover。
 
 ### WAIT_DB
 
@@ -37,7 +37,7 @@ rg -n "from flask import|import flask|create_app|flask Blueprint|WSGI|WSGIMiddle
 
 - `capabilities`：capability infrastructure，必须继续由 Flask common fallback 提供，直到建立独立 FastAPI runtime contract。
 - `portal`、`search`：跨模块 aggregation/provider，不能在没有完整 service parity 的情况下机械迁移。
-- `docs/system-architecture.html`：生成的 architecture artifact，需由后续 architecture refresh 单独更新，不能在 P5 cleanup 中直接删除。
+- `docs/system-architecture.html`：生成的 architecture artifact；本轮由 `docs/system-architecture.archify.json` 更新并重新生成，后续应继续修改 source 后再 deliver。
 
 ### REMOVE
 

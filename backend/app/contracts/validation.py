@@ -13,10 +13,10 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 def validate_contract(payload: Any, model: type[ModelT]) -> Any:
     """Validate a wire payload and return it unchanged.
 
-    Returning the original object is deliberate: P2 must describe the
+    Returning the original object is deliberate: the Contract describes the
     existing JSON, including legacy/additive fields and nullable semantics.
-    FastAPI can use the same model as its response model in P3 once parity is
-    proven, while Flask keeps byte-for-byte compatible serialization today.
+    Flask compatibility and FastAPI primary adapters reuse the same model
+    after parity coverage without changing serialization semantics.
     """
     model.model_validate(payload)
     return payload

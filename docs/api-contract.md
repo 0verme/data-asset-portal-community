@@ -5,7 +5,7 @@
 
 ## 模块总览
 
-后端蓝图在 `backend/app/__init__.py` 注册，统一以 `/api` 为前缀：
+Flask compatibility adapter 与 FastAPI primary adapter 共同复用 `backend/app/contracts/` 的框架中立 Contract，并统一以 `/api` 为前缀；Flask blueprints 由 `backend/app/__init__.py` 装配，FastAPI migrated adapters 由 `backend/app/fastapi/app.py` 装配，`backend/app/fastapi_app.py` 仅保留历史 import facade：
 
 | 模块 | 前端 API | Base Path | 说明 |
 | --- | --- | --- | --- |
@@ -76,7 +76,7 @@ Accept: application/json
 
 ### 1.6 前端运行模式
 
-前端通过 `VITE_API_MODE` 切换数据来源：`mock` 走前端内置数据并使用演示登录；`remote` 统一走 `/api` 调后端真实数据库。
+前端通过 `VITE_API_MODE` 切换数据来源：`mock` 走前端内置数据并使用演示登录；`remote` 统一走 `/api` 调后端真实数据库。后端默认由 `uvicorn backend.asgi:app` 运行 FastAPI primary + Flask compatibility fallback；`BACKEND_RUNTIME=flask` 是 rollback mode，不改变本 API Contract。
 
 ```env
 VITE_API_MODE=remote

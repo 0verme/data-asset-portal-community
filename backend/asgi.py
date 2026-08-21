@@ -1,8 +1,8 @@
-"""P5 ASGI runtime with a reversible FastAPI/Flask compatibility boundary.
+"""ASGI runtime with a reversible FastAPI primary / Flask compatibility boundary.
 
 The default runtime dispatches migrated API prefixes to FastAPI and delegates
 all other paths to the existing Flask WSGI application. Set
-``BACKEND_RUNTIME=flask`` for an immediate rollback to the legacy runtime.
+``BACKEND_RUNTIME=flask`` for an immediate rollback to the Flask runtime.
 """
 
 from __future__ import annotations
@@ -110,7 +110,10 @@ class RuntimeDispatcher:
     def _uses_fastapi(self, path: str) -> bool:
         if self.runtime_mode != "fastapi":
             return False
-        return any(path == prefix or path.startswith(f"{prefix}/") for prefix in self.migrated_prefixes)
+        return any(
+            path == prefix or path.startswith(f"{prefix}/")
+            for prefix in self.migrated_prefixes
+        )
 
     async def __call__(self, scope, receive, send):
         if scope.get("type") == "http" and scope.get("path") == "/healthz":
@@ -150,7 +153,9 @@ def create_runtime_app(
     if selected_runtime not in {"fastapi", "flask"}:
         raise RuntimeError("BACKEND_RUNTIME must be either 'fastapi' or 'flask'")
     effective_capabilities = capabilities or resolve_capabilities()
-    flask_application = flask_application or create_app(capabilities=effective_capabilities)
+    flask_application = flask_application or create_app(
+        capabilities=effective_capabilities
+    )
 
     def resolve_identity(_request):
         return identity_from_mapping(get_session_user())

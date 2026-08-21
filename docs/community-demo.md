@@ -30,7 +30,7 @@ Bootstrap 不会安装系统级 Python、Node.js、npm、Homebrew、Chocolatey �
 .\scripts\demo.ps1
 ```
 
-脚本内部使用现有的 Alembic baseline CLI 和 Community seed，执行：
+脚本内部使用现有的 Alembic baseline CLI 和 Community seed，并通过 `backend/asgi.py` 以 FastAPI primary + Flask fallback 启动后端，执行：
 
 ```text
 preflight
@@ -137,11 +137,13 @@ python backend/scripts/schema_migrate.py apply \
 python demo/seed_sqlite.py --database <absolute-local-path>/community.sqlite
 ```
 
-后端默认监听 `127.0.0.1:5099`：
+后端默认监听 `127.0.0.1:5099`，使用与生产一致的 ASGI entrypoint：
 
 ```bash
-python backend/run.py
+python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
+
+默认 `BACKEND_RUNTIME=fastapi`；如需专门验证兼容模式，可设置 `BACKEND_RUNTIME=flask`。直接 `python backend/run.py` 仅用于 Flask development / emergency rollback。
 
 前端另开终端，使用 `frontend/.env.local` 设置：
 

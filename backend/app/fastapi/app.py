@@ -48,13 +48,13 @@ def create_fastapi_app(
     operation_log_service_instance: Any | None = None,
     upstream_service_instance: Any | None = None,
 ) -> FastAPI:
-    """Create the opt-in FastAPI pilot application.
+    """Create the FastAPI primary application for migrated API prefixes.
 
     ``identity_resolver`` is the explicit auth adapter seam. Production
-    deployment must provide the resolver that bridges its session/token
-    runtime; tests can inject an identity without Flask request context.
+    deployment provides the resolver that bridges its session/token runtime;
+    tests can inject an identity without Flask request context.
     """
-    app = FastAPI(title="Data Asset Portal FastAPI Pilot", version="0.1.0")
+    app = FastAPI(title="Data Asset Portal FastAPI", version="0.1.0")
     app.state.identity_resolver = identity_resolver or (lambda _request: None)
     indicator = indicator_service_instance or indicator_service
     assets = assets_service_instance or assets_service

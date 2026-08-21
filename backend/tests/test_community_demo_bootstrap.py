@@ -27,11 +27,15 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         second_secret = prepare_demo_runtime(self.paths)
 
         self.assertEqual(first_secret, second_secret)
-        self.assertEqual(first_config, self.paths.database_config.read_text(encoding="utf-8"))
+        self.assertEqual(
+            first_config, self.paths.database_config.read_text(encoding="utf-8")
+        )
         self.assertIn("type: sqlite", first_config)
         self.assertIn("community_sqlite:", first_config)
         self.assertGreaterEqual(len(first_secret), 48)
-        self.assertNotIn(first_secret, self.paths.database_config.read_text(encoding="utf-8"))
+        self.assertNotIn(
+            first_secret, self.paths.database_config.read_text(encoding="utf-8")
+        )
         self.assertFalse((self.paths.runtime / "frontend.env").exists())
 
     def test_redirected_database_path_is_rejected(self):
@@ -49,7 +53,9 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
     def test_existing_user_config_is_not_touched(self):
         user_config = self.root / "backend" / ".env.local"
         user_config.parent.mkdir(parents=True)
-        original = "ASSET_DB_PROFILE=primary\nDATABASE_URL=postgresql://example.invalid/test\n"
+        original = (
+            "ASSET_DB_PROFILE=primary\nDATABASE_URL=postgresql://example.invalid/test\n"
+        )
         user_config.write_text(original, encoding="utf-8")
 
         prepare_demo_runtime(self.paths)
@@ -76,8 +82,11 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
 
         self.assertEqual("sqlite", environment["ASSET_DB_TYPE"])
         self.assertEqual("community_sqlite", environment["ASSET_DB_PROFILE"])
-        self.assertEqual(str(self.paths.database.resolve()), environment["ASSET_DB_DATABASE"])
+        self.assertEqual(
+            str(self.paths.database.resolve()), environment["ASSET_DB_DATABASE"]
+        )
         self.assertEqual("community_sqlite", environment["ASSET_AUTH_DB_PROFILE"])
+        self.assertEqual("fastapi", environment["BACKEND_RUNTIME"])
         self.assertEqual("", environment["LINEAGE_DB_PROFILE"])
         self.assertEqual("remote", environment["VITE_API_MODE"])
         self.assertEqual("unchanged", environment["KEEP_ME"])
@@ -85,7 +94,9 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             self.assertNotIn(key, environment)
 
     def test_non_demo_lineage_profile_still_selects_persistent_storage(self):
-        lineage_service = importlib.import_module("backend.app.services.lineage_service")
+        lineage_service = importlib.import_module(
+            "backend.app.services.lineage_service"
+        )
 
         with patch.dict(
             os.environ,
@@ -111,8 +122,11 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             env_file = Path(directory) / ".env.local"
             env_file.write_text("ASSET_DB_PROFILE=primary\n", encoding="utf-8")
-            with patch.object(settings, "_ENV_FILES", (env_file,)), patch.dict(
-                os.environ, {"ASSET_DB_PROFILE": "community_sqlite"}, clear=False
+            with (
+                patch.object(settings, "_ENV_FILES", (env_file,)),
+                patch.dict(
+                    os.environ, {"ASSET_DB_PROFILE": "community_sqlite"}, clear=False
+                ),
             ):
                 settings.load_runtime_env(overwrite=False)
                 self.assertEqual("community_sqlite", os.environ["ASSET_DB_PROFILE"])
