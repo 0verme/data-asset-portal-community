@@ -1,5 +1,7 @@
 # FastAPI P4 Migration Matrix（#16 / #53）
 
+> **Historical migration record**：本矩阵保留 P4 阶段的 Flask/FastAPI parity、DB_READY 与迁移状态证据。当前 API/runtime truth 以 [架构说明](./architecture.md)、[模块清单](./modules.md) 和 [API 契约](./api-contract.md) 为准；表中的 Flask 列不表示当前存在 Flask runtime。
+
 本矩阵基于 `origin/main` `76a766cbebfc9dca37a88e00137d1ebe6980297f` 审计。DB_READY 同时要求对应 Database Lane PR 已合并、当前没有 active DB PR 修改 Service、Service 接口稳定，并且 adapter 不需要修改 database infrastructure。
 
 | Module | Flask | FastAPI | Contract | Parity | DB_READY | Action / Status |

@@ -4,31 +4,34 @@
 
 ## 总览
 
-当前共有 12 个一级功能模块：门户首页以及下表 11 个业务导航模块。菜单是否启用、展示顺序以及位于主导航或“更多”区域，均由系统菜单配置决定。
+当前共有 12 个一级功能模块：门户首页以及下表 11 个业务导航模块。菜单是否启用、展示顺序以及位于主导航或“更多”区域，均由系统菜单配置决定。下表把 **Source / Runtime / Schema / Demo** 分开：源码存在不等于当前 Community remote route 已注册，也不等于线上静态 mock bundle 的能力范围。
 
-| 菜单 | 前端视图 | 后端接口 | 数据表 |
+| 菜单 | Source / 前端视图 | Current remote API | Schema / seed / Demo 状态 |
 | --- | --- | --- | --- |
-| 上游卸数 | `UpstreamView.jsx` | `/api/upstreams/*` | `p_upstream_system`、`p_upstream_unload_time`、`p_upstream_change_log` |
-| 数据仓库 | `AssetView.jsx` | `/api/assets/*` | `p_asset_domain`、`p_asset_layer`、`p_asset_table`、`p_asset_field`、`p_asset_change_log` |
-| 字段映射 | `FieldMappingPage.jsx` | `/api/field-mappings/*` | `p_field_mapping_table`、`p_field_mapping_field`、`p_field_mapping_change_log` |
-| 血缘分析 | `LineagePage.jsx` | `/api/lineage/*` | `p_lineage_snapshot`、`p_lineage_node`、`p_lineage_edge` |
-| 词根管理 | `RootView.jsx` | `/api/roots/*` | `p_root_category`、`p_root_item`、`p_root_change_log` |
-| 指标维护 | `IndicatorView.jsx` | `/api/indicators/*`、`/api/indicator-path/*` | `p_indicator_item`、`p_indicator_path_config`、`p_indicator_change_log` |
-| 报表资产 | `ReportView.jsx` | `/api/reports/*` | `p_report_asset` |
-| API 资产 | `ApiAssetView.jsx` | `/api/api-assets/*` | `p_api_asset`、`p_api_param`、`p_api_response_field`、`p_api_relation` |
-| 下游推送 | `PushView.jsx` | `/api/push/*` | `p_push_system`、`p_push_job`、`p_push_job_field`、`p_push_change_log` |
-| 码值表维护 | `ManualCodeTablePage.jsx` | `/api/manual-code-tables/*` | `p_manual_code_table` |
-| 系统管理 | `SystemView.jsx` | `/api/system/*` | `p_admin_user`、`p_menu`、`p_code_category`、`p_code_item` |
+| 上游卸数 | `UpstreamView.jsx` | `/api/upstreams/*`（Community 当前未注册） | `docs/pg` / `docs/dws` 扩展 DDL；mock 有数据；full profile 需外部上游依赖 |
+| 数据仓库 | `AssetView.jsx` | `/api/assets/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
+| 字段映射 | `FieldMappingPage.jsx` | `/api/field-mappings/*` | mapping core 表在 baseline；变更日志 DDL 为补充；Community seed |
+| 血缘分析 | `LineagePage.jsx` | `/api/lineage/*` | Community remote 默认使用 POC/in-memory；persistent `p_lineage_*` 由 `docs/pg` / `docs/dws` 补充 DDL；mock 有受控图 |
+| 词根管理 | `RootView.jsx` | `/api/roots/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
+| 指标维护 | `IndicatorView.jsx` | `/api/indicators/*` | indicator item/path baseline；Community seed；当前没有独立 `/api/indicator-path/*` route |
+| 报表资产 | `ReportView.jsx` | `/api/reports/*`（Community 当前未注册） | `docs/pg` / `docs/dws` 扩展 DDL；mock 有数据；full profile 需对应表 |
+| API 资产 | `ApiAssetView.jsx` | `/api/api-assets/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
+| 下游推送 | `PushView.jsx` | `/api/push/*`（Community 当前未注册） | `docs/pg` / `docs/dws` 扩展 DDL；mock 有数据；实际推送执行不在当前职责内 |
+| 码值表维护 | `ManualCodeTablePage.jsx` | `/api/manual-code-tables/*`（Community 当前未注册） | `docs/pg` / `docs/dws` 扩展 DDL；mock 有数据；当前只维护元数据 |
+| 系统管理 | `SystemView.jsx` | `/api/system/*`、`/api/operation-logs/*` | system/operation-log core 表在 baseline；Community seed；按角色控制菜单 |
+
+Community 当前 remote capability profile 注册：`portal`、`dwm`、`mapping`、`lineage`、`root`、`indicator`、`apiAsset`、`system`。`upstream`、`push`、`report`、`codeTable` 的源码和 mock 仍在仓库，但当前 profile 不注册对应 route/menu/schema；这是真实的 #115 现状，移除边界属于 [#116](https://github.com/0verme/data-asset-portal-community/issues/116)。
 
 门户首页和统一搜索是进入各业务模块的聚合入口，不作为独立主导航模块：
 
-- 门户统计：`/api/portal/*`
+- 门户统计：`/api/portal/stats`
 - 统一搜索：`/api/search`
+- 能力清单：`/api/capabilities`
 
 基础能力：
 
 - 认证：`/api/auth/*`
-- 通用码值：`/api/common-codes/*`
+- 通用码值：`/api/common-codes/*`（当前 WAIT_DB，不在 Community native route surface）
 - 操作日志：`/api/operation-logs/*`
 
 ## 1. 上游卸数
@@ -61,7 +64,7 @@
 
 **数据表**：`p_lineage_snapshot`、`p_lineage_node`、`p_lineage_edge`。
 
-**说明**：基于当前启用的血缘快照查询表或任务节点，可选择上游、下游或双向关系及 1～5 层深度；图中展示节点、关系、证据和置信度。remote 模式读取持久化快照，mock 模式使用前端受控演示图。
+**说明**：基于当前可用的血缘快照查询表或任务节点，可选择上游、下游或双向关系及 1～5 层深度；图中展示节点、关系、证据和置信度。Community remote Demo 默认使用 POC/in-memory 快照；配置 `LINEAGE_DB_PROFILE` 并准备对应 `p_lineage_*` 表后才进入 persistent 模式，mock 模式使用前端受控演示图。
 
 ## 5. 词根管理
 
@@ -153,6 +156,8 @@
 
 ### 前端 mock 数据
 
+`VITE_API_MODE=mock` 默认依据 `frontend/src/modules/moduleRegistry.js` 暴露源码中的全部 module registry；可用 `VITE_ENABLED_MODULES` 缩小范围。mock capability coverage 不代表 Community remote route coverage，也不代表线上静态 Demo 与当前 main 的版本。
+
 `VITE_API_MODE=mock` 时，业务 API 使用 `frontend/src/data/` 中的演示数据或对应 API 文件内的受控演示数据。当前数据文件包括：
 
 `apiAssets.js`、`commonCodes.js`、`fieldMappings.js`、`indicatorPathOptions.js`、`indicators.js`、`manualCodeTables.js`、`menus.js`、`operationLogs.js`、`paramDicts.js`、`pushSystems.js`、`reports.js`、`roots.js`、`systemUsers.js`、`tables.js`、`upstreamSystems.js`。
@@ -161,6 +166,6 @@
 
 ### 后端数据
 
-`VITE_API_MODE=remote` 时，前端统一访问后端 `/api`。后端业务模块始终通过数据库 profile 读写数据，不使用本地 JSON mock。
+`VITE_API_MODE=remote` 时，前端统一访问后端 `/api`。后端业务模块始终通过 Database Provider 和 database profile 读写数据，不使用本地 JSON mock；route 是否可达仍由当前 capability profile 决定。
 
-完整版正式部署使用 PostgreSQL（`type: postgres`）或 GaussDB / DWS（`type: gaussdb`）profile，初始化脚本按模块存放在 `docs/pg/` 与 `docs/dws/`。Community/local 隔离运行还支持 SQLite（`type: sqlite`），其基线由 Community migration/seed 流程维护。Cloudflare D1 不在支持范围内。
+Community/local 隔离运行支持 SQLite（`type: sqlite`），其基线由 `backend/schema` + Alembic + seed 流程维护；Community 正式部署推荐 PostgreSQL（`type: postgres`），MySQL 8.0 由独立 profile/driver 支持。完整或扩展部署可使用 PostgreSQL、GaussDB/DWS，并按 `docs/pg/`、`docs/dws/` 的补充 DDL 准备 Optional 表和外部依赖。Cloudflare D1 不在支持范围内。

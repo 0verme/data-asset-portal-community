@@ -26,7 +26,7 @@
 
 ## HISTORICAL documentation
 
-旧 P2/P3/P4 migration notes 中的 `Flask/FastAPI parity` wording 仅描述历史阶段；当前部署/architecture/API docs 已更新为 FastAPI Native。生成的 `docs/system-architecture.html` / `docs/system-architecture.archify.json` 如仍包含旧图示，属于历史生成 artifact，后续由 architecture artifact 专项更新，不参与 runtime。
+旧 P2/P3/P4 migration notes 中的 `Flask/FastAPI parity` wording 仅描述历史阶段；当前部署、architecture、API 和 Demo docs 使用 FastAPI Native 叙事。`docs/system-architecture.html` / `docs/system-architecture.archify.json` 是 versioned architecture output，当前版本以可审计的 `origin/main` source revision 为证据，不参与 runtime；后续 runtime 变化应重新生成或明确标记为 historical snapshot。
 
 ## Conclusion
 

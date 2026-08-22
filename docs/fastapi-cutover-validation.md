@@ -1,5 +1,7 @@
 # P5 FastAPI Cutover Validation（#52）
 
+> **Historical validation snapshot**：本文保留 P5 阶段的验证证据与当时的 compatibility wording。当前 production truth 以 `uvicorn backend.asgi:app` → `backend/asgi.py` → FastAPI、`/healthz` 和 [docs/architecture.md](./architecture.md) 为准；本文不表示当前仍有 Flask fallback。
+
 本验证覆盖 P5-A runtime wiring 以及 P5-B 的最小部署/兼容性 gate。
 
 ## Runtime checks

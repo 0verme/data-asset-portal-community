@@ -1,8 +1,8 @@
 # 📸 界面截图画廊
 
-> 以下截图均来自 **Community Demo**（`demo/datasets/` 虚构零售数据）真实运行的
-> **DB → Service → API → Frontend** 完整链路，前端无任何写死的演示假数据。
-> 截图基于 `2560×1440` 视口拍摄；完整可复现流程见 [Community Demo](../README.md#-community-demo完整演示环境)。
+> 以下截图均来自仓库 **Repository Community Demo**（`demo/datasets/` 虚构零售数据）真实运行的
+> **SQLite → Service → FastAPI/Uvicorn → Frontend** 链路，前端无任何写死的演示假数据。
+> 截图基于 `2560×1440` 视口拍摄；完整可复现流程见 [Community Demo 指南](./community-demo.md)。它们不代表线上独立 static/mock bundle，也不自动代表当前 `origin/main` 的全部 route coverage。
 
 ## 资产门户总览
 
@@ -64,4 +64,5 @@
 ## 说明
 
 - 所有数据均为**虚构零售演示数据**，不包含任何真实业务信息。
-- 血缘分析页（POC）暂未纳入公开截图，等待 Demo 世界观对齐后补充。
+- 截图来自 repository Community remote path；如果页面显示 `V0.1.0`，它表示 frontend application/build metadata，不是线上 static Demo 的 `V1.0.0`，也不改变 published GitHub Release `v0.1.0` 的语义。
+- 血缘分析页（POC）暂未纳入公开截图，等待 Demo 口径确认后补充；未出现在画廊不表示该 route 在所有 profile 都不可用。

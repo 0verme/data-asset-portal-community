@@ -7,6 +7,18 @@
 
 ## [Unreleased]
 
+### 运行时与数据层（Changed）
+
+- FastAPI Native runtime 已收口为唯一当前入口：Uvicorn → `backend/asgi.py` → FastAPI；`/healthz` 固定报告 `runtime=fastapi`、`fastapiPrimary=true`、`flaskFallback=false`。
+- Flask / Flask-Cors runtime dependency、WSGI fallback、Waitress 和 runtime switch 已退休；`Werkzeug`、`itsdangerous` 与 `FLASK_*` 名称仅因密码哈希、signed-session/security configuration contract 保留。
+- Database Provider、SQLAlchemy Core 与 Alembic baseline/forward migration 已成为当前数据库访问与 Community/local 初始化路径；`docs/pg` / `docs/dws` 保留为 full/extension deployment 的补充 DDL。
+
+### Repository Truth（Documentation）
+
+- 对齐 README、Architecture、Deployment、Development、API Contract、Modules、Community Demo、Screenshots 与 generated architecture artifact 的当前 FastAPI/Uvicorn、schema/migration、Demo 和版本语义。
+- 明确 published `v0.1.0`、Draft `v0.1.1`、post-`v0.1.0` current main 与独立线上 mock bundle `V1.0.0` 的区别；已发布的 `[0.1.0]` 历史章节保持不变。
+- Community / Optional runtime gating 仍按当前 profile 保留；其移除属于后续 #116，不在本变更中实施。
+
 ### 优化（Changed）
 
 - 前端完成组件化拆分：页面视图收敛到 `components/views/`、侧边栏收敛到 `components/sidebar/`，业务逻辑抽取为 `hooks/` 下的领域 hook（`useAssetModule`、`useRootModule`、`useIndicatorModule`、`usePushModule`、`useUpstreamModule`、`useSystemModule` 等）。

@@ -9,7 +9,7 @@ trace field/table mappings, and maintain roots, indicators, and downstream metad
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![CI](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml)
-![Stack](https://img.shields.io/badge/React%2018%20%2B%20Vite%207%20%7C%20FastAPI%20%2B%20Flask%20Compatibility-2025?logo=react)
+![Stack](https://img.shields.io/badge/React%2018%20%2B%20Vite%207%20%7C%20FastAPI%20%2B%20Uvicorn?logo=react)
 
 [快速开始](#-快速开始) · [社区入口](#-社区入口) · [功能模块](#-功能模块) · [文档](#-文档导航)
 
@@ -53,11 +53,19 @@ trace field/table mappings, and maintain roots, indicators, and downstream metad
 
 更多页面见 [截图画廊](./docs/screenshots.md)。
 
+## 🧭 Runtime Truth
+
+- **Frontend**：React + Vite。
+- **Backend**：FastAPI Native，由 Uvicorn 加载 `backend/asgi.py`。
+- **Production / local entrypoint**：`uvicorn backend.asgi:app --host 127.0.0.1 --port 5099`。
+- **Health contract**：`/healthz` 返回 `runtime=fastapi`、`fastapiPrimary=true`、`flaskFallback=false`；其中 `flaskFallback` 是明确的回归字段，不表示仓库仍运行 Flask。
+- **Data path**：Application / Service Layer → Database Provider → SQLite、PostgreSQL、MySQL 或 GaussDB/DWS。
+
 ## 🚀 快速开始
 
-### Community Demo（完整数据链路，推荐首次体验）
+### Repository Community Demo（真实 remote API，推荐首次体验）
 
-需要 Python 3.10+、Node.js 22.13+ 和 npm 10+。脚本会在项目目录内准备后端 virtualenv、前端依赖、SQLite、migration、Community seed，并启动真实 API 与前端。
+需要 Python 3.10+、Node.js 22.13+ 和 npm 10+。`scripts/community_demo.py` 会在项目目录内准备后端 virtualenv、前端依赖、Community SQLite、Alembic migration、seed，并以 `backend/asgi.py` + Uvicorn 启动真实 FastAPI API 与前端。它代表仓库当前 Community profile 的 remote 运行面，不等同于下方的前端 mock 或线上静态 Demo；当前 Community/Optional 边界仍由 profile 控制，移除边界由 [#116](https://github.com/0verme/data-asset-portal-community/issues/116) 负责。
 
 Linux/macOS：
 
@@ -79,9 +87,9 @@ cd data-asset-portal-community
 初始化但不启动服务时，使用 `./scripts/demo.sh --init-only` 或
 `.\scripts\demo.ps1 -InitOnly`。详细说明见 [Community Demo 指南](./docs/community-demo.md)。
 
-### 只看前端（mock）
+### 只看前端（mock mode）
 
-只需 Node.js 22.13+ 和 npm 10+；mock 模式不需要数据库或后端服务。
+只需 Node.js 22.13+ 和 npm 10+；mock mode 只读取前端受控数据，不需要数据库或后端服务。默认 module registry 可展示源码中的全部模块，但这不代表 remote Community backend 当前注册了相同的路由。
 
 ```bash
 npm --prefix frontend ci
@@ -91,6 +99,10 @@ npm --prefix frontend run dev
 
 确认 `frontend/.env.local` 中为 `VITE_API_MODE=mock` 后，使用 `admin / admin123` 登录。
 mock 数据只用于前端体验，不会写入数据库。
+
+### 在线静态 Demo
+
+[https://data.overme.cn/](https://data.overme.cn/) 是独立部署的静态/mock bundle。当前可见 footer 为 `V1.0.0`，并展示比仓库 Community remote profile 更广的 mock module navigation；它没有在页面 HTML 中提供仓库 revision，因此不自动等同于当前 `origin/main`、仓库 Community Demo 或已发布 GitHub Release。
 
 ## 🤝 社区入口
 
@@ -102,7 +114,7 @@ mock 数据只用于前端体验，不会写入数据库。
 
 ## 🧩 功能模块
 
-核心 Community profile 默认启用：
+仓库的 Community profile 当前默认启用：
 
 - **数据仓库**：浏览表、字段、层级、主题域和 DDL。
 - **字段映射与血缘分析**：追溯字段/表关系，查看有限血缘子图与关系证据。
@@ -112,9 +124,8 @@ mock 数据只用于前端体验，不会写入数据库。
 
 ### Optional 模块
 
-报表资产、上游卸数、下游推送和码值表维护属于 **Optional — disabled by default** 模块，
-由 `backend/configs/community.yaml` 的 runtime profile 控制，Community 默认不注册其路由、菜单和数据表。
-完整模块清单见 [docs/modules.md](./docs/modules.md)。
+报表资产、上游卸数、下游推送和码值表维护属于当前 profile 下 **Optional — disabled by default** 模块，
+由 `backend/configs/community.yaml` 的 runtime profile 控制，Community 当前不注册其路由、菜单和数据表；这是真实的现状边界，不是本 PR 要移除的行为。完整模块清单与 Source / Runtime / Schema / Demo 对照见 [docs/modules.md](./docs/modules.md)；边界移除由 [#116](https://github.com/0verme/data-asset-portal-community/issues/116) 负责。
 
 > **许可与运行时是两个独立概念：**本仓库包含的模块源码均按 Apache-2.0 License 提供。
 > “Optional” 只描述默认 runtime profile，不表示另一种 license、commercial edition 或 closed-source module。
@@ -129,13 +140,21 @@ flowchart LR
   A --> F["FastAPI Native routes"]
   F --> S["Service Layer"]
   S --> D["Database Provider"]
-  D --> DB[("SQLite / PostgreSQL / GaussDB-DWS")]
+  D --> DB[("SQLite / PostgreSQL / MySQL / GaussDB-DWS")]
   R -.->|"mock"| M["受控演示数据"]
 ```
 
-默认由 Uvicorn 加载 `backend/asgi.py`；FastAPI 是唯一 production runtime。Community native API 与 infrastructure routes 由 FastAPI 处理，WAIT_DB/Private routes 按 scope gate 不注册；所有 API 复用同一 Service Layer、API Contract 和 Database Provider。前端通过 `VITE_API_MODE` 选择 mock 或 remote；后端按 database profile 访问数据库。
-Community 新安装的 schema 唯一入口是 `backend/schema` 完整基线与 `backend/alembic` 增量 revision，随后使用 `demo/seed_*.py` 写入虚构数据。
-详见 [架构说明](./docs/architecture.md) 和 [数据库迁移说明](./backend/schema/README.md)。
+默认由 Uvicorn 加载 `backend/asgi.py`；FastAPI 是唯一 production runtime。Community native API 与 infrastructure routes 由 FastAPI 处理，WAIT_DB/Private routes 按当前 capability scope gate 不注册；所有 API 复用同一 Service Layer、API Contract 和 Database Provider。前端通过 `VITE_API_MODE` 选择 mock 或 remote；后端按 database profile 访问数据库。
+Community/local 新安装的 schema 唯一入口是 `backend/schema` 四方言完整 baseline + `backend/alembic` 增量 revision，随后使用对应的 `demo/seed_sqlite.py` 或 `demo/seed_postgres.py` 写入虚构数据。`docs/pg/` 与 `docs/dws/` 是完整部署或扩展模块的补充 DDL，不替代 Community baseline/migration 路径。
+详见 [架构说明](./docs/architecture.md)、[数据库迁移说明](./backend/schema/README.md) 和 [部署说明](./DEPLOYMENT.md)。
+
+## 🏷️ Release / Version Truth
+
+- **Published GitHub Release**：`v0.1.0`；对应历史章节见 [CHANGELOG.md](./CHANGELOG.md)，不会被本 PR 改写。
+- **Draft Release**：`v0.1.1` 仍是 Draft，不是 published release。
+- **Current main**：当前 `origin/main` 是 `v0.1.0` 之后的 unreleased development state。
+- **Application/package metadata**：FastAPI app、frontend package 和仓库本地 footer 仍使用 `0.1.0` / `V0.1.0`，不表示已经发布新版本。
+- **Online Demo build**：线上静态/mock bundle 的 `V1.0.0` 是独立 build metadata，不代表仓库 release 或当前 main。
 
 ## 📚 文档导航
 
@@ -161,7 +180,7 @@ Community 新安装的 schema 唯一入口是 `backend/schema` 完整基线与 `
 
 ### 支持哪些数据库？
 
-SQLite 用于 Community 本地演示、开发和 CI；PostgreSQL 用于 Community 与完整部署；GaussDB / DWS
+SQLite 用于 Community 本地演示、开发和 CI；PostgreSQL 用于 Community 与完整部署；MySQL 8.0 通过独立 profile/driver 进行数据库契约验证；GaussDB / DWS
 用于完整部署场景。当前不支持 Cloudflare D1。验证范围和初始化命令见 [开发指南](./DEVELOPMENT.md)。
 
 ### mock 和 remote 有什么区别？

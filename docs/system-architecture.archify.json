@@ -2,27 +2,33 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "数据资产门户 · FastAPI Primary Runtime",
-    "subtitle": "ASGI 入口、Flask compatibility fallback 与共享业务边界",
+    "title": "数据资产门户 · FastAPI Native Runtime",
+    "subtitle": "Uvicorn → backend/asgi.py → FastAPI；Provider、schema/migration 与当前 capability boundary",
     "output": "system-architecture.html",
     "visual_preset": "editorial",
     "quality_profile": "showcase",
     "repository": {
       "url": "https://github.com/0verme/data-asset-portal-community",
-      "revision": "ca143e2ed501c9397f158225088ab09625179b24"
+      "revision": "17a4efa32a64531e6502f531119b25583d99e7a8"
     },
     "views": [
       {
-        "id": "primary-request",
-        "label": "默认请求路径",
-        "focus": ["browser", "frontend", "asgi-runtime", "fastapi", "services", "db-provider", "metadata"],
-        "note": "默认由 Uvicorn 加载 backend/asgi.py，已迁移 prefix 进入 FastAPI。"
+        "id": "current-runtime",
+        "label": "当前请求路径",
+        "focus": ["browser", "frontend", "asgi-runtime", "fastapi", "application", "db-provider", "metadata"],
+        "note": "当前 production 与默认 development 入口均为 Uvicorn 加载 backend/asgi.py 的纯 FastAPI Native runtime。"
       },
       {
-        "id": "compatibility-boundary",
-        "label": "兼容与回滚边界",
-        "focus": ["asgi-runtime", "fastapi", "flask-fallback", "session", "services"],
-        "note": "未迁移路径、signed session、Operation Log context 与 BACKEND_RUNTIME=flask 仍依赖 Flask。"
+        "id": "data-initialization",
+        "label": "数据与初始化",
+        "focus": ["fastapi", "application", "db-provider", "metadata"],
+        "note": "Community/local 使用 backend/schema + Alembic + seed；full/extension DDL 不自动进入 Community baseline。"
+      },
+      {
+        "id": "current-boundaries",
+        "label": "当前配置边界",
+        "focus": ["asgi-runtime", "fastapi", "capability", "session-contract"],
+        "note": "Community capability gate 与保留的 signed-session/security configuration contract 是当前配置事实；Edition/Optional gating removal 延后至 #116。"
       }
     ]
   },
@@ -32,19 +38,19 @@
       "type": "external",
       "label": "Browser",
       "sublabel": "用户设备",
-      "pos": [40, 250],
+      "pos": [40, 300],
       "size": [126, 62]
     },
     {
       "id": "frontend",
       "type": "frontend",
       "label": "React + Vite",
-      "sublabel": "SPA / /api client",
-      "pos": [225, 250],
-      "size": [140, 62],
+      "sublabel": "SPA / /api client / mock mode",
+      "pos": [225, 300],
+      "size": [156, 62],
       "sources": [
-        { "path": "frontend/package.json", "line": 1, "end_line": 25, "label": "前端依赖" },
-        { "path": "frontend/src/api/http.js", "line": 23, "end_line": 74, "label": "HTTP client" }
+        { "path": "frontend/package.json", "label": "前端依赖与脚本" },
+        { "path": "frontend/src/modules/moduleRegistry.js", "label": "模块 registry" }
       ]
     },
     {
@@ -52,83 +58,81 @@
       "type": "cloud",
       "label": "ASGI Runtime",
       "sublabel": "Uvicorn → backend/asgi.py",
-      "pos": [425, 250],
-      "size": [158, 62],
+      "pos": [430, 300],
+      "size": [174, 62],
       "sources": [
-        { "path": "DEPLOYMENT.md", "line": 59, "end_line": 88, "label": "生产入口" },
-        { "path": "backend/asgi.py", "line": 1, "end_line": 6, "label": "runtime doc" }
+        { "path": "backend/asgi.py", "label": "唯一 runtime entry" }
       ]
     },
     {
       "id": "fastapi",
       "type": "backend",
-      "label": "FastAPI primary",
-      "sublabel": "migrated prefixes",
-      "pos": [640, 155],
-      "size": [154, 62],
+      "label": "FastAPI Native",
+      "sublabel": "routers / healthz / capability surface",
+      "pos": [655, 300],
+      "size": [174, 62],
       "sources": [
-        { "path": "backend/asgi.py", "line": 28, "end_line": 32, "label": "prefix map" },
-        { "path": "backend/app/fastapi/app.py", "line": 1, "end_line": 6, "label": "composition root" }
+        { "path": "backend/app/fastapi/app.py", "label": "composition root" },
+        { "path": "backend/app/fastapi/routers/infrastructure.py", "label": "native infrastructure" }
       ]
     },
     {
-      "id": "flask-fallback",
+      "id": "application",
       "type": "backend",
-      "label": "Flask fallback",
-      "sublabel": "compatibility / rollback",
-      "pos": [640, 355],
-      "size": [154, 62],
+      "label": "Application / Service",
+      "sublabel": "contracts + business services",
+      "pos": [875, 300],
+      "size": [170, 62],
       "sources": [
-        { "path": "backend/asgi.py", "line": 1, "end_line": 6, "label": "fallback doc" },
-        { "path": "backend/run.py", "line": 21, "end_line": 29, "label": "direct WSGI" }
-      ]
-    },
-    {
-      "id": "services",
-      "type": "backend",
-      "label": "Service Layer",
-      "sublabel": "shared business logic",
-      "pos": [860, 250],
-      "size": [150, 62],
-      "sources": [
-        { "path": "docs/architecture.md", "line": 35, "end_line": 35, "label": "后端边界" },
-        { "path": "backend/app/services/assets_service.py", "line": 823, "end_line": 889, "label": "业务服务" }
+        { "path": "backend/app/contracts/models.py", "label": "API contracts" },
+        { "path": "backend/app/services/assets_service.py", "label": "service boundary" }
       ]
     },
     {
       "id": "db-provider",
       "type": "backend",
       "label": "Database Provider",
-      "sublabel": "facade / adapters",
-      "pos": [1065, 250],
-      "size": [160, 62],
+      "sublabel": "SQLAlchemy Core / adapters",
+      "pos": [1090, 300],
+      "size": [174, 62],
       "sources": [
-        { "path": "backend/app/db/facade.py", "line": 267, "end_line": 278, "label": "adapter selection" },
-        { "path": "backend/app/db/registry.py", "line": 3, "end_line": 8, "label": "provider boundary" }
+        { "path": "backend/app/db/registry.py", "label": "provider registry" },
+        { "path": "backend/app/db/tables.py", "label": "table contract" }
       ]
     },
     {
       "id": "metadata",
       "type": "database",
       "label": "Metadata Store",
-      "sublabel": "SQLite / PostgreSQL / DWS",
-      "pos": [1280, 250],
-      "size": [158, 62],
+      "sublabel": "SQLite / PostgreSQL / MySQL / DWS",
+      "pos": [1310, 300],
+      "size": [188, 62],
       "sources": [
-        { "path": "backend/schema/README.md", "line": 3, "end_line": 17, "label": "schema baseline" },
-        { "path": "backend/requirements.txt", "line": 1, "end_line": 10, "label": "runtime deps" }
+        { "path": "backend/schema/README.md", "label": "baseline and migration" },
+        { "path": "backend/alembic/versions/0002_portable_asset_filter.py", "label": "forward revision" }
       ]
     },
     {
-      "id": "session",
+      "id": "capability",
       "type": "security",
-      "label": "Flask compatibility seam",
-      "sublabel": "signed session + request context",
-      "pos": [425, 500],
+      "label": "Community Capability",
+      "sublabel": "current profile / route gate",
+      "pos": [655, 500],
+      "size": [174, 62],
+      "sources": [
+        { "path": "backend/configs/community.yaml", "label": "current profile" },
+        { "path": "backend/app/core/capabilities.py", "label": "capability resolver" }
+      ]
+    },
+    {
+      "id": "session-contract",
+      "type": "security",
+      "label": "Signed-session Config",
+      "sublabel": "retained FLASK_* names / native codec",
+      "pos": [430, 500],
       "size": [190, 62],
       "sources": [
-        { "path": "backend/asgi.py", "line": 35, "end_line": 61, "label": "request context" },
-        { "path": "docs/fastapi-flask-dependency-audit.md", "line": 15, "end_line": 21, "label": "dependency audit" }
+        { "path": "backend/app/settings.py", "label": "security settings and retained names" }
       ]
     }
   ],
@@ -136,50 +140,49 @@
     {
       "kind": "region",
       "label": "Portal Application Runtime",
-      "wraps": ["asgi-runtime", "fastapi", "flask-fallback", "services", "db-provider"],
+      "wraps": ["asgi-runtime", "fastapi", "application", "db-provider"],
       "pad": 24
     },
     {
       "kind": "security-group",
-      "label": "Compatibility / rollback boundary",
-      "wraps": ["fastapi", "flask-fallback", "session"],
+      "label": "Current configuration boundaries",
+      "wraps": ["fastapi", "capability", "session-contract"],
       "pad": 18
     }
   ],
   "connections": [
     { "id": "browser-frontend", "from": "browser", "to": "frontend", "label": "HTTPS", "variant": "emphasis" },
-    { "id": "frontend-runtime", "from": "frontend", "to": "asgi-runtime", "label": "/api", "variant": "emphasis" },
-    { "id": "runtime-fastapi", "from": "asgi-runtime", "to": "fastapi", "variant": "emphasis", "route": "orthogonal-v" },
-    { "id": "runtime-flask", "from": "asgi-runtime", "to": "flask-fallback", "variant": "dashed", "route": "orthogonal-v" },
-    { "id": "fastapi-services", "from": "fastapi", "to": "services", "label": "adapter", "variant": "emphasis", "route": "orthogonal-h" },
-    { "id": "flask-services", "from": "flask-fallback", "to": "services", "label": "adapter", "variant": "dashed", "route": "orthogonal-h" },
-    { "id": "services-provider", "from": "services", "to": "db-provider", "variant": "emphasis" },
-    { "id": "provider-metadata", "from": "db-provider", "to": "metadata", "label": "SQL", "variant": "emphasis" },
-    { "id": "runtime-session", "from": "asgi-runtime", "to": "session", "variant": "security", "route": "orthogonal-v" }
+    { "id": "frontend-runtime", "from": "frontend", "to": "asgi-runtime", "variant": "emphasis" },
+    { "id": "runtime-fastapi", "from": "asgi-runtime", "to": "fastapi", "variant": "emphasis", "route": "orthogonal-h" },
+    { "id": "fastapi-application", "from": "fastapi", "to": "application", "variant": "emphasis" },
+    { "id": "application-provider", "from": "application", "to": "db-provider", "variant": "emphasis" },
+    { "id": "provider-metadata", "from": "db-provider", "to": "metadata", "variant": "emphasis" },
+    { "id": "fastapi-capability", "from": "fastapi", "to": "capability", "label": "route registration", "variant": "security", "route": "orthogonal-v" },
+    { "id": "runtime-session", "from": "asgi-runtime", "to": "session-contract", "label": "cookie/security config", "variant": "security", "route": "orthogonal-v" }
   ],
   "cards": [
     {
       "dot": "cyan",
       "title": "Runtime Truth",
       "items": [
-        "默认入口是 uvicorn backend.asgi:app，BACKEND_RUNTIME 默认值为 fastapi。",
-        "FastAPI 处理已迁移 prefix；其余路径由 Flask WSGI fallback 接管。"
+        "当前入口是 uvicorn backend.asgi:app；FastAPI 是唯一 production/native runtime。",
+        "/healthz 明确返回 runtime=fastapi、fastapiPrimary=true、flaskFallback=false；没有 Flask/WSGI fallback 节点。"
       ]
     },
     {
       "dot": "rose",
-      "title": "Compatibility Debt",
+      "title": "Data and Boundaries",
       "items": [
-        "Flask signed session、auth compatibility 和 Operation Log request context 仍被 primary runtime 使用。",
-        "Portal、Search、Auth、Capabilities 与 WAIT_DB 路径仍不能安全移除 Flask。"
+        "Community/local 使用 backend/schema baseline + Alembic forward revisions + seed；docs/pg 与 docs/dws 是 full/extension 补充 DDL。",
+        "Community profile 当前仍 gate WAIT_DB 与 Optional module routes；Edition/Optional gating removal 由 #116 负责。"
       ]
     },
     {
       "dot": "emerald",
-      "title": "Shared Boundary",
+      "title": "Version and Demo Truth",
       "items": [
-        "FastAPI 与 Flask 复用 Service、Contract 和 Database Provider。",
-        "双 runtime 是 HTTP adapter / rollback boundary，不是两套业务实现。"
+        "Published release 是 v0.1.0，v0.1.1 仍是 Draft，current main 是 post-v0.1.0 unreleased state。",
+        "Repository Community Demo、frontend mock 和 online static V1.0.0 bundle 是三个不同运行面。"
       ]
     }
   ]

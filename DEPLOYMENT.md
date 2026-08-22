@@ -9,7 +9,8 @@
 
 - 前端静态资源：`frontend/dist/`
 - 后端服务入口：`backend/asgi.py`（纯 FastAPI/Uvicorn）
-- 数据库初始化：手动执行 `docs/pg/` 或 `docs/dws/` 下的模块 DDL（无一键脚本）
+- Community/local 数据库初始化：`backend/schema/<dialect>.sql` + `backend/scripts/schema_migrate.py` + 对应 seed 脚本
+- 完整部署或扩展模块的补充 DDL：`docs/pg/`、`docs/dws/`；它们不是 Community/local 默认初始化入口
 
 ## 一、准备配置
 
@@ -23,7 +24,7 @@ VITE_BACKEND_URL=http://127.0.0.1:5099
 
 ### 后端环境变量
 
-后端始终连库、无模式开关，只需指定数据库 profile：
+后端始终连库、无模式开关，只需指定数据库 profile。下列 `FLASK_*` 是保留的安全、Session Cookie 和 CORS configuration contract 名称，不代表仍存在 Flask runtime：
 
 ```env
 ASSET_DB_PROFILE=primary
@@ -38,11 +39,11 @@ FLASK_SECRET_KEY=<generate-a-strong-random-value>
 # FLASK_CORS_ORIGINS=https://portal.example.com
 ```
 
-`FLASK_SECRET_KEY` 是所有环境的必填安全配置：缺失、空字符串或纯空白会在应用启动时失败。使用密码管理器或部署平台的 secret store 生成和保存强随机值；不要把真实值提交到仓库、写入日志或拼进 shell 命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`。
+`FLASK_SECRET_KEY` 是所有环境的必填 signed-session 安全配置：缺失、空字符串或纯空白会在应用启动时失败。使用密码管理器或部署平台的 secret store 生成和保存强随机值；不要把真实值提交到仓库、写入日志或拼进 shell 命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`。
 
-`FLASK_DEBUG` 默认关闭，只有 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会开启。`FLASK_ENV` 未设置时采用安全的生产行为：Session Cookie 为 `HttpOnly=True`、`SameSite=Lax`、`Secure=True`。仅本地 HTTP 开发可显式设置 `FLASK_ENV=development` 使 `Secure=False`；不要在生产环境使用该值。
+`FLASK_DEBUG` 默认关闭，只有 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会开启。`FLASK_ENV` 未设置时采用安全的生产行为：Session Cookie 为 `HttpOnly=True`、`SameSite=Lax`、`Secure=True`。仅本地 HTTP 开发可显式设置 `FLASK_ENV=development` 使 `Secure=False`；这些变量名属于 retained compatibility/configuration contract，不表示 Flask 进程或 Flask WSGI runtime。
 
-此文档的 Nginx 配置将静态前端和 `/api` 放在同一来源，因此不需要 CORS。若必须拆分来源，设置 `FLASK_CORS_ORIGINS` 为完整、精确的逗号分隔 allowlist（如 `https://portal.example.com,https://admin.example.com`）；未设置时不会返回 CORS 允许头，空项会忽略，且不会允许 `*` 与 Cookie 凭据的组合。
+此文档的 Nginx 配置将静态前端和 `/api` 放在同一来源，因此不需要 CORS。若必须拆分来源，设置 `FLASK_CORS_ORIGINS` 为完整、精确的逗号分隔 allowlist（如 `https://portal.example.com`）；未设置时不会返回 CORS 允许头，空项会忽略，且不会允许 `*` 与 Cookie 凭据的组合。
 
 如使用 GaussDB JDBC 覆盖路径，可额外设置：
 
@@ -52,7 +53,7 @@ ASSET_DB_JAR_PATH=/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
 
 ## 二、后端部署
 
-当前生产入口是 `backend.asgi:app`：由 Uvicorn 启动纯 FastAPI native backend。Auth、已迁移 Community API、Capabilities、Portal、Search 与 Operation Log 均由 FastAPI 承载；WAIT_DB/Private routes 按 scope gate 保持不注册。FastAPI 使用与 Flask 兼容的 signed session codec。
+当前生产入口是 `backend.asgi:app`：由 Uvicorn 启动纯 FastAPI native backend。Auth、已迁移 Community API、Capabilities、Portal、Search 与 Operation Log 均由 FastAPI 承载；WAIT_DB/Private routes 按当前 capability scope gate 保持不注册。FastAPI 使用保留历史 signed-session cookie format 的 native codec。
 
 ```bash
 cd /opt/data-asset-portal
@@ -66,7 +67,7 @@ uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 Runtime：
 
 - `uvicorn backend.asgi:app --host 127.0.0.1 --port 5099` 是唯一推荐 production runtime；
-- `backend/run.py`、Waitress 和 Flask runtime switch 已退休。
+- `backend/run.py`、Waitress 以及旧 runtime switch 均已退休；当前没有 Flask/WSGI fallback。
 
 健康检查：
 
@@ -74,13 +75,13 @@ Runtime：
 curl --fail http://127.0.0.1:5099/healthz
 ```
 
-Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"`、`"fastapiPrimary":true` 和 `"flaskFallback":false`。`/healthz` 只报告进程/runtime 状态，不执行数据库查询；数据库与业务 API 的可用性仍由对应回归和监控验证。默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）。`asgi.py` 加载仓库 runtime env 文件；系统环境变量和 demo bootstrap 规则保持现有行为。
+Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"`、`"fastapiPrimary":true` 和 `"flaskFallback":false`。其中 `flaskFallback=false` 是用于明确证明 fallback 已退休的 health contract 字段，不表示存在第二套 runtime。`/healthz` 只报告进程/runtime 状态，不执行数据库查询；数据库与业务 API 的可用性仍由对应回归和监控验证。默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）。`asgi.py` 加载仓库 runtime env 文件；系统环境变量和 demo bootstrap 规则保持现有行为。
 
 ### 安全默认值（生产）
 
 - `FLASK_DEBUG` 默认关闭；**生产环境显式开启 debug 会在启动时失败**（fail-fast），禁止 Werkzeug debugger 运行
 - Session Cookie：`HttpOnly=True`、`SameSite=Lax`、`Secure=True`（仅 `FLASK_ENV=development` 本地 HTTP 开发关闭 `Secure`）
-- 请求体上限：`FLASK_MAX_CONTENT_LENGTH_MB`（默认 16，上限存在时超限返回统一 JSON 413）
+- 请求体上限：保留配置名 `FLASK_MAX_CONTENT_LENGTH_MB`（默认 16，上限存在时超限返回统一 JSON 413；该名称不代表 Flask runtime）
 - 响应安全头：`X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy: strict-origin-when-cross-origin`
 - 4xx/5xx 错误响应统一为 JSON 结构，不向客户端泄露内部路径/连接串/底层驱动异常
 - 转发头信任：**默认不受信任**。审计日志如需真实客户端 IP，仅当请求只经受信反代（如 Nginx）时设置 `ASSET_TRUST_PROXY_HEADERS=true`；否则客户端可直接伪造 `X-Forwarded-For`。Nginx 已设置 `X-Forwarded-For` 的同源部署请开启该项
@@ -100,16 +101,31 @@ npm run build
 
 ## 四、数据库初始化与迁移
 
-应用启动不会自动迁移 schema。新环境使用 `backend/schema/<dialect>.sql` 完整基线并由 CLI stamp `0001_baseline`；后续结构变更由 `backend/alembic` forward revision 管理。既有环境应先备份并执行 `verify`，结构一致后才能 `baseline` stamp，不能用初始化 DDL 覆盖升级。
+应用启动不会自动迁移 schema。新用户应先选择与部署 profile 对应的 Community baseline，再使用 `schema_migrate.py` 应用 Alembic head；不要把手工模块 DDL 当作默认入口。
 
-**手动逐个执行模块 DDL，无一键脚本。** 根据数据库类型选择脚本目录并用对应客户端执行：
+### Community / local 默认路径
 
-- PostgreSQL → `docs/pg/*-app-pg-ddl.sql`（`psql -f`）
-- DWS / GaussDB → `docs/dws/*-app-dws-ddl.sql`（`gsql -f`）
+`backend/schema/<dialect>.sql` 是四方言 Community baseline，`backend/alembic/versions/` 管理后续 forward revisions，`backend/scripts/schema_migrate.py` 负责 apply、verify、plan 和既有库 baseline stamp。推荐顺序：
 
-覆盖模块：common-codes、assets、field-mappings、indicators、roots、upstream、push、reports、api-assets、lineage、manual-code-tables、auth、operation-logs、menus。
-每份 DDL 均为幂等（`IF NOT EXISTS` / `INSERT ... WHERE NOT EXISTS`），可安全重复执行；
-具体命令见 [README 的「数据库初始化（手动执行 SQL）」](./README.md#-快速开始)。管理员账号手动插入 `p_admin_user`。
+```bash
+# SQLite 本地 / Community Demo
+python backend/scripts/schema_migrate.py apply --profile community_sqlite
+python demo/seed_sqlite.py --database <absolute-local-path>/community.sqlite
+
+# PostgreSQL Community 部署（使用隔离的 Community 数据库）
+python backend/scripts/schema_migrate.py apply --profile community_postgres
+python demo/seed_postgres.py --dialect postgres
+```
+
+既有环境必须先备份并执行 `verify`；只有在 schema 与 baseline 契约一致时才允许 `baseline` stamp，不能用初始化 SQL 覆盖升级。后续结构变更只通过新的 Alembic revision 管理。
+
+### Full / module-specific / external dependency 路径
+
+`docs/pg/` 与 `docs/dws/` 保存按模块拆分的 PostgreSQL、GaussDB/DWS 补充 DDL。它们用于需要完整模块表、persistent lineage 或外部数据库依赖的部署场景；其中包含 Community 核心模块的补充/历史兼容 DDL，也包含当前不在 Community baseline 中的 `upstream`、`push`、`report`、`codeTable` 和 lineage 持久化表。它们不是 `backend/schema` + Alembic 的替代，也不是 Community/local 新库的默认路径。
+
+如果部署确实选择该 full/extension 路径，应先阅读对应 SQL、确认模块 profile 和外部依赖，再使用 `psql -f` 或 `gsql -f` 按模块执行；不要把所有 SQL 无条件应用到 Community 数据库。当前 Community/Optional route、schema 和 seed 边界仍然存在，移除工作属于 [#116](https://github.com/0verme/data-asset-portal-community/issues/116)。
+
+血缘 persistent 模式还需要配置 `LINEAGE_DB_PROFILE`；Community Demo 默认保持 POC/in-memory 模式，不会因为用户 shell 环境而连接外部数据库。
 
 > 🚫 仓库不再包含整库快照（`app-*-init-data.sql` 与 `docs/*/sample/*.sql` 已从公开树移除）；
 > 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。
@@ -160,7 +176,7 @@ server {
 - 确认 `/healthz` 返回 `status=ok`，并确认 runtime 为预期值
 - 确认 `/api/assets/tables` 返回 JSON 而不是 HTML
 - 确认前端为 `VITE_API_MODE=remote`，且 `/api` 已正确代理到纯 FastAPI ASGI runtime
-- 确认 `FLASK_SECRET_KEY` 由部署 secret store 提供，且 `FLASK_DEBUG=false`
+- 确认保留配置名 `FLASK_SECRET_KEY` 由部署 secret store 提供，且 `FLASK_DEBUG=false`；这些名称不代表 Flask runtime
 - HTTPS 终止后仍应保持 `FLASK_ENV=production`，以发送 Secure Cookie；FastAPI native auth 使用 signed cookie contract；本阶段未扩大转发头信任范围
 - `backend/configs/database.yaml` 与 `.env.local` 不入库（见 `.gitignore`）；请从 `backend/configs/database.example.yaml` 与 `backend/.env.example` 复制后按环境填写
 

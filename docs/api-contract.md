@@ -1,25 +1,31 @@
 # 数据资产门户 API 契约
 
-> 本文是 `data-asset-portal` 的**唯一 API 主文档**，描述全部后端接口的统一约定与各模块端点。
-> 模块的页面、数据表对照见 [modules.md](./modules.md)；本文与实现以 `backend/app/routes/` 和前端 `frontend/src/api/` 为准。
+> 本文是 `data-asset-portal` 的**唯一 API 主文档**，描述当前 `origin/main` development state 的 FastAPI 接口统一约定与端点。
+> 模块的 Source / Runtime / Schema / Demo 对照见 [modules.md](./modules.md)；routers 由 `backend/app/fastapi/routers/` 实现并由 `backend/app/fastapi/app.py` 装配，`backend/app/fastapi_app.py` 仅保留薄 import facade。历史 Flask migration 文档不代表当前 API runtime。
 
 ## 模块总览
 
-FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract，并统一以 `/api` 为前缀；routers 由 `backend/app/fastapi/app.py` 装配，`backend/app/fastapi_app.py` 仅保留薄 import facade：
+FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract，并统一以 `/api` 为前缀。下表是源码中的当前 route surface；标记为“Community 当前未注册”的模块仍可在 full/extension profile 或 mock mode 中出现，但不能把 Source/Mock coverage 当成当前 Community remote capability：
 
-| 模块 | 前端 API | Base Path | 说明 |
-| --- | --- | --- | --- |
-| 上游卸数 | `api/upstream.js` | `/api/upstreams` | 管理上游源系统与卸数状态 |
-| 数据仓库 | `api/assets.js` | `/api/assets` | 管理全部已配置层级的表资产、字段、DDL |
-| 字段映射 | `api/fieldMapping.js` | `/api/field-mappings` | 查询源字段到目标字段映射关系 |
-| 指标维护 | `api/indicator.js` | `/api/indicators` | 管理口径指标、维度、启停状态 |
-| 报表资产 | `api/report.js` | `/api/reports` | 管理报表台账、归属信息与关联引用 |
-| 词根管理 | `api/root.js` | `/api/roots` | 管理命名词根字典 |
-| 下游推送 | `api/push.js` | `/api/push` | 管理下游系统、推送作业与字段 |
-| 系统管理 | `api/systemUsers.js`、`api/paramDicts.js` | `/api/system` | 后台用户与参数字典管理 |
-| 操作日志 | `api/operationLogs.js` | `/api/operation-logs` | 查询全站操作审计日志 |
-| 通用码值 | `api/commonCodes.js` | `/api/common-codes` | 全系统可复用的分类码值与下拉选项 |
-| 认证 | `api/auth.js` | `/api/auth` | 登录、登出、获取当前用户 |
+| 模块 | 前端 API | Base Path | Community 当前状态 | 说明 |
+| --- | --- | --- | --- | --- |
+| 门户 / 能力 / 搜索 | `api/portal.js`、`api/search.js` | `/api/portal`、`/api/capabilities`、`/api/search` | 已注册 | 门户统计、能力清单、统一搜索 |
+| 认证 | `api/auth.js` | `/api/auth` | 已注册 | 登录、登出、获取当前用户 |
+| 上游卸数 | `api/upstream.js` | `/api/upstreams` | 当前未注册 | 管理上游源系统与卸数状态 |
+| 数据仓库 | `api/assets.js` | `/api/assets` | 已注册 | 管理已配置层级的表资产、字段、DDL |
+| 字段映射 | `api/fieldMapping.js` | `/api/field-mappings` | 已注册 | 查询源字段到目标字段映射关系 |
+| 血缘分析 | `api/lineage.js` | `/api/lineage` | 已注册 | POC 或配置后的 persistent 快照查询 |
+| 指标维护 | `api/indicator.js` | `/api/indicators` | 已注册 | 管理口径指标、维度、启停状态 |
+| 报表资产 | `api/report.js` | `/api/reports` | 当前未注册 | 管理报表台账、归属信息与关联引用 |
+| 词根管理 | `api/root.js` | `/api/roots` | 已注册 | 管理命名词根字典 |
+| 下游推送 | `api/push.js` | `/api/push` | 当前未注册 | 管理下游系统、推送作业与字段元数据 |
+| API 资产 | `api/apiAssets.js` | `/api/api-assets` | 已注册 | 管理 API 元数据、参数、响应字段与关系 |
+| 码值表维护 | `api/manualCodeTables.js` | `/api/manual-code-tables` | 当前未注册 | 管理手工码值表元数据 |
+| 系统管理 | `api/systemUsers.js`、`api/paramDicts.js`、`api/menus.js` | `/api/system` | 已注册 | 用户、菜单、参数字典与角色边界 |
+| 操作日志 | `api/operationLogs.js` | `/api/operation-logs` | 已注册（随 system） | 查询全站操作审计日志 |
+| 通用码值 | `api/commonCodes.js` | `/api/common-codes` | WAIT_DB，当前未注册 | 全系统可复用的分类码值与下拉选项 |
+
+Community 当前启用的 module codes 是 `portal,dwm,mapping,lineage,root,indicator,apiAsset,system`；`upstream,push,report,codeTable` 的 route registration 仍由当前 profile 关闭，边界移除属于 [#116](https://github.com/0verme/data-asset-portal-community/issues/116)。
 
 ## 1. 总体约定
 
@@ -27,15 +33,33 @@ FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract�
 
 - 统一使用 `/api` 作为接口前缀
 - 前端使用相对路径访问，例如 `/api/assets/tables`、`/api/field-mappings/stats`、`/api/roots`
+- 本地 development / Community Demo 的后端默认监听 `http://127.0.0.1:5099`
 
-### 1.2 Content-Type
+### 1.2 Health 与版本语义
+
+`GET /healthz` 不查询数据库，只报告当前 native runtime 状态：
+
+```json
+{
+  "status": "ok",
+  "runtime": "fastapi",
+  "fastapiPrimary": true,
+  "flaskFallback": false
+}
+```
+
+`flaskFallback=false` 是明确的 runtime regression flag，不表示存在 Flask route 或第二套 WSGI runtime。FastAPI app 的 `version="0.1.0"` 与 frontend package/footer 的 `0.1.0` / `V0.1.0` 是 application/package metadata；当前 `origin/main` 是 `v0.1.0` 之后的 unreleased development state。GitHub published release 仍为 `v0.1.0`，`v0.1.1` 仍是 Draft，线上静态 mock bundle 的 `V1.0.0` 也不是 API 或 repository release version。
+
+本文描述 current main contract；历史 migration 文档中的旧 adapter/status 只作为历史证据。
+
+### 1.3 Content-Type
 
 ```http
 Content-Type: application/json; charset=utf-8
 Accept: application/json
 ```
 
-### 1.3 统一返回格式
+### 1.4 统一返回格式
 
 | 场景 | 返回体 |
 | --- | --- |
@@ -46,7 +70,7 @@ Accept: application/json
 
 分页列表（如操作日志）在 `items` 外附带 `total`、`page`、`pageSize` 等字段。
 
-### 1.4 统一错误格式
+### 1.5 统一错误格式
 
 ```json
 {
@@ -62,7 +86,7 @@ Accept: application/json
 
 `details` 可选；无字段级错误时可省略。
 
-### 1.5 建议状态码
+### 1.6 建议状态码
 
 - `200 OK`：查询、更新、删除成功
 - `201 Created`：新增成功
@@ -74,7 +98,7 @@ Accept: application/json
 - `422 Unprocessable Entity`：业务校验失败
 - `500 Internal Server Error`：服务端异常
 
-### 1.6 前端运行模式
+### 1.7 前端运行模式
 
 前端通过 `VITE_API_MODE` 切换数据来源：`mock` 走前端内置数据并使用演示登录；`remote` 统一走 `/api` 调后端真实数据库。后端唯一由 `uvicorn backend.asgi:app` 运行 FastAPI Native；WAIT_DB/Private routes 按 scope gate 不注册，不改变本 API Contract。
 
@@ -82,7 +106,7 @@ Accept: application/json
 VITE_API_MODE=remote
 ```
 
-### 1.7 权限
+### 1.8 权限
 
 系统管理（`/api/system`）的写操作（新增 / 更新 / 删除 / 状态变更 / 重置密码）由后端 `require_admin` 保护，需管理员登录态。业务模块维护操作允许 `admin` 或 `maintainer` 登录态；只读接口按各模块当前路由契约执行。
 
@@ -141,7 +165,7 @@ Base Path: `/api/assets`
 
 - `keyword`：模糊匹配表名、中文名、owner、desc
 - `domain`：按主题域过滤
-- `layer`：按数据层级过滤；省略时返回全部已配置层级，取值以 `GET /api/assets/layers` 返回的启用层级为准（V1.0.0 默认包含 ODS、DWD、DWA、DWM、DWS、DM、ADS）
+- `layer`：按数据层级过滤；省略时返回全部已配置层级，取值以 `GET /api/assets/layers` 的当前 response 为准。这里不绑定 GitHub release 或 Demo footer 版本。
 
 前端数据仓库首页默认不传 `layer`，展示全部层级；DWM 是推荐筛选项。首页侧边栏提供“全部层级”和各已配置层级入口，筛选状态通过 URL 的 `layer` 参数保留并可分享、刷新及前进后退恢复。mock 与 remote 模式遵循相同的筛选语义。
 
@@ -161,10 +185,10 @@ Base Path: `/api/assets`
 
 ### 2.5 可复制的详情请求
 
-只读详情端点不要求登录态。下面的示例使用仓库 Demo 中的虚构表名；将 `http://localhost:8000` 替换为本地服务地址即可执行。
+只读详情端点不要求登录态。下面的示例使用仓库 Demo 中的虚构表名；本地默认服务地址为 `http://127.0.0.1:5099`，如使用其他 profile 请替换为实际服务地址。
 
 ```bash
-curl --get "http://localhost:8000/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D" \
+curl --get "http://127.0.0.1:5099/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D" \
   --header "Accept: application/json"
 ```
 
@@ -230,7 +254,7 @@ Base Path: `/api/search`
 ### 可复制的搜索请求
 
 ```bash
-curl --get "http://localhost:8000/api/search" \
+curl --get "http://127.0.0.1:5099/api/search" \
   --header "Accept: application/json" \
   --data-urlencode "q=会员" \
   --data-urlencode "scope=asset" \
