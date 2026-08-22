@@ -7,8 +7,9 @@
 - **Node.js** 22.13+ —— 前端 Vite 开发与构建（`lineage-viewer` workspace 要求 `>=22.13.0`，推荐 Node 24）
 - **npm** 10+ —— 安装前端依赖（npm workspaces 需要）
 - **Python** 3.10+ —— 运行 FastAPI Native runtime
-- **PostgreSQL** 或 **GaussDB / DWS** —— 完整版 remote 联调需要
-- **SQLite** —— Community/local 隔离运行可选，Python 标准库已提供驱动
+- **PostgreSQL** 或 **GaussDB / DWS** —— Community/完整部署的 remote 联调按 profile 选择
+- **MySQL 8.0** —— 通过独立 PyMySQL 依赖和 profile 进行数据库契约验证
+- **SQLite** —— Community/local 隔离运行与一键 Demo，Python 标准库已提供驱动
 
 前端依赖定义在 `frontend/package.json`（`lineage-viewer`、`@lineage-viewer/react`、
 `@lineage-viewer/domain-adapter` 为仓库内 npm workspaces，源码在 `frontend/packages/`，
@@ -136,7 +137,7 @@ FLASK_ENV=development
 - `FLASK_DEBUG` 默认关闭；仅 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会启用它。不要在共享或生产环境设置它。
 - `FLASK_SECRET_KEY` 在所有环境均为必填项；缺失、空字符串或纯空白会使应用在启动时失败。用密码管理器或部署平台的 secret store 保存它，不要提交到仓库、写入日志，或把真实值粘贴进命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`，然后直接保存到 secret store / `.env.local`。
 - `FLASK_ENV` 默认为安全的生产行为：Cookie 使用 `Secure=True`。本地 HTTP 联调必须显式设置 `FLASK_ENV=development`，此时 `Secure=False`；`HttpOnly=True` 与 `SameSite=Lax` 始终保留。
-- `backend/asgi.py` 运行纯 FastAPI Native backend；Auth 使用 Flask-compatible signed session codec，WAIT_DB/Private routes 按 scope gate 不注册。Flask compatibility runtime 已退休；`FLASK_*` 变量仅保留 signed cookie/security configuration 所需部分。
+- `backend/asgi.py` 运行纯 FastAPI Native backend；Auth 保留既有 signed-session cookie format，WAIT_DB/Private routes 按当前 scope gate 不注册。Flask compatibility runtime 已退休；`FLASK_*` 变量名仅作为 retained signed-cookie/security configuration contract，不代表 Flask 进程。
 - Nginx + Vite 的 `/api` 反代是同源部署，不需要 CORS。只有前端和 API 确实处于不同来源时，才设置 `FLASK_CORS_ORIGINS`，使用逗号分隔的完整来源，例如 `https://portal.example.com,https://admin.example.com`；空项会忽略，未配置时不发送跨域允许头，绝不使用 `*`。
 
 ## 环境文件加载顺序
@@ -167,29 +168,30 @@ FLASK_ENV=development
 
 ## 数据库初始化
 
-**Community 的唯一官方初始化路径 = 完整 baseline + Alembic + demo seed**（Schema Source of Truth 为
+**Community/local 的唯一官方初始化路径 = baseline + Alembic + demo seed**（Schema Source of Truth 为
 `backend/schema` 与 `backend/alembic`）：
 
 ```bash
+# SQLite 本地 / Community Demo
 python backend/scripts/schema_migrate.py apply --profile community_sqlite
-python demo/seed_sqlite.py --database <绝对路径>/community.db
+python demo/seed_sqlite.py --database <absolute-local-path>/community.db
+
+# PostgreSQL Community 部署
+python backend/scripts/schema_migrate.py apply --profile community_postgres
+python demo/seed_postgres.py --dialect postgres
 ```
 
-PostgreSQL 同理：`apply --profile community_postgres` + `demo/seed_postgres.py`。
-MySQL 8.0：先执行 `pip install -r backend/requirements-mysql.txt`，再使用 `community_mysql` profile 执行 `schema_migrate.py apply`；真实 CRUD、分页、唯一约束、中文/emoji、NULL 和 rollback 由 CI MySQL 8 integration job 验证。
+MySQL 8.0 先执行 `pip install -r backend/requirements-mysql.txt`，再使用 `community_mysql` profile 执行 `schema_migrate.py apply`；真实 CRUD、分页、唯一约束、中文/emoji、NULL 和 rollback 由 CI MySQL 8 integration job 验证。既有数据库先 `verify`，只有与 baseline 契约一致时才允许 `baseline` stamp；后续结构变更只走 Alembic forward revision。
 
-完整版（含可选模块）开发可手动逐个执行模块 DDL，没有一键脚本，也不要让后端自动初始化：
+### Full / module-specific / external dependency 路径
 
-- `postgres` → `docs/pg/*-app-pg-ddl.sql`
-- `gaussdb` / `dws` → `docs/dws/*-app-dws-ddl.sql`
+`docs/pg/` 与 `docs/dws/` 是完整部署或扩展模块的补充 DDL，不是 Community/local 新库的默认入口。它们按模块提供 PostgreSQL、GaussDB/DWS 的核心兼容 DDL、当前 Community baseline 未创建的 Optional 表以及 persistent lineage 表；只有选择对应 full/extension profile、确认外部依赖和目标数据库后，才按 SQL 文件说明用 `psql -f` / `gsql -f` 执行。不要把所有 SQL 无条件应用到 Community 数据库。
 
-上述 DDL 面向完整版 PostgreSQL/GaussDB 环境，同时创建可选模块表与血缘快照表；
-每个模块一份 DDL，均为幂等写法，可安全重复执行。具体执行命令与注意事项见
-[README 的「数据库初始化」](./README.md#-快速开始)。
+Community profile 当前仍禁用 `upstream`、`push`、`report`、`codeTable`，以及依赖外部 profile 的 persistent lineage；该 runtime/schema/seed boundary 的移除属于 [#116](https://github.com/0verme/data-asset-portal-community/issues/116)，本 Issue 不改变它。
 
 > 🚫 仓库不再包含整库快照（`app-*-init-data.sql` 与 `docs/*/sample/*.sql` 已从公开树移除）。
 > 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。
-> Community seed 会创建 `community_demo` 演示管理员；手动建库时请自行插入 `p_admin_user`。
+> Community seed 会创建 `community_demo` 演示管理员；手动 full/extension 建库时需按目标部署自行准备管理员数据。
 
 ## 测试与质量检查
 
@@ -228,10 +230,10 @@ python -m unittest discover -s backend/tests
 
 1. **Repository Guard** —— `python demo/validate_demo_data.py --strict`（BLOCKER / SUSPICIOUS 必须为 0）、二进制 / dump / 环境文件检查、workflow YAML 自检；
 2. **Backend / Python 3.11 + 3.13** —— `python -m unittest discover -s backend/tests` + baseline offline verify（sqlite / postgresql / mysql / dws）+ packaging contract tests；
-3. **PostgreSQL Integration（PG 16 service）** —— fresh migration → seed → integration tests（16 个不再 skip）→ repeat apply no-op → Private 表物理边界检查；
+3. **PostgreSQL Integration（PG 16 service）** —— fresh migration → seed → integration tests（16 个不再 skip）→ repeat apply no-op → 当前 Community 表物理边界检查；
 4. **MySQL 8 Integration** —— fresh baseline → verify → SQLAlchemy Core CRUD / pagination / uniqueness / Unicode / NULL / rollback → repeat apply no-op；
 5. **Frontend / Node 22 + 24** —— `npm ci` → `npm test` → `npm run build` → `npm audit --audit-level=high`；
-6. **Community Migration（SQLite）** —— fresh apply → verify → plan → seed → repeat apply no-op → Private 表物理边界检查。
+6. **Community Migration（SQLite）** —— fresh apply → verify → plan → seed → repeat apply no-op → 当前 Community 表物理边界检查。
 
 CI 权限为只读、仅用 GitHub 官方 Actions、无生产连接。
 
@@ -266,8 +268,8 @@ PostgreSQL integration 测试（16 个）通过 `TEST_DATABASE_PROFILE` + `TEST_
 
 ### 后端（`backend/app/`）
 
-- `asgi.py` / `fastapi_app.py` / `fastapi/` —— ASGI runtime 与 FastAPI HTTP adapter；`fastapi_app.py` 保留薄 import facade，legacy Flask bootstrap/routes 已由 F7 清理
-- `services/` —— 业务与数据读写，供两种 HTTP adapter 复用
+- `asgi.py` / `fastapi_app.py` / `fastapi/` —— ASGI runtime 与 FastAPI HTTP adapter；`fastapi_app.py` 保留薄 import facade，历史 Flask bootstrap/routes 已由 F7 清理
+- `services/` —— 业务与数据读写，供 FastAPI adapter 与框架中立 Application boundary 复用
 - `contracts/` —— FastAPI/Application 复用的框架中立 API Contract
 - `db/` —— 数据库连接与 profile 解析
 

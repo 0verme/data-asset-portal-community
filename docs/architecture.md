@@ -22,7 +22,7 @@ Database Provider
 uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
-`backend/run.py` 已退休；不再提供 direct Flask development/WSGI runtime 或 runtime switch。
+`backend/run.py`、Waitress、WSGI fallback 和 runtime switch 均已退休；当前没有第二套 Flask runtime。`GET /healthz` 只报告进程状态，固定返回 `runtime=fastapi`、`fastapiPrimary=true`、`flaskFallback=false`，不执行数据库查询。`flaskFallback` 是显式的回归字段，不是当前架构节点。
 
 ## 请求分发
 
@@ -33,15 +33,15 @@ flowchart LR
   R -->|"native routes"| A["FastAPI Native"]
   A --> S["Application / Service"]
   S --> P["Database Provider"]
-  P --> D[("SQLite / PostgreSQL / GaussDB-DWS")]
+  P --> D[("SQLite / PostgreSQL / MySQL / GaussDB-DWS")]
   F -.->|"mock"| M["Controlled demo data"]
 ```
 
 `backend/app/fastapi/app.py` 根据 capability map 注册 native routers；`backend/asgi.py` 只负责 FastAPI composition、CORS/security headers 和 healthz。WAIT_DB/Private routes 不注册，不通过第二套 runtime 承载。
 
-### FastAPI primary 覆盖范围
+### FastAPI current route surface
 
-当前 FastAPI adapter 承载下列已迁移模块；带 `*` 的模块受完整 profile / capability 控制，Community 默认不会注册：
+当前 FastAPI adapter 负责下列 native routes；带 `*` 的模块源码与 adapter 已存在，但仍受当前 profile / capability 控制，Community 默认不会注册：
 
 - Indicator：`/api/indicators`
 - Assets / DWM：`/api/assets`
@@ -84,7 +84,7 @@ FastAPI adapter ── Application / Service Layer ── Database Provider ─�
 - `backend/asgi.py` 负责纯 FastAPI composition、CORS/security headers、native signed-session identity resolver 和 healthz。
 - `backend/app/fastapi_app.py` 是保留历史 import path 的 thin compatibility facade。
 - `backend/app/fastapi/app.py` 负责 FastAPI app bootstrap、explicit Service injection、capability gate 与 Router registration；`dependencies.py`、`errors.py` 和 `routers/` 承载共享 adapter seam 与模块边界。
-- `backend/app/__init__.py` 的 Flask factory/blueprint 代码已退出 production composition，待 F7 清理；native package import 不再加载 Flask。
+- `backend/app/__init__.py` 仅保留 production composition 说明；历史 Flask factory/blueprint 已删除，native package import 不加载 Flask。
 - `backend/app/services/` 和 `backend/app/db/` 是 FastAPI native 复用的业务与数据库边界。
 
 ## Rollback
@@ -95,12 +95,16 @@ F6 不再提供 Flask runtime rollback switch。应用回滚通过部署上一�
 
 ### F7 cleanup result
 
-F5 gate 已证明 production native composition 不加载 Flask；F7 已删除 Flask/Flask-Cors dependencies、Flask factory/blueprints/routes 与 obsolete compatibility tests。保留的 `Werkzeug`、`itsdangerous`、signed-cookie config names 和薄 `fastapi_app.py` facade 均有明确 native reason。生成的历史 architecture artifact 如需刷新，按 diagram source 专项更新。
+F5 gate 已证明 production native composition 不加载 Flask；F7 已删除 Flask/Flask-Cors dependencies、Flask factory/blueprints/routes 与 obsolete compatibility tests。保留的 `Werkzeug`、`itsdangerous`、signed-cookie config names 和薄 `fastapi_app.py` facade 均有明确 native reason。当前生成的 architecture artifact 以可审计 source revision 为证据；历史 migration notes 中的旧图示不应被当作 current runtime truth。
 
 ## 前端与数据层
 
 - `frontend/src/App.jsx` 负责应用编排、登录态和模块路由；`frontend/src/api/` 统一访问 `/api`。
-- `VITE_API_MODE=mock` 使用受控前端演示数据；`remote` 访问真实后端数据库。
-- Schema Source of Truth 是 `backend/schema` 完整基线加 `backend/alembic` 增量 revision。
-- `backend/app/db/` 隔离 SQLite、PostgreSQL、MySQL 和 GaussDB/DWS 的 Provider 差异；Community 默认启用的数据库路径由 runtime profile 控制。
+- `VITE_API_MODE=mock` 使用受控前端演示数据；`remote` 访问真实后端数据库。mock module coverage 与 Community remote capability coverage 可以不同。
+- Schema Source of Truth 是 `backend/schema` 四方言完整 baseline 加 `backend/alembic` 增量 revision；`demo/seed_*.py` 负责 Community 演示数据。
+- `backend/app/db/` 隔离 SQLite、PostgreSQL、MySQL 和 GaussDB/DWS 的 Provider 差异；Community 默认启用的数据库路径由 runtime profile 控制。`docs/pg/`、`docs/dws/` 的扩展 DDL 不自动进入 Community baseline。
 - 正式部署由 Nginx 托管前端静态资源，并将 `/api` 代理到 ASGI runtime；详细环境变量、health check 与 Nginx 配置见 [DEPLOYMENT.md](../DEPLOYMENT.md)。
+
+## 当前边界与后续 Issue
+
+Community profile 当前仍按 `backend/configs/community.yaml` 保持 `upstream`、`push`、`report`、`codeTable` 的 route/menu/schema 边界，WAIT_DB 路径也继续不注册。#115 只记录这套现状；Edition / Optional runtime gating 的移除属于 [#116](https://github.com/0verme/data-asset-portal-community/issues/116)，本文件不提前描述其目标状态。

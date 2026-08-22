@@ -7,6 +7,14 @@
 
 所有演示数据来自仓库内的虚构全渠道零售数据，不包含真实公司、账号、地址或业务数据。
 
+## 三个 Demo 运行面
+
+本文的 **Repository Community Demo**、前端 **mock mode** 和线上 **static Demo** 不是同一个运行面：
+
+1. **Repository Community/remote Demo**：`scripts/community_demo.py` 使用 Community SQLite baseline + Alembic + seed，通过 `backend/asgi.py` 和 Uvicorn 启动真实 FastAPI API。当前 profile 注册 `portal,dwm,mapping,lineage,root,indicator,apiAsset,system`；`upstream,push,report,codeTable` 仍受 Community capability/schema 边界限制，边界移除属于 [#116](https://github.com/0verme/data-asset-portal-community/issues/116)。
+2. **Frontend mock mode**：`VITE_API_MODE=mock` 只读取 `frontend/src/data/` 和 API 文件中的受控数据，不需要后端或数据库；默认 registry 可以展示全部源码模块，因此 mock coverage 不能冒充 remote backend capability。
+3. **Online static Demo**：[https://data.overme.cn/](https://data.overme.cn/) 是独立发布的静态/mock bundle。当前可见 footer 为 `V1.0.0`，页面 HTML 没有仓库 revision/build metadata；它不自动等同于当前 `origin/main`、Repository Community Demo 或 GitHub published release `v0.1.0`。
+
 ## Prerequisites
 
 - Python 3.10+
@@ -30,7 +38,7 @@ Bootstrap 不会安装系统级 Python、Node.js、npm、Homebrew、Chocolatey �
 .\scripts\demo.ps1
 ```
 
-脚本内部使用现有的 Alembic baseline CLI 和 Community seed，并通过 `backend/asgi.py` 以 FastAPI primary + Flask fallback 启动后端，执行：
+脚本内部使用现有的 Alembic baseline CLI 和 Community seed，并通过 `backend/asgi.py` 以 Uvicorn 启动纯 FastAPI backend，执行：
 
 ```text
 preflight
@@ -85,7 +93,7 @@ CI 或只想初始化数据库时，不启动常驻服务：
 | --- | --- | --- | --- |
 | `.demo/community-demo/community.sqlite` | Community 专属 SQLite 数据库 | 是 | 否 |
 | `.demo/community-demo/database.yaml` | 仅包含上述 SQLite 路径的 profile | 是 | 否 |
-| `.demo/community-demo/flask-secret.key` | 随机 development session secret | 是 | 是 |
+| `.demo/community-demo/flask-secret.key` | 随机 development session secret；文件名保留历史 compatibility naming，不代表 Flask runtime | 是 | 是 |
 
 脚本不会覆盖或 merge 用户已有的 `.env`、`.env.local`、`backend/.env*` 或 `frontend/.env.local`。
 后端 Demo 子进程会显式固定 `community` + `community_sqlite` + 已知本地 SQLite 路径，并隔离继承的
@@ -143,7 +151,7 @@ python demo/seed_sqlite.py --database <absolute-local-path>/community.sqlite
 python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
-默认使用纯 FastAPI/Uvicorn runtime：`uvicorn backend.asgi:app --host 127.0.0.1 --port 5099`。Flask compatibility mode 与 direct Flask runtime 已退休。
+默认使用纯 FastAPI/Uvicorn runtime：`uvicorn backend.asgi:app --host 127.0.0.1 --port 5099`。Flask compatibility mode 与 direct Flask runtime 已退休；保留的 `FLASK_*` 变量名只服务于 signed-session/security configuration contract。
 
 前端另开终端，使用 `frontend/.env.local` 设置：
 
@@ -159,7 +167,7 @@ VITE_BACKEND_URL=http://127.0.0.1:5099
 npm --prefix frontend run dev
 ```
 
-手工路径中请自行确保 `FLASK_SECRET_KEY`、Community SQLite profile 和配置文件不会指向外部数据库。
+手工路径中请自行确保保留配置名 `FLASK_SECRET_KEY` 已设置、Community SQLite profile 和配置文件不会指向外部数据库。
 
 ## 演示数据
 
@@ -185,9 +193,9 @@ python demo/seed_postgres.py --dialect postgres
 
 请先审阅生成的 SQL，再导入专用数据库。不要把生产连接串、密码或真实数据粘贴到命令、Issue、日志或文档中。
 
-## 可选模块的边界
+## 当前 Community / Optional 边界
 
-Community profile 默认禁用 `upstream`、`push`、`report` 和 `codeTable`。这些模块源码仍按 Apache-2.0 License 提供，但默认运行时不注册对应路由、菜单或 Community migration 表。
+Community profile 当前禁用 `upstream`、`push`、`report` 和 `codeTable`。这些模块源码仍按 Apache-2.0 License 提供，但当前 runtime 不注册对应路由、菜单或 Community migration 表；这是真实现状，不在 #115 中删除。Edition / Optional runtime gating removal 由 [#116](https://github.com/0verme/data-asset-portal-community/issues/116) 单独处理。
 
 相关文档：
 

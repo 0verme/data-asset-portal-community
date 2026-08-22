@@ -1,5 +1,7 @@
 # FastAPI Assets 模块迁移（#16 P4）
 
+> **Historical migration record**：本文保留 P4 迁移阶段的 opt-in/parity/rollback 证据。当前 runtime 已由 F7 收口为 FastAPI Native；请以 [README](../README.md)、[架构说明](./architecture.md) 和 [API 契约](./api-contract.md) 作为 current-state truth。
+
 Assets 已通过 Database Lane 的 DB_READY Gate：相关 SQLAlchemy Core CRUD 已进入 `origin/main`，当前没有继续修改 Assets Service 的 active Database Lane PR。本 PR 在 P3 Indicator Pilot 之上，将 Assets 作为独立模块迁移到同一 opt-in FastAPI adapter。
 
 ## 范围

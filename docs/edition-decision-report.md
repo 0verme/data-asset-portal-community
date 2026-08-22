@@ -1,5 +1,7 @@
 # Edition Decision Report — Private Module Source Publication
 
+> **Historical record**：本文记录首次公开发布阶段的 Source/License 与 Community runtime boundary 决策。当前产品/runtime boundary 仍以 `backend/configs/community.yaml` 和 [#115](https://github.com/0verme/data-asset-portal-community/issues/115) 的现状说明为准；后续移除 Edition / Optional gating 的新 Owner 方向由 [#116](https://github.com/0verme/data-asset-portal-community/issues/116) 单独实施。本文内容不应被解读为 #116 已完成。
+>
 > 状态：**Owner 决策已确定 — ALLOW IN PUBLIC REPO**（见文末 Decision）。
 > 本文回答「技术上是否安全、License 是否允许」，并记录最终 Edition 决策。
 >
@@ -92,7 +94,7 @@ Community 边界（`backend/configs/community.yaml`）把以下 4 个模块标�
 - 4 个模块的代码为项目自产（Copyright 2025 Jearhe），非第三方闭源代码。
 - 未发现需单独授权才能公开的第三方代码、字体、图标或数据。
 
-## Product Strategy（Owner 决策 — 已确定）
+## Product Strategy（历史 Owner 决策 — 已被 #116 重新审视）
 
 **Decision：ALLOW IN PUBLIC REPO**
 

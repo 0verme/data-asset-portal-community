@@ -1,5 +1,7 @@
 # FastAPI P5 Cutover 与 Flask Compatibility Strategy（#16 / #52）
 
+> **Historical migration record**：本文保留 F6/F7 cutover 过程、兼容性边界和验证要求。当前 runtime truth 已收口为 Uvicorn → `backend/asgi.py` → FastAPI；请以 [README](../README.md)、[架构说明](./architecture.md) 和 [API 契约](./api-contract.md) 作为 current-state truth。
+
 ## Runtime 目标
 
 ```text

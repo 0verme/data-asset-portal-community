@@ -2,7 +2,7 @@
 
 > 说明：本文件保留为后端补充说明。项目主文档请优先查看根目录 `README.md`，开发与部署请优先查看根目录 `DEVELOPMENT.md`、`DEPLOYMENT.md`。
 
-后端唯一通过 `uvicorn backend.asgi:app` 运行 FastAPI Native；Auth、Community native API 与 infrastructure routes 由 FastAPI 处理，WAIT_DB/Private routes 按 scope gate 不注册。Flask compatibility runtime 与 `backend/run.py` 已退休。认证与数据统一使用 database profile，演示用的 mock 数据位于前端（`VITE_API_MODE=mock`）。
+后端唯一通过 `uvicorn backend.asgi:app` 运行 FastAPI Native；Auth、Community native API 与 infrastructure routes 由 FastAPI 处理，WAIT_DB/Private routes 按当前 scope gate 不注册。Flask compatibility runtime 与 `backend/run.py` 已退休，当前没有 Flask/WSGI fallback。认证与数据统一使用 database profile，演示用的 mock 数据位于前端（`VITE_API_MODE=mock`）。Community/Optional 边界仍是当前事实，移除工作由 [#116](https://github.com/0verme/data-asset-portal-community/issues/116) 负责。
 
 ## 安装
 
@@ -21,7 +21,7 @@ pip install -r requirements.txt
 python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
-生产与本地联调均使用同一条 FastAPI/Uvicorn entrypoint；不再提供 Flask compatibility mode 或 direct Flask runtime。
+生产与本地联调均使用同一条 FastAPI/Uvicorn entrypoint；不再提供 Flask compatibility mode 或 direct Flask runtime。这里的 `FLASK_*` 配置名仅保留 signed-session/security contract 兼容性，不表示运行 Flask。
 
 后台启动并写日志：
 
@@ -58,10 +58,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 | `ASSET_DB_JAR_PATH` | GaussDB JDBC jar 路径（驱动不随仓库分发，自行从官方渠道获取） | `/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar` |
 | `ASSET_DB_CONNECT_TIMEOUT_SECONDS` | 数据库连接超时秒数 | `30` |
 | `ASSET_DB_STATEMENT_TIMEOUT_MS` | PostgreSQL / GaussDB 查询超时毫秒数 | `120000` |
-| `FLASK_DEBUG` | 是否启用调试模式（默认关闭；仅 `1`/`true`/`yes`/`on` 为真） | `false` |
-| `FLASK_SECRET_KEY` | 必填的 Session 签名密钥（缺失或空白即启动失败） | `<generate-a-strong-random-value>` |
-| `FLASK_ENV` | 运行环境（默认安全生产行为；开发必须显式设置） | `production`、`development` |
-| `FLASK_CORS_ORIGINS` | 可选的精确跨域来源 allowlist，逗号分隔 | `https://portal.example.com` |
+| `FLASK_DEBUG` | Native FastAPI 的 debug 配置（默认关闭；仅 `1`/`true`/`yes`/`on` 为真） | `false` |
+| `FLASK_SECRET_KEY` | 必填的 signed-session 密钥（缺失或空白即启动失败；保留配置名不代表 Flask） | `<generate-a-strong-random-value>` |
+| `FLASK_ENV` | Cookie/security contract 的运行环境（默认安全生产行为；开发必须显式设置） | `production`、`development` |
+| `FLASK_CORS_ORIGINS` | Native FastAPI 使用的精确跨域来源 allowlist，逗号分隔 | `https://portal.example.com` |
 
 Session Cookie 始终使用 `HttpOnly=True` 和 `SameSite=Lax`。默认/生产环境使用 `Secure=True`；只有显式 `FLASK_ENV=development` 才为本地 HTTP 联调关闭 Secure。Nginx 或 Vite 的 `/api` 同源代理不需要 CORS；跨域部署才设置 `FLASK_CORS_ORIGINS`，不设置就不返回 CORS 允许头，禁止使用 `*`。不要将真实 `FLASK_SECRET_KEY` 写入仓库、日志或命令历史；可在受控终端本地执行 `python -c "import secrets; print(secrets.token_urlsafe(32))"` 生成后交由 secret store 保存。
 
@@ -149,10 +149,10 @@ python backend/scripts/schema_migrate.py apply --profile community_mysql
 `community_mysql` 必须指向隔离的 MySQL 8.0 数据库；密码通过安全配置或环境变量注入，
 不得写入仓库。
 
-完整版（含可选模块）可手动逐个执行模块 DDL，没有一键脚本，后端启动也不会自动初始化：
+Full/module-specific/external-dependency 部署可手动逐个执行模块 DDL，没有一键脚本，后端启动也不会自动初始化：
 按数据库类型选 `docs/pg/*-app-pg-ddl.sql`（PostgreSQL）或 `docs/dws/*-app-dws-ddl.sql`（DWS / GaussDB），
-用对应客户端（`psql -f` / `gsql -f`）逐个执行。具体命令见
-[根目录 README 的「数据库初始化」](../README.md#-快速开始)。
+用对应客户端（`psql -f` / `gsql -f`）逐个执行。它们是补充 DDL，不是 Community/local 的默认入口；后者必须走 `backend/schema` + `schema_migrate.py` + seed。具体边界见
+[根目录部署说明](../DEPLOYMENT.md#四数据库初始化与迁移)。
 
 > 🚫 仓库不再包含整库快照（`app-*-init-data.sql` 与 `docs/*/sample/*.sql` 已从公开树移除）；
 > 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。
