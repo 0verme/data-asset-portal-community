@@ -187,7 +187,7 @@ export function usePushModule({
       setPushRoute(getPushSystemDetailRoute(system.id));
       rememberSystem(system.id);
       scrollMainToTop();
-    }, "保存下游系统失败。");
+    }, "保存下游系统失败。", "push:write");
   };
   const handleDeletePushSystem = async (systemId) => {
     await runProtectedMutation(async () => {
@@ -199,7 +199,7 @@ export function usePushModule({
       setPushFilter(DEFAULT_PUSH_FILTER);
       setPushRoute(getModuleListRoute("push"));
       scrollMainToTop();
-    }, "删除下游系统失败。");
+    }, "删除下游系统失败。", "push:write");
   };
   const handleSavePushJob = async (job, oldId) => {
     if (!pushRoute.sys) return;
@@ -209,7 +209,7 @@ export function usePushModule({
       clearModuleNavigationState("push");
       setPushRoute(getPushInterfaceDetailRoute(pushRoute.sys, job.id));
       scrollMainToTop();
-    }, "保存推送作业失败。");
+    }, "保存推送作业失败。", "push:write");
   };
   const handleDeletePushJob = async (jobId) => {
     if (!pushRoute.sys) return;
@@ -218,7 +218,7 @@ export function usePushModule({
       await loadPushData();
       setPushRoute(getPushSystemDetailRoute(pushRoute.sys));
       scrollMainToTop();
-    }, "删除推送作业失败。");
+    }, "删除推送作业失败。", "push:write");
   };
 
   const filteredPushSystems = useMemo(() => {

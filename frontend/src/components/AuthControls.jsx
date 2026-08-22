@@ -26,7 +26,8 @@ function getSafeDisplayName(auth) {
 }
 
 export const AuthContext = React.createContext({
-  auth: { role: "guest", user: null, name: null },
+  auth: { role: "guest", user: null, name: null, permissions: [] },
+  can: () => false,
   canEdit: false,
   requireLogin: () => false,
   logout: async () => {},
@@ -162,8 +163,13 @@ export function LoginModal({ open, busy, error, onClose, onSubmit }) {
 
 export function AuthBar({ auth, onLogin, onLogout }) {
   const displayName = getSafeDisplayName(auth);
+  const roleLabel = auth.role === "admin"
+    ? "系统管理员"
+    : auth.role === "maintainer"
+      ? "业务维护员"
+      : auth.role || "游客浏览";
 
-  if (auth.role !== "admin") {
+  if (!auth.user) {
     return (
       <div className="authbar">
         <span className="role-pill guest"><Icon name="eye" size={13} />游客浏览</span>
@@ -177,7 +183,7 @@ export function AuthBar({ auth, onLogin, onLogout }) {
 
   return (
     <div className="authbar">
-      <span className="role-pill admin"><Icon name="shield" size={13} />{auth.role === "admin" ? "系统管理员" : "业务维护员"}</span>
+      <span className="role-pill admin"><Icon name="shield" size={13} />{roleLabel}</span>
       <div className="user-chip">
         <span className="uc-av">{initial(displayName)}</span>
         <span className="uc-name">{displayName}</span>

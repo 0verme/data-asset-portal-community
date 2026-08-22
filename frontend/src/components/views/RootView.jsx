@@ -54,15 +54,15 @@ export function RootView({ root, query, setQuery, requireLogin, rootRoute, setRo
         onEdit={(abbr) => requireLogin(() => {
           pushModuleNavigationState("root", { query, rootRoute, rootCategory });
           setRootRoute({ page: "edit", abbr });
-        })}
+        }, "root:write")}
         onNew={() => requireLogin(() => {
           pushModuleNavigationState("root", { query, rootRoute, rootCategory });
           setRootRoute({ page: "new", abbr: null });
-        })}
+        }, "root:write")}
         onImport={() => requireLogin(() => {
           pushModuleNavigationState("root", { query, rootRoute, rootCategory });
           setRootRoute({ page: "import", abbr: null });
-        })}
+        }, "root:write")}
         onClearQuery={() => setQuery("")}
       />
     );

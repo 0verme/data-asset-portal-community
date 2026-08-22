@@ -109,8 +109,10 @@ export default function App() {
   const {
     auth,
     authReady,
+    can,
     canEdit,
     canManageSystem,
+    canViewOperationLog,
     loginOpen,
     setLoginOpen,
     authBusy,
@@ -223,13 +225,13 @@ export default function App() {
   const visibleNavMenus = useMemo(() => {
     return navMenus
       .filter((item) => item.status !== "disabled")
-      .filter((item) => !item.adminOnly || canManageSystem || (item.code === "system" && auth.role === "maintainer"))
-      .map((item) => item.code === "system" && auth.role === "maintainer"
+      .filter((item) => !item.adminOnly || canManageSystem || (item.code === "system" && canViewOperationLog))
+      .map((item) => item.code === "system" && canViewOperationLog && !canManageSystem
         ? { ...item, name: "操作日志", icon: "file", path: "/system-management/operation-logs" }
         : item)
       .slice()
       .sort((a, b) => (a.order - b.order) || String(a.id).localeCompare(String(b.id)));
-  }, [auth.role, canManageSystem, navMenus]);
+  }, [canManageSystem, canViewOperationLog, navMenus]);
 
   const { primary: primaryNavMenus, more: moreNavMenus } = useMemo(
     () => splitNavigationMenus(visibleNavMenus),
@@ -271,7 +273,7 @@ export default function App() {
     indicatorRoute,
     setIndicatorRoute,
     indicatorFilter,
-    canEdit,
+    canEdit: can("indicator:write"),
     requireLogin,
     setAuthError,
     setLoginOpen,
@@ -283,14 +285,14 @@ export default function App() {
     reportRoute,
     setReportRoute,
     reportFilter,
-    canEdit,
+    canEdit: can("report:write"),
     requireLogin,
     setAuthError,
     setLoginOpen,
   });
   const apiAsset = useApiAssetModule({
     active: module === "apiAsset", query, route: apiAssetRoute, setRoute: setApiAssetRoute,
-    filter: apiAssetFilter, canEdit, requireLogin, setAuthError, setLoginOpen,
+    filter: apiAssetFilter, canEdit: can("api_asset:write"), requireLogin, setAuthError, setLoginOpen,
   });
 
   const push = usePushModule({
@@ -301,7 +303,7 @@ export default function App() {
     setPushRoute,
     initialView: pushViewFromUrl,
     initialFilter: pushFilterFromUrl,
-    canEdit,
+    canEdit: can("push:write"),
     requireLogin,
     runProtectedMutation,
   });
@@ -314,7 +316,7 @@ export default function App() {
     setUpRoute,
     initialView: upstreamViewFromUrl,
     initialFilter: upFilterFromUrl,
-    canEdit,
+    canEdit: can("upstream:write"),
     requireLogin,
     runProtectedMutation,
     setAuthError,
@@ -491,10 +493,10 @@ export default function App() {
   }, [authReady, canEdit]);
 
   useEffect(() => {
-    if (authReady && auth.role === "maintainer" && module === "system" && systemRoute.page !== "operation-logs") {
+    if (authReady && canViewOperationLog && !canManageSystem && module === "system" && systemRoute.page !== "operation-logs") {
       setSystemRoute({ page: "operation-logs" });
     }
-  }, [auth.role, authReady, module, systemRoute.page]);
+  }, [authReady, canManageSystem, canViewOperationLog, module, systemRoute.page]);
 
   const switchModule = (nextModule) => {
     setSidebarOpen(false);
@@ -517,7 +519,7 @@ export default function App() {
     }
     if (nextModule === "apiAsset") { setApiAssetRoute(DEFAULT_API_ASSET_ROUTE); setApiAssetFilter(DEFAULT_API_ASSET_FILTER); }
     if (nextModule === "mapping") setMappingRoute(DEFAULT_MAPPING_ROUTE);
-    if (nextModule === "system") setSystemRoute(auth.role === "maintainer" ? { page: "operation-logs" } : DEFAULT_SYSTEM_ROUTE);
+    if (nextModule === "system") setSystemRoute(canViewOperationLog && !canManageSystem ? { page: "operation-logs" } : DEFAULT_SYSTEM_ROUTE);
     setSystemActionIntent("");
     scrollMainToTop();
   };
@@ -611,17 +613,18 @@ export default function App() {
 
   const authContextValue = useMemo(() => ({
     auth,
+    can,
     canEdit,
     requireLogin,
     logout: handleLogout,
-  }), [auth, canEdit, requireLogin, handleLogout]);
+  }), [auth, can, canEdit, requireLogin, handleLogout]);
 
   const moduleContent = (
     <ModuleContent
       module={module}
       context={{
-        apiAsset, apiAssetRoute, apiAssetView, asset, backToUpstreamList, canEdit,
-        canManageSystem, goToMapping, goToModuleWithQuery, indicator, indicatorFilter,
+        apiAsset, apiAssetRoute, apiAssetView, asset, backToUpstreamList, can,
+        canEdit, canManageSystem, canViewOperationLog, goToMapping, goToModuleWithQuery, indicator, indicatorFilter,
         indicatorRoute, indicatorView, lineageRoute, manualCodeTable, mappingRoute,
         push, pushRoute, query, report, reportRoute, reportView, requireLogin, root,
         rootRoute, route, setApiAssetView, setIndicatorFilter, setIndicatorRoute,
@@ -636,7 +639,7 @@ export default function App() {
     <ModuleSidebar
       module={module}
       context={{
-        apiAsset, apiAssetFilter, asset, canEdit, canManageSystem, indicator,
+        apiAsset, apiAssetFilter, asset, can, canEdit, canManageSystem, canViewOperationLog, indicator,
         indicatorFilter, lineageBootstrap, manualCodeTable, push, pushRoute, report,
         reportFilter, requireLogin, root, setApiAssetFilter, setIndicatorFilter,
         setIndicatorRoute, setPushRoute, setReportFilter, setReportRoute, setRootRoute,

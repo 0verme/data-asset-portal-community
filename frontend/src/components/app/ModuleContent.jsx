@@ -30,7 +30,7 @@ const MODULE_RENDERERS = {
     <ManualCodeTablePage
       module={context.manualCodeTable}
       query={context.query}
-      canEdit={context.canEdit}
+      canEdit={context.can ? context.can("code_table:write") : context.canEdit}
     />
   ),
   push: ({ context }) => (

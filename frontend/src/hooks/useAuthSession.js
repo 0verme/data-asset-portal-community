@@ -17,10 +17,12 @@ import {
   clearAuthStorage,
   GUEST_AUTH,
   getInitialAuth,
+  hasPermission,
   hydrateAuth,
   login,
   logout,
 } from "../auth.js";
+import { hasAnyPermission } from "../auth/permissions.js";
 import { isUnauthorizedError } from "../api/http.js";
 import { getErrorMessage } from "../utils/ui.js";
 import { toast } from "../components/common/index.js";
@@ -32,21 +34,37 @@ export function useAuthSession() {
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState("");
 
-  const canEdit = ["admin", "maintainer"].includes(auth.role);
-  const canManageSystem = auth.role === "admin";
+  const can = useCallback((permission) => hasPermission(auth, permission), [auth]);
+  const canEdit = hasAnyPermission(auth, [
+    "asset:write",
+    "root:write",
+    "indicator:write",
+    "report:write",
+    "api_asset:write",
+    "upstream:write",
+    "push:write",
+    "code_table:write",
+    "metadata:write",
+  ]);
+  const canManageSystem = hasAnyPermission(auth, [
+    "system:user:read",
+    "system:menu:write",
+    "system:param:read",
+  ]);
+  const canViewOperationLog = can("operation_log:read");
 
-  const requireLogin = useCallback((action) => {
-    if (canEdit) {
+  const requireLogin = useCallback((action, permission) => {
+    if (permission ? can(permission) : canEdit) {
       action?.();
       return true;
     }
     setAuthError("");
     setLoginOpen(true);
     return false;
-  }, [canEdit]);
+  }, [can, canEdit]);
 
-  const runProtectedMutation = useCallback(async (task, fallbackMessage) => {
-    if (!canEdit) {
+  const runProtectedMutation = useCallback(async (task, fallbackMessage, permission) => {
+    if (!(permission ? can(permission) : canEdit)) {
       setAuthError("");
       setLoginOpen(true);
       return false;
@@ -59,7 +77,7 @@ export function useAuthSession() {
       toast.error(getErrorMessage(error, fallbackMessage));
       return false;
     }
-  }, [canEdit]);
+  }, [can, canEdit]);
 
   useEffect(() => {
     let alive = true;
@@ -131,8 +149,10 @@ export function useAuthSession() {
   return {
     auth,
     authReady,
+    can,
     canEdit,
     canManageSystem,
+    canViewOperationLog,
     loginOpen,
     setLoginOpen,
     authBusy,

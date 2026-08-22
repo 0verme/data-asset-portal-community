@@ -13,16 +13,19 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
+import { normalizePermissions } from "../auth/permissions.js";
 
 function normalizeAuth(payload) {
   const data = payload?.data && typeof payload.data === "object" ? payload.data : payload;
   if (!data || typeof data !== "object") {
     throw new Error("Invalid auth payload");
   }
+  const role = String(data.role || "guest").trim().toLowerCase() || "guest";
   return {
-    role: ["admin", "maintainer"].includes(data.role) ? data.role : "guest",
+    role,
     user: data.user || null,
-    name: data.name || null,
+    name: data.name || data.user || null,
+    permissions: normalizePermissions(data.permissions),
   };
 }
 

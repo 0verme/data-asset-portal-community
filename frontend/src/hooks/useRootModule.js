@@ -88,7 +88,7 @@ export function useRootModule({ active, query, setQuery, rootRoute, setRootRoute
       setRootCategory(DEFAULT_ROOT_CATEGORY);
       setRootRoute(DEFAULT_ROOT_ROUTE);
       scrollMainToTop();
-    }, "保存词根失败。");
+    }, "保存词根失败。", "root:write");
   };
   const handleDeleteRoot = async (abbr) => {
     await runProtectedMutation(async () => {
@@ -99,14 +99,14 @@ export function useRootModule({ active, query, setQuery, rootRoute, setRootRoute
       setRootCategory(DEFAULT_ROOT_CATEGORY);
       setRootRoute(DEFAULT_ROOT_ROUTE);
       scrollMainToTop();
-    }, "删除词根失败。");
+    }, "删除词根失败。", "root:write");
   };
   const handleImportRoots = async (items) => {
     await runProtectedMutation(async () => {
       await importRoots(items);
       await loadRootData();
       rootBack();
-    }, "导入词根失败。");
+    }, "导入词根失败。", "root:write");
   };
 
   const filteredRoots = useMemo(() => {

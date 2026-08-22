@@ -66,7 +66,7 @@ export function useManualCodeTableModule({ active, query, requireLogin }) {
     setFormErrors([]);
     setForm(EMPTY_FORM);
     setFormModal({ open: true, mode: "new", initial: null, busy: false });
-  });
+  }, "code_table:write");
 
   const openEdit = (item) => requireLogin(() => {
     setDetailItem(null);
@@ -80,7 +80,7 @@ export function useManualCodeTableModule({ active, query, requireLogin }) {
       remark: item.remark || "",
     });
     setFormModal({ open: true, mode: "edit", initial: item, busy: false });
-  });
+  }, "code_table:write");
 
   const closeForm = () => {
     if (!formModal.busy) setFormModal({ open: false, mode: "new", initial: null, busy: false });
@@ -125,7 +125,7 @@ export function useManualCodeTableModule({ active, query, requireLogin }) {
     } catch (nextError) {
       toast.error(getErrorMessage(nextError, "更新码值表状态失败。"));
     }
-  });
+  }, "code_table:write");
 
   const remove = (item) => requireLogin(async () => {
     try {
@@ -136,7 +136,7 @@ export function useManualCodeTableModule({ active, query, requireLogin }) {
     } catch (nextError) {
       toast.error(getErrorMessage(nextError, "删除码值表失败。"));
     }
-  });
+  }, "code_table:write");
 
   const exportCsv = () => {
     const styleMap = Object.fromEntries(MANUAL_CODE_TABLE_STYLES.map((item) => [item.value, item.label]));

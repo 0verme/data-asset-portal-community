@@ -81,14 +81,14 @@ export function useReportModule({
     requireLogin(() => {
       setReportRoute({ page: "new", code: null });
       scrollMainToTop();
-    });
+    }, "report:write");
   };
 
   const reportEdit = (reportCode) => {
     requireLogin(() => {
       setReportRoute({ page: "edit", code: reportCode });
       scrollMainToTop();
-    });
+    }, "report:write");
   };
 
   const reportViewDetail = (reportCode) => {
