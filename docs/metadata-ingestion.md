@@ -194,7 +194,7 @@ GET /api/metadata/ingestions/{ingestionId}
 `#116` 已将 `p_lineage_snapshot`、`p_lineage_node`、`p_lineage_edge` 纳入四方言 canonical baseline、Alembic `0003_open_repository_modules` 和 Provider contract，满足 `LINEAGE_STORAGE_READY`。`#114` 的 `0004_metadata_ingestion_identity` 增加：
 
 - `p_asset_table` 的 source-scoped identity、qualified name、catalog/database metadata；
-- source/assetType/externalId unique index；
+- source/assetType/externalId unique constraint；
 - `p_lineage_snapshot` 的 source key、content hash、ingestion ID；
 - 从旧 `table_name UNIQUE` 到 source-scoped identity 的 forward migration。
 

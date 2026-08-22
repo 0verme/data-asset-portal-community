@@ -82,10 +82,6 @@ def _columns(table: str) -> set[str]:
     return {str(item["name"]).lower() for item in _inspect().get_columns(table, schema=_schema())}
 
 
-def _has_index(table: str, name: str) -> bool:
-    return any(str(item.get("name", "")).lower() == name.lower() for item in _inspect().get_indexes(table, schema=_schema()))
-
-
 def _asset_table_definition():
     asset_id_type = sa.Integer() if _dialect() == "sqlite" else sa.BigInteger()
     return (
@@ -99,6 +95,7 @@ def _asset_table_definition():
         sa.Column("asset_type", _text(64)),
         sa.Column("external_id", _text(256)),
         sa.Column("qualified_name", _text(512)),
+        sa.UniqueConstraint("source_key", "asset_type", "external_id", name="uq_p_asset_ingestion_identity"),
         sa.Column("layer_code", _text(32)),
         sa.Column("domain_code", _text(64)),
         sa.Column("owner_name", _text(128)),
@@ -201,13 +198,24 @@ def _add_missing_columns(table: str, definitions: dict[str, tuple[str, int]]) ->
             op.add_column(table, sa.Column(name, _text(length), nullable=True), schema=_schema())
 
 
-def _ensure_asset_identity_index() -> None:
-    if not _has_index("p_asset_table", "uq_p_asset_ingestion_identity"):
-        op.create_index(
+def _has_asset_identity_unique() -> bool:
+    try:
+        constraints = _inspect().get_unique_constraints("p_asset_table", schema=_schema())
+    except (NotImplementedError, sa.exc.NoSuchTableError):
+        constraints = []
+    return any(
+        [str(column).lower() for column in item.get("column_names") or []]
+        == ["source_key", "asset_type", "external_id"]
+        for item in constraints
+    )
+
+
+def _ensure_asset_identity_unique() -> None:
+    if not _has_asset_identity_unique():
+        op.create_unique_constraint(
             "uq_p_asset_ingestion_identity",
             "p_asset_table",
             ["source_key", "asset_type", "external_id"],
-            unique=True,
             schema=_schema(),
         )
 
@@ -225,7 +233,7 @@ def upgrade() -> None:
     else:
         _add_missing_columns("p_asset_table", NEW_ASSET_COLUMNS)
         _drop_table_name_unique()
-    _ensure_asset_identity_index()
+    _ensure_asset_identity_unique()
     _ensure_lineage_columns()
 
 

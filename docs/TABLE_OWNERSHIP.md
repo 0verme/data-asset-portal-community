@@ -21,7 +21,7 @@
 | codeTable | `p_manual_code_table` |
 | lineage | `p_lineage_snapshot`, `p_lineage_node`, `p_lineage_edge` |
 
-四方言保持相同的 table/column/primary-key/unique/foreign-key/index inventory；类型使用各数据库的等价表示。`p_asset_table` 的 source-scoped identity columns 与 `uq_p_asset_ingestion_identity` 由 #114 contract mapping 使用，不能作为外部 Collector 的 wire shape。`p_push_system.master_system_id` 关联 shared `p_system`，用于复用现有 Push Service 的 master-system contract。
+四方言保持相同的 table/column/primary-key/unique/foreign-key/index inventory；类型使用各数据库的等价表示。`p_asset_table` 的 source-scoped identity columns 与 `uq_p_asset_ingestion_identity` unique constraint 由 #114 contract mapping 使用，不能作为外部 Collector 的 wire shape。`p_push_system.master_system_id` 关联 shared `p_system`，用于复用现有 Push Service 的 master-system contract。
 
 ## Lineage storage boundary
 
