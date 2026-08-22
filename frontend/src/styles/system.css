@@ -55,6 +55,27 @@
     vertical-align: bottom;
   }
 
+  .role-permission-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .role-permission-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    cursor: pointer;
+  }
+
+  .role-permission-option input { margin-top: 3px; }
+  .role-permission-option span { display: grid; gap: 3px; min-width: 0; }
+  .role-permission-option small { color: var(--ink-3); font-size: 11px; overflow-wrap: anywhere; }
+
   .system-split {
     display: grid;
     grid-template-columns: 300px minmax(0, 1fr);
@@ -387,7 +408,8 @@
 
     .form-grid,
     .system-modal-body .form-grid,
-    .lineage-candidate { grid-template-columns: 1fr; }
+    .lineage-candidate,
+    .role-permission-grid { grid-template-columns: 1fr; }
 
     .system-modal-mask,
     .confirm-mask,

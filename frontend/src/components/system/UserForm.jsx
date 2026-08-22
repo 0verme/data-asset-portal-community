@@ -1,8 +1,12 @@
 import { ActionErrorBanner, BinaryStatusToggle, confirmDeleteAction, DangerZone, FormSection } from "../common/index.js";
 
-export function UserForm({ form, setForm, errors = [], mode = "new", initial = null, onDelete }) {
+export function UserForm({ form, setForm, roles = [], errors = [], mode = "new", initial = null, onDelete }) {
   const hasError = (field) => errors.some((item) => item.field === field);
   const isEdit = mode === "edit";
+  const roleOptions = roles.length ? roles : [
+    { roleCode: "admin", name: "系统管理员" },
+    { roleCode: "maintainer", name: "业务维护员" },
+  ];
 
   return (
     <>
@@ -46,8 +50,9 @@ export function UserForm({ form, setForm, errors = [], mode = "new", initial = n
           <div className="fl">
             <label>账号角色</label>
             <select className="sel" value={form.role} onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value }))}>
-              <option value="admin">系统管理员</option>
-              <option value="maintainer">业务维护员</option>
+              {roleOptions.filter((role) => role.enabled !== "disabled").map((role) => (
+                <option value={role.roleCode} key={role.roleCode}>{role.name || role.roleCode}</option>
+              ))}
             </select>
           </div>
           <div className="fl full">

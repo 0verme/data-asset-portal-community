@@ -14,6 +14,7 @@
 
 import { Icon } from "../ui.jsx";
 import { FormModal } from "../common/index.js";
+import { useRoleModule } from "../../hooks/useRoleModule.js";
 import { useSystemModule } from "../../hooks/useSystemModule.js";
 import { UserForm } from "./UserForm.jsx";
 import { ParamForm } from "./ParamForm.jsx";
@@ -21,6 +22,7 @@ import { MenuForm } from "./MenuForm.jsx";
 import { UserManagementPage } from "./UserManagementPage.jsx";
 import { ParamDictPage } from "./ParamDictPage.jsx";
 import { MenuManagementPage } from "./MenuManagementPage.jsx";
+import { RoleForm, RoleManagementPage } from "./RoleManagementPage.jsx";
 
 export function SystemManagementPage({
   route,
@@ -73,8 +75,14 @@ export function SystemManagementPage({
     handleDeleteParam,
     handleDeleteMenu,
   } = useSystemModule({ page: route.page, requireLogin, actionIntent, onActionHandled });
+  const roleModule = useRoleModule({
+    active: route.page === "roles" || route.page === "users",
+    requireLogin,
+    actionIntent,
+    onActionHandled,
+  });
 
-  if (loading) {
+  if (loading || (route.page === "roles" && roleModule.loading)) {
     return (
       <div className="state-card" role="status" aria-live="polite">
         <div className="state-spinner" aria-hidden="true"></div>
@@ -84,20 +92,29 @@ export function SystemManagementPage({
     );
   }
 
-  if (error) {
+  if (error || (route.page === "roles" && roleModule.error)) {
     return (
       <div className="state-card state-card-error" role="alert">
         <div className="ec"><Icon name="inbox" size={24} /></div>
         <h4>系统管理加载失败</h4>
-        <p>{error}</p>
-        <button className="btn state-btn" type="button" onClick={loadAll}>重新加载</button>
+        <p>{error || roleModule.error}</p>
+        <button className="btn state-btn" type="button" onClick={route.page === "roles" ? roleModule.load : loadAll}>重新加载</button>
       </div>
     );
   }
 
   return (
     <>
-      {route.page === "menus" ? (
+      {route.page === "roles" ? (
+        <RoleManagementPage
+          roles={roleModule.roles}
+          permissions={roleModule.permissions}
+          query={query}
+          canEdit={canEdit}
+          onNew={roleModule.openNew}
+          onEdit={roleModule.openEdit}
+        />
+      ) : route.page === "menus" ? (
         <MenuManagementPage
           menus={menus}
           query={query}
@@ -141,7 +158,28 @@ export function SystemManagementPage({
         submitText={userModal.mode === "edit" ? "保存修改" : "创建"}
         busy={userModal.busy}
       >
-        <UserForm form={userForm} setForm={setUserForm} errors={userErrors} mode={userModal.mode} initial={userModal.initial} onDelete={handleDeleteUser} />
+        <UserForm form={userForm} setForm={setUserForm} roles={roleModule.roles} errors={userErrors} mode={userModal.mode} initial={userModal.initial} onDelete={handleDeleteUser} />
+      </FormModal>
+
+      <FormModal
+        open={roleModule.modal.open}
+        title={roleModule.modal.mode === "edit" ? "编辑角色" : "新增角色"}
+        subtitle={roleModule.modal.mode === "edit" ? `正在编辑：${roleModule.modal.initial?.roleCode || "-"}` : "创建新的自定义角色"}
+        icon="shield"
+        onClose={() => !roleModule.modal.busy && roleModule.setModal({ open: false, mode: "new", initial: null, busy: false })}
+        onSubmit={roleModule.submit}
+        submitText={roleModule.modal.mode === "edit" ? "保存修改" : "创建"}
+        busy={roleModule.modal.busy}
+      >
+        <RoleForm
+          form={roleModule.form}
+          setForm={roleModule.setForm}
+          permissions={roleModule.permissions}
+          errors={roleModule.errors}
+          mode={roleModule.modal.mode}
+          initial={roleModule.modal.initial}
+          onDelete={roleModule.remove}
+        />
       </FormModal>
 
       <FormModal

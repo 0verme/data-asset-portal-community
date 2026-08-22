@@ -16,6 +16,7 @@ export { SystemManagementPage } from "./SystemManagementPage.jsx";
 export { UserManagementPage } from "./UserManagementPage.jsx";
 export { ParamDictPage } from "./ParamDictPage.jsx";
 export { MenuManagementPage } from "./MenuManagementPage.jsx";
+export { RoleManagementPage, RoleForm } from "./RoleManagementPage.jsx";
 export { UserForm } from "./UserForm.jsx";
 export { ParamForm } from "./ParamForm.jsx";
 export { MenuForm } from "./MenuForm.jsx";

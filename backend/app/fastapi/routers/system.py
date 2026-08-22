@@ -20,11 +20,15 @@ from ...services.system_management_service import (
     ParamDictNotFoundError,
     SystemDataSourceError,
     SystemManagementError,
+    SystemRoleAlreadyExistsError,
+    SystemRoleAssignedError,
+    SystemRoleNotFoundError,
+    SystemRoleProtectedError,
     SystemUserAlreadyExistsError,
     SystemUserNotFoundError,
     SystemValidationError,
 )
-from ..dependencies import get_request_context, require_permission
+from ..dependencies import require_permission
 from ..errors import _service_error_response
 
 
@@ -35,6 +39,7 @@ def _system_error_status(error: SystemManagementError) -> int:
             MenuNotFoundError,
             ParamCategoryNotFoundError,
             ParamDictNotFoundError,
+            SystemRoleNotFoundError,
             SystemUserNotFoundError,
         ),
     ):
@@ -44,6 +49,9 @@ def _system_error_status(error: SystemManagementError) -> int:
         (
             MenuAlreadyExistsError,
             ParamDictAlreadyExistsError,
+            SystemRoleAlreadyExistsError,
+            SystemRoleAssignedError,
+            SystemRoleProtectedError,
             SystemUserAlreadyExistsError,
         ),
     ):
@@ -95,6 +103,23 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
             content=validate_contract(
                 {"message": "User created", "data": data}, SystemResponse
             ),
+        )
+
+    @router.patch("/users/{username}/role", response_model=None)
+    def patch_user_role(
+        username: str,
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_permission("system:user:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_user_role(username, _system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "User role updated", "data": data}, SystemResponse
+            )
         )
 
     @router.put("/users/{username}", response_model=None)
@@ -162,30 +187,81 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
             content=validate_contract({"message": "User deleted"}, SystemResponse)
         )
 
+    @router.get("/permissions", response_model=None)
+    def get_permissions(
+        _context: RequestContext = Depends(require_permission("system:role:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            items = current_service.get_permissions()
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
+
+    @router.get("/roles", response_model=None)
+    def get_roles(
+        _context: RequestContext = Depends(require_permission("system:role:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            items = current_service.get_roles()
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
+
+    @router.post("/roles", response_model=None, status_code=201)
+    def create_role(
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_permission("system:role:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.create_role(_system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            status_code=201,
+            content=validate_contract({"message": "Role created", "data": data}, SystemResponse),
+        )
+
+    @router.put("/roles/{role_code}", response_model=None)
+    def update_role(
+        role_code: str,
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_permission("system:role:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_role(role_code, _system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract({"message": "Role updated", "data": data}, SystemResponse)
+        )
+
+    @router.delete("/roles/{role_code}", response_model=None)
+    def delete_role(
+        role_code: str,
+        _context: RequestContext = Depends(require_permission("system:role:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            current_service.delete_role(role_code)
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract({"message": "Role deleted"}, SystemResponse))
+
     @router.get("/menus", response_model=None)
     def get_menus(
-        context: RequestContext = Depends(get_request_context),
         current_service: Any = Depends(get_service),
     ):
         try:
             items = current_service.get_menus()
         except SystemManagementError as error:
             return _system_error_response(error)
-        identity = context.identity
-        if identity is None or identity.role != "admin":
-            items = [
-                item
-                for item in items
-                if item["status"] == "enabled"
-                and (
-                    not item["adminOnly"]
-                    or (
-                        identity
-                        and identity.role == "maintainer"
-                        and item["code"] == "system"
-                    )
-                )
-            ]
+        # `adminOnly` is presentation metadata. The frontend applies the
+        # current permission snapshot while the public menu read remains
+        # available for guest navigation and custom roles.
         return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
 
     @router.post("/menus", response_model=None, status_code=201)

@@ -296,6 +296,9 @@ export function parseInitialLocation() {
     if (segments[1] === "param-dicts") {
       return { ...base, module: "system", systemRoute: { page: "param-dicts" } };
     }
+    if (segments[1] === "roles") {
+      return { ...base, module: "system", systemRoute: { page: "roles" } };
+    }
     if (segments[1] === "operation-logs") {
       return { ...base, module: "system", systemRoute: { page: "operation-logs" } };
     }
@@ -378,6 +381,7 @@ export function buildPathname(module, moduleRoute, systemRoute) {
   if (module === "system") {
     if (systemRoute.page === "menus") return "/system-management/menus";
     if (systemRoute.page === "param-dicts") return "/system-management/param-dicts";
+    if (systemRoute.page === "roles") return "/system-management/roles";
     if (systemRoute.page === "operation-logs") return "/system-management/operation-logs";
     return "/system-management/users";
   }

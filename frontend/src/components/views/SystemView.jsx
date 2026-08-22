@@ -20,6 +20,7 @@ export function SystemView({
   systemRoute,
   query,
   canEdit,
+  canManageRoles,
   canManageSystem,
   requireLogin,
   systemActionIntent,
@@ -32,7 +33,8 @@ export function SystemView({
     <SystemManagementPage
       route={systemRoute}
       query={query}
-      canEdit={canEdit}
+      canEdit={systemRoute.page === "roles" ? canManageRoles : canEdit}
+      canManageRoles={canManageRoles}
       canManageSystem={canManageSystem}
       requireLogin={requireLogin}
       actionIntent={systemActionIntent}

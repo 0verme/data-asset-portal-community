@@ -111,8 +111,13 @@ export default function App() {
     authReady,
     can,
     canEdit,
+    canManageRoles,
     canManageSystem,
+    canViewMenus,
     canViewOperationLog,
+    canViewParams,
+    canViewRoles,
+    canViewUsers,
     loginOpen,
     setLoginOpen,
     authBusy,
@@ -492,11 +497,26 @@ export default function App() {
     setApiAssetRoute((current) => (["new", "edit"].includes(current.page) ? DEFAULT_API_ASSET_ROUTE : current));
   }, [authReady, canEdit]);
 
+  const systemLandingRoute = useMemo(() => {
+    if (canViewUsers) return { page: "users" };
+    if (canViewRoles) return { page: "roles" };
+    if (canViewMenus) return { page: "menus" };
+    if (canViewParams) return { page: "param-dicts" };
+    if (canViewOperationLog) return { page: "operation-logs" };
+    return DEFAULT_SYSTEM_ROUTE;
+  }, [canViewMenus, canViewOperationLog, canViewParams, canViewRoles, canViewUsers]);
+
   useEffect(() => {
-    if (authReady && canViewOperationLog && !canManageSystem && module === "system" && systemRoute.page !== "operation-logs") {
-      setSystemRoute({ page: "operation-logs" });
-    }
-  }, [authReady, canManageSystem, canViewOperationLog, module, systemRoute.page]);
+    if (!authReady || module !== "system") return;
+    const accessible = {
+      users: canViewUsers,
+      roles: canViewRoles,
+      menus: canViewMenus,
+      "param-dicts": canViewParams,
+      "operation-logs": canViewOperationLog,
+    };
+    if (!accessible[systemRoute.page]) setSystemRoute(systemLandingRoute);
+  }, [authReady, canViewMenus, canViewOperationLog, canViewParams, canViewRoles, canViewUsers, module, systemLandingRoute, systemRoute.page]);
 
   const switchModule = (nextModule) => {
     setSidebarOpen(false);
@@ -519,7 +539,7 @@ export default function App() {
     }
     if (nextModule === "apiAsset") { setApiAssetRoute(DEFAULT_API_ASSET_ROUTE); setApiAssetFilter(DEFAULT_API_ASSET_FILTER); }
     if (nextModule === "mapping") setMappingRoute(DEFAULT_MAPPING_ROUTE);
-    if (nextModule === "system") setSystemRoute(canViewOperationLog && !canManageSystem ? { page: "operation-logs" } : DEFAULT_SYSTEM_ROUTE);
+    if (nextModule === "system") setSystemRoute(systemLandingRoute);
     setSystemActionIntent("");
     scrollMainToTop();
   };
@@ -552,7 +572,7 @@ export default function App() {
     }
     if (nextModule === "apiAsset") { setApiAssetRoute(DEFAULT_API_ASSET_ROUTE); setApiAssetFilter(DEFAULT_API_ASSET_FILTER); }
     if (nextModule === "mapping") setMappingRoute(target?.mappingRoute || DEFAULT_MAPPING_ROUTE);
-    if (nextModule === "system") setSystemRoute(DEFAULT_SYSTEM_ROUTE);
+    if (nextModule === "system") setSystemRoute(systemLandingRoute);
     if (nextModule === "push") {
       setPushRoute(pushNavigation.route);
     }
@@ -585,6 +605,8 @@ export default function App() {
               ? "搜索菜单名称、编码、路径或说明"
               : systemRoute.page === "param-dicts"
                 ? "搜索参数分类、编码、名称、取值或说明"
+                : systemRoute.page === "roles"
+                ? "搜索角色编码、名称或说明"
                 : systemRoute.page === "operation-logs"
                   ? "搜索操作用户、模块、对象或操作内容"
                   : "搜索用户名、显示名、邮箱或状态"
@@ -624,7 +646,8 @@ export default function App() {
       module={module}
       context={{
         apiAsset, apiAssetRoute, apiAssetView, asset, backToUpstreamList, can,
-        canEdit, canManageSystem, canViewOperationLog, goToMapping, goToModuleWithQuery, indicator, indicatorFilter,
+        canEdit, canManageRoles, canManageSystem, canViewMenus, canViewOperationLog, canViewParams,
+        canViewRoles, canViewUsers, goToMapping, goToModuleWithQuery, indicator, indicatorFilter,
         indicatorRoute, indicatorView, lineageRoute, manualCodeTable, mappingRoute,
         push, pushRoute, query, report, reportRoute, reportView, requireLogin, root,
         rootRoute, route, setApiAssetView, setIndicatorFilter, setIndicatorRoute,
@@ -639,7 +662,8 @@ export default function App() {
     <ModuleSidebar
       module={module}
       context={{
-        apiAsset, apiAssetFilter, asset, can, canEdit, canManageSystem, canViewOperationLog, indicator,
+        apiAsset, apiAssetFilter, asset, can, canEdit, canManageRoles, canManageSystem, canViewMenus,
+        canViewOperationLog, canViewParams, canViewRoles, canViewUsers, indicator,
         indicatorFilter, lineageBootstrap, manualCodeTable, push, pushRoute, report,
         reportFilter, requireLogin, root, setApiAssetFilter, setIndicatorFilter,
         setIndicatorRoute, setPushRoute, setReportFilter, setReportRoute, setRootRoute,
