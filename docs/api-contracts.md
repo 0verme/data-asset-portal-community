@@ -1,6 +1,6 @@
 # Pydantic API Contract（#16 P2）
 
-本文记录 #16 P2 建立的框架中立 API Contract 边界。`backend/app/contracts/` 描述 JSON wire format，由 Flask compatibility adapter 与当前 FastAPI primary adapter 共同复用；P2 不重新设计 API。
+本文记录 #16 P2 建立的框架中立 API Contract 边界。`backend/app/contracts/` 描述 JSON wire format，由 FastAPI Native adapter 复用；P2 不重新设计 API。
 
 ## 当前覆盖
 
@@ -22,7 +22,7 @@ Report、Indicator、Assets route 的成功和业务错误响应在 HTTP adapter
 
 ## FastAPI 复用现状
 
-FastAPI primary adapter 已使用这些模型作为 request/response model，并通过 Flask/FastAPI parity tests 固化现有行为。Flask routes 仍作为 compatibility fallback 与 rollback path 保留；P2 不改变 Database Lane 的 service 或 CoreAccess。
+FastAPI Native adapter 已使用这些模型作为 request/response model，并通过 native contract/regression tests 固化现有行为；P2 不改变 Database Lane 的 service 或 CoreAccess。
 
 ## 验证
 

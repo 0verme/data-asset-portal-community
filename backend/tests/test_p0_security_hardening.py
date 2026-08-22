@@ -1,163 +1,143 @@
-# Copyright 2025 Jearhe
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+"""Native FastAPI security and production-hardening regression tests."""
 
-"""P0 security / production hardening regression tests (Issue #16).
-
-Verifies behaviour, not implementation:
-  * production configuration fail-fast (debug must stay off)
-  * request-body ceiling -> uniform JSON 413
-  * uniform JSON shape for framework HTTP errors (405 etc.)
-  * security response headers
-  * proxy / forwarded-header trust boundary (default: ignored)
-  * data-source error sanitization (no internal paths / credentials leaked)
-  * dependency security-version floor (Flask / Werkzeug / Flask-Cors)
-"""
+# pyright: reportMissingImports=false
 
 from __future__ import annotations
 
-import io
 import os
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.app import create_app
+from backend.app.application import (
+    RequestContext,
+    request_context_scope,
+    resolve_client_address,
+)
+from backend.app.core.capabilities import resolve_capabilities
+from backend.app.services.auth_service import AuthError, auth_service
 from backend.app.services.indicator_service import IndicatorService
-from backend.app.settings import get_trust_proxy_headers
-
-# pyright: reportMissingImports=false
+from backend.app.services.operation_log_service import OperationLogService
+from backend.app.settings import (
+    get_runtime_config,
+    get_runtime_debug,
+    get_trust_proxy_headers,
+)
+from fastapi.testclient import TestClient
 
 BACKEND = Path(__file__).resolve().parents[1]
 REQUIREMENTS = BACKEND / "requirements.txt"
 
-_SECRET = "p0-security-hardening-test-secret"
+
+class NativeSecurityTestCase(unittest.TestCase):
+    def setUp(self):
+        self.environment = patch.dict(
+            os.environ,
+            {
+                "FLASK_ENV": "development",
+                "FLASK_SECRET_KEY": "p0-native-security-test-secret",
+            },
+            clear=False,
+        )
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+        self.capabilities = resolve_capabilities(edition="community")
+
+    def app(self):
+        from backend.asgi import create_native_app
+
+        return create_native_app(capabilities=self.capabilities)
 
 
-def _make_app(extra_env: dict | None = None):
-    env = {"FLASK_SECRET_KEY": _SECRET}
-    env.update(extra_env or {})
-    with patch.dict(os.environ, env):
-        return create_app()
-
-
-class ProductionConfigFailFastTests(unittest.TestCase):
+class ProductionConfigTests(NativeSecurityTestCase):
     def test_production_rejects_debug_true(self):
-        with self.assertRaises(RuntimeError) as ctx:
-            _make_app({"FLASK_ENV": "production", "FLASK_DEBUG": "true"})
-        self.assertIn("FLASK_DEBUG", str(ctx.exception))
+        with (
+            patch.dict(
+                os.environ,
+                {"FLASK_ENV": "production", "FLASK_DEBUG": "true"},
+            ),
+            self.assertRaisesRegex(RuntimeError, "FLASK_DEBUG"),
+        ):
+            get_runtime_config()
 
     def test_development_allows_debug_true(self):
-        app = _make_app({"FLASK_ENV": "development", "FLASK_DEBUG": "true"})
-        self.assertTrue(app.config["SECRET_KEY"])
+        with patch.dict(
+            os.environ,
+            {"FLASK_ENV": "development", "FLASK_DEBUG": "true"},
+        ):
+            self.assertTrue(get_runtime_debug())
+            self.assertFalse(get_runtime_config()["SESSION_COOKIE_SECURE"])
 
-    def test_production_with_debug_false_starts(self):
-        app = _make_app({"FLASK_ENV": "production", "FLASK_DEBUG": "false"})
-        self.assertTrue(app.config["SESSION_COOKIE_SECURE"])
 
-
-class RequestBoundaryAndErrorShapeTests(unittest.TestCase):
+class RequestBoundaryAndErrorShapeTests(NativeSecurityTestCase):
     def test_oversized_body_returns_uniform_json_413(self):
-        app = _make_app()
-        client = app.test_client()
-        big = io.BytesIO(b"x" * (app.config["MAX_CONTENT_LENGTH"] + 1024))
-        response = client.post(
-            "/api/auth/login",
-            data=big,
-            content_type="application/json",
-            headers={"Content-Type": "application/json"},
-        )
+        with patch.dict(os.environ, {"FLASK_MAX_CONTENT_LENGTH_MB": "1"}):
+            response = TestClient(self.app()).post(
+                "/api/auth/login",
+                content=b"x" * (1024 * 1024 + 1),
+                headers={"Content-Type": "application/json"},
+            )
         self.assertEqual(413, response.status_code)
-        body = response.get_json()
-        self.assertIn("error", body)
-        self.assertEqual("HTTP_413", body["error"]["code"])
-        self.assertEqual("请求体过大", body["error"]["message"])
+        self.assertEqual("HTTP_413", response.json()["error"]["code"])
+        self.assertEqual("请求体过大", response.json()["error"]["message"])
 
     def test_method_not_allowed_returns_uniform_json(self):
-        app = _make_app()
-        response = app.test_client().post("/api/auth/me")  # GET-only route
+        response = TestClient(self.app()).post("/api/auth/me")
         self.assertEqual(405, response.status_code)
-        body = response.get_json()
-        self.assertIn("error", body)
-        self.assertEqual("HTTP_405", body["error"]["code"])
+        self.assertEqual("HTTP_405", response.json()["error"]["code"])
 
     def test_error_shape_matches_404_convention(self):
-        app = _make_app()
-        body = app.test_client().get("/api/auth/me").get_json()
-        self.assertIn("error", body)
-        self.assertIn("code", body["error"])
-        self.assertIn("message", body["error"])
+        response = TestClient(self.app()).get("/api/auth/not-found")
+        self.assertEqual(404, response.status_code)
+        self.assertEqual("NOT_FOUND", response.json()["error"]["code"])
 
 
-class SecurityHeaderTests(unittest.TestCase):
+class SecurityHeaderTests(NativeSecurityTestCase):
     def test_security_headers_on_responses(self):
-        app = _make_app()
-        response = app.test_client().get("/api/auth/me")
+        response = TestClient(self.app()).get("/api/auth/me")
         self.assertEqual("nosniff", response.headers.get("X-Content-Type-Options"))
         self.assertEqual("SAMEORIGIN", response.headers.get("X-Frame-Options"))
         self.assertEqual(
-            "strict-origin-when-cross-origin", response.headers.get("Referrer-Policy")
+            "strict-origin-when-cross-origin",
+            response.headers.get("Referrer-Policy"),
         )
 
 
-class ProxyTrustBoundaryTests(unittest.TestCase):
+class ProxyTrustBoundaryTests(NativeSecurityTestCase):
     def test_proxy_headers_not_trusted_by_default(self):
         self.assertFalse(get_trust_proxy_headers())
+        self.assertEqual(
+            "198.51.100.7",
+            resolve_client_address(
+                "198.51.100.7",
+                {"X-Forwarded-For": "203.0.113.66"},
+                trust_proxy_headers=False,
+            ),
+        )
 
-    def test_proxy_headers_opt_in(self):
+    def test_proxy_headers_use_xff_when_trust_configured(self):
         with patch.dict(os.environ, {"ASSET_TRUST_PROXY_HEADERS": "true"}):
             self.assertTrue(get_trust_proxy_headers())
-
-    def test_audit_ip_ignores_forged_xff_by_default(self):
-        from backend.app.services.operation_log_service import operation_log_service
-
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("ASSET_TRUST_PROXY_HEADERS", None)
-            app = _make_app()
-            app.add_url_rule(
-                "/_test-audit-context",
-                endpoint="test_audit_context_default",
-                view_func=lambda: operation_log_service._request_context(),
+            self.assertEqual(
+                "203.0.113.66",
+                resolve_client_address(
+                    "127.0.0.1",
+                    {"X-Forwarded-For": "203.0.113.66, 198.51.100.1"},
+                    trust_proxy_headers=True,
+                ),
             )
-            response = app.test_client().get(
-                "/_test-audit-context",
-                headers={
-                    "X-Forwarded-For": "203.0.113.66",
-                    "User-Agent": "ua",
-                },
-                environ_base={"REMOTE_ADDR": "198.51.100.7"},
-            )
-            self.assertEqual("198.51.100.7", response.get_json()["ipAddress"])
 
-    def test_audit_ip_uses_xff_when_trust_configured(self):
-        from backend.app.services.operation_log_service import operation_log_service
-
-        with patch.dict(os.environ, {"ASSET_TRUST_PROXY_HEADERS": "true"}):
-            app = _make_app()
-            app.add_url_rule(
-                "/_test-audit-context",
-                endpoint="test_audit_context_proxy",
-                view_func=lambda: operation_log_service._request_context(),
-            )
-            response = app.test_client().get(
-                "/_test-audit-context",
-                headers={
-                    "X-Forwarded-For": "203.0.113.66, 198.51.100.1",
-                    "User-Agent": "ua",
-                },
-                environ_base={"REMOTE_ADDR": "127.0.0.1"},
-            )
-            self.assertEqual("203.0.113.66", response.get_json()["ipAddress"])
+    def test_operation_log_reads_native_proxy_context(self):
+        service = OperationLogService()
+        context = RequestContext(
+            method="GET",
+            path="/api/healthz",
+            client_address="198.51.100.7",
+            user_agent="native-security-test",
+            elapsed_time_ms=2,
+        )
+        with request_context_scope(context):
+            self.assertEqual("198.51.100.7", service._request_context()["ipAddress"])
 
 
 class ErrorSanitizationTests(unittest.TestCase):
@@ -181,14 +161,17 @@ class ErrorSanitizationTests(unittest.TestCase):
         self.assertNotIn("/opt/data-asset-portal", message)
 
     def test_auth_data_source_error_is_sanitized(self):
-        from backend.app.services.auth_service import AuthError, auth_service
-
         def _boom(profile, sql):
             raise RuntimeError("connect failed host=198.51.100.66 password=topsecret")
 
-        with patch("backend.app.services.auth_service.load_db_profiles", return_value={"primary": {"type": "postgres"}}), \
-                patch("backend.app.services.auth_service.fetch_all", side_effect=_boom), \
-                self.assertRaises(AuthError) as ctx:
+        with (
+            patch(
+                "backend.app.services.auth_service.load_db_profiles",
+                return_value={"primary": {"type": "postgres"}},
+            ),
+            patch("backend.app.services.auth_service.fetch_all", side_effect=_boom),
+            self.assertRaises(AuthError) as ctx,
+        ):
             auth_service.authenticate("admin", "wrong")
         message = str(ctx.exception)
         self.assertNotIn("topsecret", message)
@@ -206,25 +189,20 @@ class DependencySecurityVersionTests(unittest.TestCase):
             result[name.lower()] = version.strip()
         return result
 
-    def test_flask_is_at_or_above_security_floor(self):
-        version = self._parse_requirements()["flask"]
-        parts = [int(p) for p in version.split(".")]
-        self.assertGreaterEqual(parts[:3], [3, 1, 3])
+    def test_legacy_runtime_dependencies_are_removed(self):
+        dependencies = self._parse_requirements()
+        self.assertNotIn("flask", dependencies)
+        self.assertNotIn("flask-cors", dependencies)
 
-    @staticmethod
-    def _version_parts(version):
-        return [int(part) for part in (version or "").split(".")]
-
-    def test_werkzeug_is_pinned_at_security_floor(self):
+    def test_werkzeug_is_retained_for_password_hashing(self):
         version = self._parse_requirements().get("werkzeug")
-        self.assertIsNotNone(version, "Werkzeug must be explicitly pinned")
-        parts = self._version_parts(version)
-        self.assertGreaterEqual(parts[:3], [3, 1, 8])
-
-    def test_flask_cors_is_at_or_above_security_floor(self):
-        version = self._parse_requirements()["flask-cors"]
-        parts = [int(p) for p in version.split(".")]
-        self.assertGreaterEqual(parts[:3], [6, 0, 0])
+        if version is None:
+            self.fail("Werkzeug is required by AuthService password hashing")
+        try:
+            version_parts = [int(part) for part in version.split(".")][:3]
+        except ValueError:
+            self.fail("Werkzeug version must be numeric")
+        self.assertGreaterEqual(version_parts, [3, 1, 8])
 
 
 if __name__ == "__main__":

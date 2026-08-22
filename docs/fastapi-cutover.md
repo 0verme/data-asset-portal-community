@@ -31,7 +31,7 @@ F2 后，FastAPI primary 的 Auth 使用 `backend/app/application/session.py` �
 - `ASSET_TRUST_PROXY_HEADERS` 默认仍为 deny；只有显式信任反向代理时才读取 `X-Forwarded-For`；
 - FastAPI adapter 不直接读取 database Provider/CoreAccess，也不复制 Service SQL。
 
-F5/F6 已完成 native runtime gate 与 runtime retirement；F7 负责按真实引用清理剩余 Flask source、dependencies 和历史文档。
+F5/F6/F7 已完成 native runtime gate、runtime retirement、dependency cleanup 与 legacy source/test cleanup；生成的历史 architecture artifact 另行维护。
 
 ## Cutover phases
 
@@ -43,9 +43,9 @@ FastAPI/Uvicorn 成为唯一 runtime；不再提供 `BACKEND_RUNTIME` switch、W
 
 必须验证 startup、`/healthz`、session auth、capability boundary、已迁移 API、fallback API、404、validation error、CORS/security headers、SQLite/PostgreSQL CI 与 frontend checks。
 
-### F7：Dependency / legacy cleanup
+### F7：Dependency / legacy cleanup（完成）
 
-按真实引用清理 Flask、Flask-Cors、legacy blueprints/tests、obsolete docs 和 compatibility facade；保留 API/security/edition regression evidence。
+已按真实引用清理 Flask、Flask-Cors、legacy blueprints/tests、obsolete runtime docs，并保留薄 `fastapi_app.py` facade 与 API/security/edition regression evidence。
 
 ## Rollback
 

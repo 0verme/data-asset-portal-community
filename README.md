@@ -126,10 +126,8 @@ mock 数据只用于前端体验，不会写入数据库。
 flowchart LR
   U["用户浏览器"] --> R["React + Vite"]
   R -->|"remote: /api"| A["ASGI Runtime / Uvicorn"]
-  A --> F["FastAPI primary routes"]
-  A --> W["Flask compatibility fallback"]
+  A --> F["FastAPI Native routes"]
   F --> S["Service Layer"]
-  W --> S
   S --> D["Database Provider"]
   D --> DB[("SQLite / PostgreSQL / GaussDB-DWS")]
   R -.->|"mock"| M["受控演示数据"]

@@ -14,7 +14,7 @@
 
 """CLI contract tests for the schema migration command.
 
-The migration CLI mirrors Flask startup by applying the runtime profile
+The migration CLI mirrors native backend startup by applying the runtime profile
 (ASSET_RUNTIME_PROFILE) so the README Community quick-start commands work as
 written: `schema_migrate.py apply --profile community_sqlite` must resolve the
 profile file and the Community module set without hand-written flags.
@@ -104,7 +104,10 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
     def test_community_profile_applies_config_path(self):
         # With ASSET_RUNTIME_PROFILE=community the CLI must resolve the
         # community config file without --config, mirroring Flask startup.
-        env = {"ASSET_RUNTIME_PROFILE": "community", "ASSET_DB_PROFILE": "community_sqlite"}
+        env = {
+            "ASSET_RUNTIME_PROFILE": "community",
+            "ASSET_DB_PROFILE": "community_sqlite",
+        }
         proc = _run_cli(["status", "--profile", "community_sqlite"], env_extra=env)
         # status against a missing sqlite file may print "ledger=unmanaged";
         # the important contract is that it does NOT fail on missing database.yaml.
@@ -120,12 +123,14 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
         self.assertIn("0001_baseline", proc.stdout)
 
     def test_module_list_flag_still_works(self):
-        proc = _run_cli(["plan", "--offline", "--dialect", "sqlite", "--modules", "apiAsset"])
+        proc = _run_cli(
+            ["plan", "--offline", "--dialect", "sqlite", "--modules", "apiAsset"]
+        )
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("0001_baseline", proc.stdout)
 
     def test_community_profile_reads_backend_env_local(self):
-        # Mirror Flask startup: the CLI must load backend/.env.local so the
+        # Mirror native startup: the CLI must load backend/.env.local so the
         # README Community quick-start (configure .env.local, then run
         # `schema_migrate.py apply --profile community_sqlite`) works as
         # written in a clean clone without hand-exported variables.

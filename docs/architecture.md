@@ -93,9 +93,9 @@ F6 不再提供 Flask runtime rollback switch。应用回滚通过部署上一�
 
 ## Transitional Debt
 
-### F7 cleanup debt
+### F7 cleanup result
 
-F5 gate 已证明 production native composition 不加载 Flask。仓库中仍保留的 Flask factory、legacy blueprints、compatibility tests、历史文档和 Flask/Flask-Cors dependencies 属于 F7 cleanup debt，不参与 production runtime；删除前仍需按真实引用分类并保留 API/security regression evidence。
+F5 gate 已证明 production native composition 不加载 Flask；F7 已删除 Flask/Flask-Cors dependencies、Flask factory/blueprints/routes 与 obsolete compatibility tests。保留的 `Werkzeug`、`itsdangerous`、signed-cookie config names 和薄 `fastapi_app.py` facade 均有明确 native reason。生成的历史 architecture artifact 如需刷新，按 diagram source 专项更新。
 
 ## 前端与数据层
 

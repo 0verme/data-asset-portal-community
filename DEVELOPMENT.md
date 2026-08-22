@@ -6,7 +6,7 @@
 
 - **Node.js** 22.13+ —— 前端 Vite 开发与构建（`lineage-viewer` workspace 要求 `>=22.13.0`，推荐 Node 24）
 - **npm** 10+ —— 安装前端依赖（npm workspaces 需要）
-- **Python** 3.10+ —— 运行 FastAPI primary runtime 与 Flask compatibility fallback
+- **Python** 3.10+ —— 运行 FastAPI Native runtime
 - **PostgreSQL** 或 **GaussDB / DWS** —— 完整版 remote 联调需要
 - **SQLite** —— Community/local 隔离运行可选，Python 标准库已提供驱动
 
@@ -220,7 +220,7 @@ python -m unittest backend.tests.test_api_contracts
 python -m unittest discover -s backend/tests
 ```
 
-`test_p5_runtime.py` 覆盖 ASGI dispatch、FastAPI primary、Flask fallback、session compatibility、CORS、security headers 与 `/healthz`；各 `test_fastapi_*_migration.py` 覆盖已迁移模块的 Flask/FastAPI parity。`test_api_contracts.py` 验证框架中立的 Pydantic API Contract。
+`test_p5_runtime.py` 覆盖 FastAPI Native startup、scope gate、session compatibility、CORS、security headers 与 `/healthz`；native contract tests 覆盖 API wire format 与 authorization。`test_api_contracts.py` 验证框架中立的 Pydantic API Contract。
 
 ### CI（GitHub Actions）
 
@@ -266,9 +266,9 @@ PostgreSQL integration 测试（16 个）通过 `TEST_DATABASE_PROFILE` + `TEST_
 
 ### 后端（`backend/app/`）
 
-- `asgi.py` / `fastapi_app.py` / `fastapi/` —— ASGI runtime 与 FastAPI HTTP adapter；`fastapi_app.py` 保留历史 import facade，`backend/app/__init__.py` 和 `routes/` 保留 Flask compatibility adapter
+- `asgi.py` / `fastapi_app.py` / `fastapi/` —— ASGI runtime 与 FastAPI HTTP adapter；`fastapi_app.py` 保留薄 import facade，legacy Flask bootstrap/routes 已由 F7 清理
 - `services/` —— 业务与数据读写，供两种 HTTP adapter 复用
-- `contracts/` —— Flask/FastAPI 共同复用的 API Contract
+- `contracts/` —— FastAPI/Application 复用的框架中立 API Contract
 - `db/` —— 数据库连接与 profile 解析
 
 ## 代码风格约定

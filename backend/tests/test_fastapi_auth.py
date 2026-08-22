@@ -17,8 +17,6 @@ from backend.app.fastapi.auth import get_native_session_identity
 from backend.app.fastapi_app import create_fastapi_app
 from backend.app.services.auth_service import AuthService, AuthValidationError
 from fastapi.testclient import TestClient
-from flask import Flask
-from flask.sessions import SecureCookieSessionInterface
 
 
 class FastApiNativeAuthTests(unittest.TestCase):
@@ -55,7 +53,7 @@ class FastApiNativeAuthTests(unittest.TestCase):
             system_management_service_instance=self.system_service,
         )
 
-    def test_codec_is_compatible_with_flask_cookie_serializer(self):
+    def test_codec_round_trips_signed_session_payload(self):
         payload = {
             SESSION_PAYLOAD_KEY: {
                 "role": "admin",
@@ -67,23 +65,18 @@ class FastApiNativeAuthTests(unittest.TestCase):
             "f2-native-auth-test-secret",
             max_age=14 * 24 * 60 * 60,
         )
-        flask_app = Flask(__name__)
-        flask_app.secret_key = os.environ["FLASK_SECRET_KEY"]
-        flask_serializer = SecureCookieSessionInterface().get_signing_serializer(
-            flask_app
-        )
-
-        flask_cookie = flask_serializer.dumps(payload)
         native_cookie = codec.encode(payload)
 
-        self.assertEqual(payload, codec.decode(flask_cookie))
-        self.assertEqual(payload, flask_serializer.loads(native_cookie))
+        self.assertEqual(3, len(native_cookie.split(".")))
+        self.assertEqual(payload, codec.decode(native_cookie))
 
     def test_codec_rejects_tampering_and_expired_cookie(self):
         codec = SignedSessionCodec("f2-native-auth-test-secret", max_age=10)
         valid = codec.encode({SESSION_PAYLOAD_KEY: {"role": "admin"}})
         payload_part, timestamp_part, signature_part = valid.split(".")
-        changed_signature = ("A" if signature_part[0] != "A" else "B") + signature_part[1:]
+        changed_signature = ("A" if signature_part[0] != "A" else "B") + signature_part[
+            1:
+        ]
         tampered = ".".join((payload_part, timestamp_part, changed_signature))
         self.assertIsNone(codec.decode(tampered))
         self.assertIsNone(codec.decode("not-a-signed-session"))
@@ -140,8 +133,12 @@ class FastApiNativeAuthTests(unittest.TestCase):
         self.assertEqual(2, self.operation_logs.record_best_effort_audit.call_count)
 
     def test_invalid_and_forged_identity_behave_as_anonymous(self):
-        client = TestClient(self.app({"role": "admin", "user": "alice", "name": "Alice"}))
-        codec = SignedSessionCodec("f2-native-auth-test-secret", max_age=14 * 24 * 60 * 60)
+        client = TestClient(
+            self.app({"role": "admin", "user": "alice", "name": "Alice"})
+        )
+        codec = SignedSessionCodec(
+            "f2-native-auth-test-secret", max_age=14 * 24 * 60 * 60
+        )
         forged = codec.encode(
             {
                 SESSION_PAYLOAD_KEY: {
@@ -187,7 +184,9 @@ class FastApiNativeAuthTests(unittest.TestCase):
         self.auth_service.authenticate.side_effect = AuthValidationError(
             "账号或密码不正确，请重试。"
         )
-        client = TestClient(self.app({"role": "admin", "user": "alice", "name": "Alice"}))
+        client = TestClient(
+            self.app({"role": "admin", "user": "alice", "name": "Alice"})
+        )
         response = client.post(
             "/api/auth/login",
             json={"username": "alice", "password": "wrong"},

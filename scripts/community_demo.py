@@ -2,7 +2,7 @@
 """One-command Community Demo bootstrap.
 
 This module intentionally orchestrates the existing migration, seed, ASGI
-(FastAPI primary + Flask fallback) and Vite entry points.  It never reads an
+(FastAPI/Uvicorn) and Vite entry points.  It never reads an
 external database configuration and never writes the user's .env files.
 """
 
@@ -190,8 +190,6 @@ def build_demo_environment(
             "ASSET_DISABLED_MODULES",
             "FLASK_ENV",
             "FLASK_DEBUG",
-            "FLASK_HOST",
-            "FLASK_PORT",
             "FLASK_SECRET_KEY",
             "FLASK_CORS_ORIGINS",
             "LINEAGE_DB_PROFILE",
@@ -212,8 +210,6 @@ def build_demo_environment(
             "ASSET_DB_DATABASE": str(paths.database.resolve()),
             "FLASK_ENV": "development",
             "FLASK_DEBUG": "false",
-            "FLASK_HOST": "127.0.0.1",
-            "FLASK_PORT": str(BACKEND_PORT),
             "FLASK_SECRET_KEY": secret,
             "FLASK_CORS_ORIGINS": f"http://127.0.0.1:{FRONTEND_PORT},http://localhost:{FRONTEND_PORT}",
             "LINEAGE_DB_PROFILE": "",
@@ -324,7 +320,7 @@ def ensure_backend_python(paths: DemoPaths) -> Path:
         [
             str(python),
             "-c",
-            "import fastapi, flask, flask_cors, psycopg, uvicorn, yaml, werkzeug",
+            "import fastapi, itsdangerous, psycopg, uvicorn, yaml, werkzeug",
         ],
         cwd=paths.root,
     )

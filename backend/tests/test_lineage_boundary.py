@@ -16,10 +16,9 @@ import ast
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 LINEAGE_PKG = ROOT / "backend" / "app" / "services" / "lineage"
-LINEAGE_ROUTES = ROOT / "backend" / "app" / "routes" / "lineage.py"
+LINEAGE_ROUTES = ROOT / "backend" / "app" / "fastapi" / "routers" / "lineage.py"
 LINEAGE_SERVICE = ROOT / "backend" / "app" / "services" / "lineage_service.py"
 LINEAGE_COLLECTOR = ROOT / "backend" / "app" / "services" / "lineage_collector.py"
 
@@ -44,7 +43,7 @@ class LineageBoundaryTestCase(unittest.TestCase):
         self.assertTrue((LINEAGE_PKG / "collector_protocol.py").is_file())
         self.assertTrue(LINEAGE_COLLECTOR.is_file())
 
-    def test_routes_import_reader_not_collector(self):
+    def test_native_router_imports_reader_not_collector(self):
         imports = _imported_modules(LINEAGE_ROUTES)
         joined = " ".join(imports)
         self.assertIn("services.lineage", joined)
