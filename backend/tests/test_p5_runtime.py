@@ -48,9 +48,9 @@ class P5RuntimeTests(unittest.TestCase):
         self.assertEqual(200, migrated.status_code)
         self.assertIn("data", migrated.json())
 
-        fallback = client.get("/api/capabilities")
-        self.assertEqual(200, fallback.status_code)
-        self.assertIn("edition", fallback.json())
+        native_capabilities = client.get("/api/capabilities")
+        self.assertEqual(200, native_capabilities.status_code)
+        self.assertIn("edition", native_capabilities.json())
 
     def test_flask_runtime_switch_is_immediate_and_health_reports_mode(self):
         runtime = self.create_runtime_app(
@@ -103,6 +103,9 @@ class P5RuntimeTests(unittest.TestCase):
         self.assertEqual(
             {
                 "/api/auth",
+                "/api/capabilities",
+                "/api/portal",
+                "/api/search",
                 "/api/indicators",
                 "/api/assets",
                 "/api/field-mappings",

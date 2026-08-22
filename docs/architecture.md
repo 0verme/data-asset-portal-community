@@ -50,6 +50,9 @@ flowchart LR
 - API Asset：`/api/api-assets`
 - Lineage：`/api/lineage`
 - Auth：`/api/auth`（native signed-session adapter）
+- Capabilities：`/api/capabilities`（native infrastructure adapter）
+- Portal Stats：`/api/portal/stats`（native infrastructure adapter）
+- Unified Search：`/api/search`（native infrastructure adapter）
 - System Management：`/api/system`
 - Operation Log：`/api/operation-logs`
 - Upstream*：`/api/upstreams`
@@ -60,9 +63,7 @@ flowchart LR
 
 以下路径当前仍由 Flask fallback 提供，或依赖 Flask runtime compatibility seam：
 
-- Portal Stats：`/api/portal/*`
-- Unified Search：`/api/search`
-- Capabilities：`/api/capabilities`
+- Common Code：`/api/common-codes/*`（WAIT_DB）
 - WAIT_DB 模块：Indicator Path、Common Code、Push
 - 任何未命中 FastAPI migrated prefix 的请求
 
@@ -108,7 +109,7 @@ Flask 尚不能安全移除，原因是它仍承担明确的 compatibility respo
 
 - FastAPI primary 的 Auth 使用 framework-neutral signed-session codec 读取与 Flask 兼容的 `session` cookie；Flask auth blueprint 仅作为 fallback/rollback boundary 保留。
 - `Operation Log Service` 已通过 F1 `RequestContext` adapter 获取 URL、method、user-agent、client IP 和 actor，不再读取 Flask request-local state。
-- Portal、Search、Capabilities 以及 Indicator Path、Common Code、Push 尚未形成独立的 FastAPI runtime contract 或 DB_READY migration boundary。
+- Common Code 以及 Indicator Path、Push 尚未形成独立的 FastAPI runtime contract 或 DB_READY migration boundary；Portal/Search/Capabilities 已由 F3 native infrastructure adapter 承载。
 - 已迁移模块的 Flask blueprints、Flask test client 和 parity tests 仍是 rollback / compatibility 证据。
 - `backend/run.py` 提供不依赖 ASGI dispatcher 的直接 WSGI emergency path。
 

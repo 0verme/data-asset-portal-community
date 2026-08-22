@@ -36,8 +36,7 @@ rg -n "from flask import|import flask|create_app|flask Blueprint|WSGI|WSGIMiddle
 
 ### KEEP_INFRASTRUCTURE / OUT_OF_SCOPE
 
-- `capabilities`：capability infrastructure，必须继续由 Flask common fallback 提供，直到建立独立 FastAPI runtime contract。
-- `portal`、`search`：跨模块 aggregation/provider，不能在没有完整 service parity 的情况下机械迁移。
+- `capabilities`、`portal`、`search`：F3 已建立 thin FastAPI native infrastructure adapters；Flask common blueprints 仍保留为 fallback/rollback，不得删除。
 - `docs/system-architecture.html`：生成的 architecture artifact；本轮由 `docs/system-architecture.archify.json` 更新并重新生成，后续应继续修改 source 后再 deliver。
 
 ### REMOVE
@@ -46,4 +45,4 @@ rg -n "from flask import|import flask|create_app|flask Blueprint|WSGI|WSGIMiddle
 
 ## 结论
 
-FastAPI 已是迁移 prefix 与 `/api/auth` 的 primary runtime；Flask 仍是有意保留的 fallback/compatibility runtime，而不是未审计的遗留代码。机械删除 Flask 仍会破坏 WAIT_DB 模块、Flask auth rollback、fallback blueprints 或紧急 rollback，因此本阶段不执行。
+FastAPI 已是迁移 prefix、`/api/auth` 与 capabilities/portal/search common infrastructure 的 primary runtime；Flask 仍是有意保留的 fallback/compatibility runtime，而不是未审计的遗留代码。机械删除 Flask 仍会破坏 WAIT_DB 模块、Flask rollback、fallback blueprints 或紧急 rollback，因此本阶段不执行。
