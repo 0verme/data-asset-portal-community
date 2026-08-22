@@ -154,6 +154,14 @@ def main(argv=None):
 
     if config["type"] != "gaussdb":
         _alembic_upgrade(args.profile)
+    from app.authorization.persistence import seed_rbac_for_profile
+
+    seeded = seed_rbac_for_profile(args.profile)
+    print(
+        f"rbac_seed=inserted:{seeded.inserted} "
+        f"roles:{seeded.roles_inserted} permissions:{seeded.permissions_inserted} "
+        f"mappings:{seeded.mappings_inserted}"
+    )
     print(f"applied={BASELINE_REVISION if created else '-'}")
     return 0
 

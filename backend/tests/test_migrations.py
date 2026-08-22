@@ -4,11 +4,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from backend.app.db.sqlite_adapter import connect
 from backend.app.migrations.schema import (
     BASELINE_REVISION,
     SUPPORTED_DIALECTS,
-    baseline_path,
     baseline_columns,
+    baseline_path,
     baseline_tables,
     current_revision,
     initialize,
@@ -16,14 +17,13 @@ from backend.app.migrations.schema import (
     verify_baselines,
     verify_database,
 )
-from backend.app.db.sqlite_adapter import connect
 
 
 class BaselineSchemaTests(unittest.TestCase):
     def test_all_supported_dialects_have_the_same_tables(self):
         self.assertEqual(("sqlite", "postgresql", "mysql", "dws"), SUPPORTED_DIALECTS)
         tables = verify_baselines()
-        self.assertEqual(36, len(tables))
+        self.assertEqual(39, len(tables))
         for dialect in SUPPORTED_DIALECTS:
             self.assertTrue(baseline_path(dialect).is_file())
             self.assertEqual(set(tables), set(baseline_tables(dialect)))

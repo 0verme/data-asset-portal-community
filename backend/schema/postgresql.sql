@@ -86,6 +86,27 @@ CREATE INDEX IF NOT EXISTS idx_p_field_mapping_table_source
   ON dwp.p_field_mapping_table(data_source_id, source_table_name);
 
 CREATE SCHEMA IF NOT EXISTS dwp;
+CREATE TABLE IF NOT EXISTS dwp.p_role (
+  role_code VARCHAR(64) PRIMARY KEY, name VARCHAR(128) NOT NULL,
+  description VARCHAR(2000), builtin CHAR(1) NOT NULL DEFAULT 'N',
+  enabled CHAR(1) NOT NULL DEFAULT 'Y',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS dwp.p_permission (
+  permission_code VARCHAR(128) PRIMARY KEY, resource VARCHAR(64) NOT NULL,
+  action VARCHAR(32) NOT NULL, name VARCHAR(128) NOT NULL,
+  description VARCHAR(2000)
+);
+CREATE TABLE IF NOT EXISTS dwp.p_role_permission (
+  role_code VARCHAR(64) NOT NULL, permission_code VARCHAR(128) NOT NULL,
+  PRIMARY KEY (role_code, permission_code),
+  FOREIGN KEY (role_code) REFERENCES dwp.p_role(role_code) ON DELETE CASCADE,
+  FOREIGN KEY (permission_code) REFERENCES dwp.p_permission(permission_code) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_p_role_permission_permission
+  ON dwp.p_role_permission(permission_code);
+
 CREATE TABLE IF NOT EXISTS dwp.p_admin_user (
   id BIGINT PRIMARY KEY, username VARCHAR(64) NOT NULL UNIQUE,
   password_hash VARCHAR(512) NOT NULL, display_name VARCHAR(128),

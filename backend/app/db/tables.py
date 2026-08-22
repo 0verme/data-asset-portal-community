@@ -24,6 +24,32 @@ admin_user = _table(
     Column("updated_at", DateTime),
 )
 
+rbac_role = _table(
+    "p_role",
+    Column("role_code", String(64), primary_key=True),
+    Column("name", String(128), nullable=False),
+    Column("description", String(2000)),
+    Column("builtin", String(1), nullable=False),
+    Column("enabled", String(1), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_at", DateTime),
+)
+
+rbac_permission = _table(
+    "p_permission",
+    Column("permission_code", String(128), primary_key=True),
+    Column("resource", String(64), nullable=False),
+    Column("action", String(32), nullable=False),
+    Column("name", String(128), nullable=False),
+    Column("description", String(2000)),
+)
+
+rbac_role_permission = _table(
+    "p_role_permission",
+    Column("role_code", String(64), primary_key=True),
+    Column("permission_code", String(128), primary_key=True),
+)
+
 asset_domain = _table(
     "p_asset_domain",
     Column("domain_code", String(64), primary_key=True),
