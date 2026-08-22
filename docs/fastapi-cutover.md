@@ -52,7 +52,7 @@ F2 后，FastAPI primary 的 Auth 使用 `backend/app/application/session.py` �
 
 ### P5-C：Selective cleanup
 
-只删除有证据证明不再被 runtime、tests、CLI、extension 或 compatibility path 使用的 Flask adapter。Flask auth blueprint、`common_code`、`portal`、`search`、`indicator_path`、`push` 与 Flask app factory 继续保留；不做 Big Bang 删除。
+只删除有证据证明不再被 runtime、tests、CLI、extension 或 compatibility path 使用的 Flask adapter。Flask auth blueprint、capabilities/portal/search common blueprints、`common_code`、`indicator_path`、`push` 与 Flask app factory 继续保留；不做 Big Bang 删除。
 
 ## Rollback
 

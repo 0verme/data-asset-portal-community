@@ -23,7 +23,12 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.wsgi import WSGIMiddleware
 
-FASTAPI_ALWAYS_PREFIXES = {"/api/auth"}
+FASTAPI_ALWAYS_PREFIXES = {
+    "/api/auth",
+    "/api/capabilities",
+    "/api/portal",
+    "/api/search",
+}
 
 FASTAPI_MODULE_PREFIXES = {
     "indicator": "/api/indicators",

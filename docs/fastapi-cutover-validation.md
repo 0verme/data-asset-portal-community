@@ -8,9 +8,9 @@
 - `GET /healthz`：PASS；不访问数据库，返回 `runtime`、`fastapiPrimary`、`flaskFallback`
 - `BACKEND_RUNTIME=fastapi`：已迁移 prefix 进入 FastAPI，其他 prefix 进入 Flask WSGI fallback
 - `BACKEND_RUNTIME=flask`：所有业务请求进入 Flask fallback
-- runtime dispatch table：Community 下 Auth、Indicator、Assets、Field Mapping、Root、API Asset、Lineage、System、Operation Log 全部覆盖
+- runtime dispatch table：Community 下 Auth、Capabilities、Portal Stats、Unified Search、Indicator、Assets、Field Mapping、Root、API Asset、Lineage、System、Operation Log 全部覆盖
 - native session compatibility：FastAPI auth 可读取/写入 Flask-compatible signed session cookie；Flask fallback 可继续读取同一 cookie
-- capability boundary：disabled/unmigrated routes 不会被 FastAPI adapter 意外注册
+- capability boundary：disabled/private routes 不会被 FastAPI adapter 意外注册；Common Code 仍为 WAIT_DB Flask fallback
 
 ## HTTP checks
 

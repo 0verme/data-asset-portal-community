@@ -14,8 +14,10 @@ from ..services.field_mapping_service import field_mapping_service
 from ..services.indicator_service import indicator_service
 from ..services.manual_code_table_service import manual_code_table_service
 from ..services.operation_log_service import operation_log_service
+from ..services.portal_service import portal_service
 from ..services.report_service import report_service
 from ..services.root_service import root_service
+from ..services.search_provider import search_provider
 from ..services.system_management_service import system_management_service
 from ..services.upstream_service import upstream_service
 from .dependencies import IdentityResolver, RequestContextMiddleware
@@ -25,6 +27,7 @@ from .routers.assets import _register_asset_routes
 from .routers.auth import _register_auth_routes  # pyright: ignore[reportMissingImports]
 from .routers.field_mappings import _register_field_mapping_routes
 from .routers.indicators import _register_indicator_routes
+from .routers.infrastructure import _register_infrastructure_routes
 from .routers.lineage import _register_lineage_routes, lineage_service
 from .routers.manual_code_tables import _register_manual_code_table_routes
 from .routers.operation_logs import _register_operation_log_routes
@@ -39,6 +42,8 @@ def create_fastapi_app(
     capabilities: dict[str, Any] | None = None,
     identity_resolver: IdentityResolver | None = None,
     auth_service_instance: Any | None = None,
+    portal_service_instance: Any | None = None,
+    search_provider_instance: Any | None = None,
     indicator_service_instance: Any | None = None,
     assets_service_instance: Any | None = None,
     field_mapping_service_instance: Any | None = None,
@@ -64,6 +69,8 @@ def create_fastapi_app(
         identity_resolver=app.state.identity_resolver,
     )
     auth = auth_service_instance or auth_service
+    portal_stats = portal_service_instance or portal_service
+    search = search_provider_instance or search_provider
     indicator = indicator_service_instance or indicator_service
     assets = assets_service_instance or assets_service
     field_mapping = field_mapping_service_instance or field_mapping_service
@@ -76,13 +83,19 @@ def create_fastapi_app(
     operation_logs = operation_log_service_instance or operation_log_service
     upstream = upstream_service_instance or upstream_service
 
-    register_exception_handlers(app)
-    _register_auth_routes(app, auth, operation_logs)
-
     effective_capabilities = capabilities
     if effective_capabilities is None:
         effective_capabilities = resolve_capabilities()
     enabled_codes = set(effective_capabilities.get("enabled_codes") or [])
+
+    register_exception_handlers(app)
+    _register_auth_routes(app, auth, operation_logs)
+    _register_infrastructure_routes(
+        app,
+        effective_capabilities,
+        portal_stats,
+        search,
+    )
     if "indicator" in enabled_codes:
         _register_indicator_routes(app, indicator)
     if "dwm" in enabled_codes:
