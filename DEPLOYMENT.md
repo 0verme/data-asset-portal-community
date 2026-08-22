@@ -57,7 +57,7 @@ ASSET_DB_JAR_PATH=/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
 ## 二、后端部署
 
 `backend/run.py` 使用 Flask 内建的 development server，**仅用于本地开发/联调**，不作为生产承载。
-当前默认生产入口是 `backend.asgi:app`：由 Uvicorn 启动后，已迁移 API prefix 由 FastAPI primary 处理，未迁移 API 自动委托给现有 Flask WSGI fallback。Flask signed session、auth identity、Operation Log request context 与 security headers 在兼容边界内保持可用。
+当前默认生产入口是 `backend.asgi:app`：由 Uvicorn 启动后，已迁移 API prefix 与 `/api/auth` 由 FastAPI primary 处理，未迁移 API 自动委托给现有 Flask WSGI fallback。FastAPI 使用与 Flask 兼容的 signed session codec；Flask auth/session、Operation Log adapter 与 security headers 仍在 fallback/rollback boundary 内保持可用。
 
 ```bash
 cd /opt/data-asset-portal
@@ -65,14 +65,14 @@ python3 -m venv backend/.venv
 source backend/.venv/bin/activate
 pip install -r backend/requirements.txt
 pip install waitress  # 仅在需要直接 WSGI rollback 时使用
-# FastAPI primary；非迁移 API 保留 Flask fallback
+# FastAPI primary；非迁移 API 保留 Flask fallback，Auth 使用 Flask-compatible signed session
 uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
 Runtime switch：
 
 - `BACKEND_RUNTIME=fastapi`（默认）：FastAPI primary，Flask compatibility fallback
-- `BACKEND_RUNTIME=flask`：所有业务请求立即回退到 Flask；仍可使用同一 `uvicorn backend.asgi:app`，或直接使用生产 WSGI
+- `BACKEND_RUNTIME=flask`：所有业务请求立即回退到 Flask compatibility runtime；仍可使用同一 `uvicorn backend.asgi:app`，或直接使用生产 WSGI
 - 直接 Flask WSGI rollback（仅 compatibility / emergency path）：
 
 ```bash
@@ -172,7 +172,7 @@ server {
 - 确认 `/api/assets/tables` 返回 JSON 而不是 HTML
 - 确认前端为 `VITE_API_MODE=remote`，且 `/api` 已正确代理到 ASGI runtime（FastAPI primary / Flask fallback）
 - 确认 `FLASK_SECRET_KEY` 由部署 secret store 提供，且 `FLASK_DEBUG=false`
-- HTTPS 终止后仍应保持 `FLASK_ENV=production`，以发送 Secure Cookie；FastAPI primary 通过 Flask session compatibility boundary 读取同一 cookie；本阶段未扩大 Flask 对转发头的信任范围
+- HTTPS 终止后仍应保持 `FLASK_ENV=production`，以发送 Secure Cookie；FastAPI native auth 与 Flask fallback 共享同一 signed cookie contract；本阶段未扩大 Flask 对转发头的信任范围
 - `backend/configs/database.yaml` 与 `.env.local` 不入库（见 `.gitignore`）；请从 `backend/configs/database.example.yaml` 与 `backend/.env.example` 复制后按环境填写
 
 ## 七、配置来源

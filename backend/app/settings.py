@@ -17,7 +17,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-
 ROOT_DIR = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT_DIR / "backend"
 LOGS_DIR = ROOT_DIR / "logs"
@@ -83,6 +82,26 @@ def get_auth_session_days() -> int:
     return get_int_env("AUTH_SESSION_DAYS", 14, minimum=1)
 
 
+def get_session_secret() -> str:
+    """Return the shared signed-session secret without importing Flask."""
+    secret_key = os.getenv("FLASK_SECRET_KEY")
+    if not secret_key or not secret_key.strip():
+        raise RuntimeError(
+            "FLASK_SECRET_KEY must be set to a non-empty secret value before starting the application."
+        )
+    return secret_key
+
+
+def get_session_cookie_config() -> dict[str, object]:
+    """Return cookie security flags shared by Flask and FastAPI adapters."""
+    environment = os.getenv("FLASK_ENV", "production").strip().lower()
+    return {
+        "SESSION_COOKIE_HTTPONLY": True,
+        "SESSION_COOKIE_SAMESITE": "Lax",
+        "SESSION_COOKIE_SECURE": environment != "development",
+    }
+
+
 def get_db_connect_timeout_seconds() -> int:
     return get_int_env("ASSET_DB_CONNECT_TIMEOUT_SECONDS", 30, minimum=1)
 
@@ -103,7 +122,11 @@ def get_db_profile_overrides() -> dict[str, object]:
         "ASSET_DB_DSN": "dsn",
         "ASSET_DB_JDBC_URL": "jdbc_url",
     }
-    overrides = {target: value.strip() for source, target in fields.items() if (value := os.getenv(source)) and value.strip()}
+    overrides: dict[str, object] = {
+        target: value.strip()
+        for source, target in fields.items()
+        if (value := os.getenv(source)) and value.strip()
+    }
     if "port" in overrides:
         overrides["port"] = get_int_env("ASSET_DB_PORT", 5432, minimum=1, maximum=65535)
     return overrides
@@ -125,12 +148,6 @@ def get_trust_proxy_headers() -> bool:
 
 def get_flask_runtime_config() -> dict[str, object]:
     """Build the small, security-sensitive Flask configuration surface."""
-    secret_key = os.getenv("FLASK_SECRET_KEY")
-    if not secret_key or not secret_key.strip():
-        raise RuntimeError(
-            "FLASK_SECRET_KEY must be set to a non-empty secret value before starting the application."
-        )
-
     environment = os.getenv("FLASK_ENV", "production").strip().lower()
     if environment == "production" and get_flask_debug():
         raise RuntimeError(
@@ -141,10 +158,8 @@ def get_flask_runtime_config() -> dict[str, object]:
         get_int_env("FLASK_MAX_CONTENT_LENGTH_MB", 16, minimum=1, maximum=512) * 1024 * 1024
     )
     return {
-        "SECRET_KEY": secret_key,
-        "SESSION_COOKIE_HTTPONLY": True,
-        "SESSION_COOKIE_SAMESITE": "Lax",
-        "SESSION_COOKIE_SECURE": environment != "development",
+        "SECRET_KEY": get_session_secret(),
+        **get_session_cookie_config(),
         "CORS_ORIGINS": parse_comma_separated_values(os.getenv("FLASK_CORS_ORIGINS")),
         "MAX_CONTENT_LENGTH": max_content_length,
         "SECURITY_HEADERS": {

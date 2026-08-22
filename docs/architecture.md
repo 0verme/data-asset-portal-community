@@ -49,6 +49,7 @@ flowchart LR
 - Report*：`/api/reports`
 - API Asset：`/api/api-assets`
 - Lineage：`/api/lineage`
+- Auth：`/api/auth`（native signed-session adapter）
 - System Management：`/api/system`
 - Operation Log：`/api/operation-logs`
 - Upstream*：`/api/upstreams`
@@ -61,7 +62,6 @@ flowchart LR
 
 - Portal Stats：`/api/portal/*`
 - Unified Search：`/api/search`
-- Auth：`/api/auth/*`（login / me / logout）
 - Capabilities：`/api/capabilities`
 - WAIT_DB 模块：Indicator Path、Common Code、Push
 - 任何未命中 FastAPI migrated prefix 的请求
@@ -80,7 +80,7 @@ Flask adapter  ──┘
 
 `backend/app/contracts/` 是框架中立的 API Contract，由 Flask compatibility adapter 与 FastAPI primary adapter 共同复用。Service、Contract 和 Database Layer 不因 dual runtime 复制两份业务逻辑。
 
-- `backend/asgi.py` 负责 runtime dispatch、CORS/security headers、Flask request-context compatibility 和 runtime switch。
+- `backend/asgi.py` 负责 runtime dispatch、CORS/security headers、native signed-session identity resolver、Flask request-context compatibility 和 runtime switch。
 - `backend/app/fastapi_app.py` 是保留历史 import path 的 thin compatibility facade。
 - `backend/app/fastapi/app.py` 负责 FastAPI app bootstrap、explicit Service injection、capability gate 与 Router registration；`dependencies.py`、`errors.py` 和 `routers/` 承载共享 adapter seam 与模块边界。
 - `backend/app/__init__.py` 负责 Flask app factory 与 Flask fallback 的 blueprint 装配。
@@ -106,9 +106,9 @@ BACKEND_RUNTIME=flask waitress-serve --host 127.0.0.1 --port 5099 backend.run:ap
 
 Flask 尚不能安全移除，原因是它仍承担明确的 compatibility responsibilities：
 
-- FastAPI primary 通过 `FlaskRequestContextMiddleware` 读取 signed Flask session，并复用 auth identity。
-- `Operation Log Service` 仍需要 Flask request context 中的 URL、method、user-agent、client IP 和 session user。
-- Auth、Portal、Search、Capabilities 以及 Indicator Path、Common Code、Push 尚未形成独立的 FastAPI runtime contract 或 DB_READY migration boundary。
+- FastAPI primary 的 Auth 使用 framework-neutral signed-session codec 读取与 Flask 兼容的 `session` cookie；Flask auth blueprint 仅作为 fallback/rollback boundary 保留。
+- `Operation Log Service` 已通过 F1 `RequestContext` adapter 获取 URL、method、user-agent、client IP 和 actor，不再读取 Flask request-local state。
+- Portal、Search、Capabilities 以及 Indicator Path、Common Code、Push 尚未形成独立的 FastAPI runtime contract 或 DB_READY migration boundary。
 - 已迁移模块的 Flask blueprints、Flask test client 和 parity tests 仍是 rollback / compatibility 证据。
 - `backend/run.py` 提供不依赖 ASGI dispatcher 的直接 WSGI emergency path。
 

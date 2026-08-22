@@ -5,23 +5,25 @@ all other paths to the existing Flask WSGI application. Set
 ``BACKEND_RUNTIME=flask`` for an immediate rollback to the Flask runtime.
 """
 
+# pyright: reportMissingImports=false
+# pyright: reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 import os
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from backend.app import create_app
+from backend.app.core.capabilities import resolve_capabilities
+from backend.app.fastapi.auth import get_native_session_identity
+from backend.app.fastapi_app import create_fastapi_app
+from backend.app.settings import get_flask_runtime_config, load_runtime_env
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.wsgi import WSGIMiddleware
 
-from backend.app import create_app
-from backend.app.application import identity_from_mapping
-from backend.app.auth import get_session_user
-from backend.app.core.capabilities import resolve_capabilities
-from backend.app.fastapi_app import create_fastapi_app
-from backend.app.settings import get_flask_runtime_config, load_runtime_env
-
+FASTAPI_ALWAYS_PREFIXES = {"/api/auth"}
 
 FASTAPI_MODULE_PREFIXES = {
     "indicator": "/api/indicators",
@@ -157,8 +159,8 @@ def create_runtime_app(
         capabilities=effective_capabilities
     )
 
-    def resolve_identity(_request):
-        return identity_from_mapping(get_session_user())
+    def resolve_identity(request):
+        return get_native_session_identity(request)
 
     fastapi_application = fastapi_application or create_fastapi_app(
         capabilities=effective_capabilities,
@@ -180,7 +182,7 @@ def create_runtime_app(
     )
     flask_asgi = WSGIMiddleware(flask_application)
     enabled_codes = set(effective_capabilities.get("enabled_codes") or [])
-    migrated_prefixes = {
+    migrated_prefixes = FASTAPI_ALWAYS_PREFIXES | {
         prefix
         for code, configured_prefixes in FASTAPI_MODULE_PREFIXES.items()
         if code in enabled_codes

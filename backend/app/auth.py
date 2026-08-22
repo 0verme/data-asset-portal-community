@@ -21,6 +21,7 @@ from flask import jsonify, session  # pyright: ignore[reportMissingImports]
 from .application import (
     ADMIN_ROLE,
     MAINTENANCE_ROLES,
+    SESSION_PAYLOAD_KEY,
     RequestContext,
     identity_for_session,
     identity_from_mapping,
@@ -28,7 +29,7 @@ from .application import (
 )
 from .application.errors import ApplicationError
 
-SESSION_KEY = "dap_auth_user"
+SESSION_KEY = SESSION_PAYLOAD_KEY
 
 
 def get_session_identity():

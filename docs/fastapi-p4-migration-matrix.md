@@ -22,9 +22,9 @@
 | Common Code | `/api/common-codes` | — | — | — | NO（legacy `fetch_all` Service，暂无 DB Lane Core PR） | WAIT_DB |
 | Portal Stats | `/api/portal/stats` | — | — | — | N/A（跨模块聚合 / fallback） | INFRASTRUCTURE / P5 |
 | Unified Search | `/api/search` | — | — | — | N/A（跨模块聚合 Provider） | INFRASTRUCTURE / P5 |
-| Auth (`login/me/logout`) | `/api/auth` | — | — | — | N/A（session/runtime boundary） | P5 cutover |
+| Auth (`login/me/logout`) | `/api/auth` | Native signed-session adapter | API Contract | PASS | N/A（session/runtime boundary） | DONE（F2 / #102；Flask rollback retained） |
 | Capabilities | `/api/capabilities` | — | — | — | N/A（capability infrastructure） | INFRASTRUCTURE / P5 |
 
 ## P4 Close Result
 
-所有当前 DB_READY 的 business API 均已具备 FastAPI adapter、shared Service reuse、contract/parity coverage、Flask rollback 与 green PR CI。WAIT_DB 模块没有被强行迁移，Flask routes 全部保留。P4 的剩余项属于 Database Lane 前置工作或 P5 runtime/infrastructure，不阻塞本轮 DB_READY 迁移收口。
+所有当前 DB_READY 的 business API 均已具备 FastAPI adapter、shared Service reuse、contract/parity coverage、Flask rollback 与 green PR CI。Auth 已在 F2/#102 增加 native signed-session adapter；WAIT_DB 模块没有被强行迁移，Flask routes 全部保留。P4 的剩余项属于 Database Lane 前置工作或 P5 runtime/infrastructure，不阻塞本轮 DB_READY 迁移收口。

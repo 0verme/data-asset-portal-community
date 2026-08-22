@@ -137,7 +137,7 @@ FLASK_ENV=development
 - `FLASK_DEBUG` 默认关闭；仅 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会启用它。不要在共享或生产环境设置它。
 - `FLASK_SECRET_KEY` 在所有环境均为必填项；缺失、空字符串或纯空白会使应用在启动时失败。用密码管理器或部署平台的 secret store 保存它，不要提交到仓库、写入日志，或把真实值粘贴进命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`，然后直接保存到 secret store / `.env.local`。
 - `FLASK_ENV` 默认为安全的生产行为：Cookie 使用 `Secure=True`。本地 HTTP 联调必须显式设置 `FLASK_ENV=development`，此时 `Secure=False`；`HttpOnly=True` 与 `SameSite=Lax` 始终保留。
-- `BACKEND_RUNTIME=fastapi`（默认）通过 `backend/asgi.py` 运行 FastAPI primary，并将未迁移路径委托给 Flask fallback；`BACKEND_RUNTIME=flask` 是兼容 / rollback mode。两种模式都需要 Flask session 与 security configuration，因此 `FLASK_*` 变量仍然是兼容边界的一部分。
+- `BACKEND_RUNTIME=fastapi`（默认）通过 `backend/asgi.py` 运行 FastAPI primary，并将未迁移路径委托给 Flask fallback；FastAPI Auth 使用 Flask-compatible signed session codec；`BACKEND_RUNTIME=flask` 是兼容 / rollback mode。Flask fallback 仍需要 `FLASK_*` security configuration。
 - Nginx + Vite 的 `/api` 反代是同源部署，不需要 CORS。只有前端和 API 确实处于不同来源时，才设置 `FLASK_CORS_ORIGINS`，使用逗号分隔的完整来源，例如 `https://portal.example.com,https://admin.example.com`；空项会忽略，未配置时不发送跨域允许头，绝不使用 `*`。
 
 ## 环境文件加载顺序

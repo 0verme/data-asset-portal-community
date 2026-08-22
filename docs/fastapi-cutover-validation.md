@@ -8,8 +8,8 @@
 - `GET /healthz`：PASS；不访问数据库，返回 `runtime`、`fastapiPrimary`、`flaskFallback`
 - `BACKEND_RUNTIME=fastapi`：已迁移 prefix 进入 FastAPI，其他 prefix 进入 Flask WSGI fallback
 - `BACKEND_RUNTIME=flask`：所有业务请求进入 Flask fallback
-- runtime dispatch table：Community 下 Indicator、Assets、Field Mapping、Root、API Asset、Lineage、System、Operation Log 全部覆盖
-- session compatibility：Flask signed session cookie 可被 FastAPI primary 读取
+- runtime dispatch table：Community 下 Auth、Indicator、Assets、Field Mapping、Root、API Asset、Lineage、System、Operation Log 全部覆盖
+- native session compatibility：FastAPI auth 可读取/写入 Flask-compatible signed session cookie；Flask fallback 可继续读取同一 cookie
 - capability boundary：disabled/unmigrated routes 不会被 FastAPI adapter 意外注册
 
 ## HTTP checks
@@ -22,4 +22,4 @@
 
 ## Full regression evidence
 
-P4 module parity tests remain the source of truth for each migrated business API. The P5 runtime test adds dispatch, auth/session, fallback, error, CORS, security-header and health coverage without changing Service or database code.
+P4 module parity tests remain the source of truth for each migrated business API. The P5 runtime test plus F2 native-auth tests cover dispatch, signed-session compatibility, authorization, fallback, error, CORS, security-header and health behavior without changing Service or database code.
