@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyright: reportMissingImports=false
+
 import logging
 import time
 from datetime import timedelta
-
-from flask import Flask, g, jsonify, request  # pyright: ignore[reportMissingImports]
-from flask_cors import CORS
-from werkzeug.exceptions import HTTPException  # pyright: ignore[reportMissingImports]
 
 from .application import (
     RequestContext,
@@ -26,7 +24,6 @@ from .application import (
     resolve_client_address,
     set_request_context,
 )
-from .auth import get_session_identity
 from .logging_config import configure_logging
 from .settings import (
     get_auth_session_days,
@@ -57,6 +54,18 @@ def create_app(*, capabilities=None):
     *capabilities* may be an already-resolved capability map (used by tests).
     When omitted, capabilities are resolved from environment variables.
     """
+    from flask import (  # pyright: ignore[reportMissingImports]
+        Flask,
+        g,
+        jsonify,
+        request,
+    )
+    from flask_cors import CORS
+    from werkzeug.exceptions import (
+        HTTPException,  # pyright: ignore[reportMissingImports]
+    )
+
+    from .auth import get_session_identity
     from .core.blueprint_registry import register_enabled_blueprints
     from .core.capabilities import (
         ModuleCapabilityError,

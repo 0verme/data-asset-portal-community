@@ -84,7 +84,7 @@ Flask adapter  ──┘
 - `backend/asgi.py` 负责 runtime dispatch、CORS/security headers、native signed-session identity resolver、Flask request-context compatibility 和 runtime switch。
 - `backend/app/fastapi_app.py` 是保留历史 import path 的 thin compatibility facade。
 - `backend/app/fastapi/app.py` 负责 FastAPI app bootstrap、explicit Service injection、capability gate 与 Router registration；`dependencies.py`、`errors.py` 和 `routers/` 承载共享 adapter seam 与模块边界。
-- `backend/app/__init__.py` 负责 Flask app factory 与 Flask fallback 的 blueprint 装配。
+- `backend/app/__init__.py` 负责 Flask app factory 与 Flask fallback 的 blueprint 装配；Flask imports 已收敛到 `create_app()` compatibility boundary，native package import 不再加载 Flask。
 - `backend/app/services/` 和 `backend/app/db/` 是两种 HTTP adapter 共享的业务与数据库边界。
 
 ## Rollback / Compatibility Mode
@@ -107,6 +107,7 @@ BACKEND_RUNTIME=flask waitress-serve --host 127.0.0.1 --port 5099 backend.run:ap
 
 Flask 尚不能安全移除，原因是它仍承担明确的 compatibility responsibilities：
 
+- F5 native gate 通过 Flask import guard 验证 FastAPI composition、request context 和 Community native routes 可在不加载 Flask 的隔离子进程中运行。
 - FastAPI primary 的 Auth 使用 framework-neutral signed-session codec 读取与 Flask 兼容的 `session` cookie；Flask auth blueprint 仅作为 fallback/rollback boundary 保留。
 - `Operation Log Service` 已通过 F1 `RequestContext` adapter 获取 URL、method、user-agent、client IP 和 actor，不再读取 Flask request-local state。
 - Common Code 以及 Indicator Path、Push 尚未形成独立的 FastAPI runtime contract 或 DB_READY migration boundary；Portal/Search/Capabilities 已由 F3 native infrastructure adapter 承载。

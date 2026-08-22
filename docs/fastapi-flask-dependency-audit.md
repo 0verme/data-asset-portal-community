@@ -13,7 +13,7 @@ rg -n "from flask import|import flask|create_app|flask Blueprint|WSGI|WSGIMiddle
 ### KEEP_COMPAT
 
 - `backend/asgi.py`：`WSGIMiddleware`、`create_app`、`FlaskRequestContextMiddleware`；P5 primary/fallback dispatcher 和 Flask signed-session/request-context compatibility seam 仍在使用。
-- `backend/app/__init__.py`：Flask app factory、CORS、security/error handlers；fallback 与 `backend/run.py` 仍使用。
+- `backend/app/__init__.py`：Flask app factory、CORS、security/error handlers；Flask imports 已延迟到 `create_app()`，fallback 与 `backend/run.py` 仍使用。
 - `backend/app/core/blueprint_registry.py`：Flask blueprint registration；fallback 仍注册全部 legacy API。
 - 已迁移模块的 Flask routes：Assets、Field Mapping、Indicator、Root、Manual Code Table、Report、API Asset、Lineage、System Management、Operation Log、Upstream；它们是 rollback/fallback 路径，不能删除。
 - `backend/app/auth.py` 与 Flask auth routes：保留 Flask signed-session / blueprint fallback 作为 rollback boundary；默认 FastAPI primary 的 `login/me/logout` 已由 native router 承载。
@@ -45,4 +45,4 @@ rg -n "from flask import|import flask|create_app|flask Blueprint|WSGI|WSGIMiddle
 
 ## 结论
 
-FastAPI 已是迁移 prefix、`/api/auth` 与 capabilities/portal/search common infrastructure 的 primary runtime；Flask 仍是有意保留的 fallback/compatibility runtime，而不是未审计的遗留代码。机械删除 Flask 仍会破坏 WAIT_DB 模块、Flask rollback、fallback blueprints 或紧急 rollback，因此本阶段不执行。
+FastAPI 已是迁移 prefix、`/api/auth` 与 capabilities/portal/search common infrastructure 的 primary runtime；F5 native gate 已证明核心 FastAPI composition 可在 Flask import blocked 的隔离子进程中运行。Flask 仍是有意保留的 fallback/compatibility runtime，而不是未审计的遗留代码；机械删除 Flask 仍会破坏 WAIT_DB 模块、Flask rollback、fallback blueprints 或紧急 rollback，因此本阶段不执行。
