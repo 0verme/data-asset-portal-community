@@ -1,5 +1,8 @@
 """FastAPI adapter for the public Metadata Ingestion Contract."""
 
+# pyright: reportMissingImports=false
+# pyright: reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 from typing import Any
@@ -10,9 +13,9 @@ from fastapi.responses import JSONResponse  # type: ignore
 from ...application import RequestContext
 from ...contracts import validate_contract
 from ...contracts.metadata_ingestion import (  # type: ignore
+    MAX_METADATA_BODY_BYTES,
     AssetMetadataIngestionRequest,
     LineageMetadataIngestionRequest,
-    MAX_METADATA_BODY_BYTES,
     MetadataIngestionResult,
 )
 from ...services.metadata_ingestion_service import (  # type: ignore
@@ -20,7 +23,7 @@ from ...services.metadata_ingestion_service import (  # type: ignore
     MetadataPayloadTooLargeError,
     metadata_ingestion_service,
 )
-from ..dependencies import require_maintainer
+from ..dependencies import require_permission
 
 
 def _metadata_error_response(error: MetadataIngestionError) -> JSONResponse:
@@ -50,7 +53,9 @@ def _check_metadata_body_size(request: Request) -> None:
         )
 
 
-def _register_metadata_routes(app: FastAPI, service: Any = metadata_ingestion_service) -> None:
+def _register_metadata_routes(
+    app: FastAPI, service: Any = metadata_ingestion_service
+) -> None:
     router = APIRouter(prefix="/api/metadata", tags=["metadata-ingestion"])
 
     def get_service() -> Any:
@@ -73,7 +78,7 @@ def _register_metadata_routes(app: FastAPI, service: Any = metadata_ingestion_se
         payload: AssetMetadataIngestionRequest = Body(...),
         dry_run: bool = Query(default=False, alias="dryRun"),
         mode: str | None = Query(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("metadata:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -83,7 +88,12 @@ def _register_metadata_routes(app: FastAPI, service: Any = metadata_ingestion_se
             )
         except MetadataIngestionError as error:
             return _metadata_error_response(error)
-        return JSONResponse(status_code=200 if dry_run or str(mode or "").strip().casefold() == "preview" else 201, content=validate_contract(result, MetadataIngestionResult))
+        return JSONResponse(
+            status_code=200
+            if dry_run or str(mode or "").strip().casefold() == "preview"
+            else 201,
+            content=validate_contract(result, MetadataIngestionResult),
+        )
 
     @router.post(
         "/lineage/ingestions",
@@ -102,7 +112,7 @@ def _register_metadata_routes(app: FastAPI, service: Any = metadata_ingestion_se
         payload: LineageMetadataIngestionRequest = Body(...),
         dry_run: bool = Query(default=False, alias="dryRun"),
         mode: str | None = Query(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("metadata:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -112,12 +122,17 @@ def _register_metadata_routes(app: FastAPI, service: Any = metadata_ingestion_se
             )
         except MetadataIngestionError as error:
             return _metadata_error_response(error)
-        return JSONResponse(status_code=200 if dry_run or str(mode or "").strip().casefold() == "preview" else 201, content=validate_contract(result, MetadataIngestionResult))
+        return JSONResponse(
+            status_code=200
+            if dry_run or str(mode or "").strip().casefold() == "preview"
+            else 201,
+            content=validate_contract(result, MetadataIngestionResult),
+        )
 
     @router.get("/ingestions/{ingestion_id}", response_model=MetadataIngestionResult)
     def get_ingestion(
         ingestion_id: str,
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("metadata:read")),
         current_service: Any = Depends(get_service),
     ):
         try:

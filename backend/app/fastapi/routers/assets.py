@@ -1,5 +1,8 @@
 """Data asset FastAPI adapter routes."""
 
+# pyright: reportMissingImports=false
+# pyright: reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 from typing import Any
@@ -24,8 +27,9 @@ from ...services.assets_service import (
     AssetNotFoundError,
     AssetValidationError,
 )
-from ..dependencies import require_maintainer
+from ..dependencies import require_permission
 from ..errors import _service_error_response
+
 
 def _asset_payload(payload: AssetTableRequest | None) -> dict[str, Any] | None:
     if payload is None:
@@ -79,7 +83,9 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
                 }
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
-        response_model = AssetPageResponse if "page" in payload else ItemsResponse[AssetItem]
+        response_model = (
+            AssetPageResponse if "page" in payload else ItemsResponse[AssetItem]
+        )
         return JSONResponse(content=validate_contract(payload, response_model))
 
     @router.get("/tables/{table_name}", response_model=None)
@@ -93,7 +99,9 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             return _service_error_response(error, 404)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
-        return JSONResponse(content=validate_contract({"data": data}, DataEnvelope[AssetItem]))
+        return JSONResponse(
+            content=validate_contract({"data": data}, DataEnvelope[AssetItem])
+        )
 
     @router.get("/tables/{table_name}/fields", response_model=None)
     def get_asset_fields(
@@ -106,7 +114,9 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             return _service_error_response(error, 404)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
-        return JSONResponse(content=validate_contract({"items": items}, ItemsResponse[AssetField]))
+        return JSONResponse(
+            content=validate_contract({"items": items}, ItemsResponse[AssetField])
+        )
 
     @router.get("/tables/{table_name}/ddl", response_model=None)
     def get_asset_ddl(
@@ -119,7 +129,9 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             return _service_error_response(error, 404)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
-        return JSONResponse(content=validate_contract({"data": data}, DataEnvelope[object]))
+        return JSONResponse(
+            content=validate_contract({"data": data}, DataEnvelope[object])
+        )
 
     @router.get("/domains", response_model=None)
     def get_domains(
@@ -130,7 +142,9 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             items = current_service.get_domains(layer=layer)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
-        return JSONResponse(content=validate_contract({"items": items}, ItemsResponse[object]))
+        return JSONResponse(
+            content=validate_contract({"items": items}, ItemsResponse[object])
+        )
 
     @router.get("/layers", response_model=None)
     def get_layers(
@@ -141,12 +155,14 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             items = current_service.get_layers(domain=domain)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
-        return JSONResponse(content=validate_contract({"items": items}, ItemsResponse[object]))
+        return JSONResponse(
+            content=validate_contract({"items": items}, ItemsResponse[object])
+        )
 
     @router.post("/tables", response_model=None, status_code=201)
     def create_asset_table(
         payload: AssetTableRequest | None = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("asset:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -169,11 +185,13 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     def update_asset_table(
         table_name: str,
         payload: AssetTableRequest | None = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("asset:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
-            data = current_service.update_asset_table(table_name, _asset_payload(payload))
+            data = current_service.update_asset_table(
+                table_name, _asset_payload(payload)
+            )
         except AssetNotFoundError as error:
             return _service_error_response(error, 404)
         except AssetValidationError as error:
@@ -193,11 +211,13 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     def update_asset_fields(
         table_name: str,
         payload: AssetTableRequest | None = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("asset:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
-            data = current_service.update_asset_fields(table_name, _asset_payload(payload))
+            data = current_service.update_asset_fields(
+                table_name, _asset_payload(payload)
+            )
         except AssetNotFoundError as error:
             return _service_error_response(error, 404)
         except AssetValidationError as error:
@@ -214,7 +234,7 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     @router.delete("/tables/{table_name}", response_model=None)
     def delete_asset_table(
         table_name: str,
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("asset:write")),
         current_service: Any = Depends(get_service),
     ):
         try:

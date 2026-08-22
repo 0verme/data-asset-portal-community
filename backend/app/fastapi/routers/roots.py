@@ -1,5 +1,8 @@
 """Root FastAPI adapter routes."""
 
+# pyright: reportMissingImports=false
+# pyright: reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 from typing import Any
@@ -23,8 +26,9 @@ from ...services.root_service import (
     RootNotFoundError,
     RootValidationError,
 )
-from ..dependencies import require_maintainer
+from ..dependencies import require_permission
 from ..errors import _service_error_response
+
 
 def _register_root_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(prefix="/api/roots", tags=["root-migration"])
@@ -47,7 +51,9 @@ def _register_root_routes(app: FastAPI, service: Any) -> None:
             items = current_service.get_roots(keyword=keyword, cat=cat)
         except RootDataSourceError as error:
             return _service_error_response(error, 500)
-        return JSONResponse(content=validate_contract({"items": items}, RootListResponse))
+        return JSONResponse(
+            content=validate_contract({"items": items}, RootListResponse)
+        )
 
     @router.get("/categories", response_model=None)
     def get_root_categories(current_service: Any = Depends(get_service)):
@@ -55,7 +61,9 @@ def _register_root_routes(app: FastAPI, service: Any) -> None:
             items = current_service.get_root_categories()
         except RootDataSourceError as error:
             return _service_error_response(error, 500)
-        return JSONResponse(content=validate_contract({"items": items}, RootCategoryListResponse))
+        return JSONResponse(
+            content=validate_contract({"items": items}, RootCategoryListResponse)
+        )
 
     @router.get("/{abbr}", response_model=None)
     def get_root_detail(abbr: str, current_service: Any = Depends(get_service)):
@@ -65,12 +73,14 @@ def _register_root_routes(app: FastAPI, service: Any) -> None:
             return _service_error_response(error, 404)
         except RootDataSourceError as error:
             return _service_error_response(error, 500)
-        return JSONResponse(content=validate_contract({"data": data}, DataEnvelope[RootItem]))
+        return JSONResponse(
+            content=validate_contract({"data": data}, DataEnvelope[RootItem])
+        )
 
     @router.post("", response_model=None, status_code=201)
     def create_root(
         payload: RootRequest | None = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("root:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -93,7 +103,7 @@ def _register_root_routes(app: FastAPI, service: Any) -> None:
     def update_root(
         abbr: str,
         payload: RootRequest | None = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("root:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -116,7 +126,7 @@ def _register_root_routes(app: FastAPI, service: Any) -> None:
     @router.delete("/{abbr}", response_model=None)
     def delete_root(
         abbr: str,
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("root:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -130,7 +140,7 @@ def _register_root_routes(app: FastAPI, service: Any) -> None:
     @router.post("/import", response_model=None)
     def import_root_items(
         payload: RootRequest | None = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("root:write")),
         current_service: Any = Depends(get_service),
     ):
         try:

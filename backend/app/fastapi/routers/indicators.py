@@ -1,5 +1,8 @@
 """Indicator FastAPI adapter routes."""
 
+# pyright: reportMissingImports=false
+# pyright: reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 from typing import Any
@@ -22,8 +25,9 @@ from ...services.indicator_service import (
     IndicatorNotFoundError,
     IndicatorValidationError,
 )
-from ..dependencies import require_maintainer
+from ..dependencies import require_permission
 from ..errors import _service_error_response
+
 
 def _indicator_payload(payload: IndicatorRequest | None) -> dict[str, Any] | None:
     if payload is None:
@@ -74,7 +78,7 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
     @router.post("", response_model=None, status_code=201)
     def create_indicator(
         payload: IndicatorRequest | None = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("indicator:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -97,7 +101,7 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
     def update_indicator(
         indicator_id: str,
         payload: IndicatorRequest | None = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("indicator:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -124,7 +128,7 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
     def patch_indicator_status(
         indicator_id: str,
         payload: IndicatorRequest | None = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("indicator:write")),
         current_service: Any = Depends(get_service),
     ):
         body = _indicator_payload(payload) or {}
@@ -146,7 +150,7 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
     @router.delete("/{indicator_id}", response_model=None)
     def delete_indicator(
         indicator_id: str,
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("indicator:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
