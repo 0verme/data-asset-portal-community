@@ -5,6 +5,9 @@ idempotent for fresh databases and creates the missing structures when a
 pre-#116 database upgrades from the previous head.
 """
 
+# pyright: reportMissingImports=false
+# pyright: reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 from alembic import op

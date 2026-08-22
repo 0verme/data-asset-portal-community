@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Render an idempotent PostgreSQL/DWS-compatible Community seed without
-opening a database.
+"""Render an idempotent PostgreSQL/DWS-compatible repository seed.
 
-Community-owned tables only; the canonical column set comes from
-``demo/seed_loader.py`` (aligned with ``backend/schema``).
+The canonical column set comes from ``demo/seed_loader.py`` and
+``backend/schema``; all rows are fictional demo metadata.
 """
+
+# pyright: reportAttributeAccessIssue=false
 
 from __future__ import annotations
 
