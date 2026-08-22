@@ -2,23 +2,27 @@
 
 ## Runtime Truth
 
-当前后端是一个带有兼容边界的 ASGI 运行时：
+当前后端是纯 FastAPI ASGI 运行时：
 
 ```text
 Uvicorn
   ↓
 backend/asgi.py
-  ├── FastAPI primary：已迁移且已启用的 API prefix
-  └── Flask WSGI fallback：未迁移、基础设施和兼容路径
+  ↓
+FastAPI Native
+  ↓
+Application / Service
+  ↓
+Database Provider
 ```
 
-`BACKEND_RUNTIME` 默认值为 `fastapi`。生产和默认开发入口均为：
+生产和默认开发入口均为：
 
 ```bash
 uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
-`backend/run.py` 仍然创建直接 Flask application，但只用于本地 development server 或绕过 ASGI dispatcher 的 emergency rollback；它不是默认生产入口。
+`backend/run.py` 已退休；不再提供 direct Flask development/WSGI runtime 或 runtime switch。
 
 ## 请求分发
 
@@ -26,16 +30,14 @@ uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 flowchart LR
   U["Browser"] --> F["React + Vite"]
   F -->|"/api"| R["Uvicorn / backend/asgi.py"]
-  R -->|"migrated prefixes"| A["FastAPI primary"]
-  R -->|"other paths"| W["Flask compatibility fallback"]
+  R -->|"native routes"| A["FastAPI Native"]
   A --> S["Application / Service"]
-  W --> S
   S --> P["Database Provider"]
   P --> D[("SQLite / PostgreSQL / GaussDB-DWS")]
   F -.->|"mock"| M["Controlled demo data"]
 ```
 
-`backend/asgi.py` 根据 capability map 计算已迁移 prefix，再由 `RuntimeDispatcher` 选择 adapter。FastAPI 和 Flask 不是两套业务实现：两者都进入相同的 Application / Service Layer，并通过 Database Provider 访问数据。
+`backend/app/fastapi/app.py` 根据 capability map 注册 native routers；`backend/asgi.py` 只负责 FastAPI composition、CORS/security headers 和 healthz。WAIT_DB/Private routes 不注册，不通过第二套 runtime 承载。
 
 ### FastAPI primary 覆盖范围
 
@@ -57,64 +59,43 @@ flowchart LR
 - Operation Log：`/api/operation-logs`
 - Upstream*：`/api/upstreams`
 
-具体 prefix gate 由 `backend/asgi.py` 的 `FASTAPI_MODULE_PREFIXES` 定义；模块级 parity 和 migration 状态见 [FastAPI P4 Migration Matrix](./fastapi-p4-migration-matrix.md)。
+模块级 parity 和 migration 状态见 [FastAPI P4 Migration Matrix](./fastapi-p4-migration-matrix.md)。
 
-### Flask compatibility fallback
+### Scope exclusions
 
-以下路径当前仍由 Flask fallback 提供，或依赖 Flask runtime compatibility seam：
+以下路径在 Community Native runtime 中按 gate 不注册：
 
 - Common Code：`/api/common-codes/*`（WAIT_DB）
-- WAIT_DB 模块：Indicator Path、Common Code、Push
-- 任何未命中 FastAPI migrated prefix 的请求
+- Indicator Path、Common Code、Push（WAIT_DB/Private boundary）
+- 任何未注册的请求返回 FastAPI `NOT_FOUND` envelope
 
-已迁移模块的 Flask blueprints 也必须继续保留，因为它们是 fallback、rollback 和 parity tests 的安全边界。Community profile 的 disabled/private 路径仍由 capability gate 控制，不会因为 FastAPI primary 而意外暴露。
+Community profile 的 disabled/private 路径不会因为 runtime 收口而意外暴露。
 
 ## Application Boundary
 
 HTTP adapter 只负责请求解析、认证依赖、contract validation、response envelope 和 adapter-specific error mapping：
 
 ```text
-FastAPI adapter ─┐
-                  ├── Application / Service Layer ── Database Provider ── Database
-Flask adapter  ──┘
+FastAPI adapter ── Application / Service Layer ── Database Provider ── Database
 ```
 
-`backend/app/contracts/` 是框架中立的 API Contract，由 Flask compatibility adapter 与 FastAPI primary adapter 共同复用。Service、Contract 和 Database Layer 不因 dual runtime 复制两份业务逻辑。
+`backend/app/contracts/` 是框架中立的 API Contract，由 FastAPI native adapter 复用；Service、Contract 和 Database Layer 不因 runtime retirement 复制业务逻辑。
 
-- `backend/asgi.py` 负责 runtime dispatch、CORS/security headers、native signed-session identity resolver、Flask request-context compatibility 和 runtime switch。
+- `backend/asgi.py` 负责纯 FastAPI composition、CORS/security headers、native signed-session identity resolver 和 healthz。
 - `backend/app/fastapi_app.py` 是保留历史 import path 的 thin compatibility facade。
 - `backend/app/fastapi/app.py` 负责 FastAPI app bootstrap、explicit Service injection、capability gate 与 Router registration；`dependencies.py`、`errors.py` 和 `routers/` 承载共享 adapter seam 与模块边界。
-- `backend/app/__init__.py` 负责 Flask app factory 与 Flask fallback 的 blueprint 装配；Flask imports 已收敛到 `create_app()` compatibility boundary，native package import 不再加载 Flask。
-- `backend/app/services/` 和 `backend/app/db/` 是两种 HTTP adapter 共享的业务与数据库边界。
+- `backend/app/__init__.py` 的 Flask factory/blueprint 代码已退出 production composition，待 F7 清理；native package import 不再加载 Flask。
+- `backend/app/services/` 和 `backend/app/db/` 是 FastAPI native 复用的业务与数据库边界。
 
-## Rollback / Compatibility Mode
+## Rollback
 
-优先使用同一个 ASGI entrypoint 切换到 Flask：
-
-```bash
-BACKEND_RUNTIME=flask uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
-```
-
-这会让所有业务请求进入 Flask fallback，同时保留 `/healthz` 的 runtime 标识。若需要完全绕过 ASGI dispatcher，可安装并使用 Waitress 直接承载 Flask WSGI application：
-
-```bash
-BACKEND_RUNTIME=flask waitress-serve --host 127.0.0.1 --port 5099 backend.run:app
-```
-
-回滚不需要回退数据库 schema、migration、Service 或已合并的 FastAPI adapter。`python backend/run.py` 只适合本地 development server，不应作为生产 rollback server。
+F6 不再提供 Flask runtime rollback switch。应用回滚通过部署上一版已验证的 Git commit/image 完成；不回滚数据库 schema、migration、Service 或 API Contract。`uvicorn backend.asgi:app` 是唯一当前推荐入口。
 
 ## Transitional Debt
 
-Flask 尚不能安全移除，原因是它仍承担明确的 compatibility responsibilities：
+### F7 cleanup debt
 
-- F5 native gate 通过 Flask import guard 验证 FastAPI composition、request context 和 Community native routes 可在不加载 Flask 的隔离子进程中运行。
-- FastAPI primary 的 Auth 使用 framework-neutral signed-session codec 读取与 Flask 兼容的 `session` cookie；Flask auth blueprint 仅作为 fallback/rollback boundary 保留。
-- `Operation Log Service` 已通过 F1 `RequestContext` adapter 获取 URL、method、user-agent、client IP 和 actor，不再读取 Flask request-local state。
-- Common Code 以及 Indicator Path、Push 尚未形成独立的 FastAPI runtime contract 或 DB_READY migration boundary；Portal/Search/Capabilities 已由 F3 native infrastructure adapter 承载。
-- 已迁移模块的 Flask blueprints、Flask test client 和 parity tests 仍是 rollback / compatibility 证据。
-- `backend/run.py` 提供不依赖 ASGI dispatcher 的直接 WSGI emergency path。
-
-因此当前准确的架构描述是 **FastAPI primary + Flask compatibility fallback**，不是“所有 API 已完全迁移 FastAPI”，也不是“Flask 仅作为未清理遗留代码存在”。
+F5 gate 已证明 production native composition 不加载 Flask。仓库中仍保留的 Flask factory、legacy blueprints、compatibility tests、历史文档和 Flask/Flask-Cors dependencies 属于 F7 cleanup debt，不参与 production runtime；删除前仍需按真实引用分类并保留 API/security regression evidence。
 
 ## 前端与数据层
 

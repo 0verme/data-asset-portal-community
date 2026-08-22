@@ -143,7 +143,7 @@ python demo/seed_sqlite.py --database <absolute-local-path>/community.sqlite
 python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
-默认 `BACKEND_RUNTIME=fastapi`；如需专门验证兼容模式，可设置 `BACKEND_RUNTIME=flask`。直接 `python backend/run.py` 仅用于 Flask development / emergency rollback。
+默认使用纯 FastAPI/Uvicorn runtime：`uvicorn backend.asgi:app --host 127.0.0.1 --port 5099`。Flask compatibility mode 与 direct Flask runtime 已退休。
 
 前端另开终端，使用 `frontend/.env.local` 设置：
 

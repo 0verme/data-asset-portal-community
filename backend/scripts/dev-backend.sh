@@ -44,9 +44,7 @@ mkdir -p "$backendLogDir"
 stdoutPath="$backendLogDir/backend.out.log"
 stderrPath="$backendLogDir/backend.err.log"
 
-# 默认使用 FastAPI primary；Flask 仍由 backend/asgi.py 作为 compatibility fallback
-export BACKEND_RUNTIME="fastapi"
-
+# backend/asgi.py is the pure FastAPI/Uvicorn production entrypoint.
 echo "Starting backend on port $backendPort. Logs:"
 echo "  STDOUT -> $stdoutPath"
 echo "  STDERR -> $stderrPath"

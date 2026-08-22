@@ -105,18 +105,19 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
         self.assertEqual(flask_response.get_json(), fastapi_response.json())
 
     def test_common_code_remains_wait_db_and_is_not_native_route(self):
-        from backend.asgi import create_runtime_app
+        from backend.asgi import create_native_app
 
-        flask_app, fastapi_app = self.apps()
+        _flask_app, fastapi_app = self.apps()
         response = TestClient(fastapi_app).get("/api/common-codes/categories")
         self.assertEqual(404, response.status_code)
-        runtime = create_runtime_app(
-            runtime_mode="fastapi",
+        runtime = create_native_app(
             capabilities=self.capabilities,
-            flask_application=flask_app,
             fastapi_application=fastapi_app,
         )
-        self.assertNotIn("/api/common-codes", runtime.migrated_prefixes)
+        self.assertEqual(
+            404,
+            TestClient(runtime).get("/api/common-codes/categories").status_code,
+        )
 
 
 if __name__ == "__main__":

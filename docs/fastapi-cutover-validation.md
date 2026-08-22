@@ -5,12 +5,11 @@
 ## Runtime checks
 
 - `uvicorn backend.asgi:app --host=127.0.0.1 --port=51239` production-like startup：PASS
-- `GET /healthz`：PASS；不访问数据库，返回 `runtime`、`fastapiPrimary`、`flaskFallback`
-- `BACKEND_RUNTIME=fastapi`：已迁移 prefix 进入 FastAPI，其他 prefix 进入 Flask WSGI fallback
-- `BACKEND_RUNTIME=flask`：所有业务请求进入 Flask fallback
+- `GET /healthz`：PASS；不访问数据库，返回 `runtime=fastapi`、`fastapiPrimary=true`、`flaskFallback=false`
+- F6 native runtime：`backend.asgi:app` 只创建 FastAPI，所有 native prefixes 在同一 ASGI app 内注册
 - F5 native gate：Flask/Flask-Cors import blocked 子进程可加载 FastAPI composition、建立 native request context 并探测 Community native routes
 - runtime dispatch table：Community 下 Auth、Capabilities、Portal Stats、Unified Search、Indicator、Assets、Field Mapping、Root、API Asset、Lineage、System、Operation Log 全部覆盖
-- native session compatibility：FastAPI auth 可读取/写入 Flask-compatible signed session cookie；Flask fallback 可继续读取同一 cookie
+- native session compatibility：FastAPI auth 可读取/写入 Flask-compatible signed session cookie
 - capability boundary：disabled/private routes 不会被 FastAPI adapter 意外注册；Common Code 仍为 WAIT_DB Flask fallback
 
 ## HTTP checks
@@ -23,4 +22,4 @@
 
 ## Full regression evidence
 
-P4 module parity tests remain the source of truth for each migrated business API. The P5 runtime test plus F2 native-auth tests cover dispatch, signed-session compatibility, authorization, fallback, error, CORS, security-header and health behavior without changing Service or database code.
+P4 module parity tests remain the source of truth for each migrated business API. F2 native-auth, F5 Flask-free gate and F6 native runtime tests cover dispatch, signed-session compatibility, authorization, scope exclusions, error, CORS, security-header and health behavior without changing Service or database code.

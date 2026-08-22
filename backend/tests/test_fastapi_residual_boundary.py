@@ -8,7 +8,6 @@ import os
 import unittest
 from unittest.mock import patch
 
-from backend.app import create_app
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi_app import create_fastapi_app
 from fastapi.testclient import TestClient
@@ -43,16 +42,14 @@ class FastApiResidualBoundaryTests(unittest.TestCase):
         self.assertNotIn("/api/push/systems", native_paths)
 
     def test_runtime_keeps_wait_db_and_private_residuals_out_of_fastapi(self):
-        from backend.asgi import create_runtime_app
+        from backend.asgi import create_native_app
 
         fastapi_app = create_fastapi_app(
             capabilities=self.capabilities,
             identity_resolver=lambda _request: None,
         )
-        runtime = create_runtime_app(
-            runtime_mode="fastapi",
+        runtime = create_native_app(
             capabilities=self.capabilities,
-            flask_application=create_app(capabilities=self.capabilities),
             fastapi_application=fastapi_app,
         )
 
@@ -62,9 +59,7 @@ class FastApiResidualBoundaryTests(unittest.TestCase):
             "/api/push/systems",
         ):
             with self.subTest(path=path):
-                self.assertFalse(runtime._uses_fastapi(path))
-
-        self.assertEqual(404, TestClient(fastapi_app).get("/api/push/systems").status_code)
+                self.assertEqual(404, TestClient(runtime).get(path).status_code)
 
 
 if __name__ == "__main__":

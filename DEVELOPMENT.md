@@ -45,11 +45,11 @@ pip install -r backend/requirements.txt
 # 前端（Vite 开发服务器）
 npm --prefix frontend run dev
 
-# 后端（FastAPI primary + Flask compatibility fallback）
+# 后端（FastAPI Native）
 python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
-`backend/asgi.py` 是默认开发与生产共用的 ASGI entrypoint，`BACKEND_RUNTIME=fastapi` 为默认值。若要验证兼容模式，可将 `BACKEND_RUNTIME` 设置为 `flask`；`python backend/run.py` 仅启动直接 Flask development server，不是默认推荐入口。
+`backend/asgi.py` 是唯一开发与生产共用的 FastAPI Native ASGI entrypoint。`python backend/run.py` 已退休，不再提供 Flask development/WSGI runtime。
 
 > **端口约定**：后端固定使用 **5099** 端口，绝不自动切换到 5001/5002。
 > 下面的写日志脚本会在启动前自动检测 5099 是否被占用，若被占用则找出 PID 并结束该进程，
@@ -97,7 +97,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-all.ps1
 
 ## Mock / Remote 切换
 
-前端数据来源与认证方式只有一个开关 `VITE_API_MODE`；后端始终连接数据库。后端 runtime 另由 `BACKEND_RUNTIME` 控制：默认 `fastapi`，设置为 `flask` 时所有业务请求回退到 Flask。
+前端数据来源与认证方式只有一个开关 `VITE_API_MODE`；后端始终由唯一的 FastAPI/Uvicorn runtime 连接数据库。
 
 ### 只看前端页面（mock）
 
@@ -124,7 +124,6 @@ VITE_BACKEND_URL=http://localhost:5099
 # backend/.env.local
 ASSET_DB_PROFILE=primary
 ASSET_AUTH_DB_PROFILE=primary
-BACKEND_RUNTIME=fastapi
 FLASK_SECRET_KEY=<generate-a-strong-random-value>
 # Explicit local-development setting: permits HTTP session cookies locally.
 FLASK_ENV=development
@@ -137,7 +136,7 @@ FLASK_ENV=development
 - `FLASK_DEBUG` 默认关闭；仅 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会启用它。不要在共享或生产环境设置它。
 - `FLASK_SECRET_KEY` 在所有环境均为必填项；缺失、空字符串或纯空白会使应用在启动时失败。用密码管理器或部署平台的 secret store 保存它，不要提交到仓库、写入日志，或把真实值粘贴进命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`，然后直接保存到 secret store / `.env.local`。
 - `FLASK_ENV` 默认为安全的生产行为：Cookie 使用 `Secure=True`。本地 HTTP 联调必须显式设置 `FLASK_ENV=development`，此时 `Secure=False`；`HttpOnly=True` 与 `SameSite=Lax` 始终保留。
-- `BACKEND_RUNTIME=fastapi`（默认）通过 `backend/asgi.py` 运行 FastAPI primary，并将未迁移路径委托给 Flask fallback；FastAPI Auth 使用 Flask-compatible signed session codec；`BACKEND_RUNTIME=flask` 是兼容 / rollback mode。Flask fallback 仍需要 `FLASK_*` security configuration。
+- `backend/asgi.py` 运行纯 FastAPI Native backend；Auth 使用 Flask-compatible signed session codec，WAIT_DB/Private routes 按 scope gate 不注册。Flask compatibility runtime 已退休；`FLASK_*` 变量仅保留 signed cookie/security configuration 所需部分。
 - Nginx + Vite 的 `/api` 反代是同源部署，不需要 CORS。只有前端和 API 确实处于不同来源时，才设置 `FLASK_CORS_ORIGINS`，使用逗号分隔的完整来源，例如 `https://portal.example.com,https://admin.example.com`；空项会忽略，未配置时不发送跨域允许头，绝不使用 `*`。
 
 ## 环境文件加载顺序

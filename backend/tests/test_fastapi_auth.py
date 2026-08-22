@@ -8,7 +8,6 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from backend.app import create_app
 from backend.app.application import (
     SESSION_PAYLOAD_KEY,
     SignedSessionCodec,
@@ -69,7 +68,7 @@ class FastApiNativeAuthTests(unittest.TestCase):
             max_age=14 * 24 * 60 * 60,
         )
         flask_app = Flask(__name__)
-        flask_app.secret_key = "f2-native-auth-test-secret"
+        flask_app.secret_key = os.environ["FLASK_SECRET_KEY"]
         flask_serializer = SecureCookieSessionInterface().get_signing_serializer(
             flask_app
         )
@@ -83,7 +82,9 @@ class FastApiNativeAuthTests(unittest.TestCase):
     def test_codec_rejects_tampering_and_expired_cookie(self):
         codec = SignedSessionCodec("f2-native-auth-test-secret", max_age=10)
         valid = codec.encode({SESSION_PAYLOAD_KEY: {"role": "admin"}})
-        tampered = valid[:-1] + ("a" if valid[-1] != "a" else "b")
+        payload_part, timestamp_part, signature_part = valid.split(".")
+        changed_signature = ("A" if signature_part[0] != "A" else "B") + signature_part[1:]
+        tampered = ".".join((payload_part, timestamp_part, changed_signature))
         self.assertIsNone(codec.decode(tampered))
         self.assertIsNone(codec.decode("not-a-signed-session"))
 
@@ -93,15 +94,12 @@ class FastApiNativeAuthTests(unittest.TestCase):
             self.assertIsNone(codec.decode(expired_candidate))
 
     def test_runtime_dispatches_auth_to_native_fastapi_route(self):
-        from backend.asgi import create_runtime_app
+        from backend.asgi import create_native_app
 
         user = {"role": "admin", "user": "alice", "name": "Alice"}
-        flask_application = create_app(capabilities=self.capabilities)
         native_application = self.app(user)
-        runtime = create_runtime_app(
-            runtime_mode="fastapi",
+        runtime = create_native_app(
             capabilities=self.capabilities,
-            flask_application=flask_application,
             fastapi_application=native_application,
         )
         client = TestClient(runtime)
