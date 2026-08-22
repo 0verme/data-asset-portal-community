@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+# pyright: reportMissingImports=false
+
 import logging
 import os
 
@@ -89,7 +91,7 @@ class AuthService:
             columns, rows = fetch_all(selected_profile, sql)
         except Exception as error:
             raise AuthDataSourceError("认证服务暂不可用，请稍后重试") from error
-        return [dict(zip(columns, row)) for row in rows]
+        return [dict(zip(columns, row, strict=True)) for row in rows]
 
     def _fetch_user(self, username: str) -> dict | None:
         rows = self._fetch_rows(
@@ -131,7 +133,10 @@ WHERE username = {self._quote(normalized_user)}
             raise AuthDataSourceError("认证服务暂不可用，请稍后重试") from error
 
         return {
-            "role": user.get("role") if user.get("role") in {ADMIN_ROLE, MAINTAINER_ROLE} else ADMIN_ROLE,
+            # Preserve an unknown role as a constrained identity. The
+            # authorization core resolves current role state and fails closed;
+            # authentication must never silently upgrade it to admin.
+            "role": str(user.get("role") or "").strip().lower(),
             "user": normalized_user,
             "name": user.get("display_name") or normalized_user,
         }

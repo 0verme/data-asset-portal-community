@@ -20,6 +20,7 @@ from ..application.errors import (
     AuthenticationRequiredError,
     PermissionDeniedError,
 )
+from ..authorization.core import AuthorizationService
 from ..settings import get_trust_proxy_headers
 
 IdentityResolver = Callable[[Request], Any]
@@ -71,6 +72,11 @@ class RequestContextMiddleware:
             reset_request_context(token)
 
 
+def get_authorization_service(request: Request) -> AuthorizationService:
+    """Return the current application authorization service."""
+    return request.app.state.authorization_service
+
+
 async def get_request_context(request: Request) -> RequestContext:
     """Resolve the neutral context installed by the native FastAPI adapter."""
     context = current_request_context()
@@ -83,21 +89,54 @@ async def get_request_context(request: Request) -> RequestContext:
     return build_request_context(request, identity)
 
 
+def _require_authenticated(
+    context: RequestContext,
+    service: AuthorizationService,
+    *,
+    admin_only: bool = False,
+) -> RequestContext:
+    decision = service.authenticate(context.identity)
+    if not decision.authenticated:
+        raise AuthenticationRequiredError("请先登录。")
+    if decision.reason == "role_unknown_or_disabled":
+        raise PermissionDeniedError("当前角色不可执行此操作。")
+    if admin_only and not service.is_admin(context.identity):
+        raise PermissionDeniedError("仅系统管理员可执行此操作。")
+    return context
+
+
 def require_maintainer(
     context: RequestContext = Depends(get_request_context),
+    service: AuthorizationService = Depends(get_authorization_service),
 ) -> RequestContext:
-    """FastAPI auth adapter retaining the current maintainer gate."""
-    if context.identity is None:
-        raise AuthenticationRequiredError("请先登录。")
-    return context
+    """Compatibility gate for an enabled current authenticated identity."""
+    return _require_authenticated(context, service)
 
 
 def require_admin(
     context: RequestContext = Depends(get_request_context),
+    service: AuthorizationService = Depends(get_authorization_service),
 ) -> RequestContext:
-    """FastAPI auth adapter retaining the current administrator gate."""
-    if context.identity is None:
-        raise AuthenticationRequiredError("请先登录管理员账号。")
-    if not context.identity.is_admin:
-        raise PermissionDeniedError("仅系统管理员可执行此操作。")
-    return context
+    """Compatibility gate resolved against the current database role."""
+    return _require_authenticated(context, service, admin_only=True)
+
+
+def require_permission(permission: str) -> Callable[..., RequestContext]:
+    """Build a FastAPI dependency backed by the neutral authorization core."""
+    normalized = str(permission or "").strip()
+    if not normalized:
+        raise ValueError("permission code must be non-empty")
+
+    def dependency(
+        context: RequestContext = Depends(get_request_context),
+        service: AuthorizationService = Depends(get_authorization_service),
+    ) -> RequestContext:
+        decision = service.authorize(context.identity, normalized)
+        if not decision.authenticated:
+            raise AuthenticationRequiredError("请先登录。")
+        if not decision.allowed:
+            raise PermissionDeniedError("无权限执行此操作。")
+        return context
+
+    dependency.__name__ = f"require_permission_{normalized.replace(':', '_')}"
+    return dependency

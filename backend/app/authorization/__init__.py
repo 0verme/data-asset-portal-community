@@ -5,6 +5,13 @@ adapters, database repositories, and the frontend contract consume the same
 stable permission codes in later RBAC phases.
 """
 
+from .core import (
+    AuthorizationDecision,
+    AuthorizationRepository,
+    AuthorizationService,
+    AuthorizationSubject,
+    IdentityAuthorizationRepository,
+)
 from .permissions import (
     ADMIN_ROLE,
     BUILTIN_ROLE_PERMISSION_CODES,
@@ -19,10 +26,15 @@ from .permissions import (
 
 __all__ = [
     "ADMIN_ROLE",
+    "AuthorizationDecision",
+    "AuthorizationRepository",
+    "AuthorizationService",
+    "AuthorizationSubject",
     "BUILTIN_ROLE_PERMISSION_CODES",
     "MAINTAINER_ROLE",
     "PERMISSION_CODES",
     "PERMISSION_DEFINITIONS",
+    "IdentityAuthorizationRepository",
     "PermissionDefinition",
     "get_permission_definition",
     "is_registered_permission",
