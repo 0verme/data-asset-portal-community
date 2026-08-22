@@ -1,4 +1,4 @@
-"""F4 regression coverage for residual WAIT_DB and edition boundaries."""
+"""Regression coverage for the native route surface after boundary cleanup."""
 
 # pyright: reportMissingImports=false
 
@@ -10,56 +10,45 @@ from unittest.mock import patch
 
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi_app import create_fastapi_app
-from fastapi.testclient import TestClient
 
 
-class FastApiResidualBoundaryTests(unittest.TestCase):
+class FastApiRepositoryBoundaryTests(unittest.TestCase):
     def setUp(self):
         self.environment = patch.dict(
             os.environ,
             {
                 "FLASK_ENV": "development",
-                "FLASK_SECRET_KEY": "f4-residual-boundary-test",
+                "FLASK_SECRET_KEY": "native-boundary-test",
             },
             clear=False,
         )
         self.environment.start()
         self.addCleanup(self.environment.stop)
-        self.capabilities = resolve_capabilities(edition="community")
+        self.capabilities = resolve_capabilities()
 
-    def test_community_residuals_are_classified_before_native_registration(self):
-        self.assertTrue(self.capabilities["by_code"]["indicator"]["enabled"])
-        self.assertFalse(self.capabilities["by_code"]["push"]["enabled"])
-        self.assertFalse(self.capabilities["by_code"]["codeTable"]["enabled"])
-
-        fastapi_app = create_fastapi_app(
+    def test_all_repository_modules_are_available_before_external_readiness(self):
+        app = create_fastapi_app(
             capabilities=self.capabilities,
             identity_resolver=lambda _request: None,
         )
-        native_paths = {route.path for route in fastapi_app.routes}
-        self.assertNotIn("/api/indicator-path/tree", native_paths)
-        self.assertNotIn("/api/common-codes/categories", native_paths)
-        self.assertNotIn("/api/push/systems", native_paths)
-
-    def test_runtime_keeps_wait_db_and_private_residuals_out_of_fastapi(self):
-        from backend.asgi import create_native_app
-
-        fastapi_app = create_fastapi_app(
-            capabilities=self.capabilities,
-            identity_resolver=lambda _request: None,
-        )
-        runtime = create_native_app(
-            capabilities=self.capabilities,
-            fastapi_application=fastapi_app,
-        )
-
+        paths = {route.path for route in app.routes}
         for path in (
-            "/api/indicator-path/tree",
-            "/api/common-codes/categories",
+            "/api/upstreams/systems",
             "/api/push/systems",
+            "/api/reports",
+            "/api/manual-code-tables",
+            "/api/lineage/bootstrap",
         ):
-            with self.subTest(path=path):
-                self.assertEqual(404, TestClient(runtime).get(path).status_code)
+            self.assertIn(path, paths)
+
+    def test_unrelated_wait_db_routes_remain_unregistered(self):
+        app = create_fastapi_app(
+            capabilities=self.capabilities,
+            identity_resolver=lambda _request: None,
+        )
+        paths = {route.path for route in app.routes}
+        self.assertNotIn("/api/indicator-path/tree", paths)
+        self.assertNotIn("/api/common-codes/categories", paths)
 
 
 if __name__ == "__main__":

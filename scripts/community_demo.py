@@ -34,7 +34,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 BACKEND_PORT = 5099
 FRONTEND_PORT = 5173
-COMMUNITY_MODULES = "portal,dwm,mapping,lineage,root,indicator,apiAsset,system"
 PYTHON_MINIMUM = (3, 10)
 NODE_MINIMUM = (22, 13, 0)
 
@@ -185,9 +184,6 @@ def build_demo_environment(
         and key.upper()
         not in {
             "ASSET_RUNTIME_PROFILE",
-            "ASSET_EDITION",
-            "ASSET_ENABLED_MODULES",
-            "ASSET_DISABLED_MODULES",
             "FLASK_ENV",
             "FLASK_DEBUG",
             "FLASK_SECRET_KEY",
@@ -200,9 +196,6 @@ def build_demo_environment(
         {
             "COMMUNITY_DEMO_BOOTSTRAP": "1",
             "ASSET_RUNTIME_PROFILE": "community",
-            "ASSET_EDITION": "community",
-            "ASSET_ENABLED_MODULES": COMMUNITY_MODULES,
-            "ASSET_DISABLED_MODULES": "upstream,push,report,codeTable",
             "ASSET_DB_CONFIG_PATH": str(paths.database_config.resolve()),
             "ASSET_DB_PROFILE": "community_sqlite",
             "ASSET_AUTH_DB_PROFILE": "community_sqlite",
@@ -212,7 +205,7 @@ def build_demo_environment(
             "FLASK_DEBUG": "false",
             "FLASK_SECRET_KEY": secret,
             "FLASK_CORS_ORIGINS": f"http://127.0.0.1:{FRONTEND_PORT},http://localhost:{FRONTEND_PORT}",
-            "LINEAGE_DB_PROFILE": "",
+            "LINEAGE_DB_PROFILE": "community_sqlite",
             "VITE_API_MODE": "remote",
             "VITE_API_BASE_URL": "/api",
             "VITE_BACKEND_URL": f"http://127.0.0.1:{BACKEND_PORT}",
@@ -394,8 +387,6 @@ def initialize_demo(paths: DemoPaths) -> tuple[dict[str, str], Path]:
             "community_sqlite",
             "--config",
             str(paths.database_config),
-            "--modules",
-            COMMUNITY_MODULES,
         ],
         cwd=paths.root,
         environment=environment,
@@ -417,7 +408,7 @@ def initialize_demo(paths: DemoPaths) -> tuple[dict[str, str], Path]:
 
 
 def verify_demo_database(database: Path) -> dict[str, int]:
-    """Verify canonical seed volumes and the Community-only physical boundary."""
+    """Verify the complete deterministic repository seed contract."""
     import sqlite3
 
     from demo.seed_loader import ADMIN_USER, community_seed_plan
@@ -432,21 +423,19 @@ def verify_demo_database(database: Path) -> dict[str, int]:
                 "SELECT name FROM sqlite_master WHERE type='table'"
             )
         }
-        private_markers = ("push", "upstream", "report", "code_table", "manual_code")
-        private = sorted(
-            name for name in tables if any(marker in name for marker in private_markers)
-        )
-        if private:
+        plan = community_seed_plan()
+        missing = sorted(set(plan) - tables)
+        if missing:
             raise BootstrapError(
-                f"Community SQLite contains private tables: {', '.join(private)}"
+                f"Demo database is missing canonical module tables: {', '.join(missing)}"
             )
         counts: dict[str, int] = {}
-        for table, spec in community_seed_plan().items():
+        for table, spec in plan.items():
             count = connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
             expected = len(spec["rows"])
             if count != expected:
                 raise BootstrapError(
-                    f"Unexpected Community demo count for {table}: {count} (expected {expected})"
+                    f"Unexpected demo count for {table}: {count} (expected {expected})"
                 )
             counts[table] = count
         admin_count = connection.execute(
@@ -455,14 +444,17 @@ def verify_demo_database(database: Path) -> dict[str, int]:
         ).fetchone()[0]
         if admin_count != 1:
             raise BootstrapError(
-                f"Community demo account count is {admin_count} (expected 1)"
+                f"Demo account count is {admin_count} (expected 1)"
             )
         counts[f"p_admin_user:{ADMIN_USER['username']}"] = admin_count
         print(
-            "[demo] verified Community data: "
-            f"p_asset_table={counts['p_asset_table']}, "
-            f"p_asset_field={counts['p_asset_field']}, "
-            f"p_api_asset={counts['p_api_asset']}, "
+            "[demo] verified repository data: "
+            f"menus={counts['p_menu']}, "
+            f"assets={counts['p_asset_table']}, "
+            f"upstream={counts['p_upstream_system']}, "
+            f"push={counts['p_push_system']}, "
+            f"reports={counts['p_report_asset']}, "
+            f"lineage_nodes={counts['p_lineage_node']}, "
             f"{ADMIN_USER['username']}=1",
             flush=True,
         )

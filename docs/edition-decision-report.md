@@ -1,9 +1,9 @@
 # Edition Decision Report — Private Module Source Publication
 
-> **Historical record**：本文记录首次公开发布阶段的 Source/License 与 Community runtime boundary 决策。当前产品/runtime boundary 仍以 `backend/configs/community.yaml` 和 [#115](https://github.com/0verme/data-asset-portal-community/issues/115) 的现状说明为准；后续移除 Edition / Optional gating 的新 Owner 方向由 [#116](https://github.com/0verme/data-asset-portal-community/issues/116) 单独实施。本文内容不应被解读为 #116 已完成。
+> **Historical record — superseded by #116**：本文记录首次公开发布阶段的 Source/License 与旧 runtime boundary 决策。#115 已完成 Repository Truth Alignment，#116 已删除 Edition / Optional artificial runtime gating；本文中的 disabled route/table/profile 描述只保留为历史证据，不是当前产品或部署原则。
 >
-> 状态：**Owner 决策已确定 — ALLOW IN PUBLIC REPO**（见文末 Decision）。
-> 本文回答「技术上是否安全、License 是否允许」，并记录最终 Edition 决策。
+> 状态：**Historical Owner 决策 — ALLOW IN PUBLIC REPO**（见文末 Decision）。
+> 本文回答「当时技术上是否安全、License 是否允许」；当前产品边界以仓库 manifest、canonical schema 和 #116 Owner Decision 为准。
 >
 > 生成时间：P4（CI / Open Source Guardrails & Release Readiness）
 > 决策时间：Release Closure（首次公开发布）

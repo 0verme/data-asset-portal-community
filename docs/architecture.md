@@ -100,11 +100,11 @@ F5 gate 已证明 production native composition 不加载 Flask；F7 已删除 F
 ## 前端与数据层
 
 - `frontend/src/App.jsx` 负责应用编排、登录态和模块路由；`frontend/src/api/` 统一访问 `/api`。
-- `VITE_API_MODE=mock` 使用受控前端演示数据；`remote` 访问真实后端数据库。mock module coverage 与 Community remote capability coverage 可以不同。
-- Schema Source of Truth 是 `backend/schema` 四方言完整 baseline 加 `backend/alembic` 增量 revision；`demo/seed_*.py` 负责 Community 演示数据。
-- `backend/app/db/` 隔离 SQLite、PostgreSQL、MySQL 和 GaussDB/DWS 的 Provider 差异；Community 默认启用的数据库路径由 runtime profile 控制。`docs/pg/`、`docs/dws/` 的扩展 DDL 不自动进入 Community baseline。
+- `VITE_API_MODE=mock` 使用受控前端演示数据；`remote` 访问真实后端数据库。两种模式默认使用同一仓库模块集合，数据和外部执行能力可以不同。
+- Schema Source of Truth 是 `backend/schema` 四方言完整 baseline 加 `backend/alembic` 增量 revision；`demo/seed_*.py` 负责完整仓库模块的虚构演示数据。
+- `backend/app/db/` 隔离 SQLite、PostgreSQL、MySQL 和 GaussDB/DWS 的 Provider 差异；数据库 profile 只表达部署连接能力。`docs/pg/`、`docs/dws/` 是方言参考和部署说明，不再作为隐藏模块的 schema 边界。
 - 正式部署由 Nginx 托管前端静态资源，并将 `/api` 代理到 ASGI runtime；详细环境变量、health check 与 Nginx 配置见 [DEPLOYMENT.md](../DEPLOYMENT.md)。
 
 ## 当前边界与后续 Issue
 
-Community profile 当前仍按 `backend/configs/community.yaml` 保持 `upstream`、`push`、`report`、`codeTable` 的 route/menu/schema 边界，WAIT_DB 路径也继续不注册。#115 只记录这套现状；Edition / Optional runtime gating 的移除属于 [#116](https://github.com/0verme/data-asset-portal-community/issues/116)，本文件不提前描述其目标状态。
+仓库已有模块均默认进入统一的 route、capability、schema、seed、search 和 portal statistics contract。`backend/configs/community.yaml` 仅保留本地演示的数据库/feature profile；`p_menu.status` 仍是实例级可见性配置。WAIT_DB 或外部存储/驱动未配置时，模块 route 仍存在，由现有 Service error contract 返回可诊断状态。

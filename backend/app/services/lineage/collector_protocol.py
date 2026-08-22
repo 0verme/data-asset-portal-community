@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Collector interface for private lineage snapshot generation.
+"""Collector interface for external lineage snapshot generation.
 
 The reader path never imports implementations of this protocol.
-Private scheduler-based collection remains in
-``backend.app.services.lineage_collector`` (private edition only).
+Scheduler-based collection remains in
+``backend.app.services.lineage_collector`` when an external scheduler/storage profile is configured.
 """
 
 from __future__ import annotations

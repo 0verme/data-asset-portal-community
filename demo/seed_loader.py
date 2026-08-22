@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Shared Community demo seed loader.
+"""Shared repository demo seed loader.
 
-Every Community demo seed (SQLite / PostgreSQL / DWS) draws from the same
-fictional retail datasets in ``demo/datasets/`` and plans rows only for
-Community-owned tables using the canonical migration schema.
+Every demo seed (SQLite / PostgreSQL / DWS) draws from the same fictional
+retail datasets and plans rows for every repository module using the canonical
+migration schema. External execution remains metadata-only and fictional.
 
 ``backend/schema`` is the schema source of truth: the columns planned here
 match the baseline SQL exactly (e.g. ``p_asset_domain`` keys on
-``domain_code``, not ``domain_id``). Private module tables (push / report /
-upstream / codeTable) are intentionally excluded from the Community plan.
+``domain_code``, not ``domain_id``).
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 DATASETS_DIR = Path(__file__).resolve().parent / "datasets"
@@ -39,16 +39,19 @@ ADMIN_USER = {
     "status": "ACTIVE",
 }
 
-# Community module menus (menu_id values match the full-edition docs DDL so a
-# later full upgrade stays consistent). portal has no menu row: it is the
-# fixed landing page.
-COMMUNITY_MENUS = [
+# Repository module menus (menu_id values match the existing full DDL).
+# portal has no menu row: it is the fixed landing page.
+DEMO_MENUS = [
+    (1, "upstream", "上游卸数", "download", "/upstream", 10, "primary", "N", "Y", "上游卸数系统列表与维护"),
     (2, "dwm", "数据仓库", "db", "/data-warehouse", 20, "primary", "N", "Y", "DWM 表资产、字段与 DDL"),
     (3, "mapping", "字段映射", "link", "/field-mapping", 30, "primary", "N", "Y", "字段与表的映射关系查询"),
     (10, "lineage", "血缘分析", "layers", "/lineage", 35, "primary", "N", "Y", "任务与数据表的上下游血缘排查"),
     (4, "root", "词根管理", "book", "/root-management", 40, "more", "N", "Y", "词根、分类与批量导入"),
     (5, "indicator", "指标维护", "hash", "/indicator-maintenance", 50, "primary", "N", "Y", "指标列表、详情与启停"),
+    (6, "report", "报表资产", "file", "/report-assets", 55, "more", "N", "Y", "报表元数据台账、归属信息与关联引用"),
     (9, "apiAsset", "API 资产", "api", "/api-assets", 58, "more", "N", "Y", "API 元数据台账、参数、响应字段与关联资产维护"),
+    (7, "push", "下游推送", "upload", "/push", 60, "more", "N", "Y", "下游推送系统、作业与字段"),
+    (11, "codeTable", "码值表维护", "table", "/code-table-maintenance", 65, "more", "N", "Y", "湖仓手工码值表的表级元数据登记与维护"),
     (8, "system", "系统管理", "shield", "/system-management", 70, "more", "Y", "Y", "用户、菜单、参数字典与操作日志（仅管理员可见）"),
 ]
 
@@ -227,6 +230,142 @@ def community_seed_plan() -> dict[str, dict]:
         for index, item in enumerate(load_dataset("indicators.json"), start=1)
     ]
 
+    upstream_specs = [
+        (1, "up_member", "MEM", "会员中心", "PostgreSQL", "会员运营部"),
+        (2, "up_product", "PIM", "商品中心", "MySQL", "商品运营部"),
+        (3, "up_order", "OMS", "订单中心", "PostgreSQL", "交易运营部"),
+        (4, "up_pos", "POS", "门店 POS", "SQL Server", "门店运营部"),
+        (5, "up_inventory", "IMS", "库存中心", "Oracle", "供应链部"),
+        (6, "up_marketing", "MKT", "营销平台", "MongoDB", "市场营销部"),
+        (7, "up_fulfillment", "FUL", "履约平台", "Kafka", "履约运营部"),
+        (8, "up_service", "SVC", "售后中心", "Object Storage", "客户服务部"),
+    ]
+    upstream_system_rows = []
+    upstream_unload_rows = []
+    upstream_change_rows = []
+    for source_id, system_id, abbr, name, db_type, dept in upstream_specs:
+        status = sources[source_id - 1][-1]
+        upstream_system_rows.append(
+            (
+                source_id, source_id, system_id, abbr, name, db_type,
+                f"{abbr.lower()}.demo.invalid", f"DEMO_{abbr}",
+                f"DEMO_{abbr}_OWNER", status, "演示数据维护组", dept,
+                f"{name}，仅用于完全虚构的零售演示。", 4, "N", "demo",
+                "2026-07-12 01:00:00", "demo", "2026-07-12 01:00:00",
+            )
+        )
+        times = ["00:15", "00:30", "00:45"] if source_id == 7 else ["01:00", "07:00", "13:00", "19:00"]
+        for order, value in enumerate(times, start=1):
+            upstream_unload_rows.append(
+                (source_id * 10 + order, source_id, value, order, "N", "demo", "2026-07-12 01:00:00", "demo", "2026-07-12 01:00:00")
+            )
+        upstream_change_rows.append(
+            (
+                source_id, source_id, system_id, "SEED", "创建虚构演示上游系统", None,
+                json.dumps({"id": system_id, "status": status}, ensure_ascii=False),
+                "demo", "2026-07-12 01:00:00",
+            )
+        )
+
+    push_system_rows = []
+    push_job_rows = []
+    push_field_rows = []
+    push_change_rows = []
+    for item in load_dataset("push_systems.json"):
+        system_id = int(item["id"])
+        code = item["code"]
+        abbr = code.removeprefix("DEMO_")
+        table_name = f"DWM_{abbr.lower()}_stat_1d"
+        job_id = system_id * 10
+        job_code = f"JOB_{abbr}_{system_id:02d}"
+        push_system_rows.append(
+            (
+                system_id, system_id, code, item["name"], abbr, item["protocol"],
+                f"{abbr.lower()}.consumer.demo.invalid", 443 if item["protocol"] == "HTTP" else 9000,
+                "DEMO_ONLY", "演示占位配置", "演示业务维护组", "演示数据维护组",
+                item["department"], f"{item['name']}消费完全虚构的零售主题数据。",
+                item["status"], "normal", None, 1, "N", "demo",
+                "2026-07-12 02:00:00", "demo", "2026-07-12 02:00:00",
+            )
+        )
+        push_job_rows.append(
+            (
+                job_id, system_id, job_code, f"{item['name']}每日推送",
+                f"/demo/dwm/{table_name}/dt={{yyyy-MM-dd}}", f"{table_name}_{{yyyyMMdd}}.json",
+                f"/demo/incoming/{abbr.lower()}/", f"{table_name}_{{yyyyMMdd}}.json",
+                "", "T+1", ",", "UTF-8", "约 1 万行", "Y" if item["status"] == "enabled" else "N",
+                "完全虚构的演示推送作业", 3, "N", "demo", "2026-07-12 02:00:00", "demo", "2026-07-12 02:00:00",
+            )
+        )
+        for field_order, field_name in enumerate(("record_id", "business_date", "metric_value"), start=1):
+            push_field_rows.append(
+                (
+                    job_id * 10 + field_order, job_id, field_name, field_name.replace("_", " "),
+                    field_order, "DWM", "decimal(18,2)" if field_name == "metric_value" else "string",
+                    f"演示字段 {field_name}", "N", "demo", "2026-07-12 02:00:00", "demo", "2026-07-12 02:00:00",
+                )
+            )
+        push_change_rows.append(
+            (
+                system_id, system_id, job_id, "JOB", job_code, "SEED",
+                "创建虚构演示推送作业", None, json.dumps({"jobCode": job_code}, ensure_ascii=False),
+                "demo", "2026-07-12 02:00:00", f"demo-push-{system_id}",
+            )
+        )
+
+    report_rows = []
+    for item in load_dataset("reports.json"):
+        related_tables = [
+            {**related, "tableName": str(related.get("tableName") or "").upper()}
+            for related in item.get("relatedTables", [])
+        ]
+        report_rows.append(
+            (
+                item["id"], item["code"], item["name"], item.get("alias", ""), item["type"],
+                item.get("domain", ""), item.get("freq", ""), item.get("statPeriod", ""),
+                item.get("dateCaliber", ""), item.get("dateCaliberOther", ""),
+                item.get("dataTimeliness", ""), item.get("dataTimelinessCustom", ""), item["status"],
+                item.get("effectiveDate", ""), item.get("expireDate", ""), item.get("purpose", ""),
+                item.get("statObject", ""), item.get("statScope", ""), item.get("timeCaliber", ""),
+                item.get("filterCondition", ""), item.get("specialRule", ""), item.get("ownerDept", ""),
+                item.get("ownerName", ""), item.get("maintainerName", ""),
+                json.dumps(related_tables, ensure_ascii=False),
+                json.dumps(item.get("relatedIndicators", []), ensure_ascii=False), item.get("remark", ""),
+                "N", "demo", item.get("updatedAt", "2026-07-12 03:00:00"), "demo", item.get("updatedAt", "2026-07-12 03:00:00"),
+            )
+        )
+
+    manual_code_table_rows = [
+        (1, "ORDER_STATUS", "订单状态", "status", "演示业务维护组", "active", "完全虚构的订单状态码值。", "demo", "2026-07-12 03:00:00", "demo", "2026-07-12 03:00:00"),
+        (2, "CHANNEL_TYPE", "渠道类型", "enum", "演示业务维护组", "active", "完全虚构的零售渠道码值。", "demo", "2026-07-12 03:00:00", "demo", "2026-07-12 03:00:00"),
+        (3, "DELIVERY_MODE", "履约方式", "map", "演示业务维护组", "draft", "完全虚构的配送方式映射。", "demo", "2026-07-12 03:00:00", "demo", "2026-07-12 03:00:00"),
+    ]
+
+    lineage_snapshot_id = "demo-lineage-20260712-001"
+    lineage_generated_at = "2026-07-12 04:00:00"
+    lineage_edges_source = load_dataset("lineage.json")
+    lineage_nodes = {}
+    kind_by_type = {"indicator": "indicator", "report": "report", "push": "push_job"}
+    for relation in lineage_edges_source:
+        for value in (relation["source"], relation["target"]):
+            if value in lineage_nodes:
+                continue
+            kind = kind_by_type.get(relation["type"], "table")
+            namespace = kind
+            lineage_nodes[value] = (
+                lineage_snapshot_id, value, kind, value, value, namespace,
+                json.dumps({"source": "fictional_demo_dataset"}, ensure_ascii=False),
+            )
+    lineage_node_rows = list(lineage_nodes.values())
+    lineage_edge_rows = [
+        (
+            lineage_snapshot_id, f"demo-lineage-edge-{index}", relation["source"], relation["target"],
+            relation["type"], "demo_dataset", f"demo-lineage-{index}",
+            "完全虚构的演示血缘关系", "medium", lineage_generated_at, "[]",
+        )
+        for index, relation in enumerate(lineage_edges_source, start=1)
+    ]
+
     return {
         "p_menu": spec(
             (
@@ -236,7 +375,7 @@ def community_seed_plan() -> dict[str, dict]:
             ),
             [
                 (*menu, "系统初始化")
-                for menu in COMMUNITY_MENUS
+                for menu in DEMO_MENUS
             ],
         ),
         "p_system": spec(
@@ -338,5 +477,95 @@ def community_seed_plan() -> dict[str, dict]:
                 "status_code", "registrar_name", "registered_date",
             ),
             indicator_items,
+        ),
+        "p_upstream_system": spec(
+            (
+                "system_pk", "data_source_id", "system_id", "system_abbr", "system_name",
+                "db_type", "host_name", "db_name", "schema_name", "status_code",
+                "owner_name", "dept_name", "system_desc", "unload_count", "is_deleted",
+                "created_by", "created_at", "updated_by", "updated_at",
+            ),
+            upstream_system_rows,
+        ),
+        "p_upstream_unload_time": spec(
+            (
+                "time_pk", "system_pk", "unload_time", "display_order", "is_deleted",
+                "created_by", "created_at", "updated_by", "updated_at",
+            ),
+            upstream_unload_rows,
+        ),
+        "p_upstream_change_log": spec(
+            (
+                "change_id", "system_pk", "system_id", "change_type", "change_summary",
+                "before_json", "after_json", "operator_name", "change_time",
+            ),
+            upstream_change_rows,
+        ),
+        "p_push_system": spec(
+            (
+                "system_id", "master_system_id", "system_code", "system_name", "system_abbr", "protocol_type",
+                "host_name", "port_no", "account_name", "auth_type", "contact_name",
+                "data_developer_contact_name", "dept_name", "system_desc", "status_code",
+                "importance_level_code", "latest_output_time", "job_count", "is_deleted",
+                "created_by", "created_at", "updated_by", "updated_at",
+            ),
+            push_system_rows,
+        ),
+        "p_push_job": spec(
+            (
+                "job_id", "system_id", "job_code", "job_name", "source_path",
+                "source_file_name", "target_path", "target_file_name", "freq_desc", "freq_type",
+                "delimiter_code", "encoding_type", "row_count_desc", "enabled_flag", "job_desc",
+                "field_count", "is_deleted", "created_by", "created_at", "updated_by", "updated_at",
+            ),
+            push_job_rows,
+        ),
+        "p_push_job_field": spec(
+            (
+                "field_id", "job_id", "field_name", "field_cn_name", "field_order", "source_code",
+                "data_type", "field_meaning", "is_deleted", "created_by", "created_at", "updated_by", "updated_at",
+            ),
+            push_field_rows,
+        ),
+        "p_push_change_log": spec(
+            (
+                "change_id", "system_id", "job_id", "object_type", "object_code", "change_type",
+                "change_summary", "before_json", "after_json", "operator_name", "change_time", "trace_id",
+            ),
+            push_change_rows,
+        ),
+        "p_report_asset": spec(
+            (
+                "report_pk", "report_code", "report_name", "report_alias", "report_type", "domain_name",
+                "freq_code", "stat_period_code", "date_caliber_code", "date_caliber_other_desc",
+                "data_timeliness_code", "data_timeliness_custom_desc", "status_code", "effective_date",
+                "expire_date", "purpose_desc", "stat_object_desc", "stat_scope_desc", "time_caliber_desc",
+                "filter_condition_desc", "special_rule_desc", "owner_dept_name", "owner_name", "maintainer_name",
+                "related_tables_json", "related_indicators_json", "remark_desc", "is_deleted", "created_by",
+                "created_at", "updated_by", "updated_at",
+            ),
+            report_rows,
+        ),
+        "p_manual_code_table": spec(
+            (
+                "table_id", "table_code", "table_name", "table_style", "owner_name", "status_code",
+                "remark", "created_by", "created_at", "updated_by", "updated_at",
+            ),
+            manual_code_table_rows,
+        ),
+        "p_lineage_snapshot": spec(
+            ("snapshot_id", "generated_at", "generator_name", "generator_version", "import_batch_id", "status_code"),
+            [(lineage_snapshot_id, lineage_generated_at, "demo-seed", "1.0", lineage_snapshot_id, "ACTIVE")],
+        ),
+        "p_lineage_node": spec(
+            ("snapshot_id", "node_id", "kind_code", "node_name", "display_name", "namespace_name", "attributes_json"),
+            lineage_node_rows,
+        ),
+        "p_lineage_edge": spec(
+            (
+                "snapshot_id", "edge_id", "source_node_id", "target_node_id", "kind_code", "evidence_type",
+                "source_record_id", "evidence_description", "confidence_code", "generated_at", "diagnostics_json",
+            ),
+            lineage_edge_rows,
         ),
     }

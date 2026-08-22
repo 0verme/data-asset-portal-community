@@ -2,7 +2,7 @@
 #   - sqlite    (Community/local isolated operation)
 #   - postgres  (PostgreSQL)
 #   - mysql     (MySQL 8.0 via optional PyMySQL dependency)
-#   - gaussdb   (private GaussDB / DWS via optional JDBC dependencies)
+#   - gaussdb   (GaussDB / DWS via optional JDBC dependencies)
 
 defaults:
   type: postgres

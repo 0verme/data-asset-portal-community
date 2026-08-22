@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unified module manifest — single source of truth for module boundaries.
+"""Unified module manifest — single source of truth for repository modules.
 
 Module *codes* match existing frontend menu codes and search/stat module keys
-so that this phase does not require a global rename.
+so that this phase does not require a global rename. Availability is open by
+default; deployment dependencies and instance menu status are separate
+concerns handled by their respective services.
 """
 
 from __future__ import annotations
@@ -25,8 +27,7 @@ from typing import Any
 
 
 # Codes used by frontend menus, ModuleContent, portal search scopes, and
-# backend portal/search providers. Keep them stable for private-edition
-# compatibility.
+# backend portal/search providers. Keep them stable across the API boundary.
 MODULES: dict[str, dict[str, Any]] = {
     "portal": {
         "name": "门户首页",
@@ -36,7 +37,6 @@ MODULES: dict[str, dict[str, Any]] = {
         "requires": [],
         "search_provider": False,
         "portal_stat_provider": False,
-        "edition": "community",
     },
     "dwm": {
         "name": "数据仓库",
@@ -46,7 +46,6 @@ MODULES: dict[str, dict[str, Any]] = {
         "requires": [],
         "search_provider": True,
         "portal_stat_provider": True,
-        "edition": "community",
     },
     "upstream": {
         "name": "上游卸数",
@@ -56,7 +55,6 @@ MODULES: dict[str, dict[str, Any]] = {
         "requires": [],
         "search_provider": True,
         "portal_stat_provider": True,
-        "edition": "private",
     },
     "mapping": {
         "name": "字段映射",
@@ -66,7 +64,6 @@ MODULES: dict[str, dict[str, Any]] = {
         "requires": [],
         "search_provider": True,
         "portal_stat_provider": True,
-        "edition": "community",
     },
     "lineage": {
         "name": "血缘分析",
@@ -76,7 +73,6 @@ MODULES: dict[str, dict[str, Any]] = {
         "requires": [],
         "search_provider": False,
         "portal_stat_provider": False,
-        "edition": "community",
     },
     "root": {
         "name": "词根管理",
@@ -86,7 +82,6 @@ MODULES: dict[str, dict[str, Any]] = {
         "requires": [],
         "search_provider": True,
         "portal_stat_provider": True,
-        "edition": "community",
     },
     "indicator": {
         "name": "指标维护",
@@ -96,7 +91,6 @@ MODULES: dict[str, dict[str, Any]] = {
         "requires": [],
         "search_provider": True,
         "portal_stat_provider": True,
-        "edition": "community",
     },
     "report": {
         "name": "报表资产",
@@ -106,7 +100,6 @@ MODULES: dict[str, dict[str, Any]] = {
         "requires": [],
         "search_provider": True,
         "portal_stat_provider": True,
-        "edition": "private",
     },
     "apiAsset": {
         "name": "API 资产",
@@ -116,7 +109,6 @@ MODULES: dict[str, dict[str, Any]] = {
         "requires": [],
         "search_provider": True,
         "portal_stat_provider": True,
-        "edition": "community",
     },
     "push": {
         "name": "下游推送",
@@ -126,7 +118,6 @@ MODULES: dict[str, dict[str, Any]] = {
         "requires": [],
         "search_provider": True,
         "portal_stat_provider": True,
-        "edition": "private",
     },
     "codeTable": {
         "name": "码值表维护",
@@ -136,7 +127,6 @@ MODULES: dict[str, dict[str, Any]] = {
         "requires": [],
         "search_provider": True,
         "portal_stat_provider": True,
-        "edition": "private",
     },
     "system": {
         "name": "系统管理",
@@ -146,7 +136,6 @@ MODULES: dict[str, dict[str, Any]] = {
         "requires": [],
         "search_provider": False,
         "portal_stat_provider": False,
-        "edition": "community",
     },
 }
 

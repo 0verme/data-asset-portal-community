@@ -1,23 +1,11 @@
-edition: community
-modules:
-  enabled:
-    - portal
-    - dwm
-    - mapping
-    - lineage
-    - root
-    - indicator
-    - apiAsset
-    - system
-  disabled:
-    - upstream
-    - push
-    - report
-    - codeTable
+# Local SQLite demonstration profile.
+# The profile selects database/bootstrap behavior only; repository modules are
+# all available by default and are not selected by a product allowlist.
 database:
   allowed_types:
     - sqlite
     - postgres
+    - mysql
 features:
   lineage_collector: false
   audit_integration: false

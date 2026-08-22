@@ -8,6 +8,7 @@ CREATE SCHEMA IF NOT EXISTS dwp;
 
 CREATE TABLE IF NOT EXISTS dwp.p_push_system (
     system_id            BIGINT                 NOT NULL,
+    master_system_id     BIGINT,
     system_code          VARCHAR(64)            NOT NULL,
     system_name          VARCHAR(256)           NOT NULL,
     system_abbr          VARCHAR(32)            NOT NULL,
@@ -28,7 +29,9 @@ CREATE TABLE IF NOT EXISTS dwp.p_push_system (
     created_by           VARCHAR(64)            NOT NULL DEFAULT 'system',
     created_at           TIMESTAMP              NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by           VARCHAR(64)            NOT NULL DEFAULT 'system',
-    updated_at           TIMESTAMP              NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at           TIMESTAMP              NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_p_push_system_master FOREIGN KEY (master_system_id)
+        REFERENCES dwp.p_system(system_id) ON DELETE RESTRICT
 );
 
 COMMENT ON TABLE dwp.p_push_system IS '下游系统清单主表';
@@ -57,6 +60,9 @@ COMMENT ON COLUMN dwp.p_push_system.updated_at IS '更新时间';
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_p_push_system_uk_01
     ON dwp.p_push_system (system_code);
+
+CREATE INDEX IF NOT EXISTS idx_p_push_system_master
+    ON dwp.p_push_system (master_system_id);
 
 CREATE INDEX IF NOT EXISTS idx_p_push_system_ix_01
     ON dwp.p_push_system (status_code, protocol_type, dept_name);

@@ -27,7 +27,6 @@ import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
-from ..core.capabilities import get_enabled_module_codes
 from ..db.gaussdb import _prepare_execute_args, connect_with_profile, fetch_all, resolve_db_profile_name
 from ..settings import get_int_env
 from .providers import entity_module_codes, list_search_entities, module_scope_aliases
@@ -214,13 +213,6 @@ class KeywordSearchProvider(SearchProvider):
             return normalized
         return SCOPE_ALL
 
-    def _enabled_capability_codes(self):
-        """Modules installed/enabled for this instance (not menu visibility)."""
-        try:
-            return get_enabled_module_codes()
-        except Exception as error:
-            raise SearchDataSourceError("搜索服务暂不可用，请稍后重试") from error
-
     def _enabled_menu_codes(self):
         try:
             return system_management_service.get_enabled_menu_codes()
@@ -228,22 +220,17 @@ class KeywordSearchProvider(SearchProvider):
             raise SearchDataSourceError("搜索服务暂不可用，请稍后重试") from error
 
     def _registered_configs(self):
-        """Configs for capability-enabled modules only — never query disabled tables."""
-        enabled_modules = self._enabled_capability_codes()
-        return [
-            config
-            for config in self.ENTITY_CONFIGS
-            if str(config.get("module") or "").strip() in enabled_modules
-        ]
+        """All registered repository entities; menu state controls visibility."""
+        return list(self.ENTITY_CONFIGS)
 
     def _visible_configs(self, scope):
-        # Capability gate first (no SQL for disabled modules), then menu UX filter.
-        capability_configs = self._registered_configs()
+        # Repository entities are open by default; apply only menu UX filtering.
+        registered_configs = self._registered_configs()
         enabled_menu_codes = self._enabled_menu_codes()
         configs = (
-            capability_configs
+            registered_configs
             if scope == SCOPE_ALL
-            else [config for config in capability_configs if config["type"] == scope]
+            else [config for config in registered_configs if config["type"] == scope]
         )
         return [
             config for config in configs

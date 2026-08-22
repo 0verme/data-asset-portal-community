@@ -35,8 +35,6 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 FRONTEND = ROOT / "frontend"
 
-COMMUNITY_MODULES = "portal,dwm,mapping,lineage,root,indicator,apiAsset,system"
-
 CHECKS: list[tuple[str, str]] = []
 
 
@@ -134,12 +132,12 @@ def _sqlite_fresh_flow():
             encoding="utf-8",
         )
         run([python(), "backend/scripts/schema_migrate.py", "apply", "--profile", "ci_sqlite",
-             "--config", str(config), "--modules", COMMUNITY_MODULES], label="sqlite apply (fresh)")
+             "--config", str(config)], label="sqlite apply (fresh)")
         run([python(), "backend/scripts/schema_migrate.py", "verify", "--profile", "ci_sqlite",
-             "--config", str(config), "--modules", COMMUNITY_MODULES], label="sqlite verify")
+             "--config", str(config)], label="sqlite verify")
         run([python(), "demo/seed_sqlite.py", "--database", str(db)], label="sqlite seed")
         result = run([python(), "backend/scripts/schema_migrate.py", "apply", "--profile", "ci_sqlite",
-                      "--config", str(config), "--modules", COMMUNITY_MODULES], label="sqlite repeat apply")
+                      "--config", str(config)], label="sqlite repeat apply")
         if "applied=-" not in result.stdout:
             raise SystemExit("[FAIL] sqlite repeat apply was not a no-op")
 

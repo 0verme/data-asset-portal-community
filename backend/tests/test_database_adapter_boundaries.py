@@ -1,9 +1,4 @@
-"""Database adapter boundaries for the Community edition.
-
-SQLite and PostgreSQL are the supported Community runtimes and must import
-without optional GaussDB/JDBC dependencies; the GaussDB adapter stays a
-private-edition-only capability.
-"""
+"""Database provider availability is independent of repository modules."""
 
 from __future__ import annotations
 
@@ -13,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 
-class OptionalDatabaseDependencyTests(unittest.TestCase):
+class DatabaseProviderAvailabilityTests(unittest.TestCase):
     def test_sqlite_facade_loads_without_jdbc_dependencies(self):
         real_import = builtins.__import__
 
@@ -27,8 +22,11 @@ class OptionalDatabaseDependencyTests(unittest.TestCase):
             self.assertIn("sqlite", module.SUPPORTED_DB_TYPES)
             self.assertIn("postgres", module.SUPPORTED_DB_TYPES)
 
-    def test_community_adapter_registry_excludes_gaussdb(self):
+    def test_adapter_registry_lists_all_provider_types(self):
         from backend.app.db.registry import available_adapter_names
 
-        self.assertEqual(("sqlite", "postgres", "mysql"), available_adapter_names("community"))
-        self.assertIn("gaussdb", available_adapter_names("private"))
+        self.assertEqual(("gaussdb", "mysql", "postgres", "sqlite"), available_adapter_names())
+
+
+if __name__ == "__main__":
+    unittest.main()

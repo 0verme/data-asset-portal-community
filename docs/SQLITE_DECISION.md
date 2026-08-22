@@ -56,7 +56,7 @@ Community 隔离运行方式，但 `.env.example`、部分历史文档仍残留"
 - Service 层 SQL 统一使用 `dwp.` schema + 相同列名，**无 `if sqlite` fork**。
 - 方言差异全部收敛在 migration SQL 与 seed 的 placeholder 语法
   （`?` vs `%s`、`INSERT OR IGNORE` vs `ON CONFLICT`）。
-- Adapter 边界清晰：registry 按 edition 返回适配器；facade 延迟加载 JDBC。
+- Adapter 边界清晰：registry 按 provider 类型返回适配器；facade 延迟加载 JDBC。
 
 ## 决策
 
@@ -66,7 +66,7 @@ Community 隔离运行方式，但 `.env.example`、部分历史文档仍残留"
 | --- | --- |
 | Community 本地演示 / 开发 / CI | **SQLite**（`community_sqlite` profile） |
 | Community 正式部署 | **PostgreSQL**（`community_postgres` profile） |
-| 完整部署（含可选模块） | **PostgreSQL / GaussDB (DWS)** |
+| 多数据库部署与外部集成 | **PostgreSQL / MySQL / GaussDB (DWS)** |
 
 删除 SQLite 的成本（fixture 重写、PG 依赖、Community 默认配置失效）远超其
 维护成本；保留 SQLite 不污染 Service SQL，且带来 clone-to-run 与 CI 收益。

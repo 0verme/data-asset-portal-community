@@ -26,7 +26,7 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
         )
         self.environment.start()
         self.addCleanup(self.environment.stop)
-        self.capabilities = resolve_capabilities(edition="community")
+        self.capabilities = resolve_capabilities()
         self.portal_service = MagicMock()
         self.search_provider = MagicMock()
 

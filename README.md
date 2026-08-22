@@ -102,7 +102,7 @@ mock 数据只用于前端体验，不会写入数据库。
 
 ### 在线静态 Demo
 
-[https://data.overme.cn/](https://data.overme.cn/) 是独立部署的静态/mock bundle。当前可见 footer 为 `V1.0.0`，并展示比仓库 Community remote profile 更广的 mock module navigation；它没有在页面 HTML 中提供仓库 revision，因此不自动等同于当前 `origin/main`、仓库 Community Demo 或已发布 GitHub Release。
+[https://data.overme.cn/](https://data.overme.cn/) 是独立部署的静态/mock bundle。当前可见 footer 为 `V1.0.0`，其数据、版本和部署 revision 独立于仓库；它与仓库 mock/remote Demo 共享“仓库模块默认开放”的解释，但不自动等同于当前 `origin/main` 或已发布 GitHub Release。
 
 ## 🤝 社区入口
 
@@ -114,22 +114,19 @@ mock 数据只用于前端体验，不会写入数据库。
 
 ## 🧩 功能模块
 
-仓库的 Community profile 当前默认启用：
+仓库中已有的 Apache-2.0 模块默认属于同一 open module set：
 
-- **数据仓库**：浏览表、字段、层级、主题域和 DDL。
-- **字段映射与血缘分析**：追溯字段/表关系，查看有限血缘子图与关系证据。
-- **词根与指标**：维护命名词根、指标口径和指标路径。
-- **API 资产**：维护 API 元数据、参数、响应字段和资产关系。
-- **统一搜索与系统管理**：跨资产搜索，并维护用户、菜单、参数字典和操作日志。
+- **门户首页、数据仓库、字段映射、血缘分析**：浏览资产、映射关系和血缘快照。
+- **上游卸数、下游推送、报表资产、码值表维护**：维护外部数据源、推送元数据、报表台账和码值表元数据。
+- **词根、指标、API 资产、系统管理**：维护命名、指标口径、API 元数据以及用户/菜单/参数字典/操作日志。
+- **统一搜索与门户统计**：为所有已注册搜索实体和统计 provider 提供聚合入口。
 
-### Optional 模块
+所有模块默认注册 route、进入 capability response、进入 canonical schema/seed；管理员仍可通过 `p_menu.status` 配置单个实例的菜单可见性。需要数据库驱动、凭据、外部系统、持久化 lineage storage 或危险写操作时，系统会报告真实 deployment capability 状态，而不是隐藏源码模块。
 
-报表资产、上游卸数、下游推送和码值表维护属于当前 profile 下 **Optional — disabled by default** 模块，
-由 `backend/configs/community.yaml` 的 runtime profile 控制，Community 当前不注册其路由、菜单和数据表；这是真实的现状边界，不是本 PR 要移除的行为。完整模块清单与 Source / Runtime / Schema / Demo 对照见 [docs/modules.md](./docs/modules.md)；边界移除由 [#116](https://github.com/0verme/data-asset-portal-community/issues/116) 负责。
+完整的 Source / Runtime / Schema / Demo 对照见 [docs/modules.md](./docs/modules.md)。
 
-> **许可与运行时是两个独立概念：**本仓库包含的模块源码均按 Apache-2.0 License 提供。
-> “Optional” 只描述默认 runtime profile，不表示另一种 license、commercial edition 或 closed-source module。
-> 关闭模块是默认运行时边界，不是源码访问或再分发限制；部署可选模块前请确认对应数据库和运维条件。
+> **许可、仓库模块和部署能力是三个独立概念：**本仓库包含的源码均按 Apache-2.0 License 提供。
+> 外部 Collector、Adapter、Integration、凭据和生产连接属于部署/集成能力；它们未配置时不改变模块的存在性。
 
 ## 🏗 架构概览
 
@@ -144,8 +141,9 @@ flowchart LR
   R -.->|"mock"| M["受控演示数据"]
 ```
 
-默认由 Uvicorn 加载 `backend/asgi.py`；FastAPI 是唯一 production runtime。Community native API 与 infrastructure routes 由 FastAPI 处理，WAIT_DB/Private routes 按当前 capability scope gate 不注册；所有 API 复用同一 Service Layer、API Contract 和 Database Provider。前端通过 `VITE_API_MODE` 选择 mock 或 remote；后端按 database profile 访问数据库。
-Community/local 新安装的 schema 唯一入口是 `backend/schema` 四方言完整 baseline + `backend/alembic` 增量 revision，随后使用对应的 `demo/seed_sqlite.py` 或 `demo/seed_postgres.py` 写入虚构数据。`docs/pg/` 与 `docs/dws/` 是完整部署或扩展模块的补充 DDL，不替代 Community baseline/migration 路径。
+默认由 Uvicorn 加载 `backend/asgi.py`；FastAPI 是唯一 production runtime。所有仓库模块 route 与 infrastructure route 由 FastAPI 处理；缺少数据库、驱动、凭据或外部集成时，Service Layer 返回已有的诊断错误契约，而不是因产品 profile 返回 404。所有 API 复用同一 Service Layer、API Contract 和 Database Provider。前端通过 `VITE_API_MODE` 选择 mock 或 remote；后端按 database profile 访问数据库。
+
+新安装和既有数据库升级都以 `backend/schema` 四方言完整 baseline + `backend/alembic` 增量 revision 为唯一结构契约，随后使用对应的 `demo/seed_sqlite.py` 或 `demo/seed_postgres.py` 写入完全虚构数据。`docs/pg/` 与 `docs/dws/` 保留为方言参考和部署说明，不再代表隐藏模块的物理边界。
 详见 [架构说明](./docs/architecture.md)、[数据库迁移说明](./backend/schema/README.md) 和 [部署说明](./DEPLOYMENT.md)。
 
 ## 🏷️ Release / Version Truth

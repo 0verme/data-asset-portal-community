@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {
-  listModuleCodes,
-  resolveDefaultEnabledModules,
-} from "../modules/moduleRegistry.js";
+import { listModuleCodes, resolveDefaultEnabledModules } from "../modules/moduleRegistry.js";
 
 function readApiMode() {
   try {
@@ -25,45 +22,41 @@ function readApiMode() {
   }
 }
 
-/** Safe default when remote capabilities fail — shell only, never all private modules. */
-export const SAFE_FALLBACK_MODULES = Object.freeze(["portal"]);
+/**
+ * A capability request failure must not turn repository modules into a fake
+ * 404. Deployment readiness may be unknown, while source-backed modules stay
+ * navigable and can render their own dependency error state.
+ */
+export const SAFE_FALLBACK_MODULES = Object.freeze(listModuleCodes());
 
 export function isRemoteCapabilitiesMode() {
   return readApiMode() === "remote";
 }
 
-export function modulesFromPayload(payload) {
-  const items = Array.isArray(payload?.modules) ? payload.modules : [];
-  const enabled = new Set();
-  for (const item of items) {
-    if (item && item.enabled && item.code) enabled.add(item.code);
-  }
-  if (!enabled.has("portal")) enabled.add("portal");
+function openModuleItems() {
+  return listModuleCodes().map((code) => ({
+    code,
+    enabled: true,
+    reason: null,
+  }));
+}
+
+export function modulesFromPayload(_payload) {
+  // Deployment readiness may be described by additional capability fields,
+  // but the repository module set itself is always open.
+  const modules = openModuleItems();
   return {
-    edition: payload?.edition || "private",
-    modules: items,
-    enabledCodes: enabled,
+    modules,
+    enabledCodes: new Set(SAFE_FALLBACK_MODULES),
     status: "ready",
     error: null,
   };
 }
 
 export function buildMockCapabilities() {
-  let envValue;
-  try {
-    envValue = import.meta.env?.VITE_ENABLED_MODULES;
-  } catch (_error) {
-    envValue = undefined;
-  }
-  const enabledCodes = resolveDefaultEnabledModules(envValue);
-  const known = listModuleCodes();
+  const enabledCodes = resolveDefaultEnabledModules();
   return {
-    edition: "private",
-    modules: known.map((code) => ({
-      code,
-      enabled: enabledCodes.has(code),
-      reason: enabledCodes.has(code) ? null : "disabled_by_configuration",
-    })),
+    modules: openModuleItems(),
     enabledCodes,
     status: "ready",
     error: null,
@@ -73,12 +66,7 @@ export function buildMockCapabilities() {
 export function buildSafeFallbackCapabilities(error) {
   const enabledCodes = new Set(SAFE_FALLBACK_MODULES);
   return {
-    edition: "unknown",
-    modules: listModuleCodes().map((code) => ({
-      code,
-      enabled: enabledCodes.has(code),
-      reason: enabledCodes.has(code) ? null : "capabilities_unavailable",
-    })),
+    modules: openModuleItems(),
     enabledCodes,
     status: "error",
     error: error instanceof Error ? error.message : String(error || "capabilities unavailable"),
@@ -86,26 +74,20 @@ export function buildSafeFallbackCapabilities(error) {
 }
 
 /**
- * Load instance capabilities.
- * Remote: GET /api/capabilities (never fall back to "all modules").
- * Mock: local default / VITE_ENABLED_MODULES.
+ * Load deployment capabilities.
+ * Remote and mock modes share the same repository module set. A failed remote
+ * request only changes readiness status; it never hides source-backed routes.
  */
 export async function loadCapabilities() {
   if (!isRemoteCapabilitiesMode()) {
     return buildMockCapabilities();
   }
   try {
-    // Lazy import so Node unit tests can exercise pure helpers without Vite env.
     const { requestRemote } = await import("../api/http.js");
     const payload = await requestRemote("/capabilities");
     return modulesFromPayload(payload);
   } catch (error) {
-    console.error("Failed to load module capabilities; using safe fallback.", error);
+    console.error("Failed to load deployment capabilities; using open module fallback.", error);
     return buildSafeFallbackCapabilities(error);
   }
-}
-
-export function isCapabilityEnabled(capabilities, code) {
-  if (!capabilities?.enabledCodes) return false;
-  return capabilities.enabledCodes.has(code);
 }

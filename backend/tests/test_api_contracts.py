@@ -28,7 +28,7 @@ class ApiContractTests(unittest.TestCase):
         self.indicator_service = MagicMock()
         self.assets_service = MagicMock()
         self.app = create_fastapi_app(
-            capabilities=resolve_capabilities(edition="private"),
+            capabilities=resolve_capabilities(),
             identity_resolver=lambda _request: Identity("admin", "admin", "Admin"),
             report_service_instance=self.report_service,
             indicator_service_instance=self.indicator_service,
@@ -96,7 +96,7 @@ class ApiContractTests(unittest.TestCase):
 
     def test_anonymous_auth_failure_uses_existing_error_contract(self):
         app = create_fastapi_app(
-            capabilities=resolve_capabilities(edition="community"),
+            capabilities=resolve_capabilities(),
             identity_resolver=lambda _request: None,
         )
         response = TestClient(app).get("/api/auth/me")

@@ -47,5 +47,5 @@ Not applicable checks and reason:
 
 - [ ] No private/internal data, secrets, credentials, or real connection
       strings included in this PR (code, docs, logs, screenshots)
-- [ ] Community boundary unchanged, or boundary changes are explicitly
-      documented (private tables / modules / routes)
+- [ ] Public module/schema boundary is unchanged, or any canonical module/table/route
+      contract change is explicitly documented with migration and deployment notes

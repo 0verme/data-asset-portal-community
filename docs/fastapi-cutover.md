@@ -13,7 +13,7 @@ client -> Uvicorn -> FastAPI -> existing services -> existing DB stack
 
 - 只创建 FastAPI native app，不再按 prefix 分发到第二个 runtime；
 - `/healthz` 是无数据库查询的进程健康检查，返回 FastAPI runtime；
-- WAIT_DB/Private routes 不注册，未注册请求返回 native 404 envelope。
+- 本文记录的 WAIT_DB/Private route gate 是历史 migration 状态；当前仓库模块 route 默认注册，未配置的外部依赖由 native error contract 表达。
 
 ## Protocol / deployment
 
@@ -47,7 +47,7 @@ FastAPI/Uvicorn 成为唯一 runtime；不再提供 `BACKEND_RUNTIME` switch、W
 
 ### F7：Dependency / legacy cleanup（完成）
 
-已按真实引用清理 Flask、Flask-Cors、legacy blueprints/tests、obsolete runtime docs，并保留薄 `fastapi_app.py` facade 与 API/security/edition regression evidence。
+已按真实引用清理 Flask、Flask-Cors、legacy blueprints/tests、obsolete runtime docs，并保留薄 `fastapi_app.py` facade 与 API/security/module-boundary regression evidence。
 
 ## Rollback
 

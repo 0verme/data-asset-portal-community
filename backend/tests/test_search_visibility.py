@@ -207,7 +207,7 @@ class SearchVisibilityTestCase(unittest.TestCase):
 class SearchRouteAliasTestCase(unittest.TestCase):
     def setUp(self):
         app = create_fastapi_app(
-            capabilities=resolve_capabilities(edition="private"),
+            capabilities=resolve_capabilities(),
             identity_resolver=lambda _request: None,
         )
         self.client = TestClient(app)

@@ -3,25 +3,30 @@ import test from "node:test";
 
 import {
   MODULE_REGISTRY,
-  filterMenusByCapabilities,
   getModuleDefinition,
   listModuleCodes,
   resolveDefaultEnabledModules,
   validateModuleRegistry,
 } from "./moduleRegistry.js";
 
-test("module registry is internally consistent", () => {
+test("module registry is internally consistent and complete", () => {
   assert.equal(validateModuleRegistry(), true);
   const codes = listModuleCodes();
   assert.ok(codes.includes("dwm"));
   assert.ok(codes.includes("mapping"));
   assert.ok(codes.includes("apiAsset"));
+  assert.ok(codes.includes("push"));
+  assert.ok(codes.includes("report"));
+  assert.ok(codes.includes("codeTable"));
   assert.ok(codes.includes("portal"));
+  assert.equal(codes.length, 12);
 });
 
-test("mapping and apiAsset are independent of private connection modules", () => {
-  assert.deepEqual(getModuleDefinition("mapping").requires, []);
-  assert.deepEqual(getModuleDefinition("apiAsset").requires, []);
+test("all repository modules are open by default", () => {
+  const enabled = resolveDefaultEnabledModules();
+  assert.deepEqual([...enabled].sort(), [...listModuleCodes()].sort());
+  assert.equal(getModuleDefinition("mapping").requires.length, 0);
+  assert.equal(getModuleDefinition("apiAsset").requires.length, 0);
 });
 
 test("path prefixes are unique across modules", () => {
@@ -33,25 +38,4 @@ test("path prefixes are unique across modules", () => {
       seen.add(prefix);
     }
   }
-});
-
-test("resolveDefaultEnabledModules keeps decoupled public modules", () => {
-  const enabled = resolveDefaultEnabledModules("portal,dwm,mapping,system");
-  assert.equal(enabled.has("portal"), true);
-  assert.equal(enabled.has("dwm"), true);
-  assert.equal(enabled.has("mapping"), true);
-  assert.equal(enabled.has("system"), true);
-});
-
-test("filterMenusByCapabilities hides disabled modules", () => {
-  const menus = [
-    { code: "dwm", name: "数据仓库" },
-    { code: "push", name: "下游推送" },
-    { code: "unknownCustom", name: "自定义" },
-  ];
-  const filtered = filterMenusByCapabilities(menus, new Set(["portal", "dwm"]));
-  assert.deepEqual(
-    filtered.map((item) => item.code),
-    ["dwm", "unknownCustom"],
-  );
 });

@@ -29,7 +29,6 @@ import {
   DEFAULT_API_ASSET_VIEW,
   DEFAULT_LAYOUT,
   DEFAULT_PUSH_FILTER,
-  DEFAULT_INDICATOR_FILTER,
   DEFAULT_INDICATOR_ROUTE,
   DEFAULT_MAPPING_ROUTE,
   DEFAULT_PUSH_ROUTE,
@@ -55,7 +54,6 @@ import { useStatusOptions } from "./hooks/useStatusOptions.js";
 import { useTheme } from "./hooks/useTheme.js";
 import { useUpstreamModule } from "./hooks/useUpstreamModule.js";
 import { loadCapabilities } from "./capabilities/capabilities.js";
-import { filterMenusByCapabilities } from "./modules/moduleRegistry.js";
 import { buildPathname, parseInitialLocation } from "./routing/location.js";
 import { loadNavigationMenus } from "./routing/navigationMenus.js";
 import { splitNavigationMenus } from "./routing/navigationMenuGrouping.js";
@@ -105,9 +103,6 @@ export default function App() {
   const [navMenus, setNavMenus] = useState([]);
   const [navMenuStatus, setNavMenuStatus] = useState("loading");
   const navMenuRequestRef = useRef(0);
-  const [capabilities, setCapabilities] = useState(null);
-  const [capabilitiesStatus, setCapabilitiesStatus] = useState("loading");
-  const capabilitiesRequestRef = useRef(0);
 
   const { theme, toggleTheme } = useTheme();
   const { statusOptions } = useStatusOptions();
@@ -145,19 +140,12 @@ export default function App() {
   }, []);
 
   const refreshCapabilities = React.useCallback(async () => {
-    const requestId = capabilitiesRequestRef.current + 1;
-    capabilitiesRequestRef.current = requestId;
-    setCapabilitiesStatus("loading");
     try {
-      const next = await loadCapabilities();
-      if (requestId !== capabilitiesRequestRef.current) return;
-      setCapabilities(next);
-      setCapabilitiesStatus(next.status === "error" ? "error" : "ready");
+      // Capability readiness is observed for diagnostics only. It must never
+      // control module navigation or deep-link availability.
+      await loadCapabilities();
     } catch (error) {
-      if (requestId !== capabilitiesRequestRef.current) return;
-      console.error("Failed to load capabilities.", error);
-      setCapabilities(null);
-      setCapabilitiesStatus("error");
+      console.error("Failed to load deployment capabilities.", error);
     }
   }, []);
 
@@ -172,9 +160,7 @@ export default function App() {
 
   useEffect(() => {
     refreshCapabilities();
-    return () => {
-      capabilitiesRequestRef.current += 1;
-    };
+    return undefined;
   }, [refreshCapabilities]);
 
   useEffect(() => {
@@ -234,15 +220,8 @@ export default function App() {
     return () => desktopViewport.removeEventListener("change", closeMobilePanels);
   }, []);
 
-  const enabledModuleCodes = useMemo(() => {
-    if (capabilities?.enabledCodes) return capabilities.enabledCodes;
-    // While loading or on total failure before fallback applied: do not expose all private modules.
-    return new Set(["portal"]);
-  }, [capabilities]);
-
   const visibleNavMenus = useMemo(() => {
-    const capabilityFiltered = filterMenusByCapabilities(navMenus, enabledModuleCodes);
-    return capabilityFiltered
+    return navMenus
       .filter((item) => item.status !== "disabled")
       .filter((item) => !item.adminOnly || canManageSystem || (item.code === "system" && auth.role === "maintainer"))
       .map((item) => item.code === "system" && auth.role === "maintainer"
@@ -250,7 +229,7 @@ export default function App() {
         : item)
       .slice()
       .sort((a, b) => (a.order - b.order) || String(a.id).localeCompare(String(b.id)));
-  }, [auth.role, canManageSystem, enabledModuleCodes, navMenus]);
+  }, [auth.role, canManageSystem, navMenus]);
 
   const { primary: primaryNavMenus, more: moreNavMenus } = useMemo(
     () => splitNavigationMenus(visibleNavMenus),
@@ -262,15 +241,6 @@ export default function App() {
     () => visibleNavMenus.map((item) => item.code),
     [visibleNavMenus],
   );
-
-  // Redirect away from capability-disabled modules (deep links / stale history).
-  useEffect(() => {
-    if (capabilitiesStatus === "loading") return;
-    if (module === "portal") return;
-    if (enabledModuleCodes.has(module)) return;
-    setModule("portal");
-    setQuery("");
-  }, [capabilitiesStatus, enabledModuleCodes, module]);
 
   const asset = useAssetModule({
     active: module === "dwm",
@@ -591,12 +561,10 @@ export default function App() {
   const isPush = module === "push";
   const isIndicator = module === "indicator";
   const isReport = module === "report";
-  const isApiAsset = module === "apiAsset";
   const isRoot = module === "root";
   const isSystem = module === "system";
   const isUpstream = module === "upstream";
   const isMapping = module === "mapping";
-  const isLineage = module === "lineage";
   const isCodeTable = module === "codeTable";
   const isPortal = module === "portal";
 
@@ -661,7 +629,6 @@ export default function App() {
         setPushRoute, setQuery, setReportView, setRootRoute, setSystemActionIntent,
         setUpRoute, statusOptions, systemActionIntent, systemRoute, upRoute, upstream,
         visibleModuleKeys,
-        enabledModuleCodes,
       }}
     />
   );

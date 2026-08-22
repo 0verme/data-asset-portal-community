@@ -41,7 +41,7 @@ class NativeSecurityTestCase(unittest.TestCase):
         )
         self.environment.start()
         self.addCleanup(self.environment.stop)
-        self.capabilities = resolve_capabilities(edition="community")
+        self.capabilities = resolve_capabilities()
 
     def app(self):
         from backend.asgi import create_native_app

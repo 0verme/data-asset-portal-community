@@ -1,8 +1,6 @@
 import React from "react";
 
 import { SearchPortalPage } from "../SearchPortalPage.jsx";
-import { ModuleDisabledPage } from "./ModuleDisabledPage.jsx";
-import { getModuleDefinition } from "../../modules/moduleRegistry.js";
 
 function lazyNamed(loader, exportName) {
   return React.lazy(() => loader().then((module) => ({ default: module[exportName] })));
@@ -138,26 +136,7 @@ function ModuleLoadingState() {
   );
 }
 
-function isModuleCapabilityEnabled(moduleCode, enabledModuleCodes) {
-  if (!enabledModuleCodes) return true;
-  if (moduleCode === "portal") return true;
-  return enabledModuleCodes.has(moduleCode);
-}
-
 export function ModuleContent({ module, context }) {
-  const enabledModuleCodes = context.enabledModuleCodes;
-  const goToPortal = () => context.goToModuleWithQuery?.("portal", "");
-
-  if (!isModuleCapabilityEnabled(module, enabledModuleCodes)) {
-    const def = getModuleDefinition(module);
-    return (
-      <ModuleDisabledPage
-        moduleCode={def?.title || module}
-        onBackToPortal={goToPortal}
-      />
-    );
-  }
-
   const renderer = MODULE_RENDERERS[module] || MODULE_RENDERERS.dwm;
   if (module === "portal") {
     return renderer({ context });

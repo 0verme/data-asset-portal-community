@@ -15,6 +15,7 @@ from ..services.indicator_service import indicator_service
 from ..services.manual_code_table_service import manual_code_table_service
 from ..services.operation_log_service import operation_log_service
 from ..services.portal_service import portal_service
+from ..services.push_service import push_service
 from ..services.report_service import report_service
 from ..services.root_service import root_service
 from ..services.search_provider import search_provider
@@ -31,6 +32,7 @@ from .routers.infrastructure import _register_infrastructure_routes
 from .routers.lineage import _register_lineage_routes, lineage_service
 from .routers.manual_code_tables import _register_manual_code_table_routes
 from .routers.operation_logs import _register_operation_log_routes
+from .routers.push import _register_push_routes
 from .routers.reports import _register_report_routes
 from .routers.roots import _register_root_routes
 from .routers.system import _register_system_management_routes
@@ -55,6 +57,7 @@ def create_fastapi_app(
     system_management_service_instance: Any | None = None,
     operation_log_service_instance: Any | None = None,
     upstream_service_instance: Any | None = None,
+    push_service_instance: Any | None = None,
 ) -> FastAPI:
     """Create the FastAPI primary application for migrated API prefixes.
 
@@ -82,11 +85,9 @@ def create_fastapi_app(
     system_management = system_management_service_instance or system_management_service
     operation_logs = operation_log_service_instance or operation_log_service
     upstream = upstream_service_instance or upstream_service
+    push = push_service_instance or push_service
 
-    effective_capabilities = capabilities
-    if effective_capabilities is None:
-        effective_capabilities = resolve_capabilities()
-    enabled_codes = set(effective_capabilities.get("enabled_codes") or [])
+    effective_capabilities = capabilities or resolve_capabilities()
 
     register_exception_handlers(app)
     _register_auth_routes(app, auth, operation_logs)
@@ -96,25 +97,19 @@ def create_fastapi_app(
         portal_stats,
         search,
     )
-    if "indicator" in enabled_codes:
-        _register_indicator_routes(app, indicator)
-    if "dwm" in enabled_codes:
-        _register_asset_routes(app, assets)
-    if "mapping" in enabled_codes:
-        _register_field_mapping_routes(app, field_mapping)
-    if "root" in enabled_codes:
-        _register_root_routes(app, root)
-    if "codeTable" in enabled_codes:
-        _register_manual_code_table_routes(app, manual_code_table)
-    if "report" in enabled_codes:
-        _register_report_routes(app, report)
-    if "apiAsset" in enabled_codes:
-        _register_api_asset_routes(app, api_asset)
-    if "lineage" in enabled_codes:
-        _register_lineage_routes(app, lineage)
-    if "system" in enabled_codes:
-        _register_system_management_routes(app, system_management)
-        _register_operation_log_routes(app, operation_logs)
-    if "upstream" in enabled_codes:
-        _register_upstream_routes(app, upstream)
+    # Every router shipped in this repository is part of the default runtime.
+    # External dependencies report their own diagnostic errors at request time;
+    # they do not turn an existing source module into a 404.
+    _register_indicator_routes(app, indicator)
+    _register_asset_routes(app, assets)
+    _register_field_mapping_routes(app, field_mapping)
+    _register_root_routes(app, root)
+    _register_manual_code_table_routes(app, manual_code_table)
+    _register_report_routes(app, report)
+    _register_api_asset_routes(app, api_asset)
+    _register_lineage_routes(app, lineage)
+    _register_system_management_routes(app, system_management)
+    _register_operation_log_routes(app, operation_logs)
+    _register_upstream_routes(app, upstream)
+    _register_push_routes(app, push)
     return app

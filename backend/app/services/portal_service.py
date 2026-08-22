@@ -20,7 +20,6 @@ import logging
 import os
 import time
 
-from ..core.capabilities import get_enabled_module_codes
 from ..db.gaussdb import database_transaction, fetch_all, resolve_db_profile_name
 from ..settings import get_int_env
 from .providers import list_portal_stats
@@ -48,13 +47,8 @@ class PortalService:
         return list_portal_stats()
 
     def registered_stat_providers(self):
-        """Providers for capability-enabled modules only."""
-        enabled = get_enabled_module_codes()
-        return [
-            PortalStatProvider(config)
-            for config in self.STAT_CONFIGS
-            if str(config.get("module") or "").strip() in enabled
-        ]
+        """Return every repository stat provider; menu state is applied later."""
+        return [PortalStatProvider(config) for config in self.STAT_CONFIGS]
 
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
@@ -72,16 +66,16 @@ class PortalService:
     def _enabled_menu_codes(self):
         return system_management_service.get_enabled_menu_codes()
 
-    def _capability_stat_configs(self):
-        """Configs whose module is capability-enabled — never query disabled tables."""
+    def _registered_stat_configs(self):
+        """Return all registered stat configs before menu visibility filtering."""
         return [provider.config for provider in self.registered_stat_providers()]
 
     def _visible_stat_configs(self):
-        # Capability gate first, then menu visibility for UX alignment.
-        capability_configs = self._capability_stat_configs()
+        # Repository modules are open by default; apply menu visibility only.
+        registered_configs = self._registered_stat_configs()
         enabled_menu_codes = self._enabled_menu_codes()
         return [
-            config for config in capability_configs
+            config for config in registered_configs
             if not config.get("module") or str(config.get("module") or "").strip() in enabled_menu_codes
         ]
 
@@ -165,7 +159,7 @@ class PortalService:
             configs = self._visible_stat_configs()
         except Exception:
             try:
-                configs = self._capability_stat_configs()
+                configs = self._registered_stat_configs()
             except Exception:
                 configs = []
         return [{"key": config["key"], "label": config["label"], "value": 0} for config in configs]

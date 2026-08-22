@@ -7,38 +7,32 @@ import {
   buildSafeFallbackCapabilities,
   modulesFromPayload,
 } from "./capabilities.js";
+import { listModuleCodes } from "../modules/moduleRegistry.js";
 
-test("modulesFromPayload only keeps enabled codes", () => {
+test("remote payload cannot hide repository modules", () => {
   const result = modulesFromPayload({
-    edition: "community-test",
     modules: [
       { code: "portal", enabled: true, reason: null },
       { code: "dwm", enabled: true, reason: null },
       { code: "push", enabled: false, reason: "disabled_by_configuration" },
     ],
   });
-  assert.equal(result.edition, "community-test");
   assert.equal(result.enabledCodes.has("dwm"), true);
-  assert.equal(result.enabledCodes.has("push"), false);
-  assert.equal(result.enabledCodes.has("portal"), true);
+  assert.equal(result.enabledCodes.has("push"), true);
+  assert.deepEqual([...result.enabledCodes].sort(), [...listModuleCodes()].sort());
 });
 
-test("safe fallback never enables private modules", () => {
+test("safe fallback keeps every repository module navigable", () => {
   const result = buildSafeFallbackCapabilities(new Error("network down"));
   assert.equal(result.status, "error");
   assert.deepEqual([...result.enabledCodes].sort(), [...SAFE_FALLBACK_MODULES].sort());
-  assert.equal(result.enabledCodes.has("push"), false);
-  assert.equal(result.enabledCodes.has("mapping"), false);
-  assert.equal(result.enabledCodes.has("apiAsset"), false);
+  assert.deepEqual([...result.enabledCodes].sort(), [...listModuleCodes()].sort());
 });
 
-test("mock capabilities enable defaults including private modules", () => {
+test("mock and remote capability sets share the same open module contract", () => {
   const result = buildMockCapabilities();
   assert.equal(result.status, "ready");
-  assert.equal(result.enabledCodes.has("portal"), true);
-  assert.equal(result.enabledCodes.has("dwm"), true);
-  assert.equal(result.enabledCodes.has("push"), true);
-  assert.equal(result.enabledCodes.has("mapping"), true);
+  assert.deepEqual([...result.enabledCodes].sort(), [...listModuleCodes()].sort());
 });
 
 test("backend and frontend share module code spelling for apiAsset", () => {

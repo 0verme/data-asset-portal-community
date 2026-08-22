@@ -31,10 +31,6 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Community edition module set; schema_migrate needs it explicitly because
-  # a clean checkout has no .env.local to derive it from.
-  COMMUNITY_MODULES: portal,dwm,mapping,lineage,root,indicator,apiAsset,system
 
 jobs:
   repository-guard:
@@ -243,17 +239,17 @@ jobs:
           YAML
 
       - name: Fresh migration apply
-        run: python backend/scripts/schema_migrate.py apply --profile pg_ci --config /tmp/pg-ci-config.yaml --modules "$COMMUNITY_MODULES"
+        run: python backend/scripts/schema_migrate.py apply --profile pg_ci --config /tmp/pg-ci-config.yaml
 
       - name: Migration verify
-        run: python backend/scripts/schema_migrate.py verify --profile pg_ci --config /tmp/pg-ci-config.yaml --modules "$COMMUNITY_MODULES"
+        run: python backend/scripts/schema_migrate.py verify --profile pg_ci --config /tmp/pg-ci-config.yaml
 
       - name: Migration status (Alembic head)
         run: |
-          STATUS="$(python backend/scripts/schema_migrate.py status --profile pg_ci --config /tmp/pg-ci-config.yaml --modules "$COMMUNITY_MODULES")"
+          STATUS="$(python backend/scripts/schema_migrate.py status --profile pg_ci --config /tmp/pg-ci-config.yaml)"
           echo "$STATUS"
           case "$STATUS" in
-            *"revision=0002_portable_asset_filter"*) : ;;
+            *"revision=0003_open_repository_modules"*) : ;;
             *) echo "unexpected Alembic migration state"; exit 1 ;;
           esac
 
@@ -273,27 +269,28 @@ jobs:
 
       - name: Repeat migration apply must be a no-op
         run: |
-          OUT="$(python backend/scripts/schema_migrate.py apply --profile pg_ci --config /tmp/pg-ci-config.yaml --modules "$COMMUNITY_MODULES")"
+          OUT="$(python backend/scripts/schema_migrate.py apply --profile pg_ci --config /tmp/pg-ci-config.yaml)"
           echo "$OUT"
           case "$OUT" in *"applied=-"*) ;; *) echo "repeat apply was not a no-op"; exit 1 ;; esac
 
-      - name: Physical Community boundary (private relations absent)
+      - name: Canonical repository schema contract
         run: |
           python - <<'EOF'
-          import psycopg, sys
+          import psycopg
+          from demo.seed_loader import community_seed_plan
           conn = psycopg.connect(host="127.0.0.1", port=5432, dbname="test",
                                  user="postgres", password="postgres")
           cur = conn.cursor()
           cur.execute("SELECT table_name FROM information_schema.tables "
                       "WHERE table_schema='dwp' AND table_type='BASE TABLE'")
-          tables = [r[0] for r in cur.fetchall()]
-          markers = ("push", "upstream", "report", "code_table")
-          private = [t for t in tables if any(m in t for m in markers)]
-          print(f"total tables: {len(tables)}")
-          if private:
-              print("PRIVATE TABLES PRESENT:", private)
-              sys.exit(1)
-          print("private tables: 0 — boundary OK")
+          tables = {row[0] for row in cur.fetchall()}
+          expected = set(community_seed_plan())
+          missing = sorted(expected - tables)
+          print(f"repository tables: {len(tables)}; canonical tables: {len(expected)}")
+          if missing:
+              raise SystemExit(f"missing canonical repository tables: {missing}")
+          print("canonical repository schema: OK")
+          conn.close()
           EOF
 
       - name: Backend tests with PostgreSQL integration enabled (0 skipped)

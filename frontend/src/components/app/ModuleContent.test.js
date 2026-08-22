@@ -12,8 +12,7 @@ test("business modules are lazy-loaded while the portal remains in the app shell
   assert.match(source, /React\.Suspense/);
   assert.doesNotMatch(source, /from "\.\.\/views\/index\.js"/);
   assert.match(source, /MODULE_RENDERERS/);
-  assert.match(source, /ModuleDisabledPage/);
-  assert.match(source, /enabledModuleCodes/);
+  assert.doesNotMatch(source, /enabledModuleCodes/);
 
   for (const modulePath of [
     "../views/AssetView.jsx",

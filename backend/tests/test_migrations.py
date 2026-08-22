@@ -23,7 +23,7 @@ class BaselineSchemaTests(unittest.TestCase):
     def test_all_supported_dialects_have_the_same_tables(self):
         self.assertEqual(("sqlite", "postgresql", "mysql", "dws"), SUPPORTED_DIALECTS)
         tables = verify_baselines()
-        self.assertEqual(24, len(tables))
+        self.assertEqual(36, len(tables))
         for dialect in SUPPORTED_DIALECTS:
             self.assertTrue(baseline_path(dialect).is_file())
             self.assertEqual(set(tables), set(baseline_tables(dialect)))
