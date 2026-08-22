@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import re
 import unittest
-from pathlib import Path
 
 from backend.tests.db_test_support import (
     DOCS_DWS,
@@ -74,6 +73,10 @@ class SchemaContractTests(unittest.TestCase):
             auth = read_sql(docs / f"auth-app-{suffix}-ddl.sql")
             assets = read_sql(docs / f"assets-app-{suffix}-ddl.sql")
             self.assertIn("p_admin_user", auth)
+            assert_table_has_columns(auth, "p_role", {"role_code", "name", "builtin", "enabled"})
+            assert_table_has_columns(auth, "p_permission", {"permission_code", "resource", "action", "name"})
+            assert_table_has_columns(auth, "p_role_permission", {"role_code", "permission_code"})
+            self.assertIn("idx_p_role_permission_permission", auth)
             assert_table_has_columns(assets, "p_asset_table", {"table_name", "layer_code", "domain_code"})
             assert_table_has_columns(assets, "p_asset_field", {"field_name", "asset_id"})
 

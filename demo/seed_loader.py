@@ -272,6 +272,7 @@ def community_seed_plan() -> dict[str, dict]:
     push_field_rows = []
     push_change_rows = []
     for item in load_dataset("push_systems.json"):
+        # pi-lens-ignore: unchecked-throwing-call-python
         system_id = int(item["id"])
         code = item["code"]
         abbr = code.removeprefix("DEMO_")
@@ -567,5 +568,46 @@ def community_seed_plan() -> dict[str, dict]:
                 "source_record_id", "evidence_description", "confidence_code", "generated_at", "diagnostics_json",
             ),
             lineage_edge_rows,
+        ),
+    }
+
+
+def rbac_seed_plan() -> dict[str, dict]:
+    """Return deterministic RBAC seed rows for PostgreSQL/DWS demo SQL."""
+    from backend.app.authorization import (
+        BUILTIN_ROLE_PERMISSION_CODES,
+        PERMISSION_CODES,
+        PERMISSION_DEFINITIONS,
+    )
+
+    def spec(columns, rows):
+        return {"columns": list(columns), "rows": [list(row) for row in rows]}
+
+    roles = [
+        ("admin", "系统管理员", "Community 内置系统管理员角色。", "Y", "Y"),
+        ("maintainer", "业务维护员", "兼容现有业务资产维护和操作日志读取能力。", "Y", "Y"),
+    ]
+    permissions = [
+        (item.code, item.resource, item.action, item.name, item.description)
+        for item in PERMISSION_DEFINITIONS
+    ]
+    mappings = [
+        (role_code, permission_code)
+        for role_code in ("admin", "maintainer")
+        for permission_code in PERMISSION_CODES
+        if permission_code in BUILTIN_ROLE_PERMISSION_CODES[role_code]
+    ]
+    return {
+        "p_role": spec(
+            ("role_code", "name", "description", "builtin", "enabled"),
+            roles,
+        ),
+        "p_permission": spec(
+            ("permission_code", "resource", "action", "name", "description"),
+            permissions,
+        ),
+        "p_role_permission": spec(
+            ("role_code", "permission_code"),
+            mappings,
         ),
     }

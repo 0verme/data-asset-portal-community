@@ -11,6 +11,11 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 # The generated SQL contains CJK demo text; force UTF-8 stdout so piping the
 # seed into a database works identically on Windows and POSIX terminals.
@@ -18,9 +23,9 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in {"utf-8", "utf8"}:
     sys.stdout.reconfigure(encoding="utf-8")
 
 try:
-    from seed_loader import community_seed_plan  # noqa: E402
+    from seed_loader import community_seed_plan, rbac_seed_plan  # noqa: E402
 except ImportError:  # imported as demo.seed_postgres from tests
-    from demo.seed_loader import community_seed_plan  # noqa: E402
+    from demo.seed_loader import community_seed_plan, rbac_seed_plan  # noqa: E402
 
 
 def literal(value):
@@ -47,7 +52,8 @@ def main():
     print(
         "-- backend/scripts/reset_all_user_passwords.py after first startup."
     )
-    for table, spec in community_seed_plan().items():
+    seed_plan = {**rbac_seed_plan(), **community_seed_plan()}
+    for table, spec in seed_plan.items():
         if not spec["rows"]:
             continue
         columns = ", ".join(spec["columns"])
@@ -58,6 +64,7 @@ def main():
             "p_data_source": "source_code",
             "p_lineage_node": "snapshot_id,node_id",
             "p_lineage_edge": "snapshot_id,edge_id",
+            "p_role_permission": "role_code,permission_code",
         }.get(table, spec["columns"][0])
         print(
             f"INSERT INTO dwp.{table} ({columns}) VALUES\n"

@@ -70,10 +70,11 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
             apply = _run_cli(["apply", "--profile", "fresh", "--config", str(config)])
             self.assertEqual(0, apply.returncode, apply.stderr)
             self.assertIn("applied=0001_baseline", apply.stdout)
+            self.assertIn("rbac_seed=inserted:", apply.stdout)
 
             status = _run_cli(["status", "--profile", "fresh", "--config", str(config)])
             self.assertEqual(0, status.returncode, status.stderr)
-            self.assertIn("revision=0004_metadata_ingestion_identity", status.stdout)
+            self.assertIn("revision=0005_rbac_persistence", status.stdout)
             connection = sqlite3.connect(database)
             try:
                 row = connection.execute(
@@ -107,6 +108,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                     "p_lineage_edge", "p_lineage_node", "p_lineage_snapshot", "p_manual_code_table",
                     "p_report_asset", "p_push_change_log", "p_push_job_field", "p_push_job",
                     "p_push_system", "p_upstream_change_log", "p_upstream_unload_time", "p_upstream_system",
+                    "p_role_permission", "p_permission", "p_role",
                 ):
                     connection.execute(f"DROP TABLE dwp.{table}")
                 connection.execute("UPDATE dwp.alembic_version SET version_num = '0002_portable_asset_filter'")
@@ -121,12 +123,23 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 self.assertEqual(("Legacy system",), connection.execute(
                     "SELECT system_name FROM dwp.p_system WHERE system_id = 99"
                 ).fetchone())
-                self.assertEqual(("0004_metadata_ingestion_identity",), connection.execute(
+                self.assertEqual(("0005_rbac_persistence",), connection.execute(
                     "SELECT version_num FROM dwp.alembic_version"
                 ).fetchone())
                 self.assertIsNotNone(connection.execute(
                     "SELECT name FROM dwp.sqlite_master WHERE name = 'p_lineage_snapshot'"
                 ).fetchone())
+                self.assertIsNotNone(connection.execute(
+                    "SELECT name FROM dwp.sqlite_master WHERE name = 'p_role_permission'"
+                ).fetchone())
+                self.assertEqual(
+                    (2,),
+                    connection.execute("SELECT COUNT(*) FROM dwp.p_role").fetchone(),
+                )
+                self.assertGreater(
+                    connection.execute("SELECT COUNT(*) FROM dwp.p_permission").fetchone()[0],
+                    0,
+                )
             finally:
                 connection.close()
 
@@ -141,7 +154,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("verify=ok", proc.stdout)
         self.assertIn("0001_baseline", proc.stdout)
-        self.assertIn("tables=36", proc.stdout)
+        self.assertIn("tables=39", proc.stdout)
 
     def test_offline_verify_includes_mysql_baseline(self):
         proc = _run_cli(["verify", "--offline", "--dialect", "mysql"])

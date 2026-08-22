@@ -53,6 +53,9 @@ class MigrationSchemaParityTests(unittest.TestCase):
             "p_asset_table": {"asset_id", "table_name", "layer_code", "domain_code"},
             "p_asset_field": {"field_id", "asset_id", "field_name", "data_type"},
             "p_admin_user": {"id", "username", "password_hash", "role"},
+            "p_role": {"role_code", "name", "description", "builtin", "enabled"},
+            "p_permission": {"permission_code", "resource", "action", "name"},
+            "p_role_permission": {"role_code", "permission_code"},
             "p_api_asset": {"api_pk", "api_code", "api_name", "system_id"},
             "p_upstream_system": {"system_pk", "data_source_id", "system_id", "host_name"},
             "p_push_system": {"system_id", "master_system_id", "system_code", "protocol_type"},
@@ -84,12 +87,15 @@ class MigrationSchemaParityTests(unittest.TestCase):
             "idx_p_report_asset_ix_01",
             "idx_p_manual_code_table_filter",
             "idx_p_lineage_node_lookup",
+            "idx_p_role_permission_permission",
             "foreign key (system_id)",
             "foreign key (data_source_id)",
             "foreign key (table_pk)",
             "on delete cascade",
             "foreign key (master_system_id)",
             "foreign key (snapshot_id)",
+            "foreign key (role_code)",
+            "foreign key (permission_code)",
         )
         for dialect, sql in self.sql.items():
             normalized = " ".join(sql.lower().split())

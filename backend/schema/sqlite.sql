@@ -112,6 +112,25 @@ CREATE TABLE IF NOT EXISTS dwp.p_field_mapping_field (
     FOREIGN KEY (table_pk) REFERENCES p_field_mapping_table(table_pk) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS dwp.p_role (
+  role_code TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT,
+  builtin TEXT NOT NULL DEFAULT 'N', enabled TEXT NOT NULL DEFAULT 'Y',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS dwp.p_permission (
+  permission_code TEXT PRIMARY KEY, resource TEXT NOT NULL, action TEXT NOT NULL,
+  name TEXT NOT NULL, description TEXT
+);
+CREATE TABLE IF NOT EXISTS dwp.p_role_permission (
+  role_code TEXT NOT NULL, permission_code TEXT NOT NULL,
+  PRIMARY KEY (role_code, permission_code),
+  FOREIGN KEY (role_code) REFERENCES p_role(role_code) ON DELETE CASCADE,
+  FOREIGN KEY (permission_code) REFERENCES p_permission(permission_code) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_role_permission_permission
+  ON p_role_permission(permission_code);
+
 CREATE TABLE IF NOT EXISTS dwp.p_admin_user (
   id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
   display_name TEXT, role TEXT NOT NULL DEFAULT 'admin', status TEXT NOT NULL DEFAULT 'ACTIVE',

@@ -83,6 +83,29 @@ ALTER TABLE p_field_mapping_field ADD CONSTRAINT fk_p_field_mapping_field_table
 CREATE INDEX idx_p_field_mapping_table_source
   ON p_field_mapping_table(data_source_id, source_table_name);
 
+CREATE TABLE IF NOT EXISTS p_role (
+  role_code VARCHAR(64) PRIMARY KEY, name VARCHAR(128) NOT NULL,
+  description VARCHAR(2000), builtin CHAR(1) NOT NULL DEFAULT 'N',
+  enabled CHAR(1) NOT NULL DEFAULT 'Y',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+CREATE TABLE IF NOT EXISTS p_permission (
+  permission_code VARCHAR(128) PRIMARY KEY, resource VARCHAR(64) NOT NULL,
+  action VARCHAR(32) NOT NULL, name VARCHAR(128) NOT NULL,
+  description VARCHAR(2000)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+CREATE TABLE IF NOT EXISTS p_role_permission (
+  role_code VARCHAR(64) NOT NULL, permission_code VARCHAR(128) NOT NULL,
+  PRIMARY KEY (role_code, permission_code),
+  CONSTRAINT fk_p_role_permission_role FOREIGN KEY (role_code)
+    REFERENCES p_role(role_code) ON DELETE CASCADE,
+  CONSTRAINT fk_p_role_permission_permission FOREIGN KEY (permission_code)
+    REFERENCES p_permission(permission_code) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+CREATE INDEX idx_p_role_permission_permission
+  ON p_role_permission(permission_code);
+
 CREATE TABLE IF NOT EXISTS p_admin_user (
   id BIGINT PRIMARY KEY, username VARCHAR(64) NOT NULL UNIQUE,
   password_hash VARCHAR(512) NOT NULL, display_name VARCHAR(128),
