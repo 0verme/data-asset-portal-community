@@ -89,7 +89,7 @@ cd data-asset-portal-community
 
 ### 只看前端（mock mode）
 
-只需 Node.js 22.13+ 和 npm 10+；mock mode 只读取前端受控数据，不需要数据库或后端服务。默认 module registry 可展示源码中的全部模块，但这不代表 remote Community backend 当前注册了相同的路由。
+只需 Node.js 22.13+ 和 npm 10+；mock mode 只读取前端受控数据，不需要数据库或后端服务。默认 module registry 与 remote backend 采用同一 open repository module contract；数据、外部依赖和 storage readiness 仍可不同。
 
 ```bash
 npm --prefix frontend ci
@@ -141,7 +141,9 @@ flowchart LR
   R -.->|"mock"| M["受控演示数据"]
 ```
 
-默认由 Uvicorn 加载 `backend/asgi.py`；FastAPI 是唯一 production runtime。所有仓库模块 route 与 infrastructure route 由 FastAPI 处理；缺少数据库、驱动、凭据或外部集成时，Service Layer 返回已有的诊断错误契约，而不是因产品 profile 返回 404。所有 API 复用同一 Service Layer、API Contract 和 Database Provider。前端通过 `VITE_API_MODE` 选择 mock 或 remote；后端按 database profile 访问数据库。
+默认由 Uvicorn 加载 `backend/asgi.py`；FastAPI 是唯一 production runtime。所有仓库模块 route 与 infrastructure route 由 FastAPI 处理；缺少数据库、驱动、凭据或外部集成时，Service Layer 返回已有的诊断错误契约，而不是因产品 profile 返回 404。所有 API 复用同一 Service Layer、API Contract 和 Database Provider。外部元数据通过稳定的 `Metadata Contract` 接入 `/api/metadata`，Collector 不需要知道 DAP 内部 schema；前端通过 `VITE_API_MODE` 选择 mock 或 remote，后端按 database profile 访问数据库。
+
+外部接入链路为 `Customer System → Collector / Adapter → Versioned Metadata Contract → DAP Metadata API`。DAP 负责 Receive、Validate、Normalize、Persist、Audit、Expose；Collector 负责 source access、parse、schedule 和 retry。详见 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 和 [ADR-001](./docs/adr/001-metadata-ingestion-contract.md)。
 
 新安装和既有数据库升级都以 `backend/schema` 四方言完整 baseline + `backend/alembic` 增量 revision 为唯一结构契约，随后使用对应的 `demo/seed_sqlite.py` 或 `demo/seed_postgres.py` 写入完全虚构数据。`docs/pg/` 与 `docs/dws/` 保留为方言参考和部署说明，不再代表隐藏模块的物理边界。
 详见 [架构说明](./docs/architecture.md)、[数据库迁移说明](./backend/schema/README.md) 和 [部署说明](./DEPLOYMENT.md)。
@@ -167,6 +169,8 @@ flowchart LR
 | [架构说明](./docs/architecture.md) | 前后端架构、数据流和数据库边界 |
 | [模块清单](./docs/modules.md) | 页面、接口入口和数据表对照 |
 | [API 契约](./docs/api-contract.md) | API 约定、端点和请求/响应模型 |
+| [Metadata Ingestion Contract](./docs/metadata-ingestion.md) | 外部 Collector 接入、版本、幂等、血缘 snapshot 与示例 |
+| [ADR-001](./docs/adr/001-metadata-ingestion-contract.md) | Metadata Contract 架构决策记录 |
 | [数据库迁移](./backend/schema/README.md) | Alembic baseline、stamp 与 forward migration 运维规则 |
 | [截图画廊](./docs/screenshots.md) | Community Demo 全量界面截图 |
 | [资产风险联动设计](./docs/asset-risk-integration-design.md) | 外部审计结果接入边界与提案 |
@@ -188,7 +192,7 @@ SQLite 用于 Community 本地演示、开发和 CI；PostgreSQL 用于 Communit
 
 ### 这个项目负责真实数据采集吗？
 
-不负责。项目维护元数据和关系展示；采集调度、任务编排、失败重试和真实文件推送不在当前职责内。
+不负责 source-specific 采集和调度。DAP 提供稳定的 Metadata Ingestion Contract/API，接收 Collector 已解析的资产和 lineage snapshot；采集连接、parser、调度、失败重试和真实文件推送仍属于外部 Collector / Adapter 或独立集成项目。
 
 ## 🗺 路线图
 
@@ -197,7 +201,7 @@ SQLite 用于 Community 本地演示、开发和 CI；PostgreSQL 用于 Communit
 - 真实采集调度、任务编排和失败重试
 - 真实下游文件推送执行链路
 - 细粒度 RBAC、多角色权限体系和完整审计中心
-- 自动血缘解析与自动元数据采集
+- DAP Core 内置万能 parser、自动血缘解析与自动元数据采集；外部 Collector Contract 已提供接入边界
 
 阶段更新见 [CHANGELOG.md](./CHANGELOG.md)，待确认事项见 [docs/todo.md](./docs/todo.md)。
 

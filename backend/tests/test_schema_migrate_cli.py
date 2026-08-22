@@ -30,8 +30,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from backend.app.db.sqlite_adapter import connect
-from backend.app.migrations.schema import initialize
+from backend.app.db.sqlite_adapter import connect  # type: ignore
+from backend.app.migrations.schema import initialize  # type: ignore
 
 BACKEND = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND.parent
@@ -73,7 +73,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
 
             status = _run_cli(["status", "--profile", "fresh", "--config", str(config)])
             self.assertEqual(0, status.returncode, status.stderr)
-            self.assertIn("revision=0003_open_repository_modules", status.stdout)
+            self.assertIn("revision=0004_metadata_ingestion_identity", status.stdout)
             connection = sqlite3.connect(database)
             try:
                 row = connection.execute(
@@ -121,7 +121,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 self.assertEqual(("Legacy system",), connection.execute(
                     "SELECT system_name FROM dwp.p_system WHERE system_id = 99"
                 ).fetchone())
-                self.assertEqual(("0003_open_repository_modules",), connection.execute(
+                self.assertEqual(("0004_metadata_ingestion_identity",), connection.execute(
                     "SELECT version_num FROM dwp.alembic_version"
                 ).fetchone())
                 self.assertIsNotNone(connection.execute(

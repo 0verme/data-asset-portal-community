@@ -1,0 +1,47 @@
+{
+  "contractVersion": "1.0",
+  "source": {
+    "type": "postgresql",
+    "name": "warehouse-prod",
+    "namespace": "finance"
+  },
+  "collector": {
+    "name": "sample-lineage-producer",
+    "version": "0.1.0"
+  },
+  "snapshot": {
+    "externalSnapshotId": "sample-2026-08-22-001",
+    "generatedAt": "2026-08-22T10:00:00Z",
+    "mode": "replace"
+  },
+  "nodes": [
+    {
+      "externalId": "table:public.orders",
+      "type": "table",
+      "name": "public.orders",
+      "namespace": "public",
+      "attributes": {"layer": "source"}
+    },
+    {
+      "externalId": "table:public.orders_daily",
+      "type": "table",
+      "name": "public.orders_daily",
+      "namespace": "public",
+      "attributes": {"layer": "dwm"}
+    }
+  ],
+  "edges": [
+    {
+      "sourceId": "table:public.orders",
+      "targetId": "table:public.orders_daily",
+      "type": "table_lineage",
+      "evidence": {
+        "type": "mapping",
+        "sourceRecordId": "sample:mapping:1",
+        "description": "Reference producer evidence"
+      },
+      "confidence": "high",
+      "diagnostics": []
+    }
+  ]
+}

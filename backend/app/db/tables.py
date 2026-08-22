@@ -48,6 +48,12 @@ asset_table = _table(
     Column("table_name", String(256), nullable=False),
     Column("table_cn_name", String(256)),
     Column("schema_name", String(128), nullable=False),
+    Column("catalog_name", String(128)),
+    Column("database_name", String(128)),
+    Column("source_key", String(64)),
+    Column("asset_type", String(64)),
+    Column("external_id", String(256)),
+    Column("qualified_name", String(512)),
     Column("layer_code", String(32)),
     Column("domain_code", String(64)),
     Column("owner_name", String(128)),
@@ -306,6 +312,9 @@ lineage_snapshot = _table(
     Column("generator_name", String(256), nullable=False),
     Column("generator_version", String(64), nullable=False),
     Column("import_batch_id", String(128)),
+    Column("source_key", String(64)),
+    Column("content_hash", String(64)),
+    Column("ingestion_id", String(64)),
     Column("status_code", String(32), nullable=False),
 )
 
