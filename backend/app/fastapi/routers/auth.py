@@ -1,0 +1,109 @@
+"""FastAPI-native authentication routes."""
+
+# pyright: reportMissingImports=false
+# pyright: reportAttributeAccessIssue=false
+
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import (  # pyright: ignore[reportAttributeAccessIssue]
+    APIRouter,
+    Body,
+    Depends,
+    FastAPI,
+)
+from fastapi.responses import JSONResponse  # pyright: ignore[reportMissingImports]
+
+from ...application import (
+    RequestContext,
+    identity_for_session,
+    set_current_request_identity,
+)
+from ...services.auth_service import AuthError
+from ...services.operation_log_service import (
+    OPERATION_TYPE_LOGIN,
+    OPERATION_TYPE_LOGOUT,
+)
+from ..auth import clear_native_session_cookie, set_native_session_cookie
+from ..dependencies import get_request_context
+
+MODULE_LOGIN = "系统登录"
+
+
+def _register_auth_routes(app: FastAPI, auth_service: Any, operation_logs: Any) -> None:
+    auth_router = APIRouter(prefix="/api/auth", tags=["auth-native"])
+
+    @auth_router.post("/login")
+    def login(
+        payload: dict[str, Any] | None = Body(default=None),
+        _context: RequestContext = Depends(get_request_context),
+    ):
+        data = payload or {}
+        username = str(data.get("username") or "").strip()
+        try:
+            user = auth_service.authenticate(
+                data.get("username"), data.get("password")
+            )
+        except AuthError as error:
+            operation_logs.record_best_effort_audit(
+                module_name=MODULE_LOGIN,
+                operation_type=OPERATION_TYPE_LOGIN,
+                operation_object=username,
+                operation_desc="管理员登录失败",
+                result_status="failure",
+                error_message=error.message,
+                user_id=username,
+                user_name=username,
+            )
+            return JSONResponse(
+                status_code=error.status_code,
+                content={"error": error.to_dict()},
+            )
+
+        identity = identity_for_session(user)
+        set_current_request_identity(identity)
+        operation_logs.record_best_effort_audit(
+            module_name=MODULE_LOGIN,
+            operation_type=OPERATION_TYPE_LOGIN,
+            operation_object=user.get("user") or username,
+            operation_desc="管理员登录系统",
+        )
+        response = JSONResponse(content={"message": "登录成功", "data": user})
+        set_native_session_cookie(response, user, bool(data.get("remember")))
+        return response
+
+    @auth_router.get("/me")
+    def current_user(context: RequestContext = Depends(get_request_context)):
+        if context.identity is None:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "error": {
+                        "code": "UNAUTHORIZED",
+                        "message": "当前未登录。",
+                    }
+                },
+            )
+        return JSONResponse(content={"data": context.identity.as_dict()})
+
+    @auth_router.post("/logout")
+    def logout(
+        context: RequestContext = Depends(get_request_context),
+    ):
+        current = context.identity
+        if current is not None:
+            operation_logs.record_best_effort_audit(
+                module_name=MODULE_LOGIN,
+                operation_type=OPERATION_TYPE_LOGOUT,
+                operation_object=current.user or "",
+                operation_desc="管理员退出登录",
+                user_id=current.user or "",
+                user_name=current.name or current.user or "",
+            )
+        set_current_request_identity(None)
+        response = JSONResponse(content={"message": "已退出登录"})
+        clear_native_session_cookie(response)
+        return response
+
+    app.include_router(auth_router)

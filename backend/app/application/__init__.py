@@ -23,6 +23,7 @@ from .identity import (
     identity_for_session,
     identity_from_mapping,
 )
+from .session import SESSION_COOKIE_NAME, SESSION_PAYLOAD_KEY, SignedSessionCodec
 
 __all__ = [
     "ADMIN_ROLE",
@@ -33,6 +34,9 @@ __all__ = [
     "Identity",
     "PermissionDeniedError",
     "RequestContext",
+    "SESSION_COOKIE_NAME",
+    "SESSION_PAYLOAD_KEY",
+    "SignedSessionCodec",
     "current_request_context",
     "identity_for_session",
     "identity_from_mapping",

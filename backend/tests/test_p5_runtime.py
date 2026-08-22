@@ -1,15 +1,17 @@
 """P5 ASGI primary and Flask fallback runtime tests."""
+
+# pyright: reportMissingImports=false
+
 from __future__ import annotations
 
 import os
 import unittest
 from unittest.mock import patch
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from backend.app import create_app
 from backend.app.core.capabilities import resolve_capabilities
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 class P5RuntimeTests(unittest.TestCase):
@@ -100,6 +102,7 @@ class P5RuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             {
+                "/api/auth",
                 "/api/indicators",
                 "/api/assets",
                 "/api/field-mappings",

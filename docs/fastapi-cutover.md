@@ -30,14 +30,15 @@ client -> ASGI runtime dispatcher
 
 ## Compatibility boundary
 
-`FlaskRequestContextMiddleware` 在 FastAPI primary 处理请求期间建立最小 Flask request context：
+F2 后，FastAPI primary 的 Auth 使用 `backend/app/application/session.py` 与 `backend/app/fastapi/auth.py` 读取相同格式的 signed `session` cookie，完成 native `login/me/logout` 和 identity resolution：
 
-- 读取相同的 signed Flask session cookie，复用现有 `admin` / `maintainer` identity；
-- 让仍依赖 Flask request context 的 Operation Log Service 保持请求 URL、method、user-agent、client IP 与 session user 兼容；
+- 保持现有 cookie name、签名格式、expiration、`admin` / `maintainer` identity 与安全 flags；
+- F1 的 Operation Log 已通过 neutral `RequestContext` 获取 request metadata，不再需要 Flask request context；
+- `FlaskRequestContextMiddleware` 仍只为其它 compatibility/fallback 责任建立最小 Flask request context；
 - `ASSET_TRUST_PROXY_HEADERS` 默认仍为 deny；只有显式信任反向代理时才读取 `X-Forwarded-For`；
 - FastAPI adapter 不直接读取 database Provider/CoreAccess，也不复制 Service SQL。
 
-这是临时但可回滚的 compatibility seam。只有当 Auth、Operation Log 与全部剩余 fallback route 完成独立 framework-neutral 验证后，才允许在后续 PR 中移除。
+这是分阶段可回滚的 compatibility boundary。只有全部剩余 fallback route 与 runtime deletion 完成独立验证后，才允许在后续 PR 中移除 Flask runtime。
 
 ## Cutover phases
 
@@ -51,7 +52,7 @@ client -> ASGI runtime dispatcher
 
 ### P5-C：Selective cleanup
 
-只删除有证据证明不再被 runtime、tests、CLI、extension 或 compatibility path 使用的 Flask adapter。未迁移的 `auth`、`common_code`、`portal`、`search`、`indicator_path`、`push` 与 Flask app factory 继续保留；不做 Big Bang 删除。
+只删除有证据证明不再被 runtime、tests、CLI、extension 或 compatibility path 使用的 Flask adapter。Flask auth blueprint、`common_code`、`portal`、`search`、`indicator_path`、`push` 与 Flask app factory 继续保留；不做 Big Bang 删除。
 
 ## Rollback
 

@@ -1,6 +1,6 @@
 # Flask Dependency Audit（P5-C）
 
-审计基线：`origin/main` `224e8bc296e700757b4e5c06a53717c28f3f2ec9`。
+审计基线：`origin/main` `f099aaa05901bb83e976721243eb9b7145970840`（F1/#99 merge 后、F2/#102 开始前）。
 
 执行的搜索：
 
@@ -16,8 +16,9 @@ rg -n "from flask import|import flask|create_app|flask Blueprint|WSGI|WSGIMiddle
 - `backend/app/__init__.py`：Flask app factory、CORS、security/error handlers；fallback 与 `backend/run.py` 仍使用。
 - `backend/app/core/blueprint_registry.py`：Flask blueprint registration；fallback 仍注册全部 legacy API。
 - 已迁移模块的 Flask routes：Assets、Field Mapping、Indicator、Root、Manual Code Table、Report、API Asset、Lineage、System Management、Operation Log、Upstream；它们是 rollback/fallback 路径，不能删除。
-- `backend/app/auth.py` 与 Flask auth routes：FastAPI primary 读取 Flask signed session，`login/me/logout` 尚未迁移，不能删除。
-- `backend/app/services/operation_log_service.py`：仍有 Flask request-context compatibility；P5 middleware 正在为 FastAPI primary 提供这个 context。
+- `backend/app/auth.py` 与 Flask auth routes：保留 Flask signed-session / blueprint fallback 作为 rollback boundary；默认 FastAPI primary 的 `login/me/logout` 已由 native router 承载。
+- `backend/app/fastapi/auth.py` 与 `backend/app/application/session.py`：FastAPI native 读取和写入与 Flask 兼容的 signed `session` cookie；不使用 Flask `session` proxy。
+- `backend/app/services/operation_log_service.py`：F1 已通过 framework-neutral `RequestContext` 获取 audit metadata；Flask adapter 仍为 fallback 路径提供 context。
 - `backend/run.py`：直接 Flask WSGI emergency rollback。
 
 ### KEEP_TOOLING
@@ -45,4 +46,4 @@ rg -n "from flask import|import flask|create_app|flask Blueprint|WSGI|WSGIMiddle
 
 ## 结论
 
-FastAPI 已是迁移 prefix 的 primary runtime；Flask 仍是有意保留的 fallback/compatibility runtime，而不是未审计的遗留代码。机械删除 Flask 会破坏 WAIT_DB 模块、auth session、operation log compatibility 或紧急 rollback，因此不执行。
+FastAPI 已是迁移 prefix 与 `/api/auth` 的 primary runtime；Flask 仍是有意保留的 fallback/compatibility runtime，而不是未审计的遗留代码。机械删除 Flask 仍会破坏 WAIT_DB 模块、Flask auth rollback、fallback blueprints 或紧急 rollback，因此本阶段不执行。
