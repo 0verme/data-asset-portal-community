@@ -20,15 +20,29 @@ from ...application import (
     identity_for_session,
     set_current_request_identity,
 )
+from ...authorization.core import AuthorizationService
 from ...services.auth_service import AuthError
 from ...services.operation_log_service import (
     OPERATION_TYPE_LOGIN,
     OPERATION_TYPE_LOGOUT,
 )
 from ..auth import clear_native_session_cookie, set_native_session_cookie
-from ..dependencies import get_request_context
+from ..dependencies import get_authorization_service, get_request_context
 
 MODULE_LOGIN = "系统登录"
+
+
+def _auth_payload(
+    identity: Any,
+    service: AuthorizationService,
+    user: dict[str, Any],
+) -> dict[str, Any]:
+    current = service.current_subject(identity)
+    payload = dict(user)
+    if current is not None and current.role_code:
+        payload["role"] = current.role_code
+    payload["permissions"] = list(service.get_permissions(identity))
+    return payload
 
 
 def _register_auth_routes(app: FastAPI, auth_service: Any, operation_logs: Any) -> None:
@@ -38,6 +52,7 @@ def _register_auth_routes(app: FastAPI, auth_service: Any, operation_logs: Any) 
     def login(
         payload: dict[str, Any] | None = Body(default=None),
         _context: RequestContext = Depends(get_request_context),
+        authorization: AuthorizationService = Depends(get_authorization_service),
     ):
         data = payload or {}
         username = str(data.get("username") or "").strip()
@@ -62,6 +77,7 @@ def _register_auth_routes(app: FastAPI, auth_service: Any, operation_logs: Any) 
             )
 
         identity = identity_for_session(user)
+        user = _auth_payload(identity, authorization, user)
         set_current_request_identity(identity)
         operation_logs.record_best_effort_audit(
             module_name=MODULE_LOGIN,
@@ -74,7 +90,10 @@ def _register_auth_routes(app: FastAPI, auth_service: Any, operation_logs: Any) 
         return response
 
     @auth_router.get("/me")
-    def current_user(context: RequestContext = Depends(get_request_context)):
+    def current_user(
+        context: RequestContext = Depends(get_request_context),
+        authorization: AuthorizationService = Depends(get_authorization_service),
+    ):
         if context.identity is None:
             return JSONResponse(
                 status_code=401,
@@ -85,7 +104,24 @@ def _register_auth_routes(app: FastAPI, auth_service: Any, operation_logs: Any) 
                     }
                 },
             )
-        return JSONResponse(content={"data": context.identity.as_dict()})
+        decision = authorization.authenticate(context.identity)
+        if not decision.authenticated:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "error": {
+                        "code": "UNAUTHORIZED",
+                        "message": "当前登录已失效。",
+                    }
+                },
+            )
+        current = decision.subject
+        data: dict[str, Any] = dict(context.identity.as_dict())
+        if current is not None:
+            data["user"] = current.username
+            data["role"] = current.role_code
+        data["permissions"] = list(authorization.get_permissions(context.identity))
+        return JSONResponse(content={"data": data})
 
     @auth_router.post("/logout")
     def logout(

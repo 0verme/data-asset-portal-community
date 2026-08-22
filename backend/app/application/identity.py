@@ -29,12 +29,15 @@ class Identity:
 
 
 def identity_from_mapping(value: Mapping[str, Any] | None) -> Identity | None:
-    """Parse a persisted identity without depending on a web framework."""
-    if not isinstance(value, Mapping) or value.get("role") not in MAINTENANCE_ROLES:
+    """Parse any non-empty role code without depending on a web framework."""
+    if not isinstance(value, Mapping):
+        return None
+    role = str(value.get("role") or "").strip().lower()
+    if not role:
         return None
     user = value.get("user") or None
     name = value.get("name") or user
-    return Identity(role=str(value["role"]), user=user, name=name)
+    return Identity(role=role, user=user, name=name)
 
 
 def identity_for_session(value: Mapping[str, Any] | None) -> Identity:
