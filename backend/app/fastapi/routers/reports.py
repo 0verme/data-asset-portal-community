@@ -1,5 +1,8 @@
 """Report FastAPI adapter routes."""
 
+# pyright: reportMissingImports=false
+# pyright: reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 from typing import Any
@@ -22,8 +25,9 @@ from ...services.report_service import (
     ReportNotFoundError,
     ReportValidationError,
 )
-from ..dependencies import require_maintainer
+from ..dependencies import require_permission
 from ..errors import _service_error_response
+
 
 def _register_report_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(prefix="/api/reports", tags=["report-migration"])
@@ -58,22 +62,28 @@ def _register_report_routes(app: FastAPI, service: Any) -> None:
             )
         except ReportDataSourceError as error:
             return error_response(error, 500)
-        return JSONResponse(content=validate_contract({"items": items}, ReportListResponse))
+        return JSONResponse(
+            content=validate_contract({"items": items}, ReportListResponse)
+        )
 
     @router.get("/{report_code}", response_model=None)
-    def get_report_detail(report_code: str, current_service: Any = Depends(get_service)):
+    def get_report_detail(
+        report_code: str, current_service: Any = Depends(get_service)
+    ):
         try:
             data = current_service.get_report_detail(report_code)
         except ReportNotFoundError as error:
             return error_response(error, 404)
         except ReportDataSourceError as error:
             return error_response(error, 500)
-        return JSONResponse(content=validate_contract({"data": data}, DataEnvelope[ReportItem]))
+        return JSONResponse(
+            content=validate_contract({"data": data}, DataEnvelope[ReportItem])
+        )
 
     @router.post("", response_model=None, status_code=201)
     def create_report(
         payload: ReportRequest | None = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("report:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -96,7 +106,7 @@ def _register_report_routes(app: FastAPI, service: Any) -> None:
     def update_report(
         report_code: str,
         payload: ReportRequest | None = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("report:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -119,7 +129,7 @@ def _register_report_routes(app: FastAPI, service: Any) -> None:
     @router.delete("/{report_code}", response_model=None)
     def delete_report(
         report_code: str,
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("report:write")),
         current_service: Any = Depends(get_service),
     ):
         try:

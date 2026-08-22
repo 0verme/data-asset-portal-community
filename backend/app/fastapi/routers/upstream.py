@@ -1,5 +1,8 @@
 """Upstream system FastAPI adapter routes."""
 
+# pyright: reportMissingImports=false
+# pyright: reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 from typing import Any
@@ -15,7 +18,7 @@ from ...services.upstream_service import (
     UpstreamSystemNotFoundError,
     UpstreamValidationError,
 )
-from ..dependencies import require_maintainer
+from ..dependencies import require_permission
 from ..errors import _service_error_response
 
 
@@ -72,28 +75,24 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
             data = current_service.get_system_detail(system_id)
         except (UpstreamSystemNotFoundError, UpstreamDataSourceError) as error:
             return _upstream_error_response(error)
-        return JSONResponse(
-            content=validate_contract({"data": data}, UpstreamResponse)
-        )
+        return JSONResponse(content=validate_contract({"data": data}, UpstreamResponse))
 
     @router.get("/systems/{system_id}/admin-detail", response_model=None)
     def get_system_admin_detail(
         system_id: str,
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("upstream:read")),
         current_service: Any = Depends(get_service),
     ):
         try:
             data = current_service.get_system_admin_detail(system_id)
         except (UpstreamSystemNotFoundError, UpstreamDataSourceError) as error:
             return _upstream_error_response(error)
-        return JSONResponse(
-            content=validate_contract({"data": data}, UpstreamResponse)
-        )
+        return JSONResponse(content=validate_contract({"data": data}, UpstreamResponse))
 
     @router.post("/systems", response_model=None, status_code=201)
     def create_system(
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("upstream:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -115,7 +114,7 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
     def update_system(
         system_id: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("upstream:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -137,7 +136,7 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
     def patch_system_status(
         system_id: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("upstream:write")),
         current_service: Any = Depends(get_service),
     ):
         payload = payload or {}
@@ -158,7 +157,7 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
     @router.delete("/systems/{system_id}", response_model=None)
     def delete_system(
         system_id: str,
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("upstream:write")),
         current_service: Any = Depends(get_service),
     ):
         try:

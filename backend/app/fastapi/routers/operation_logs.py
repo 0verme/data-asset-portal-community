@@ -1,5 +1,8 @@
 """Operation log FastAPI adapter routes."""
 
+# pyright: reportMissingImports=false
+# pyright: reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 from typing import Any
@@ -14,7 +17,7 @@ from ...services.operation_log_service import (
     OperationLogNotFoundError,
     OperationLogValidationError,
 )
-from ..dependencies import require_maintainer
+from ..dependencies import require_permission
 from ..errors import _service_error_response
 
 
@@ -32,7 +35,6 @@ def _register_operation_log_routes(app: FastAPI, service: Any) -> None:
     def get_operation_logs_service() -> Any:
         return service
 
-
     operation_router = APIRouter(
         prefix="/api/operation-logs", tags=["operation-log-migration"]
     )
@@ -47,7 +49,7 @@ def _register_operation_log_routes(app: FastAPI, service: Any) -> None:
         end_time: str | None = Query(default=None, alias="endTime"),
         page: str | None = Query(default=None),
         page_size: str | None = Query(default=None, alias="pageSize"),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("operation_log:read")),
         current_service: Any = Depends(get_operation_logs_service),
     ):
         filters = {
@@ -69,15 +71,13 @@ def _register_operation_log_routes(app: FastAPI, service: Any) -> None:
     @operation_router.get("/{log_id}", response_model=None)
     def get_operation_log_detail(
         log_id: str,
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("operation_log:read")),
         current_service: Any = Depends(get_operation_logs_service),
     ):
         try:
             data = current_service.get_log_detail(log_id)
         except (OperationLogNotFoundError, OperationLogDataSourceError) as error:
             return _operation_log_error_response(error)
-        return JSONResponse(
-            content=validate_contract({"data": data}, SystemResponse)
-        )
+        return JSONResponse(content=validate_contract({"data": data}, SystemResponse))
 
     app.include_router(operation_router)

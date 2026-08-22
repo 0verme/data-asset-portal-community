@@ -40,14 +40,17 @@ from ...services.push_service import (
     PushSystemNotFoundError,
     PushValidationError,
 )
-from ..dependencies import require_maintainer
+from ..dependencies import require_permission
 from ..errors import _service_error_response
 
 
 def _push_error_status(error: Any) -> int:
     if isinstance(error, (PushSystemNotFoundError, PushJobNotFoundError)):
         return 404
-    if isinstance(error, (PushSystemAlreadyExistsError, PushJobAlreadyExistsError, PushSystemInUseError)):
+    if isinstance(
+        error,
+        (PushSystemAlreadyExistsError, PushJobAlreadyExistsError, PushSystemInUseError),
+    ):
         return 409
     if isinstance(error, PushValidationError):
         return 422
@@ -93,7 +96,7 @@ def _register_push_routes(app: FastAPI, service: Any) -> None:
     @router.get("/systems/{system_id}/admin-detail", response_model=None)
     def get_system_admin_detail(
         system_id: str,
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("push:read")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -116,20 +119,22 @@ def _register_push_routes(app: FastAPI, service: Any) -> None:
     @router.post("/systems", response_model=None, status_code=201)
     def create_system(
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("push:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
             data = current_service.create_push_system(payload)
         except Exception as error:
             return _push_error_response(error)
-        return JSONResponse(status_code=201, content={"message": "下游系统创建成功", "data": data})
+        return JSONResponse(
+            status_code=201, content={"message": "下游系统创建成功", "data": data}
+        )
 
     @router.put("/systems/{system_id}", response_model=None)
     def update_system(
         system_id: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("push:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -141,7 +146,7 @@ def _register_push_routes(app: FastAPI, service: Any) -> None:
     @router.delete("/systems/{system_id}", response_model=None)
     def delete_system(
         system_id: str,
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("push:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -154,21 +159,23 @@ def _register_push_routes(app: FastAPI, service: Any) -> None:
     def create_job(
         system_id: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("push:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
             data = current_service.create_push_job(system_id, payload)
         except Exception as error:
             return _push_error_response(error)
-        return JSONResponse(status_code=201, content={"message": "推送作业创建成功", "data": data})
+        return JSONResponse(
+            status_code=201, content={"message": "推送作业创建成功", "data": data}
+        )
 
     @router.put("/systems/{system_id}/jobs/{job_id}", response_model=None)
     def update_job(
         system_id: str,
         job_id: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("push:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -181,7 +188,7 @@ def _register_push_routes(app: FastAPI, service: Any) -> None:
     def delete_job(
         system_id: str,
         job_id: str,
-        _context: RequestContext = Depends(require_maintainer),
+        _context: RequestContext = Depends(require_permission("push:write")),
         current_service: Any = Depends(get_service),
     ):
         try:

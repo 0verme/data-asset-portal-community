@@ -1,5 +1,8 @@
 """System management FastAPI adapter routes."""
 
+# pyright: reportMissingImports=false
+# pyright: reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 from typing import Any
@@ -21,14 +24,29 @@ from ...services.system_management_service import (
     SystemUserNotFoundError,
     SystemValidationError,
 )
-from ..dependencies import get_request_context, require_admin
+from ..dependencies import get_request_context, require_permission
 from ..errors import _service_error_response
 
 
 def _system_error_status(error: SystemManagementError) -> int:
-    if isinstance(error, (MenuNotFoundError, ParamCategoryNotFoundError, ParamDictNotFoundError, SystemUserNotFoundError)):
+    if isinstance(
+        error,
+        (
+            MenuNotFoundError,
+            ParamCategoryNotFoundError,
+            ParamDictNotFoundError,
+            SystemUserNotFoundError,
+        ),
+    ):
         return 404
-    if isinstance(error, (MenuAlreadyExistsError, ParamDictAlreadyExistsError, SystemUserAlreadyExistsError)):
+    if isinstance(
+        error,
+        (
+            MenuAlreadyExistsError,
+            ParamDictAlreadyExistsError,
+            SystemUserAlreadyExistsError,
+        ),
+    ):
         return 409
     if isinstance(error, SystemValidationError):
         return 422
@@ -53,7 +71,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
 
     @router.get("/users", response_model=None)
     def get_users(
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:user:read")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -65,7 +83,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     @router.post("/users", response_model=None, status_code=201)
     def create_user(
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:user:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -83,7 +101,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     def update_user(
         username: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:user:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -100,7 +118,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     def patch_user_status(
         username: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:user:write")),
         current_service: Any = Depends(get_service),
     ):
         payload = payload or {}
@@ -117,7 +135,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     @router.post("/users/{username}/reset-password", response_model=None)
     def reset_user_password(
         username: str,
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:user:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -133,7 +151,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     @router.delete("/users/{username}", response_model=None)
     def delete_user(
         username: str,
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:user:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -161,17 +179,19 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
                 if item["status"] == "enabled"
                 and (
                     not item["adminOnly"]
-                    or (identity and identity.role == "maintainer" and item["code"] == "system")
+                    or (
+                        identity
+                        and identity.role == "maintainer"
+                        and item["code"] == "system"
+                    )
                 )
             ]
-        return JSONResponse(
-            content=validate_contract({"items": items}, SystemResponse)
-        )
+        return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
 
     @router.post("/menus", response_model=None, status_code=201)
     def create_menu(
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:menu:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -189,7 +209,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     def update_menu(
         menu_id: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:menu:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -206,7 +226,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     def patch_menu_status(
         menu_id: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:menu:write")),
         current_service: Any = Depends(get_service),
     ):
         payload = payload or {}
@@ -224,7 +244,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     def patch_menu_move(
         menu_id: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:menu:write")),
         current_service: Any = Depends(get_service),
     ):
         payload = payload or {}
@@ -241,7 +261,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     @router.delete("/menus/{menu_id}", response_model=None)
     def delete_menu(
         menu_id: str,
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:menu:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -254,22 +274,20 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
 
     @router.get("/param-dicts/categories", response_model=None)
     def get_param_categories(
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:param:read")),
         current_service: Any = Depends(get_service),
     ):
         try:
             items = current_service.get_param_dict_categories()
         except SystemManagementError as error:
             return _system_error_response(error)
-        return JSONResponse(
-            content=validate_contract({"items": items}, SystemResponse)
-        )
+        return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
 
     @router.patch("/param-dicts/categories/{category_code}/status", response_model=None)
     def patch_param_category_status(
         category_code: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
         current_service: Any = Depends(get_service),
     ):
         payload = payload or {}
@@ -288,21 +306,19 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     @router.get("/param-dicts", response_model=None)
     def get_param_dicts(
         category_code: str | None = Query(default=None, alias="categoryCode"),
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:param:read")),
         current_service: Any = Depends(get_service),
     ):
         try:
             items = current_service.get_param_dicts(category_code)
         except SystemManagementError as error:
             return _system_error_response(error)
-        return JSONResponse(
-            content=validate_contract({"items": items}, SystemResponse)
-        )
+        return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
 
     @router.post("/param-dicts", response_model=None, status_code=201)
     def create_param_dict(
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -320,7 +336,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     def update_param_dict(
         dict_id: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -337,7 +353,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     def patch_param_dict_status(
         dict_id: str,
         payload: Any = Body(default=None),
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
         current_service: Any = Depends(get_service),
     ):
         payload = payload or {}
@@ -356,7 +372,7 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     @router.delete("/param-dicts/{dict_id}", response_model=None)
     def delete_param_dict(
         dict_id: str,
-        _context: RequestContext = Depends(require_admin),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
@@ -366,4 +382,5 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
         return JSONResponse(
             content=validate_contract({"message": "Parameter deleted"}, SystemResponse)
         )
+
     app.include_router(router)
