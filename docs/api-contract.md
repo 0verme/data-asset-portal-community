@@ -5,27 +5,27 @@
 
 ## 模块总览
 
-FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract，并统一以 `/api` 为前缀。下表是源码中的当前 route surface；标记为“Community 当前未注册”的模块仍可在 full/extension profile 或 mock mode 中出现，但不能把 Source/Mock coverage 当成当前 Community remote capability：
+FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract，并统一以 `/api` 为前缀。下表是源码中的当前 route surface；所有仓库已有模块默认注册，外部 database/credential/storage readiness 通过 Service error contract 表达，不通过 Edition 隐藏 route：
 
 | 模块 | 前端 API | Base Path | Community 当前状态 | 说明 |
 | --- | --- | --- | --- | --- |
 | 门户 / 能力 / 搜索 | `api/portal.js`、`api/search.js` | `/api/portal`、`/api/capabilities`、`/api/search` | 已注册 | 门户统计、能力清单、统一搜索 |
 | 认证 | `api/auth.js` | `/api/auth` | 已注册 | 登录、登出、获取当前用户 |
-| 上游卸数 | `api/upstream.js` | `/api/upstreams` | 当前未注册 | 管理上游源系统与卸数状态 |
+| 上游卸数 | `api/upstream.js` | `/api/upstreams` | 已注册 | 管理上游源系统与卸数状态 |
 | 数据仓库 | `api/assets.js` | `/api/assets` | 已注册 | 管理已配置层级的表资产、字段、DDL |
 | 字段映射 | `api/fieldMapping.js` | `/api/field-mappings` | 已注册 | 查询源字段到目标字段映射关系 |
 | 血缘分析 | `api/lineage.js` | `/api/lineage` | 已注册 | POC 或配置后的 persistent 快照查询 |
 | 指标维护 | `api/indicator.js` | `/api/indicators` | 已注册 | 管理口径指标、维度、启停状态 |
-| 报表资产 | `api/report.js` | `/api/reports` | 当前未注册 | 管理报表台账、归属信息与关联引用 |
+| 报表资产 | `api/report.js` | `/api/reports` | 已注册 | 管理报表台账、归属信息与关联引用 |
 | 词根管理 | `api/root.js` | `/api/roots` | 已注册 | 管理命名词根字典 |
-| 下游推送 | `api/push.js` | `/api/push` | 当前未注册 | 管理下游系统、推送作业与字段元数据 |
+| 下游推送 | `api/push.js` | `/api/push` | 已注册 | 管理下游系统、推送作业与字段元数据 |
 | API 资产 | `api/apiAssets.js` | `/api/api-assets` | 已注册 | 管理 API 元数据、参数、响应字段与关系 |
-| 码值表维护 | `api/manualCodeTables.js` | `/api/manual-code-tables` | 当前未注册 | 管理手工码值表元数据 |
+| 码值表维护 | `api/manualCodeTables.js` | `/api/manual-code-tables` | 已注册 | 管理手工码值表元数据 |
 | 系统管理 | `api/systemUsers.js`、`api/paramDicts.js`、`api/menus.js` | `/api/system` | 已注册 | 用户、菜单、参数字典与角色边界 |
 | 操作日志 | `api/operationLogs.js` | `/api/operation-logs` | 已注册（随 system） | 查询全站操作审计日志 |
 | 通用码值 | `api/commonCodes.js` | `/api/common-codes` | WAIT_DB，当前未注册 | 全系统可复用的分类码值与下拉选项 |
 
-Community 当前启用的 module codes 是 `portal,dwm,mapping,lineage,root,indicator,apiAsset,system`；`upstream,push,report,codeTable` 的 route registration 仍由当前 profile 关闭，边界移除属于 [#116](https://github.com/0verme/data-asset-portal-community/issues/116)。
+仓库已有 module codes 默认进入同一 open runtime contract；菜单 `status`、外部依赖、database driver、credential 和 persistent lineage storage readiness 是实例/部署状态，不是 Edition feature gate。
 
 ## 1. 总体约定
 
@@ -100,7 +100,7 @@ Accept: application/json
 
 ### 1.7 前端运行模式
 
-前端通过 `VITE_API_MODE` 切换数据来源：`mock` 走前端内置数据并使用演示登录；`remote` 统一走 `/api` 调后端真实数据库。后端唯一由 `uvicorn backend.asgi:app` 运行 FastAPI Native；WAIT_DB/Private routes 按 scope gate 不注册，不改变本 API Contract。
+前端通过 `VITE_API_MODE` 切换数据来源：`mock` 走前端内置数据并使用演示登录；`remote` 统一走 `/api` 调后端真实数据库。后端唯一由 `uvicorn backend.asgi:app` 运行 FastAPI Native；真正的 WAIT_DB / 外部 storage readiness 通过可诊断的 Service error 表达，不把仓库已有源码模块伪装成不存在。
 
 ```env
 VITE_API_MODE=remote
@@ -955,7 +955,27 @@ Base Path: `/api/lineage`
 回退到默认表节点，并分别返回 `ROOT_NOT_IN_SNAPSHOT` 或
 `TABLE_VIEW_REQUIRES_TABLE_ROOT`。
 
-## 13. 实施建议
+## 13. Metadata Ingestion Contract
+
+外部 Collector 只依赖 versioned JSON Contract，不依赖 DAP 内部表名、内部主键、Provider 或 migration。完整 ADR、字段语义和 reference examples 见 [metadata-ingestion.md](./metadata-ingestion.md) 与 [ADR-001](./adr/001-metadata-ingestion-contract.md)。
+
+### 13.1 Asset ingestion
+
+- `POST /api/metadata/assets/ingestions`：bulk upsert Asset Contract；兼容 alias `POST /api/metadata/assets:bulk-upsert`。
+- query `dryRun=true` 或 `mode=preview`：只校验、normalize、compare，不修改业务数据或 audit。
+- 请求包含 `contractVersion`、`source`、`collector`、`assets[]`；natural key 是 source identity + assetType + externalId，缺少 externalId 时使用 qualifiedName。
+- 响应包含 `ingestionId`、`correlationId`、`status`、`summary` 和 item results；summary 区分 create/update/unchanged/conflict/invalid/deleteCandidate。
+
+### 13.2 Lineage snapshot ingestion
+
+- `POST /api/metadata/lineage/ingestions`：发布 self-contained lineage snapshot；兼容 alias `POST /api/metadata/lineage:snapshots`。
+- V1 只支持 `snapshot.mode=replace`；edge source/target 必须引用当前 nodes。
+- 相同 source + importId + content 返回 `already_applied`；同一 import 使用不同内容返回 `409 conflict`。
+- `GET /api/metadata/ingestions/{ingestionId}`：查询正式 ingestion 的 audit summary；dry-run 不创建持久状态。
+
+写入复用当前 `maintainer` auth seam。默认 bulk limits 为 1000 assets、1000 fields/asset、10000 total fields、10000 nodes、20000 edges 和 8 MiB body。Collector responsibilities、error model、transaction/rollback、四方言 migration 和非目标见 [metadata-ingestion.md](./metadata-ingestion.md)。
+
+## 14. 实施建议
 
 - 后端返回结构尽量严格遵循本文，不要模块间各自定义一套包装格式。
 - 本文是仓库内唯一的 API 契约文档；新增接口请在对应模块章节内补充，不再新开平行契约文件。

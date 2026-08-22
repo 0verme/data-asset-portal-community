@@ -13,6 +13,7 @@ from ..services.auth_service import auth_service
 from ..services.field_mapping_service import field_mapping_service
 from ..services.indicator_service import indicator_service
 from ..services.manual_code_table_service import manual_code_table_service
+from ..services.metadata_ingestion_service import metadata_ingestion_service  # type: ignore
 from ..services.operation_log_service import operation_log_service
 from ..services.portal_service import portal_service
 from ..services.push_service import push_service
@@ -31,6 +32,7 @@ from .routers.indicators import _register_indicator_routes
 from .routers.infrastructure import _register_infrastructure_routes
 from .routers.lineage import _register_lineage_routes, lineage_service
 from .routers.manual_code_tables import _register_manual_code_table_routes
+from .routers.metadata import _register_metadata_routes  # type: ignore
 from .routers.operation_logs import _register_operation_log_routes
 from .routers.push import _register_push_routes
 from .routers.reports import _register_report_routes
@@ -56,6 +58,7 @@ def create_fastapi_app(
     lineage_service_instance: Any | None = None,
     system_management_service_instance: Any | None = None,
     operation_log_service_instance: Any | None = None,
+    metadata_ingestion_service_instance: Any | None = None,
     upstream_service_instance: Any | None = None,
     push_service_instance: Any | None = None,
 ) -> FastAPI:
@@ -84,6 +87,7 @@ def create_fastapi_app(
     lineage = lineage_service_instance or lineage_service
     system_management = system_management_service_instance or system_management_service
     operation_logs = operation_log_service_instance or operation_log_service
+    metadata_ingestion = metadata_ingestion_service_instance or metadata_ingestion_service
     upstream = upstream_service_instance or upstream_service
     push = push_service_instance or push_service
 
@@ -108,6 +112,7 @@ def create_fastapi_app(
     _register_report_routes(app, report)
     _register_api_asset_routes(app, api_asset)
     _register_lineage_routes(app, lineage)
+    _register_metadata_routes(app, metadata_ingestion)
     _register_system_management_routes(app, system_management)
     _register_operation_log_routes(app, operation_logs)
     _register_upstream_routes(app, upstream)

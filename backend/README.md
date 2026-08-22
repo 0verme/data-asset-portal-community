@@ -2,7 +2,7 @@
 
 > 说明：本文件保留为后端补充说明。项目主文档请优先查看根目录 `README.md`，开发与部署请优先查看根目录 `DEVELOPMENT.md`、`DEPLOYMENT.md`。
 
-后端唯一通过 `uvicorn backend.asgi:app` 运行 FastAPI Native；Auth、Community native API 与 infrastructure routes 由 FastAPI 处理，WAIT_DB/Private routes 按当前 scope gate 不注册。Flask compatibility runtime 与 `backend/run.py` 已退休，当前没有 Flask/WSGI fallback。认证与数据统一使用 database profile，演示用的 mock 数据位于前端（`VITE_API_MODE=mock`）。Community/Optional 边界仍是当前事实，移除工作由 [#116](https://github.com/0verme/data-asset-portal-community/issues/116) 负责。
+后端唯一通过 `uvicorn backend.asgi:app` 运行 FastAPI Native；所有仓库模块 route 与 infrastructure routes 由 FastAPI 处理，外部 database/credential/storage readiness 通过 Service error contract 表达。Flask compatibility runtime 与 `backend/run.py` 已退休，当前没有 Flask/WSGI fallback。认证与数据统一使用 database profile，演示用的 mock 数据位于前端（`VITE_API_MODE=mock`）。外部元数据通过 [Metadata Ingestion Contract](../docs/metadata-ingestion.md) 的 `/api/metadata` 接入，Collector 不直接依赖 DAP 内部 schema。
 
 ## 安装
 

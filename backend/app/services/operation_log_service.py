@@ -224,6 +224,21 @@ class OperationLogService:
             raise OperationLogNotFoundError(f"Operation log not found: {log_id}")
         return self._row_to_log(rows[0])
 
+    def get_batch_log(self, batch_id: str) -> dict | None:
+        """Return the latest audit row for an ingestion/batch identifier."""
+        value = str(batch_id or "").strip()
+        if not value:
+            return None
+        statement = (
+            select(*self._columns())
+            .select_from(operation_log)
+            .where(operation_log.c.operation_object == value)
+            .order_by(operation_log.c.created_at.desc(), operation_log.c.id.desc())
+            .limit(1)
+        )
+        rows = self._fetch_rows(statement)
+        return self._row_to_log(rows[0]) if rows else None
+
     @staticmethod
     def _is_sensitive_field(name) -> bool:
         return "".join(char for char in str(name).lower() if char.isalnum()) in SENSITIVE_FIELD_NAMES

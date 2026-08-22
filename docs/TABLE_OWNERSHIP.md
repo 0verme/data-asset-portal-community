@@ -4,7 +4,7 @@
 
 ## Canonical baseline
 
-`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0003_open_repository_modules` 共同覆盖以下 36 张 canonical tables：
+`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0004_metadata_ingestion_identity` 共同覆盖以下 36 张 canonical tables：
 
 | Owner | Tables |
 | --- | --- |
@@ -21,13 +21,13 @@
 | codeTable | `p_manual_code_table` |
 | lineage | `p_lineage_snapshot`, `p_lineage_node`, `p_lineage_edge` |
 
-四方言保持相同的 table/column/primary-key/unique/foreign-key/index inventory；类型使用各数据库的等价表示。`p_push_system.master_system_id` 关联 shared `p_system`，用于复用现有 Push Service 的 master-system contract。
+四方言保持相同的 table/column/primary-key/unique/foreign-key/index inventory；类型使用各数据库的等价表示。`p_asset_table` 的 source-scoped identity columns 与 `uq_p_asset_ingestion_identity` unique constraint 由 #114 contract mapping 使用，不能作为外部 Collector 的 wire shape。`p_push_system.master_system_id` 关联 shared `p_system`，用于复用现有 Push Service 的 master-system contract。
 
 ## Lineage storage boundary
 
 `lineage` 模块、持久化 storage 和外部 collector 是三个不同概念：
 
-- `p_lineage_snapshot`、`p_lineage_node`、`p_lineage_edge` 是仓库自身的 canonical storage，由 baseline 和 forward migration 创建；
+- `p_lineage_snapshot`、`p_lineage_node`、`p_lineage_edge` 是仓库自身的 canonical storage，由 baseline 和 forward migration 创建；其 source/content/ingestion bookkeeping 由 `0004_metadata_ingestion_identity` 维护；
 - `LINEAGE_DB_PROFILE` 选择 persistent storage profile；
 - development/test 未配置 profile 时可以使用受控 POC snapshot；
 - `backend/app/services/lineage_collector.py` 只有在外部 scheduler/source profile 可用时才执行采集，不影响 lineage route 和模块存在性。

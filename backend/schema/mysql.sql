@@ -101,15 +101,19 @@ CREATE TABLE IF NOT EXISTS p_asset_layer (
   is_deleted CHAR(1) NOT NULL DEFAULT 'N'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 CREATE TABLE IF NOT EXISTS p_asset_table (
-  asset_id BIGINT PRIMARY KEY, table_name VARCHAR(256) NOT NULL UNIQUE,
+  asset_id BIGINT PRIMARY KEY, table_name VARCHAR(256) NOT NULL,
   table_cn_name VARCHAR(256), schema_name VARCHAR(128) NOT NULL DEFAULT 'dwp',
-  layer_code VARCHAR(32), domain_code VARCHAR(64), owner_name VARCHAR(128),
-  grain_desc VARCHAR(1000), cycle_desc VARCHAR(1000), table_desc VARCHAR(2000),
-  field_count INTEGER NOT NULL DEFAULT 0, is_deleted CHAR(1) NOT NULL DEFAULT 'N',
+  catalog_name VARCHAR(128), database_name VARCHAR(128),
+  source_key VARCHAR(64), asset_type VARCHAR(64), external_id VARCHAR(256),
+  qualified_name VARCHAR(512), layer_code VARCHAR(32), domain_code VARCHAR(64),
+  owner_name VARCHAR(128), grain_desc VARCHAR(1000), cycle_desc VARCHAR(1000),
+  table_desc VARCHAR(2000), field_count INTEGER NOT NULL DEFAULT 0,
+  is_deleted CHAR(1) NOT NULL DEFAULT 'N',
   created_by VARCHAR(64) NOT NULL DEFAULT 'system',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (source_key, asset_type, external_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 CREATE TABLE IF NOT EXISTS p_asset_field (
   field_id BIGINT PRIMARY KEY, asset_id BIGINT NOT NULL, field_name VARCHAR(256) NOT NULL,
@@ -429,6 +433,9 @@ CREATE TABLE IF NOT EXISTS p_lineage_snapshot (
     generator_name VARCHAR(128) NOT NULL,
     generator_version VARCHAR(64) NOT NULL,
     import_batch_id VARCHAR(128) NOT NULL UNIQUE,
+    source_key VARCHAR(64),
+    content_hash VARCHAR(64),
+    ingestion_id VARCHAR(64),
     status_code VARCHAR(16) NOT NULL,
     CHECK (status_code IN ('ACTIVE', 'INACTIVE'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

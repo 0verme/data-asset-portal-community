@@ -127,14 +127,16 @@ CREATE TABLE IF NOT EXISTS dwp.p_asset_layer (
   is_active TEXT NOT NULL DEFAULT 'Y', is_deleted TEXT NOT NULL DEFAULT 'N'
 );
 CREATE TABLE IF NOT EXISTS dwp.p_asset_table (
-  asset_id INTEGER PRIMARY KEY, table_name TEXT NOT NULL UNIQUE, table_cn_name TEXT,
-  schema_name TEXT NOT NULL DEFAULT 'dwp', layer_code TEXT, domain_code TEXT,
-  owner_name TEXT, grain_desc TEXT, cycle_desc TEXT, table_desc TEXT,
-  field_count INTEGER NOT NULL DEFAULT 0, is_deleted TEXT NOT NULL DEFAULT 'N',
-  created_by TEXT NOT NULL DEFAULT 'system',
+  asset_id INTEGER PRIMARY KEY, table_name TEXT NOT NULL, table_cn_name TEXT,
+  schema_name TEXT NOT NULL DEFAULT 'dwp', catalog_name TEXT, database_name TEXT,
+  source_key TEXT, asset_type TEXT, external_id TEXT, qualified_name TEXT,
+  layer_code TEXT, domain_code TEXT, owner_name TEXT, grain_desc TEXT,
+  cycle_desc TEXT, table_desc TEXT, field_count INTEGER NOT NULL DEFAULT 0,
+  is_deleted TEXT NOT NULL DEFAULT 'N', created_by TEXT NOT NULL DEFAULT 'system',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by TEXT NOT NULL DEFAULT 'system',
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (source_key, asset_type, external_id)
 );
 CREATE TABLE IF NOT EXISTS dwp.p_asset_field (
   field_id INTEGER PRIMARY KEY, asset_id INTEGER NOT NULL, field_name TEXT NOT NULL,
@@ -457,6 +459,9 @@ CREATE TABLE IF NOT EXISTS dwp.p_lineage_snapshot (
     generator_name TEXT NOT NULL,
     generator_version TEXT NOT NULL,
     import_batch_id TEXT NOT NULL UNIQUE,
+    source_key TEXT,
+    content_hash TEXT,
+    ingestion_id TEXT,
     status_code TEXT NOT NULL,
     CHECK (status_code IN ('ACTIVE', 'INACTIVE'))
 );

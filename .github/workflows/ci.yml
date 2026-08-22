@@ -249,7 +249,7 @@ jobs:
           STATUS="$(python backend/scripts/schema_migrate.py status --profile pg_ci --config /tmp/pg-ci-config.yaml)"
           echo "$STATUS"
           case "$STATUS" in
-            *"revision=0003_open_repository_modules"*) : ;;
+            *"revision=0004_metadata_ingestion_identity"*) : ;;
             *) echo "unexpected Alembic migration state"; exit 1 ;;
           esac
 

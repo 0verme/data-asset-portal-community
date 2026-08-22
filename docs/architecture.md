@@ -51,6 +51,7 @@ flowchart LR
 - Report：`/api/reports`
 - API Asset：`/api/api-assets`
 - Lineage：`/api/lineage`
+- Metadata Ingestion：`/api/metadata`（versioned external Asset / Lineage Contract）
 - Auth：`/api/auth`（native signed-session adapter）
 - Capabilities：`/api/capabilities`（native infrastructure adapter）
 - Portal Stats：`/api/portal/stats`（native infrastructure adapter）
@@ -87,6 +88,29 @@ FastAPI adapter ── Application / Service Layer ── Database Provider ─�
 - `backend/app/fastapi/app.py` 负责 FastAPI app bootstrap、explicit Service injection、capability gate 与 Router registration；`dependencies.py`、`errors.py` 和 `routers/` 承载共享 adapter seam 与模块边界。
 - `backend/app/__init__.py` 仅保留 production composition 说明；历史 Flask factory/blueprint 已删除，native package import 不加载 Flask。
 - `backend/app/services/` 和 `backend/app/db/` 是 FastAPI native 复用的业务与数据库边界。
+
+## Metadata Integration Boundary
+
+外部元数据不直接写业务表，而是通过版本化 Contract 进入 FastAPI：
+
+```text
+External Collector / Adapter
+          ↓
+Versioned Metadata Contract
+          ↓
+/api/metadata/assets/ingestions
+/api/metadata/lineage/ingestions
+          ↓
+MetadataIngestionService
+          ↓
+SQLAlchemy Core / Database Provider
+          ↓
+Canonical asset / lineage storage
+```
+
+`backend/app/contracts/metadata_ingestion.py` 是 framework-neutral public DTO；`backend/app/services/metadata_ingestion_service.py` 负责 source identity、normalize、natural key、idempotency、dry-run、bulk limits、transaction、snapshot activation 和 audit summary；`backend/app/fastapi/routers/metadata.py` 只负责 auth、request parsing、HTTP status mapping。Collector 不需要知道 `p_asset_*`、`p_lineage_*`、内部 PK、Provider 或 migration。完整字段与语义见 [metadata-ingestion.md](./metadata-ingestion.md) 和 [ADR-001](./adr/001-metadata-ingestion-contract.md)。
+
+V1 lineage 只支持 self-contained `replace` snapshot：新 snapshot 先以 `INACTIVE` 写入，节点/边校验成功后在同一 transaction 内切换 `ACTIVE`。`append`、`merge`、source-specific parser、scheduler 和 connector framework 不属于 DAP Core。
 
 ## Rollback
 
