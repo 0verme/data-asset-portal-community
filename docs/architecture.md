@@ -37,18 +37,18 @@ flowchart LR
   F -.->|"mock"| M["Controlled demo data"]
 ```
 
-`backend/app/fastapi/app.py` 根据 capability map 注册 native routers；`backend/asgi.py` 只负责 FastAPI composition、CORS/security headers 和 healthz。WAIT_DB/Private routes 不注册，不通过第二套 runtime 承载。
+`backend/app/fastapi/app.py` 统一注册仓库 native routers；`backend/asgi.py` 只负责 FastAPI composition、CORS/security headers 和 healthz。数据库、驱动、凭据、storage 或 external integration readiness 不改变已存在 route 的注册状态。
 
 ### FastAPI current route surface
 
-当前 FastAPI adapter 负责下列 native routes；带 `*` 的模块源码与 adapter 已存在，但仍受当前 profile / capability 控制，Community 默认不会注册：
+当前 FastAPI adapter 负责下列 native routes；所有仓库模块默认注册，实例菜单可见性与外部 readiness 在更上层/Service contract 中单独表达：
 
 - Indicator：`/api/indicators`
 - Assets / DWM：`/api/assets`
 - Field Mapping：`/api/field-mappings`
 - Root：`/api/roots`
-- Manual Code Table*：`/api/manual-code-tables`
-- Report*：`/api/reports`
+- Manual Code Table：`/api/manual-code-tables`
+- Report：`/api/reports`
 - API Asset：`/api/api-assets`
 - Lineage：`/api/lineage`
 - Auth：`/api/auth`（native signed-session adapter）
@@ -57,19 +57,20 @@ flowchart LR
 - Unified Search：`/api/search`（native infrastructure adapter）
 - System Management：`/api/system`
 - Operation Log：`/api/operation-logs`
-- Upstream*：`/api/upstreams`
+- Upstream：`/api/upstreams`
+- Push：`/api/push`
 
 模块级 parity 和 migration 状态见 [FastAPI P4 Migration Matrix](./fastapi-p4-migration-matrix.md)。
 
 ### Scope exclusions
 
-以下路径在 Community Native runtime 中按 gate 不注册：
+以下路径不属于当前 native module route contract：
 
-- Common Code：`/api/common-codes/*`（WAIT_DB）
-- Indicator Path、Common Code、Push（WAIT_DB/Private boundary）
-- 任何未注册的请求返回 FastAPI `NOT_FOUND` envelope
+- Common Code：`/api/common-codes/*`（WAIT_DB，保留为后续基础设施边界）
+- Indicator Path：当前没有独立 native route
+- 任何真正不存在的请求返回 FastAPI `NOT_FOUND` envelope；外部依赖缺失的已注册模块使用 service error contract。
 
-Community profile 的 disabled/private 路径不会因为 runtime 收口而意外暴露。
+仓库模块不会因为 runtime profile 名称而意外隐藏；实例菜单 status 仍可控制导航可见性。
 
 ## Application Boundary
 

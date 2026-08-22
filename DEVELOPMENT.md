@@ -137,7 +137,7 @@ FLASK_ENV=development
 - `FLASK_DEBUG` 默认关闭；仅 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会启用它。不要在共享或生产环境设置它。
 - `FLASK_SECRET_KEY` 在所有环境均为必填项；缺失、空字符串或纯空白会使应用在启动时失败。用密码管理器或部署平台的 secret store 保存它，不要提交到仓库、写入日志，或把真实值粘贴进命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`，然后直接保存到 secret store / `.env.local`。
 - `FLASK_ENV` 默认为安全的生产行为：Cookie 使用 `Secure=True`。本地 HTTP 联调必须显式设置 `FLASK_ENV=development`，此时 `Secure=False`；`HttpOnly=True` 与 `SameSite=Lax` 始终保留。
-- `backend/asgi.py` 运行纯 FastAPI Native backend；Auth 保留既有 signed-session cookie format，WAIT_DB/Private routes 按当前 scope gate 不注册。Flask compatibility runtime 已退休；`FLASK_*` 变量名仅作为 retained signed-cookie/security configuration contract，不代表 Flask 进程。
+- `backend/asgi.py` 运行纯 FastAPI Native backend；Auth 保留既有 signed-session cookie format，仓库已有模块 routes 默认注册，数据库/驱动/外部依赖 readiness 通过 error contract 表达。Flask compatibility runtime 已退休；`FLASK_*` 变量名仅作为 retained signed-cookie/security configuration contract，不代表 Flask 进程。
 - Nginx + Vite 的 `/api` 反代是同源部署，不需要 CORS。只有前端和 API 确实处于不同来源时，才设置 `FLASK_CORS_ORIGINS`，使用逗号分隔的完整来源，例如 `https://portal.example.com,https://admin.example.com`；空项会忽略，未配置时不发送跨域允许头，绝不使用 `*`。
 
 ## 环境文件加载顺序
@@ -183,11 +183,11 @@ python demo/seed_postgres.py --dialect postgres
 
 MySQL 8.0 先执行 `pip install -r backend/requirements-mysql.txt`，再使用 `community_mysql` profile 执行 `schema_migrate.py apply`；真实 CRUD、分页、唯一约束、中文/emoji、NULL 和 rollback 由 CI MySQL 8 integration job 验证。既有数据库先 `verify`，只有与 baseline 契约一致时才允许 `baseline` stamp；后续结构变更只走 Alembic forward revision。
 
-### Full / module-specific / external dependency 路径
+### 方言参考 / external dependency 路径
 
-`docs/pg/` 与 `docs/dws/` 是完整部署或扩展模块的补充 DDL，不是 Community/local 新库的默认入口。它们按模块提供 PostgreSQL、GaussDB/DWS 的核心兼容 DDL、当前 Community baseline 未创建的 Optional 表以及 persistent lineage 表；只有选择对应 full/extension profile、确认外部依赖和目标数据库后，才按 SQL 文件说明用 `psql -f` / `gsql -f` 执行。不要把所有 SQL 无条件应用到 Community 数据库。
+`docs/pg/` 与 `docs/dws/` 是 PostgreSQL、GaussDB/DWS 的方言参考、历史兼容 DDL 和 external integration 说明，不是隐藏仓库模块的产品边界，也不是 local 新库的默认入口。需要 vendor-specific DDL 或 external storage/collector 时，确认 profile、依赖和目标数据库后再按 SQL 文件说明执行。
 
-Community profile 当前仍禁用 `upstream`、`push`、`report`、`codeTable`，以及依赖外部 profile 的 persistent lineage；该 runtime/schema/seed boundary 的移除属于 [#116](https://github.com/0verme/data-asset-portal-community/issues/116)，本 Issue 不改变它。
+所有仓库模块的 runtime/schema/seed 默认 contract 已统一；persistent lineage 需要 `LINEAGE_DB_PROFILE`，development/test 未配置时使用受控 POC，实例菜单可见性仍由 `p_menu.status` 管理。
 
 > 🚫 仓库不再包含整库快照（`app-*-init-data.sql` 与 `docs/*/sample/*.sql` 已从公开树移除）。
 > 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。
