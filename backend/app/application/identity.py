@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from typing import Any, Mapping
+from typing import Any
 
 
 ADMIN_ROLE = "admin"
@@ -37,16 +38,9 @@ def identity_from_mapping(value: Mapping[str, Any] | None) -> Identity | None:
 
 
 def identity_for_session(value: Mapping[str, Any] | None) -> Identity:
-    """Normalize a successful login result for the legacy session format.
-
-    The existing Flask implementation defaults unknown roles to ``admin``.
-    Keeping that behavior here makes the rule explicit and reusable by a
-    future adapter without changing current authentication semantics.
-    """
+    """Normalize a successful login result without upgrading unknown roles."""
     if not isinstance(value, Mapping):
         value = {}
-    role = value.get("role")
-    if role not in MAINTENANCE_ROLES:
-        role = ADMIN_ROLE
+    role = str(value.get("role") or "").strip().lower()
     user = value.get("user") or None
-    return Identity(role=str(role), user=user, name=value.get("name") or user)
+    return Identity(role=role, user=user, name=value.get("name") or user)

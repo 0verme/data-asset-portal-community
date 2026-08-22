@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import FastAPI  # pyright: ignore[reportAttributeAccessIssue]
 
+from ..authorization.core import AuthorizationService
 from ..core.capabilities import resolve_capabilities
 from ..services.api_asset_service import api_asset_service
 from ..services.assets_service import assets_service
@@ -13,7 +14,9 @@ from ..services.auth_service import auth_service
 from ..services.field_mapping_service import field_mapping_service
 from ..services.indicator_service import indicator_service
 from ..services.manual_code_table_service import manual_code_table_service
-from ..services.metadata_ingestion_service import metadata_ingestion_service  # type: ignore
+from ..services.metadata_ingestion_service import (
+    metadata_ingestion_service,  # type: ignore
+)
 from ..services.operation_log_service import operation_log_service
 from ..services.portal_service import portal_service
 from ..services.push_service import push_service
@@ -61,6 +64,8 @@ def create_fastapi_app(
     metadata_ingestion_service_instance: Any | None = None,
     upstream_service_instance: Any | None = None,
     push_service_instance: Any | None = None,
+    authorization_repository_instance: Any | None = None,
+    authorization_service_instance: Any | None = None,
 ) -> FastAPI:
     """Create the FastAPI primary application for migrated API prefixes.
 
@@ -75,6 +80,11 @@ def create_fastapi_app(
         identity_resolver=app.state.identity_resolver,
     )
     auth = auth_service_instance or auth_service
+    authorization_service = authorization_service_instance or AuthorizationService(
+        authorization_repository_instance
+    )
+    app.state.authorization_service = authorization_service
+    app.state.authorization_repository = authorization_service.repository
     portal_stats = portal_service_instance or portal_service
     search = search_provider_instance or search_provider
     indicator = indicator_service_instance or indicator_service

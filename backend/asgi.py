@@ -9,6 +9,7 @@ import os
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from backend.app.authorization.repository import DatabaseAuthorizationRepository
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi.auth import get_native_session_identity
 from backend.app.fastapi_app import create_fastapi_app
@@ -88,6 +89,7 @@ def create_native_app(
     native_app = fastapi_application or create_fastapi_app(
         capabilities=effective_capabilities,
         identity_resolver=get_native_session_identity,
+        authorization_repository_instance=DatabaseAuthorizationRepository(),
     )
 
     @native_app.get("/healthz")

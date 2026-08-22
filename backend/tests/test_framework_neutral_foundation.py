@@ -1,12 +1,13 @@
 """Regression tests for the framework-neutral P1 foundation."""
 
+# pyright: reportMissingImports=false
+
 from __future__ import annotations
 
 import unittest
 from pathlib import Path
 
 from backend.app.application import (
-    ADMIN_ROLE,
     ApplicationError,
     AuthenticationRequiredError,
     Identity,
@@ -26,11 +27,14 @@ class FrameworkNeutralIdentityTests(unittest.TestCase):
         self.assertIsNone(identity_from_mapping({"role": "viewer", "user": "alice"}))
         self.assertIsNone(identity_from_mapping(None))
 
-    def test_session_normalization_preserves_legacy_admin_fallback(self):
+    def test_session_normalization_does_not_upgrade_unknown_role(self):
         identity = identity_for_session({"role": "future-role", "user": "alice"})
-        self.assertEqual(ADMIN_ROLE, identity.role)
+        self.assertEqual("future-role", identity.role)
         self.assertEqual("alice", identity.user)
-        self.assertEqual({"role": "admin", "user": "alice", "name": "alice"}, identity.as_dict())
+        self.assertEqual(
+            {"role": "future-role", "user": "alice", "name": "alice"},
+            identity.as_dict(),
+        )
 
     def test_request_context_enforces_auth_without_flask_context(self):
         anonymous = RequestContext()
