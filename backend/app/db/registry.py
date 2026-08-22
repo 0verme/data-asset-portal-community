@@ -28,7 +28,7 @@ def register_builtin_providers(*, replace: bool = False):
     from .providers import BUILTIN_PROVIDERS
 
     for provider in BUILTIN_PROVIDERS:
-        register_provider(provider, replace=replace)
+        register_provider(provider, replace=replace)  # pyright: ignore[reportArgumentType]
 
 
 def _load_entry_points():
@@ -41,7 +41,7 @@ def _load_entry_points():
     for entry_point in metadata.entry_points(group=ENTRY_POINT_GROUP):
         loaded = entry_point.load()
         provider = loaded() if isinstance(loaded, type) else loaded
-        register_provider(provider)
+        register_provider(provider)  # pyright: ignore[reportArgumentType]
 
 
 def get_provider(name: str) -> DatabaseBackendProvider:
@@ -62,14 +62,13 @@ def available_provider_names() -> tuple[str, ...]:
     return tuple(sorted({provider.name for provider in _PROVIDERS.values()}))
 
 
-def available_adapter_names(edition: str) -> tuple[str, ...]:
-    _load_entry_points()
-    from .providers import BUILTIN_PROVIDERS
+def available_adapter_names() -> tuple[str, ...]:
+    """Return all registered database adapters.
 
-    names = tuple(provider.name for provider in BUILTIN_PROVIDERS)
-    if edition == "community":
-        return tuple(name for name in names if name != "gaussdb")
-    return names
+    Provider and driver readiness is a deployment capability; it is never
+    reduced by a repository module profile.
+    """
+    return available_provider_names()
 
 
 def clear_registry_for_tests():

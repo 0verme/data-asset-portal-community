@@ -14,7 +14,8 @@
 
 /**
  * Frontend module registry — single source for module codes, paths, and
- * default enable flags. Codes match backend capabilities and menu codes.
+ * open-by-default module metadata. Codes match backend capabilities and menu
+ * codes; instance menu status is applied by the navigation layer.
  */
 
 export const MODULE_REGISTRY = [
@@ -174,58 +175,17 @@ export function getModuleByPathPrefix(topSegment) {
 }
 
 /**
- * Default enabled set for mock mode / offline fallbacks.
- * Respects VITE_ENABLED_MODULES when set (comma-separated or "all").
+ * Default module set for mock mode and offline capability fallbacks.
+ * There is no frontend module allowlist; every registered module is open.
  */
-export function resolveDefaultEnabledModules(envValue = import.meta.env?.VITE_ENABLED_MODULES) {
-  const raw = String(envValue ?? "").trim();
-  if (!raw || raw.toLowerCase() === "all") {
-    return new Set(
-      MODULE_REGISTRY.filter((item) => item.enabledByDefault).map((item) => item.code),
-    );
-  }
-  const requested = raw
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-  const known = new Set(listModuleCodes());
-  const enabled = new Set(requested.filter((code) => known.has(code)));
-
-  // Auto-disable dependents when a required module is missing (mirror backend).
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const item of MODULE_REGISTRY) {
-      if (!enabled.has(item.code)) continue;
-      for (const req of item.requires || []) {
-        if (!enabled.has(req)) {
-          enabled.delete(item.code);
-          changed = true;
-          break;
-        }
-      }
-    }
-  }
-  // portal is always available for the shell.
-  enabled.add("portal");
-  return enabled;
+export function resolveDefaultEnabledModules() {
+  return new Set(
+    MODULE_REGISTRY.filter((item) => item.enabledByDefault).map((item) => item.code),
+  );
 }
 
-export function isModuleEnabled(code, enabledSet) {
-  if (!enabledSet) return true;
-  return enabledSet.has(code);
-}
-
-export function filterMenusByCapabilities(menus, enabledSet) {
-  if (!Array.isArray(menus)) return [];
-  if (!enabledSet) return menus;
-  return menus.filter((item) => {
-    const code = item?.code;
-    if (!code) return false;
-    // Unknown menu codes (custom) pass through; known registry codes need capability.
-    if (!BY_CODE.has(code)) return true;
-    return enabledSet.has(code);
-  });
+export function isModuleEnabled(code) {
+  return BY_CODE.has(code);
 }
 
 export function validateModuleRegistry() {

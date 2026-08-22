@@ -1,4 +1,6 @@
-"""Private GaussDB JDBC adapter with explicit optional dependencies."""
+"""GaussDB JDBC adapter with explicit optional dependencies."""
+
+# pyright: reportMissingImports=false
 
 from __future__ import annotations
 

@@ -18,13 +18,13 @@ Public surface for HTTP / portal read path (reader only)::
 
     from backend.app.services.lineage import get_bootstrap, get_subgraph, ...
 
-Private collector (scheduler metadata → snapshot) is NOT re-exported here.
-Import it only from scripts or private tooling::
+External collector (scheduler metadata → snapshot) is NOT re-exported here.
+Import it only from scripts or deployment tooling::
 
     from backend.app.services.lineage_collector import collect_and_publish
 
 This separation ensures Community/read-only deployments can keep snapshot
-reading without shipping or importing the private job/program collector.
+reading without shipping or importing the external job/program collector.
 """
 
 from .reader import (

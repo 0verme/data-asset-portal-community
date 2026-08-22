@@ -235,3 +235,260 @@ CREATE TABLE IF NOT EXISTS dwp.p_indicator_change_log (
   operator_name TEXT NOT NULL DEFAULT 'system',
   change_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Open repository modules: upstream, push, report, manual code tables, lineage.
+CREATE TABLE IF NOT EXISTS dwp.p_upstream_system (
+    system_pk INTEGER PRIMARY KEY,
+    data_source_id INTEGER,
+    system_id TEXT NOT NULL UNIQUE,
+    system_abbr TEXT NOT NULL,
+    system_name TEXT NOT NULL,
+    db_type TEXT NOT NULL,
+    host_name TEXT NOT NULL,
+    db_name TEXT,
+    schema_name TEXT,
+    status_code TEXT NOT NULL DEFAULT 'enabled',
+    owner_name TEXT,
+    dept_name TEXT,
+    system_desc TEXT,
+    unload_count INTEGER NOT NULL DEFAULT 0,
+    is_deleted TEXT NOT NULL DEFAULT 'N',
+    created_by TEXT NOT NULL DEFAULT 'system',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT NOT NULL DEFAULT 'system',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (data_source_id) REFERENCES p_data_source(source_id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_upstream_system_data_source
+    ON p_upstream_system (data_source_id);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_upstream_system_ix_01
+    ON p_upstream_system (status_code, db_type);
+
+CREATE TABLE IF NOT EXISTS dwp.p_upstream_unload_time (
+    time_pk INTEGER PRIMARY KEY,
+    system_pk INTEGER NOT NULL,
+    unload_time TEXT NOT NULL,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    is_deleted TEXT NOT NULL DEFAULT 'N',
+    created_by TEXT NOT NULL DEFAULT 'system',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT NOT NULL DEFAULT 'system',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(system_pk, unload_time),
+    FOREIGN KEY (system_pk) REFERENCES p_upstream_system(system_pk) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_upstream_unload_time_ix_01
+    ON p_upstream_unload_time (system_pk, display_order);
+
+CREATE TABLE IF NOT EXISTS dwp.p_upstream_change_log (
+    change_id INTEGER PRIMARY KEY,
+    system_pk INTEGER,
+    system_id TEXT NOT NULL,
+    change_type TEXT NOT NULL,
+    change_summary TEXT,
+    before_json TEXT,
+    after_json TEXT,
+    operator_name TEXT NOT NULL DEFAULT 'system',
+    change_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_upstream_change_log_ix_01
+    ON p_upstream_change_log (system_id, change_time);
+
+CREATE TABLE IF NOT EXISTS dwp.p_push_system (
+    system_id INTEGER PRIMARY KEY,
+    master_system_id INTEGER,
+    system_code TEXT NOT NULL UNIQUE,
+    system_name TEXT NOT NULL,
+    system_abbr TEXT NOT NULL,
+    protocol_type TEXT NOT NULL,
+    host_name TEXT NOT NULL,
+    port_no INTEGER NOT NULL,
+    account_name TEXT,
+    auth_type TEXT,
+    contact_name TEXT,
+    data_developer_contact_name TEXT,
+    dept_name TEXT,
+    system_desc TEXT,
+    status_code TEXT NOT NULL DEFAULT 'enabled',
+    importance_level_code TEXT NOT NULL DEFAULT 'normal',
+    latest_output_time TEXT,
+    job_count INTEGER NOT NULL DEFAULT 0,
+    is_deleted TEXT NOT NULL DEFAULT 'N',
+    created_by TEXT NOT NULL DEFAULT 'system',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT NOT NULL DEFAULT 'system',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (master_system_id) REFERENCES p_system(system_id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_push_system_master
+    ON p_push_system (master_system_id);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_push_system_ix_01
+    ON p_push_system (status_code, protocol_type, dept_name);
+
+CREATE TABLE IF NOT EXISTS dwp.p_push_job (
+    job_id INTEGER PRIMARY KEY,
+    system_id INTEGER NOT NULL,
+    job_code TEXT NOT NULL,
+    job_name TEXT NOT NULL,
+    source_path TEXT,
+    source_file_name TEXT,
+    target_path TEXT,
+    target_file_name TEXT NOT NULL,
+    freq_desc TEXT,
+    freq_type TEXT,
+    delimiter_code TEXT,
+    encoding_type TEXT,
+    row_count_desc TEXT,
+    enabled_flag TEXT NOT NULL DEFAULT 'Y',
+    job_desc TEXT,
+    field_count INTEGER NOT NULL DEFAULT 0,
+    is_deleted TEXT NOT NULL DEFAULT 'N',
+    created_by TEXT NOT NULL DEFAULT 'system',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT NOT NULL DEFAULT 'system',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(system_id, job_code),
+    FOREIGN KEY (system_id) REFERENCES p_push_system(system_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_push_job_ix_01
+    ON p_push_job (system_id, enabled_flag, freq_type);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_push_job_ix_02
+    ON p_push_job (system_id, is_deleted, job_code);
+
+CREATE TABLE IF NOT EXISTS dwp.p_push_job_field (
+    field_id INTEGER PRIMARY KEY,
+    job_id INTEGER NOT NULL,
+    field_name TEXT NOT NULL,
+    field_cn_name TEXT NOT NULL,
+    field_order INTEGER NOT NULL DEFAULT 0,
+    source_code TEXT,
+    data_type TEXT NOT NULL,
+    field_meaning TEXT,
+    is_deleted TEXT NOT NULL DEFAULT 'N',
+    created_by TEXT NOT NULL DEFAULT 'system',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT NOT NULL DEFAULT 'system',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(job_id, field_name),
+    FOREIGN KEY (job_id) REFERENCES p_push_job(job_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_push_job_field_ix_01
+    ON p_push_job_field (job_id, field_order);
+
+CREATE TABLE IF NOT EXISTS dwp.p_push_change_log (
+    change_id INTEGER PRIMARY KEY,
+    system_id INTEGER,
+    job_id INTEGER,
+    object_type TEXT NOT NULL,
+    object_code TEXT NOT NULL,
+    change_type TEXT NOT NULL,
+    change_summary TEXT,
+    before_json TEXT,
+    after_json TEXT,
+    operator_name TEXT NOT NULL DEFAULT 'system',
+    change_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    trace_id TEXT
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_push_change_log_ix_01
+    ON p_push_change_log (system_id, change_time);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_push_change_log_ix_02
+    ON p_push_change_log (job_id, change_time);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_push_change_log_ix_03
+    ON p_push_change_log (object_type, object_code, change_time);
+
+CREATE TABLE IF NOT EXISTS dwp.p_report_asset (
+    report_pk INTEGER PRIMARY KEY,
+    report_code TEXT NOT NULL UNIQUE,
+    report_name TEXT NOT NULL,
+    report_alias TEXT,
+    report_type TEXT NOT NULL,
+    domain_name TEXT,
+    freq_code TEXT,
+    stat_period_code TEXT,
+    date_caliber_code TEXT,
+    date_caliber_other_desc TEXT,
+    data_timeliness_code TEXT,
+    data_timeliness_custom_desc TEXT,
+    status_code TEXT NOT NULL DEFAULT 'enabled',
+    effective_date TEXT,
+    expire_date TEXT,
+    purpose_desc TEXT,
+    stat_object_desc TEXT,
+    stat_scope_desc TEXT,
+    time_caliber_desc TEXT,
+    filter_condition_desc TEXT,
+    special_rule_desc TEXT,
+    owner_dept_name TEXT NOT NULL,
+    owner_name TEXT NOT NULL,
+    maintainer_name TEXT,
+    related_tables_json TEXT NOT NULL DEFAULT '[]',
+    related_indicators_json TEXT NOT NULL DEFAULT '[]',
+    remark_desc TEXT,
+    is_deleted TEXT NOT NULL DEFAULT 'N',
+    created_by TEXT NOT NULL DEFAULT 'system',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT NOT NULL DEFAULT 'system',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_report_asset_ix_01
+    ON p_report_asset (status_code, report_type, domain_name);
+
+CREATE TABLE IF NOT EXISTS dwp.p_manual_code_table (
+    table_id INTEGER PRIMARY KEY,
+    table_code TEXT NOT NULL UNIQUE,
+    table_name TEXT NOT NULL,
+    table_style TEXT NOT NULL,
+    owner_name TEXT,
+    status_code TEXT NOT NULL DEFAULT 'active',
+    remark TEXT,
+    created_by TEXT NOT NULL DEFAULT 'system',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT NOT NULL DEFAULT 'system',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (table_style IN ('enum', 'dim', 'status', 'map', 'custom')),
+    CHECK (status_code IN ('active', 'draft', 'disabled'))
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_manual_code_table_filter
+    ON p_manual_code_table (table_style, status_code, updated_at);
+
+CREATE TABLE IF NOT EXISTS dwp.p_lineage_snapshot (
+    snapshot_id TEXT PRIMARY KEY,
+    generated_at TIMESTAMP NOT NULL,
+    generator_name TEXT NOT NULL,
+    generator_version TEXT NOT NULL,
+    import_batch_id TEXT NOT NULL UNIQUE,
+    status_code TEXT NOT NULL,
+    CHECK (status_code IN ('ACTIVE', 'INACTIVE'))
+);
+CREATE TABLE IF NOT EXISTS dwp.p_lineage_node (
+    snapshot_id TEXT NOT NULL,
+    node_id TEXT NOT NULL,
+    kind_code TEXT NOT NULL,
+    node_name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    namespace_name TEXT NOT NULL,
+    attributes_json TEXT NOT NULL,
+    PRIMARY KEY (snapshot_id, node_id),
+    FOREIGN KEY (snapshot_id) REFERENCES p_lineage_snapshot(snapshot_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_lineage_node_lookup
+    ON p_lineage_node (snapshot_id, kind_code, node_name);
+CREATE TABLE IF NOT EXISTS dwp.p_lineage_edge (
+    snapshot_id TEXT NOT NULL,
+    edge_id TEXT NOT NULL,
+    source_node_id TEXT NOT NULL,
+    target_node_id TEXT NOT NULL,
+    kind_code TEXT NOT NULL,
+    evidence_type TEXT NOT NULL,
+    source_record_id TEXT NOT NULL,
+    evidence_description TEXT NOT NULL,
+    confidence_code TEXT NOT NULL,
+    generated_at TIMESTAMP NOT NULL,
+    diagnostics_json TEXT NOT NULL,
+    PRIMARY KEY (snapshot_id, edge_id),
+    FOREIGN KEY (snapshot_id) REFERENCES p_lineage_snapshot(snapshot_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_lineage_edge_source
+    ON p_lineage_edge (snapshot_id, source_node_id);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_lineage_edge_target
+    ON p_lineage_edge (snapshot_id, target_node_id);

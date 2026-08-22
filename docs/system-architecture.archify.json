@@ -28,7 +28,7 @@
         "id": "current-boundaries",
         "label": "当前配置边界",
         "focus": ["asgi-runtime", "fastapi", "capability", "session-contract"],
-        "note": "Community capability gate 与保留的 signed-session/security configuration contract 是当前配置事实；Edition/Optional gating removal 延后至 #116。"
+        "note": "仓库模块默认 open；signed-session/security configuration、database profile 和 external integration readiness 是独立部署能力，菜单 status 是实例可见性。"
       }
     ]
   },
@@ -174,7 +174,7 @@
       "title": "Data and Boundaries",
       "items": [
         "Community/local 使用 backend/schema baseline + Alembic forward revisions + seed；docs/pg 与 docs/dws 是 full/extension 补充 DDL。",
-        "Community profile 当前仍 gate WAIT_DB 与 Optional module routes；Edition/Optional gating removal 由 #116 负责。"
+        "所有仓库模块 route 默认注册；WAIT_DB、数据库、驱动、凭据和外部 storage 未就绪时由现有 error contract 返回诊断状态。"
       ]
     },
     {

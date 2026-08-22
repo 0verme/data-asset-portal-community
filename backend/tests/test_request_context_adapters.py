@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 
 class RequestContextAdapterTests(unittest.TestCase):
     def setUp(self):
-        self.capabilities = resolve_capabilities(edition="community")
+        self.capabilities = resolve_capabilities()
 
     def test_fastapi_adapter_supplies_operation_log_metadata(self):
         service = OperationLogService()

@@ -37,18 +37,18 @@ flowchart LR
   F -.->|"mock"| M["Controlled demo data"]
 ```
 
-`backend/app/fastapi/app.py` 根据 capability map 注册 native routers；`backend/asgi.py` 只负责 FastAPI composition、CORS/security headers 和 healthz。WAIT_DB/Private routes 不注册，不通过第二套 runtime 承载。
+`backend/app/fastapi/app.py` 统一注册仓库 native routers；`backend/asgi.py` 只负责 FastAPI composition、CORS/security headers 和 healthz。数据库、驱动、凭据、storage 或 external integration readiness 不改变已存在 route 的注册状态。
 
 ### FastAPI current route surface
 
-当前 FastAPI adapter 负责下列 native routes；带 `*` 的模块源码与 adapter 已存在，但仍受当前 profile / capability 控制，Community 默认不会注册：
+当前 FastAPI adapter 负责下列 native routes；所有仓库模块默认注册，实例菜单可见性与外部 readiness 在更上层/Service contract 中单独表达：
 
 - Indicator：`/api/indicators`
 - Assets / DWM：`/api/assets`
 - Field Mapping：`/api/field-mappings`
 - Root：`/api/roots`
-- Manual Code Table*：`/api/manual-code-tables`
-- Report*：`/api/reports`
+- Manual Code Table：`/api/manual-code-tables`
+- Report：`/api/reports`
 - API Asset：`/api/api-assets`
 - Lineage：`/api/lineage`
 - Auth：`/api/auth`（native signed-session adapter）
@@ -57,19 +57,20 @@ flowchart LR
 - Unified Search：`/api/search`（native infrastructure adapter）
 - System Management：`/api/system`
 - Operation Log：`/api/operation-logs`
-- Upstream*：`/api/upstreams`
+- Upstream：`/api/upstreams`
+- Push：`/api/push`
 
 模块级 parity 和 migration 状态见 [FastAPI P4 Migration Matrix](./fastapi-p4-migration-matrix.md)。
 
 ### Scope exclusions
 
-以下路径在 Community Native runtime 中按 gate 不注册：
+以下路径不属于当前 native module route contract：
 
-- Common Code：`/api/common-codes/*`（WAIT_DB）
-- Indicator Path、Common Code、Push（WAIT_DB/Private boundary）
-- 任何未注册的请求返回 FastAPI `NOT_FOUND` envelope
+- Common Code：`/api/common-codes/*`（WAIT_DB，保留为后续基础设施边界）
+- Indicator Path：当前没有独立 native route
+- 任何真正不存在的请求返回 FastAPI `NOT_FOUND` envelope；外部依赖缺失的已注册模块使用 service error contract。
 
-Community profile 的 disabled/private 路径不会因为 runtime 收口而意外暴露。
+仓库模块不会因为 runtime profile 名称而意外隐藏；实例菜单 status 仍可控制导航可见性。
 
 ## Application Boundary
 
@@ -100,11 +101,11 @@ F5 gate 已证明 production native composition 不加载 Flask；F7 已删除 F
 ## 前端与数据层
 
 - `frontend/src/App.jsx` 负责应用编排、登录态和模块路由；`frontend/src/api/` 统一访问 `/api`。
-- `VITE_API_MODE=mock` 使用受控前端演示数据；`remote` 访问真实后端数据库。mock module coverage 与 Community remote capability coverage 可以不同。
-- Schema Source of Truth 是 `backend/schema` 四方言完整 baseline 加 `backend/alembic` 增量 revision；`demo/seed_*.py` 负责 Community 演示数据。
-- `backend/app/db/` 隔离 SQLite、PostgreSQL、MySQL 和 GaussDB/DWS 的 Provider 差异；Community 默认启用的数据库路径由 runtime profile 控制。`docs/pg/`、`docs/dws/` 的扩展 DDL 不自动进入 Community baseline。
+- `VITE_API_MODE=mock` 使用受控前端演示数据；`remote` 访问真实后端数据库。两种模式默认使用同一仓库模块集合，数据和外部执行能力可以不同。
+- Schema Source of Truth 是 `backend/schema` 四方言完整 baseline 加 `backend/alembic` 增量 revision；`demo/seed_*.py` 负责完整仓库模块的虚构演示数据。
+- `backend/app/db/` 隔离 SQLite、PostgreSQL、MySQL 和 GaussDB/DWS 的 Provider 差异；数据库 profile 只表达部署连接能力。`docs/pg/`、`docs/dws/` 是方言参考和部署说明，不再作为隐藏模块的 schema 边界。
 - 正式部署由 Nginx 托管前端静态资源，并将 `/api` 代理到 ASGI runtime；详细环境变量、health check 与 Nginx 配置见 [DEPLOYMENT.md](../DEPLOYMENT.md)。
 
 ## 当前边界与后续 Issue
 
-Community profile 当前仍按 `backend/configs/community.yaml` 保持 `upstream`、`push`、`report`、`codeTable` 的 route/menu/schema 边界，WAIT_DB 路径也继续不注册。#115 只记录这套现状；Edition / Optional runtime gating 的移除属于 [#116](https://github.com/0verme/data-asset-portal-community/issues/116)，本文件不提前描述其目标状态。
+仓库已有模块均默认进入统一的 route、capability、schema、seed、search 和 portal statistics contract。`backend/configs/community.yaml` 仅保留本地演示的数据库/feature profile；`p_menu.status` 仍是实例级可见性配置。WAIT_DB 或外部存储/驱动未配置时，模块 route 仍存在，由现有 Service error contract 返回可诊断状态。

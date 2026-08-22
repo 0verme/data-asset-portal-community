@@ -30,9 +30,9 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
         from backend.asgi import create_native_app
 
         self.create_native_app = create_native_app
-        self.capabilities = resolve_capabilities(edition="community")
+        self.capabilities = resolve_capabilities()
 
-    def test_native_runtime_serves_health_and_community_routes(self):
+    def test_native_runtime_serves_health_and_repository_routes(self):
         runtime = self.create_native_app(capabilities=self.capabilities)
         client = TestClient(runtime)
         health = client.get("/healthz")
@@ -53,7 +53,7 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
         self.assertIn("data", migrated.json())
         capabilities = client.get("/api/capabilities")
         self.assertEqual(200, capabilities.status_code)
-        self.assertEqual("community", capabilities.json()["edition"])
+        self.assertNotIn("edition", capabilities.json())
         self.assertEqual(404, client.get("/api/common-codes/categories").status_code)
 
     def test_native_request_context_is_neutral(self):
@@ -96,7 +96,7 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
         )
         self.assertNotIn("/api/indicator-path/tree", paths)
         self.assertNotIn("/api/common-codes/categories", paths)
-        self.assertNotIn("/api/push/systems", paths)
+        self.assertIn("/api/push/systems", paths)
 
     def test_native_error_mapping_and_cors_security_headers(self):
         runtime = self.create_native_app(capabilities=self.capabilities)

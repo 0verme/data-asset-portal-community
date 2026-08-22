@@ -53,7 +53,7 @@ ASSET_DB_JAR_PATH=/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
 
 ## 二、后端部署
 
-当前生产入口是 `backend.asgi:app`：由 Uvicorn 启动纯 FastAPI native backend。Auth、已迁移 Community API、Capabilities、Portal、Search 与 Operation Log 均由 FastAPI 承载；WAIT_DB/Private routes 按当前 capability scope gate 保持不注册。FastAPI 使用保留历史 signed-session cookie format 的 native codec。
+当前生产入口是 `backend.asgi:app`：由 Uvicorn 启动纯 FastAPI native backend。Auth、Capabilities、Portal、Search、Operation Log 以及仓库已有模块 routes 均由 FastAPI 承载；数据库、驱动、凭据、storage 或外部 integration 未就绪时，由对应 Service error contract 返回诊断状态，不把源码模块变成 404。FastAPI 使用保留历史 signed-session cookie format 的 native codec。
 
 ```bash
 cd /opt/data-asset-portal
@@ -101,11 +101,11 @@ npm run build
 
 ## 四、数据库初始化与迁移
 
-应用启动不会自动迁移 schema。新用户应先选择与部署 profile 对应的 Community baseline，再使用 `schema_migrate.py` 应用 Alembic head；不要把手工模块 DDL 当作默认入口。
+应用启动不会自动迁移 schema。新用户应先选择与部署 profile 对应的 canonical repository baseline，再使用 `schema_migrate.py` 应用 Alembic head；不要把方言参考 DDL 当作默认入口。
 
 ### Community / local 默认路径
 
-`backend/schema/<dialect>.sql` 是四方言 Community baseline，`backend/alembic/versions/` 管理后续 forward revisions，`backend/scripts/schema_migrate.py` 负责 apply、verify、plan 和既有库 baseline stamp。推荐顺序：
+`backend/schema/<dialect>.sql` 是覆盖全部仓库模块的四方言 canonical baseline，`backend/alembic/versions/` 管理后续 forward revisions，`backend/scripts/schema_migrate.py` 负责 apply、verify、plan 和既有库 baseline stamp。推荐顺序：
 
 ```bash
 # SQLite 本地 / Community Demo
@@ -119,13 +119,13 @@ python demo/seed_postgres.py --dialect postgres
 
 既有环境必须先备份并执行 `verify`；只有在 schema 与 baseline 契约一致时才允许 `baseline` stamp，不能用初始化 SQL 覆盖升级。后续结构变更只通过新的 Alembic revision 管理。
 
-### Full / module-specific / external dependency 路径
+### 方言参考 / external dependency 路径
 
-`docs/pg/` 与 `docs/dws/` 保存按模块拆分的 PostgreSQL、GaussDB/DWS 补充 DDL。它们用于需要完整模块表、persistent lineage 或外部数据库依赖的部署场景；其中包含 Community 核心模块的补充/历史兼容 DDL，也包含当前不在 Community baseline 中的 `upstream`、`push`、`report`、`codeTable` 和 lineage 持久化表。它们不是 `backend/schema` + Alembic 的替代，也不是 Community/local 新库的默认路径。
+`docs/pg/` 与 `docs/dws/` 保存按模块拆分的 PostgreSQL、GaussDB/DWS 方言参考、历史兼容 DDL 与外部 storage/collector 说明。它们不是 `backend/schema` + Alembic 的替代，也不是隐藏仓库模块的产品边界。
 
-如果部署确实选择该 full/extension 路径，应先阅读对应 SQL、确认模块 profile 和外部依赖，再使用 `psql -f` 或 `gsql -f` 按模块执行；不要把所有 SQL 无条件应用到 Community 数据库。当前 Community/Optional route、schema 和 seed 边界仍然存在，移除工作属于 [#116](https://github.com/0verme/data-asset-portal-community/issues/116)。
+如果部署需要 vendor-specific DDL 或 external integration，应先阅读对应 SQL、确认 profile 和依赖，再使用 `psql -f` 或 `gsql -f` 按模块执行；不要把所有 SQL 无条件应用到目标数据库。
 
-血缘 persistent 模式还需要配置 `LINEAGE_DB_PROFILE`；Community Demo 默认保持 POC/in-memory 模式，不会因为用户 shell 环境而连接外部数据库。
+persistent lineage 模式需要配置 `LINEAGE_DB_PROFILE`；development/test 未配置时使用受控 POC，Community Demo 会在隔离 SQLite 中准备 demo snapshot 并使用其 profile。
 
 > 🚫 仓库不再包含整库快照（`app-*-init-data.sql` 与 `docs/*/sample/*.sql` 已从公开树移除）；
 > 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。

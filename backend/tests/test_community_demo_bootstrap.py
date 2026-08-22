@@ -87,7 +87,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         )
         self.assertEqual("community_sqlite", environment["ASSET_AUTH_DB_PROFILE"])
         self.assertNotIn("BACKEND_RUNTIME", environment)
-        self.assertEqual("", environment["LINEAGE_DB_PROFILE"])
+        self.assertEqual("community_sqlite", environment["LINEAGE_DB_PROFILE"])
         self.assertEqual("remote", environment["VITE_API_MODE"])
         self.assertEqual("unchanged", environment["KEEP_ME"])
         for key in ("DATABASE_URL", "PGHOST", "PGSERVICE", "MYSQL_HOST", "DB_HOST"):
@@ -102,7 +102,6 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             os.environ,
             {
                 "FLASK_ENV": "production",
-                "ASSET_EDITION": "private",
                 "LINEAGE_DB_PROFILE": "production_lineage",
             },
             clear=False,
@@ -115,6 +114,17 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
                 },
                 lineage_service.lineage_storage_status(),
             )
+
+    def test_production_without_storage_profile_is_explicitly_unavailable(self):
+        lineage_service = importlib.import_module(
+            "backend.app.services.lineage_service"
+        )
+        with patch.dict(
+            os.environ,
+            {"FLASK_ENV": "production", "LINEAGE_DB_PROFILE": ""},
+            clear=False,
+        ), self.assertRaises(lineage_service.LineageConfigurationError):
+            lineage_service.lineage_storage_status()
 
     def test_load_runtime_env_can_preserve_process_owned_values(self):
         settings = importlib.import_module("backend.app.settings")

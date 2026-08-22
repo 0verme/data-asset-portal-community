@@ -34,7 +34,6 @@ class FlaskFreeRuntimeGateTests(unittest.TestCase):
             builtins.__import__ = guarded_import
             os.environ["FLASK_ENV"] = "development"
             os.environ["FLASK_SECRET_KEY"] = "x" * 48
-            os.environ["ASSET_EDITION"] = "community"
 
             from fastapi.testclient import TestClient
             from backend.app.application import current_request_context
@@ -42,7 +41,7 @@ class FlaskFreeRuntimeGateTests(unittest.TestCase):
             from backend.app.fastapi_app import create_fastapi_app
             from backend.asgi import app as module_app, create_native_app
 
-            capabilities = resolve_capabilities(edition="community")
+            capabilities = resolve_capabilities()
             native_app = create_fastapi_app(
                 capabilities=capabilities,
                 identity_resolver=lambda _request: None,

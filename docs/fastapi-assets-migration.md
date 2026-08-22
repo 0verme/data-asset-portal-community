@@ -10,7 +10,7 @@ Assets 已通过 Database Lane 的 DB_READY Gate：相关 SQLAlchemy Core CRUD �
 - table detail、fields、DDL、domains、layers；
 - table create/update、fields update、delete；
 - 复用 `AssetsService`、Pydantic contracts、`RequestContext` 与统一 error mapping；
-- 继续使用 capabilities gate，Community Edition 不注册 private Report/Push 路由。
+- 迁移阶段的 capabilities gate 仅作为历史记录；当前 Report/Push 路由随仓库模块默认注册，外部执行能力由 service error contract 表达。
 
 ## 兼容性与回滚
 

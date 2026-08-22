@@ -140,8 +140,7 @@ password: demo-change-me
 ```bash
 python backend/scripts/schema_migrate.py apply \
   --profile community_sqlite \
-  --config backend/configs/database.community.yaml \
-  --modules portal,dwm,mapping,lineage,root,indicator,apiAsset,system
+  --config backend/configs/database.community.yaml
 python demo/seed_sqlite.py --database <absolute-local-path>/community.sqlite
 ```
 
@@ -171,10 +170,11 @@ npm --prefix frontend run dev
 
 ## 演示数据
 
-- 30 张 DWD / DWM / DWS 主题表
-- 251 个字段、40 个词根、16 个指标和 10 个 API 资产
-- 8 个数据源、48 个字段映射、9 类 / 33 项参数字典
-- 关系数据包含指标路径和有限血缘示例
+- 11 个业务菜单（portal landing page 不占菜单行）
+- 30 张 DWD / DWM / DWS 主题表、251 个字段、40 个词根、16 个指标和 10 个 API 资产
+- 8 个数据源、8 个上游系统、48 个字段映射、9 类 / 33 项参数字典
+- 6 个下游系统、6 个推送作业、8 个报表资产和 3 个手工码值表元数据
+- 关系数据包含指标路径、持久化 lineage snapshot/node/edge 和有限血缘示例
 
 执行 Public Data Guard 可检查演示数据和公开仓库安全边界：
 
@@ -193,9 +193,11 @@ python demo/seed_postgres.py --dialect postgres
 
 请先审阅生成的 SQL，再导入专用数据库。不要把生产连接串、密码或真实数据粘贴到命令、Issue、日志或文档中。
 
-## 当前 Community / Optional 边界
+## 模块与部署能力边界
 
-Community profile 当前禁用 `upstream`、`push`、`report` 和 `codeTable`。这些模块源码仍按 Apache-2.0 License 提供，但当前 runtime 不注册对应路由、菜单或 Community migration 表；这是真实现状，不在 #115 中删除。Edition / Optional runtime gating removal 由 [#116](https://github.com/0verme/data-asset-portal-community/issues/116) 单独处理。
+仓库中的 `portal`、`dwm`、`mapping`、`lineage`、`root`、`indicator`、`report`、`apiAsset`、`upstream`、`push`、`codeTable`、`system` 默认使用同一 open module contract：route、menu/capability、schema、seed、search 和 portal statistics 保持一致。Demo seed 会创建这些模块的 canonical tables 和完全虚构的 metadata。
+
+外部 Collector、实际推送、上游连接、数据库驱动、凭据和 persistent lineage storage 是 deployment/integration capability。它们未配置时，页面/API 展示 metadata、POC 或明确的 not-configured/error state，但不会用 404 隐藏模块。实例管理员仍可通过 `p_menu.status` 配置菜单可见性。
 
 相关文档：
 

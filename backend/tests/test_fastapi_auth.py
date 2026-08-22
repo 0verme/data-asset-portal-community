@@ -32,7 +32,7 @@ class FastApiNativeAuthTests(unittest.TestCase):
         )
         self.environment.start()
         self.addCleanup(self.environment.stop)
-        self.capabilities = resolve_capabilities(edition="community")
+        self.capabilities = resolve_capabilities()
         self.auth_service = MagicMock(spec=AuthService)
         self.operation_logs = MagicMock()
         self.operation_logs.get_logs.return_value = {"items": [], "total": 0}

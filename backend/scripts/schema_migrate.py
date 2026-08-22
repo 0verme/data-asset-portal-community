@@ -34,7 +34,6 @@ def _parser():
     parser.add_argument("--config", help="Path to an existing database profile configuration file.")
     parser.add_argument("--root", type=Path, default=BACKEND / "schema", help=argparse.SUPPRESS)
     parser.add_argument("--version", help="Baseline revision; only 0001_baseline is supported.")
-    parser.add_argument("--modules", default="", help=argparse.SUPPRESS)
     parser.add_argument("--dry-run", action="store_true", help="Validate baseline stamping without writing it.")
     return parser
 
@@ -83,11 +82,8 @@ def _alembic_upgrade(profile: str):
 def main(argv=None):
     args = _parser().parse_args(argv)
     # Mirror native startup: load backend/.env.local using the same environment
-    # profile handling as the runtime, then apply the runtime profile (e.g. community)
-    # variables (ASSET_RUNTIME_PROFILE) configure both the database profile
-    # file and the enabled module set. This keeps the README Community
-    # quick-start commands (`.env.local` + `schema_migrate.py apply`) working
-    # as written in a clean clone.
+    # profile handling as the runtime, then apply the named database profile.
+    # This keeps the local quick-start commands reproducible in a clean clone.
     if args.command != "baseline":
         try:
             from app.settings import load_runtime_env
@@ -102,13 +98,6 @@ def main(argv=None):
             apply_runtime_profile()
         except Exception:
             pass  # offline / non-profile invocations are unaffected
-    modules = [item.strip() for item in args.modules.split(",") if item.strip()]
-    if not modules:
-        # Fall back to the module set the runtime profile declared (e.g.
-        # community.yaml), so `apply --profile community_sqlite` matches the
-        # Community schema contract without repeating the list by hand.
-        declared = (os.getenv("ASSET_ENABLED_MODULES") or "").strip()
-        modules = [item.strip() for item in declared.split(",") if item.strip()]
     if args.offline:
         return _offline(args)
     if not args.profile:

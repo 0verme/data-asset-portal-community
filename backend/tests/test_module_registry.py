@@ -1,27 +1,8 @@
-# Copyright 2025 Jearhe
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 # pyright: reportMissingImports=false
 
-import os
 import unittest
 
-from backend.app.core.capabilities import (
-    REASON_DISABLED_BY_CONFIGURATION,
-    ModuleCapabilityError,
-    resolve_capabilities,
-)
+from backend.app.core.capabilities import capabilities_public_payload, resolve_capabilities
 from backend.app.core.modules import MODULES, list_module_codes, validate_manifest
 
 
@@ -29,122 +10,35 @@ class ModuleManifestTestCase(unittest.TestCase):
     def test_manifest_is_internally_consistent(self):
         validate_manifest()
 
-    def test_real_frontend_codes_present(self):
+    def test_repository_module_codes_are_complete(self):
         expected = {
-            "portal",
-            "dwm",
-            "upstream",
-            "mapping",
-            "lineage",
-            "root",
-            "indicator",
-            "report",
-            "apiAsset",
-            "push",
-            "codeTable",
-            "system",
+            "portal", "dwm", "upstream", "mapping", "lineage", "root",
+            "indicator", "report", "apiAsset", "push", "codeTable", "system",
         }
         self.assertEqual(expected, set(list_module_codes()))
 
-    def test_declared_dependencies(self):
-        self.assertNotIn("upstream", MODULES["mapping"]["requires"])
-        self.assertNotIn("push", MODULES["apiAsset"]["requires"])
+    def test_manifest_has_no_edition_metadata(self):
+        self.assertTrue(all("edition" not in meta for meta in MODULES.values()))
+        self.assertTrue(all(meta["enabled_by_default"] for meta in MODULES.values()))
+
+    def test_mapping_and_api_asset_are_independent(self):
+        self.assertEqual([], MODULES["mapping"]["requires"])
+        self.assertEqual([], MODULES["apiAsset"]["requires"])
 
 
 class ModuleCapabilityResolveTestCase(unittest.TestCase):
-    def test_default_enables_all_modules(self):
-        caps = resolve_capabilities(
-            enabled=None, disabled=[], edition="private", strict=False
-        )
-        self.assertEqual("private", caps["edition"])
-        self.assertEqual(set(list_module_codes()), set(caps["enabled_codes"]))
+    def test_default_capability_opens_every_repository_module(self):
+        capabilities = resolve_capabilities()
+        self.assertEqual(set(list_module_codes()), set(capabilities["enabled_codes"]))
+        self.assertTrue(all(item["enabled"] for item in capabilities["modules"]))
+        self.assertTrue(all(item["reason"] is None for item in capabilities["modules"]))
+        self.assertNotIn("edition", capabilities)
 
-    def test_disabled_list_force_off(self):
-        caps = resolve_capabilities(
-            enabled=None,
-            disabled=["report", "codeTable"],
-            edition="private",
-            strict=False,
-        )
-        by_code = caps["by_code"]
-        self.assertFalse(by_code["report"]["enabled"])
-        self.assertEqual(REASON_DISABLED_BY_CONFIGURATION, by_code["report"]["reason"])
-        self.assertTrue(by_code["dwm"]["enabled"])
-
-    def test_mapping_remains_enabled_when_upstream_off(self):
-        caps = resolve_capabilities(
-            enabled=None,
-            disabled=["upstream"],
-            edition="private",
-            strict=False,
-        )
-        by_code = caps["by_code"]
-        self.assertFalse(by_code["upstream"]["enabled"])
-        self.assertTrue(by_code["mapping"]["enabled"])
-
-    def test_api_asset_remains_enabled_when_push_off(self):
-        caps = resolve_capabilities(
-            enabled=None,
-            disabled=["push"],
-            edition="private",
-            strict=False,
-        )
-        by_code = caps["by_code"]
-        self.assertFalse(by_code["push"]["enabled"])
-        self.assertTrue(by_code["apiAsset"]["enabled"])
-
-    def test_decoupled_modules_are_valid_in_strict_mode(self):
-        caps = resolve_capabilities(
-            enabled=None,
-            disabled=["upstream", "push"],
-            edition="private",
-            strict=True,
-        )
-        self.assertTrue(caps["by_code"]["mapping"]["enabled"])
-        self.assertTrue(caps["by_code"]["apiAsset"]["enabled"])
-
-    def test_unknown_module_in_strict_mode(self):
-        with self.assertRaises(ModuleCapabilityError):
-            resolve_capabilities(
-                enabled=["dwm", "notARealModule"],
-                disabled=[],
-                edition="private",
-                strict=True,
-            )
-
-    def test_enabled_list_restricts_set(self):
-        caps = resolve_capabilities(
-            enabled=["portal", "dwm", "system"],
-            disabled=[],
-            edition="community-test",
-            strict=False,
-        )
-        self.assertEqual({"portal", "dwm", "system"}, set(caps["enabled_codes"]))
-        self.assertFalse(caps["by_code"]["upstream"]["enabled"])
-
-    def test_environment_defaults_used(self):
-        previous = {
-            "ASSET_ENABLED_MODULES": os.getenv("ASSET_ENABLED_MODULES"),
-            "ASSET_DISABLED_MODULES": os.getenv("ASSET_DISABLED_MODULES"),
-            "ASSET_EDITION": os.getenv("ASSET_EDITION"),
-            "ASSET_MODULE_STRICT": os.getenv("ASSET_MODULE_STRICT"),
-            "FLASK_ENV": os.getenv("FLASK_ENV"),
-        }
-        try:
-            os.environ.pop("ASSET_ENABLED_MODULES", None)
-            os.environ["ASSET_DISABLED_MODULES"] = "report"
-            os.environ["ASSET_EDITION"] = "private"
-            os.environ["ASSET_MODULE_STRICT"] = "0"
-            os.environ["FLASK_ENV"] = "production"
-            caps = resolve_capabilities()
-            self.assertFalse(caps["by_code"]["report"]["enabled"])
-            self.assertTrue(caps["by_code"]["dwm"]["enabled"])
-        finally:
-            for key, value in previous.items():
-                if value is None:
-                    os.environ.pop(key, None)
-                else:
-                    os.environ[key] = value
+    def test_public_payload_is_edition_free_and_complete(self):
+        payload = capabilities_public_payload(resolve_capabilities())
+        self.assertNotIn("edition", payload)
+        self.assertEqual(set(list_module_codes()), {item["code"] for item in payload["modules"]})
+        self.assertTrue(all(item["enabled"] for item in payload["modules"]))
 
 
 if __name__ == "__main__":

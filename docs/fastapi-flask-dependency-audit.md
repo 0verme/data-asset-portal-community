@@ -16,7 +16,7 @@
 - `FLASK_SECRET_KEY`、`FLASK_ENV`、`FLASK_CORS_ORIGINS`：历史配置名称仍是 browser/cookie/security contract；实现不导入 Flask。
 - `backend/app/fastapi_app.py`：保留为无 Flask 的薄 import facade，现有 tests/integrations 使用稳定 import path；删除需另行评估公开 import compatibility。
 - `backend/app/application/**`、contracts、services、database provider、FastAPI routers：native/application/database boundary。
-- `common_code_service.py`、`indicator_path_service.py`、`push_service.py`：WAIT_DB/Private source boundary；没有 native route，不因 F7 删除而抢 Database Lane 或改变 edition scope。
+- `common_code_service.py`、`indicator_path_service.py`、`push_service.py`：本文记录的 WAIT_DB/Private source boundary 属于历史迁移审计；当前 native route composition 由 #116 的 open module contract 决定，缺少真实依赖时返回诊断错误。
 
 ## TEST / SECURITY REWRITE
 

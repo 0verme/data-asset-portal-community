@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Render an idempotent PostgreSQL/DWS-compatible Community seed without
-opening a database.
+"""Render an idempotent PostgreSQL/DWS-compatible repository seed.
 
-Community-owned tables only; the canonical column set comes from
-``demo/seed_loader.py`` (aligned with ``backend/schema``).
+The canonical column set comes from ``demo/seed_loader.py`` and
+``backend/schema``; all rows are fictional demo metadata.
 """
+
+# pyright: reportAttributeAccessIssue=false
 
 from __future__ import annotations
 
@@ -55,6 +56,8 @@ def main():
         key_column = {
             "p_system": "system_code",
             "p_data_source": "source_code",
+            "p_lineage_node": "snapshot_id,node_id",
+            "p_lineage_edge": "snapshot_id,edge_id",
         }.get(table, spec["columns"][0])
         print(
             f"INSERT INTO dwp.{table} ({columns}) VALUES\n"

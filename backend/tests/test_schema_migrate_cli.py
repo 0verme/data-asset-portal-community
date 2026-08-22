@@ -15,9 +15,9 @@
 """CLI contract tests for the schema migration command.
 
 The migration CLI mirrors native backend startup by applying the runtime profile
-(ASSET_RUNTIME_PROFILE) so the README Community quick-start commands work as
-written: `schema_migrate.py apply --profile community_sqlite` must resolve the
-profile file and the Community module set without hand-written flags.
+(ASSET_RUNTIME_PROFILE) so the local quick-start commands work as written:
+`schema_migrate.py apply --profile community_sqlite` resolves the profile file
+without a module allowlist.
 """
 
 from __future__ import annotations
@@ -30,13 +30,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from backend.app.db.sqlite_adapter import connect
+from backend.app.migrations.schema import initialize
+
 BACKEND = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND.parent
 
 PYTHON = sys.executable
 MIGRATE = BACKEND / "scripts" / "schema_migrate.py"
 
-COMMUNITY_MODULES = "portal,dwm,mapping,lineage,root,indicator,apiAsset,system"
 
 
 def _run_cli(args, env_extra=None):
@@ -71,7 +73,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
 
             status = _run_cli(["status", "--profile", "fresh", "--config", str(config)])
             self.assertEqual(0, status.returncode, status.stderr)
-            self.assertIn("revision=0002_portable_asset_filter", status.stdout)
+            self.assertIn("revision=0003_open_repository_modules", status.stdout)
             connection = sqlite3.connect(database)
             try:
                 row = connection.execute(
@@ -82,7 +84,53 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 connection.close()
             self.assertEqual(("idx_p_asset_table_filter",), row)
 
-    def test_offline_plan_with_community_modules(self):
+    def test_existing_pre_116_database_upgrades_without_losing_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "legacy.sqlite"
+            config = root / "database.yaml"
+            config.write_text(
+                "profiles:\n  legacy:\n    type: sqlite\n"
+                f"    database: {database.as_posix()}\n",
+                encoding="utf-8",
+            )
+            connection = connect({"type": "sqlite", "database": str(database)})
+            try:
+                self.assertTrue(initialize(connection, {"type": "sqlite", "database": str(database)}, "sqlite"))
+                connection.execute(
+                    "INSERT INTO dwp.p_system "
+                    "(system_id, system_code, system_name, system_abbr, system_type, status_code) "
+                    "VALUES (99, 'LEGACY', 'Legacy system', 'LEG', 'business', 'enabled')"
+                )
+                connection.execute("CREATE INDEX dwp.idx_p_asset_table_filter ON p_asset_table(layer_code, domain_code)")
+                for table in (
+                    "p_lineage_edge", "p_lineage_node", "p_lineage_snapshot", "p_manual_code_table",
+                    "p_report_asset", "p_push_change_log", "p_push_job_field", "p_push_job",
+                    "p_push_system", "p_upstream_change_log", "p_upstream_unload_time", "p_upstream_system",
+                ):
+                    connection.execute(f"DROP TABLE dwp.{table}")
+                connection.execute("UPDATE dwp.alembic_version SET version_num = '0002_portable_asset_filter'")
+                connection.commit()
+            finally:
+                connection.close()
+
+            apply = _run_cli(["apply", "--profile", "legacy", "--config", str(config)])
+            self.assertEqual(0, apply.returncode, apply.stderr)
+            connection = connect({"type": "sqlite", "database": str(database)})
+            try:
+                self.assertEqual(("Legacy system",), connection.execute(
+                    "SELECT system_name FROM dwp.p_system WHERE system_id = 99"
+                ).fetchone())
+                self.assertEqual(("0003_open_repository_modules",), connection.execute(
+                    "SELECT version_num FROM dwp.alembic_version"
+                ).fetchone())
+                self.assertIsNotNone(connection.execute(
+                    "SELECT name FROM dwp.sqlite_master WHERE name = 'p_lineage_snapshot'"
+                ).fetchone())
+            finally:
+                connection.close()
+
+    def test_offline_plan_uses_canonical_repository_schema(self):
         proc = _run_cli(["plan", "--offline", "--dialect", "sqlite"])
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("0001_baseline", proc.stdout)
@@ -93,7 +141,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("verify=ok", proc.stdout)
         self.assertIn("0001_baseline", proc.stdout)
-        self.assertIn("tables=24", proc.stdout)
+        self.assertIn("tables=36", proc.stdout)
 
     def test_offline_verify_includes_mysql_baseline(self):
         proc = _run_cli(["verify", "--offline", "--dialect", "mysql"])
@@ -114,18 +162,10 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
         self.assertNotIn("database.yaml", proc.stderr, proc.stderr)
         self.assertIn("dialect=", proc.stdout, proc.stdout)
 
-    def test_offline_plan_defaults_to_community_modules(self):
-        # Module selection is intentionally ignored after migration squashing:
-        # every fresh database receives the complete Community baseline.
+    def test_offline_plan_uses_the_canonical_repository_baseline(self):
+        # Every fresh database receives the complete repository baseline.
         env = {"ASSET_RUNTIME_PROFILE": "community"}
         proc = _run_cli(["plan", "--offline", "--dialect", "sqlite"], env_extra=env)
-        self.assertEqual(0, proc.returncode, proc.stderr)
-        self.assertIn("0001_baseline", proc.stdout)
-
-    def test_module_list_flag_still_works(self):
-        proc = _run_cli(
-            ["plan", "--offline", "--dialect", "sqlite", "--modules", "apiAsset"]
-        )
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("0001_baseline", proc.stdout)
 

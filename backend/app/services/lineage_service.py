@@ -4,6 +4,8 @@ The daily collector will replace this in-memory snapshot.  The portal owns the
 contract and graph traversal; renderers only receive the resulting subgraph.
 """
 
+# pyright: reportMissingImports=false
+
 from __future__ import annotations
 
 from collections import deque
@@ -85,8 +87,7 @@ def lineage_storage_status():
         return {"mode": "persistent", "profile": profile, "schema": "dwp"}
 
     environment = os.getenv("FLASK_ENV", "production").strip().lower()
-    edition = os.getenv("ASSET_EDITION", "private").strip().lower()
-    if environment in POC_ENVIRONMENTS or edition == "community":
+    if environment in POC_ENVIRONMENTS:
         return {"mode": "poc", "profile": None, "schema": None}
     raise LineageConfigurationError(
         "lineage data source is not configured; set LINEAGE_DB_PROFILE for non-development environments"

@@ -309,6 +309,10 @@ def _add_constraint(table: TableSpec, definition: str):
         upper = normalized.upper()
     if upper.startswith("PRIMARY KEY"):
         table.primary_key = _identifier_list(normalized[normalized.find("("):])
+        for column_name in table.primary_key:
+            if column_name in table.columns:
+                table.columns[column_name].primary_key = True
+                table.columns[column_name].nullable = False
     elif upper.startswith("UNIQUE"):
         columns_start = normalized.find("(")
         if columns_start >= 0:

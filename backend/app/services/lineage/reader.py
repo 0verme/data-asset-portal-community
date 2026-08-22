@@ -14,7 +14,7 @@
 
 """Lineage snapshot reader — display path only.
 
-Must never import the private scheduler collector (``lineage_collector`` or the
+Must never import the external scheduler collector (``lineage_collector`` or the
 scheduler metadata tables ``p_job_*`` / ``p_program_*``).
 """
 

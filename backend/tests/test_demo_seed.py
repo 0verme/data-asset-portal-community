@@ -15,15 +15,6 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = ROOT.parent
 COMMUNITY_CONFIG = ROOT / "configs" / "database.community.yaml"
 
-COMMUNITY_MODULES = ["portal", "dwm", "mapping", "lineage", "root", "indicator", "apiAsset", "system"]
-
-PRIVATE_TABLES = {
-    "p_push_system", "p_push_job", "p_push_job_field", "p_push_change_log",
-    "p_upstream_system", "p_upstream_unload_time", "p_upstream_change_log",
-    "p_report_asset",
-    "p_manual_code_table",
-}
-
 # Expected deterministic demo volumes (aligned with demo/validate_demo_data.py).
 EXPECTED_COUNTS = {
     "p_asset_table": 30,
@@ -36,6 +27,19 @@ EXPECTED_COUNTS = {
     "p_system": 8,
     "p_data_source": 8,
     "p_api_asset": 10,
+    "p_menu": 11,
+    "p_upstream_system": 8,
+    "p_upstream_unload_time": 31,
+    "p_upstream_change_log": 8,
+    "p_push_system": 6,
+    "p_push_job": 6,
+    "p_push_job_field": 18,
+    "p_push_change_log": 6,
+    "p_report_asset": 8,
+    "p_manual_code_table": 3,
+    "p_lineage_snapshot": 1,
+    "p_lineage_node": 9,
+    "p_lineage_edge": 7,
 }
 
 
@@ -45,7 +49,7 @@ def _load_dataset(name: str) -> list[dict]:
 
 
 class CommunityDemoSeedTests(unittest.TestCase):
-    """Community demo seed must be deterministic, idempotent and Community-only."""
+    """Repository demo seed must be deterministic, idempotent and complete."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -57,7 +61,6 @@ class CommunityDemoSeedTests(unittest.TestCase):
                 "ASSET_DB_CONFIG_PATH": str(COMMUNITY_CONFIG),
                 "ASSET_DB_PROFILE": "community_sqlite",
                 "ASSET_DB_DATABASE": str(self.database),
-                "ASSET_EDITION": "community",
                 "FLASK_ENV": "production",
                 "FLASK_SECRET_KEY": "demo-seed-test-only",
                 "LINEAGE_DB_PROFILE": "",
@@ -170,8 +173,10 @@ class CommunityDemoSeedTests(unittest.TestCase):
             if pk == "Y":
                 self.assertEqual(nullable, "N", f"pk field {field_id} must be non-nullable")
 
-    def test_seed_never_touches_private_tables(self):
+    def test_seed_contains_every_repository_module_table(self):
         self._seed()
+        from demo.seed_loader import community_seed_plan
+
         connection = sqlite3.connect(self.database)
         try:
             names = {row[0] for row in connection.execute(
@@ -179,8 +184,7 @@ class CommunityDemoSeedTests(unittest.TestCase):
             )}
         finally:
             connection.close()
-        self.assertFalse(names & PRIVATE_TABLES)
-        # Every indicator result table must exist in the asset catalog.
+        self.assertTrue(set(community_seed_plan()) <= names)
         indicators = _load_dataset("indicators.json")
         asset_tables = {item["table"] for item in _load_dataset("assets.json")}
         for indicator in indicators:

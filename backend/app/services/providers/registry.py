@@ -15,8 +15,8 @@
 """Pluggable portal search / stat provider registry.
 
 Modules contribute configs via register_* helpers. KeywordSearchProvider and
-PortalService only consume the registry and apply capability / menu gates —
-they do not hard-code per-module SQL.
+PortalService only consume the registry and apply instance menu visibility and
+error degradation — they do not hard-code per-module SQL.
 """
 
 from __future__ import annotations

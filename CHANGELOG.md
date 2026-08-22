@@ -17,7 +17,7 @@
 
 - 对齐 README、Architecture、Deployment、Development、API Contract、Modules、Community Demo、Screenshots 与 generated architecture artifact 的当前 FastAPI/Uvicorn、schema/migration、Demo 和版本语义。
 - 明确 published `v0.1.0`、Draft `v0.1.1`、post-`v0.1.0` current main 与独立线上 mock bundle `V1.0.0` 的区别；已发布的 `[0.1.0]` 历史章节保持不变。
-- Community / Optional runtime gating 仍按当前 profile 保留；其移除属于后续 #116，不在本变更中实施。
+- Issue #116 已移除 Community / Private / Optional artificial runtime gating；仓库已有模块统一进入 open-by-default runtime、schema、seed、search 和 portal statistics contract。
 
 ### 优化（Changed）
 

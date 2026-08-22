@@ -25,7 +25,7 @@ FastAPI 不读取 Flask `session` proxy。现行 `SignedSessionCodec` 保持原 
 
 ## Current status
 
-F5/F6 已验证并完成纯 FastAPI/Uvicorn runtime 收口。WAIT_DB/Private modules 按 capability/DB_READY gate 不注册。该历史文档保留用于解释 pilot 决策，不是当前部署说明。
+F5/F6 已验证并完成纯 FastAPI/Uvicorn runtime 收口。本文中的 WAIT_DB/Private module route gate 是 pilot 阶段的历史决策；#116 后仓库模块默认注册，缺少 DB_READY/外部依赖时由现有错误契约返回诊断状态。本文保留用于解释 pilot 决策，不是当前部署说明。
 
 ## 验证
 
