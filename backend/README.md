@@ -2,7 +2,7 @@
 
 > 说明：本文件保留为后端补充说明。项目主文档请优先查看根目录 `README.md`，开发与部署请优先查看根目录 `DEVELOPMENT.md`、`DEPLOYMENT.md`。
 
-后端默认通过 `uvicorn backend.asgi:app` 运行 FastAPI primary；已迁移 API 由 FastAPI 处理，未迁移路径和兼容职责由 Flask fallback 提供。`BACKEND_RUNTIME=flask` 可切换到 Flask compatibility / rollback mode，`backend/run.py` 仅是直接 Flask development / WSGI 入口。认证与数据统一使用 database profile，演示用的 mock 数据位于前端（`VITE_API_MODE=mock`）。
+后端唯一通过 `uvicorn backend.asgi:app` 运行 FastAPI Native；Auth、Community native API 与 infrastructure routes 由 FastAPI 处理，WAIT_DB/Private routes 按 scope gate 不注册。Flask compatibility runtime 与 `backend/run.py` 已退休。认证与数据统一使用 database profile，演示用的 mock 数据位于前端（`VITE_API_MODE=mock`）。
 
 ## 安装
 
@@ -21,7 +21,7 @@ pip install -r requirements.txt
 python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
-如需验证 Flask compatibility mode，可设置 `BACKEND_RUNTIME=flask` 后仍运行同一 ASGI command；直接 `python backend/run.py` 仅用于本地 Flask development server 或 emergency rollback。
+生产与本地联调均使用同一条 FastAPI/Uvicorn entrypoint；不再提供 Flask compatibility mode 或 direct Flask runtime。
 
 后台启动并写日志：
 
@@ -58,9 +58,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 | `ASSET_DB_JAR_PATH` | GaussDB JDBC jar 路径（驱动不随仓库分发，自行从官方渠道获取） | `/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar` |
 | `ASSET_DB_CONNECT_TIMEOUT_SECONDS` | 数据库连接超时秒数 | `30` |
 | `ASSET_DB_STATEMENT_TIMEOUT_MS` | PostgreSQL / GaussDB 查询超时毫秒数 | `120000` |
-| `BACKEND_RUNTIME` | ASGI dispatcher runtime；默认 FastAPI primary，也可切换 Flask fallback | `fastapi`、`flask` |
-| `FLASK_HOST` | 直接 Flask development / WSGI rollback 的监听地址 | `127.0.0.1` |
-| `FLASK_PORT` | 直接 Flask development / WSGI rollback 的监听端口 | `5099` |
 | `FLASK_DEBUG` | 是否启用调试模式（默认关闭；仅 `1`/`true`/`yes`/`on` 为真） | `false` |
 | `FLASK_SECRET_KEY` | 必填的 Session 签名密钥（缺失或空白即启动失败） | `<generate-a-strong-random-value>` |
 | `FLASK_ENV` | 运行环境（默认安全生产行为；开发必须显式设置） | `production`、`development` |
@@ -172,7 +169,7 @@ python backend/scripts/schema_migrate.py apply --profile community_mysql
 - 创建带备份/恢复方案的隔离 PostgreSQL 数据库，例如 `dap_38_postgresql` 对应的专用测试对象；不要复用归属不明的共享库。
 - 准备一个不在 Git 中的 profile YAML，`type` 必须是 `postgres`，并指向该隔离数据库；将 profile 名称放入 `DAP38_PG_PROFILE`，文件路径放入 `DAP38_PG_CONFIG`。
 - 为执行 `psql` 的终端准备同一个测试库的 `DAP38_PG_DSN`，密码通过 `.pgpass` 或 secret store 提供，避免出现在命令历史中。
-- 设置 `ASSET_RUNTIME_PROFILE=community`；启动应用前将 `ASSET_DB_PROFILE` 指向同一个 `DAP38_PG_PROFILE`，设置 `BACKEND_RUNTIME=fastapi`，并设置非空的本地 `FLASK_SECRET_KEY`。环境变量和安全边界详见 [首次贡献指南](../docs/first-contribution.md) 与 [开发指南](../DEVELOPMENT.md)。
+- 设置 `ASSET_RUNTIME_PROFILE=community`；启动应用前将 `ASSET_DB_PROFILE` 指向同一个 `DAP38_PG_PROFILE`，并设置非空的本地 `FLASK_SECRET_KEY`。环境变量和安全边界详见 [首次贡献指南](../docs/first-contribution.md) 与 [开发指南](../DEVELOPMENT.md)。
 
 ### 2. 离线 baseline 检查
 

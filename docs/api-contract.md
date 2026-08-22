@@ -76,7 +76,7 @@ Accept: application/json
 
 ### 1.6 前端运行模式
 
-前端通过 `VITE_API_MODE` 切换数据来源：`mock` 走前端内置数据并使用演示登录；`remote` 统一走 `/api` 调后端真实数据库。后端默认由 `uvicorn backend.asgi:app` 运行 FastAPI primary + Flask compatibility fallback；`BACKEND_RUNTIME=flask` 是 rollback mode，不改变本 API Contract。
+前端通过 `VITE_API_MODE` 切换数据来源：`mock` 走前端内置数据并使用演示登录；`remote` 统一走 `/api` 调后端真实数据库。后端唯一由 `uvicorn backend.asgi:app` 运行 FastAPI Native；WAIT_DB/Private routes 按 scope gate 不注册，不改变本 API Contract。
 
 ```env
 VITE_API_MODE=remote

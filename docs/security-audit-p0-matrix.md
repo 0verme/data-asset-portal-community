@@ -3,10 +3,10 @@
 ## Audit Matrix
 
 | ID | Area | Current State | Risk | Proposed Fix | P0? |
-|----|------|---------------|------|--------------|-----|
+| ---- | ------ | --------------- | ------ | -------------- | ----- |
 | F1 | Runtime / Dependencies | Flask==3.1.1，存在 CVE-2026-27205（低危，session 访问未设置 `Vary: Cookie`，缓存代理场景可能泄露用户级响应）；3.1.3 修复 | Medium | 升级 Flask==3.1.3（patch 级）；显式 pin Werkzeug==3.1.8（当前仅隐式 `>=3.1`，<3.1.4 有 CVE-2025-66221 Windows DoS） | ✅ |
 | F2 | Runtime / Dependencies | Flask-Cors==5.0.0，存在 CVE-2024-6844（path 经 unquote_plus 规范化不一致）与 CVE-2024-6866（路径匹配大小写处理缺陷）；本项目使用 `resources={r"/api/*"}` path 模式，直接受影响 | High | 升级 Flask-Cors==6.0.1（6.0.0 修复，行为兼容） | ✅ |
-| F3 | Runtime / WSGI | DEPLOYMENT.md 生产推荐 `python run.py`（Flask development server）；无 waitress/gunicorn 生产 WSGI 指引 | High | 部署文档改为推荐生产 WSGI（waitress 示例），`run.py` 标注为开发/本地入口 | ✅ |
+| F3 | Runtime / WSGI | 历史 Flask direct runtime 与 WSGI rollback 已退休；生产统一 Uvicorn/FastAPI | High | `backend.asgi:app` 作为唯一 runtime，F5/F6 native gate 与 full CI 验证 | ✅ |
 | F4 | Runtime / Debug | `FLASK_DEBUG` 默认 false，但 production 下显式设置 `FLASK_DEBUG=true` 仍会开启 Werkzeug debugger（远程代码执行面） | High | production 环境 `FLASK_DEBUG=true` → 启动即失败（fail-fast） | ✅ |
 | C1 | Session / Cookie | SECRET_KEY 缺失即启动失败；HttpOnly=True；SameSite=Lax；Secure 按 FLASK_ENV（production 默认）；PERMANENT_SESSION_LIFETIME=14d；无硬编码 secret；session 仅存 role/user/name；logout 会清除 cookie | Info | 已合规，无需代码变更；补 regression test 固化 | ❌ |
 | O1 | CORS | 显式 allowlist（`FLASK_CORS_ORIGINS`），未配置即不启用 CORS；无 `*`；credentials 与 allowlist 组合正确；development 通过同一机制显式配置 | Info | 已合规；依赖升级（F2）修复底层路径匹配缺陷 | ❌ |

@@ -33,19 +33,22 @@ class FlaskFreeRuntimeGateTests(unittest.TestCase):
 
             builtins.__import__ = guarded_import
             os.environ["FLASK_ENV"] = "development"
+            os.environ["FLASK_SECRET_KEY"] = "x" * 48
+            os.environ["ASSET_EDITION"] = "community"
 
             from fastapi.testclient import TestClient
             from backend.app.application import current_request_context
             from backend.app.core.capabilities import resolve_capabilities
             from backend.app.fastapi_app import create_fastapi_app
+            from backend.asgi import app as module_app, create_native_app
 
             capabilities = resolve_capabilities(edition="community")
-            app = create_fastapi_app(
+            native_app = create_fastapi_app(
                 capabilities=capabilities,
                 identity_resolver=lambda _request: None,
             )
 
-            @app.get("/__flask_free_probe")
+            @native_app.get("/__flask_free_probe")
             def probe():
                 context = current_request_context()
                 return {
@@ -57,7 +60,7 @@ class FlaskFreeRuntimeGateTests(unittest.TestCase):
                     ),
                 }
 
-            paths = {route.path for route in app.routes}
+            paths = {route.path for route in native_app.routes}
             required = {
                 "/api/auth/login",
                 "/api/auth/me",
@@ -67,7 +70,14 @@ class FlaskFreeRuntimeGateTests(unittest.TestCase):
                 "/api/search",
             }
             assert required.issubset(paths), (required - paths)
-            response = TestClient(app).get("/__flask_free_probe")
+            runtime = create_native_app(
+                capabilities=capabilities,
+                fastapi_application=native_app,
+            )
+            module_health = TestClient(module_app).get("/healthz")
+            assert module_health.status_code == 200, module_health.text
+            assert module_health.json()["flaskFallback"] is False
+            response = TestClient(runtime).get("/__flask_free_probe")
             assert response.status_code == 200, response.text
             assert response.json() == {
                 "method": "GET",

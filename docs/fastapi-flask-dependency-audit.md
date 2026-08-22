@@ -1,6 +1,6 @@
-# Flask Dependency Audit（P5-C）
+# Flask Dependency Audit（F6/F7 boundary）
 
-审计基线：`origin/main` `f099aaa05901bb83e976721243eb9b7145970840`（F1/#99 merge 后、F2/#102 开始前）。
+审计基线：`origin/main` `d9ca29302886798caf4c9f89f650d7d875bbdf80`（F5/#108 merge 后、F6/#110 开始前）。
 
 执行的搜索：
 
@@ -12,19 +12,19 @@ rg -n "from flask import|import flask|create_app|flask Blueprint|WSGI|WSGIMiddle
 
 ### KEEP_COMPAT
 
-- `backend/asgi.py`：`WSGIMiddleware`、`create_app`、`FlaskRequestContextMiddleware`；P5 primary/fallback dispatcher 和 Flask signed-session/request-context compatibility seam 仍在使用。
-- `backend/app/__init__.py`：Flask app factory、CORS、security/error handlers；Flask imports 已延迟到 `create_app()`，fallback 与 `backend/run.py` 仍使用。
-- `backend/app/core/blueprint_registry.py`：Flask blueprint registration；fallback 仍注册全部 legacy API。
-- 已迁移模块的 Flask routes：Assets、Field Mapping、Indicator、Root、Manual Code Table、Report、API Asset、Lineage、System Management、Operation Log、Upstream；它们是 rollback/fallback 路径，不能删除。
-- `backend/app/auth.py` 与 Flask auth routes：保留 Flask signed-session / blueprint fallback 作为 rollback boundary；默认 FastAPI primary 的 `login/me/logout` 已由 native router 承载。
+- `backend/asgi.py`：纯 FastAPI/Uvicorn composition、native health/CORS/security headers；不再创建 Flask application 或 WSGI bridge。
+- `backend/app/__init__.py`：legacy Flask app factory、CORS、security/error handlers；production native runtime 不导入/调用，待 F7 按引用清理。
+- `backend/app/core/blueprint_registry.py`：legacy Flask blueprint registration；F6 后不再由 production composition 调用，待 F7 分类清理。
+- 已迁移模块的 Flask routes：Assets、Field Mapping、Indicator、Root、Manual Code Table、Report、API Asset、Lineage、System Management、Operation Log、Upstream；保留为 legacy contract/test evidence，未挂载到 production runtime。
+- `backend/app/auth.py` 与 Flask auth routes：保留 signed-session compatibility source/test evidence；默认 production Auth 已由 native router 承载，待 F7 清理。
 - `backend/app/fastapi/auth.py` 与 `backend/app/application/session.py`：FastAPI native 读取和写入与 Flask 兼容的 signed `session` cookie；不使用 Flask `session` proxy。
-- `backend/app/services/operation_log_service.py`：F1 已通过 framework-neutral `RequestContext` 获取 audit metadata；Flask adapter 仍为 fallback 路径提供 context。
-- `backend/run.py`：直接 Flask WSGI emergency rollback。
+- `backend/app/services/operation_log_service.py`：F1 已通过 framework-neutral `RequestContext` 获取 audit metadata；不再依赖 Flask adapter runtime。
+- `backend/run.py`：已由 F6 删除；direct Flask WSGI/emergency runtime retired。
 
 ### KEEP_TOOLING
 
 - backend tests 中的 `create_app`、Flask test client 与 security regression fixtures；它们固化 Flask/FastAPI parity 与 rollback。
-- `docs/community-demo.md` 的 `uvicorn backend.asgi:app`：Community demo/dev-only startup，使用 FastAPI primary，不属于生产 cutover。
+- `docs/community-demo.md` 的 `uvicorn backend.asgi:app`：Community demo/dev startup，与 production 使用同一纯 FastAPI entrypoint。
 
 ### WAIT_DB
 
@@ -36,13 +36,13 @@ rg -n "from flask import|import flask|create_app|flask Blueprint|WSGI|WSGIMiddle
 
 ### KEEP_INFRASTRUCTURE / OUT_OF_SCOPE
 
-- `capabilities`、`portal`、`search`：F3 已建立 thin FastAPI native infrastructure adapters；Flask common blueprints 仍保留为 fallback/rollback，不得删除。
+- `capabilities`、`portal`、`search`：F3 已建立 thin FastAPI native infrastructure adapters；legacy Flask common blueprints 未挂载 production，待 F7 清理。
 - `docs/system-architecture.html`：生成的 architecture artifact；本轮由 `docs/system-architecture.archify.json` 更新并重新生成，后续应继续修改 source 后再 deliver。
 
-### REMOVE
+### REMOVE / F7
 
-当前没有安全可证明冗余、且不被 fallback、rollback、tests、CLI 或 compatibility path 使用的 Flask adapter/dependency，因此本轮 **REMOVE = empty**。删除工作必须在后续独立 PR 中以 runtime trace、全量测试和 rollback 证据为前提。
+F6 已移除 `RuntimeDispatcher`、`FlaskRequestContextMiddleware`、`WSGIMiddleware`、`BACKEND_RUNTIME` runtime switch 与 `backend/run.py`。F7 继续分类并清理 Flask package dependencies、legacy blueprints/tests、dead imports 与历史文档。
 
 ## 结论
 
-FastAPI 已是迁移 prefix、`/api/auth` 与 capabilities/portal/search common infrastructure 的 primary runtime；F5 native gate 已证明核心 FastAPI composition 可在 Flask import blocked 的隔离子进程中运行。Flask 仍是有意保留的 fallback/compatibility runtime，而不是未审计的遗留代码；机械删除 Flask 仍会破坏 WAIT_DB 模块、Flask rollback、fallback blueprints 或紧急 rollback，因此本阶段不执行。
+FastAPI 已是唯一 production runtime，覆盖 `/api/auth`、capabilities/portal/search common infrastructure 与已满足 gate 的 Community API；F5/F6 gate 已证明 `backend.asgi:app` 可在 Flask import blocked 的隔离子进程中运行。Flask 相关 factory/blueprints/tests/dependencies 仍是 F7 legacy cleanup debt，但不再参与 production fallback/rollback runtime。

@@ -52,9 +52,7 @@ New-Item -ItemType Directory -Path $backendLogDir -Force | Out-Null
 $stdoutPath = Join-Path $backendLogDir "backend.out.log"
 $stderrPath = Join-Path $backendLogDir "backend.err.log"
 
-# 默认使用 FastAPI primary；Flask 仍由 backend/asgi.py 作为 compatibility fallback
-$env:BACKEND_RUNTIME = "fastapi"
-
+# backend/asgi.py is the pure FastAPI/Uvicorn production entrypoint.
 Write-Host "Starting backend on port $backendPort. Logs:"
 Write-Host "  STDOUT -> $stdoutPath"
 Write-Host "  STDERR -> $stderrPath"

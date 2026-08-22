@@ -8,8 +8,7 @@
 ## 部署产物
 
 - 前端静态资源：`frontend/dist/`
-- 后端服务入口：`backend/asgi.py`（FastAPI primary + Flask fallback）
-- 直接 Flask rollback 入口：`backend/run.py`
+- 后端服务入口：`backend/asgi.py`（纯 FastAPI/Uvicorn）
 - 数据库初始化：手动执行 `docs/pg/` 或 `docs/dws/` 下的模块 DDL（无一键脚本）
 
 ## 一、准备配置
@@ -30,9 +29,6 @@ VITE_BACKEND_URL=http://127.0.0.1:5099
 ASSET_DB_PROFILE=primary
 ASSET_AUTH_DB_PROFILE=primary
 ASSET_DB_CONFIG_PATH=/opt/data-asset-portal/backend/configs/database.yaml
-BACKEND_RUNTIME=fastapi
-FLASK_HOST=127.0.0.1
-FLASK_PORT=5099
 FLASK_DEBUG=false
 FLASK_SECRET_KEY=<generate-a-strong-random-value>
 # FLASK_ENV defaults to production; production cookies are Secure.
@@ -56,28 +52,21 @@ ASSET_DB_JAR_PATH=/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
 
 ## 二、后端部署
 
-`backend/run.py` 使用 Flask 内建的 development server，**仅用于本地开发/联调**，不作为生产承载。
-当前默认生产入口是 `backend.asgi:app`：由 Uvicorn 启动后，已迁移 API prefix 与 `/api/auth` 由 FastAPI primary 处理，未迁移 API 自动委托给现有 Flask WSGI fallback。FastAPI 使用与 Flask 兼容的 signed session codec；Flask auth/session、Operation Log adapter 与 security headers 仍在 fallback/rollback boundary 内保持可用。
+当前生产入口是 `backend.asgi:app`：由 Uvicorn 启动纯 FastAPI native backend。Auth、已迁移 Community API、Capabilities、Portal、Search 与 Operation Log 均由 FastAPI 承载；WAIT_DB/Private routes 按 scope gate 保持不注册。FastAPI 使用与 Flask 兼容的 signed session codec。
 
 ```bash
 cd /opt/data-asset-portal
 python3 -m venv backend/.venv
 source backend/.venv/bin/activate
 pip install -r backend/requirements.txt
-pip install waitress  # 仅在需要直接 WSGI rollback 时使用
-# FastAPI primary；非迁移 API 保留 Flask fallback，Auth 使用 Flask-compatible signed session
+# 唯一推荐 production runtime
 uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
-Runtime switch：
+Runtime：
 
-- `BACKEND_RUNTIME=fastapi`（默认）：FastAPI primary，Flask compatibility fallback
-- `BACKEND_RUNTIME=flask`：所有业务请求立即回退到 Flask compatibility runtime；仍可使用同一 `uvicorn backend.asgi:app`，或直接使用生产 WSGI
-- 直接 Flask WSGI rollback（仅 compatibility / emergency path）：
-
-```bash
-BACKEND_RUNTIME=flask waitress-serve --host=127.0.0.1 --port=5099 backend.run:app
-```
+- `uvicorn backend.asgi:app --host 127.0.0.1 --port 5099` 是唯一推荐 production runtime；
+- `backend/run.py`、Waitress 和 Flask runtime switch 已退休。
 
 健康检查：
 
@@ -85,7 +74,7 @@ BACKEND_RUNTIME=flask waitress-serve --host=127.0.0.1 --port=5099 backend.run:ap
 curl --fail http://127.0.0.1:5099/healthz
 ```
 
-FastAPI primary 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"`、`"fastapiPrimary":true` 和 `"flaskFallback":true`。`/healthz` 只报告进程/runtime 状态，不执行数据库查询；数据库与业务 API 的可用性仍由对应回归和监控验证。默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）。`asgi.py` 与 `run.py` 顶层都会加载仓库 runtime env 文件；系统环境变量和 demo bootstrap 规则保持现有行为。
+Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"`、`"fastapiPrimary":true` 和 `"flaskFallback":false`。`/healthz` 只报告进程/runtime 状态，不执行数据库查询；数据库与业务 API 的可用性仍由对应回归和监控验证。默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）。`asgi.py` 加载仓库 runtime env 文件；系统环境变量和 demo bootstrap 规则保持现有行为。
 
 ### 安全默认值（生产）
 

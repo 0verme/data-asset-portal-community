@@ -1,4 +1,4 @@
-"""P5 ASGI primary and Flask fallback runtime tests."""
+"""Native FastAPI production runtime tests."""
 
 # pyright: reportMissingImports=false
 
@@ -8,120 +8,98 @@ import os
 import unittest
 from unittest.mock import patch
 
-from backend.app import create_app
+from backend.app.application import current_request_context
 from backend.app.core.capabilities import resolve_capabilities
-from fastapi import FastAPI
+from backend.app.fastapi_app import create_fastapi_app
 from fastapi.testclient import TestClient
 
 
-class P5RuntimeTests(unittest.TestCase):
+class NativeFastApiRuntimeTests(unittest.TestCase):
     def setUp(self):
         self.environment = patch.dict(
             os.environ,
             {
                 "FLASK_ENV": "development",
-                "FLASK_SECRET_KEY": "test-p5-runtime",
+                "FLASK_SECRET_KEY": "test-native-runtime",
                 "LINEAGE_DB_PROFILE": "",
-                "BACKEND_RUNTIME": "fastapi",
             },
             clear=False,
         )
         self.environment.start()
         self.addCleanup(self.environment.stop)
-        from backend.asgi import create_runtime_app
+        from backend.asgi import create_native_app
 
-        self.create_runtime_app = create_runtime_app
+        self.create_native_app = create_native_app
         self.capabilities = resolve_capabilities(edition="community")
 
-    def test_fastapi_primary_dispatches_migrated_routes_and_falls_back_for_common_routes(self):
-        runtime = self.create_runtime_app(
-            runtime_mode="fastapi", capabilities=self.capabilities
-        )
+    def test_native_runtime_serves_health_and_community_routes(self):
+        runtime = self.create_native_app(capabilities=self.capabilities)
         client = TestClient(runtime)
         health = client.get("/healthz")
         self.assertEqual(200, health.status_code)
-        self.assertEqual("ok", health.json()["status"])
-        self.assertTrue(health.json()["fastapiPrimary"])
+        self.assertEqual(
+            {
+                "status": "ok",
+                "runtime": "fastapi",
+                "fastapiPrimary": True,
+                "flaskFallback": False,
+            },
+            health.json(),
+        )
         self.assertEqual("nosniff", health.headers["X-Content-Type-Options"])
 
         migrated = client.get("/api/lineage/bootstrap")
         self.assertEqual(200, migrated.status_code)
         self.assertIn("data", migrated.json())
+        capabilities = client.get("/api/capabilities")
+        self.assertEqual(200, capabilities.status_code)
+        self.assertEqual("community", capabilities.json()["edition"])
+        self.assertEqual(404, client.get("/api/common-codes/categories").status_code)
 
-        native_capabilities = client.get("/api/capabilities")
-        self.assertEqual(200, native_capabilities.status_code)
-        self.assertIn("edition", native_capabilities.json())
-
-    def test_flask_runtime_switch_is_immediate_and_health_reports_mode(self):
-        runtime = self.create_runtime_app(
-            runtime_mode="flask", capabilities=self.capabilities
-        )
-        client = TestClient(runtime)
-        health = client.get("/healthz")
-        self.assertEqual(200, health.status_code)
-        self.assertEqual("flask", health.json()["runtime"])
-        self.assertFalse(health.json()["fastapiPrimary"])
-        response = client.get("/api/lineage/bootstrap")
-        self.assertEqual(200, response.status_code)
-        self.assertIn("data", response.json())
-
-    def test_flask_session_identity_is_available_to_fastapi_primary(self):
-        flask_application = create_app(capabilities=self.capabilities)
-        fastapi_application = FastAPI()
-
-        @fastapi_application.get("/api/system/users")
-        def session_probe():
-            from backend.app.auth import get_session_user
-
-            return {"user": get_session_user()}
-
-        runtime = self.create_runtime_app(
-            runtime_mode="fastapi",
+    def test_native_request_context_is_neutral(self):
+        app = create_fastapi_app(
             capabilities=self.capabilities,
-            flask_application=flask_application,
-            fastapi_application=fastapi_application,
+            identity_resolver=lambda _request: None,
         )
-        flask_client = flask_application.test_client()
-        with flask_client.session_transaction() as session:
-            session["dap_auth_user"] = {
-                "role": "admin",
-                "user": "tester",
-                "name": "Tester",
-            }
-        cookie = flask_client.get_cookie("session")
-        self.assertIsNotNone(cookie)
-        fastapi_client = TestClient(runtime)
-        fastapi_client.cookies.set("session", cookie.value)
-        response = fastapi_client.get("/api/system/users")
-        self.assertEqual(200, response.status_code)
-        self.assertEqual("admin", response.json()["user"]["role"])
 
-    def test_runtime_dispatch_table_covers_all_community_migrated_prefixes(self):
-        runtime = self.create_runtime_app(
-            runtime_mode="fastapi", capabilities=self.capabilities
-        )
+        @app.get("/__runtime-context-probe")
+        def probe():
+            context = current_request_context()
+            return {
+                "method": context.method if context else None,
+                "path": context.path if context else None,
+            }
+
+        response = TestClient(app).get("/__runtime-context-probe")
         self.assertEqual(
+            {"method": "GET", "path": "/__runtime-context-probe"},
+            response.json(),
+        )
+
+    def test_native_runtime_route_surface_has_no_wait_db_or_private_paths(self):
+        app = create_fastapi_app(
+            capabilities=self.capabilities,
+            identity_resolver=lambda _request: None,
+        )
+        paths = {route.path for route in app.routes}
+        self.assertTrue(
             {
-                "/api/auth",
+                "/api/auth/login",
+                "/api/auth/me",
+                "/api/auth/logout",
                 "/api/capabilities",
-                "/api/portal",
+                "/api/portal/stats",
                 "/api/search",
                 "/api/indicators",
-                "/api/assets",
-                "/api/field-mappings",
-                "/api/roots",
-                "/api/api-assets",
-                "/api/lineage",
-                "/api/system",
-                "/api/operation-logs",
-            },
-            runtime.migrated_prefixes,
+                "/api/assets/tables",
+            }.issubset(paths)
         )
+        self.assertNotIn("/api/indicator-path/tree", paths)
+        self.assertNotIn("/api/common-codes/categories", paths)
+        self.assertNotIn("/api/push/systems", paths)
 
-    def test_fastapi_error_mapping_and_cors_security_headers(self):
-        runtime = self.create_runtime_app(
-            runtime_mode="fastapi", capabilities=self.capabilities
-        )
+    def test_native_error_mapping_and_cors_security_headers(self):
+        runtime = self.create_native_app(capabilities=self.capabilities)
         client = TestClient(runtime)
         validation = client.get("/api/lineage/subgraph?direction=sideways")
         self.assertEqual(422, validation.status_code)
@@ -129,14 +107,12 @@ class P5RuntimeTests(unittest.TestCase):
         not_found = client.get("/api/lineage/subgraph?rootId=table:missing:UNKNOWN")
         self.assertEqual(404, not_found.status_code)
         self.assertEqual("LINEAGE_NOT_FOUND", not_found.json()["error"]["code"])
-        fallback_not_found = client.get("/api/not-migrated")
-        self.assertEqual(404, fallback_not_found.status_code)
-        self.assertEqual("NOT_FOUND", fallback_not_found.json()["error"]["code"])
+        unknown = client.get("/api/not-migrated")
+        self.assertEqual(404, unknown.status_code)
+        self.assertEqual("NOT_FOUND", unknown.json()["error"]["code"])
 
         with patch.dict(os.environ, {"FLASK_CORS_ORIGINS": "https://portal.example.com"}):
-            cors_runtime = self.create_runtime_app(
-                runtime_mode="fastapi", capabilities=self.capabilities
-            )
+            cors_runtime = self.create_native_app(capabilities=self.capabilities)
         preflight = TestClient(cors_runtime).options(
             "/api/lineage/bootstrap",
             headers={
@@ -150,11 +126,13 @@ class P5RuntimeTests(unittest.TestCase):
             preflight.headers["access-control-allow-origin"],
         )
 
-    def test_invalid_runtime_mode_fails_closed(self):
-        with self.assertRaisesRegex(RuntimeError, "BACKEND_RUNTIME"):
-            self.create_runtime_app(
-                runtime_mode="unknown", capabilities=self.capabilities
-            )
+    def test_legacy_runtime_switch_and_dispatcher_are_gone(self):
+        import backend.asgi as asgi
+
+        self.assertFalse(hasattr(asgi, "RuntimeDispatcher"))
+        self.assertFalse(hasattr(asgi, "FlaskRequestContextMiddleware"))
+        self.assertFalse(hasattr(asgi, "create_runtime_app"))
+        self.assertNotIn("BACKEND_RUNTIME", vars(asgi))
 
 
 if __name__ == "__main__":

@@ -86,7 +86,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             str(self.paths.database.resolve()), environment["ASSET_DB_DATABASE"]
         )
         self.assertEqual("community_sqlite", environment["ASSET_AUTH_DB_PROFILE"])
-        self.assertEqual("fastapi", environment["BACKEND_RUNTIME"])
+        self.assertNotIn("BACKEND_RUNTIME", environment)
         self.assertEqual("", environment["LINEAGE_DB_PROFILE"])
         self.assertEqual("remote", environment["VITE_API_MODE"])
         self.assertEqual("unchanged", environment["KEEP_ME"])

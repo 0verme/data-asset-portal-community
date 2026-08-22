@@ -29,7 +29,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -195,7 +194,6 @@ def build_demo_environment(
             "FLASK_PORT",
             "FLASK_SECRET_KEY",
             "FLASK_CORS_ORIGINS",
-            "BACKEND_RUNTIME",
             "LINEAGE_DB_PROFILE",
             "COMMUNITY_DEMO_BOOTSTRAP",
         }
@@ -218,7 +216,6 @@ def build_demo_environment(
             "FLASK_PORT": str(BACKEND_PORT),
             "FLASK_SECRET_KEY": secret,
             "FLASK_CORS_ORIGINS": f"http://127.0.0.1:{FRONTEND_PORT},http://localhost:{FRONTEND_PORT}",
-            "BACKEND_RUNTIME": "fastapi",
             "LINEAGE_DB_PROFILE": "",
             "VITE_API_MODE": "remote",
             "VITE_API_BASE_URL": "/api",
