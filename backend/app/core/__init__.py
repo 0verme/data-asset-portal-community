@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Core module capability and blueprint registration."""
+"""Core module capability and provider registration."""
 
 from .capabilities import (
     ModuleCapabilityError,

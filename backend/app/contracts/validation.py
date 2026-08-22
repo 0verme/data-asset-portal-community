@@ -1,11 +1,12 @@
 """Contract validation helpers for existing HTTP adapters."""
 
+# pyright: reportMissingImports=false
+
 from __future__ import annotations
 
 from typing import Any, TypeVar
 
 from pydantic import BaseModel
-
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
@@ -15,7 +16,7 @@ def validate_contract(payload: Any, model: type[ModelT]) -> Any:
 
     Returning the original object is deliberate: the Contract describes the
     existing JSON, including legacy/additive fields and nullable semantics.
-    Flask compatibility and FastAPI primary adapters reuse the same model
+    FastAPI adapters and framework-neutral services reuse the same model
     after parity coverage without changing serialization semantics.
     """
     model.model_validate(payload)

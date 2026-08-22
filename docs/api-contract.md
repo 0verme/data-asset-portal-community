@@ -5,7 +5,7 @@
 
 ## 模块总览
 
-Flask compatibility adapter 与 FastAPI primary adapter 共同复用 `backend/app/contracts/` 的框架中立 Contract，并统一以 `/api` 为前缀；Flask blueprints 由 `backend/app/__init__.py` 装配，FastAPI migrated adapters 由 `backend/app/fastapi/app.py` 装配，`backend/app/fastapi_app.py` 仅保留历史 import facade：
+FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract，并统一以 `/api` 为前缀；routers 由 `backend/app/fastapi/app.py` 装配，`backend/app/fastapi_app.py` 仅保留薄 import facade：
 
 | 模块 | 前端 API | Base Path | 说明 |
 | --- | --- | --- | --- |

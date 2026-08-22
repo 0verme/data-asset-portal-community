@@ -159,9 +159,9 @@ server {
 - 确认数据库 `schema` 与 SQL 脚本一致（当前为 `dwp`）
 - 确认 `/healthz` 返回 `status=ok`，并确认 runtime 为预期值
 - 确认 `/api/assets/tables` 返回 JSON 而不是 HTML
-- 确认前端为 `VITE_API_MODE=remote`，且 `/api` 已正确代理到 ASGI runtime（FastAPI primary / Flask fallback）
+- 确认前端为 `VITE_API_MODE=remote`，且 `/api` 已正确代理到纯 FastAPI ASGI runtime
 - 确认 `FLASK_SECRET_KEY` 由部署 secret store 提供，且 `FLASK_DEBUG=false`
-- HTTPS 终止后仍应保持 `FLASK_ENV=production`，以发送 Secure Cookie；FastAPI native auth 与 Flask fallback 共享同一 signed cookie contract；本阶段未扩大 Flask 对转发头的信任范围
+- HTTPS 终止后仍应保持 `FLASK_ENV=production`，以发送 Secure Cookie；FastAPI native auth 使用 signed cookie contract；本阶段未扩大转发头信任范围
 - `backend/configs/database.yaml` 与 `.env.local` 不入库（见 `.gitignore`）；请从 `backend/configs/database.example.yaml` 与 `backend/.env.example` 复制后按环境填写
 
 ## 七、配置来源

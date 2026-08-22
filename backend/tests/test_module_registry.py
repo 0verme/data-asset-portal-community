@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyright: reportMissingImports=false
+
 import os
 import unittest
 
-from backend.app.core.blueprint_registry import validate_blueprint_registry
 from backend.app.core.capabilities import (
-    ModuleCapabilityError,
     REASON_DISABLED_BY_CONFIGURATION,
-    REASON_REQUIRED_PREFIX,
+    ModuleCapabilityError,
     resolve_capabilities,
 )
 from backend.app.core.modules import MODULES, list_module_codes, validate_manifest
@@ -28,7 +28,6 @@ from backend.app.core.modules import MODULES, list_module_codes, validate_manife
 class ModuleManifestTestCase(unittest.TestCase):
     def test_manifest_is_internally_consistent(self):
         validate_manifest()
-        validate_blueprint_registry()
 
     def test_real_frontend_codes_present(self):
         expected = {
@@ -54,7 +53,9 @@ class ModuleManifestTestCase(unittest.TestCase):
 
 class ModuleCapabilityResolveTestCase(unittest.TestCase):
     def test_default_enables_all_modules(self):
-        caps = resolve_capabilities(enabled=None, disabled=[], edition="private", strict=False)
+        caps = resolve_capabilities(
+            enabled=None, disabled=[], edition="private", strict=False
+        )
         self.assertEqual("private", caps["edition"])
         self.assertEqual(set(list_module_codes()), set(caps["enabled_codes"]))
 

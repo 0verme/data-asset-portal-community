@@ -43,13 +43,17 @@ def parse_comma_separated_values(value: str | None) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-def get_int_env(name: str, default: int, *, minimum: int | None = None, maximum: int | None = None) -> int:
+def get_int_env(
+    name: str, default: int, *, minimum: int | None = None, maximum: int | None = None
+) -> int:
     """Read a bounded integer setting, using *default* for blank or invalid input."""
     try:
         value = int(str(os.getenv(name, "")).strip())
     except (TypeError, ValueError):
         return default
-    if (minimum is not None and value < minimum) or (maximum is not None and value > maximum):
+    if (minimum is not None and value < minimum) or (
+        maximum is not None and value > maximum
+    ):
         return default
     return value
 
@@ -70,7 +74,9 @@ def get_string_env(name: str, default: str = "") -> str:
 def get_page_size_limits(default_size: int) -> tuple[int, int]:
     """Return the shared page-size override and its safe maximum."""
     maximum = get_int_env("APP_PAGE_SIZE_MAX", 200, minimum=1)
-    default = get_int_env("APP_PAGE_SIZE_DEFAULT", default_size, minimum=1, maximum=maximum)
+    default = get_int_env(
+        "APP_PAGE_SIZE_DEFAULT", default_size, minimum=1, maximum=maximum
+    )
     return default, maximum
 
 
@@ -132,7 +138,7 @@ def get_db_profile_overrides() -> dict[str, object]:
     return overrides
 
 
-def get_flask_debug() -> bool:
+def get_runtime_debug() -> bool:
     return parse_bool(os.getenv("FLASK_DEBUG"))
 
 
@@ -146,16 +152,18 @@ def get_trust_proxy_headers() -> bool:
     return parse_bool(os.getenv("ASSET_TRUST_PROXY_HEADERS"))
 
 
-def get_flask_runtime_config() -> dict[str, object]:
-    """Build the small, security-sensitive Flask configuration surface."""
+def get_runtime_config() -> dict[str, object]:
+    """Build the small, security-sensitive runtime configuration surface."""
     environment = os.getenv("FLASK_ENV", "production").strip().lower()
-    if environment == "production" and get_flask_debug():
+    if environment == "production" and get_runtime_debug():
         raise RuntimeError(
             "FLASK_DEBUG must be disabled in production; the Werkzeug debugger must never run there."
         )
 
     max_content_length = (
-        get_int_env("FLASK_MAX_CONTENT_LENGTH_MB", 16, minimum=1, maximum=512) * 1024 * 1024
+        get_int_env("FLASK_MAX_CONTENT_LENGTH_MB", 16, minimum=1, maximum=512)
+        * 1024
+        * 1024
     )
     return {
         "SECRET_KEY": get_session_secret(),

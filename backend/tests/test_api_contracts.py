@@ -1,12 +1,13 @@
-"""Contract tests for the framework-neutral API wire format."""
+"""Contract tests for the native FastAPI API wire format."""
+
+# pyright: reportMissingImports=false
 
 from __future__ import annotations
 
-import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
-from backend.app import create_app
+from backend.app.application import Identity
 from backend.app.contracts import (
     AssetPageResponse,
     ErrorEnvelope,
@@ -16,19 +17,24 @@ from backend.app.contracts import (
     ReportRequest,
     validate_contract,
 )
+from backend.app.core.capabilities import resolve_capabilities
+from backend.app.fastapi_app import create_fastapi_app
+from fastapi.testclient import TestClient
 
 
 class ApiContractTests(unittest.TestCase):
     def setUp(self):
-        self._old_secret = os.environ.get("FLASK_SECRET_KEY")
-        os.environ["FLASK_SECRET_KEY"] = "test-contracts"
-        self.addCleanup(self._restore_secret)
-
-    def _restore_secret(self):
-        if self._old_secret is None:
-            os.environ.pop("FLASK_SECRET_KEY", None)
-        else:
-            os.environ["FLASK_SECRET_KEY"] = self._old_secret
+        self.report_service = MagicMock()
+        self.indicator_service = MagicMock()
+        self.assets_service = MagicMock()
+        self.app = create_fastapi_app(
+            capabilities=resolve_capabilities(edition="private"),
+            identity_resolver=lambda _request: Identity("admin", "admin", "Admin"),
+            report_service_instance=self.report_service,
+            indicator_service_instance=self.indicator_service,
+            assets_service_instance=self.assets_service,
+        )
+        self.client = TestClient(self.app)
 
     def test_report_success_keeps_legacy_and_nullable_wire_fields(self):
         payload = {
@@ -56,54 +62,45 @@ class ApiContractTests(unittest.TestCase):
         self.assertIsNone(request.relatedTables)
         self.assertEqual("日", request.model_extra["legacyFreq"])
 
-    def test_flask_report_route_output_is_declared_contract(self):
-        app = create_app()
-        app.config.update(TESTING=True)
-        with patch(
-            "backend.app.services.report_service.report_service.get_reports",
-            return_value=[{"code": "R1", "name": "Report"}],
-        ):
-            response = app.test_client().get("/api/reports")
+    def test_native_report_route_output_is_declared_contract(self):
+        self.report_service.get_reports.return_value = [
+            {"code": "R1", "name": "Report"}
+        ]
+        response = self.client.get("/api/reports")
         self.assertEqual(200, response.status_code)
         self.assertIsInstance(
-            ReportListResponse.model_validate(response.get_json()), ReportListResponse
+            ReportListResponse.model_validate(response.json()), ReportListResponse
         )
 
-    def test_flask_indicator_route_output_is_declared_contract(self):
-        app = create_app()
-        app.config.update(TESTING=True)
-        with patch(
-            "backend.app.services.indicator_service.indicator_service.get_indicators",
-            return_value=[{"id": "I1", "name": "Indicator"}],
-        ):
-            response = app.test_client().get("/api/indicators")
+    def test_native_indicator_route_output_is_declared_contract(self):
+        self.indicator_service.get_indicators.return_value = [
+            {"id": "I1", "name": "Indicator"}
+        ]
+        response = self.client.get("/api/indicators")
         self.assertEqual(200, response.status_code)
-        contract = IndicatorListResponse.model_validate(response.get_json())
+        contract = IndicatorListResponse.model_validate(response.json())
         self.assertIsInstance(contract.items[0], IndicatorItem)
 
     def test_asset_summary_contract_preserves_pagination_shape(self):
-        app = create_app()
-        app.config.update(TESTING=True)
         page = {
             "items": [{"name": "T1", "fieldCount": 0, "fields": []}],
             "page": 2,
             "pageSize": 20,
             "total": 21,
         }
-        with patch(
-            "backend.app.services.assets_service.assets_service.get_asset_table_page",
-            return_value=page,
-        ):
-            response = app.test_client().get("/api/assets/tables?summary=true&page=2")
+        self.assets_service.get_asset_table_page.return_value = page
+        response = self.client.get("/api/assets/tables?summary=true&page=2")
         self.assertEqual(200, response.status_code)
-        self.assertEqual(2, AssetPageResponse.model_validate(response.get_json()).page)
-        self.assertEqual(21, response.get_json()["total"])
+        self.assertEqual(2, AssetPageResponse.model_validate(response.json()).page)
+        self.assertEqual(21, response.json()["total"])
 
-    def test_auth_failure_uses_existing_error_contract(self):
-        app = create_app()
-        app.config.update(TESTING=True)
-        response = app.test_client().get("/api/auth/me")
-        contract = ErrorEnvelope.model_validate(response.get_json())
+    def test_anonymous_auth_failure_uses_existing_error_contract(self):
+        app = create_fastapi_app(
+            capabilities=resolve_capabilities(edition="community"),
+            identity_resolver=lambda _request: None,
+        )
+        response = TestClient(app).get("/api/auth/me")
+        contract = ErrorEnvelope.model_validate(response.json())
         self.assertEqual(401, response.status_code)
         self.assertEqual("UNAUTHORIZED", contract.error.code)
 

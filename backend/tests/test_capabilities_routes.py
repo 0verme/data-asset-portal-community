@@ -1,9 +1,15 @@
+"""Native FastAPI capability endpoint tests."""
+
+# pyright: reportMissingImports=false
+
+from __future__ import annotations
+
 import os
 import unittest
-from unittest.mock import patch
 
-from backend.app import create_app
-from backend.app.core.capabilities import resolve_capabilities, set_resolved_capabilities
+from backend.app.core.capabilities import resolve_capabilities
+from backend.app.fastapi_app import create_fastapi_app
+from fastapi.testclient import TestClient
 
 
 class CapabilitiesRouteTests(unittest.TestCase):
@@ -11,7 +17,6 @@ class CapabilitiesRouteTests(unittest.TestCase):
         self._original_env = {
             key: os.getenv(key)
             for key in (
-                "FLASK_SECRET_KEY",
                 "FLASK_ENV",
                 "ASSET_MODULE_STRICT",
                 "ASSET_ENABLED_MODULES",
@@ -22,11 +27,8 @@ class CapabilitiesRouteTests(unittest.TestCase):
             )
         }
         self.addCleanup(self._restore_env)
-        self.addCleanup(lambda: set_resolved_capabilities(None))
-        os.environ["FLASK_SECRET_KEY"] = "test-only-capabilities-secret"
         os.environ["FLASK_ENV"] = "production"
         os.environ["ASSET_MODULE_STRICT"] = "0"
-        # Capabilities endpoint must not require a real database connection.
         os.environ.pop("ASSET_DB_PROFILE", None)
         os.environ.pop("ASSET_DB_CONFIG_PATH", None)
 
@@ -37,12 +39,19 @@ class CapabilitiesRouteTests(unittest.TestCase):
             else:
                 os.environ[key] = value
 
+    @staticmethod
+    def _client(caps):
+        app = create_fastapi_app(
+            capabilities=caps,
+            identity_resolver=lambda _request: None,
+        )
+        return TestClient(app)
+
     def test_capabilities_all_enabled_by_default(self):
         caps = resolve_capabilities(enabled=None, disabled=[], strict=False)
-        app = create_app(capabilities=caps)
-        response = app.test_client().get("/api/capabilities")
+        response = self._client(caps).get("/api/capabilities")
         self.assertEqual(200, response.status_code)
-        payload = response.get_json()
+        payload = response.json()
         self.assertEqual("private", payload["edition"])
         enabled = {m["code"] for m in payload["modules"] if m["enabled"]}
         self.assertIn("dwm", enabled)
@@ -57,11 +66,9 @@ class CapabilitiesRouteTests(unittest.TestCase):
             edition="community-test",
             strict=False,
         )
-        app = create_app(capabilities=caps)
-        response = app.test_client().get("/api/capabilities")
+        response = self._client(caps).get("/api/capabilities")
         self.assertEqual(200, response.status_code)
-        payload = response.get_json()
-        by_code = {m["code"]: m for m in payload["modules"]}
+        by_code = {m["code"]: m for m in response.json()["modules"]}
         self.assertFalse(by_code["upstream"]["enabled"])
         self.assertTrue(by_code["mapping"]["enabled"])
         self.assertIsNone(by_code["mapping"]["reason"])
@@ -75,10 +82,9 @@ class CapabilitiesRouteTests(unittest.TestCase):
             disabled=[],
             strict=False,
         )
-        app = create_app(capabilities=caps)
-        response = app.test_client().get("/api/capabilities")
+        response = self._client(caps).get("/api/capabilities")
         self.assertEqual(200, response.status_code)
-        text = response.get_data(as_text=True)
+        text = response.text
         self.assertNotIn("password", text.lower())
         self.assertNotIn("jdbc", text.lower())
 

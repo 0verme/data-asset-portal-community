@@ -1,4 +1,4 @@
-"""F3 parity and boundary tests for native common infrastructure routes."""
+"""Native common infrastructure contract tests after Flask runtime retirement."""
 
 # pyright: reportMissingImports=false
 
@@ -8,7 +8,6 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from backend.app import create_app
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi_app import create_fastapi_app
 from backend.app.services.search_provider import SearchDataSourceError
@@ -21,7 +20,7 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
             os.environ,
             {
                 "FLASK_ENV": "development",
-                "FLASK_SECRET_KEY": "f3-common-infrastructure-test",
+                "FLASK_SECRET_KEY": "f7-common-infrastructure-test",
             },
             clear=False,
         )
@@ -31,18 +30,15 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
         self.portal_service = MagicMock()
         self.search_provider = MagicMock()
 
-    def apps(self):
-        flask_app = create_app(capabilities=self.capabilities)
-        flask_app.config.update(TESTING=True)
-        fastapi_app = create_fastapi_app(
+    def app(self):
+        return create_fastapi_app(
             capabilities=self.capabilities,
             identity_resolver=lambda _request: None,
             portal_service_instance=self.portal_service,
             search_provider_instance=self.search_provider,
         )
-        return flask_app, fastapi_app
 
-    def test_capabilities_portal_and_search_keep_flask_fastapi_parity(self):
+    def test_capabilities_portal_and_search_contracts(self):
         self.portal_service.get_stats.return_value = [
             {"key": "dwm", "label": "数据仓库", "value": 3}
         ]
@@ -52,72 +48,39 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
             "groups": [],
             "total": 0,
         }
-        with patch("backend.app.routes.portal.portal_service", self.portal_service), patch(
-            "backend.app.routes.search.search_provider", self.search_provider
-        ):
-            flask_app, fastapi_app = self.apps()
-            flask_client = flask_app.test_client()
-            fastapi_client = TestClient(fastapi_app)
-
-            pairs = (
-                ("/api/capabilities", None),
-                ("/api/portal/stats", None),
-                ("/api/search?q=ORDER&type=indicator&limit=7", None),
-            )
-            for path, _body in pairs:
-                with self.subTest(path=path):
-                    flask_response = flask_client.get(path)
-                    fastapi_response = fastapi_client.get(path)
-                    self.assertEqual(flask_response.status_code, fastapi_response.status_code)
-                    self.assertEqual(flask_response.get_json(), fastapi_response.json())
-
-        self.assertEqual(2, self.search_provider.search.call_count)
+        client = TestClient(self.app())
+        self.assertEqual(200, client.get("/api/capabilities").status_code)
         self.assertEqual(
-            ("ORDER",), self.search_provider.search.call_args.args
+            {"items": self.portal_service.get_stats.return_value},
+            client.get("/api/portal/stats").json(),
         )
-        self.assertEqual(
-            {"scope": "indicator", "limit": "7"},
-            self.search_provider.search.call_args.kwargs,
+        search = client.get("/api/search?q=ORDER&type=indicator&limit=7")
+        self.assertEqual(200, search.status_code)
+        self.assertEqual(self.search_provider.search.return_value, search.json())
+        self.search_provider.search.assert_called_once_with(
+            "ORDER", scope="indicator", limit="7"
         )
 
     def test_portal_fatal_error_keeps_zero_filled_200_fallback(self):
         fallback = [{"key": "dwm", "label": "数据仓库", "value": 0}]
         self.portal_service.get_stats.side_effect = RuntimeError("temporary failure")
         self.portal_service.zero_stats.return_value = fallback
-        with patch("backend.app.routes.portal.portal_service", self.portal_service):
-            flask_app, fastapi_app = self.apps()
-            flask_response = flask_app.test_client().get("/api/portal/stats")
-            fastapi_response = TestClient(fastapi_app).get("/api/portal/stats")
-
-        self.assertEqual(200, flask_response.status_code)
-        self.assertEqual(200, fastapi_response.status_code)
-        self.assertEqual(flask_response.get_json(), fastapi_response.json())
+        response = TestClient(self.app()).get("/api/portal/stats")
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"items": fallback}, response.json())
 
     def test_search_data_source_error_keeps_error_envelope(self):
         self.search_provider.search.side_effect = SearchDataSourceError("search down")
-        with patch("backend.app.routes.search.search_provider", self.search_provider):
-            flask_app, fastapi_app = self.apps()
-            flask_response = flask_app.test_client().get("/api/search?q=ORDER")
-            fastapi_response = TestClient(fastapi_app).get("/api/search?q=ORDER")
-
-        self.assertEqual(500, flask_response.status_code)
-        self.assertEqual(500, fastapi_response.status_code)
-        self.assertEqual(flask_response.get_json(), fastapi_response.json())
+        response = TestClient(self.app()).get("/api/search?q=ORDER")
+        self.assertEqual(500, response.status_code)
+        self.assertEqual(
+            {"code": "SEARCH_DATA_SOURCE_ERROR", "message": "search down"},
+            response.json()["error"],
+        )
 
     def test_common_code_remains_wait_db_and_is_not_native_route(self):
-        from backend.asgi import create_native_app
-
-        _flask_app, fastapi_app = self.apps()
-        response = TestClient(fastapi_app).get("/api/common-codes/categories")
+        response = TestClient(self.app()).get("/api/common-codes/categories")
         self.assertEqual(404, response.status_code)
-        runtime = create_native_app(
-            capabilities=self.capabilities,
-            fastapi_application=fastapi_app,
-        )
-        self.assertEqual(
-            404,
-            TestClient(runtime).get("/api/common-codes/categories").status_code,
-        )
 
 
 if __name__ == "__main__":

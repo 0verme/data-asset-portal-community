@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Initialize the current schema baseline and coordinate Alembic revisions."""
 
+# pyright: reportMissingImports=false
+# pyright: reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 import argparse
@@ -79,8 +82,8 @@ def _alembic_upgrade(profile: str):
 
 def main(argv=None):
     args = _parser().parse_args(argv)
-    # Mirror Flask startup: load backend/.env.local the same way run.py does,
-    # then apply the runtime profile (e.g. community) so the same environment
+    # Mirror native startup: load backend/.env.local using the same environment
+    # profile handling as the runtime, then apply the runtime profile (e.g. community)
     # variables (ASSET_RUNTIME_PROFILE) configure both the database profile
     # file and the enabled module set. This keeps the README Community
     # quick-start commands (`.env.local` + `schema_migrate.py apply`) working
@@ -157,7 +160,8 @@ def main(argv=None):
             return 0
         created = initialize(connection, config, dialect, args.root)
     finally:
-        connection.close()
+        if connection is not None:
+            connection.close()
 
     if config["type"] != "gaussdb":
         _alembic_upgrade(args.profile)
@@ -170,4 +174,4 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except Exception as exc:
         print(f"schema migration failed: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(1) from exc

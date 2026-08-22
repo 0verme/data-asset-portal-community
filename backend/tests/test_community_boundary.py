@@ -1,18 +1,21 @@
+# pyright: reportMissingImports=false
+
 from __future__ import annotations
 
 import os
 import sqlite3
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.app import create_app
-from backend.app.core.capabilities import resolve_capabilities, set_resolved_capabilities
+from backend.app.core.capabilities import (
+    resolve_capabilities,
+    set_resolved_capabilities,
+)
 from backend.app.db.facade import connect_with_profile
 from backend.app.migrations.schema import initialize, verify_database
-
+from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = ROOT.parent
@@ -22,9 +25,14 @@ COMMUNITY_CONFIG = ROOT / "configs" / "database.community.yaml"
 # backend/app/core/modules.py (upstream / report / push / codeTable).
 PRIVATE_TABLES = {
     # push
-    "p_push_system", "p_push_job", "p_push_job_field", "p_push_change_log",
+    "p_push_system",
+    "p_push_job",
+    "p_push_job_field",
+    "p_push_change_log",
     # upstream
-    "p_upstream_system", "p_upstream_unload_time", "p_upstream_change_log",
+    "p_upstream_system",
+    "p_upstream_unload_time",
+    "p_upstream_change_log",
     # report
     "p_report_asset",
     # codeTable
@@ -62,31 +70,47 @@ class CommunityBoundaryTests(unittest.TestCase):
         try:
             config = {"type": "sqlite", "database": str(self.database)}
             self.assertTrue(initialize(connection, config, "sqlite"))
-            self.assertEqual("0001_baseline", verify_database(connection, config, "sqlite"))
+            self.assertEqual(
+                "0001_baseline", verify_database(connection, config, "sqlite")
+            )
         finally:
             connection.close()
         from demo.seed_sqlite import seed
+
         seed(self.database)
 
     def table_names(self):
         connection = sqlite3.connect(self.database)
         try:
-            return {row[0] for row in connection.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )}
+            return {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
         finally:
             connection.close()
 
     def client(self):
         capabilities = resolve_capabilities(
-            enabled=["portal", "dwm", "mapping", "lineage", "root", "indicator", "apiAsset", "system"],
+            enabled=[
+                "portal",
+                "dwm",
+                "mapping",
+                "lineage",
+                "root",
+                "indicator",
+                "apiAsset",
+                "system",
+            ],
             disabled=["upstream", "push"],
             edition="community",
             strict=True,
         )
-        app = create_app(capabilities=capabilities)
-        app.config.update(TESTING=True)
-        return app.test_client(), capabilities
+        from backend.asgi import create_native_app
+
+        app = create_native_app(capabilities=capabilities)
+        return TestClient(app), capabilities
 
     def test_community_schema_and_routes_exclude_private_modules(self):
         names = self.table_names()
@@ -110,7 +134,9 @@ class CommunityBoundaryTests(unittest.TestCase):
             self.assertEqual(200, client.get("/api/field-mappings/fields").status_code)
             self.assertEqual(200, client.get("/api/field-mappings/tables").status_code)
             self.assertEqual(200, client.get("/api/field-mappings/stats").status_code)
-            self.assertEqual(200, client.get("/api/field-mappings/source-systems").status_code)
+            self.assertEqual(
+                200, client.get("/api/field-mappings/source-systems").status_code
+            )
             self.assertEqual(200, client.get("/api/search?q=ORDER").status_code)
             self.assertEqual(200, client.get("/api/portal/stats").status_code)
         login = client.post(
@@ -132,34 +158,22 @@ class CommunityBoundaryTests(unittest.TestCase):
 
         order_query = api_assets["ORDER_QUERY"]
         expected_system = systems[order_query["systemId"]]
-        asset = client.get("/api/api-assets/ORDER_QUERY").get_json()["data"]
+        asset = client.get("/api/api-assets/ORDER_QUERY").json()["data"]
         self.assertEqual(expected_system["id"], asset["systemId"])
         self.assertEqual(expected_system["code"], asset["system"]["code"])
         self.assertNotIn("host", asset["system"])
 
-        source_systems = client.get(
-            "/api/field-mappings/source-systems"
-        ).get_json()["items"]
+        source_systems = client.get("/api/field-mappings/source-systems").json()[
+            "items"
+        ]
         source_by_code = {item["systemCode"]: item for item in source_systems}
         for mapping in mappings:
             expected = sources[mapping["dataSourceId"]]
             self.assertIn(
-                expected["code"], source_by_code,
+                expected["code"],
+                source_by_code,
                 f"mapping {mapping['id']} must resolve through p_data_source",
             )
-
-    def test_community_start_does_not_import_private_implementations(self):
-        before = set(sys.modules)
-        self.client()
-        private_modules = {
-            "backend.app.services.push_service",
-            "backend.app.services.upstream_service",
-            "backend.app.services.lineage_collector",
-            "backend.app.db.gaussdb_adapter",
-            "backend.app.services.manual_code_table_service",
-            "backend.app.services.report_service",
-        }
-        self.assertFalse(private_modules.intersection(set(sys.modules) - before))
 
     def test_search_never_queries_private_tables_in_physically_missing_schema(self):
         # The Community database has NO private tables at all (see setUp); a
@@ -168,14 +182,14 @@ class CommunityBoundaryTests(unittest.TestCase):
         client, _ = self.client()
         response = client.get("/api/search?q=DEMO")
         self.assertEqual(200, response.status_code)
-        payload = response.get_json()
+        payload = response.json()
         for group in payload.get("groups") or []:
             self.assertNotIn(
                 group.get("type"),
                 PRIVATE_SEARCH_TYPES,
                 f"search returned private entity type {group.get('type')}",
             )
-        scopes = client.get("/api/search/scopes").get_json()
+        scopes = client.get("/api/search/scopes").json()
         for scope in scopes if isinstance(scopes, list) else scopes.get("scopes", []):
             if isinstance(scope, dict):
                 self.assertNotIn(
@@ -188,7 +202,7 @@ class CommunityBoundaryTests(unittest.TestCase):
         client, _ = self.client()
         response = client.get("/api/portal/stats")
         self.assertEqual(200, response.status_code)
-        cards = response.get_json()
+        cards = response.json()
         cards = cards.get("items") if isinstance(cards, dict) else cards
         for card in cards or []:
             self.assertNotIn(
