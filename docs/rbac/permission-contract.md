@@ -1,0 +1,255 @@
+# RBAC Permission Contract
+
+> P0 artifact for [#32](https://github.com/0verme/data-asset-portal-community/issues/32) and
+> [#120](https://github.com/0verme/data-asset-portal-community/issues/120).
+>
+> **Repository Truth baseline:** `origin/main` at `47f4bf642bf6eb1286d7713820f6331a8a6b42ec`.
+> This document is an audit of the code that existed at that baseline. It is not a
+> copy of the historical issue description.
+
+## 1. Current runtime boundary
+
+- Production entry point is `backend.asgi:app`, served by FastAPI/Uvicorn.
+- Authentication is a signed `session` cookie carrying the existing `dap_auth_user`
+  identity payload. The native FastAPI adapter resolves it through
+  `backend.app.fastapi.auth.get_native_session_identity`.
+- The current application identity has `user`, `name`, and `role`; it does not yet
+  contain a permission set.
+- `require_maintainer` currently means **authenticated identity** (there is no
+  separate maintainer-only distinction in that dependency). `admin` and
+  `maintainer` both pass it. `require_admin` is the current administrator gate.
+- Current provider registrations are SQLite, PostgreSQL, MySQL/PyMySQL, and
+  GaussDB/DWS. Community/local migration uses `backend/schema` plus Alembic and
+  `backend/scripts/schema_migrate.py`; P1 must follow that current contract.
+- Repository module availability is open by default. RBAC must not reintroduce
+  Community/Private runtime gating or register Private/Enterprise-only permissions.
+
+## 2. Permission naming contract
+
+Permission codes use the stable form `resource:action`. A resource may contain
+an additional namespace segment, for example `system:user:write`; the final
+segment is always the action.
+
+Initial action vocabulary is intentionally small:
+
+- `read`: query, view, inspect, or export data;
+- `write`: create, update, delete, import, status-change, reorder, or otherwise
+  mutate a resource.
+
+A new code is allowed only when its authorization boundary is materially
+separate, a user can reasonably have one capability without the other, and the
+separation has audit value. Do not create one permission per endpoint or button.
+
+The checked-in registry is
+`backend/app/authorization/permissions.py`. The registry order is stable for
+seed output, API snapshots, frontend state, and debugging.
+
+## 3. Permission registry
+
+| Permission | Resource | Action | Public/API scope |
+| --- | --- | --- | --- |
+| `asset:read` | asset | read | Public asset query routes; reserved for a future protected read boundary. |
+| `asset:write` | asset | write | Protected asset table/field mutations. |
+| `root:read` | root | read | Public root query routes; reserved for a future protected read boundary. |
+| `root:write` | root | write | Protected root create/update/delete/import. |
+| `indicator:read` | indicator | read | Public indicator query routes; reserved for a future protected read boundary. |
+| `indicator:write` | indicator | write | Protected indicator create/update/delete/status. |
+| `report:read` | report | read | Public report query routes; reserved for a future protected read boundary. |
+| `report:write` | report | write | Protected report create/update/delete. |
+| `api_asset:read` | api_asset | read | Public API asset query routes; reserved for a future protected read boundary. |
+| `api_asset:write` | api_asset | write | Protected API asset, params, response-fields, and relations mutations. |
+| `upstream:read` | upstream | read | Protected upstream `admin-detail`; ordinary list/detail remains public. |
+| `upstream:write` | upstream | write | Protected upstream create/update/status/delete. |
+| `push:read` | push | read | Protected push `admin-detail`; ordinary list/detail remains public. |
+| `push:write` | push | write | Protected push system/job mutations. |
+| `code_table:read` | code_table | read | Current list/detail/export routes are public; code is reserved for a protected read boundary. |
+| `code_table:write` | code_table | write | Protected manual code table create/update/status/delete. |
+| `field_mapping:read` | field_mapping | read | Current query routes are public; do not make them login-only in this Epic. |
+| `lineage:read` | lineage | read | Current bootstrap/search/subgraph routes are public; do not make them login-only in this Epic. |
+| `metadata:read` | metadata | read | Protected ingestion result lookup. |
+| `metadata:write` | metadata | write | Protected asset/lineage Metadata Ingestion and preview/bulk aliases. |
+| `operation_log:read` | operation_log | read | Protected operation log list/detail. |
+| `system:user:read` | system:user | read | Administrator-only user list. |
+| `system:user:write` | system:user | write | Administrator-only user CRUD, status, reset-password, and delete. |
+| `system:menu:read` | system:menu | read | Full menu management read; public menu endpoint remains filtered and open. |
+| `system:menu:write` | system:menu | write | Administrator-only menu CRUD/status/move/delete. |
+| `system:param:read` | system:param | read | Administrator-only parameter category/dictionary reads. |
+| `system:param:write` | system:param | write | Administrator-only parameter category/dictionary mutations. |
+| `system:role:read` | system:role | read | Reserved for P6 role-management API/UI; no current route at P0. |
+| `system:role:write` | system:role | write | Reserved for P6 role-management API/UI; no current route at P0. |
+
+### Evolution policy
+
+1. Once a permission is released, its code and meaning are immutable.
+2. A replacement gets a new code and an explicit migration/compatibility note;
+   a deprecated code is never silently reused for another meaning.
+3. The registry is the only source for valid codes. Route modules must not carry
+   independent permission lists.
+4. `admin` is explicitly mapped to every registered code. It does not use `*`.
+   Adding a permission therefore produces a visible registry/seed diff.
+5. `maintainer` is mapped to the compatibility set below. Public routes remain
+   public even when a corresponding `read` code exists.
+
+## 4. Current route authorization matrix
+
+The following is the complete FastAPI route inventory at the P0 baseline. `Public`
+means no login dependency is evaluated. `Auth` means a valid enabled identity
+is required. `Admin` means the current administrator gate is required. The
+permission column is the target contract for P3; P0 records the existing gate
+and does not silently change public read behavior.
+
+| Resource | API / action | Public | Authenticated | `maintainer` | `admin` | Mutation | Permission |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| auth | `POST /api/auth/login` | Yes | — | — | — | No | — |
+| auth | `GET /api/auth/me` | No | Yes | Yes | Yes | No | — |
+| auth | `POST /api/auth/logout` | Yes (idempotent) | Optional | Optional | Optional | No | — |
+| infrastructure | `GET /healthz`, `GET /api/capabilities` | Yes | — | — | — | No | — |
+| portal/search | `GET /api/portal/stats`, `GET /api/search` | Yes | — | — | — | No | — |
+| asset | `GET /api/assets/tables`, `GET /api/assets/tables/{table_name}`, `GET /api/assets/tables/{table_name}/fields`, `GET /api/assets/tables/{table_name}/ddl`, `GET /api/assets/domains`, `GET /api/assets/layers` | Yes | — | — | — | No | Public; `asset:read` reserved |
+| asset | `POST /api/assets/tables`, `PUT /api/assets/tables/{table_name}`, `PUT /api/assets/tables/{table_name}/fields`, `DELETE /api/assets/tables/{table_name}` | No | Yes | Yes | Yes | Yes | `asset:write` |
+| root | `GET /api/roots`, `GET /api/roots/categories`, `GET /api/roots/{abbr}` | Yes | — | — | — | No | Public; `root:read` reserved |
+| root | `POST /api/roots`, `PUT /api/roots/{abbr}`, `DELETE /api/roots/{abbr}`, `POST /api/roots/import` | No | Yes | Yes | Yes | Yes | `root:write` |
+| indicator | `GET /api/indicators`, `GET /api/indicators/{indicator_id}` | Yes | — | — | — | No | Public; `indicator:read` reserved |
+| indicator | `POST /api/indicators`, `PUT /api/indicators/{indicator_id}`, `PATCH /api/indicators/{indicator_id}/status`, `DELETE /api/indicators/{indicator_id}` | No | Yes | Yes | Yes | Yes | `indicator:write` |
+| report | `GET /api/reports`, `GET /api/reports/{report_code}` | Yes | — | — | — | No | Public; `report:read` reserved |
+| report | `POST /api/reports`, `PUT /api/reports/{report_code}`, `DELETE /api/reports/{report_code}` | No | Yes | Yes | Yes | Yes | `report:write` |
+| api asset | `GET /api/api-assets`, `GET /api/api-assets/downstream-systems`, `GET /api/api-assets/systems`, `GET /api/api-assets/{api_code}` | Yes | — | — | — | No | Public; `api_asset:read` reserved |
+| api asset | `POST /api/api-assets`, `PUT /api/api-assets/{api_code}`, `PATCH /api/api-assets/{api_code}/status`, `DELETE /api/api-assets/{api_code}`, `PUT /api/api-assets/{api_code}/params`, `PUT /api/api-assets/{api_code}/response-fields`, `PUT /api/api-assets/{api_code}/relations` | No | Yes | Yes | Yes | Yes | `api_asset:write` |
+| upstream | `GET /api/upstreams/systems`, `GET /api/upstreams/systems/{system_id}` | Yes | — | — | — | No | Public |
+| upstream | `GET /api/upstreams/systems/{system_id}/admin-detail` | No | Yes | Yes | Yes | No | `upstream:read` |
+| upstream | `POST /api/upstreams/systems`, `PUT /api/upstreams/systems/{system_id}`, `PATCH /api/upstreams/systems/{system_id}/status`, `DELETE /api/upstreams/systems/{system_id}` | No | Yes | Yes | Yes | Yes | `upstream:write` |
+| push | `GET /api/push/systems`, `GET /api/push/systems/{system_id}` | Yes | — | — | — | No | Public |
+| push | `GET /api/push/systems/{system_id}/admin-detail` | No | Yes | Yes | Yes | No | `push:read` |
+| push | `POST /api/push/systems`, `PUT /api/push/systems/{system_id}`, `DELETE /api/push/systems/{system_id}`, `POST /api/push/systems/{system_id}/jobs`, `PUT /api/push/systems/{system_id}/jobs/{job_id}`, `DELETE /api/push/systems/{system_id}/jobs/{job_id}` | No | Yes | Yes | Yes | Yes | `push:write` |
+| code table | `GET /api/manual-code-tables`, `GET /api/manual-code-tables/export`, `GET /api/manual-code-tables/{table_id}` | Yes | — | — | — | No | Public; `code_table:read` reserved |
+| code table | `POST /api/manual-code-tables`, `PUT /api/manual-code-tables/{table_id}`, `PATCH /api/manual-code-tables/{table_id}/status`, `DELETE /api/manual-code-tables/{table_id}` | No | Yes | Yes | Yes | Yes | `code_table:write` |
+| field mapping | `GET /api/field-mappings/source-systems`, `GET /api/field-mappings/stats`, `GET /api/field-mappings/fields`, `GET /api/field-mappings/tables` | Yes | — | — | — | No | Public; `field_mapping:read` reserved |
+| lineage | `GET /api/lineage/bootstrap`, `GET /api/lineage/assets`, `GET /api/lineage/subgraph`, `GET /api/lineage/initial-view` | Yes | — | — | — | No | Public; `lineage:read` reserved |
+| metadata | `POST /api/metadata/assets/ingestions`, hidden alias `POST /api/metadata/assets:bulk-upsert` | No | Yes | Yes | Yes | Yes | `metadata:write` |
+| metadata | `POST /api/metadata/lineage/ingestions`, hidden alias `POST /api/metadata/lineage:snapshots` | No | Yes | Yes | Yes | Yes | `metadata:write` |
+| metadata | `GET /api/metadata/ingestions/{ingestion_id}` | No | Yes | Yes | Yes | No | `metadata:read` |
+| operation log | `GET /api/operation-logs`, `GET /api/operation-logs/{log_id}` | No | Yes | Yes | Yes | No | `operation_log:read` |
+| system user | `GET /api/system/users` | No | No | No | Yes | No | `system:user:read` |
+| system user | `POST /api/system/users`, `PUT /api/system/users/{username}`, `PATCH /api/system/users/{username}/status`, `POST /api/system/users/{username}/reset-password`, `DELETE /api/system/users/{username}` | No | No | No | Yes | Yes | `system:user:write` |
+| system menu | `GET /api/system/menus` | Yes, filtered | Optional | Current maintainer sees enabled menu plus `system`; admin sees full list | Yes | No | Public filtered read; `system:menu:read` for management read |
+| system menu | `POST /api/system/menus`, `PUT /api/system/menus/{menu_id}`, `PATCH /api/system/menus/{menu_id}/status`, `PATCH /api/system/menus/{menu_id}/move`, `DELETE /api/system/menus/{menu_id}` | No | No | No | Yes | Yes | `system:menu:write` |
+| system param | `GET /api/system/param-dicts/categories`, `GET /api/system/param-dicts` | No | No | No | Yes | No | `system:param:read` |
+| system param | `PATCH /api/system/param-dicts/categories/{category_code}/status`, `POST /api/system/param-dicts`, `PUT /api/system/param-dicts/{dict_id}`, `PATCH /api/system/param-dicts/{dict_id}/status`, `DELETE /api/system/param-dicts/{dict_id}` | No | No | No | Yes | Yes | `system:param:write` |
+| system role | No current endpoint at P0 | — | — | — | — | — | `system:role:read/write` reserved for P6 |
+
+The two hidden Metadata aliases are included because they are real mutation
+routes even though they are omitted from OpenAPI.
+
+## 5. Compatibility role matrix
+
+### Existing behavior
+
+| Identity | Current behavior at P0 | Contract decision |
+| --- | --- | --- |
+| guest | Public routes only. Protected dependencies reject the request. | Preserve public reads; map protected unauthenticated requests to `401`. |
+| `maintainer` | Passes `require_maintainer`; cannot pass `require_admin`. | Preserve business maintenance and operation-log access; do not grant system user/menu/param/role management. |
+| `admin` | Passes both current gates. | Preserve all current access and explicitly map every registered permission. |
+| unknown role | `identity_from_mapping` returns no identity, but `AuthService.authenticate` and `identity_for_session` currently normalize an unknown role to `admin`. | This is a P0 security finding. P2/P4 must remove the fail-open normalization; unknown/deleted role maps to no permissions and cannot access protected APIs. |
+| disabled/deleted user | Login rejects inactive status; current native session resolver trusts the signed identity and does not re-query the user on every request. | P2/P4 must revalidate current user state for protected requests so an old cookie cannot retain access. |
+
+### Built-in permission mapping
+
+`admin` is the full explicit registry. `maintainer` is the compatibility set
+below; a check mark on a public read code documents capability, but does not
+make that route private.
+
+| Permission | `admin` | `maintainer` | Custom example `indicator-maintainer` |
+| --- | :---: | :---: | :---: |
+| `asset:read` | Yes | Yes | No |
+| `asset:write` | Yes | Yes | No |
+| `root:read` | Yes | Yes | No |
+| `root:write` | Yes | Yes | No |
+| `indicator:read` | Yes | Yes | Yes |
+| `indicator:write` | Yes | Yes | Yes |
+| `report:read` | Yes | Yes | No |
+| `report:write` | Yes | Yes | No |
+| `api_asset:read` | Yes | Yes | No |
+| `api_asset:write` | Yes | Yes | No |
+| `upstream:read` | Yes | Yes | No |
+| `upstream:write` | Yes | Yes | No |
+| `push:read` | Yes | Yes | No |
+| `push:write` | Yes | Yes | No |
+| `code_table:read` | Yes | Yes | No |
+| `code_table:write` | Yes | Yes | No |
+| `field_mapping:read` | Yes | Yes | No |
+| `lineage:read` | Yes | Yes | No |
+| `metadata:read` | Yes | Yes | No |
+| `metadata:write` | Yes | Yes | No |
+| `operation_log:read` | Yes | Yes | Yes |
+| `system:user:read` | Yes | No | No |
+| `system:user:write` | Yes | No | No |
+| `system:menu:read` | Yes | No | No |
+| `system:menu:write` | Yes | No | No |
+| `system:param:read` | Yes | No | No |
+| `system:param:write` | Yes | No | No |
+| `system:role:read` | Yes | No | No |
+| `system:role:write` | Yes | No | No |
+
+The custom example is intentionally exact: it can maintain indicators and
+read operation logs, but cannot manage users or other system resources.
+P6 will make this mapping persistable and user-selectable while retaining one
+role per user.
+
+## 6. Security and session decisions
+
+- Authorization is deny-by-default. Unknown role, disabled role, missing
+  permission, deleted user, or disabled user never upgrades to `admin`.
+- `401 Unauthorized`: no valid current identity, invalid/expired session,
+  missing user, or disabled user.
+- `403 Forbidden`: a valid enabled identity exists but the current permission
+  is absent.
+- The session should retain only the minimum identity needed to locate the
+  current user. Permission decisions must resolve current role and
+  Role-Permission state on the backend; no first-phase permission cache is
+  planned.
+- `adminOnly` remains UI/menu compatibility metadata. It is not an API
+  security boundary and cannot replace a backend permission check.
+- Frontend menu/button/deep-link hiding is UX only. Direct API calls must be
+  denied by the backend.
+- No ABAC, ACL, data scope, row/column security, multi-role, hierarchy,
+  tenant, external IAM, policy engine, or new authorization dependency is in
+  scope.
+
+## 7. P1 migration plan
+
+1. Add forward-only Role, Permission, and Role-Permission persistence following
+   the current schema/migration manifest and all registered providers.
+2. Keep `p_admin_user.role` as the stable role code unless an actual schema
+   constraint requires a compatibility column migration. Do not introduce
+   `p_user_role` in this phase.
+3. Seed the registry in deterministic order; seed `admin` explicitly with all
+   codes and `maintainer` with the compatibility set. Use conflict-safe,
+   non-destructive upserts that do not overwrite custom mappings.
+4. Validate fresh install, upgrade from current head, existing `admin`/
+   `maintainer` users, repeat seed, and bootstrap ordering.
+5. Verify schema parity/offline plans for SQLite, PostgreSQL, MySQL, and
+   GaussDB/DWS. A real DWS integration remains `NOT RUN` unless an isolated
+   test instance and credentials are available; static contract checks are not
+   reported as live database PASS.
+6. Add tests for registry/seed idempotency and unknown-role fail-closed
+   behavior before route enforcement.
+
+## 8. P0 test plan and findings
+
+- Contract unit test: code uniqueness, `resource/action` decomposition,
+  deterministic order, explicit admin coverage, and no unknown role fallback.
+- Route inventory test/fixture: every current mutation has a target permission;
+  public GET route behavior remains unchanged.
+- P2 core unit tests: admin, maintainer, custom role, unknown role, disabled
+  role/user, deleted user, missing and unknown permission.
+- P3 direct API matrix: every sensitive POST/PUT/PATCH/DELETE returns 401 or
+  403 without relying on frontend state.
+- P4 session regression: role change, permission revocation, disable/delete
+  take effect for an existing cookie.
+- P5 UX tests: `/auth/me` permissions, `can(permission)`, menu/button/deep
+  link behavior. Backend tests remain the security authority.
+
+Known P0 gaps intentionally deferred to later phases are the current unknown
+role fail-open normalization, absence of persisted role/permission tables,
+absence of a framework-neutral authorization service, and the lack of
+permission data in `/api/auth/me`.
