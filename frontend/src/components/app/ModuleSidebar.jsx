@@ -13,11 +13,12 @@ import {
 
 export function ModuleSidebar({ module, context }) {
   const {
-    apiAsset, apiAssetFilter, asset, can, canEdit, canManageSystem, indicator,
+    apiAsset, apiAssetFilter, asset, can, canEdit, canManageMenus, canManageParams, canManageRoles, canManageUsers, indicator,
     indicatorFilter, lineageBootstrap, manualCodeTable, push, pushRoute, report,
     reportFilter, requireLogin, root, setApiAssetFilter, setIndicatorFilter,
     setIndicatorRoute, setPushRoute, setReportFilter, setReportRoute, setRootRoute,
     setSystemActionIntent, setSystemRoute, setUpRoute, statusOptions, systemRoute,
+    canViewMenus, canViewOperationLog, canViewParams, canViewRoles, canViewUsers,
     upstream,
   } = context;
   const canPermission = can || (() => canEdit);
@@ -37,7 +38,22 @@ export function ModuleSidebar({ module, context }) {
   }
   if (module === "root") return <RootSidebar root={root} requireLogin={requireLogin} setRootRoute={setRootRoute} />;
   if (module === "system") {
-    return <SystemSidebar systemRoute={systemRoute} setSystemRoute={setSystemRoute} setSystemActionIntent={setSystemActionIntent} canManageSystem={canManageSystem} />;
+    return (
+      <SystemSidebar
+        systemRoute={systemRoute}
+        setSystemRoute={setSystemRoute}
+        setSystemActionIntent={setSystemActionIntent}
+        canViewUsers={canViewUsers}
+        canViewRoles={canViewRoles}
+        canViewMenus={canViewMenus}
+        canViewParams={canViewParams}
+        canViewOperationLog={canViewOperationLog}
+        canManageUsers={canManageUsers || canPermission("system:user:write")}
+        canManageRoles={canManageRoles || canPermission("system:role:write")}
+        canManageMenus={canManageMenus || canPermission("system:menu:write")}
+        canManageParams={canManageParams || canPermission("system:param:write")}
+      />
+    );
   }
   if (module === "upstream") {
     return <UpstreamSidebar upstream={upstream} statusOptions={statusOptions} requireLogin={requireLogin} setUpRoute={setUpRoute} />;

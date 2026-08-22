@@ -19,7 +19,11 @@ const API_MODE = (import.meta.env.VITE_API_MODE || "mock").trim().toLowerCase();
 let mockUsers = clone(SYSTEM_USERS);
 
 function clone(value) {
-  return JSON.parse(JSON.stringify(value));
+  try {
+    return structuredClone(value);
+  } catch (error) {
+    throw new Error("Unable to clone system user payload", { cause: error });
+  }
 }
 
 function readStore() {

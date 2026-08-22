@@ -89,6 +89,7 @@ const MODULE_RENDERERS = {
       systemRoute={context.systemRoute}
       query={context.query}
       canEdit={context.canEdit}
+      canManageRoles={context.canManageRoles}
       canManageSystem={context.canManageSystem}
       requireLogin={context.requireLogin}
       systemActionIntent={context.systemActionIntent}

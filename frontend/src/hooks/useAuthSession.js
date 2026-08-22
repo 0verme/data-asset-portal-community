@@ -46,10 +46,20 @@ export function useAuthSession() {
     "code_table:write",
     "metadata:write",
   ]);
+  const canViewUsers = can("system:user:read");
+  const canViewRoles = can("system:role:read");
+  const canViewMenus = can("system:menu:read");
+  const canViewParams = can("system:param:read");
+  const canManageRoles = can("system:role:write");
   const canManageSystem = hasAnyPermission(auth, [
     "system:user:read",
+    "system:user:write",
+    "system:menu:read",
     "system:menu:write",
     "system:param:read",
+    "system:param:write",
+    "system:role:read",
+    "system:role:write",
   ]);
   const canViewOperationLog = can("operation_log:read");
 
@@ -151,8 +161,13 @@ export function useAuthSession() {
     authReady,
     can,
     canEdit,
+    canManageRoles,
     canManageSystem,
+    canViewMenus,
     canViewOperationLog,
+    canViewParams,
+    canViewRoles,
+    canViewUsers,
     loginOpen,
     setLoginOpen,
     authBusy,

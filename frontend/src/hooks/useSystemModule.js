@@ -48,7 +48,7 @@ function getFieldErrors(error, fallback) {
 }
 
 export function useSystemModule({ page, requireLogin, actionIntent, onActionHandled }) {
-  const currentPage = page === "menus" || page === "param-dicts" ? page : "users";
+  const currentPage = ["menus", "param-dicts", "roles"].includes(page) ? page : "users";
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
   const [users, setUsers] = React.useState([]);
@@ -120,7 +120,7 @@ export function useSystemModule({ page, requireLogin, actionIntent, onActionHand
         await loadMenus();
       } else if (currentPage === "param-dicts") {
         await loadCategories();
-      } else {
+      } else if (currentPage !== "roles") {
         await loadUsers();
       }
       loadedPagesRef.current.add(currentPage);
@@ -285,6 +285,7 @@ export function useSystemModule({ page, requireLogin, actionIntent, onActionHand
         username: userForm.username.trim(),
         displayName: userForm.displayName.trim(),
         status: userForm.status,
+        role: userForm.role,
         email: userForm.email.trim(),
         remark: userForm.remark.trim(),
       };
