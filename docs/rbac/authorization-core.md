@@ -62,11 +62,12 @@ authorization implementation.
 ## Session security
 
 P2 removes the old unknown-role-to-admin normalization from
-`identity_for_session` and `AuthService.authenticate`. `identity_from_mapping`
-still rejects unknown signed session roles at the native session boundary, so
-an invalid/unknown cookie cannot become an administrator. Current database
-role/status checks provide the stronger protection for existing valid cookies;
-P4 will expose the resulting permissions in the authentication contract.
+`identity_for_session` and `AuthService.authenticate`. Non-empty custom/unknown
+role codes can now cross the signed-session boundary without any admin upgrade;
+the current database role/status check remains authoritative, so an unknown
+role receives no permissions and protected APIs return `403`. Missing,
+deleted, or disabled users return `401`. P4 exposes the resulting permissions
+in the authentication contract.
 
 No permission cache, TTL, version counter, event bus, multi-role, ABAC, ACL,
 data scope, or external IAM dependency is introduced.

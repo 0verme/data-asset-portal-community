@@ -19,12 +19,16 @@ from backend.app.application import (
 
 
 class FrameworkNeutralIdentityTests(unittest.TestCase):
-    def test_identity_parser_accepts_only_current_maintenance_roles(self):
+    def test_identity_parser_accepts_non_empty_role_codes(self):
         identity = identity_from_mapping(
             {"role": "maintainer", "user": "alice", "name": "Alice"}
         )
         self.assertEqual(Identity("maintainer", "alice", "Alice"), identity)
-        self.assertIsNone(identity_from_mapping({"role": "viewer", "user": "alice"}))
+        self.assertEqual(
+            Identity("viewer", "alice", "alice"),
+            identity_from_mapping({"role": "viewer", "user": "alice"}),
+        )
+        self.assertIsNone(identity_from_mapping({"role": "", "user": "alice"}))
         self.assertIsNone(identity_from_mapping(None))
 
     def test_session_normalization_does_not_upgrade_unknown_role(self):

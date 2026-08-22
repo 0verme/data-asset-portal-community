@@ -12,6 +12,7 @@ from backend.app.application import (
     SESSION_PAYLOAD_KEY,
     SignedSessionCodec,
 )
+from backend.app.authorization import BUILTIN_ROLE_PERMISSION_CODES
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi.auth import get_native_session_identity
 from backend.app.fastapi_app import create_fastapi_app
@@ -20,6 +21,15 @@ from fastapi.testclient import TestClient
 
 
 class FastApiNativeAuthTests(unittest.TestCase):
+    @staticmethod
+    def auth_data(user):
+        return {
+            **user,
+            "permissions": sorted(
+                BUILTIN_ROLE_PERMISSION_CODES.get(user.get("role"), frozenset())
+            ),
+        }
+
     def setUp(self):
         self.environment = patch.dict(
             os.environ,
@@ -101,7 +111,7 @@ class FastApiNativeAuthTests(unittest.TestCase):
             json={"username": "alice", "password": "correct"},
         )
         self.assertEqual(200, login.status_code)
-        self.assertEqual(user, client.get("/api/auth/me").json()["data"])
+        self.assertEqual(self.auth_data(user), client.get("/api/auth/me").json()["data"])
 
     def test_native_login_me_logout_and_cookie_flags(self):
         user = {"role": "admin", "user": "alice", "name": "Alice"}
@@ -112,7 +122,7 @@ class FastApiNativeAuthTests(unittest.TestCase):
             json={"username": "alice", "password": "correct", "remember": True},
         )
         self.assertEqual(200, login.status_code)
-        self.assertEqual(user, login.json()["data"])
+        self.assertEqual(self.auth_data(user), login.json()["data"])
         set_cookie = login.headers["set-cookie"]
         self.assertIn("session=", set_cookie)
         self.assertIn("HttpOnly", set_cookie)
@@ -122,7 +132,7 @@ class FastApiNativeAuthTests(unittest.TestCase):
 
         current = client.get("/api/auth/me")
         self.assertEqual(200, current.status_code)
-        self.assertEqual(user, current.json()["data"])
+        self.assertEqual(self.auth_data(user), current.json()["data"])
         self.operation_logs.record_best_effort_audit.assert_called_once()
 
         logout = client.post("/api/auth/logout")
@@ -132,7 +142,7 @@ class FastApiNativeAuthTests(unittest.TestCase):
         self.assertEqual(401, client.get("/api/auth/me").status_code)
         self.assertEqual(2, self.operation_logs.record_best_effort_audit.call_count)
 
-    def test_invalid_and_forged_identity_behave_as_anonymous(self):
+    def test_invalid_identity_is_anonymous_and_unknown_role_has_no_permissions(self):
         client = TestClient(
             self.app({"role": "admin", "user": "alice", "name": "Alice"})
         )
@@ -149,7 +159,10 @@ class FastApiNativeAuthTests(unittest.TestCase):
             }
         )
         client.cookies.set("session", forged)
-        self.assertEqual(401, client.get("/api/auth/me").status_code)
+        unknown = client.get("/api/auth/me")
+        self.assertEqual(200, unknown.status_code)
+        self.assertEqual("viewer", unknown.json()["data"]["role"])
+        self.assertEqual([], unknown.json()["data"]["permissions"])
 
         client.cookies.set("session", "invalid.signature")
         self.assertEqual(401, client.get("/api/auth/me").status_code)
