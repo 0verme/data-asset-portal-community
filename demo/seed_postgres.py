@@ -55,6 +55,8 @@ def main():
         key_column = {
             "p_system": "system_code",
             "p_data_source": "source_code",
+            "p_lineage_node": "snapshot_id,node_id",
+            "p_lineage_edge": "snapshot_id,edge_id",
         }.get(table, spec["columns"][0])
         print(
             f"INSERT INTO dwp.{table} ({columns}) VALUES\n"

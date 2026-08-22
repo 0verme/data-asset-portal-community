@@ -57,6 +57,10 @@ def _char(length: int = 1):
     return sa.CHAR(length)
 
 
+def _large_text(length: int):
+    return sa.Text() if _dialect() == "mysql" else _text(length)
+
+
 def _timestamp():
     return sa.TIMESTAMP()
 
@@ -280,7 +284,8 @@ def upgrade() -> None:
         ("idx_p_push_change_log_ix_03", ["object_type", "object_code", "change_time"]),
     ])
 
-    json_type = _text(4000) if _dialect() == "mysql" else sa.Text()
+    json_type = _large_text(4000)
+    json_default = None if _dialect() == "mysql" else _default("'[]'")
     op.create_table(
         "p_report_asset",
         sa.Column("report_pk", _number(big=True), primary_key=True),
@@ -298,18 +303,18 @@ def upgrade() -> None:
         sa.Column("status_code", _text(32), nullable=False, server_default=_default("'enabled'")),
         sa.Column("effective_date", _text(10)),
         sa.Column("expire_date", _text(10)),
-        sa.Column("purpose_desc", _text(2000)),
-        sa.Column("stat_object_desc", _text(1000)),
-        sa.Column("stat_scope_desc", _text(1000)),
-        sa.Column("time_caliber_desc", _text(1000)),
-        sa.Column("filter_condition_desc", _text(2000)),
-        sa.Column("special_rule_desc", _text(2000)),
+        sa.Column("purpose_desc", _large_text(2000)),
+        sa.Column("stat_object_desc", _large_text(1000)),
+        sa.Column("stat_scope_desc", _large_text(1000)),
+        sa.Column("time_caliber_desc", _large_text(1000)),
+        sa.Column("filter_condition_desc", _large_text(2000)),
+        sa.Column("special_rule_desc", _large_text(2000)),
         sa.Column("owner_dept_name", _text(128), nullable=False),
         sa.Column("owner_name", _text(64), nullable=False),
         sa.Column("maintainer_name", _text(64)),
-        sa.Column("related_tables_json", json_type, nullable=False, server_default=_default("'[]'")),
-        sa.Column("related_indicators_json", json_type, nullable=False, server_default=_default("'[]'")),
-        sa.Column("remark_desc", _text(2000)),
+        sa.Column("related_tables_json", json_type, nullable=False, server_default=json_default),
+        sa.Column("related_indicators_json", json_type, nullable=False, server_default=json_default),
+        sa.Column("remark_desc", _large_text(2000)),
         sa.Column("is_deleted", _char(), nullable=False, server_default=_default("'N'")),
         sa.Column("created_by", _text(64), nullable=False, server_default=_default("'system'")),
         sa.Column("created_at", _timestamp(), nullable=False, server_default=_default("CURRENT_TIMESTAMP")),
