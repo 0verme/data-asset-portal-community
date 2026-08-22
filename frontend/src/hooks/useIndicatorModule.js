@@ -76,14 +76,14 @@ export function useIndicatorModule({
     requireLogin(() => {
       setIndicatorRoute({ page: "new", id: null });
       scrollMainToTop();
-    });
+    }, "indicator:write");
   };
 
   const indicatorEdit = (indicatorId) => {
     requireLogin(() => {
       setIndicatorRoute({ page: "edit", id: indicatorId });
       scrollMainToTop();
-    });
+    }, "indicator:write");
   };
 
   const indicatorViewDetail = (indicatorId) => {

@@ -13,6 +13,13 @@
 // limitations under the License.
 
 import { getCurrentRemoteUser, loginRemote, logoutRemote } from "./api/auth.js";
+import {
+  hasPermission,
+  MOCK_ROLE_PERMISSIONS,
+  normalizePermissions,
+} from "./auth/permissions.js";
+
+export { hasPermission } from "./auth/permissions.js";
 
 // 认证模式跟随数据模式 VITE_API_MODE：remote → 真实登录(db)，其余 → 演示登录(mock)
 export const AUTH_MODE = (import.meta.env.VITE_API_MODE || "mock").trim().toLowerCase() === "remote"
@@ -33,15 +40,21 @@ export const GUEST_AUTH = Object.freeze({
   role: "guest",
   user: null,
   name: null,
+  permissions: [],
 });
 
 function normalizeAuth(auth) {
   if (!auth || typeof auth !== "object") return { ...GUEST_AUTH };
-  if (!["admin", "maintainer"].includes(auth.role)) return { ...GUEST_AUTH };
+  const role = String(auth.role || "guest").trim().toLowerCase() || "guest";
+  const legacyMockPermissions = auth.permissions === undefined
+    && AUTH_MODE === "mock"
+    ? (MOCK_ROLE_PERMISSIONS[role] || [])
+    : auth.permissions;
   return {
-    role: auth.role,
+    role,
     user: auth.user || null,
     name: auth.name || auth.user || null,
+    permissions: normalizePermissions(legacyMockPermissions),
   };
 }
 
@@ -119,6 +132,7 @@ export async function login({ username, password, remember }) {
     role: MOCK_ROLE,
     user: MOCK_USER,
     name: MOCK_NAME,
+    permissions: MOCK_ROLE_PERMISSIONS[MOCK_ROLE] || [],
   };
   persistStoredAuth(auth, remember);
   return auth;

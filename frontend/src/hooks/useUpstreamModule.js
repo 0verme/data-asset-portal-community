@@ -213,7 +213,7 @@ export function useUpstreamModule({
       setUpstreamSaveError("");
       setUpRoute(getModuleListRoute("upstream"));
       scrollMainToTop();
-    }, "删除上游系统失败。");
+    }, "删除上游系统失败。", "upstream:write");
   };
   const handleToggleUpstream = async (systemId, status) => {
     if (!canEdit) {

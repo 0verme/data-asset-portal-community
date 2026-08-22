@@ -244,14 +244,14 @@ export function useAssetModule({
       pushModuleNavigationState("dwm", buildNavigationSnapshot());
       setRoute(getModuleEditRoute("dwm"));
       scrollMainToTop();
-    });
+    }, "asset:write");
   };
 
   const assetEdit = (tableName) => {
     requireLogin(() => {
       setRoute(getModuleEditRoute("dwm", tableName));
       scrollMainToTop();
-    });
+    }, "asset:write");
   };
 
   const handleSaveTable = async (table, oldName) => {
@@ -262,7 +262,7 @@ export function useAssetModule({
       setRoute(getModuleDetailRoute("dwm", table.name));
       setDetailTab(DEFAULT_DETAIL_TAB);
       scrollMainToTop();
-    }, "保存表失败。");
+    }, "保存表失败。", "asset:write");
   };
 
   const handleDeleteTable = async (tableName) => {
@@ -274,7 +274,7 @@ export function useAssetModule({
       setQuery("");
       setRoute(getModuleListRoute("dwm"));
       scrollMainToTop();
-    }, "删除表失败。");
+    }, "删除表失败。", "asset:write");
   };
 
   const resetAssetNavigation = useCallback(() => {

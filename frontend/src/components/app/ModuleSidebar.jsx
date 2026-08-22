@@ -1,5 +1,3 @@
-import React from "react";
-
 import {
   AssetSidebar,
   ApiAssetSidebar,
@@ -15,15 +13,16 @@ import {
 
 export function ModuleSidebar({ module, context }) {
   const {
-    apiAsset, apiAssetFilter, asset, canEdit, canManageSystem, indicator,
+    apiAsset, apiAssetFilter, asset, can, canEdit, canManageSystem, indicator,
     indicatorFilter, lineageBootstrap, manualCodeTable, push, pushRoute, report,
     reportFilter, requireLogin, root, setApiAssetFilter, setIndicatorFilter,
     setIndicatorRoute, setPushRoute, setReportFilter, setReportRoute, setRootRoute,
     setSystemActionIntent, setSystemRoute, setUpRoute, statusOptions, systemRoute,
     upstream,
   } = context;
+  const canPermission = can || (() => canEdit);
 
-  if (module === "codeTable") return <ManualCodeTableSidebar module={manualCodeTable} canEdit={canEdit} />;
+  if (module === "codeTable") return <ManualCodeTableSidebar module={manualCodeTable} canEdit={canPermission("code_table:write")} />;
   if (module === "push") {
     return <PushSidebar push={push} statusOptions={statusOptions} requireLogin={requireLogin} pushRoute={pushRoute} setPushRoute={setPushRoute} />;
   }
