@@ -23,7 +23,7 @@ from ...services.metadata_ingestion_service import (  # type: ignore
     MetadataPayloadTooLargeError,
     metadata_ingestion_service,
 )
-from ..dependencies import require_permission
+from ..dependencies import require_authenticated, require_permission
 
 
 def _metadata_error_response(error: MetadataIngestionError) -> JSONResponse:
@@ -56,7 +56,11 @@ def _check_metadata_body_size(request: Request) -> None:
 def _register_metadata_routes(
     app: FastAPI, service: Any = metadata_ingestion_service
 ) -> None:
-    router = APIRouter(prefix="/api/metadata", tags=["metadata-ingestion"])
+    router = APIRouter(
+        prefix="/api/metadata",
+        tags=["metadata-ingestion"],
+        dependencies=[Depends(require_authenticated)],
+    )
 
     def get_service() -> Any:
         return service

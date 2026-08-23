@@ -17,6 +17,11 @@ store. Debug must remain disabled in production. The old names are retained for
 migration and are deprecated; they may be removed in a future release after
 operators have migrated.
 
+There is intentionally no Public Catalog or anonymous-business-read setting.
+Ordinary business API reads are authenticated by default; the public surface is
+limited to the explicit health/capability and authentication lifecycle routes
+listed in [the authenticated-read model](./rbac/authenticated-read-model.md).
+
 ## Advanced runtime settings
 
 Change these only when the deployment has a concrete operational requirement.

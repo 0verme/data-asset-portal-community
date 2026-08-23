@@ -24,6 +24,8 @@ const MODULE_RENDERERS = {
     <SearchPortalPage
       onNavigate={context.goToModuleWithQuery}
       availableModules={context.visibleModuleKeys}
+      authenticated={context.businessAccessReady}
+      onRequireLogin={() => context.requireLogin?.(() => {})}
     />
   ),
   codeTable: ({ context }) => (
@@ -127,6 +129,16 @@ const MODULE_RENDERERS = {
   ),
 };
 
+function AuthenticatedBusinessPrompt({ onRequireLogin }) {
+  return (
+    <div className="state-card" role="status" aria-live="polite">
+      <h4>登录后访问业务目录</h4>
+      <p>普通业务目录、搜索和元数据只对已登录用户开放。</p>
+      <button className="btn primary" type="button" onClick={onRequireLogin}>登录</button>
+    </div>
+  );
+}
+
 function ModuleLoadingState() {
   return (
     <div className="state-card" role="status" aria-live="polite">
@@ -139,6 +151,9 @@ function ModuleLoadingState() {
 
 export function ModuleContent({ module, context }) {
   const renderer = MODULE_RENDERERS[module] || MODULE_RENDERERS.dwm;
+  if (module !== "portal" && context.businessAccessReady === false) {
+    return <AuthenticatedBusinessPrompt onRequireLogin={() => context.requireLogin?.(() => {})} />;
+  }
   if (module === "portal") {
     return renderer({ context });
   }

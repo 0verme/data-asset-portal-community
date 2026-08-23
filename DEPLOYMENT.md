@@ -77,6 +77,12 @@ curl --fail http://127.0.0.1:5099/healthz
 
 Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"`、`"fastapiPrimary":true` 和 `"flaskFallback":false`。其中 `flaskFallback=false` 是用于明确证明 fallback 已退休的 health contract 字段，不表示存在第二套 runtime。`/healthz` 只报告进程/runtime 状态，不执行数据库查询；数据库与业务 API 的可用性仍由对应回归和监控验证。默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）。`asgi.py` 加载仓库 runtime env 文件；系统环境变量和 demo bootstrap 规则保持现有行为。
 
+### Authentication boundary
+
+部署后的普通业务目录 API 默认要求有效 signed-session cookie：匿名请求到资产、指标、搜索、血缘、字段映射、菜单、报表、API 资产、上/下游系统或统计接口返回 `401`。登录后的普通用户可以读取普通目录；写操作、管理 API、操作日志、metadata lookup 和上/下游 admin detail 仍由既有 RBAC permission 返回 `403`（身份有效但未授权）。
+
+公开例外是显式且有限的：`GET /healthz`、不包含业务行数据的 `GET /api/capabilities`，以及 `/api/auth` 登录生命周期端点。没有 Public Catalog 开关或匿名业务目录部署模式。不要通过 Nginx、菜单隐藏或 OpenAPI visibility 替代后端认证；Production OpenAPI docs policy 仍由 #144 单独维护。完整 route inventory 见 [Authenticated-by-default Business Read Model](./docs/rbac/authenticated-read-model.md)。
+
 ### 安全默认值（生产）
 
 - `APP_DEBUG` 默认关闭；**生产环境显式开启 debug 会在启动时失败**（fail-fast），禁止 Werkzeug debugger 运行

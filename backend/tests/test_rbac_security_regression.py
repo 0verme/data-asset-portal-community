@@ -60,9 +60,9 @@ class RbacSecurityRegressionTests(unittest.TestCase):
         self.assertEqual(403, forbidden_roles.status_code)
         self.system_service.get_roles.assert_not_called()
 
-        public_read = self.client.get("/api/indicators")
-        self.assertEqual(200, public_read.status_code)
-        self.assertEqual([], public_read.json()["items"])
+        ordinary_read = self.client.get("/api/indicators")
+        self.assertEqual(200, ordinary_read.status_code)
+        self.assertEqual([], ordinary_read.json()["items"])
 
     def test_role_reader_can_read_roles_but_guest_and_disabled_user_cannot(self):
         self.current_identity = Identity("role-reader", "role-reader", "Role reader")
@@ -78,11 +78,35 @@ class RbacSecurityRegressionTests(unittest.TestCase):
         disabled = self.client.get("/api/system/roles")
         self.assertEqual(401, disabled.status_code)
 
-    def test_public_menu_read_is_not_an_authorization_boundary(self):
-        self.current_identity = None
+    def test_authenticated_menu_read_is_not_an_authorization_boundary(self):
+        self.current_identity = Identity("indicator-reader", "custom", "Custom")
         response = self.client.get("/api/system/menus")
         self.assertEqual(200, response.status_code)
         self.assertEqual("system", response.json()["items"][0]["code"])
+        self.assertNotIn("permission", response.text.lower())
+
+        self.current_identity = None
+        anonymous = self.client.get("/api/system/menus")
+        self.assertEqual(401, anonymous.status_code)
+        self.system_service.get_menus.assert_called_once()
+
+    def test_anonymous_business_reads_return_401_across_catalog_groups(self):
+        self.current_identity = None
+        representative_reads = (
+            "/api/assets/tables",
+            "/api/indicators",
+            "/api/search?q=customer",
+            "/api/lineage/bootstrap",
+            "/api/field-mappings/fields",
+            "/api/system/menus",
+        )
+        for path in representative_reads:
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(401, response.status_code)
+                self.assertEqual("UNAUTHORIZED", response.json()["error"]["code"])
+                self.assertNotIn("permission", response.text.lower())
+                self.assertNotIn("database", response.text.lower())
 
     def test_authenticated_missing_role_write_cannot_create_role_directly(self):
         self.current_identity = Identity("role-reader", "role-reader", "Role reader")

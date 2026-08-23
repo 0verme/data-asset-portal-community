@@ -15,6 +15,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { getMenus, MENUS_CHANGED_EVENT } from "./api/menus.js";
+import { isDbAuthMode } from "./auth.js";
 import { AuthBar, AuthContext, LoginModal } from "./components/AuthControls.jsx";
 import { AppShell } from "./components/app/AppShell.jsx";
 import { ModuleContent } from "./components/app/ModuleContent.jsx";
@@ -128,6 +129,7 @@ export default function App() {
     handleLoginSubmit,
     handleLogout,
   } = useAuthSession();
+  const businessAccessReady = !isDbAuthMode() || (authReady && Boolean(auth.user));
 
   const loadMenus = React.useCallback(async () => {
     const requestId = navMenuRequestRef.current + 1;
@@ -157,13 +159,19 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!businessAccessReady) {
+      navMenuRequestRef.current += 1;
+      setNavMenus([]);
+      setNavMenuStatus(authReady ? "ready" : "loading");
+      return undefined;
+    }
     loadMenus();
     window.addEventListener(MENUS_CHANGED_EVENT, loadMenus);
     return () => {
       navMenuRequestRef.current += 1;
       window.removeEventListener(MENUS_CHANGED_EVENT, loadMenus);
     };
-  }, [loadMenus]);
+  }, [authReady, businessAccessReady, loadMenus]);
 
   useEffect(() => {
     refreshCapabilities();
@@ -250,7 +258,7 @@ export default function App() {
   );
 
   const asset = useAssetModule({
-    active: module === "dwm",
+    active: businessAccessReady && module === "dwm",
     query,
     setQuery,
     route,
@@ -264,7 +272,7 @@ export default function App() {
   });
 
   const root = useRootModule({
-    active: module === "root",
+    active: businessAccessReady && module === "root",
     query,
     setQuery,
     rootRoute,
@@ -273,7 +281,7 @@ export default function App() {
   });
 
   const indicator = useIndicatorModule({
-    active: module === "indicator",
+    active: businessAccessReady && module === "indicator",
     query,
     indicatorRoute,
     setIndicatorRoute,
@@ -285,7 +293,7 @@ export default function App() {
   });
 
   const report = useReportModule({
-    active: module === "report",
+    active: businessAccessReady && module === "report",
     query,
     reportRoute,
     setReportRoute,
@@ -296,12 +304,12 @@ export default function App() {
     setLoginOpen,
   });
   const apiAsset = useApiAssetModule({
-    active: module === "apiAsset", query, route: apiAssetRoute, setRoute: setApiAssetRoute,
+    active: businessAccessReady && module === "apiAsset", query, route: apiAssetRoute, setRoute: setApiAssetRoute,
     filter: apiAssetFilter, canEdit: can("api_asset:write"), requireLogin, setAuthError, setLoginOpen,
   });
 
   const push = usePushModule({
-    active: module === "push",
+    active: businessAccessReady && module === "push",
     query,
     setQuery,
     pushRoute,
@@ -314,7 +322,7 @@ export default function App() {
   });
 
   const upstream = useUpstreamModule({
-    active: module === "upstream",
+    active: businessAccessReady && module === "upstream",
     query,
     setQuery,
     upRoute,
@@ -329,7 +337,7 @@ export default function App() {
   });
 
   const manualCodeTable = useManualCodeTableModule({
-    active: module === "codeTable",
+    active: businessAccessReady && module === "codeTable",
     query,
     requireLogin,
   });
@@ -645,7 +653,7 @@ export default function App() {
     <ModuleContent
       module={module}
       context={{
-        apiAsset, apiAssetRoute, apiAssetView, asset, backToUpstreamList, can,
+        apiAsset, apiAssetRoute, apiAssetView, asset, backToUpstreamList, businessAccessReady, can,
         canEdit, canManageRoles, canManageSystem, canViewMenus, canViewOperationLog, canViewParams,
         canViewRoles, canViewUsers, goToMapping, goToModuleWithQuery, indicator, indicatorFilter,
         indicatorRoute, indicatorView, lineageRoute, manualCodeTable, mappingRoute,

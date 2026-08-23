@@ -177,6 +177,12 @@ APP_ENV=development
 - `backend/asgi.py` 运行纯 FastAPI Native backend；Auth 保留既有 signed-session cookie format，仓库已有模块 routes 默认注册，数据库/驱动/外部依赖 readiness 通过 error contract 表达。Flask compatibility runtime 已退休；`FLASK_*` 变量名仅作为 retained signed-cookie/security configuration contract，不代表 Flask 进程。
 - Nginx + Vite 的 `/api` 反代是同源部署，不需要 CORS。只有前端和 API 确实处于不同来源时，才设置 `APP_CORS_ORIGINS`，使用逗号分隔的完整来源，例如 `https://portal.example.com,https://admin.example.com`；空项会忽略，未配置时不发送跨域允许头，绝不使用 `*`。
 
+### Authenticated-by-default 业务读模型
+
+Remote API 的普通业务 GET 默认需要登录：匿名请求返回 `401`，已登录普通用户可以浏览普通目录，不需要为每个 GET 申请细粒度 read permission。写操作、管理 API 和敏感读取继续使用现有 RBAC `require_permission(...)`，`403` 表示已有身份但缺少授权。
+
+显式匿名例外仅包括 `/healthz`、有限的 `/api/capabilities` 模块元数据以及 `/api/auth` 登录生命周期。当前没有 Public Catalog 配置或默认开放业务目录。前端 remote 模式会先完成 `/api/auth/me` 身份 bootstrap，再请求菜单、统计和业务模块；未登录时不会循环请求这些 API。完整清单见 [Authenticated-by-default Business Read Model](./docs/rbac/authenticated-read-model.md)。
+
 ## 环境文件加载顺序
 
 后端依次加载（后者覆盖前者）：
