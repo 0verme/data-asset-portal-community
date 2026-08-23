@@ -612,6 +612,33 @@ class SystemManagementService:
             audit.after = result
             return result
 
+    def create_bootstrap_admin(self, username: str, display_name: str, password: str):
+        """Create the initial administrator without exposing a default password."""
+        if not password:
+            raise SystemValidationError("Admin password must not be empty")
+        user = self._normalize_user_payload({
+            "username": username,
+            "displayName": display_name,
+            "status": "enabled",
+            "role": "admin",
+        })
+        existing = self._core_fetch(
+            select(admin_user.c.id).where(admin_user.c.username == user["username"])
+        )
+        if existing:
+            raise SystemUserAlreadyExistsError(f"User already exists: {user['username']}")
+        self._core_execute([
+            insert(admin_user).values(
+                id=self._core_next_pk(),
+                username=user["username"],
+                password_hash=build_password_hash(password),
+                display_name=user["displayName"],
+                status=self._user_status_to_db_status("enabled"),
+                role="admin",
+            )
+        ])
+        return user["username"]
+
     def _create_user(self, payload):
         user = self._normalize_user_payload(payload)
         self._ensure_assignable_role(user["role"], for_user=True)

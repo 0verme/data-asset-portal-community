@@ -17,10 +17,16 @@ from backend.app.settings import (
 
 class NativeSecurityConfigTests(unittest.TestCase):
     _CONFIG_KEYS = (
+        "APP_DEBUG",
+        "APP_SECRET_KEY",
+        "APP_ENV",
+        "APP_CORS_ORIGINS",
+        "APP_MAX_CONTENT_LENGTH_MB",
         "FLASK_DEBUG",
         "FLASK_SECRET_KEY",
         "FLASK_ENV",
         "FLASK_CORS_ORIGINS",
+        "FLASK_MAX_CONTENT_LENGTH_MB",
     )
 
     def setUp(self):
@@ -47,8 +53,17 @@ class NativeSecurityConfigTests(unittest.TestCase):
                 os.environ["FLASK_DEBUG"] = value
                 self.assertTrue(get_runtime_debug())
 
+    def test_app_names_prefer_legacy_names_and_legacy_fallback_works(self):
+        os.environ["FLASK_SECRET_KEY"] = "legacy-secret"
+        self.assertEqual("legacy-secret", get_session_secret())
+        os.environ["APP_SECRET_KEY"] = "preferred-secret"
+        self.assertEqual("preferred-secret", get_session_secret())
+        os.environ["FLASK_ENV"] = "development"
+        os.environ["APP_ENV"] = "production"
+        self.assertTrue(get_session_cookie_config()["SESSION_COOKIE_SECURE"])
+
     def test_missing_or_blank_secret_fails_without_leaking_value(self):
-        with self.assertRaisesRegex(RuntimeError, "FLASK_SECRET_KEY"):
+        with self.assertRaisesRegex(RuntimeError, "APP_SECRET_KEY"):
             get_session_secret()
         secret_value = "not-a-valid-secret-to-display"
         for value in ("", "   "):
