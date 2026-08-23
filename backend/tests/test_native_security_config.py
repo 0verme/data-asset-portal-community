@@ -8,6 +8,7 @@ import os
 import unittest
 
 from backend.app.settings import (
+    get_int_env_from_compatible,
     get_runtime_config,
     get_runtime_debug,
     get_session_cookie_config,
@@ -17,10 +18,16 @@ from backend.app.settings import (
 
 class NativeSecurityConfigTests(unittest.TestCase):
     _CONFIG_KEYS = (
+        "APP_DEBUG",
+        "APP_SECRET_KEY",
+        "APP_ENV",
+        "APP_CORS_ORIGINS",
+        "APP_MAX_CONTENT_LENGTH_MB",
         "FLASK_DEBUG",
         "FLASK_SECRET_KEY",
         "FLASK_ENV",
         "FLASK_CORS_ORIGINS",
+        "FLASK_MAX_CONTENT_LENGTH_MB",
     )
 
     def setUp(self):
@@ -47,8 +54,94 @@ class NativeSecurityConfigTests(unittest.TestCase):
                 os.environ["FLASK_DEBUG"] = value
                 self.assertTrue(get_runtime_debug())
 
+    def test_app_names_prefer_legacy_names_and_legacy_fallback_works(self):
+        os.environ["FLASK_SECRET_KEY"] = "legacy-secret"
+        self.assertEqual("legacy-secret", get_session_secret())
+        os.environ["APP_SECRET_KEY"] = "preferred-secret"
+        self.assertEqual("preferred-secret", get_session_secret())
+        os.environ["FLASK_ENV"] = "development"
+        os.environ["APP_ENV"] = "production"
+        self.assertTrue(get_session_cookie_config()["SESSION_COOKIE_SECURE"])
+
+    def test_blank_app_values_fall_back_to_legacy(self):
+        os.environ["APP_SECRET_KEY"] = ""
+        os.environ["FLASK_SECRET_KEY"] = "legacy-secret"
+        self.assertEqual("legacy-secret", get_session_secret())
+        os.environ["APP_ENV"] = "   "
+        os.environ["FLASK_ENV"] = "development"
+        self.assertFalse(get_session_cookie_config()["SESSION_COOKIE_SECURE"])
+        os.environ["APP_DEBUG"] = ""
+        os.environ["FLASK_DEBUG"] = "true"
+        self.assertTrue(get_runtime_debug())
+        os.environ["APP_CORS_ORIGINS"] = ""
+        os.environ["FLASK_CORS_ORIGINS"] = "https://legacy.example.com"
+        self.assertEqual(
+            ["https://legacy.example.com"],
+            get_runtime_config()["CORS_ORIGINS"],
+        )
+
+    def test_max_content_length_precedence_and_invalid_bounds(self):
+        self.assertEqual(
+            16,
+            get_int_env_from_compatible(
+                "APP_MAX_CONTENT_LENGTH_MB", "FLASK_MAX_CONTENT_LENGTH_MB", 16, minimum=1, maximum=512
+            ),
+        )
+        os.environ["FLASK_MAX_CONTENT_LENGTH_MB"] = "32"
+        self.assertEqual(
+            32,
+            get_int_env_from_compatible(
+                "APP_MAX_CONTENT_LENGTH_MB", "FLASK_MAX_CONTENT_LENGTH_MB", 16, minimum=1, maximum=512
+            ),
+        )
+        os.environ["APP_MAX_CONTENT_LENGTH_MB"] = "64"
+        self.assertEqual(
+            64,
+            get_int_env_from_compatible(
+                "APP_MAX_CONTENT_LENGTH_MB", "FLASK_MAX_CONTENT_LENGTH_MB", 16, minimum=1, maximum=512
+            ),
+        )
+        # Invalid APP wins the name selection, then falls back to the default (not legacy).
+        os.environ["APP_MAX_CONTENT_LENGTH_MB"] = "abc"
+        self.assertEqual(
+            16,
+            get_int_env_from_compatible(
+                "APP_MAX_CONTENT_LENGTH_MB", "FLASK_MAX_CONTENT_LENGTH_MB", 16, minimum=1, maximum=512
+            ),
+        )
+        for invalid in ("0", "-1", "513"):
+            with self.subTest(value=invalid):
+                os.environ["APP_MAX_CONTENT_LENGTH_MB"] = invalid
+                self.assertEqual(
+                    16,
+                    get_int_env_from_compatible(
+                        "APP_MAX_CONTENT_LENGTH_MB",
+                        "FLASK_MAX_CONTENT_LENGTH_MB",
+                        16,
+                        minimum=1,
+                        maximum=512,
+                    ),
+                )
+        # Whitespace-only APP is treated as absent and falls back to legacy.
+        os.environ["APP_MAX_CONTENT_LENGTH_MB"] = " "
+        self.assertEqual(
+            32,
+            get_int_env_from_compatible(
+                "APP_MAX_CONTENT_LENGTH_MB", "FLASK_MAX_CONTENT_LENGTH_MB", 16, minimum=1, maximum=512
+            ),
+        )
+
+    def test_app_debug_false_wins_over_legacy_true_in_production(self):
+        os.environ["APP_SECRET_KEY"] = "test-only-provided-secret"
+        os.environ["APP_ENV"] = "production"
+        os.environ["APP_DEBUG"] = "false"
+        os.environ["FLASK_DEBUG"] = "true"
+        self.assertFalse(get_runtime_debug())
+        config = get_runtime_config()
+        self.assertTrue(config["SESSION_COOKIE_SECURE"])
+
     def test_missing_or_blank_secret_fails_without_leaking_value(self):
-        with self.assertRaisesRegex(RuntimeError, "FLASK_SECRET_KEY"):
+        with self.assertRaisesRegex(RuntimeError, "APP_SECRET_KEY"):
             get_session_secret()
         secret_value = "not-a-valid-secret-to-display"
         for value in ("", "   "):

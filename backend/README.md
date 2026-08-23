@@ -58,12 +58,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 | `ASSET_DB_JAR_PATH` | GaussDB JDBC jar 路径（驱动不随仓库分发，自行从官方渠道获取） | `/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar` |
 | `ASSET_DB_CONNECT_TIMEOUT_SECONDS` | 数据库连接超时秒数 | `30` |
 | `ASSET_DB_STATEMENT_TIMEOUT_MS` | PostgreSQL / GaussDB 查询超时毫秒数 | `120000` |
-| `FLASK_DEBUG` | Native FastAPI 的 debug 配置（默认关闭；仅 `1`/`true`/`yes`/`on` 为真） | `false` |
-| `FLASK_SECRET_KEY` | 必填的 signed-session 密钥（缺失或空白即启动失败；保留配置名不代表 Flask） | `<generate-a-strong-random-value>` |
-| `FLASK_ENV` | Cookie/security contract 的运行环境（默认安全生产行为；开发必须显式设置） | `production`、`development` |
-| `FLASK_CORS_ORIGINS` | Native FastAPI 使用的精确跨域来源 allowlist，逗号分隔 | `https://portal.example.com` |
+| `APP_DEBUG` | Native FastAPI 的 debug 配置（默认关闭；仅 `1`/`true`/`yes`/`on` 为真） | `false` |
+| `APP_SECRET_KEY` | 必填的 signed-session 密钥（缺失或空白即启动失败；保留配置名不代表 Flask） | `<generate-a-strong-random-value>` |
+| `APP_ENV` | Cookie/security contract 的运行环境（默认安全生产行为；开发必须显式设置） | `production`、`development` |
+| `APP_CORS_ORIGINS` | Native FastAPI 使用的精确跨域来源 allowlist，逗号分隔 | `https://portal.example.com` |
 
-Session Cookie 始终使用 `HttpOnly=True` 和 `SameSite=Lax`。默认/生产环境使用 `Secure=True`；只有显式 `FLASK_ENV=development` 才为本地 HTTP 联调关闭 Secure。Nginx 或 Vite 的 `/api` 同源代理不需要 CORS；跨域部署才设置 `FLASK_CORS_ORIGINS`，不设置就不返回 CORS 允许头，禁止使用 `*`。不要将真实 `FLASK_SECRET_KEY` 写入仓库、日志或命令历史；可在受控终端本地执行 `python -c "import secrets; print(secrets.token_urlsafe(32))"` 生成后交由 secret store 保存。
+Session Cookie 始终使用 `HttpOnly=True` 和 `SameSite=Lax`。默认/生产环境使用 `Secure=True`；只有显式 `APP_ENV=development` 才为本地 HTTP 联调关闭 Secure。Nginx 或 Vite 的 `/api` 同源代理不需要 CORS；跨域部署才设置 `APP_CORS_ORIGINS`，不设置就不返回 CORS 允许头，禁止使用 `*`。不要将真实 `APP_SECRET_KEY` 写入仓库、日志或命令历史；可在受控终端本地执行 `python -c "import secrets; print(secrets.token_urlsafe(32))"` 生成后交由 secret store 保存。
 
 内网数据库链路较慢时，可在 `backend/.env.local` 中设置：
 
@@ -169,7 +169,7 @@ Full/module-specific/external-dependency 部署可手动逐个执行模块 DDL�
 - 创建带备份/恢复方案的隔离 PostgreSQL 数据库，例如 `dap_38_postgresql` 对应的专用测试对象；不要复用归属不明的共享库。
 - 准备一个不在 Git 中的 profile YAML，`type` 必须是 `postgres`，并指向该隔离数据库；将 profile 名称放入 `DAP38_PG_PROFILE`，文件路径放入 `DAP38_PG_CONFIG`。
 - 为执行 `psql` 的终端准备同一个测试库的 `DAP38_PG_DSN`，密码通过 `.pgpass` 或 secret store 提供，避免出现在命令历史中。
-- 设置 `ASSET_RUNTIME_PROFILE=community`；启动应用前将 `ASSET_DB_PROFILE` 指向同一个 `DAP38_PG_PROFILE`，并设置非空的本地 `FLASK_SECRET_KEY`。环境变量和安全边界详见 [首次贡献指南](../docs/first-contribution.md) 与 [开发指南](../DEVELOPMENT.md)。
+- 设置 `ASSET_RUNTIME_PROFILE=community`；启动应用前将 `ASSET_DB_PROFILE` 指向同一个 `DAP38_PG_PROFILE`，并设置非空的本地 `APP_SECRET_KEY`。环境变量和安全边界详见 [首次贡献指南](../docs/first-contribution.md) 与 [开发指南](../DEVELOPMENT.md)。
 
 ### 2. 离线 baseline 检查
 

@@ -24,26 +24,26 @@ VITE_BACKEND_URL=http://127.0.0.1:5099
 
 ### 后端环境变量
 
-后端始终连库、无模式开关，只需指定数据库 profile。下列 `FLASK_*` 是保留的安全、Session Cookie 和 CORS configuration contract 名称，不代表仍存在 Flask runtime：
+后端始终连库、无模式开关，只需指定数据库 profile。下列 `APP_*` 是安全、Session Cookie 和 CORS configuration contract 名称（`FLASK_*` 仍可作为兼容 fallback，不代表仍存在 Flask runtime）：
 
 ```env
 ASSET_DB_PROFILE=primary
 ASSET_AUTH_DB_PROFILE=primary
 ASSET_DB_CONFIG_PATH=/opt/data-asset-portal/backend/configs/database.yaml
-FLASK_DEBUG=false
-FLASK_SECRET_KEY=<generate-a-strong-random-value>
-# FLASK_ENV defaults to production; production cookies are Secure.
-# FLASK_ENV=production
+APP_DEBUG=false
+APP_SECRET_KEY=<generate-a-strong-random-value>
+# APP_ENV defaults to production; production cookies are Secure.
+# APP_ENV=production
 # Same-origin Nginx deployment does not need this. If API is cross-origin,
 # provide exact comma-separated origins; never use * with session cookies.
-# FLASK_CORS_ORIGINS=https://portal.example.com
+# APP_CORS_ORIGINS=https://portal.example.com
 ```
 
-`FLASK_SECRET_KEY` 是所有环境的必填 signed-session 安全配置：缺失、空字符串或纯空白会在应用启动时失败。使用密码管理器或部署平台的 secret store 生成和保存强随机值；不要把真实值提交到仓库、写入日志或拼进 shell 命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`。
+优先使用 `APP_*` 名称；现有部署中的 `FLASK_*` 名称仍作为兼容 fallback，且 `APP_*` 同时存在时优先。`APP_SECRET_KEY` 是所有环境的必填 signed-session 安全配置：缺失、空字符串或纯空白会在应用启动时失败。使用密码管理器或部署平台的 secret store 生成和保存强随机值；不要把真实值提交到仓库、写入日志或拼进 shell 命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`。
 
-`FLASK_DEBUG` 默认关闭，只有 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会开启。`FLASK_ENV` 未设置时采用安全的生产行为：Session Cookie 为 `HttpOnly=True`、`SameSite=Lax`、`Secure=True`。仅本地 HTTP 开发可显式设置 `FLASK_ENV=development` 使 `Secure=False`；这些变量名属于 retained compatibility/configuration contract，不表示 Flask 进程或 Flask WSGI runtime。
+`APP_DEBUG` 默认关闭，只有 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会开启。`APP_ENV` 未设置时采用安全的生产行为：Session Cookie 为 `HttpOnly=True`、`SameSite=Lax`、`Secure=True`。仅本地 HTTP 开发可显式设置 `APP_ENV=development` 使 `Secure=False`；这些变量名属于 retained compatibility/configuration contract，不表示 Flask 进程或 Flask WSGI runtime。
 
-此文档的 Nginx 配置将静态前端和 `/api` 放在同一来源，因此不需要 CORS。若必须拆分来源，设置 `FLASK_CORS_ORIGINS` 为完整、精确的逗号分隔 allowlist（如 `https://portal.example.com`）；未设置时不会返回 CORS 允许头，空项会忽略，且不会允许 `*` 与 Cookie 凭据的组合。
+此文档的 Nginx 配置将静态前端和 `/api` 放在同一来源，因此不需要 CORS。若必须拆分来源，设置 `APP_CORS_ORIGINS` 为完整、精确的逗号分隔 allowlist（如 `https://portal.example.com`）；未设置时不会返回 CORS 允许头，空项会忽略，且不会允许 `*` 与 Cookie 凭据的组合。
 
 如使用 GaussDB JDBC 覆盖路径，可额外设置：
 
@@ -79,9 +79,9 @@ Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"`、`
 
 ### 安全默认值（生产）
 
-- `FLASK_DEBUG` 默认关闭；**生产环境显式开启 debug 会在启动时失败**（fail-fast），禁止 Werkzeug debugger 运行
-- Session Cookie：`HttpOnly=True`、`SameSite=Lax`、`Secure=True`（仅 `FLASK_ENV=development` 本地 HTTP 开发关闭 `Secure`）
-- 请求体上限：保留配置名 `FLASK_MAX_CONTENT_LENGTH_MB`（默认 16，上限存在时超限返回统一 JSON 413；该名称不代表 Flask runtime）
+- `APP_DEBUG` 默认关闭；**生产环境显式开启 debug 会在启动时失败**（fail-fast），禁止 Werkzeug debugger 运行
+- Session Cookie：`HttpOnly=True`、`SameSite=Lax`、`Secure=True`（仅 `APP_ENV=development` 本地 HTTP 开发关闭 `Secure`）
+- 请求体上限：保留配置名 `APP_MAX_CONTENT_LENGTH_MB`（默认 16，上限存在时超限返回统一 JSON 413；该名称不代表 Flask runtime）
 - 响应安全头：`X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy: strict-origin-when-cross-origin`
 - 4xx/5xx 错误响应统一为 JSON 结构，不向客户端泄露内部路径/连接串/底层驱动异常
 - 转发头信任：**默认不受信任**。审计日志如需真实客户端 IP，仅当请求只经受信反代（如 Nginx）时设置 `ASSET_TRUST_PROXY_HEADERS=true`；否则客户端可直接伪造 `X-Forwarded-For`。Nginx 已设置 `X-Forwarded-For` 的同源部署请开启该项
@@ -176,8 +176,8 @@ server {
 - 确认 `/healthz` 返回 `status=ok`，并确认 runtime 为预期值
 - 确认 `/api/assets/tables` 返回 JSON 而不是 HTML
 - 确认前端为 `VITE_API_MODE=remote`，且 `/api` 已正确代理到纯 FastAPI ASGI runtime
-- 确认保留配置名 `FLASK_SECRET_KEY` 由部署 secret store 提供，且 `FLASK_DEBUG=false`；这些名称不代表 Flask runtime
-- HTTPS 终止后仍应保持 `FLASK_ENV=production`，以发送 Secure Cookie；FastAPI native auth 使用 signed cookie contract；本阶段未扩大转发头信任范围
+- 确认保留配置名 `APP_SECRET_KEY` 由部署 secret store 提供，且 `APP_DEBUG=false`；这些名称不代表 Flask runtime
+- HTTPS 终止后仍应保持 `APP_ENV=production`，以发送 Secure Cookie；FastAPI native auth 使用 signed cookie contract；本阶段未扩大转发头信任范围
 - `backend/configs/database.yaml` 与 `.env.local` 不入库（见 `.gitignore`）；请从 `backend/configs/database.example.yaml` 与 `backend/.env.example` 复制后按环境填写
 
 ## 七、配置来源

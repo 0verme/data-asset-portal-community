@@ -33,7 +33,7 @@ const MOCK_ROLE = (import.meta.env.VITE_MOCK_AUTH_ROLE || "admin").trim().toLowe
   : "admin";
 
 const MOCK_USER = (import.meta.env.VITE_MOCK_AUTH_USER || "admin").trim() || "admin";
-const MOCK_PASSWORD = import.meta.env.VITE_MOCK_AUTH_PASSWORD || "admin123";
+const MOCK_PASSWORD = import.meta.env.VITE_MOCK_AUTH_PASSWORD || "community-demo-password";
 const MOCK_NAME = (import.meta.env.VITE_MOCK_AUTH_NAME || "管理员").trim() || "管理员";
 
 export const GUEST_AUTH = Object.freeze({
