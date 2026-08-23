@@ -143,7 +143,17 @@ python backend/scripts/collect_lineage_snapshot.py --profile <profile>
 在调度元数据表更新后定时执行采集命令。采集失败会回滚并继续保留原 ACTIVE 快照。
 完整运行、验证和回退方法见 [血缘快照采集与发布指南](docs/lineage_bulk_import_guide.md)。
 
-## 五、Nginx 示例
+## 五、管理员初始化
+
+Schema migration 不通过 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 环境变量创建管理员。首次部署完成数据库初始化后，使用交互式 CLI 创建或确认管理员：
+
+```bash
+python backend/scripts/create_admin.py
+```
+
+CLI 使用当前 runtime 配置（`ASSET_DB_PROFILE`、`ASSET_DB_CONFIG_PATH`）并交互式提示用户名、显示名和密码；它不接受 `--profile` 或 `ADMIN_*` 参数。真实凭据只应通过受控终端或 secret store 提供，不写入文档、日志或 shell 历史。Community Demo 的 `community_demo` 是受控演示账号，不是生产管理员凭据。
+
+## 六、Nginx 示例
 
 ```nginx
 server {
@@ -168,7 +178,7 @@ server {
 }
 ```
 
-## 六、部署检查项
+## 七、部署检查项
 
 - 确认 `ASSET_DB_CONFIG_PATH` 指向正确文件，且 `ASSET_DB_PROFILE` 在配置中存在
 - 如使用 GaussDB，确认 JDBC jar 可访问
@@ -180,7 +190,7 @@ server {
 - HTTPS 终止后仍应保持 `APP_ENV=production`，以发送 Secure Cookie；FastAPI native auth 使用 signed cookie contract；本阶段未扩大转发头信任范围
 - `backend/configs/database.yaml` 与 `.env.local` 不入库（见 `.gitignore`）；请从 `backend/configs/database.example.yaml` 与 `backend/.env.example` 复制后按环境填写
 
-## 七、配置来源
+## 八、配置来源
 
 - 数据库实连配置：复制 `backend/configs/database.example.yaml` → `backend/configs/database.yaml`（或用 `ASSET_DB_CONFIG_PATH` 指向环境专用路径）
 - 后端环境变量：复制 `backend/.env.example` → `backend/.env.local`

@@ -6,6 +6,10 @@
 > **Repository Truth baseline:** `origin/main` at `47f4bf642bf6eb1286d7713820f6331a8a6b42ec`.
 > This document is an audit of the code that existed at that baseline. It is not a
 > copy of the historical issue description.
+>
+> **Status:** The P0 design has been implemented through the RBAC phases. The
+> current permission registry, backend enforcement, role management and single-role
+> binding are current; remaining limitations are listed below.
 
 ## 1. Current runtime boundary
 
@@ -149,8 +153,8 @@ routes even though they are omitted from OpenAPI.
 | guest | Public routes only. Protected dependencies reject the request. | Preserve public reads; map protected unauthenticated requests to `401`. |
 | `maintainer` | Passes `require_maintainer`; cannot pass `require_admin`. | Preserve business maintenance and operation-log access; do not grant system user/menu/param/role management. |
 | `admin` | Passes both current gates. | Preserve all current access and explicitly map every registered permission. |
-| unknown role | `identity_from_mapping` returns no identity, but `AuthService.authenticate` and `identity_for_session` currently normalize an unknown role to `admin`. | This is a P0 security finding. P2/P4 must remove the fail-open normalization; unknown/deleted role maps to no permissions and cannot access protected APIs. |
-| disabled/deleted user | Login rejects inactive status; current native session resolver trusts the signed identity and does not re-query the user on every request. | P2/P4 must revalidate current user state for protected requests so an old cookie cannot retain access. |
+| unknown role | Unknown or deleted roles resolve to no permissions. | Deny by default; protected APIs return `403` for a valid identity without the required permission. |
+| disabled/deleted user | Current authentication/authorization revalidates user and role state; inactive users cannot retain access through an old cookie. | Return `401` and revoke access. |
 
 ### Built-in permission mapping
 
@@ -192,8 +196,8 @@ make that route private.
 
 The custom example is intentionally exact: it can maintain indicators and
 read operation logs, but cannot manage users or other system resources.
-P6 will make this mapping persistable and user-selectable while retaining one
-role per user.
+The mapping is persisted in the role/permission tables and is user-selectable
+through the role-management API while retaining one role per user.
 
 ## 6. Security and session decisions
 

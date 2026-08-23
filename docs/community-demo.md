@@ -11,9 +11,9 @@
 
 本文的 **Repository Community Demo**、前端 **mock mode** 和线上 **static Demo** 不是同一个运行面：
 
-1. **Repository Community/remote Demo**：`scripts/community_demo.py` 使用 Community SQLite baseline + Alembic + seed，通过 `backend/asgi.py` 和 Uvicorn 启动真实 FastAPI API。当前 profile 注册 `portal,dwm,mapping,lineage,root,indicator,apiAsset,system`；`upstream,push,report,codeTable` 仍受 Community capability/schema 边界限制，边界移除属于 [#116](https://github.com/0verme/data-asset-portal-community/issues/116)。
+1. **Repository Community/remote Demo**：`scripts/community_demo.py` 使用 Community SQLite baseline + Alembic + seed，通过 `backend/asgi.py` 和 Uvicorn 启动真实 FastAPI API。仓库模块默认按 open repository module contract 注册；数据库驱动、外部依赖、凭据和 persistent storage readiness 可能影响部署能力，但不隐藏源码模块。
 2. **Frontend mock mode**：`VITE_API_MODE=mock` 只读取 `frontend/src/data/` 和 API 文件中的受控数据，不需要后端或数据库；默认 registry 可以展示全部源码模块，因此 mock coverage 不能冒充 remote backend capability。
-3. **Online static Demo**：[https://data.overme.cn/](https://data.overme.cn/) 是独立发布的静态/mock bundle。当前可见 footer 为 `V1.0.0`，页面 HTML 没有仓库 revision/build metadata；它不自动等同于当前 `origin/main`、Repository Community Demo 或 GitHub published release `v0.1.0`。
+3. **Online static Demo**：[https://data.overme.cn/](https://data.overme.cn/) 是独立发布的静态/mock bundle。当前可见 footer 为 `V1.0.0`，页面 HTML 没有仓库 revision/build metadata；它不自动等同于当前 `origin/main`、Repository Community Demo 或 GitHub published release `v0.1.1`。
 
 ## Prerequisites
 

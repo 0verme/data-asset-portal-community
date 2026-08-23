@@ -67,7 +67,7 @@ CI（`.github/workflows/ci.yml`）会运行 Public Data Guard、后端测试、P
 请参考 [快速开始](./README.md#-快速开始)、[首次贡献指南](./docs/first-contribution.md) 与 [开发指南](./DEVELOPMENT.md)。
 
 - 前端：React 18 + Vite 7，视图在 `frontend/src/components/views/`，业务逻辑在 `frontend/src/hooks/`，API 层按模块拆分于 `frontend/src/api/`
-- 后端：Flask 3，service 位于 `backend/app/services/`，blueprint 位于 `backend/app/routes/`
+- 后端：FastAPI Native + Uvicorn，入口为 `backend/asgi.py`；service 位于 `backend/app/services/`，native routers 位于 `backend/app/fastapi/routers/`
 - 推荐先用 `VITE_API_MODE=mock` 快速验证前端改动
 
 最小验证命令：
