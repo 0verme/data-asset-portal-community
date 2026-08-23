@@ -28,7 +28,7 @@ from .common_code_service import (
     CommonCodeDataSourceError,
     common_code_service,
 )
-from ..db.gaussdb import database_transaction
+from ..db.facade import database_transaction
 from ..db.service import CoreAccess
 from ..db.tables import data_source, upstream_change_log, upstream_system, upstream_unload_time
 from ..settings import get_default_operator, get_page_size_limits

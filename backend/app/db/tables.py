@@ -279,6 +279,22 @@ indicator_change_log = _table(
     Column("change_time", DateTime),
 )
 
+indicator_path_config = _table(
+    "p_indicator_path_config",
+    Column("id", Integer, primary_key=True),
+    Column("parent_id", Integer),
+    Column("path_code", String(64), nullable=False),
+    Column("path_name", String(256), nullable=False),
+    Column("dimension_code", String(16), nullable=False),
+    Column("path_level", Integer, nullable=False),
+    Column("full_path", String(1000), nullable=False),
+    Column("sort_order", Integer, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("remark", String(1000)),
+    Column("created_at", DateTime),
+    Column("updated_at", DateTime),
+)
+
 code_category = _table(
     "p_code_category",
     Column("category_id", Integer, primary_key=True),
@@ -407,6 +423,91 @@ system_table = _table(
     Column("created_at", DateTime),
     Column("updated_by", String(64), nullable=False),
     Column("updated_at", DateTime),
+)
+
+push_system = _table(
+    "p_push_system",
+    Column("system_id", Integer, primary_key=True),
+    Column("master_system_id", Integer),
+    Column("system_code", String(64), nullable=False),
+    Column("system_name", String(256), nullable=False),
+    Column("system_abbr", String(32), nullable=False),
+    Column("protocol_type", String(32), nullable=False),
+    Column("host_name", String(256), nullable=False),
+    Column("port_no", Integer, nullable=False),
+    Column("account_name", String(128)),
+    Column("auth_type", String(64)),
+    Column("contact_name", String(128)),
+    Column("data_developer_contact_name", String(128)),
+    Column("dept_name", String(128)),
+    Column("system_desc", String(2000)),
+    Column("status_code", String(32), nullable=False),
+    Column("importance_level_code", String(16), nullable=False),
+    Column("latest_output_time", String(5)),
+    Column("job_count", Integer, nullable=False),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+push_job = _table(
+    "p_push_job",
+    Column("job_id", Integer, primary_key=True),
+    Column("system_id", Integer, nullable=False),
+    Column("job_code", String(128), nullable=False),
+    Column("job_name", String(256), nullable=False),
+    Column("source_path", String(1000)),
+    Column("source_file_name", String(512)),
+    Column("target_path", String(1000)),
+    Column("target_file_name", String(512), nullable=False),
+    Column("freq_desc", String(200)),
+    Column("freq_type", String(64)),
+    Column("delimiter_code", String(32)),
+    Column("encoding_type", String(64)),
+    Column("row_count_desc", String(200)),
+    Column("enabled_flag", String(1), nullable=False),
+    Column("job_desc", String(2000)),
+    Column("field_count", Integer, nullable=False),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+push_job_field = _table(
+    "p_push_job_field",
+    Column("field_id", Integer, primary_key=True),
+    Column("job_id", Integer, nullable=False),
+    Column("field_name", String(128), nullable=False),
+    Column("field_cn_name", String(256), nullable=False),
+    Column("field_order", Integer, nullable=False),
+    Column("source_code", String(64)),
+    Column("data_type", String(128), nullable=False),
+    Column("field_meaning", String(2000)),
+    Column("is_deleted", String(1), nullable=False),
+    Column("created_by", String(64), nullable=False),
+    Column("created_at", DateTime),
+    Column("updated_by", String(64), nullable=False),
+    Column("updated_at", DateTime),
+)
+
+push_change_log = _table(
+    "p_push_change_log",
+    Column("change_id", Integer, primary_key=True),
+    Column("system_id", Integer),
+    Column("job_id", Integer),
+    Column("object_type", String(32), nullable=False),
+    Column("object_code", String(128), nullable=False),
+    Column("change_type", String(64), nullable=False),
+    Column("change_summary", String(1000)),
+    Column("before_json", Text),
+    Column("after_json", Text),
+    Column("operator_name", String(64), nullable=False),
+    Column("change_time", DateTime),
+    Column("trace_id", String(128)),
 )
 
 api_asset = _table(

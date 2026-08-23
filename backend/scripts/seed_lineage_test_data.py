@@ -11,7 +11,7 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from app.db.gaussdb import database_transaction, execute_sql, get_db_profile
+from app.db.facade import database_transaction, execute_sql, get_db_profile
 from app.services.lineage_test_data import SNAPSHOT_ID, build_test_snapshot, test_snapshot_counts
 
 

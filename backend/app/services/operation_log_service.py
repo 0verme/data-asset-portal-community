@@ -21,10 +21,11 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, or_, select  # pyright: ignore[reportMissingImports]
+from sqlalchemy import func, insert, or_, select  # pyright: ignore[reportMissingImports]
 
 from ..application import current_request_context
-from ..db.gaussdb import (
+from ..db.core import execute_core_on_connection, execute_core_on_cursor
+from ..db.facade import (
     _commit_if_needed,
     _rollback_if_needed,
     active_transaction_connection,
@@ -38,7 +39,6 @@ from ..settings import get_page_size_limits
 
 logger = logging.getLogger(__name__)
 
-TABLE_OPERATION_LOG = "dwp.p_operation_log"
 OPERATION_TYPE_CREATE = "新增"
 OPERATION_TYPE_UPDATE = "编辑"
 OPERATION_TYPE_DELETE = "删除"
@@ -110,11 +110,6 @@ class OperationLogService:
 
     def _profile(self):
         return self._db_profile or resolve_db_profile_name()
-
-    def _quote(self, value):
-        if value is None:
-            return "NULL"
-        return "'" + str(value).replace("'", "''") + "'"
 
     def _fetch_rows(self, statement):
         return self._db.fetch_rows(statement)
@@ -291,7 +286,7 @@ class OperationLogService:
         context = current_request_context()
         return context.elapsed_ms() if context is not None else 0
 
-    def _build_audit_insert_sql(self, *, module_name, operation_type, operation_object, before=None, after=None, operation_desc=None, result_status="success", error_message=None, remark=None, user_id=None, user_name=None, request_params=None) -> str:
+    def _build_audit_insert_statement(self, *, module_name, operation_type, operation_object, before=None, after=None, operation_desc=None, result_status="success", error_message=None, remark=None, user_id=None, user_name=None, request_params=None):
         ctx = self._request_context()
         if user_id is not None:
             ctx["userId"] = (user_id or "")[:64]
@@ -299,11 +294,25 @@ class OperationLogService:
             ctx["userName"] = (user_name or "")[:128]
         if request_params is None:
             request_params = self._serialize_snapshot(before, after)
-        columns = ("user_id", "user_name", "dept_name", "module_name", "operation_type", "operation_object", "operation_desc", "request_method", "request_url", "request_params", "result_status", "error_message", "ip_address", "user_agent", "cost_time_ms", "remark", "created_at")
-        values = [
-            self._quote(ctx["userId"]), self._quote(ctx["userName"]), self._quote(ctx["deptName"]), self._quote(module_name), self._quote(operation_type), self._quote((operation_object or "")[:512]), self._quote(operation_desc), self._quote(ctx["requestMethod"]), self._quote(ctx["requestUrl"]), self._quote(request_params), self._quote(result_status if result_status in RESULT_STATUSES else "success"), self._quote(error_message[:1024] if error_message else None), self._quote(ctx["ipAddress"]), self._quote(ctx["userAgent"]), str(self._cost_time_ms()), self._quote(remark), "CURRENT_TIMESTAMP",
-        ]
-        return f"INSERT INTO {TABLE_OPERATION_LOG} ({', '.join(columns)}) VALUES ({', '.join(values)})"
+        return insert(operation_log).values(
+            user_id=ctx["userId"],
+            user_name=ctx["userName"],
+            dept_name=ctx["deptName"],
+            module_name=module_name,
+            operation_type=operation_type,
+            operation_object=(operation_object or "")[:512],
+            operation_desc=operation_desc,
+            request_method=ctx["requestMethod"],
+            request_url=ctx["requestUrl"],
+            request_params=request_params,
+            result_status=result_status if result_status in RESULT_STATUSES else "success",
+            error_message=error_message[:1024] if error_message else None,
+            ip_address=ctx["ipAddress"],
+            user_agent=ctx["userAgent"],
+            cost_time_ms=self._cost_time_ms(),
+            remark=remark,
+            created_at=func.current_timestamp(),
+        )
 
     @staticmethod
     def _rollback_owned_connection(conn: Any, owns_connection: bool) -> None:
@@ -328,7 +337,13 @@ class OperationLogService:
                 if conn is None:
                     raise RuntimeError("Audit connection was not initialized.")
                 active_cursor = conn.cursor()
-            active_cursor.execute(self._build_audit_insert_sql(**kwargs))
+            statement = self._build_audit_insert_statement(**kwargs)
+            if active_cursor is not None:
+                execute_core_on_cursor(self._profile(), active_cursor, statement)
+            elif conn is not None:
+                execute_core_on_connection(self._profile(), conn, statement)
+            else:
+                raise RuntimeError("Audit database handle was not initialized.")
             if owns_connection:
                 _commit_if_needed(conn)
         except Exception:

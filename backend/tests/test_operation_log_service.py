@@ -16,14 +16,6 @@ from sqlalchemy.dialects import mysql, postgresql, sqlite
 class OperationLogServiceUnitTests(unittest.TestCase):
     def setUp(self):
         self.service = OperationLogService()
-        self.table_patch = patch(
-            "backend.app.services.operation_log_service.TABLE_OPERATION_LOG",
-            "dwp.p_operation_log",
-        )
-        self.table_patch.start()
-
-    def tearDown(self):
-        self.table_patch.stop()
 
     def test_service_reads_audit_metadata_from_neutral_context(self):
         context = RequestContext(
@@ -54,83 +46,98 @@ class OperationLogServiceUnitTests(unittest.TestCase):
         self.assertNotIn("flask", source)
 
     def test_generated_insert_delegates_id_to_database(self):
-        sql = self.service._build_audit_insert_sql(
+        statement = self.service._build_audit_insert_statement(
             module_name="test",
             operation_type="CREATE",
             operation_object="item",
         )
-        self.assertNotIn("MAX(", sql.upper())
-        self.assertNotIn(" id,", sql.lower())
-        self.assertIn("INSERT INTO dwp.p_operation_log", sql)
-        self.assertIn("CURRENT_TIMESTAMP", sql)
+        compiled = statement.compile(dialect=sqlite.dialect())
+        self.assertNotIn("MAX(", str(compiled).upper())
+        self.assertNotIn(" id,", str(compiled).lower())
+        self.assertIn("p_operation_log", str(compiled))
+        self.assertIn("CURRENT_TIMESTAMP", str(compiled))
 
-    def test_snapshots_redact_sensitive_values_in_sql_payload(self):
-        sql = self.service._build_audit_insert_sql(
+    def test_snapshots_bind_and_redact_sensitive_values(self):
+        statement = self.service._build_audit_insert_statement(
             module_name="test",
             operation_type="CREATE",
             operation_object="item",
             before={"password": "p", "token": "t", "safe": "kept"},
             after={"jdbc_url": "jdbc:secret", "connectionString": "secret"},
         )
-        self.assertIn("[REDACTED]", sql)
-        self.assertIn("kept", sql)
-        self.assertNotIn("jdbc:secret", sql)
-        self.assertNotIn("'p'", sql)
-        self.assertNotIn("'t'", sql)
+        compiled = statement.compile(dialect=sqlite.dialect())
+        params = compiled.params
+        self.assertIn("[REDACTED]", params["request_params"])
+        self.assertIn("kept", params["request_params"])
+        self.assertNotIn("jdbc:secret", params["request_params"])
+        self.assertNotIn("'p'", str(compiled))
+        self.assertNotIn("'t'", str(compiled))
 
-    def test_batch_summary_stores_counts_not_rows(self):
+    def test_batch_summary_binds_counts_not_rows(self):
         conn = MagicMock()
-        cursor = conn.cursor.return_value
-        self.service.record_required_batch_audit(
-            connection=conn,
-            batch_id="batch-1",
-            resource_type="root",
-            operation="IMPORT",
-            total_count=10,
-            success_count=8,
-            failed_count=1,
-            skipped_count=1,
-            summary="root import",
-        )
-        sql = cursor.execute.call_args.args[0]
-        self.assertIn('"batchId": "batch-1"', sql)
-        self.assertIn('"totalCount": 10', sql)
-        self.assertNotIn("rows", sql)
+        self.service._db_profile = "test"
+        with patch(
+            "backend.app.services.operation_log_service.execute_core_on_cursor"
+        ) as execute:
+            self.service.record_required_batch_audit(
+                connection=conn,
+                batch_id="batch-1",
+                resource_type="root",
+                operation="IMPORT",
+                total_count=10,
+                success_count=8,
+                failed_count=1,
+                skipped_count=1,
+                summary="root import",
+            )
+        statement = execute.call_args.args[2]
+        params = statement.compile(dialect=sqlite.dialect()).params
+        self.assertIn('"batchId": "batch-1"', params["request_params"])
+        self.assertIn('"totalCount": 10', params["request_params"])
+        self.assertNotIn("rows", params["request_params"])
         conn.commit.assert_not_called()
 
     def test_required_audit_uses_external_connection_without_commit(self):
         conn = MagicMock()
-        cursor = conn.cursor.return_value
-        self.assertTrue(
-            self.service.record_required_audit(
-                connection=conn,
-                module_name="test",
-                operation_type="CREATE",
-                operation_object="item",
+        self.service._db_profile = "test"
+        with patch(
+            "backend.app.services.operation_log_service.execute_core_on_cursor"
+        ) as execute:
+            self.assertTrue(
+                self.service.record_required_audit(
+                    connection=conn,
+                    module_name="test",
+                    operation_type="CREATE",
+                    operation_object="item",
+                )
             )
-        )
-        cursor.execute.assert_called_once()
+        execute.assert_called_once()
         conn.commit.assert_not_called()
         conn.rollback.assert_not_called()
 
     def test_required_audit_failure_raises_domain_error_without_swallowing(self):
         conn = MagicMock()
-        cursor = conn.cursor.return_value
-        cursor.execute.side_effect = RuntimeError("db down")
-        with self.assertRaises(AuditLogError):
-            self.service.record_required_audit(
-                connection=conn,
-                module_name="test",
-                operation_type="CREATE",
-                operation_object="item",
-            )
+        self.service._db_profile = "test"
+        with patch(
+            "backend.app.services.operation_log_service.execute_core_on_cursor",
+            side_effect=RuntimeError("db down"),
+        ):
+            with self.assertRaises(AuditLogError):
+                self.service.record_required_audit(
+                    connection=conn,
+                    module_name="test",
+                    operation_type="CREATE",
+                    operation_object="item",
+                )
         conn.commit.assert_not_called()
 
     def test_best_effort_failure_returns_false_and_logs_without_sensitive_values(self):
         conn = MagicMock()
-        cursor = conn.cursor.return_value
-        cursor.execute.side_effect = RuntimeError("db down")
-        with self.assertLogs("backend.app.services.operation_log_service", level="ERROR") as logs:
+        self.service._db_profile = "test"
+        with patch(
+            "backend.app.services.operation_log_service.execute_core_on_cursor",
+            side_effect=RuntimeError("db down"),
+        ), self.assertLogs("backend.app.services.operation_log_service", level="ERROR") as logs:
             result = self.service.record_best_effort_audit(
                 connection=conn,
                 module_name="auth",

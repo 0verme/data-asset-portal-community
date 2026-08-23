@@ -21,12 +21,22 @@ import re
 from copy import deepcopy
 from time import perf_counter
 
+from sqlalchemy import delete, func, insert, or_, select, update
+
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
     common_code_service,
 )
-from ..db.gaussdb import database_transaction, execute_statements, fetch_all, resolve_db_profile_name
+from ..db.facade import database_transaction
+from ..db.service import CoreAccess
+from ..db.tables import (
+    push_change_log,
+    push_job,
+    push_job_field,
+    push_system,
+    system_table,
+)
 from ..settings import get_default_operator, get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
 from .operation_log_service import (
@@ -53,10 +63,6 @@ DEFAULT_PUSH_FREQ_TYPES = {"T+1", "T+0", "准实时", "每周", "每月"}
 DEFAULT_PUSH_DEPTS = set()
 DEFAULT_PUSH_AUTH_TYPES = {"密钥认证", "账号密码"}
 
-TABLE_PUSH_SYSTEM = "dwp.p_push_system"
-TABLE_PUSH_JOB = "dwp.p_push_job"
-TABLE_PUSH_JOB_FIELD = "dwp.p_push_job_field"
-TABLE_PUSH_CHANGE_LOG = "dwp.p_push_change_log"
 LOGGER = logging.getLogger(__name__)
 
 
@@ -148,24 +154,18 @@ class PushService:
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
         self._default_operator = get_default_operator()
+        self._db = CoreAccess(
+            profile_getter=lambda: self._db_profile,
+            error_factory=PushDataSourceError,
+        )
 
-    def _fetch_rows(self, sql):
-        try:
-            columns, rows = fetch_all(self._db_profile or resolve_db_profile_name(), sql)
-        except FileNotFoundError as error:
-            raise PushDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise PushDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise PushDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise PushDataSourceError("数据库查询失败") from error
-        return [dict(zip(columns, row)) for row in rows]
+    def _fetch_rows(self, statement):
+        return self._db.fetch_rows(statement)
 
-    def _fetch_rows_logged(self, sql, *, purpose, method, page=None, page_size=None, keyword=None):
+    def _fetch_rows_logged(self, statement, *, purpose, method, page=None, page_size=None, keyword=None):
         started_at = perf_counter()
         try:
-            return self._fetch_rows(sql)
+            return self._fetch_rows(statement)
         finally:
             log_slow_service_call(
                 LOGGER,
@@ -179,24 +179,7 @@ class PushService:
             )
 
     def _execute_statements(self, statements):
-        try:
-            return execute_statements(self._db_profile or resolve_db_profile_name(), statements)
-        except FileNotFoundError as error:
-            raise PushDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise PushDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise PushDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise PushDataSourceError("数据库执行失败") from error
-
-    def _quote(self, value):
-        if value is None:
-            return "NULL"
-        return "'" + str(value).replace("'", "''") + "'"
-
-    def _flag(self, value):
-        return "'Y'" if value else "'N'"
+        return self._db.execute_statements(statements)
 
     def _validate_id(self, value, field_name, details, allow_numeric_prefix=False):
         if not isinstance(value, str) or not value.strip():
@@ -477,10 +460,8 @@ class PushService:
                 return index
         raise PushJobNotFoundError(system["id"], job_id)
 
-    def _get_next_id(self, table_name, id_column):
-        sql = f"SELECT COALESCE(MAX({id_column}), 0) + 1 AS next_id FROM {table_name}"
-        rows = self._fetch_rows(sql)
-        return int(rows[0]["next_id"])
+    def _get_next_id(self, table, column):
+        return self._db.next_pk(table, column)
 
     def _resolve_paging(self, page=None, page_size=None):
         default_page_size, max_page_size = get_page_size_limits(20)
@@ -497,33 +478,40 @@ class PushService:
         return normalized_page, normalized_page_size
 
     def _build_system_where(self, status=None, protocol=None, dept=None, keyword=None):
-        where = ["s.is_deleted = 'N'"]
+        where = [push_system.c.is_deleted == "N"]
         if status:
-            where.append(f"s.status_code = {self._quote(status)}")
+            where.append(push_system.c.status_code == status)
         if protocol:
-            where.append(f"s.protocol_type = {self._quote(protocol)}")
+            where.append(push_system.c.protocol_type == protocol)
         if dept:
-            where.append(f"s.dept_name = {self._quote(dept)}")
+            where.append(push_system.c.dept_name == dept)
         normalized_keyword = str(keyword or "").strip().lower()
         if normalized_keyword:
-            like = self._quote(f"%{normalized_keyword}%")
+            like = f"%{normalized_keyword}%"
+            system_searchable = (
+                push_system.c.system_code,
+                push_system.c.system_name,
+                push_system.c.system_abbr,
+                push_system.c.dept_name,
+                push_system.c.system_desc,
+            )
+            job_searchable = (
+                push_job.c.job_code,
+                push_job.c.job_name,
+                push_job.c.source_file_name,
+                push_job.c.target_file_name,
+                push_job.c.job_desc,
+            )
+            job_match = select(1).select_from(push_job).where(
+                push_job.c.system_id == push_system.c.system_id,
+                push_job.c.is_deleted == "N",
+                or_(*(func.lower(func.coalesce(column, "")).like(like) for column in job_searchable)),
+            ).exists()
             where.append(
-                "("
-                f"LOWER(COALESCE(s.system_code, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(s.system_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(s.system_abbr, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(s.dept_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(s.system_desc, '')) LIKE {like} OR "
-                f"EXISTS ("
-                f"SELECT 1 FROM {TABLE_PUSH_JOB} j "
-                f"WHERE j.system_id = s.system_id AND j.is_deleted = 'N' AND ("
-                f"LOWER(COALESCE(j.job_code, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(j.job_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(j.source_file_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(j.target_file_name, '')) LIKE {like} OR "
-                f"LOWER(COALESCE(j.job_desc, '')) LIKE {like}"
-                f"))"
-                ")"
+                or_(
+                    *(func.lower(func.coalesce(column, "")).like(like) for column in system_searchable),
+                    job_match,
+                )
             )
         return where
 
@@ -531,36 +519,35 @@ class PushService:
         paginate = page is not None or page_size is not None
         page, page_size = self._resolve_paging(page=page, page_size=page_size)
         offset = (page - 1) * page_size
-        where_sql = " AND ".join(self._build_system_where(status=status, protocol=protocol, dept=dept, keyword=keyword))
-        sql = f"""
-SELECT
-    s.system_id,
-    s.system_code,
-    s.system_name,
-    s.system_abbr,
-    s.protocol_type,
-    s.host_name,
-    s.port_no,
-    s.account_name,
-    s.auth_type,
-    s.contact_name,
-    s.data_developer_contact_name,
-    s.dept_name,
-    s.system_desc,
-    s.status_code,
-    s.importance_level_code,
-    s.latest_output_time,
-    s.job_count,
-    s.created_at,
-    s.updated_at
-FROM {TABLE_PUSH_SYSTEM} s
-WHERE {where_sql}
-ORDER BY s.system_code
-"""
+        statement = (
+            select(
+                push_system.c.system_id,
+                push_system.c.system_code,
+                push_system.c.system_name,
+                push_system.c.system_abbr,
+                push_system.c.protocol_type,
+                push_system.c.host_name,
+                push_system.c.port_no,
+                push_system.c.account_name,
+                push_system.c.auth_type,
+                push_system.c.contact_name,
+                push_system.c.data_developer_contact_name,
+                push_system.c.dept_name,
+                push_system.c.system_desc,
+                push_system.c.status_code,
+                push_system.c.importance_level_code,
+                push_system.c.latest_output_time,
+                push_system.c.job_count,
+                push_system.c.created_at,
+                push_system.c.updated_at,
+            )
+            .where(*self._build_system_where(status=status, protocol=protocol, dept=dept, keyword=keyword))
+            .order_by(push_system.c.system_code)
+        )
         if paginate:
-            sql += f"\nLIMIT {page_size} OFFSET {offset}"
+            statement = statement.limit(page_size).offset(offset)
         return self._fetch_rows_logged(
-            sql,
+            statement,
             purpose="push system list",
             method="_load_system_rows",
             page=page,
@@ -571,33 +558,35 @@ ORDER BY s.system_code
     def _load_job_rows(self, system_ids):
         if not system_ids:
             return {}
-        ids_sql = ", ".join(str(int(system_id)) for system_id in system_ids)
-        sql = f"""
-SELECT
-    job_id,
-    system_id,
-    job_code,
-    job_name,
-    source_path,
-    source_file_name,
-    target_path,
-    target_file_name,
-    freq_desc,
-    freq_type,
-    delimiter_code,
-    encoding_type,
-    row_count_desc,
-    enabled_flag,
-    job_desc,
-    field_count,
-    created_at,
-    updated_at
-FROM {TABLE_PUSH_JOB}
-WHERE is_deleted = 'N'
-  AND system_id IN ({ids_sql})
-ORDER BY system_id, created_at DESC, job_code
-"""
-        rows = self._fetch_rows_logged(sql, purpose="push job list", method="_load_job_rows")
+        normalized_ids = [int(system_id) for system_id in system_ids]
+        statement = (
+            select(
+                push_job.c.job_id,
+                push_job.c.system_id,
+                push_job.c.job_code,
+                push_job.c.job_name,
+                push_job.c.source_path,
+                push_job.c.source_file_name,
+                push_job.c.target_path,
+                push_job.c.target_file_name,
+                push_job.c.freq_desc,
+                push_job.c.freq_type,
+                push_job.c.delimiter_code,
+                push_job.c.encoding_type,
+                push_job.c.row_count_desc,
+                push_job.c.enabled_flag,
+                push_job.c.job_desc,
+                push_job.c.field_count,
+                push_job.c.created_at,
+                push_job.c.updated_at,
+            )
+            .where(
+                push_job.c.is_deleted == "N",
+                push_job.c.system_id.in_(normalized_ids),
+            )
+            .order_by(push_job.c.system_id, push_job.c.created_at.desc(), push_job.c.job_code)
+        )
+        rows = self._fetch_rows_logged(statement, purpose="push job list", method="_load_job_rows")
         grouped = {}
         for row in rows:
             grouped.setdefault(int(row["system_id"]), []).append(row)
@@ -606,23 +595,29 @@ ORDER BY system_id, created_at DESC, job_code
     def _load_field_rows(self, job_ids):
         if not job_ids:
             return {}
-        ids_sql = ", ".join(str(int(job_id)) for job_id in job_ids)
-        sql = f"""
-SELECT
-    field_id,
-    job_id,
-    field_name,
-    field_cn_name,
-    field_order,
-    source_code,
-    data_type,
-    field_meaning
-FROM {TABLE_PUSH_JOB_FIELD}
-WHERE is_deleted = 'N'
-  AND job_id IN ({ids_sql})
-ORDER BY job_id, field_order, field_name
-"""
-        rows = self._fetch_rows_logged(sql, purpose="push job field list", method="_load_field_rows")
+        normalized_ids = [int(job_id) for job_id in job_ids]
+        statement = (
+            select(
+                push_job_field.c.field_id,
+                push_job_field.c.job_id,
+                push_job_field.c.field_name,
+                push_job_field.c.field_cn_name,
+                push_job_field.c.field_order,
+                push_job_field.c.source_code,
+                push_job_field.c.data_type,
+                push_job_field.c.field_meaning,
+            )
+            .where(
+                push_job_field.c.is_deleted == "N",
+                push_job_field.c.job_id.in_(normalized_ids),
+            )
+            .order_by(
+                push_job_field.c.job_id,
+                push_job_field.c.field_order,
+                push_job_field.c.field_name,
+            )
+        )
+        rows = self._fetch_rows_logged(statement, purpose="push job field list", method="_load_field_rows")
         grouped = {}
         for row in rows:
             grouped.setdefault(int(row["job_id"]), []).append(
@@ -708,15 +703,28 @@ ORDER BY job_id, field_order, field_name
     def _load_public_job_rows(self, system_ids):
         if not system_ids:
             return {}
-        ids_sql = ", ".join(str(int(system_id)) for system_id in system_ids)
+        normalized_ids = [int(system_id) for system_id in system_ids]
+        statement = (
+            select(
+                push_job.c.job_id,
+                push_job.c.system_id,
+                push_job.c.job_code,
+                push_job.c.job_name,
+                push_job.c.source_file_name,
+                push_job.c.target_file_name,
+                push_job.c.freq_desc,
+                push_job.c.freq_type,
+                push_job.c.enabled_flag,
+                push_job.c.job_desc,
+            )
+            .where(
+                push_job.c.is_deleted == "N",
+                push_job.c.system_id.in_(normalized_ids),
+            )
+            .order_by(push_job.c.system_id, push_job.c.created_at.desc(), push_job.c.job_code)
+        )
         rows = self._fetch_rows_logged(
-            f"""
-SELECT job_id, system_id, job_code, job_name, source_file_name, target_file_name,
-       freq_desc, freq_type, enabled_flag, job_desc
-FROM {TABLE_PUSH_JOB}
-WHERE is_deleted = 'N' AND system_id IN ({ids_sql})
-ORDER BY system_id, created_at DESC, job_code
-""",
+            statement,
             purpose="public push job list",
             method="_load_public_job_rows",
         )
@@ -729,18 +737,35 @@ ORDER BY system_id, created_at DESC, job_code
         paginate = page is not None or page_size is not None
         page, page_size = self._resolve_paging(page=page, page_size=page_size)
         offset = (page - 1) * page_size
-        where_sql = " AND ".join(self._build_system_where(status=status, protocol=protocol, dept=dept, keyword=keyword))
-        sql = f"""
-SELECT s.system_id, s.system_code, s.system_name, s.system_abbr, s.protocol_type, s.host_name,
-       s.contact_name, s.data_developer_contact_name, s.dept_name, s.system_desc, s.status_code,
-       s.importance_level_code, s.latest_output_time
-FROM {TABLE_PUSH_SYSTEM} s
-WHERE {where_sql}
-ORDER BY s.system_code
-"""
+        statement = (
+            select(
+                push_system.c.system_id,
+                push_system.c.system_code,
+                push_system.c.system_name,
+                push_system.c.system_abbr,
+                push_system.c.protocol_type,
+                push_system.c.host_name,
+                push_system.c.contact_name,
+                push_system.c.data_developer_contact_name,
+                push_system.c.dept_name,
+                push_system.c.system_desc,
+                push_system.c.status_code,
+                push_system.c.importance_level_code,
+                push_system.c.latest_output_time,
+            )
+            .where(*self._build_system_where(status=status, protocol=protocol, dept=dept, keyword=keyword))
+            .order_by(push_system.c.system_code)
+        )
         if paginate:
-            sql += f"\nLIMIT {page_size} OFFSET {offset}"
-        return self._fetch_rows_logged(sql, purpose="public push system list", method="_load_public_system_rows", page=page, page_size=page_size, keyword=keyword)
+            statement = statement.limit(page_size).offset(offset)
+        return self._fetch_rows_logged(
+            statement,
+            purpose="public push system list",
+            method="_load_public_system_rows",
+            page=page,
+            page_size=page_size,
+            keyword=keyword,
+        )
 
     def _load_public_systems(self, **filters):
         rows = self._load_public_system_rows(**filters)
@@ -770,33 +795,40 @@ ORDER BY s.system_code
         return systems
 
     def _get_db_system_detail_row(self, system_code):
-        sql = f"""
-SELECT
-    system_id,
-    system_code,
-    system_name,
-    system_abbr,
-    protocol_type,
-    host_name,
-    port_no,
-    account_name,
-    auth_type,
-    contact_name,
-    data_developer_contact_name,
-    dept_name,
-    system_desc,
-    status_code,
-    importance_level_code,
-    latest_output_time,
-    job_count,
-    created_at,
-    updated_at
-FROM {TABLE_PUSH_SYSTEM}
-WHERE is_deleted = 'N'
-  AND system_code = {self._quote(system_code)}
-LIMIT 1
-"""
-        rows = self._fetch_rows_logged(sql, purpose="push system detail row", method="_get_db_system_detail_row")
+        statement = (
+            select(
+                push_system.c.system_id,
+                push_system.c.master_system_id,
+                push_system.c.system_code,
+                push_system.c.system_name,
+                push_system.c.system_abbr,
+                push_system.c.protocol_type,
+                push_system.c.host_name,
+                push_system.c.port_no,
+                push_system.c.account_name,
+                push_system.c.auth_type,
+                push_system.c.contact_name,
+                push_system.c.data_developer_contact_name,
+                push_system.c.dept_name,
+                push_system.c.system_desc,
+                push_system.c.status_code,
+                push_system.c.importance_level_code,
+                push_system.c.latest_output_time,
+                push_system.c.job_count,
+                push_system.c.created_at,
+                push_system.c.updated_at,
+            )
+            .where(
+                push_system.c.is_deleted == "N",
+                push_system.c.system_code == system_code,
+            )
+            .limit(1)
+        )
+        rows = self._fetch_rows_logged(
+            statement,
+            purpose="push system detail row",
+            method="_get_db_system_detail_row",
+        )
         if not rows:
             raise PushSystemNotFoundError(system_code)
         return rows[0]
@@ -825,26 +857,29 @@ LIMIT 1
         return row
 
     def _get_system_code_by_id(self, system_id):
-        sql = f"""
-SELECT system_code
-FROM {TABLE_PUSH_SYSTEM}
-WHERE system_id = {int(system_id)}
-  AND is_deleted = 'N'
-"""
-        rows = self._fetch_rows(sql)
+        statement = select(push_system.c.system_code).where(
+            push_system.c.system_id == int(system_id),
+            push_system.c.is_deleted == "N",
+        )
+        rows = self._fetch_rows(statement)
         if not rows:
             raise PushSystemNotFoundError(str(system_id))
         return rows[0]["system_code"]
 
     def _ensure_db_system_absent(self, system_code, exclude_system_id=None):
-        sql = f"""
-SELECT system_id
-FROM {TABLE_PUSH_SYSTEM}
-WHERE is_deleted = 'N'
-  AND system_code = {self._quote(system_code)}
-LIMIT 1
-"""
-        rows = self._fetch_rows_logged(sql, purpose="push system uniqueness check", method="_ensure_db_system_absent")
+        statement = (
+            select(push_system.c.system_id)
+            .where(
+                push_system.c.is_deleted == "N",
+                push_system.c.system_code == system_code,
+            )
+            .limit(1)
+        )
+        rows = self._fetch_rows_logged(
+            statement,
+            purpose="push system uniqueness check",
+            method="_ensure_db_system_absent",
+        )
         if not rows:
             return
         if exclude_system_id is not None and int(rows[0]["system_id"]) == int(exclude_system_id):
@@ -861,35 +896,22 @@ LIMIT 1
             raise PushJobAlreadyExistsError(system_code, job_code)
 
     def _insert_db_job_fields(self, job_id, fields):
-        field_id = self._get_next_id(TABLE_PUSH_JOB_FIELD, "field_id")
+        field_id = self._get_next_id(push_job_field, push_job_field.c.field_id)
         statements = []
         for index, field in enumerate(fields, start=1):
             statements.append(
-                f"""
-INSERT INTO {TABLE_PUSH_JOB_FIELD} (
-    field_id,
-    job_id,
-    field_name,
-    field_cn_name,
-    field_order,
-    source_code,
-    data_type,
-    field_meaning,
-    created_by,
-    updated_by
-) VALUES (
-    {field_id},
-    {int(job_id)},
-    {self._quote(field['name'])},
-    {self._quote(field['cn'])},
-    {index},
-    {self._quote(field.get('src'))},
-    {self._quote(field['type'])},
-    {self._quote(field.get('meaning'))},
-    {self._quote(self._default_operator)},
-    {self._quote(self._default_operator)}
-)
-""".strip()
+                insert(push_job_field).values(
+                    field_id=field_id,
+                    job_id=int(job_id),
+                    field_name=field["name"],
+                    field_cn_name=field["cn"],
+                    field_order=index,
+                    source_code=field.get("src"),
+                    data_type=field["type"],
+                    field_meaning=field.get("meaning"),
+                    created_by=self._default_operator,
+                    updated_by=self._default_operator,
+                )
             )
             field_id += 1
         return statements
@@ -897,111 +919,81 @@ INSERT INTO {TABLE_PUSH_JOB_FIELD} (
     def _insert_db_jobs(self, system_id, jobs):
         if not jobs:
             return []
-        job_id = self._get_next_id(TABLE_PUSH_JOB, "job_id")
+        job_id = self._get_next_id(push_job, push_job.c.job_id)
         statements = []
         for job in jobs:
             current_job_id = job_id
             statements.append(
-                f"""
-INSERT INTO {TABLE_PUSH_JOB} (
-    job_id,
-    system_id,
-    job_code,
-    job_name,
-    source_path,
-    source_file_name,
-    target_path,
-    target_file_name,
-    freq_desc,
-    freq_type,
-    delimiter_code,
-    encoding_type,
-    row_count_desc,
-    enabled_flag,
-    job_desc,
-    field_count,
-    created_by,
-    updated_by
-) VALUES (
-    {current_job_id},
-    {int(system_id)},
-    {self._quote(job['id'])},
-    {self._quote(job['cn'])},
-    {self._quote(job['sourcePath'])},
-    {self._quote(job['sourceFileName'])},
-    {self._quote(job['targetPath'])},
-    {self._quote(job['targetFileName'])},
-    {self._quote(job['freq'])},
-    {self._quote(job['freqType'])},
-    {self._quote(job['delimiter'])},
-    {self._quote(job['encoding'])},
-    {self._quote(job['rowCnt'])},
-    {self._flag(job['enabled'])},
-    {self._quote(job['desc'])},
-    {len(job['fields'])},
-    {self._quote(self._default_operator)},
-    {self._quote(self._default_operator)}
-)
-""".strip()
+                insert(push_job).values(
+                    job_id=current_job_id,
+                    system_id=int(system_id),
+                    job_code=job["id"],
+                    job_name=job["cn"],
+                    source_path=job["sourcePath"],
+                    source_file_name=job["sourceFileName"],
+                    target_path=job["targetPath"],
+                    target_file_name=job["targetFileName"],
+                    freq_desc=job["freq"],
+                    freq_type=job["freqType"],
+                    delimiter_code=job["delimiter"],
+                    encoding_type=job["encoding"],
+                    row_count_desc=job["rowCnt"],
+                    enabled_flag="Y" if job["enabled"] else "N",
+                    job_desc=job["desc"],
+                    field_count=len(job["fields"]),
+                    created_by=self._default_operator,
+                    updated_by=self._default_operator,
+                )
             )
             statements.extend(self._insert_db_job_fields(current_job_id, job["fields"]))
             job_id += 1
         return statements
 
     def _insert_change_log(self, system_id, job_id, object_type, object_code, change_type, summary, before_data, after_data):
-        change_id = self._get_next_id(TABLE_PUSH_CHANGE_LOG, "change_id")
+        change_id = self._get_next_id(push_change_log, push_change_log.c.change_id)
         before_json = json.dumps(before_data, ensure_ascii=False) if before_data is not None else None
         after_json = json.dumps(after_data, ensure_ascii=False) if after_data is not None else None
-        return f"""
-INSERT INTO {TABLE_PUSH_CHANGE_LOG} (
-    change_id,
-    system_id,
-    job_id,
-    object_type,
-    object_code,
-    change_type,
-    change_summary,
-    before_json,
-    after_json,
-    operator_name
-) VALUES (
-    {change_id},
-    {self._quote(system_id) if system_id is not None else 'NULL'},
-    {self._quote(job_id) if job_id is not None else 'NULL'},
-    {self._quote(object_type)},
-    {self._quote(object_code)},
-    {self._quote(change_type)},
-    {self._quote(summary)},
-    {self._quote(before_json)},
-    {self._quote(after_json)},
-    {self._quote(self._default_operator)}
-)
-""".strip()
+        return insert(push_change_log).values(
+            change_id=change_id,
+            system_id=system_id,
+            job_id=job_id,
+            object_type=object_type,
+            object_code=object_code,
+            change_type=change_type,
+            change_summary=summary,
+            before_json=before_json,
+            after_json=after_json,
+            operator_name=self._default_operator,
+        )
 
     def _refresh_system_job_count_statement(self, system_id):
-        return f"""
-UPDATE {TABLE_PUSH_SYSTEM}
-SET
-    job_count = (
-        SELECT COUNT(1)
-        FROM {TABLE_PUSH_JOB}
-        WHERE system_id = {int(system_id)}
-          AND is_deleted = 'N'
-    ),
-    updated_by = {self._quote(self._default_operator)},
-    updated_at = CURRENT_TIMESTAMP
-WHERE system_id = {int(system_id)}
-""".strip()
+        job_count = (
+            select(func.count())
+            .select_from(push_job)
+            .where(
+                push_job.c.system_id == int(system_id),
+                push_job.c.is_deleted == "N",
+            )
+            .scalar_subquery()
+        )
+        return (
+            update(push_system)
+            .where(push_system.c.system_id == int(system_id))
+            .values(
+                job_count=job_count,
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            )
+        )
 
     def _delete_db_jobs_statements(self, system_id):
         job_rows = self._load_job_rows([system_id]).get(int(system_id), [])
         if not job_rows:
             return []
         job_ids = [int(row["job_id"]) for row in job_rows]
-        ids_sql = ", ".join(str(job_id) for job_id in job_ids)
         return [
-            f"DELETE FROM {TABLE_PUSH_JOB_FIELD} WHERE job_id IN ({ids_sql})",
-            f"DELETE FROM {TABLE_PUSH_JOB} WHERE system_id = {int(system_id)}",
+            delete(push_job_field).where(push_job_field.c.job_id.in_(job_ids)),
+            delete(push_job).where(push_job.c.system_id == int(system_id)),
         ]
 
     def get_push_systems(self, status=None, protocol=None, dept=None, keyword=None, page=None, page_size=None):
@@ -1038,69 +1030,56 @@ WHERE system_id = {int(system_id)}
     def _create_push_system(self, payload):
         system = self._normalize_system_payload(payload)
         self._ensure_db_system_absent(system["id"])
-        system_id = self._get_next_id(TABLE_PUSH_SYSTEM, "system_id")
-        master_system_id = self._get_next_id("dwp.p_system", "system_id")
+        system_id = self._get_next_id(push_system, push_system.c.system_id)
+        master_system_id = self._get_next_id(system_table, system_table.c.system_id)
         after_data = deepcopy(system)
 
         statements = [
-            f"""
-INSERT INTO dwp.p_system (
-    system_id, system_code, system_name, system_abbr, description_text,
-    system_type, department_name, status_code, created_by, updated_by
-) VALUES (
-    {master_system_id}, {self._quote(system['id'])}, {self._quote(system['name'])},
-    {self._quote(system['abbr'])}, {self._quote(system['desc'])}, 'downstream',
-    {self._quote(system['dept'])}, {self._quote(system['status'])},
-    {self._quote(self._default_operator)}, {self._quote(self._default_operator)}
-)
-""".strip(),
-            f"""
-INSERT INTO {TABLE_PUSH_SYSTEM} (
-    system_id,
-    master_system_id,
-    system_code,
-    system_name,
-    system_abbr,
-    protocol_type,
-    host_name,
-    port_no,
-    account_name,
-    auth_type,
-    contact_name,
-    data_developer_contact_name,
-    dept_name,
-    system_desc,
-    status_code,
-    importance_level_code,
-    latest_output_time,
-    job_count,
-    created_by,
-    updated_by
-) VALUES (
-    {system_id},
-    {master_system_id},
-    {self._quote(system['id'])},
-    {self._quote(system['name'])},
-    {self._quote(system['abbr'])},
-    {self._quote(system['protocol'])},
-    {self._quote(system['host'])},
-    {int(system['port'])},
-    {self._quote(system['account'])},
-    {self._quote(system['auth'])},
-    {self._quote(system['downstreamContact'])},
-    {self._quote(system['dataDeveloperContact'])},
-    {self._quote(system['dept'])},
-    {self._quote(system['desc'])},
-    {self._quote(system['status'])},
-    {self._quote(system['importanceLevel'])},
-    {self._quote(system['latestOutputTime'] or None)},
-    {len(system['jobs'])},
-    {self._quote(self._default_operator)},
-    {self._quote(self._default_operator)}
-)
-""".strip(),
+            insert(system_table).values(
+                system_id=master_system_id,
+                system_code=system["id"],
+                system_name=system["name"],
+                system_abbr=system["abbr"],
+                description_text=system["desc"],
+                system_type="downstream",
+                department_name=system["dept"],
+                status_code=system["status"],
+                created_by=self._default_operator,
+                updated_by=self._default_operator,
+            ),
+            insert(push_system).values(
+                system_id=system_id,
+                master_system_id=master_system_id,
+                system_code=system["id"],
+                system_name=system["name"],
+                system_abbr=system["abbr"],
+                protocol_type=system["protocol"],
+                host_name=system["host"],
+                port_no=int(system["port"]),
+                account_name=system["account"],
+                auth_type=system["auth"],
+                contact_name=system["downstreamContact"],
+                data_developer_contact_name=system["dataDeveloperContact"],
+                dept_name=system["dept"],
+                system_desc=system["desc"],
+                status_code=system["status"],
+                importance_level_code=system["importanceLevel"],
+                latest_output_time=system["latestOutputTime"] or None,
+                job_count=len(system["jobs"]),
+                created_by=self._default_operator,
+                updated_by=self._default_operator,
+            ),
             *self._insert_db_jobs(system_id, system["jobs"]),
-            self._insert_change_log(system_id, None, "SYSTEM", system["id"], "CREATE_SYSTEM", "创建下游系统", None, after_data),
+            self._insert_change_log(
+                system_id,
+                None,
+                "SYSTEM",
+                system["id"],
+                "CREATE_SYSTEM",
+                "创建下游系统",
+                None,
+                after_data,
+            ),
         ]
         self._execute_statements(statements)
         return self._get_public_system_detail(system["id"]), after_data
@@ -1128,44 +1107,52 @@ INSERT INTO {TABLE_PUSH_SYSTEM} (
         after_data = deepcopy(system)
 
         statements = [
-            f"""
-UPDATE dwp.p_system
-SET system_code = {self._quote(system['id'])},
-    system_name = {self._quote(system['name'])},
-    system_abbr = {self._quote(system['abbr'])},
-    description_text = {self._quote(system['desc'])},
-    department_name = {self._quote(system['dept'])},
-    status_code = {self._quote(system['status'])},
-    updated_by = {self._quote(self._default_operator)},
-    updated_at = CURRENT_TIMESTAMP
-WHERE system_id = {master_system_id}
-""".strip(),
-            f"""
-UPDATE {TABLE_PUSH_SYSTEM}
-SET
-    system_code = {self._quote(system['id'])},
-    system_name = {self._quote(system['name'])},
-    system_abbr = {self._quote(system['abbr'])},
-    protocol_type = {self._quote(system['protocol'])},
-    host_name = {self._quote(system['host'])},
-    port_no = {int(system['port'])},
-    account_name = {self._quote(system['account'])},
-    auth_type = {self._quote(system['auth'])},
-    contact_name = {self._quote(system['downstreamContact'])},
-    data_developer_contact_name = {self._quote(system['dataDeveloperContact'])},
-    dept_name = {self._quote(system['dept'])},
-    system_desc = {self._quote(system['desc'])},
-    status_code = {self._quote(system['status'])},
-    importance_level_code = {self._quote(system['importanceLevel'])},
-    latest_output_time = {self._quote(system['latestOutputTime'] or None)},
-    job_count = {len(system['jobs'])},
-    updated_by = {self._quote(self._default_operator)},
-    updated_at = CURRENT_TIMESTAMP
-WHERE system_id = {system_pk}
-""".strip(),
+            update(system_table)
+            .where(system_table.c.system_id == master_system_id)
+            .values(
+                system_code=system["id"],
+                system_name=system["name"],
+                system_abbr=system["abbr"],
+                description_text=system["desc"],
+                department_name=system["dept"],
+                status_code=system["status"],
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            ),
+            update(push_system)
+            .where(push_system.c.system_id == system_pk)
+            .values(
+                system_code=system["id"],
+                system_name=system["name"],
+                system_abbr=system["abbr"],
+                protocol_type=system["protocol"],
+                host_name=system["host"],
+                port_no=int(system["port"]),
+                account_name=system["account"],
+                auth_type=system["auth"],
+                contact_name=system["downstreamContact"],
+                data_developer_contact_name=system["dataDeveloperContact"],
+                dept_name=system["dept"],
+                system_desc=system["desc"],
+                status_code=system["status"],
+                importance_level_code=system["importanceLevel"],
+                latest_output_time=system["latestOutputTime"] or None,
+                job_count=len(system["jobs"]),
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            ),
             *self._delete_db_jobs_statements(system_pk),
             *self._insert_db_jobs(system_pk, system["jobs"]),
-            self._insert_change_log(system_pk, None, "SYSTEM", system["id"], "UPDATE_SYSTEM", "更新下游系统", current, after_data),
+            self._insert_change_log(
+                system_pk,
+                None,
+                "SYSTEM",
+                system["id"],
+                "UPDATE_SYSTEM",
+                "更新下游系统",
+                current,
+                after_data,
+            ),
         ]
         self._execute_statements(statements)
         return self._get_public_system_detail(system["id"]), current, after_data
@@ -1186,9 +1173,18 @@ WHERE system_id = {system_pk}
         current_row = self._get_db_system_detail_row(system_id)
         system_pk = int(current_row["system_id"])
         statements = [
-            self._insert_change_log(system_pk, None, "SYSTEM", current["id"], "DELETE_SYSTEM", "删除下游系统", current, None),
+            self._insert_change_log(
+                system_pk,
+                None,
+                "SYSTEM",
+                current["id"],
+                "DELETE_SYSTEM",
+                "删除下游系统",
+                current,
+                None,
+            ),
             *self._delete_db_jobs_statements(system_pk),
-            f"DELETE FROM {TABLE_PUSH_SYSTEM} WHERE system_id = {system_pk}",
+            delete(push_system).where(push_system.c.system_id == system_pk),
         ]
         self._execute_statements(statements)
         return current
@@ -1210,54 +1206,42 @@ WHERE system_id = {system_pk}
         job = self._normalize_job_payload(payload)
         system_pk = int(system_row["system_id"])
         self._ensure_db_job_absent(system_pk, job["id"], system_id)
-        job_pk = self._get_next_id(TABLE_PUSH_JOB, "job_id")
+        job_pk = self._get_next_id(push_job, push_job.c.job_id)
         after_data = deepcopy(job)
 
         statements = [
-            f"""
-INSERT INTO {TABLE_PUSH_JOB} (
-    job_id,
-    system_id,
-    job_code,
-    job_name,
-    source_path,
-    source_file_name,
-    target_path,
-    target_file_name,
-    freq_desc,
-    freq_type,
-    delimiter_code,
-    encoding_type,
-    row_count_desc,
-    enabled_flag,
-    job_desc,
-    field_count,
-    created_by,
-    updated_by
-) VALUES (
-    {job_pk},
-    {system_pk},
-    {self._quote(job['id'])},
-    {self._quote(job['cn'])},
-    {self._quote(job['sourcePath'])},
-    {self._quote(job['sourceFileName'])},
-    {self._quote(job['targetPath'])},
-    {self._quote(job['targetFileName'])},
-    {self._quote(job['freq'])},
-    {self._quote(job['freqType'])},
-    {self._quote(job['delimiter'])},
-    {self._quote(job['encoding'])},
-    {self._quote(job['rowCnt'])},
-    {self._flag(job['enabled'])},
-    {self._quote(job['desc'])},
-    {len(job['fields'])},
-    {self._quote(self._default_operator)},
-    {self._quote(self._default_operator)}
-)
-""".strip(),
+            insert(push_job).values(
+                job_id=job_pk,
+                system_id=system_pk,
+                job_code=job["id"],
+                job_name=job["cn"],
+                source_path=job["sourcePath"],
+                source_file_name=job["sourceFileName"],
+                target_path=job["targetPath"],
+                target_file_name=job["targetFileName"],
+                freq_desc=job["freq"],
+                freq_type=job["freqType"],
+                delimiter_code=job["delimiter"],
+                encoding_type=job["encoding"],
+                row_count_desc=job["rowCnt"],
+                enabled_flag="Y" if job["enabled"] else "N",
+                job_desc=job["desc"],
+                field_count=len(job["fields"]),
+                created_by=self._default_operator,
+                updated_by=self._default_operator,
+            ),
             *self._insert_db_job_fields(job_pk, job["fields"]),
             self._refresh_system_job_count_statement(system_pk),
-            self._insert_change_log(system_pk, job_pk, "JOB", job["id"], "CREATE_JOB", "创建推送作业", None, after_data),
+            self._insert_change_log(
+                system_pk,
+                job_pk,
+                "JOB",
+                job["id"],
+                "CREATE_JOB",
+                "创建推送作业",
+                None,
+                after_data,
+            ),
         ]
         self._execute_statements(statements)
         return self._get_public_system_detail(system_id)["jobs"][0], after_data
@@ -1290,31 +1274,39 @@ INSERT INTO {TABLE_PUSH_JOB} (
         job_pk = int(job_row["job_id"])
 
         statements = [
-            f"""
-UPDATE {TABLE_PUSH_JOB}
-SET
-    job_code = {self._quote(job['id'])},
-    job_name = {self._quote(job['cn'])},
-    source_path = {self._quote(job['sourcePath'])},
-    source_file_name = {self._quote(job['sourceFileName'])},
-    target_path = {self._quote(job['targetPath'])},
-    target_file_name = {self._quote(job['targetFileName'])},
-    freq_desc = {self._quote(job['freq'])},
-    freq_type = {self._quote(job['freqType'])},
-    delimiter_code = {self._quote(job['delimiter'])},
-    encoding_type = {self._quote(job['encoding'])},
-    row_count_desc = {self._quote(job['rowCnt'])},
-    enabled_flag = {self._flag(job['enabled'])},
-    job_desc = {self._quote(job['desc'])},
-    field_count = {len(job['fields'])},
-    updated_by = {self._quote(self._default_operator)},
-    updated_at = CURRENT_TIMESTAMP
-WHERE job_id = {job_pk}
-""".strip(),
-            f"DELETE FROM {TABLE_PUSH_JOB_FIELD} WHERE job_id = {job_pk}",
+            update(push_job)
+            .where(push_job.c.job_id == job_pk)
+            .values(
+                job_code=job["id"],
+                job_name=job["cn"],
+                source_path=job["sourcePath"],
+                source_file_name=job["sourceFileName"],
+                target_path=job["targetPath"],
+                target_file_name=job["targetFileName"],
+                freq_desc=job["freq"],
+                freq_type=job["freqType"],
+                delimiter_code=job["delimiter"],
+                encoding_type=job["encoding"],
+                row_count_desc=job["rowCnt"],
+                enabled_flag="Y" if job["enabled"] else "N",
+                job_desc=job["desc"],
+                field_count=len(job["fields"]),
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            ),
+            delete(push_job_field).where(push_job_field.c.job_id == job_pk),
             *self._insert_db_job_fields(job_pk, job["fields"]),
             self._refresh_system_job_count_statement(system_pk),
-            self._insert_change_log(system_pk, job_pk, "JOB", job["id"], "UPDATE_JOB", "更新推送作业", current_job, after_data),
+            self._insert_change_log(
+                system_pk,
+                job_pk,
+                "JOB",
+                job["id"],
+                "UPDATE_JOB",
+                "更新推送作业",
+                current_job,
+                after_data,
+            ),
         ]
         self._execute_statements(statements)
         next_system = self._get_public_system_detail(system_id)
@@ -1344,9 +1336,18 @@ WHERE job_id = {job_pk}
         job_pk = int(job_row["job_id"])
 
         statements = [
-            self._insert_change_log(system_pk, job_pk, "JOB", job_id, "DELETE_JOB", "删除推送作业", current_job, None),
-            f"DELETE FROM {TABLE_PUSH_JOB_FIELD} WHERE job_id = {job_pk}",
-            f"DELETE FROM {TABLE_PUSH_JOB} WHERE job_id = {job_pk}",
+            self._insert_change_log(
+                system_pk,
+                job_pk,
+                "JOB",
+                job_id,
+                "DELETE_JOB",
+                "删除推送作业",
+                current_job,
+                None,
+            ),
+            delete(push_job_field).where(push_job_field.c.job_id == job_pk),
+            delete(push_job).where(push_job.c.job_id == job_pk),
             self._refresh_system_job_count_statement(system_pk),
         ]
         self._execute_statements(statements)

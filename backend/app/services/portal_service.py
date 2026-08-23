@@ -20,7 +20,7 @@ import logging
 import os
 import time
 
-from ..db.gaussdb import database_transaction, fetch_all, resolve_db_profile_name
+from ..db.facade import database_transaction, fetch_all, resolve_db_profile_name
 from ..settings import get_int_env
 from .providers import list_portal_stats
 from .system_management_service import system_management_service
