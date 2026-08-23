@@ -13,7 +13,11 @@
     "dev:log": "powershell -ExecutionPolicy Bypass -File ./scripts/dev-frontend.ps1",
     "dev:backend": "powershell -ExecutionPolicy Bypass -File ../backend/scripts/dev-backend.ps1",
     "dev:backend:sh": "bash ../backend/scripts/dev-backend.sh",
-    "build": "vite build",
+    "build": "npm run build:lineage && npm run build:frontend",
+    "build:lineage": "npm run build --workspace=lineage-viewer && npm run build --workspace=@lineage-viewer/domain-adapter && npm run build --workspace=@lineage-viewer/react",
+    "build:frontend": "vite build",
+    "typecheck:lineage": "npm run typecheck --workspace=lineage-viewer && npm run typecheck --workspace=@lineage-viewer/domain-adapter && npm run typecheck --workspace=@lineage-viewer/react",
+    "verify:lineage-packages": "node scripts/verify-lineage-packages.mjs",
     "test": "node --test src/**/*.test.js",
     "preview": "vite preview",
     "export:assets": "node scripts/export-assets.mjs"

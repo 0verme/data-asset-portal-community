@@ -385,6 +385,33 @@ jobs:
       - name: npm ci (clean install from lockfile)
         run: npm ci
 
+      - name: Build Lineage workspace packages from source
+        run: npm run build:lineage
+
+      - name: Typecheck Lineage workspace packages
+        run: npm run typecheck:lineage
+
+      - name: Verify Lineage package contracts
+        run: npm run verify:lineage-packages
+
+      - name: Ensure generated Lineage output is not tracked
+        run: |
+          set -euo pipefail
+          for path in \
+            packages/lineage-viewer/dist/index.d.ts \
+            packages/lineage-viewer/dist/lineage-viewer.js \
+            packages/lineage-viewer-react/dist/index.d.ts \
+            packages/lineage-viewer-react/dist/index.js \
+            packages/lineage-viewer-domain-adapter/dist/index.d.ts \
+            packages/lineage-viewer-domain-adapter/dist/index.js; do
+            test -f "$path"
+            git check-ignore -q "$path"
+          done
+          if git ls-files 'packages/lineage-viewer*/dist/**' | grep -q .; then
+            echo "Generated Lineage dist/ must not be tracked" >&2
+            exit 1
+          fi
+
       - name: Lineage workspace packages resolve inside the repository
         run: |
           npm ls lineage-viewer @lineage-viewer/react @lineage-viewer/domain-adapter --depth=0
@@ -404,7 +431,7 @@ jobs:
         run: npm test
 
       - name: Frontend production build
-        run: npm run build
+        run: npm run build:frontend
 
       - name: Dependency audit gate (Critical/High must be 0)
         run: npm audit --audit-level=high
