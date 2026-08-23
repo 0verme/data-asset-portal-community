@@ -23,10 +23,11 @@ from time import perf_counter
 
 from sqlalchemy import delete, exists, func, insert, or_, select, update
 
+from ..application import AuditActorMixin, actor_aware
 from ..db.facade import database_transaction, get_db_profile, resolve_db_profile_name
 from ..db.service import CoreAccess
 from ..db.tables import asset_change_log, asset_domain, asset_field, asset_layer, asset_table
-from ..settings import get_default_operator, get_page_size_limits
+from ..settings import get_page_size_limits
 from ..utils.data_types import DEFAULT_DATA_TYPE, normalize_data_type
 from ..utils.ddl_generator import generate_table_ddl, get_ddl_dialect_label, normalize_db_dialect
 from ..utils.service_perf import log_slow_service_call
@@ -118,11 +119,10 @@ class AssetDataSourceError(Exception):
         }
 
 
-class AssetsService:
+class AssetsService(AuditActorMixin):
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
         self._default_schema_prefix = os.getenv("ASSET_SCHEMA_PREFIX", "DWS_").strip() or "DWS_"
-        self._default_operator = get_default_operator()
         self._db = CoreAccess(
             profile_getter=lambda: self._db_profile,
             error_factory=AssetDataSourceError,
@@ -820,6 +820,7 @@ class AssetsService:
             for row in self._load_layer_rows(domain=domain)
         ]
 
+    @actor_aware
     def create_asset_table(self, payload):
         with operation_log_service.audit(
             module_name="数据仓库",
@@ -861,6 +862,7 @@ class AssetsService:
         self._execute_statements(statements)
         return self._with_empty_asset_risks(self._get_db_asset_detail(table["name"])), table, after_data
 
+    @actor_aware
     def update_asset_table(self, table_name, payload):
         with operation_log_service.audit(
             module_name="数据仓库",
@@ -909,6 +911,7 @@ class AssetsService:
         self._execute_statements(statements)
         return self._with_empty_asset_risks(self._get_db_asset_detail(table["name"])), current, after_data, table["name"]
 
+    @actor_aware
     def update_asset_fields(self, table_name, payload):
         with operation_log_service.audit(
             module_name="数据仓库",
@@ -967,6 +970,7 @@ class AssetsService:
         self._execute_statements(statements)
         return {"tableName": table_name, "fields": deepcopy(normalized_fields)}, current, after_data
 
+    @actor_aware
     def delete_asset_table(self, table_name):
         with operation_log_service.audit(
             module_name="数据仓库",
