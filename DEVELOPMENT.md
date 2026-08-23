@@ -27,6 +27,43 @@ npm ci
 > 三个 lineage package 是仓库内置的 npm workspace（`frontend/packages/`），
 > `npm ci` 会从本地源码链接它们，无需也不可能从 npm registry 安装。
 
+#### Lineage workspace source / artifact policy
+
+三个 workspace 的 `src/`、配置、文档和示例是 Git source of truth；`dist/` 是由 package
+build 生成的 runtime/type/release output，不是 checkout 的输入。为避免 source/artifact drift，
+三个 `dist/` 目录不提交，由显式、按依赖顺序的脚本重建：
+
+```bash
+cd frontend
+npm run build:lineage       # lineage-viewer -> domain-adapter -> react
+npm run typecheck:lineage
+npm test
+npm run build              # build:lineage + root frontend production build
+npm run verify:lineage-packages
+```
+
+| Artifact | Repository policy | Producer / consumer |
+|---|---|---|
+| `src/`、TypeScript/TSX source、配置、docs/examples | `KEEP` | 人工维护；workspace build、typecheck 和 frontend 消费 |
+| `dist/*.js`、`dist/*.d.ts`、Vite hashed bundles | `IGNORE` | package build 生成；root frontend 和 npm pack 在 build 后消费 |
+| `dist/*.map` | `IGNORE` | Vite/TypeScript 生成；不进入 Git，随 `files: ["dist"]` 作为 release 调试 artifact 保留在 npm package |
+| npm `.tgz` tarball | `RELEASE ONLY` | `npm pack` / `npm publish` 临时生成；不提交、不部署到 frontend repository |
+
+`package.json` 的 `main`、`module`、`types`、`exports` 继续指向 `dist/`，`files` 继续把
+`dist/` 放入 npm package。因此 `npm ci` 后必须先运行 Lineage build，不能把 workspace
+symlink 的存在误认为 runtime output 已经存在。当前仓库没有 npm publish 自动化；发布前从
+干净 checkout 执行上述 build、typecheck、verify，再在各 package 目录运行
+`npm pack --dry-run` 或按发布流程 `npm publish`。生产 frontend 的 source-map 配置不因本策略改变。
+
+旧 checkout 若依赖已提交的 `dist/`，迁移方式为：
+
+```text
+npm ci -> npm run build:lineage -> npm run build / npm run verify:lineage-packages
+```
+
+回滚不需要数据迁移：revert 本策略 commit 即可恢复原先的 tracked `dist/`，或在隔离分支
+重新生成并恢复需要的 release artifact。
+
 ### 后端
 
 ```bash
