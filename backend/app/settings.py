@@ -124,9 +124,21 @@ def get_session_secret() -> str:
     return secret_key
 
 
+def get_runtime_environment() -> str:
+    """Return the normalized runtime environment, preferring APP_ENV."""
+    return (
+        get_compatible_env("APP_ENV", "FLASK_ENV", "production") or "production"
+    ).strip().lower()
+
+
+def get_openapi_docs_enabled() -> bool:
+    """Enable HTTP OpenAPI docs only for an explicit development runtime."""
+    return get_runtime_environment() == "development"
+
+
 def get_session_cookie_config() -> dict[str, object]:
     """Return cookie security flags shared by Flask and FastAPI adapters."""
-    environment = (get_compatible_env("APP_ENV", "FLASK_ENV", "production") or "production").strip().lower()
+    environment = get_runtime_environment()
     return {
         "SESSION_COOKIE_HTTPONLY": True,
         "SESSION_COOKIE_SAMESITE": "Lax",
@@ -180,7 +192,7 @@ def get_trust_proxy_headers() -> bool:
 
 def get_runtime_config() -> dict[str, object]:
     """Build the small, security-sensitive runtime configuration surface."""
-    environment = (get_compatible_env("APP_ENV", "FLASK_ENV", "production") or "production").strip().lower()
+    environment = get_runtime_environment()
     if environment == "production" and get_runtime_debug():
         raise RuntimeError(
             "APP_DEBUG (legacy FLASK_DEBUG) must be disabled in production; the Werkzeug debugger must never run there."

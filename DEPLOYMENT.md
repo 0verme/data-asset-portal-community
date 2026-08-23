@@ -43,6 +43,8 @@ APP_SECRET_KEY=<generate-a-strong-random-value>
 
 `APP_DEBUG` 默认关闭，只有 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会开启。`APP_ENV` 未设置时采用安全的生产行为：Session Cookie 为 `HttpOnly=True`、`SameSite=Lax`、`Secure=True`。仅本地 HTTP 开发可显式设置 `APP_ENV=development` 使 `Secure=False`；这些变量名属于 retained compatibility/configuration contract，不表示 Flask 进程或 Flask WSGI runtime。
 
+Production contract：当 `APP_ENV=production` 或未设置时，FastAPI application construction 不注册 `/docs`、`/redoc` 和 `/openapi.json`，访问这些路径应返回 `404`。只有显式的 `APP_ENV=development` 默认开启这三个开发文档端点；`staging`、`test`、`qa` 等非 development 环境同样保持关闭。关闭 interactive docs/OpenAPI HTTP endpoint 是减少 API 枚举面的 deployment hardening，不是 authentication control，也不替代业务 API 的 Authentication / Authorization。
+
 此文档的 Nginx 配置将静态前端和 `/api` 放在同一来源，因此不需要 CORS。若必须拆分来源，设置 `APP_CORS_ORIGINS` 为完整、精确的逗号分隔 allowlist（如 `https://portal.example.com`）；未设置时不会返回 CORS 允许头，空项会忽略，且不会允许 `*` 与 Cookie 凭据的组合。
 
 如使用 GaussDB JDBC 覆盖路径，可额外设置：
