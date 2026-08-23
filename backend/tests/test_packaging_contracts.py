@@ -124,12 +124,20 @@ class WorkspaceContractTests(unittest.TestCase):
                     f"{rel} must keep its {name}",
                 )
 
-    def test_workspace_packages_have_source_and_dist(self):
-        # Runtime needs dist (npm ci does not build workspace packages);
-        # source must be present so the dist is auditable / reproducible.
+    def test_workspace_packages_are_rebuildable_from_source(self):
+        # A clean checkout intentionally has no generated dist/; the explicit
+        # frontend build pipeline creates it before runtime or packaging use.
         for rel in WORKSPACE_DIRS:
-            self.assertTrue((FRONTEND / rel / "src").is_dir(), f"{rel} lacks src/")
-            self.assertTrue((FRONTEND / rel / "dist").is_dir(), f"{rel} lacks dist/")
+            package_dir = FRONTEND / rel
+            manifest = _load_json(package_dir / "package.json")
+            self.assertTrue((package_dir / "src").is_dir(), f"{rel} lacks src/")
+            self.assertIn("dist", manifest.get("files", []), f"{rel} must package generated dist/")
+            self.assertTrue(manifest.get("scripts", {}).get("build"), f"{rel} lacks a build script")
+            for field in ("main", "module", "types"):
+                self.assertTrue(
+                    manifest.get(field, "").startswith("./dist/"),
+                    f"{rel} {field} must point at generated dist/",
+                )
 
 
 class LockfileContractTests(unittest.TestCase):

@@ -4,6 +4,12 @@ node_modules
 # 构建产物
 frontend/dist
 
+# Lineage workspace outputs are rebuilt from src before app builds and package releases.
+frontend/packages/lineage-viewer/dist/
+frontend/packages/lineage-viewer-react/dist/
+frontend/packages/lineage-viewer-domain-adapter/dist/
+*.tgz
+
 # 缓存
 .vite
 backend/.venv/
