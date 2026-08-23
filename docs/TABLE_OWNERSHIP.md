@@ -4,12 +4,13 @@
 
 ## Canonical baseline
 
-`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0004_metadata_ingestion_identity` 共同覆盖以下 36 张 canonical tables：
+`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0005_rbac_persistence` 共同覆盖以下 39 张 canonical tables：
 
 | Owner | Tables |
 | --- | --- |
 | shared/core | `p_system`, `p_data_source` |
 | system | `p_admin_user`, `p_menu`, `p_code_category`, `p_code_item`, `p_operation_log` |
+| rbac | `p_role`, `p_permission`, `p_role_permission` |
 | dwm | `p_asset_domain`, `p_asset_layer`, `p_asset_table`, `p_asset_field`, `p_asset_change_log` |
 | mapping | `p_field_mapping_table`, `p_field_mapping_field` |
 | root | `p_root_category`, `p_root_item`, `p_root_change_log` |
@@ -46,7 +47,7 @@
 
 `docs/pg/` 和 `docs/dws/` 保留为方言说明、历史迁移参考和部署 catalog。它们不能再被解释为某个仓库模块的产品锁或 baseline 排除清单。
 
-`p_field_mapping_change_log` 的旧 DDL 目前没有对应 runtime service/SQLAlchemy declaration，也不在 canonical 36-table inventory；它作为 docs-only historical/reference artifact 保留，待实际 runtime 使用时再按正常 migration 流程纳入，不得作为当前 module availability 判据。
+`p_field_mapping_change_log` 的旧 DDL 目前没有对应 runtime service/SQLAlchemy declaration，也不在 canonical 39-table inventory；它作为 docs-only historical/reference artifact 保留，待实际 runtime 使用时再按正常 migration 流程纳入，不得作为当前 module availability 判据。
 
 ## Instance state versus module availability
 

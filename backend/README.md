@@ -133,8 +133,8 @@ profiles:
 
 ## 初始化数据库
 
-**Community 的唯一官方初始化路径 = 完整 baseline + Alembic + demo seed**（Schema Source of Truth 为
-`backend/schema` 与 `backend/alembic`）：
+**Community 的唯一官方初始化路径 = 完整 baseline + Alembic + demo seed**（部署契约由
+`backend/schema` 四方言 versioned baseline 与 `backend/alembic` immutable forward revisions 共同组成；runtime `tables.py` 不是完整 physical schema，详见 [ADR-002](../docs/adr/002-schema-canonical-source.md)）：
 
 ```bash
 python backend/scripts/schema_migrate.py apply --profile community_sqlite
