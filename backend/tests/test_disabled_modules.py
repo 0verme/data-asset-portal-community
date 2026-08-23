@@ -63,6 +63,24 @@ class OpenRepositoryModuleTests(unittest.TestCase):
                     f"{code} router should not depend on capability state",
                 )
 
+    def test_disabled_menu_status_does_not_remove_repository_routes(self):
+        menu_service = MagicMock()
+        menu_service.get_enabled_menu_codes.return_value = set()
+        app = create_fastapi_app(
+            capabilities=resolve_capabilities(),
+            identity_resolver=lambda _request: None,
+            portal_service_instance=MagicMock(),
+            search_provider_instance=MagicMock(),
+            system_management_service_instance=menu_service,
+        )
+        paths = {route.path for route in app.routes}
+        for prefix in ("/api/assets", "/api/reports", "/api/push", "/api/system/menus"):
+            with self.subTest(prefix=prefix):
+                self.assertTrue(
+                    any(path == prefix or path.startswith(prefix + "/") for path in paths),
+                    f"disabled menu status must not remove {prefix}",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
