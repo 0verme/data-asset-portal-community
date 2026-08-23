@@ -119,6 +119,7 @@ mock 数据只用于前端体验，不会写入数据库。
 - **门户首页、数据仓库、字段映射、血缘分析**：浏览资产、映射关系和血缘快照。
 - **上游卸数、下游推送、报表资产、码值表维护**：维护外部数据源、推送元数据、报表台账和码值表元数据。
 - **词根、指标、API 资产、系统管理**：维护命名、指标口径、API 元数据以及用户/菜单/参数字典/操作日志。
+- **Permission-based RBAC**：后端按 permission code 强制授权，支持角色、权限映射、角色管理和单角色用户绑定；前端权限仅用于 UX。
 - **统一搜索与门户统计**：为所有已注册搜索实体和统计 provider 提供聚合入口。
 
 所有模块默认注册 route、进入 capability response、进入 canonical schema/seed；管理员仍可通过 `p_menu.status` 配置单个实例的菜单可见性。需要数据库驱动、凭据、外部系统、持久化 lineage storage 或危险写操作时，系统会报告真实 deployment capability 状态，而不是隐藏源码模块。
@@ -150,10 +151,8 @@ flowchart LR
 
 ## 🏷️ Release / Version Truth
 
-- **Published GitHub Release**：`v0.1.0`；对应历史章节见 [CHANGELOG.md](./CHANGELOG.md)，不会被本 PR 改写。
-- **Draft Release**：`v0.1.1` 仍是 Draft，不是 published release。
-- **Current main**：当前 `origin/main` 是 `v0.1.0` 之后的 unreleased development state。
-- **Application/package metadata**：FastAPI app、frontend package 和仓库本地 footer 仍使用 `0.1.0` / `V0.1.0`，不表示已经发布新版本。
+- **Latest published GitHub Release**：`v0.1.1`（已发布，非 draft、非 prerelease）。历史版本见 [CHANGELOG.md](./CHANGELOG.md)。
+- **Application/package metadata**：FastAPI app、frontend package 和仓库本地 footer 仍可能使用 `0.1.0` / `V0.1.0`；这属于 version sync debt，不改变 GitHub release 事实。
 - **Online Demo build**：线上静态/mock bundle 的 `V1.0.0` 是独立 build metadata，不代表仓库 release 或当前 main。
 
 ## 📚 文档导航
@@ -200,7 +199,7 @@ SQLite 用于 Community 本地演示、开发和 CI；PostgreSQL 用于 Communit
 
 - 真实采集调度、任务编排和失败重试
 - 真实下游文件推送执行链路
-- 细粒度 RBAC、多角色权限体系和完整审计中心
+- 多角色绑定、ABAC/ACL、数据范围（row-level/data-scope）授权、SSO/外部 IAM
 - DAP Core 内置万能 parser、自动血缘解析与自动元数据采集；外部 Collector Contract 已提供接入边界
 
 阶段更新见 [CHANGELOG.md](./CHANGELOG.md)，待确认事项见 [docs/todo.md](./docs/todo.md)。

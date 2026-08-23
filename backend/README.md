@@ -38,10 +38,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 
 ## 环境变量
 
-后端按以下顺序读取环境文件：
+后端按以下顺序读取环境文件，后者覆盖前者：
 
-1. `backend/.env`
-2. `backend/.env.local`
+1. 根目录 `.env`
+2. 根目录 `.env.local`
+3. `backend/.env`
+4. `backend/.env.local`
 
 数据库配置查找顺序：
 
@@ -156,7 +158,7 @@ Full/module-specific/external-dependency 部署可手动逐个执行模块 DDL�
 
 > 🚫 仓库不再包含整库快照（`app-*-init-data.sql` 与 `docs/*/sample/*.sql` 已从公开树移除）；
 > 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。
-> 管理员账号手动插入 `p_admin_user`。
+> 初始化真实环境的管理员使用 CLI：`python backend/scripts/create_admin.py --help`。不要在文档、命令行历史或仓库中写入真实密码。
 
 ## PostgreSQL migration 验证 checklist
 

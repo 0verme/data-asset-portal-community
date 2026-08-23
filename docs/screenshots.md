@@ -64,5 +64,5 @@
 ## 说明
 
 - 所有数据均为**虚构零售演示数据**，不包含任何真实业务信息。
-- 截图来自 repository Community remote path；如果页面显示 `V0.1.0`，它表示 frontend application/build metadata，不是线上 static Demo 的 `V1.0.0`，也不改变 published GitHub Release `v0.1.0` 的语义。
+- 截图来自 repository Community remote path；如果页面显示 `V0.1.0`，它表示 frontend application/build metadata，不是线上 static Demo 的 `V1.0.0`，也不改变 published GitHub Release `v0.1.1` 的语义。
 - 血缘分析页（POC）暂未纳入公开截图，等待 Demo 口径确认后补充；未出现在画廊不表示该 route 在所有 profile 都不可用。

@@ -48,7 +48,7 @@ FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract�
 }
 ```
 
-`flaskFallback=false` 是明确的 runtime regression flag，不表示存在 Flask route 或第二套 WSGI runtime。FastAPI app 的 `version="0.1.0"` 与 frontend package/footer 的 `0.1.0` / `V0.1.0` 是 application/package metadata；当前 `origin/main` 是 `v0.1.0` 之后的 unreleased development state。GitHub published release 仍为 `v0.1.0`，`v0.1.1` 仍是 Draft，线上静态 mock bundle 的 `V1.0.0` 也不是 API 或 repository release version。
+`flaskFallback=false` 是明确的 runtime regression flag，不表示存在 Flask route 或第二套 WSGI runtime。FastAPI app 的 `version="0.1.0"` 与 frontend package/footer 的 `0.1.0` / `V0.1.0` 是 application/package metadata；GitHub latest published release 为 `v0.1.1`。线上静态 mock bundle 的 `V1.0.0` 也不是 API 或 repository release version。
 
 本文描述 current main contract；历史 migration 文档中的旧 adapter/status 只作为历史证据。
 
@@ -108,7 +108,9 @@ VITE_API_MODE=remote
 
 ### 1.8 权限
 
-系统管理（`/api/system`）的写操作（新增 / 更新 / 删除 / 状态变更 / 重置密码）由后端 `require_admin` 保护，需管理员登录态。业务模块维护操作允许 `admin` 或 `maintainer` 登录态；只读接口按各模块当前路由契约执行。
+系统使用 permission-based RBAC。`/auth/me` 返回当前有效的 `permissions[]`；后端路由通过 `require_permission("resource:action")` 强制授权，前端 `can(permission)` 仅用于界面 UX，不能替代后端检查。角色管理接口包括 `GET/POST/PATCH /api/system/roles` 与 `GET /api/system/permissions`，用户绑定单个角色；禁用用户、禁用角色或撤销权限会在下一次授权决策中立即生效。
+
+现阶段仍保留 `admin`、`maintainer` 等内置角色及兼容 helper，但授权事实以当前角色—权限映射为准。未实现多角色绑定、ABAC/ACL、数据范围授权或外部 IAM。
 
 ## 2. 数据仓库模块 `assets`
 

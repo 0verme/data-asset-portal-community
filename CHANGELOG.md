@@ -5,6 +5,10 @@
 
 本文不是 Git 提交历史，而是基于仓库状态整理的阶段性变更摘要。
 
+## [0.1.1] - 2026-08-23
+
+正式发布的 v0.1.1 收口了 FastAPI Native 唯一运行时、Database Provider / SQLAlchemy Core / Alembic 数据层、MySQL 8 + PyMySQL acceptance、Metadata Ingestion Contract、open repository module contract，以及 permission-based RBAC（后端权限强制、角色管理和单角色用户绑定）。同时完成 backend configuration surface 收敛：`APP_*` 为主配置名，旧 `FLASK_*` 仅作兼容 fallback 名称。
+
 ## [Unreleased]
 
 ### 运行时与数据层（Changed）
@@ -17,7 +21,7 @@
 ### Repository Truth（Documentation）
 
 - 对齐 README、Architecture、Deployment、Development、API Contract、Modules、Community Demo、Screenshots 与 generated architecture artifact 的当前 FastAPI/Uvicorn、schema/migration、Demo 和版本语义。
-- 明确 published `v0.1.0`、Draft `v0.1.1`、post-`v0.1.0` current main 与独立线上 mock bundle `V1.0.0` 的区别；已发布的 `[0.1.0]` 历史章节保持不变。
+- 明确 published `v0.1.1`、application/package version sync debt 与独立线上 mock bundle `V1.0.0` 的区别；已发布的 `[0.1.0]` 历史章节保持不变。
 - Issue #116 已移除 Community / Private / Optional artificial runtime gating；仓库已有模块统一进入 open-by-default runtime、schema、seed、search 和 portal statistics contract。
 
 ### 优化（Changed）

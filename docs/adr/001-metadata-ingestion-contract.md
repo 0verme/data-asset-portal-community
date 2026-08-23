@@ -3,6 +3,7 @@
 - 状态：Accepted
 - 日期：2026-08-22
 - 范围：#114 Phase A–D
+- 当前说明：本文保留决策时的历史上下文；其中“未来 RBAC”措辞不代表当前授权实现。当前使用 permission-based RBAC，Contract / Service 仍保持 framework-neutral。
 
 ## Context
 

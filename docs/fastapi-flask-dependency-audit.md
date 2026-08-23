@@ -1,5 +1,8 @@
 # Flask Dependency Audit（F7 final classification）
 
+> [!NOTE]
+> **Historical / Superseded audit record.** 本文记录 F7 清理阶段的依赖分类与迁移证据；其中的 WAIT_DB / Private boundary 是当时的阶段状态，不代表 v0.1.1 当前模块 contract。当前事实请参阅 [architecture.md](./architecture.md) 与 [modules.md](./modules.md)。
+
 审计基线：`origin/main` `f938b5e3caa8ea494748546bd051bc0bbb3c9096`（F6/#110 merge 后、F7/#112 开始前）。
 
 ## REMOVE（已完成）
