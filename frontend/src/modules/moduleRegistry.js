@@ -13,9 +13,11 @@
 // limitations under the License.
 
 /**
- * Frontend module registry — single source for module codes, paths, and
- * open-by-default module metadata. Codes match backend capabilities and menu
- * codes; instance menu status is applied by the navigation layer.
+ * Frontend module registry — source for repository module codes, paths, and
+ * static metadata. Codes match the backend capability compatibility contract
+ * and menu codes; instance menu status is applied by the navigation layer.
+ * `enabledByDefault` is retained metadata for the open module contract, not a
+ * license, Edition, permission, menu, profile, or dependency-readiness gate.
  */
 
 export const MODULE_REGISTRY = [
@@ -175,17 +177,25 @@ export function getModuleByPathPrefix(topSegment) {
 }
 
 /**
- * Default module set for mock mode and offline capability fallbacks.
+ * Return the source-backed module codes for mock mode and offline fallbacks.
  * There is no frontend module allowlist; every registered module is open.
  */
-export function resolveDefaultEnabledModules() {
-  return new Set(
-    MODULE_REGISTRY.filter((item) => item.enabledByDefault).map((item) => item.code),
-  );
+export function resolveRepositoryModuleCodes() {
+  return new Set(listModuleCodes());
 }
 
-export function isModuleEnabled(code) {
+/** Compatibility alias retained for callers using the old enablement name. */
+export function resolveDefaultEnabledModules() {
+  return resolveRepositoryModuleCodes();
+}
+
+export function isRegisteredModule(code) {
   return BY_CODE.has(code);
+}
+
+/** Compatibility alias; this checks registry identity, not a mutable gate. */
+export function isModuleEnabled(code) {
+  return isRegisteredModule(code);
 }
 
 export function validateModuleRegistry() {

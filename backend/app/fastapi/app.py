@@ -101,6 +101,9 @@ def create_fastapi_app(
     upstream = upstream_service_instance or upstream_service
     push = push_service_instance or push_service
 
+    # The capability contract is used by the infrastructure payload only.
+    # Router registration below is static for every repository module and does
+    # not depend on capability, menu, profile, or readiness state.
     effective_capabilities = capabilities or resolve_capabilities()
 
     register_exception_handlers(app)

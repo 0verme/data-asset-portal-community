@@ -9,7 +9,7 @@ FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract�
 
 | 模块 | 前端 API | Base Path | Community 当前状态 | 说明 |
 | --- | --- | --- | --- | --- |
-| 门户 / 能力 / 搜索 | `api/portal.js`、`api/search.js` | `/api/portal`、`/api/capabilities`、`/api/search` | 已注册 | 门户统计、能力清单、统一搜索 |
+| 门户 / Repository Module Contract / 搜索 | `api/portal.js`、`api/search.js` | `/api/portal`、`/api/capabilities`、`/api/search` | 已注册 | 门户统计、兼容的仓库模块 capability contract、统一搜索 |
 | 认证 | `api/auth.js` | `/api/auth` | 已注册 | 登录、登出、获取当前用户 |
 | 上游卸数 | `api/upstream.js` | `/api/upstreams` | 已注册 | 管理上游源系统与卸数状态 |
 | 数据仓库 | `api/assets.js` | `/api/assets` | 已注册 | 管理已配置层级的表资产、字段、DDL |
@@ -25,7 +25,7 @@ FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract�
 | 操作日志 | `api/operationLogs.js` | `/api/operation-logs` | 已注册（随 system） | 查询全站操作审计日志 |
 | 通用码值 | `api/commonCodes.js` | `/api/common-codes` | WAIT_DB，当前未注册 | 全系统可复用的分类码值与下拉选项 |
 
-仓库已有 module codes 默认进入同一 open runtime contract；菜单 `status`、外部依赖、database driver、credential 和 persistent lineage storage readiness 是实例/部署状态，不是 Edition feature gate。
+仓库已有 module codes 默认进入同一 open runtime contract；菜单 `status`、外部依赖、database driver、credential 和 persistent lineage storage readiness 是实例/部署状态，不是 Edition feature gate。Module availability is not a licensing gate；menu visibility is not authorization，RBAC authorization is not module availability，runtime/DB profile is not feature gating。
 
 ## 1. 总体约定
 
@@ -111,6 +111,27 @@ VITE_API_MODE=remote
 系统使用 permission-based RBAC。`/auth/me` 返回当前有效的 `permissions[]`；后端路由通过 `require_permission("resource:action")` 强制授权，前端 `can(permission)` 仅用于界面 UX，不能替代后端检查。角色管理接口包括 `GET/POST/PATCH /api/system/roles` 与 `GET /api/system/permissions`，用户绑定单个角色；禁用用户、禁用角色或撤销权限会在下一次授权决策中立即生效。
 
 现阶段仍保留 `admin`、`maintainer` 等内置角色及兼容 helper，但授权事实以当前角色—权限映射为准。未实现多角色绑定、ABAC/ACL、数据范围授权或外部 IAM。
+
+### 1.9 Repository module capability contract
+
+`GET /api/capabilities` 是历史上已经公开的兼容 endpoint。它的名称保留为 **capability**，但当前实现的唯一职责是表示仓库中 source-backed 的 open module contract；它不是通用 deployment readiness API，也不是 feature flag、license/Edition entitlement、菜单配置、RBAC 或 database profile API。
+
+当前响应保持以下字段形状：
+
+```json
+{
+  "modules": [
+    { "code": "dwm", "enabled": true, "reason": null }
+  ]
+}
+```
+
+- `modules[].code` 与 backend module manifest、frontend module registry、menu/search/stat module keys 共用稳定 code；module codes 不是权限码。
+- `modules[].enabled` 是保留的兼容字段。在当前 open repository contract 中，source-backed modules 为 `true`；它不表示 license entitlement、Community/Private Edition、`p_menu.status`、当前用户 RBAC permission、数据库连接或外部依赖可用性。
+- `modules[].reason` 是保留的兼容字段；当前模块 contract 对 source-backed modules 返回 `null`。数据库/驱动/存储/外部服务未就绪时，使用各业务 service 的诊断/error contract，不通过 capability payload 隐藏模块。
+- endpoint 不返回 Edition，也不根据 capability 状态取消 FastAPI router registration。当前没有为术语清理新增 `/api/modules` 或 `/api/readiness`，以避免无必要的 public API 扩张。
+
+前端 `frontend/src/capabilities/capabilities.js` 继续请求该 endpoint，但返回对象的 `loadStatus` / `loadError` 只表示 HTTP loader 状态（请求成功或失败）。网络失败保留完整的 repository module registry；它不能被解释为模块不存在或假 404。`ModuleCapabilityError`、`resolve_capabilities()` 等 backend 名称同样是保留的 capability compatibility terminology，不代表 readiness 或 licensing gate。
 
 ## 2. 数据仓库模块 `assets`
 

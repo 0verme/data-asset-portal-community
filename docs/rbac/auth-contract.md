@@ -23,8 +23,8 @@ an additional backend-authoritative permission collection:
 ```
 
 `permissions` is sorted lexicographically and contains only registered current
-codes. The frontend must consume this list rather than re-deriving capability
-from `role`.
+codes. The frontend must consume this permission set rather than re-deriving
+authorization from `role`.
 
 ## Current-state semantics
 

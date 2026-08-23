@@ -30,7 +30,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class PortalStatProvider:
-    """One portal stat card keyed to a capability module code."""
+    """One portal stat card keyed to a repository module code."""
 
     def __init__(self, config: dict):
         self.code = str(config.get("module") or "").strip()

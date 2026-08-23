@@ -65,8 +65,9 @@ def available_provider_names() -> tuple[str, ...]:
 def available_adapter_names() -> tuple[str, ...]:
     """Return all registered database adapters.
 
-    Provider and driver readiness is a deployment capability; it is never
-    reduced by a repository module profile.
+    Provider and driver readiness is a deployment concern; provider capability
+    flags describe adapter support and are never reduced by a repository module
+    profile.
     """
     return available_provider_names()
 

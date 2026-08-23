@@ -3,7 +3,7 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "数据资产门户 · FastAPI Native Runtime",
-    "subtitle": "Uvicorn → backend/asgi.py → FastAPI；Provider、schema/migration 与当前 capability boundary",
+    "subtitle": "Uvicorn → backend/asgi.py → FastAPI；Provider、schema/migration 与 module contract boundary",
     "output": "system-architecture.html",
     "visual_preset": "editorial",
     "quality_profile": "showcase",
@@ -115,13 +115,13 @@
     {
       "id": "capability",
       "type": "security",
-      "label": "Community Capability",
-      "sublabel": "current profile / route gate",
+      "label": "Repository Module Contract",
+      "sublabel": "open module payload; no route gate",
       "pos": [655, 500],
       "size": [174, 62],
       "sources": [
-        { "path": "backend/configs/community.yaml", "label": "current profile" },
-        { "path": "backend/app/core/capabilities.py", "label": "capability resolver" }
+        { "path": "backend/app/core/modules.py", "label": "module manifest" },
+        { "path": "backend/app/core/capabilities.py", "label": "compatibility payload" }
       ]
     },
     {
@@ -157,7 +157,7 @@
     { "id": "fastapi-application", "from": "fastapi", "to": "application", "variant": "emphasis" },
     { "id": "application-provider", "from": "application", "to": "db-provider", "variant": "emphasis" },
     { "id": "provider-metadata", "from": "db-provider", "to": "metadata", "variant": "emphasis" },
-    { "id": "fastapi-capability", "from": "fastapi", "to": "capability", "label": "route registration", "variant": "security", "route": "orthogonal-v" },
+    { "id": "fastapi-capability", "from": "fastapi", "to": "capability", "label": "capability payload", "variant": "security", "route": "orthogonal-v" },
     { "id": "runtime-session", "from": "asgi-runtime", "to": "session-contract", "label": "cookie/security config", "variant": "security", "route": "orthogonal-v" }
   ],
   "cards": [

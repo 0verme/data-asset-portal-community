@@ -48,6 +48,21 @@ class OpenRepositoryModuleTests(unittest.TestCase):
                     f"{code} router should be registered",
                 )
 
+    def test_capability_state_cannot_unregister_repository_module_routers(self):
+        app = create_fastapi_app(
+            capabilities={"modules": [], "enabled_codes": []},
+            identity_resolver=lambda _request: None,
+            portal_service_instance=MagicMock(),
+            search_provider_instance=MagicMock(),
+        )
+        paths = {route.path for route in app.routes}
+        for code, prefix in MODULE_PREFIXES.items():
+            with self.subTest(code=code):
+                self.assertTrue(
+                    any(path == prefix or path.startswith(prefix + "/") for path in paths),
+                    f"{code} router should not depend on capability state",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

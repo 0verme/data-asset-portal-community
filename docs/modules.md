@@ -4,7 +4,7 @@
 
 ## 总览
 
-当前共有 12 个一级功能模块：门户首页以及下表 11 个业务导航模块。菜单是否启用、展示顺序以及位于主导航或“更多”区域，均由系统菜单配置决定。下表把 **Source / Runtime / Schema / Demo** 分开：源码模块默认 route、capability、schema、seed、search 和统计 contract 一致；外部执行能力和实例菜单可见性另行表达。
+当前共有 12 个一级功能模块：门户首页以及下表 11 个业务导航模块。菜单是否启用、展示顺序以及位于主导航或“更多”区域，均由系统菜单配置决定。下表把 **Source / Runtime / Schema / Demo** 分开：源码模块默认 route、repository-module capability contract、schema、seed、search 和统计 contract 一致；外部执行能力和实例菜单可见性另行表达。
 
 | 菜单 | Source / 前端视图 | Current remote API | Schema / seed / Demo 状态 |
 | --- | --- | --- | --- |
@@ -20,13 +20,13 @@
 | 码值表维护 | `ManualCodeTablePage.jsx` | `/api/manual-code-tables/*` | canonical baseline/migration + demo seed；当前只维护元数据 |
 | 系统管理 | `SystemView.jsx` | `/api/system/*`、`/api/operation-logs/*` | system/operation-log core 表在 baseline；Community seed；按角色控制菜单 |
 
-所有 12 个仓库模块均由 backend manifest、FastAPI composition root、frontend registry 和 canonical schema/seed 覆盖。`/api/capabilities` 只描述 open module set 与部署状态，不包含 Edition 产品锁；管理员仍可通过 `p_menu.status` 配置实例菜单可见性。
+所有 12 个仓库模块均由 backend manifest、FastAPI composition root、frontend registry 和 canonical schema/seed 覆盖。`/api/capabilities` 是保留的兼容 endpoint，只描述 source-backed open module set；它不读取数据库/外部依赖 readiness，也不包含 Edition 产品锁。管理员仍可通过 `p_menu.status` 配置实例菜单可见性，但菜单隐藏不会删除 route 或撤销 RBAC。
 
 门户首页和统一搜索是进入各业务模块的聚合入口，不作为独立主导航模块：
 
 - 门户统计：`/api/portal/stats`
 - 统一搜索：`/api/search`
-- 能力清单：`/api/capabilities`
+- Repository module capability contract（兼容 endpoint）：`/api/capabilities`
 
 基础能力：
 
@@ -166,6 +166,6 @@
 
 ### 后端数据
 
-`VITE_API_MODE=remote` 时，前端统一访问后端 `/api`。后端业务模块始终通过 Database Provider 和 database profile 读写数据，不使用本地 JSON mock；route 默认可达，数据库/驱动/凭据/外部集成 readiness 通过服务错误契约表达。
+`VITE_API_MODE=remote` 时，前端统一访问后端 `/api`。后端业务模块始终通过 Database Provider 和 database profile 读写数据，不使用本地 JSON mock；route 默认可达，数据库/驱动/凭据/外部集成 readiness 通过服务错误契约表达。前端 capability loader 的 `loadStatus` / `loadError` 只表示 capability HTTP 请求状态，不改变 registry module set。
 
 Community/local 隔离运行支持 SQLite（`type: sqlite`），其基线由 `backend/schema` + Alembic + seed 流程维护；Community 正式部署推荐 PostgreSQL（`type: postgres`），MySQL 8.0 由独立 profile/driver 支持。部署可使用 PostgreSQL、MySQL、GaussDB/DWS，并按 `docs/pg/`、`docs/dws/` 的方言参考准备对应 profile 与外部依赖。Cloudflare D1 不在支持范围内。

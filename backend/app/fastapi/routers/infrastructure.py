@@ -28,6 +28,9 @@ def _register_infrastructure_routes(
     portal_service: Any,
     search_provider: Any,
 ) -> None:
+    # ``/api/capabilities`` is a compatibility endpoint for the open
+    # repository-module contract. It does not perform dependency readiness,
+    # menu, RBAC, profile, license, or route-registration gating.
     capabilities_router = APIRouter(
         prefix="/api/capabilities", tags=["capabilities-native"]
     )

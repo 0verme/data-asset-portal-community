@@ -1,9 +1,18 @@
 # pyright: reportMissingImports=false
 
+import os
 import unittest
+from unittest.mock import patch
 
-from backend.app.core.capabilities import capabilities_public_payload, resolve_capabilities
+from backend.app.core.capabilities import (
+    ModuleCapabilityError,
+    capabilities_public_payload,
+    is_module_enabled,
+    is_repository_module,
+    resolve_capabilities,
+)
 from backend.app.core.modules import MODULES, list_module_codes, validate_manifest
+from backend.app.core.profiles import apply_runtime_profile
 
 
 class ModuleManifestTestCase(unittest.TestCase):
@@ -39,6 +48,34 @@ class ModuleCapabilityResolveTestCase(unittest.TestCase):
         self.assertNotIn("edition", payload)
         self.assertEqual(set(list_module_codes()), {item["code"] for item in payload["modules"]})
         self.assertTrue(all(item["enabled"] for item in payload["modules"]))
+
+    def test_public_payload_ignores_injected_enablement_state(self):
+        payload = capabilities_public_payload(
+            {
+                "modules": [{"code": "dwm", "enabled": False, "reason": "disabled"}],
+                "enabled_codes": [],
+            }
+        )
+        self.assertEqual(set(list_module_codes()), {item["code"] for item in payload["modules"]})
+        self.assertTrue(all(item["enabled"] for item in payload["modules"]))
+
+    def test_module_identity_helper_is_not_a_runtime_enablement_gate(self):
+        self.assertTrue(is_repository_module("dwm"))
+        self.assertFalse(is_repository_module("not-a-repository-module"))
+        self.assertEqual(is_repository_module("dwm"), is_module_enabled("dwm"))
+
+    def test_runtime_profile_does_not_change_repository_module_set(self):
+        with patch.dict(os.environ, {"ASSET_RUNTIME_PROFILE": "community"}, clear=False):
+            apply_runtime_profile()
+            self.assertEqual(
+                set(list_module_codes()),
+                {item["code"] for item in resolve_capabilities()["modules"]},
+            )
+
+    def test_legacy_module_capability_error_contract_is_retained(self):
+        error = ModuleCapabilityError("contract error", details=["detail"])
+        self.assertEqual("MODULE_CAPABILITY_ERROR", error.to_dict()["code"])
+        self.assertEqual(["detail"], error.to_dict()["details"])
 
 
 if __name__ == "__main__":
