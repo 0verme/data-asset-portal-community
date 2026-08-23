@@ -39,6 +39,7 @@ import {
 } from "../config/defaults.js";
 import { INDICATOR_DIMENSION_OPTIONS } from "../data/indicators.js";
 import { LAYER_OPTIONS } from "../config/assets.js";
+import { getActiveModuleRoute } from "./navigation.js";
 
 export function parseInitialLocation() {
   if (typeof window === "undefined") {
@@ -387,4 +388,130 @@ export function buildPathname(module, moduleRoute, systemRoute) {
   }
   if (module === "portal") return "/";
   return "/data-warehouse";
+}
+
+const DEFAULT_LINEAGE_ROUTE = { rootId: null, direction: "both", depth: 2, view: "table" };
+
+export function buildNavigationLocation({ module, routes = {}, query = "", urlState = {} }) {
+  const pathname = buildPathname(
+    module,
+    getActiveModuleRoute(module, routes),
+    routes.system || DEFAULT_SYSTEM_ROUTE,
+  );
+  const params = new URLSearchParams();
+  const asset = urlState.asset || {};
+  const indicator = urlState.indicator || {};
+  const report = urlState.report || {};
+  const apiAsset = urlState.apiAsset || {};
+  const upstream = urlState.upstream || {};
+  const push = urlState.push || {};
+  const indicatorFilter = indicator.filter || DEFAULT_INDICATOR_FILTER;
+  const reportFilter = report.filter || DEFAULT_REPORT_FILTER;
+  const apiAssetFilter = apiAsset.filter || DEFAULT_API_ASSET_FILTER;
+  const upstreamFilter = upstream.filter || DEFAULT_UP_FILTER;
+  const pushFilter = push.filter || DEFAULT_PUSH_FILTER;
+  const assetLayout = asset.layout || DEFAULT_LAYOUT;
+  const assetDetailTab = asset.detailTab || DEFAULT_DETAIL_TAB;
+  const indicatorView = indicator.view || DEFAULT_INDICATOR_VIEW;
+  const reportView = report.view || DEFAULT_REPORT_VIEW;
+  const apiAssetView = apiAsset.view || DEFAULT_API_ASSET_VIEW;
+  const upstreamView = upstream.view || DEFAULT_UP_VIEW;
+  const pushView = push.view || DEFAULT_PUSH_VIEW;
+  const mappingRoute = routes.mapping || DEFAULT_MAPPING_ROUTE;
+  const lineageRoute = routes.lineage || DEFAULT_LINEAGE_ROUTE;
+  const normalizedQuery = String(query || "").trim();
+
+  if (module === "dwm") {
+    if (normalizedQuery) params.set("q", normalizedQuery);
+    if (asset.domain) params.set("domain", asset.domain);
+    if (asset.selectedLayer) params.set("layer", asset.selectedLayer);
+    if (assetLayout !== DEFAULT_LAYOUT) params.set("layout", assetLayout);
+    if (routes.asset?.page === "detail" && assetDetailTab !== DEFAULT_DETAIL_TAB) {
+      params.set("tab", assetDetailTab);
+    }
+  }
+
+  if (module === "report") {
+    if (normalizedQuery) params.set("q", normalizedQuery);
+    if (reportFilter.type) params.set("type", reportFilter.type);
+    if (reportFilter.status) params.set("status", reportFilter.status);
+    if (reportFilter.ownerDept) params.set("ownerDept", reportFilter.ownerDept);
+    if (reportView !== DEFAULT_REPORT_VIEW) {
+      params.set("view", reportView);
+    }
+  }
+
+  if (module === "apiAsset") {
+    if (normalizedQuery) params.set("q", normalizedQuery);
+    if (apiAssetFilter.status) params.set("status", apiAssetFilter.status);
+    if (apiAssetFilter.method) params.set("method", apiAssetFilter.method);
+    if (apiAssetFilter.downstreamSystemId) params.set("downstreamSystemId", apiAssetFilter.downstreamSystemId);
+    if (apiAssetView !== DEFAULT_API_ASSET_VIEW) {
+      params.set("view", apiAssetView);
+    }
+  }
+
+  if (module === "indicator") {
+    if (normalizedQuery) params.set("q", normalizedQuery);
+    if (indicatorFilter.dimension !== "all") params.set("dimension", indicatorFilter.dimension);
+    if (indicatorFilter.status !== "all") params.set("status", indicatorFilter.status);
+    if (indicatorView !== DEFAULT_INDICATOR_VIEW) {
+      params.set("view", indicatorView);
+    }
+  }
+
+  if (module === "mapping") {
+    if (mappingRoute.upstreamSystemId) params.set("upstreamSystemId", mappingRoute.upstreamSystemId);
+    if (mappingRoute.sourceTable) params.set("sourceTable", mappingRoute.sourceTable);
+    if (mappingRoute.dwfTable) params.set("dwfTable", mappingRoute.dwfTable);
+    if (mappingRoute.tab && mappingRoute.tab !== DEFAULT_MAPPING_ROUTE.tab) {
+      params.set("tab", mappingRoute.tab);
+    }
+  }
+
+  if (module === "lineage") {
+    if (lineageRoute.rootId) params.set("rootId", lineageRoute.rootId);
+    params.set("direction", lineageRoute.direction);
+    params.set("depth", lineageRoute.depth);
+    if (lineageRoute.view !== DEFAULT_LINEAGE_ROUTE.view) params.set("view", lineageRoute.view);
+  }
+
+  if (module === "upstream") {
+    if (normalizedQuery) params.set("q", normalizedQuery);
+    if (upstreamFilter.status) params.set("status", upstreamFilter.status);
+    if (upstreamFilter.dbType) params.set("dbType", upstreamFilter.dbType);
+    if (upstreamView !== DEFAULT_UP_VIEW && routes.upstream?.page === "list") {
+      params.set("view", upstreamView);
+    }
+  }
+
+  if (module === "push") {
+    if (normalizedQuery) params.set("q", normalizedQuery);
+    if (pushFilter.status) params.set("status", pushFilter.status);
+    if (pushFilter.protocol) params.set("protocol", pushFilter.protocol);
+    if (pushFilter.dept) params.set("dept", pushFilter.dept);
+    if (pushFilter.importanceLevel) params.set("importanceLevel", pushFilter.importanceLevel);
+    if (pushView !== DEFAULT_PUSH_VIEW && routes.push?.page === "systems") {
+      params.set("view", pushView);
+    }
+  }
+
+  if (module === "codeTable" && normalizedQuery) params.set("q", normalizedQuery);
+
+  const search = params.toString() ? `?${params.toString()}` : "";
+  return { pathname, search, url: `${pathname}${search}` };
+}
+
+export function resolveHistoryAction({
+  currentUrl,
+  currentPathname,
+  nextUrl,
+  nextPathname,
+  historyReady,
+  isPopstate = false,
+}) {
+  if (currentUrl === nextUrl) return "noop";
+  if (isPopstate) return "replace";
+  if (historyReady && currentPathname !== nextPathname) return "push";
+  return "replace";
 }
