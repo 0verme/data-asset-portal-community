@@ -1,4 +1,3 @@
-import React from "react";
 import { SidebarFilterGroup } from "./SidebarFilterGroup.jsx";
 
 export function SidebarActionGroup({ actions = [] }) {

@@ -1,4 +1,3 @@
-import React from "react";
 import { CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.js";
 import { Highlight, Icon } from "../ui.jsx";
 

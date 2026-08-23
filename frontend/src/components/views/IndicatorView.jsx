@@ -1,4 +1,3 @@
-import React from "react";
 import { IndicatorPage } from "../IndicatorPage.jsx";
 import IndicatorEditor from "../IndicatorEditor.jsx";
 import { Icon } from "../ui.jsx";

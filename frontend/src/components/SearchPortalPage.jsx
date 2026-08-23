@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./ui.jsx";
 import { getPortalStats } from "../api/portal.js";
 import { unifiedSearch } from "../api/search.js";
@@ -183,12 +183,17 @@ export function SearchPortalPage({ onNavigate, availableModules = [] }) {
     }
 
     runSearch(activeQuery, nextScope);
+    // This synchronization intentionally runs only when the available module set changes.
+    // The called search updates state, so adding its render-scoped dependencies would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableModules]);
 
   useEffect(() => {
     const initialQuery = String(initialSearchRef.current.query || "").trim();
     if (!initialQuery) return;
     runSearch(initialQuery, initialSearchRef.current.scope);
+    // Bootstrap the URL query once; re-running on the render-scoped callback would repeat the search.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const doSearch = () => runSearch(query, scope);

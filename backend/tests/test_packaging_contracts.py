@@ -33,6 +33,7 @@ import json
 import re
 import unittest
 from pathlib import Path
+from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND = REPO_ROOT / "frontend"
@@ -137,14 +138,16 @@ class LockfileContractTests(unittest.TestCase):
 
     FORBIDDEN_URL_FRAGMENTS = (
         "localhost",
-        "127.0.0.1",
-        "192.168.",
-        "10.",
-        "172.16.",
         "registry.cn-",
         "nexus",
         "artifactory",
         "verdaccio",
+    )
+    FORBIDDEN_PRIVATE_HOST_PREFIXES = (
+        "127.0.0.1",
+        "192.168.",
+        "10.",
+        "172.16.",
     )
 
     def setUp(self):
@@ -161,6 +164,12 @@ class LockfileContractTests(unittest.TestCase):
             if isinstance(entry, dict) and entry.get("resolved")
         ]
         for url in resolved_urls:
+            host = (urlparse(url).hostname or "").lower()
+            for prefix in self.FORBIDDEN_PRIVATE_HOST_PREFIXES:
+                self.assertFalse(
+                    host.startswith(prefix),
+                    f"resolved URL {url} references private host {host}",
+                )
             for fragment in self.FORBIDDEN_URL_FRAGMENTS:
                 self.assertNotIn(fragment, url, f"resolved URL {url} references {fragment}")
 
