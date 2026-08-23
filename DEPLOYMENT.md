@@ -85,6 +85,8 @@ Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"`、`
 - 响应安全头：`X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy: strict-origin-when-cross-origin`
 - 4xx/5xx 错误响应统一为 JSON 结构，不向客户端泄露内部路径/连接串/底层驱动异常
 - 转发头信任：**默认不受信任**。审计日志如需真实客户端 IP，仅当请求只经受信反代（如 Nginx）时设置 `ASSET_TRUST_PROXY_HEADERS=true`；否则客户端可直接伪造 `X-Forwarded-For`。Nginx 已设置 `X-Forwarded-For` 的同源部署请开启该项
+- 登录保护：`/api/auth/login` 默认启用进程内的轻量失败窗口与临时 backoff，按用户名和已解析的 request-context client identity 计数；默认 60 秒窗口内第 5 次失败后临时限制，backoff 最高 30 秒。状态有 15 分钟 TTL 和 10,000 条容量上限，不需要 Redis，也不会永久锁定账号。
+- 登录保护只在当前进程内共享；多实例部署不会共享失败状态。需要跨实例共享限流时，应在后续设计中替换为外部共享实现。默认不信任伪造的 `X-Forwarded-For`，只有显式启用 `ASSET_TRUST_PROXY_HEADERS=true` 时才使用受信代理解析出的地址。
 
 ## 三、前端构建
 
