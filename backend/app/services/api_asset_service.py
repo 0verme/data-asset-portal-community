@@ -7,6 +7,7 @@ import re
 
 from sqlalchemy import and_, delete, func, insert, or_, select, update
 
+from ..application import AuditActorMixin, actor_aware
 from ..db.facade import database_transaction
 from ..db.service import CoreAccess
 from ..db.tables import (
@@ -15,6 +16,12 @@ from ..db.tables import (
     api_relation,
     api_response_field,
     system_table,
+)
+from .operation_log_service import (
+    OPERATION_TYPE_CREATE,
+    OPERATION_TYPE_DELETE,
+    OPERATION_TYPE_UPDATE,
+    operation_log_service,
 )
 
 CODE_RE = re.compile(r"^[A-Z][A-Z0-9_-]{2,63}$")
@@ -49,7 +56,7 @@ class ApiAssetValidationError(ApiAssetError):
     status, code = 422, "API_ASSET_VALIDATION_FAILED"
 
 
-class ApiAssetService:
+class ApiAssetService(AuditActorMixin):
     def __init__(self):
         self._profile = os.getenv("ASSET_DB_PROFILE", "").strip()
         self._db = CoreAccess(
@@ -477,60 +484,110 @@ class ApiAssetService:
             description_text=item["description"],
             remark_desc=item["remark"],
             is_deleted="N",
-            created_by="system",
-            updated_by="system",
+            created_by=self._default_operator,
+            updated_by=self._default_operator,
         )
 
+    @actor_aware
     def create(self, payload):
+        payload = payload or {}
         item = self._validate_asset(payload)
-        if self._exists(item["code"]):
-            raise ApiAssetExistsError("API asset already exists")
-        self._execute([self._insert_asset(item, self._next(api_asset, api_asset.c.api_pk))])
-        for key, kind in (("params", "params"), ("responseFields", "responseFields"), ("relations", "relations")):
-            if key in payload:
-                self.replace_rows(item["code"], payload[key], kind)
-        return self.get_asset(item["code"])
+        with operation_log_service.audit(
+            module_name="API资产",
+            operation_type=OPERATION_TYPE_CREATE,
+            operation_object=item["code"],
+            operation_desc="新增API资产",
+        ) as audit:
+            if self._exists(item["code"]):
+                raise ApiAssetExistsError("API asset already exists")
+            self._execute([self._insert_asset(item, self._next(api_asset, api_asset.c.api_pk))])
+            for key, kind in (("params", "params"), ("responseFields", "responseFields"), ("relations", "relations")):
+                if key in payload:
+                    self._replace_rows(item["code"], payload[key], kind)
+            result = self.get_asset(item["code"])
+            audit.after = result
+            return result
 
+    @actor_aware
     def update(self, code, payload):
-        self.get_asset(code)
-        item = self._validate_asset({**(payload or {}), "code": code})
-        values = {
-            "api_name": item["name"],
-            "method_code": item["method"],
-            "path_text": item["path"],
-            "version_text": item["version"],
-            "system_id": item["systemId"],
-            "api_type": item["type"],
-            "status_code": item["status"],
-            "owner_dept_name": item["ownerDept"],
-            "owner_name": item["ownerName"],
-            "maintainer_name": item["maintainerName"],
-            "description_text": item["description"],
-            "remark_desc": item["remark"],
-            "updated_at": func.current_timestamp(),
-        }
-        self._execute([update(api_asset).where(api_asset.c.api_code == item["code"]).values(**values)])
-        for key, kind in (("params", "params"), ("responseFields", "responseFields"), ("relations", "relations")):
-            if key in payload:
-                self.replace_rows(item["code"], payload[key], kind)
-        return self.get_asset(item["code"])
+        payload = payload or {}
+        before = self.get_asset(code)
+        item = self._validate_asset({**payload, "code": code})
+        with operation_log_service.audit(
+            module_name="API资产",
+            operation_type=OPERATION_TYPE_UPDATE,
+            operation_object=item["code"],
+            operation_desc="编辑API资产",
+        ) as audit:
+            values = {
+                "api_name": item["name"],
+                "method_code": item["method"],
+                "path_text": item["path"],
+                "version_text": item["version"],
+                "system_id": item["systemId"],
+                "api_type": item["type"],
+                "status_code": item["status"],
+                "owner_dept_name": item["ownerDept"],
+                "owner_name": item["ownerName"],
+                "maintainer_name": item["maintainerName"],
+                "description_text": item["description"],
+                "remark_desc": item["remark"],
+                "updated_by": self._default_operator,
+                "updated_at": func.current_timestamp(),
+            }
+            self._execute([update(api_asset).where(api_asset.c.api_code == item["code"]).values(**values)])
+            for key, kind in (("params", "params"), ("responseFields", "responseFields"), ("relations", "relations")):
+                if key in payload:
+                    self._replace_rows(item["code"], payload[key], kind)
+            result = self.get_asset(item["code"])
+            audit.before = before
+            audit.after = result
+            return result
 
+    @actor_aware
     def update_status(self, code, payload):
-        self.get_asset(code)
+        before = self.get_asset(code)
         status = str((payload or {}).get("status") or "").strip()
         if status not in BINARY_STATUS_VALUES:
             raise ApiAssetValidationError(
                 "API asset validation failed",
                 [{"field": "status", "message": "status is not allowed"}],
             )
-        self._execute([
-            update(api_asset)
-            .where(api_asset.c.api_code == str(code).upper())
-            .values(status_code=status, updated_at=func.current_timestamp())
-        ])
-        return self.get_asset(code)
+        with operation_log_service.audit(
+            module_name="API资产",
+            operation_type=OPERATION_TYPE_UPDATE,
+            operation_object=str(code).upper(),
+            operation_desc="更新API资产状态",
+        ) as audit:
+            self._execute([
+                update(api_asset)
+                .where(api_asset.c.api_code == str(code).upper())
+                .values(
+                    status_code=status,
+                    updated_by=self._default_operator,
+                    updated_at=func.current_timestamp(),
+                )
+            ])
+            result = self.get_asset(code)
+            audit.before = before
+            audit.after = result
+            return result
 
+    @actor_aware
     def replace_rows(self, code, rows, kind):
+        before = self.get_asset(code)
+        with operation_log_service.audit(
+            module_name="API资产",
+            operation_type=OPERATION_TYPE_UPDATE,
+            operation_object=str(code).upper(),
+            operation_desc=f"更新API资产{kind}",
+        ) as audit:
+            result = self._replace_rows(code, rows, kind)
+            audit.before = before
+            audit.after = result
+            return result
+
+    def _replace_rows(self, code, rows, kind):
         self.get_asset(code)
         values = self._validate_rows(rows, kind)
         code = str(code).strip().upper()
@@ -583,13 +640,25 @@ class ApiAssetService:
         self._execute(statements)
         return self.get_asset(code)
 
+    @actor_aware
     def delete(self, code):
-        self.get_asset(code)
-        self._execute([
-            update(api_asset)
-            .where(api_asset.c.api_code == str(code).upper())
-            .values(is_deleted="Y", updated_at=func.current_timestamp())
-        ])
+        before = self.get_asset(code)
+        with operation_log_service.audit(
+            module_name="API资产",
+            operation_type=OPERATION_TYPE_DELETE,
+            operation_object=str(code).upper(),
+            operation_desc="删除API资产",
+        ) as audit:
+            self._execute([
+                update(api_asset)
+                .where(api_asset.c.api_code == str(code).upper())
+                .values(
+                    is_deleted="Y",
+                    updated_by=self._default_operator,
+                    updated_at=func.current_timestamp(),
+                )
+            ])
+            audit.before = before
 
 
 api_asset_service = ApiAssetService()

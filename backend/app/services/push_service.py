@@ -21,13 +21,14 @@ import re
 from copy import deepcopy
 from time import perf_counter
 
+from ..application import AuditActorMixin, actor_aware
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
     common_code_service,
 )
 from ..db.gaussdb import database_transaction, execute_statements, fetch_all, resolve_db_profile_name
-from ..settings import get_default_operator, get_page_size_limits
+from ..settings import get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
@@ -144,10 +145,9 @@ class PushDataSourceError(Exception):
         }
 
 
-class PushService:
+class PushService(AuditActorMixin):
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
-        self._default_operator = get_default_operator()
 
     def _fetch_rows(self, sql):
         try:
@@ -1023,6 +1023,7 @@ WHERE system_id = {int(system_id)}
         with database_transaction():
             return self._get_db_system_detail(system_id)
 
+    @actor_aware
     def create_push_system(self, payload):
         with operation_log_service.audit(
             module_name="下游推送",
@@ -1105,6 +1106,7 @@ INSERT INTO {TABLE_PUSH_SYSTEM} (
         self._execute_statements(statements)
         return self._get_public_system_detail(system["id"]), after_data
 
+    @actor_aware
     def update_push_system(self, system_id, payload):
         with operation_log_service.audit(
             module_name="下游推送",
@@ -1170,6 +1172,7 @@ WHERE system_id = {system_pk}
         self._execute_statements(statements)
         return self._get_public_system_detail(system["id"]), current, after_data
 
+    @actor_aware
     def delete_push_system(self, system_id):
         with operation_log_service.audit(
             module_name="下游推送",
@@ -1193,6 +1196,7 @@ WHERE system_id = {system_pk}
         self._execute_statements(statements)
         return current
 
+    @actor_aware
     def create_push_job(self, system_id, payload):
         with operation_log_service.audit(
             module_name="下游推送",
@@ -1262,6 +1266,7 @@ INSERT INTO {TABLE_PUSH_JOB} (
         self._execute_statements(statements)
         return self._get_public_system_detail(system_id)["jobs"][0], after_data
 
+    @actor_aware
     def update_push_job(self, system_id, job_id, payload):
         with operation_log_service.audit(
             module_name="下游推送",
@@ -1323,6 +1328,7 @@ WHERE job_id = {job_pk}
             raise PushJobNotFoundError(system_id, job["id"])
         return next_job, current_job, after_data
 
+    @actor_aware
     def delete_push_job(self, system_id, job_id):
         with operation_log_service.audit(
             module_name="下游推送",

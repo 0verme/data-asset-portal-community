@@ -22,9 +22,9 @@ from datetime import date
 
 from sqlalchemy import and_, func, insert, or_, select, update
 
+from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
 from ..db.tables import indicator_change_log, indicator_item
-from ..settings import get_default_operator
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
@@ -96,10 +96,9 @@ class IndicatorDataSourceError(Exception):
         return {"code": "INDICATOR_DATA_SOURCE_ERROR", "message": self.message}
 
 
-class IndicatorService:
+class IndicatorService(AuditActorMixin):
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
-        self._default_operator = get_default_operator()
         self._db = CoreAccess(
             profile_getter=lambda: self._db_profile,
             error_factory=IndicatorDataSourceError,
@@ -300,6 +299,7 @@ class IndicatorService:
             operator_name=self._default_operator,
         )
 
+    @actor_aware
     def create_indicator(self, payload):
         with operation_log_service.audit(
             module_name="指标维护",
@@ -331,6 +331,7 @@ class IndicatorService:
         ])
         return item
 
+    @actor_aware
     def update_indicator(self, indicator_id, payload):
         with operation_log_service.audit(
             module_name="指标维护",
@@ -386,6 +387,7 @@ class IndicatorService:
         ])
         return current, item
 
+    @actor_aware
     def patch_status(self, indicator_id, status):
         normalized = str(status or "").strip()
         if normalized not in self._allowed_status_values():
@@ -428,6 +430,7 @@ class IndicatorService:
             audit.after = item
             return item
 
+    @actor_aware
     def delete_indicator(self, indicator_id):
         with operation_log_service.audit(
             module_name="指标维护",
