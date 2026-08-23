@@ -97,7 +97,7 @@ cp frontend/.env.example frontend/.env.local
 npm --prefix frontend run dev
 ```
 
-确认 `frontend/.env.local` 中为 `VITE_API_MODE=mock` 后，使用 `the demo credentials configured by the mock demo` 登录。
+确认 `frontend/.env.local` 中为 `VITE_API_MODE=mock` 后，使用公开演示账号 `admin` / `community-demo-password` 登录（仅 mock 模式；可用 `VITE_MOCK_AUTH_*` 覆盖）。
 mock 数据只用于前端体验，不会写入数据库。
 
 ### 在线静态 Demo
@@ -187,7 +187,7 @@ SQLite 用于 Community 本地演示、开发和 CI；PostgreSQL 用于 Communit
 
 ### mock 和 remote 有什么区别？
 
-`VITE_API_MODE=mock` 只读取前端内置数据，使用 `the demo credentials configured by the mock demo` 演示登录；`remote` 通过 `/api`
+`VITE_API_MODE=mock` 只读取前端内置数据，使用公开演示账号 `admin` / `community-demo-password` 登录；`remote` 通过 `/api`
 访问后端真实数据库，需要先按 [Community Demo](./docs/community-demo.md) 或 [开发指南](./DEVELOPMENT.md) 配置。
 
 ### 这个项目负责真实数据采集吗？

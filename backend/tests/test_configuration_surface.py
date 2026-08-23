@@ -20,6 +20,9 @@ class ConfigurationSurfaceTests(unittest.TestCase):
             self.assertNotIn(removed, template)
         self.assertIn("APP_SECRET_KEY", template)
         self.assertIn("ASSET_DB_PROFILE", template)
+        # Relative cwd-dependent path must not be the active default assignment.
+        self.assertNotRegex(template, r"(?m)^ASSET_DB_CONFIG_PATH=backend/")
+        self.assertIn("ASSET_AUTH_DB_PROFILE", template)
 
     def test_advanced_document_preserves_database_and_runtime_contracts(self):
         documentation = (ROOT / "docs/configuration.md").read_text(encoding="utf-8")
@@ -30,8 +33,20 @@ class ConfigurationSurfaceTests(unittest.TestCase):
             "database.example.yaml",
             "database.community.yaml",
             "APP_*",
+            "ASSET_AUTH_DB_PROFILE",
         ):
             self.assertIn(value, documentation)
+
+    def test_mock_credentials_remain_discoverable_and_aligned(self):
+        auth_js = (ROOT / "frontend/src/auth.js").read_text(encoding="utf-8")
+        frontend_env = (ROOT / "frontend/.env.example").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn('"community-demo-password"', auth_js)
+        self.assertNotIn("admin123", auth_js)
+        self.assertIn("community-demo-password", frontend_env)
+        self.assertNotIn("admin123", frontend_env)
+        self.assertIn("community-demo-password", readme)
+        self.assertNotIn("the demo credentials configured by the mock demo", readme)
 
 
 if __name__ == "__main__":

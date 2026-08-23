@@ -24,7 +24,7 @@ VITE_BACKEND_URL=http://127.0.0.1:5099
 
 ### 后端环境变量
 
-后端始终连库、无模式开关，只需指定数据库 profile。下列 `FLASK_*` 是保留的安全、Session Cookie 和 CORS configuration contract 名称，不代表仍存在 Flask runtime：
+后端始终连库、无模式开关，只需指定数据库 profile。下列 `APP_*` 是安全、Session Cookie 和 CORS configuration contract 名称（`FLASK_*` 仍可作为兼容 fallback，不代表仍存在 Flask runtime）：
 
 ```env
 ASSET_DB_PROFILE=primary

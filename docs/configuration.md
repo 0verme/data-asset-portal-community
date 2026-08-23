@@ -45,9 +45,13 @@ URLs are sensitive and should not be placed in committed files.
 
 The repository does not include `backend/configs/database.yaml`. For a normal
 deployment, copy `backend/configs/database.example.yaml` to
-`backend/configs/database.yaml` and edit the selected profile. Alternatively,
-set `ASSET_DB_CONFIG_PATH` to an environment-specific file. Community runtime
+`backend/configs/database.yaml` and edit the selected profile. Leave
+`ASSET_DB_CONFIG_PATH` unset so the runtime uses that default path (resolved
+from the backend package, not process cwd). Set `ASSET_DB_CONFIG_PATH` only when
+you need an absolute, environment-specific YAML. Community runtime
 (`ASSET_RUNTIME_PROFILE=community`) selects `database.community.yaml`.
+`ASSET_AUTH_DB_PROFILE` is optional; when unset, auth falls back to
+`ASSET_DB_PROFILE` (and then to an available `primary` profile when present).
 
 Resolution is:
 

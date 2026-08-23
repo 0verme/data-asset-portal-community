@@ -1,9 +1,46 @@
 import io
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from backend.scripts import create_admin
-from backend.app.services.system_management_service import SystemUserAlreadyExistsError
+from backend.app.services.system_management_service import (
+    SystemManagementService,
+    SystemUserAlreadyExistsError,
+    SystemValidationError,
+)
+
+
+class CreateBootstrapAdminServiceTests(unittest.TestCase):
+    def setUp(self):
+        self.service = SystemManagementService()
+
+    def test_rejects_blank_and_whitespace_passwords(self):
+        for password in ("", "   ", None):
+            with self.subTest(password=repr(password)):
+                with self.assertRaises(SystemValidationError):
+                    self.service.create_bootstrap_admin("admin", "Administrator", password)
+
+    def test_creates_admin_with_supplied_password_hash(self):
+        self.service._core.fetch_rows = MagicMock(return_value=[])
+        self.service._core.next_pk = MagicMock(return_value=1)
+        self.service._core.execute_statements = MagicMock()
+        with patch(
+            "backend.app.services.system_management_service.build_password_hash",
+            return_value="hashed-secret",
+        ) as build_hash:
+            created = self.service.create_bootstrap_admin(
+                "admin", "Administrator", "not-a-default-password"
+            )
+        self.assertEqual("admin", created)
+        build_hash.assert_called_once_with("not-a-default-password")
+        insert_statement = self.service._core.execute_statements.call_args.args[0][0]
+        compiled = str(insert_statement.compile(compile_kwargs={"literal_binds": False}))
+        self.assertIn("p_admin_user", compiled)
+
+    def test_duplicate_username_is_explicit(self):
+        self.service._core.fetch_rows = MagicMock(return_value=[{"id": 1}])
+        with self.assertRaises(SystemUserAlreadyExistsError):
+            self.service.create_bootstrap_admin("admin", "Administrator", "secret")
 
 
 class CreateAdminCliTests(unittest.TestCase):

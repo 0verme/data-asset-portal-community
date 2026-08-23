@@ -102,7 +102,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-all.ps1
 
 ### 只看前端页面（mock）
 
-适合 UI 调整或无后端场景：前端读内置 mock 数据 + 演示登录（`the demo credentials configured by the mock demo`）。
+适合 UI 调整或无后端场景：前端读内置 mock 数据 + 演示登录（公开凭据 `admin` / `community-demo-password`，仅 mock 模式生效）。
 
 ```env
 # frontend/.env.local

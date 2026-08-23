@@ -614,7 +614,7 @@ class SystemManagementService:
 
     def create_bootstrap_admin(self, username: str, display_name: str, password: str):
         """Create the initial administrator without exposing a default password."""
-        if not password:
+        if not isinstance(password, str) or not password.strip():
             raise SystemValidationError("Admin password must not be empty")
         user = self._normalize_user_payload({
             "username": username,
