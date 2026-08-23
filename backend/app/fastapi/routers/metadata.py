@@ -7,20 +7,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, FastAPI, Query, Request  # type: ignore
+from fastapi import APIRouter, Body, Depends, FastAPI, Query  # type: ignore
 from fastapi.responses import JSONResponse  # type: ignore
 
 from ...application import RequestContext
 from ...contracts import validate_contract
 from ...contracts.metadata_ingestion import (  # type: ignore
-    MAX_METADATA_BODY_BYTES,
     AssetMetadataIngestionRequest,
     LineageMetadataIngestionRequest,
     MetadataIngestionResult,
 )
 from ...services.metadata_ingestion_service import (  # type: ignore
     MetadataIngestionError,
-    MetadataPayloadTooLargeError,
     metadata_ingestion_service,
 )
 from ..dependencies import require_permission
@@ -40,19 +38,6 @@ def _metadata_error_response(error: MetadataIngestionError) -> JSONResponse:
     return JSONResponse(status_code=error.status_code, content=payload)
 
 
-def _check_metadata_body_size(request: Request) -> None:
-    value = request.headers.get("content-length")
-    try:
-        content_length = int(value) if value else 0
-    except (TypeError, ValueError):
-        content_length = 0
-    if content_length > MAX_METADATA_BODY_BYTES:
-        raise MetadataPayloadTooLargeError(
-            f"metadata request body exceeds {MAX_METADATA_BODY_BYTES} bytes",
-            details={"code": "PAYLOAD_TOO_LARGE", "maxBytes": MAX_METADATA_BODY_BYTES},
-        )
-
-
 def _register_metadata_routes(
     app: FastAPI, service: Any = metadata_ingestion_service
 ) -> None:
@@ -65,14 +50,12 @@ def _register_metadata_routes(
         "/assets/ingestions",
         response_model=MetadataIngestionResult,
         status_code=201,
-        dependencies=[Depends(_check_metadata_body_size)],
     )
     @router.post(
         "/assets:bulk-upsert",
         response_model=MetadataIngestionResult,
         status_code=201,
         include_in_schema=False,
-        dependencies=[Depends(_check_metadata_body_size)],
     )
     def ingest_assets(
         payload: AssetMetadataIngestionRequest = Body(...),
@@ -99,14 +82,12 @@ def _register_metadata_routes(
         "/lineage/ingestions",
         response_model=MetadataIngestionResult,
         status_code=201,
-        dependencies=[Depends(_check_metadata_body_size)],
     )
     @router.post(
         "/lineage:snapshots",
         response_model=MetadataIngestionResult,
         status_code=201,
         include_in_schema=False,
-        dependencies=[Depends(_check_metadata_body_size)],
     )
     def ingest_lineage(
         payload: LineageMetadataIngestionRequest = Body(...),

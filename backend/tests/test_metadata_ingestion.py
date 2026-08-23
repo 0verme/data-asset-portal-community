@@ -234,11 +234,19 @@ class MetadataApiTests(unittest.TestCase):
         self.client = TestClient(app)
 
     def test_asset_and_lineage_routes_are_additive_and_authenticated(self):
-        response = self.client.post("/api/metadata/assets/ingestions", json=asset_request().model_dump(by_alias=True))
+        asset_payload = asset_request().model_dump(by_alias=True)
+        response = self.client.post("/api/metadata/assets/ingestions", json=asset_payload)
         self.assertEqual(201, response.status_code)
-        self.service.ingest_assets.assert_called_once()
-        response = self.client.post("/api/metadata/lineage/ingestions", json=lineage_request().model_dump(mode="json", by_alias=True))
+        response = self.client.post("/api/metadata/assets:bulk-upsert", json=asset_payload)
         self.assertEqual(201, response.status_code)
+        self.assertEqual(2, self.service.ingest_assets.call_count)
+
+        lineage_payload = lineage_request().model_dump(mode="json", by_alias=True)
+        response = self.client.post("/api/metadata/lineage/ingestions", json=lineage_payload)
+        self.assertEqual(201, response.status_code)
+        response = self.client.post("/api/metadata/lineage:snapshots", json=lineage_payload)
+        self.assertEqual(201, response.status_code)
+        self.assertEqual(2, self.service.ingest_lineage.call_count)
         self.assertEqual(200, self.client.get("/api/metadata/ingestions/ingestion-1").status_code)
 
     def test_anonymous_collector_cannot_write(self):
