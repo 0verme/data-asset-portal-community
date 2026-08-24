@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import {
   buildNavigationLocation,
   resolveHistoryAction,
-} from "../routing/location.js";
+} from "../routing/location.ts";
 
 function getRoutes(navigation) {
   return {

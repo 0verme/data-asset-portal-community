@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
-import { normalizePermissions } from "../auth/permissions.js";
+import { normalizePermissions } from "../auth/permissions.ts";
 
 function normalizeAuth(payload) {
   const data = payload?.data && typeof payload.data === "object" ? payload.data : payload;

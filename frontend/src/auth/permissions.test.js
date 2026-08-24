@@ -6,7 +6,7 @@ import {
   hasPermission,
   MOCK_ROLE_PERMISSIONS,
   normalizePermissions,
-} from "./permissions.js";
+} from "./permissions.ts";
 
 test("normalizePermissions keeps registered codes sorted and unique", () => {
   assert.deepEqual(

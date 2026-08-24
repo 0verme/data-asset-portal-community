@@ -8,7 +8,7 @@ import {
   hasPermission,
   MOCK_ROLE_PERMISSIONS,
   normalizePermissions,
-} from "./auth/permissions.js";
+} from "./auth/permissions.ts";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 

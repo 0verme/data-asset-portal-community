@@ -48,7 +48,9 @@ export const PERMISSION_CODES = Object.freeze([
   "system:param:write",
   "system:role:read",
   "system:role:write",
-]);
+] as const);
+
+export type PermissionCode = typeof PERMISSION_CODES[number];
 
 const MAINTAINER_PERMISSIONS = Object.freeze([
   "asset:read",
@@ -72,24 +74,37 @@ const MAINTAINER_PERMISSIONS = Object.freeze([
   "metadata:read",
   "metadata:write",
   "operation_log:read",
-]);
+] as const satisfies readonly PermissionCode[]);
 
 export const MOCK_ROLE_PERMISSIONS = Object.freeze({
   admin: PERMISSION_CODES,
   maintainer: MAINTAINER_PERMISSIONS,
 });
 
-const REGISTERED_PERMISSIONS = new Set(PERMISSION_CODES);
+type PermissionSource = {
+  permissions?: readonly string[] | null;
+};
 
-export function normalizePermissions(value) {
-  if (!Array.isArray(value)) return [];
-  return [...new Set(value
-    .map((permission) => String(permission || "").trim().toLowerCase())
-    .filter((permission) => REGISTERED_PERMISSIONS.has(permission)))]
-    .sort();
+const REGISTERED_PERMISSIONS: ReadonlySet<PermissionCode> = new Set(PERMISSION_CODES);
+
+function isPermissionCode(permission: string): permission is PermissionCode {
+  return REGISTERED_PERMISSIONS.has(permission as PermissionCode);
 }
 
-export function hasPermission(auth, permission) {
+export function normalizePermissions(value: unknown): PermissionCode[] {
+  if (!Array.isArray(value)) return [];
+  const values: unknown[] = value;
+  return [...new Set(
+    values
+      .map((permission) => String(permission || "").trim().toLowerCase())
+      .filter(isPermissionCode),
+  )].sort();
+}
+
+export function hasPermission(
+  auth: PermissionSource | null | undefined,
+  permission: string | null | undefined,
+): boolean {
   const normalized = String(permission || "").trim().toLowerCase();
   return Boolean(
     normalized
@@ -98,6 +113,9 @@ export function hasPermission(auth, permission) {
   );
 }
 
-export function hasAnyPermission(auth, permissions) {
-  return (permissions || []).some((permission) => hasPermission(auth, permission));
+export function hasAnyPermission(
+  auth: PermissionSource | null | undefined,
+  permissions: readonly string[] = [],
+): boolean {
+  return permissions.some((permission) => hasPermission(auth, permission));
 }

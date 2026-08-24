@@ -15,7 +15,7 @@
 import { RootEditor, RootImport, RootLibrary } from "../RootPages.jsx";
 import { Icon } from "../ui.jsx";
 import { EmptyState, ErrorState, LoadingState } from "../common/index.js";
-import { pushModuleNavigationState } from "../../routing/navigation.js";
+import { pushModuleNavigationState } from "../../routing/navigation.ts";
 
 export function RootView({ root, query, setQuery, requireLogin, rootRoute, setRootRoute }) {
   const {

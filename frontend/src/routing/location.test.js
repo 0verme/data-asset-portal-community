@@ -5,11 +5,11 @@ import {
   buildNavigationLocation,
   parseInitialLocation,
   resolveHistoryAction,
-} from "./location.js";
+} from "./location.ts";
 import {
   createNavigationState,
   getActiveModuleRoute,
-} from "./navigation.js";
+} from "./navigation.ts";
 
 function parseLocation(url) {
   const previousWindow = globalThis.window;

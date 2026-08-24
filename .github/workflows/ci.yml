@@ -388,8 +388,8 @@ jobs:
       - name: Build Lineage workspace packages from source
         run: npm run build:lineage
 
-      - name: Typecheck Lineage workspace packages
-        run: npm run typecheck:lineage
+      - name: Typecheck frontend adoption boundaries
+        run: npm run typecheck
 
       - name: Verify Lineage package contracts
         run: npm run verify:lineage-packages

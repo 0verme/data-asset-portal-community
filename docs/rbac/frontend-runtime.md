@@ -4,7 +4,7 @@
 
 ## Single source
 
-`frontend/src/auth/permissions.js` provides the only frontend permission
+`frontend/src/auth/permissions.ts` provides the only frontend permission
 predicate:
 
 ```js

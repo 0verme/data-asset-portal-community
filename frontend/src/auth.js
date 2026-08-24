@@ -16,9 +16,9 @@ import { getCurrentRemoteUser, loginRemote, logoutRemote } from "./api/auth.js";
 import {
   MOCK_ROLE_PERMISSIONS,
   normalizePermissions,
-} from "./auth/permissions.js";
+} from "./auth/permissions.ts";
 
-export { hasPermission } from "./auth/permissions.js";
+export { hasPermission } from "./auth/permissions.ts";
 
 // 认证模式跟随数据模式 VITE_API_MODE：remote → 真实登录(db)，其余 → 演示登录(mock)
 export const AUTH_MODE = (import.meta.env.VITE_API_MODE || "mock").trim().toLowerCase() === "remote"

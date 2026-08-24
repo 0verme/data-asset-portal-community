@@ -15,7 +15,7 @@
 import React from "react";
 import { Highlight, Icon } from "./ui.jsx";
 import { ActionErrorBanner, confirmDeleteAction, DangerZone, EmptyState, FormActionBar, PageHeader, RowActions } from "./common/index.js";
-import { buildModuleBreadcrumbs } from "../routing/navigation.js";
+import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { ROOT_ABBR_RULE_MESSAGE, isValidRootAbbr } from "../utils/rootValidation.js";
 
 function CatBadge({ cat }) {

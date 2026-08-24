@@ -21,7 +21,7 @@ test("role management consumes role and permission APIs", async () => {
 });
 
 test("role route is addressable without changing the public module registry", async () => {
-  const source = await readFile(`${here}/../../routing/location.js`, "utf8");
+  const source = await readFile(`${here}/../../routing/location.ts`, "utf8");
   assert.match(source, /segments\[1\] === "roles"/);
   assert.match(source, /system-management\/roles/);
 });

@@ -13,7 +13,7 @@ import { formatFreq, validateJob, validateSystem } from "./push/pushUtils.js";
 
 const defaultsPath = fileURLToPath(new URL("../config/defaults.js", import.meta.url));
 const pushHookPath = fileURLToPath(new URL("../hooks/usePushModule.js", import.meta.url));
-const locationPath = fileURLToPath(new URL("../routing/location.js", import.meta.url));
+const locationPath = fileURLToPath(new URL("../routing/location.ts", import.meta.url));
 const pagePath = fileURLToPath(new URL("./PushPages.jsx", import.meta.url));
 const pushSidebarPath = fileURLToPath(new URL("./sidebar/PushSidebar.jsx", import.meta.url));
 const systemListPath = fileURLToPath(new URL("./push/PushSystemList.jsx", import.meta.url));
@@ -116,11 +116,7 @@ test("push importance filter is restored only from supported URL values", async 
 
   assert.match(
     source,
-    /\["important", "normal"\]\.includes\(searchParams\.get\("importanceLevel"\)\)/,
-  );
-  assert.match(
-    source,
-    /: DEFAULT_PUSH_FILTER\.importanceLevel/,
+    /readAllowedNullable\(\s*searchParams\.get\("importanceLevel"\),\s*\["important", "normal"\],\s*DEFAULT_PUSH_FILTER\.importanceLevel,\s*\)/,
   );
 });
 

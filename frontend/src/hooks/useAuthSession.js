@@ -22,7 +22,7 @@ import {
   login,
   logout,
 } from "../auth.js";
-import { hasAnyPermission } from "../auth/permissions.js";
+import { hasAnyPermission } from "../auth/permissions.ts";
 import { isUnauthorizedError } from "../api/http.js";
 import { getErrorMessage } from "../utils/ui.js";
 import { toast } from "../components/common/index.js";
