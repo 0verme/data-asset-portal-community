@@ -221,8 +221,8 @@ Remote API 的普通业务 GET 默认需要登录：匿名请求返回 `401`，�
 
 ## 数据库初始化
 
-**Community/local 的唯一官方初始化路径 = baseline + Alembic + demo seed**（Schema Source of Truth 为
-`backend/schema` 与 `backend/alembic`）：
+**Community/local 的唯一官方初始化路径 = baseline + Alembic + demo seed**（部署契约由
+`backend/schema` 四方言 versioned baseline 与 `backend/alembic` immutable forward revisions 共同组成；runtime `tables.py` 不是完整 physical schema，详见 [ADR-002](./docs/adr/002-schema-canonical-source.md)）：
 
 ```bash
 # SQLite 本地 / Community Demo
