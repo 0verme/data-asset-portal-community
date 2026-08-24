@@ -75,7 +75,7 @@ flowchart LR
 
 ## Application Boundary
 
-HTTP adapter 只负责请求解析、认证依赖、contract validation、response envelope 和 adapter-specific error mapping：
+HTTP adapter 只负责请求解析、认证依赖、contract validation、response envelope 和 adapter-specific error mapping。业务 router 默认先执行 authentication-only `require_authenticated`；只有 mutation、admin 或 sensitive read 再叠加 `require_permission(...)`，因此 Authentication 不等于 Authorization：
 
 ```text
 FastAPI adapter ── Application / Service Layer ── Database Provider ── Database

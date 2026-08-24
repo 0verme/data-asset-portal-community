@@ -26,6 +26,7 @@ from ..services.search_provider import search_provider
 from ..services.system_management_service import system_management_service
 from ..services.upstream_service import upstream_service
 from ..security.login_protection import LoginAttemptLimiter
+from ..settings import get_openapi_docs_enabled
 from .dependencies import IdentityResolver, RequestContextMiddleware
 from .errors import register_exception_handlers
 from .routers.api_assets import _register_api_asset_routes
@@ -68,14 +69,26 @@ def create_fastapi_app(
     authorization_repository_instance: Any | None = None,
     authorization_service_instance: Any | None = None,
     login_protection_instance: LoginAttemptLimiter | None = None,
+    openapi_enabled: bool | None = None,
 ) -> FastAPI:
     """Create the FastAPI primary application for migrated API prefixes.
 
     ``identity_resolver`` is the explicit auth adapter seam. Production
     deployment provides the resolver that bridges its session/token runtime;
-    tests can inject an identity without Flask request context.
+    tests can inject an identity without Flask request context. The optional
+    ``openapi_enabled`` argument is a factory-only override; when omitted,
+    only an explicit ``APP_ENV=development`` enables the HTTP docs endpoints.
     """
-    app = FastAPI(title="Data Asset Portal FastAPI", version="0.1.0")
+    docs_enabled = (
+        get_openapi_docs_enabled() if openapi_enabled is None else openapi_enabled
+    )
+    app = FastAPI(
+        title="Data Asset Portal FastAPI",
+        version="0.1.0",
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
+    )
     app.state.identity_resolver = identity_resolver or (lambda _request: None)
     app.add_middleware(
         RequestContextMiddleware,

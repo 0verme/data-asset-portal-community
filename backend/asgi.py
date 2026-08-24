@@ -12,49 +12,13 @@ from typing import Any
 from backend.app.authorization.repository import DatabaseAuthorizationRepository
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi.auth import get_native_session_identity
+from backend.app.fastapi.request_body import RequestSizeLimitMiddleware
 from backend.app.fastapi_app import create_fastapi_app
 from backend.app.settings import get_runtime_config, load_runtime_env
 from fastapi import FastAPI  # pyright: ignore[reportAttributeAccessIssue]
 from fastapi.middleware.cors import (  # pyright: ignore[reportMissingImports]
     CORSMiddleware,
 )
-from fastapi.responses import JSONResponse  # pyright: ignore[reportMissingImports]
-
-
-class RequestSizeLimitMiddleware:
-    """Reject requests larger than the configured native body limit."""
-
-    def __init__(self, app: Callable[..., Awaitable[Any]], max_content_length: int):
-        self.app = app
-        self.max_content_length = max_content_length
-
-    async def __call__(self, scope, receive, send):
-        if scope.get("type") == "http":
-            content_length = next(
-                (
-                    value
-                    for key, value in scope.get("headers", [])
-                    if key.lower() == b"content-length"
-                ),
-                b"0",
-            )
-            try:
-                oversized = int(content_length) > self.max_content_length
-            except (TypeError, ValueError):
-                oversized = False
-            if oversized:
-                response = JSONResponse(
-                    {
-                        "error": {
-                            "code": "HTTP_413",
-                            "message": "请求体过大",
-                        }
-                    },
-                    status_code=413,
-                )
-                await response(scope, receive, send)
-                return
-        await self.app(scope, receive, send)
 
 
 class SecurityHeadersMiddleware:

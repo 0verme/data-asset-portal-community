@@ -27,7 +27,7 @@ from ...services.assets_service import (
     AssetNotFoundError,
     AssetValidationError,
 )
-from ..dependencies import require_permission
+from ..dependencies import require_authenticated, require_permission
 from ..errors import _service_error_response
 
 
@@ -38,7 +38,11 @@ def _asset_payload(payload: AssetTableRequest | None) -> dict[str, Any] | None:
 
 
 def _register_asset_routes(app: FastAPI, service: Any) -> None:
-    router = APIRouter(prefix="/api/assets", tags=["assets-migration"])
+    router = APIRouter(
+        prefix="/api/assets",
+        tags=["assets-migration"],
+        dependencies=[Depends(require_authenticated)],
+    )
 
     def get_service() -> Any:
         return service

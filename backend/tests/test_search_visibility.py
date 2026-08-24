@@ -5,6 +5,7 @@ import unittest
 from contextlib import contextmanager, nullcontext
 from unittest.mock import patch
 
+from backend.app.application import Identity
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi_app import create_fastapi_app
 from backend.app.services.portal_service import PortalService
@@ -208,7 +209,7 @@ class SearchRouteAliasTestCase(unittest.TestCase):
     def setUp(self):
         app = create_fastapi_app(
             capabilities=resolve_capabilities(),
-            identity_resolver=lambda _request: None,
+            identity_resolver=lambda _request: Identity("maintainer", "search-user", "Search User"),
         )
         self.client = TestClient(app)
 

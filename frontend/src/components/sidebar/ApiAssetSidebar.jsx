@@ -1,4 +1,3 @@
-import React from "react";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.jsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.jsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.jsx";

@@ -1,20 +1,15 @@
 import React from "react";
-import { Highlight, Icon } from "../ui.jsx";
+import { Icon } from "../ui.jsx";
 import {
   ActionErrorBanner,
   BinaryStatusToggle,
   confirmDeleteAction,
   DangerZone,
-  EmptyState,
   FormActionBar,
-  MetaItem,
   PageHeader,
-  RowActions,
-  StatusBadge,
-  TimeInput,
 } from "../common/index.js";
 
-import { buildModuleBreadcrumbs } from "../../routing/navigation.js";
+
 import { getLegacyAwareOptions, isLegacyDictValue } from "../../hooks/useDictOptions.js";
 import { optionLabel } from "../../utils/ui.js";
 import {

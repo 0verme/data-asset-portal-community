@@ -5,7 +5,7 @@
 #   2. Backend           — unit tests on Python 3.11 + 3.13, migration verify
 #   3. PostgreSQL        — fresh migration -> seed -> integration tests on PG 16
 #   4. MySQL             — fresh baseline + CRUD/transaction contracts on MySQL 8
-#   5. Frontend          — npm ci / test / build on Node 22 + 24, audit gate
+#   5. Frontend          — npm ci / lint / test / build on Node 22 + 24, audit gate
 #   6. Community Migration — SQLite fresh apply / verify / seed / repeat no-op
 #
 # Security posture:
@@ -426,6 +426,9 @@ jobs:
             console.log(`${pkg} -> ${p}`);
           }
           EOF
+
+      - name: Frontend lint
+        run: npm run lint
 
       - name: Frontend tests
         run: npm test
