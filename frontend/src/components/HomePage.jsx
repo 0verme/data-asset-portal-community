@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React from "react";
 import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.jsx";
 import { CardGridView, EmptyState, GroupView } from "./common/index.js";
 

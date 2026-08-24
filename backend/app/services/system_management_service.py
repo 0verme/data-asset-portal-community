@@ -24,6 +24,7 @@ from datetime import datetime
 # pi-lens-ignore: python-hallucinated-import
 from sqlalchemy import delete, func, insert, select, update
 
+from ..application import AuditActorMixin, actor_aware
 from ..authorization import permissions as permission_contract
 from ..db.service import CoreAccess
 from ..db.tables import (
@@ -34,7 +35,6 @@ from ..db.tables import (
     rbac_role,
     rbac_role_permission,
 )
-from ..settings import get_default_operator
 from .auth_service import build_password_hash
 from .common_code_service import common_code_service
 from .operation_log_service import (
@@ -126,10 +126,9 @@ class MenuAlreadyExistsError(SystemManagementError):
     code = "MENU_ALREADY_EXISTS"
 
 
-class SystemManagementService:
+class SystemManagementService(AuditActorMixin):
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
-        self._default_operator = get_default_operator()
         self._core = CoreAccess(
             profile_getter=lambda: self._db_profile,
             error_factory=SystemDataSourceError,
@@ -314,6 +313,7 @@ class SystemManagementService:
         )
         return [self._role_payload(row) for row in rows]
 
+    @actor_aware
     def create_role(self, payload):
         with operation_log_service.audit(
             module_name="角色管理",
@@ -348,6 +348,7 @@ class SystemManagementService:
         self._core_execute(statements)
         return self._role_payload(self._get_role_row(role["roleCode"]))
 
+    @actor_aware
     def update_role(self, role_code: str, payload):
         code = str(role_code or "").strip().lower()
         with operation_log_service.audit(
@@ -385,6 +386,7 @@ class SystemManagementService:
         self._core_execute(statements)
         return before, self._role_payload(self._get_role_row(role["roleCode"]))
 
+    @actor_aware
     def delete_role(self, role_code: str):
         code = str(role_code or "").strip().lower()
         with operation_log_service.audit(
@@ -416,6 +418,7 @@ class SystemManagementService:
         ])
         return before
 
+    @actor_aware
     def update_user_role(self, username: str, payload):
         with operation_log_service.audit(
             module_name="用户管理",
@@ -561,6 +564,7 @@ class SystemManagementService:
             for row in rows
         ]
 
+    @actor_aware
     def create_user(self, payload):
         with operation_log_service.audit(
             module_name="用户管理",
@@ -573,6 +577,7 @@ class SystemManagementService:
             audit.after = result
             return result
 
+    @actor_aware
     def create_bootstrap_admin(self, username: str, display_name: str, password: str):
         """Create the initial administrator without exposing a default password."""
         if not isinstance(password, str) or not password.strip():
@@ -622,6 +627,7 @@ class SystemManagementService:
         ])
         return next((item for item in self.get_users() if item["username"] == user["username"]), None)
 
+    @actor_aware
     def update_user(self, username: str, payload):
         with operation_log_service.audit(
             module_name="用户管理",
@@ -668,6 +674,7 @@ class SystemManagementService:
         after = next((item for item in self.get_users() if item["username"] == user["username"]), None)
         return after, before, user["username"]
 
+    @actor_aware
     def update_user_status(self, username: str, status: str):
         operation_type = OPERATION_TYPE_ENABLE if str(status).strip().lower() == "enabled" else OPERATION_TYPE_DISABLE
         with operation_log_service.audit(
@@ -699,6 +706,7 @@ class SystemManagementService:
             raise SystemUserNotFoundError(f"User not found: {username}")
         return user
 
+    @actor_aware
     def reset_user_password(self, username: str):
         with operation_log_service.audit(
             module_name="用户管理",
@@ -730,6 +738,7 @@ class SystemManagementService:
             }
             return {"username": current_username, "resetAt": self._now_text()}
 
+    @actor_aware
     def delete_user(self, username: str):
         with operation_log_service.audit(
             module_name="用户管理",
@@ -840,6 +849,7 @@ class SystemManagementService:
             for row in rows
         ]
 
+    @actor_aware
     def create_param_dict(self, payload):
         with operation_log_service.audit(
             module_name="参数字典",
@@ -884,6 +894,7 @@ class SystemManagementService:
         common_code_service.invalidate([item["categoryCode"]])
         return result
 
+    @actor_aware
     def update_param_dict(self, dict_id: str, payload):
         with operation_log_service.audit(
             module_name="参数字典",
@@ -935,6 +946,7 @@ class SystemManagementService:
         ])
         return after, before, f"{item['categoryCode']}/{item['code']}"
 
+    @actor_aware
     def update_param_dict_status(self, dict_id: str, status: str):
         operation_type = OPERATION_TYPE_ENABLE if str(status).strip().lower() == "enabled" else OPERATION_TYPE_DISABLE
         with operation_log_service.audit(
@@ -970,6 +982,7 @@ class SystemManagementService:
         common_code_service.invalidate([current["categoryCode"]])
         return current
 
+    @actor_aware
     def delete_param_dict(self, dict_id: str):
         with operation_log_service.audit(
             module_name="参数字典",
@@ -991,6 +1004,7 @@ class SystemManagementService:
         common_code_service.invalidate([(before or {}).get("categoryCode")])
         return before
 
+    @actor_aware
     def update_param_category_status(self, category_code: str, status: str):
         operation_type = OPERATION_TYPE_ENABLE if str(status).strip().lower() == "enabled" else OPERATION_TYPE_DISABLE
         with operation_log_service.audit(
@@ -1118,6 +1132,7 @@ class SystemManagementService:
     def _get_menu(self, menu_id: int):
         return next((item for item in self.get_menus() if item["id"] == str(menu_id)), None)
 
+    @actor_aware
     def create_menu(self, payload):
         with operation_log_service.audit(
             module_name="菜单管理",
@@ -1164,6 +1179,7 @@ class SystemManagementService:
         ])
         return self._get_menu(next_id)
 
+    @actor_aware
     def update_menu(self, menu_id: str, payload):
         with operation_log_service.audit(
             module_name="菜单管理",
@@ -1212,6 +1228,7 @@ class SystemManagementService:
         ])
         return self._get_menu(item_id), before
 
+    @actor_aware
     def update_menu_status(self, menu_id: str, status: str):
         operation_type = OPERATION_TYPE_ENABLE if str(status).strip().lower() == "enabled" else OPERATION_TYPE_DISABLE
         with operation_log_service.audit(
@@ -1245,6 +1262,7 @@ class SystemManagementService:
         ])
         return self._get_menu(item_id)
 
+    @actor_aware
     def move_menu(self, menu_id: str, direction: str):
         normalized = str(direction or "").strip().lower()
         if normalized not in {"up", "down"}:
@@ -1290,6 +1308,7 @@ class SystemManagementService:
             audit.after = self._get_menu(item_id)
             return result
 
+    @actor_aware
     def delete_menu(self, menu_id: str):
         with operation_log_service.audit(
             module_name="菜单管理",

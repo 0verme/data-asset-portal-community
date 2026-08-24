@@ -1,1 +1,0 @@
-{"version":3,"file":"create-render-scene.d.ts","sourceRoot":"","sources":["../../src/render/create-render-scene.ts"],"names":[],"mappings":"AACA,OAAO,KAAK,EAAE,sBAAsB,EAAE,MAAM,mBAAmB,CAAC;AAChE,OAAO,KAAK,EAAE,4BAA4B,EAAE,MAAM,0BAA0B,CAAC;AAE7E,OAAO,KAAK,EAA0B,WAAW,EAAE,MAAM,YAAY,CAAC;AAKtE,wBAAgB,wBAAwB,CACtC,KAAK,EAAE,sBAAsB,EAC7B,OAAO,EAAE,4BAA4B,GACpC,WAAW,CAgCb"}

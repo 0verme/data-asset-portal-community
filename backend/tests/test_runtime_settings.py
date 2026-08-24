@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from backend.app.application import actor_scope, configured_system_actor
 from backend.app.db.facade import get_db_profile
 from backend.app.settings import get_float_env, get_int_env, get_page_size_limits
 from backend.app.services.common_code_service import common_code_service
@@ -65,7 +66,7 @@ class RuntimeSettingsTestCase(unittest.TestCase):
             self.assertEqual("env-user", profile["user"])
             self.assertEqual("env-password", profile["password"])
 
-    def test_system_management_sql_uses_configured_default_operator(self):
+    def test_system_management_sql_uses_explicit_configured_system_actor(self):
         os.environ["ASSET_OPERATOR"] = "batch-agent"
         service = SystemManagementService()
         statements = []
@@ -74,7 +75,8 @@ class RuntimeSettingsTestCase(unittest.TestCase):
         service.get_param_dict_categories = lambda: [{"code": "test"}]
 
         with patch.object(common_code_service, "invalidate") as invalidate:
-            service._update_param_category_status("test", "enabled")
+            with actor_scope(configured_system_actor()):
+                service._update_param_category_status("test", "enabled")
 
         compiled = statements[0].compile()
         self.assertIn("updated_by", str(compiled))

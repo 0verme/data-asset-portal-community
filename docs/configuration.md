@@ -17,6 +17,25 @@ store. Debug must remain disabled in production. The old names are retained for
 migration and are deprecated; they may be removed in a future release after
 operators have migrated.
 
+## OpenAPI and interactive docs exposure
+
+`APP_ENV` also defines the default HTTP exposure policy for the FastAPI-generated
+OpenAPI schema and interactive documentation:
+
+| Normalized environment | `/docs` | `/redoc` | `/openapi.json` |
+|---|---:|---:|---:|
+| `development` | enabled | enabled | enabled |
+| unset (defaults to production) | disabled | disabled | disabled |
+| `production` or any other value | disabled | disabled | disabled |
+
+Only the exact normalized value `development` enables these endpoints. `APP_ENV`
+wins over the retained `FLASK_ENV` fallback when both are present. No separate
+OpenAPI deployment variable is required. Production can still generate its
+schema internally with `app.openapi()`; the policy only prevents registering the
+HTTP documentation endpoints. The app factory's optional `openapi_enabled` seam is
+for tests or embedded composition only; its default `None` follows this policy
+and it is not a deployment environment variable.
+
 ## Advanced runtime settings
 
 Change these only when the deployment has a concrete operational requirement.
@@ -27,7 +46,7 @@ Defaults are shown for orientation and are implemented by the runtime.
 | `ASSET_DB_CONNECT_TIMEOUT_SECONDS` | DB connection timeout | `30`; provider dependent |
 | `ASSET_DB_STATEMENT_TIMEOUT_MS` | query statement timeout | `120000`; PostgreSQL/GaussDB |
 | `ASSET_SCHEMA_PREFIX` | logical schema prefix for asset services | unset; optional |
-| `ASSET_OPERATOR` | default audit operator | `system` |
+| `ASSET_OPERATOR` | name used by explicitly declared system/background actors; not an HTTP fallback | `system` |
 | `APP_PAGE_SIZE_DEFAULT`, `APP_PAGE_SIZE_MAX` | pagination bounds | service defaults; runtime |
 | `FIELD_MAPPING_STATS_CACHE_TTL_SECONDS`, `PORTAL_STATS_CACHE_TTL_SECONDS` | service cache TTLs | `300`, `600` |
 | `APP_SLOW_SERVICE_SECONDS` | slow-service logging threshold | `3` |

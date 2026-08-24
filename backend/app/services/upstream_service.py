@@ -23,6 +23,7 @@ from time import perf_counter
 
 from sqlalchemy import delete, func, insert, or_, select, update
 
+from ..application import AuditActorMixin, actor_aware
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
@@ -31,7 +32,7 @@ from .common_code_service import (
 from ..db.facade import database_transaction
 from ..db.service import CoreAccess
 from ..db.tables import data_source, upstream_change_log, upstream_system, upstream_unload_time
-from ..settings import get_default_operator, get_page_size_limits
+from ..settings import get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
@@ -87,10 +88,9 @@ class UpstreamDataSourceError(Exception):
         return {"code": "UPSTREAM_DATA_SOURCE_ERROR", "message": self.message}
 
 
-class UpstreamService:
+class UpstreamService(AuditActorMixin):
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
-        self._default_operator = get_default_operator()
         self._db = CoreAccess(
             profile_getter=lambda: self._db_profile,
             error_factory=UpstreamDataSourceError,
@@ -363,6 +363,7 @@ class UpstreamService:
                 method="get_system_admin_detail",
             )
 
+    @actor_aware
     def create_system(self, payload):
         with operation_log_service.audit(
             module_name="上游系统",
@@ -420,6 +421,7 @@ class UpstreamService:
         self._execute(statements)
         return item
 
+    @actor_aware
     def update_system(self, system_id, payload):
         with operation_log_service.audit(
             module_name="上游系统",
@@ -476,6 +478,7 @@ class UpstreamService:
         self._execute(statements)
         return current, item
 
+    @actor_aware
     def patch_status(self, system_id, status):
         normalized = str(status or "").strip()
         if normalized not in self._get_allowed_status_values():
@@ -515,6 +518,7 @@ class UpstreamService:
             audit.after = item
             return item
 
+    @actor_aware
     def delete_system(self, system_id):
         with operation_log_service.audit(
             module_name="上游系统",

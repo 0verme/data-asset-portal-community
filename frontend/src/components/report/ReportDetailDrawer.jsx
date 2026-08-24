@@ -1,4 +1,3 @@
-import React from "react";
 import { formatDate, formatDateTime } from "../../utils/date.js";
 import { RowActions, StatusBadge } from "../common/index.js";
 import { Icon } from "../ui.jsx";

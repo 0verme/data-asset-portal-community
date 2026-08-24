@@ -13,7 +13,6 @@
 // limitations under the License.
 
 /* ===== 共享 UI 组件与工具 ===== */
-import React from "react";
 import { DOMAIN_HUE_MAP } from "../config/assets.js";
 
 // ---- 图标 (inline SVG, 1.6px stroke) ----
