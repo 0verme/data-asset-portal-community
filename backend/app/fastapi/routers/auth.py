@@ -21,15 +21,18 @@ from ...application import (
     set_current_request_identity,
 )
 from ...authorization.core import AuthorizationService
-from ...services.auth_service import AuthError
+from ...services.auth_service import AuthError, AuthValidationError
 from ...services.operation_log_service import (
     OPERATION_TYPE_LOGIN,
     OPERATION_TYPE_LOGOUT,
 )
+from ...security.login_protection import LoginAttemptLimiter
 from ..auth import clear_native_session_cookie, set_native_session_cookie
 from ..dependencies import get_authorization_service, get_request_context
 
 MODULE_LOGIN = "系统登录"
+LOGIN_RATE_LIMIT_CODE = "TOO_MANY_LOGIN_ATTEMPTS"
+LOGIN_RATE_LIMIT_MESSAGE = "登录尝试过于频繁，请稍后重试。"
 
 
 def _auth_payload(
@@ -45,7 +48,12 @@ def _auth_payload(
     return payload
 
 
-def _register_auth_routes(app: FastAPI, auth_service: Any, operation_logs: Any) -> None:
+def _register_auth_routes(
+    app: FastAPI,
+    auth_service: Any,
+    operation_logs: Any,
+    login_protection: LoginAttemptLimiter,
+) -> None:
     auth_router = APIRouter(prefix="/api/auth", tags=["auth-native"])
 
     @auth_router.post("/login")
@@ -56,11 +64,36 @@ def _register_auth_routes(app: FastAPI, auth_service: Any, operation_logs: Any) 
     ):
         data = payload or {}
         username = str(data.get("username") or "").strip()
+        decision = login_protection.check(username, _context.client_address)
+        if not decision.allowed:
+            operation_logs.record_best_effort_audit(
+                module_name=MODULE_LOGIN,
+                operation_type=OPERATION_TYPE_LOGIN,
+                operation_object=username,
+                operation_desc="管理员登录暂时受限",
+                result_status="failure",
+                error_message=LOGIN_RATE_LIMIT_MESSAGE,
+                user_id=username,
+                user_name=username,
+            )
+            response = JSONResponse(
+                status_code=429,
+                content={
+                    "error": {
+                        "code": LOGIN_RATE_LIMIT_CODE,
+                        "message": LOGIN_RATE_LIMIT_MESSAGE,
+                    }
+                },
+            )
+            response.headers["Retry-After"] = str(decision.retry_after_seconds)
+            return response
         try:
             user = auth_service.authenticate(
                 data.get("username"), data.get("password")
             )
         except AuthError as error:
+            if isinstance(error, AuthValidationError):
+                login_protection.record_failure(username, _context.client_address)
             operation_logs.record_best_effort_audit(
                 module_name=MODULE_LOGIN,
                 operation_type=OPERATION_TYPE_LOGIN,
@@ -76,6 +109,7 @@ def _register_auth_routes(app: FastAPI, auth_service: Any, operation_logs: Any) 
                 content={"error": error.to_dict()},
             )
 
+        login_protection.record_success(username, _context.client_address)
         identity = identity_for_session(user)
         user = _auth_payload(identity, authorization, user)
         set_current_request_identity(identity)

@@ -25,6 +25,7 @@ from ..services.root_service import root_service
 from ..services.search_provider import search_provider
 from ..services.system_management_service import system_management_service
 from ..services.upstream_service import upstream_service
+from ..security.login_protection import LoginAttemptLimiter
 from ..settings import get_openapi_docs_enabled
 from .dependencies import IdentityResolver, RequestContextMiddleware
 from .errors import register_exception_handlers
@@ -67,6 +68,7 @@ def create_fastapi_app(
     push_service_instance: Any | None = None,
     authorization_repository_instance: Any | None = None,
     authorization_service_instance: Any | None = None,
+    login_protection_instance: LoginAttemptLimiter | None = None,
     openapi_enabled: bool | None = None,
 ) -> FastAPI:
     """Create the FastAPI primary application for migrated API prefixes.
@@ -98,6 +100,12 @@ def create_fastapi_app(
     )
     app.state.authorization_service = authorization_service
     app.state.authorization_repository = authorization_service.repository
+    login_protection = (
+        login_protection_instance
+        if login_protection_instance is not None
+        else LoginAttemptLimiter()
+    )
+    app.state.login_protection = login_protection
     portal_stats = portal_service_instance or portal_service
     search = search_provider_instance or search_provider
     indicator = indicator_service_instance or indicator_service
@@ -117,7 +125,7 @@ def create_fastapi_app(
     effective_capabilities = capabilities or resolve_capabilities()
 
     register_exception_handlers(app)
-    _register_auth_routes(app, auth, operation_logs)
+    _register_auth_routes(app, auth, operation_logs, login_protection)
     _register_infrastructure_routes(
         app,
         effective_capabilities,
