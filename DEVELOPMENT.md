@@ -177,6 +177,16 @@ APP_ENV=development
 - `backend/asgi.py` 运行纯 FastAPI Native backend；Auth 保留既有 signed-session cookie format，仓库已有模块 routes 默认注册，数据库/驱动/外部依赖 readiness 通过 error contract 表达。Flask compatibility runtime 已退休；`FLASK_*` 变量名仅作为 retained signed-cookie/security configuration contract，不代表 Flask 进程。
 - Nginx + Vite 的 `/api` 反代是同源部署，不需要 CORS。只有前端和 API 确实处于不同来源时，才设置 `APP_CORS_ORIGINS`，使用逗号分隔的完整来源，例如 `https://portal.example.com,https://admin.example.com`；空项会忽略，未配置时不发送跨域允许头，绝不使用 `*`。
 
+### FastAPI 开发文档
+
+本地后端显式设置 `APP_ENV=development` 后，FastAPI 的开发文档端点可用：
+
+- Swagger UI：`http://127.0.0.1:5099/docs`
+- ReDoc：`http://127.0.0.1:5099/redoc`
+- OpenAPI JSON：`http://127.0.0.1:5099/openapi.json`
+
+`APP_ENV` 未设置或不是 `development` 时，这些 HTTP 端点默认关闭；这不影响应用内部通过 `app.openapi()` 生成 schema。
+
 ## 环境文件加载顺序
 
 后端依次加载（后者覆盖前者）：

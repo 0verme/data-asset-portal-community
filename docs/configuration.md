@@ -17,6 +17,25 @@ store. Debug must remain disabled in production. The old names are retained for
 migration and are deprecated; they may be removed in a future release after
 operators have migrated.
 
+## OpenAPI and interactive docs exposure
+
+`APP_ENV` also defines the default HTTP exposure policy for the FastAPI-generated
+OpenAPI schema and interactive documentation:
+
+| Normalized environment | `/docs` | `/redoc` | `/openapi.json` |
+|---|---:|---:|---:|
+| `development` | enabled | enabled | enabled |
+| unset (defaults to production) | disabled | disabled | disabled |
+| `production` or any other value | disabled | disabled | disabled |
+
+Only the exact normalized value `development` enables these endpoints. `APP_ENV`
+wins over the retained `FLASK_ENV` fallback when both are present. No separate
+OpenAPI deployment variable is required. Production can still generate its
+schema internally with `app.openapi()`; the policy only prevents registering the
+HTTP documentation endpoints. The app factory's optional `openapi_enabled` seam is
+for tests or embedded composition only; its default `None` follows this policy
+and it is not a deployment environment variable.
+
 ## Advanced runtime settings
 
 Change these only when the deployment has a concrete operational requirement.
