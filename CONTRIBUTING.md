@@ -28,7 +28,7 @@ Issue 模板位于 [`.github/ISSUE_TEMPLATE/`](./.github/ISSUE_TEMPLATE/)。日�
 python scripts/release_check.py fast
 ```
 
-CI（`.github/workflows/ci.yml`）会运行 Public Data Guard、后端测试、PostgreSQL 集成、前端测试/构建和 Community migration contract。
+CI（`.github/workflows/ci.yml`）会运行 Public Data Guard、后端测试、PostgreSQL 集成、前端 lint/测试/构建和 Community migration contract。
 
 ## 贡献标签语义
 
@@ -74,6 +74,7 @@ CI（`.github/workflows/ci.yml`）会运行 Public Data Guard、后端测试、P
 
 ```bash
 # 修改 frontend/
+npm --prefix frontend run lint
 npm --prefix frontend test
 npm --prefix frontend run build
 

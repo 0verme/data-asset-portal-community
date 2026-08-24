@@ -89,9 +89,15 @@ def main() -> int:
         print("Password confirmation does not match.", file=sys.stderr)
         return 1
     try:
-        created = system_management_service.create_bootstrap_admin(
-            username, display_name, password
-        )
+        try:
+            from app.application import actor_scope, configured_system_actor
+        except ModuleNotFoundError:  # pragma: no cover - package vs script entry
+            from backend.app.application import actor_scope, configured_system_actor  # type: ignore
+
+        with actor_scope(configured_system_actor()):
+            created = system_management_service.create_bootstrap_admin(
+                username, display_name, password
+            )
     except SystemUserAlreadyExistsError:
         print(f"{username or 'admin'} already exists", file=sys.stderr)
         return 1

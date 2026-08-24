@@ -15,6 +15,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { getMenus, MENUS_CHANGED_EVENT } from "./api/menus.js";
+import { isDbAuthMode } from "./auth.js";
 import { AuthBar, AuthContext, LoginModal } from "./components/AuthControls.jsx";
 import { AppShell } from "./components/app/AppShell.jsx";
 import { ModuleContent } from "./components/app/ModuleContent.jsx";
@@ -24,23 +25,12 @@ import { Icon } from "./components/ui.jsx";
 import {
   APP_VERSION,
   DEFAULT_ASSET_ROUTE,
-  DEFAULT_API_ASSET_FILTER,
   DEFAULT_API_ASSET_ROUTE,
-  DEFAULT_API_ASSET_VIEW,
-  DEFAULT_LAYOUT,
-  DEFAULT_PUSH_FILTER,
   DEFAULT_INDICATOR_ROUTE,
-  DEFAULT_MAPPING_ROUTE,
-  DEFAULT_PUSH_ROUTE,
-  DEFAULT_PUSH_VIEW,
-  DEFAULT_REPORT_FILTER,
   DEFAULT_REPORT_ROUTE,
-  DEFAULT_REPORT_VIEW,
   DEFAULT_ROOT_ROUTE,
   DEFAULT_SYSTEM_ROUTE,
-  DEFAULT_UP_FILTER,
   DEFAULT_UP_ROUTE,
-  DEFAULT_UP_VIEW,
 } from "./config/defaults.js";
 import { useAssetModule } from "./hooks/useAssetModule.js";
 import { useApiAssetModule } from "./hooks/useApiAssetModule.js";
@@ -54,55 +44,78 @@ import { useStatusOptions } from "./hooks/useStatusOptions.js";
 import { useTheme } from "./hooks/useTheme.js";
 import { useUpstreamModule } from "./hooks/useUpstreamModule.js";
 import { loadCapabilities } from "./capabilities/capabilities.js";
-import { buildPathname, parseInitialLocation } from "./routing/location.js";
 import { loadNavigationMenus } from "./routing/navigationMenus.js";
 import { splitNavigationMenus } from "./routing/navigationMenuGrouping.js";
-import { getPortalPushNavigation } from "./routing/portalNavigation.js";
+import { useLocationSynchronization } from "./hooks/useLocationSynchronization.js";
+import { useNavigationController } from "./hooks/useNavigationController.js";
 import { scrollMainToTop } from "./utils/ui.js";
 
 export default function App() {
-  const initialLocation = useMemo(() => parseInitialLocation(), []);
-  const historyReadyRef = React.useRef(false);
   const hamburgerRef = React.useRef(null);
   const sidebarRef = React.useRef(null);
   const searchToggleRef = React.useRef(null);
   const searchInputRef = React.useRef(null);
   const moreNavRef = useRef(null);
 
-  const [module, setModule] = useState(initialLocation.module);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [moreNavOpen, setMoreNavOpen] = useState(false);
-  const [route, setRoute] = useState(initialLocation.assetRoute || DEFAULT_ASSET_ROUTE);
-  const [pushRoute, setPushRoute] = useState(initialLocation.pushRoute || DEFAULT_PUSH_ROUTE);
-  const [indicatorRoute, setIndicatorRoute] = useState(initialLocation.indicatorRoute);
-  const [reportRoute, setReportRoute] = useState(initialLocation.reportRoute || DEFAULT_REPORT_ROUTE);
-  const [apiAssetRoute, setApiAssetRoute] = useState(initialLocation.apiAssetRoute || DEFAULT_API_ASSET_ROUTE);
-  const [rootRoute, setRootRoute] = useState(DEFAULT_ROOT_ROUTE);
-  const [upRoute, setUpRoute] = useState(initialLocation.upRoute || DEFAULT_UP_ROUTE);
-  const [mappingRoute, setMappingRoute] = useState(initialLocation.mappingRoute || DEFAULT_MAPPING_ROUTE);
-  const [lineageRoute, setLineageRoute] = useState(initialLocation.lineageRoute);
   const [lineageBootstrap, setLineageBootstrap] = useState(null);
-  const [systemRoute, setSystemRoute] = useState(initialLocation.systemRoute || DEFAULT_SYSTEM_ROUTE);
   const [systemActionIntent, setSystemActionIntent] = useState("");
-  const [indicatorView, setIndicatorView] = useState(initialLocation.indicatorView);
-  const [query, setQuery] = useState(initialLocation.query);
-  const [assetLayoutFromUrl, setAssetLayoutFromUrl] = useState(initialLocation.assetLayout);
-  const [assetDomainFromUrl, setAssetDomainFromUrl] = useState(initialLocation.assetDomain);
-  const [assetLayerFromUrl, setAssetLayerFromUrl] = useState(initialLocation.assetLayer);
-  const [assetDetailTabFromUrl, setAssetDetailTabFromUrl] = useState(initialLocation.assetDetailTab);
-  const [pushViewFromUrl, setPushViewFromUrl] = useState(initialLocation.pushView || DEFAULT_PUSH_VIEW);
-  const [pushFilterFromUrl, setPushFilterFromUrl] = useState(initialLocation.pushFilter || DEFAULT_PUSH_FILTER);
-  const [upFilterFromUrl, setUpFilterFromUrl] = useState(initialLocation.upFilter || DEFAULT_UP_FILTER);
-  const [upstreamViewFromUrl, setUpstreamViewFromUrl] = useState(initialLocation.upstreamView || DEFAULT_UP_VIEW);
-  const [indicatorFilter, setIndicatorFilter] = useState(initialLocation.indicatorFilter);
-  const [reportFilter, setReportFilter] = useState(initialLocation.reportFilter || DEFAULT_REPORT_FILTER);
-  const [reportView, setReportView] = useState(initialLocation.reportView || DEFAULT_REPORT_VIEW);
-  const [apiAssetFilter, setApiAssetFilter] = useState(initialLocation.apiAssetFilter || DEFAULT_API_ASSET_FILTER);
-  const [apiAssetView, setApiAssetView] = useState(initialLocation.apiAssetView || DEFAULT_API_ASSET_VIEW);
   const [navMenus, setNavMenus] = useState([]);
   const [navMenuStatus, setNavMenuStatus] = useState("loading");
   const navMenuRequestRef = useRef(0);
+
+  const handlePopState = React.useCallback(() => {
+    setSidebarOpen(false);
+    setSystemActionIntent("");
+  }, []);
+  const navigation = useNavigationController({ onPopState: handlePopState });
+  const {
+    module,
+    query,
+    setQuery,
+    route,
+    setRoute,
+    pushRoute,
+    setPushRoute,
+    indicatorRoute,
+    setIndicatorRoute,
+    reportRoute,
+    setReportRoute,
+    apiAssetRoute,
+    setApiAssetRoute,
+    rootRoute,
+    setRootRoute,
+    upRoute,
+    setUpRoute,
+    mappingRoute,
+    setMappingRoute,
+    lineageRoute,
+    setLineageRoute,
+    systemRoute,
+    setSystemRoute,
+    assetLayoutFromUrl,
+    assetDomainFromUrl,
+    assetLayerFromUrl,
+    assetDetailTabFromUrl,
+    pushViewFromUrl,
+    pushFilterFromUrl,
+    upFilterFromUrl,
+    upstreamViewFromUrl,
+    indicatorFilter,
+    setIndicatorFilter,
+    indicatorView,
+    setIndicatorView,
+    reportFilter,
+    setReportFilter,
+    reportView,
+    setReportView,
+    apiAssetFilter,
+    setApiAssetFilter,
+    apiAssetView,
+    setApiAssetView,
+  } = navigation;
 
   const { theme, toggleTheme } = useTheme();
   const { statusOptions } = useStatusOptions();
@@ -128,6 +141,7 @@ export default function App() {
     handleLoginSubmit,
     handleLogout,
   } = useAuthSession();
+  const businessAccessReady = !isDbAuthMode() || (authReady && Boolean(auth.user));
 
   const loadMenus = React.useCallback(async () => {
     const requestId = navMenuRequestRef.current + 1;
@@ -157,13 +171,19 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!businessAccessReady) {
+      navMenuRequestRef.current += 1;
+      setNavMenus([]);
+      setNavMenuStatus(authReady ? "ready" : "loading");
+      return undefined;
+    }
     loadMenus();
     window.addEventListener(MENUS_CHANGED_EVENT, loadMenus);
     return () => {
       navMenuRequestRef.current += 1;
       window.removeEventListener(MENUS_CHANGED_EVENT, loadMenus);
     };
-  }, [loadMenus]);
+  }, [authReady, businessAccessReady, loadMenus]);
 
   useEffect(() => {
     refreshCapabilities();
@@ -250,7 +270,7 @@ export default function App() {
   );
 
   const asset = useAssetModule({
-    active: module === "dwm",
+    active: businessAccessReady && module === "dwm",
     query,
     setQuery,
     route,
@@ -264,7 +284,7 @@ export default function App() {
   });
 
   const root = useRootModule({
-    active: module === "root",
+    active: businessAccessReady && module === "root",
     query,
     setQuery,
     rootRoute,
@@ -273,7 +293,7 @@ export default function App() {
   });
 
   const indicator = useIndicatorModule({
-    active: module === "indicator",
+    active: businessAccessReady && module === "indicator",
     query,
     indicatorRoute,
     setIndicatorRoute,
@@ -285,7 +305,7 @@ export default function App() {
   });
 
   const report = useReportModule({
-    active: module === "report",
+    active: businessAccessReady && module === "report",
     query,
     reportRoute,
     setReportRoute,
@@ -296,12 +316,12 @@ export default function App() {
     setLoginOpen,
   });
   const apiAsset = useApiAssetModule({
-    active: module === "apiAsset", query, route: apiAssetRoute, setRoute: setApiAssetRoute,
+    active: businessAccessReady && module === "apiAsset", query, route: apiAssetRoute, setRoute: setApiAssetRoute,
     filter: apiAssetFilter, canEdit: can("api_asset:write"), requireLogin, setAuthError, setLoginOpen,
   });
 
   const push = usePushModule({
-    active: module === "push",
+    active: businessAccessReady && module === "push",
     query,
     setQuery,
     pushRoute,
@@ -314,7 +334,7 @@ export default function App() {
   });
 
   const upstream = useUpstreamModule({
-    active: module === "upstream",
+    active: businessAccessReady && module === "upstream",
     query,
     setQuery,
     upRoute,
@@ -329,7 +349,7 @@ export default function App() {
   });
 
   const manualCodeTable = useManualCodeTableModule({
-    active: module === "codeTable",
+    active: businessAccessReady && module === "codeTable",
     query,
     requireLogin,
   });
@@ -342,133 +362,7 @@ export default function App() {
   const { upBack, resetUpstreamNavigation } = upstream;
   const { resetRootNavigation } = root;
 
-  useEffect(() => {
-    const handlePopState = () => {
-      const next = parseInitialLocation();
-      setModule(next.module);
-      setQuery(next.query);
-      setRoute(next.assetRoute || DEFAULT_ASSET_ROUTE);
-      setAssetLayoutFromUrl(next.assetLayout);
-      setAssetDomainFromUrl(next.assetDomain);
-      setAssetLayerFromUrl(next.assetLayer);
-      setAssetDetailTabFromUrl(next.assetDetailTab);
-      setPushRoute(next.pushRoute || DEFAULT_PUSH_ROUTE);
-      setPushViewFromUrl(next.pushView || DEFAULT_PUSH_VIEW);
-      setPushFilterFromUrl(next.pushFilter || DEFAULT_PUSH_FILTER);
-      setIndicatorRoute(next.indicatorRoute);
-      setIndicatorFilter(next.indicatorFilter);
-      setIndicatorView(next.indicatorView);
-      setReportRoute(next.reportRoute || DEFAULT_REPORT_ROUTE);
-      setReportFilter(next.reportFilter || DEFAULT_REPORT_FILTER);
-      setReportView(next.reportView || DEFAULT_REPORT_VIEW);
-      setApiAssetRoute(next.apiAssetRoute || DEFAULT_API_ASSET_ROUTE);
-      setApiAssetFilter(next.apiAssetFilter || DEFAULT_API_ASSET_FILTER);
-      setApiAssetView(next.apiAssetView || DEFAULT_API_ASSET_VIEW);
-      setUpRoute(next.upRoute || DEFAULT_UP_ROUTE);
-      setUpFilterFromUrl(next.upFilter || DEFAULT_UP_FILTER);
-      setUpstreamViewFromUrl(next.upstreamView || DEFAULT_UP_VIEW);
-      setMappingRoute(next.mappingRoute || DEFAULT_MAPPING_ROUTE);
-      setLineageRoute(next.lineageRoute);
-      setSystemRoute(next.systemRoute || DEFAULT_SYSTEM_ROUTE);
-      setSystemActionIntent("");
-      setSidebarOpen(false);
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
-
-  useEffect(() => {
-    const moduleRoute = module === "dwm"
-      ? route
-      : module === "push"
-        ? pushRoute
-      : module === "upstream"
-        ? upRoute
-      : module === "report"
-        ? reportRoute
-        : module === "apiAsset"
-          ? apiAssetRoute
-        : indicatorRoute;
-    const pathname = buildPathname(module, moduleRoute, systemRoute);
-    const params = new URLSearchParams();
-
-    if (module === "dwm") {
-      if (query.trim()) params.set("q", query.trim());
-      if (asset.domain) params.set("domain", asset.domain);
-      if (asset.selectedLayer) params.set("layer", asset.selectedLayer);
-      if (asset.layout !== DEFAULT_LAYOUT) params.set("layout", asset.layout);
-      if (route.page === "detail" && asset.detailTab !== "fields") params.set("tab", asset.detailTab);
-    }
-
-    if (module === "report") {
-      if (query.trim()) params.set("q", query.trim());
-      if (reportFilter.type) params.set("type", reportFilter.type);
-      if (reportFilter.status) params.set("status", reportFilter.status);
-      if (reportFilter.ownerDept) params.set("ownerDept", reportFilter.ownerDept);
-      if (reportView !== DEFAULT_REPORT_VIEW) params.set("view", reportView);
-    }
-    if (module === "apiAsset") {
-      if (query.trim()) params.set("q", query.trim());
-      if (apiAssetFilter.status) params.set("status", apiAssetFilter.status);
-      if (apiAssetFilter.method) params.set("method", apiAssetFilter.method);
-      if (apiAssetFilter.downstreamSystemId) params.set("downstreamSystemId", apiAssetFilter.downstreamSystemId);
-      if (apiAssetView !== DEFAULT_API_ASSET_VIEW) params.set("view", apiAssetView);
-    }
-
-    if (module === "indicator") {
-      if (query.trim()) params.set("q", query.trim());
-      if (indicatorFilter.dimension !== "all") params.set("dimension", indicatorFilter.dimension);
-      if (indicatorFilter.status !== "all") params.set("status", indicatorFilter.status);
-      if (indicatorView !== "list") params.set("view", indicatorView);
-    }
-
-    if (module === "mapping") {
-      if (mappingRoute.upstreamSystemId) params.set("upstreamSystemId", mappingRoute.upstreamSystemId);
-      if (mappingRoute.sourceTable) params.set("sourceTable", mappingRoute.sourceTable);
-      if (mappingRoute.dwfTable) params.set("dwfTable", mappingRoute.dwfTable);
-      if (mappingRoute.tab && mappingRoute.tab !== DEFAULT_MAPPING_ROUTE.tab) {
-        params.set("tab", mappingRoute.tab);
-      }
-    }
-
-    if (module === "lineage") {
-      if (lineageRoute.rootId) params.set("rootId", lineageRoute.rootId);
-      params.set("direction", lineageRoute.direction);
-      params.set("depth", lineageRoute.depth);
-      if (lineageRoute.view !== "table") params.set("view", lineageRoute.view);
-    }
-
-    if (module === "upstream") {
-      if (query.trim()) params.set("q", query.trim());
-      if (upstream.upFilter.status) params.set("status", upstream.upFilter.status);
-      if (upstream.upFilter.dbType) params.set("dbType", upstream.upFilter.dbType);
-      if (upstream.upstreamView !== DEFAULT_UP_VIEW && upRoute.page === "list") params.set("view", upstream.upstreamView);
-    }
-
-    if (module === "push") {
-      if (query.trim()) params.set("q", query.trim());
-      if (push.pushFilter.status) params.set("status", push.pushFilter.status);
-      if (push.pushFilter.protocol) params.set("protocol", push.pushFilter.protocol);
-      if (push.pushFilter.dept) params.set("dept", push.pushFilter.dept);
-      if (push.pushFilter.importanceLevel) params.set("importanceLevel", push.pushFilter.importanceLevel);
-      if (push.pushView !== DEFAULT_PUSH_VIEW && pushRoute.page === "systems") params.set("view", push.pushView);
-    }
-
-    if (module === "codeTable" && query.trim()) params.set("q", query.trim());
-
-    const nextUrl = `${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-    const currentUrl = `${window.location.pathname}${window.location.search}`;
-    if (nextUrl !== currentUrl) {
-      const pathnameChanged = window.location.pathname !== pathname;
-      if (historyReadyRef.current && pathnameChanged) {
-        window.history.pushState({}, "", nextUrl);
-      } else {
-        window.history.replaceState({}, "", nextUrl);
-      }
-    }
-    historyReadyRef.current = true;
-  }, [apiAssetFilter, apiAssetRoute, apiAssetView, asset.detailTab, asset.domain, asset.layout, asset.selectedLayer, indicatorFilter, indicatorRoute, indicatorView, lineageRoute, mappingRoute, module, push.pushFilter, push.pushView, pushRoute, query, reportFilter, reportRoute, reportView, route, systemRoute, upRoute, upstream.upFilter, upstream.upstreamView]);
+  useLocationSynchronization({ navigation, asset, push, upstream });
 
   useEffect(() => {
     if (!authReady || canEdit) return;
@@ -495,7 +389,17 @@ export default function App() {
       ["new", "edit"].includes(current.page) ? DEFAULT_REPORT_ROUTE : current
     ));
     setApiAssetRoute((current) => (["new", "edit"].includes(current.page) ? DEFAULT_API_ASSET_ROUTE : current));
-  }, [authReady, canEdit]);
+  }, [
+    authReady,
+    canEdit,
+    setApiAssetRoute,
+    setIndicatorRoute,
+    setPushRoute,
+    setReportRoute,
+    setRootRoute,
+    setRoute,
+    setUpRoute,
+  ]);
 
   const systemLandingRoute = useMemo(() => {
     if (canViewUsers) return { page: "users" };
@@ -516,7 +420,25 @@ export default function App() {
       "operation-logs": canViewOperationLog,
     };
     if (!accessible[systemRoute.page]) setSystemRoute(systemLandingRoute);
-  }, [authReady, canViewMenus, canViewOperationLog, canViewParams, canViewRoles, canViewUsers, module, systemLandingRoute, systemRoute.page]);
+  }, [
+    authReady,
+    canViewMenus,
+    canViewOperationLog,
+    canViewParams,
+    canViewRoles,
+    canViewUsers,
+    module,
+    setSystemRoute,
+    systemLandingRoute,
+    systemRoute.page,
+  ]);
+
+  const {
+    switchModule: switchNavigationModule,
+    goToMapping: navigateToMapping,
+    backToUpstreamList: navigateBackToUpstreamList,
+    goToModuleWithQuery: navigateToModuleWithQuery,
+  } = navigation.actions;
 
   const switchModule = (nextModule) => {
     setSidebarOpen(false);
@@ -525,35 +447,19 @@ export default function App() {
     resetPushNavigation();
     resetRootNavigation();
     resetUpstreamNavigation();
-    setModule(nextModule);
-    setQuery("");
-    setSidebarOpen(false);
-    setRoute(DEFAULT_ASSET_ROUTE);
-    setPushRoute(DEFAULT_PUSH_ROUTE);
-    setRootRoute(DEFAULT_ROOT_ROUTE);
-    setUpRoute(DEFAULT_UP_ROUTE);
-    if (nextModule === "indicator") setIndicatorRoute(DEFAULT_INDICATOR_ROUTE);
-    if (nextModule === "report") {
-      setReportRoute(DEFAULT_REPORT_ROUTE);
-      setReportFilter(DEFAULT_REPORT_FILTER);
-    }
-    if (nextModule === "apiAsset") { setApiAssetRoute(DEFAULT_API_ASSET_ROUTE); setApiAssetFilter(DEFAULT_API_ASSET_FILTER); }
-    if (nextModule === "mapping") setMappingRoute(DEFAULT_MAPPING_ROUTE);
-    if (nextModule === "system") setSystemRoute(systemLandingRoute);
+    switchNavigationModule(nextModule, { systemRoute: systemLandingRoute });
     setSystemActionIntent("");
     scrollMainToTop();
   };
 
   const goToMapping = (nextMappingRoute) => {
-    setModule("mapping");
-    setMappingRoute({ ...DEFAULT_MAPPING_ROUTE, ...nextMappingRoute });
+    navigateToMapping(nextMappingRoute);
     setSidebarOpen(false);
     scrollMainToTop();
   };
 
   const backToUpstreamList = () => {
-    setModule("upstream");
-    setUpRoute(DEFAULT_UP_ROUTE);
+    navigateBackToUpstreamList();
     setSidebarOpen(false);
     scrollMainToTop();
   };
@@ -561,21 +467,8 @@ export default function App() {
   const goToModuleWithQuery = (target, nextQuery) => {
     const nextModule = target?.module || target;
     if (!nextModule) return;
-    const pushNavigation = nextModule === "push" ? getPortalPushNavigation(target, DEFAULT_PUSH_ROUTE) : null;
-    setModule(nextModule);
-    setQuery((pushNavigation?.query ?? nextQuery) || "");
+    navigateToModuleWithQuery(target, nextQuery, { systemRoute: systemLandingRoute });
     setSidebarOpen(false);
-    if (nextModule === "indicator") setIndicatorRoute(DEFAULT_INDICATOR_ROUTE);
-    if (nextModule === "report") {
-      setReportRoute(DEFAULT_REPORT_ROUTE);
-      setReportFilter(DEFAULT_REPORT_FILTER);
-    }
-    if (nextModule === "apiAsset") { setApiAssetRoute(DEFAULT_API_ASSET_ROUTE); setApiAssetFilter(DEFAULT_API_ASSET_FILTER); }
-    if (nextModule === "mapping") setMappingRoute(target?.mappingRoute || DEFAULT_MAPPING_ROUTE);
-    if (nextModule === "system") setSystemRoute(systemLandingRoute);
-    if (nextModule === "push") {
-      setPushRoute(pushNavigation.route);
-    }
     setSystemActionIntent("");
     scrollMainToTop();
   };
@@ -645,7 +538,7 @@ export default function App() {
     <ModuleContent
       module={module}
       context={{
-        apiAsset, apiAssetRoute, apiAssetView, asset, backToUpstreamList, can,
+        apiAsset, apiAssetRoute, apiAssetView, asset, backToUpstreamList, businessAccessReady, can,
         canEdit, canManageRoles, canManageSystem, canViewMenus, canViewOperationLog, canViewParams,
         canViewRoles, canViewUsers, goToMapping, goToModuleWithQuery, indicator, indicatorFilter,
         indicatorRoute, indicatorView, lineageRoute, manualCodeTable, mappingRoute,

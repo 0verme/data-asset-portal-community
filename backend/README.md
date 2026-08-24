@@ -67,6 +67,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 
 Session Cookie 始终使用 `HttpOnly=True` 和 `SameSite=Lax`。默认/生产环境使用 `Secure=True`；只有显式 `APP_ENV=development` 才为本地 HTTP 联调关闭 Secure。Nginx 或 Vite 的 `/api` 同源代理不需要 CORS；跨域部署才设置 `APP_CORS_ORIGINS`，不设置就不返回 CORS 允许头，禁止使用 `*`。不要将真实 `APP_SECRET_KEY` 写入仓库、日志或命令历史；可在受控终端本地执行 `python -c "import secrets; print(secrets.token_urlsafe(32))"` 生成后交由 secret store 保存。
 
+### 业务 API authentication boundary
+
+FastAPI router 默认对业务读模型使用 `require_authenticated`：资产、字段/DDL、指标、搜索、映射、血缘、菜单、报表、API 资产、码值表、上/下游目录、门户统计和 metadata routes 不接受匿名业务读取。匿名请求返回 `401`；已登录普通用户无需逐个 `*:read` permission 即可浏览普通目录。写操作、管理 API 和敏感读取继续使用 `require_permission(...)`，缺少授权时返回 `403`。
+
+明确的 anonymous exceptions 只有 `/healthz`、有限的 `/api/capabilities` 模块元数据和 `/api/auth` 登录生命周期；当前没有 Public Catalog 开关。详见 [authenticated-read-model.md](../docs/rbac/authenticated-read-model.md)。
+
 内网数据库链路较慢时，可在 `backend/.env.local` 中设置：
 
 ```env

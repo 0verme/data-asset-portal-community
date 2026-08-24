@@ -28,7 +28,7 @@ from ...services.system_management_service import (
     SystemUserNotFoundError,
     SystemValidationError,
 )
-from ..dependencies import require_permission
+from ..dependencies import require_authenticated, require_permission
 from ..errors import _service_error_response
 
 
@@ -72,7 +72,11 @@ def _system_payload(payload: Any) -> Any:
 
 
 def _register_system_management_routes(app: FastAPI, service: Any) -> None:
-    router = APIRouter(prefix="/api/system", tags=["system-management-migration"])
+    router = APIRouter(
+        prefix="/api/system",
+        tags=["system-management-migration"],
+        dependencies=[Depends(require_authenticated)],
+    )
 
     def get_service() -> Any:
         return service
@@ -260,8 +264,8 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
         except SystemManagementError as error:
             return _system_error_response(error)
         # `adminOnly` is presentation metadata. The frontend applies the
-        # current permission snapshot while the public menu read remains
-        # available for guest navigation and custom roles.
+        # current permission snapshot while authentication remains enforced
+        # by the router dependency; this endpoint is not an authorization engine.
         return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
 
     @router.post("/menus", response_model=None, status_code=201)

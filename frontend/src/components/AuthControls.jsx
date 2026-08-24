@@ -99,7 +99,7 @@ export function LoginModal({ open, busy, error, onClose, onSubmit }) {
         </div>
         <h2 className="login-title">管理员登录</h2>
         <p className="login-desc">
-          登录后可新增、编辑与维护数据资产；游客可继续浏览全部内容。
+          登录后可浏览业务目录，并按当前权限新增、编辑与维护数据资产。
         </p>
         <label className="login-field">
           <span className="lf-label">账号</span>
@@ -153,7 +153,7 @@ export function LoginModal({ open, busy, error, onClose, onSubmit }) {
           {busy ? "登录中..." : "登录"}
         </button>
         <button className="login-guest" onClick={onClose} disabled={busy}>
-          以游客身份继续浏览
+          暂不登录
           <Icon name="arrow" size={14} />
         </button>
       </div>
@@ -167,12 +167,12 @@ export function AuthBar({ auth, onLogin, onLogout }) {
     ? "系统管理员"
     : auth.role === "maintainer"
       ? "业务维护员"
-      : auth.role || "游客浏览";
+      : auth.role || "未登录";
 
   if (!auth.user) {
     return (
       <div className="authbar">
-        <span className="role-pill guest"><Icon name="eye" size={13} />游客浏览</span>
+        <span className="role-pill guest"><Icon name="eye" size={13} />未登录</span>
         <button className="login-cta" onClick={onLogin}>
           <Icon name="login" size={15} />
           登录

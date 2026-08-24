@@ -68,8 +68,10 @@ class ApiAssetCoreCrudTests(unittest.TestCase):
         self.assertNotIn("customer' OR 1=1", str(self.service._db.fetch_rows.call_args_list[0].args[0].compile(dialect=sqlite.dialect())))
         self.assertEqual(items[0]["code"], "CUSTOMER_API")
 
+    @patch("backend.app.services.api_asset_service.operation_log_service.audit")
     @patch("backend.app.services.api_asset_service.ApiAssetService.get_asset")
-    def test_create_update_and_replace_use_core_mutations(self, get_asset):
+    def test_create_update_and_replace_use_core_mutations(self, get_asset, audit):
+        audit.return_value.__enter__.return_value = MagicMock()
         get_asset.return_value = {"code": "CUSTOMER_API"}
         self.service._db.next_pk = MagicMock(side_effect=[7, 8, 9])
         self.service._db.execute_statements = MagicMock()

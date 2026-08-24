@@ -86,9 +86,30 @@ class RoutePermissionInventoryTests(unittest.TestCase):
                 self.assertIn(key, found)
                 self.assertIn(dependency_name, found[key])
 
-    def test_public_reads_remain_without_permission_dependency(self):
+    def test_business_routes_require_authentication_by_default(self):
         app = create_fastapi_app(identity_resolver=lambda _request: None)
-        public = {
+        explicit_auth_contract = {
+            ("POST", "/api/auth/login"),
+            ("GET", "/api/auth/me"),
+            ("POST", "/api/auth/logout"),
+            ("GET", "/api/capabilities"),
+        }
+        for route in app.routes:
+            if not isinstance(route, APIRoute):
+                continue
+            names = {
+                getattr(dependency.call, "__name__", "")
+                for dependency in route.dependant.dependencies
+            }
+            for method in route.methods or ():
+                if (method, route.path) in explicit_auth_contract:
+                    continue
+                with self.subTest(route=(method, route.path)):
+                    self.assertIn("require_authenticated", names)
+
+    def test_ordinary_business_reads_are_authentication_only(self):
+        app = create_fastapi_app(identity_resolver=lambda _request: None)
+        ordinary_reads = {
             ("GET", "/api/assets/tables"),
             ("GET", "/api/indicators"),
             ("GET", "/api/search"),
@@ -96,20 +117,21 @@ class RoutePermissionInventoryTests(unittest.TestCase):
             ("GET", "/api/field-mappings/fields"),
             ("GET", "/api/system/menus"),
         }
-        for route in app.routes:
-            if not isinstance(route, APIRoute):
-                continue
-            for method in route.methods or ():
-                if (method, route.path) not in public:
-                    continue
+        routes = {
+            (method, route.path): route
+            for route in app.routes
+            if isinstance(route, APIRoute)
+            for method in route.methods or ()
+        }
+        for key in ordinary_reads:
+            with self.subTest(route=key):
+                self.assertIn(key, routes)
                 names = {
                     getattr(dependency.call, "__name__", "")
-                    for dependency in route.dependant.dependencies
+                    for dependency in routes[key].dependant.dependencies
                 }
-                with self.subTest(route=(method, route.path)):
-                    self.assertFalse(
-                        any(name.startswith("require_permission_") for name in names)
-                    )
+                self.assertIn("require_authenticated", names)
+                self.assertFalse(any(name.startswith("require_permission_") for name in names))
 
 
 class DirectApiBypassTests(unittest.TestCase):
@@ -137,13 +159,15 @@ class DirectApiBypassTests(unittest.TestCase):
         self.assertEqual(403, forbidden.status_code)
         indicator_service.create_indicator.assert_not_called()
 
-        public_read = client.get("/api/indicators")
-        self.assertEqual(200, public_read.status_code)
-        self.assertEqual([], public_read.json()["items"])
+        authenticated_read = client.get("/api/indicators")
+        self.assertEqual(200, authenticated_read.status_code)
+        self.assertEqual([], authenticated_read.json()["items"])
 
         current_identity = None
-        anonymous = client.post("/api/indicators", json={})
-        self.assertEqual(401, anonymous.status_code)
+        anonymous_read = client.get("/api/indicators")
+        self.assertEqual(401, anonymous_read.status_code)
+        anonymous_mutation = client.post("/api/indicators", json={})
+        self.assertEqual(401, anonymous_mutation.status_code)
 
 
 if __name__ == "__main__":

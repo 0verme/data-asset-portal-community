@@ -18,7 +18,7 @@ from ...services.upstream_service import (
     UpstreamSystemNotFoundError,
     UpstreamValidationError,
 )
-from ..dependencies import require_permission
+from ..dependencies import require_authenticated, require_permission
 from ..errors import _service_error_response
 
 
@@ -37,7 +37,11 @@ def _upstream_error_response(error: Any) -> JSONResponse:
 
 
 def _register_upstream_routes(app: FastAPI, service: Any) -> None:
-    router = APIRouter(prefix="/api/upstreams", tags=["upstream-migration"])
+    router = APIRouter(
+        prefix="/api/upstreams",
+        tags=["upstream-migration"],
+        dependencies=[Depends(require_authenticated)],
+    )
 
     def get_service() -> Any:
         return service

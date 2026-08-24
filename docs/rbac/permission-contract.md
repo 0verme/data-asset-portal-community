@@ -19,9 +19,10 @@
   `backend.app.fastapi.auth.get_native_session_identity`.
 - The current application identity has `user`, `name`, and `role`; it does not yet
   contain a permission set.
-- `require_maintainer` currently means **authenticated identity** (there is no
-  separate maintainer-only distinction in that dependency). `admin` and
-  `maintainer` both pass it. `require_admin` is the current administrator gate.
+- `require_authenticated` means **authenticated identity** without checking a
+  permission code. `require_maintainer` remains a compatibility alias; `admin`
+  and `maintainer` both pass it. `require_admin` is the current administrator
+  gate.
 - Current provider registrations are SQLite, PostgreSQL, MySQL/PyMySQL, and
   GaussDB/DWS. Community/local migration uses `backend/schema` plus Alembic and
   `backend/scripts/schema_migrate.py`; P1 must follow that current contract.
@@ -52,30 +53,30 @@ seed output, API snapshots, frontend state, and debugging.
 
 | Permission | Resource | Action | Public/API scope |
 | --- | --- | --- | --- |
-| `asset:read` | asset | read | Public asset query routes; reserved for a future protected read boundary. |
+| `asset:read` | asset | read | Reserved for a materially sensitive asset-read boundary; ordinary asset reads require authentication only. |
 | `asset:write` | asset | write | Protected asset table/field mutations. |
-| `root:read` | root | read | Public root query routes; reserved for a future protected read boundary. |
+| `root:read` | root | read | Reserved for a materially sensitive root-read boundary; ordinary root reads require authentication only. |
 | `root:write` | root | write | Protected root create/update/delete/import. |
-| `indicator:read` | indicator | read | Public indicator query routes; reserved for a future protected read boundary. |
+| `indicator:read` | indicator | read | Reserved for a materially sensitive indicator-read boundary; ordinary indicator reads require authentication only. |
 | `indicator:write` | indicator | write | Protected indicator create/update/delete/status. |
-| `report:read` | report | read | Public report query routes; reserved for a future protected read boundary. |
+| `report:read` | report | read | Reserved for a materially sensitive report-read boundary; ordinary report reads require authentication only. |
 | `report:write` | report | write | Protected report create/update/delete. |
-| `api_asset:read` | api_asset | read | Public API asset query routes; reserved for a future protected read boundary. |
+| `api_asset:read` | api_asset | read | Reserved for a materially sensitive API-asset read boundary; ordinary reads require authentication only. |
 | `api_asset:write` | api_asset | write | Protected API asset, params, response-fields, and relations mutations. |
-| `upstream:read` | upstream | read | Protected upstream `admin-detail`; ordinary list/detail remains public. |
+| `upstream:read` | upstream | read | Protected upstream `admin-detail`; ordinary list/detail requires authentication only. |
 | `upstream:write` | upstream | write | Protected upstream create/update/status/delete. |
-| `push:read` | push | read | Protected push `admin-detail`; ordinary list/detail remains public. |
+| `push:read` | push | read | Protected push `admin-detail`; ordinary list/detail requires authentication only. |
 | `push:write` | push | write | Protected push system/job mutations. |
-| `code_table:read` | code_table | read | Current list/detail/export routes are public; code is reserved for a protected read boundary. |
+| `code_table:read` | code_table | read | Reserved for a materially sensitive code-table read boundary; ordinary list/detail/export requires authentication only. |
 | `code_table:write` | code_table | write | Protected manual code table create/update/status/delete. |
-| `field_mapping:read` | field_mapping | read | Current query routes are public; do not make them login-only in this Epic. |
-| `lineage:read` | lineage | read | Current bootstrap/search/subgraph routes are public; do not make them login-only in this Epic. |
+| `field_mapping:read` | field_mapping | read | Reserved for a materially sensitive mapping-read boundary; ordinary queries require authentication only. |
+| `lineage:read` | lineage | read | Reserved for a materially sensitive lineage-read boundary; ordinary queries require authentication only. |
 | `metadata:read` | metadata | read | Protected ingestion result lookup. |
 | `metadata:write` | metadata | write | Protected asset/lineage Metadata Ingestion and preview/bulk aliases. |
 | `operation_log:read` | operation_log | read | Protected operation log list/detail. |
 | `system:user:read` | system:user | read | Administrator-only user list. |
 | `system:user:write` | system:user | write | Administrator-only user CRUD, status, reset-password, and delete. |
-| `system:menu:read` | system:menu | read | Full menu management read; public menu endpoint remains filtered and open. |
+| `system:menu:read` | system:menu | read | Full menu-management read; ordinary authenticated menu navigation is not permission-gated. |
 | `system:menu:write` | system:menu | write | Administrator-only menu CRUD/status/move/delete. |
 | `system:param:read` | system:param | read | Administrator-only parameter category/dictionary reads. |
 | `system:param:write` | system:param | write | Administrator-only parameter category/dictionary mutations. |
@@ -91,16 +92,19 @@ seed output, API snapshots, frontend state, and debugging.
    independent permission lists.
 4. `admin` is explicitly mapped to every registered code. It does not use `*`.
    Adding a permission therefore produces a visible registry/seed diff.
-5. `maintainer` is mapped to the compatibility set below. Public routes remain
-   public even when a corresponding `read` code exists.
+5. `maintainer` is mapped to the compatibility set below. Ordinary business
+   routes require authentication even when a corresponding `read` code exists;
+   the code is not automatically applied to every catalog GET.
 
-## 4. Current route authorization matrix
+## 4. Historical P0 route authorization matrix
 
-The following is the complete FastAPI route inventory at the P0 baseline. `Public`
+The following table records the pre-#140 FastAPI route inventory and is retained
+as historical evidence. The current route contract superseding its public-read
+rows is [authenticated-read-model.md](./authenticated-read-model.md). `Public`
 means no login dependency is evaluated. `Auth` means a valid enabled identity
 is required. `Admin` means the current administrator gate is required. The
 permission column is the target contract for P3; P0 records the existing gate
-and does not silently change public read behavior.
+and is superseded by #140's authentication-only ordinary business reads.
 
 | Resource | API / action | Public | Authenticated | `maintainer` | `admin` | Mutation | Permission |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -150,7 +154,7 @@ routes even though they are omitted from OpenAPI.
 
 | Identity | Current behavior at P0 | Contract decision |
 | --- | --- | --- |
-| guest | Public routes only. Protected dependencies reject the request. | Preserve public reads; map protected unauthenticated requests to `401`. |
+| guest | Explicit infrastructure/auth lifecycle routes only; business routes reject the request. | Return `401` for anonymous business reads while preserving the bounded public exceptions. |
 | `maintainer` | Passes `require_maintainer`; cannot pass `require_admin`. | Preserve business maintenance and operation-log access; do not grant system user/menu/param/role management. |
 | `admin` | Passes both current gates. | Preserve all current access and explicitly map every registered permission. |
 | unknown role | Unknown or deleted roles resolve to no permissions. | Deny by default; protected APIs return `403` for a valid identity without the required permission. |
@@ -159,8 +163,9 @@ routes even though they are omitted from OpenAPI.
 ### Built-in permission mapping
 
 `admin` is the full explicit registry. `maintainer` is the compatibility set
-below; a check mark on a public read code documents capability, but does not
-make that route private.
+below; a check mark on an ordinary read code documents a capability but does
+not make that route permission-gated. Ordinary business routes still require
+an authenticated identity.
 
 | Permission | `admin` | `maintainer` | Custom example `indicator-maintainer` |
 | --- | :---: | :---: | :---: |
@@ -243,7 +248,8 @@ through the role-management API while retaining one role per user.
 - Contract unit test: code uniqueness, `resource/action` decomposition,
   deterministic order, explicit admin coverage, and no unknown role fallback.
 - Route inventory test/fixture: every current mutation has a target permission;
-  public GET route behavior remains unchanged.
+  ordinary business GET routes require authentication; explicit infrastructure
+  exceptions are tested separately.
 - P2 core unit tests: admin, maintainer, custom role, unknown role, disabled
   role/user, deleted user, missing and unknown permission.
 - P3 direct API matrix: every sensitive POST/PUT/PATCH/DELETE returns 401 or

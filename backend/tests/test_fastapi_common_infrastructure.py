@@ -8,6 +8,7 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
+from backend.app.application import Identity
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi_app import create_fastapi_app
 from backend.app.services.search_provider import SearchDataSourceError
@@ -33,7 +34,7 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
     def app(self):
         return create_fastapi_app(
             capabilities=self.capabilities,
-            identity_resolver=lambda _request: None,
+            identity_resolver=lambda _request: Identity("admin", "admin", "Admin"),
             portal_service_instance=self.portal_service,
             search_provider_instance=self.search_provider,
         )

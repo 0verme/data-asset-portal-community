@@ -69,6 +69,7 @@ export function ToastHost() {
   }, []);
 
   React.useEffect(() => {
+    const timers = timersRef.current;
     pushToast = ({ message, tone, duration }) => {
       const id = ++idRef.current;
       setItems((prev) => [...prev, { id, message, tone }]);
@@ -79,8 +80,8 @@ export function ToastHost() {
     };
     return () => {
       pushToast = null;
-      timersRef.current.forEach((timer) => clearTimeout(timer));
-      timersRef.current.clear();
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
     };
   }, [dismiss]);
 

@@ -134,6 +134,30 @@ def execute_core(profile: str, statement) -> int:
     return _execute_on_shared_or_owned(profile, _run)
 
 
+def execute_core_on_cursor(profile: str, cursor, statement) -> int:
+    """Execute one Core statement on a caller-owned DB-API cursor.
+
+    This is used by infrastructure code that already owns a transaction or
+    cursor (for example the required audit writer).  Compilation remains in
+    this module so callers never handle physical schemas or placeholders.
+    """
+    statement = _normalize_core_statement(statement)
+    config = get_db_profile(profile)
+    engine = get_engine(profile, config=config)
+    sql, params = _compile(profile, statement, engine.dialect if engine is not None else None)
+    cursor.execute(sql, params)
+    return int(getattr(cursor, "rowcount", 0) or 0)
+
+
+def execute_core_on_connection(profile: str, connection, statement) -> int:
+    """Execute one Core statement on a caller-owned DB-API connection."""
+    cursor = connection.cursor()
+    try:
+        return execute_core_on_cursor(profile, cursor, statement)
+    finally:
+        cursor.close()
+
+
 def execute_many_core(profile: str, statement, rows) -> int:
     """Execute one Core statement for each parameter mapping on a single connection."""
     statement = _normalize_core_statement(statement)
