@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React from "react";
 import { DEFAULT_INDICATOR_ROUTE } from "../../config/defaults.js";
 import { INDICATOR_DIMENSION_OPTIONS } from "../../data/indicators.js";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.jsx";

@@ -15,6 +15,7 @@ from ...services.lineage import (
     get_subgraph as get_lineage_subgraph,
     search_nodes as search_lineage_nodes,
 )
+from ..dependencies import require_authenticated
 from ..errors import _service_error_response
 
 
@@ -41,7 +42,11 @@ class _LineageServiceAdapter:
 lineage_service = _LineageServiceAdapter()
 
 def _register_lineage_routes(app: FastAPI, service: Any) -> None:
-    router = APIRouter(prefix="/api/lineage", tags=["lineage-migration"])
+    router = APIRouter(
+        prefix="/api/lineage",
+        tags=["lineage-migration"],
+        dependencies=[Depends(require_authenticated)],
+    )
 
     def get_service() -> Any:
         return service

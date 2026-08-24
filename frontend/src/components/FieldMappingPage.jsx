@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   FIELD_MAPPING_DEFAULT_PAGE_SIZE,
@@ -63,7 +63,10 @@ export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRo
   const [error, setError] = useState("");
   const previousKeywordRef = useRef(keyword);
   const requestPage = previousKeywordRef.current === keyword ? page : 1;
-  const requestFilters = buildFieldMappingRequestFilters(filters, route);
+  const requestFilters = useMemo(
+    () => buildFieldMappingRequestFilters(filters, route),
+    [filters, route],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -170,6 +173,7 @@ export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRo
     sort.direction,
     sort.key,
     tab,
+    requestFilters,
   ]);
 
   useEffect(() => {

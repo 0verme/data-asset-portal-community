@@ -24,7 +24,6 @@ import {
 } from "../api/assets.js";
 import { DOMAIN_ORDER, LAYER_OPTIONS } from "../config/assets.js";
 import {
-  DEFAULT_ASSET_ROUTE,
   DEFAULT_DETAIL_TAB,
   DEFAULT_LAYOUT,
 } from "../config/defaults.js";

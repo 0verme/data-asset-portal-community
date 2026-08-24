@@ -1,54 +1,63 @@
 # RBAC Security Regression & Acceptance Matrix
 
-> P7 of [#32](https://github.com/0verme/data-asset-portal-community/issues/32)。
-> 基线：P6 merge `e7532e886b196f94c577f4879cc8bbac83a68e5b`。
+> Current Issue #140 read-boundary contract layered on the RBAC phases.
 
 ## Matrix
 
-| Subject | Public reads | Business write without mapping | Role read | Role write | Disabled user |
-| --- | --- | --- | --- | --- | --- |
-| guest | allowed where public contract says so | `401` | `401` | `401` | n/a |
-| `maintainer` | allowed | mapped business permissions only | denied by default | denied by default | n/a |
-| `admin` | allowed | all registered Community permissions | allowed | allowed | n/a |
-| custom role | depends on returned `permissions[]` | only mapped permission | only if `system:role:read` | only if `system:role:write` | n/a |
-| any disabled user | no sensitive API access | `401` | `401` | `401` | `401` |
+| Subject | Ordinary business read | Sensitive read | Mutation |
+| --- | --- | --- | --- |
+| anonymous | `401` | `401` | `401` |
+| authenticated normal user, no special read permission | `200` | `403` when permission is required | `403` when permission is required |
+| authenticated user with unrelated permissions | `200` | `403` when permission is missing | `403` when permission is missing |
+| admin | `200` | `200` where permitted | `200` where permitted |
+| disabled/deleted user | `401` | `401` | `401` |
 
 The matrix is checked at the backend dependency boundary, not only through
-frontend visibility. The P7 regression test directly constructs requests for
-indicator mutation, role reads/writes, public menu reads, guests, custom roles,
-and disabled users.
+frontend visibility. Representative ordinary reads include assets,
+indicators, portal/search, lineage bootstrap, field mappings, and system
+menus. A normal authenticated user can browse these routes without receiving
+an artificial `*:read` permission requirement.
+
+Sensitive management reads continue to use the existing registered permission
+codes. In particular, users/roles/parameters, operation logs, metadata lookup,
+and upstream/push admin detail are not downgraded by the authenticated read
+model.
+
+## Explicit public exceptions
+
+The anonymous routes are intentionally limited to:
+
+- `GET /healthz`;
+- `GET /api/capabilities`;
+- `POST /api/auth/login`;
+- `GET /api/auth/me` as a `401` authentication probe;
+- `POST /api/auth/logout` as idempotent cookie cleanup.
+
+There is no anonymous Public Catalog mode. Business reads are never public
+because a handler happens to omit an individual dependency.
 
 ## Session refresh
 
-P4 already verifies that `/api/auth/me` re-resolves current database-backed
-subject state for an existing cookie. A role or permission change therefore
-changes the returned role/`permissions[]` snapshot, and disabling the user
-returns `401`; the browser auth runtime consumes the refreshed snapshot and
-fails closed after permission revocation.
+`/api/auth/me` re-resolves current database-backed subject state for an
+existing cookie. A role or permission change therefore changes the returned
+role/`permissions[]` snapshot, and disabling the user returns `401`. The
+browser auth runtime consumes the refreshed snapshot and fails closed after
+permission revocation.
 
-## Invariants
+## Information leakage
 
-P6 SQLite tests continue to cover:
-
-- only registered permission codes;
-- immutable `admin` / `maintainer` roles;
-- single-role user binding;
-- assigned-role deletion rejection;
-- last active administrator protection.
+Authentication and authorization failures use the existing minimal error
+contract: `UNAUTHORIZED`/`请先登录。` for missing identity and
+`FORBIDDEN`/`无权限执行此操作。` for a missing permission. Responses do not
+include permission names, roles, database/schema identifiers, or stack traces.
 
 ## Verification evidence
 
-- `python -m unittest discover -s backend/tests -p 'test_*.py'` — PASS（342 tests，7 skipped）
-- `npm ci --include=dev` — PASS（0 vulnerabilities）
-- `npm test` — PASS（103 tests）
-- `npm run build` — PASS（Vite 7.3.6；existing dynamic/static import warning）
-- SQLite migration/schema/seed tests — PASS（included in backend suite）
-- PostgreSQL / MySQL integration — CI matrix evidence; no local production credentials used
-- DWS/GaussDB live integration — NOT RUN（无隔离实例与凭据；static compatibility remains covered by existing contracts）
+Focused and full backend tests cover route inventory, the direct API matrix,
+ordinary authenticated reads, sensitive RBAC reads, explicit public
+exceptions, and Community seeded routes. PostgreSQL/MySQL integration remains
+CI-owned unless an isolated local instance is configured; unexecuted live
+validation is reported as `NOT RUN`, never inferred as PASS.
 
-## Boundary
-
-This phase adds regression evidence only. It does not add Flask, edition
-flags, multiple roles, ABAC/ACL, data scope, ownership, external IAM, or a
-permission cache. Frontend controls remain UX; backend authorization remains
-the security boundary.
+The backend remains the security boundary. This phase adds no edition gate,
+ABAC/ACL, data scope, multi-role model, external IAM, or permission cache.

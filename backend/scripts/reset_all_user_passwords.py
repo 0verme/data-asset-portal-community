@@ -10,7 +10,7 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from app.db.gaussdb import (  # noqa: E402
+from app.db.facade import (  # noqa: E402
     AUTH_PROFILE_ENV,
     DEFAULT_PROFILE_ENV,
     database_transaction,
@@ -18,7 +18,9 @@ from app.db.gaussdb import (  # noqa: E402
     fetch_all,
     load_db_profiles,
 )
-from app.services.auth_service import TABLE_ADMIN_USER, build_password_hash  # noqa: E402
+from app.services.auth_service import build_password_hash  # noqa: E402
+
+TABLE_ADMIN_USER = "dwp.p_admin_user"
 
 
 def resolve_profile(explicit_profile: str | None = None) -> str:

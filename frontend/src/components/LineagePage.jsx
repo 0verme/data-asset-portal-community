@@ -25,6 +25,9 @@ export function LineagePage({ route, onRouteChange, onBootstrap }) {
   const [notice, setNotice] = React.useState("");
   const appliedRouteRef = React.useRef(null);
   const requestSequenceRef = React.useRef(0);
+  const routeDirection = route.direction;
+  const routeDepth = route.depth;
+  const routeView = route.view;
 
   const loadGraph = React.useCallback(async (nextRoute) => {
     const sequence = requestSequenceRef.current + 1;
@@ -78,8 +81,8 @@ export function LineagePage({ route, onRouteChange, onBootstrap }) {
   }, [loadGraph, route]);
 
   React.useEffect(() => {
-    setPendingFilters(routeFilters(route));
-  }, [route.direction, route.depth, route.view]);
+    setPendingFilters({ direction: routeDirection, depth: routeDepth, view: routeView });
+  }, [routeDirection, routeDepth, routeView]);
 
   React.useEffect(() => () => {
     requestSequenceRef.current += 1;
