@@ -43,12 +43,11 @@ FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract�
 {
   "status": "ok",
   "runtime": "fastapi",
-  "fastapiPrimary": true,
-  "flaskFallback": false
+  "fastapiPrimary": true
 }
 ```
 
-`flaskFallback=false` 是明确的 runtime regression flag，不表示存在 Flask route 或第二套 WSGI runtime。FastAPI app 的 `version="0.1.0"` 与 frontend package/footer 的 `0.1.0` / `V0.1.0` 是 application/package metadata；GitHub latest published release 为 `v0.1.1`。线上静态 mock bundle 的 `V1.0.0` 也不是 API 或 repository release version。
+健康响应不包含历史 runtime fallback 字段；FastAPI app 的 `version="0.1.0"` 与 frontend package/footer 的 `0.1.0` / `V0.1.0` 是 application/package metadata；GitHub latest published release 为 `v0.1.1`。线上静态 mock bundle 的 `V1.0.0` 也不是 API 或 repository release version。
 
 本文描述 current main contract；历史 migration 文档中的旧 adapter/status 只作为历史证据。
 

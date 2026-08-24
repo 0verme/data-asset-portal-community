@@ -19,7 +19,7 @@
 | `app/__init__.py` | package marker，不导入 HTTP framework | native package boundary | KEEP；production composition 位于 `backend/asgi.py` |
 | `app/core/blueprint_registry.py` | 历史 Flask blueprint registry | retired bootstrap | F7 已删除 |
 | `app/routes/**` | 历史 Flask HTTP adapters | retired adapters | F7 已删除；native routers 位于 `app/fastapi/routers/` |
-| `app/fastapi/auth.py` / `application/session.py` | signed session codec | FastAPI native adapter | KEEP；保持既有 cookie/signature contract，不导入 Flask |
+| `app/fastapi/auth.py` / `application/session.py` | signed session codec | FastAPI native adapter | KEEP；application-owned HMAC-SHA256 cookie；旧格式只读迁移，不导入 Flask |
 | `app/services/operation_log_service.py` | neutral `RequestContext` | application/service | KEEP；不读取 Flask request-local state |
 | `app/services/**` 其他模块 | 无直接 Flask request/session 依赖 | application/service | KEEP；按 module DB_READY Gate 使用 neutral `RequestContext` |
 

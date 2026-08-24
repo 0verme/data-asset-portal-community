@@ -20,8 +20,8 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
         self.environment = patch.dict(
             os.environ,
             {
-                "FLASK_ENV": "development",
-                "FLASK_SECRET_KEY": "f7-common-infrastructure-test",
+                "APP_ENV": "development",
+                "APP_SECRET_KEY": "f7-common-infrastructure-test",
             },
             clear=False,
         )

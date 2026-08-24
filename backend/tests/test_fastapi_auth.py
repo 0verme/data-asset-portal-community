@@ -6,9 +6,11 @@ from __future__ import annotations
 
 import os
 import unittest
+from http.cookies import SimpleCookie
 from unittest.mock import MagicMock, patch
 
 from backend.app.application import (
+    LegacySignedSessionCodec,
     SESSION_PAYLOAD_KEY,
     SignedSessionCodec,
 )
@@ -34,8 +36,8 @@ class FastApiNativeAuthTests(unittest.TestCase):
         self.environment = patch.dict(
             os.environ,
             {
-                "FLASK_ENV": "development",
-                "FLASK_SECRET_KEY": "f2-native-auth-test-secret",
+                "APP_ENV": "development",
+                "APP_SECRET_KEY": "f2-native-auth-test-secret",
                 "AUTH_SESSION_DAYS": "14",
             },
             clear=False,
@@ -79,6 +81,46 @@ class FastApiNativeAuthTests(unittest.TestCase):
 
         self.assertEqual(3, len(native_cookie.split(".")))
         self.assertEqual(payload, codec.decode(native_cookie))
+
+    def test_legacy_cookie_is_read_once_and_reissued_with_native_signer(self):
+        user = {"role": "admin", "user": "alice", "name": "Alice"}
+        client = TestClient(self.app(user))
+        payload = {SESSION_PAYLOAD_KEY: user}
+        legacy_cookie = LegacySignedSessionCodec(
+            "f2-native-auth-test-secret",
+            max_age=14 * 24 * 60 * 60,
+        ).encode(payload)
+        response = client.get(
+            "/api/auth/me",
+            headers={"Cookie": f"session={legacy_cookie}"},
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(self.auth_data(user), response.json()["data"])
+        migrated = SimpleCookie(response.headers["set-cookie"])
+        migrated_cookie = migrated["session"].value
+        self.assertEqual(payload, SignedSessionCodec(
+            "f2-native-auth-test-secret",
+            max_age=14 * 24 * 60 * 60,
+        ).decode(migrated_cookie))
+        self.assertIsNone(LegacySignedSessionCodec(
+            "f2-native-auth-test-secret",
+            max_age=14 * 24 * 60 * 60,
+        ).decode(migrated_cookie))
+
+    def test_legacy_cookie_is_not_reissued_after_logout(self):
+        user = {"role": "admin", "user": "alice", "name": "Alice"}
+        client = TestClient(self.app(user))
+        legacy_cookie = LegacySignedSessionCodec(
+            "f2-native-auth-test-secret",
+            max_age=14 * 24 * 60 * 60,
+        ).encode({SESSION_PAYLOAD_KEY: user})
+        logout = client.post(
+            "/api/auth/logout",
+            headers={"Cookie": f"session={legacy_cookie}"},
+        )
+        self.assertEqual(200, logout.status_code)
+        self.assertIn("session=", logout.headers["set-cookie"])
+        self.assertIn("max-age=0", logout.headers["set-cookie"].lower())
 
     def test_codec_rejects_tampering_and_expired_cookie(self):
         codec = SignedSessionCodec("f2-native-auth-test-secret", max_age=10)

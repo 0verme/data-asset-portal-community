@@ -4,18 +4,58 @@
 runtime knob. Advanced settings remain supported in code and are listed here for
 operators who need them.
 
-## Application names and compatibility
+## Application configuration contract
 
-Use `APP_SECRET_KEY`, `APP_ENV`, `APP_DEBUG`, `APP_CORS_ORIGINS`, and
-`APP_MAX_CONTENT_LENGTH_MB`. During the compatibility period each falls back to
-its historical `FLASK_*` counterpart when the new value is blank or absent;
-`APP_*` wins if both are set. Existing deployments can migrate without a
-breaking change. New documentation and templates use only `APP_*` names.
+The native runtime reads only `APP_SECRET_KEY`, `APP_ENV`, `APP_DEBUG`,
+`APP_CORS_ORIGINS`, and `APP_MAX_CONTENT_LENGTH_MB` for application security,
+session, CORS, and request-size settings. `APP_*` is the only supported
+configuration namespace after Issue #145; the old names are ignored rather than
+silently falling back.
+
+This is the documented breaking cleanup after the published v0.1.1 migration
+window. Migrate deployments before upgrading:
+
+| Legacy name | Native name | Policy |
+|---|---|---|
+| `FLASK_SECRET_KEY` | `APP_SECRET_KEY` | Removed; copy the existing secret value to preserve sessions |
+| `FLASK_ENV` | `APP_ENV` | Removed; default is the secure production behavior |
+| `FLASK_DEBUG` | `APP_DEBUG` | Removed; default is disabled |
+| `FLASK_CORS_ORIGINS` | `APP_CORS_ORIGINS` | Removed; use the exact comma-separated allowlist |
+| `FLASK_MAX_CONTENT_LENGTH_MB` | `APP_MAX_CONTENT_LENGTH_MB` | Removed; default is 16 MiB |
 
 The secret is required and must come from a secret manager or equivalent secure
-store. Debug must remain disabled in production. The old names are retained for
-migration and are deprecated; they may be removed in a future release after
-operators have migrated.
+store. Debug must remain disabled in production. An old `FLASK_*` value does not
+satisfy a missing `APP_*` setting and is never logged or echoed by the runtime.
+
+## Signed-session contract
+
+The application now writes an application-owned signed `session` cookie using
+`itsdangerous`, an application-owned salt, and HMAC-SHA256. This is a native
+browser-session security primitive, not a Flask compatibility layer. The cookie
+still contains only the minimum identity mapping and retains `HttpOnly`,
+`SameSite=Lax`, production `Secure`, tamper detection, and bounded expiration.
+
+For rolling migration, the runtime reads the pre-#145 `cookie-session`/HMAC-SHA1
+wire format only when the native codec fails, and reissues a verified identity
+with the native codec after a successful response. The reader is bounded by the
+configured `AUTH_SESSION_DAYS` max age and is read-only; future cleanup may
+remove it after one complete maximum legacy-cookie lifetime. Keep the existing
+secret value when changing the configuration name. Rotating the secret at the
+same time intentionally invalidates both cookie formats. If an emergency
+rollback is needed before the legacy lifetime ends, roll back through a bridge
+that reads both formats; a direct pre-#145 binary can read legacy cookies but
+cannot read cookies already reissued in the native format.
+
+## Compatibility inventory (#145)
+
+| Surface | Decision | Current result |
+|---|---|---|
+| `FLASK_*` runtime names | REMOVE | `APP_*` only; migration table above |
+| Native signed-session codec | KEEP — signed browser session is a native requirement | HMAC-SHA256; writes only native format |
+| Legacy session reader | DEPRECATE UNTIL all pre-#145 cookies expire | Read-only rolling migration; no forced logout when the secret is preserved |
+| `flaskFallback` health field | REMOVE | `/healthz` reports only the native runtime contract |
+| `backend/app/fastapi_app.py` | KEEP — stable internal import path | Thin facade with no framework compatibility logic |
+| Werkzeug | KEEP — password hashing | Used directly by `AuthService`; not a Flask runtime dependency |
 
 There is intentionally no Public Catalog or anonymous-business-read setting.
 Ordinary business API reads are authenticated by default; the public surface is
@@ -33,13 +73,13 @@ OpenAPI schema and interactive documentation:
 | unset (defaults to production) | disabled | disabled | disabled |
 | `production` or any other value | disabled | disabled | disabled |
 
-Only the exact normalized value `development` enables these endpoints. `APP_ENV`
-wins over the retained `FLASK_ENV` fallback when both are present. No separate
-OpenAPI deployment variable is required. Production can still generate its
-schema internally with `app.openapi()`; the policy only prevents registering the
-HTTP documentation endpoints. The app factory's optional `openapi_enabled` seam is
-for tests or embedded composition only; its default `None` follows this policy
-and it is not a deployment environment variable.
+Only the exact normalized value `development` enables these endpoints. The
+runtime reads `APP_ENV` only; no separate OpenAPI deployment variable is
+required. Production can still generate its schema internally with
+`app.openapi()`; the policy only prevents registering the HTTP documentation
+endpoints. The app factory's optional `openapi_enabled` seam is for tests or
+embedded composition only; its default `None` follows this policy and it is not
+a deployment environment variable.
 
 ## Advanced runtime settings
 

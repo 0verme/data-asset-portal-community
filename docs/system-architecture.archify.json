@@ -128,11 +128,11 @@
       "id": "session-contract",
       "type": "security",
       "label": "Signed-session Config",
-      "sublabel": "retained FLASK_* names / native codec",
+      "sublabel": "APP_* names / native signed codec",
       "pos": [430, 500],
       "size": [190, 62],
       "sources": [
-        { "path": "backend/app/settings.py", "label": "security settings and retained names" }
+        { "path": "backend/app/settings.py", "label": "native security and session settings" }
       ]
     }
   ],
@@ -166,7 +166,7 @@
       "title": "Runtime Truth",
       "items": [
         "当前入口是 uvicorn backend.asgi:app；FastAPI 是唯一 production/native runtime。",
-        "/healthz 明确返回 runtime=fastapi、fastapiPrimary=true、flaskFallback=false；没有 Flask/WSGI fallback 节点。"
+        "/healthz 返回 runtime=fastapi、fastapiPrimary=true；没有 Flask/WSGI fallback 节点。"
       ]
     },
     {

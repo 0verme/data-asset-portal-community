@@ -19,8 +19,8 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
         self.environment = patch.dict(
             os.environ,
             {
-                "FLASK_ENV": "development",
-                "FLASK_SECRET_KEY": "test-native-runtime",
+                "APP_ENV": "development",
+                "APP_SECRET_KEY": "test-native-runtime",
                 "LINEAGE_DB_PROFILE": "",
             },
             clear=False,
@@ -42,7 +42,6 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
                 "status": "ok",
                 "runtime": "fastapi",
                 "fastapiPrimary": True,
-                "flaskFallback": False,
             },
             health.json(),
         )
@@ -118,7 +117,7 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
         self.assertEqual(404, unknown.status_code)
         self.assertEqual("NOT_FOUND", unknown.json()["error"]["code"])
 
-        with patch.dict(os.environ, {"FLASK_CORS_ORIGINS": "https://portal.example.com"}):
+        with patch.dict(os.environ, {"APP_CORS_ORIGINS": "https://portal.example.com"}):
             cors_application = create_fastapi_app(
                 capabilities=self.capabilities,
                 identity_resolver=lambda _request: Identity("admin", "admin", "Admin"),

@@ -1,4 +1,4 @@
-"""Framework-neutral compatibility codec for the existing signed session cookie."""
+"""Framework-neutral signed-session codecs."""
 
 from __future__ import annotations
 
@@ -14,17 +14,17 @@ from itsdangerous import (  # pyright: ignore[reportMissingImports]
 
 SESSION_COOKIE_NAME = "session"
 SESSION_PAYLOAD_KEY = "dap_auth_user"
-SESSION_SALT = "cookie-session"
+
+# Native cookies use an application-owned contract.  The legacy reader below
+# is intentionally read-only so a deployment can roll existing sessions
+# forward without keeping the old signer as its write format.
+SESSION_SALT = "dap-native-session-v2"
+LEGACY_SESSION_SALT = "cookie-session"
 
 
-class SignedSessionCodec:
-    """Encode and validate the legacy Flask-compatible signed cookie.
-
-    The current cookie stores only a small JSON mapping.  Itsdangerous' default
-    JSON serializer produces the same payload format as Flask's tagged JSON
-    serializer for that mapping, while the explicit salt and signer arguments
-    preserve the existing cookie signature contract.
-    """
+class _SignedSessionCodec:
+    _salt: str
+    _digest_method: Any
 
     def __init__(self, secret: str, *, max_age: int):
         if not isinstance(secret, str) or not secret.strip():
@@ -33,16 +33,16 @@ class SignedSessionCodec:
             raise ValueError("Session max_age must be a positive integer.")
         self._serializer = URLSafeTimedSerializer(
             secret,
-            salt=SESSION_SALT,
+            salt=self._salt,
             signer_kwargs={
                 "key_derivation": "hmac",
-                "digest_method": hashlib.sha1,
+                "digest_method": self._digest_method,
             },
         )
         self.max_age = max_age
 
     def encode(self, payload: Mapping[str, Any]) -> str:
-        """Return a Flask-compatible signed representation of *payload*."""
+        """Return a signed representation of *payload*."""
         return self._serializer.dumps(dict(payload))
 
     def decode(self, value: str | None) -> dict[str, Any] | None:
@@ -54,3 +54,17 @@ class SignedSessionCodec:
         except (BadData, TypeError, ValueError):
             return None
         return dict(payload) if isinstance(payload, Mapping) else None
+
+
+class SignedSessionCodec(_SignedSessionCodec):
+    """Encode and validate the native application session cookie."""
+
+    _salt = SESSION_SALT
+    _digest_method = hashlib.sha256
+
+
+class LegacySignedSessionCodec(_SignedSessionCodec):
+    """Read the pre-#145 cookie wire format during its bounded migration window."""
+
+    _salt = LEGACY_SESSION_SALT
+    _digest_method = hashlib.sha1

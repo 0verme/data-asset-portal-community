@@ -21,7 +21,7 @@ pip install -r requirements.txt
 python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
-生产与本地联调均使用同一条 FastAPI/Uvicorn entrypoint；不再提供 Flask compatibility mode 或 direct Flask runtime。这里的 `FLASK_*` 配置名仅保留 signed-session/security contract 兼容性，不表示运行 Flask。
+生产与本地联调均使用同一条 FastAPI/Uvicorn entrypoint；不再提供 Flask compatibility mode 或 direct Flask runtime。应用配置只读取 `APP_*` 名称；旧 `FLASK_*` 名称已移除。
 
 后台启动并写日志：
 
@@ -61,11 +61,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 | `ASSET_DB_CONNECT_TIMEOUT_SECONDS` | 数据库连接超时秒数 | `30` |
 | `ASSET_DB_STATEMENT_TIMEOUT_MS` | PostgreSQL / GaussDB 查询超时毫秒数 | `120000` |
 | `APP_DEBUG` | Native FastAPI 的 debug 配置（默认关闭；仅 `1`/`true`/`yes`/`on` 为真） | `false` |
-| `APP_SECRET_KEY` | 必填的 signed-session 密钥（缺失或空白即启动失败；保留配置名不代表 Flask） | `<generate-a-strong-random-value>` |
+| `APP_SECRET_KEY` | 必填的 application-owned signed-session 密钥（缺失或空白即启动失败） | `<generate-a-strong-random-value>` |
 | `APP_ENV` | Cookie/security contract 的运行环境（默认安全生产行为；开发必须显式设置） | `production`、`development` |
 | `APP_CORS_ORIGINS` | Native FastAPI 使用的精确跨域来源 allowlist，逗号分隔 | `https://portal.example.com` |
 
-Session Cookie 始终使用 `HttpOnly=True` 和 `SameSite=Lax`。默认/生产环境使用 `Secure=True`；只有显式 `APP_ENV=development` 才为本地 HTTP 联调关闭 Secure。Nginx 或 Vite 的 `/api` 同源代理不需要 CORS；跨域部署才设置 `APP_CORS_ORIGINS`，不设置就不返回 CORS 允许头，禁止使用 `*`。不要将真实 `APP_SECRET_KEY` 写入仓库、日志或命令历史；可在受控终端本地执行 `python -c "import secrets; print(secrets.token_urlsafe(32))"` 生成后交由 secret store 保存。
+Session Cookie 始终使用 `HttpOnly=True` 和 `SameSite=Lax`。默认/生产环境使用 `Secure=True`；只有显式 `APP_ENV=development` 才为本地 HTTP 联调关闭 Secure。新登录写入 application-owned HMAC-SHA256 cookie；旧 cookie 在有限窗口内只读并成功请求后迁移。Nginx 或 Vite 的 `/api` 同源代理不需要 CORS；跨域部署才设置 `APP_CORS_ORIGINS`，不设置就不返回 CORS 允许头，禁止使用 `*`。不要将真实 `APP_SECRET_KEY` 写入仓库、日志或命令历史；可在受控终端本地执行 `python -c "import secrets; print(secrets.token_urlsafe(32))"` 生成后交由 secret store 保存。
 
 ### 业务 API authentication boundary
 

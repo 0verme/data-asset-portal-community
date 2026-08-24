@@ -22,7 +22,7 @@ Database Provider
 uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
-`backend/run.py`、Waitress、WSGI fallback 和 runtime switch 均已退休；当前没有第二套 Flask runtime。`GET /healthz` 只报告进程状态，固定返回 `runtime=fastapi`、`fastapiPrimary=true`、`flaskFallback=false`，不执行数据库查询。`flaskFallback` 是显式的回归字段，不是当前架构节点。
+`backend/run.py`、Waitress、WSGI fallback 和 runtime switch 均已退休；当前没有第二套 Flask runtime。`GET /healthz` 只报告进程状态，固定返回 `runtime=fastapi` 和 `fastapiPrimary=true`，不执行数据库查询。
 
 ## 请求分发
 
@@ -139,7 +139,7 @@ F6 不再提供 Flask runtime rollback switch。应用回滚通过部署上一�
 
 ### F7 cleanup result
 
-F5 gate 已证明 production native composition 不加载 Flask；F7 已删除 Flask/Flask-Cors dependencies、Flask factory/blueprints/routes 与 obsolete compatibility tests。保留的 `Werkzeug`、`itsdangerous`、signed-cookie config names 和薄 `fastapi_app.py` facade 均有明确 native reason。当前生成的 architecture artifact 以可审计 source revision 为证据；历史 migration notes 中的旧图示不应被当作 current runtime truth。
+F5 gate 已证明 production native composition 不加载 Flask；F7 已删除 Flask/Flask-Cors dependencies、Flask factory/blueprints/routes 与 obsolete compatibility tests。#145 进一步移除了 `FLASK_*` runtime names 和历史 health flag；保留的 `Werkzeug`（AuthService password hashing）、`itsdangerous`（native signed session）和薄 `fastapi_app.py` facade 均有明确 native reason。旧 signed cookie 仅在有限生命周期内只读迁移为 HMAC-SHA256 native cookie。当前生成的 architecture artifact 以可审计 source revision 为证据；历史 migration notes 中的旧图示不应被当作 current runtime truth。
 
 ## 前端与数据层
 

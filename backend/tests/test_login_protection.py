@@ -248,8 +248,8 @@ class LoginProtectionFastApiTests(unittest.TestCase):
         self.environment = patch.dict(
             os.environ,
             {
-                "FLASK_ENV": "development",
-                "FLASK_SECRET_KEY": "login-protection-test-secret",
+                "APP_ENV": "development",
+                "APP_SECRET_KEY": "login-protection-test-secret",
                 "ASSET_TRUST_PROXY_HEADERS": "false",
             },
             clear=False,

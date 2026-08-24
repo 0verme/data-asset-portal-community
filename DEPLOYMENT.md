@@ -24,7 +24,7 @@ VITE_BACKEND_URL=http://127.0.0.1:5099
 
 ### 后端环境变量
 
-后端始终连库、无模式开关，只需指定数据库 profile。下列 `APP_*` 是安全、Session Cookie 和 CORS configuration contract 名称（`FLASK_*` 仍可作为兼容 fallback，不代表仍存在 Flask runtime）：
+后端始终连库、无模式开关，只需指定数据库 profile。下列 `APP_*` 是唯一的安全、Session Cookie、CORS 和请求体限制配置 contract：
 
 ```env
 ASSET_DB_PROFILE=primary
@@ -39,9 +39,9 @@ APP_SECRET_KEY=<generate-a-strong-random-value>
 # APP_CORS_ORIGINS=https://portal.example.com
 ```
 
-优先使用 `APP_*` 名称；现有部署中的 `FLASK_*` 名称仍作为兼容 fallback，且 `APP_*` 同时存在时优先。`APP_SECRET_KEY` 是所有环境的必填 signed-session 安全配置：缺失、空字符串或纯空白会在应用启动时失败。使用密码管理器或部署平台的 secret store 生成和保存强随机值；不要把真实值提交到仓库、写入日志或拼进 shell 命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`。
+`APP_SECRET_KEY` 是所有环境的必填 signed-session 安全配置：缺失、空字符串或纯空白会在应用启动时失败。Issue #145 移除了 `FLASK_*` fallback；部署升级前请将旧值迁移到同名 `APP_*` 变量，并在更换配置名称时保留原 secret，以便 rolling cookie migration 继续验证已有会话。使用密码管理器或部署平台的 secret store 生成和保存强随机值；不要把真实值提交到仓库、写入日志或拼进 shell 命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`。
 
-`APP_DEBUG` 默认关闭，只有 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会开启。`APP_ENV` 未设置时采用安全的生产行为：Session Cookie 为 `HttpOnly=True`、`SameSite=Lax`、`Secure=True`。仅本地 HTTP 开发可显式设置 `APP_ENV=development` 使 `Secure=False`；这些变量名属于 retained compatibility/configuration contract，不表示 Flask 进程或 Flask WSGI runtime。
+`APP_DEBUG` 默认关闭，只有 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会开启。`APP_ENV` 未设置时采用安全的生产行为：Session Cookie 为 `HttpOnly=True`、`SameSite=Lax`、`Secure=True`。仅本地 HTTP 开发可显式设置 `APP_ENV=development` 使 `Secure=False`。旧 `FLASK_*` 变量不会被读取。
 
 Production contract：当 `APP_ENV=production` 或未设置时，FastAPI application construction 不注册 `/docs`、`/redoc` 和 `/openapi.json`，访问这些路径应返回 `404`。只有显式的 `APP_ENV=development` 默认开启这三个开发文档端点；`staging`、`test`、`qa` 等非 development 环境同样保持关闭。关闭 interactive docs/OpenAPI HTTP endpoint 是减少 API 枚举面的 deployment hardening，不是 authentication control，也不替代业务 API 的 Authentication / Authorization。
 
@@ -55,7 +55,7 @@ ASSET_DB_JAR_PATH=/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
 
 ## 二、后端部署
 
-当前生产入口是 `backend.asgi:app`：由 Uvicorn 启动纯 FastAPI native backend。Auth、Capabilities、Portal、Search、Operation Log 以及仓库已有模块 routes 均由 FastAPI 承载；数据库、驱动、凭据、storage 或外部 integration 未就绪时，由对应 Service error contract 返回诊断状态，不把源码模块变成 404。FastAPI 使用保留历史 signed-session cookie format 的 native codec。
+当前生产入口是 `backend.asgi:app`：由 Uvicorn 启动纯 FastAPI native backend。Auth、Capabilities、Portal、Search、Operation Log 以及仓库已有模块 routes 均由 FastAPI 承载；数据库、驱动、凭据、storage 或外部 integration 未就绪时，由对应 Service error contract 返回诊断状态，不把源码模块变成 404。FastAPI 使用 application-owned signed-session codec；旧 cookie 在有限迁移窗口内只读并成功请求后重新签发。
 
 ```bash
 cd /opt/data-asset-portal
@@ -77,7 +77,7 @@ Runtime：
 curl --fail http://127.0.0.1:5099/healthz
 ```
 
-Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"`、`"fastapiPrimary":true` 和 `"flaskFallback":false`。其中 `flaskFallback=false` 是用于明确证明 fallback 已退休的 health contract 字段，不表示存在第二套 runtime。`/healthz` 只报告进程/runtime 状态，不执行数据库查询；数据库与业务 API 的可用性仍由对应回归和监控验证。默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）。`asgi.py` 加载仓库 runtime env 文件；系统环境变量和 demo bootstrap 规则保持现有行为。
+Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"` 和 `"fastapiPrimary":true`。`/healthz` 只报告进程/runtime 状态，不执行数据库查询；数据库与业务 API 的可用性仍由对应回归和监控验证。默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）。`asgi.py` 加载仓库 runtime env 文件；系统环境变量和 demo bootstrap 规则保持现有行为。
 
 ### Authentication boundary
 
@@ -89,7 +89,7 @@ Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"`、`
 
 - `APP_DEBUG` 默认关闭；**生产环境显式开启 debug 会在启动时失败**（fail-fast），禁止 Werkzeug debugger 运行
 - Session Cookie：`HttpOnly=True`、`SameSite=Lax`、`Secure=True`（仅 `APP_ENV=development` 本地 HTTP 开发关闭 `Secure`）
-- 请求体上限：保留配置名 `APP_MAX_CONTENT_LENGTH_MB`（默认 16，上限存在时超限返回统一 JSON 413；该名称不代表 Flask runtime）
+- 请求体上限：`APP_MAX_CONTENT_LENGTH_MB`（默认 16，上限存在时超限返回统一 JSON 413）
 - 响应安全头：`X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy: strict-origin-when-cross-origin`
 - 4xx/5xx 错误响应统一为 JSON 结构，不向客户端泄露内部路径/连接串/底层驱动异常
 - 转发头信任：**默认不受信任**。审计日志如需真实客户端 IP，仅当请求只经受信反代（如 Nginx）时设置 `ASSET_TRUST_PROXY_HEADERS=true`；否则客户端可直接伪造 `X-Forwarded-For`。Nginx 已设置 `X-Forwarded-For` 的同源部署请开启该项
@@ -196,7 +196,7 @@ server {
 - 确认 `/healthz` 返回 `status=ok`，并确认 runtime 为预期值
 - 确认 `/api/assets/tables` 返回 JSON 而不是 HTML
 - 确认前端为 `VITE_API_MODE=remote`，且 `/api` 已正确代理到纯 FastAPI ASGI runtime
-- 确认保留配置名 `APP_SECRET_KEY` 由部署 secret store 提供，且 `APP_DEBUG=false`；这些名称不代表 Flask runtime
+- 确认 `APP_SECRET_KEY` 由部署 secret store 提供，且 `APP_DEBUG=false`；不要同时轮换 secret 和配置名称
 - HTTPS 终止后仍应保持 `APP_ENV=production`，以发送 Secure Cookie；FastAPI native auth 使用 signed cookie contract；本阶段未扩大转发头信任范围
 - `backend/configs/database.yaml` 与 `.env.local` 不入库（见 `.gitignore`）；请从 `backend/configs/database.example.yaml` 与 `backend/.env.example` 复制后按环境填写
 

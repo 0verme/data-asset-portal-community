@@ -174,7 +174,7 @@ APP_ENV=development
 - `APP_DEBUG` 默认关闭；仅 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会启用它。不要在共享或生产环境设置它。
 - `APP_SECRET_KEY` 在所有环境均为必填项；缺失、空字符串或纯空白会使应用在启动时失败。用密码管理器或部署平台的 secret store 保存它，不要提交到仓库、写入日志，或把真实值粘贴进命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`，然后直接保存到 secret store / `.env.local`。
 - `APP_ENV` 默认为安全的生产行为：Cookie 使用 `Secure=True`。本地 HTTP 联调必须显式设置 `APP_ENV=development`，此时 `Secure=False`；`HttpOnly=True` 与 `SameSite=Lax` 始终保留。
-- `backend/asgi.py` 运行纯 FastAPI Native backend；Auth 保留既有 signed-session cookie format，仓库已有模块 routes 默认注册，数据库/驱动/外部依赖 readiness 通过 error contract 表达。Flask compatibility runtime 已退休；`FLASK_*` 变量名仅作为 retained signed-cookie/security configuration contract，不代表 Flask 进程。
+- `backend/asgi.py` 运行纯 FastAPI Native backend；Auth 使用 application-owned signed-session cookie，新格式写入、旧格式在有限窗口内只读迁移，仓库已有模块 routes 默认注册，数据库/驱动/外部依赖 readiness 通过 error contract 表达。应用配置只读取 `APP_*` 名称；旧 `FLASK_*` 名称已移除。
 - Nginx + Vite 的 `/api` 反代是同源部署，不需要 CORS。只有前端和 API 确实处于不同来源时，才设置 `APP_CORS_ORIGINS`，使用逗号分隔的完整来源，例如 `https://portal.example.com,https://admin.example.com`；空项会忽略，未配置时不发送跨域允许头，绝不使用 `*`。
 
 ### Authenticated-by-default 业务读模型
@@ -275,7 +275,7 @@ python -m unittest backend.tests.test_api_contracts
 python -m unittest discover -s backend/tests
 ```
 
-`test_p5_runtime.py` 覆盖 FastAPI Native startup、scope gate、session compatibility、CORS、security headers 与 `/healthz`；native contract tests 覆盖 API wire format 与 authorization。`test_api_contracts.py` 验证框架中立的 Pydantic API Contract。
+`test_p5_runtime.py` 覆盖 FastAPI Native startup、scope gate、session migration、CORS、security headers 与 `/healthz`；native contract tests 覆盖 API wire format 与 authorization。`test_api_contracts.py` 验证框架中立的 Pydantic API Contract。
 
 ### CI（GitHub Actions）
 

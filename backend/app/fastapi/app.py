@@ -27,6 +27,7 @@ from ..services.system_management_service import system_management_service
 from ..services.upstream_service import upstream_service
 from ..security.login_protection import LoginAttemptLimiter
 from ..settings import get_openapi_docs_enabled
+from .auth import LegacySessionMigrationMiddleware
 from .dependencies import IdentityResolver, RequestContextMiddleware
 from .errors import register_exception_handlers
 from .routers.api_assets import _register_api_asset_routes
@@ -94,6 +95,7 @@ def create_fastapi_app(
         RequestContextMiddleware,
         identity_resolver=app.state.identity_resolver,
     )
+    app.add_middleware(LegacySessionMigrationMiddleware)
     auth = auth_service_instance or auth_service
     authorization_service = authorization_service_instance or AuthorizationService(
         authorization_repository_instance

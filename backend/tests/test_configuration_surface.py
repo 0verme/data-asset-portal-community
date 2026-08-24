@@ -16,6 +16,8 @@ class ConfigurationSurfaceTests(unittest.TestCase):
             "FLASK_SECRET_KEY",
             "FLASK_ENV",
             "FLASK_DEBUG",
+            "FLASK_CORS_ORIGINS",
+            "FLASK_MAX_CONTENT_LENGTH_MB",
         ):
             self.assertNotIn(removed, template)
         self.assertIn("APP_SECRET_KEY", template)
@@ -34,6 +36,8 @@ class ConfigurationSurfaceTests(unittest.TestCase):
             "database.community.yaml",
             "APP_*",
             "ASSET_AUTH_DB_PROFILE",
+            "FLASK_SECRET_KEY",
+            "HMAC-SHA256",
         ):
             self.assertIn(value, documentation)
 

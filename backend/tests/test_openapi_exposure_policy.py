@@ -20,7 +20,7 @@ class OpenAPIExposurePolicyTests(unittest.TestCase):
         self,
         *,
         app_env: str | None = None,
-        flask_env: str | None = None,
+        legacy_env: str | None = None,
         openapi_enabled: bool | None = None,
     ):
         with patch.dict(os.environ, {}, clear=False):
@@ -28,8 +28,8 @@ class OpenAPIExposurePolicyTests(unittest.TestCase):
             os.environ.pop("FLASK_ENV", None)
             if app_env is not None:
                 os.environ["APP_ENV"] = app_env
-            if flask_env is not None:
-                os.environ["FLASK_ENV"] = flask_env
+            if legacy_env is not None:
+                os.environ["FLASK_ENV"] = legacy_env
             return create_fastapi_app(
                 identity_resolver=lambda _request: None,
                 openapi_enabled=openapi_enabled,
@@ -95,10 +95,10 @@ class OpenAPIExposurePolicyTests(unittest.TestCase):
         self.assert_doc_endpoints(app, 404)
         self.assert_schema_generation_available(app)
 
-    def test_app_env_wins_over_legacy_environment_fallback(self):
-        app = self.app(app_env="development", flask_env="production")
+    def test_legacy_environment_is_ignored(self):
+        app = self.app(legacy_env="development")
 
-        self.assert_doc_endpoints(app, 200)
+        self.assert_doc_endpoints(app, 404)
 
     def test_factory_override_can_explicitly_enable_or_disable_docs(self):
         enabled_app = self.app(app_env="production", openapi_enabled=True)

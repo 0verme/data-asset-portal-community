@@ -32,8 +32,8 @@ class FlaskFreeRuntimeGateTests(unittest.TestCase):
                 return real_import(name, globals, locals, fromlist, level)
 
             builtins.__import__ = guarded_import
-            os.environ["FLASK_ENV"] = "development"
-            os.environ["FLASK_SECRET_KEY"] = "x" * 48
+            os.environ["APP_ENV"] = "development"
+            os.environ["APP_SECRET_KEY"] = "x" * 48
 
             from fastapi.testclient import TestClient
             from backend.app.application import current_request_context
@@ -75,7 +75,11 @@ class FlaskFreeRuntimeGateTests(unittest.TestCase):
             )
             module_health = TestClient(module_app).get("/healthz")
             assert module_health.status_code == 200, module_health.text
-            assert module_health.json()["flaskFallback"] is False
+            assert module_health.json() == {
+                "status": "ok",
+                "runtime": "fastapi",
+                "fastapiPrimary": True,
+            }
             response = TestClient(runtime).get("/__flask_free_probe")
             assert response.status_code == 200, response.text
             assert response.json() == {
