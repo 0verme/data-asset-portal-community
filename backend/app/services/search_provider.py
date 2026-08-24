@@ -15,8 +15,9 @@
 """Unified portal search provider.
 
 Entity SQL and row mapping live in `services.providers` (pluggable registry).
-This module only normalizes scope/limit, gates by capability + menu, and runs
-queries.
+This module only normalizes scope/limit, applies instance menu visibility to
+registered provider configs, and runs queries. Provider module codes are static
+repository identities, not capability or readiness gates.
 """
 
 from __future__ import annotations

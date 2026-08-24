@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Core module capability and provider registration."""
+"""Repository module identity and capability compatibility exports."""
 
 from .capabilities import (
     ModuleCapabilityError,
     get_capabilities,
     get_enabled_module_codes,
+    get_repository_module_codes,
     is_module_enabled,
+    is_repository_module,
     resolve_capabilities,
 )
 from .modules import MODULES, get_module_manifest, list_module_codes
@@ -28,8 +30,10 @@ __all__ = [
     "ModuleCapabilityError",
     "get_capabilities",
     "get_enabled_module_codes",
+    "get_repository_module_codes",
     "get_module_manifest",
     "is_module_enabled",
+    "is_repository_module",
     "list_module_codes",
     "resolve_capabilities",
 ]

@@ -1,4 +1,4 @@
-"""Apply named runtime profiles through the existing environment config surface."""
+"""Select database/deployment configuration, not product module availability."""
 
 # pyright: reportMissingModuleSource=false
 

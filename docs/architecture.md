@@ -39,6 +39,25 @@ flowchart LR
 
 `backend/app/fastapi/app.py` 统一注册仓库 native routers；`backend/asgi.py` 只负责 FastAPI composition、CORS/security headers 和 healthz。数据库、驱动、凭据、storage 或 external integration readiness 不改变已存在 route 的注册状态。
 
+## Terminology and responsibility boundaries
+
+以下职责矩阵是 backend、frontend、API 和文档共同遵循的 repository truth。它把“仓库里有什么”“实例显示什么”“用户能做什么”“部署如何运行”和“依赖是否可用”分成正交维度：
+
+| 概念 | 职责 / Source of truth | 可以影响 | 明确不能影响 |
+| --- | --- | --- | --- |
+| **Module** | 仓库/产品领域身份；backend `app/core/modules.py`、frontend `src/modules/moduleRegistry.js` 及静态 composition/provider registry | module code、名称、路径、route/provider/search/stat identity | RBAC、菜单可见性、license/Edition、数据库连接或外部 readiness |
+| **Capability** | 现有 `/api/capabilities` 的兼容性公开表示；当前实际是 source-backed open module contract，由 module manifest 生成 | capability payload 及前端加载诊断；`modules[].enabled` / `reason` 是兼容字段 | license/Edition entitlement、菜单 status、RBAC、runtime profile、route registration 或依赖 readiness |
+| **Readiness / Diagnostics** | 运行时依赖和集成的实际状态：database connectivity、driver、storage、credentials、external service 等，由 provider/service error contract 表达 | 请求级成功、降级或可诊断错误 | Module identity、源码/route 存在性、菜单、RBAC、Edition |
+| **Menu Status** | 实例导航配置，事实源是 `p_menu.status` 及菜单排序/位置字段 | 导航展示，以及门户/搜索/统计的实例可见性过滤 | 删除源码模块、取消 route、后端授权、license、数据库可用性 |
+| **RBAC Permission** | 当前用户授权，事实源是 permission registry 与 role → permission mapping；后端 `require_permission` 是 enforcement | 受保护 API 的读写/管理操作；前端隐藏按钮仅是 UX | Module 是否存在、菜单实例配置、deployment readiness、runtime profile |
+| **Runtime / DB Profile** | 连接、provider 和部署选择，事实源是 `ASSET_RUNTIME_PROFILE`、`ASSET_DB_PROFILE` 与 profile config | 数据库/provider、连接参数、部署默认值和集成选择 | Module identity、license、菜单、用户 permission |
+
+因此：**Module availability is not a licensing gate.** 仓库中的 source-backed 模块默认属于同一 open product surface；菜单隐藏不等于 route 删除或 API 禁止，RBAC 不等于模块存在性，runtime/DB profile 不等于 feature flag。**Menu visibility is not authorization. RBAC authorization is not module availability. Runtime/DB profile is not feature gating. Readiness failure does not remove repository routes. Capabilities must not be interpreted as Community/Private Edition locking.**
+
+数据库层的 `BackendCapability` / `BackendCapabilities` 是 provider adapter 的基础设施支持矩阵（例如 transaction、JDBC 或 connection pool），虽然复用了 capability 这个英文词，也不属于 `/api/capabilities` module payload，更不是 license 或模块隐藏开关。
+
+前端 `frontend/src/capabilities/capabilities.js` 中的 `loadStatus` / `loadError` 只表示 `/api/capabilities` HTTP 请求的加载结果（`ready` 或 `error`），不是 deployment readiness。请求失败时保留全部 registry module codes；具体模块若依赖数据库或外部集成，会在自己的 service/API contract 中报告诊断状态。
+
 ### FastAPI current route surface
 
 当前 FastAPI adapter 负责下列 native routes；所有仓库模块默认注册，实例菜单可见性与外部 readiness 在更上层/Service contract 中单独表达：
@@ -85,7 +104,7 @@ FastAPI adapter ── Application / Service Layer ── Database Provider ─�
 
 - `backend/asgi.py` 负责纯 FastAPI composition、CORS/security headers、native signed-session identity resolver 和 healthz。
 - `backend/app/fastapi_app.py` 是保留历史 import path 的 thin compatibility facade。
-- `backend/app/fastapi/app.py` 负责 FastAPI app bootstrap、explicit Service injection、capability gate 与 Router registration；`dependencies.py`、`errors.py` 和 `routers/` 承载共享 adapter seam 与模块边界。
+- `backend/app/fastapi/app.py` 负责 FastAPI app bootstrap、explicit Service injection、capability payload 与静态 Router registration；capability、menu、profile 或 readiness 状态都不作为 route gate。`dependencies.py`、`errors.py` 和 `routers/` 承载共享 adapter seam 与模块边界。
 - `backend/app/__init__.py` 仅保留 production composition 说明；历史 Flask factory/blueprint 已删除，native package import 不加载 Flask。
 - `backend/app/services/` 和 `backend/app/db/` 是 FastAPI native 复用的业务与数据库边界。
 
@@ -136,4 +155,4 @@ F5 gate 已证明 production native composition 不加载 Flask；F7 已删除 F
 
 ## 当前边界与后续 Issue
 
-仓库已有模块均默认进入统一的 route、capability、schema、seed、search 和 portal statistics contract。`backend/configs/community.yaml` 仅保留本地演示的数据库/feature profile；`p_menu.status` 仍是实例级可见性配置。WAIT_DB 或外部存储/驱动未配置时，模块 route 仍存在，由现有 Service error contract 返回可诊断状态。
+仓库已有模块均默认进入统一的 route、repository-module capability contract、schema、seed、search 和 portal statistics contract。`backend/configs/community.yaml` 仅保留本地演示的数据库/集成配置；`p_menu.status` 仍是实例级可见性配置。WAIT_DB 或外部存储/驱动未配置时，模块 route 仍存在，由现有 Service error contract 返回可诊断状态。

@@ -12,7 +12,7 @@
 本文的 **Repository Community Demo**、前端 **mock mode** 和线上 **static Demo** 不是同一个运行面：
 
 1. **Repository Community/remote Demo**：`scripts/community_demo.py` 使用 Community SQLite baseline + Alembic + seed，通过 `backend/asgi.py` 和 Uvicorn 启动真实 FastAPI API。仓库模块默认按 open repository module contract 注册；数据库驱动、外部依赖、凭据和 persistent storage readiness 可能影响部署能力，但不隐藏源码模块。
-2. **Frontend mock mode**：`VITE_API_MODE=mock` 只读取 `frontend/src/data/` 和 API 文件中的受控数据，不需要后端或数据库；默认 registry 可以展示全部源码模块，因此 mock coverage 不能冒充 remote backend capability。
+2. **Frontend mock mode**：`VITE_API_MODE=mock` 只读取 `frontend/src/data/` 和 API 文件中的受控数据，不需要后端或数据库；默认 registry 可以展示全部源码模块，因此 mock coverage 不能冒充 remote backend deployment readiness。
 3. **Online static Demo**：[https://data.overme.cn/](https://data.overme.cn/) 是独立发布的静态/mock bundle。当前可见 footer 为 `V1.0.0`，页面 HTML 没有仓库 revision/build metadata；它不自动等同于当前 `origin/main`、Repository Community Demo 或 GitHub published release `v0.1.1`。
 
 ## Prerequisites
@@ -195,9 +195,9 @@ python demo/seed_postgres.py --dialect postgres
 
 ## 模块与部署能力边界
 
-仓库中的 `portal`、`dwm`、`mapping`、`lineage`、`root`、`indicator`、`report`、`apiAsset`、`upstream`、`push`、`codeTable`、`system` 默认使用同一 open module contract：route、menu/capability、schema、seed、search 和 portal statistics 保持一致。Demo seed 会创建这些模块的 canonical tables 和完全虚构的 metadata。
+仓库中的 `portal`、`dwm`、`mapping`、`lineage`、`root`、`indicator`、`report`、`apiAsset`、`upstream`、`push`、`codeTable`、`system` 默认使用同一 open module contract：route、menu visibility、repository-module capability contract、schema、seed、search 和 portal statistics 保持一致。Demo seed 会创建这些模块的 canonical tables 和完全虚构的 metadata。
 
-外部 Collector、实际推送、上游连接、数据库驱动、凭据和 persistent lineage storage 是 deployment/integration capability。它们未配置时，页面/API 展示 metadata、POC 或明确的 not-configured/error state，但不会用 404 隐藏模块。实例管理员仍可通过 `p_menu.status` 配置菜单可见性。
+外部 Collector、实际推送、上游连接、数据库驱动、凭据和 persistent lineage storage 是 deployment/integration readiness concerns。它们未配置时，页面/API 展示 metadata、POC 或明确的 not-configured/error state，但不会用 404 隐藏模块。实例管理员仍可通过 `p_menu.status` 配置菜单可见性。
 
 相关文档：
 

@@ -9,7 +9,7 @@ from typing import Protocol, runtime_checkable
 
 
 class BackendCapability(str, Enum):
-    """Infrastructure capabilities that a backend may expose."""
+    """Provider adapter features, separate from the module capability API."""
 
     SQLALCHEMY_ENGINE = "sqlalchemy_engine"
     DBAPI_CONNECTION = "dbapi_connection"
@@ -24,11 +24,11 @@ class BackendCapability(str, Enum):
 
 @dataclass(frozen=True)
 class BackendCapabilities:
-    """Typed, honest capability declaration for one provider.
+    """Typed provider-adapter feature declaration for one database provider.
 
-    The flags describe infrastructure that is implemented today.  They are
-    deliberately independent of database brand so callers can ask what a
-    backend does rather than which vendor it represents.
+    The flags describe infrastructure implemented by the adapter today. They
+    are deliberately independent of database brand and are not product module
+    availability, `/api/capabilities` payload fields, or runtime readiness.
     """
 
     sqlalchemy_engine: bool = False

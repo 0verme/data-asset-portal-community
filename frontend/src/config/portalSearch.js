@@ -14,7 +14,8 @@
 
 /**
  * Portal search scopes — pluggable list.
- * Each scoped entity maps to a capability module code (moduleKey).
+ * Each scoped entity maps to a repository module code (moduleKey), shared with
+ * the capability compatibility payload and the menu/search provider contract.
  * Adding a searchable module: append here + mock entity in api/search.js +
  * backend providers registry; engines stay unchanged.
  */
@@ -45,7 +46,7 @@ export const PORTAL_HOT_TAGS = [
   { q: "JOB_BI_01", mono: true, moduleKeys: ["push"] },
 ];
 
-/** Search entity type → capability / menu module code. */
+/** Search entity type → repository module code used by menu filtering. */
 export const SEARCH_SCOPE_TO_MODULE = {
   asset: "dwm",
   system: "upstream",

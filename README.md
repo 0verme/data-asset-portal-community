@@ -122,7 +122,7 @@ mock 数据只用于前端体验，不会写入数据库。
 - **Permission-based RBAC**：后端按 permission code 强制授权，支持角色、权限映射、角色管理和单角色用户绑定；前端权限仅用于 UX。
 - **统一搜索与门户统计**：为所有已注册搜索实体和统计 provider 提供聚合入口。
 
-所有模块默认注册 route、进入 capability response、进入 canonical schema/seed；管理员仍可通过 `p_menu.status` 配置单个实例的菜单可见性。需要数据库驱动、凭据、外部系统、持久化 lineage storage 或危险写操作时，系统会报告真实 deployment capability 状态，而不是隐藏源码模块。
+所有模块默认注册 route、进入 repository-module capability response、进入 canonical schema/seed；管理员仍可通过 `p_menu.status` 配置单个实例的菜单可见性。需要数据库驱动、凭据、外部系统、持久化 lineage storage 或危险写操作时，业务 service 会报告真实 deployment readiness/diagnostic 状态，而不是隐藏源码模块。`/api/capabilities` 本身只表示 source-backed open module contract，不是 license、Edition、菜单、RBAC 或 runtime profile gate。
 
 完整的 Source / Runtime / Schema / Demo 对照见 [docs/modules.md](./docs/modules.md)。
 

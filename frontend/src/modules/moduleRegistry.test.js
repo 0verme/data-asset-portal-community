@@ -4,8 +4,10 @@ import test from "node:test";
 import {
   MODULE_REGISTRY,
   getModuleDefinition,
+  isRegisteredModule,
   listModuleCodes,
   resolveDefaultEnabledModules,
+  resolveRepositoryModuleCodes,
   validateModuleRegistry,
 } from "./moduleRegistry.js";
 
@@ -22,9 +24,12 @@ test("module registry is internally consistent and complete", () => {
   assert.equal(codes.length, 12);
 });
 
-test("all repository modules are open by default", () => {
-  const enabled = resolveDefaultEnabledModules();
-  assert.deepEqual([...enabled].sort(), [...listModuleCodes()].sort());
+test("all repository modules are source-backed and open by default", () => {
+  const moduleCodes = resolveRepositoryModuleCodes();
+  assert.deepEqual([...moduleCodes].sort(), [...listModuleCodes()].sort());
+  assert.deepEqual([...resolveDefaultEnabledModules()].sort(), [...moduleCodes].sort());
+  assert.equal(isRegisteredModule("dwm"), true);
+  assert.equal(isRegisteredModule("not-a-repository-module"), false);
   assert.equal(getModuleDefinition("mapping").requires.length, 0);
   assert.equal(getModuleDefinition("apiAsset").requires.length, 0);
 });

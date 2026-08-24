@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unified module manifest — single source of truth for repository modules.
+"""Unified module manifest — source of truth for repository module identity.
 
 Module *codes* match existing frontend menu codes and search/stat module keys
-so that this phase does not require a global rename. Availability is open by
-default; deployment dependencies and instance menu status are separate
-concerns handled by their respective services.
+so that this phase does not require a global rename. The repository module set
+is open by default; deployment dependencies and instance menu status are
+separate concerns handled by their respective services.
 """
 
 from __future__ import annotations
@@ -28,6 +28,11 @@ from typing import Any
 
 # Codes used by frontend menus, ModuleContent, portal search scopes, and
 # backend portal/search providers. Keep them stable across the API boundary.
+#
+# `enabled_by_default` is retained manifest compatibility metadata. In this
+# repository it means that a source-backed module belongs to the open module
+# contract; it is not a mutable feature switch, license/Edition entitlement,
+# menu status, permission, runtime profile, or dependency-readiness result.
 MODULES: dict[str, dict[str, Any]] = {
     "portal": {
         "name": "门户首页",

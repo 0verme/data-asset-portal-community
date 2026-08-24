@@ -162,11 +162,11 @@ export default function App() {
 
   const refreshCapabilities = React.useCallback(async () => {
     try {
-      // Capability readiness is observed for diagnostics only. It must never
-      // control module navigation or deep-link availability.
+      // The capability contract load is observed for diagnostics only. Its
+      // HTTP load state must never control module navigation or deep links.
       await loadCapabilities();
     } catch (error) {
-      console.error("Failed to load deployment capabilities.", error);
+      console.error("Failed to load the repository-module capability contract.", error);
     }
   }, []);
 

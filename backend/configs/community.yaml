@@ -6,6 +6,8 @@ database:
     - sqlite
     - postgres
     - mysql
+# These are integration/deployment switches only; they do not remove
+# source-backed modules or unregister their routes.
 features:
   lineage_collector: false
   audit_integration: false

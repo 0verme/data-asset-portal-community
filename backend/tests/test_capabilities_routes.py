@@ -35,6 +35,14 @@ class CapabilitiesRouteTests(unittest.TestCase):
         self.assertNotIn("password", text)
         self.assertNotIn("jdbc", text)
 
+    def test_capability_endpoint_cannot_hide_source_backed_modules(self):
+        payload = self._client({"modules": [], "enabled_codes": []}).get("/api/capabilities").json()
+        self.assertEqual(
+            set(list_module_codes()),
+            {item["code"] for item in payload["modules"]},
+        )
+        self.assertTrue(all(item["enabled"] for item in payload["modules"]))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { listModuleCodes, resolveDefaultEnabledModules } from "../modules/moduleRegistry.js";
+import { listModuleCodes, resolveRepositoryModuleCodes } from "../modules/moduleRegistry.js";
 
 function readApiMode() {
   try {
@@ -23,9 +23,9 @@ function readApiMode() {
 }
 
 /**
- * A capability request failure must not turn repository modules into a fake
- * 404. Deployment readiness may be unknown, while source-backed modules stay
- * navigable and can render their own dependency error state.
+ * A capability contract request failure must not turn repository modules into
+ * a fake 404. Deployment readiness may be unknown, while source-backed modules
+ * stay navigable and can render their own dependency error state.
  */
 export const SAFE_FALLBACK_MODULES = Object.freeze(listModuleCodes());
 
@@ -42,24 +42,26 @@ function openModuleItems() {
 }
 
 export function modulesFromPayload(_payload) {
-  // Deployment readiness may be described by additional capability fields,
-  // but the repository module set itself is always open.
+  // The current payload describes the source-backed module contract. Any
+  // future dependency diagnostics must remain separate from this module set.
   const modules = openModuleItems();
   return {
     modules,
+    // Retained field name: this is the source-backed module set, not a gate.
     enabledCodes: new Set(SAFE_FALLBACK_MODULES),
-    status: "ready",
-    error: null,
+    // These fields describe the HTTP capability-contract loader only.
+    loadStatus: "ready",
+    loadError: null,
   };
 }
 
 export function buildMockCapabilities() {
-  const enabledCodes = resolveDefaultEnabledModules();
+  const enabledCodes = resolveRepositoryModuleCodes();
   return {
     modules: openModuleItems(),
     enabledCodes,
-    status: "ready",
-    error: null,
+    loadStatus: "ready",
+    loadError: null,
   };
 }
 
@@ -68,15 +70,16 @@ export function buildSafeFallbackCapabilities(error) {
   return {
     modules: openModuleItems(),
     enabledCodes,
-    status: "error",
-    error: error instanceof Error ? error.message : String(error || "capabilities unavailable"),
+    loadStatus: "error",
+    loadError: error instanceof Error ? error.message : String(error || "capabilities unavailable"),
   };
 }
 
 /**
- * Load deployment capabilities.
+ * Load the public repository-module capability contract.
  * Remote and mock modes share the same repository module set. A failed remote
- * request only changes readiness status; it never hides source-backed routes.
+ * request only changes the HTTP loader's loadStatus/loadError; it never hides
+ * source-backed routes or claims that a module is unavailable.
  */
 export async function loadCapabilities() {
   if (!isRemoteCapabilitiesMode()) {
@@ -87,7 +90,7 @@ export async function loadCapabilities() {
     const payload = await requestRemote("/capabilities");
     return modulesFromPayload(payload);
   } catch (error) {
-    console.error("Failed to load deployment capabilities; using open module fallback.", error);
+    console.error("Failed to load repository-module capability contract; using open module fallback.", error);
     return buildSafeFallbackCapabilities(error);
   }
 }

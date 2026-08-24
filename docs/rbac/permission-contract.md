@@ -42,7 +42,7 @@ Initial action vocabulary is intentionally small:
   mutate a resource.
 
 A new code is allowed only when its authorization boundary is materially
-separate, a user can reasonably have one capability without the other, and the
+separate, a user can reasonably have one permission without the other, and the
 separation has audit value. Do not create one permission per endpoint or button.
 
 The checked-in registry is
@@ -163,9 +163,9 @@ routes even though they are omitted from OpenAPI.
 ### Built-in permission mapping
 
 `admin` is the full explicit registry. `maintainer` is the compatibility set
-below; a check mark on an ordinary read code documents a capability but does
-not make that route permission-gated. Ordinary business routes still require
-an authenticated identity.
+below; a check mark on an ordinary read code documents an authorization
+concept/capability but does not make that route private or permission-gated.
+Ordinary business routes still require an authenticated identity.
 
 | Permission | `admin` | `maintainer` | Custom example `indicator-maintainer` |
 | --- | :---: | :---: | :---: |

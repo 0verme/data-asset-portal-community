@@ -53,7 +53,7 @@
 
 - `p_menu.is_active` / menu `status`：管理员可以配置实例菜单是否展示；这是 instance visibility。
 - `p_*.*status_code`、`enabled_flag`、`is_deleted`：业务记录状态；这是 data/business state。
-- database profile、driver、credential、external API、storage profile 和 dangerous write readiness：deployment capability。
+- database profile、driver、credential、external API、storage profile 和 dangerous write readiness：deployment/runtime selection and diagnostics；它们不是 module availability 或 license gate。
 - source/runtime module set：由仓库 manifest 和 route composition 固定为 open by default。
 
 新增表时先确定 owner，再同时更新四方言 schema、Alembic revision、reflection/verify、seed 和相关 contract tests。禁止通过缺表、静默跳过 provider 或 route 404 制造产品 Edition 边界。

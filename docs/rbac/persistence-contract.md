@@ -56,7 +56,7 @@ still intentionally left for the deployment/bootstrap operator in that SQL
 path.
 
 Repeated seed is a no-op. A new permission is an additive registry/seed diff;
-it does not silently grant unrelated capabilities or reset custom mappings.
+it does not silently grant unrelated permissions or reset custom mappings.
 
 ## Verification contract
 
