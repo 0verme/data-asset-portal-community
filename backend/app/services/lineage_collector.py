@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 
-from ..db.gaussdb import (
+from ..db.facade import (
     database_transaction,
     execute_many,
     execute_sql,

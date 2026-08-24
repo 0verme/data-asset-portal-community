@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import unittest
 
+from sqlalchemy.dialects import sqlite
+
 from backend.app.application import (
     ActorSource,
     Identity,
@@ -139,7 +141,7 @@ class OperationLogActorAlignmentTests(unittest.TestCase):
         with request_context_scope(
             RequestContext(identity=Identity("maintainer", "alice", "Alice"))
         ):
-            sql = service._build_audit_insert_sql(
+            statement = service._build_audit_insert_statement(
                 module_name="assets",
                 operation_type="UPDATE",
                 operation_object="orders",
@@ -147,14 +149,15 @@ class OperationLogActorAlignmentTests(unittest.TestCase):
                 user_name="Bob",
             )
 
-        self.assertIn("'alice'", sql)
-        self.assertIn("'Alice'", sql)
-        self.assertNotIn("'bob'", sql)
-        self.assertNotIn("'Bob'", sql)
+        params = statement.compile(dialect=sqlite.dialect()).params
+        self.assertEqual("alice", params["user_id"])
+        self.assertEqual("Alice", params["user_name"])
+        self.assertNotIn("bob", params.values())
+        self.assertNotIn("Bob", params.values())
 
     def test_explicit_actor_is_not_replaced_by_legacy_identity_overrides(self):
         service = OperationLogService()
-        sql = service._build_audit_insert_sql(
+        statement = service._build_audit_insert_statement(
             module_name="metadata",
             operation_type="IMPORT",
             operation_object="batch-1",
@@ -163,9 +166,11 @@ class OperationLogActorAlignmentTests(unittest.TestCase):
             user_name="Bob",
         )
 
-        self.assertIn("'metadata-importer'", sql)
-        self.assertNotIn("'bob'", sql)
-        self.assertNotIn("'Bob'", sql)
+        params = statement.compile(dialect=sqlite.dialect()).params
+        self.assertEqual("", params["user_id"])
+        self.assertEqual("metadata-importer", params["user_name"])
+        self.assertNotIn("bob", params.values())
+        self.assertNotIn("Bob", params.values())
 
 
 if __name__ == "__main__":

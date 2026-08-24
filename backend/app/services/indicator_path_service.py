@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import os
 
-from ..db.gaussdb import fetch_all, resolve_db_profile_name
+from sqlalchemy import func, select
 
-
-TABLE_INDICATOR_PATH_CONFIG = "dwp.p_indicator_path_config"
+from ..db.service import CoreAccess
+from ..db.tables import indicator_path_config
 
 
 class IndicatorPathDataSourceError(Exception):
@@ -20,49 +20,43 @@ class IndicatorPathDataSourceError(Exception):
 class IndicatorPathService:
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
+        self._db = CoreAccess(
+            profile_getter=lambda: self._db_profile,
+            error_factory=IndicatorPathDataSourceError,
+        )
 
-    def _quote(self, value):
-        if value is None:
-            return "NULL"
-        return "'" + str(value).replace("'", "''") + "'"
-
-    def _fetch_rows(self, sql):
-        try:
-            columns, rows = fetch_all(self._db_profile or resolve_db_profile_name(), sql)
-        except FileNotFoundError as error:
-            raise IndicatorPathDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise IndicatorPathDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise IndicatorPathDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise IndicatorPathDataSourceError("数据库查询失败") from error
-        return [dict(zip(columns, row)) for row in rows]
+    def _fetch_rows(self, statement):
+        return self._db.fetch_rows(statement)
 
     def get_path_tree(self, dimension_code=None):
         where = [
-            "status IN ('enabled', 'ENABLED', '启用')",
+            indicator_path_config.c.status.in_(("enabled", "ENABLED", "启用")),
         ]
         if dimension_code:
             normalized = str(dimension_code).strip().upper()
-            where.append(f"dimension_code = {self._quote(normalized)}")
-        sql = f"""
-SELECT
-    id,
-    parent_id,
-    path_code,
-    path_name,
-    dimension_code,
-    path_level,
-    full_path,
-    sort_order,
-    status,
-    remark
-FROM {TABLE_INDICATOR_PATH_CONFIG}
-WHERE {' AND '.join(where)}
-ORDER BY path_level, COALESCE(parent_id, 0), sort_order, id
-"""
-        rows = self._fetch_rows(sql)
+            where.append(indicator_path_config.c.dimension_code == normalized)
+        statement = (
+            select(
+                indicator_path_config.c.id,
+                indicator_path_config.c.parent_id,
+                indicator_path_config.c.path_code,
+                indicator_path_config.c.path_name,
+                indicator_path_config.c.dimension_code,
+                indicator_path_config.c.path_level,
+                indicator_path_config.c.full_path,
+                indicator_path_config.c.sort_order,
+                indicator_path_config.c.status,
+                indicator_path_config.c.remark,
+            )
+            .where(*where)
+            .order_by(
+                indicator_path_config.c.path_level,
+                func.coalesce(indicator_path_config.c.parent_id, 0),
+                indicator_path_config.c.sort_order,
+                indicator_path_config.c.id,
+            )
+        )
+        rows = self._fetch_rows(statement)
 
         nodes_by_id = {}
         children_by_parent = {}

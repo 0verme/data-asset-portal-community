@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend.app.application import actor_scope, configured_system_actor
-from backend.app.db.gaussdb import get_db_profile
+from backend.app.db.facade import get_db_profile
 from backend.app.settings import get_float_env, get_int_env, get_page_size_limits
 from backend.app.services.common_code_service import common_code_service
 from backend.app.services.system_management_service import SystemManagementService
