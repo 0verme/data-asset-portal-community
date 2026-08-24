@@ -17,8 +17,8 @@ class FastApiRepositoryBoundaryTests(unittest.TestCase):
         self.environment = patch.dict(
             os.environ,
             {
-                "FLASK_ENV": "development",
-                "FLASK_SECRET_KEY": "native-boundary-test",
+                "APP_ENV": "development",
+                "APP_SECRET_KEY": "native-boundary-test",
             },
             clear=False,
         )

@@ -43,7 +43,7 @@ MIGRATE = BACKEND / "scripts" / "schema_migrate.py"
 
 def _run_cli(args, env_extra=None):
     env = dict(os.environ)
-    env.setdefault("FLASK_SECRET_KEY", "test-only-migration-secret")
+    env.setdefault("APP_SECRET_KEY", "test-only-migration-secret")
     if env_extra:
         env.update(env_extra)
     return subprocess.run(
@@ -164,7 +164,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
 
     def test_community_profile_applies_config_path(self):
         # With ASSET_RUNTIME_PROFILE=community the CLI must resolve the
-        # community config file without --config, mirroring Flask startup.
+        # community config file without --config, mirroring normal startup.
         env = {
             "ASSET_RUNTIME_PROFILE": "community",
             "ASSET_DB_PROFILE": "community_sqlite",

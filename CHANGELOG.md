@@ -13,8 +13,9 @@
 
 ### 运行时与数据层（Changed）
 
-- FastAPI Native runtime 已收口为唯一当前入口：Uvicorn → `backend/asgi.py` → FastAPI；`/healthz` 固定报告 `runtime=fastapi`、`fastapiPrimary=true`、`flaskFallback=false`。
-- Flask / Flask-Cors runtime dependency、WSGI fallback、Waitress 和 runtime switch 已退休；`Werkzeug`、`itsdangerous` 与 `FLASK_*` 名称仅因密码哈希、signed-session/security configuration contract 保留。
+- FastAPI Native runtime 已收口为唯一当前入口：Uvicorn → `backend/asgi.py` → FastAPI；`/healthz` 只报告 `runtime=fastapi` 和 `fastapiPrimary=true`。
+- Flask / Flask-Cors runtime dependency、WSGI fallback、Waitress、runtime switch 与 `FLASK_*` application configuration names 已退休；`Werkzeug` 保留用于 AuthService password hashing，`itsdangerous` 提供 native signed-session codec。
+- #145 将 signed-session 写入格式迁移到 application-owned HMAC-SHA256；pre-#145 cookie 在一个有界 session lifetime 内只读验证并成功请求后重新签发，不要求用户同时轮换 secret。
 - Database Provider、SQLAlchemy Core 与 Alembic baseline/forward migration 已成为当前数据库访问与 Community/local 初始化路径；`docs/pg` / `docs/dws` 保留为 full/extension deployment 的补充 DDL。
 - 建立版本化 Metadata Ingestion Contract：外部 Collector 通过 `/api/metadata` 批量提交 Asset / Lineage snapshot；支持 source-scoped idempotency、dry-run、replace activation、audit summary 和 ingestion status query，不暴露内部 database schema。
 

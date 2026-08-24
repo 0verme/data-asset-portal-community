@@ -21,8 +21,8 @@ class AuthPermissionsContractTests(unittest.TestCase):
         self.environment = patch.dict(
             os.environ,
             {
-                "FLASK_ENV": "development",
-                "FLASK_SECRET_KEY": "p4-auth-contract-test-secret",
+                "APP_ENV": "development",
+                "APP_SECRET_KEY": "p4-auth-contract-test-secret",
                 "AUTH_SESSION_DAYS": "14",
             },
             clear=False,

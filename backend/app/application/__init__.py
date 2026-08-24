@@ -34,7 +34,12 @@ from .identity import (
     identity_for_session,
     identity_from_mapping,
 )
-from .session import SESSION_COOKIE_NAME, SESSION_PAYLOAD_KEY, SignedSessionCodec
+from .session import (
+    SESSION_COOKIE_NAME,
+    SESSION_PAYLOAD_KEY,
+    LegacySignedSessionCodec,
+    SignedSessionCodec,
+)
 
 __all__ = [
     "ADMIN_ROLE",
@@ -51,6 +56,7 @@ __all__ = [
     "RequestContext",
     "SESSION_COOKIE_NAME",
     "SESSION_PAYLOAD_KEY",
+    "LegacySignedSessionCodec",
     "SignedSessionCodec",
     "actor_aware",
     "actor_scope",

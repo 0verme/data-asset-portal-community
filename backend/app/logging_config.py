@@ -61,7 +61,7 @@ def configure_logging() -> Path:
             handler._asset_portal_handler = True
             root_logger.addHandler(handler)
 
-    for logger_name in ("werkzeug", "app"):
+    for logger_name in ("app",):
         logger = logging.getLogger(logger_name)
         logger.setLevel(root_logger.level)
         logger.propagate = True

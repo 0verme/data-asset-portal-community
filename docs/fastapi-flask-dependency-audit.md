@@ -15,9 +15,9 @@
 ## KEEP with reason
 
 - `Werkzeug==3.1.8`：`AuthService` 直接使用 `check_password_hash` / `generate_password_hash`，不是 Flask runtime dependency。
-- `itsdangerous==2.2.0`：FastAPI Native `SignedSessionCodec` 保持既有 `session` cookie 的 signed format/expiration contract。
-- `FLASK_SECRET_KEY`、`FLASK_ENV`、`FLASK_CORS_ORIGINS`：历史配置名称仍是 browser/cookie/security contract；实现不导入 Flask。
-- `backend/app/fastapi_app.py`：保留为无 Flask 的薄 import facade，现有 tests/integrations 使用稳定 import path；删除需另行评估公开 import compatibility。
+- `itsdangerous==2.2.0`：FastAPI Native `SignedSessionCodec` 提供 application-owned signed `session` cookie；HMAC-SHA256 native format 写入，旧格式只读迁移。
+- `FLASK_*` names：#145 已从 runtime configuration contract 移除；部署必须迁移到 `APP_*`，旧名称不会 fallback。
+- `backend/app/fastapi_app.py`：保留为无 Flask 的薄 import facade，现有 tests/integrations 使用稳定 import path；这是稳定内部 import contract，不是 framework compatibility。
 - `backend/app/application/**`、contracts、services、database provider、FastAPI routers：native/application/database boundary。
 - `common_code_service.py`、`indicator_path_service.py`、`push_service.py`：本文记录的 WAIT_DB/Private source boundary 属于历史迁移审计；当前 native route composition 由 #116 的 open module contract 决定，缺少真实依赖时返回诊断错误。
 
@@ -40,3 +40,15 @@ Production runtime: Uvicorn → FastAPI → Application / Service → Database P
 ```
 
 WAIT_DB 与 Private routes 仍按 F4 scope gate 排除，未为“清零 Flask 命中”而公开或改动 Database Lane。
+
+## #145 current follow-up
+
+```text
+FLASK_* runtime config: REMOVE; APP_* only
+native signed-session codec: KEEP; HMAC-SHA256, application-owned
+legacy signed-session reader: DEPRECATE UNTIL all pre-#145 cookies expire; read-only reissue
+flaskFallback health field: REMOVE
+fastapi_app facade: KEEP; stable import contract
+Werkzeug: KEEP; AuthService password hashing
+Flask / Flask-Cors / WSGI runtime: NOT PRESENT
+```

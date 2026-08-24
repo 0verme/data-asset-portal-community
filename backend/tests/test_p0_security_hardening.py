@@ -34,8 +34,8 @@ class NativeSecurityTestCase(unittest.TestCase):
         self.environment = patch.dict(
             os.environ,
             {
-                "FLASK_ENV": "development",
-                "FLASK_SECRET_KEY": "p0-native-security-test-secret",
+                "APP_ENV": "development",
+                "APP_SECRET_KEY": "p0-native-security-test-secret",
             },
             clear=False,
         )
@@ -54,16 +54,16 @@ class ProductionConfigTests(NativeSecurityTestCase):
         with (
             patch.dict(
                 os.environ,
-                {"FLASK_ENV": "production", "FLASK_DEBUG": "true"},
+                {"APP_ENV": "production", "APP_DEBUG": "true"},
             ),
-            self.assertRaisesRegex(RuntimeError, "FLASK_DEBUG"),
+            self.assertRaisesRegex(RuntimeError, "APP_DEBUG"),
         ):
             get_runtime_config()
 
     def test_development_allows_debug_true(self):
         with patch.dict(
             os.environ,
-            {"FLASK_ENV": "development", "FLASK_DEBUG": "true"},
+            {"APP_ENV": "development", "APP_DEBUG": "true"},
         ):
             self.assertTrue(get_runtime_debug())
             self.assertFalse(get_runtime_config()["SESSION_COOKIE_SECURE"])
@@ -71,7 +71,7 @@ class ProductionConfigTests(NativeSecurityTestCase):
 
 class RequestBoundaryAndErrorShapeTests(NativeSecurityTestCase):
     def test_oversized_body_returns_uniform_json_413(self):
-        with patch.dict(os.environ, {"FLASK_MAX_CONTENT_LENGTH_MB": "1"}):
+        with patch.dict(os.environ, {"APP_MAX_CONTENT_LENGTH_MB": "1"}):
             response = TestClient(self.app()).post(
                 "/api/auth/login",
                 content=b"x" * (1024 * 1024 + 1),

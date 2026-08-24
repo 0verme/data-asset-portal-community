@@ -62,7 +62,6 @@ def create_native_app(
             "status": "ok",
             "runtime": "fastapi",
             "fastapiPrimary": True,
-            "flaskFallback": False,
         }
 
     settings = get_runtime_config()

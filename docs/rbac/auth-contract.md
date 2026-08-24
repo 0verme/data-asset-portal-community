@@ -46,3 +46,9 @@ authorization from `role`.
 The signed session retains only the existing minimum identity fields. It does
 not cache permissions and does not add a distributed invalidation mechanism.
 Logout and error envelopes remain compatible with the current FastAPI contract.
+
+The application-owned `session` cookie is signed with the native HMAC-SHA256
+codec. Pre-#145 cookies are verified by a read-only migration reader and
+reissued after a successful request; deployments must preserve the existing
+secret while renaming it to `APP_SECRET_KEY`. The legacy reader is removed only
+after the maximum configured session lifetime has elapsed.

@@ -60,7 +60,7 @@ class DemoPaths:
             runtime=runtime,
             database=runtime / "community.sqlite",
             database_config=runtime / "database.yaml",
-            secret=runtime / "flask-secret.key",
+            secret=runtime / "session-secret.key",
             backend_venv=root / "backend" / ".venv",
         )
 
@@ -184,10 +184,10 @@ def build_demo_environment(
         and key.upper()
         not in {
             "ASSET_RUNTIME_PROFILE",
-            "FLASK_ENV",
-            "FLASK_DEBUG",
-            "FLASK_SECRET_KEY",
-            "FLASK_CORS_ORIGINS",
+            "APP_ENV",
+            "APP_DEBUG",
+            "APP_SECRET_KEY",
+            "APP_CORS_ORIGINS",
             "LINEAGE_DB_PROFILE",
             "COMMUNITY_DEMO_BOOTSTRAP",
         }
@@ -201,10 +201,10 @@ def build_demo_environment(
             "ASSET_AUTH_DB_PROFILE": "community_sqlite",
             "ASSET_DB_TYPE": "sqlite",
             "ASSET_DB_DATABASE": str(paths.database.resolve()),
-            "FLASK_ENV": "development",
-            "FLASK_DEBUG": "false",
-            "FLASK_SECRET_KEY": secret,
-            "FLASK_CORS_ORIGINS": f"http://127.0.0.1:{FRONTEND_PORT},http://localhost:{FRONTEND_PORT}",
+            "APP_ENV": "development",
+            "APP_DEBUG": "false",
+            "APP_SECRET_KEY": secret,
+            "APP_CORS_ORIGINS": f"http://127.0.0.1:{FRONTEND_PORT},http://localhost:{FRONTEND_PORT}",
             "LINEAGE_DB_PROFILE": "community_sqlite",
             "VITE_API_MODE": "remote",
             "VITE_API_BASE_URL": "/api",

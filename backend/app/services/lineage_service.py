@@ -20,7 +20,7 @@ from sqlalchemy import select
 from ..db.facade import database_transaction
 from ..db.service import CoreAccess
 from ..db.tables import lineage_edge, lineage_node, lineage_snapshot
-from ..settings import get_compatible_env
+from ..settings import get_runtime_environment
 
 
 LOGGER = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ def lineage_storage_status():
     if profile:
         return {"mode": "persistent", "profile": profile, "schema": "dwp"}
 
-    environment = (get_compatible_env("APP_ENV", "FLASK_ENV", "production") or "production").strip().lower()
+    environment = get_runtime_environment()
     if environment in POC_ENVIRONMENTS:
         return {"mode": "poc", "profile": None, "schema": None}
     raise LineageConfigurationError(

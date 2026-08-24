@@ -58,7 +58,7 @@ trace field/table mappings, and maintain roots, indicators, and downstream metad
 - **Frontend**：React + Vite。
 - **Backend**：FastAPI Native，由 Uvicorn 加载 `backend/asgi.py`。
 - **Production / local entrypoint**：`uvicorn backend.asgi:app --host 127.0.0.1 --port 5099`。
-- **Health contract**：`/healthz` 返回 `runtime=fastapi`、`fastapiPrimary=true`、`flaskFallback=false`；其中 `flaskFallback` 是明确的回归字段，不表示仓库仍运行 Flask。
+- **Health contract**：`/healthz` 返回 `runtime=fastapi`、`fastapiPrimary=true`；健康检查只报告当前 native runtime 状态。
 - **Data path**：Application / Service Layer → Database Provider → SQLite、PostgreSQL、MySQL 或 GaussDB/DWS。
 
 ## 🚀 快速开始

@@ -88,9 +88,25 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         self.assertEqual("community_sqlite", environment["ASSET_AUTH_DB_PROFILE"])
         self.assertNotIn("BACKEND_RUNTIME", environment)
         self.assertEqual("community_sqlite", environment["LINEAGE_DB_PROFILE"])
+        self.assertEqual("development", environment["APP_ENV"])
+        self.assertEqual("false", environment["APP_DEBUG"])
+        self.assertEqual(
+            "demo-secret-that-is-not-fixed-production-secret",
+            environment["APP_SECRET_KEY"],
+        )
         self.assertEqual("remote", environment["VITE_API_MODE"])
         self.assertEqual("unchanged", environment["KEEP_ME"])
-        for key in ("DATABASE_URL", "PGHOST", "PGSERVICE", "MYSQL_HOST", "DB_HOST"):
+        for key in (
+            "DATABASE_URL",
+            "PGHOST",
+            "PGSERVICE",
+            "MYSQL_HOST",
+            "DB_HOST",
+            "FLASK_ENV",
+            "FLASK_DEBUG",
+            "FLASK_SECRET_KEY",
+            "FLASK_CORS_ORIGINS",
+        ):
             self.assertNotIn(key, environment)
 
     def test_non_demo_lineage_profile_still_selects_persistent_storage(self):
@@ -101,7 +117,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "FLASK_ENV": "production",
+                "APP_ENV": "production",
                 "LINEAGE_DB_PROFILE": "production_lineage",
             },
             clear=False,
@@ -121,7 +137,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         )
         with patch.dict(
             os.environ,
-            {"FLASK_ENV": "production", "LINEAGE_DB_PROFILE": ""},
+            {"APP_ENV": "production", "LINEAGE_DB_PROFILE": ""},
             clear=False,
         ), self.assertRaises(lineage_service.LineageConfigurationError):
             lineage_service.lineage_storage_status()

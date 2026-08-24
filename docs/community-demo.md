@@ -93,7 +93,7 @@ CI 或只想初始化数据库时，不启动常驻服务：
 | --- | --- | --- | --- |
 | `.demo/community-demo/community.sqlite` | Community 专属 SQLite 数据库 | 是 | 否 |
 | `.demo/community-demo/database.yaml` | 仅包含上述 SQLite 路径的 profile | 是 | 否 |
-| `.demo/community-demo/flask-secret.key` | 随机 development session secret；文件名保留历史 compatibility naming，不代表 Flask runtime | 是 | 是 |
+| `.demo/community-demo/session-secret.key` | 随机 development session secret | 是 | 是 |
 
 脚本不会覆盖或 merge 用户已有的 `.env`、`.env.local`、`backend/.env*` 或 `frontend/.env.local`。
 后端 Demo 子进程会显式固定 `community` + `community_sqlite` + 已知本地 SQLite 路径，并隔离继承的
@@ -150,7 +150,7 @@ python demo/seed_sqlite.py --database <absolute-local-path>/community.sqlite
 python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 ```
 
-默认使用纯 FastAPI/Uvicorn runtime：`uvicorn backend.asgi:app --host 127.0.0.1 --port 5099`。Flask compatibility mode 与 direct Flask runtime 已退休；保留的 `FLASK_*` 变量名只服务于 signed-session/security configuration contract。
+默认使用纯 FastAPI/Uvicorn runtime：`uvicorn backend.asgi:app --host 127.0.0.1 --port 5099`。Flask compatibility mode 与 direct Flask runtime 已退休；应用配置只读取 `APP_*` 名称，旧 `FLASK_*` 名称已移除。
 
 前端另开终端，使用 `frontend/.env.local` 设置：
 
@@ -166,7 +166,7 @@ VITE_BACKEND_URL=http://127.0.0.1:5099
 npm --prefix frontend run dev
 ```
 
-手工路径中请自行确保保留配置名 `FLASK_SECRET_KEY` 已设置、Community SQLite profile 和配置文件不会指向外部数据库。
+手工路径中请自行确保 `APP_SECRET_KEY` 已设置、Community SQLite profile 和配置文件不会指向外部数据库。
 
 ## 演示数据
 
