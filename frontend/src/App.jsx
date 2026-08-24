@@ -389,7 +389,17 @@ export default function App() {
       ["new", "edit"].includes(current.page) ? DEFAULT_REPORT_ROUTE : current
     ));
     setApiAssetRoute((current) => (["new", "edit"].includes(current.page) ? DEFAULT_API_ASSET_ROUTE : current));
-  }, [authReady, canEdit]);
+  }, [
+    authReady,
+    canEdit,
+    setApiAssetRoute,
+    setIndicatorRoute,
+    setPushRoute,
+    setReportRoute,
+    setRootRoute,
+    setRoute,
+    setUpRoute,
+  ]);
 
   const systemLandingRoute = useMemo(() => {
     if (canViewUsers) return { page: "users" };
@@ -410,7 +420,18 @@ export default function App() {
       "operation-logs": canViewOperationLog,
     };
     if (!accessible[systemRoute.page]) setSystemRoute(systemLandingRoute);
-  }, [authReady, canViewMenus, canViewOperationLog, canViewParams, canViewRoles, canViewUsers, module, systemLandingRoute, systemRoute.page]);
+  }, [
+    authReady,
+    canViewMenus,
+    canViewOperationLog,
+    canViewParams,
+    canViewRoles,
+    canViewUsers,
+    module,
+    setSystemRoute,
+    systemLandingRoute,
+    systemRoute.page,
+  ]);
 
   const {
     switchModule: switchNavigationModule,

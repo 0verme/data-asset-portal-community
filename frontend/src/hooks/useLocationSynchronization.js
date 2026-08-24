@@ -116,6 +116,9 @@ export function useLocationSynchronization({ navigation, asset, push, upstream }
     }
     if (isPopstate) lastPopstateRevisionRef.current = navigation.locationRevision;
     historyReadyRef.current = true;
+    // The dependency list intentionally tracks the primitive route and URL-state
+    // values above instead of the render-scoped container objects.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     asset.detailTab,
     asset.domain,
