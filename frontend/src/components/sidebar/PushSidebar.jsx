@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React from "react";
 import { DEFAULT_PUSH_FILTER } from "../../config/defaults.js";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.jsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.jsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.jsx";
 
-export function PushSidebar({ push, statusOptions, requireLogin, pushRoute, setPushRoute }) {
+export function PushSidebar({ push, statusOptions, requireLogin, pushRoute }) {
   const {
     pushSystems,
     pushProtocolOptions,

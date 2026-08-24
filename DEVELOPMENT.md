@@ -183,6 +183,16 @@ Remote API 的普通业务 GET 默认需要登录：匿名请求返回 `401`，�
 
 显式匿名例外仅包括 `/healthz`、有限的 `/api/capabilities` 模块元数据以及 `/api/auth` 登录生命周期。当前没有 Public Catalog 配置或默认开放业务目录。前端 remote 模式会先完成 `/api/auth/me` 身份 bootstrap，再请求菜单、统计和业务模块；未登录时不会循环请求这些 API。完整清单见 [Authenticated-by-default Business Read Model](./docs/rbac/authenticated-read-model.md)。
 
+### FastAPI 开发文档
+
+本地后端显式设置 `APP_ENV=development` 后，FastAPI 的开发文档端点可用：
+
+- Swagger UI：`http://127.0.0.1:5099/docs`
+- ReDoc：`http://127.0.0.1:5099/redoc`
+- OpenAPI JSON：`http://127.0.0.1:5099/openapi.json`
+
+`APP_ENV` 未设置或不是 `development` 时，这些 HTTP 端点默认关闭；这不影响应用内部通过 `app.openapi()` 生成 schema。
+
 ## 环境文件加载顺序
 
 后端依次加载（后者覆盖前者）：
@@ -243,10 +253,10 @@ MySQL 8.0 先执行 `pip install -r backend/requirements-mysql.txt`，再使用 
 仓库提供与 CI 对齐的本地检查脚本，提交 / 发版前建议运行：
 
 ```bash
-# 快速检查：Public Data Guard + 后端单元测试 + migration offline verify + packaging + 前端测试
+# 快速检查：Public Data Guard + 后端单元测试 + migration offline verify + packaging + 前端 lint/测试
 python scripts/release_check.py fast
 
-# 完整检查：fast + SQLite fresh 迁移/seed/重复 apply + 前端 npm ci/build/audit
+# 完整检查：fast + SQLite fresh 迁移/seed/重复 apply + 前端 npm ci/lint/build/audit
 # 如需 PostgreSQL 集成（16 个 integration 测试）再设置：
 #   TEST_DATABASE_PROFILE=<profile> TEST_DATABASE_CONFIG_PATH=<config>
 python scripts/release_check.py full
@@ -275,7 +285,7 @@ python -m unittest discover -s backend/tests
 2. **Backend / Python 3.11 + 3.13** —— `python -m unittest discover -s backend/tests` + baseline offline verify（sqlite / postgresql / mysql / dws）+ packaging contract tests；
 3. **PostgreSQL Integration（PG 16 service）** —— fresh migration → seed → integration tests（16 个不再 skip）→ repeat apply no-op → 当前 Community 表物理边界检查；
 4. **MySQL 8 Integration** —— fresh baseline → verify → SQLAlchemy Core CRUD / pagination / uniqueness / Unicode / NULL / rollback → repeat apply no-op；
-5. **Frontend / Node 22 + 24** —— `npm ci` → `npm test` → `npm run build` → `npm audit --audit-level=high`；
+5. **Frontend / Node 22 + 24** —— `npm ci` → `npm run lint` → `npm test` → `npm run build` → `npm audit --audit-level=high`；
 6. **Community Migration（SQLite）** —— fresh apply → verify → plan → seed → repeat apply no-op → 当前 Community 表物理边界检查。
 
 CI 权限为只读、仅用 GitHub 官方 Actions、无生产连接。

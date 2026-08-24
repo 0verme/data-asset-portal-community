@@ -17,7 +17,7 @@ import os
 
 from sqlalchemy import select
 
-from ..db.gaussdb import database_transaction
+from ..db.facade import database_transaction
 from ..db.service import CoreAccess
 from ..db.tables import lineage_edge, lineage_node, lineage_snapshot
 from ..settings import get_compatible_env

@@ -48,7 +48,7 @@ function normalizeDetail(payload) {
 }
 
 function toPublicSystem(system) {
-  const { host, db, schema, ...summary } = system;
+  const { host: _host, db: _db, schema: _schema, ...summary } = system;
   return summary;
 }
 

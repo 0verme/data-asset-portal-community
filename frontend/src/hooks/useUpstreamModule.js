@@ -25,7 +25,6 @@ import { isUnauthorizedError } from "../api/http.js";
 import { toast } from "../components/common/index.js";
 import {
   DEFAULT_UP_FILTER,
-  DEFAULT_UP_ROUTE,
   DEFAULT_UP_VIEW,
 } from "../config/defaults.js";
 import {
@@ -49,7 +48,7 @@ export function useUpstreamModule({
   initialView = DEFAULT_UP_VIEW,
   initialFilter = DEFAULT_UP_FILTER,
   canEdit,
-  requireLogin,
+  requireLogin: _requireLogin,
   runProtectedMutation,
   setAuthError,
   setLoginOpen,

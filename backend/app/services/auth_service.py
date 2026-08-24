@@ -19,19 +19,12 @@ from __future__ import annotations
 import logging
 import os
 
+from sqlalchemy import func, select, update
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from ..db.gaussdb import (
-    AUTH_PROFILE_ENV,
-    DEFAULT_PROFILE_ENV,
-    execute_sql,
-    fetch_all,
-    load_db_profiles,
-    resolve_db_profile_name,
-)
-
-
-TABLE_ADMIN_USER = "dwp.p_admin_user"
+from ..db.facade import AUTH_PROFILE_ENV, DEFAULT_PROFILE_ENV, load_db_profiles, resolve_db_profile_name
+from ..db.service import CoreAccess
+from ..db.tables import admin_user
 ADMIN_ROLE = "admin"
 MAINTAINER_ROLE = "maintainer"
 LOGGER = logging.getLogger(__name__)
@@ -60,6 +53,12 @@ class AuthDataSourceError(AuthError):
 
 
 class AuthService:
+    def __init__(self):
+        self._db = CoreAccess(
+            profile_getter=self._profile,
+            error_factory=AuthDataSourceError,
+        )
+
     def _profile(self) -> str:
         available_profiles = load_db_profiles()
 
@@ -76,10 +75,7 @@ class AuthService:
 
         return resolve_db_profile_name()
 
-    def _quote(self, value: str) -> str:
-        return "'" + str(value).replace("'", "''") + "'"
-
-    def _fetch_rows(self, sql: str) -> list[dict]:
+    def _fetch_rows(self, statement) -> list[dict]:
         selected_profile = self._profile()
         LOGGER.info(
             "Auth query profile resolved to %s (ASSET_AUTH_DB_PROFILE=%s, ASSET_DB_PROFILE=%s)",
@@ -87,21 +83,21 @@ class AuthService:
             os.getenv(AUTH_PROFILE_ENV),
             os.getenv(DEFAULT_PROFILE_ENV),
         )
-        try:
-            columns, rows = fetch_all(selected_profile, sql)
-        except Exception as error:
-            raise AuthDataSourceError("认证服务暂不可用，请稍后重试") from error
-        return [dict(zip(columns, row, strict=True)) for row in rows]
+        return self._db.fetch_rows(statement)
 
     def _fetch_user(self, username: str) -> dict | None:
-        rows = self._fetch_rows(
-            f"""
-SELECT username, password_hash, display_name, status, role
-FROM {TABLE_ADMIN_USER}
-WHERE username = {self._quote(username)}
-LIMIT 1
-""".strip()
+        statement = (
+            select(
+                admin_user.c.username,
+                admin_user.c.password_hash,
+                admin_user.c.display_name,
+                admin_user.c.status,
+                admin_user.c.role,
+            )
+            .where(admin_user.c.username == username)
+            .limit(1)
         )
+        rows = self._fetch_rows(statement)
         return rows[0] if rows else None
 
     def authenticate(self, username: str, password: str) -> dict:
@@ -120,15 +116,16 @@ LIMIT 1
         try:
             selected_profile = self._profile()
             LOGGER.info("Auth update profile resolved to %s", selected_profile)
-            execute_sql(
-                selected_profile,
-                f"""
-UPDATE {TABLE_ADMIN_USER}
-SET last_login_at = CURRENT_TIMESTAMP,
-    updated_at = CURRENT_TIMESTAMP
-WHERE username = {self._quote(normalized_user)}
-""".strip(),
+            self._db.execute(
+                update(admin_user)
+                .where(admin_user.c.username == normalized_user)
+                .values(
+                    last_login_at=func.current_timestamp(),
+                    updated_at=func.current_timestamp(),
+                )
             )
+        except AuthDataSourceError:
+            raise
         except Exception as error:
             raise AuthDataSourceError("认证服务暂不可用，请稍后重试") from error
 

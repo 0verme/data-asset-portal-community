@@ -32,7 +32,7 @@ def main() -> int:
     if args.config:
         os.environ["ASSET_DB_CONFIG_PATH"] = args.config
 
-    from app.db.gaussdb import connect_with_profile
+    from app.db.facade import connect_with_profile
 
     conn = connect_with_profile(args.profile)
     try:

@@ -28,7 +28,7 @@ EXPORT_ROOT = ROOT_DIR / "tmp" / "db-init-sql"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.db.gaussdb import fetch_all, get_db_profile, resolve_db_profile_name
+from app.db.facade import fetch_all, get_db_profile, resolve_db_profile_name
 from app.settings import load_runtime_env
 
 

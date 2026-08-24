@@ -26,7 +26,6 @@ from sqlalchemy import delete, func, insert, select, update
 
 from ..application import AuditActorMixin, actor_aware
 from ..authorization import permissions as permission_contract
-from ..db.gaussdb import execute_sql, fetch_all, resolve_db_profile_name
 from ..db.service import CoreAccess
 from ..db.tables import (
     admin_user,
@@ -48,11 +47,6 @@ from .operation_log_service import (
     operation_log_service,
 )
 
-
-TABLE_ADMIN_USER = "dwp.p_admin_user"
-TABLE_CODE_CATEGORY = "dwp.p_code_category"
-TABLE_CODE_ITEM = "dwp.p_code_item"
-TABLE_MENU = "dwp.p_menu"
 
 USER_STATUSES = {"enabled", "disabled"}
 ROLE_STATUSES = {"enabled", "disabled"}
@@ -140,34 +134,6 @@ class SystemManagementService(AuditActorMixin):
             error_factory=SystemDataSourceError,
         )
 
-    def _profile(self):
-        return self._db_profile or resolve_db_profile_name()
-
-    def _fetch_rows(self, sql: str, params=None):
-        try:
-            columns, rows = fetch_all(self._profile(), sql, params=params)
-        except FileNotFoundError as error:
-            raise SystemDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise SystemDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise SystemDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise SystemDataSourceError("数据库查询失败") from error
-        return [dict(zip(columns, row, strict=True)) for row in rows]
-
-    def _execute(self, sql: str, params=None):
-        try:
-            return execute_sql(self._profile(), sql, params=params)
-        except FileNotFoundError as error:
-            raise SystemDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise SystemDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise SystemDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise SystemDataSourceError("数据库执行失败") from error
-
     def _core_fetch(self, statement):
         return self._core.fetch_rows(statement)
 
@@ -182,11 +148,6 @@ class SystemManagementService(AuditActorMixin):
 
     def _now_text(self):
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    def _next_pk(self, table_name: str, id_column: str):
-        rows = self._fetch_rows(f"SELECT COALESCE(MAX({id_column}), 0) + 1 AS next_id FROM {table_name}")
-        # pi-lens-ignore: unchecked-throwing-call-python
-        return int(rows[0]["next_id"])
 
     def _parse_item_id(self, dict_id: str):
         value = str(dict_id or "").strip()

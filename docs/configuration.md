@@ -22,6 +22,25 @@ Ordinary business API reads are authenticated by default; the public surface is
 limited to the explicit health/capability and authentication lifecycle routes
 listed in [the authenticated-read model](./rbac/authenticated-read-model.md).
 
+## OpenAPI and interactive docs exposure
+
+`APP_ENV` also defines the default HTTP exposure policy for the FastAPI-generated
+OpenAPI schema and interactive documentation:
+
+| Normalized environment | `/docs` | `/redoc` | `/openapi.json` |
+|---|---:|---:|---:|
+| `development` | enabled | enabled | enabled |
+| unset (defaults to production) | disabled | disabled | disabled |
+| `production` or any other value | disabled | disabled | disabled |
+
+Only the exact normalized value `development` enables these endpoints. `APP_ENV`
+wins over the retained `FLASK_ENV` fallback when both are present. No separate
+OpenAPI deployment variable is required. Production can still generate its
+schema internally with `app.openapi()`; the policy only prevents registering the
+HTTP documentation endpoints. The app factory's optional `openapi_enabled` seam is
+for tests or embedded composition only; its default `None` follows this policy
+and it is not a deployment environment variable.
+
 ## Advanced runtime settings
 
 Change these only when the deployment has a concrete operational requirement.
