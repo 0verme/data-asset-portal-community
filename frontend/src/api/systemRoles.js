@@ -16,7 +16,7 @@ import { requestRemote } from "./http.js";
 import {
   MOCK_ROLE_PERMISSIONS,
   PERMISSION_CODES,
-} from "../auth/permissions.js";
+} from "../auth/permissions.ts";
 
 const API_MODE = (import.meta.env.VITE_API_MODE || "mock").trim().toLowerCase();
 

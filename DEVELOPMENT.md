@@ -253,7 +253,7 @@ MySQL 8.0 先执行 `pip install -r backend/requirements-mysql.txt`，再使用 
 仓库提供与 CI 对齐的本地检查脚本，提交 / 发版前建议运行：
 
 ```bash
-# 快速检查：Public Data Guard + 后端单元测试 + migration offline verify + packaging + 前端 lint/测试
+# 快速检查：Public Data Guard + 后端单元测试 + migration offline verify + packaging + 前端 lint/typecheck/测试
 python scripts/release_check.py fast
 
 # 完整检查：fast + SQLite fresh 迁移/seed/重复 apply + 前端 npm ci/lint/build/audit
@@ -318,6 +318,27 @@ PostgreSQL integration 测试（16 个）通过 `TEST_DATABASE_PROFILE` + `TEST_
 - `hooks/` —— 领域业务 hook（数据加载、状态、主题、会话等）
 - `data/` —— mock 数据（仅 `VITE_API_MODE=mock` 时使用）
 - `routing/`、`utils/`、`config/`、`styles/` —— 路由解析、工具、默认配置与样式
+
+### 前端渐进 TypeScript 采用
+
+主应用采用 **JS/TS 共存**，不是一次性重写。`frontend/tsconfig.app.json` 只覆盖已经建立类型边界的基础模块；它不会通过 `checkJs` 扫描 legacy JavaScript。主应用边界和既有 lineage workspace 可以分别检查，也可以用统一命令检查：
+
+```bash
+cd frontend
+npm run typecheck:app      # main-app TypeScript boundary only
+npm run typecheck          # app boundary + lineage workspaces
+```
+
+| 区域 | 默认策略 |
+| --- | --- |
+| 新增 routing / serialization / shared contract | TypeScript preferred |
+| 新增 API / auth / domain adapter boundary | TypeScript preferred |
+| 既有 JS hooks | 只有发生实质重构时迁移 |
+| 既有 JSX components / views | JS/JSX allowed |
+| `src/App.jsx` | 本阶段保持 JSX |
+| `packages/lineage-viewer*` | 继续遵循现有 workspace TypeScript policy |
+
+新增代码不应仅为更换扩展名制造 churn；迁移应当带来边界类型价值。边界可以用靠近 legacy JS 配置的 `.d.ts` 描述文件接入，但不复制完整后端 schema。已有 URL、API/auth wire contract 和模块代码保持不变。Node 22+ 的原生 type stripping 仅用于现有 Node tests 加载少量 `.ts` runtime boundary，不引入 `ts-node`、`tsx` 或新的测试运行时。
 
 ### 后端（`backend/app/`）
 

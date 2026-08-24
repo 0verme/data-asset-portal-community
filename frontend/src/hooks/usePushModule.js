@@ -32,7 +32,7 @@ import {
   getPushInterfaceEditRoute,
   getPushSystemDetailRoute,
   getPushSystemEditRoute,
-} from "../routing/navigation.js";
+} from "../routing/navigation.ts";
 import { getDictOptionsBatch } from "./useDictOptions.js";
 import { comparePushSystemImportance } from "../utils/push.js";
 import { getErrorMessage, scrollMainToTop } from "../utils/ui.js";

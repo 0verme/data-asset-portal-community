@@ -14,7 +14,7 @@
 
 import { Icon } from "../ui.jsx";
 import { MetaItem, PageHeader, StatusBadge } from "../common/index.js";
-import { buildModuleBreadcrumbs } from "../../routing/navigation.js";
+import { buildModuleBreadcrumbs } from "../../routing/navigation.ts";
 import { isLegacyDictValue } from "../../hooks/useDictOptions.js";
 
 import { DbBadge, nextUnload, ScheduleTimeline } from "./UpstreamParts.jsx";

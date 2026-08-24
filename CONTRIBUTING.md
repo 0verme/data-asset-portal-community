@@ -28,7 +28,7 @@ Issue 模板位于 [`.github/ISSUE_TEMPLATE/`](./.github/ISSUE_TEMPLATE/)。日�
 python scripts/release_check.py fast
 ```
 
-CI（`.github/workflows/ci.yml`）会运行 Public Data Guard、后端测试、PostgreSQL 集成、前端 lint/测试/构建和 Community migration contract。
+CI（`.github/workflows/ci.yml`）会运行 Public Data Guard、后端测试、PostgreSQL 集成、前端 lint/typecheck/测试/构建和 Community migration contract。
 
 ## 贡献标签语义
 
@@ -69,12 +69,15 @@ CI（`.github/workflows/ci.yml`）会运行 Public Data Guard、后端测试、P
 - 前端：React 18 + Vite 7，视图在 `frontend/src/components/views/`，业务逻辑在 `frontend/src/hooks/`，API 层按模块拆分于 `frontend/src/api/`
 - 后端：FastAPI Native + Uvicorn，入口为 `backend/asgi.py`；service 位于 `backend/app/services/`，native routers 位于 `backend/app/fastapi/routers/`
 - 推荐先用 `VITE_API_MODE=mock` 快速验证前端改动
+- 新增 routing、serialization、API/auth 或 domain contract 时优先使用 TypeScript；既有 JS/JSX 不要求仅因触碰就迁移
+- 不要通过 `checkJs` 一次打开 legacy JavaScript 全量检查，也不要把 `App.jsx` 或既有 UI 机械改成 TSX
 
 最小验证命令：
 
 ```bash
 # 修改 frontend/
 npm --prefix frontend run lint
+npm --prefix frontend run typecheck
 npm --prefix frontend test
 npm --prefix frontend run build
 

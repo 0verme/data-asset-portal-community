@@ -34,7 +34,7 @@ import {
   getModuleListRoute,
   MODULE_META,
   pushModuleNavigationState,
-} from "../routing/navigation.js";
+} from "../routing/navigation.ts";
 import { useSmartBack } from "./useSmartBack.js";
 import { getDictOptions } from "./useDictOptions.js";
 import { getErrorMessage, scrollMainToTop } from "../utils/ui.js";

@@ -1,3 +1,17 @@
+// Copyright 2025 Jearhe
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import {
   DEFAULT_ASSET_ROUTE,
   DEFAULT_API_ASSET_FILTER,
@@ -21,10 +35,20 @@ import {
   DEFAULT_UP_ROUTE,
   DEFAULT_UP_VIEW,
 } from "../config/defaults.js";
+import type {
+  BreadcrumbItem,
+  ModuleId,
+  ModuleMeta,
+  ModuleMetaKey,
+  NavigationRoute,
+  NavigationRoutes,
+  NavigationState,
+  LocationSnapshotInput,
+} from "./types.js";
 
 const MODULE_NAV_STACK_PREFIX = "dap:nav-stack:";
 
-export const MODULE_META = {
+export const MODULE_META: Record<ModuleMetaKey, ModuleMeta> = {
   dwm: {
     moduleKey: "dwm",
     moduleName: "数据仓库",
@@ -74,8 +98,12 @@ export const MODULE_META = {
     backText: "返回报表资产列表",
   },
   apiAsset: {
-    moduleKey: "apiAsset", moduleName: "API 资产", defaultRoute: DEFAULT_API_ASSET_ROUTE,
-    defaultPath: "/api-assets", listLabel: "API 资产列表", backText: "返回 API 资产列表",
+    moduleKey: "apiAsset",
+    moduleName: "API 资产",
+    defaultRoute: DEFAULT_API_ASSET_ROUTE,
+    defaultPath: "/api-assets",
+    listLabel: "API 资产列表",
+    backText: "返回 API 资产列表",
   },
   push: {
     moduleKey: "push",
@@ -103,14 +131,17 @@ export const MODULE_META = {
   },
 };
 
-function cloneRoute(route) {
+function cloneRoute(route: NavigationRoute | null | undefined): NavigationRoute | null | undefined {
   if (!route || typeof route !== "object") return route;
   return { ...route };
 }
 
-const DEFAULT_LINEAGE_ROUTE = { rootId: null, direction: "both", depth: 2, view: "table" };
+const DEFAULT_LINEAGE_ROUTE = { rootId: null, direction: "both", depth: 2, view: "table" } as const;
 
-export function getActiveModuleRoute(moduleKey, routes = {}) {
+export function getActiveModuleRoute(
+  moduleKey: ModuleId,
+  routes: NavigationRoutes = {},
+): NavigationRoute | null | undefined {
   switch (moduleKey) {
     case "dwm": return routes.asset;
     case "push": return routes.push;
@@ -127,7 +158,7 @@ export function getActiveModuleRoute(moduleKey, routes = {}) {
   }
 }
 
-export function createNavigationState(location = {}) {
+export function createNavigationState(location: LocationSnapshotInput = {}): NavigationState {
   return {
     module: location.module || "portal",
     query: location.query || "",
@@ -158,12 +189,14 @@ export function createNavigationState(location = {}) {
   };
 }
 
-export function getModuleListRoute(moduleKey) {
-  const meta = MODULE_META[moduleKey];
-  return meta ? cloneRoute(meta.defaultRoute) : null;
+export function getModuleListRoute(moduleKey: string): NavigationRoute | null {
+  const meta = Object.prototype.hasOwnProperty.call(MODULE_META, moduleKey)
+    ? MODULE_META[moduleKey as ModuleMetaKey]
+    : undefined;
+  return meta ? cloneRoute(meta.defaultRoute) || null : null;
 }
 
-export function getModuleDetailRoute(moduleKey, id) {
+export function getModuleDetailRoute(moduleKey: string, id: string | null | undefined): NavigationRoute | null {
   if (!id) return getModuleListRoute(moduleKey);
   switch (moduleKey) {
     case "dwm":
@@ -183,7 +216,7 @@ export function getModuleDetailRoute(moduleKey, id) {
   }
 }
 
-export function getModuleEditRoute(moduleKey, id) {
+export function getModuleEditRoute(moduleKey: string, id?: string | null): NavigationRoute | null {
   switch (moduleKey) {
     case "dwm":
       return id ? { page: "edit", table: id } : { page: "new", table: null };
@@ -200,36 +233,48 @@ export function getModuleEditRoute(moduleKey, id) {
   }
 }
 
-export function getPushSystemDetailRoute(systemId) {
+export function getPushSystemDetailRoute(systemId: string | null | undefined): NavigationRoute | null {
   return systemId ? { page: "jobs", sys: systemId, job: null } : getModuleListRoute("push");
 }
 
-export function getPushSystemEditRoute(systemId) {
-  return systemId ? { page: "sysEdit", sys: systemId, job: null } : { page: "sysNew", sys: null, job: null };
+export function getPushSystemEditRoute(systemId: string | null | undefined): NavigationRoute | null {
+  return systemId
+    ? { page: "sysEdit", sys: systemId, job: null }
+    : { page: "sysNew", sys: null, job: null };
 }
 
-export function getPushInterfaceDetailRoute(systemId, jobId) {
+export function getPushInterfaceDetailRoute(
+  systemId: string | null | undefined,
+  jobId: string | null | undefined,
+): NavigationRoute | null {
   if (!systemId) return getModuleListRoute("push");
-  return jobId ? { page: "fields", sys: systemId, job: jobId } : getPushSystemDetailRoute(systemId);
+  return jobId
+    ? { page: "fields", sys: systemId, job: jobId }
+    : getPushSystemDetailRoute(systemId);
 }
 
-export function getPushInterfaceEditRoute(systemId, jobId) {
+export function getPushInterfaceEditRoute(
+  systemId: string | null | undefined,
+  jobId: string | null | undefined,
+): NavigationRoute | null {
   if (!systemId) return getModuleListRoute("push");
-  return jobId ? { page: "jobEdit", sys: systemId, job: jobId } : { page: "jobNew", sys: systemId, job: null };
+  return jobId
+    ? { page: "jobEdit", sys: systemId, job: jobId }
+    : { page: "jobNew", sys: systemId, job: null };
 }
 
-function readStack(moduleKey) {
+function readStack(moduleKey: string): unknown[] {
   if (typeof window === "undefined" || !window.sessionStorage) return [];
   try {
     const raw = window.sessionStorage.getItem(`${MODULE_NAV_STACK_PREFIX}${moduleKey}`);
-    const parsed = raw ? JSON.parse(raw) : [];
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-function writeStack(moduleKey, stack) {
+function writeStack(moduleKey: string, stack: unknown[]): void {
   if (typeof window === "undefined" || !window.sessionStorage) return;
   try {
     if (!stack.length) {
@@ -242,29 +287,35 @@ function writeStack(moduleKey, stack) {
   }
 }
 
-export function pushModuleNavigationState(moduleKey, state) {
+export function pushModuleNavigationState(moduleKey: string, state: unknown): void {
   if (!moduleKey || !state) return;
   const stack = readStack(moduleKey);
   writeStack(moduleKey, [...stack, state]);
 }
 
-export function popModuleNavigationState(moduleKey) {
+export function popModuleNavigationState(moduleKey: string): unknown | null {
   if (!moduleKey) return null;
   const stack = readStack(moduleKey);
   if (!stack.length) return null;
   const next = stack.slice(0, -1);
   const entry = stack[stack.length - 1];
   writeStack(moduleKey, next);
-  return entry;
+  return entry ?? null;
 }
 
-export function clearModuleNavigationState(moduleKey) {
+export function clearModuleNavigationState(moduleKey: string): void {
   if (!moduleKey) return;
   writeStack(moduleKey, []);
 }
 
-export function buildModuleBreadcrumbs(moduleKey, items = [], onModuleClick) {
-  const meta = MODULE_META[moduleKey];
+export function buildModuleBreadcrumbs(
+  moduleKey: string,
+  items: BreadcrumbItem[] = [],
+  onModuleClick?: () => void,
+): BreadcrumbItem[] {
+  const meta = Object.prototype.hasOwnProperty.call(MODULE_META, moduleKey)
+    ? MODULE_META[moduleKey as ModuleMetaKey]
+    : undefined;
   if (!meta) return items;
 
   return [

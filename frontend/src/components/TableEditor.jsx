@@ -15,7 +15,7 @@
 import React from "react";
 import { Icon } from "./ui.jsx";
 import { ActionErrorBanner, confirmDeleteAction, DangerZone, FormActionBar, PageHeader } from "./common/index.js";
-import { buildModuleBreadcrumbs } from "../routing/navigation.js";
+import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import {
   buildColumnType,
   DATA_TYPE_BASE_OPTIONS,

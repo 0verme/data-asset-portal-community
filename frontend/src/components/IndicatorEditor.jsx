@@ -8,7 +8,7 @@ import {
 } from "../data/indicatorPathOptions.js";
 import IndicatorPathCascader from "./IndicatorPathCascader.jsx";
 import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader } from "./common/index.js";
-import { buildModuleBreadcrumbs } from "../routing/navigation.js";
+import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { Icon } from "./ui.jsx";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

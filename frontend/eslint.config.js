@@ -2,10 +2,12 @@ import js from "@eslint/js";
 import globals from "globals";
 import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
+import tseslint from "typescript-eslint";
 
 const sourceFiles = ["src/**/*.{js,jsx}"];
+const tsSourceFiles = ["src/**/*.{ts,tsx}"];
 const nodeFiles = ["scripts/**/*.{js,mjs}", "src/**/*.test.js"];
-const lintFiles = [...sourceFiles, ...nodeFiles];
+const lintFiles = [...sourceFiles, ...tsSourceFiles, ...nodeFiles];
 
 export default [
   {
@@ -23,6 +25,28 @@ export default [
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
+    },
+  },
+  ...tseslint.configs.recommended.map((config) => ({
+    ...config,
+    files: tsSourceFiles,
+  })),
+  {
+    files: tsSourceFiles,
+    languageOptions: {
+      globals: globals.browser,
+    },
+    rules: {
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          args: "after-used",
+          argsIgnorePattern: "^_",
+          caughtErrors: "none",
+          varsIgnorePattern: "^_",
+        },
+      ],
     },
   },
   {

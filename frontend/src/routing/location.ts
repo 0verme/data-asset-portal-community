@@ -39,9 +39,64 @@ import {
 } from "../config/defaults.js";
 import { INDICATOR_DIMENSION_OPTIONS } from "../data/indicators.js";
 import { LAYER_OPTIONS } from "../config/assets.js";
-import { getActiveModuleRoute } from "./navigation.js";
+import { getActiveModuleRoute } from "./navigation.ts";
+import type {
+  ApiAssetFilter,
+  BuildNavigationLocationOptions,
+  IndicatorFilter,
+  LineageRoute,
+  LocationSnapshot,
+  MappingRoute,
+  NavigationLocation,
+  NavigationRoute,
+  ReportFilter,
+  HistoryAction,
+  HistoryActionOptions,
+  PushFilter,
+  UpstreamFilter,
+} from "./types.js";
 
-export function parseInitialLocation() {
+const DEFAULT_LINEAGE_ROUTE: LineageRoute = {
+  rootId: null,
+  direction: "both",
+  depth: 2,
+  view: "table",
+};
+
+function readAllowedString(
+  value: string | null,
+  allowed: readonly string[],
+  fallback: string,
+): string {
+  return value !== null && allowed.includes(value) ? value : fallback;
+}
+
+function readAllowedNullable(
+  value: string | null,
+  allowed: readonly string[],
+  fallback: string | null = null,
+): string | null {
+  return value !== null && allowed.includes(value) ? value : fallback;
+}
+
+function readOption(
+  options: ReadonlySet<string>,
+  value: string | null,
+  fallback: string,
+): string {
+  return value !== null && options.has(value) ? value : fallback;
+}
+
+function readEnum<T extends string>(
+  value: string | null,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  if (value === null) return fallback;
+  return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+export function parseInitialLocation(): LocationSnapshot {
   if (typeof window === "undefined") {
     return {
       module: "portal",
@@ -67,7 +122,7 @@ export function parseInitialLocation() {
       upFilter: DEFAULT_UP_FILTER,
       upstreamView: DEFAULT_UP_VIEW,
       mappingRoute: DEFAULT_MAPPING_ROUTE,
-      lineageRoute: { rootId: null, direction: "both", depth: 2, view: "table" },
+      lineageRoute: DEFAULT_LINEAGE_ROUTE,
       systemRoute: DEFAULT_SYSTEM_ROUTE,
     };
   }
@@ -77,67 +132,71 @@ export function parseInitialLocation() {
   const segments = pathname.split("/").filter(Boolean);
   const top = segments[0] || "";
 
-  const indicatorView = INDICATOR_VIEW_OPTIONS.has(searchParams.get("view"))
-    ? searchParams.get("view")
-    : DEFAULT_INDICATOR_VIEW;
-  const indicatorFilter = {
-    dimension: INDICATOR_DIMENSION_OPTIONS.some((item) => item.value === searchParams.get("dimension"))
-      ? searchParams.get("dimension")
+  const indicatorDimension = searchParams.get("dimension");
+  const indicatorView = readOption(
+    INDICATOR_VIEW_OPTIONS,
+    searchParams.get("view"),
+    DEFAULT_INDICATOR_VIEW,
+  );
+  const indicatorFilter: IndicatorFilter = {
+    dimension: indicatorDimension !== null
+      && INDICATOR_DIMENSION_OPTIONS.some((item) => item.value === indicatorDimension)
+      ? indicatorDimension
       : DEFAULT_INDICATOR_FILTER.dimension,
-    status: ["all", "enabled", "disabled"].includes(searchParams.get("status"))
-      ? searchParams.get("status")
-      : DEFAULT_INDICATOR_FILTER.status,
+    status: readAllowedString(
+      searchParams.get("status"),
+      ["all", "enabled", "disabled"],
+      DEFAULT_INDICATOR_FILTER.status,
+    ),
   };
-  const reportFilter = {
+  const reportFilter: ReportFilter = {
     type: searchParams.get("type") || DEFAULT_REPORT_FILTER.type,
-    status: ["enabled", "disabled"].includes(searchParams.get("status"))
-      ? searchParams.get("status")
-      : DEFAULT_REPORT_FILTER.status,
+    status: readAllowedNullable(searchParams.get("status"), ["enabled", "disabled"]),
     ownerDept: searchParams.get("ownerDept") || DEFAULT_REPORT_FILTER.ownerDept,
   };
-  const reportView = ASSET_VIEW_OPTIONS.has(searchParams.get("view")) ? searchParams.get("view") : DEFAULT_REPORT_VIEW;
-  const apiAssetFilter = { status: ["enabled", "disabled"].includes(searchParams.get("status")) ? searchParams.get("status") : null, method: searchParams.get("method") || null, downstreamSystemId: searchParams.get("downstreamSystemId") || null };
-  const apiAssetView = ASSET_VIEW_OPTIONS.has(searchParams.get("view")) ? searchParams.get("view") : DEFAULT_API_ASSET_VIEW;
-  const pushFilter = {
-    status: ["enabled", "disabled"].includes(searchParams.get("status"))
-      ? searchParams.get("status")
-      : DEFAULT_PUSH_FILTER.status,
+  const reportView = readOption(ASSET_VIEW_OPTIONS, searchParams.get("view"), DEFAULT_REPORT_VIEW);
+  const apiAssetFilter: ApiAssetFilter = {
+    status: readAllowedNullable(searchParams.get("status"), ["enabled", "disabled"]),
+    method: searchParams.get("method") || null,
+    downstreamSystemId: searchParams.get("downstreamSystemId") || null,
+  };
+  const apiAssetView = readOption(ASSET_VIEW_OPTIONS, searchParams.get("view"), DEFAULT_API_ASSET_VIEW);
+  const pushFilter: PushFilter = {
+    status: readAllowedNullable(searchParams.get("status"), ["enabled", "disabled"]),
     protocol: searchParams.get("protocol") || DEFAULT_PUSH_FILTER.protocol,
     dept: searchParams.get("dept") || DEFAULT_PUSH_FILTER.dept,
-    importanceLevel: ["important", "normal"].includes(searchParams.get("importanceLevel"))
-      ? searchParams.get("importanceLevel")
-      : DEFAULT_PUSH_FILTER.importanceLevel,
+    importanceLevel: readAllowedNullable(
+      searchParams.get("importanceLevel"),
+      ["important", "normal"],
+      DEFAULT_PUSH_FILTER.importanceLevel,
+    ),
   };
-  const pushView = ["card", "list"].includes(searchParams.get("view"))
-    ? searchParams.get("view")
-    : DEFAULT_PUSH_VIEW;
-  const upFilter = {
-    status: ["enabled", "disabled"].includes(searchParams.get("status"))
-      ? searchParams.get("status")
-      : DEFAULT_UP_FILTER.status,
+  const pushView = readAllowedString(searchParams.get("view"), ["card", "list"], DEFAULT_PUSH_VIEW);
+  const upFilter: UpstreamFilter = {
+    status: readAllowedNullable(searchParams.get("status"), ["enabled", "disabled"]),
     dbType: searchParams.get("dbType") || DEFAULT_UP_FILTER.dbType,
   };
-  const upstreamView = ["card", "list"].includes(searchParams.get("view"))
-    ? searchParams.get("view")
-    : DEFAULT_UP_VIEW;
-  const assetLayout = ASSET_LAYOUT_OPTIONS.has(searchParams.get("layout"))
-    ? searchParams.get("layout")
-    : DEFAULT_LAYOUT;
-  const assetDetailTab = searchParams.get("tab") === "ddl"
-    ? "ddl"
-    : DEFAULT_DETAIL_TAB;
+  const upstreamView = readAllowedString(searchParams.get("view"), ["card", "list"], DEFAULT_UP_VIEW);
+  const assetLayout = readOption(ASSET_LAYOUT_OPTIONS, searchParams.get("layout"), DEFAULT_LAYOUT);
+  const assetDetailTab = searchParams.get("tab") === "ddl" ? "ddl" : DEFAULT_DETAIL_TAB;
   const requestedLayer = searchParams.get("layer")?.trim().toUpperCase() || "";
   const assetLayer = LAYER_OPTIONS.some((item) => item.code === requestedLayer)
     ? requestedLayer
     : null;
-  const lineageRoute = {
+  const lineageRoute: LineageRoute = {
     rootId: searchParams.get("rootId") || null,
-    direction: ["upstream", "downstream", "both"].includes(searchParams.get("direction")) ? searchParams.get("direction") : "both",
-    depth: [1, 2, 3, 4, 5].includes(Number(searchParams.get("depth"))) ? Number(searchParams.get("depth")) : 2,
-    view: ["table", "detail"].includes(searchParams.get("view")) ? searchParams.get("view") : "table",
+    direction: readEnum(
+      searchParams.get("direction"),
+      ["upstream", "downstream", "both"],
+      "both",
+    ),
+    depth: [1, 2, 3, 4, 5].includes(Number(searchParams.get("depth")))
+      ? Number(searchParams.get("depth"))
+      : 2,
+    view: readEnum(searchParams.get("view"), ["table", "detail"], "table"),
   };
 
-  const base = {
+  const base: Omit<LocationSnapshot, "module"> = {
     query: searchParams.get("q") || "",
     assetRoute: DEFAULT_ASSET_ROUTE,
     assetLayout,
@@ -309,41 +368,46 @@ export function parseInitialLocation() {
   return { ...base, module: "portal" };
 }
 
-export function buildPathname(module, moduleRoute, systemRoute) {
+export function buildPathname(
+  module: LocationSnapshot["module"],
+  moduleRoute: NavigationRoute | null | undefined,
+  systemRoute: { page: string },
+): string {
+  const route = moduleRoute || {};
   if (module === "dwm") {
-    if (moduleRoute.page === "new") return "/data-warehouse/new";
-    if (moduleRoute.page === "edit" && moduleRoute.table) {
-      return `/data-warehouse/${encodeURIComponent(moduleRoute.table)}/edit`;
+    if (route.page === "new") return "/data-warehouse/new";
+    if (route.page === "edit" && route.table) {
+      return `/data-warehouse/${encodeURIComponent(route.table)}/edit`;
     }
-    if (moduleRoute.page === "detail" && moduleRoute.table) {
-      return `/data-warehouse/${encodeURIComponent(moduleRoute.table)}`;
+    if (route.page === "detail" && route.table) {
+      return `/data-warehouse/${encodeURIComponent(route.table)}`;
     }
     return "/data-warehouse";
   }
   if (module === "indicator") {
-    if (moduleRoute.page === "new") return "/indicator-maintenance/new";
-    if (moduleRoute.page === "edit" && moduleRoute.id) {
-      return `/indicator-maintenance/${encodeURIComponent(moduleRoute.id)}/edit`;
+    if (route.page === "new") return "/indicator-maintenance/new";
+    if (route.page === "edit" && route.id) {
+      return `/indicator-maintenance/${encodeURIComponent(route.id)}/edit`;
     }
-    if (moduleRoute.page === "view" && moduleRoute.id) {
-      return `/indicator-maintenance/${encodeURIComponent(moduleRoute.id)}`;
+    if (route.page === "view" && route.id) {
+      return `/indicator-maintenance/${encodeURIComponent(route.id)}`;
     }
     return "/indicator-maintenance";
   }
   if (module === "report") {
-    if (moduleRoute.page === "new") return "/report-assets/new";
-    if (moduleRoute.page === "edit" && moduleRoute.code) {
-      return `/report-assets/${encodeURIComponent(moduleRoute.code)}/edit`;
+    if (route.page === "new") return "/report-assets/new";
+    if (route.page === "edit" && route.code) {
+      return `/report-assets/${encodeURIComponent(route.code)}/edit`;
     }
-    if (moduleRoute.page === "view" && moduleRoute.code) {
-      return `/report-assets/${encodeURIComponent(moduleRoute.code)}`;
+    if (route.page === "view" && route.code) {
+      return `/report-assets/${encodeURIComponent(route.code)}`;
     }
     return "/report-assets";
   }
   if (module === "apiAsset") {
-    if (moduleRoute.page === "new") return "/api-assets/new";
-    if (moduleRoute.page === "edit" && moduleRoute.code) return `/api-assets/${encodeURIComponent(moduleRoute.code)}/edit`;
-    if (moduleRoute.page === "view" && moduleRoute.code) return `/api-assets/${encodeURIComponent(moduleRoute.code)}`;
+    if (route.page === "new") return "/api-assets/new";
+    if (route.page === "edit" && route.code) return `/api-assets/${encodeURIComponent(route.code)}/edit`;
+    if (route.page === "view" && route.code) return `/api-assets/${encodeURIComponent(route.code)}`;
     return "/api-assets";
   }
   if (module === "mapping") return "/field-mapping";
@@ -351,31 +415,31 @@ export function buildPathname(module, moduleRoute, systemRoute) {
   if (module === "root") return "/root-management";
   if (module === "codeTable") return "/code-table-maintenance";
   if (module === "upstream") {
-    if (moduleRoute.page === "new") return "/upstream/new";
-    if (moduleRoute.page === "edit" && moduleRoute.id) {
-      return `/upstream/${encodeURIComponent(moduleRoute.id)}/edit`;
+    if (route.page === "new") return "/upstream/new";
+    if (route.page === "edit" && route.id) {
+      return `/upstream/${encodeURIComponent(route.id)}/edit`;
     }
-    if (moduleRoute.page === "detail" && moduleRoute.id) {
-      return `/upstream/${encodeURIComponent(moduleRoute.id)}`;
+    if (route.page === "detail" && route.id) {
+      return `/upstream/${encodeURIComponent(route.id)}`;
     }
     return "/upstream";
   }
   if (module === "push") {
-    if (moduleRoute.page === "sysNew") return "/push/new";
-    if (moduleRoute.page === "sysEdit" && moduleRoute.sys) {
-      return `/push/${encodeURIComponent(moduleRoute.sys)}/edit`;
+    if (route.page === "sysNew") return "/push/new";
+    if (route.page === "sysEdit" && route.sys) {
+      return `/push/${encodeURIComponent(route.sys)}/edit`;
     }
-    if (moduleRoute.page === "jobNew" && moduleRoute.sys) {
-      return `/push/${encodeURIComponent(moduleRoute.sys)}/new`;
+    if (route.page === "jobNew" && route.sys) {
+      return `/push/${encodeURIComponent(route.sys)}/new`;
     }
-    if (moduleRoute.page === "jobEdit" && moduleRoute.sys && moduleRoute.job) {
-      return `/push/${encodeURIComponent(moduleRoute.sys)}/${encodeURIComponent(moduleRoute.job)}/edit`;
+    if (route.page === "jobEdit" && route.sys && route.job) {
+      return `/push/${encodeURIComponent(route.sys)}/${encodeURIComponent(route.job)}/edit`;
     }
-    if (moduleRoute.page === "fields" && moduleRoute.sys && moduleRoute.job) {
-      return `/push/${encodeURIComponent(moduleRoute.sys)}/${encodeURIComponent(moduleRoute.job)}`;
+    if (route.page === "fields" && route.sys && route.job) {
+      return `/push/${encodeURIComponent(route.sys)}/${encodeURIComponent(route.job)}`;
     }
-    if (moduleRoute.page === "jobs" && moduleRoute.sys) {
-      return `/push/${encodeURIComponent(moduleRoute.sys)}`;
+    if (route.page === "jobs" && route.sys) {
+      return `/push/${encodeURIComponent(route.sys)}`;
     }
     return "/push";
   }
@@ -390,9 +454,12 @@ export function buildPathname(module, moduleRoute, systemRoute) {
   return "/data-warehouse";
 }
 
-const DEFAULT_LINEAGE_ROUTE = { rootId: null, direction: "both", depth: 2, view: "table" };
-
-export function buildNavigationLocation({ module, routes = {}, query = "", urlState = {} }) {
+export function buildNavigationLocation({
+  module,
+  routes = {},
+  query = "",
+  urlState = {},
+}: BuildNavigationLocationOptions): NavigationLocation {
   const pathname = buildPathname(
     module,
     getActiveModuleRoute(module, routes),
@@ -417,7 +484,7 @@ export function buildNavigationLocation({ module, routes = {}, query = "", urlSt
   const apiAssetView = apiAsset.view || DEFAULT_API_ASSET_VIEW;
   const upstreamView = upstream.view || DEFAULT_UP_VIEW;
   const pushView = push.view || DEFAULT_PUSH_VIEW;
-  const mappingRoute = routes.mapping || DEFAULT_MAPPING_ROUTE;
+  const mappingRoute: MappingRoute = routes.mapping || DEFAULT_MAPPING_ROUTE;
   const lineageRoute = routes.lineage || DEFAULT_LINEAGE_ROUTE;
   const normalizedQuery = String(query || "").trim();
 
@@ -472,7 +539,7 @@ export function buildNavigationLocation({ module, routes = {}, query = "", urlSt
   if (module === "lineage") {
     if (lineageRoute.rootId) params.set("rootId", lineageRoute.rootId);
     params.set("direction", lineageRoute.direction);
-    params.set("depth", lineageRoute.depth);
+    params.set("depth", String(lineageRoute.depth));
     if (lineageRoute.view !== DEFAULT_LINEAGE_ROUTE.view) params.set("view", lineageRoute.view);
   }
 
@@ -509,7 +576,7 @@ export function resolveHistoryAction({
   nextPathname,
   historyReady,
   isPopstate = false,
-}) {
+}: HistoryActionOptions): HistoryAction {
   if (currentUrl === nextUrl) return "noop";
   if (isPopstate) return "replace";
   if (historyReady && currentPathname !== nextPathname) return "push";

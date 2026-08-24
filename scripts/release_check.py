@@ -3,8 +3,8 @@
 
 Usage (from the repository root):
 
-    python scripts/release_check.py fast    # guard + backend unit + migration verify + frontend lint/test
-    python scripts/release_check.py full    # fast + frontend ci/lint/test/build + fresh SQLite + packaging
+    python scripts/release_check.py fast    # guard + backend unit + migration verify + frontend lint/typecheck/test
+    python scripts/release_check.py full    # fast + frontend ci/lint/typecheck/test/build + fresh SQLite + packaging
 
 `full` additionally runs the PostgreSQL integration suite when
 TEST_DATABASE_PROFILE and TEST_DATABASE_CONFIG_PATH point at an ephemeral
@@ -158,6 +158,11 @@ def _frontend_lint():
     run([npm(), "run", "lint"], cwd=FRONTEND, label="npm run lint", env=npm_env())
 
 
+@check("Frontend typecheck", "npm run typecheck")
+def _frontend_typecheck():
+    run([npm(), "run", "typecheck"], cwd=FRONTEND, label="npm run typecheck", env=npm_env())
+
+
 @check("Frontend tests", "npm test")
 def _frontend_tests():
     run([npm(), "test"], cwd=FRONTEND, label="npm test", env=npm_env())
@@ -184,10 +189,10 @@ def _frontend_audit():
 
 
 FAST = ("Public Data Guard", "Backend unit tests", "Migration offline verify", "Packaging contracts",
-        "Frontend lint", "Frontend tests")
+        "Frontend lint", "Frontend typecheck", "Frontend tests")
 FULL = ("Public Data Guard", "Backend unit tests", "Migration offline verify", "Packaging contracts",
-        "Fresh SQLite migration + seed + repeat apply", "Frontend npm ci + build", "Frontend lint", "Frontend tests",
-        "Frontend audit gate", "PostgreSQL integration")
+        "Fresh SQLite migration + seed + repeat apply", "Frontend npm ci + build", "Frontend lint", "Frontend typecheck",
+        "Frontend tests", "Frontend audit gate", "PostgreSQL integration")
 
 
 def main(argv):

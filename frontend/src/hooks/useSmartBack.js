@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import { popModuleNavigationState } from "../routing/navigation.js";
+import { popModuleNavigationState } from "../routing/navigation.ts";
 
 export function useSmartBack({ moduleKey, onRestore, onFallback }) {
   return useCallback(() => {

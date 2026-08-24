@@ -19,9 +19,9 @@ import {
   DEFAULT_PUSH_VIEW,
   DEFAULT_UP_VIEW,
 } from "../config/defaults.js";
-import { createNavigationState } from "../routing/navigation.js";
+import { createNavigationState } from "../routing/navigation.ts";
 import { getPortalPushNavigation } from "../routing/portalNavigation.js";
-import { parseInitialLocation } from "../routing/location.js";
+import { parseInitialLocation } from "../routing/location.ts";
 
 function resetNavigationForModule(current, nextModule, systemRoute) {
   const next = {
