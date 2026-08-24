@@ -1,13 +1,25 @@
 import {
   DEFAULT_ASSET_ROUTE,
+  DEFAULT_API_ASSET_FILTER,
   DEFAULT_API_ASSET_ROUTE,
+  DEFAULT_API_ASSET_VIEW,
+  DEFAULT_DETAIL_TAB,
+  DEFAULT_INDICATOR_FILTER,
   DEFAULT_INDICATOR_ROUTE,
+  DEFAULT_INDICATOR_VIEW,
+  DEFAULT_LAYOUT,
   DEFAULT_MAPPING_ROUTE,
+  DEFAULT_PUSH_FILTER,
   DEFAULT_PUSH_ROUTE,
+  DEFAULT_PUSH_VIEW,
+  DEFAULT_REPORT_FILTER,
   DEFAULT_REPORT_ROUTE,
+  DEFAULT_REPORT_VIEW,
   DEFAULT_ROOT_ROUTE,
   DEFAULT_SYSTEM_ROUTE,
+  DEFAULT_UP_FILTER,
   DEFAULT_UP_ROUTE,
+  DEFAULT_UP_VIEW,
 } from "../config/defaults.js";
 
 const MODULE_NAV_STACK_PREFIX = "dap:nav-stack:";
@@ -94,6 +106,56 @@ export const MODULE_META = {
 function cloneRoute(route) {
   if (!route || typeof route !== "object") return route;
   return { ...route };
+}
+
+const DEFAULT_LINEAGE_ROUTE = { rootId: null, direction: "both", depth: 2, view: "table" };
+
+export function getActiveModuleRoute(moduleKey, routes = {}) {
+  switch (moduleKey) {
+    case "dwm": return routes.asset;
+    case "push": return routes.push;
+    case "upstream": return routes.upstream;
+    case "report": return routes.report;
+    case "apiAsset": return routes.apiAsset;
+    case "indicator": return routes.indicator;
+    case "mapping": return routes.mapping;
+    case "lineage": return routes.lineage;
+    case "root": return routes.root;
+    case "system": return routes.system;
+    case "codeTable": return null;
+    default: return routes.indicator;
+  }
+}
+
+export function createNavigationState(location = {}) {
+  return {
+    module: location.module || "portal",
+    query: location.query || "",
+    route: location.assetRoute || DEFAULT_ASSET_ROUTE,
+    pushRoute: location.pushRoute || DEFAULT_PUSH_ROUTE,
+    indicatorRoute: location.indicatorRoute || DEFAULT_INDICATOR_ROUTE,
+    reportRoute: location.reportRoute || DEFAULT_REPORT_ROUTE,
+    apiAssetRoute: location.apiAssetRoute || DEFAULT_API_ASSET_ROUTE,
+    rootRoute: location.rootRoute || DEFAULT_ROOT_ROUTE,
+    upRoute: location.upRoute || DEFAULT_UP_ROUTE,
+    mappingRoute: location.mappingRoute || DEFAULT_MAPPING_ROUTE,
+    lineageRoute: location.lineageRoute || DEFAULT_LINEAGE_ROUTE,
+    systemRoute: location.systemRoute || DEFAULT_SYSTEM_ROUTE,
+    assetLayoutFromUrl: location.assetLayout || DEFAULT_LAYOUT,
+    assetDomainFromUrl: location.assetDomain ?? null,
+    assetLayerFromUrl: location.assetLayer ?? null,
+    assetDetailTabFromUrl: location.assetDetailTab || DEFAULT_DETAIL_TAB,
+    pushViewFromUrl: location.pushView || DEFAULT_PUSH_VIEW,
+    pushFilterFromUrl: location.pushFilter || DEFAULT_PUSH_FILTER,
+    upFilterFromUrl: location.upFilter || DEFAULT_UP_FILTER,
+    upstreamViewFromUrl: location.upstreamView || DEFAULT_UP_VIEW,
+    indicatorFilter: location.indicatorFilter || DEFAULT_INDICATOR_FILTER,
+    indicatorView: location.indicatorView || DEFAULT_INDICATOR_VIEW,
+    reportFilter: location.reportFilter || DEFAULT_REPORT_FILTER,
+    reportView: location.reportView || DEFAULT_REPORT_VIEW,
+    apiAssetFilter: location.apiAssetFilter || DEFAULT_API_ASSET_FILTER,
+    apiAssetView: location.apiAssetView || DEFAULT_API_ASSET_VIEW,
+  };
 }
 
 export function getModuleListRoute(moduleKey) {
