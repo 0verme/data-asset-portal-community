@@ -136,9 +136,14 @@ class AuthorizationService:
             reason="authenticated",
         )
 
-    def get_permissions(self, identity: Identity | None) -> tuple[str, ...]:
+    def get_permissions(
+        self,
+        identity: Identity | None,
+        *,
+        authentication: AuthorizationDecision | None = None,
+    ) -> tuple[str, ...]:
         """Return a stable current permission snapshot, or an empty set."""
-        authentication = self.authenticate(identity)
+        authentication = authentication or self.authenticate(identity)
         if (
             not authentication.authenticated
             or authentication.subject is None
@@ -153,9 +158,11 @@ class AuthorizationService:
         self,
         identity: Identity | None,
         permission: str,
+        *,
+        authentication: AuthorizationDecision | None = None,
     ) -> AuthorizationDecision:
         """Check one registered permission against current repository state."""
-        authentication = self.authenticate(identity)
+        authentication = authentication or self.authenticate(identity)
         if not authentication.authenticated:
             return AuthorizationDecision(
                 authenticated=False,
@@ -180,7 +187,10 @@ class AuthorizationService:
                 subject=authentication.subject,
                 reason="unknown_permission",
             )
-        allowed = permission in self.get_permissions(identity)
+        allowed = permission in self.get_permissions(
+            identity,
+            authentication=authentication,
+        )
         return AuthorizationDecision(
             authenticated=True,
             allowed=allowed,

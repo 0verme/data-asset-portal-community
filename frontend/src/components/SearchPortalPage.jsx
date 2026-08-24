@@ -42,7 +42,12 @@ function formatMatchedField(item) {
   return `命中：${first.label} ${first.value}`;
 }
 
-export function SearchPortalPage({ onNavigate, availableModules = [] }) {
+export function SearchPortalPage({
+  onNavigate,
+  availableModules = [],
+  authenticated = true,
+  onRequireLogin,
+}) {
   const scopeOptions = useMemo(
     () => filterPortalScopesByModules(availableModules),
     [availableModules],
@@ -123,6 +128,14 @@ export function SearchPortalPage({ onNavigate, availableModules = [] }) {
       clearSearch(nextScope);
       return;
     }
+    if (!authenticated) {
+      setSearchError("请先登录后搜索。");
+      setResult(null);
+      setSearchLoading(false);
+      setSearchedTerm(keyword);
+      onRequireLogin?.();
+      return;
+    }
 
     const seq = ++requestSeq.current;
     setQuery(keyword);
@@ -149,6 +162,17 @@ export function SearchPortalPage({ onNavigate, availableModules = [] }) {
 
   useEffect(() => {
     let cancelled = false;
+    if (!authenticated) {
+      setStats([]);
+      setStatsLoading(false);
+      setStatsError("");
+      setResult(null);
+      setSearchError("");
+      setSearchedTerm("");
+      return () => {
+        cancelled = true;
+      };
+    }
     setStatsLoading(true);
     setStatsError("");
 
@@ -167,9 +191,10 @@ export function SearchPortalPage({ onNavigate, availableModules = [] }) {
     return () => {
       cancelled = true;
     };
-  }, [availableModules]);
+  }, [availableModules, authenticated]);
 
   useEffect(() => {
+    if (!authenticated) return;
     const nextScope = validScopeKeys.has(scope) ? scope : DEFAULT_PORTAL_SCOPE;
     const activeQuery = String(searchedTerm || query || "").trim();
 
@@ -183,18 +208,21 @@ export function SearchPortalPage({ onNavigate, availableModules = [] }) {
     }
 
     runSearch(activeQuery, nextScope);
-    // This synchronization intentionally runs only when the available module set changes.
-    // The called search updates state, so adding its render-scoped dependencies would loop.
+    // This synchronization intentionally runs only when the available module set or
+    // authentication state changes. The called search updates state, so adding its
+    // render-scoped dependencies would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableModules]);
+  }, [availableModules, authenticated]);
 
   useEffect(() => {
+    if (!authenticated) return;
     const initialQuery = String(initialSearchRef.current.query || "").trim();
     if (!initialQuery) return;
     runSearch(initialQuery, initialSearchRef.current.scope);
-    // Bootstrap the URL query once; re-running on the render-scoped callback would repeat the search.
+    // Bootstrap the URL query once per authentication bootstrap; re-running on the
+    // render-scoped callback would repeat the search.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authenticated]);
 
   const doSearch = () => runSearch(query, scope);
 
@@ -332,7 +360,9 @@ export function SearchPortalPage({ onNavigate, availableModules = [] }) {
         </div>
       ) : (
         <div className="sp-stats">
-          {statsLoading ? (
+          {!authenticated ? (
+            <div className="sp-stats-hint">登录后查看资产统计与搜索结果。</div>
+          ) : statsLoading ? (
             <div className="sp-stats-hint">正在加载资产统计...</div>
           ) : statsError ? (
             <div className="sp-stats-hint sp-stats-error">{statsError}</div>

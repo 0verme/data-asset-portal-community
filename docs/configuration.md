@@ -17,6 +17,11 @@ store. Debug must remain disabled in production. The old names are retained for
 migration and are deprecated; they may be removed in a future release after
 operators have migrated.
 
+There is intentionally no Public Catalog or anonymous-business-read setting.
+Ordinary business API reads are authenticated by default; the public surface is
+limited to the explicit health/capability and authentication lifecycle routes
+listed in [the authenticated-read model](./rbac/authenticated-read-model.md).
+
 ## OpenAPI and interactive docs exposure
 
 `APP_ENV` also defines the default HTTP exposure policy for the FastAPI-generated

@@ -62,10 +62,20 @@ class RepositoryOpenBoundaryTests(unittest.TestCase):
         finally:
             connection.close()
 
-    def client(self):
+    def client(self, *, authenticated=False):
         from backend.asgi import create_native_app
 
-        return TestClient(create_native_app(capabilities=resolve_capabilities()))
+        client = TestClient(create_native_app(capabilities=resolve_capabilities()))
+        if authenticated:
+            login = client.post(
+                "/api/auth/login",
+                json={"username": "community_demo", "password": "demo-change-me"},
+            )
+            self.assertEqual(200, login.status_code, login.text)
+            session = login.cookies.get("session")
+            self.assertTrue(session)
+            client.cookies.set("session", session)
+        return client
 
     def test_schema_contains_every_seeded_repository_module_table(self):
         from demo.seed_loader import community_seed_plan
@@ -78,7 +88,7 @@ class RepositoryOpenBoundaryTests(unittest.TestCase):
         self.assertIn("p_manual_code_table", self.table_names())
 
     def test_every_repository_route_is_registered_and_diagnostic(self):
-        client = self.client()
+        client = self.client(authenticated=True)
         requests = {
             "upstream": "/api/upstreams/systems",
             "push": "/api/push/systems",
@@ -102,7 +112,7 @@ class RepositoryOpenBoundaryTests(unittest.TestCase):
         self.assertTrue(all(item["enabled"] for item in capabilities.json()["modules"]))
 
     def test_open_modules_are_present_in_search_and_portal_stats(self):
-        client = self.client()
+        client = self.client(authenticated=True)
         for scope, query in (("upstream", "up_"), ("push", "DEMO_"), ("report", "RPT_"), ("codeTable", "ORDER_STATUS")):
             with self.subTest(scope=scope):
                 search = client.get(f"/api/search?q={query}&scope={scope}")
