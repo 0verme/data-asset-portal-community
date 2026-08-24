@@ -86,7 +86,10 @@ class FlaskFreeRuntimeGateTests(unittest.TestCase):
             """
         )
         environment = os.environ.copy()
-        environment["PYTHONPATH"] = str(BACKEND_ROOT)
+        pythonpath = [str(BACKEND_ROOT)]
+        if environment.get("PYTHONPATH"):
+            pythonpath.append(environment["PYTHONPATH"])
+        environment["PYTHONPATH"] = os.pathsep.join(pythonpath)
         result = subprocess.run(
             [sys.executable, "-c", probe],
             cwd=BACKEND_ROOT,

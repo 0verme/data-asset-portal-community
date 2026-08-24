@@ -23,11 +23,12 @@ from typing import Any, cast
 
 from sqlalchemy import and_, func, insert, or_, select, update
 
+from ..application import AuditActorMixin, actor_aware
+
 # pyright: reportMissingImports=false
 
 from ..db.service import CoreAccess
 from ..db.tables import asset_domain, asset_table, indicator_item, report_asset
-from ..settings import get_default_operator
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
@@ -97,10 +98,9 @@ class ReportDataSourceError(Exception):
         return {"code": "REPORT_DATA_SOURCE_ERROR", "message": self.message}
 
 
-class ReportService:
+class ReportService(AuditActorMixin):
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
-        self._default_operator = get_default_operator()
         self._db = CoreAccess(
             profile_getter=lambda: self._db_profile,
             error_factory=ReportDataSourceError,
@@ -469,6 +469,7 @@ class ReportService:
             raise ReportNotFoundError(report_code)
         return deepcopy(item)
 
+    @actor_aware
     def create_report(self, payload):
         with operation_log_service.audit(
             module_name="报表资产",
@@ -523,6 +524,7 @@ class ReportService:
         self._execute([self._insert_report(item, report_pk)])
         return self.get_report_detail(item["code"])
 
+    @actor_aware
     def update_report(self, report_code, payload):
         with operation_log_service.audit(
             module_name="报表资产",
@@ -584,6 +586,7 @@ class ReportService:
         ])
         return current, self.get_report_detail(item["code"])
 
+    @actor_aware
     def delete_report(self, report_code):
         with operation_log_service.audit(
             module_name="报表资产",

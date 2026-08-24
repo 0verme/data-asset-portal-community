@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React from "react";
 import {
   JobEditor,
   PushJobDetail,
@@ -23,9 +22,8 @@ import {
 import { Icon } from "../ui.jsx";
 import { EmptyState, ErrorState, LoadingState, ViewModeSwitcher } from "../common/index.js";
 
-export function PushView({ push, query, statusOptions, requireLogin, canEdit, pushRoute, setPushRoute }) {
+export function PushView({ push, query, statusOptions, requireLogin, canEdit, pushRoute }) {
   const {
-    pushSystems,
     pushProtocolOptions,
     pushAuthOptions,
     pushDelimiterOptions,

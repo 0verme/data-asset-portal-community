@@ -11,7 +11,6 @@ import {
 } from "../utils/push.js";
 import { formatFreq, validateJob, validateSystem } from "./push/pushUtils.js";
 
-const appPath = fileURLToPath(new URL("../App.jsx", import.meta.url));
 const defaultsPath = fileURLToPath(new URL("../config/defaults.js", import.meta.url));
 const pushHookPath = fileURLToPath(new URL("../hooks/usePushModule.js", import.meta.url));
 const locationPath = fileURLToPath(new URL("../routing/location.js", import.meta.url));
@@ -126,11 +125,11 @@ test("push importance filter is restored only from supported URL values", async 
 });
 
 test("push importance filter is persisted in the URL", async () => {
-  const source = await readFile(appPath, "utf8");
+  const source = await readFile(locationPath, "utf8");
 
   assert.match(
     source,
-    /if \(push\.pushFilter\.importanceLevel\) params\.set\("importanceLevel", push\.pushFilter\.importanceLevel\)/,
+    /if \(pushFilter\.importanceLevel\) params\.set\("importanceLevel", pushFilter\.importanceLevel\)/,
   );
 });
 

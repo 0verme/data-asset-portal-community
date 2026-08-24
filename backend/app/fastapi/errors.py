@@ -12,6 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..application.errors import ApplicationError
 from ..contracts import ErrorEnvelope, validate_contract
+from .request_body import RequestBodyTooLargeError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +54,12 @@ def register_exception_handlers(app: FastAPI) -> None:
         ]
         payload = {"error": {"code": "VALIDATION_ERROR", "message": "请求参数不合法", "details": details}}
         return JSONResponse(status_code=422, content=payload)
+
+    @app.exception_handler(RequestBodyTooLargeError)
+    async def handle_request_body_too_large(
+        _request: Request, error: RequestBodyTooLargeError
+    ):
+        return JSONResponse(status_code=413, content=error.policy.payload())
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_exception(_request: Request, error: StarletteHTTPException):

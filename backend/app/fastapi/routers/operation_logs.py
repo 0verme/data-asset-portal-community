@@ -17,7 +17,7 @@ from ...services.operation_log_service import (
     OperationLogNotFoundError,
     OperationLogValidationError,
 )
-from ..dependencies import require_permission
+from ..dependencies import require_authenticated, require_permission
 from ..errors import _service_error_response
 
 
@@ -36,7 +36,9 @@ def _register_operation_log_routes(app: FastAPI, service: Any) -> None:
         return service
 
     operation_router = APIRouter(
-        prefix="/api/operation-logs", tags=["operation-log-migration"]
+        prefix="/api/operation-logs",
+        tags=["operation-log-migration"],
+        dependencies=[Depends(require_authenticated)],
     )
 
     @operation_router.get("", response_model=None)

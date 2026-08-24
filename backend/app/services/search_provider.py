@@ -28,7 +28,7 @@ import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
-from ..db.gaussdb import _prepare_execute_args, connect_with_profile, fetch_all, resolve_db_profile_name
+from ..db.facade import _prepare_execute_args, connect_with_profile, fetch_all, resolve_db_profile_name
 from ..settings import get_int_env
 from .providers import entity_module_codes, list_search_entities, module_scope_aliases
 from .system_management_service import system_management_service

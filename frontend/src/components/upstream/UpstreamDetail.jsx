@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React from "react";
 import { Icon } from "../ui.jsx";
-import { ActionErrorBanner, BinaryStatusToggle, CardGridView, DangerZone, EmptyState, FormActionBar, isValidTime, MetaItem, PageHeader, RowActions, StatusBadge, TimeInput, ViewModeSwitcher } from "../common/index.js";
+import { MetaItem, PageHeader, StatusBadge } from "../common/index.js";
 import { buildModuleBreadcrumbs } from "../../routing/navigation.js";
-import { getLegacyAwareOptions, isLegacyDictValue } from "../../hooks/useDictOptions.js";
-import { optionLabel } from "../../utils/ui.js";
+import { isLegacyDictValue } from "../../hooks/useDictOptions.js";
 
 import { DbBadge, nextUnload, ScheduleTimeline } from "./UpstreamParts.jsx";
 

@@ -94,7 +94,7 @@ flowchart LR
 
 ## Application Boundary
 
-HTTP adapter 只负责请求解析、认证依赖、contract validation、response envelope 和 adapter-specific error mapping：
+HTTP adapter 只负责请求解析、认证依赖、contract validation、response envelope 和 adapter-specific error mapping。业务 router 默认先执行 authentication-only `require_authenticated`；只有 mutation、admin 或 sensitive read 再叠加 `require_permission(...)`，因此 Authentication 不等于 Authorization：
 
 ```text
 FastAPI adapter ── Application / Service Layer ── Database Provider ── Database
@@ -145,9 +145,13 @@ F5 gate 已证明 production native composition 不加载 Flask；F7 已删除 F
 
 - `frontend/src/App.jsx` 负责应用编排、登录态和模块路由；`frontend/src/api/` 统一访问 `/api`。
 - `VITE_API_MODE=mock` 使用受控前端演示数据；`remote` 访问真实后端数据库。两种模式默认使用同一仓库模块集合，数据和外部执行能力可以不同。
-- Schema Source of Truth 是 `backend/schema` 四方言完整 baseline 加 `backend/alembic` 增量 revision；`demo/seed_*.py` 负责完整仓库模块的虚构演示数据。
+- Schema deployment contract 是 `backend/schema` 下四份 versioned dialect baseline 加 `backend/alembic` immutable forward revisions；baseline 是 fresh-install/offline physical artifact set，Alembic 负责 existing-database/head upgrade，二者不是同一个来源。`backend/app/db/tables.py` 只承载 runtime SQLAlchemy Core 查询子集，`demo/seed_*.py` 负责完整仓库模块的虚构演示数据。完整职责与编辑顺序见 [ADR-002](./adr/002-schema-canonical-source.md)。
 - `backend/app/db/` 隔离 SQLite、PostgreSQL、MySQL 和 GaussDB/DWS 的 Provider 差异；数据库 profile 只表达部署连接能力。`docs/pg/`、`docs/dws/` 是方言参考和部署说明，不再作为隐藏模块的 schema 边界。
 - 正式部署由 Nginx 托管前端静态资源，并将 `/api` 代理到 ASGI runtime；详细环境变量、health check 与 Nginx 配置见 [DEPLOYMENT.md](../DEPLOYMENT.md)。
+
+## Schema ownership boundary
+
+四方言 baseline 必须保持共同的 logical table/column/constraint/index inventory，但 SQLite attached schema、PostgreSQL identity、MySQL storage/row-size rules 和 DWS distribution/JDBC clauses 属于 physical deployment contract，不能被 generic PostgreSQL/SQLAlchemy compiler 默认抹平。`0001_baseline` 只是 ledger marker；fresh install 先执行 selected baseline，再按 provider capability 应用 forward head。详见 [ADR-002](./adr/002-schema-canonical-source.md)。
 
 ## 当前边界与后续 Issue
 

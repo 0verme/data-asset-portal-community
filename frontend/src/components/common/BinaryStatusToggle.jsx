@@ -1,4 +1,3 @@
-import React from "react";
 
 import { getBinaryStatusValue, normalizeBinaryStatusOptions } from "./status.js";
 

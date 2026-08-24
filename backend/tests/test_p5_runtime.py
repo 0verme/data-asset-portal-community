@@ -8,7 +8,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from backend.app.application import current_request_context
+from backend.app.application import Identity, current_request_context
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi_app import create_fastapi_app
 from fastapi.testclient import TestClient
@@ -49,8 +49,8 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
         self.assertEqual("nosniff", health.headers["X-Content-Type-Options"])
 
         migrated = client.get("/api/lineage/bootstrap")
-        self.assertEqual(200, migrated.status_code)
-        self.assertIn("data", migrated.json())
+        self.assertEqual(401, migrated.status_code)
+        self.assertEqual("UNAUTHORIZED", migrated.json()["error"]["code"])
         capabilities = client.get("/api/capabilities")
         self.assertEqual(200, capabilities.status_code)
         self.assertNotIn("edition", capabilities.json())
@@ -99,7 +99,14 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
         self.assertIn("/api/push/systems", paths)
 
     def test_native_error_mapping_and_cors_security_headers(self):
-        runtime = self.create_native_app(capabilities=self.capabilities)
+        authenticated_application = create_fastapi_app(
+            capabilities=self.capabilities,
+            identity_resolver=lambda _request: Identity("admin", "admin", "Admin"),
+        )
+        runtime = self.create_native_app(
+            capabilities=self.capabilities,
+            fastapi_application=authenticated_application,
+        )
         client = TestClient(runtime)
         validation = client.get("/api/lineage/subgraph?direction=sideways")
         self.assertEqual(422, validation.status_code)
@@ -112,7 +119,14 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
         self.assertEqual("NOT_FOUND", unknown.json()["error"]["code"])
 
         with patch.dict(os.environ, {"FLASK_CORS_ORIGINS": "https://portal.example.com"}):
-            cors_runtime = self.create_native_app(capabilities=self.capabilities)
+            cors_application = create_fastapi_app(
+                capabilities=self.capabilities,
+                identity_resolver=lambda _request: Identity("admin", "admin", "Admin"),
+            )
+            cors_runtime = self.create_native_app(
+                capabilities=self.capabilities,
+                fastapi_application=cors_application,
+            )
         preflight = TestClient(cors_runtime).options(
             "/api/lineage/bootstrap",
             headers={

@@ -40,7 +40,7 @@ from ...services.push_service import (
     PushSystemNotFoundError,
     PushValidationError,
 )
-from ..dependencies import require_permission
+from ..dependencies import require_authenticated, require_permission
 from ..errors import _service_error_response
 
 
@@ -62,7 +62,11 @@ def _push_error_response(error: Any) -> JSONResponse:
 
 
 def _register_push_routes(app: FastAPI, service: Any) -> None:
-    router = APIRouter(prefix="/api/push", tags=["push"])
+    router = APIRouter(
+        prefix="/api/push",
+        tags=["push"],
+        dependencies=[Depends(require_authenticated)],
+    )
 
     def get_service() -> Any:
         return service

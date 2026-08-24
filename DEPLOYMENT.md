@@ -43,6 +43,8 @@ APP_SECRET_KEY=<generate-a-strong-random-value>
 
 `APP_DEBUG` 默认关闭，只有 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会开启。`APP_ENV` 未设置时采用安全的生产行为：Session Cookie 为 `HttpOnly=True`、`SameSite=Lax`、`Secure=True`。仅本地 HTTP 开发可显式设置 `APP_ENV=development` 使 `Secure=False`；这些变量名属于 retained compatibility/configuration contract，不表示 Flask 进程或 Flask WSGI runtime。
 
+Production contract：当 `APP_ENV=production` 或未设置时，FastAPI application construction 不注册 `/docs`、`/redoc` 和 `/openapi.json`，访问这些路径应返回 `404`。只有显式的 `APP_ENV=development` 默认开启这三个开发文档端点；`staging`、`test`、`qa` 等非 development 环境同样保持关闭。关闭 interactive docs/OpenAPI HTTP endpoint 是减少 API 枚举面的 deployment hardening，不是 authentication control，也不替代业务 API 的 Authentication / Authorization。
+
 此文档的 Nginx 配置将静态前端和 `/api` 放在同一来源，因此不需要 CORS。若必须拆分来源，设置 `APP_CORS_ORIGINS` 为完整、精确的逗号分隔 allowlist（如 `https://portal.example.com`）；未设置时不会返回 CORS 允许头，空项会忽略，且不会允许 `*` 与 Cookie 凭据的组合。
 
 如使用 GaussDB JDBC 覆盖路径，可额外设置：
@@ -77,6 +79,12 @@ curl --fail http://127.0.0.1:5099/healthz
 
 Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"`、`"fastapiPrimary":true` 和 `"flaskFallback":false`。其中 `flaskFallback=false` 是用于明确证明 fallback 已退休的 health contract 字段，不表示存在第二套 runtime。`/healthz` 只报告进程/runtime 状态，不执行数据库查询；数据库与业务 API 的可用性仍由对应回归和监控验证。默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）。`asgi.py` 加载仓库 runtime env 文件；系统环境变量和 demo bootstrap 规则保持现有行为。
 
+### Authentication boundary
+
+部署后的普通业务目录 API 默认要求有效 signed-session cookie：匿名请求到资产、指标、搜索、血缘、字段映射、菜单、报表、API 资产、上/下游系统或统计接口返回 `401`。登录后的普通用户可以读取普通目录；写操作、管理 API、操作日志、metadata lookup 和上/下游 admin detail 仍由既有 RBAC permission 返回 `403`（身份有效但未授权）。
+
+公开例外是显式且有限的：`GET /healthz`、不包含业务行数据的 `GET /api/capabilities`，以及 `/api/auth` 登录生命周期端点。没有 Public Catalog 开关或匿名业务目录部署模式。不要通过 Nginx、菜单隐藏或 OpenAPI visibility 替代后端认证；Production OpenAPI docs policy 仍由 #144 单独维护。完整 route inventory 见 [Authenticated-by-default Business Read Model](./docs/rbac/authenticated-read-model.md)。
+
 ### 安全默认值（生产）
 
 - `APP_DEBUG` 默认关闭；**生产环境显式开启 debug 会在启动时失败**（fail-fast），禁止 Werkzeug debugger 运行
@@ -85,6 +93,8 @@ Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"`、`
 - 响应安全头：`X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy: strict-origin-when-cross-origin`
 - 4xx/5xx 错误响应统一为 JSON 结构，不向客户端泄露内部路径/连接串/底层驱动异常
 - 转发头信任：**默认不受信任**。审计日志如需真实客户端 IP，仅当请求只经受信反代（如 Nginx）时设置 `ASSET_TRUST_PROXY_HEADERS=true`；否则客户端可直接伪造 `X-Forwarded-For`。Nginx 已设置 `X-Forwarded-For` 的同源部署请开启该项
+- 登录保护：`/api/auth/login` 默认启用进程内的轻量失败窗口与临时 backoff，按用户名和已解析的 request-context client identity 计数；默认 60 秒窗口内第 5 次失败后临时限制，backoff 最高 30 秒。状态有 15 分钟 TTL 和 10,000 条容量上限，不需要 Redis，也不会永久锁定账号。
+- 登录保护只在当前进程内共享；多实例部署不会共享失败状态。需要跨实例共享限流时，应在后续设计中替换为外部共享实现。默认不信任伪造的 `X-Forwarded-For`，只有显式启用 `ASSET_TRUST_PROXY_HEADERS=true` 时才使用受信代理解析出的地址。
 
 ## 三、前端构建
 

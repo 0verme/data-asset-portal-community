@@ -133,6 +133,23 @@ VITE_API_MODE=remote
 
 前端 `frontend/src/capabilities/capabilities.js` 继续请求该 endpoint，但返回对象的 `loadStatus` / `loadError` 只表示 HTTP loader 状态（请求成功或失败）。网络失败保留完整的 repository module registry；它不能被解释为模块不存在或假 404。`ModuleCapabilityError`、`resolve_capabilities()` 等 backend 名称同样是保留的 capability compatibility terminology，不代表 readiness 或 licensing gate。
 
+### 1.10 Authentication boundary
+
+Authentication and authorization are separate contracts:
+
+- ordinary business reads are authenticated by default through the shared
+  `require_authenticated` router dependency;
+- mutations, administration, and sensitive reads keep their existing
+  `require_permission("resource:action")` RBAC checks;
+- frontend menu visibility, route guards, and OpenAPI exposure are not security
+  boundaries;
+- explicit anonymous exceptions are `GET /healthz`, `GET /api/capabilities`,
+  and the `/api/auth` lifecycle routes only;
+- no Public Catalog setting or anonymous business-read mode is implemented.
+
+See [Authenticated-by-default Business Read Model](./rbac/authenticated-read-model.md)
+for the complete route classification and direct API matrix.
+
 ## 2. 数据仓库模块 `assets`
 
 Base Path: `/api/assets`
@@ -208,11 +225,12 @@ Base Path: `/api/assets`
 
 ### 2.5 可复制的详情请求
 
-只读详情端点不要求登录态。下面的示例使用仓库 Demo 中的虚构表名；本地默认服务地址为 `http://127.0.0.1:5099`，如使用其他 profile 请替换为实际服务地址。
+资产详情端点属于 authenticated business reads，必须先建立有效登录态。下面的示例使用仓库 Demo 中的虚构表名；本地默认服务地址为 `http://127.0.0.1:5099`，如使用其他 profile 请替换为实际服务地址。
 
 ```bash
 curl --get "http://127.0.0.1:5099/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D" \
-  --header "Accept: application/json"
+  --header "Accept: application/json" \
+  --cookie "session=<signed-session-cookie-from-login>"
 ```
 
 成功响应（`200 OK`）：
@@ -261,7 +279,7 @@ curl --get "http://127.0.0.1:5099/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D"
 
 Base Path: `/api/search`
 
-当前统一搜索只读端点不要求登录态。
+当前统一搜索属于 authenticated business read，匿名请求返回 `401`；已登录用户不需要额外的搜索 `*:read` 权限。
 
 ### 接口与查询参数
 

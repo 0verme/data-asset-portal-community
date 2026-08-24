@@ -22,9 +22,9 @@ from uuid import uuid4
 
 from sqlalchemy import and_, func, insert, or_, select, update
 
+from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
 from ..db.tables import root_category, root_change_log, root_item
-from ..settings import get_default_operator
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
     OPERATION_TYPE_DELETE,
@@ -73,10 +73,9 @@ class RootDataSourceError(Exception):
         return {"code": "ROOT_DATA_SOURCE_ERROR", "message": self.message}
 
 
-class RootService:
+class RootService(AuditActorMixin):
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
-        self._default_operator = get_default_operator()
         self._db = CoreAccess(
             profile_getter=lambda: self._db_profile,
             error_factory=RootDataSourceError,
@@ -254,6 +253,7 @@ class RootService:
             operator_name=self._default_operator,
         )
 
+    @actor_aware
     def create_root(self, payload):
         with operation_log_service.audit(
             module_name="词根管理",
@@ -287,6 +287,7 @@ class RootService:
         )
         return item
 
+    @actor_aware
     def update_root(self, abbr, payload):
         with operation_log_service.audit(
             module_name="词根管理",
@@ -340,6 +341,7 @@ class RootService:
         )
         return current, item
 
+    @actor_aware
     def delete_root(self, abbr):
         with operation_log_service.audit(
             module_name="词根管理",
@@ -380,6 +382,7 @@ class RootService:
         )
         return current
 
+    @actor_aware
     def import_roots(self, payload):
         items = self._normalize_items(payload.get("items") if isinstance(payload, dict) else None)
         batch_id = uuid4().hex

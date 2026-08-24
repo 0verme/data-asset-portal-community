@@ -89,13 +89,32 @@ async def get_request_context(request: Request) -> RequestContext:
     return build_request_context(request, identity)
 
 
+_AUTHENTICATION_CACHE_ATTRIBUTE = "_dap_authentication_decision"
+
+
+def _authentication_decision(
+    request: Request | None,
+    context: RequestContext,
+    service: AuthorizationService,
+):
+    if request is not None:
+        cached = getattr(request.state, _AUTHENTICATION_CACHE_ATTRIBUTE, None)
+        if cached is not None:
+            return cached
+    decision = service.authenticate(context.identity)
+    if request is not None:
+        setattr(request.state, _AUTHENTICATION_CACHE_ATTRIBUTE, decision)
+    return decision
+
+
 def _require_authenticated(
     context: RequestContext,
     service: AuthorizationService,
     *,
     admin_only: bool = False,
+    request: Request | None = None,
 ) -> RequestContext:
-    decision = service.authenticate(context.identity)
+    decision = _authentication_decision(request, context, service)
     if not decision.authenticated:
         raise AuthenticationRequiredError("请先登录。")
     if decision.reason == "role_unknown_or_disabled":
@@ -105,20 +124,30 @@ def _require_authenticated(
     return context
 
 
+def require_authenticated(
+    request: Request,
+    context: RequestContext = Depends(get_request_context),
+    service: AuthorizationService = Depends(get_authorization_service),
+) -> RequestContext:
+    """Require a current enabled identity without checking a permission code."""
+    return _require_authenticated(context, service, request=request)
+
+
 def require_maintainer(
     context: RequestContext = Depends(get_request_context),
     service: AuthorizationService = Depends(get_authorization_service),
 ) -> RequestContext:
-    """Compatibility gate for an enabled current authenticated identity."""
+    """Backward-compatible alias for the authentication-only dependency."""
     return _require_authenticated(context, service)
 
 
 def require_admin(
+    request: Request,
     context: RequestContext = Depends(get_request_context),
     service: AuthorizationService = Depends(get_authorization_service),
 ) -> RequestContext:
     """Compatibility gate resolved against the current database role."""
-    return _require_authenticated(context, service, admin_only=True)
+    return _require_authenticated(context, service, admin_only=True, request=request)
 
 
 def require_permission(permission: str) -> Callable[..., RequestContext]:
@@ -128,10 +157,15 @@ def require_permission(permission: str) -> Callable[..., RequestContext]:
         raise ValueError("permission code must be non-empty")
 
     def dependency(
+        request: Request,
         context: RequestContext = Depends(get_request_context),
         service: AuthorizationService = Depends(get_authorization_service),
     ) -> RequestContext:
-        decision = service.authorize(context.identity, normalized)
+        decision = service.authorize(
+            context.identity,
+            normalized,
+            authentication=_authentication_decision(request, context, service),
+        )
         if not decision.authenticated:
             raise AuthenticationRequiredError("请先登录。")
         if not decision.allowed:
