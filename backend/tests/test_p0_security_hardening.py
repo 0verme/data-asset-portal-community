@@ -161,7 +161,7 @@ class ErrorSanitizationTests(unittest.TestCase):
         self.assertNotIn("/opt/data-asset-portal", message)
 
     def test_auth_data_source_error_is_sanitized(self):
-        def _boom(profile, sql):
+        def _boom(statement):
             raise RuntimeError("connect failed host=198.51.100.66 password=topsecret")
 
         with (
@@ -169,7 +169,7 @@ class ErrorSanitizationTests(unittest.TestCase):
                 "backend.app.services.auth_service.load_db_profiles",
                 return_value={"primary": {"type": "postgres"}},
             ),
-            patch("backend.app.services.auth_service.fetch_all", side_effect=_boom),
+            patch("backend.app.db.service.fetch_all_core", side_effect=_boom),
             self.assertRaises(AuthError) as ctx,
         ):
             auth_service.authenticate("admin", "wrong")

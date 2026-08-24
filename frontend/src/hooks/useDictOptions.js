@@ -64,7 +64,7 @@ export function getLegacyAwareOptions(options = [], currentValue = "") {
 export function useDictOptions(categoryCode, { fallback = [] } = {}) {
   const fallbackSignature = JSON.stringify(fallback || []);
   const normalizedFallback = React.useMemo(
-    () => normalizeDictOptions(fallback),
+    () => normalizeDictOptions(JSON.parse(fallbackSignature)),
     [fallbackSignature],
   );
   const [options, setOptions] = React.useState(() => normalizedFallback);

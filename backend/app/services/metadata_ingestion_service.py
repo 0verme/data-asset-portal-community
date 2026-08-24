@@ -17,7 +17,7 @@ from uuid import uuid4
 
 from sqlalchemy import delete, func, insert, select, update  # type: ignore
 
-from ..application import current_request_context
+from ..application import AuditActorMixin, actor_aware, current_request_context
 from ..application.errors import ApplicationError
 from ..contracts.metadata_ingestion import (  # type: ignore
     AssetMetadataIngestionRequest,
@@ -43,7 +43,6 @@ from ..db.tables import (
     lineage_node,
     lineage_snapshot,
 )
-from ..settings import get_default_operator
 from ..utils.data_types import normalize_data_type
 from .operation_log_service import OperationLogService, operation_log_service
 
@@ -86,7 +85,7 @@ class _ItemProblem(ValueError):
         self.field = field
 
 
-class MetadataIngestionService:
+class MetadataIngestionService(AuditActorMixin):
     """Normalize, compare, persist and audit metadata ingestion requests."""
 
     def __init__(
@@ -102,7 +101,6 @@ class MetadataIngestionService:
             error_factory=MetadataDataSourceError,
         )
         self._operation_logs = operation_logs or operation_log_service
-        self._operator = get_default_operator()
 
     def _profile(self) -> str:
         return self._db_profile or resolve_db_profile_name()
@@ -541,6 +539,7 @@ class MetadataIngestionService:
         )
         return result.model_dump(by_alias=True, exclude_none=True)
 
+    @actor_aware
     def ingest_assets(self, request: AssetMetadataIngestionRequest, *, dry_run: bool = False) -> dict[str, Any]:
         self._validate_contract_version(request.contract_version)
         ingestion_id = str(uuid4())
@@ -765,6 +764,7 @@ class MetadataIngestionService:
         self._db.execute(update(lineage_snapshot).where(lineage_snapshot.c.status_code == "ACTIVE").values(status_code="INACTIVE"))
         self._db.execute(update(lineage_snapshot).where(lineage_snapshot.c.snapshot_id == normalized["snapshot_id"]).values(status_code="ACTIVE"))
 
+    @actor_aware
     def ingest_lineage(self, request: LineageMetadataIngestionRequest, *, dry_run: bool = False) -> dict[str, Any]:
         self._validate_contract_version(request.contract_version)
         ingestion_id = str(uuid4())

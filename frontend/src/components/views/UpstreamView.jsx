@@ -1,4 +1,3 @@
-import React from "react";
 import { UpstreamDetail, UpstreamEditor, UpstreamList } from "../UpstreamPages.jsx";
 import { Icon } from "../ui.jsx";
 import { confirmDeleteAction, ErrorState, LoadingState } from "../common/index.js";

@@ -27,13 +27,15 @@ from ...services.manual_code_table_service import (
     ManualCodeTableNotFoundError,
     ManualCodeTableValidationError,
 )
-from ..dependencies import require_permission
+from ..dependencies import require_authenticated, require_permission
 from ..errors import _service_error_response
 
 
 def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
-        prefix="/api/manual-code-tables", tags=["manual-code-table-migration"]
+        prefix="/api/manual-code-tables",
+        tags=["manual-code-table-migration"],
+        dependencies=[Depends(require_authenticated)],
     )
     style_labels = {
         "enum": "标准枚举",

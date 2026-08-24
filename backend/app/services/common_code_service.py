@@ -20,12 +20,12 @@ import re
 import threading
 import time
 
-from ..db.gaussdb import fetch_all, resolve_db_profile_name
+from sqlalchemy import and_, case, func, select
+
+from ..db.facade import resolve_db_profile_name
+from ..db.service import CoreAccess
+from ..db.tables import code_category, code_item
 from ..settings import get_int_env
-
-
-TABLE_CODE_CATEGORY = "dwp.p_code_category"
-TABLE_CODE_ITEM = "dwp.p_code_item"
 CATEGORY_CODE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
 MAX_BATCH_CATEGORIES = 50
 
@@ -73,6 +73,10 @@ class CommonCodeService:
         self._cache_lock = threading.Lock()
         self._item_cache = {}
         self._category_cache = {}
+        self._db = CoreAccess(
+            profile_getter=lambda: self._db_profile,
+            error_factory=CommonCodeDataSourceError,
+        )
 
     def _profile(self):
         return self._db_profile or resolve_db_profile_name()
@@ -124,23 +128,8 @@ class CommonCodeService:
                 self._item_cache.clear()
             self._category_cache.clear()
 
-    def _fetch_rows(self, sql: str):
-        try:
-            columns, rows = fetch_all(self._profile(), sql)
-        except FileNotFoundError as error:
-            raise CommonCodeDataSourceError("数据库配置文件不存在") from error
-        except KeyError as error:
-            raise CommonCodeDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except RuntimeError as error:
-            raise CommonCodeDataSourceError("数据库服务暂不可用，请稍后重试") from error
-        except Exception as error:
-            raise CommonCodeDataSourceError("数据库查询失败") from error
-        return [dict(zip(columns, row)) for row in rows]
-
-    def _quote(self, value):
-        if value is None:
-            return "NULL"
-        return "'" + str(value).replace("'", "''") + "'"
+    def _fetch_rows(self, statement):
+        return self._db.fetch_rows(statement)
 
     def get_categories(self):
         namespace = self._cache_namespace()
@@ -151,21 +140,36 @@ class CommonCodeService:
                 return [dict(item) for item in entry["items"]]
             self._category_cache.pop(namespace, None)
 
-        sql = f"""
-SELECT
-    c.category_code,
-    c.category_name,
-    c.category_desc,
-    c.display_order,
-    c.is_active,
-    COUNT(i.item_id) FILTER (WHERE i.is_active = 'Y') AS item_count
-FROM {TABLE_CODE_CATEGORY} c
-LEFT JOIN {TABLE_CODE_ITEM} i
-  ON c.category_code = i.category_code
-WHERE c.is_active = 'Y'
-GROUP BY c.category_code, c.category_name, c.category_desc, c.display_order, c.is_active
-ORDER BY c.display_order, c.category_code
-"""
+        statement = (
+            select(
+                code_category.c.category_code,
+                code_category.c.category_name,
+                code_category.c.category_desc,
+                code_category.c.display_order,
+                code_category.c.is_active,
+                func.coalesce(
+                    func.sum(
+                        case((code_item.c.is_active == "Y", 1), else_=0)
+                    ),
+                    0,
+                ).label("item_count"),
+            )
+            .select_from(
+                code_category.outerjoin(
+                    code_item,
+                    code_category.c.category_code == code_item.c.category_code,
+                )
+            )
+            .where(code_category.c.is_active == "Y")
+            .group_by(
+                code_category.c.category_code,
+                code_category.c.category_name,
+                code_category.c.category_desc,
+                code_category.c.display_order,
+                code_category.c.is_active,
+            )
+            .order_by(code_category.c.display_order, code_category.c.category_code)
+        )
         items = [
             {
                 "code": row["category_code"],
@@ -174,7 +178,7 @@ ORDER BY c.display_order, c.category_code
                 "active": str(row.get("is_active") or "").upper() == "Y",
                 "count": int(row.get("item_count") or 0),
             }
-            for row in self._fetch_rows(sql)
+            for row in self._fetch_rows(statement)
         ]
         with self._cache_lock:
             self._category_cache[namespace] = {
@@ -212,27 +216,38 @@ ORDER BY c.display_order, c.category_code
                 cached[category_code] = entry
 
         if uncached:
-            codes_sql = ", ".join(self._quote(code) for code in uncached)
-            rows = self._fetch_rows(
-                f"""
-SELECT
-    c.category_code,
-    i.item_code,
-    i.item_name,
-    i.item_value,
-    i.item_desc,
-    i.display_order,
-    i.ext_json,
-    i.is_active
-FROM {TABLE_CODE_CATEGORY} c
-LEFT JOIN {TABLE_CODE_ITEM} i
-  ON c.category_code = i.category_code
- AND i.is_active = 'Y'
-WHERE c.category_code IN ({codes_sql})
-  AND c.is_active = 'Y'
-ORDER BY c.display_order, c.category_code, i.display_order, i.item_code
-"""
+            statement = (
+                select(
+                    code_category.c.category_code,
+                    code_item.c.item_code,
+                    code_item.c.item_name,
+                    code_item.c.item_value,
+                    code_item.c.item_desc,
+                    code_item.c.display_order,
+                    code_item.c.ext_json,
+                    code_item.c.is_active,
+                )
+                .select_from(
+                    code_category.outerjoin(
+                        code_item,
+                        and_(
+                            code_category.c.category_code == code_item.c.category_code,
+                            code_item.c.is_active == "Y",
+                        ),
+                    )
+                )
+                .where(
+                    code_category.c.category_code.in_(uncached),
+                    code_category.c.is_active == "Y",
+                )
+                .order_by(
+                    code_category.c.display_order,
+                    code_category.c.category_code,
+                    code_item.c.display_order,
+                    code_item.c.item_code,
+                )
             )
+            rows = self._fetch_rows(statement)
             loaded = {code: {"exists": False, "items": []} for code in uncached}
             for row in rows:
                 category_code = row["category_code"]

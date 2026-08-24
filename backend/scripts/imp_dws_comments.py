@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.db.gaussdb import connect_with_profile, fetch_all, resolve_db_profile_name
+from app.db.facade import connect_with_profile, fetch_all, resolve_db_profile_name
 
 
 # 默认脚本目录：优先环境变量，其次 generic 部署路径。
