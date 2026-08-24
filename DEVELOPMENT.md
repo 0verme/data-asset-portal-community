@@ -237,10 +237,10 @@ MySQL 8.0 先执行 `pip install -r backend/requirements-mysql.txt`，再使用 
 仓库提供与 CI 对齐的本地检查脚本，提交 / 发版前建议运行：
 
 ```bash
-# 快速检查：Public Data Guard + 后端单元测试 + migration offline verify + packaging + 前端测试
+# 快速检查：Public Data Guard + 后端单元测试 + migration offline verify + packaging + 前端 lint/测试
 python scripts/release_check.py fast
 
-# 完整检查：fast + SQLite fresh 迁移/seed/重复 apply + 前端 npm ci/build/audit
+# 完整检查：fast + SQLite fresh 迁移/seed/重复 apply + 前端 npm ci/lint/build/audit
 # 如需 PostgreSQL 集成（16 个 integration 测试）再设置：
 #   TEST_DATABASE_PROFILE=<profile> TEST_DATABASE_CONFIG_PATH=<config>
 python scripts/release_check.py full
@@ -269,7 +269,7 @@ python -m unittest discover -s backend/tests
 2. **Backend / Python 3.11 + 3.13** —— `python -m unittest discover -s backend/tests` + baseline offline verify（sqlite / postgresql / mysql / dws）+ packaging contract tests；
 3. **PostgreSQL Integration（PG 16 service）** —— fresh migration → seed → integration tests（16 个不再 skip）→ repeat apply no-op → 当前 Community 表物理边界检查；
 4. **MySQL 8 Integration** —— fresh baseline → verify → SQLAlchemy Core CRUD / pagination / uniqueness / Unicode / NULL / rollback → repeat apply no-op；
-5. **Frontend / Node 22 + 24** —— `npm ci` → `npm test` → `npm run build` → `npm audit --audit-level=high`；
+5. **Frontend / Node 22 + 24** —— `npm ci` → `npm run lint` → `npm test` → `npm run build` → `npm audit --audit-level=high`；
 6. **Community Migration（SQLite）** —— fresh apply → verify → plan → seed → repeat apply no-op → 当前 Community 表物理边界检查。
 
 CI 权限为只读、仅用 GitHub 官方 Actions、无生产连接。

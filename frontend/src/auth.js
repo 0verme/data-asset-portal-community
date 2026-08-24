@@ -14,7 +14,6 @@
 
 import { getCurrentRemoteUser, loginRemote, logoutRemote } from "./api/auth.js";
 import {
-  hasPermission,
   MOCK_ROLE_PERMISSIONS,
   normalizePermissions,
 } from "./auth/permissions.js";
