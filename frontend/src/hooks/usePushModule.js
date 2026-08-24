@@ -23,7 +23,6 @@ import {
 } from "../api/push.js";
 import {
   DEFAULT_PUSH_FILTER,
-  DEFAULT_PUSH_ROUTE,
   DEFAULT_PUSH_VIEW,
 } from "../config/defaults.js";
 import {
@@ -47,7 +46,7 @@ export function usePushModule({
   initialView = DEFAULT_PUSH_VIEW,
   initialFilter = DEFAULT_PUSH_FILTER,
   canEdit,
-  requireLogin,
+  requireLogin: _requireLogin,
   runProtectedMutation,
 }) {
   const [pushSystems, setPushSystems] = useState([]);

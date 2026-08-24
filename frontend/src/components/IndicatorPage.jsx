@@ -1,4 +1,3 @@
-import React from "react";
 
 import { INDICATOR_DIMENSION_OPTIONS } from "../data/indicators.js";
 import { formatDate, formatDateTime } from "../utils/date.js";

@@ -10,9 +10,9 @@ import re
 
 from sqlalchemy import delete, func, insert, or_, select, update
 
+from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
 from ..db.tables import manual_code_table
-from ..settings import get_default_operator
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
     OPERATION_TYPE_DELETE,
@@ -68,10 +68,9 @@ class ManualCodeTableDataSourceError(Exception):
         return {"code": "MANUAL_CODE_TABLE_DATA_SOURCE_ERROR", "message": self.message}
 
 
-class ManualCodeTableService:
+class ManualCodeTableService(AuditActorMixin):
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
-        self._default_operator = get_default_operator()
         self._db = CoreAccess(
             profile_getter=lambda: self._db_profile,
             error_factory=ManualCodeTableDataSourceError,
@@ -222,6 +221,7 @@ class ManualCodeTableService:
             raise ManualCodeTableNotFoundError(table_id)
         return self._row_to_item(rows[0])
 
+    @actor_aware
     def create_table(self, payload):
         with operation_log_service.audit(
             module_name="码值表维护",
@@ -252,6 +252,7 @@ class ManualCodeTableService:
             audit.after = created
             return created
 
+    @actor_aware
     def update_table(self, table_id, payload):
         with operation_log_service.audit(
             module_name="码值表维护",
@@ -290,6 +291,7 @@ class ManualCodeTableService:
             audit.after = after
             return after
 
+    @actor_aware
     def update_status(self, table_id, status):
         normalized_status = str(status or "").strip().lower()
         if normalized_status not in TABLE_STATUSES:
@@ -326,6 +328,7 @@ class ManualCodeTableService:
             audit.after = after
             return after
 
+    @actor_aware
     def delete_table(self, table_id):
         with operation_log_service.audit(
             module_name="码值表维护",

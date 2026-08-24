@@ -46,7 +46,7 @@ Defaults are shown for orientation and are implemented by the runtime.
 | `ASSET_DB_CONNECT_TIMEOUT_SECONDS` | DB connection timeout | `30`; provider dependent |
 | `ASSET_DB_STATEMENT_TIMEOUT_MS` | query statement timeout | `120000`; PostgreSQL/GaussDB |
 | `ASSET_SCHEMA_PREFIX` | logical schema prefix for asset services | unset; optional |
-| `ASSET_OPERATOR` | default audit operator | `system` |
+| `ASSET_OPERATOR` | name used by explicitly declared system/background actors; not an HTTP fallback | `system` |
 | `APP_PAGE_SIZE_DEFAULT`, `APP_PAGE_SIZE_MAX` | pagination bounds | service defaults; runtime |
 | `FIELD_MAPPING_STATS_CACHE_TTL_SECONDS`, `PORTAL_STATS_CACHE_TTL_SECONDS` | service cache TTLs | `300`, `600` |
 | `APP_SLOW_SERVICE_SECONDS` | slow-service logging threshold | `3` |

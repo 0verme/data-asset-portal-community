@@ -23,7 +23,7 @@ from typing import Any
 
 from sqlalchemy import func, or_, select  # pyright: ignore[reportMissingImports]
 
-from ..application import current_request_context
+from ..application import actor_scope, current_operation_actor, current_request_context, resolve_actor
 from ..db.gaussdb import (
     _commit_if_needed,
     _rollback_if_needed,
@@ -263,7 +263,7 @@ class OperationLogService:
         except (TypeError, ValueError):
             return None
 
-    def _request_context(self) -> dict:
+    def _request_context(self, *, actor=None, system_actor=None) -> dict:
         ctx = {
             "userId": "",
             "userName": "",
@@ -274,28 +274,28 @@ class OperationLogService:
             "userAgent": "",
         }
         context = current_request_context()
-        if context is None:
-            return ctx
-        ctx["requestMethod"] = (context.method or "")[:16]
-        ctx["requestUrl"] = (context.path or "")[:512]
-        ctx["ipAddress"] = (context.client_address or "")[:64]
-        ctx["userAgent"] = (context.user_agent or "")[:512]
-        if context.identity is not None:
-            ctx["userId"] = (context.identity.user or "")[:64]
-            ctx["userName"] = (
-                (context.identity.name or context.identity.user or "")[:128]
-            )
+        if context is not None:
+            ctx["requestMethod"] = (context.method or "")[:16]
+            ctx["requestUrl"] = (context.path or "")[:512]
+            ctx["ipAddress"] = (context.client_address or "")[:64]
+            ctx["userAgent"] = (context.user_agent or "")[:512]
+        resolved = resolve_actor(explicit_actor=actor, system_actor=system_actor)
+        ctx["userId"] = (resolved.id or "")[:64]
+        ctx["userName"] = resolved.operation_name[:128]
         return ctx
 
     def _cost_time_ms(self) -> int:
         context = current_request_context()
         return context.elapsed_ms() if context is not None else 0
 
-    def _build_audit_insert_sql(self, *, module_name, operation_type, operation_object, before=None, after=None, operation_desc=None, result_status="success", error_message=None, remark=None, user_id=None, user_name=None, request_params=None) -> str:
-        ctx = self._request_context()
-        if user_id is not None:
+    def _build_audit_insert_sql(self, *, module_name, operation_type, operation_object, before=None, after=None, operation_desc=None, result_status="success", error_message=None, remark=None, user_id=None, user_name=None, request_params=None, actor=None, system_actor=None) -> str:
+        ctx = self._request_context(actor=actor, system_actor=system_actor)
+        request_context = current_request_context()
+        request_is_authenticated = request_context is not None and request_context.identity is not None
+        actor_is_declared = actor is not None or system_actor is not None or current_operation_actor() is not None
+        if not request_is_authenticated and not actor_is_declared and user_id is not None:
             ctx["userId"] = (user_id or "")[:64]
-        if user_name is not None:
+        if not request_is_authenticated and not actor_is_declared and user_name is not None:
             ctx["userName"] = (user_name or "")[:128]
         if request_params is None:
             request_params = self._serialize_snapshot(before, after)
@@ -365,8 +365,8 @@ class OperationLogService:
         """Backward-compatible required-audit entry point for existing write paths."""
         return self.record_required_audit(**kwargs)
 
-    def _batch_audit_kwargs(self, *, batch_id, resource_type, operation, total_count, success_count, failed_count, skipped_count, created_count=0, updated_count=0, summary=None):
-        return {
+    def _batch_audit_kwargs(self, *, batch_id, resource_type, operation, total_count, success_count, failed_count, skipped_count, created_count=0, updated_count=0, summary=None, actor=None, system_actor=None):
+        data = {
             "module_name": resource_type, "operation_type": operation, "operation_object": batch_id,
             "operation_desc": summary,
             "after": {
@@ -375,6 +375,9 @@ class OperationLogService:
                 "updatedCount": updated_count, "summary": summary,
             },
         }
+        if actor is not None or system_actor is not None:
+            data["actor"] = resolve_actor(explicit_actor=actor, system_actor=system_actor)
+        return data
 
     def record_required_batch_audit(self, *, connection=None, cursor=None, **kwargs) -> bool:
         return self.record_required_audit(connection=connection, cursor=cursor, **self._batch_audit_kwargs(**kwargs))
@@ -383,8 +386,9 @@ class OperationLogService:
         return self.record_best_effort_audit(connection=connection, cursor=cursor, **self._batch_audit_kwargs(**kwargs))
 
     @contextmanager
-    def batch_audit(self, *, batch_id, resource_type, operation, total_count, summary=None):
+    def batch_audit(self, *, batch_id, resource_type, operation, total_count, summary=None, actor=None, system_actor=None):
         """Run a required batch audit and its business writes in one transaction."""
+        resolved = resolve_actor(explicit_actor=actor, system_actor=system_actor)
         handle = _BatchAuditHandle(
             batch_id=batch_id,
             resource_type=resource_type,
@@ -397,42 +401,46 @@ class OperationLogService:
             updated_count=0,
             summary=summary,
         )
-        with database_transaction():
-            try:
-                yield handle
-            except Exception:
-                raise
-            connection = active_transaction_connection(self._profile())
-            if connection is None:
-                raise AuditLogError("Required batch audit operation did not use a database connection.")
-            self.record_required_batch_audit(connection=connection, **handle.to_kwargs())
+        with actor_scope(resolved):
+            with database_transaction():
+                try:
+                    yield handle
+                except Exception:
+                    raise
+                connection = active_transaction_connection(self._profile())
+                if connection is None:
+                    raise AuditLogError("Required batch audit operation did not use a database connection.")
+                self.record_required_batch_audit(connection=connection, actor=resolved, **handle.to_kwargs())
 
     @contextmanager
-    def audit(self, *, module_name, operation_type, operation_object="", before=None, after=None, operation_desc=None, remark=None):
+    def audit(self, *, module_name, operation_type, operation_object="", before=None, after=None, operation_desc=None, remark=None, actor=None, system_actor=None):
         """Run a required-audit management write in one database transaction."""
+        resolved = resolve_actor(explicit_actor=actor, system_actor=system_actor)
         handle = _AuditHandle(module_name=module_name, operation_type=operation_type, operation_object=operation_object, before=before, after=after, operation_desc=operation_desc, remark=remark)
-        with database_transaction():
-            try:
-                yield handle
-            except Exception:
-                # The business exception causes the shared transaction to roll
-                # back. Do not persist a misleading success or failure record
-                # in a separate transaction.
-                raise
-            connection = active_transaction_connection(self._profile())
-            if connection is None:
-                raise AuditLogError("Required audit operation did not use a database connection.")
-            self.record_required_audit(
-                connection=connection,
-                module_name=handle.module_name,
-                operation_type=handle.operation_type,
-                operation_object=handle.operation_object,
-                before=handle.before,
-                after=handle.after,
-                operation_desc=handle.operation_desc,
-                result_status="success",
-                remark=handle.remark,
-            )
+        with actor_scope(resolved):
+            with database_transaction():
+                try:
+                    yield handle
+                except Exception:
+                    # The business exception causes the shared transaction to roll
+                    # back. Do not persist a misleading success or failure record
+                    # in a separate transaction.
+                    raise
+                connection = active_transaction_connection(self._profile())
+                if connection is None:
+                    raise AuditLogError("Required audit operation did not use a database connection.")
+                self.record_required_audit(
+                    connection=connection,
+                    module_name=handle.module_name,
+                    operation_type=handle.operation_type,
+                    operation_object=handle.operation_object,
+                    before=handle.before,
+                    after=handle.after,
+                    operation_desc=handle.operation_desc,
+                    result_status="success",
+                    remark=handle.remark,
+                    actor=resolved,
+                )
 
 
 class _AuditHandle:

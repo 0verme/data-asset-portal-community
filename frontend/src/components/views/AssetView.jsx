@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React from "react";
 import { DetailPage } from "../DetailPage.jsx";
 import { HomePage } from "../HomePage.jsx";
 import { TableEditor } from "../TableEditor.jsx";

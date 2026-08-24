@@ -33,6 +33,7 @@ import json
 import re
 import unittest
 from pathlib import Path
+from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND = REPO_ROOT / "frontend"
@@ -124,12 +125,20 @@ class WorkspaceContractTests(unittest.TestCase):
                     f"{rel} must keep its {name}",
                 )
 
-    def test_workspace_packages_have_source_and_dist(self):
-        # Runtime needs dist (npm ci does not build workspace packages);
-        # source must be present so the dist is auditable / reproducible.
+    def test_workspace_packages_are_rebuildable_from_source(self):
+        # A clean checkout intentionally has no generated dist/; the explicit
+        # frontend build pipeline creates it before runtime or packaging use.
         for rel in WORKSPACE_DIRS:
-            self.assertTrue((FRONTEND / rel / "src").is_dir(), f"{rel} lacks src/")
-            self.assertTrue((FRONTEND / rel / "dist").is_dir(), f"{rel} lacks dist/")
+            package_dir = FRONTEND / rel
+            manifest = _load_json(package_dir / "package.json")
+            self.assertTrue((package_dir / "src").is_dir(), f"{rel} lacks src/")
+            self.assertIn("dist", manifest.get("files", []), f"{rel} must package generated dist/")
+            self.assertTrue(manifest.get("scripts", {}).get("build"), f"{rel} lacks a build script")
+            for field in ("main", "module", "types"):
+                self.assertTrue(
+                    manifest.get(field, "").startswith("./dist/"),
+                    f"{rel} {field} must point at generated dist/",
+                )
 
 
 class LockfileContractTests(unittest.TestCase):
@@ -137,14 +146,16 @@ class LockfileContractTests(unittest.TestCase):
 
     FORBIDDEN_URL_FRAGMENTS = (
         "localhost",
-        "127.0.0.1",
-        "192.168.",
-        "10.",
-        "172.16.",
         "registry.cn-",
         "nexus",
         "artifactory",
         "verdaccio",
+    )
+    FORBIDDEN_PRIVATE_HOST_PREFIXES = (
+        "127.0.0.1",
+        "192.168.",
+        "10.",
+        "172.16.",
     )
 
     def setUp(self):
@@ -161,6 +172,12 @@ class LockfileContractTests(unittest.TestCase):
             if isinstance(entry, dict) and entry.get("resolved")
         ]
         for url in resolved_urls:
+            host = (urlparse(url).hostname or "").lower()
+            for prefix in self.FORBIDDEN_PRIVATE_HOST_PREFIXES:
+                self.assertFalse(
+                    host.startswith(prefix),
+                    f"resolved URL {url} references private host {host}",
+                )
             for fragment in self.FORBIDDEN_URL_FRAGMENTS:
                 self.assertNotIn(fragment, url, f"resolved URL {url} references {fragment}")
 

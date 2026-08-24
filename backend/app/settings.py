@@ -107,6 +107,11 @@ def get_page_size_limits(default_size: int) -> tuple[int, int]:
 
 
 def get_default_operator() -> str:
+    """Return the configured name for an explicitly declared system actor.
+
+    This setting is not a universal mutation operator. HTTP request identity
+    and caller-supplied actors are resolved by ``application.actor`` first.
+    """
     return get_string_env("ASSET_OPERATOR", "system")
 
 
