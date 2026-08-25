@@ -104,7 +104,7 @@ FastAPI adapter ── Application / Service Layer ── Database Provider ─�
 
 - `backend/asgi.py` 负责纯 FastAPI composition、CORS/security headers、native signed-session identity resolver 和 healthz。
 - `backend/app/fastapi_app.py` 是保留历史 import path 的 thin compatibility facade。
-- `backend/app/fastapi/app.py` 负责 FastAPI app bootstrap、explicit Service injection、capability payload 与静态 Router registration；capability、menu、profile 或 readiness 状态都不作为 route gate。`dependencies.py`、`errors.py` 和 `routers/` 承载共享 adapter seam 与模块边界。
+- `backend/app/fastapi/app.py` 负责 FastAPI app bootstrap、explicit Service injection、capability payload 与静态 Router registration；capability、menu、profile 或 readiness 状态都不作为 route gate。`dependencies.py`、`errors.py` 和 `routers/` 承载共享 adapter seam 与模块边界。渐进迁移的 module-level router convention、inventory 和 operation-log pilot 见 [`fastapi-router-convention.md`](fastapi-router-convention.md)。
 - `backend/app/__init__.py` 仅保留 production composition 说明；历史 Flask factory/blueprint 已删除，native package import 不加载 Flask。
 - `backend/app/services/` 和 `backend/app/db/` 是 FastAPI native 复用的业务与数据库边界。
 
