@@ -39,7 +39,7 @@ from .routers.infrastructure import _register_infrastructure_routes
 from .routers.lineage import _register_lineage_routes, lineage_service
 from .routers.manual_code_tables import _register_manual_code_table_routes
 from .routers.metadata import _register_metadata_routes  # type: ignore
-from .routers.operation_logs import _register_operation_log_routes
+from .routers.operation_logs import router as operation_log_router
 from .routers.push import _register_push_routes
 from .routers.reports import _register_report_routes
 from .routers.roots import _register_root_routes
@@ -120,6 +120,7 @@ def create_fastapi_app(
     lineage = lineage_service_instance or lineage_service
     system_management = system_management_service_instance or system_management_service
     operation_logs = operation_log_service_instance or operation_log_service
+    app.state.operation_log_service = operation_logs
     metadata_ingestion = metadata_ingestion_service_instance or metadata_ingestion_service
     upstream = upstream_service_instance or upstream_service
     push = push_service_instance or push_service
@@ -150,7 +151,7 @@ def create_fastapi_app(
     _register_lineage_routes(app, lineage)
     _register_metadata_routes(app, metadata_ingestion)
     _register_system_management_routes(app, system_management)
-    _register_operation_log_routes(app, operation_logs)
+    app.include_router(operation_log_router)
     _register_upstream_routes(app, upstream)
     _register_push_routes(app, push)
     return app
