@@ -75,8 +75,14 @@ export default [
   {
     // Keep the React 18 baseline to Rules of Hooks and dependency checking;
     // React Compiler rules belong to a later architecture/migration task.
-    ...reactHooks.configs["flat/recommended"][0],
+    plugins: {
+      "react-hooks": reactHooks,
+    },
     files: sourceFiles,
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+    },
   },
   {
     files: nodeFiles,
