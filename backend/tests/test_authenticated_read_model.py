@@ -5,7 +5,6 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock
 
-from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from backend.app.application import Identity
@@ -136,18 +135,31 @@ class AuthenticatedReadModelApiTests(unittest.TestCase):
             ("POST", "/api/auth/logout"),
             ("GET", "/api/capabilities"),
         }
-        unguarded = set()
-        for route in self.app.routes:
-            if not isinstance(route, APIRoute):
-                continue
-            names = {
-                getattr(dependency.call, "__name__", "")
-                for dependency in route.dependant.dependencies
-            }
-            if "require_authenticated" not in names:
-                unguarded.update((method, route.path) for method in route.methods or ())
+        paths = self.app.openapi()["paths"]
+        registered = {
+            (method.upper(), path)
+            for path, operations in paths.items()
+            for method in operations
+            if method != "parameters"
+        }
+        self.assertTrue(explicit.issubset(registered))
 
-        self.assertEqual(explicit, unguarded)
+        def concrete_path(path):
+            return "/".join(
+                "contract-value" if segment.startswith("{") else segment
+                for segment in path.split("/")
+            )
+
+        for method, path in sorted(registered - explicit):
+            with self.subTest(route=(method, path)):
+                payload = None if method in {"GET", "HEAD", "OPTIONS"} else {}
+                response = self.client.request(
+                    method,
+                    concrete_path(path),
+                    json=payload,
+                )
+                self.assertEqual(401, response.status_code)
+                self.assertEqual("UNAUTHORIZED", response.json()["error"]["code"])
 
 
 if __name__ == "__main__":

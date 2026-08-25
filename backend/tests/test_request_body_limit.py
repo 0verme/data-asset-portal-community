@@ -325,6 +325,7 @@ class MetadataASGIBoundaryTests(unittest.TestCase):
             invoke_asgi(
                 runtime,
                 [{"type": "http.request", "body": body, "more_body": False}],
+                headers=[(b"content-type", b"application/json")],
                 path="/api/metadata/assets/ingestions",
             )
         )
@@ -365,6 +366,7 @@ class FastAPIParserBoundaryTests(unittest.TestCase):
             invoke_asgi(
                 self.runtime,
                 [{"type": "http.request", "body": b'{"ok":true}', "more_body": False}],
+                headers=[(b"content-type", b"application/json")],
             )
         )
         self.assertEqual(200, result["status"])

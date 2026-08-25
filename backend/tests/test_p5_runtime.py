@@ -80,7 +80,7 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
             capabilities=self.capabilities,
             identity_resolver=lambda _request: None,
         )
-        paths = {route.path for route in app.routes}
+        paths = set(app.openapi()["paths"])
         self.assertTrue(
             {
                 "/api/auth/login",

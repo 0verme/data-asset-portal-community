@@ -40,7 +40,7 @@ class OpenRepositoryModuleTests(unittest.TestCase):
             portal_service_instance=portal,
             search_provider_instance=search,
         )
-        paths = {route.path for route in app.routes}
+        paths = set(app.openapi()["paths"])
         for code, prefix in MODULE_PREFIXES.items():
             with self.subTest(code=code):
                 self.assertTrue(
@@ -55,7 +55,7 @@ class OpenRepositoryModuleTests(unittest.TestCase):
             portal_service_instance=MagicMock(),
             search_provider_instance=MagicMock(),
         )
-        paths = {route.path for route in app.routes}
+        paths = set(app.openapi()["paths"])
         for code, prefix in MODULE_PREFIXES.items():
             with self.subTest(code=code):
                 self.assertTrue(
@@ -73,7 +73,7 @@ class OpenRepositoryModuleTests(unittest.TestCase):
             search_provider_instance=MagicMock(),
             system_management_service_instance=menu_service,
         )
-        paths = {route.path for route in app.routes}
+        paths = set(app.openapi()["paths"])
         for prefix in ("/api/assets", "/api/reports", "/api/push", "/api/system/menus"):
             with self.subTest(prefix=prefix):
                 self.assertTrue(

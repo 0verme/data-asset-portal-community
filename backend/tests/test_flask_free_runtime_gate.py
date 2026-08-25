@@ -59,7 +59,7 @@ class FlaskFreeRuntimeGateTests(unittest.TestCase):
                     ),
                 }
 
-            paths = {route.path for route in native_app.routes}
+            paths = set(native_app.openapi()["paths"])
             required = {
                 "/api/auth/login",
                 "/api/auth/me",

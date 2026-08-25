@@ -36,20 +36,23 @@ class OperationLogRouterConventionTests(unittest.TestCase):
 
     def test_route_surface_and_dependencies_are_preserved(self):
         app = self.app()
-        routes = {
+        paths = app.openapi()["paths"]
+        module_routes = {
             (method, route.path): route
-            for route in app.routes
+            for route in operation_logs.router.routes
             if isinstance(route, APIRoute)
             for method in route.methods or ()
-            if (method, route.path) in self.EXPECTED_ROUTES
         }
 
-        self.assertEqual(set(self.EXPECTED_ROUTES), set(routes))
-        for key, expected_name in self.EXPECTED_ROUTES.items():
-            with self.subTest(route=key):
-                route = routes[key]
-                self.assertEqual(expected_name, route.name)
-                self.assertEqual(["operation-log-migration"], route.tags)
+        self.assertEqual(set(self.EXPECTED_ROUTES), set(module_routes))
+        for (method, path), expected_name in self.EXPECTED_ROUTES.items():
+            with self.subTest(route=(method, path)):
+                operation = paths[path][method.lower()]
+                self.assertTrue(
+                    operation["operationId"].startswith(f"{expected_name}_")
+                )
+                self.assertEqual(["operation-log-migration"], operation["tags"])
+                route = module_routes[(method, path)]
                 dependency_names = {
                     getattr(dependency.call, "__name__", "")
                     for dependency in route.dependant.dependencies
@@ -61,7 +64,7 @@ class OperationLogRouterConventionTests(unittest.TestCase):
 
     def test_pilot_keeps_existing_registration_order(self):
         app = self.app()
-        paths = [route.path for route in app.routes if isinstance(route, APIRoute)]
+        paths = list(app.openapi()["paths"])
         operation_indices = [
             index
             for index, path in enumerate(paths)
