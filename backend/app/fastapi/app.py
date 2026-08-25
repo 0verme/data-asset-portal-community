@@ -85,7 +85,7 @@ def create_fastapi_app(
     )
     app = FastAPI(
         title="Data Asset Portal FastAPI",
-        version="0.1.0",
+        version="0.2.0",
         docs_url="/docs" if docs_enabled else None,
         redoc_url="/redoc" if docs_enabled else None,
         openapi_url="/openapi.json" if docs_enabled else None,

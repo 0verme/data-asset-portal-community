@@ -11,25 +11,42 @@
 
 ## [Unreleased]
 
-### 运行时与数据层（Changed）
+## [0.2.0] - 2026-08-25
 
-- FastAPI Native runtime 已收口为唯一当前入口：Uvicorn → `backend/asgi.py` → FastAPI；`/healthz` 只报告 `runtime=fastapi` 和 `fastapiPrimary=true`。
-- Flask / Flask-Cors runtime dependency、WSGI fallback、Waitress、runtime switch 与 `FLASK_*` application configuration names 已退休；`Werkzeug` 保留用于 AuthService password hashing，`itsdangerous` 提供 native signed-session codec。
-- #145 将 signed-session 写入格式迁移到 application-owned HMAC-SHA256；pre-#145 cookie 在一个有界 session lifetime 内只读验证并成功请求后重新签发，不要求用户同时轮换 secret。
-- Database Provider、SQLAlchemy Core 与 Alembic baseline/forward migration 已成为当前数据库访问与 Community/local 初始化路径；`docs/pg` / `docs/dws` 保留为 full/extension deployment 的补充 DDL。
-- 建立版本化 Metadata Ingestion Contract：外部 Collector 通过 `/api/metadata` 批量提交 Asset / Lineage snapshot；支持 source-scoped idempotency、dry-run、replace activation、audit summary 和 ingestion status query，不暴露内部 database schema。
+### 安全与认证（Security）
 
-### Repository Truth（Documentation）
+- 退休剩余 Flask authentication/runtime compatibility surface；FastAPI Native signed-session 成为唯一当前认证运行面，并保留有界的旧 cookie 只读迁移以维持会话连续性。
+- 普通业务读取接口默认要求认证；写操作、管理操作和敏感读取继续由 permission-based RBAC 强制授权。
+- 增加按用户名与请求上下文身份计数的登录失败 backoff，限制短时间重复失败但不永久锁定账号。
+- 在 ASGI 层执行请求体大小上限，超限请求返回统一的 `413` 错误契约。
+- 收紧 production OpenAPI 暴露策略：生产默认不注册 `/docs`、`/redoc` 和 `/openapi.json`；仅显式 `APP_ENV=development` 开启。
+- 统一审计 actor identity，并继续以安全回归测试固化 RBAC route enforcement、认证边界和 Community 数据边界。
 
-- 对齐 README、Architecture、Deployment、Development、API Contract、Modules、Community Demo、Screenshots 与 generated architecture artifact 的当前 FastAPI/Uvicorn、schema/migration、Demo 和版本语义。
-- 明确 published `v0.1.1`、application/package version sync debt 与独立线上 mock bundle `V1.0.0` 的区别；已发布的 `[0.1.0]` 历史章节保持不变。
-- Issue #116 已移除 Community / Private / Optional artificial runtime gating；仓库已有模块统一进入 open-by-default runtime、schema、seed、search 和 portal statistics contract。
+### 运行时与架构（Changed）
 
-### 优化（Changed）
+- FastAPI Native-only runtime 稳定为 `Uvicorn → backend/asgi.py → FastAPI`；健康检查只报告当前 native runtime 状态。
+- 建立 module-level `APIRouter` convention pilot，并固化 public/stable route registration contract。
+- 收敛 Module、Capability 与 Readiness 职责：仓库模块默认注册，数据库、驱动、凭据和外部 storage readiness 通过诊断/error contract 表达，不作为 Edition 或 route gate。
+- 兼容 FastAPI `0.141.1`、Pydantic `2.13.4` 和 Uvicorn `0.52.4`，并同步 backend runtime dependency baseline。
 
-- 前端完成组件化拆分：页面视图收敛到 `components/views/`、侧边栏收敛到 `components/sidebar/`，业务逻辑抽取为 `hooks/` 下的领域 hook（`useAssetModule`、`useRootModule`、`useIndicatorModule`、`usePushModule`、`useUpstreamModule`、`useSystemModule` 等）。
-- 统一交互反馈：新增公共 `ConfirmDialog` / `confirmDelete` 确认弹窗与 toast 提示组件（`components/common/`），全面禁用原生 `alert` / `confirm`。
-- 整理项目文档体系：重构 `README.md`，新增根级 `CHANGELOG.md` / `DEPLOYMENT.md` / `DEVELOPMENT.md`，对齐 `docs/` 下各文档。
+### 数据库与迁移（Changed）
+
+- 退休 legacy service SQL path，统一通过 Database Provider、SQLAlchemy Core 和 Alembic/schema canonical source 访问与初始化数据库。
+- 刷新 SQLAlchemy `2.0.52`、Alembic `1.19.1` 与 PyMySQL `1.2.0`；PostgreSQL / MySQL contract 由 CI integration jobs 验证。
+- 本版本未新增不可逆数据库 schema migration；新库仍使用 canonical baseline + Alembic head，既有库升级前应先执行 schema verify。
+
+### 前端工程化（Changed）
+
+- 升级 Vite 至 `8.2.2`、`@vitejs/plugin-react` 至 `6.1.0`，并保持 ESLint quality gate。
+- 完成 App routing/navigation decomposition 与增量 TypeScript boundary，重新建立 lineage workspace source/dist 构建契约。
+
+### 兼容性说明（Upgrade Notes）
+
+- Legacy Flask authentication compatibility surface has been removed. Deployments must use `uvicorn backend.asgi:app` and the current `APP_*` configuration names.
+- Business read APIs now require authentication where applicable; existing RBAC rules still govern writes, administration and sensitive reads.
+- Review [DEPLOYMENT.md](./DEPLOYMENT.md) and [backend/.env.example](./backend/.env.example), especially `APP_SECRET_KEY`, `APP_ENV`, OpenAPI exposure and request-size settings.
+- Fresh Community/local databases use `backend/schema` + Alembic + demo seed. For existing databases, verify the schema before applying the current head; this release does not provide a general database downgrade.
+- ESLint 10 is intentionally not included because upstream `eslint-plugin-react` peer compatibility does not yet cover ESLint 10.
 
 ## [0.1.0]
 
