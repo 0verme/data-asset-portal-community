@@ -31,7 +31,7 @@ class FastApiRepositoryBoundaryTests(unittest.TestCase):
             capabilities=self.capabilities,
             identity_resolver=lambda _request: None,
         )
-        paths = {route.path for route in app.routes}
+        paths = set(app.openapi()["paths"])
         for path in (
             "/api/upstreams/systems",
             "/api/push/systems",
@@ -46,7 +46,7 @@ class FastApiRepositoryBoundaryTests(unittest.TestCase):
             capabilities=self.capabilities,
             identity_resolver=lambda _request: None,
         )
-        paths = {route.path for route in app.routes}
+        paths = set(app.openapi()["paths"])
         self.assertNotIn("/api/indicator-path/tree", paths)
         self.assertNotIn("/api/common-codes/categories", paths)
 
