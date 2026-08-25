@@ -9,7 +9,7 @@ trace field/table mappings, and maintain roots, indicators, and downstream metad
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![CI](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml)
-![Stack](https://img.shields.io/badge/React%2018%20%2B%20Vite%207%20%7C%20FastAPI%20%2B%20Uvicorn?logo=react)
+![Stack](https://img.shields.io/badge/React%2018%20%2B%20Vite%208%20%7C%20FastAPI%20%2B%20Uvicorn?logo=react)
 
 [快速开始](#-快速开始) · [社区入口](#-社区入口) · [功能模块](#-功能模块) · [文档](#-文档导航)
 
@@ -159,8 +159,8 @@ flowchart LR
 
 ## 🏷️ Release / Version Truth
 
-- **Latest published GitHub Release**：`v0.1.1`（已发布，非 draft、非 prerelease）。历史版本见 [CHANGELOG.md](./CHANGELOG.md)。
-- **Application/package metadata**：FastAPI app、frontend package 和仓库本地 footer 仍可能使用 `0.1.0` / `V0.1.0`；这属于 version sync debt，不改变 GitHub release 事实。
+- **Latest published GitHub Release**：`v0.2.0`（已发布，非 draft、非 prerelease）。历史版本见 [CHANGELOG.md](./CHANGELOG.md)。
+- **Application/package metadata**：FastAPI app、frontend package 和仓库本地 footer 已对齐为 `0.2.0` / `V0.2.0`；线上静态 Demo 的独立 build metadata 不改变 GitHub release 事实。
 - **Online Demo build**：线上静态/mock bundle 的 `V1.0.0` 是独立 build metadata，不代表仓库 release 或当前 main。
 
 ## 📚 文档导航

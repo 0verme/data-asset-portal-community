@@ -47,7 +47,7 @@ FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract�
 }
 ```
 
-健康响应不包含历史 runtime fallback 字段；FastAPI app 的 `version="0.1.0"` 与 frontend package/footer 的 `0.1.0` / `V0.1.0` 是 application/package metadata；GitHub latest published release 为 `v0.1.1`。线上静态 mock bundle 的 `V1.0.0` 也不是 API 或 repository release version。
+健康响应不包含历史 runtime fallback 字段；FastAPI app 的 `version="0.2.0"` 与 frontend package/footer 的 `0.2.0` / `V0.2.0` 是当前 application/package metadata；GitHub latest published release 为 `v0.2.0`。线上静态 mock bundle 的 `V1.0.0` 仍是独立 build metadata，不是 API 或 repository release version。
 
 本文描述 current main contract；历史 migration 文档中的旧 adapter/status 只作为历史证据。
 

@@ -181,7 +181,7 @@
       "dot": "emerald",
       "title": "Version and Demo Truth",
       "items": [
-        "Published release 是 v0.1.0，v0.1.1 仍是 Draft，current main 是 post-v0.1.0 unreleased state。",
+        "Release baseline 是 v0.2.0；current main 与该稳定基线保持一致。",
         "Repository Community Demo、frontend mock 和 online static V1.0.0 bundle 是三个不同运行面。"
       ]
     }
