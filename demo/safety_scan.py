@@ -27,7 +27,9 @@ PRIVATE_IPV4 = re.compile(
 )
 DOCUMENTATION_IPV4 = re.compile(r"\b(?:192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}\b")
 INTERNAL_DOMAIN = re.compile(
-    r"\b(?:[\w-]+\.)+(?:" + "|".join(map(re.escape, ("intra", "internal", "corp", "lan"))) + r")(?::[0-9]+)?\b",
+    r"\b(?:[\w-]+\.)+(?:"
+    + "|".join(map(re.escape, ("intra", "internal", "corp", "lan")))
+    + r")(?::[0-9]+)?\b",
     re.IGNORECASE,
 )
 EMAIL = re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b")
@@ -66,7 +68,17 @@ REAL_SECRET_VALUE = re.compile(
 # Business-sensitive vocabulary of the original internal product. Kept narrow:
 # only confirmed residue markers from the pre-public tree.
 BUSINESS_TERMS = tuple(
-    _w for _w in ("核心银行", "反洗钱", "信贷管理", "支付清算", "账务系统", "贷款", "存款", "借据")
+    _w
+    for _w in (
+        "核心银行",
+        "反洗钱",
+        "信贷管理",
+        "支付清算",
+        "账务系统",
+        "贷款",
+        "存款",
+        "借据",
+    )
 )
 # Words that are fine to discuss (e.g. "bank" as a generic example) — used by
 # scanners to skip an otherwise-forbidden term inside an allowlisted context.
@@ -128,14 +140,24 @@ def classify(text: str, label: str) -> list[dict]:
         if "internal server error" in window.lower():
             # HTTP status phrase (e.g. `500 Internal Server Error`), not a domain.
             findings.append(
-                {"label": label, "category": "network", "severity": "SAFE", "detail": "HTTP status phrase"}
+                {
+                    "label": label,
+                    "category": "network",
+                    "severity": "SAFE",
+                    "detail": "HTTP status phrase",
+                }
             )
             continue
         if "example." in domain:
             # RFC 2606-style placeholder domain (e.g. `registry.example.internal`
             # in vendored third-party docs) is documentation, not a real host.
             findings.append(
-                {"label": label, "category": "network", "severity": "SAFE", "detail": "example placeholder domain"}
+                {
+                    "label": label,
+                    "category": "network",
+                    "severity": "SAFE",
+                    "detail": "example placeholder domain",
+                }
             )
             continue
         findings.append(
@@ -149,7 +171,12 @@ def classify(text: str, label: str) -> list[dict]:
     for match in EMAIL.finditer(text):
         if match.group(0).lower().endswith("@demo.invalid"):
             findings.append(
-                {"label": label, "category": "network", "severity": "SAFE", "detail": "demo email"}
+                {
+                    "label": label,
+                    "category": "network",
+                    "severity": "SAFE",
+                    "detail": "demo email",
+                }
             )
         else:
             findings.append(
@@ -162,15 +189,30 @@ def classify(text: str, label: str) -> list[dict]:
             )
     for _match in PHONE.finditer(text):
         findings.append(
-            {"label": label, "category": "network", "severity": "SUSPICIOUS", "detail": "phone number"}
+            {
+                "label": label,
+                "category": "network",
+                "severity": "SUSPICIOUS",
+                "detail": "phone number",
+            }
         )
     for _match in WINDOWS_PATH.finditer(text):
         findings.append(
-            {"label": label, "category": "path", "severity": "BLOCKER", "detail": "Windows user path"}
+            {
+                "label": label,
+                "category": "path",
+                "severity": "BLOCKER",
+                "detail": "Windows user path",
+            }
         )
     for _match in USER_HOME_PATH.finditer(text):
         findings.append(
-            {"label": label, "category": "path", "severity": "SUSPICIOUS", "detail": "user home path"}
+            {
+                "label": label,
+                "category": "path",
+                "severity": "SUSPICIOUS",
+                "detail": "user home path",
+            }
         )
     for match in INTERNAL_SVN_PATH.finditer(text):
         findings.append(
@@ -191,7 +233,12 @@ def classify(text: str, label: str) -> list[dict]:
             or "SYNC_PG_DSN" in window
         ):
             findings.append(
-                {"label": label, "category": "secret", "severity": "EXPECTED", "detail": "example connection string"}
+                {
+                    "label": label,
+                    "category": "secret",
+                    "severity": "EXPECTED",
+                    "detail": "example connection string",
+                }
             )
         else:
             findings.append(
@@ -204,13 +251,28 @@ def classify(text: str, label: str) -> list[dict]:
             )
     for match in JDBC_URL.finditer(text):
         window = text[max(0, match.start() - 40) : match.end() + 60]
-        if "example" in match.group(0).lower() or "demo" in match.group(0).lower() or "127.0.0.1" in match.group(0) or "示例" in window:
+        if (
+            "example" in match.group(0).lower()
+            or "demo" in match.group(0).lower()
+            or "127.0.0.1" in match.group(0)
+            or "示例" in window
+        ):
             findings.append(
-                {"label": label, "category": "secret", "severity": "EXPECTED", "detail": "example JDBC URL"}
+                {
+                    "label": label,
+                    "category": "secret",
+                    "severity": "EXPECTED",
+                    "detail": "example JDBC URL",
+                }
             )
         else:
             findings.append(
-                {"label": label, "category": "secret", "severity": "SUSPICIOUS", "detail": "JDBC URL"}
+                {
+                    "label": label,
+                    "category": "secret",
+                    "severity": "SUSPICIOUS",
+                    "detail": "JDBC URL",
+                }
             )
 
     for match in SECRET_KEYWORDS.finditer(text):
@@ -280,7 +342,10 @@ def classify(text: str, label: str) -> list[dict]:
 
 def _is_naming_reference_row(line: str) -> bool:
     """True for seed-corpus rows like `abbr|en|cn|category|desc` (5 pipe-separated columns)."""
-    return len(line.split("|")) >= 4 and re.match(r"^\s*[a-z0-9_]+\|\s*[a-zA-Z ]+\|", line) is not None
+    return (
+        len(line.split("|")) >= 4
+        and re.match(r"^\s*[a-z0-9_]+\|\s*[a-zA-Z ]+\|", line) is not None
+    )
 
 
 def _line_containing(text: str, term: str) -> str:
@@ -291,7 +356,11 @@ def _line_containing(text: str, term: str) -> str:
 
 
 def _is_env_var_name(window: str) -> bool:
-    return bool(re.search(r"\b[A-Z][A-Z0-9_]*(?:PASSWORD|TOKEN|SECRET|KEY|CREDENTIAL)\b", window))
+    return bool(
+        re.search(
+            r"\b[A-Z][A-Z0-9_]*(?:PASSWORD|TOKEN|SECRET|KEY|CREDENTIAL)\b", window
+        )
+    )
 
 
 def scan_file(path: Path, repo_root: Path) -> list[dict]:
@@ -304,5 +373,7 @@ def scan_file(path: Path, repo_root: Path) -> list[dict]:
     return classify(text, label)
 
 
-def high_severity(findings: list[dict], severities=("BLOCKER", "SUSPICIOUS")) -> list[dict]:
+def high_severity(
+    findings: list[dict], severities=("BLOCKER", "SUSPICIOUS")
+) -> list[dict]:
     return [f for f in findings if f.get("severity") in severities]
