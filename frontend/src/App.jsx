@@ -770,6 +770,15 @@ export default function App() {
         <footer className="app-footer-shell">
           <div className="app-footer">
             <span className="app-footer-copy">数据资产管理与血缘分析平台 {APP_VERSION}</span>
+            <span className="app-footer-separator" aria-hidden="true">·</span>
+            <a
+              className="app-footer-link"
+              href="https://github.com/0verme/data-asset-portal-community"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              GitHub ↗
+            </a>
           </div>
         </footer>
 
