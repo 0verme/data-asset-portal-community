@@ -56,6 +56,7 @@ logs, system users/roles/parameters, and all mutations remain protected.
 | upstream | `upstream:read` on admin detail; `upstream:write` on mutations |
 | push | `push:read` on admin detail; `push:write` on system/job mutations |
 | code table | `code_table:write` on create/update/status/delete |
+| field mapping | `field_mapping:write` on batch import |
 | metadata | `metadata:read` on lookup; `metadata:write` on ingestion aliases |
 | operation log | `operation_log:read` on list/detail |
 | system user | `system:user:read/write` |

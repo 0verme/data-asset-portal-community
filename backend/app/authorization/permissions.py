@@ -27,7 +27,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
-
 ADMIN_ROLE = "admin"
 MAINTAINER_ROLE = "maintainer"
 
@@ -41,7 +40,6 @@ class PermissionDefinition:
     action: str
     name: str
     description: str
-
 
 
 def _permission(
@@ -71,7 +69,9 @@ PERMISSION_DEFINITIONS: tuple[PermissionDefinition, ...] = (
     _permission("report:read", "报表读取", "查询报表资产及详情。"),
     _permission("report:write", "报表维护", "创建、更新和删除报表资产。"),
     _permission("api_asset:read", "API 资产读取", "查询 API 资产及其关联信息。"),
-    _permission("api_asset:write", "API 资产维护", "维护 API 资产、参数、响应字段和关系。"),
+    _permission(
+        "api_asset:write", "API 资产维护", "维护 API 资产、参数、响应字段和关系。"
+    ),
     _permission("upstream:read", "上游系统受限读取", "读取受保护的上游系统管理详情。"),
     _permission("upstream:write", "上游系统维护", "创建、更新、停用和删除上游系统。"),
     _permission("push:read", "下游推送受限读取", "读取受保护的下游系统管理详情。"),
@@ -79,22 +79,37 @@ PERMISSION_DEFINITIONS: tuple[PermissionDefinition, ...] = (
     _permission("code_table:read", "码值表读取", "查询和导出手工码值表。"),
     _permission("code_table:write", "码值表维护", "创建、更新、停用和删除手工码值表。"),
     _permission("field_mapping:read", "字段映射读取", "查询字段映射和映射统计。"),
+    _permission("field_mapping:write", "字段映射导入", "批量导入和幂等更新字段映射。"),
     _permission("lineage:read", "血缘读取", "查询血缘 bootstrap、节点和子图。"),
     _permission("metadata:read", "Metadata 读取", "读取 Metadata Ingestion 结果。"),
-    _permission("metadata:write", "Metadata 写入", "写入或预览资产、血缘 Metadata ingestion。"),
+    _permission(
+        "metadata:write", "Metadata 写入", "写入或预览资产、血缘 Metadata ingestion。"
+    ),
     _permission("operation_log:read", "操作日志读取", "查询操作日志及日志详情。"),
     _permission("system:user:read", "用户管理读取", "查询系统用户。"),
-    _permission("system:user:write", "用户管理维护", "创建、更新、禁用、删除用户及重置密码。"),
-    _permission("system:menu:read", "菜单管理读取", "读取完整菜单管理数据；公共菜单接口仍按公开契约过滤。"),
-    _permission("system:menu:write", "菜单管理维护", "创建、更新、排序、停用和删除菜单。"),
+    _permission(
+        "system:user:write", "用户管理维护", "创建、更新、禁用、删除用户及重置密码。"
+    ),
+    _permission(
+        "system:menu:read",
+        "菜单管理读取",
+        "读取完整菜单管理数据；公共菜单接口仍按公开契约过滤。",
+    ),
+    _permission(
+        "system:menu:write", "菜单管理维护", "创建、更新、排序、停用和删除菜单。"
+    ),
     _permission("system:param:read", "参数管理读取", "读取参数分类和参数字典。"),
-    _permission("system:param:write", "参数管理维护", "创建、更新、停用和删除参数字典。"),
+    _permission(
+        "system:param:write", "参数管理维护", "创建、更新、停用和删除参数字典。"
+    ),
     _permission("system:role:read", "角色管理读取", "P6 读取角色及权限映射。"),
     _permission("system:role:write", "角色管理维护", "P6 创建、更新角色及权限映射。"),
 )
 
 PERMISSION_CODES: tuple[str, ...] = tuple(item.code for item in PERMISSION_DEFINITIONS)
-_DEFINITIONS_BY_CODE = MappingProxyType({item.code: item for item in PERMISSION_DEFINITIONS})
+_DEFINITIONS_BY_CODE = MappingProxyType(
+    {item.code: item for item in PERMISSION_DEFINITIONS}
+)
 
 # The compatibility mapping deliberately remains explicit.  Public reads are
 # not made private by this set; the set describes the permissions a maintainer
@@ -118,6 +133,7 @@ MAINTAINER_PERMISSION_CODES = frozenset(
         "code_table:read",
         "code_table:write",
         "field_mapping:read",
+        "field_mapping:write",
         "lineage:read",
         "metadata:read",
         "metadata:write",

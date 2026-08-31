@@ -56,7 +56,7 @@
 
 **数据表**：`p_data_source`、`p_field_mapping_table`、`p_field_mapping_field`；运行查询不依赖 `p_upstream_system`。旧 `p_field_mapping_change_log` DDL 仅作为 docs-only reference 保留，当前没有对应 runtime service，不参与 canonical availability contract。
 
-**说明**：展示源系统、源表及字段到目标表字段的映射关系，支持查询、统计和 CSV 导出；当前没有前端编辑入口。
+**说明**：展示源系统、源表及字段到目标表字段的映射关系，支持查询、统计和 CSV 导出；外部 Collector 可通过受保护的 `POST /api/field-mappings/import` 批量幂等写入，当前没有前端编辑入口。
 
 ## 4. 血缘分析
 

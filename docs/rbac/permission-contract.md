@@ -71,6 +71,7 @@ are not made private merely because a corresponding `*:read` code exists.
 | `code_table:read` | code_table | read | Reserved for a materially sensitive code-table read boundary; ordinary list/detail/export are public with audit-field redaction. |
 | `code_table:write` | code_table | write | Protected manual code table create/update/status/delete. |
 | `field_mapping:read` | field_mapping | read | Reserved for a materially sensitive mapping-read boundary; ordinary catalog queries are public. |
+| `field_mapping:write` | field_mapping | write | Protected batch Field Mapping import and idempotent upsert. |
 | `lineage:read` | lineage | read | Reserved for a materially sensitive lineage-read boundary; ordinary queries are public with nested-value redaction. |
 | `metadata:read` | metadata | read | Protected ingestion result lookup. |
 | `metadata:write` | metadata | write | Protected asset/lineage Metadata Ingestion and preview/bulk aliases. |
@@ -133,6 +134,7 @@ for P3; ordinary public catalog reads are now governed by Issue #180.
 | code table | `GET /api/manual-code-tables`, `GET /api/manual-code-tables/export`, `GET /api/manual-code-tables/{table_id}` | Yes | — | — | — | No | Public; `code_table:read` reserved |
 | code table | `POST /api/manual-code-tables`, `PUT /api/manual-code-tables/{table_id}`, `PATCH /api/manual-code-tables/{table_id}/status`, `DELETE /api/manual-code-tables/{table_id}` | No | Yes | Yes | Yes | Yes | `code_table:write` |
 | field mapping | `GET /api/field-mappings/source-systems`, `GET /api/field-mappings/stats`, `GET /api/field-mappings/fields`, `GET /api/field-mappings/tables` | Yes | — | — | — | No | Public; `field_mapping:read` reserved |
+| field mapping | `POST /api/field-mappings/import` | No | Yes | Yes | Yes | Yes | `field_mapping:write` |
 | lineage | `GET /api/lineage/bootstrap`, `GET /api/lineage/assets`, `GET /api/lineage/subgraph`, `GET /api/lineage/initial-view` | Yes | — | — | — | No | Public; `lineage:read` reserved |
 | metadata | `POST /api/metadata/assets/ingestions`, hidden alias `POST /api/metadata/assets:bulk-upsert` | No | Yes | Yes | Yes | Yes | `metadata:write` |
 | metadata | `POST /api/metadata/lineage/ingestions`, hidden alias `POST /api/metadata/lineage:snapshots` | No | Yes | Yes | Yes | Yes | `metadata:write` |
@@ -189,6 +191,7 @@ Ordinary catalog GET routes accept anonymous requests; sensitive reads and all m
 | `code_table:read` | Yes | Yes | No |
 | `code_table:write` | Yes | Yes | No |
 | `field_mapping:read` | Yes | Yes | No |
+| `field_mapping:write` | Yes | Yes | No |
 | `lineage:read` | Yes | Yes | No |
 | `metadata:read` | Yes | Yes | No |
 | `metadata:write` | Yes | Yes | No |

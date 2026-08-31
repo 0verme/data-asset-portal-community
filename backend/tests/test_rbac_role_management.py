@@ -74,12 +74,12 @@ class RbacRoleManagementTests(unittest.TestCase):
     def test_lists_registry_permissions_and_builtin_roles(self):
         permissions = self.service.get_permissions()
         self.assertEqual("asset:read", permissions[0]["code"])
-        self.assertEqual(29, len(permissions))
+        self.assertEqual(30, len(permissions))
 
         roles = self.service.get_roles()
         self.assertEqual(["admin", "maintainer"], [item["roleCode"] for item in roles])
         self.assertTrue(roles[0]["builtin"])
-        self.assertEqual(29, len(roles[0]["permissionCodes"]))
+        self.assertEqual(30, len(roles[0]["permissionCodes"]))
 
     def test_custom_role_replaces_permission_mapping(self):
         created = self._create_role()
@@ -101,11 +101,15 @@ class RbacRoleManagementTests(unittest.TestCase):
 
     def test_builtin_roles_are_protected(self):
         with self.assertRaises(SystemRoleProtectedError):
-            self.service.update_role("admin", {"name": "Changed", "permissionCodes": []})
+            self.service.update_role(
+                "admin", {"name": "Changed", "permissionCodes": []}
+            )
         with self.assertRaises(SystemRoleProtectedError):
             self.service.delete_role("maintainer")
         with self.assertRaises(SystemRoleProtectedError):
-            self.service.create_role({"roleCode": "admin", "name": "Duplicate", "permissionCodes": []})
+            self.service.create_role(
+                {"roleCode": "admin", "name": "Duplicate", "permissionCodes": []}
+            )
 
     def test_assigned_custom_role_cannot_be_deleted(self):
         self._create_role("temporary-role")
@@ -130,9 +134,15 @@ class RbacRoleManagementTests(unittest.TestCase):
             "VALUES (2, 'maintainer-user', 'hash', 'Maintainer', 'maintainer', 'ACTIVE')"
         )
         self.connection.commit()
-        updated = self.service.update_user_role("maintainer-user", {"role": "indicator-maintainer"})
+        updated = self.service.update_user_role(
+            "maintainer-user", {"role": "indicator-maintainer"}
+        )
         self.assertEqual("indicator-maintainer", updated["role"])
-        current = next(item for item in self.service.get_users() if item["username"] == "maintainer-user")
+        current = next(
+            item
+            for item in self.service.get_users()
+            if item["username"] == "maintainer-user"
+        )
         self.assertEqual("indicator-maintainer", current["role"])
 
     def test_unknown_permission_and_unknown_user_role_are_rejected(self):

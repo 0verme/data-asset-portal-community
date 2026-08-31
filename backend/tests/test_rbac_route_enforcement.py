@@ -77,6 +77,7 @@ class RoutePermissionInventoryTests(unittest.TestCase):
         ): "push:read",
         ("POST", "/api/push/systems"): "push:write",
         ("POST", "/api/manual-code-tables"): "code_table:write",
+        ("POST", "/api/field-mappings/import"): "field_mapping:write",
         (
             "POST",
             "/api/metadata/assets/ingestions",
@@ -187,7 +188,9 @@ class RoutePermissionInventoryTests(unittest.TestCase):
                 if method == "parameters":
                     continue
                 key = (method.upper(), path)
-                if key in explicit_auth or (method.upper() == "GET" and path in self.PUBLIC_GETS):
+                if key in explicit_auth or (
+                    method.upper() == "GET" and path in self.PUBLIC_GETS
+                ):
                     continue
                 with self.subTest(route=key):
                     payload = None if method in {"get", "head", "options"} else {}
@@ -197,16 +200,16 @@ class RoutePermissionInventoryTests(unittest.TestCase):
                         json=payload,
                     )
                     self.assertEqual(401, response.status_code, response.text)
-                    self.assertEqual(
-                        "UNAUTHORIZED", response.json()["error"]["code"]
-                    )
+                    self.assertEqual("UNAUTHORIZED", response.json()["error"]["code"])
 
     def test_public_catalog_gets_do_not_carry_authentication_guard(self):
         app = create_fastapi_app(identity_resolver=lambda _request: None)
         routes = {
             route.path: route
             for wrapper in app.routes
-            for route in getattr(getattr(wrapper, "original_router", None), "routes", [])
+            for route in getattr(
+                getattr(wrapper, "original_router", None), "routes", []
+            )
             if isinstance(route, APIRoute) and "GET" in (route.methods or ())
         }
         for path in self.PUBLIC_GETS:
@@ -223,7 +226,9 @@ class RoutePermissionInventoryTests(unittest.TestCase):
             (method.upper(), path)
             for path, operations in create_fastapi_app(
                 identity_resolver=lambda _request: None
-            ).openapi()["paths"].items()
+            )
+            .openapi()["paths"]
+            .items()
             for method in operations
             if method != "parameters"
         }
