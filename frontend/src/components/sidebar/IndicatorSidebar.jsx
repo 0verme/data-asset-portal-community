@@ -25,17 +25,17 @@ export function IndicatorSidebar({ indicator, indicatorFilter, setIndicatorFilte
     <>
       <SidebarFilterGroup
         title="指标维度"
-        items={[
-          {
-            key: "all",
-            label: "全部指标",
-            count: indicators.length,
-            active: indicatorFilter.dimension === "all",
-            onClick: () => {
-              setIndicatorFilter((prev) => ({ ...prev, dimension: "all" }));
-              setIndicatorRoute(DEFAULT_INDICATOR_ROUTE);
-            },
+        allOption={{
+          key: "all",
+          label: "全部指标",
+          count: indicators.length,
+          active: indicatorFilter.dimension === "all",
+          onClick: () => {
+            setIndicatorFilter((prev) => ({ ...prev, dimension: "all" }));
+            setIndicatorRoute(DEFAULT_INDICATOR_ROUTE);
           },
+        }}
+        items={[
           ...INDICATOR_DIMENSION_OPTIONS.filter((item) => item.value !== "all").map((item) => ({
             key: item.value,
             active: indicatorFilter.dimension === item.value,

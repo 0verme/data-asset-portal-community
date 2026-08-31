@@ -11,8 +11,14 @@ export function ManualCodeTableSidebar({ module, canEdit }) {
     <>
       <SidebarFilterGroup
         title="码表样式"
+        allOption={{
+          key: "all",
+          label: "全部码表",
+          count: module.items.length,
+          active: !module.styleFilter,
+          onClick: () => module.setStyleFilter(""),
+        }}
         items={[
-          { key: "all", label: "全部码表", count: module.items.length, active: !module.styleFilter, onClick: () => module.setStyleFilter("") },
           ...MANUAL_CODE_TABLE_STYLES.map((style) => ({
             key: style.value,
             label: style.label,

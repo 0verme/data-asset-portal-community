@@ -22,14 +22,14 @@ export function RootSidebar({ root, requireLogin, canEdit = false, setRootRoute 
     <>
       <SidebarFilterGroup
         title="词根分类"
+        allOption={{
+          key: "all-roots",
+          label: "全部词根",
+          count: roots.length,
+          active: !rootCategory,
+          onClick: () => setRootCategory(null),
+        }}
         items={[
-          {
-            key: "all-roots",
-            label: "全部词根",
-            count: roots.length,
-            active: !rootCategory,
-            onClick: () => setRootCategory(null),
-          },
           ...rootCategories.map((item) => ({
             key: item.name,
             label: item.name,

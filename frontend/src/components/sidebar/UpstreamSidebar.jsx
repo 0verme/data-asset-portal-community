@@ -43,6 +43,13 @@ export function UpstreamSidebar({ upstream, statusOptions, requireLogin, canEdit
     <>
       <SidebarFilterGroup
         title="数据库类型"
+        allOption={{
+          key: "all-db-types",
+          label: "全部类型",
+          count: upstreamSystems.length,
+          active: !upFilter.dbType,
+          onClick: () => setUpFilter((prev) => ({ ...prev, dbType: null })),
+        }}
         items={upstreamDbTypes
           .filter((item) => dbTypeCounts[item.value])
           .map((item) => ({
