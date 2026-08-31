@@ -23,7 +23,7 @@ FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract�
 | 码值表维护 | `api/manualCodeTables.js` | `/api/manual-code-tables` | 已注册 | 管理手工码值表元数据 |
 | 系统管理 | `api/systemUsers.js`、`api/paramDicts.js`、`api/menus.js` | `/api/system` | 已注册 | 用户、菜单、参数字典与角色边界 |
 | 操作日志 | `api/operationLogs.js` | `/api/operation-logs` | 已注册（随 system） | 查询全站操作审计日志 |
-| 通用码值 | `api/commonCodes.js` | `/api/common-codes` | WAIT_DB，当前未注册 | 全系统可复用的分类码值与下拉选项 |
+| 通用码值（历史） | — | `/api/common-codes` | WAIT_DB，当前未注册 | 历史数据模型；前端运行时不得调用，参数字典管理见 `/api/system/param-dicts*` |
 
 仓库已有 module codes 默认进入同一 open runtime contract；菜单 `status`、外部依赖、database driver、credential 和 persistent lineage storage readiness 是实例/部署状态，不是 Edition feature gate。Module availability is not a licensing gate；menu visibility is not authorization，RBAC authorization is not module availability，runtime/DB profile is not feature gating。
 
@@ -873,52 +873,18 @@ Base Path: `/api/operation-logs`
 }
 ```
 
-## 11. 通用码值模块 `common-codes`
+## 11. 通用码值（历史/WAIT_DB）
 
-Base Path: `/api/common-codes`
+`/api/common-codes/*` 是早期 Flask 的 Legacy Contract。FastAPI Native 迁移记录将 Common Code 保留为 `WAIT_DB`，当前没有注册 router，也不出现在 OpenAPI；前端运行时不得调用这些路径。
 
-### 11.1 核心模型
+当前替代关系如下：
 
-#### CommonCodeCategory
+- 系统参数字典的管理契约是 `/api/system/param-dicts*`，由系统管理权限保护，数据表为 `p_code_category` / `p_code_item`。
+- 报表类型是 `p_report_asset.report_type` 的领域值；报表页面从当前 `/api/reports` 列表建立 facet/编辑选项。
+- 上游和推送编辑候选项从各自已注册的 `/api/upstreams`、`/api/push` 数据及集中本地默认选项建立。
+- `enabled` / `disabled` 的公共展示使用共享二态状态契约“启用 / 禁用”。
 
-```json
-{
-  "code": "UPSTREAM_DB_TYPE",
-  "name": "上游数据库类型",
-  "desc": "上游卸数系统数据库类型选项",
-  "active": true,
-  "count": 6
-}
-```
-
-#### CommonCodeItem
-
-```json
-{
-  "categoryCode": "UPSTREAM_DB_TYPE",
-  "code": "POSTGRESQL",
-  "name": "PostgreSQL",
-  "value": "PostgreSQL",
-  "desc": "PostgreSQL Database",
-  "order": 30,
-  "active": true,
-  "ext": {}
-}
-```
-
-### 11.2 接口
-
-- `GET /api/common-codes/categories`
-- `GET /api/common-codes/categories/{categoryCode}/items`
-
-### 11.3 当前初始化分类
-
-`UPSTREAM_DB_TYPE`、`UPSTREAM_DEPT`、`PUSH_PROTOCOL`、`PUSH_AUTH_TYPE`、`PUSH_DELIMITER`、`FILE_ENCODING`、`FREQ_TYPE`（推送频率，取值 T+1/T+0/准实时/每周/每月）、`SYSTEM_STATUS`。
-
-### 11.4 使用约定
-
-- 通用下拉项、状态项、协议项等场景统一走通用码值，页面不再硬编码。
-- 已接入页面：上游卸数系统页（数据库类型）、下游推送系统页与筛选区（推送协议、认证方式、系统状态）。
+Common Code service 仍可作为后端领域校验的内部数据访问实现，但这不代表恢复了一个公共 HTTP endpoint，也不构成第二套前端 API 契约。
 
 ## 12. 认证模块 `auth`
 

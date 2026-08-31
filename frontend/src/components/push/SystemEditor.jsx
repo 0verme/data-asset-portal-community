@@ -10,7 +10,7 @@ import {
   TimeInput,
 } from "../common/index.js";
 
-import { getLegacyAwareOptions, isLegacyDictValue } from "../../hooks/useDictOptions.js";
+import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.js";
 import { isValidLatestOutputTime, normalizeLatestOutputTime } from "../../utils/push.js";
 import { optionLabel } from "../../utils/ui.js";
 import {

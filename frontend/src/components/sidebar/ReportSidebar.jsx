@@ -14,14 +14,16 @@
 
 
 import { DEFAULT_REPORT_FILTER } from "../../config/defaults.js";
-import { useDictOptions } from "../../hooks/useDictOptions.js";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.jsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.jsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.jsx";
 
 export function ReportSidebar({ report, requireLogin, canEdit = false, setReportRoute }) {
   const { reports, reportFilter, setReportFilter, reportFacets } = report;
-  const { options: reportTypeOptions } = useDictOptions("REPORT_TYPE");
+  // Report type is a facet of the current report-asset response, not a
+  // common-code endpoint. This also preserves types added in the database.
+  const reportTypeOptions = Object.keys(reportFacets.type)
+    .map((value) => ({ value, name: value }));
 
   return (
     <>
@@ -34,9 +36,7 @@ export function ReportSidebar({ report, requireLogin, canEdit = false, setReport
           active: !reportFilter.type,
           onClick: () => setReportFilter((prev) => ({ ...prev, type: null })),
         }}
-        items={[...reportTypeOptions, ...Object.keys(reportFacets.type)
-          .filter((value) => !reportTypeOptions.some((item) => item.value === value))
-          .map((value) => ({ value, name: value, legacy: true }))]
+        items={reportTypeOptions
           .filter((item) => reportFacets.type[item.value])
           .map((item) => ({
             key: item.value,
