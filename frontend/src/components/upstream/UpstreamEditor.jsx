@@ -19,6 +19,8 @@ import { buildModuleBreadcrumbs } from "../../routing/navigation.ts";
 import { getLegacyAwareOptions, isLegacyDictValue } from "../../hooks/useDictOptions.js";
 import { optionLabel } from "../../utils/ui.js";
 
+import { getUpstreamFieldLabel } from "./upstreamFieldContract.js";
+
 export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions = [], statusOptions = [], onSave, onCancel, onBackToList, onBackToDetail, onDelete, saveError = "", onClearSaveError }) {
   const isEdit = mode === "edit";
   const oldId = initial?.id || "";
@@ -142,19 +144,19 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
         <h3><Icon name="server" size={14} />基本信息</h3>
         <div className="form-grid">
           <div className="fl">
-            <label>系统标识</label>
+            <label>{getUpstreamFieldLabel("id")}</label>
             <input className={`inp mono${touched && !form.id.trim() ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder="例如：up_cbs" />
           </div>
           <div className="fl">
-            <label>系统简称</label>
+            <label>{getUpstreamFieldLabel("abbr")}</label>
             <input className={`inp mono${touched && !form.abbr.trim() ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setValue("abbr", event.target.value)} placeholder="例如：CBS" />
           </div>
           <div className="fl">
-            <label>系统名称</label>
+            <label>{getUpstreamFieldLabel("name")}</label>
             <input className={`inp${touched && !form.name.trim() ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：商品中心" />
           </div>
           <div className="fl">
-            <label>数据库类型</label>
+            <label>{getUpstreamFieldLabel("dbType")}</label>
             <select className={`sel${touched && !form.dbType.trim() ? " invalid" : ""}`} value={form.dbType} onChange={(event) => setValue("dbType", event.target.value)}>
               <option value="">请选择数据库类型</option>
               {dbTypeSelectOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item)}</option>)}
@@ -162,11 +164,11 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
             {dbTypeLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>当前值未在码值中维护，请补充码值或重新选择。</div> : null}
           </div>
           <div className="fl">
-            <label>负责人</label>
+            <label>{getUpstreamFieldLabel("owner")}</label>
             <input className="inp" value={form.owner} onChange={(event) => setValue("owner", event.target.value)} placeholder="例如：王芳" />
           </div>
           <div className="fl">
-            <label>业务部门</label>
+            <label>{getUpstreamFieldLabel("dept")}</label>
             <select className="sel" value={form.dept} onChange={(event) => setValue("dept", event.target.value)}>
               <option value="">请选择业务部门</option>
               {deptSelectOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item)}</option>)}
@@ -174,7 +176,7 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
             {deptLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>当前值未在码值中维护，请补充码值或重新选择。</div> : null}
           </div>
           <div className="fl">
-            <label>状态</label>
+            <label>{getUpstreamFieldLabel("status")}</label>
             <BinaryStatusToggle
               mode="status"
               value={form.status}
@@ -183,7 +185,7 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
             />
           </div>
           <div className="fl full">
-            <label>系统说明</label>
+            <label>{getUpstreamFieldLabel("desc")}</label>
             <textarea className="ta" value={form.desc} onChange={(event) => setValue("desc", event.target.value)} placeholder="描述该系统提供哪些数据，以及卸数用途。" />
           </div>
         </div>
@@ -193,11 +195,11 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
         <h3><Icon name="db" size={14} />数据库连接</h3>
         <div className="form-grid">
           <div className="fl">
-            <label>JDBC 地址</label>
+            <label>{getUpstreamFieldLabel("host")}</label>
             <input className={`inp mono${touched && !form.host.trim() ? " invalid" : ""}`} value={form.host} onChange={(event) => setValue("host", event.target.value)} placeholder="例如：product.source.demo.invalid" />
           </div>
           <div className="fl">
-            <label>Schema</label>
+            <label>{getUpstreamFieldLabel("schema")}</label>
             <input className="inp mono" value={form.schema} onChange={(event) => setValue("schema", event.target.value)} placeholder="例如：CBS_OWNER" />
           </div>
         </div>

@@ -75,6 +75,13 @@ test("push module owns its desktop and responsive styles", () => {
   assert.doesNotMatch(styles, /\.sys-grid/);
 });
 
+test("upstream detail metadata uses responsive grid columns", () => {
+  assert.match(moduleStyles.upstream, /\.upstream-detail-meta\s*\{[\s\S]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(moduleStyles.upstream, /@media \(max-width: 1100px\)[\s\S]*\.upstream-detail-meta\s*\{[\s\S]*repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(moduleStyles.upstream, /@media \(max-width: 768px\)[\s\S]*\.upstream-detail-meta\s*\{[\s\S]*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(moduleStyles.upstream, /@media \(max-width: 560px\)[\s\S]*\.upstream-detail-meta\s*\{[\s\S]*minmax\(0, 1fr\)/);
+});
+
 test("remaining governed modules own their scoped styles", () => {
   assert.match(moduleStyles.report, /\.report-detail-section/);
   assert.match(moduleStyles.upstream, /\.upstream-page/);

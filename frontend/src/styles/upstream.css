@@ -16,6 +16,65 @@
     align-self: flex-end;
   }
 
+  .upstream-detail-title {
+    font-size: 20px;
+    font-weight: 650;
+    color: var(--ink);
+  }
+
+  .upstream-detail-abbr {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 3px 9px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .upstream-detail-meta {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 18px 24px;
+  }
+
+  .upstream-detail-meta .mi,
+  .upstream-detail-meta .mi + .mi {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .upstream-detail-meta .mi .v {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 1100px) {
+    .upstream-detail-meta {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 768px) {
+    .upstream-detail-meta {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 560px) {
+    .upstream-detail-meta {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   .flow-card {
     display: flex;
     align-items: center;
