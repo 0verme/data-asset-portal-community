@@ -28,7 +28,11 @@ from ...services.system_management_service import (
     SystemUserNotFoundError,
     SystemValidationError,
 )
-from ..dependencies import get_authorization_service, get_request_context, require_permission
+from ..dependencies import (
+    get_authorization_service,
+    get_request_context,
+    require_permission,
+)
 from ..errors import _service_error_response
 from ..public_catalog import is_authenticated_request, public_navigation_menus
 
@@ -193,11 +197,16 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
 
     @router.get("/permissions", response_model=None)
     def get_permissions(
+        assignable_only: bool = Query(default=False, alias="assignableOnly"),
         _context: RequestContext = Depends(require_permission("system:role:read")),
         current_service: Any = Depends(get_service),
     ):
         try:
-            items = current_service.get_permissions()
+            items = (
+                current_service.get_role_assignable_permissions()
+                if assignable_only
+                else current_service.get_permissions()
+            )
         except SystemManagementError as error:
             return _system_error_response(error)
         return JSONResponse(content=validate_contract({"items": items}, SystemResponse))

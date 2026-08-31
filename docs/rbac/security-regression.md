@@ -13,7 +13,9 @@
 | disabled/deleted user | public projection or normal service result; no privileged projection | `401` | `401` |
 
 The matrix is checked at the backend dependency and response boundary, not only
-through frontend visibility. Public representative reads include assets,
+through frontend visibility. For the permission snapshot, anonymous and valid
+authenticated actors both receive the explicit public set; authenticated role
+permissions add capabilities and never remove it. Public representative reads include assets,
 fields/DDL, portal statistics, search, mappings, lineage, menus, roots,
 indicators, reports, API assets, code-table metadata, upstream catalogs, and
 push catalogs.
@@ -42,9 +44,10 @@ and enforced by the FastAPI router composition.
 
 `/api/auth/me` re-resolves current database-backed subject state for an
 existing cookie. A role or permission change therefore changes the returned
-role/`permissions[]` snapshot, and disabling the user returns `401`. The
-browser auth runtime treats a missing session as anonymous for public catalog
-bootstrap while failing closed for protected operations.
+role/`permissions[]` snapshot while retaining the public set, and disabling the
+user returns `401`. The browser auth runtime treats a missing session as
+anonymous for public catalog bootstrap while failing closed for protected
+operations.
 
 ## Information leakage
 
@@ -65,5 +68,7 @@ write controls. PostgreSQL/MySQL integration remains CI-owned unless an
 isolated local instance is configured; unexecuted live validation is reported
 as `NOT RUN`, never inferred as PASS.
 
-The backend remains the security boundary. This change adds no edition gate,
-ABAC/ACL, data scope, multi-role model, external IAM, or permission cache.
+The backend remains the security boundary. Public permissions are explicit,
+not a blanket `*:read` rule; writes, admin-detail reads, system management,
+metadata ingestion, and audit logs remain protected. This change adds no edition
+gate, ABAC/ACL, data scope, multi-role model, external IAM, or permission cache.

@@ -15,16 +15,26 @@ an additional backend-authoritative permission collection:
     "name": "Alice",
     "role": "maintainer",
     "permissions": [
+      "api_asset:read",
+      "asset:read",
+      "code_table:read",
+      "field_mapping:read",
       "indicator:read",
-      "operation_log:read"
+      "indicator:write",
+      "lineage:read",
+      "operation_log:read",
+      "report:read",
+      "root:read"
     ]
   }
 }
 ```
 
 `permissions` is sorted lexicographically and contains only registered current
-codes. The frontend must consume this permission set rather than re-deriving
-authorization from `role`.
+codes. It is the effective snapshot: public catalog permissions are included
+for every anonymous/valid authenticated actor, and role permissions add the
+incremental capabilities. The frontend must consume this permission set rather
+than re-deriving authorization from `role`.
 
 ## Current-state semantics
 
@@ -34,9 +44,10 @@ authorization from `role`.
 - If an existing cookie's user is disabled or deleted, `/auth/me` returns `401`
   and sensitive API dependencies reject the same cookie.
 - If the current role changes, `/auth/me` returns the new role and its current
-  sorted mappings on the next request.
-- If a role mapping is revoked, the next `/auth/me` returns the reduced list and
-  the next protected API request returns `403`.
+  sorted effective permissions on the next request.
+- If a role mapping is revoked, the next `/auth/me` keeps the public catalog
+  permissions but removes that role delta, and the next protected API request
+  returns `403`.
 - A non-empty unknown/disabled role is not upgraded to `admin`; its
   `permissions` is empty and protected resources return `403` when the current
   user still exists. Missing/disabled/deleted users return `401`.

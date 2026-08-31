@@ -6,7 +6,9 @@
 
 The FastAPI system adapter exposes:
 
-- `GET /api/system/permissions` — the P0 permission registry;
+- `GET /api/system/permissions` — the complete permission registry;
+- `GET /api/system/permissions?assignableOnly=true` — only role-assignable
+  incremental permissions for the role form;
 - `GET /api/system/roles` — roles, enabled state, mapped permission codes, and
   assigned-user count;
 - `POST /api/system/roles` — create a custom role;
@@ -25,6 +27,8 @@ All role-management writes require `system:role:write`; reads require
   updated, or deleted through the management API.
 - Permission mappings accept only registered P0 permission codes; unknown codes
   are rejected and mappings are normalized, deduplicated, and sorted.
+- Public catalog read codes are inherited by the effective permission model and
+  are ignored/removed from role mappings; they are not role-assignable.
 - Disabled or missing custom roles cannot be assigned to a user.
 - A role that is still assigned to any user cannot be deleted.
 - User binding remains single-role (`p_admin_user.role`); multi-role and ABAC/

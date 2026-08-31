@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
 from backend.app.authorization.core import AuthorizationService, AuthorizationSubject
+from backend.app.authorization.permissions import PUBLIC_PERMISSION_CODES
 from backend.app.fastapi.auth import get_native_session_identity
 from backend.app.fastapi_app import create_fastapi_app
 from backend.app.services.auth_service import AuthService
@@ -59,7 +60,7 @@ class AuthPermissionsContractTests(unittest.TestCase):
         )
         self.assertEqual(200, login.status_code)
         self.assertEqual(
-            ["indicator:write", "operation_log:read"],
+            sorted(PUBLIC_PERMISSION_CODES | self.permission_set),
             login.json()["data"]["permissions"],
         )
         self.assertEqual(
@@ -81,11 +82,17 @@ class AuthPermissionsContractTests(unittest.TestCase):
         changed = self.client.get("/api/auth/me")
         self.assertEqual(200, changed.status_code)
         self.assertEqual("maintainer", changed.json()["data"]["role"])
-        self.assertEqual(["indicator:read"], changed.json()["data"]["permissions"])
+        self.assertEqual(
+            sorted(PUBLIC_PERMISSION_CODES | {"indicator:read"}),
+            changed.json()["data"]["permissions"],
+        )
 
         self.permission_set.clear()
         revoked = self.client.get("/api/auth/me")
-        self.assertEqual([], revoked.json()["data"]["permissions"])
+        self.assertEqual(
+            sorted(PUBLIC_PERMISSION_CODES),
+            revoked.json()["data"]["permissions"],
+        )
 
         self.subject = AuthorizationSubject("alice", "maintainer", user_enabled=False)
         disabled = self.client.get("/api/auth/me")
@@ -107,7 +114,7 @@ class AuthPermissionsContractTests(unittest.TestCase):
         self.assertEqual(200, login.status_code)
         self.assertEqual("indicator-maintainer", login.json()["data"]["role"])
         self.assertEqual(
-            ["indicator:read", "operation_log:read"],
+            sorted(PUBLIC_PERMISSION_CODES | {"indicator:read", "operation_log:read"}),
             login.json()["data"]["permissions"],
         )
 

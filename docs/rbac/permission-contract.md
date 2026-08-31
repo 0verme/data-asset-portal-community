@@ -47,31 +47,33 @@ separation has audit value. Do not create one permission per endpoint or button.
 
 The checked-in registry is
 `backend/app/authorization/permissions.py`. The registry order is stable for
-seed output, API snapshots, frontend state, and debugging. Public catalog reads
-are not made private merely because a corresponding `*:read` code exists.
+seed output, API snapshots, frontend state, and debugging. Issue #185 also
+makes the public/role split explicit: public catalog permissions are inherited
+by anonymous and valid authenticated users, while roles store only incremental
+permissions.
 
 ## 3. Permission registry
 
 | Permission | Resource | Action | Public/API scope |
 | --- | --- | --- | --- |
-| `asset:read` | asset | read | Reserved for a materially sensitive asset-read boundary; ordinary catalog asset reads are public. |
+| `asset:read` | asset | read | Public catalog read; inherited and never role-configured. |
 | `asset:write` | asset | write | Protected asset table/field mutations. |
-| `root:read` | root | read | Reserved for a materially sensitive root-read boundary; ordinary root catalog reads are public. |
+| `root:read` | root | read | Public catalog read; inherited and never role-configured. |
 | `root:write` | root | write | Protected root create/update/delete/import. |
-| `indicator:read` | indicator | read | Reserved for a materially sensitive indicator-read boundary; ordinary indicator catalog reads are public. |
+| `indicator:read` | indicator | read | Public catalog read; inherited and never role-configured. |
 | `indicator:write` | indicator | write | Protected indicator create/update/delete/status. |
-| `report:read` | report | read | Reserved for a materially sensitive report-read boundary; ordinary report catalog reads are public. |
+| `report:read` | report | read | Public catalog read; inherited and never role-configured. |
 | `report:write` | report | write | Protected report create/update/delete. |
-| `api_asset:read` | api_asset | read | Reserved for a materially sensitive API-asset read boundary; ordinary catalog reads are public. |
+| `api_asset:read` | api_asset | read | Public catalog read; inherited and never role-configured. |
 | `api_asset:write` | api_asset | write | Protected API asset, params, response-fields, and relations mutations. |
 | `upstream:read` | upstream | read | Protected upstream `admin-detail`; ordinary list/detail requires authentication only. |
 | `upstream:write` | upstream | write | Protected upstream create/update/status/delete. |
 | `push:read` | push | read | Protected push `admin-detail`; ordinary list/detail requires authentication only. |
 | `push:write` | push | write | Protected push system/job mutations. |
-| `code_table:read` | code_table | read | Reserved for a materially sensitive code-table read boundary; ordinary list/detail/export are public with audit-field redaction. |
+| `code_table:read` | code_table | read | Public list/detail/export read with audit-field redaction; inherited and never role-configured. |
 | `code_table:write` | code_table | write | Protected manual code table create/update/status/delete. |
-| `field_mapping:read` | field_mapping | read | Reserved for a materially sensitive mapping-read boundary; ordinary catalog queries are public. |
-| `lineage:read` | lineage | read | Reserved for a materially sensitive lineage-read boundary; ordinary queries are public with nested-value redaction. |
+| `field_mapping:read` | field_mapping | read | Public catalog read; inherited and never role-configured. |
+| `lineage:read` | lineage | read | Public graph read with nested-value redaction; inherited and never role-configured. |
 | `metadata:read` | metadata | read | Protected ingestion result lookup. |
 | `metadata:write` | metadata | write | Protected asset/lineage Metadata Ingestion and preview/bulk aliases. |
 | `operation_log:read` | operation_log | read | Protected operation log list/detail. |
@@ -93,9 +95,12 @@ are not made private merely because a corresponding `*:read` code exists.
    independent permission lists.
 4. `admin` is explicitly mapped to every registered code. It does not use `*`.
    Adding a permission therefore produces a visible registry/seed diff.
-5. `maintainer` is mapped to the compatibility set below. Public catalog GET
-   routes do not require a corresponding `read` code; the code remains reserved
-   for materially sensitive read boundaries.
+5. `maintainer` is mapped only to role-controlled incremental permissions.
+   Public codes are inherited by the authorization core and are not repeated in
+   role mappings.
+6. `PUBLIC_PERMISSION_CODES` must remain an explicit subset of registered read
+   codes. A sensitive read must use a separate protected permission rather than
+   broadening this set.
 
 ## 4. Historical P0 route authorization matrix
 
@@ -165,31 +170,33 @@ and the protected `admin-detail` boundaries are documented in
 
 ### Built-in permission mapping
 
-`admin` is the full explicit registry. `maintainer` is the compatibility set
-below; a check mark on an ordinary read code documents an authorization
-concept/capability but does not make that route private or permission-gated.
-Ordinary catalog GET routes accept anonymous requests; sensitive reads and all mutations still require the existing authentication/permission boundary.
+`admin` is the full explicit registry. `maintainer` is the role-controlled
+compatibility set below. Public codes are included in the effective permission
+snapshot for every anonymous/valid authenticated actor, but are not persisted
+as maintainer mappings or shown in role configuration. Ordinary catalog GET
+routes accept anonymous requests; sensitive reads and all mutations still
+require the existing authentication/permission boundary.
 
 | Permission | `admin` | `maintainer` | Custom example `indicator-maintainer` |
 | --- | :---: | :---: | :---: |
-| `asset:read` | Yes | Yes | No |
+| `asset:read` | Yes | Inherited | No |
 | `asset:write` | Yes | Yes | No |
-| `root:read` | Yes | Yes | No |
+| `root:read` | Yes | Inherited | No |
 | `root:write` | Yes | Yes | No |
-| `indicator:read` | Yes | Yes | Yes |
+| `indicator:read` | Yes | Inherited | Yes |
 | `indicator:write` | Yes | Yes | Yes |
-| `report:read` | Yes | Yes | No |
+| `report:read` | Yes | Inherited | No |
 | `report:write` | Yes | Yes | No |
-| `api_asset:read` | Yes | Yes | No |
+| `api_asset:read` | Yes | Inherited | No |
 | `api_asset:write` | Yes | Yes | No |
 | `upstream:read` | Yes | Yes | No |
 | `upstream:write` | Yes | Yes | No |
 | `push:read` | Yes | Yes | No |
 | `push:write` | Yes | Yes | No |
-| `code_table:read` | Yes | Yes | No |
+| `code_table:read` | Yes | Inherited | No |
 | `code_table:write` | Yes | Yes | No |
-| `field_mapping:read` | Yes | Yes | No |
-| `lineage:read` | Yes | Yes | No |
+| `field_mapping:read` | Yes | Inherited | No |
+| `lineage:read` | Yes | Inherited | No |
 | `metadata:read` | Yes | Yes | No |
 | `metadata:write` | Yes | Yes | No |
 | `operation_log:read` | Yes | Yes | Yes |
@@ -202,9 +209,11 @@ Ordinary catalog GET routes accept anonymous requests; sensitive reads and all m
 | `system:role:read` | Yes | No | No |
 | `system:role:write` | Yes | No | No |
 
-The custom example is intentionally exact: it can maintain indicators and
-read operation logs, but cannot manage users or other system resources.
-The mapping is persisted in the role/permission tables and is user-selectable
+The `Inherited` entries are effective permissions, not persisted
+`maintainer` mappings. The custom example is intentionally exact: it can
+maintain indicators and read operation logs, while also inheriting the public
+catalog, but cannot manage users or other system resources. Role-controlled
+mapping remains persisted in the role/permission tables and user-selectable
 through the role-management API while retaining one role per user.
 
 ## 6. Security and session decisions
@@ -235,7 +244,8 @@ through the role-management API while retaining one role per user.
    constraint requires a compatibility column migration. Do not introduce
    `p_user_role` in this phase.
 3. Seed the registry in deterministic order; seed `admin` explicitly with all
-   codes and `maintainer` with the compatibility set. Use conflict-safe,
+   codes and `maintainer` with only the role-controlled compatibility set.
+   Public codes are inherited at authorization time. Use conflict-safe,
    non-destructive upserts that do not overwrite custom mappings.
 4. Validate fresh install, upgrade from current head, existing `admin`/
    `maintainer` users, repeat seed, and bootstrap ordering.
@@ -255,6 +265,9 @@ through the role-management API while retaining one role per user.
   authentication lifecycle exceptions.
 - P2 core unit tests: admin, maintainer, custom role, unknown role, disabled
   role/user, deleted user, missing and unknown permission.
+- #185 permission-model tests: anonymous/public effective permissions,
+  authenticated public inheritance, role-only writes, assignable-role
+  candidates, legacy public mappings, and normalized role payloads.
 - P3 direct API matrix: every sensitive POST/PUT/PATCH/DELETE returns 401 or
   403 without relying on frontend state.
 - P4 session regression: role change, permission revocation, disable/delete
@@ -262,7 +275,6 @@ through the role-management API while retaining one role per user.
 - P5 UX tests: `/auth/me` permissions, `can(permission)`, menu/button/deep
   link behavior. Backend tests remain the security authority.
 
-Known P0 gaps intentionally deferred to later phases are the current unknown
-role fail-open normalization, absence of persisted role/permission tables,
-absence of a framework-neutral authorization service, and the lack of
-permission data in `/api/auth/me`.
+The original P0 gaps listed above have been addressed by the current RBAC
+phases. Remaining deferred scope is limited to the explicitly excluded
+multi-role, ABAC/ACL, data-scope, external-IAM, and permission-cache designs.

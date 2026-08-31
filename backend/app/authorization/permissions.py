@@ -15,9 +15,9 @@
 """Stable Community RBAC permission registry.
 
 This module is the P0 contract, not an HTTP enforcement layer.  It contains
-only immutable permission definitions and the compatibility mappings that P1
-will persist.  No FastAPI, Request, Session, database, or frontend dependency
-belongs here.
+only immutable permission definitions and the public/role policy used by
+authorization and persistence adapters.  No FastAPI, Request, Session,
+database, or frontend dependency belongs here.
 """
 
 from __future__ import annotations
@@ -26,7 +26,6 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-
 
 ADMIN_ROLE = "admin"
 MAINTAINER_ROLE = "maintainer"
@@ -96,29 +95,45 @@ PERMISSION_DEFINITIONS: tuple[PermissionDefinition, ...] = (
 PERMISSION_CODES: tuple[str, ...] = tuple(item.code for item in PERMISSION_DEFINITIONS)
 _DEFINITIONS_BY_CODE = MappingProxyType({item.code: item for item in PERMISSION_DEFINITIONS})
 
-# The compatibility mapping deliberately remains explicit.  Public reads are
-# not made private by this set; the set describes the permissions a maintainer
-# receives whenever a later phase protects that operation.
-MAINTAINER_PERMISSION_CODES = frozenset(
+# This is the single permission-policy source for the public catalog.  It is
+# intentionally narrower than all read permissions: upstream/push read codes
+# protect admin-detail responses, while system, metadata, and audit reads are
+# never public.
+PUBLIC_PERMISSION_CODES = frozenset(
     {
         "asset:read",
-        "asset:write",
         "root:read",
-        "root:write",
         "indicator:read",
-        "indicator:write",
         "report:read",
-        "report:write",
         "api_asset:read",
+        "code_table:read",
+        "field_mapping:read",
+        "lineage:read",
+    }
+)
+
+# Keep the role-management candidate order aligned with the stable registry.
+ROLE_ASSIGNABLE_PERMISSION_CODES: tuple[str, ...] = tuple(
+    item.code
+    for item in PERMISSION_DEFINITIONS
+    if item.code not in PUBLIC_PERMISSION_CODES
+)
+
+# Built-in role mappings contain only role-controlled permissions for the
+# maintainer.  Public codes are inherited by the authorization core instead of
+# being repeated in this Role-Permission mapping.
+MAINTAINER_PERMISSION_CODES = frozenset(
+    {
+        "asset:write",
+        "root:write",
+        "indicator:write",
+        "report:write",
         "api_asset:write",
         "upstream:read",
         "upstream:write",
         "push:read",
         "push:write",
-        "code_table:read",
         "code_table:write",
-        "field_mapping:read",
-        "lineage:read",
         "metadata:read",
         "metadata:write",
         "operation_log:read",
@@ -147,6 +162,16 @@ def is_registered_permission(code: str) -> bool:
     return code in _DEFINITIONS_BY_CODE
 
 
+def is_public_permission(code: str) -> bool:
+    """Return whether *code* is inherited by the public catalog."""
+    return code in PUBLIC_PERMISSION_CODES
+
+
+def is_role_assignable_permission(code: str) -> bool:
+    """Return whether a role may grant *code* as an incremental permission."""
+    return is_registered_permission(code) and not is_public_permission(code)
+
+
 def validate_permission_registry() -> None:
     """Raise ``ValueError`` when the checked-in contract is internally invalid."""
     if not PERMISSION_DEFINITIONS:
@@ -160,6 +185,20 @@ def validate_permission_registry() -> None:
             raise ValueError(f"permission fields do not match code: {item.code}")
         if not item.name.strip() or not item.description.strip():
             raise ValueError(f"permission metadata is incomplete: {item.code}")
+    unknown_public = PUBLIC_PERMISSION_CODES - set(PERMISSION_CODES)
+    if unknown_public:
+        raise ValueError(
+            f"public permissions are not registered: {', '.join(sorted(unknown_public))}"
+        )
+    if any(
+        _DEFINITIONS_BY_CODE[code].action != "read"
+        for code in PUBLIC_PERMISSION_CODES
+    ):
+        raise ValueError("public permissions must be read permissions")
+    if set(ROLE_ASSIGNABLE_PERMISSION_CODES) != (
+        set(PERMISSION_CODES) - PUBLIC_PERMISSION_CODES
+    ):
+        raise ValueError("role-assignable permissions must complement public permissions")
     for role, permissions in BUILTIN_ROLE_PERMISSION_CODES.items():
         if not role.strip():
             raise ValueError("builtin role code must be non-empty")

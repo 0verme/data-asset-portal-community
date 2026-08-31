@@ -13,9 +13,16 @@
 // limitations under the License.
 
 import React from "react";
-import { createRole, deleteRole, getPermissions, getRoles, updateRole } from "../api/systemRoles.js";
+import {
+  createRole,
+  deleteRole,
+  getRoleAssignablePermissions,
+  getRoles,
+  updateRole,
+} from "../api/systemRoles.js";
 import { toast } from "../components/common/index.js";
 import { getErrorMessage } from "../utils/ui.js";
+import { normalizeRolePermissionCodes } from "../auth/permissions.ts";
 
 const DEFAULT_FORM = {
   roleCode: "",
@@ -46,7 +53,10 @@ export function useRoleModule({ active, requireLogin, actionIntent, onActionHand
     setLoading(true);
     setError("");
     try {
-      const [nextRoles, nextPermissions] = await Promise.all([getRoles(), getPermissions()]);
+      const [nextRoles, nextPermissions] = await Promise.all([
+        getRoles(),
+        getRoleAssignablePermissions(),
+      ]);
       if (requestId !== requestSeq.current) return;
       setRoles(nextRoles);
       setPermissions(nextPermissions);
@@ -81,7 +91,7 @@ export function useRoleModule({ active, requireLogin, actionIntent, onActionHand
         name: role.name || "",
         description: role.description || "",
         enabled: role.enabled || "enabled",
-        permissionCodes: [...(role.permissionCodes || [])],
+        permissionCodes: normalizeRolePermissionCodes(role.permissionCodes),
       });
       setModal({ open: true, mode: "edit", initial: role, busy: false });
     }, "system:role:write");
@@ -112,7 +122,7 @@ export function useRoleModule({ active, requireLogin, actionIntent, onActionHand
         name: form.name.trim(),
         description: form.description.trim(),
         enabled: form.enabled,
-        permissionCodes: [...new Set(form.permissionCodes || [])].sort(),
+        permissionCodes: normalizeRolePermissionCodes(form.permissionCodes),
       };
       if (modal.mode === "edit") await updateRole(modal.initial.roleCode, payload);
       else await createRole(payload);

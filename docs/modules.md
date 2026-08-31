@@ -134,7 +134,7 @@
 
 **数据表**：`p_admin_user`。
 
-**说明**：remote 模式由后端使用数据库用户表完成登录、会话恢复和登出，仅启用用户可以登录；`/auth/me` 返回当前角色及 `permissions[]`，后端按实时 Role-Permission 映射授权。mock 模式使用前端演示登录，不能代表生产凭据或生产授权。
+**说明**：remote 模式由后端使用数据库用户表完成登录、会话恢复和登出，仅启用用户可以登录；`/auth/me` 返回当前角色及有效 `permissions[]`，后端按 `PUBLIC_PERMISSION_CODES ∪ role_permissions` 实时聚合授权。mock 模式使用前端演示登录，不能代表生产凭据或生产授权。
 
 ## 14. 通用码值
 

@@ -166,9 +166,9 @@ def require_permission(permission: str) -> Callable[..., RequestContext]:
             normalized,
             authentication=_authentication_decision(request, context, service),
         )
-        if not decision.authenticated:
-            raise AuthenticationRequiredError("请先登录。")
         if not decision.allowed:
+            if not decision.authenticated:
+                raise AuthenticationRequiredError("请先登录。")
             raise PermissionDeniedError("无权限执行此操作。")
         return context
 

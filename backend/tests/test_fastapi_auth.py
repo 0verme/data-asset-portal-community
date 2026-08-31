@@ -9,17 +9,21 @@ import unittest
 from http.cookies import SimpleCookie
 from unittest.mock import MagicMock, patch
 
+from fastapi.testclient import TestClient
+
 from backend.app.application import (
-    LegacySignedSessionCodec,
     SESSION_PAYLOAD_KEY,
+    LegacySignedSessionCodec,
     SignedSessionCodec,
 )
-from backend.app.authorization import BUILTIN_ROLE_PERMISSION_CODES
+from backend.app.authorization import (
+    BUILTIN_ROLE_PERMISSION_CODES,
+    PUBLIC_PERMISSION_CODES,
+)
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi.auth import get_native_session_identity
 from backend.app.fastapi_app import create_fastapi_app
 from backend.app.services.auth_service import AuthService, AuthValidationError
-from fastapi.testclient import TestClient
 
 
 class FastApiNativeAuthTests(unittest.TestCase):
@@ -28,7 +32,8 @@ class FastApiNativeAuthTests(unittest.TestCase):
         return {
             **user,
             "permissions": sorted(
-                BUILTIN_ROLE_PERMISSION_CODES.get(user.get("role"), frozenset())
+                PUBLIC_PERMISSION_CODES
+                | BUILTIN_ROLE_PERMISSION_CODES.get(user.get("role"), frozenset())
             ),
         }
 
