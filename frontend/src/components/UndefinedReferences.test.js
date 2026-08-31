@@ -28,7 +28,7 @@ test("rendered components import their referenced helpers", async () => {
   );
   assert.match(
     upstreamDetail,
-    /import \{ DbBadge, nextUnload, ScheduleTimeline \} from "\.\/UpstreamParts\.jsx";/,
+    /import \{ nextUnload, ScheduleTimeline \} from "\.\/UpstreamParts\.jsx";/,
   );
   assert.match(upstreamParts, /export function nextUnload\(times\)/);
 });
