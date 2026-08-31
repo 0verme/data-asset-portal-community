@@ -39,7 +39,9 @@ export function useRoleModule({ active, requireLogin, actionIntent, onActionHand
   const [modal, setModal] = React.useState({ open: false, mode: "new", initial: null, busy: false });
   const [form, setForm] = React.useState(DEFAULT_FORM);
   const [errors, setErrors] = React.useState([]);
+  const [deletingRoleCode, setDeletingRoleCode] = React.useState("");
   const requestSeq = React.useRef(0);
+  const deletingRoleCodes = React.useRef(new Set());
 
   const load = React.useCallback(async () => {
     const requestId = ++requestSeq.current;
@@ -126,12 +128,25 @@ export function useRoleModule({ active, requireLogin, actionIntent, onActionHand
   }, [form, load, modal, validate]);
 
   const remove = React.useCallback(async (role) => {
+    const code = String(role?.roleCode || "").trim().toLowerCase();
+    if (!code || deletingRoleCodes.current.has(code)) return;
+    deletingRoleCodes.current.add(code);
+    setDeletingRoleCode(code);
+    setModal((previous) => ({ ...previous, busy: true }));
     try {
-      await deleteRole(role.roleCode);
+      await deleteRole(code);
+      setRoles((current) => current.filter((item) => item.roleCode !== code));
       await load();
       setModal({ open: false, mode: "new", initial: null, busy: false });
+      setForm(DEFAULT_FORM);
+      toast.success(`角色「${role?.name || code}」已删除`);
     } catch (nextError) {
       toast.error(getErrorMessage(nextError, "删除角色失败。"));
+      setModal((previous) => ({ ...previous, busy: false }));
+      throw nextError;
+    } finally {
+      deletingRoleCodes.current.delete(code);
+      setDeletingRoleCode((current) => (current === code ? "" : current));
     }
   }, [load]);
 
@@ -145,6 +160,7 @@ export function useRoleModule({ active, requireLogin, actionIntent, onActionHand
     form,
     setForm,
     errors,
+    deletingRoleCode,
     load,
     openNew,
     openEdit,

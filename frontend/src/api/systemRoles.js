@@ -150,6 +150,11 @@ export async function deleteRole(roleCode) {
     return;
   }
   const current = localRoles.find((item) => item.roleCode === roleCode);
-  if (current?.builtin) throw new Error("Built-in role cannot be deleted");
+  if (!current) throw new Error(`Role not found: ${roleCode}`);
+  if (current.builtin) throw new Error("Built-in role cannot be deleted");
+  const userCount = Number(current.userCount || 0);
+  if (userCount > 0) {
+    throw new Error(`Role is assigned to ${userCount} user(s); unassign them before deleting: ${roleCode}`);
+  }
   localRoles = localRoles.filter((item) => item.roleCode !== roleCode);
 }
