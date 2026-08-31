@@ -21,7 +21,7 @@ const COMMON_CODES = {
     category("UPSTREAM_DB_TYPE", "上游数据库类型", ["PostgreSQL", "MySQL", "Oracle", "SQL Server", "MongoDB", "Kafka", "Object Storage", "其他"]),
     category("UPSTREAM_DEPT", "零售业务部门", ["商品运营部", "会员运营部", "交易运营部", "门店运营部", "供应链部", "市场营销部", "履约运营部", "客户服务部"]),
     category("PUSH_PROTOCOL", "下游推送协议", ["HTTP", "OSS"]),
-    category("PUSH_AUTH_TYPE", "下游认证方式", ["演示占位配置", "无需认证"]),
+    category("PUSH_AUTH_TYPE", "下游认证方式", ["密钥认证", "账号密码"]),
     category("PUSH_DELIMITER", "字段分隔符", ["|", ",", "\\t", ";", "\\u0001"]),
     category("FILE_ENCODING", "文件编码", ["UTF-8", "GBK", "GB2312", "ISO-8859-1"]),
     category("FREQ_TYPE", "推送频率", ["T+1", "T+0", "准实时", "每周", "每月"]),

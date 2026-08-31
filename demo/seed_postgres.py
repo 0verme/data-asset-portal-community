@@ -23,9 +23,21 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in {"utf-8", "utf8"}:
     sys.stdout.reconfigure(encoding="utf-8")
 
 try:
-    from seed_loader import community_seed_plan, rbac_seed_plan  # noqa: E402
+    from seed_loader import (  # noqa: E402
+        DEMO_PUSH_AUTH_TYPE,
+        LEGACY_DEMO_PUSH_AUTH_TYPE,
+        community_seed_plan,
+        demo_push_system_codes,
+        rbac_seed_plan,
+    )
 except ImportError:  # imported as demo.seed_postgres from tests
-    from demo.seed_loader import community_seed_plan, rbac_seed_plan  # noqa: E402
+    from demo.seed_loader import (  # noqa: E402
+        DEMO_PUSH_AUTH_TYPE,
+        LEGACY_DEMO_PUSH_AUTH_TYPE,
+        community_seed_plan,
+        demo_push_system_codes,
+        rbac_seed_plan,
+    )
 
 
 def literal(value):
@@ -71,6 +83,14 @@ def main():
             + values(spec["rows"])
             + f"\nON CONFLICT ({key_column}) DO NOTHING;"
         )
+    system_codes = ", ".join(literal(code) for code in demo_push_system_codes())
+    print(
+        "UPDATE dwp.p_push_system "
+        f"SET auth_type = {literal(DEMO_PUSH_AUTH_TYPE)} "
+        f"WHERE system_code IN ({system_codes}) "
+        f"AND auth_type = {literal(LEGACY_DEMO_PUSH_AUTH_TYPE)} "
+        f"AND created_by = {literal('demo')};"
+    )
     print("COMMIT;")
 
 
