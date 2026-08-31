@@ -100,8 +100,8 @@ def community_seed_plan() -> dict[str, dict]:
     for mapping in load_dataset("mappings.json"):
         mapping_tables.append(
             (
-                mapping["id"], mapping["dataSourceId"], mapping["sourceTable"],
-                mapping["sourceTableName"], mapping["targetLayer"],
+                mapping["id"], mapping["dataSourceId"], mapping["upstreamSystemId"],
+                mapping["sourceTable"], mapping["sourceTableName"], mapping["targetLayer"],
                 mapping["targetTable"], mapping["loadMode"],
                 len(mapping["fields"]), len(mapping["fields"]),
             )
@@ -401,22 +401,6 @@ def community_seed_plan() -> dict[str, dict]:
             ),
             api_assets,
         ),
-        "p_field_mapping_table": spec(
-            (
-                "table_pk", "data_source_id", "source_table_name",
-                "source_table_cn", "target_layer_code", "target_table_name",
-                "load_mode", "field_total_count", "mapped_field_count",
-            ),
-            mapping_tables,
-        ),
-        "p_field_mapping_field": spec(
-            (
-                "field_pk", "table_pk", "source_field_name", "source_field_type",
-                "source_field_comment", "target_field_name", "mapping_rule",
-                "field_order",
-            ),
-            mapping_fields,
-        ),
         "p_asset_domain": spec(
             ("domain_code", "domain_name", "display_order", "is_active", "is_deleted"),
             domains,
@@ -501,6 +485,24 @@ def community_seed_plan() -> dict[str, dict]:
                 "before_json", "after_json", "operator_name", "change_time",
             ),
             upstream_change_rows,
+        ),
+        # Mapping rows depend on the upstream-system primary key, so seed them
+        # only after the upstream entity has been inserted.
+        "p_field_mapping_table": spec(
+            (
+                "table_pk", "data_source_id", "upstream_system_id", "source_table_name",
+                "source_table_cn", "target_layer_code", "target_table_name",
+                "load_mode", "field_total_count", "mapped_field_count",
+            ),
+            mapping_tables,
+        ),
+        "p_field_mapping_field": spec(
+            (
+                "field_pk", "table_pk", "source_field_name", "source_field_type",
+                "source_field_comment", "target_field_name", "mapping_rule",
+                "field_order",
+            ),
+            mapping_fields,
         ),
         "p_push_system": spec(
             (

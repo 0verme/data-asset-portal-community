@@ -54,7 +54,7 @@
 
 **页面**：字段维度视图、表维度视图、统计卡片。
 
-**数据表**：`p_data_source`、`p_field_mapping_table`、`p_field_mapping_field`；运行查询不依赖 `p_upstream_system`。旧 `p_field_mapping_change_log` DDL 仅作为 docs-only reference 保留，当前没有对应 runtime service，不参与 canonical availability contract。
+**数据表**：`p_data_source`、`p_upstream_system`、`p_field_mapping_table`、`p_field_mapping_field`；`p_field_mapping_table.upstream_system_id` 外键关联 `p_upstream_system.system_pk`，`p_data_source` 仅保留为兼容的公共数据源关系。旧 `p_field_mapping_change_log` DDL 仅作为 docs-only reference 保留，当前没有对应 runtime service，不参与 canonical availability contract。
 
 **说明**：展示源系统、源表及字段到目标表字段的映射关系，支持查询、统计和 CSV 导出；当前没有前端编辑入口。
 

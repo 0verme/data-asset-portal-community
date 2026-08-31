@@ -64,8 +64,27 @@ const TABLE_MAPPINGS = [
   ]],
 ];
 
+// Stable mock relation: source-table fixtures point at the upstream-system
+// primary key explicitly. Never derive this relation from the display name.
+const SOURCE_SYSTEM_BY_TABLE = Object.freeze({
+  PIM_SKU: { sourceSystemId: 2, systemCode: "PIM" },
+  PIM_CATEGORY: { sourceSystemId: 2, systemCode: "PIM" },
+  MEMBER_PROFILE: { sourceSystemId: 1, systemCode: "MEM" },
+  ORDER_HEADER: { sourceSystemId: 3, systemCode: "OMS" },
+  ORDER_ITEM: { sourceSystemId: 3, systemCode: "OMS" },
+  POS_RECEIPT: { sourceSystemId: 4, systemCode: "POS" },
+  STOCK_SNAPSHOT: { sourceSystemId: 5, systemCode: "IMS" },
+  REPLENISHMENT: { sourceSystemId: 5, systemCode: "IMS" },
+  CAMPAIGN_EVENT: { sourceSystemId: 6, systemCode: "MKT" },
+  PACKAGE_INFO: { sourceSystemId: 7, systemCode: "FUL" },
+  RETURN_REQUEST: { sourceSystemId: 8, systemCode: "SVC" },
+  SERVICE_TICKET: { sourceSystemId: 8, systemCode: "SVC" },
+});
+
 export const FIELD_MAPPING_ROWS = TABLE_MAPPINGS.flatMap(([srcSystem, srcTable, srcTableCn, targetTable, loadMode, fields], tableIndex) => (
   fields.map(([srcField, srcType, srcComment, targetField, mappingRule], fieldIndex) => ({
+    ...SOURCE_SYSTEM_BY_TABLE[srcTable],
+    upstreamSystemId: SOURCE_SYSTEM_BY_TABLE[srcTable].sourceSystemId,
     srcSystem,
     srcTable,
     srcTableCn,

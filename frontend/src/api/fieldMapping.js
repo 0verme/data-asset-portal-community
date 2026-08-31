@@ -15,9 +15,7 @@
 import { requestRemote } from "./http.js";
 import { LONG_REQUEST_TIMEOUT } from "../config/request.js";
 import { FIELD_MAPPING_ROWS } from "../data/fieldMappings.js";
-import { UPSTREAM_SYSTEMS } from "../data/upstreamSystems.js";
-
-const API_MODE = import.meta.env.VITE_API_MODE || "mock";
+const API_MODE = import.meta.env?.VITE_API_MODE || "mock";
 export const FIELD_MAPPING_PAGE_SIZE_OPTIONS = [50, 100, 150];
 export const FIELD_MAPPING_DEFAULT_PAGE_SIZE = FIELD_MAPPING_PAGE_SIZE_OPTIONS[0];
 
@@ -53,10 +51,6 @@ function normalizePaged(payload) {
 
 function includesValue(value, query) {
   return String(value || "").toLowerCase().includes(query);
-}
-
-function normalizeValue(value) {
-  return String(value || "").trim().toLowerCase();
 }
 
 function compareNullableText(left, right) {
@@ -113,22 +107,19 @@ function compareFieldRowsBySort(left, right, sortKey, sortDirection) {
   return compareFieldRowsDefault(left, right);
 }
 
-function resolveMockUpstreamSystemId(row) {
-  const upstreamMatch = UPSTREAM_SYSTEMS.find((item) => normalizeValue(item.name) === normalizeValue(row.srcSystem));
-  return upstreamMatch?.upstreamSystemId ?? "";
-}
-
 function enrichRow(row) {
+  const sourceSystemId = row.sourceSystemId ?? row.upstreamSystemId ?? "";
   return {
     ...row,
     fieldOrder: row.fieldOrder ?? row.columnId ?? row.ordinalPosition ?? row.sortOrder ?? null,
-    upstreamSystemId: row.upstreamSystemId ?? resolveMockUpstreamSystemId(row),
+    sourceSystemId,
+    upstreamSystemId: row.upstreamSystemId ?? sourceSystemId,
   };
 }
 
-function applyFilters(rows, params = {}) {
+export function filterFieldMappingRows(rows, params = {}) {
   const keyword = String(params.keyword || "").trim().toLowerCase();
-  const upstreamSystemId = String(params.upstreamSystemId || "").trim();
+  const sourceSystemId = String(params.sourceSystemId || params.upstreamSystemId || "").trim();
   const srcSystem = String(params.srcSystem || "").trim();
   const srcTable = String(params.srcTable || "").trim().toLowerCase();
   const srcField = String(params.srcField || "").trim().toLowerCase();
@@ -137,7 +128,7 @@ function applyFilters(rows, params = {}) {
   const targetField = String(params.targetField || "").trim().toLowerCase();
 
   return rows.filter((row) => {
-    if (upstreamSystemId && String(row.upstreamSystemId || "") !== upstreamSystemId) return false;
+    if (sourceSystemId && String(row.sourceSystemId || row.upstreamSystemId || "") !== sourceSystemId) return false;
     if (srcSystem && row.srcSystem !== srcSystem) return false;
     if (srcTable && !includesValue(row.srcTable, srcTable)) return false;
     if (srcField && !includesValue(row.srcField, srcField)) return false;
@@ -164,10 +155,13 @@ function summarizeTables(rows) {
   const groups = new Map();
 
   rows.forEach((row) => {
-    const key = `${row.srcSystem}::${row.srcTable}`;
+    const sourceSystemId = row.sourceSystemId ?? row.upstreamSystemId ?? "";
+    const key = `${sourceSystemId}::${row.srcTable}`;
     const current = groups.get(key) || {
       __mockIndex: row.__mockIndex ?? 0,
-      upstreamSystemId: row.upstreamSystemId || "",
+      sourceSystemId,
+      upstreamSystemId: row.upstreamSystemId ?? sourceSystemId,
+      systemCode: row.systemCode || "",
       srcSystem: row.srcSystem,
       srcTable: row.srcTable,
       srcTableCn: row.srcTableCn,
@@ -198,7 +192,10 @@ function buildStats(rows) {
   const tables = summarizeTables(rows);
   const mappedFields = rows.filter((row) => row.targetField).length;
   return {
-    sourceSystemCount: new Set(rows.map((row) => row.srcSystem)).size,
+    sourceSystemCount: new Set(rows
+      .map((row) => row.sourceSystemId ?? row.upstreamSystemId)
+      .filter((value) => value !== undefined && value !== null && value !== ""),
+    ).size,
     sourceTableCount: tables.length,
     fieldCount: rows.length,
     mappedFieldCount: mappedFields,
@@ -211,7 +208,7 @@ function buildStats(rows) {
 function getMockRows(params = {}) {
   const sortKey = String(params.sortKey || "").trim();
   const sortDirection = String(params.sortDirection || "").trim().toLowerCase() === "desc" ? "desc" : "asc";
-  const rows = applyFilters(
+  const rows = filterFieldMappingRows(
     clone(FIELD_MAPPING_ROWS).map((row, index) => enrichRow({ ...row, __mockIndex: index })),
     params,
   );
@@ -230,19 +227,26 @@ export async function getFieldMappingSourceSystems() {
   }
 
   const counts = FIELD_MAPPING_ROWS.reduce((acc, row) => {
-    const current = acc[row.srcSystem] || {
+    const sourceSystemId = row.sourceSystemId ?? row.upstreamSystemId ?? "";
+    const current = acc[sourceSystemId] || {
+      id: sourceSystemId,
+      sourceSystemId,
+      upstreamSystemId: row.upstreamSystemId ?? sourceSystemId,
       name: row.srcSystem,
+      systemName: row.srcSystem,
+      systemCode: row.systemCode || "",
+      systemAbbr: row.systemCode || "",
       count: 0,
-      upstreamSystemId: resolveMockUpstreamSystemId(row),
     };
     current.count += 1;
-    acc[row.srcSystem] = current;
+    acc[sourceSystemId] = current;
     return acc;
   }, {});
 
-  return Object.keys(counts)
-    .sort()
-    .map((name) => counts[name]);
+  return Object.values(counts)
+    .sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), "zh-CN")
+      || String(left.systemCode || "").localeCompare(String(right.systemCode || ""), "zh-CN")
+      || Number(left.id || 0) - Number(right.id || 0));
 }
 
 export async function getFieldMappingStats(params = {}) {

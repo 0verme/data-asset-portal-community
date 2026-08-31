@@ -36,7 +36,7 @@ const emptyRoutes = {
   apiAsset: { page: "list", code: null },
   root: { page: "library", abbr: null },
   upstream: { page: "list", id: null },
-  mapping: { tab: "table", upstreamSystemId: "", sourceTable: "", dwfTable: "" },
+  mapping: { tab: "table", sourceSystemId: "", sourceTable: "", dwfTable: "" },
   lineage: { rootId: null, direction: "both", depth: 2, view: "table" },
   system: { page: "users" },
 };
@@ -73,7 +73,7 @@ test("canonical module paths restore their existing route shapes", () => {
   }
 });
 
-test("mapping keeps the legacy sourceSystemId compatibility parameter", () => {
+test("mapping keeps the canonical sourceSystemId parameter", () => {
   const location = parseLocation(
     "/field-mapping?tab=field&sourceSystemId=legacy-system&sourceTable=orders&dwfTable=dws_orders",
   );
@@ -81,10 +81,15 @@ test("mapping keeps the legacy sourceSystemId compatibility parameter", () => {
   assert.equal(location.module, "mapping");
   assert.deepEqual(location.mappingRoute, {
     tab: "field",
-    upstreamSystemId: "legacy-system",
+    sourceSystemId: "legacy-system",
     sourceTable: "orders",
     dwfTable: "dws_orders",
   });
+});
+
+test("mapping normalizes the legacy upstreamSystemId URL alias", () => {
+  const location = parseLocation("/field-mapping?upstreamSystemId=101");
+  assert.equal(location.mappingRoute.sourceSystemId, "101");
 });
 
 test("lineage and invalid query values use the existing safe defaults", () => {
@@ -166,9 +171,9 @@ test("module URL serialization covers filter, view, mapping, lineage, and system
 
   const mapping = buildNavigationLocation({
     module: "mapping",
-    routes: { ...emptyRoutes, mapping: { tab: "field", upstreamSystemId: "up-1", sourceTable: "src", dwfTable: "dwf" } },
+    routes: { ...emptyRoutes, mapping: { tab: "field", sourceSystemId: "101", sourceTable: "src", dwfTable: "dwf" } },
   });
-  assert.equal(mapping.url, "/field-mapping?upstreamSystemId=up-1&sourceTable=src&dwfTable=dwf&tab=field");
+  assert.equal(mapping.url, "/field-mapping?sourceSystemId=101&sourceTable=src&dwfTable=dwf&tab=field");
 
   const lineage = buildNavigationLocation({
     module: "lineage",

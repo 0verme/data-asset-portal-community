@@ -259,7 +259,12 @@ export function parseInitialLocation(): LocationSnapshot {
       module: "mapping",
       mappingRoute: {
         tab: searchParams.get("tab") === "field" ? "field" : "table",
-        upstreamSystemId: searchParams.get("upstreamSystemId") || searchParams.get("sourceSystemId") || "",
+        // sourceSystemId is canonical; old upstreamSystemId URLs are read
+        // and normalized without changing the underlying identity.
+        sourceSystemId: searchParams.get("sourceSystemId")
+          || searchParams.get("source_system_id")
+          || searchParams.get("upstreamSystemId")
+          || "",
         sourceTable: searchParams.get("sourceTable") || "",
         dwfTable: searchParams.get("dwfTable") || "",
       },
@@ -528,7 +533,8 @@ export function buildNavigationLocation({
   }
 
   if (module === "mapping") {
-    if (mappingRoute.upstreamSystemId) params.set("upstreamSystemId", mappingRoute.upstreamSystemId);
+    const sourceSystemId = mappingRoute.sourceSystemId || mappingRoute.upstreamSystemId;
+    if (sourceSystemId) params.set("sourceSystemId", sourceSystemId);
     if (mappingRoute.sourceTable) params.set("sourceTable", mappingRoute.sourceTable);
     if (mappingRoute.dwfTable) params.set("dwfTable", mappingRoute.dwfTable);
     if (mappingRoute.tab && mappingRoute.tab !== DEFAULT_MAPPING_ROUTE.tab) {

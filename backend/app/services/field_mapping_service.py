@@ -24,7 +24,7 @@ from sqlalchemy import and_, case, distinct, func, or_, select
 
 from ..db.facade import database_transaction
 from ..db.service import CoreAccess
-from ..db.tables import data_source, mapping_field, mapping_table
+from ..db.tables import data_source, mapping_field, mapping_table, upstream_system
 from ..settings import get_int_env, get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
 
@@ -32,7 +32,7 @@ from ..utils.service_perf import log_slow_service_call
 LOGGER = logging.getLogger(__name__)
 
 FIELD_SORT_COLUMNS = {
-    "srcSystem": data_source.c.source_name,
+    "srcSystem": upstream_system.c.system_name,
     "srcTable": mapping_table.c.source_table_name,
     "srcField": mapping_field.c.source_field_name,
     "srcType": mapping_field.c.source_field_type,
@@ -93,12 +93,19 @@ class FieldMappingService:
 
     @staticmethod
     def _base_from():
-        return data_source.join(
-            mapping_table,
+        # ``upstream_system_id`` is the mapping identity.  ``data_source`` is
+        # an older, optional catalog relation and must not decide which
+        # upstream system owns a mapping.
+        return mapping_table.join(
+            upstream_system,
             and_(
-                data_source.c.source_id == mapping_table.c.data_source_id,
+                mapping_table.c.upstream_system_id == upstream_system.c.system_pk,
                 mapping_table.c.is_deleted == "N",
+                upstream_system.c.is_deleted == "N",
             ),
+        ).outerjoin(
+            data_source,
+            data_source.c.source_id == mapping_table.c.data_source_id,
         ).join(
             mapping_field,
             and_(
@@ -120,15 +127,38 @@ class FieldMappingService:
 
     def _build_where(self, params=None):
         params = params or {}
-        clauses = [data_source.c.is_deleted == "N"]
+        clauses = []
 
-        upstream_system_id = str(params.get("upstreamSystemId") or "").strip()
-        if upstream_system_id.isdigit():
-            clauses.append(data_source.c.source_id == int(upstream_system_id))
+        # The canonical filter is the upstream table's primary key.  The
+        # historical upstreamSystemId alias is also resolved against that
+        # table (and may still carry the old unique technical system_id).
+        source_system_id = str(
+            params.get("sourceSystemId") or params.get("source_system_id") or ""
+        ).strip()
+        legacy_upstream_system_id = str(params.get("upstreamSystemId") or "").strip()
+        if source_system_id:
+            if source_system_id.isdigit():
+                clauses.append(upstream_system.c.system_pk == int(source_system_id))
+            else:
+                clauses.append(upstream_system.c.system_id == source_system_id)
+        elif legacy_upstream_system_id:
+            if legacy_upstream_system_id.isdigit():
+                clauses.append(upstream_system.c.system_pk == int(legacy_upstream_system_id))
+            else:
+                clauses.append(upstream_system.c.system_id == legacy_upstream_system_id)
+        else:
+            # dataSourceId remains a deprecated catalog compatibility filter;
+            # it is never promoted to an upstream identity.
+            data_source_id = str(params.get("dataSourceId") or "").strip()
+            if data_source_id.isdigit():
+                clauses.append(data_source.c.source_id == int(data_source_id))
 
+        # srcSystem is retained only as a non-identity, deprecated display
+        # filter.  If names collide it intentionally returns every matching
+        # upstream system instead of choosing one.
         src_system = str(params.get("srcSystem") or "").strip()
         if src_system:
-            clauses.append(data_source.c.source_name == src_system)
+            clauses.append(upstream_system.c.system_name == src_system)
 
         self._append_like(clauses, mapping_table.c.source_table_name, params.get("srcTable"))
         self._append_like(clauses, mapping_field.c.source_field_name, params.get("srcField"))
@@ -147,7 +177,11 @@ class FieldMappingService:
             escaped = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             pattern = f"%{escaped}%"
             searchable = (
+                upstream_system.c.system_name,
+                upstream_system.c.system_abbr,
+                upstream_system.c.system_id,
                 data_source.c.source_name,
+                data_source.c.source_code,
                 mapping_table.c.source_table_name,
                 mapping_table.c.source_table_cn,
                 mapping_field.c.source_field_name,
@@ -185,7 +219,10 @@ class FieldMappingService:
     def _stats_cache_key(self, params=None):
         relevant = {
             "keyword": (params or {}).get("keyword"),
+            "sourceSystemId": (params or {}).get("sourceSystemId"),
+            "source_system_id": (params or {}).get("source_system_id"),
             "upstreamSystemId": (params or {}).get("upstreamSystemId"),
+            "dataSourceId": (params or {}).get("dataSourceId"),
             "srcSystem": (params or {}).get("srcSystem"),
             "srcTable": (params or {}).get("srcTable"),
             "srcField": (params or {}).get("srcField"),
@@ -226,14 +263,18 @@ class FieldMappingService:
 
     def _table_default_order_terms(self):
         return (
-            self._null_last_text_order_terms(data_source.c.source_name)
+            self._null_last_text_order_terms(upstream_system.c.system_name)
+            + self._null_last_text_order_terms(upstream_system.c.system_abbr)
+            + [upstream_system.c.system_pk.asc()]
             + self._null_last_text_order_terms(mapping_table.c.source_table_name)
             + self._null_last_text_order_terms(mapping_table.c.target_table_name)
         )
 
     def _field_default_order_terms(self):
         return (
-            self._null_last_text_order_terms(data_source.c.source_name)
+            self._null_last_text_order_terms(upstream_system.c.system_name)
+            + self._null_last_text_order_terms(upstream_system.c.system_abbr)
+            + [upstream_system.c.system_pk.asc()]
             + self._null_last_text_order_terms(mapping_table.c.source_table_name)
             + self._null_last_numeric_order_terms(mapping_field.c.field_order)
             + self._null_last_text_order_terms(mapping_field.c.source_field_name)
@@ -245,10 +286,12 @@ class FieldMappingService:
     @staticmethod
     def _field_select():
         return (
-            data_source.c.source_id.label("upstream_system_id"),
-            data_source.c.source_code.label("system_code"),
-            data_source.c.source_name.label("system_name"),
-            func.coalesce(data_source.c.source_type, "").label("system_abbr"),
+            data_source.c.source_id.label("data_source_id"),
+            mapping_table.c.upstream_system_id.label("source_system_id"),
+            mapping_table.c.upstream_system_id.label("upstream_system_id"),
+            upstream_system.c.system_abbr.label("system_code"),
+            upstream_system.c.system_name.label("system_name"),
+            upstream_system.c.system_abbr.label("system_abbr"),
             mapping_table.c.source_table_name,
             mapping_table.c.source_table_cn,
             func.coalesce(mapping_table.c.target_layer_code, "DWF").label("target_layer_code"),
@@ -267,12 +310,18 @@ class FieldMappingService:
         )
 
     def _row_to_field_mapping(self, row):
+        source_system_id = row.get("source_system_id", row.get("upstream_system_id"))
+        data_source_id = row.get("data_source_id", source_system_id)
+        system_name = row.get("system_name", row.get("src_system"))
+        system_code = row.get("system_code", row.get("system_abbr"))
         return {
-            "dataSourceId": row["upstream_system_id"],
-            "upstreamSystemId": row["upstream_system_id"],
-            "systemCode": row["system_code"],
-            "srcSystem": row["system_name"],
-            "systemAbbr": row["system_abbr"],
+            "dataSourceId": data_source_id,
+            "sourceSystemId": source_system_id,
+            "upstreamSystemId": source_system_id,
+            "systemName": system_name,
+            "systemCode": system_code,
+            "srcSystem": system_name,
+            "systemAbbr": row.get("system_abbr", system_code),
             "srcTable": row["source_table_name"],
             "srcTableCn": row["source_table_cn"] or row["source_table_name"],
             "srcField": row["source_field_name"],
@@ -289,30 +338,32 @@ class FieldMappingService:
     def get_source_systems(self):
         statement = (
             select(
-                data_source.c.source_name.label("name"),
+                upstream_system.c.system_pk.label("source_system_id"),
+                data_source.c.source_id.label("data_source_id"),
+                upstream_system.c.system_name.label("system_name"),
+                upstream_system.c.system_abbr.label("system_code"),
                 func.count().label("count"),
-                data_source.c.source_id.label("upstream_system_id"),
-                data_source.c.source_code.label("system_code"),
-                func.coalesce(data_source.c.source_type, "").label("system_abbr"),
             )
             .select_from(self._base_from())
-            .where(data_source.c.is_deleted == "N")
             .group_by(
+                upstream_system.c.system_pk,
                 data_source.c.source_id,
-                data_source.c.source_code,
-                data_source.c.source_name,
-                data_source.c.source_type,
+                upstream_system.c.system_name,
+                upstream_system.c.system_abbr,
             )
-            .order_by(data_source.c.source_name)
+            .order_by(upstream_system.c.system_name, upstream_system.c.system_abbr, upstream_system.c.system_pk)
         )
         return [
             {
-                "name": row["name"],
-                "count": int(row["count"] or 0),
-                "dataSourceId": row["upstream_system_id"],
-                "upstreamSystemId": row["upstream_system_id"],
+                "id": row["source_system_id"],
+                "sourceSystemId": row["source_system_id"],
+                "upstreamSystemId": row["source_system_id"],
+                "dataSourceId": row["data_source_id"],
+                "name": row["system_name"],
+                "systemName": row["system_name"],
                 "systemCode": row["system_code"],
-                "systemAbbr": row["system_abbr"],
+                "systemAbbr": row["system_code"],
+                "count": int(row["count"] or 0),
             }
             for row in self._fetch_rows_logged(
                 statement,
@@ -327,7 +378,7 @@ class FieldMappingService:
             return cached
         statement = (
             select(
-                func.count(distinct(data_source.c.source_id)).label("source_system_count"),
+                func.count(distinct(upstream_system.c.system_pk)).label("source_system_count"),
                 func.count(distinct(mapping_table.c.table_pk)).label("source_table_count"),
                 func.count(distinct(mapping_field.c.field_pk)).label("field_count"),
                 func.count(
@@ -469,10 +520,12 @@ class FieldMappingService:
         ).label("source_table_cn")
         statement = (
             select(
-                data_source.c.source_id.label("upstream_system_id"),
-                data_source.c.source_code.label("system_code"),
-                data_source.c.source_name.label("system_name"),
-                func.coalesce(data_source.c.source_type, "").label("system_abbr"),
+                data_source.c.source_id.label("data_source_id"),
+                mapping_table.c.upstream_system_id.label("source_system_id"),
+                mapping_table.c.upstream_system_id.label("upstream_system_id"),
+                upstream_system.c.system_abbr.label("system_code"),
+                upstream_system.c.system_name.label("system_name"),
+                upstream_system.c.system_abbr.label("system_abbr"),
                 mapping_table.c.source_table_name,
                 source_table_cn,
                 func.coalesce(mapping_table.c.target_layer_code, "DWF").label("target_layer_code"),
@@ -509,9 +562,10 @@ class FieldMappingService:
             .where(*where)
             .group_by(
                 data_source.c.source_id,
-                data_source.c.source_code,
-                data_source.c.source_name,
-                data_source.c.source_type,
+                mapping_table.c.upstream_system_id,
+                upstream_system.c.system_pk,
+                upstream_system.c.system_abbr,
+                upstream_system.c.system_name,
                 mapping_table.c.source_table_name,
                 mapping_table.c.source_table_cn,
                 mapping_table.c.target_layer_code,
@@ -531,15 +585,21 @@ class FieldMappingService:
             page_size=page_size,
             keyword=(params or {}).get("keyword"),
         ):
+            source_system_id = row.get("source_system_id", row.get("upstream_system_id"))
+            data_source_id = row.get("data_source_id", source_system_id)
+            system_name = row.get("system_name", row.get("src_system"))
+            system_code = row.get("system_code", row.get("system_abbr"))
             field_count = int(row["field_count"] or 0)
             empty_comment_count = int(row["empty_comment_count"] or 0)
             items.append(
                 {
-                    "dataSourceId": row["upstream_system_id"],
-                    "upstreamSystemId": row["upstream_system_id"],
-                    "systemCode": row["system_code"],
-                    "srcSystem": row["system_name"],
-                    "systemAbbr": row["system_abbr"],
+                    "dataSourceId": data_source_id,
+                    "sourceSystemId": source_system_id,
+                    "upstreamSystemId": source_system_id,
+                    "systemName": system_name,
+                    "systemCode": system_code,
+                    "srcSystem": system_name,
+                    "systemAbbr": row.get("system_abbr", system_code),
                     "srcTable": row["source_table_name"],
                     "srcTableCn": row["source_table_cn"],
                     "targetLayer": row["target_layer_code"],

@@ -32,7 +32,7 @@ export const DEFAULT_SYSTEM_ROUTE: {
 };
 export const DEFAULT_MAPPING_ROUTE: {
   tab: string;
-  upstreamSystemId: string;
+  sourceSystemId: string;
   sourceTable: string;
   dwfTable: string;
 };

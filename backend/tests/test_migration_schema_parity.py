@@ -82,6 +82,7 @@ class MigrationSchemaParityTests(unittest.TestCase):
         required = (
             "idx_p_api_asset_filter",
             "idx_p_field_mapping_table_source",
+            "idx_p_field_mapping_table_uk_01",
             "idx_p_upstream_system_ix_01",
             "idx_p_push_system_ix_01",
             "idx_p_report_asset_ix_01",
@@ -90,6 +91,7 @@ class MigrationSchemaParityTests(unittest.TestCase):
             "idx_p_role_permission_permission",
             "foreign key (system_id)",
             "foreign key (data_source_id)",
+            "foreign key (upstream_system_id)",
             "foreign key (table_pk)",
             "on delete cascade",
             "foreign key (master_system_id)",

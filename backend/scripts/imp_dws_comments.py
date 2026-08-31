@@ -361,24 +361,34 @@ def build_schema_name_set(table_names: list[str]) -> set[str]:
 
 
 def load_upstream_system_map(profile: str) -> dict[str, int]:
+    """Resolve only unique machine/readable upstream identities.
+
+    ``system_name`` is intentionally excluded: it is a display attribute and
+    may be shared by multiple upstream systems.  ``system_abbr`` is also
+    accepted only while it remains unambiguous; duplicate abbreviations are
+    omitted instead of silently selecting the first row.
+    """
     sql = """
 SELECT
     system_pk,
     UPPER(COALESCE(system_abbr, '')) AS system_abbr,
-    UPPER(COALESCE(system_id, '')) AS system_id,
-    UPPER(COALESCE(system_name, '')) AS system_name
+    UPPER(COALESCE(system_id, '')) AS system_id
 FROM dwp.p_upstream_system
 WHERE is_deleted = 'N'
 """
     columns, rows = fetch_all(profile, sql)
-    mapping: dict[str, int] = {}
+    candidates: dict[str, set[int]] = {}
     for row in rows_to_dicts(columns, rows):
         system_pk = int(row["system_pk"])
-        for key in ("system_abbr", "system_id", "system_name"):
+        for key in ("system_abbr", "system_id"):
             value = str(row.get(key) or "").strip().upper()
-            if value and value not in mapping:
-                mapping[value] = system_pk
-    return mapping
+            if value:
+                candidates.setdefault(value, set()).add(system_pk)
+    return {
+        key: next(iter(system_pks))
+        for key, system_pks in candidates.items()
+        if len(system_pks) == 1
+    }
 
 
 def load_recv_dwf_map(profile: str) -> dict[str, RecvDwfMeta]:
@@ -531,12 +541,12 @@ def build_table_rows(profile: str, directory: str) -> list[TableMappingRow]:
         upstream_system_id = upstream_system_map.get(recv_dwf_meta.data_source)
         if upstream_system_id is None:
             skipped_tables.append(
-                f"skip: missing upstream system, data_source={recv_dwf_meta.data_source}, "
-                f"target_table={target_table}, file={py_file}"
+                f"skip: missing or ambiguous upstream system identity, "
+                f"data_source={recv_dwf_meta.data_source}, target_table={target_table}, file={py_file}"
             )
             print(
-                f"[skip] missing upstream system: data_source={recv_dwf_meta.data_source}, "
-                f"target_table={target_table} ({py_file})"
+                f"[skip] missing or ambiguous upstream system identity: "
+                f"data_source={recv_dwf_meta.data_source}, target_table={target_table} ({py_file})"
             )
             continue
 

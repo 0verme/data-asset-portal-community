@@ -16,7 +16,13 @@ test("retail demo exposes the planned deterministic data volume", () => {
   assert.equal(DWM_TABLES.length, 32);
   assert.equal(INDICATORS.length, 36);
   assert.equal(FIELD_MAPPING_ROWS.length, 72);
-  assert.equal(new Set(FIELD_MAPPING_ROWS.map((item) => `${item.srcSystem}:${item.srcTable}`)).size, 12);
+  assert.equal(new Set(FIELD_MAPPING_ROWS.map((item) => `${item.sourceSystemId}:${item.srcTable}`)).size, 12);
+  assert.equal(new Set(FIELD_MAPPING_ROWS.map((item) => item.sourceSystemId)).size, 8);
+  FIELD_MAPPING_ROWS.forEach((item) => {
+    assert.ok(item.sourceSystemId);
+    assert.equal(item.upstreamSystemId, item.sourceSystemId);
+    assert.ok(item.systemCode);
+  });
   assert.equal(UPSTREAM_SYSTEMS.length, 8);
   assert.equal(PUSH_SYSTEMS.length, 6);
   assert.equal(REPORTS.length, 8);

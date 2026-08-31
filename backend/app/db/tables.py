@@ -195,7 +195,7 @@ mapping_table = _table(
     "p_field_mapping_table",
     Column("table_pk", Integer, primary_key=True),
     Column("data_source_id", Integer),
-    Column("upstream_system_id", Integer),
+    Column("upstream_system_id", Integer, nullable=False),
     Column("source_table_name", String(128), nullable=False),
     Column("source_table_cn", String(256)),
     Column("target_layer_code", String(32), nullable=False),

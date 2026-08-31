@@ -1,5 +1,6 @@
 
 import { Icon } from "../ui.jsx";
+import { formatSystemLabel, getSourceSystemId } from "./fieldMappingUtils.js";
 
 function StatCard({ label, value, hint }) {
   return (
@@ -48,11 +49,16 @@ export function FieldMappingFilters({
           <div className="fm-filter-grid">
             <label className="fm-field">
               <span>源系统</span>
-              <select className="sel" value={draftFilters.srcSystem} onChange={onChange("srcSystem")}>
+              <select className="sel" value={draftFilters.sourceSystemId} onChange={onChange("sourceSystemId")}>
                 <option value="">全部</option>
-                {sourceSystems.map((item) => (
-                  <option key={item.name} value={item.name}>{item.name}</option>
-                ))}
+                {sourceSystems.map((item) => {
+                  const sourceSystemId = getSourceSystemId(item);
+                  return (
+                    <option key={String(sourceSystemId)} value={String(sourceSystemId)}>
+                      {formatSystemLabel(item)}
+                    </option>
+                  );
+                })}
               </select>
             </label>
             <label className="fm-field">
