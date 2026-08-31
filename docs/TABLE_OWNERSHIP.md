@@ -4,7 +4,7 @@
 
 ## Canonical baseline
 
-`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0006_field_mapping_upstream_identity` 共同覆盖以下 39 张 canonical tables：
+`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0006_field_mapping_upstream_id` 共同覆盖以下 39 张 canonical tables：
 
 | Owner | Tables |
 | --- | --- |

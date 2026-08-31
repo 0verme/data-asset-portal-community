@@ -27,6 +27,6 @@ python backend/scripts/schema_migrate.py verify --offline --dialect mysql
 python backend/scripts/schema_migrate.py verify --offline --dialect dws
 ```
 
-后续结构变更只新增 `backend/alembic/versions/` revision，不修改已发布 revision，不提供自动 downgrade。`0002_portable_asset_filter`、`0003_open_repository_modules`、`0004_metadata_ingestion_identity`、`0005_rbac_persistence` 和 `0006_field_mapping_upstream_identity` 是增量示例；`0004` 为 Asset source-scoped identity、Lineage import/content bookkeeping 提供 forward migration，并移除 legacy `table_name` global unique 约束；`0006` 将字段映射已有的 `upstream_system_id` 收口为 `p_upstream_system.system_pk` 外键，并对历史数据执行不猜测的 backfill。SQLite、PostgreSQL 与 MySQL 的 fresh/upgrade 路径都会从 baseline 升级到同一 head。DWS 目前保留离线基线验证与静态兼容验证；其 JDBC/provider 路径不宣称 online Alembic parity。
+后续结构变更只新增 `backend/alembic/versions/` revision，不修改已发布 revision，不提供自动 downgrade。`0002_portable_asset_filter`、`0003_open_repository_modules`、`0004_metadata_ingestion_identity`、`0005_rbac_persistence` 和 `0006_field_mapping_upstream_id` 是增量示例；`0004` 为 Asset source-scoped identity、Lineage import/content bookkeeping 提供 forward migration，并移除 legacy `table_name` global unique 约束；`0006` 将字段映射已有的 `upstream_system_id` 收口为 `p_upstream_system.system_pk` 外键，并对历史数据执行不猜测的 backfill。SQLite、PostgreSQL 与 MySQL 的 fresh/upgrade 路径都会从 baseline 升级到同一 head。DWS 目前保留离线基线验证与静态兼容验证；其 JDBC/provider 路径不宣称 online Alembic parity。
 
 业务服务使用 `__app__.` 逻辑 schema 或 SQLAlchemy Core；物理 schema、参数风格和连接池由 `backend/app/db/` Provider 统一处理。禁止在服务层写 `dwp.`、数据库类型分支或手工替换占位符。

@@ -17,7 +17,7 @@ from __future__ import annotations
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0006_field_mapping_upstream_identity"
+revision = "0006_field_mapping_upstream_id"
 down_revision = "0005_rbac_persistence"
 branch_labels = None
 depends_on = None
