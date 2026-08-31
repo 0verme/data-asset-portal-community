@@ -28,9 +28,10 @@ test("rendered components import their referenced helpers", async () => {
   );
   assert.match(
     upstreamDetail,
-    /import \{ nextUnload, ScheduleTimeline \} from "\.\/UpstreamParts\.jsx";/,
+    /import \{ nextUnload, ScheduleStepper \} from "\.\/UpstreamParts\.jsx";/,
   );
-  assert.match(upstreamParts, /export function nextUnload\(times\)/);
+  assert.match(upstreamParts, /export \{ getScheduleSteps, nextUnload \} from "\.\/scheduleStepper\.js"/);
+  assert.match(upstreamParts, /export function ScheduleStepper\(\{ times, muted, now \}\)/);
 });
 
 test("data hooks import the shared error formatter", async () => {
