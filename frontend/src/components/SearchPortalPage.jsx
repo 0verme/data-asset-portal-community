@@ -45,8 +45,7 @@ function formatMatchedField(item) {
 export function SearchPortalPage({
   onNavigate,
   availableModules = [],
-  authenticated = true,
-  onRequireLogin,
+  publicAccessReady = true,
 }) {
   const scopeOptions = useMemo(
     () => filterPortalScopesByModules(availableModules),
@@ -124,19 +123,11 @@ export function SearchPortalPage({
     const keyword = String(rawQuery ?? "").trim();
     const nextScope = validScopeKeys.has(rawScope) ? rawScope : DEFAULT_PORTAL_SCOPE;
 
+    if (!publicAccessReady) return;
     if (!keyword) {
       clearSearch(nextScope);
       return;
     }
-    if (!authenticated) {
-      setSearchError("请先登录后搜索。");
-      setResult(null);
-      setSearchLoading(false);
-      setSearchedTerm(keyword);
-      onRequireLogin?.();
-      return;
-    }
-
     const seq = ++requestSeq.current;
     setQuery(keyword);
     setScope(nextScope);
@@ -162,13 +153,8 @@ export function SearchPortalPage({
 
   useEffect(() => {
     let cancelled = false;
-    if (!authenticated) {
-      setStats([]);
-      setStatsLoading(false);
-      setStatsError("");
-      setResult(null);
-      setSearchError("");
-      setSearchedTerm("");
+    if (!publicAccessReady) {
+      setStatsLoading(true);
       return () => {
         cancelled = true;
       };
@@ -191,10 +177,10 @@ export function SearchPortalPage({
     return () => {
       cancelled = true;
     };
-  }, [availableModules, authenticated]);
+  }, [availableModules, publicAccessReady]);
 
   useEffect(() => {
-    if (!authenticated) return;
+    if (!publicAccessReady) return;
     const nextScope = validScopeKeys.has(scope) ? scope : DEFAULT_PORTAL_SCOPE;
     const activeQuery = String(searchedTerm || query || "").trim();
 
@@ -209,20 +195,20 @@ export function SearchPortalPage({
 
     runSearch(activeQuery, nextScope);
     // This synchronization intentionally runs only when the available module set or
-    // authentication state changes. The called search updates state, so adding its
+    // public access readiness changes. The called search updates state, so adding its
     // render-scoped dependencies would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableModules, authenticated]);
+  }, [availableModules, publicAccessReady]);
 
   useEffect(() => {
-    if (!authenticated) return;
+    if (!publicAccessReady) return;
     const initialQuery = String(initialSearchRef.current.query || "").trim();
     if (!initialQuery) return;
     runSearch(initialQuery, initialSearchRef.current.scope);
     // Bootstrap the URL query once per authentication bootstrap; re-running on the
     // render-scoped callback would repeat the search.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authenticated]);
+  }, [publicAccessReady]);
 
   const doSearch = () => runSearch(query, scope);
 
@@ -360,8 +346,8 @@ export function SearchPortalPage({
         </div>
       ) : (
         <div className="sp-stats">
-          {!authenticated ? (
-            <div className="sp-stats-hint">登录后查看资产统计与搜索结果。</div>
+          {!publicAccessReady ? (
+            <div className="sp-stats-hint">正在准备公开资产目录...</div>
           ) : statsLoading ? (
             <div className="sp-stats-hint">正在加载资产统计...</div>
           ) : statsError ? (

@@ -141,7 +141,12 @@ export default function App() {
     handleLoginSubmit,
     handleLogout,
   } = useAuthSession();
-  const businessAccessReady = !isDbAuthMode() || (authReady && Boolean(auth.user));
+  // `/auth/me` is an identity probe. A 401 means anonymous, not that the
+  // public catalog must be disabled; wait only for the probe to settle.
+  const businessAccessReady = !isDbAuthMode() || authReady;
+  const canManageUsers = can("system:user:write");
+  const canManageMenus = can("system:menu:write");
+  const canManageParams = can("system:param:write");
 
   const loadMenus = React.useCallback(async () => {
     const requestId = navMenuRequestRef.current + 1;
@@ -364,34 +369,62 @@ export default function App() {
 
   useLocationSynchronization({ navigation, asset, push, upstream });
 
+  const canEditAsset = can("asset:write");
+  const canEditPush = can("push:write");
+  const canEditRoot = can("root:write");
+  const canEditUpstream = can("upstream:write");
+  const canEditIndicator = can("indicator:write");
+  const canEditReport = can("report:write");
+  const canEditApiAsset = can("api_asset:write");
+
   useEffect(() => {
-    if (!authReady || canEdit) return;
-    setRoute((current) => (
-      current.page === "edit" || current.page === "new" ? DEFAULT_ASSET_ROUTE : current
-    ));
-    setPushRoute((current) => (
-      ["sysNew", "sysEdit", "jobNew", "jobEdit"].includes(current.page)
-        ? { page: current.sys ? "jobs" : "systems", sys: current.sys, job: null }
-        : current
-    ));
-    setRootRoute((current) => (
-      ["new", "edit", "import"].includes(current.page) ? DEFAULT_ROOT_ROUTE : current
-    ));
-    setUpRoute((current) => (
-      ["new", "edit"].includes(current.page)
-        ? (current.id ? { page: "detail", id: current.id } : DEFAULT_UP_ROUTE)
-        : current
-    ));
-    setIndicatorRoute((current) => (
-      ["new", "edit"].includes(current.page) ? DEFAULT_INDICATOR_ROUTE : current
-    ));
-    setReportRoute((current) => (
-      ["new", "edit"].includes(current.page) ? DEFAULT_REPORT_ROUTE : current
-    ));
-    setApiAssetRoute((current) => (["new", "edit"].includes(current.page) ? DEFAULT_API_ASSET_ROUTE : current));
+    if (!authReady) return;
+    if (!canEditAsset) {
+      setRoute((current) => (
+        current.page === "edit" || current.page === "new" ? DEFAULT_ASSET_ROUTE : current
+      ));
+    }
+    if (!canEditPush) {
+      setPushRoute((current) => (
+        ["sysNew", "sysEdit", "jobNew", "jobEdit"].includes(current.page)
+          ? { page: current.sys ? "jobs" : "systems", sys: current.sys, job: null }
+          : current
+      ));
+    }
+    if (!canEditRoot) {
+      setRootRoute((current) => (
+        ["new", "edit", "import"].includes(current.page) ? DEFAULT_ROOT_ROUTE : current
+      ));
+    }
+    if (!canEditUpstream) {
+      setUpRoute((current) => (
+        ["new", "edit"].includes(current.page)
+          ? (current.id ? { page: "detail", id: current.id } : DEFAULT_UP_ROUTE)
+          : current
+      ));
+    }
+    if (!canEditIndicator) {
+      setIndicatorRoute((current) => (
+        ["new", "edit"].includes(current.page) ? DEFAULT_INDICATOR_ROUTE : current
+      ));
+    }
+    if (!canEditReport) {
+      setReportRoute((current) => (
+        ["new", "edit"].includes(current.page) ? DEFAULT_REPORT_ROUTE : current
+      ));
+    }
+    if (!canEditApiAsset) {
+      setApiAssetRoute((current) => (["new", "edit"].includes(current.page) ? DEFAULT_API_ASSET_ROUTE : current));
+    }
   }, [
     authReady,
-    canEdit,
+    canEditApiAsset,
+    canEditAsset,
+    canEditIndicator,
+    canEditPush,
+    canEditReport,
+    canEditRoot,
+    canEditUpstream,
     setApiAssetRoute,
     setIndicatorRoute,
     setPushRoute,
@@ -484,7 +517,7 @@ export default function App() {
   const isPortal = module === "portal";
 
   const searchPlaceholder = isPush
-    ? "搜索系统、主机、联系人或推送作业"
+    ? "搜索系统、作业、文件名或说明"
     : isCodeTable
       ? "搜索表编码、表名称、负责人或说明"
       : isReport
@@ -504,7 +537,7 @@ export default function App() {
                   ? "搜索操作用户、模块、对象或操作内容"
                   : "搜索用户名、显示名、邮箱或状态"
             : isUpstream
-              ? "搜索系统简称、名称、主机或数据库"
+              ? "搜索系统简称、名称、负责人、部门或说明"
               : isMapping
                 ? "搜索源系统、源表、字段或目标字段"
                 : "搜索表名、中文名、负责人或字段";
@@ -538,8 +571,9 @@ export default function App() {
     <ModuleContent
       module={module}
       context={{
-        apiAsset, apiAssetRoute, apiAssetView, asset, backToUpstreamList, businessAccessReady, can,
-        canEdit, canManageRoles, canManageSystem, canViewMenus, canViewOperationLog, canViewParams,
+        apiAsset, apiAssetRoute, apiAssetView, asset, auth, backToUpstreamList, businessAccessReady, can,
+        canEdit, canManageMenus, canManageParams, canManageRoles, canManageSystem, canManageUsers,
+        canViewMenus, canViewOperationLog, canViewParams,
         canViewRoles, canViewUsers, goToMapping, goToModuleWithQuery, indicator, indicatorFilter,
         indicatorRoute, indicatorView, lineageRoute, manualCodeTable, mappingRoute,
         push, pushRoute, query, report, reportRoute, reportView, requireLogin, root,
@@ -555,7 +589,8 @@ export default function App() {
     <ModuleSidebar
       module={module}
       context={{
-        apiAsset, apiAssetFilter, asset, can, canEdit, canManageRoles, canManageSystem, canViewMenus,
+        apiAsset, apiAssetFilter, asset, can, canEdit, canManageMenus, canManageParams, canManageRoles,
+        canManageSystem, canManageUsers, canViewMenus,
         canViewOperationLog, canViewParams, canViewRoles, canViewUsers, indicator,
         indicatorFilter, lineageBootstrap, manualCodeTable, push, pushRoute, report,
         reportFilter, requireLogin, root, setApiAssetFilter, setIndicatorFilter,

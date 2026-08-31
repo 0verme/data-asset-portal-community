@@ -10,7 +10,6 @@ from typing import Any
 
 from fastapi import (  # pyright: ignore[reportAttributeAccessIssue]
     APIRouter,
-    Depends,
     FastAPI,
     Query,
 )
@@ -18,7 +17,6 @@ from fastapi.responses import JSONResponse  # pyright: ignore[reportMissingImpor
 
 from ...core.capabilities import capabilities_public_payload
 from ...services.search_provider import SCOPE_ALL, SearchDataSourceError
-from ..dependencies import require_authenticated
 from ..errors import _service_error_response
 
 LOGGER = logging.getLogger(__name__)
@@ -46,7 +44,6 @@ def _register_infrastructure_routes(
     portal_router = APIRouter(
         prefix="/api/portal",
         tags=["portal-native"],
-        dependencies=[Depends(require_authenticated)],
     )
 
     @portal_router.get("/stats", response_model=None)
@@ -61,7 +58,6 @@ def _register_infrastructure_routes(
     search_router = APIRouter(
         prefix="/api/search",
         tags=["search-native"],
-        dependencies=[Depends(require_authenticated)],
     )
 
     @search_router.get("", response_model=None)

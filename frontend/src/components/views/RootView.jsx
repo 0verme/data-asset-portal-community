@@ -17,7 +17,7 @@ import { Icon } from "../ui.jsx";
 import { EmptyState, ErrorState, LoadingState } from "../common/index.js";
 import { pushModuleNavigationState } from "../../routing/navigation.ts";
 
-export function RootView({ root, query, setQuery, requireLogin, rootRoute, setRootRoute }) {
+export function RootView({ root, query, setQuery, requireLogin, rootRoute, setRootRoute, canEdit = false }) {
   const {
     roots = [],
     rootCategories = [],
@@ -41,6 +41,9 @@ export function RootView({ root, query, setQuery, requireLogin, rootRoute, setRo
   if (rootError) {
     return <ErrorState title="词根模块加载失败" desc={rootError} onRetry={loadRootData} />;
   }
+  if (!canEdit && rootRoute.page !== "library") {
+    return <div className="state-card" role="status"><h4>当前页面仅对维护权限开放</h4><p>词根目录仍可公开浏览，新增、编辑、导入和删除需要相应权限。</p></div>;
+  }
   if (rootRoute.page === "library") {
     return (
       <RootLibrary
@@ -50,18 +53,19 @@ export function RootView({ root, query, setQuery, requireLogin, rootRoute, setRo
         activeCategory={rootCategory}
         categories={rootCategories}
         onSetCategory={setRootCategory}
-        onEdit={(abbr) => requireLogin(() => {
+        canEdit={canEdit}
+        onEdit={canEdit ? (abbr) => requireLogin(() => {
           pushModuleNavigationState("root", { query, rootRoute, rootCategory });
           setRootRoute({ page: "edit", abbr });
-        }, "root:write")}
-        onNew={() => requireLogin(() => {
+        }, "root:write") : undefined}
+        onNew={canEdit ? () => requireLogin(() => {
           pushModuleNavigationState("root", { query, rootRoute, rootCategory });
           setRootRoute({ page: "new", abbr: null });
-        }, "root:write")}
-        onImport={() => requireLogin(() => {
+        }, "root:write") : undefined}
+        onImport={canEdit ? () => requireLogin(() => {
           pushModuleNavigationState("root", { query, rootRoute, rootCategory });
           setRootRoute({ page: "import", abbr: null });
-        }, "root:write")}
+        }, "root:write") : undefined}
         onClearQuery={() => setQuery("")}
       />
     );

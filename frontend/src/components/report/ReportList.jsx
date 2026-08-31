@@ -1,7 +1,7 @@
 import { CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.js";
 import { Highlight, Icon } from "../ui.jsx";
 
-function ReportCardLayout({ reports, query, onView, onEdit }) {
+function ReportCardLayout({ reports, query, onView, onEdit, canEdit }) {
   return <CardGridView
     items={reports}
     getKey={(item) => item.code}
@@ -12,7 +12,7 @@ function ReportCardLayout({ reports, query, onView, onEdit }) {
     renderDesc={(item) => item.purpose || "暂无用途说明"}
     renderFootLeft={(item) => <span className="t-owner">{item.ownerDept || "未归属部门"}</span>}
     renderFootMeta={(item) => <><span className="m"><Icon name="table" size={13} /><b>{item.relatedTableCount}</b> 表</span><span className="m"><Icon name="info" size={13} /><b>{item.relatedIndicatorCount}</b> 指标</span></>}
-    renderFootActions={(item) => <RowActions onView={() => onView(item.code)} onEdit={() => onEdit(item.code)} />}
+    renderFootActions={(item) => <RowActions onView={() => onView(item.code)} onEdit={canEdit ? () => onEdit(item.code) : undefined} />}
   />;
 }
 
@@ -29,7 +29,7 @@ function ReportGroupLayout({ reports, query, onView }) {
   />;
 }
 
-export function ReportList({ reports, query, view, onChangeView, onView, onEdit, onNew }) {
+export function ReportList({ reports, query, view, onChangeView, onView, onEdit, onNew, canEdit = false }) {
   return (
     <div className="indicator-page">
       <div className="page-head">
@@ -39,7 +39,7 @@ export function ReportList({ reports, query, view, onChangeView, onView, onEdit,
             共 <b>{reports.length}</b> 个报表资产{query ? <>，匹配 “{query}”</> : null}
           </div>
         </div>
-        <div className="head-actions"><ViewModeSwitcher value={view} onChange={onChangeView} /><button className="btn primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增报表</button></div>
+        <div className="head-actions"><ViewModeSwitcher value={view} onChange={onChangeView} />{canEdit ? <button className="btn primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增报表</button> : null}</div>
       </div>
 
       {!reports.length ? <EmptyState title={query ? "未找到符合条件的报表资产" : "暂无报表资产"} /> : view === "list" ? <div className="tbl-wrap indicator-tbl">
@@ -74,13 +74,13 @@ export function ReportList({ reports, query, view, onChangeView, onView, onEdit,
                 <td data-label="状态"><StatusBadge status={item.status} /></td>
                 <td data-label="关联引用" className="mono indicator-date">{item.relatedTableCount} 表 / {item.relatedIndicatorCount} 指标</td>
                 <td data-label="" className="mobile-card-actions" style={{ textAlign: "right" }}>
-                  <RowActions onView={() => onView(item.code)} onEdit={() => onEdit(item.code)} />
+                  <RowActions onView={() => onView(item.code)} onEdit={canEdit ? () => onEdit(item.code) : undefined} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div> : view === "card" ? <ReportCardLayout reports={reports} query={query} onView={onView} onEdit={onEdit} /> : <ReportGroupLayout reports={reports} query={query} onView={onView} />}
+      </div> : view === "card" ? <ReportCardLayout reports={reports} query={query} onView={onView} onEdit={onEdit} canEdit={canEdit} /> : <ReportGroupLayout reports={reports} query={query} onView={onView} />}
     </div>
   );
 }

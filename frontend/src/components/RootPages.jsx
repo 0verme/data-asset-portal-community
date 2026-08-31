@@ -33,6 +33,7 @@ export function RootLibrary({
   onNew,
   onImport,
   onClearQuery,
+  canEdit = false,
 }) {
   const counts = allRoots.reduce((acc, item) => {
     acc[item.cat] = (acc[item.cat] || 0) + 1;
@@ -50,8 +51,8 @@ export function RootLibrary({
           </div>
         </div>
         <div className="head-actions">
-          <button className="btn" onClick={onImport}><Icon name="upload" size={15} />批量导入</button>
-          <button className="btn primary" onClick={onNew}><Icon name="plus" size={15} />新增词根</button>
+          {canEdit ? <button className="btn" onClick={onImport}><Icon name="upload" size={15} />批量导入</button> : null}
+          {canEdit ? <button className="btn primary" onClick={onNew}><Icon name="plus" size={15} />新增词根</button> : null}
         </div>
       </div>
 
@@ -107,14 +108,14 @@ export function RootLibrary({
             </thead>
             <tbody>
               {roots.map((item) => (
-                <tr key={item.abbr} onClick={() => onEdit(item.abbr)}>
+                <tr key={item.abbr} onClick={canEdit ? () => onEdit(item.abbr) : undefined}>
                   <td data-label=""><span className="root-abbr"><Highlight text={item.abbr} q={query} /></span></td>
                   <td data-label="英文全称"><span className="root-en"><Highlight text={item.en} q={query} /></span></td>
                   <td data-label="中文名"><Highlight text={item.cn} q={query} /></td>
                   <td data-label="分类"><CatBadge cat={item.cat} /></td>
                   <td data-label="说明">{item.desc || "-"}</td>
                   <td data-label="" className="mobile-card-actions" style={{ textAlign: "right" }} onClick={(event) => event.stopPropagation()}>
-                    <RowActions onEdit={() => onEdit(item.abbr)} />
+                    <RowActions onEdit={canEdit ? () => onEdit(item.abbr) : undefined} />
                   </td>
                 </tr>
               ))}

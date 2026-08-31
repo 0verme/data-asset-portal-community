@@ -17,7 +17,7 @@ import { SidebarActionGroup } from "./common/SidebarActionGroup.jsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.jsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.jsx";
 
-export function UpstreamSidebar({ upstream, statusOptions, requireLogin, setUpRoute }) {
+export function UpstreamSidebar({ upstream, statusOptions, requireLogin, canEdit = false, setUpRoute }) {
   const { upstreamSystems, upstreamDbTypes, upFilter, setUpFilter } = upstream;
 
   const dbTypeCounts = upstreamSystems.reduce((acc, item) => {
@@ -70,13 +70,11 @@ export function UpstreamSidebar({ upstream, statusOptions, requireLogin, setUpRo
       />
 
       <SidebarActionGroup
-        actions={[
-          {
-            key: "create-upstream",
-            label: "新增系统",
-            onClick: () => requireLogin(() => setUpRoute({ page: "new", id: null })),
-          },
-        ]}
+        actions={canEdit ? [{
+          key: "create-upstream",
+          label: "新增系统",
+          onClick: () => requireLogin(() => setUpRoute({ page: "new", id: null })),
+        }] : []}
       />
     </>
   );

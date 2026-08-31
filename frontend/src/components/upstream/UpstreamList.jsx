@@ -28,6 +28,7 @@ export function UpstreamList({
   onNew,
   onToggle,
   onViewTables,
+  canEdit = false,
 }) {
   return (
     <div className="upstream-page">
@@ -40,7 +41,7 @@ export function UpstreamList({
         </div>
         <div className="head-actions">
           <ViewModeSwitcher value={view} onChange={onChangeView} modes={["card", "list"]} />
-          <button className="btn primary" onClick={onNew}><Icon name="plus" size={15} />新增系统</button>
+          {canEdit ? <button className="btn primary" onClick={onNew}><Icon name="plus" size={15} />新增系统</button> : null}
         </div>
       </div>
 
@@ -73,7 +74,7 @@ export function UpstreamList({
             return (
               <RowActions
                 disabled={pendingIds.includes(item.id)}
-                onEdit={() => onEdit(item.id)}
+                onEdit={canEdit ? () => onEdit(item.id) : undefined}
                 extraActions={[
                   {
                     key: "view-tables",
@@ -85,11 +86,11 @@ export function UpstreamList({
                     }),
                   },
                 ]}
-                toggle={{
+                toggle={canEdit ? {
                   enabled,
                   label: item.name,
                   onToggle: () => onToggle(item.id, enabled ? "disabled" : "enabled"),
-                }}
+                } : undefined}
               />
             );
           }}
@@ -132,7 +133,7 @@ export function UpstreamList({
                   <td data-label="" className="mobile-card-actions" style={{ textAlign: "right" }} onClick={(event) => event.stopPropagation()}>
                     <RowActions
                       disabled={isPending}
-                      onEdit={() => onEdit(item.id)}
+                      onEdit={canEdit ? () => onEdit(item.id) : undefined}
                       extraActions={[
                         {
                           key: "view-tables",
@@ -144,11 +145,11 @@ export function UpstreamList({
                           }),
                         },
                       ]}
-                      toggle={{
+                      toggle={canEdit ? {
                         enabled,
                         label: item.name,
                         onToggle: () => onToggle(item.id, enabled ? "disabled" : "enabled"),
-                      }}
+                      } : undefined}
                     />
                   </td>
                 </tr>

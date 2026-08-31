@@ -18,7 +18,7 @@ import { SidebarActionGroup } from "./common/SidebarActionGroup.jsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.jsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.jsx";
 
-export function IndicatorSidebar({ indicator, indicatorFilter, setIndicatorFilter, setIndicatorRoute }) {
+export function IndicatorSidebar({ indicator, indicatorFilter, setIndicatorFilter, setIndicatorRoute, canEdit = false }) {
   const { indicators, indicatorFacets, indicatorCreate } = indicator;
 
   return (
@@ -67,13 +67,11 @@ export function IndicatorSidebar({ indicator, indicatorFilter, setIndicatorFilte
       />
 
       <SidebarActionGroup
-        actions={[
-          {
-            key: "create-indicator",
-            label: "新增指标",
-            onClick: indicatorCreate,
-          },
-        ]}
+        actions={canEdit ? [{
+          key: "create-indicator",
+          label: "新增指标",
+          onClick: indicatorCreate,
+        }] : []}
       />
     </>
   );

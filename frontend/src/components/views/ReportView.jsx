@@ -16,7 +16,7 @@
 import { ActionErrorBanner, confirmDeleteAction, EmptyState, ErrorState, LoadingState } from "../common/index.js";
 import { ReportDetailDrawer, ReportEditor, ReportList } from "../ReportPages.jsx";
 
-export function ReportView({ report, query, reportRoute, view, onChangeView }) {
+export function ReportView({ report, query, reportRoute, view, onChangeView, canEdit = false }) {
   const {
     reportLoading,
     reportError,
@@ -44,6 +44,9 @@ export function ReportView({ report, query, reportRoute, view, onChangeView }) {
 
   if (reportError) {
     return <ErrorState title="报表资产加载失败" desc={reportError} onRetry={loadReportData} />;
+  }
+  if (!canEdit && ["new", "edit"].includes(reportRoute.page)) {
+    return <EmptyState title="当前页面需要报表维护权限" desc="报表目录可以公开浏览，新增和编辑需要相应写权限。" />;
   }
 
   if (reportRoute.page === "new") {
@@ -104,12 +107,14 @@ export function ReportView({ report, query, reportRoute, view, onChangeView }) {
         onView={reportViewDetail}
         onEdit={reportEdit}
         onNew={reportCreate}
+        canEdit={canEdit}
       />
 
       <ReportDetailDrawer
         open={Boolean(currentReportDetail)}
         report={currentReportDetail}
         onClose={reportCloseDetail}
+        canEdit={canEdit}
         onEdit={reportEdit}
         onDelete={async (reportCode) => {
           if (await confirmDeleteAction({

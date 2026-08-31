@@ -48,8 +48,8 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
         self.assertEqual("nosniff", health.headers["X-Content-Type-Options"])
 
         migrated = client.get("/api/lineage/bootstrap")
-        self.assertEqual(401, migrated.status_code)
-        self.assertEqual("UNAUTHORIZED", migrated.json()["error"]["code"])
+        self.assertEqual(200, migrated.status_code)
+        self.assertIn("data", migrated.json())
         capabilities = client.get("/api/capabilities")
         self.assertEqual(200, capabilities.status_code)
         self.assertNotIn("edition", capabilities.json())

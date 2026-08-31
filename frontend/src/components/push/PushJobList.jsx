@@ -18,6 +18,7 @@ export function PushJobList({
   onEditSystem,
   onNewJob,
   onEditJob,
+  canEdit = false,
 }) {
   const badgeText = getSystemBadgeText(system.abbr);
   const normalizedQuery = (query || "").trim().toLowerCase();
@@ -52,13 +53,13 @@ export function PushJobList({
             </div>
           </div>
           <div className="dh-actions">
-            <button className="btn" onClick={onEditSystem}><Icon name="edit" size={15} />编辑系统</button>
+            {canEdit ? <button className="btn" onClick={onEditSystem}><Icon name="edit" size={15} />编辑系统</button> : null}
           </div>
         </div>
         <div className="dh-meta">
           <MetaItem label="连接协议" value={<ProtocolTag protocol={system.protocol} />} />
-          <MetaItem label="下游对接人" value={system.downstreamContact || "未指定"} />
-          <MetaItem label="数据开发对接人" value={system.dataDeveloperContact || "未指定"} />
+          {system.downstreamContact ? <MetaItem label="下游对接人" value={system.downstreamContact} /> : null}
+          {system.dataDeveloperContact ? <MetaItem label="数据开发对接人" value={system.dataDeveloperContact} /> : null}
           <MetaItem label="业务部门" value={system.dept} />
         </div>
       </div>
@@ -69,7 +70,7 @@ export function PushJobList({
           推送作业清单
           <span className="sub-count">{jobs.length} 个</span>
         </div>
-        <button className="btn primary" onClick={onNewJob}><Icon name="plus" size={15} />新增接口</button>
+        {canEdit ? <button className="btn primary" onClick={onNewJob}><Icon name="plus" size={15} />新增接口</button> : null}
       </div>
 
       {!jobs.length ? (
@@ -102,7 +103,7 @@ export function PushJobList({
                   <td data-label="推送频率"><span className="freq-cell"><Icon name="clock" size={13} color="var(--ink-3)" />{formatFreq(job)}</span></td>
                   <td data-label="状态"><StatusBadge on={job.enabled} /></td>
                   <td data-label="" className="mobile-card-actions" style={{ textAlign: "right" }} onClick={(event) => event.stopPropagation()}>
-                    <RowActions onEdit={() => onEditJob(job.id)} />
+                    <RowActions onEdit={canEdit ? () => onEditJob(job.id) : undefined} />
                   </td>
                 </tr>
               ))}

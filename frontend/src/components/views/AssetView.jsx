@@ -19,7 +19,7 @@ import { Icon } from "../ui.jsx";
 import { EmptyState, ErrorState, LoadingState, ViewModeSwitcher } from "../common/index.js";
 import { DOMAIN_ORDER } from "../../config/assets.js";
 
-export function AssetView({ asset, query, route }) {
+export function AssetView({ asset, query, route, canEdit = false }) {
   const {
     homeLoading,
     homeError,
@@ -55,6 +55,10 @@ export function AssetView({ asset, query, route }) {
     existingNames,
   } = asset;
 
+  if (!canEdit && ["edit", "new"].includes(route.page)) {
+    return <EmptyState title="当前页面需要资产维护权限" desc="数据资产目录可以公开浏览，新增和编辑需要相应写权限。" />;
+  }
+
   if (route.page === "home") {
     if (homeLoading) {
       return <LoadingState title="加载资产元数据" desc="正在准备表清单、主题域和分层信息。" />;
@@ -76,7 +80,7 @@ export function AssetView({ asset, query, route }) {
           </div>
           <div className="head-actions">
             <ViewModeSwitcher value={layout} onChange={setLayout} />
-            <button className="btn primary" onClick={assetCreate}><Icon name="plus" size={15} />新增表</button>
+            {canEdit ? <button className="btn primary" onClick={assetCreate}><Icon name="plus" size={15} />新增表</button> : null}
           </div>
         </div>
         <HomePage tables={filteredTables} layout={layout} query={query} onOpen={assetOpen} />
@@ -115,7 +119,7 @@ export function AssetView({ asset, query, route }) {
         onTabChange={setDetailTab}
         onBack={assetGoList}
         onBackToList={assetGoList}
-        onEdit={() => assetEdit(detailAsset.name)}
+        onEdit={canEdit ? () => assetEdit(detailAsset.name) : undefined}
       />
     );
   }

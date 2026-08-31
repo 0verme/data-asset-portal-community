@@ -47,30 +47,31 @@ separation has audit value. Do not create one permission per endpoint or button.
 
 The checked-in registry is
 `backend/app/authorization/permissions.py`. The registry order is stable for
-seed output, API snapshots, frontend state, and debugging.
+seed output, API snapshots, frontend state, and debugging. Public catalog reads
+are not made private merely because a corresponding `*:read` code exists.
 
 ## 3. Permission registry
 
 | Permission | Resource | Action | Public/API scope |
 | --- | --- | --- | --- |
-| `asset:read` | asset | read | Reserved for a materially sensitive asset-read boundary; ordinary asset reads require authentication only. |
+| `asset:read` | asset | read | Reserved for a materially sensitive asset-read boundary; ordinary catalog asset reads are public. |
 | `asset:write` | asset | write | Protected asset table/field mutations. |
-| `root:read` | root | read | Reserved for a materially sensitive root-read boundary; ordinary root reads require authentication only. |
+| `root:read` | root | read | Reserved for a materially sensitive root-read boundary; ordinary root catalog reads are public. |
 | `root:write` | root | write | Protected root create/update/delete/import. |
-| `indicator:read` | indicator | read | Reserved for a materially sensitive indicator-read boundary; ordinary indicator reads require authentication only. |
+| `indicator:read` | indicator | read | Reserved for a materially sensitive indicator-read boundary; ordinary indicator catalog reads are public. |
 | `indicator:write` | indicator | write | Protected indicator create/update/delete/status. |
-| `report:read` | report | read | Reserved for a materially sensitive report-read boundary; ordinary report reads require authentication only. |
+| `report:read` | report | read | Reserved for a materially sensitive report-read boundary; ordinary report catalog reads are public. |
 | `report:write` | report | write | Protected report create/update/delete. |
-| `api_asset:read` | api_asset | read | Reserved for a materially sensitive API-asset read boundary; ordinary reads require authentication only. |
+| `api_asset:read` | api_asset | read | Reserved for a materially sensitive API-asset read boundary; ordinary catalog reads are public. |
 | `api_asset:write` | api_asset | write | Protected API asset, params, response-fields, and relations mutations. |
 | `upstream:read` | upstream | read | Protected upstream `admin-detail`; ordinary list/detail requires authentication only. |
 | `upstream:write` | upstream | write | Protected upstream create/update/status/delete. |
 | `push:read` | push | read | Protected push `admin-detail`; ordinary list/detail requires authentication only. |
 | `push:write` | push | write | Protected push system/job mutations. |
-| `code_table:read` | code_table | read | Reserved for a materially sensitive code-table read boundary; ordinary list/detail/export requires authentication only. |
+| `code_table:read` | code_table | read | Reserved for a materially sensitive code-table read boundary; ordinary list/detail/export are public with audit-field redaction. |
 | `code_table:write` | code_table | write | Protected manual code table create/update/status/delete. |
-| `field_mapping:read` | field_mapping | read | Reserved for a materially sensitive mapping-read boundary; ordinary queries require authentication only. |
-| `lineage:read` | lineage | read | Reserved for a materially sensitive lineage-read boundary; ordinary queries require authentication only. |
+| `field_mapping:read` | field_mapping | read | Reserved for a materially sensitive mapping-read boundary; ordinary catalog queries are public. |
+| `lineage:read` | lineage | read | Reserved for a materially sensitive lineage-read boundary; ordinary queries are public with nested-value redaction. |
 | `metadata:read` | metadata | read | Protected ingestion result lookup. |
 | `metadata:write` | metadata | write | Protected asset/lineage Metadata Ingestion and preview/bulk aliases. |
 | `operation_log:read` | operation_log | read | Protected operation log list/detail. |
@@ -92,19 +93,19 @@ seed output, API snapshots, frontend state, and debugging.
    independent permission lists.
 4. `admin` is explicitly mapped to every registered code. It does not use `*`.
    Adding a permission therefore produces a visible registry/seed diff.
-5. `maintainer` is mapped to the compatibility set below. Ordinary business
-   routes require authentication even when a corresponding `read` code exists;
-   the code is not automatically applied to every catalog GET.
+5. `maintainer` is mapped to the compatibility set below. Public catalog GET
+   routes do not require a corresponding `read` code; the code remains reserved
+   for materially sensitive read boundaries.
 
 ## 4. Historical P0 route authorization matrix
 
 The following table records the pre-#140 FastAPI route inventory and is retained
 as historical evidence. The current route contract superseding its public-read
 rows is [authenticated-read-model.md](./authenticated-read-model.md). `Public`
-means no login dependency is evaluated. `Auth` means a valid enabled identity
-is required. `Admin` means the current administrator gate is required. The
-permission column is the target contract for P3; P0 records the existing gate
-and is superseded by #140's authentication-only ordinary business reads.
+means no login dependency is evaluated and the public projection may apply.
+`Auth` means a valid enabled identity is required. `Admin` means the current
+administrator gate is required. The permission column is the target contract
+for P3; ordinary public catalog reads are now governed by Issue #180.
 
 | Resource | API / action | Public | Authenticated | `maintainer` | `admin` | Mutation | Permission |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -146,7 +147,9 @@ and is superseded by #140's authentication-only ordinary business reads.
 | system role | No current endpoint at P0 | — | — | — | — | — | `system:role:read/write` reserved for P6 |
 
 The two hidden Metadata aliases are included because they are real mutation
-routes even though they are omitted from OpenAPI.
+routes even though they are omitted from OpenAPI. Public catalog projections
+and the protected `admin-detail` boundaries are documented in
+[authenticated-read-model.md](./authenticated-read-model.md).
 
 ## 5. Compatibility role matrix
 
@@ -154,7 +157,7 @@ routes even though they are omitted from OpenAPI.
 
 | Identity | Current behavior at P0 | Contract decision |
 | --- | --- | --- |
-| guest | Explicit infrastructure/auth lifecycle routes only; business routes reject the request. | Return `401` for anonymous business reads while preserving the bounded public exceptions. |
+| guest | Public catalog reads and authentication lifecycle routes; protected reads/mutations reject the request. | Return the public projection for catalog reads; return `401` for protected business operations. |
 | `maintainer` | Passes `require_maintainer`; cannot pass `require_admin`. | Preserve business maintenance and operation-log access; do not grant system user/menu/param/role management. |
 | `admin` | Passes both current gates. | Preserve all current access and explicitly map every registered permission. |
 | unknown role | Unknown or deleted roles resolve to no permissions. | Deny by default; protected APIs return `403` for a valid identity without the required permission. |
@@ -165,7 +168,7 @@ routes even though they are omitted from OpenAPI.
 `admin` is the full explicit registry. `maintainer` is the compatibility set
 below; a check mark on an ordinary read code documents an authorization
 concept/capability but does not make that route private or permission-gated.
-Ordinary business routes still require an authenticated identity.
+Ordinary catalog GET routes accept anonymous requests; sensitive reads and all mutations still require the existing authentication/permission boundary.
 
 | Permission | `admin` | `maintainer` | Custom example `indicator-maintainer` |
 | --- | :---: | :---: | :---: |
@@ -248,8 +251,8 @@ through the role-management API while retaining one role per user.
 - Contract unit test: code uniqueness, `resource/action` decomposition,
   deterministic order, explicit admin coverage, and no unknown role fallback.
 - Route inventory test/fixture: every current mutation has a target permission;
-  ordinary business GET routes require authentication; explicit infrastructure
-  exceptions are tested separately.
+  explicit public catalog GET routes are separated from protected reads and
+  authentication lifecycle exceptions.
 - P2 core unit tests: admin, maintainer, custom role, unknown role, disabled
   role/user, deleted user, missing and unknown permission.
 - P3 direct API matrix: every sensitive POST/PUT/PATCH/DELETE returns 401 or

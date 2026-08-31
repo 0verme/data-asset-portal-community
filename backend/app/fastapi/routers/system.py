@@ -28,8 +28,9 @@ from ...services.system_management_service import (
     SystemUserNotFoundError,
     SystemValidationError,
 )
-from ..dependencies import require_authenticated, require_permission
+from ..dependencies import get_authorization_service, get_request_context, require_permission
 from ..errors import _service_error_response
+from ..public_catalog import is_authenticated_request, public_navigation_menus
 
 
 def _system_error_status(error: SystemManagementError) -> int:
@@ -75,7 +76,6 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/system",
         tags=["system-management-migration"],
-        dependencies=[Depends(require_authenticated)],
     )
 
     def get_service() -> Any:
@@ -258,14 +258,18 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     @router.get("/menus", response_model=None)
     def get_menus(
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             items = current_service.get_menus()
+            if not is_authenticated_request(context, authorization):
+                items = public_navigation_menus(items)
         except SystemManagementError as error:
             return _system_error_response(error)
-        # `adminOnly` is presentation metadata. The frontend applies the
-        # current permission snapshot while authentication remains enforced
-        # by the router dependency; this endpoint is not an authorization engine.
+        # `adminOnly` remains presentation metadata for authenticated clients;
+        # anonymous callers already receive the explicit public navigation
+        # projection above. This endpoint is not an authorization engine.
         return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
 
     @router.post("/menus", response_model=None, status_code=201)

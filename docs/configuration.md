@@ -57,10 +57,12 @@ cannot read cookies already reissued in the native format.
 | `backend/app/fastapi_app.py` | KEEP — stable internal import path | Thin facade with no framework compatibility logic |
 | Werkzeug | KEEP — password hashing | Used directly by `AuthService`; not a Flask runtime dependency |
 
-There is intentionally no Public Catalog or anonymous-business-read setting.
-Ordinary business API reads are authenticated by default; the public surface is
-limited to the explicit health/capability and authentication lifecycle routes
-listed in [the authenticated-read model](./rbac/authenticated-read-model.md).
+There is intentionally no Public Catalog feature flag. Community Edition
+uses the fixed `Public Catalog + Authenticated Management` contract: ordinary
+catalog GET routes are public with necessary response redaction, while
+mutations, administration, sensitive reads, connection data, credentials and
+audit data remain protected. The complete route inventory is listed in [the
+Public Catalog contract](./rbac/authenticated-read-model.md).
 
 ## OpenAPI and interactive docs exposure
 

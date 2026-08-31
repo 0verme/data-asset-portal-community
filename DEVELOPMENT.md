@@ -177,11 +177,13 @@ APP_ENV=development
 - `backend/asgi.py` 运行纯 FastAPI Native backend；Auth 使用 application-owned signed-session cookie，新格式写入、旧格式在有限窗口内只读迁移，仓库已有模块 routes 默认注册，数据库/驱动/外部依赖 readiness 通过 error contract 表达。应用配置只读取 `APP_*` 名称；旧 `FLASK_*` 名称已移除。
 - Nginx + Vite 的 `/api` 反代是同源部署，不需要 CORS。只有前端和 API 确实处于不同来源时，才设置 `APP_CORS_ORIGINS`，使用逗号分隔的完整来源，例如 `https://portal.example.com,https://admin.example.com`；空项会忽略，未配置时不发送跨域允许头，绝不使用 `*`。
 
-### Authenticated-by-default 业务读模型
+### Public Catalog + Authenticated Management
 
-Remote API 的普通业务 GET 默认需要登录：匿名请求返回 `401`，已登录普通用户可以浏览普通目录，不需要为每个 GET 申请细粒度 read permission。写操作、管理 API 和敏感读取继续使用现有 RBAC `require_permission(...)`，`403` 表示已有身份但缺少授权。
+Remote API 的普通业务目录 GET 支持匿名浏览：资产、字段/DDL、映射、血缘、词根、指标、报表、API 资产、码值表、上/下游目录、菜单、门户统计和统一搜索返回 `200`，并在需要时执行公开响应脱敏。普通登录用户继续获得现有业务能力，不因本模型自动新增写权限。
 
-显式匿名例外仅包括 `/healthz`、有限的 `/api/capabilities` 模块元数据以及 `/api/auth` 登录生命周期。当前没有 Public Catalog 配置或默认开放业务目录。前端 remote 模式会先完成 `/api/auth/me` 身份 bootstrap，再请求菜单、统计和业务模块；未登录时不会循环请求这些 API。完整清单见 [Authenticated-by-default Business Read Model](./docs/rbac/authenticated-read-model.md)。
+写操作、管理 API 和敏感读取继续使用现有 RBAC `require_permission(...)`；匿名访问这些接口返回 `401`，已有身份但缺少授权返回 `403`。系统用户/角色/参数、操作日志、Metadata ingestion、上/下游 `admin-detail` 以及连接/凭据字段不属于公开目录。
+
+`/api/auth/me` 未登录仍返回 `401`，这是正常的身份探测结果。前端将其转换为 anonymous 状态，然后继续加载公开菜单、统计、搜索和业务模块，而不是停止应用数据加载。完整清单见 [Public Catalog + Authenticated Management](./docs/rbac/authenticated-read-model.md)。
 
 ### FastAPI 开发文档
 

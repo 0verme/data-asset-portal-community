@@ -25,15 +25,15 @@ from ...services.report_service import (
     ReportNotFoundError,
     ReportValidationError,
 )
-from ..dependencies import require_authenticated, require_permission
+from ..dependencies import get_authorization_service, get_request_context, require_permission
 from ..errors import _service_error_response
+from ..public_catalog import is_authenticated_request, redact_public_report
 
 
 def _register_report_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/reports",
         tags=["report-migration"],
-        dependencies=[Depends(require_authenticated)],
     )
 
     def get_service() -> Any:
@@ -55,6 +55,8 @@ def _register_report_routes(app: FastAPI, service: Any) -> None:
         status: str | None = Query(default=None),
         owner_dept: str | None = Query(default=None, alias="ownerDept"),
         current_service: Any = Depends(get_service),
+        context: Any = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             items = current_service.get_reports(
@@ -66,13 +68,18 @@ def _register_report_routes(app: FastAPI, service: Any) -> None:
             )
         except ReportDataSourceError as error:
             return error_response(error, 500)
+        if not is_authenticated_request(context, authorization):
+            items = [redact_public_report(item) for item in items]
         return JSONResponse(
             content=validate_contract({"items": items}, ReportListResponse)
         )
 
     @router.get("/{report_code}", response_model=None)
     def get_report_detail(
-        report_code: str, current_service: Any = Depends(get_service)
+        report_code: str,
+        current_service: Any = Depends(get_service),
+        context: Any = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             data = current_service.get_report_detail(report_code)
@@ -80,6 +87,8 @@ def _register_report_routes(app: FastAPI, service: Any) -> None:
             return error_response(error, 404)
         except ReportDataSourceError as error:
             return error_response(error, 500)
+        if not is_authenticated_request(context, authorization):
+            data = redact_public_report(data)
         return JSONResponse(
             content=validate_contract({"data": data}, DataEnvelope[ReportItem])
         )

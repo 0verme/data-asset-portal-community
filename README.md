@@ -128,11 +128,11 @@ mock 数据只用于前端体验，不会写入数据库。
 
 ### API 安全边界
 
-- **Authentication**：普通业务目录、搜索、字段/DDL、映射、血缘、菜单和统计 API 默认要求有效登录态；匿名业务请求返回 `401`。
-- **Authorization**：写操作、管理操作和敏感读取继续由现有 permission-based RBAC 控制；已登录普通用户不需要为每个目录 GET 额外申请 `*:read` 权限。
-- **Public exceptions**：仅保留 `/healthz`、有限的 `/api/capabilities` 模块元数据和 `/api/auth` 登录生命周期端点；没有 Public Catalog 模式。
+- **Public Catalog**：普通业务目录、搜索、字段/DDL、映射、血缘、菜单、报表、API 资产、码值表、上/下游目录和门户统计支持匿名只读浏览；公开响应按需脱敏，不是全部 GET 无脑公开。
+- **Authenticated Management**：写操作、管理操作和敏感读取继续由现有 permission-based RBAC 控制；本次没有放宽写权限，也没有重写 RBAC。
+- **Protected data**：系统用户/角色/参数、操作日志、Metadata ingestion、上/下游 `admin-detail`、连接信息、凭据和认证信息继续要求认证/权限。
 
-完整 route 分类见 [Authenticated-by-default Business Read Model](./docs/rbac/authenticated-read-model.md)。
+完整 route 分类见 [Public Catalog + Authenticated Management](./docs/rbac/authenticated-read-model.md)。
 
 > **许可、仓库模块和部署能力是三个独立概念：**本仓库包含的源码均按 Apache-2.0 License 提供。
 > 外部 Collector、Adapter、Integration、凭据和生产连接属于部署/集成能力；它们未配置时不改变模块的存在性。

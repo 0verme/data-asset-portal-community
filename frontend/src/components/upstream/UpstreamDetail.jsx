@@ -50,9 +50,9 @@ export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], o
               </div>
             ) : null}
           </div>
-          <div className="dh-actions">
+          {onEdit ? <div className="dh-actions">
             <button className="btn" onClick={onEdit}><Icon name="edit" size={15} />编辑</button>
-          </div>
+          </div> : null}
         </div>
         <div className="dh-meta">
           <MetaItem label="系统简称" value={system.abbr} mono />

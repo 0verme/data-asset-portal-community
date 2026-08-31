@@ -39,6 +39,11 @@ import { useSmartBack } from "./useSmartBack.js";
 import { getDictOptions } from "./useDictOptions.js";
 import { getErrorMessage, scrollMainToTop } from "../utils/ui.js";
 
+function fallbackOptions(values) {
+  return [...new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean))]
+    .map((value) => ({ value, name: value }));
+}
+
 export function useUpstreamModule({
   active,
   query,
@@ -88,19 +93,19 @@ export function useUpstreamModule({
     try {
       const [systems, dbTypeItems, deptItems] = await Promise.all([
         getUpstreamSystems(),
-        getDictOptions("UPSTREAM_DB_TYPE"),
-        getDictOptions("UPSTREAM_DEPT").catch(() => []),
+        canEdit ? getDictOptions("UPSTREAM_DB_TYPE").catch(() => []) : Promise.resolve([]),
+        canEdit ? getDictOptions("UPSTREAM_DEPT").catch(() => []) : Promise.resolve([]),
       ]);
       setUpstreamSystems(systems);
-      setUpstreamDbTypes(dbTypeItems);
-      setUpstreamDeptOptions(deptItems);
+      setUpstreamDbTypes(dbTypeItems.length ? dbTypeItems : fallbackOptions(systems.map((item) => item.dbType)));
+      setUpstreamDeptOptions(deptItems.length ? deptItems : fallbackOptions(systems.map((item) => item.dept)));
       setUpstreamLoaded(true);
     } catch (error) {
       setUpstreamError(getErrorMessage(error, "上游卸数系统加载失败。"));
     } finally {
       setUpstreamLoading(false);
     }
-  }, []);
+  }, [canEdit]);
 
   const loadUpstreamDetail = useCallback(async (systemId) => {
     setUpstreamDetailLoading(true);
@@ -120,6 +125,10 @@ export function useUpstreamModule({
       loadUpstreamData();
     }
   }, [active, upstreamLoaded, upstreamLoading, loadUpstreamData]);
+
+  useEffect(() => {
+    setUpstreamLoaded(false);
+  }, [canEdit]);
 
   useEffect(() => {
     setUpstreamView(initialView || DEFAULT_UP_VIEW);
