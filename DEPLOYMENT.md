@@ -81,9 +81,9 @@ Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"` 和
 
 ### Authentication boundary
 
-部署后的普通业务目录 API 默认要求有效 signed-session cookie：匿名请求到资产、指标、搜索、血缘、字段映射、菜单、报表、API 资产、上/下游系统或统计接口返回 `401`。登录后的普通用户可以读取普通目录；写操作、管理 API、操作日志、metadata lookup 和上/下游 admin detail 仍由既有 RBAC permission 返回 `403`（身份有效但未授权）。
+部署后的 Community Edition 使用 `Public Catalog + Authenticated Management`：资产、指标、搜索、血缘、字段映射、菜单、报表、API 资产、码值表、上/下游目录和统计等普通业务 GET 无需 signed-session cookie 即可浏览，响应按公开目录规则执行必要脱敏。公开读取不代表写权限，也不代表所有 GET 无条件开放。
 
-公开例外是显式且有限的：`GET /healthz`、不包含业务行数据的 `GET /api/capabilities`，以及 `/api/auth` 登录生命周期端点。没有 Public Catalog 开关或匿名业务目录部署模式。不要通过 Nginx、菜单隐藏或 OpenAPI visibility 替代后端认证；Production OpenAPI docs policy 仍由 #144 单独维护。完整 route inventory 见 [Authenticated-by-default Business Read Model](./docs/rbac/authenticated-read-model.md)。
+写操作、管理 API、操作日志、metadata lookup 和上/下游 `admin-detail` 仍要求认证与既有 RBAC permission；匿名请求返回 `401`，身份有效但未授权返回 `403`。不要通过 Nginx、菜单隐藏或 OpenAPI visibility 替代后端保护；Production OpenAPI docs policy 仍由 #144 单独维护。完整 route inventory 与 redaction 规则见 [Public Catalog + Authenticated Management](./docs/rbac/authenticated-read-model.md)。
 
 ### 安全默认值（生产）
 

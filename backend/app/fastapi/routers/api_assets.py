@@ -20,15 +20,15 @@ from ...contracts import (
     validate_contract,
 )
 from ...services.api_asset_service import ApiAssetError
-from ..dependencies import require_authenticated, require_permission
+from ..dependencies import get_authorization_service, get_request_context, require_permission
 from ..errors import _service_error_response
+from ..public_catalog import is_authenticated_request, redact_public_api_asset
 
 
 def _register_api_asset_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/api-assets",
         tags=["api-asset-migration"],
-        dependencies=[Depends(require_authenticated)],
     )
 
     def get_service() -> Any:
@@ -52,6 +52,8 @@ def _register_api_asset_routes(app: FastAPI, service: Any) -> None:
             default=None, alias="downstreamSystemId"
         ),
         current_service: Any = Depends(get_service),
+        context: Any = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             data = {
@@ -59,6 +61,8 @@ def _register_api_asset_routes(app: FastAPI, service: Any) -> None:
                     keyword, status, method, downstream_system_id
                 )
             }
+            if not is_authenticated_request(context, authorization):
+                data["items"] = [redact_public_api_asset(item) for item in data["items"]]
         except ApiAssetError as error:
             return error_response(error)
         return JSONResponse(content=validate_contract(data, ApiAssetListResponse))
@@ -82,9 +86,16 @@ def _register_api_asset_routes(app: FastAPI, service: Any) -> None:
         return downstream_systems(keyword, current_service)
 
     @router.get("/{api_code}", response_model=None)
-    def detail(api_code: str, current_service: Any = Depends(get_service)):
+    def detail(
+        api_code: str,
+        current_service: Any = Depends(get_service),
+        context: Any = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
+    ):
         try:
             data = {"data": current_service.get_asset(api_code)}
+            if not is_authenticated_request(context, authorization):
+                data["data"] = redact_public_api_asset(data["data"])
         except ApiAssetError as error:
             return error_response(error)
         return JSONResponse(content=validate_contract(data, DataEnvelope[ApiAssetItem]))

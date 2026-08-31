@@ -7,6 +7,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock
 
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from backend.app.application.identity import Identity
@@ -19,6 +20,45 @@ from backend.app.fastapi_app import create_fastapi_app
 
 
 class RoutePermissionInventoryTests(unittest.TestCase):
+    PUBLIC_GETS = {
+        "/api/capabilities",
+        "/api/portal/stats",
+        "/api/search",
+        "/api/assets/tables",
+        "/api/assets/tables/{table_name}",
+        "/api/assets/tables/{table_name}/fields",
+        "/api/assets/tables/{table_name}/ddl",
+        "/api/assets/domains",
+        "/api/assets/layers",
+        "/api/field-mappings/source-systems",
+        "/api/field-mappings/stats",
+        "/api/field-mappings/fields",
+        "/api/field-mappings/tables",
+        "/api/lineage/bootstrap",
+        "/api/lineage/assets",
+        "/api/lineage/subgraph",
+        "/api/lineage/initial-view",
+        "/api/roots",
+        "/api/roots/categories",
+        "/api/roots/{abbr}",
+        "/api/indicators",
+        "/api/indicators/{indicator_id}",
+        "/api/reports",
+        "/api/reports/{report_code}",
+        "/api/api-assets",
+        "/api/api-assets/downstream-systems",
+        "/api/api-assets/systems",
+        "/api/api-assets/{api_code}",
+        "/api/manual-code-tables",
+        "/api/manual-code-tables/export",
+        "/api/manual-code-tables/{table_id}",
+        "/api/upstreams/systems",
+        "/api/upstreams/systems/{system_id}",
+        "/api/push/systems",
+        "/api/push/systems/{system_id}",
+        "/api/system/menus",
+    }
+
     EXPECTED = {
         ("POST", "/api/assets/tables"): "asset:write",
         ("PUT", "/api/assets/tables/{table_name}"): "asset:write",
@@ -133,7 +173,7 @@ class RoutePermissionInventoryTests(unittest.TestCase):
                 )
                 authorization.authorize.reset_mock()
 
-    def test_business_routes_require_authentication_by_default(self):
+    def test_only_non_public_routes_require_authentication_by_default(self):
         app = create_fastapi_app(identity_resolver=lambda _request: None)
         client = TestClient(app)
         explicit_auth = {
@@ -147,7 +187,7 @@ class RoutePermissionInventoryTests(unittest.TestCase):
                 if method == "parameters":
                     continue
                 key = (method.upper(), path)
-                if key in explicit_auth:
+                if key in explicit_auth or (method.upper() == "GET" and path in self.PUBLIC_GETS):
                     continue
                 with self.subTest(route=key):
                     payload = None if method in {"get", "head", "options"} else {}
@@ -156,10 +196,27 @@ class RoutePermissionInventoryTests(unittest.TestCase):
                         self._concrete_path(path),
                         json=payload,
                     )
-                    self.assertEqual(401, response.status_code)
+                    self.assertEqual(401, response.status_code, response.text)
                     self.assertEqual(
                         "UNAUTHORIZED", response.json()["error"]["code"]
                     )
+
+    def test_public_catalog_gets_do_not_carry_authentication_guard(self):
+        app = create_fastapi_app(identity_resolver=lambda _request: None)
+        routes = {
+            route.path: route
+            for wrapper in app.routes
+            for route in getattr(getattr(wrapper, "original_router", None), "routes", [])
+            if isinstance(route, APIRoute) and "GET" in (route.methods or ())
+        }
+        for path in self.PUBLIC_GETS:
+            with self.subTest(path=path):
+                self.assertIn(path, routes)
+                dependency_names = {
+                    getattr(dependency.call, "__name__", "")
+                    for dependency in routes[path].dependant.dependencies
+                }
+                self.assertNotIn("require_authenticated", dependency_names)
 
     def test_ordinary_business_reads_are_registered(self):
         registered = {
@@ -214,7 +271,8 @@ class DirectApiBypassTests(unittest.TestCase):
 
         current_identity = None
         anonymous_read = client.get("/api/indicators")
-        self.assertEqual(401, anonymous_read.status_code)
+        self.assertEqual(200, anonymous_read.status_code)
+        self.assertEqual([], anonymous_read.json()["items"])
         anonymous_mutation = client.post("/api/indicators", json={})
         self.assertEqual(401, anonymous_mutation.status_code)
 

@@ -136,18 +136,19 @@ VITE_API_MODE=remote
 
 Authentication and authorization are separate contracts:
 
-- ordinary business reads are authenticated by default through the shared
-  `require_authenticated` router dependency;
+- ordinary business catalog GET routes are explicitly public and use the
+  necessary public response projection;
 - mutations, administration, and sensitive reads keep their existing
   `require_permission("resource:action")` RBAC checks;
 - frontend menu visibility, route guards, and OpenAPI exposure are not security
   boundaries;
-- explicit anonymous exceptions are `GET /healthz`, `GET /api/capabilities`,
-  and the `/api/auth` lifecycle routes only;
-- no Public Catalog setting or anonymous business-read mode is implemented.
+- `/api/auth/me` remains a `401` probe for anonymous sessions; the frontend
+  translates that result to anonymous and continues public bootstrap;
+- there is no deployment feature flag: Community Edition uses the fixed
+  `Public Catalog + Authenticated Management` model.
 
-See [Authenticated-by-default Business Read Model](./rbac/authenticated-read-model.md)
-for the complete route classification and direct API matrix.
+See [Public Catalog + Authenticated Management](./rbac/authenticated-read-model.md)
+for the complete route classification, redaction boundary and direct API matrix.
 
 ## 2. 数据仓库模块 `assets`
 
@@ -224,12 +225,11 @@ Base Path: `/api/assets`
 
 ### 2.5 可复制的详情请求
 
-资产详情端点属于 authenticated business reads，必须先建立有效登录态。下面的示例使用仓库 Demo 中的虚构表名；本地默认服务地址为 `http://127.0.0.1:5099`，如使用其他 profile 请替换为实际服务地址。
+资产详情端点属于 Public Catalog reads，无需先建立登录态。下面的示例使用仓库 Demo 中的虚构表名；本地默认服务地址为 `http://127.0.0.1:5099`，如使用其他 profile 请替换为实际服务地址。
 
 ```bash
 curl --get "http://127.0.0.1:5099/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D" \
-  --header "Accept: application/json" \
-  --cookie "session=<signed-session-cookie-from-login>"
+  --header "Accept: application/json"
 ```
 
 成功响应（`200 OK`）：
@@ -278,7 +278,7 @@ curl --get "http://127.0.0.1:5099/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D"
 
 Base Path: `/api/search`
 
-当前统一搜索属于 authenticated business read，匿名请求返回 `401`；已登录用户不需要额外的搜索 `*:read` 权限。
+当前统一搜索属于 Public Catalog read，匿名请求返回 `200`；已登录用户不需要额外的搜索 `*:read` 权限。搜索结果只返回目录展示字段，不返回连接凭据或管理审计数据。
 
 ### 接口与查询参数
 
@@ -614,7 +614,7 @@ Base Path: `/api/upstreams`
 
 ### 7.1 核心模型
 
-#### UpstreamSystem
+#### UpstreamSystem（公开目录响应）
 
 ```json
 {
@@ -622,9 +622,6 @@ Base Path: `/api/upstreams`
   "abbr": "MEMBER",
   "name": "会员中心",
   "dbType": "Oracle",
-  "host": "192.0.2.11",
-  "db": "MEMBER_PROFILE",
-  "schema": "public",
   "unloadTimes": ["00:30", "06:00", "12:00", "18:00"],
   "status": "enabled",
   "owner": "陈默",
@@ -632,6 +629,9 @@ Base Path: `/api/upstreams`
   "desc": "会员档案数据按固定时点卸数至 ODS"
 }
 ```
+
+`host`、`db`、`schema` 只在受 `upstream:read` 保护的
+`GET /api/upstreams/systems/{systemId}/admin-detail` 响应中返回。
 
 ### 7.2 接口
 
@@ -646,7 +646,7 @@ Base Path: `/api/upstreams`
 
 `GET /api/upstreams/systems`
 
-- `keyword`：模糊匹配 `id`、`abbr`、`name`、`host`、`db`、`schema`
+- `keyword`：模糊匹配 `id`、`abbr`、`name`、负责人、部门和说明；连接信息不属于公开搜索字段
 - `status`：如 `enabled` / `disabled`
 - `dbType`：如 `Oracle`、`MySQL`、`PostgreSQL`
 
@@ -664,7 +664,7 @@ Base Path: `/api/push`
 
 ### 8.1 核心模型
 
-#### PushSystem
+#### PushSystem（公开目录响应）
 
 ```json
 {
@@ -672,11 +672,6 @@ Base Path: `/api/push`
   "name": "会员运营工作台",
   "abbr": "DEMO_CDP",
   "protocol": "SFTP",
-  "host": "198.51.100.10",
-  "port": 22,
-  "account": "dw_member_push",
-  "auth": "密钥认证",
-  "contact": "苏瑶",
   "dept": "会员运营部",
   "desc": "会员运营下游推送",
   "status": "enabled",
@@ -684,27 +679,25 @@ Base Path: `/api/push`
 }
 ```
 
-#### PushJob
+`host`、`port`、`account`、`auth` 和联系人字段只在受
+`push:read` 保护的 `admin-detail` 响应中使用。
+
+#### PushJob（公开目录响应）
 
 ```json
 {
   "id": "job_member_profile",
   "cn": "会员档案推送",
-  "sourcePath": "/dwm/member/profile",
   "sourceFileName": "member_profile_source_${yyyyMMdd}.csv",
-  "targetPath": "/push/member/profile/",
   "targetFileName": "member_profile_${yyyyMMdd}.csv",
   "freqType": "T+1",
-  "freq": "",
-  "delimiter": ",",
-  "encoding": "UTF-8",
-  "rows": "约 12 万",
   "enabled": true,
-  "owner": "林晓",
-  "desc": "会员档案推送作业",
-  "fields": []
+  "desc": "会员档案推送作业"
 }
 ```
+
+来源/目标路径、分隔符、编码、行数和字段清单属于受保护的维护详情，
+不随匿名目录响应返回。
 
 > **推送频率（`freqType` + `freq`）**：`freqType` 为类型，`freq` 为对应参数（落库分别对应 `freq_type` / `freq_desc`）。
 >
@@ -732,7 +725,7 @@ Base Path: `/api/push`
 - `status`：如 `enabled` / `disabled`
 - `protocol`：如 `SFTP` / `FTP` / `HTTP`
 - `dept`：按归属部门过滤
-- 返回项包含 `host`，用于展示下游服务器地址（可为 IP 或域名）；不包含端口、账号和认证方式。
+- 匿名返回项只包含目录级协议和作业摘要，不包含下游服务器地址、端口、账号、认证方式、内部路径或联系人；维护详情仍受 `push:read` 保护。
 
 ## 9. 系统管理模块 `system`
 
@@ -797,7 +790,7 @@ Base Path: `/api/system`
 
 ### 9.4 菜单管理接口
 
-- `GET /api/system/menus`
+- `GET /api/system/menus`（匿名只返回启用的非管理业务菜单；管理员登录后返回完整菜单管理数据）
 - `POST /api/system/menus`
 - `PUT /api/system/menus/{menuId}`
 - `PATCH /api/system/menus/{menuId}/status`
@@ -822,7 +815,7 @@ Base Path: `/api/system`
 
 Base Path: `/api/operation-logs`
 
-提供全站操作审计的分页查询与详情查询，只读。
+提供全站操作审计的分页查询与详情查询，只读；接口需要 `operation_log:read`，不属于 Public Catalog。
 
 ### 10.1 核心模型
 

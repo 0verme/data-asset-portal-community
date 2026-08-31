@@ -1,6 +1,6 @@
 import { UpstreamDetail, UpstreamEditor, UpstreamList } from "../UpstreamPages.jsx";
 import { Icon } from "../ui.jsx";
-import { confirmDeleteAction, ErrorState, LoadingState } from "../common/index.js";
+import { confirmDeleteAction, EmptyState, ErrorState, LoadingState } from "../common/index.js";
 
 const confirmDeleteUpstream = (system, run) => async () => {
   if (!system) return;
@@ -19,7 +19,7 @@ const confirmDeleteUpstream = (system, run) => async () => {
   }
 };
 
-export function UpstreamView({ upstream, query, statusOptions, requireLogin, upRoute, setUpRoute, onViewTables }) {
+export function UpstreamView({ upstream, query, statusOptions, requireLogin, canEdit = false, upRoute, setUpRoute, onViewTables }) {
   const {
     upstreamDbTypes,
     upstreamDeptOptions,
@@ -52,6 +52,9 @@ export function UpstreamView({ upstream, query, statusOptions, requireLogin, upR
   if (upstreamError && !["detail", "edit"].includes(upRoute.page)) {
     return <ErrorState title="上游卸数加载失败" desc={upstreamError} onRetry={loadUpstreamData} />;
   }
+  if (!canEdit && ["new", "edit"].includes(upRoute.page)) {
+    return <EmptyState title="当前页面需要上游系统维护权限" desc="上游系统目录可以公开浏览，新增和编辑需要相应写权限。" />;
+  }
   if (upRoute.page === "list") {
     return (
       <UpstreamList
@@ -62,11 +65,12 @@ export function UpstreamView({ upstream, query, statusOptions, requireLogin, upR
         onChangeView={setUpstreamView}
         statusOptions={statusOptions}
         onOpen={upOpen}
-        onEdit={(id) => requireLogin(() => upGoEdit(id))}
-        onNew={() => requireLogin(() => {
+        onEdit={canEdit ? (id) => requireLogin(() => upGoEdit(id), "upstream:write") : undefined}
+        canEdit={canEdit}
+        onNew={canEdit ? () => requireLogin(() => {
           setUpRoute({ page: "new", id: null });
-        })}
-        onToggle={handleToggleUpstream}
+        }, "upstream:write") : undefined}
+        onToggle={canEdit ? handleToggleUpstream : undefined}
         onViewTables={onViewTables}
       />
     );
@@ -81,7 +85,7 @@ export function UpstreamView({ upstream, query, statusOptions, requireLogin, upR
     if (!currentUpstream) {
       return <div className="empty"><div className="ec"><Icon name="inbox" size={26} /></div><h4>系统不存在</h4></div>;
     }
-    return <UpstreamDetail system={currentUpstream} statusOptions={statusOptions} dbTypeOptions={upstreamDbTypes} deptOptions={upstreamDeptOptions} onBack={upGoList} onBackToList={upGoList} onEdit={() => requireLogin(() => upGoEdit(currentUpstream.id))} />;
+    return <UpstreamDetail system={currentUpstream} statusOptions={statusOptions} dbTypeOptions={upstreamDbTypes} deptOptions={upstreamDeptOptions} onBack={upGoList} onBackToList={upGoList} onEdit={canEdit ? () => requireLogin(() => upGoEdit(currentUpstream.id), "upstream:write") : undefined} />;
   }
   if (upRoute.page === "new") {
     return <UpstreamEditor mode="new" dbTypeOptions={upstreamDbTypes} deptOptions={upstreamDeptOptions} statusOptions={statusOptions} onSave={handleSaveUpstream} onCancel={upBack} onBackToList={upGoList} saveError={upstreamSaveError} onClearSaveError={() => setUpstreamSaveError("")} />;

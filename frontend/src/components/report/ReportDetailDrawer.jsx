@@ -36,7 +36,7 @@ function ReferenceChips({ items, itemKey, labelKey, mono = false, empty = "暂�
     </div>
   );
 }
-export function ReportDetailDrawer({ report, open, onClose, onEdit, onDelete }) {
+export function ReportDetailDrawer({ report, open, onClose, onEdit, onDelete, canEdit = false }) {
   if (!open || !report) return null;
 
   return (
@@ -114,12 +114,12 @@ export function ReportDetailDrawer({ report, open, onClose, onEdit, onDelete }) 
           </div>
         </div>
 
-        <div className="indicator-detail-foot">
+        {canEdit ? <div className="indicator-detail-foot">
           <RowActions onEdit={() => onEdit(report.code)} />
           <button className="btn ghost-danger" type="button" onClick={() => onDelete(report.code)}>
             <Icon name="trash" size={14} />删除
           </button>
-        </div>
+        </div> : null}
       </aside>
     </div>
   );

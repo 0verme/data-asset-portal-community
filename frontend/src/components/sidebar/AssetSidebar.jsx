@@ -16,7 +16,7 @@ import { SidebarActionGroup } from "./common/SidebarActionGroup.jsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.jsx";
 import { buildSidebarFacetItems } from "./common/buildSidebarFacetItems.js";
 
-export function AssetSidebar({ asset }) {
+export function AssetSidebar({ asset, canEdit = false }) {
   const {
     domain,
     setDomain,
@@ -92,13 +92,11 @@ export function AssetSidebar({ asset }) {
       />
 
       <SidebarActionGroup
-        actions={[
-          {
-            key: "create-asset",
-            label: "新增表",
-            onClick: assetCreate,
-          },
-        ]}
+        actions={canEdit ? [{
+          key: "create-asset",
+          label: "新增表",
+          onClick: assetCreate,
+        }] : []}
       />
     </>
   );

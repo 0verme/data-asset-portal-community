@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, FastAPI, Query
 from fastapi.responses import JSONResponse
 
+from ...application import RequestContext
 from ...contracts import LineageResponse, validate_contract
 from ...services.lineage import (
     LineageValidationError,
@@ -15,8 +16,9 @@ from ...services.lineage import (
     get_subgraph as get_lineage_subgraph,
     search_nodes as search_lineage_nodes,
 )
-from ..dependencies import require_authenticated
+from ..dependencies import get_authorization_service, get_request_context
 from ..errors import _service_error_response
+from ..public_catalog import is_authenticated_request, redact_public_lineage
 
 
 class _LineageServiceAdapter:
@@ -45,7 +47,6 @@ def _register_lineage_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/lineage",
         tags=["lineage-migration"],
-        dependencies=[Depends(require_authenticated)],
     )
 
     def get_service() -> Any:
@@ -66,9 +67,13 @@ def _register_lineage_routes(app: FastAPI, service: Any) -> None:
     def get_assets(
         name: str | None = Query(default=None),
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             data = current_service.search_nodes(name)
+            if not is_authenticated_request(context, authorization):
+                data = redact_public_lineage(data)
         except LineageValidationError as error:
             return error_response(error)
         return JSONResponse(content=validate_contract({"data": data}, LineageResponse))
@@ -81,11 +86,15 @@ def _register_lineage_routes(app: FastAPI, service: Any) -> None:
         max_nodes: str | None = Query(default=None, alias="maxNodes"),
         view: str | None = Query(default="table"),
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             data = current_service.get_subgraph(
                 root_id, direction, depth, max_nodes, view
             )
+            if not is_authenticated_request(context, authorization):
+                data = redact_public_lineage(data)
         except LineageValidationError as error:
             return error_response(error)
         return JSONResponse(content=validate_contract({"data": data}, LineageResponse))
@@ -98,11 +107,15 @@ def _register_lineage_routes(app: FastAPI, service: Any) -> None:
         max_nodes: str | None = Query(default=None, alias="maxNodes"),
         view: str | None = Query(default="table"),
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             data = current_service.get_initial_view(
                 root_id, direction, depth, max_nodes, view
             )
+            if not is_authenticated_request(context, authorization):
+                data = redact_public_lineage(data)
         except LineageValidationError as error:
             return error_response(error)
         return JSONResponse(content=validate_contract({"data": data}, LineageResponse))

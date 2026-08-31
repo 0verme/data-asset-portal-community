@@ -15,7 +15,7 @@
 import { SidebarActionGroup } from "./common/SidebarActionGroup.jsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.jsx";
 
-export function RootSidebar({ root, requireLogin, setRootRoute }) {
+export function RootSidebar({ root, requireLogin, canEdit = false, setRootRoute }) {
   const { roots, rootCategories, rootCategory, setRootCategory } = root;
 
   return (
@@ -41,7 +41,7 @@ export function RootSidebar({ root, requireLogin, setRootRoute }) {
       />
 
       <SidebarActionGroup
-        actions={[
+        actions={canEdit ? [
           {
             key: "create-root",
             label: "新增词根",
@@ -52,7 +52,7 @@ export function RootSidebar({ root, requireLogin, setRootRoute }) {
             label: "批量导入",
             onClick: () => requireLogin(() => setRootRoute({ page: "import", abbr: null })),
           },
-        ]}
+        ] : []}
       />
     </>
   );

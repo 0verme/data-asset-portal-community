@@ -70,6 +70,6 @@ Lineage request 的 `snapshot`、`nodes[]` 和 `edges[]` 是同一份 self-conta
 ## Consequences
 
 - Collector 可以只依赖 JSON/HTTP，不需要导入任何 DAP 数据库模块。
-- portal 现有 CRUD、lineage read API 和认证边界保持不变；新增 ingestion contract 是 additive。
+- portal 现有 CRUD、lineage read API 及其 Public Catalog / protected ingestion boundary 保持不变；新增 ingestion contract 是 additive。
 - source identity hash 是实现细节，未来替换内部表结构时只要 V1 mapping 兼容，Collector 不需修改。
 - V1 的 replace-only lineage 语义使 rollback 明确，但 append/merge 需要未来单独的 contract decision。

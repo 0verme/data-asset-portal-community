@@ -1,7 +1,7 @@
 import { IndicatorPage } from "../IndicatorPage.jsx";
 import IndicatorEditor from "../IndicatorEditor.jsx";
 import { Icon } from "../ui.jsx";
-import { confirmDeleteAction, ErrorState, LoadingState } from "../common/index.js";
+import { confirmDeleteAction, EmptyState, ErrorState, LoadingState } from "../common/index.js";
 import { DEFAULT_INDICATOR_FILTER } from "../../config/defaults.js";
 
 export function IndicatorView({
@@ -44,6 +44,9 @@ export function IndicatorView({
   }
   if (indicatorError) {
     return <ErrorState title="指标维护加载失败" desc={indicatorError} onRetry={loadIndicatorData} />;
+  }
+  if (!canEdit && ["new", "edit"].includes(indicatorRoute.page)) {
+    return <EmptyState title="当前页面需要指标维护权限" desc="指标目录可以公开浏览，新增和编辑需要相应写权限。" />;
   }
   if (indicatorRoute.page === "new") {
     return (

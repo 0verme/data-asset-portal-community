@@ -40,12 +40,27 @@ class RbacSecurityRegressionTests(unittest.TestCase):
         ]
         self.indicator_service = MagicMock()
         self.indicator_service.get_indicators.return_value = []
+        self.assets_service = MagicMock()
+        self.assets_service.get_asset_tables.return_value = []
+        self.portal_service = MagicMock()
+        self.portal_service.get_stats.return_value = []
+        self.search_provider = MagicMock()
+        self.search_provider.search.return_value = {"query": "customer", "scope": "all", "groups": [], "total": 0}
+        self.lineage_service = MagicMock()
+        self.lineage_service.get_bootstrap.return_value = {}
+        self.field_mapping_service = MagicMock()
+        self.field_mapping_service.get_field_mappings.return_value = {"items": []}
         self.client = TestClient(
             create_fastapi_app(
                 identity_resolver=lambda _request: self.current_identity,
                 authorization_service_instance=self.authorization,
                 system_management_service_instance=self.system_service,
                 indicator_service_instance=self.indicator_service,
+                assets_service_instance=self.assets_service,
+                portal_service_instance=self.portal_service,
+                search_provider_instance=self.search_provider,
+                lineage_service_instance=self.lineage_service,
+                field_mapping_service_instance=self.field_mapping_service,
             )
         )
 
@@ -78,7 +93,7 @@ class RbacSecurityRegressionTests(unittest.TestCase):
         disabled = self.client.get("/api/system/roles")
         self.assertEqual(401, disabled.status_code)
 
-    def test_authenticated_menu_read_is_not_an_authorization_boundary(self):
+    def test_menu_read_is_public_but_anonymous_payload_is_filtered(self):
         self.current_identity = Identity("indicator-reader", "custom", "Custom")
         response = self.client.get("/api/system/menus")
         self.assertEqual(200, response.status_code)
@@ -87,10 +102,11 @@ class RbacSecurityRegressionTests(unittest.TestCase):
 
         self.current_identity = None
         anonymous = self.client.get("/api/system/menus")
-        self.assertEqual(401, anonymous.status_code)
-        self.system_service.get_menus.assert_called_once()
+        self.assertEqual(200, anonymous.status_code)
+        self.assertEqual([], anonymous.json()["items"])
+        self.assertNotIn("system", anonymous.text)
 
-    def test_anonymous_business_reads_return_401_across_catalog_groups(self):
+    def test_anonymous_business_reads_are_public_across_catalog_groups(self):
         self.current_identity = None
         representative_reads = (
             "/api/assets/tables",
@@ -103,10 +119,9 @@ class RbacSecurityRegressionTests(unittest.TestCase):
         for path in representative_reads:
             with self.subTest(path=path):
                 response = self.client.get(path)
-                self.assertEqual(401, response.status_code)
-                self.assertEqual("UNAUTHORIZED", response.json()["error"]["code"])
-                self.assertNotIn("permission", response.text.lower())
-                self.assertNotIn("database", response.text.lower())
+                self.assertEqual(200, response.status_code, response.text)
+                self.assertNotIn("password", response.text.lower())
+                self.assertNotIn("authorization", response.text.lower())
 
     def test_authenticated_missing_role_write_cannot_create_role_directly(self):
         self.current_identity = Identity("role-reader", "role-reader", "Role reader")

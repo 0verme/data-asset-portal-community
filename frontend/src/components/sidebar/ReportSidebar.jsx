@@ -19,7 +19,7 @@ import { SidebarActionGroup } from "./common/SidebarActionGroup.jsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.jsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.jsx";
 
-export function ReportSidebar({ report, requireLogin, setReportRoute }) {
+export function ReportSidebar({ report, requireLogin, canEdit = false, setReportRoute }) {
   const { reports, reportFilter, setReportFilter, reportFacets } = report;
   const { options: reportTypeOptions } = useDictOptions("REPORT_TYPE");
 
@@ -65,13 +65,11 @@ export function ReportSidebar({ report, requireLogin, setReportRoute }) {
       />
 
       <SidebarActionGroup
-        actions={[
-          {
-            key: "create-report",
-            label: "新增报表",
-            onClick: () => requireLogin(() => setReportRoute({ page: "new", code: null })),
-          },
-        ]}
+        actions={canEdit ? [{
+          key: "create-report",
+          label: "新增报表",
+          onClick: () => requireLogin(() => setReportRoute({ page: "new", code: null })),
+        }] : []}
       />
     </>
   );

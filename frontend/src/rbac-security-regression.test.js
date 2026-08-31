@@ -47,8 +47,9 @@ test("frontend security boundary keeps API authorization server-owned", async ()
   assert.match(sidebar, /canViewRoles/);
   assert.match(auth, /system:role:write/);
   assert.match(app, /businessAccessReady/);
-  assert.match(app, /if \(!businessAccessReady\)/);
-  assert.match(moduleContent, /登录后访问业务目录/);
-  assert.match(searchPortal, /authenticated = true/);
-  assert.match(searchPortal, /请先登录后搜索/);
+  assert.match(app, /businessAccessReady = !isDbAuthMode\(\) \|\| authReady/);
+  assert.doesNotMatch(moduleContent, /登录后访问业务目录/);
+  assert.match(moduleContent, /publicAccessReady/);
+  assert.match(searchPortal, /publicAccessReady = true/);
+  assert.doesNotMatch(searchPortal, /请先登录后搜索/);
 });

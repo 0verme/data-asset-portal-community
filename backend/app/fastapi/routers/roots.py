@@ -26,7 +26,7 @@ from ...services.root_service import (
     RootNotFoundError,
     RootValidationError,
 )
-from ..dependencies import require_authenticated, require_permission
+from ..dependencies import require_permission
 from ..errors import _service_error_response
 
 
@@ -34,7 +34,6 @@ def _register_root_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/roots",
         tags=["root-migration"],
-        dependencies=[Depends(require_authenticated)],
     )
 
     def get_service() -> Any:

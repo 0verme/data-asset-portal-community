@@ -366,9 +366,9 @@ export function IndicatorPage({
         </div>
         <div className="head-actions">
           <ViewModeSwitcher value={view} onChange={onChangeView} />
-          <button className="btn primary" type="button" onClick={onNew}>
+          {canEdit ? <button className="btn primary" type="button" onClick={onNew}>
             <Icon name="plus" size={15} />新增指标
-          </button>
+          </button> : null}
         </div>
       </div>
 

@@ -69,9 +69,11 @@ Session Cookie 始终使用 `HttpOnly=True` 和 `SameSite=Lax`。默认/生产�
 
 ### 业务 API authentication boundary
 
-FastAPI router 默认对业务读模型使用 `require_authenticated`：资产、字段/DDL、指标、搜索、映射、血缘、菜单、报表、API 资产、码值表、上/下游目录、门户统计和 metadata routes 不接受匿名业务读取。匿名请求返回 `401`；已登录普通用户无需逐个 `*:read` permission 即可浏览普通目录。写操作、管理 API 和敏感读取继续使用 `require_permission(...)`，缺少授权时返回 `403`。
+Community Edition 采用 `Public Catalog + Authenticated Management`：资产、字段/DDL、指标、搜索、映射、血缘、菜单、报表、API 资产、码值表、上/下游目录和门户统计等普通业务 GET 支持匿名读取。公开响应在 FastAPI adapter 边界按 [public catalog contract](../docs/rbac/authenticated-read-model.md) 执行必要脱敏；这不是“全部 GET 无脑公开”。
 
-明确的 anonymous exceptions 只有 `/healthz`、有限的 `/api/capabilities` 模块元数据和 `/api/auth` 登录生命周期；当前没有 Public Catalog 开关。详见 [authenticated-read-model.md](../docs/rbac/authenticated-read-model.md)。
+写操作、管理 API 和敏感读取继续使用 `require_permission(...)`：匿名请求返回 `401`，已有身份但缺少授权返回 `403`。系统用户/角色/参数、操作日志、Metadata ingestion、上/下游 `admin-detail` 和连接/凭据字段继续受保护。
+
+`/api/auth/me` 未登录仍返回 `401`，前端将其视为 anonymous 并继续加载公开菜单、统计、搜索和业务模块。详见 [Public Catalog + Authenticated Management](../docs/rbac/authenticated-read-model.md)。
 
 内网数据库链路较慢时，可在 `backend/.env.local` 中设置：
 

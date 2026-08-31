@@ -11,6 +11,10 @@ export function ProtocolTag({ protocol }) {
 }
 
 export function PushSystemList({ systems, query, view, onOpen }) {
+  const showContactDetails = systems.some((system) => (
+    system.host || system.downstreamContact || system.dataDeveloperContact
+  ));
+
   if (!systems.length) {
     return <EmptyState title="未找到匹配的系统" desc="没有符合当前筛选条件的下游系统，试试调整搜索词或清空筛选。" />;
   }
@@ -22,9 +26,11 @@ export function PushSystemList({ systems, query, view, onOpen }) {
           <thead>
             <tr>
               <th style={{ width: "26%" }}>系统</th>
-              <th>连接</th>
-              <th style={{ width: 140 }}>下游对接人</th>
-              <th style={{ width: 140 }}>数据开发对接人</th>
+              <th>连接协议</th>
+              {showContactDetails ? <>
+                <th style={{ width: 140 }}>下游对接人</th>
+                <th style={{ width: 140 }}>数据开发对接人</th>
+              </> : null}
               <th style={{ width: 96, textAlign: "center" }}>作业数</th>
               <th style={{ width: 96 }}>状态</th>
             </tr>
@@ -48,8 +54,10 @@ export function PushSystemList({ systems, query, view, onOpen }) {
                     </div>
                   </td>
                   <td data-label="连接"><span className="path-txt"><ProtocolTag protocol={system.protocol} /></span></td>
-                  <td data-label="下游对接人" style={{ color: "var(--ink-2)" }}>{system.downstreamContact || "未指定"}</td>
-                  <td data-label="数据开发对接人" style={{ color: "var(--ink-2)" }}>{system.dataDeveloperContact || "未指定"}</td>
+                  {showContactDetails ? <>
+                    <td data-label="下游对接人" style={{ color: "var(--ink-2)" }}>{system.downstreamContact || "未指定"}</td>
+                    <td data-label="数据开发对接人" style={{ color: "var(--ink-2)" }}>{system.dataDeveloperContact || "未指定"}</td>
+                  </> : null}
                   <td data-label="作业数" style={{ textAlign: "center" }}><span className="t-num">{system.jobs.length}</span></td>
                   <td data-label="状态"><StatusBadge status={system.status} /></td>
                 </tr>
@@ -92,18 +100,18 @@ export function PushSystemList({ systems, query, view, onOpen }) {
                 <span className="cv mono">{system.latestOutputTime || "未配置"}</span>
               </div>
             ) : null}
-            <div className="sys-conn">
+            {system.host ? <div className="sys-conn">
               <span className="ck">下游 IP</span>
-              <span className="cv mono">{system.host || "未指定"}</span>
-            </div>
-            <div className="sys-conn">
+              <span className="cv mono">{system.host}</span>
+            </div> : null}
+            {system.downstreamContact ? <div className="sys-conn">
               <span className="ck">下游对接人</span>
-              <span className="cv">{system.downstreamContact || "未指定"}</span>
-            </div>
-            <div className="sys-conn">
+              <span className="cv">{system.downstreamContact}</span>
+            </div> : null}
+            {system.dataDeveloperContact ? <div className="sys-conn">
               <span className="ck">数据开发对接</span>
-              <span className="cv">{system.dataDeveloperContact || "未指定"}</span>
-            </div>
+              <span className="cv">{system.dataDeveloperContact}</span>
+            </div> : null}
             <div className="sys-card-foot">
               <span className="jobs-n"><Icon name="push" size={14} color="var(--ink-3)" /><b>{system.jobs.length}</b> 个推送作业</span>
               <span className="enter-link">进入 <Icon name="arrow" size={14} /></span>

@@ -18,21 +18,40 @@ import { OperationLogPage } from "../OperationLog/OperationLogPage.jsx";
 export function SystemView({
   systemRoute,
   query,
-  canEdit,
+  authenticated = true,
+  canManageMenus = false,
+  canManageParams = false,
   canManageRoles,
+  canManageUsers = false,
   canManageSystem,
   requireLogin,
   systemActionIntent,
   setSystemActionIntent,
 }) {
+  if (!authenticated) {
+    return (
+      <div className="state-card" role="status" aria-live="polite">
+        <h4>登录后访问系统管理</h4>
+        <p>系统管理、用户、角色、配置和操作日志仅对授权用户开放。</p>
+        <button className="btn primary" type="button" onClick={() => requireLogin?.(() => {})}>登录</button>
+      </div>
+    );
+  }
   if (systemRoute.page === "operation-logs" || !canManageSystem) {
     return <OperationLogPage query={query} />;
   }
+  const canEditCurrentPage = systemRoute.page === "roles"
+    ? canManageRoles
+    : systemRoute.page === "menus"
+      ? canManageMenus
+      : systemRoute.page === "param-dicts"
+        ? canManageParams
+        : canManageUsers;
   return (
     <SystemManagementPage
       route={systemRoute}
       query={query}
-      canEdit={systemRoute.page === "roles" ? canManageRoles : canEdit}
+      canEdit={canEditCurrentPage}
       canManageRoles={canManageRoles}
       canManageSystem={canManageSystem}
       requireLogin={requireLogin}

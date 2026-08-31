@@ -1,6 +1,8 @@
 import { SidebarFilterGroup } from "./SidebarFilterGroup.jsx";
 
 export function SidebarActionGroup({ actions = [] }) {
+  if (!actions.length) return null;
+
   return (
     <SidebarFilterGroup
       title="维护"

@@ -19,20 +19,23 @@ const LineagePage = lazyNamed(() => import("../LineagePage.jsx"), "LineagePage")
 const ManualCodeTablePage = lazyNamed(() => import("../ManualCodeTablePage.jsx"), "ManualCodeTablePage");
 
 /** Module code → lazy page renderer (registry-driven dispatch). */
+function canAccess(context, permission) {
+  return typeof context.can === "function" ? context.can(permission) : Boolean(context.canEdit);
+}
+
 const MODULE_RENDERERS = {
   portal: ({ context }) => (
     <SearchPortalPage
       onNavigate={context.goToModuleWithQuery}
       availableModules={context.visibleModuleKeys}
-      authenticated={context.businessAccessReady}
-      onRequireLogin={() => context.requireLogin?.(() => {})}
+      publicAccessReady={context.businessAccessReady}
     />
   ),
   codeTable: ({ context }) => (
     <ManualCodeTablePage
       module={context.manualCodeTable}
       query={context.query}
-      canEdit={context.can ? context.can("code_table:write") : context.canEdit}
+      canEdit={canAccess(context, "code_table:write")}
     />
   ),
   push: ({ context }) => (
@@ -41,7 +44,7 @@ const MODULE_RENDERERS = {
       query={context.query}
       statusOptions={context.statusOptions}
       requireLogin={context.requireLogin}
-      canEdit={context.canEdit}
+      canEdit={canAccess(context, "push:write")}
       pushRoute={context.pushRoute}
       setPushRoute={context.setPushRoute}
     />
@@ -65,6 +68,7 @@ const MODULE_RENDERERS = {
       reportRoute={context.reportRoute}
       view={context.reportView}
       onChangeView={context.setReportView}
+      canEdit={canAccess(context, "report:write")}
     />
   ),
   apiAsset: ({ context }) => (
@@ -74,6 +78,7 @@ const MODULE_RENDERERS = {
       route={context.apiAssetRoute}
       view={context.apiAssetView}
       onChangeView={context.setApiAssetView}
+      canEdit={canAccess(context, "api_asset:write")}
     />
   ),
   root: ({ context }) => (
@@ -84,14 +89,18 @@ const MODULE_RENDERERS = {
       requireLogin={context.requireLogin}
       rootRoute={context.rootRoute}
       setRootRoute={context.setRootRoute}
+      canEdit={canAccess(context, "root:write")}
     />
   ),
   system: ({ context }) => (
     <SystemView
       systemRoute={context.systemRoute}
       query={context.query}
-      canEdit={context.canEdit}
+      authenticated={Boolean(context.auth?.user)}
+      canManageMenus={context.canManageMenus}
+      canManageParams={context.canManageParams}
       canManageRoles={context.canManageRoles}
+      canManageUsers={context.canManageUsers}
       canManageSystem={context.canManageSystem}
       requireLogin={context.requireLogin}
       systemActionIntent={context.systemActionIntent}
@@ -104,6 +113,7 @@ const MODULE_RENDERERS = {
       query={context.query}
       statusOptions={context.statusOptions}
       requireLogin={context.requireLogin}
+      canEdit={canAccess(context, "upstream:write")}
       upRoute={context.upRoute}
       setUpRoute={context.setUpRoute}
       onViewTables={context.goToMapping}
@@ -125,19 +135,14 @@ const MODULE_RENDERERS = {
     />
   ),
   dwm: ({ context }) => (
-    <AssetView asset={context.asset} query={context.query} route={context.route} />
+    <AssetView
+      asset={context.asset}
+      query={context.query}
+      route={context.route}
+      canEdit={canAccess(context, "asset:write")}
+    />
   ),
 };
-
-function AuthenticatedBusinessPrompt({ onRequireLogin }) {
-  return (
-    <div className="state-card" role="status" aria-live="polite">
-      <h4>登录后访问业务目录</h4>
-      <p>普通业务目录、搜索和元数据只对已登录用户开放。</p>
-      <button className="btn primary" type="button" onClick={onRequireLogin}>登录</button>
-    </div>
-  );
-}
 
 function ModuleLoadingState() {
   return (
@@ -149,10 +154,20 @@ function ModuleLoadingState() {
   );
 }
 
+function PublicAccessLoadingState() {
+  return (
+    <div className="state-card" role="status" aria-live="polite">
+      <div className="state-spinner" aria-hidden="true"></div>
+      <h4>准备公开目录</h4>
+      <p>正在确认会话状态并加载可浏览的数据资产。</p>
+    </div>
+  );
+}
+
 export function ModuleContent({ module, context }) {
   const renderer = MODULE_RENDERERS[module] || MODULE_RENDERERS.dwm;
-  if (module !== "portal" && context.businessAccessReady === false) {
-    return <AuthenticatedBusinessPrompt onRequireLogin={() => context.requireLogin?.(() => {})} />;
+  if (context.businessAccessReady === false) {
+    return <PublicAccessLoadingState />;
   }
   if (module === "portal") {
     return renderer({ context });

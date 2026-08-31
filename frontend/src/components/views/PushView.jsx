@@ -59,6 +59,9 @@ export function PushView({ push, query, statusOptions, requireLogin, canEdit, pu
   if (pushError) {
     return <ErrorState title="下游推送加载失败" desc={pushError} onRetry={loadPushData} />;
   }
+  if (!canEdit && ["sysNew", "sysEdit", "jobNew", "jobEdit"].includes(pushRoute.page)) {
+    return <EmptyState title="当前页面需要下游推送维护权限" desc="下游推送目录可以公开浏览，新增和编辑需要相应写权限。" />;
+  }
   if (pushRoute.page === "systems") {
     return (
       <>
@@ -69,7 +72,7 @@ export function PushView({ push, query, statusOptions, requireLogin, canEdit, pu
           </div>
           <div className="head-actions">
             <ViewModeSwitcher value={pushView} onChange={setPushView} modes={["card", "list"]} />
-            <button className="btn primary" onClick={() => requireLogin(() => pushGoSystemEdit(null))}><Icon name="plus" size={15} />新增系统</button>
+            {canEdit ? <button className="btn primary" onClick={() => requireLogin(() => pushGoSystemEdit(null), "push:write")}><Icon name="plus" size={15} />新增系统</button> : null}
           </div>
         </div>
         <PushSystemList systems={filteredPushSystems} query={query} view={pushView} onOpen={pushOpenSystem} />
@@ -83,9 +86,10 @@ export function PushView({ push, query, statusOptions, requireLogin, canEdit, pu
         query={query}
         onBack={pushGoList}
         onOpen={(jobId) => pushGoJob(currentSystem.id, jobId)}
-        onEditSystem={() => requireLogin(() => pushGoSystemEdit(currentSystem.id))}
-        onNewJob={() => requireLogin(() => pushGoJobEdit(currentSystem.id, null))}
-        onEditJob={(jobId) => requireLogin(() => pushGoJobEdit(currentSystem.id, jobId))}
+        onEditSystem={canEdit ? () => requireLogin(() => pushGoSystemEdit(currentSystem.id), "push:write") : undefined}
+        onNewJob={canEdit ? () => requireLogin(() => pushGoJobEdit(currentSystem.id, null), "push:write") : undefined}
+        onEditJob={canEdit ? (jobId) => requireLogin(() => pushGoJobEdit(currentSystem.id, jobId), "push:write") : undefined}
+        canEdit={canEdit}
       />
     );
   }
@@ -102,7 +106,7 @@ export function PushView({ push, query, statusOptions, requireLogin, canEdit, pu
         showDetails={Boolean(detailJob)}
         onBackSystems={pushGoList}
         onBackJobs={() => pushGoSystem(currentSystem.id)}
-        onEdit={() => requireLogin(() => pushGoJobEdit(currentSystem.id, currentJob.id))}
+        onEdit={canEdit ? () => requireLogin(() => pushGoJobEdit(currentSystem.id, currentJob.id), "push:write") : undefined}
       />
     );
   }

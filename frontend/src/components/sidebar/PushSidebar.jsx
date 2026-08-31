@@ -17,7 +17,7 @@ import { SidebarActionGroup } from "./common/SidebarActionGroup.jsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.jsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.jsx";
 
-export function PushSidebar({ push, statusOptions, requireLogin, pushRoute }) {
+export function PushSidebar({ push, statusOptions, requireLogin, canEdit = false, pushRoute }) {
   const {
     pushSystems,
     pushProtocolOptions,
@@ -81,13 +81,11 @@ export function PushSidebar({ push, statusOptions, requireLogin, pushRoute }) {
       />
 
       <SidebarActionGroup
-        actions={[
-          {
-            key: "create-push-system",
-            label: "新增系统",
-            onClick: () => requireLogin(() => pushGoSystemEdit(null)),
-          },
-        ]}
+        actions={canEdit ? [{
+          key: "create-push-system",
+          label: "新增系统",
+          onClick: () => requireLogin(() => pushGoSystemEdit(null)),
+        }] : []}
       />
 
       {recentPushSystems.length ? (

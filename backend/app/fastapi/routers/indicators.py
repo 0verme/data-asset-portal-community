@@ -25,7 +25,7 @@ from ...services.indicator_service import (
     IndicatorNotFoundError,
     IndicatorValidationError,
 )
-from ..dependencies import require_authenticated, require_permission
+from ..dependencies import require_permission
 from ..errors import _service_error_response
 
 
@@ -39,7 +39,6 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/indicators",
         tags=["indicator-pilot"],
-        dependencies=[Depends(require_authenticated)],
     )
 
     def get_service() -> Any:

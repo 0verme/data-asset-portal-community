@@ -246,9 +246,9 @@ export function DetailPage({ asset, fields, ddl, ddlDialectLabel, tab, onTabChan
             <div className="dh-desc">{asset.desc}</div>
           </div>
           <div className="dh-actions">
-            <button className="btn" onClick={onEdit}>
+            {onEdit ? <button className="btn" onClick={onEdit}>
               <Icon name="edit" size={15} />编辑表
-            </button>
+            </button> : null}
             <button className={"btn" + (copied ? " copied" : "")} onClick={copyName}>
               <Icon name={copied ? "check" : "copy"} size={15} />{copied ? "已复制" : "复制表名"}
             </button>

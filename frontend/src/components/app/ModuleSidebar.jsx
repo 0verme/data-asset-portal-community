@@ -25,18 +25,18 @@ export function ModuleSidebar({ module, context }) {
 
   if (module === "codeTable") return <ManualCodeTableSidebar module={manualCodeTable} canEdit={canPermission("code_table:write")} />;
   if (module === "push") {
-    return <PushSidebar push={push} statusOptions={statusOptions} requireLogin={requireLogin} pushRoute={pushRoute} setPushRoute={setPushRoute} />;
+    return <PushSidebar push={push} statusOptions={statusOptions} requireLogin={requireLogin} canEdit={canPermission("push:write")} pushRoute={pushRoute} setPushRoute={setPushRoute} />;
   }
   if (module === "indicator") {
-    return <IndicatorSidebar indicator={indicator} indicatorFilter={indicatorFilter} setIndicatorFilter={setIndicatorFilter} setIndicatorRoute={setIndicatorRoute} />;
+    return <IndicatorSidebar indicator={indicator} indicatorFilter={indicatorFilter} setIndicatorFilter={setIndicatorFilter} setIndicatorRoute={setIndicatorRoute} canEdit={canPermission("indicator:write")} />;
   }
   if (module === "report") {
-    return <ReportSidebar report={{ ...report, reportFilter, setReportFilter }} requireLogin={requireLogin} setReportRoute={setReportRoute} />;
+    return <ReportSidebar report={{ ...report, reportFilter, setReportFilter }} requireLogin={requireLogin} canEdit={canPermission("report:write")} setReportRoute={setReportRoute} />;
   }
   if (module === "apiAsset") {
-    return <ApiAssetSidebar apiAsset={apiAsset} filter={apiAssetFilter} setFilter={setApiAssetFilter} requireLogin={requireLogin} />;
+    return <ApiAssetSidebar apiAsset={apiAsset} filter={apiAssetFilter} setFilter={setApiAssetFilter} requireLogin={requireLogin} canEdit={canPermission("api_asset:write")} />;
   }
-  if (module === "root") return <RootSidebar root={root} requireLogin={requireLogin} setRootRoute={setRootRoute} />;
+  if (module === "root") return <RootSidebar root={root} requireLogin={requireLogin} canEdit={canPermission("root:write")} setRootRoute={setRootRoute} />;
   if (module === "system") {
     return (
       <SystemSidebar
@@ -56,7 +56,7 @@ export function ModuleSidebar({ module, context }) {
     );
   }
   if (module === "upstream") {
-    return <UpstreamSidebar upstream={upstream} statusOptions={statusOptions} requireLogin={requireLogin} setUpRoute={setUpRoute} />;
+    return <UpstreamSidebar upstream={upstream} statusOptions={statusOptions} requireLogin={requireLogin} canEdit={canPermission("upstream:write")} setUpRoute={setUpRoute} />;
   }
   if (module === "mapping") return <MappingSidebar />;
   if (module === "lineage") {
@@ -68,5 +68,5 @@ export function ModuleSidebar({ module, context }) {
         : "血缘数据源尚未配置";
     return <div className="side-group"><div className="side-title">血缘范围</div><div className="side-note">{note}</div>{details?.mode === "persistent" && details.snapshotAt ? <div className="side-note">更新时间：{details.snapshotAt} · 节点：{details.nodeCount} · 关系：{details.edgeCount}</div> : null}</div>;
   }
-  return <AssetSidebar asset={asset} />;
+  return <AssetSidebar asset={asset} canEdit={canPermission("asset:write")} />;
 }

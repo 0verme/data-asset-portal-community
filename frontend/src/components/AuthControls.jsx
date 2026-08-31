@@ -99,7 +99,7 @@ export function LoginModal({ open, busy, error, onClose, onSubmit }) {
         </div>
         <h2 className="login-title">管理员登录</h2>
         <p className="login-desc">
-          登录后可浏览业务目录，并按当前权限新增、编辑与维护数据资产。
+          无需登录即可浏览公开目录；登录后可按当前权限新增、编辑与维护数据资产。
         </p>
         <label className="login-field">
           <span className="lf-label">账号</span>

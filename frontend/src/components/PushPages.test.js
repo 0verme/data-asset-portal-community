@@ -36,13 +36,14 @@ test("push systems keep downstream and data-developer contacts separate", async 
   assert.equal(PUSH_SYSTEMS.every((system) => typeof system.dataDeveloperContact === "string"), true);
 });
 
-test("push system cards show downstream host instead of protocol", async () => {
+test("public push cards omit protected connection and contact details", async () => {
   const source = await readFile(systemListPath, "utf8");
 
-  assert.match(source, /下游 IP/);
-  assert.match(source, /数据开发对接/);
-  assert.match(source, /system\.host \|\| "未指定"/);
-  assert.doesNotMatch(source, /<span className="ck">连接协议<\/span>/);
+  assert.match(source, /showContactDetails/);
+  assert.match(source, /system\.host \?/);
+  assert.match(source, /连接协议/);
+  assert.match(source, /下游对接人/);
+  assert.match(source, /数据开发对接人/);
 });
 
 test("push jobs rely on system contacts instead of a duplicated owner", async () => {

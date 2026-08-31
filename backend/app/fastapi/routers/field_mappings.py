@@ -16,14 +16,12 @@ from ...contracts import (
     validate_contract,
 )
 from ...services.field_mapping_service import FieldMappingDataSourceError
-from ..dependencies import require_authenticated
 from ..errors import _service_error_response
 
 def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/field-mappings",
         tags=["field-mapping-migration"],
-        dependencies=[Depends(require_authenticated)],
     )
 
     def get_service() -> Any:
