@@ -36,7 +36,6 @@ test("rendered components import their referenced helpers", async () => {
 test("data hooks import the shared error formatter", async () => {
   const sources = await Promise.all([
     readSource("../hooks/useAssetModule.js"),
-    readSource("../hooks/useDictOptions.js"),
     readSource("../hooks/usePushModule.js"),
     readSource("../hooks/useRootModule.js"),
   ]);

@@ -15,7 +15,7 @@
 import { Icon } from "../ui.jsx";
 import { MetaItem, PageHeader, StatusBadge } from "../common/index.js";
 import { buildModuleBreadcrumbs } from "../../routing/navigation.ts";
-import { isLegacyDictValue } from "../../hooks/useDictOptions.js";
+import { isLegacyDictValue } from "../../utils/optionUtils.js";
 
 import { nextUnload, ScheduleTimeline } from "./UpstreamParts.jsx";
 import { displayUpstreamValue, getUpstreamDetailMetadata } from "./upstreamFieldContract.js";

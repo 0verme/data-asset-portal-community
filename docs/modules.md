@@ -31,7 +31,8 @@
 基础能力：
 
 - 认证：`/api/auth/*`
-- 通用码值：`/api/common-codes/*`（当前 WAIT_DB，不在 Community native route surface）
+- 历史通用码值：`/api/common-codes/*`（WAIT_DB，不在 Community native route surface；前端不得调用）
+- 参数字典管理：`/api/system/param-dicts*`（系统管理权限）；业务下拉项优先来自对应已注册领域 API 或集中本地选项
 - 操作日志：`/api/operation-logs/*`
 
 ## 1. 上游卸数
@@ -40,7 +41,7 @@
 
 **数据表**：`p_upstream_system`、`p_upstream_unload_time`、`p_upstream_change_log`。
 
-**说明**：登记上游源系统、连接元数据、负责人和多个卸数时间点，支持筛选、启停及删除；数据库类型、部门和状态选项由通用码值驱动。
+**说明**：登记上游源系统、连接元数据、负责人和多个卸数时间点，支持筛选、启停及删除；数据库类型和部门选项从当前上游数据及集中默认选项建立，状态使用共享二态契约。
 
 ## 2. 数据仓库
 
@@ -104,7 +105,7 @@
 
 **数据表**：`p_push_system`、`p_push_job`、`p_push_job_field`、`p_push_change_log`。
 
-**说明**：登记下游系统连接信息、联系人、推送作业、源 / 目标路径与文件名及作业字段。协议、认证方式、分隔符、编码和推送频率等选项由通用码值驱动；本模块管理推送元数据，不执行实际推送任务。
+**说明**：登记下游系统连接信息、联系人、推送作业、源 / 目标路径与文件名及作业字段。协议、认证方式、分隔符、编码和推送频率等选项从当前推送数据及集中默认选项建立；本模块管理推送元数据，不执行实际推送任务。
 
 ## 10. 码值表维护
 
@@ -136,13 +137,13 @@
 
 **说明**：remote 模式由后端使用数据库用户表完成登录、会话恢复和登出，仅启用用户可以登录；`/auth/me` 返回当前角色及有效 `permissions[]`，后端按 `PUBLIC_PERMISSION_CODES ∪ role_permissions` 实时聚合授权。mock 模式使用前端演示登录，不能代表生产凭据或生产授权。
 
-## 14. 通用码值
+## 14. 参数字典与历史通用码值
 
 **数据表**：`p_code_category`、`p_code_item`。
 
-**已初始化关键分类**：`UPSTREAM_DB_TYPE`、`UPSTREAM_DEPT`、`PUSH_PROTOCOL`、`PUSH_AUTH_TYPE`、`PUSH_DELIMITER`、`FILE_ENCODING`、`FREQ_TYPE`、`SYSTEM_STATUS`。
+**当前管理入口**：`/api/system/param-dicts*`，由系统管理权限保护；该入口不是 `/api/common-codes/*` 的兼容别名。
 
-**说明**：为上游卸数、下游推送等模块提供统一分类码值和下拉选项；分类及条目由系统管理中的参数字典页面维护。
+**说明**：参数字典页面维护系统级分类及条目。报表类型、上游/推送候选项和二态状态在公共业务页面分别复用当前领域 API、集中本地选项和共享 `enabled` / `disabled` 状态契约；历史 Common Code HTTP route 保持 WAIT_DB，前端不再调用。
 
 ## 15. 操作日志
 
@@ -160,7 +161,7 @@
 
 `VITE_API_MODE=mock` 时，业务 API 使用 `frontend/src/data/` 中的演示数据或对应 API 文件内的受控演示数据。当前数据文件包括：
 
-`apiAssets.js`、`commonCodes.js`、`fieldMappings.js`、`indicatorPathOptions.js`、`indicators.js`、`manualCodeTables.js`、`menus.js`、`operationLogs.js`、`paramDicts.js`、`pushSystems.js`、`reports.js`、`roots.js`、`systemUsers.js`、`tables.js`、`upstreamSystems.js`。
+`apiAssets.js`、`commonCodes.js`、`fieldMappings.js`、`indicatorPathOptions.js`、`indicators.js`、`manualCodeTables.js`、`menus.js`、`operationLogs.js`、`paramDicts.js`、`pushSystems.js`、`reports.js`、`roots.js`、`systemUsers.js`、`tables.js`、`upstreamSystems.js`。其中 `commonCodes.js` 仅保留为本地演示选项目录，不对应远程 `/api/common-codes` 请求。
 
 门户统计、统一搜索和血缘分析的 mock 数据分别由对应前端 API 模块聚合或内置，不使用独立数据文件。
 

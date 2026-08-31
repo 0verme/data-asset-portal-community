@@ -33,19 +33,26 @@ import {
   getPushSystemDetailRoute,
   getPushSystemEditRoute,
 } from "../routing/navigation.ts";
-import { getDictOptionsBatch } from "./useDictOptions.js";
+import {
+  DEFAULT_AUTH_OPTIONS,
+  DEFAULT_DELIMITER_OPTIONS,
+  DEFAULT_ENCODING_OPTIONS,
+  DEFAULT_FREQ_TYPE_OPTIONS,
+  DEFAULT_PROTOCOL_OPTIONS,
+} from "../components/push/pushConstants.js";
+import { DEFAULT_UPSTREAM_DEPTS } from "../config/defaults.js";
+import { normalizeDictOptions } from "../utils/optionUtils.js";
 import { comparePushSystemImportance } from "../utils/push.js";
 import { getErrorMessage, scrollMainToTop } from "../utils/ui.js";
 
 function fallbackOptions(values) {
-  return [...new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean))]
-    .map((value) => ({ value, name: value }));
+  const seen = new Set();
+  return normalizeDictOptions(values).filter((item) => {
+    if (seen.has(item.value)) return false;
+    seen.add(item.value);
+    return true;
+  });
 }
-
-const FALLBACK_PUSH_AUTH_TYPES = ["密钥认证", "账号密码"];
-const FALLBACK_PUSH_DELIMITERS = ["|", ",", "\\t", ";"];
-const FALLBACK_PUSH_ENCODINGS = ["UTF-8", "GBK", "GB2312"];
-const FALLBACK_PUSH_FREQ_TYPES = ["T+1", "T+0", "准实时", "每周", "每月"];
 
 export function usePushModule({
   active,
@@ -79,43 +86,32 @@ export function usePushModule({
     setPushLoading(true);
     setPushError("");
     try {
-      const categoryCodes = [
-        "PUSH_PROTOCOL",
-        "PUSH_AUTH_TYPE",
-        "PUSH_DELIMITER",
-        "FILE_ENCODING",
-        "FREQ_TYPE",
-        "UPSTREAM_DEPT",
-      ];
       const systems = await getPushSystems();
-      let dictionaries = { options: {}, missingCodes: categoryCodes };
-      if (canEdit) {
-        try {
-          dictionaries = await getDictOptionsBatch(categoryCodes);
-        } catch {
-          // Common-code routes are an optional management dependency. Public
-          // catalog browsing must not fail when they are unavailable.
-        }
-      }
       const allJobs = systems.flatMap((system) => system.jobs || []);
-      const protocolItems = dictionaries.options.PUSH_PROTOCOL?.length
-        ? dictionaries.options.PUSH_PROTOCOL
-        : fallbackOptions(systems.map((system) => system.protocol));
-      const authItems = dictionaries.options.PUSH_AUTH_TYPE?.length
-        ? dictionaries.options.PUSH_AUTH_TYPE
-        : fallbackOptions(FALLBACK_PUSH_AUTH_TYPES);
-      const delimiterItems = dictionaries.options.PUSH_DELIMITER?.length
-        ? dictionaries.options.PUSH_DELIMITER
-        : fallbackOptions([...FALLBACK_PUSH_DELIMITERS, ...allJobs.map((job) => job.delimiter)]);
-      const encodingItems = dictionaries.options.FILE_ENCODING?.length
-        ? dictionaries.options.FILE_ENCODING
-        : fallbackOptions([...FALLBACK_PUSH_ENCODINGS, ...allJobs.map((job) => job.encoding)]);
-      const freqTypeItems = dictionaries.options.FREQ_TYPE?.length
-        ? dictionaries.options.FREQ_TYPE
-        : fallbackOptions([...FALLBACK_PUSH_FREQ_TYPES, ...allJobs.map((job) => job.freqType)]);
-      const deptItems = dictionaries.options.UPSTREAM_DEPT?.length
-        ? dictionaries.options.UPSTREAM_DEPT
-        : fallbackOptions(systems.map((system) => system.dept));
+      const protocolItems = fallbackOptions([
+        ...DEFAULT_PROTOCOL_OPTIONS,
+        ...systems.map((system) => system.protocol),
+      ]);
+      const authItems = fallbackOptions([
+        ...DEFAULT_AUTH_OPTIONS,
+        ...systems.map((system) => system.auth),
+      ]);
+      const delimiterItems = fallbackOptions([
+        ...DEFAULT_DELIMITER_OPTIONS,
+        ...allJobs.map((job) => job.delimiter),
+      ]);
+      const encodingItems = fallbackOptions([
+        ...DEFAULT_ENCODING_OPTIONS,
+        ...allJobs.map((job) => job.encoding),
+      ]);
+      const freqTypeItems = fallbackOptions([
+        ...DEFAULT_FREQ_TYPE_OPTIONS,
+        ...allJobs.map((job) => job.freqType),
+      ]);
+      const deptItems = fallbackOptions([
+        ...DEFAULT_UPSTREAM_DEPTS,
+        ...systems.map((system) => system.dept),
+      ]);
       setPushSystems(systems);
       setPushProtocolOptions(protocolItems);
       setPushAuthOptions(authItems);
@@ -129,7 +125,7 @@ export function usePushModule({
     } finally {
       setPushLoading(false);
     }
-  }, [canEdit]);
+  }, []);
 
   useEffect(() => {
     if (active && !pushLoaded && !pushLoading) {
