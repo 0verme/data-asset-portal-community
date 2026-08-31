@@ -49,7 +49,7 @@
 /* ---- 语义色（仅状态用，均自带 -soft 底 与 -line 线）---- */
 --accent / --accent-soft         在线 / 启用 / 成功（正向状态复用强调色族）
 --warn   / --warn-soft / --warn-line     校验中 / 待补充
---danger / --danger-soft / --danger-line 缺失 / 停用 / 异常
+--danger / --danger-soft / --danger-line 缺失 / 禁用 / 异常
 --info   / --info-soft / --info-line      信息 / 直接映射等中性提示
 /* 无语义分类 badge（维度/分类）：底 --chip，字 --ink-2 */
 
@@ -96,7 +96,7 @@
 | primary | `--accent` | `#fff` | 无 | 每页唯一主操作 |
 | secondary | `--surface` | `--ink` | `0.5px --line-strong` | 次操作（导出、重置） |
 | text | 透明 | `--accent` | 无 | 轻量行为（查看详情） |
-| danger | `--danger-soft` | `--danger` | 无 | 删除、停用 |
+| danger | `--danger-soft` | `--danger` | 无 | 删除、禁用 |
 
 - 尺寸：`padding: 8px 18px; font-size: 14px; font-weight: 500; border-radius: var(--radius);`
 - 交互：`hover` 用 `--accent-strong` 或 `filter: brightness(1.05)`；`active` 加 `transform: scale(0.98)`
@@ -140,11 +140,11 @@
 |---|---|---|
 | 正向状态（在线/启用/成功） | `.tag-ok` | `--accent-soft` / `--accent-soft-color` |
 | 进行中（校验中/待补充） | `.tag-warn` | `--warn-soft` / `--warn` |
-| 负向（缺失/停用/异常） | `.tag-danger` | `--danger-soft` / `--danger` |
+| 负向（缺失/禁用/异常） | `.tag-danger` | `--danger-soft` / `--danger` |
 | 中性信息（直接映射等） | `.tag-info` | `--info-soft` / `--info` |
 | 无语义分类（维度/分类标签） | `.tag-neutral` | `--chip` / `--ink-2` |
 
-- 状态点用 `●`（实心=正向/激活）/ `○`（空心=离线/停用），不靠颜色单独区分。
+- 状态点用 `●`（实心=正向/启用）/ `○`（空心=离线/禁用），不靠颜色单独区分。
 - 维度类标签（CONT 合同维度等）一律走 `.tag-neutral`，**不要给绿色**。
 
 ### 3.5 内容卡片（下游推送页系统卡）
@@ -161,18 +161,18 @@
 
 左侧筛选栏的推荐结构：
 - 第一组：业务分类筛选。标题按模块语义命名，如 `数据库类型`、`连接协议`、`指标维度`、`数据分层`、`主题域`、`词根分类`。
-- 第二组：状态。仅在模块本身已有状态筛选能力时展示，标题固定为 `状态`，选项固定为 `全部状态 / 启用 / 停用`。
+- 第二组：状态。仅在模块本身已有状态筛选能力时展示，标题固定为 `状态`，选项固定为 `全部状态 / 启用 / 禁用`。
 - 第三组：维护。用于承载 `新增系统 / 新增指标 / 新增表 / 新增词根 / 批量导入` 等操作入口。
 - 模块附加组：仅在确有独立语义时追加，例如下游推送的 `最近访问`。
 
 左侧筛选栏优先复用共享组件，目录为 `frontend/src/components/sidebar/common/`：
 - `SidebarFilterGroup.jsx`：通用分组组件，负责标题、选项列表、active、disabled、count 和点击事件。适用于业务分类组、最近访问组等普通分组。
-- `StatusFilterGroup.jsx`：状态分组组件，固定渲染 `状态 / 全部状态 / 启用 / 停用`。它只负责显示和回调，**不改动底层值语义**；`null`、`"all"`、`enabled`、`disabled` 等兼容关系由模块侧传入。
+- `StatusFilterGroup.jsx`：状态分组组件，固定渲染 `状态 / 全部状态 / 启用 / 禁用`。它只负责显示和回调，**不改动底层值语义**；`null`、`"all"`、`enabled`、`disabled` 等兼容关系由模块侧传入。
 - `SidebarActionGroup.jsx`：维护分组组件，固定渲染 `维护`，通过 `actions` 配置承载新增、导入等入口。
 
 共享 Sidebar 组件的约束：
 - 继续复用现有 `.side-group / .side-title / .side-item / .count`，不要为通用 Sidebar 组件另起一套样式体系。
-- 状态筛选统一为显式切换：点击 `启用 / 停用` 不反选清空，回到全部只能点击 `全部状态`。
+- 状态筛选统一为显式切换：点击 `启用 / 禁用` 不反选清空，回到全部只能点击 `全部状态`。
 - 业务分类筛选是否支持“点击已选项取消”由各模块自行决定，通用组件不强制统一这一行为。
 - 真正的左侧筛选栏模块应优先接入这 3 个组件，例如上游卸数、下游推送、指标维护、数据仓库、词根管理。
 - 说明面板型左侧栏或模块导航型左侧栏先不要强行套入，例如 `MappingSidebar`、`SystemSidebar`。
@@ -183,25 +183,25 @@
 （全站唯一实现，禁止再写本地副本）。两种调用方式：
 
 - `<StatusBadge status={s} metaMap={X_STATUS_META} />`：按映射取文案/色调（系统管理、指标等）。
-  不传 `metaMap` 时回退 enabled/disabled → 启用/停用。
-- `<StatusBadge on={bool} label="自定义" />`：二态开关型，默认文案 已启用/已停用（推送、上游）。
+  不传 `metaMap` 时回退 enabled/disabled → 启用/禁用。
+- `<StatusBadge on={bool} label="自定义" />`：二态开关型，默认文案 已启用/已禁用（推送、上游）。
 
-色调走 `.tag-ok / .tag-danger / .tag-warn`（见 §3.4），自带 `●`(正向) / `○`(停用/离线) 状态点。
+色调走 `.tag-ok / .tag-danger / .tag-warn`（见 §3.4），自带 `●`(正向) / `○`(禁用/离线) 状态点。
 **列表状态禁止再用 Switch 开关**（Switch 只保留在编辑器表单里设置状态）。
 
 **行操作一律用共享 `RowActions`**（`components/common/RowActions.jsx`），禁止各页自写 `.btn` 行操作组。
 
-- 固定按钮顺序：**查看 → 编辑 → 启用/停用 → 业务动作(extraActions)**。
+- 固定按钮顺序：**查看 → 编辑 → 启用/禁用 → 业务动作(extraActions)**。
 - 所有按钮**常驻显示**，不再 hover 浮出（已废弃 `.row-2nd` 隐藏逻辑）。
-- 「启用/停用」按钮根据 `toggle.enabled` 显示反向动作文案（当前启用→「停用」，停用→「启用」）。
+- 「启用/禁用」按钮根据 `toggle.enabled` 显示反向动作文案（当前启用→「禁用」，禁用→「启用」）。
 - **列表页禁止删除类操作进入 `RowActions`**，包括删除、强制删除、清空、重置、批量删除、物理删除。
-- `RowActions` 中的启用/停用与标注 `confirm` 的普通业务动作统一走二次确认弹窗；
+- `RowActions` 中的启用/禁用与标注 `confirm` 的普通业务动作统一走二次确认弹窗；
   传入 `RowActions` 的 `onToggle` 应为**裸操作**（确认已在组件内完成），hook 里不要再叠加确认。
 - 删除只允许出现在编辑页 / 详情页底部的 `DangerZone`，统一复用 `DeleteConfirmDialog` / `confirmDeleteAction`。
 - 颜色全走 token：编辑/启停/业务动作用中性 `.btn`（描边 `--line-strong`、字 `--ink-2`）；
   危险区删除用 `.btn.ghost-danger`（字 `--danger`、描边 `--danger-line`）。**禁止散落 hex。**
-- 三态及以上状态（如用户 启用/锁定/停用）不套二态 `toggle`，改用 `extraActions` 逐个列出反向动作，
-  对停用/锁定等收敛性动作挂 `confirm`。
+- 三态及以上状态（如用户 启用/锁定/禁用）不套二态 `toggle`，改用 `extraActions` 逐个列出反向动作，
+  对禁用/锁定等收敛性动作挂 `confirm`。
 - 容器 class 为 `.row-actions`（右对齐、`gap:8px`、可换行）。
   `.row-tools` 仅保留给编辑器内字段行的图标工具组（上移/下移/删除），不要用于列表行操作。
 
@@ -221,7 +221,7 @@
 - 页面主区左右留白 ≥ 32px，模块之间 ≥ 40px。
 - 卡片内边距 ≥ 16px，重要卡片 24px。
 - 信息密度宁可低不可高：指标管理这类多行文字页，行内说明限制 2 行 + 省略号（`-webkit-line-clamp: 2`）。
-- 操作列拥挤时（编辑/删除/停用三连）：收进 `⋯` 下拉，或仅在行 hover 时显示次要操作。
+- 操作列拥挤时（编辑/删除/禁用三连）：收进 `⋯` 下拉，或仅在行 hover 时显示次要操作。
 
 ---
 

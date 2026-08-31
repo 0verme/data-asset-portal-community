@@ -14,7 +14,7 @@ export function RowActions({ onView, onEdit, extraActions = [], toggle, disabled
 
   const handleToggle = () => {
     if (!toggle) return;
-    const acting = toggle.enabled ? "停用" : "启用";
+    const acting = toggle.enabled ? "禁用" : "启用";
     runConfirm(
       {
         title: acting,
@@ -46,7 +46,7 @@ export function RowActions({ onView, onEdit, extraActions = [], toggle, disabled
           onClick={handleToggle}
         >
           <Icon name={toggle.enabled ? "close" : "check"} size={14} />
-          {toggle.enabled ? "停用" : "启用"}
+          {toggle.enabled ? "禁用" : "启用"}
         </button>
       ) : null}
       {extraActions.map((action) => (

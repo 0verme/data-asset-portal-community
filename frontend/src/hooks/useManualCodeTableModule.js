@@ -6,7 +6,7 @@ import {
   updateManualCodeTable,
   updateManualCodeTableStatus,
 } from "../api/manualCodeTables.js";
-import { toast } from "../components/common/index.js";
+import { getBinaryStatusValue, toast } from "../components/common/index.js";
 import { getErrorMessage } from "../utils/ui.js";
 
 export const MANUAL_CODE_TABLE_STYLES = [
@@ -18,12 +18,11 @@ export const MANUAL_CODE_TABLE_STYLES = [
 ];
 
 export const MANUAL_CODE_TABLE_STATUS_META = {
-  active: { label: "启用", className: "st-on" },
-  draft: { label: "草稿", className: "st-warn" },
-  disabled: { label: "停用", className: "st-off" },
+  enabled: { label: "启用", className: "st-on" },
+  disabled: { label: "禁用", className: "st-off" },
 };
 
-const EMPTY_FORM = { tableCode: "", tableName: "", style: "", owner: "", status: "active", remark: "" };
+const EMPTY_FORM = { tableCode: "", tableName: "", style: "", owner: "", status: "enabled", remark: "" };
 
 export function useManualCodeTableModule({ active, query, requireLogin }) {
   const [items, setItems] = useState([]);
@@ -40,7 +39,8 @@ export function useManualCodeTableModule({ active, query, requireLogin }) {
     setLoading(true);
     setError("");
     try {
-      setItems(await getManualCodeTables());
+      const nextItems = await getManualCodeTables();
+      setItems(nextItems.map((item) => ({ ...item, status: getBinaryStatusValue(item.status) })));
     } catch (nextError) {
       setError(getErrorMessage(nextError, "加载码值表失败。"));
     } finally {
@@ -121,7 +121,7 @@ export function useManualCodeTableModule({ active, query, requireLogin }) {
     try {
       await updateManualCodeTableStatus(item.id, status);
       await load();
-      toast.success(`已${status === "active" ? "启用" : "停用"} ${item.tableName}`);
+      toast.success(`已${status === "enabled" ? "启用" : "禁用"} ${item.tableName}`);
     } catch (nextError) {
       toast.error(getErrorMessage(nextError, "更新码值表状态失败。"));
     }

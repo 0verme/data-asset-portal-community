@@ -27,7 +27,7 @@ import {
 
 const ROLE_STATUS_META = {
   enabled: { label: "启用", className: "st-on" },
-  disabled: { label: "停用", className: "st-off" },
+  disabled: { label: "禁用", className: "st-off" },
 };
 
 function permissionName(permission) {

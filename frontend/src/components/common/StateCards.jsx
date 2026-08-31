@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { Icon } from "../ui.jsx";
-import { getBinaryStatusValue, normalizeBinaryStatusLabel } from "./status.js";
+import { getBinaryStatusValue, normalizeBinaryStatusLabel, normalizeBinaryStatusValue } from "./status.js";
 
 export function LoadingState({ title, desc }) {
   return (
@@ -73,7 +73,9 @@ export function StatusBadge({ status, metaMap, on, label }) {
   let tone;
   let text;
   if (status !== undefined) {
-    const sourceMeta = (metaMap || DEFAULT_STATUS_META)[status];
+    const statusMap = metaMap || DEFAULT_STATUS_META;
+    const normalizedStatus = normalizeBinaryStatusValue(status);
+    const sourceMeta = normalizedStatus ? statusMap[normalizedStatus] : statusMap[status];
     const meta = sourceMeta || { label: label || status || "-", className: "st-off" };
     tone = STATUS_TAG[meta.className] || STATUS_TAG["st-off"];
     text = normalizeBinaryStatusLabel(status, meta.label);

@@ -26,7 +26,7 @@
   ]},
   {"categoryCode":"INDICATOR_STATUS","categoryName":"指标状态","categoryDesc":"指标启停状态字典","items":[
     {"code":"enabled","name":"启用","value":"enabled","desc":"指标启用可见"},
-    {"code":"disabled","name":"停用","value":"disabled","desc":"指标停用不可见"}
+    {"code":"disabled","name":"禁用","value":"disabled","desc":"指标禁用不可见"}
   ]},
   {"categoryCode":"SYSTEM_TYPE","categoryName":"系统类型","categoryDesc":"业务系统类型字典","items":[
     {"code":"business","name":"业务系统","value":"business","desc":"承载业务流程的系统"},

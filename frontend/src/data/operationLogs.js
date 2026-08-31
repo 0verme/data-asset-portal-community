@@ -1,5 +1,5 @@
 export const OPERATION_MODULES = ["数据仓库", "指标维护", "字段映射", "上游卸数", "下游推送", "词根管理", "报表资产", "API 资产", "血缘分析"];
-export const OPERATION_TYPES = ["查询", "新增", "编辑", "启用", "停用", "导出", "导入"];
+export const OPERATION_TYPES = ["查询", "新增", "编辑", "启用", "禁用", "导出", "导入"];
 export const OPERATION_RESULTS = [{ value: "success", name: "成功" }, { value: "failed", name: "失败" }];
 
 const SUBJECTS = [
@@ -12,7 +12,7 @@ const SUBJECTS = [
   ["报表资产", "查询", "RPT_RETAIL_DAILY", "查看全渠道零售经营日报。"],
   ["API 资产", "启用", "STOCK_QUERY", "启用商品库存查询 API。"],
   ["血缘分析", "查询", "DWS_TRADE_SALES_STAT_1D", "查询销售汇总表的上下游血缘。"],
-  ["指标维护", "停用", "SVC00005", "停用商品平均评分指标以演示状态管理。"],
+  ["指标维护", "禁用", "SVC00005", "禁用商品平均评分指标以演示状态管理。"],
 ];
 
 export const OPERATION_LOGS = Array.from({ length: 20 }, (_, index) => {

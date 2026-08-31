@@ -36,7 +36,7 @@ const COMMON_CODES = {
       active: true,
       items: [
         { code: "ENABLED", name: "启用", value: "enabled", desc: "系统启用", order: 10, active: true },
-        { code: "DISABLED", name: "停用", value: "disabled", desc: "系统停用", order: 20, active: true },
+        { code: "DISABLED", name: "禁用", value: "disabled", desc: "系统禁用", order: 20, active: true },
       ],
     },
   ],

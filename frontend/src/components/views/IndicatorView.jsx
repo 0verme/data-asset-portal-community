@@ -74,7 +74,7 @@ export function IndicatorView({
           if (await confirmDeleteAction({
             name: currentIndicatorEdit.id,
             typeLabel: "指标",
-            impact: "该指标删除后，可能影响指标口径、指标来源字段、指标结果表字段、报表引用、血缘关系和审计记录。若指标已被引用，应优先停用，而不是删除。",
+            impact: "该指标删除后，可能影响指标口径、指标来源字段、指标结果表字段、报表引用、血缘关系和审计记录。若指标已被引用，应优先禁用，而不是删除。",
             consequences: [
               "删除前会以服务端校验结果为准，不会绕过引用关系检查。",
               "若后端返回不可删除原因，页面会直接展示原因。",

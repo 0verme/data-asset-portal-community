@@ -15,7 +15,8 @@ test("user management actions exclude lock and use binary status labels", async 
   assert.match(source, /label: "重置密码"/);
   assert.match(source, /key: "disable"[\s\S]*label: "禁用"/);
   assert.match(source, /key: "enable"[\s\S]*label: "启用"/);
-  assert.doesNotMatch(source, /key: "lock"|label: "锁定"|label: "解锁"|label: "停用"/);
+  assert.doesNotMatch(source, /key: "lock"|label: "锁定"|label: "解锁"/);
+  assert.match(source, /label: "禁用"/);
 });
 
 test("password reset uses a non-danger confirmation without exposing a password", async () => {

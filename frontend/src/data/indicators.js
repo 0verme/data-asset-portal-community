@@ -16,7 +16,7 @@ export const INDICATOR_DIMENSIONS = [
 export const INDICATOR_STATUS_OPTIONS = [
   { value: "all", label: "全部状态" },
   { value: "enabled", label: "启用" },
-  { value: "disabled", label: "停用" },
+  { value: "disabled", label: "禁用" },
 ];
 
 const SPECS = [
