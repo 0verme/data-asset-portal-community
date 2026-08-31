@@ -47,7 +47,6 @@ from .operation_log_service import (
     operation_log_service,
 )
 
-
 USER_STATUSES = {"enabled", "disabled"}
 ROLE_STATUSES = {"enabled", "disabled"}
 DICT_STATUSES = {"enabled", "disabled"}
@@ -216,7 +215,7 @@ class SystemManagementService(AuditActorMixin):
             permission = str(value or "").strip().lower()
             if not permission_contract.is_registered_permission(permission):
                 details.append({"field": "permissionCodes", "message": f"unknown permission: {permission or value}"})
-            elif permission not in permission_codes:
+            elif permission_contract.is_role_assignable_permission(permission) and permission not in permission_codes:
                 permission_codes.append(permission)
         if details:
             raise SystemValidationError("Role validation failed", details)
@@ -251,7 +250,15 @@ class SystemManagementService(AuditActorMixin):
             .where(rbac_role_permission.c.role_code == role_code)
             .order_by(rbac_role_permission.c.permission_code)
         )
-        return [str(row["permission_code"]).strip().lower() for row in rows if row.get("permission_code")]
+        return [
+            code
+            for code in (
+                str(row["permission_code"]).strip().lower()
+                for row in rows
+                if row.get("permission_code")
+            )
+            if permission_contract.is_role_assignable_permission(code)
+        ]
 
     def _role_payload(self, row):
         role_code = str(row.get("role_code") or "").strip().lower()
@@ -297,6 +304,14 @@ class SystemManagementService(AuditActorMixin):
                 "description": item.description,
             }
             for item in permission_contract.PERMISSION_DEFINITIONS
+        ]
+
+    def get_role_assignable_permissions(self):
+        """Return only permissions that a role can grant as an incremental delta."""
+        return [
+            item
+            for item in self.get_permissions()
+            if permission_contract.is_role_assignable_permission(item["code"])
         ]
 
     def get_roles(self):

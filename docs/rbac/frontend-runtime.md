@@ -12,10 +12,13 @@ predicate:
 can("indicator:write")
 ```
 
-`useAuthSession` exposes `can`, and the auth context carries it to the app
-shell. In remote mode, `auth.permissions` comes from the backend authentication
-contract. Mock mode uses the built-in maps only for its local deterministic
-demo; it does not replace backend authorization.
+The backend registry owns the public/role policy. In remote mode,
+`auth.permissions` is the backend's effective snapshot (`public + role`), and
+the role form requests the backend-filtered assignable candidates. The small
+public-code mirror in the frontend exists only for deterministic mock data and
+normalizing legacy local sessions. `useAuthSession` exposes `can`, and the auth
+context carries it to the app shell. Mock mode does not replace backend
+authorization.
 
 ## Public catalog bootstrap
 
@@ -46,6 +49,10 @@ controls are derived from the mock permission snapshot.
 - portal statistics and unified search are usable without login;
 - asset, field mapping, lineage, root, indicator, report, API asset, upstream,
   push, and code-table pages retain their read paths;
+- public read permissions are inherited for guest and authenticated mock
+  snapshots, while role payloads contain only incremental codes;
+- the role form hides public permissions, requests only assignable candidates,
+  and counts visible role permissions rather than legacy public mappings;
 - mutation entry points are hidden unless the relevant resource write
   permission is present;
 - deep-linked edit routes are reset or blocked without the relevant write

@@ -1,5 +1,7 @@
 """P0 contract tests for the repository-owned RBAC registry."""
 
+# pyright: reportMissingImports=false
+
 from __future__ import annotations
 
 import unittest
@@ -10,8 +12,12 @@ from backend.app.authorization import (
     MAINTAINER_ROLE,
     PERMISSION_CODES,
     PERMISSION_DEFINITIONS,
+    PUBLIC_PERMISSION_CODES,
+    ROLE_ASSIGNABLE_PERMISSION_CODES,
     get_permission_definition,
+    is_public_permission,
     is_registered_permission,
+    is_role_assignable_permission,
     validate_permission_registry,
 )
 
@@ -29,6 +35,34 @@ class RbacPermissionContractTests(unittest.TestCase):
             frozenset(PERMISSION_CODES),
         )
         self.assertIn(MAINTAINER_ROLE, BUILTIN_ROLE_PERMISSION_CODES)
+        self.assertFalse(
+            PUBLIC_PERMISSION_CODES & BUILTIN_ROLE_PERMISSION_CODES[MAINTAINER_ROLE]
+        )
+
+    def test_public_and_role_assignable_permission_sets_are_disjoint_and_complete(self):
+        self.assertTrue(PUBLIC_PERMISSION_CODES)
+        self.assertTrue(all(is_public_permission(code) for code in PUBLIC_PERMISSION_CODES))
+        self.assertTrue(all(is_role_assignable_permission(code) for code in ROLE_ASSIGNABLE_PERMISSION_CODES))
+        self.assertEqual(
+            set(PERMISSION_CODES),
+            PUBLIC_PERMISSION_CODES | set(ROLE_ASSIGNABLE_PERMISSION_CODES),
+        )
+        self.assertTrue(PUBLIC_PERMISSION_CODES.isdisjoint(ROLE_ASSIGNABLE_PERMISSION_CODES))
+        self.assertTrue(all(code.endswith(":read") for code in PUBLIC_PERMISSION_CODES))
+        self.assertTrue(
+            PUBLIC_PERMISSION_CODES.isdisjoint(
+                {
+                    "upstream:read",
+                    "push:read",
+                    "metadata:read",
+                    "operation_log:read",
+                    "system:user:read",
+                    "system:menu:read",
+                    "system:param:read",
+                    "system:role:read",
+                }
+            )
+        )
 
     def test_permission_codes_decompose_into_resource_and_action(self):
         for definition in PERMISSION_DEFINITIONS:

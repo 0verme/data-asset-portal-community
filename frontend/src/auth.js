@@ -14,6 +14,7 @@
 
 import { getCurrentRemoteUser, loginRemote, logoutRemote } from "./api/auth.js";
 import {
+  getEffectivePermissions,
   MOCK_ROLE_PERMISSIONS,
   normalizePermissions,
 } from "./auth/permissions.ts";
@@ -39,7 +40,7 @@ export const GUEST_AUTH = Object.freeze({
   role: "guest",
   user: null,
   name: null,
-  permissions: [],
+  permissions: Object.freeze(getEffectivePermissions([])),
 });
 
 function normalizeAuth(auth) {
@@ -53,7 +54,9 @@ function normalizeAuth(auth) {
     role,
     user: auth.user || null,
     name: auth.name || auth.user || null,
-    permissions: normalizePermissions(legacyMockPermissions),
+    permissions: AUTH_MODE === "mock"
+      ? getEffectivePermissions(legacyMockPermissions)
+      : normalizePermissions(legacyMockPermissions),
   };
 }
 
@@ -131,7 +134,7 @@ export async function login({ username, password, remember }) {
     role: MOCK_ROLE,
     user: MOCK_USER,
     name: MOCK_NAME,
-    permissions: MOCK_ROLE_PERMISSIONS[MOCK_ROLE] || [],
+    permissions: getEffectivePermissions(MOCK_ROLE_PERMISSIONS[MOCK_ROLE] || []),
   };
   persistStoredAuth(auth, remember);
   return auth;

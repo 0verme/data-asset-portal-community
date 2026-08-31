@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { isPublicPermission } from "../../auth/permissions.ts";
 import { Highlight, Icon } from "../ui.jsx";
 import {
   ActionErrorBanner,
@@ -50,10 +51,14 @@ function requestRoleDeletion(role, onDelete) {
 export function RoleForm({ form, setForm, permissions, errors = [], mode = "new", initial = null, onDelete }) {
   const isEdit = mode === "edit";
   const hasError = (field) => errors.some((item) => item.field === field);
-  const selected = new Set(form.permissionCodes || []);
+  const assignablePermissions = permissions.filter((permission) => !isPublicPermission(permission?.code));
+  const assignableCodes = new Set(assignablePermissions.map((permission) => permission.code));
+  const selected = new Set((form.permissionCodes || []).filter((code) => assignableCodes.has(code)));
   const togglePermission = (code) => {
     setForm((previous) => {
-      const current = new Set(previous.permissionCodes || []);
+      const current = new Set(
+        (previous.permissionCodes || []).filter((permission) => !isPublicPermission(permission)),
+      );
       if (current.has(code)) current.delete(code);
       else current.add(code);
       return { ...previous, permissionCodes: [...current].sort() };
@@ -113,8 +118,9 @@ export function RoleForm({ form, setForm, permissions, errors = [], mode = "new"
       </FormSection>
 
       <FormSection title={`权限映射（已选 ${selected.size} 项）`}>
+        <p className="form-hint">公共只读权限已默认开放，无需在角色中重复配置；此处仅配置角色的额外权限。</p>
         <div className="role-permission-grid">
-          {permissions.map((permission) => (
+          {assignablePermissions.map((permission) => (
             <label className="role-permission-option" key={permission.code}>
               <input
                 type="checkbox"

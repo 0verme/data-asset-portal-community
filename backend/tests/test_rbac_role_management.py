@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 # pyright: reportMissingImports=false
-
 import os
 import tempfile
 import unittest
@@ -14,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from backend.app.application import Identity
 from backend.app.authorization.core import AuthorizationService, AuthorizationSubject
+from backend.app.authorization.permissions import PUBLIC_PERMISSION_CODES
 from backend.app.authorization.persistence import seed_rbac
 from backend.app.db.sqlite_adapter import connect
 from backend.app.fastapi_app import create_fastapi_app
@@ -67,7 +67,7 @@ class RbacRoleManagementTests(unittest.TestCase):
         self.service = SystemManagementService()
         repository = MagicMock()
         repository.get_subject.return_value = AuthorizationSubject("admin", "admin")
-        repository.get_permissions.return_value = {"system:role:write"}
+        repository.get_permissions.return_value = {"system:role:read", "system:role:write"}
         authorization = AuthorizationService(repository)
         self.client = TestClient(
             create_fastapi_app(
@@ -92,18 +92,29 @@ class RbacRoleManagementTests(unittest.TestCase):
         permissions = self.service.get_permissions()
         self.assertEqual("asset:read", permissions[0]["code"])
         self.assertEqual(29, len(permissions))
+        assignable = self.service.get_role_assignable_permissions()
+        self.assertEqual(21, len(assignable))
+        self.assertFalse(PUBLIC_PERMISSION_CODES & {item["code"] for item in assignable})
 
         roles = self.service.get_roles()
         self.assertEqual(["admin", "maintainer"], [item["roleCode"] for item in roles])
         self.assertTrue(roles[0]["builtin"])
-        self.assertEqual(29, len(roles[0]["permissionCodes"]))
+        self.assertEqual(21, len(roles[0]["permissionCodes"]))
+
+    def test_permission_api_keeps_full_registry_and_filters_role_candidates(self):
+        full = self.client.get("/api/system/permissions")
+        assignable = self.client.get("/api/system/permissions?assignableOnly=true")
+
+        self.assertEqual(200, full.status_code)
+        self.assertEqual(200, assignable.status_code)
+        self.assertEqual(29, len(full.json()["items"]))
+        assignable_codes = {item["code"] for item in assignable.json()["items"]}
+        self.assertEqual(21, len(assignable_codes))
+        self.assertFalse(PUBLIC_PERMISSION_CODES & assignable_codes)
 
     def test_custom_role_replaces_permission_mapping(self):
         created = self._create_role()
-        self.assertEqual(
-            ["indicator:read", "indicator:write"],
-            created["permissionCodes"],
-        )
+        self.assertEqual(["indicator:write"], created["permissionCodes"])
         updated = self.service.update_role(
             "indicator-maintainer",
             {
@@ -113,8 +124,19 @@ class RbacRoleManagementTests(unittest.TestCase):
                 "permissionCodes": ["indicator:read"],
             },
         )
-        self.assertEqual(["indicator:read"], updated["permissionCodes"])
+        self.assertEqual([], updated["permissionCodes"])
         self.assertEqual("Read-only", updated["description"])
+
+    def test_historical_public_mapping_is_hidden_from_role_payload(self):
+        self._create_role("legacy-role", ["asset:write"])
+        self.connection.execute(
+            "INSERT INTO dwp.p_role_permission (role_code, permission_code) "
+            "VALUES ('legacy-role', 'asset:read')"
+        )
+        self.connection.commit()
+
+        role = next(item for item in self.service.get_roles() if item["roleCode"] == "legacy-role")
+        self.assertEqual(["asset:write"], role["permissionCodes"])
 
     def test_builtin_roles_are_protected(self):
         with self.assertRaises(SystemRoleProtectedError):
@@ -132,7 +154,7 @@ class RbacRoleManagementTests(unittest.TestCase):
     def test_unassigned_custom_role_deletes_role_and_permission_mappings(self):
         self._create_role("temporary-role")
         self.assertEqual(
-            2,
+            1,
             self.connection.execute(
                 "SELECT COUNT(*) FROM dwp.p_role_permission WHERE role_code = 'temporary-role'"
             ).fetchone()[0],
@@ -188,7 +210,7 @@ class RbacRoleManagementTests(unittest.TestCase):
             ).fetchone()
         )
         self.assertEqual(
-            2,
+            1,
             self.connection.execute(
                 "SELECT COUNT(*) FROM dwp.p_role_permission WHERE role_code = 'transactional-role'"
             ).fetchone()[0],
@@ -212,7 +234,7 @@ class RbacRoleManagementTests(unittest.TestCase):
             ).fetchone()
         )
         self.assertEqual(
-            2,
+            1,
             self.connection.execute(
                 "SELECT COUNT(*) FROM dwp.p_role_permission WHERE role_code = 'temporary-role'"
             ).fetchone()[0],
@@ -266,7 +288,7 @@ class RbacRoleManagementTests(unittest.TestCase):
             ).fetchone()
         )
         self.assertEqual(
-            2,
+            1,
             self.connection.execute(
                 "SELECT COUNT(*) FROM dwp.p_role_permission WHERE role_code = 'api-assigned-role'"
             ).fetchone()[0],

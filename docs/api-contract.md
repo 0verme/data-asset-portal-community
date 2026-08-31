@@ -107,9 +107,9 @@ VITE_API_MODE=remote
 
 ### 1.8 权限
 
-系统使用 permission-based RBAC。`/auth/me` 返回当前有效的 `permissions[]`；后端路由通过 `require_permission("resource:action")` 强制授权，前端 `can(permission)` 仅用于界面 UX，不能替代后端检查。角色管理接口包括 `GET/POST/PATCH /api/system/roles` 与 `GET /api/system/permissions`，用户绑定单个角色；禁用用户、禁用角色或撤销权限会在下一次授权决策中立即生效。
+系统使用 permission-based RBAC。`/auth/me` 返回当前有效的 `permissions[]`；后端路由通过 `require_permission("resource:action")` 强制授权，前端 `can(permission)` 仅用于界面 UX，不能替代后端检查。有效权限统一为 `PUBLIC_PERMISSION_CODES ∪ role_permissions`；匿名和有效登录用户继承公共目录读取能力，角色只配置增量权限。角色管理接口包括 `GET/POST/PATCH /api/system/roles`、`GET /api/system/permissions` 以及 `GET /api/system/permissions?assignableOnly=true`，用户绑定单个角色；禁用用户、禁用角色或撤销权限会在下一次授权决策中立即生效。
 
-现阶段仍保留 `admin`、`maintainer` 等内置角色及兼容 helper，但授权事实以当前角色—权限映射为准。未实现多角色绑定、ABAC/ACL、数据范围授权或外部 IAM。
+现阶段仍保留 `admin`、`maintainer` 等内置角色及兼容 helper，但授权事实以当前角色—权限映射与公共权限策略为准。未实现多角色绑定、ABAC/ACL、数据范围授权或外部 IAM。
 
 ### 1.9 Repository module capability contract
 

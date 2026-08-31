@@ -23,6 +23,39 @@ Admin
 public catalog bootstrap. Authentication is not granted merely because a route
 is public, and public read access never grants a write permission.
 
+## Public permission contract (#185)
+
+The authorization registry is the single backend source of truth for public
+permissions:
+
+- `asset:read`
+- `root:read`
+- `indicator:read`
+- `report:read`
+- `api_asset:read`
+- `code_table:read`
+- `field_mapping:read`
+- `lineage:read`
+
+These codes correspond to the public catalog families and their existing
+redacted/read-only projections. They are not a blanket `*:read` rule:
+`upstream:read`, `push:read`, `metadata:read`, `operation_log:read`, and all
+`system:*:read` codes remain protected because they cover admin detail,
+ingestion, audit, or system-management data.
+
+The effective permission snapshot is:
+
+```text
+anonymous          = public permissions
+valid authenticated = public permissions ∪ role permissions
+admin              = existing full registered permission set
+```
+
+The role UI requests `/api/system/permissions?assignableOnly=true`, while the
+unfiltered endpoint continues to expose the complete permission registry. A
+role payload and role response contain only role-assignable incremental codes;
+legacy public mappings are ignored on normalization and hidden from counts.
+
 ## Explicit anonymous contract
 
 The following routes intentionally accept anonymous requests:
@@ -105,7 +138,10 @@ The following permissions are not weakened:
 - `system:user:*`, `system:role:*`, and `system:param:*` for system management;
 - `system:menu:write` for menu mutations.
 
-Ordinary public catalog reads do not require a matching `*:read` permission.
+Ordinary public catalog routes are explicitly registered without an
+authentication dependency. Their matching public read codes are nevertheless
+part of the effective permission contract, so a valid login can never lose a
+catalog capability merely because its role omits that code.
 
 ## Frontend compatibility
 

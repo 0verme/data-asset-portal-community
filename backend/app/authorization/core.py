@@ -31,6 +31,7 @@ from .permissions import (
     ADMIN_ROLE,
     BUILTIN_ROLE_PERMISSION_CODES,
     PERMISSION_CODES,
+    PUBLIC_PERMISSION_CODES,
     is_registered_permission,
 )
 
@@ -142,8 +143,10 @@ class AuthorizationService:
         *,
         authentication: AuthorizationDecision | None = None,
     ) -> tuple[str, ...]:
-        """Return a stable current permission snapshot, or an empty set."""
+        """Return the effective public-plus-role permission snapshot."""
         authentication = authentication or self.authenticate(identity)
+        if identity is None:
+            return tuple(sorted(PUBLIC_PERMISSION_CODES))
         if (
             not authentication.authenticated
             or authentication.subject is None
@@ -152,7 +155,9 @@ class AuthorizationService:
         ):
             return ()
         current = self.repository.get_permissions(authentication.subject.role_code)
-        return tuple(sorted({code for code in current if is_registered_permission(code)}))
+        effective = set(PUBLIC_PERMISSION_CODES)
+        effective.update(code for code in current if is_registered_permission(code))
+        return tuple(sorted(effective))
 
     def authorize(
         self,
@@ -164,12 +169,13 @@ class AuthorizationService:
         """Check one registered permission against current repository state."""
         authentication = authentication or self.authenticate(identity)
         if not authentication.authenticated:
+            public_allowed = identity is None and permission in PUBLIC_PERMISSION_CODES
             return AuthorizationDecision(
                 authenticated=False,
-                allowed=False,
+                allowed=public_allowed,
                 permission=permission,
                 subject=authentication.subject,
-                reason=authentication.reason,
+                reason="public_permission" if public_allowed else authentication.reason,
             )
         if authentication.reason == "role_unknown_or_disabled":
             return AuthorizationDecision(

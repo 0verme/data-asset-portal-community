@@ -45,10 +45,13 @@ read-before-insert seed:
 
 1. `p_role` inserts built-in `admin` and `maintainer` only when absent.
 2. `p_permission` inserts every P0 registry definition in registry order.
-3. `p_role_permission` inserts explicit admin-all and maintainer-compatibility
-   mappings only when absent.
+3. `p_role_permission` inserts explicit admin-all and maintainer role-delta
+   mappings only when absent; public catalog permissions are inherited at
+   authorization time and are not added to new maintainer mappings.
 4. Existing custom role descriptions, custom permissions, and extra mappings
-   are never overwritten or deleted.
+   are never overwritten or deleted. Historical public mappings remain
+   compatible and are filtered from effective role payloads; saving a role uses
+   the existing replacement semantics to normalize its submitted mapping.
 
 `schema_migrate.py apply` runs the seed after baseline/Alembic work and prints
 an insertion summary. The SQLite demo seed invokes the same function before
@@ -58,7 +61,8 @@ still intentionally left for the deployment/bootstrap operator in that SQL
 path.
 
 Repeated seed is a no-op. A new permission is an additive registry/seed diff;
-it does not silently grant unrelated permissions or reset custom mappings.
+it does not silently grant unrelated permissions or reset custom mappings. The
+public/role split is code policy, so Issue #185 requires no schema migration.
 
 ## Verification contract
 
