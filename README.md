@@ -65,27 +65,21 @@ trace field/table mappings, and maintain roots, indicators, and downstream metad
 
 ### Repository Community Demo（真实 remote API，推荐首次体验）
 
-需要 Python 3.10+、Node.js 22.13+ 和 npm 10+。`scripts/community_demo.py` 会在项目目录内准备后端 virtualenv、前端依赖、SQLite、Alembic migration、完整 repository seed，并以 `backend/asgi.py` + Uvicorn 启动真实 FastAPI API 与前端。它与前端 mock 共享仓库模块集合；数据来源、storage profile 和线上静态 Demo revision 可以不同，但不会因 profile 隐藏仓库模块。
+需要 Python 3.10+、Node.js 22.13+ 和 npm 10+。执行以下一键命令后，按终端输出打开 Demo。
 
 Linux/macOS：
 
 ```bash
-git clone https://github.com/0verme/data-asset-portal-community.git
-cd data-asset-portal-community
 ./scripts/demo.sh
 ```
 
 Windows PowerShell：
 
 ```powershell
-git clone https://github.com/0verme/data-asset-portal-community.git
-cd data-asset-portal-community
 .\scripts\demo.ps1
 ```
 
-启动后按终端输出打开 Demo URL，使用账号 `community_demo / demo-change-me` 登录。
-初始化但不启动服务时，使用 `./scripts/demo.sh --init-only` 或
-`.\scripts\demo.ps1 -InitOnly`。详细说明见 [Community Demo 指南](./docs/community-demo.md)。
+详细说明见 [Community Demo 指南](./docs/community-demo.md)。
 
 ### 只看前端（mock mode）
 

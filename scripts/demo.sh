@@ -15,4 +15,5 @@ else
   exit 1
 fi
 
+# Keep the shell wrapper transparent so Python owns option parsing and validation.
 exec "$python_command" "$root_dir/scripts/community_demo.py" "$@"
