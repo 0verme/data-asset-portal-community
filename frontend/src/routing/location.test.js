@@ -183,6 +183,46 @@ test("module URL serialization covers filter, view, mapping, lineage, and system
   assert.equal(system.url, "/system-management/operation-logs");
 });
 
+test("clearing one filter dimension omits only its query parameter", () => {
+  const apiAsset = buildNavigationLocation({
+    module: "apiAsset",
+    routes: { ...emptyRoutes, apiAsset: { page: "list", code: null } },
+    urlState: {
+      apiAsset: {
+        filter: { status: "enabled", method: null, downstreamSystemId: "sys-1" },
+      },
+    },
+  });
+  assert.equal(apiAsset.url, "/api-assets?status=enabled&downstreamSystemId=sys-1");
+
+  const push = buildNavigationLocation({
+    module: "push",
+    routes: { ...emptyRoutes, push: { page: "systems", sys: null, job: null } },
+    urlState: {
+      push: {
+        filter: { status: "enabled", protocol: null, dept: null, importanceLevel: "important" },
+      },
+    },
+  });
+  assert.equal(push.url, "/push?status=enabled&importanceLevel=important");
+});
+
+test("API asset filter deep links distinguish a selected method from all methods", () => {
+  const selected = parseLocation("/api-assets?method=POST&status=enabled");
+  assert.deepEqual(selected.apiAssetFilter, {
+    status: "enabled",
+    method: "POST",
+    downstreamSystemId: null,
+  });
+
+  const all = parseLocation("/api-assets?status=enabled");
+  assert.deepEqual(all.apiAssetFilter, {
+    status: "enabled",
+    method: null,
+    downstreamSystemId: null,
+  });
+});
+
 test("module route mapping is centralized for representative and special modules", () => {
   const routes = {
     asset: "asset",

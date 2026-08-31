@@ -36,6 +36,13 @@ export function PushSidebar({ push, statusOptions, requireLogin, canEdit = false
     <>
       <SidebarFilterGroup
         title="连接协议"
+        allOption={{
+          key: "all-protocols",
+          label: "全部协议",
+          count: pushSystems.length,
+          active: !pushFilter.protocol,
+          onClick: () => setPushFilter((prev) => ({ ...prev, protocol: null })),
+        }}
         items={pushProtocolOptions
           .filter((item) => pushFacets.protocol[item.value])
           .map((item) => ({
@@ -64,6 +71,13 @@ export function PushSidebar({ push, statusOptions, requireLogin, canEdit = false
 
       <SidebarFilterGroup
         title="重要程度"
+        allOption={{
+          key: "all-importance-levels",
+          label: "全部重要程度",
+          count: pushSystems.length,
+          active: !pushFilter.importanceLevel,
+          onClick: () => setPushFilter((prev) => ({ ...prev, importanceLevel: null })),
+        }}
         items={[
           { value: "important", label: "重要" },
           { value: "normal", label: "普通" },
