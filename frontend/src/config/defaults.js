@@ -74,6 +74,6 @@ export const DEFAULT_PUSH_FREQ_TYPE_OPTIONS = [
 ];
 export const DEFAULT_STATUS_OPTIONS = [
   { value: "enabled", name: "启用" },
-  { value: "disabled", name: "停用" },
+  { value: "disabled", name: "禁用" },
 ];
 export const INDICATOR_VIEW_OPTIONS = new Set(["list", "card", "group"]);

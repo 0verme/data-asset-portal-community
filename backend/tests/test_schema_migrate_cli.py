@@ -74,7 +74,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
 
             status = _run_cli(["status", "--profile", "fresh", "--config", str(config)])
             self.assertEqual(0, status.returncode, status.stderr)
-            self.assertIn("revision=0006_field_mapping_upstream_id", status.stdout)
+            self.assertIn("revision=0007_binary_status_contract", status.stdout)
             connection = sqlite3.connect(database)
             try:
                 row = connection.execute(
@@ -123,7 +123,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 self.assertEqual(("Legacy system",), connection.execute(
                     "SELECT system_name FROM dwp.p_system WHERE system_id = 99"
                 ).fetchone())
-                self.assertEqual(("0006_field_mapping_upstream_id",), connection.execute(
+                self.assertEqual(("0007_binary_status_contract",), connection.execute(
                     "SELECT version_num FROM dwp.alembic_version"
                 ).fetchone())
                 self.assertIsNotNone(connection.execute(
@@ -142,6 +142,73 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 )
             finally:
                 connection.close()
+
+    def test_manual_code_table_status_migration_preserves_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "legacy-status.sqlite"
+            config = root / "database.yaml"
+            config.write_text(
+                "profiles:\n  legacy_status:\n    type: sqlite\n"
+                f"    database: {database.as_posix()}\n",
+                encoding="utf-8",
+            )
+            connection = connect({"type": "sqlite", "database": str(database)})
+            try:
+                self.assertTrue(initialize(connection, {"type": "sqlite", "database": str(database)}, "sqlite"))
+                connection.execute("DROP TABLE dwp.p_manual_code_table")
+                connection.execute(
+                    "CREATE TABLE dwp.p_manual_code_table ("
+                    "table_id INTEGER PRIMARY KEY, table_code TEXT NOT NULL UNIQUE, "
+                    "table_name TEXT NOT NULL, table_style TEXT NOT NULL, owner_name TEXT, "
+                    "status_code TEXT NOT NULL DEFAULT 'active', remark TEXT, "
+                    "created_by TEXT NOT NULL DEFAULT 'system', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    "updated_by TEXT NOT NULL DEFAULT 'system', updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    "CHECK (table_style IN ('enum', 'dim', 'status', 'map', 'custom')), "
+                    "CHECK (status_code IN ('active', 'draft', 'disabled'))"
+                    ")"
+                )
+                connection.execute(
+                    "CREATE INDEX dwp.idx_p_manual_code_table_filter "
+                    "ON p_manual_code_table(table_style, status_code, updated_at)"
+                )
+                connection.executemany(
+                    "INSERT INTO dwp.p_manual_code_table "
+                    "(table_id, table_code, table_name, table_style, status_code) VALUES (?, ?, ?, ?, ?)",
+                    [
+                        (101, "LEGACY_ACTIVE", "legacy active", "enum", "active"),
+                        (102, "LEGACY_DRAFT", "legacy draft", "enum", "draft"),
+                        (103, "LEGACY_DISABLED", "legacy disabled", "enum", "disabled"),
+                    ],
+                )
+                connection.execute("UPDATE dwp.alembic_version SET version_num = '0005_rbac_persistence'")
+                connection.commit()
+            finally:
+                connection.close()
+
+            apply = _run_cli(["apply", "--profile", "legacy_status", "--config", str(config)])
+            self.assertEqual(0, apply.returncode, apply.stderr)
+            connection = sqlite3.connect(database)
+            try:
+                rows = connection.execute(
+                    "SELECT table_id, status_code FROM p_manual_code_table ORDER BY table_id"
+                ).fetchall()
+                schema = connection.execute(
+                    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'p_manual_code_table'"
+                ).fetchone()[0].lower()
+                index = connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_p_manual_code_table_filter'"
+                ).fetchone()
+            finally:
+                connection.close()
+            self.assertEqual(
+                [(101, "enabled"), (102, "disabled"), (103, "disabled")],
+                rows,
+            )
+            self.assertIn("default 'enabled'", schema)
+            self.assertIn("status_code in ('enabled', 'disabled')", schema)
+            self.assertNotIn("'draft'", schema)
+            self.assertEqual(("idx_p_manual_code_table_filter",), index)
 
     def test_offline_plan_uses_canonical_repository_schema(self):
         proc = _run_cli(["plan", "--offline", "--dialect", "sqlite"])

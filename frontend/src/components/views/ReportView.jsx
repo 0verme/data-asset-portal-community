@@ -123,7 +123,7 @@ export function ReportView({ report, query, reportRoute, view, onChangeView, can
             impact: "删除后会从台账中移除，并丢失当前维护的关联表和关联指标引用展示。",
             consequences: [
               "删除前以后端校验结果为准。",
-              "若报表已停用但仍需历史留档，应优先保留而非删除。",
+              "若报表已禁用但仍需历史留档，应优先保留而非删除。",
             ],
             confirmKeyword: reportCode,
             confirmKeywordLabel: "请输入报表编码二次确认",

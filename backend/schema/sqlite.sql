@@ -463,14 +463,14 @@ CREATE TABLE IF NOT EXISTS dwp.p_manual_code_table (
     table_name TEXT NOT NULL,
     table_style TEXT NOT NULL,
     owner_name TEXT,
-    status_code TEXT NOT NULL DEFAULT 'active',
+    status_code TEXT NOT NULL DEFAULT 'enabled',
     remark TEXT,
     created_by TEXT NOT NULL DEFAULT 'system',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by TEXT NOT NULL DEFAULT 'system',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (table_style IN ('enum', 'dim', 'status', 'map', 'custom')),
-    CHECK (status_code IN ('active', 'draft', 'disabled'))
+    CHECK (status_code IN ('enabled', 'disabled'))
 );
 CREATE INDEX IF NOT EXISTS dwp.idx_p_manual_code_table_filter
     ON p_manual_code_table (table_style, status_code, updated_at);

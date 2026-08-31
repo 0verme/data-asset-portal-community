@@ -44,7 +44,7 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
         "map": "业务映射",
         "custom": "自定义结构",
     }
-    status_labels = {"active": "启用", "draft": "草稿", "disabled": "停用"}
+    status_labels = {"enabled": "启用", "disabled": "禁用"}
 
     def get_service() -> Any:
         return service

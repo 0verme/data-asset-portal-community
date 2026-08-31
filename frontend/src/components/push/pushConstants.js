@@ -2,7 +2,7 @@ export const DEFAULT_PROTOCOL_OPTIONS = ["HTTP", "OSS"];
 export const DEFAULT_AUTH_OPTIONS = ["密钥认证", "账号密码"];
 export const DEFAULT_STATUS_OPTIONS = [
   { value: "enabled", name: "启用" },
-  { value: "disabled", name: "停用" },
+  { value: "disabled", name: "禁用" },
 ];
 export const DEFAULT_FREQ_TYPE_OPTIONS = [
   { value: "T+1", name: "T+1" },

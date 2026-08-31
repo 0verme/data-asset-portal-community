@@ -72,6 +72,14 @@ class MigrationSchemaParityTests(unittest.TestCase):
                 for column in columns:
                     self.assertRegex(body, rf"\b{column}\b", f"{dialect}.{table}.{column}")
 
+    def test_manual_code_table_status_is_binary_across_dialects(self):
+        for dialect, sql in self.sql.items():
+            body = _table_body(sql, "p_manual_code_table")
+            self.assertIn("default 'enabled'", body, dialect)
+            self.assertIn("status_code in ('enabled', 'disabled')", body, dialect)
+            self.assertNotIn("'active'", body, dialect)
+            self.assertNotIn("'draft'", body, dialect)
+
     def test_primary_and_unique_constraints_exist_across_dialects(self):
         for dialect, sql in self.sql.items():
             normalized = sql.lower()

@@ -113,7 +113,7 @@ export function MenuForm({ form, setForm, errors = [], mode = "new", initial = n
                 if (await confirmDeleteAction({
                   name: initial.name,
                   typeLabel: "菜单",
-                  impact: "该菜单删除后，可能影响系统导航、权限配置和历史访问追溯。建议优先停用，而不是删除。",
+                  impact: "该菜单删除后，可能影响系统导航、权限配置和历史访问追溯。建议优先禁用，而不是删除。",
                   consequences: [
                     "删除前应以后端权限与依赖校验结果为准。",
                     "若后端返回不可删除原因，页面会直接展示原因。",

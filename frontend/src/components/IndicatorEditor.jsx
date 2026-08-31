@@ -240,7 +240,7 @@ export function IndicatorEditor({
       </div>
 
       <FormActionBar
-        note={isEdit ? "保存后会更新指标口径、状态和登记信息。" : "保存后会加入指标维护清单并可立即启停用。"}
+        note={isEdit ? "保存后会更新指标口径、状态和登记信息。" : "保存后会加入指标维护清单并可立即启用或禁用。"}
         onCancel={onCancel}
         onSave={submit}
         saving={saveBusy}
@@ -248,7 +248,7 @@ export function IndicatorEditor({
       />
       {isEdit ? (
         <DangerZone
-          description="删除指标是高风险操作。若指标已被引用，应优先停用而不是删除。"
+          description="删除指标是高风险操作。若指标已被引用，应优先禁用而不是删除。"
           actions={[
             {
               key: "delete-indicator",

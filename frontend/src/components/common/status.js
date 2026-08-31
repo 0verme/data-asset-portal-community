@@ -3,11 +3,21 @@ export const BINARY_STATUS_LABELS = {
   disabled: "禁用",
 };
 
+// Legacy values are read-only compatibility input. New UI options and writes
+// must always use the canonical enabled/disabled pair.
+const LEGACY_BINARY_VALUES = {
+  active: "enabled",
+  inactive: "disabled",
+  draft: "disabled",
+  stop: "disabled",
+  stopped: "disabled",
+};
+
 const LEGACY_BINARY_LABELS = {
-  启用: "启用",
-  停用: "禁用",
-  已启用: "启用",
-  已停用: "禁用",
+  启用: "enabled",
+  停用: "disabled",
+  已启用: "enabled",
+  已停用: "disabled",
 };
 
 export const BINARY_STATUS_OPTIONS = [
@@ -15,17 +25,27 @@ export const BINARY_STATUS_OPTIONS = [
   { value: "disabled", name: BINARY_STATUS_LABELS.disabled },
 ];
 
+export function normalizeBinaryStatusValue(value) {
+  if (value === true) return "enabled";
+  if (value === false) return "disabled";
+  if (typeof value !== "string") return null;
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "enabled" || normalized === "disabled") return normalized;
+  return LEGACY_BINARY_VALUES[normalized] || LEGACY_BINARY_LABELS[value.trim()] || null;
+}
+
 export function getBinaryStatusValue(value) {
-  if (value === "disabled" || value === false) return "disabled";
-  return "enabled";
+  return normalizeBinaryStatusValue(value) || "enabled";
 }
 
 export function normalizeBinaryStatusLabel(value, fallback) {
-  if (value === "enabled" || value === true) return BINARY_STATUS_LABELS.enabled;
-  if (value === "disabled" || value === false) return BINARY_STATUS_LABELS.disabled;
+  const normalized = normalizeBinaryStatusValue(value);
+  if (normalized) return BINARY_STATUS_LABELS[normalized];
 
-  if (typeof fallback === "string" && LEGACY_BINARY_LABELS[fallback]) {
-    return LEGACY_BINARY_LABELS[fallback];
+  if (typeof fallback === "string") {
+    const fallbackValue = normalizeBinaryStatusValue(fallback);
+    if (fallbackValue) return BINARY_STATUS_LABELS[fallbackValue];
   }
 
   return fallback || (typeof value === "string" ? value : "-");
@@ -33,8 +53,13 @@ export function normalizeBinaryStatusLabel(value, fallback) {
 
 export function normalizeBinaryStatusOptions(options = []) {
   const source = Array.isArray(options) && options.length ? options : BINARY_STATUS_OPTIONS;
-  return source.map((item) => ({
-    ...item,
-    name: normalizeBinaryStatusLabel(item?.value, item?.name),
-  }));
+  const seen = new Set();
+  const normalized = [];
+  for (const item of source) {
+    const value = normalizeBinaryStatusValue(item?.value);
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    normalized.push({ ...item, value, name: BINARY_STATUS_LABELS[value] });
+  }
+  return normalized.length ? normalized : BINARY_STATUS_OPTIONS;
 }

@@ -443,14 +443,14 @@ CREATE TABLE IF NOT EXISTS p_manual_code_table (
     table_name VARCHAR(128) NOT NULL,
     table_style VARCHAR(16) NOT NULL,
     owner_name VARCHAR(64),
-    status_code VARCHAR(16) NOT NULL DEFAULT 'active',
+    status_code VARCHAR(16) NOT NULL DEFAULT 'enabled',
     remark VARCHAR(1000),
     created_by VARCHAR(64) NOT NULL DEFAULT 'system',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (table_style IN ('enum', 'dim', 'status', 'map', 'custom')),
-    CHECK (status_code IN ('active', 'draft', 'disabled'))
+    CHECK (status_code IN ('enabled', 'disabled'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 CREATE INDEX idx_p_manual_code_table_filter ON p_manual_code_table (table_style, status_code, updated_at);
 

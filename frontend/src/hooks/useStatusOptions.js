@@ -2,7 +2,7 @@ import { useDictOptions } from "./useDictOptions.js";
 
 const STATUS_FALLBACK = [
   { value: "enabled", name: "启用" },
-  { value: "disabled", name: "停用" },
+  { value: "disabled", name: "禁用" },
 ];
 
 export function useStatusOptions() {
