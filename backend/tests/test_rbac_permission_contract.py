@@ -35,6 +35,9 @@ class RbacPermissionContractTests(unittest.TestCase):
             frozenset(PERMISSION_CODES),
         )
         self.assertIn(MAINTAINER_ROLE, BUILTIN_ROLE_PERMISSION_CODES)
+        self.assertFalse(
+            PUBLIC_PERMISSION_CODES & BUILTIN_ROLE_PERMISSION_CODES[MAINTAINER_ROLE]
+        )
 
     def test_public_and_role_assignable_permission_sets_are_disjoint_and_complete(self):
         self.assertTrue(PUBLIC_PERMISSION_CODES)

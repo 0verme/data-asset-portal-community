@@ -207,5 +207,7 @@ def validate_permission_registry() -> None:
             raise ValueError(
                 f"{role} maps unknown permissions: {', '.join(sorted(unknown))}"
             )
+    if PUBLIC_PERMISSION_CODES & BUILTIN_ROLE_PERMISSION_CODES[MAINTAINER_ROLE]:
+        raise ValueError("maintainer must map only role-assignable permissions")
     if BUILTIN_ROLE_PERMISSION_CODES[ADMIN_ROLE] != frozenset(PERMISSION_CODES):
         raise ValueError("admin must explicitly map every registered permission")
