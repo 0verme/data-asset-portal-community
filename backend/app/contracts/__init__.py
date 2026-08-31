@@ -1,18 +1,34 @@
 """Explicit API contracts shared by FastAPI adapters and services."""
 
+# pyright: reportMissingImports=false
+
+from .field_mapping import (
+    MAX_FIELD_MAPPING_IMPORT_ITEMS,
+    MAX_FIELDS_PER_MAPPING_IMPORT_ITEM,
+    FieldMappingImportAction,
+    FieldMappingImportError,
+    FieldMappingImportFieldRequest,
+    FieldMappingImportIdentity,
+    FieldMappingImportItemRequest,
+    FieldMappingImportItemResult,
+    FieldMappingImportRequest,
+    FieldMappingImportResponse,
+    FieldMappingImportSummary,
+)
 from .metadata_ingestion import (  # type: ignore
-    AssetMetadataIngestionRequest,
-    LineageEdge,
-    LineageEvidence,
-    LineageMetadataIngestionRequest,
-    LineageNode,
-    LineageSnapshot,
     MAX_ASSETS_PER_REQUEST,
     MAX_FIELDS_PER_ASSET,
     MAX_LINEAGE_EDGES,
     MAX_LINEAGE_NODES,
     MAX_METADATA_BODY_BYTES,
     MAX_TOTAL_FIELDS,
+    SUPPORTED_CONTRACT_MAJOR,
+    AssetMetadataIngestionRequest,
+    LineageEdge,
+    LineageEvidence,
+    LineageMetadataIngestionRequest,
+    LineageNode,
+    LineageSnapshot,
     MetadataAsset,
     MetadataCollector,
     MetadataField,
@@ -21,7 +37,6 @@ from .metadata_ingestion import (  # type: ignore
     MetadataSource,
     MetadataStatusResult,
     MetadataSummary,
-    SUPPORTED_CONTRACT_MAJOR,
 )
 from .models import (
     ApiAssetItem,
@@ -65,6 +80,17 @@ from .validation import validate_contract
 
 __all__ = [
     "AssetMetadataIngestionRequest",
+    "FieldMappingImportAction",
+    "FieldMappingImportError",
+    "FieldMappingImportFieldRequest",
+    "FieldMappingImportIdentity",
+    "FieldMappingImportItemRequest",
+    "FieldMappingImportItemResult",
+    "FieldMappingImportRequest",
+    "FieldMappingImportResponse",
+    "FieldMappingImportSummary",
+    "MAX_FIELD_MAPPING_IMPORT_ITEMS",
+    "MAX_FIELDS_PER_MAPPING_IMPORT_ITEM",
     "AssetField",
     "AssetItem",
     "AssetPageResponse",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 # pyright: reportMissingImports=false
+
 import os
 import tempfile
 import unittest
@@ -67,11 +68,16 @@ class RbacRoleManagementTests(unittest.TestCase):
         self.service = SystemManagementService()
         repository = MagicMock()
         repository.get_subject.return_value = AuthorizationSubject("admin", "admin")
-        repository.get_permissions.return_value = {"system:role:read", "system:role:write"}
+        repository.get_permissions.return_value = {
+            "system:role:read",
+            "system:role:write",
+        }
         authorization = AuthorizationService(repository)
         self.client = TestClient(
             create_fastapi_app(
-                identity_resolver=lambda _request: Identity("admin", "admin", "Administrator"),
+                identity_resolver=lambda _request: Identity(
+                    "admin", "admin", "Administrator"
+                ),
                 authorization_service_instance=authorization,
                 system_management_service_instance=self.service,
             )
@@ -91,15 +97,18 @@ class RbacRoleManagementTests(unittest.TestCase):
     def test_lists_registry_permissions_and_builtin_roles(self):
         permissions = self.service.get_permissions()
         self.assertEqual("asset:read", permissions[0]["code"])
-        self.assertEqual(29, len(permissions))
+        self.assertEqual(30, len(permissions))
         assignable = self.service.get_role_assignable_permissions()
-        self.assertEqual(21, len(assignable))
-        self.assertFalse(PUBLIC_PERMISSION_CODES & {item["code"] for item in assignable})
+        self.assertEqual(22, len(assignable))
+        self.assertFalse(
+            PUBLIC_PERMISSION_CODES & {item["code"] for item in assignable}
+        )
 
         roles = self.service.get_roles()
         self.assertEqual(["admin", "maintainer"], [item["roleCode"] for item in roles])
         self.assertTrue(roles[0]["builtin"])
-        self.assertEqual(21, len(roles[0]["permissionCodes"]))
+        self.assertEqual(22, len(roles[0]["permissionCodes"]))
+        self.assertEqual(14, len(roles[1]["permissionCodes"]))
 
     def test_permission_api_keeps_full_registry_and_filters_role_candidates(self):
         full = self.client.get("/api/system/permissions")
@@ -107,9 +116,9 @@ class RbacRoleManagementTests(unittest.TestCase):
 
         self.assertEqual(200, full.status_code)
         self.assertEqual(200, assignable.status_code)
-        self.assertEqual(29, len(full.json()["items"]))
+        self.assertEqual(30, len(full.json()["items"]))
         assignable_codes = {item["code"] for item in assignable.json()["items"]}
-        self.assertEqual(21, len(assignable_codes))
+        self.assertEqual(22, len(assignable_codes))
         self.assertFalse(PUBLIC_PERMISSION_CODES & assignable_codes)
 
     def test_custom_role_replaces_permission_mapping(self):
@@ -135,17 +144,28 @@ class RbacRoleManagementTests(unittest.TestCase):
         )
         self.connection.commit()
 
-        role = next(item for item in self.service.get_roles() if item["roleCode"] == "legacy-role")
+        role = next(
+            item
+            for item in self.service.get_roles()
+            if item["roleCode"] == "legacy-role"
+        )
         self.assertEqual(["asset:write"], role["permissionCodes"])
 
     def test_builtin_roles_are_protected(self):
         with self.assertRaises(SystemRoleProtectedError):
-            self.service.update_role("admin", {"name": "Changed", "permissionCodes": []})
+            self.service.update_role(
+                "admin", {"name": "Changed", "permissionCodes": []}
+            )
         for role_code in ("admin", "maintainer"):
-            with self.subTest(role_code=role_code), self.assertRaises(SystemRoleProtectedError):
+            with (
+                self.subTest(role_code=role_code),
+                self.assertRaises(SystemRoleProtectedError),
+            ):
                 self.service.delete_role(role_code)
         with self.assertRaises(SystemRoleProtectedError):
-            self.service.create_role({"roleCode": "admin", "name": "Duplicate", "permissionCodes": []})
+            self.service.create_role(
+                {"roleCode": "admin", "name": "Duplicate", "permissionCodes": []}
+            )
 
     def test_delete_unknown_role_is_not_found(self):
         with self.assertRaises(SystemRoleNotFoundError):
@@ -201,7 +221,10 @@ class RbacRoleManagementTests(unittest.TestCase):
             execute([statements[0]])
             raise RuntimeError("role delete failed")
 
-        with patch.object(self.service, "_core_execute", side_effect=fail_after_mapping), self.assertRaisesRegex(RuntimeError, "role delete failed"):
+        with (
+            patch.object(self.service, "_core_execute", side_effect=fail_after_mapping),
+            self.assertRaisesRegex(RuntimeError, "role delete failed"),
+        ):
             self.service.delete_role("transactional-role")
 
         self.assertIsNotNone(
@@ -305,9 +328,15 @@ class RbacRoleManagementTests(unittest.TestCase):
             "VALUES (2, 'maintainer-user', 'hash', 'Maintainer', 'maintainer', 'ACTIVE')"
         )
         self.connection.commit()
-        updated = self.service.update_user_role("maintainer-user", {"role": "indicator-maintainer"})
+        updated = self.service.update_user_role(
+            "maintainer-user", {"role": "indicator-maintainer"}
+        )
         self.assertEqual("indicator-maintainer", updated["role"])
-        current = next(item for item in self.service.get_users() if item["username"] == "maintainer-user")
+        current = next(
+            item
+            for item in self.service.get_users()
+            if item["username"] == "maintainer-user"
+        )
         self.assertEqual("indicator-maintainer", current["role"])
 
     def test_unknown_permission_and_unknown_user_role_are_rejected(self):

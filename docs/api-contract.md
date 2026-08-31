@@ -412,6 +412,7 @@ Base Path: `/api/field-mappings`
 - `GET /api/field-mappings/stats`
 - `GET /api/field-mappings/fields`
 - `GET /api/field-mappings/tables`
+- `POST /api/field-mappings/import`（需要 `field_mapping:write`）
 
 ### 3.3 查询参数
 
@@ -444,6 +445,88 @@ Base Path: `/api/field-mappings`
   "page": 1,
   "pageSize": 20
 }
+```
+
+### 3.5 批量导入
+
+`POST /api/field-mappings/import` 使用正式 Pydantic Contract，一次请求可提交多张表。当前只支持 `mode: "upsert"`：
+
+```json
+{
+  "mode": "upsert",
+  "dryRun": false,
+  "items": [
+    {
+      "sourceSystemId": 103,
+      "sourceTable": "ODS_CORE_ACCOUNT",
+      "sourceTableCn": "账户信息",
+      "targetLayer": "DWF",
+      "targetTable": "DWF_ACCOUNT",
+      "loadMode": "incr",
+      "tableDesc": "账户加工",
+      "fields": [
+        {
+          "sourceField": "ACCOUNT_NO",
+          "sourceType": "VARCHAR(64)",
+          "sourceComment": "账号",
+          "targetField": "ACCOUNT_NO",
+          "mappingRule": "直接映射",
+          "fieldOrder": 1
+        }
+      ]
+    }
+  ]
+}
+```
+
+表映射业务身份按当前 canonical schema 的 `sourceSystemId + sourceTable` 解析，其中 `sourceSystemId` 对应 `p_upstream_system.system_pk`；`dataSourceId` 仅作为兼容输入，只有能唯一解析到一个有效上游系统时才接受。字段映射身份按所属表的 `sourceField + targetField` 解析。已有记录会返回 `created`、`updated` 或 `unchanged`，同一请求中的异常 item 返回 `failed`、`index`、`identity` 和错误码。请求遗漏的旧字段不会被删除；table 与 fields 在每个 item 的事务内一起提交。成功的真实 create/update 会清理映射统计缓存；`unchanged` 不写入伪修改审计。`dryRun: true` 只做校验和 action 预判，不写业务表、审计或缓存。
+
+接口返回直接的导入响应：
+
+```json
+{
+  "mode": "upsert",
+  "dryRun": true,
+  "summary": {
+    "received": 1,
+    "created": 1,
+    "updated": 0,
+    "unchanged": 0,
+    "failed": 0,
+    "fieldCount": 1,
+    "createdFieldCount": 1,
+    "updatedFieldCount": 0,
+    "unchangedFieldCount": 0
+  },
+  "items": [
+    {
+      "index": 0,
+      "identity": {
+        "sourceSystemId": 103,
+        "upstreamSystemId": 103,
+        "dataSourceId": 12,
+        "sourceTable": "ODS_CORE_ACCOUNT",
+        "targetTable": "DWF_ACCOUNT"
+      },
+      "action": "created",
+      "fieldCount": 1,
+      "createdFieldCount": 1,
+      "updatedFieldCount": 0,
+      "unchangedFieldCount": 0
+    }
+  ]
+}
+```
+
+DWS 解析脚本保留源端只读 metadata 查询，但不再连接或写入 Portal 的 mapping business tables。脚本通过现有 signed session cookie 认证，不引入第二套 token 管理；凭据只通过安全运行时变量注入。例如：
+
+```powershell
+$env:DAP_SESSION_COOKIE = 'session=<signed-cookie-value>'
+python backend/scripts/imp_dws_comments.py `
+  --directory 'D:\dws-scripts' `
+  --api-base-url 'http://127.0.0.1:5099' `
+  --batch-size 100 `
+  --dry-run
 ```
 
 ## 4. 指标维护模块 `indicators`

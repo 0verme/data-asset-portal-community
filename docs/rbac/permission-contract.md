@@ -73,6 +73,7 @@ permissions.
 | `code_table:read` | code_table | read | Public list/detail/export read with audit-field redaction; inherited and never role-configured. |
 | `code_table:write` | code_table | write | Protected manual code table create/update/status/delete. |
 | `field_mapping:read` | field_mapping | read | Public catalog read; inherited and never role-configured. |
+| `field_mapping:write` | field_mapping | write | Protected batch Field Mapping import and idempotent upsert. |
 | `lineage:read` | lineage | read | Public graph read with nested-value redaction; inherited and never role-configured. |
 | `metadata:read` | metadata | read | Protected ingestion result lookup. |
 | `metadata:write` | metadata | write | Protected asset/lineage Metadata Ingestion and preview/bulk aliases. |
@@ -137,8 +138,9 @@ for P3; ordinary public catalog reads are now governed by Issue #180.
 | push | `POST /api/push/systems`, `PUT /api/push/systems/{system_id}`, `DELETE /api/push/systems/{system_id}`, `POST /api/push/systems/{system_id}/jobs`, `PUT /api/push/systems/{system_id}/jobs/{job_id}`, `DELETE /api/push/systems/{system_id}/jobs/{job_id}` | No | Yes | Yes | Yes | Yes | `push:write` |
 | code table | `GET /api/manual-code-tables`, `GET /api/manual-code-tables/export`, `GET /api/manual-code-tables/{table_id}` | Yes | — | — | — | No | Public; `code_table:read` reserved |
 | code table | `POST /api/manual-code-tables`, `PUT /api/manual-code-tables/{table_id}`, `PATCH /api/manual-code-tables/{table_id}/status`, `DELETE /api/manual-code-tables/{table_id}` | No | Yes | Yes | Yes | Yes | `code_table:write` |
-| field mapping | `GET /api/field-mappings/source-systems`, `GET /api/field-mappings/stats`, `GET /api/field-mappings/fields`, `GET /api/field-mappings/tables` | Yes | — | — | — | No | Public; `field_mapping:read` reserved |
-| lineage | `GET /api/lineage/bootstrap`, `GET /api/lineage/assets`, `GET /api/lineage/subgraph`, `GET /api/lineage/initial-view` | Yes | — | — | — | No | Public; `lineage:read` reserved |
+| field mapping | `GET /api/field-mappings/source-systems`, `GET /api/field-mappings/stats`, `GET /api/field-mappings/fields`, `GET /api/field-mappings/tables` | Yes | — | — | — | No | Public; `field_mapping:read` inherited |
+| field mapping | `POST /api/field-mappings/import` | No | Yes | Yes | Yes | Yes | `field_mapping:write` |
+| lineage | `GET /api/lineage/bootstrap`, `GET /api/lineage/assets`, `GET /api/lineage/subgraph`, `GET /api/lineage/initial-view` | Yes | — | — | — | No | Public; `lineage:read` inherited |
 | metadata | `POST /api/metadata/assets/ingestions`, hidden alias `POST /api/metadata/assets:bulk-upsert` | No | Yes | Yes | Yes | Yes | `metadata:write` |
 | metadata | `POST /api/metadata/lineage/ingestions`, hidden alias `POST /api/metadata/lineage:snapshots` | No | Yes | Yes | Yes | Yes | `metadata:write` |
 | metadata | `GET /api/metadata/ingestions/{ingestion_id}` | No | Yes | Yes | Yes | No | `metadata:read` |
@@ -196,6 +198,7 @@ require the existing authentication/permission boundary.
 | `code_table:read` | Yes | Inherited | No |
 | `code_table:write` | Yes | Yes | No |
 | `field_mapping:read` | Yes | Inherited | No |
+| `field_mapping:write` | Yes | Yes | No |
 | `lineage:read` | Yes | Inherited | No |
 | `metadata:read` | Yes | Yes | No |
 | `metadata:write` | Yes | Yes | No |

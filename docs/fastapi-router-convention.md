@@ -68,7 +68,7 @@ surface.
 | --- | --- | --- | --- | ---: | --- | --- |
 | operation logs | `_register_operation_log_routes` | operation-log service | `/api/operation-logs` | 2 | LOW | pilot (#146) |
 | lineage | `_register_lineage_routes` | reader adapter / external storage | `/api/lineage` | 4 | MEDIUM | next low-risk batch |
-| field mappings | `_register_field_mapping_routes` | field-mapping service | `/api/field-mappings` | 4 | LOW | next low-risk batch |
+| field mappings | `_register_field_mapping_routes` | field-mapping service / `field_mapping:write` | `/api/field-mappings` | 5 | MEDIUM | batch import (#187) |
 | reports | `_register_report_routes` | report service | `/api/reports` | 5 | MEDIUM | after pilot validation |
 | roots | `_register_root_routes` | root service | `/api/roots` | 7 | MEDIUM | after pilot validation |
 | manual code tables | `_register_manual_code_table_routes` | code-table service | `/api/manual-code-tables` | 7 | MEDIUM | mutation batch |

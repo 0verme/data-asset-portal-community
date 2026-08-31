@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-"""Load DWS mapping scripts into p_field_mapping_table and p_field_mapping_field."""
+"""Parse DWS mapping scripts and submit a Field Mapping import contract."""
 
 from __future__ import annotations
 
@@ -8,15 +7,16 @@ import os
 import re
 import sys
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
+from typing import Any
 
+import httpx  # pyright: ignore[reportMissingImports]
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.db.facade import connect_with_profile, fetch_all, resolve_db_profile_name
+from app.db.facade import fetch_all, resolve_db_profile_name  # noqa: E402, I001
 
 
 # 默认脚本目录：优先环境变量，其次 generic 部署路径。
@@ -29,7 +29,6 @@ DEFAULT_TARGET_LAYER = "DWF"
 DEFAULT_MAPPING_RULE = "\u76f4\u63a5\u6620\u5c04"
 FALLBACK_MAPPING_RULE = "\u5f85\u8865\u5145"
 DATE_MAPPING_RULE = "\u65e5\u671f\u683c\u5f0f\u5316"
-SYSTEM_USER = "system"
 LOAD_MODE_FULL = "full"
 LOAD_MODE_INCR = "incr"
 LOAD_MODE_INCR_ZIP = "incr_zip"
@@ -60,10 +59,7 @@ class TableMappingRow:
     source_table_cn: str
     target_table_name: str
     load_mode: str
-    field_total_count: int
-    mapped_field_count: int
     table_desc: str
-    latest_mapping_time: str
     fields: list[FieldMappingRow]
     source_columns: dict[str, dict[str, str]]
 
@@ -87,21 +83,66 @@ class ParsedScriptRow:
     fields: list[FieldMappingRow]
 
 
-@dataclass
-class FieldMappingTableLayout:
-    has_upstream_system_id: bool
-    has_system_pk: bool
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(str(value))
+    except (TypeError, ValueError) as error:
+        raise argparse.ArgumentTypeError("must be a positive integer") from error
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
+def _positive_float(value: str) -> float:
+    try:
+        parsed = float(str(value))
+    except (TypeError, ValueError) as error:
+        raise argparse.ArgumentTypeError("must be greater than zero") from error
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+    return parsed
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Parse DWS INSERT...SELECT scripts and load app field mapping tables."
+        description="Parse DWS INSERT...SELECT scripts and submit Field Mapping imports through the Portal API."
     )
-    parser.add_argument("--profile", default="gauss_primary", help="Database profile name. Defaults to ASSET_DB_PROFILE.")
+    parser.add_argument(
+        "--profile",
+        default=None,
+        help="Source metadata database profile. Defaults to ASSET_DB_PROFILE or gauss_primary.",
+    )
     parser.add_argument(
         "--directory",
         default=DEFAULT_DIRECTORY,
         help="Directory containing ETL Python files. Defaults to DWS_SCRIPT_DIR env or /opt/data-asset-portal/dws-scripts.",
+    )
+    parser.add_argument(
+        "--api-base-url",
+        default=os.environ.get("DAP_API_BASE_URL", ""),
+        help="Portal API base URL. Can also be set with DAP_API_BASE_URL.",
+    )
+    parser.add_argument(
+        "--session-cookie",
+        default=os.environ.get("DAP_SESSION_COOKIE"),
+        help="Existing Portal session cookie value. Prefer DAP_SESSION_COOKIE; never commit it.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate and classify imports without changing Portal data.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=_positive_int,
+        default=100,
+        help="Number of table mappings per API request (default: 100).",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=_positive_float,
+        default=30.0,
+        help="HTTP request timeout in seconds (default: 30).",
     )
     return parser.parse_args()
 
@@ -158,7 +199,11 @@ def split_select_items(text: str) -> list[str]:
 def parse_target_fields(raw_fields: str | None) -> list[str]:
     if not raw_fields:
         return []
-    return [field.strip().strip('"').upper() for field in split_select_items(raw_fields) if field.strip()]
+    return [
+        field.strip().strip('"').upper()
+        for field in split_select_items(raw_fields)
+        if field.strip()
+    ]
 
 
 def extract_block(sql: str, start_pattern: str, end_pattern: str) -> str:
@@ -202,9 +247,15 @@ def find_first_insert_sql(file_path: str) -> str:
     if not start:
         return ""
 
-    tail = content[start.start():]
+    tail = content[start.start() :]
     markers: list[int] = []
-    for pattern in (r'"""\s*$', r"'''\s*$", r"\n\s*run_sql", r"\n\s*def\s+", r"\n\s*class\s+"):
+    for pattern in (
+        r'"""\s*$',
+        r"'''\s*$",
+        r"\n\s*run_sql",
+        r"\n\s*def\s+",
+        r"\n\s*class\s+",
+    ):
         match = re.search(pattern, tail, re.IGNORECASE | re.MULTILINE)
         if match:
             markers.append(match.start())
@@ -243,7 +294,9 @@ def find_py_files(directory: str) -> list[str]:
 
 def extract_table_mapping(sql: str) -> tuple[str, str]:
     normalized = re.sub(r"\s+", " ", normalize_sql(sql))
-    insert_match = re.search(r"INSERT\s+INTO\s+([A-Z0-9_.$\"]+)", normalized, re.IGNORECASE)
+    insert_match = re.search(
+        r"INSERT\s+INTO\s+([A-Z0-9_.$\"]+)", normalized, re.IGNORECASE
+    )
     if not insert_match:
         raise ValueError("Cannot find target table after INSERT INTO")
 
@@ -263,24 +316,34 @@ def parse_select_item(select_item: str, target_field: str) -> tuple[str, str]:
     if alias_match:
         item = item[: alias_match.start()].strip()
 
-    direct_match = re.fullmatch(r'(?:[A-Z_][A-Z0-9_]*\.)?"?([A-Z_][A-Z0-9_]*)"?', item, re.IGNORECASE)
+    direct_match = re.fullmatch(
+        r'(?:[A-Z_][A-Z0-9_]*\.)?"?([A-Z_][A-Z0-9_]*)"?', item, re.IGNORECASE
+    )
     if direct_match:
         source_field = direct_match.group(1).upper()
         return source_field, infer_mapping_rule(item, source_field, target_field)
 
     fallback_field = re.sub(r"\s+", "", target_field).upper()
-    return fallback_field, infer_mapping_rule(item, fallback_field, target_field, direct=False)
+    return fallback_field, infer_mapping_rule(
+        item, fallback_field, target_field, direct=False
+    )
 
 
-def infer_mapping_rule(select_item: str, source_field: str, target_field: str, direct: bool = True) -> str:
+def infer_mapping_rule(
+    select_item: str, source_field: str, target_field: str, direct: bool = True
+) -> str:
     upper_item = select_item.upper()
     if not direct:
-        if "TO_DATE" in upper_item or "DATE_FORMAT" in upper_item or "YYYY-MM-DD" in upper_item:
+        if (
+            "TO_DATE" in upper_item
+            or "DATE_FORMAT" in upper_item
+            or "YYYY-MM-DD" in upper_item
+        ):
             return DATE_MAPPING_RULE
         return FALLBACK_MAPPING_RULE
     if source_field == target_field:
         return DEFAULT_MAPPING_RULE
-    if source_field.endswith("_DT") or source_field.endswith("_DATE") or target_field.endswith("_DATE"):
+    if source_field.endswith(("_DT", "_DATE")) or target_field.endswith("_DATE"):
         return DATE_MAPPING_RULE
     return DEFAULT_MAPPING_RULE
 
@@ -299,7 +362,9 @@ def extract_insert_select_mapping(sql: str) -> list[FieldMappingRow]:
         return []
 
     field_rows: list[FieldMappingRow] = []
-    for index, (target_field, select_item) in enumerate(zip(target_fields, select_items), start=1):
+    for index, (target_field, select_item) in enumerate(
+        zip(target_fields, select_items, strict=False), start=1
+    ):
         source_field_name, mapping_rule = parse_select_item(select_item, target_field)
         inline_comment = ""
         if index - 1 < len(select_comments):
@@ -335,14 +400,6 @@ def split_schema_table(table_name: str) -> tuple[str | None, str]:
     return schema_name.strip('"').upper(), raw_table.strip('"').upper()
 
 
-def escape_sql(value: object) -> str:
-    if value is None:
-        return "NULL"
-    if isinstance(value, (int, float)):
-        return str(value)
-    return "'" + str(value).replace("'", "''") + "'"
-
-
 def truncate_text(value: str, max_length: int) -> str:
     normalized = (value or "").strip()
     encoded = normalized.encode("utf-8")
@@ -352,14 +409,29 @@ def truncate_text(value: str, max_length: int) -> str:
 
 
 def rows_to_dicts(columns: list[str], rows: list[tuple]) -> list[dict[str, object]]:
-    return [dict(zip(columns, row)) for row in rows]
+    return [dict(zip(columns, row, strict=True)) for row in rows]
+
+
+def _safe_int(value: object, default: int = 0) -> int:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError, OverflowError):
+        return default
 
 
 def build_schema_name_set(table_names: list[str]) -> set[str]:
-    schema_names = {schema_name for schema_name, _raw_table in (split_schema_table(name) for name in table_names) if schema_name}
+    schema_names = {
+        schema_name
+        for schema_name, _raw_table in (
+            split_schema_table(name) for name in table_names
+        )
+        if schema_name
+    }
     return schema_names or {"DWO"}
 
 
+# Source Metadata Read-only Adapter: the following queries only read DWS/source
+# metadata needed to construct the public import payload.
 def load_upstream_system_map(profile: str) -> dict[str, int]:
     """Resolve only unique machine/readable upstream identities.
 
@@ -379,7 +451,9 @@ WHERE is_deleted = 'N'
     columns, rows = fetch_all(profile, sql)
     candidates: dict[str, set[int]] = {}
     for row in rows_to_dicts(columns, rows):
-        system_pk = int(row["system_pk"])
+        system_pk = _safe_int(row.get("system_pk"))
+        if system_pk <= 0:
+            continue
         for key in ("system_abbr", "system_id"):
             value = str(row.get(key) or "").strip().upper()
             if value:
@@ -406,74 +480,65 @@ def load_recv_dwf_map(profile: str) -> dict[str, RecvDwfMeta]:
         recv_plan = str(row.get("recv_plan") or "").strip().lower()
         data_source = str(row.get("data_source") or "").strip().upper()
         if table_name:
-            mapping[table_name] = RecvDwfMeta(load_mode=recv_plan, data_source=data_source)
+            mapping[table_name] = RecvDwfMeta(
+                load_mode=recv_plan, data_source=data_source
+            )
     return mapping
 
 
-def load_field_mapping_table_layout(profile: str) -> FieldMappingTableLayout:
-    sql = """
-SELECT UPPER(column_name) AS column_name
-FROM information_schema.columns
-WHERE UPPER(table_schema) = 'DWP'
-  AND UPPER(table_name) = 'P_FIELD_MAPPING_TABLE'
-"""
-    columns, rows = fetch_all(profile, sql)
-    column_names = {
-        str(row["column_name"]).upper()
-        for row in rows_to_dicts(columns, rows)
-    }
-    return FieldMappingTableLayout(
-        has_upstream_system_id="UPSTREAM_SYSTEM_ID" in column_names,
-        has_system_pk="SYSTEM_PK" in column_names,
-    )
-
-
-def load_table_comment_map(profile: str, table_names: list[str]) -> dict[tuple[str | None, str], str]:
+def load_table_comment_map(
+    profile: str, table_names: list[str]
+) -> dict[tuple[str | None, str], str]:
     if not table_names:
         return {}
 
     comments: dict[tuple[str | None, str], str] = {}
     for schema_name in sorted(build_schema_name_set(table_names)):
         print(f"[meta] loading table comments for schema={schema_name}")
-        sql = f"""
+        sql = """
 SELECT COALESCE(MAX("comments"), '') AS table_comment
      , UPPER(table_name) AS raw_table
 FROM all_tab_comments
-WHERE UPPER(owner) = {escape_sql(schema_name)}
+WHERE UPPER(owner) = ?
 GROUP BY UPPER(table_name)
 """
-        columns, rows = fetch_all(profile, sql)
+        columns, rows = fetch_all(profile, sql, params=(schema_name,))
         for row in rows_to_dicts(columns, rows):
             raw_table = str(row["raw_table"]).upper()
-            comments[(schema_name, raw_table)] = str(row.get("table_comment") or "").strip()
+            comments[(schema_name, raw_table)] = str(
+                row.get("table_comment") or ""
+            ).strip()
     return comments
 
 
-def load_source_column_map(profile: str, table_names: list[str]) -> dict[str, dict[str, dict[str, str]]]:
+def load_source_column_map(
+    profile: str, table_names: list[str]
+) -> dict[str, dict[str, dict[str, str]]]:
     if not table_names:
         return {}
 
-    table_pairs = {split_schema_table(table_name) for table_name in table_names}
     comments_by_table: dict[tuple[str | None, str], dict[str, str]] = {}
     for schema_name in sorted(build_schema_name_set(table_names)):
         print(f"[meta] loading column comments for schema={schema_name}")
-        comment_sql = f"""
+        comment_sql = """
 SELECT UPPER(column_name) AS column_name, COALESCE("comments", '') AS column_comment
      , UPPER(table_name) AS raw_table
 FROM all_col_comments
-WHERE UPPER(owner) = {escape_sql(schema_name)}
+WHERE UPPER(owner) = ?
 """
-        comment_columns, comment_rows = fetch_all(profile, comment_sql)
+        comment_columns, comment_rows = fetch_all(
+            profile, comment_sql, params=(schema_name,)
+        )
         for row in rows_to_dicts(comment_columns, comment_rows):
             raw_table = str(row["raw_table"]).upper()
-            comments_by_table.setdefault((schema_name, raw_table), {})[str(row["column_name"]).upper()] = str(
-                row.get("column_comment") or ""
-            ).strip()
+            comments_by_table.setdefault((schema_name, raw_table), {})[
+                str(row["column_name"]).upper()
+            ] = str(row.get("column_comment") or "").strip()
 
     data_types_by_table: dict[tuple[str | None, str], dict[str, str]] = {}
     for schema_name in sorted(build_schema_name_set(table_names)):
         print(f"[meta] loading column types for schema={schema_name}")
-        type_sql = f"""
+        type_sql = """
 SELECT
     UPPER(COALESCE(table_schema, '')) AS table_schema,
     UPPER(table_name) AS raw_table,
@@ -488,15 +553,15 @@ SELECT
         ''
     ) AS data_type
 FROM information_schema.columns
-WHERE UPPER(table_schema) = {escape_sql(schema_name)}
+WHERE UPPER(table_schema) = ?
 """
-        type_columns, type_rows = fetch_all(profile, type_sql)
+        type_columns, type_rows = fetch_all(profile, type_sql, params=(schema_name,))
         for row in rows_to_dicts(type_columns, type_rows):
             raw_table = str(row["raw_table"]).upper()
             key = (schema_name, raw_table)
-            data_types_by_table.setdefault(key, {})[str(row["column_name"]).upper()] = str(
-                row.get("data_type") or ""
-            ).strip().upper()
+            data_types_by_table.setdefault(key, {})[str(row["column_name"]).upper()] = (
+                str(row.get("data_type") or "").strip().upper()
+            )
 
     result: dict[str, dict[str, dict[str, str]]] = {}
     for table_name in table_names:
@@ -517,7 +582,6 @@ WHERE UPPER(table_schema) = {escape_sql(schema_name)}
 def build_table_rows(profile: str, directory: str) -> list[TableMappingRow]:
     upstream_system_map = load_upstream_system_map(profile)
     recv_dwf_map = load_recv_dwf_map(profile)
-    now_text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     parsed_rows: list[ParsedScriptRow] = []
     skipped_tables: list[str] = []
@@ -534,7 +598,9 @@ def build_table_rows(profile: str, directory: str) -> list[TableMappingRow]:
         _legacy_system_abbr, source_table_name = parse_source_identity(source_table)
         recv_dwf_meta = recv_dwf_map.get(target_table)
         if recv_dwf_meta is None:
-            skipped_tables.append(f"skip: missing p_recv_dwf metadata, target_table={target_table}, file={py_file}")
+            skipped_tables.append(
+                f"skip: missing p_recv_dwf metadata, target_table={target_table}, file={py_file}"
+            )
             print(f"[skip] missing p_recv_dwf metadata: {target_table} ({py_file})")
             continue
 
@@ -559,7 +625,9 @@ def build_table_rows(profile: str, directory: str) -> list[TableMappingRow]:
                 source_table=source_table,
                 source_table_name=source_table_name,
                 target_table=target_table,
-                recv_dwf_meta=RecvDwfMeta(load_mode=load_mode, data_source=recv_dwf_meta.data_source),
+                recv_dwf_meta=RecvDwfMeta(
+                    load_mode=load_mode, data_source=recv_dwf_meta.data_source
+                ),
                 upstream_system_id=upstream_system_id,
                 description=description,
                 fields=fields,
@@ -574,8 +642,10 @@ def build_table_rows(profile: str, directory: str) -> list[TableMappingRow]:
     table_rows: list[TableMappingRow] = []
     for row in parsed_rows:
         source_columns = source_columns_map.get(row.source_table, {})
-        source_table_cn = table_comment_map.get(split_schema_table(row.source_table), "") or row.source_table_name
-        mapped_field_count = sum(1 for field in row.fields if field.target_field_name)
+        source_table_cn = (
+            table_comment_map.get(split_schema_table(row.source_table), "")
+            or row.source_table_name
+        )
         table_rows.append(
             TableMappingRow(
                 upstream_system_id=row.upstream_system_id,
@@ -585,10 +655,7 @@ def build_table_rows(profile: str, directory: str) -> list[TableMappingRow]:
                 source_table_cn=source_table_cn,
                 target_table_name=row.target_table,
                 load_mode=row.recv_dwf_meta.load_mode,
-                field_total_count=len(row.fields),
-                mapped_field_count=mapped_field_count,
                 table_desc=row.description,
-                latest_mapping_time=now_text,
                 fields=row.fields,
                 source_columns=source_columns,
             )
@@ -600,7 +667,7 @@ def build_table_rows(profile: str, directory: str) -> list[TableMappingRow]:
 
 def validate_table_rows(table_rows: list[TableMappingRow]) -> None:
     duplicate_messages: list[str] = []
-    for table_pk, table_row in enumerate(table_rows, start=1):
+    for table_index, table_row in enumerate(table_rows, start=1):
         seen_pairs: set[tuple[str, str]] = set()
         duplicate_pairs: list[tuple[str, str]] = []
         for field in table_row.fields:
@@ -615,202 +682,215 @@ def validate_table_rows(table_rows: list[TableMappingRow]) -> None:
             seen_pairs.add(pair)
         if duplicate_pairs:
             duplicate_messages.append(
-                "table_pk={table_pk}, source_table={source_table}, source_table_name={source_table_name}, "
-                "target_table={target_table}, file={file_path}, duplicate_field_mappings={duplicate_fields}".format(
-                    table_pk=table_pk,
-                    source_table=table_row.source_table,
-                    source_table_name=table_row.source_table_name,
-                    target_table=table_row.target_table_name,
-                    file_path=table_row.file_path,
-                    duplicate_fields="; ".join(
-                        f"{source_field_name} -> {target_field_name or '<EMPTY>'}"
-                        for source_field_name, target_field_name in duplicate_pairs
-                    ),
+                f"item={table_index}, source_table={table_row.source_table}, "
+                f"target_table={table_row.target_table_name}, file={table_row.file_path}, "
+                "duplicate_field_mappings="
+                + "; ".join(
+                    f"{source_field_name} -> {target_field_name or '<EMPTY>'}"
+                    for source_field_name, target_field_name in duplicate_pairs
                 )
             )
     if duplicate_messages:
         raise ValueError(
-            "Duplicate source/target field mapping detected before insert into dwp.p_field_mapping_field.\n"
+            "Duplicate source/target field mapping detected before API submission.\n"
             + "\n".join(duplicate_messages)
         )
 
 
-def build_table_insert_statement(
-    table_row: TableMappingRow,
-    table_pk: int,
-    layout: FieldMappingTableLayout,
-    now_text: str,
-) -> str:
-    table_columns = ["table_pk"]
-    table_values = [str(table_pk)]
-    if layout.has_upstream_system_id:
-        table_columns.append("upstream_system_id")
-        table_values.append(str(table_row.upstream_system_id))
-    if layout.has_system_pk:
-        table_columns.append("system_pk")
-        table_values.append(str(table_row.upstream_system_id))
-    table_columns.extend(
-        [
-            "source_table_name",
-            "source_table_cn",
-            "target_layer_code",
-            "target_table_name",
-            "load_mode",
-            "field_total_count",
-            "mapped_field_count",
-            "latest_mapping_time",
-            "table_desc",
-            "is_deleted",
-            "created_by",
-            "created_at",
-            "updated_by",
-            "updated_at",
-        ]
-    )
-    table_values.extend(
-        [
-            escape_sql(table_row.source_table_name),
-            escape_sql(table_row.source_table_cn),
-            escape_sql(DEFAULT_TARGET_LAYER),
-            escape_sql(table_row.target_table_name),
-            escape_sql(table_row.load_mode),
-            str(table_row.field_total_count),
-            str(table_row.mapped_field_count),
-            escape_sql(table_row.latest_mapping_time),
-            escape_sql(table_row.table_desc),
-            "'N'",
-            escape_sql(SYSTEM_USER),
-            escape_sql(now_text),
-            escape_sql(SYSTEM_USER),
-            escape_sql(now_text),
-        ]
-    )
-    return f"""
-INSERT INTO dwp.p_field_mapping_table (
-    {', '.join(table_columns)}
-) VALUES (
-    {', '.join(table_values)}
-)
-""".strip()
-
-
-def build_field_insert_statement(
-    field: FieldMappingRow,
-    table_row: TableMappingRow,
-    table_pk: int,
-    field_pk: int,
-    now_text: str,
-) -> str:
+def _import_field_payload(
+    field: FieldMappingRow, table_row: TableMappingRow
+) -> dict[str, object]:
     column_meta = table_row.source_columns.get(field.source_field_name, {})
     source_field_comment = truncate_text(
         field.source_field_comment or column_meta.get("comment", ""),
         MAX_SOURCE_FIELD_COMMENT_LENGTH,
     )
-    return f"""
-INSERT INTO dwp.p_field_mapping_field (
-    field_pk, table_pk, source_field_name, source_field_type, source_field_comment,
-    target_field_name, mapping_rule, field_order, is_deleted,
-    created_by, created_at, updated_by, updated_at
-) VALUES (
-    {field_pk},
-    {table_pk},
-    {escape_sql(field.source_field_name)},
-    {escape_sql(column_meta.get('type', ''))},
-    {escape_sql(source_field_comment)},
-    {escape_sql(field.target_field_name)},
-    {escape_sql(field.mapping_rule)},
-    {field.field_order},
-    'N',
-    {escape_sql(SYSTEM_USER)},
-    {escape_sql(now_text)},
-    {escape_sql(SYSTEM_USER)},
-    {escape_sql(now_text)}
-)
-""".strip()
+    return {
+        "sourceField": field.source_field_name,
+        "sourceType": column_meta.get("type") or None,
+        "sourceComment": source_field_comment or None,
+        "targetField": field.target_field_name or None,
+        "mappingRule": field.mapping_rule or FALLBACK_MAPPING_RULE,
+        "fieldOrder": field.field_order,
+    }
 
 
-def execute_import(profile: str, table_rows: list[TableMappingRow], layout: FieldMappingTableLayout) -> None:
-    conn = None
-    curs = None
-    now_text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    field_pk = 1
-    imported_table_count = 0
-    failed_tables: list[str] = []
-    try:
-        conn = connect_with_profile(profile)
-        curs = conn.cursor()
-        curs.execute("TRUNCATE TABLE dwp.p_field_mapping_field")
-        curs.execute("TRUNCATE TABLE dwp.p_field_mapping_table")
-        conn.commit()
+def build_import_payload(
+    table_rows: list[TableMappingRow], *, dry_run: bool = False
+) -> dict[str, object]:
+    """Build the public contract without touching the Portal database."""
+    items = []
+    for table_row in table_rows:
+        items.append(
+            {
+                "sourceSystemId": table_row.upstream_system_id,
+                "sourceTable": table_row.source_table_name,
+                "sourceTableCn": table_row.source_table_cn or None,
+                "targetLayer": DEFAULT_TARGET_LAYER,
+                "targetTable": table_row.target_table_name or None,
+                "loadMode": table_row.load_mode or None,
+                "tableDesc": table_row.table_desc or None,
+                "fields": [
+                    _import_field_payload(field, table_row)
+                    for field in table_row.fields
+                ],
+            }
+        )
+    return {"mode": "upsert", "dryRun": dry_run, "items": items}
 
-        for table_pk, table_row in enumerate(table_rows, start=1):
-            try:
-                curs.execute(build_table_insert_statement(table_row, table_pk, layout, now_text))
-                for field in table_row.fields:
-                    curs.execute(build_field_insert_statement(field, table_row, table_pk, field_pk, now_text))
-                    field_pk += 1
-                conn.commit()
-                imported_table_count += 1
-            except Exception as exc:
-                try:
-                    conn.rollback()
-                except Exception as rollback_exc:
-                    raise RuntimeError(
-                        f"Failed to roll back import for table_pk={table_pk}"
-                    ) from rollback_exc
-                failed_message = (
-                    "table_pk={table_pk}, file={file_path}, source_table={source_table}, "
-                    "source_table_name={source_table_name}, target_table={target_table}, "
-                    "current_field_pk={field_pk}, error={error}".format(
-                        table_pk=table_pk,
-                        file_path=table_row.file_path,
-                        source_table=table_row.source_table,
-                        source_table_name=table_row.source_table_name,
-                        target_table=table_row.target_table_name,
-                        field_pk=field_pk,
-                        error=exc,
-                    )
+
+class FieldMappingApiError(RuntimeError):
+    """A transport or contract error returned by the Field Mapping API."""
+
+
+class FieldMappingApiClient:
+    """Small synchronous client for the existing Portal session contract."""
+
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        timeout: float = 30.0,
+        session_cookie: str | None = None,
+        client: httpx.Client | None = None,
+    ) -> None:
+        normalized_url = (base_url or "").strip().rstrip("/")
+        if not normalized_url:
+            raise ValueError("api base URL must be provided")
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        if client is None:
+            self._client = httpx.Client(
+                base_url=normalized_url,
+                timeout=timeout,
+                headers=headers,
+            )
+        else:
+            self._client = client
+            self._client.headers.update(headers)
+        self._owns_client = client is None
+        cookie = (session_cookie or "").strip()
+        if cookie:
+            self._client.headers.update({"Cookie": cookie})
+
+    def close(self) -> None:
+        if self._owns_client:
+            self._client.close()
+
+    def __enter__(self) -> FieldMappingApiClient:
+        return self
+
+    def __exit__(self, _exc_type, _exc_value, _traceback) -> None:
+        self.close()
+
+    def import_mappings(self, payload: dict[str, object]) -> dict[str, Any]:
+        try:
+            response = self._client.post("/api/field-mappings/import", json=payload)
+        except httpx.HTTPError as error:
+            raise FieldMappingApiError(
+                "Field Mapping API request failed; check the API URL and timeout"
+            ) from error
+        try:
+            data = response.json()
+        except ValueError as error:
+            raise FieldMappingApiError(
+                f"Field Mapping API returned invalid JSON (HTTP {response.status_code})"
+            ) from error
+        if response.status_code >= 400:
+            error_data = data.get("error") if isinstance(data, dict) else None
+            message = (
+                error_data.get("message")
+                if isinstance(error_data, dict)
+                else "request rejected"
+            )
+            raise FieldMappingApiError(
+                f"Field Mapping API rejected the batch (HTTP {response.status_code}): {message}"
+            )
+        if not isinstance(data, dict) or not isinstance(data.get("summary"), dict):
+            raise FieldMappingApiError(
+                "Field Mapping API response did not match the import contract"
+            )
+        return data
+
+
+def execute_import(
+    client: FieldMappingApiClient,
+    table_rows: list[TableMappingRow],
+    *,
+    dry_run: bool = False,
+    batch_size: int = 100,
+) -> dict[str, int]:
+    """Submit table mappings in bounded batches and aggregate API summaries."""
+    if batch_size < 1:
+        raise ValueError("batch_size must be a positive integer")
+    summary = {
+        "received": 0,
+        "created": 0,
+        "updated": 0,
+        "unchanged": 0,
+        "failed": 0,
+        "fieldCount": 0,
+    }
+    for start in range(0, len(table_rows), batch_size):
+        batch = table_rows[start : start + batch_size]
+        result = client.import_mappings(build_import_payload(batch, dry_run=dry_run))
+        batch_summary = result["summary"]
+        for key in summary:
+            summary[key] += _safe_int(batch_summary.get(key))
+        print(
+            f"[batch {start // batch_size + 1}] received={batch_summary.get('received', 0)} "
+            f"created={batch_summary.get('created', 0)} "
+            f"updated={batch_summary.get('updated', 0)} "
+            f"unchanged={batch_summary.get('unchanged', 0)} "
+            f"failed={batch_summary.get('failed', 0)}"
+        )
+        for item in result.get("items", []):
+            if item.get("action") == "failed":
+                print(
+                    f"[failed] index={item.get('index')} identity={item.get('identity')} "
+                    f"error={item.get('error')}",
+                    file=sys.stderr,
                 )
-                failed_tables.append(failed_message)
-                print(f"[skip] import failed: {failed_message}")
-
-    except Exception:
-        if conn is not None:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-        raise
-    finally:
-        if curs is not None:
-            try:
-                curs.close()
-            except Exception:
-                pass
-        if conn is not None:
-            try:
-                conn.close()
-            except Exception:
-                pass
-    print(f"Imported {imported_table_count} table mappings successfully.")
-    if failed_tables:
-        print(f"Skipped {len(failed_tables)} table import error record(s).")
-        for item in failed_tables:
-            print(f"[failed] {item}")
+    print(
+        f"Import summary: received={summary['received']} created={summary['created']} "
+        f"updated={summary['updated']} unchanged={summary['unchanged']} "
+        f"failed={summary['failed']} fieldCount={summary['fieldCount']}"
+    )
+    return summary
 
 
 def main() -> None:
     args = parse_args()
-    profile = (args.profile or "").strip() or resolve_db_profile_name()
+    profile = (
+        (args.profile or "").strip()
+        or os.environ.get("ASSET_DB_PROFILE", "").strip()
+        or resolve_db_profile_name(fallback="gauss_primary")
+    )
+    api_base_url = (args.api_base_url or "").strip()
+    if not api_base_url:
+        raise SystemExit("--api-base-url or DAP_API_BASE_URL is required")
     table_rows = build_table_rows(profile, args.directory)
     validate_table_rows(table_rows)
-    layout = load_field_mapping_table_layout(profile)
-    print(
-        f"[meta] field_mapping_table layout: "
-        f"upstream_system_id={layout.has_upstream_system_id}, system_pk={layout.has_system_pk}"
-    )
-    execute_import(profile, table_rows, layout)
-    print("Finished importing dwp.p_field_mapping_table / dwp.p_field_mapping_field")
+    try:
+        with FieldMappingApiClient(
+            api_base_url,
+            timeout=args.timeout,
+            session_cookie=args.session_cookie,
+        ) as client:
+            summary = execute_import(
+                client,
+                table_rows,
+                dry_run=args.dry_run,
+                batch_size=args.batch_size,
+            )
+    except FieldMappingApiError as error:
+        print(f"[error] {error}", file=sys.stderr)
+        raise SystemExit(1) from error
+    if summary["failed"]:
+        raise SystemExit("Field Mapping API reported failed item(s)")
+    print("Finished submitting Field Mapping imports through the Portal API.")
 
 
 if __name__ == "__main__":
