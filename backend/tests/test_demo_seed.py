@@ -1,3 +1,7 @@
+"""Community demo seed and push-system contract tests."""
+
+# pyright: reportMissingImports=false
+
 from __future__ import annotations
 
 import json
@@ -8,8 +12,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.app.db.facade import connect_with_profile
+from backend.app.db.facade import clear_engine_cache, connect_with_profile
 from backend.app.migrations.schema import initialize, verify_database
+from backend.app.services.push_service import (
+    DEFAULT_PUSH_AUTH_TYPES,
+    PushService,
+    PushValidationError,
+)
+from demo.seed_loader import DEMO_PUSH_AUTH_TYPE, LEGACY_DEMO_PUSH_AUTH_TYPE
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = ROOT.parent
@@ -69,6 +79,7 @@ class CommunityDemoSeedTests(unittest.TestCase):
         )
         self.environment.start()
         self.addCleanup(self.environment.stop)
+        self.addCleanup(clear_engine_cache)
         connection = connect_with_profile("community_sqlite")
         try:
             config = {"type": "sqlite", "database": str(self.database)}
@@ -190,6 +201,44 @@ class CommunityDemoSeedTests(unittest.TestCase):
         for indicator in indicators:
             self.assertIn(indicator["table"], asset_tables, indicator["code"])
 
+    def test_mapping_rows_reference_upstream_system_primary_keys(self):
+        self._seed()
+        connection = sqlite3.connect(self.database)
+        try:
+            rows = connection.execute(
+                "SELECT t.upstream_system_id, u.system_pk, u.system_abbr "
+                "FROM p_field_mapping_table t "
+                "JOIN p_upstream_system u ON u.system_pk = t.upstream_system_id "
+                "ORDER BY t.table_pk"
+            ).fetchall()
+            foreign_keys = connection.execute(
+                "PRAGMA foreign_key_list(p_field_mapping_table)"
+            ).fetchall()
+        finally:
+            connection.close()
+        self.assertEqual(8, len(rows))
+        self.assertTrue(all(row[0] == row[1] for row in rows))
+        self.assertEqual({"MEM", "PIM", "OMS", "POS", "IMS", "MKT", "FUL", "SVC"}, {row[2] for row in rows})
+        self.assertTrue(any(row[2] == "p_upstream_system" and row[3] == "upstream_system_id" for row in foreign_keys))
+
+    def test_manual_code_table_seed_uses_binary_status_values(self):
+        self._seed()
+        connection = sqlite3.connect(self.database)
+        try:
+            statuses = connection.execute(
+                "SELECT table_code, status_code FROM p_manual_code_table ORDER BY table_id"
+            ).fetchall()
+        finally:
+            connection.close()
+        self.assertEqual(
+            [
+                ("ORDER_STATUS", "enabled"),
+                ("CHANNEL_TYPE", "enabled"),
+                ("DELIVERY_MODE", "disabled"),
+            ],
+            statuses,
+        )
+
     def test_common_codes_and_paths_are_stable(self):
         self._seed()
         connection = sqlite3.connect(self.database)
@@ -208,6 +257,100 @@ class CommunityDemoSeedTests(unittest.TestCase):
         self.assertEqual(len(roots), 1)
         for path in paths:
             self.assertEqual(path[3].split("/")[-1], path[0], f"full_path tail for {path[0]}")
+
+    def test_fresh_demo_push_auth_matches_contract_and_edit_succeeds(self):
+        self._seed()
+        connection = sqlite3.connect(self.database)
+        try:
+            rows = connection.execute(
+                "SELECT system_code, auth_type FROM p_push_system ORDER BY system_code"
+            ).fetchall()
+        finally:
+            connection.close()
+
+        self.assertEqual({DEMO_PUSH_AUTH_TYPE}, {row[1] for row in rows})
+        self.assertTrue(all(row[1] in DEFAULT_PUSH_AUTH_TYPES for row in rows))
+
+        service = PushService()
+        current = service.get_push_system_admin_detail("DEMO_BI")
+        current["name"] = "零售经营看板（已编辑）"
+        service.update_push_system("DEMO_BI", current)
+
+        updated = service.get_push_system_admin_detail("DEMO_BI")
+        self.assertEqual("零售经营看板（已编辑）", updated["name"])
+        self.assertEqual(DEMO_PUSH_AUTH_TYPE, updated["auth"])
+
+    def test_seed_repairs_legacy_demo_auth_idempotently_and_preserves_valid_auth(self):
+        self._seed()
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute(
+                "UPDATE p_push_system SET auth_type = ? "
+                "WHERE system_code = 'DEMO_BI'",
+                (LEGACY_DEMO_PUSH_AUTH_TYPE,),
+            )
+            connection.execute(
+                "UPDATE p_push_system SET auth_type = ?, created_by = ? "
+                "WHERE system_code = 'DEMO_REPL'",
+                ("账号密码", "operator"),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        self._seed()
+        connection = sqlite3.connect(self.database)
+        try:
+            repaired = connection.execute(
+                "SELECT system_code, auth_type, created_by FROM p_push_system "
+                "WHERE system_code IN ('DEMO_BI', 'DEMO_REPL') ORDER BY system_code"
+            ).fetchall()
+        finally:
+            connection.close()
+
+        self.assertEqual(
+            [
+                ("DEMO_BI", DEMO_PUSH_AUTH_TYPE, "demo"),
+                ("DEMO_REPL", "账号密码", "operator"),
+            ],
+            repaired,
+        )
+
+        self._seed()
+        connection = sqlite3.connect(self.database)
+        try:
+            self.assertEqual(
+                repaired,
+                connection.execute(
+                    "SELECT system_code, auth_type, created_by FROM p_push_system "
+                    "WHERE system_code IN ('DEMO_BI', 'DEMO_REPL') ORDER BY system_code"
+                ).fetchall(),
+            )
+        finally:
+            connection.close()
+
+    def test_push_update_keeps_auth_validation_strict(self):
+        self._seed()
+        service = PushService()
+        current = service.get_push_system_admin_detail("DEMO_BI")
+        current["auth"] = LEGACY_DEMO_PUSH_AUTH_TYPE
+
+        with self.assertRaises(PushValidationError) as error:
+            service.update_push_system("DEMO_BI", current)
+
+        self.assertEqual(
+            [
+                {
+                    "field": "auth",
+                    "message": f"auth 不在允许范围内: {LEGACY_DEMO_PUSH_AUTH_TYPE}",
+                }
+            ],
+            error.exception.details,
+        )
+        self.assertEqual(
+            DEMO_PUSH_AUTH_TYPE,
+            service.get_push_system_admin_detail("DEMO_BI")["auth"],
+        )
 
 
 if __name__ == "__main__":

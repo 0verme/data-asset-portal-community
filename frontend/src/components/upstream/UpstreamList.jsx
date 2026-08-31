@@ -81,7 +81,7 @@ export function UpstreamList({
                     label: "查看入仓表",
                     icon: "link",
                     onClick: () => onViewTables?.({
-                      upstreamSystemId: item.upstreamSystemId || "",
+                      sourceSystemId: item.upstreamSystemId || "",
                       tab: "table",
                     }),
                   },
@@ -140,7 +140,7 @@ export function UpstreamList({
                           label: "查看入仓表",
                           icon: "link",
                           onClick: () => onViewTables?.({
-                            upstreamSystemId: item.upstreamSystemId || "",
+                            sourceSystemId: item.upstreamSystemId || "",
                             tab: "table",
                           }),
                         },

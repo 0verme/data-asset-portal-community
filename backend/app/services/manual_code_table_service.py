@@ -25,7 +25,7 @@ from .operation_log_service import (
 
 TABLE_CODE_RE = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
 TABLE_STYLES = {"enum", "dim", "status", "map", "custom"}
-TABLE_STATUSES = {"active", "draft", "disabled"}
+TABLE_STATUSES = {"enabled", "disabled"}
 
 
 class ManualCodeTableNotFoundError(Exception):
@@ -104,7 +104,7 @@ class ManualCodeTableService(AuditActorMixin):
             "tableName": str(payload.get("tableName") or "").strip(),
             "style": str(payload.get("style") or "").strip().lower(),
             "owner": str(payload.get("owner") or "").strip(),
-            "status": str(payload.get("status") or "active").strip().lower(),
+            "status": str(payload.get("status") or "enabled").strip().lower(),
             "remark": str(payload.get("remark") or "").strip(),
         }
         details = []
@@ -300,7 +300,7 @@ class ManualCodeTableService(AuditActorMixin):
             )
         operation_type = (
             OPERATION_TYPE_ENABLE
-            if normalized_status == "active"
+            if normalized_status == "enabled"
             else OPERATION_TYPE_DISABLE
         )
         with operation_log_service.audit(

@@ -23,7 +23,7 @@ FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract�
 | 码值表维护 | `api/manualCodeTables.js` | `/api/manual-code-tables` | 已注册 | 管理手工码值表元数据 |
 | 系统管理 | `api/systemUsers.js`、`api/paramDicts.js`、`api/menus.js` | `/api/system` | 已注册 | 用户、菜单、参数字典与角色边界 |
 | 操作日志 | `api/operationLogs.js` | `/api/operation-logs` | 已注册（随 system） | 查询全站操作审计日志 |
-| 通用码值 | `api/commonCodes.js` | `/api/common-codes` | WAIT_DB，当前未注册 | 全系统可复用的分类码值与下拉选项 |
+| 通用码值（历史） | — | `/api/common-codes` | WAIT_DB，当前未注册 | 历史数据模型；前端运行时不得调用，参数字典管理见 `/api/system/param-dicts*` |
 
 仓库已有 module codes 默认进入同一 open runtime contract；菜单 `status`、外部依赖、database driver、credential 和 persistent lineage storage readiness 是实例/部署状态，不是 Edition feature gate。Module availability is not a licensing gate；menu visibility is not authorization，RBAC authorization is not module availability，runtime/DB profile is not feature gating。
 
@@ -97,6 +97,10 @@ Accept: application/json
 - `422 Unprocessable Entity`：业务校验失败
 - `500 Internal Server Error`：服务端异常
 
+### Binary availability status
+
+凡表示资源当前是否可用、是否生效或是否启用的 `status` 字段，接口值统一为 `enabled` / `disabled`，展示文案统一为“启用 / 禁用”。码值表的创建、更新、筛选和状态变更接口不接受 `active`、`draft` 或其它 legacy 启停值；历史数据由 forward migration 收口。
+
 ### 1.7 前端运行模式
 
 前端通过 `VITE_API_MODE` 切换数据来源：`mock` 走前端内置数据并使用演示登录；`remote` 统一走 `/api` 调后端真实数据库。后端唯一由 `uvicorn backend.asgi:app` 运行 FastAPI Native；真正的 WAIT_DB / 外部 storage readiness 通过可诊断的 Service error 表达，不把仓库已有源码模块伪装成不存在。
@@ -107,9 +111,9 @@ VITE_API_MODE=remote
 
 ### 1.8 权限
 
-系统使用 permission-based RBAC。`/auth/me` 返回当前有效的 `permissions[]`；后端路由通过 `require_permission("resource:action")` 强制授权，前端 `can(permission)` 仅用于界面 UX，不能替代后端检查。角色管理接口包括 `GET/POST/PATCH /api/system/roles` 与 `GET /api/system/permissions`，用户绑定单个角色；禁用用户、禁用角色或撤销权限会在下一次授权决策中立即生效。
+系统使用 permission-based RBAC。`/auth/me` 返回当前有效的 `permissions[]`；后端路由通过 `require_permission("resource:action")` 强制授权，前端 `can(permission)` 仅用于界面 UX，不能替代后端检查。有效权限统一为 `PUBLIC_PERMISSION_CODES ∪ role_permissions`；匿名和有效登录用户继承公共目录读取能力，角色只配置增量权限。角色管理接口包括 `GET/POST/PATCH /api/system/roles`、`GET /api/system/permissions` 以及 `GET /api/system/permissions?assignableOnly=true`，用户绑定单个角色；禁用用户、禁用角色或撤销权限会在下一次授权决策中立即生效。
 
-现阶段仍保留 `admin`、`maintainer` 等内置角色及兼容 helper，但授权事实以当前角色—权限映射为准。未实现多角色绑定、ABAC/ACL、数据范围授权或外部 IAM。
+现阶段仍保留 `admin`、`maintainer` 等内置角色及兼容 helper，但授权事实以当前角色—权限映射与公共权限策略为准。未实现多角色绑定、ABAC/ACL、数据范围授权或外部 IAM。
 
 ### 1.9 Repository module capability contract
 
@@ -344,8 +348,13 @@ Base Path: `/api/field-mappings`
 
 #### FieldMappingRow
 
+`sourceSystemId` 是上游卸数系统主键（对应 `p_upstream_system.system_pk`），用于程序关联和筛选；`srcSystem` / `systemName` 只承载展示名称，`systemCode` 是用户侧消歧编码。
+
 ```json
 {
+  "sourceSystemId": 1,
+  "systemCode": "MEM",
+  "systemName": "会员中心",
   "srcSystem": "会员中心",
   "srcTable": "MEMBER_PROFILE",
   "srcTableCn": "会员档案表",
@@ -380,6 +389,9 @@ Base Path: `/api/field-mappings`
 
 ```json
 {
+  "sourceSystemId": 1,
+  "systemCode": "MEM",
+  "systemName": "会员中心",
   "srcSystem": "会员中心",
   "srcTable": "MEMBER_PROFILE",
   "srcTableCn": "会员档案表",
@@ -394,6 +406,8 @@ Base Path: `/api/field-mappings`
 
 ### 3.2 接口
 
+`GET /api/field-mappings/source-systems` 的选项至少返回 `id`、`sourceSystemId`、`name`、`systemCode` 和 `count`。`id` / `sourceSystemId` 只供程序使用，常规 UI 不展示数据库主键；显示标签为 `name · systemCode`。
+
 - `GET /api/field-mappings/source-systems`
 - `GET /api/field-mappings/stats`
 - `GET /api/field-mappings/fields`
@@ -405,7 +419,10 @@ Base Path: `/api/field-mappings`
 下列参数由 `stats`、`fields`、`tables` 共用：
 
 - `keyword`：全局关键字
-- `srcSystem`：源系统名，精确匹配
+- `sourceSystemId`：规范的上游系统主键筛选，值为 `p_upstream_system.system_pk`；“全部”不发送该参数
+- `upstreamSystemId`：兼容别名，内部同样按上游系统主键（或既有唯一技术标识）解析
+- `srcSystem`：deprecated 的展示名称筛选，仅按名称匹配，不承担唯一系统身份；同名系统会同时返回
+- `dataSourceId`：deprecated 的公共数据源兼容筛选，不会被当作上游系统主键
 - `srcTable`：源表名，模糊匹配
 - `srcField`：源字段名，模糊匹配
 - `emptyComment`：`yes` / `no`
@@ -440,7 +457,7 @@ Base Path: `/api/field-mappings`
   "dryRun": false,
   "items": [
     {
-      "dataSourceId": 12,
+      "sourceSystemId": 103,
       "sourceTable": "ODS_CORE_ACCOUNT",
       "sourceTableCn": "账户信息",
       "targetLayer": "DWF",
@@ -462,7 +479,7 @@ Base Path: `/api/field-mappings`
 }
 ```
 
-表映射业务身份按当前 canonical schema 的 `dataSourceId + sourceTable` 解析；字段映射身份按所属表的 `sourceField + targetField` 解析。已有记录会返回 `created`、`updated` 或 `unchanged`，同一请求中的异常 item 返回 `failed`、`index`、`identity` 和错误码。请求遗漏的旧字段不会被删除；table 与 fields 在每个 item 的事务内一起提交。成功的真实 create/update 会清理映射统计缓存；`unchanged` 不写入伪修改审计。`dryRun: true` 只做校验和 action 预判，不写业务表、审计或缓存。
+表映射业务身份按当前 canonical schema 的 `sourceSystemId + sourceTable` 解析，其中 `sourceSystemId` 对应 `p_upstream_system.system_pk`；`dataSourceId` 仅作为兼容输入，只有能唯一解析到一个有效上游系统时才接受。字段映射身份按所属表的 `sourceField + targetField` 解析。已有记录会返回 `created`、`updated` 或 `unchanged`，同一请求中的异常 item 返回 `failed`、`index`、`identity` 和错误码。请求遗漏的旧字段不会被删除；table 与 fields 在每个 item 的事务内一起提交。成功的真实 create/update 会清理映射统计缓存；`unchanged` 不写入伪修改审计。`dryRun: true` 只做校验和 action 预判，不写业务表、审计或缓存。
 
 接口返回直接的导入响应：
 
@@ -485,6 +502,8 @@ Base Path: `/api/field-mappings`
     {
       "index": 0,
       "identity": {
+        "sourceSystemId": 103,
+        "upstreamSystemId": 103,
         "dataSourceId": 12,
         "sourceTable": "ODS_CORE_ACCOUNT",
         "targetTable": "DWF_ACCOUNT"
@@ -828,7 +847,7 @@ Base Path: `/api/system`
 }
 ```
 
-`status` 取值：`enabled` / `disabled` / `locked`。
+`status` 取值：`enabled` / `disabled`。
 
 #### ParamDict
 
@@ -941,52 +960,18 @@ Base Path: `/api/operation-logs`
 }
 ```
 
-## 11. 通用码值模块 `common-codes`
+## 11. 通用码值（历史/WAIT_DB）
 
-Base Path: `/api/common-codes`
+`/api/common-codes/*` 是早期 Flask 的 Legacy Contract。FastAPI Native 迁移记录将 Common Code 保留为 `WAIT_DB`，当前没有注册 router，也不出现在 OpenAPI；前端运行时不得调用这些路径。
 
-### 11.1 核心模型
+当前替代关系如下：
 
-#### CommonCodeCategory
+- 系统参数字典的管理契约是 `/api/system/param-dicts*`，由系统管理权限保护，数据表为 `p_code_category` / `p_code_item`。
+- 报表类型是 `p_report_asset.report_type` 的领域值；报表页面从当前 `/api/reports` 列表建立 facet/编辑选项。
+- 上游和推送编辑候选项从各自已注册的 `/api/upstreams`、`/api/push` 数据及集中本地默认选项建立。
+- `enabled` / `disabled` 的公共展示使用共享二态状态契约“启用 / 禁用”。
 
-```json
-{
-  "code": "UPSTREAM_DB_TYPE",
-  "name": "上游数据库类型",
-  "desc": "上游卸数系统数据库类型选项",
-  "active": true,
-  "count": 6
-}
-```
-
-#### CommonCodeItem
-
-```json
-{
-  "categoryCode": "UPSTREAM_DB_TYPE",
-  "code": "POSTGRESQL",
-  "name": "PostgreSQL",
-  "value": "PostgreSQL",
-  "desc": "PostgreSQL Database",
-  "order": 30,
-  "active": true,
-  "ext": {}
-}
-```
-
-### 11.2 接口
-
-- `GET /api/common-codes/categories`
-- `GET /api/common-codes/categories/{categoryCode}/items`
-
-### 11.3 当前初始化分类
-
-`UPSTREAM_DB_TYPE`、`UPSTREAM_DEPT`、`PUSH_PROTOCOL`、`PUSH_AUTH_TYPE`、`PUSH_DELIMITER`、`FILE_ENCODING`、`FREQ_TYPE`（推送频率，取值 T+1/T+0/准实时/每周/每月）、`SYSTEM_STATUS`。
-
-### 11.4 使用约定
-
-- 通用下拉项、状态项、协议项等场景统一走通用码值，页面不再硬编码。
-- 已接入页面：上游卸数系统页（数据库类型）、下游推送系统页与筛选区（推送协议、认证方式、系统状态）。
+Common Code service 仍可作为后端领域校验的内部数据访问实现，但这不代表恢复了一个公共 HTTP endpoint，也不构成第二套前端 API 契约。
 
 ## 12. 认证模块 `auth`
 

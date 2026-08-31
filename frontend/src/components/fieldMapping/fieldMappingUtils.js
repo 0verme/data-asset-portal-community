@@ -1,5 +1,5 @@
 export const DEFAULT_FILTERS = {
-  srcSystem: "",
+  sourceSystemId: "",
   srcTable: "",
   srcField: "",
   emptyComment: "",
@@ -65,16 +65,37 @@ function normalizeValue(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-export function resolveSourceSystemName(route, sourceSystems) {
-  const upstreamSystemId = normalizeValue(route.upstreamSystemId);
-  const sourceSystemMatch = sourceSystems.find((item) => normalizeValue(item.upstreamSystemId) === upstreamSystemId);
-  return sourceSystemMatch?.name || "";
+export function getSourceSystemId(system) {
+  if (!system || typeof system !== "object") return "";
+  return system.sourceSystemId ?? system.id ?? system.upstreamSystemId ?? "";
 }
 
-export function buildLinkedFilters(route, sourceSystemName) {
+export function getRouteSourceSystemId(route) {
+  return route?.sourceSystemId || route?.upstreamSystemId || "";
+}
+
+export function formatSystemLabel(system, code) {
+  const item = system && typeof system === "object" ? system : { name: system, systemCode: code };
+  const name = String(item.name ?? item.systemName ?? item.srcSystem ?? "").trim();
+  const systemCode = String(item.systemCode ?? item.abbr ?? item.systemAbbr ?? code ?? "").trim();
+  if (name && systemCode) return `${name} · ${systemCode}`;
+  return name || systemCode;
+}
+
+export function resolveSourceSystemLabel(route, sourceSystems) {
+  const sourceSystemId = normalizeValue(getRouteSourceSystemId(route));
+  const sourceSystemMatch = sourceSystems.find((item) => normalizeValue(getSourceSystemId(item)) === sourceSystemId);
+  return sourceSystemMatch ? formatSystemLabel(sourceSystemMatch) : "";
+}
+
+// Kept as an additive compatibility export for existing callers. It now
+// returns the same disambiguating label as the source-system selector.
+export const resolveSourceSystemName = resolveSourceSystemLabel;
+
+export function buildLinkedFilters(route, _sourceSystemLabel) {
   return {
     ...DEFAULT_FILTERS,
-    srcSystem: sourceSystemName || "",
+    sourceSystemId: getRouteSourceSystemId(route),
     srcTable: route.sourceTable || "",
     targetTable: route.dwfTable || "",
   };
@@ -85,14 +106,15 @@ export function areFieldMappingFiltersEqual(left, right) {
 }
 
 export function buildFieldMappingRequestFilters(filters, route) {
+  const { srcSystem: _legacySourceSystemName, ...rest } = filters || {};
   return {
-    ...filters,
-    srcSystem: route.upstreamSystemId ? "" : filters.srcSystem,
+    ...rest,
+    sourceSystemId: getRouteSourceSystemId(route) || rest.sourceSystemId || "",
   };
 }
 
 export function isLinkedRoute(route) {
-  return Boolean(route.upstreamSystemId || route.sourceTable || route.dwfTable);
+  return Boolean(getRouteSourceSystemId(route) || route.sourceTable || route.dwfTable);
 }
 
 export function sortMarker(sort, key) {

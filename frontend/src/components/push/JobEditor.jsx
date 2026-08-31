@@ -10,7 +10,7 @@ import {
 } from "../common/index.js";
 
 
-import { getLegacyAwareOptions, isLegacyDictValue } from "../../hooks/useDictOptions.js";
+import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.js";
 import { optionLabel } from "../../utils/ui.js";
 import {
   DEFAULT_DELIMITER_OPTIONS,

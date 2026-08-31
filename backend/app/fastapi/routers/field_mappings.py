@@ -40,6 +40,7 @@ def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
         data_source_id: str | None,
         upstream_system_id: str | None,
         source_system_id: str | None,
+        source_system_id_snake: str | None,
         src_system: str | None,
         src_table: str | None,
         src_field: str | None,
@@ -53,9 +54,12 @@ def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
     ) -> dict[str, str | None]:
         return {
             "keyword": keyword,
-            "upstreamSystemId": data_source_id
-            or upstream_system_id
-            or source_system_id,
+            # sourceSystemId is the canonical primary-key filter. Keep the
+            # legacy aliases separate so dataSourceId is never mistaken for
+            # an upstream_system primary key.
+            "sourceSystemId": source_system_id or source_system_id_snake,
+            "upstreamSystemId": upstream_system_id,
+            "dataSourceId": data_source_id,
             "srcSystem": src_system,
             "srcTable": src_table,
             "srcField": src_field,
@@ -73,6 +77,9 @@ def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
         data_source_id: str | None = Query(default=None, alias="dataSourceId"),
         upstream_system_id: str | None = Query(default=None, alias="upstreamSystemId"),
         source_system_id: str | None = Query(default=None, alias="sourceSystemId"),
+        source_system_id_snake: str | None = Query(
+            default=None, alias="source_system_id"
+        ),
         src_system: str | None = Query(default=None, alias="srcSystem"),
         src_table: str | None = Query(default=None, alias="srcTable"),
         src_field: str | None = Query(default=None, alias="srcField"),
@@ -89,6 +96,7 @@ def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
             data_source_id,
             upstream_system_id,
             source_system_id,
+            source_system_id_snake,
             src_system,
             src_table,
             src_field,

@@ -52,25 +52,32 @@ export const PERMISSION_CODES = Object.freeze([
 
 export type PermissionCode = typeof PERMISSION_CODES[number];
 
-const MAINTAINER_PERMISSIONS = Object.freeze([
+/**
+ * Contract mirror used by the mock adapter and legacy client normalization.
+ * Remote role candidates are filtered by the backend's assignable-only API.
+ */
+export const PUBLIC_PERMISSION_CODES = Object.freeze([
   "asset:read",
-  "asset:write",
   "root:read",
-  "root:write",
   "indicator:read",
-  "indicator:write",
   "report:read",
-  "report:write",
   "api_asset:read",
+  "code_table:read",
+  "field_mapping:read",
+  "lineage:read",
+] as const satisfies readonly PermissionCode[]);
+
+const MAINTAINER_PERMISSIONS = Object.freeze([
+  "asset:write",
+  "root:write",
+  "indicator:write",
+  "report:write",
   "api_asset:write",
   "upstream:read",
   "upstream:write",
   "push:read",
   "push:write",
-  "code_table:read",
   "code_table:write",
-  "field_mapping:read",
-  "lineage:read",
   "metadata:read",
   "metadata:write",
   "operation_log:read",
@@ -86,6 +93,7 @@ type PermissionSource = {
 };
 
 const REGISTERED_PERMISSIONS: ReadonlySet<PermissionCode> = new Set(PERMISSION_CODES);
+const PUBLIC_PERMISSIONS: ReadonlySet<PermissionCode> = new Set(PUBLIC_PERMISSION_CODES);
 
 function isPermissionCode(permission: string): permission is PermissionCode {
   return REGISTERED_PERMISSIONS.has(permission as PermissionCode);
@@ -99,6 +107,22 @@ export function normalizePermissions(value: unknown): PermissionCode[] {
       .map((permission) => String(permission || "").trim().toLowerCase())
       .filter(isPermissionCode),
   )].sort();
+}
+
+export function isPublicPermission(permission: unknown): boolean {
+  const normalized = String(permission || "").trim().toLowerCase();
+  return PUBLIC_PERMISSIONS.has(normalized as PermissionCode);
+}
+
+export function getEffectivePermissions(rolePermissions: unknown): PermissionCode[] {
+  return normalizePermissions([
+    ...PUBLIC_PERMISSION_CODES,
+    ...normalizePermissions(rolePermissions),
+  ]);
+}
+
+export function normalizeRolePermissionCodes(value: unknown): PermissionCode[] {
+  return normalizePermissions(value).filter((permission) => !isPublicPermission(permission));
 }
 
 export function hasPermission(

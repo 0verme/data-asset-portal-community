@@ -50,6 +50,7 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
                 compiled = statement.compile(dialect=dialect)
                 self.assertIn("p_field_mapping", str(compiled))
                 self.assertIn("p_data_source", str(compiled))
+                self.assertIn("p_upstream_system", str(compiled))
                 self.assertIn("__app__", str(compiled))
                 self.assertNotIn("dwp.", str(compiled))
 
@@ -65,6 +66,21 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
             self._assert_portable(statement)
         self.assertNotIn("customer' OR 1=1", str(statements[1].compile(dialect=sqlite.dialect())))
         self.assertEqual(result["items"][0]["srcField"], "customer_id")
+
+    def test_source_system_filter_uses_upstream_primary_key(self):
+        self.service._db.fetch_rows = MagicMock(return_value=[{
+            "source_system_count": 1,
+            "source_table_count": 1,
+            "field_count": 1,
+            "mapped_field_count": 1,
+            "empty_comment_count": 0,
+        }])
+
+        self.service.get_stats({"sourceSystemId": "103"})
+        statement = self.service._db.fetch_rows.call_args.args[0]
+        compiled = str(statement.compile(dialect=sqlite.dialect()))
+        self.assertIn("p_upstream_system.system_pk", compiled)
+        self.assertNotRegex(compiled, r"p_data_source\.source_id\s*=\s*[?:%]")
 
     def test_stats_and_table_page_use_core_aggregates(self):
         self.service._db.fetch_rows = MagicMock(return_value=[{

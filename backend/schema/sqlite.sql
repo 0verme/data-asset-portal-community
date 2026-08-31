@@ -74,8 +74,8 @@ CREATE TABLE IF NOT EXISTS dwp.p_api_relation (
 
 CREATE TABLE IF NOT EXISTS dwp.p_field_mapping_table (
     table_pk INTEGER PRIMARY KEY,
-    data_source_id INTEGER NOT NULL,
-    upstream_system_id INTEGER,
+    data_source_id INTEGER,
+    upstream_system_id INTEGER NOT NULL,
     source_table_name TEXT NOT NULL,
     source_table_cn TEXT,
     target_layer_code TEXT NOT NULL DEFAULT 'DWF',
@@ -90,10 +90,13 @@ CREATE TABLE IF NOT EXISTS dwp.p_field_mapping_table (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by TEXT NOT NULL DEFAULT 'system',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (data_source_id) REFERENCES p_data_source(source_id) ON DELETE RESTRICT
+    FOREIGN KEY (data_source_id) REFERENCES p_data_source(source_id) ON DELETE RESTRICT,
+    FOREIGN KEY (upstream_system_id) REFERENCES p_upstream_system(system_pk) ON DELETE RESTRICT
 );
 CREATE INDEX IF NOT EXISTS dwp.idx_p_field_mapping_table_source
     ON p_field_mapping_table (data_source_id, source_table_name);
+CREATE UNIQUE INDEX IF NOT EXISTS dwp.idx_p_field_mapping_table_uk_01
+    ON p_field_mapping_table (upstream_system_id, source_table_name);
 
 CREATE TABLE IF NOT EXISTS dwp.p_field_mapping_field (
     field_pk INTEGER PRIMARY KEY,
@@ -460,14 +463,14 @@ CREATE TABLE IF NOT EXISTS dwp.p_manual_code_table (
     table_name TEXT NOT NULL,
     table_style TEXT NOT NULL,
     owner_name TEXT,
-    status_code TEXT NOT NULL DEFAULT 'active',
+    status_code TEXT NOT NULL DEFAULT 'enabled',
     remark TEXT,
     created_by TEXT NOT NULL DEFAULT 'system',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by TEXT NOT NULL DEFAULT 'system',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (table_style IN ('enum', 'dim', 'status', 'map', 'custom')),
-    CHECK (status_code IN ('active', 'draft', 'disabled'))
+    CHECK (status_code IN ('enabled', 'disabled'))
 );
 CREATE INDEX IF NOT EXISTS dwp.idx_p_manual_code_table_filter
     ON p_manual_code_table (table_style, status_code, updated_at);

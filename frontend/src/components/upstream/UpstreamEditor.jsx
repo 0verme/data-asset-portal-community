@@ -16,7 +16,7 @@ import React from "react";
 import { Icon } from "../ui.jsx";
 import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, isValidTime, PageHeader, TimeInput } from "../common/index.js";
 import { buildModuleBreadcrumbs } from "../../routing/navigation.ts";
-import { getLegacyAwareOptions, isLegacyDictValue } from "../../hooks/useDictOptions.js";
+import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.js";
 import { optionLabel } from "../../utils/ui.js";
 
 import { getUpstreamFieldLabel } from "./upstreamFieldContract.js";
@@ -240,7 +240,7 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
       />
       {isEdit ? (
         <DangerZone
-          description="删除上游系统前，应优先评估停用是否足够。存在关联入仓表、字段映射、卸数计划或历史记录时，不应允许删除。"
+          description="删除上游系统前，应优先评估禁用是否足够。存在关联入仓表、字段映射、卸数计划或历史记录时，不应允许删除。"
           actions={[
             {
               key: "delete-upstream",

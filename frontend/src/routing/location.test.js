@@ -36,7 +36,7 @@ const emptyRoutes = {
   apiAsset: { page: "list", code: null },
   root: { page: "library", abbr: null },
   upstream: { page: "list", id: null },
-  mapping: { tab: "table", upstreamSystemId: "", sourceTable: "", dwfTable: "" },
+  mapping: { tab: "table", sourceSystemId: "", sourceTable: "", dwfTable: "" },
   lineage: { rootId: null, direction: "both", depth: 2, view: "table" },
   system: { page: "users" },
 };
@@ -73,7 +73,7 @@ test("canonical module paths restore their existing route shapes", () => {
   }
 });
 
-test("mapping keeps the legacy sourceSystemId compatibility parameter", () => {
+test("mapping keeps the canonical sourceSystemId parameter", () => {
   const location = parseLocation(
     "/field-mapping?tab=field&sourceSystemId=legacy-system&sourceTable=orders&dwfTable=dws_orders",
   );
@@ -81,10 +81,15 @@ test("mapping keeps the legacy sourceSystemId compatibility parameter", () => {
   assert.equal(location.module, "mapping");
   assert.deepEqual(location.mappingRoute, {
     tab: "field",
-    upstreamSystemId: "legacy-system",
+    sourceSystemId: "legacy-system",
     sourceTable: "orders",
     dwfTable: "dws_orders",
   });
+});
+
+test("mapping normalizes the legacy upstreamSystemId URL alias", () => {
+  const location = parseLocation("/field-mapping?upstreamSystemId=101");
+  assert.equal(location.mappingRoute.sourceSystemId, "101");
 });
 
 test("lineage and invalid query values use the existing safe defaults", () => {
@@ -166,9 +171,9 @@ test("module URL serialization covers filter, view, mapping, lineage, and system
 
   const mapping = buildNavigationLocation({
     module: "mapping",
-    routes: { ...emptyRoutes, mapping: { tab: "field", upstreamSystemId: "up-1", sourceTable: "src", dwfTable: "dwf" } },
+    routes: { ...emptyRoutes, mapping: { tab: "field", sourceSystemId: "101", sourceTable: "src", dwfTable: "dwf" } },
   });
-  assert.equal(mapping.url, "/field-mapping?upstreamSystemId=up-1&sourceTable=src&dwfTable=dwf&tab=field");
+  assert.equal(mapping.url, "/field-mapping?sourceSystemId=101&sourceTable=src&dwfTable=dwf&tab=field");
 
   const lineage = buildNavigationLocation({
     module: "lineage",
@@ -181,6 +186,46 @@ test("module URL serialization covers filter, view, mapping, lineage, and system
     routes: { ...emptyRoutes, system: { page: "operation-logs" } },
   });
   assert.equal(system.url, "/system-management/operation-logs");
+});
+
+test("clearing one filter dimension omits only its query parameter", () => {
+  const apiAsset = buildNavigationLocation({
+    module: "apiAsset",
+    routes: { ...emptyRoutes, apiAsset: { page: "list", code: null } },
+    urlState: {
+      apiAsset: {
+        filter: { status: "enabled", method: null, downstreamSystemId: "sys-1" },
+      },
+    },
+  });
+  assert.equal(apiAsset.url, "/api-assets?status=enabled&downstreamSystemId=sys-1");
+
+  const push = buildNavigationLocation({
+    module: "push",
+    routes: { ...emptyRoutes, push: { page: "systems", sys: null, job: null } },
+    urlState: {
+      push: {
+        filter: { status: "enabled", protocol: null, dept: null, importanceLevel: "important" },
+      },
+    },
+  });
+  assert.equal(push.url, "/push?status=enabled&importanceLevel=important");
+});
+
+test("API asset filter deep links distinguish a selected method from all methods", () => {
+  const selected = parseLocation("/api-assets?method=POST&status=enabled");
+  assert.deepEqual(selected.apiAssetFilter, {
+    status: "enabled",
+    method: "POST",
+    downstreamSystemId: null,
+  });
+
+  const all = parseLocation("/api-assets?status=enabled");
+  assert.deepEqual(all.apiAssetFilter, {
+    status: "enabled",
+    method: null,
+    downstreamSystemId: null,
+  });
 });
 
 test("module route mapping is centralized for representative and special modules", () => {

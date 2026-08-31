@@ -19,9 +19,13 @@ from .permissions import (
     MAINTAINER_ROLE,
     PERMISSION_CODES,
     PERMISSION_DEFINITIONS,
+    PUBLIC_PERMISSION_CODES,
+    ROLE_ASSIGNABLE_PERMISSION_CODES,
     PermissionDefinition,
     get_permission_definition,
+    is_public_permission,
     is_registered_permission,
+    is_role_assignable_permission,
     validate_permission_registry,
 )
 
@@ -35,10 +39,14 @@ __all__ = [
     "MAINTAINER_ROLE",
     "PERMISSION_CODES",
     "PERMISSION_DEFINITIONS",
+    "PUBLIC_PERMISSION_CODES",
+    "ROLE_ASSIGNABLE_PERMISSION_CODES",
     "IdentityAuthorizationRepository",
     "PermissionDefinition",
     "permissions",
     "get_permission_definition",
+    "is_public_permission",
     "is_registered_permission",
+    "is_role_assignable_permission",
     "validate_permission_registry",
 ]

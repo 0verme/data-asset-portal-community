@@ -34,17 +34,17 @@ export function AssetSidebar({ asset, canEdit = false }) {
     <>
       <SidebarFilterGroup
         title="数据分层"
-        items={[
-          {
-            key: "all-layers",
-            label: "全部层级",
-            count: Object.values(layerCounts).reduce((total, count) => total + count, 0),
-            active: !selectedLayer,
-            onClick: () => {
-              setSelectedLayer(null);
-              assetBack();
-            },
+        allOption={{
+          key: "all-layers",
+          label: "全部层级",
+          count: Object.values(layerCounts).reduce((total, count) => total + count, 0),
+          active: !selectedLayer,
+          onClick: () => {
+            setSelectedLayer(null);
+            assetBack();
           },
+        }}
+        items={[
           ...buildSidebarFacetItems({
             options: visibleLayers,
             selectedValue: selectedLayer,
@@ -67,17 +67,17 @@ export function AssetSidebar({ asset, canEdit = false }) {
 
       <SidebarFilterGroup
         title="主题域"
-        items={[
-          {
-            key: "all-domains",
-            label: "全部主题域",
-            count: Object.values(domainCounts).reduce((total, count) => total + count, 0),
-            active: !domain,
-            onClick: () => {
-              setDomain(null);
-              assetBack();
-            },
+        allOption={{
+          key: "all-domains",
+          label: "全部主题域",
+          count: Object.values(domainCounts).reduce((total, count) => total + count, 0),
+          active: !domain,
+          onClick: () => {
+            setDomain(null);
+            assetBack();
           },
+        }}
+        items={[
           ...buildSidebarFacetItems({
             options: visibleDomains,
             selectedValue: domain,

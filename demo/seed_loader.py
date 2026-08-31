@@ -17,6 +17,12 @@ from pathlib import Path
 
 DATASETS_DIR = Path(__file__).resolve().parent / "datasets"
 
+# Keep demo push rows inside the backend PUSH_AUTH_TYPE contract. The legacy
+# value is retained only so seeders can repair databases created by older
+# Community releases.
+DEMO_PUSH_AUTH_TYPE = "密钥认证"
+LEGACY_DEMO_PUSH_AUTH_TYPE = "演示占位配置"
+
 # Canonical asset domain codes (baseline: p_asset_domain.domain_code PK).
 DOMAIN_CODE_BY_NAME = {
     "商品": "PRODUCT",
@@ -61,6 +67,11 @@ def load_dataset(name: str) -> list[dict]:
     return __import__("json").loads(path.read_text(encoding="utf-8"))
 
 
+def demo_push_system_codes() -> tuple[str, ...]:
+    """Return the exact push-system codes owned by the Community demo."""
+    return tuple(item["code"] for item in load_dataset("push_systems.json"))
+
+
 def community_seed_plan() -> dict[str, dict]:
     """Return canonical Community seed rows keyed by table name.
 
@@ -100,8 +111,8 @@ def community_seed_plan() -> dict[str, dict]:
     for mapping in load_dataset("mappings.json"):
         mapping_tables.append(
             (
-                mapping["id"], mapping["dataSourceId"], mapping["sourceTable"],
-                mapping["sourceTableName"], mapping["targetLayer"],
+                mapping["id"], mapping["dataSourceId"], mapping["upstreamSystemId"],
+                mapping["sourceTable"], mapping["sourceTableName"], mapping["targetLayer"],
                 mapping["targetTable"], mapping["loadMode"],
                 len(mapping["fields"]), len(mapping["fields"]),
             )
@@ -283,7 +294,7 @@ def community_seed_plan() -> dict[str, dict]:
             (
                 system_id, system_id, code, item["name"], abbr, item["protocol"],
                 f"{abbr.lower()}.consumer.demo.invalid", 443 if item["protocol"] == "HTTP" else 9000,
-                "DEMO_ONLY", "演示占位配置", "演示业务维护组", "演示数据维护组",
+                "DEMO_ONLY", DEMO_PUSH_AUTH_TYPE, "演示业务维护组", "演示数据维护组",
                 item["department"], f"{item['name']}消费完全虚构的零售主题数据。",
                 item["status"], "normal", None, 1, "N", "demo",
                 "2026-07-12 02:00:00", "demo", "2026-07-12 02:00:00",
@@ -337,9 +348,9 @@ def community_seed_plan() -> dict[str, dict]:
         )
 
     manual_code_table_rows = [
-        (1, "ORDER_STATUS", "订单状态", "status", "演示业务维护组", "active", "完全虚构的订单状态码值。", "demo", "2026-07-12 03:00:00", "demo", "2026-07-12 03:00:00"),
-        (2, "CHANNEL_TYPE", "渠道类型", "enum", "演示业务维护组", "active", "完全虚构的零售渠道码值。", "demo", "2026-07-12 03:00:00", "demo", "2026-07-12 03:00:00"),
-        (3, "DELIVERY_MODE", "履约方式", "map", "演示业务维护组", "draft", "完全虚构的配送方式映射。", "demo", "2026-07-12 03:00:00", "demo", "2026-07-12 03:00:00"),
+        (1, "ORDER_STATUS", "订单状态", "status", "演示业务维护组", "enabled", "完全虚构的订单状态码值。", "demo", "2026-07-12 03:00:00", "demo", "2026-07-12 03:00:00"),
+        (2, "CHANNEL_TYPE", "渠道类型", "enum", "演示业务维护组", "enabled", "完全虚构的零售渠道码值。", "demo", "2026-07-12 03:00:00", "demo", "2026-07-12 03:00:00"),
+        (3, "DELIVERY_MODE", "履约方式", "map", "演示业务维护组", "disabled", "完全虚构的配送方式映射。", "demo", "2026-07-12 03:00:00", "demo", "2026-07-12 03:00:00"),
     ]
 
     lineage_snapshot_id = "demo-lineage-20260712-001"
@@ -400,22 +411,6 @@ def community_seed_plan() -> dict[str, dict]:
                 "owner_dept_name", "owner_name", "description_text",
             ),
             api_assets,
-        ),
-        "p_field_mapping_table": spec(
-            (
-                "table_pk", "data_source_id", "source_table_name",
-                "source_table_cn", "target_layer_code", "target_table_name",
-                "load_mode", "field_total_count", "mapped_field_count",
-            ),
-            mapping_tables,
-        ),
-        "p_field_mapping_field": spec(
-            (
-                "field_pk", "table_pk", "source_field_name", "source_field_type",
-                "source_field_comment", "target_field_name", "mapping_rule",
-                "field_order",
-            ),
-            mapping_fields,
         ),
         "p_asset_domain": spec(
             ("domain_code", "domain_name", "display_order", "is_active", "is_deleted"),
@@ -501,6 +496,24 @@ def community_seed_plan() -> dict[str, dict]:
                 "before_json", "after_json", "operator_name", "change_time",
             ),
             upstream_change_rows,
+        ),
+        # Mapping rows depend on the upstream-system primary key, so seed them
+        # only after the upstream entity has been inserted.
+        "p_field_mapping_table": spec(
+            (
+                "table_pk", "data_source_id", "upstream_system_id", "source_table_name",
+                "source_table_cn", "target_layer_code", "target_table_name",
+                "load_mode", "field_total_count", "mapped_field_count",
+            ),
+            mapping_tables,
+        ),
+        "p_field_mapping_field": spec(
+            (
+                "field_pk", "table_pk", "source_field_name", "source_field_type",
+                "source_field_comment", "target_field_name", "mapping_rule",
+                "field_order",
+            ),
+            mapping_fields,
         ),
         "p_push_system": spec(
             (

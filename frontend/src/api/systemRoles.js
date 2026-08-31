@@ -14,7 +14,9 @@
 
 import { requestRemote } from "./http.js";
 import {
+  isPublicPermission,
   MOCK_ROLE_PERMISSIONS,
+  normalizeRolePermissionCodes,
   PERMISSION_CODES,
 } from "../auth/permissions.ts";
 
@@ -95,7 +97,7 @@ function mockRoles() {
       description: "拥有全部已注册权限。",
       builtin: true,
       enabled: "enabled",
-      permissionCodes: [...MOCK_ROLE_PERMISSIONS.admin],
+      permissionCodes: normalizeRolePermissionCodes(MOCK_ROLE_PERMISSIONS.admin),
       userCount: 1,
     },
     {
@@ -104,7 +106,7 @@ function mockRoles() {
       description: "负责业务元数据维护与操作日志读取。",
       builtin: true,
       enabled: "enabled",
-      permissionCodes: [...MOCK_ROLE_PERMISSIONS.maintainer],
+      permissionCodes: normalizeRolePermissionCodes(MOCK_ROLE_PERMISSIONS.maintainer),
       userCount: 7,
     },
   ];
@@ -117,6 +119,15 @@ export async function getPermissions() {
   return clone(mockPermissions());
 }
 
+export async function getRoleAssignablePermissions() {
+  if (API_MODE === "remote") {
+    return normalizeCollection(await requestRemote("/system/permissions", {
+      params: { assignableOnly: "true" },
+    }));
+  }
+  return clone(mockPermissions().filter((permission) => !isPublicPermission(permission.code)));
+}
+
 export async function getRoles() {
   if (API_MODE === "remote") return normalizeCollection(await requestRemote("/system/roles"));
   return clone(localRoles);
@@ -127,7 +138,12 @@ export async function createRole(payload) {
     return normalizeDetail(await requestRemote("/system/roles", { method: "POST", body: payload }));
   }
   if (localRoles.some((item) => item.roleCode === payload.roleCode)) throw new Error(`Role already exists: ${payload.roleCode}`);
-  const role = { ...clone(payload), builtin: false, userCount: 0 };
+  const role = {
+    ...clone(payload),
+    builtin: false,
+    permissionCodes: normalizeRolePermissionCodes(payload.permissionCodes),
+    userCount: 0,
+  };
   localRoles = [...localRoles, role];
   return clone(role);
 }
@@ -139,7 +155,12 @@ export async function updateRole(roleCode, payload) {
   const current = localRoles.find((item) => item.roleCode === roleCode);
   if (!current) throw new Error(`Role not found: ${roleCode}`);
   if (current.builtin) throw new Error("Built-in role cannot be updated");
-  const next = { ...current, ...clone(payload), roleCode };
+  const next = {
+    ...current,
+    ...clone(payload),
+    roleCode,
+    permissionCodes: normalizeRolePermissionCodes(payload.permissionCodes),
+  };
   localRoles = localRoles.map((item) => (item.roleCode === roleCode ? next : item));
   return clone(next);
 }
@@ -150,6 +171,11 @@ export async function deleteRole(roleCode) {
     return;
   }
   const current = localRoles.find((item) => item.roleCode === roleCode);
-  if (current?.builtin) throw new Error("Built-in role cannot be deleted");
+  if (!current) throw new Error(`Role not found: ${roleCode}`);
+  if (current.builtin) throw new Error("Built-in role cannot be deleted");
+  const userCount = Number(current.userCount || 0);
+  if (userCount > 0) {
+    throw new Error(`Role is assigned to ${userCount} user(s); unassign them before deleting: ${roleCode}`);
+  }
   localRoles = localRoles.filter((item) => item.roleCode !== roleCode);
 }

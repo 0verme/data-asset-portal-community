@@ -47,7 +47,7 @@ from ..db.facade import (
     resolve_db_profile_name,
 )
 from ..db.service import CoreAccess
-from ..db.tables import data_source, mapping_field, mapping_table
+from ..db.tables import data_source, mapping_field, mapping_table, upstream_system
 from ..settings import get_int_env, get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
 from .operation_log_service import (
@@ -59,7 +59,7 @@ from .operation_log_service import (
 LOGGER = logging.getLogger(__name__)
 
 FIELD_SORT_COLUMNS = {
-    "srcSystem": data_source.c.source_name,
+    "srcSystem": upstream_system.c.system_name,
     "srcTable": mapping_table.c.source_table_name,
     "srcField": mapping_field.c.source_field_name,
     "srcType": mapping_field.c.source_field_type,
@@ -92,6 +92,8 @@ _ENABLED_DATA_SOURCE_STATUSES = frozenset(
     {"Y", "YES", "TRUE", "1", "ACTIVE", "ENABLED"}
 )
 _TABLE_COMPARE_KEYS = (
+    "upstream_system_id",
+    "data_source_id",
     "source_table_name",
     "source_table_cn",
     "target_layer_code",
@@ -162,18 +164,29 @@ class FieldMappingService(AuditActorMixin):
 
     @staticmethod
     def _base_from():
-        return data_source.join(
-            mapping_table,
-            and_(
+        # ``upstream_system_id`` is the mapping identity.  ``data_source`` is
+        # an older, optional catalog relation and must not decide which
+        # upstream system owns a mapping.
+        return (
+            mapping_table.join(
+                upstream_system,
+                and_(
+                    mapping_table.c.upstream_system_id == upstream_system.c.system_pk,
+                    mapping_table.c.is_deleted == "N",
+                    upstream_system.c.is_deleted == "N",
+                ),
+            )
+            .outerjoin(
+                data_source,
                 data_source.c.source_id == mapping_table.c.data_source_id,
-                mapping_table.c.is_deleted == "N",
-            ),
-        ).join(
-            mapping_field,
-            and_(
-                mapping_table.c.table_pk == mapping_field.c.table_pk,
-                mapping_field.c.is_deleted == "N",
-            ),
+            )
+            .join(
+                mapping_field,
+                and_(
+                    mapping_table.c.table_pk == mapping_field.c.table_pk,
+                    mapping_field.c.is_deleted == "N",
+                ),
+            )
         )
 
     @staticmethod
@@ -187,17 +200,45 @@ class FieldMappingService(AuditActorMixin):
 
     def _build_where(self, params=None):
         params = params or {}
-        clauses = [data_source.c.is_deleted == "N"]
+        clauses = []
 
-        upstream_system_id = str(params.get("upstreamSystemId") or "").strip()
-        if upstream_system_id.isdigit():
-            clauses.append(
-                data_source.c.source_id == self._safe_int(upstream_system_id)
-            )
+        # The canonical filter is the upstream table's primary key.  The
+        # historical upstreamSystemId alias is also resolved against that
+        # table (and may still carry the old unique technical system_id).
+        source_system_id = str(
+            params.get("sourceSystemId") or params.get("source_system_id") or ""
+        ).strip()
+        legacy_upstream_system_id = str(params.get("upstreamSystemId") or "").strip()
+        if source_system_id:
+            if source_system_id.isdigit():
+                clauses.append(
+                    upstream_system.c.system_pk == self._safe_int(source_system_id)
+                )
+            else:
+                clauses.append(upstream_system.c.system_id == source_system_id)
+        elif legacy_upstream_system_id:
+            if legacy_upstream_system_id.isdigit():
+                clauses.append(
+                    upstream_system.c.system_pk
+                    == self._safe_int(legacy_upstream_system_id)
+                )
+            else:
+                clauses.append(upstream_system.c.system_id == legacy_upstream_system_id)
+        else:
+            # dataSourceId remains a deprecated catalog compatibility filter;
+            # it is never promoted to an upstream identity.
+            data_source_id = str(params.get("dataSourceId") or "").strip()
+            if data_source_id.isdigit():
+                clauses.append(
+                    data_source.c.source_id == self._safe_int(data_source_id)
+                )
 
+        # srcSystem is retained only as a non-identity, deprecated display
+        # filter.  If names collide it intentionally returns every matching
+        # upstream system instead of choosing one.
         src_system = str(params.get("srcSystem") or "").strip()
         if src_system:
-            clauses.append(data_source.c.source_name == src_system)
+            clauses.append(upstream_system.c.system_name == src_system)
 
         self._append_like(
             clauses, mapping_table.c.source_table_name, params.get("srcTable")
@@ -226,7 +267,11 @@ class FieldMappingService(AuditActorMixin):
             )
             pattern = f"%{escaped}%"
             searchable = (
+                upstream_system.c.system_name,
+                upstream_system.c.system_abbr,
+                upstream_system.c.system_id,
                 data_source.c.source_name,
+                data_source.c.source_code,
                 mapping_table.c.source_table_name,
                 mapping_table.c.source_table_cn,
                 mapping_field.c.source_field_name,
@@ -264,7 +309,10 @@ class FieldMappingService(AuditActorMixin):
     def _stats_cache_key(self, params=None):
         relevant = {
             "keyword": (params or {}).get("keyword"),
+            "sourceSystemId": (params or {}).get("sourceSystemId"),
+            "source_system_id": (params or {}).get("source_system_id"),
             "upstreamSystemId": (params or {}).get("upstreamSystemId"),
+            "dataSourceId": (params or {}).get("dataSourceId"),
             "srcSystem": (params or {}).get("srcSystem"),
             "srcTable": (params or {}).get("srcTable"),
             "srcField": (params or {}).get("srcField"),
@@ -370,14 +418,79 @@ class FieldMappingService(AuditActorMixin):
             )
         return row
 
+    def _load_import_source_system(
+        self, item: FieldMappingImportItemRequest
+    ) -> tuple[dict[str, Any], int, int | None]:
+        requested_source_system_id = item.source_system_id
+        requested_data_source_id = item.data_source_id
+        if requested_data_source_id is not None:
+            self._load_import_data_source(requested_data_source_id)
+
+        if requested_source_system_id is not None:
+            rows = self._fetch_rows(
+                select(upstream_system).where(
+                    upstream_system.c.system_pk == requested_source_system_id
+                )
+            )
+            if not rows:
+                raise FieldMappingImportItemError(
+                    "UPSTREAM_SYSTEM_NOT_FOUND", "上游系统不存在或已删除"
+                )
+        elif requested_data_source_id is not None:
+            rows = self._fetch_rows(
+                select(upstream_system).where(
+                    upstream_system.c.data_source_id == requested_data_source_id
+                )
+            )
+        else:
+            raise FieldMappingImportItemError(
+                "UPSTREAM_SYSTEM_NOT_FOUND", "必须提供有效的上游系统标识"
+            )
+
+        active_rows = [
+            row
+            for row in rows
+            if self._is_active(row.get("is_deleted"))
+            and self._is_enabled_status(row.get("status_code"))
+        ]
+        if requested_source_system_id is None and len(active_rows) > 1:
+            raise FieldMappingImportItemError(
+                "UPSTREAM_SYSTEM_AMBIGUOUS",
+                "数据源对应多个有效上游系统，请改用 sourceSystemId",
+            )
+        if not active_rows:
+            raise FieldMappingImportItemError(
+                "UPSTREAM_SYSTEM_NOT_AVAILABLE", "上游系统不存在或未启用"
+            )
+        owner = active_rows[0]
+        resolved_source_system_id = self._safe_int(owner.get("system_pk"))
+        if resolved_source_system_id <= 0:
+            raise FieldMappingImportItemError(
+                "UPSTREAM_SYSTEM_NOT_FOUND", "上游系统主键无效"
+            )
+
+        owner_data_source_id = (
+            self._safe_int(owner.get("data_source_id"), default=0) or None
+        )
+        if (
+            requested_data_source_id is not None
+            and owner_data_source_id != requested_data_source_id
+        ):
+            raise FieldMappingImportItemError(
+                "IDENTITY_MISMATCH", "sourceSystemId 与 dataSourceId 不属于同一上游系统"
+            )
+        if owner_data_source_id is not None and requested_data_source_id is None:
+            self._load_import_data_source(owner_data_source_id)
+        return owner, resolved_source_system_id, owner_data_source_id
+
     def _load_import_table(
-        self, data_source_id: int, source_table: str
+        self, source_system_id: int, source_table: str
     ) -> dict[str, Any] | None:
         rows = self._fetch_rows(
             select(mapping_table)
             .where(
                 and_(
-                    mapping_table.c.data_source_id == data_source_id,
+                    mapping_table.c.upstream_system_id == source_system_id,
                     func.lower(mapping_table.c.source_table_name)
                     == source_table.casefold(),
                 )
@@ -388,7 +501,7 @@ class FieldMappingService(AuditActorMixin):
         if len(active) > 1:
             raise FieldMappingImportItemError(
                 "DUPLICATE_TABLE_IDENTITY",
-                "同一数据源和源表名存在多条有效表映射",
+                "同一上游系统和源表名存在多条有效表映射",
             )
         if active:
             return active[0]
@@ -396,7 +509,7 @@ class FieldMappingService(AuditActorMixin):
         if len(deleted) > 1:
             raise FieldMappingImportItemError(
                 "DUPLICATE_TABLE_IDENTITY",
-                "同一数据源和源表名存在多条已删除表映射",
+                "同一上游系统和源表名存在多条已删除表映射",
             )
         return deleted[0] if deleted else None
 
@@ -501,9 +614,9 @@ class FieldMappingService(AuditActorMixin):
     def _prepare_import_item(
         self, index: int, item: FieldMappingImportItemRequest
     ) -> dict[str, Any]:
-        self._load_import_data_source(item.data_source_id)
+        _owner, source_system_id, data_source_id = self._load_import_source_system(item)
         source_table = item.source_table.strip()
-        current_table = self._load_import_table(item.data_source_id, source_table)
+        current_table = self._load_import_table(source_system_id, source_table)
         current_fields = (
             self._load_import_fields(self._safe_int(current_table.get("table_pk")))
             if current_table is not None
@@ -567,7 +680,8 @@ class FieldMappingService(AuditActorMixin):
             table_desc = self._optional_text(current_table.get("table_desc"))
 
         table_values = {
-            "data_source_id": item.data_source_id,
+            "upstream_system_id": source_system_id,
+            "data_source_id": data_source_id,
             "source_table_name": current_table.get("source_table_name")
             if current_table is not None
             else source_table,
@@ -598,7 +712,9 @@ class FieldMappingService(AuditActorMixin):
             else "unchanged"
         )
         identity = {
-            "dataSourceId": item.data_source_id,
+            "sourceSystemId": source_system_id,
+            "upstreamSystemId": source_system_id,
+            "dataSourceId": data_source_id,
             "sourceTable": table_values["source_table_name"],
             "targetTable": table_values["target_table_name"],
         }
@@ -757,7 +873,9 @@ class FieldMappingService(AuditActorMixin):
                 connection=connection,
                 module_name="字段映射",
                 operation_type=OPERATION_TYPE_IMPORT,
-                operation_object=f"{item.data_source_id}:{item.source_table}",
+                operation_object=(
+                    f"{prepared['identity'].get('sourceSystemId')}:{item.source_table}"
+                ),
                 before=prepared["before"],
                 after=result,
                 operation_desc="导入字段映射",
@@ -773,6 +891,8 @@ class FieldMappingService(AuditActorMixin):
         return FieldMappingImportItemResult(
             index=index,
             identity={
+                "sourceSystemId": item.source_system_id,
+                "upstreamSystemId": item.source_system_id,
                 "dataSourceId": item.data_source_id,
                 "sourceTable": item.source_table,
                 "targetTable": item.target_table,
@@ -851,14 +971,18 @@ class FieldMappingService(AuditActorMixin):
 
     def _table_default_order_terms(self):
         return (
-            self._null_last_text_order_terms(data_source.c.source_name)
+            self._null_last_text_order_terms(upstream_system.c.system_name)
+            + self._null_last_text_order_terms(upstream_system.c.system_abbr)
+            + [upstream_system.c.system_pk.asc()]
             + self._null_last_text_order_terms(mapping_table.c.source_table_name)
             + self._null_last_text_order_terms(mapping_table.c.target_table_name)
         )
 
     def _field_default_order_terms(self):
         return (
-            self._null_last_text_order_terms(data_source.c.source_name)
+            self._null_last_text_order_terms(upstream_system.c.system_name)
+            + self._null_last_text_order_terms(upstream_system.c.system_abbr)
+            + [upstream_system.c.system_pk.asc()]
             + self._null_last_text_order_terms(mapping_table.c.source_table_name)
             + self._null_last_numeric_order_terms(mapping_field.c.field_order)
             + self._null_last_text_order_terms(mapping_field.c.source_field_name)
@@ -870,10 +994,12 @@ class FieldMappingService(AuditActorMixin):
     @staticmethod
     def _field_select():
         return (
-            data_source.c.source_id.label("upstream_system_id"),
-            data_source.c.source_code.label("system_code"),
-            data_source.c.source_name.label("system_name"),
-            func.coalesce(data_source.c.source_type, "").label("system_abbr"),
+            data_source.c.source_id.label("data_source_id"),
+            mapping_table.c.upstream_system_id.label("source_system_id"),
+            mapping_table.c.upstream_system_id.label("upstream_system_id"),
+            upstream_system.c.system_abbr.label("system_code"),
+            upstream_system.c.system_name.label("system_name"),
+            upstream_system.c.system_abbr.label("system_abbr"),
             mapping_table.c.source_table_name,
             mapping_table.c.source_table_cn,
             func.coalesce(mapping_table.c.target_layer_code, "DWF").label(
@@ -902,12 +1028,18 @@ class FieldMappingService(AuditActorMixin):
         )
 
     def _row_to_field_mapping(self, row):
+        source_system_id = row.get("source_system_id", row.get("upstream_system_id"))
+        data_source_id = row.get("data_source_id", source_system_id)
+        system_name = row.get("system_name", row.get("src_system"))
+        system_code = row.get("system_code", row.get("system_abbr"))
         return {
-            "dataSourceId": row["upstream_system_id"],
-            "upstreamSystemId": row["upstream_system_id"],
-            "systemCode": row["system_code"],
-            "srcSystem": row["system_name"],
-            "systemAbbr": row["system_abbr"],
+            "dataSourceId": data_source_id,
+            "sourceSystemId": source_system_id,
+            "upstreamSystemId": source_system_id,
+            "systemName": system_name,
+            "systemCode": system_code,
+            "srcSystem": system_name,
+            "systemAbbr": row.get("system_abbr", system_code),
             "srcTable": row["source_table_name"],
             "srcTableCn": row["source_table_cn"] or row["source_table_name"],
             "srcField": row["source_field_name"],
@@ -924,30 +1056,36 @@ class FieldMappingService(AuditActorMixin):
     def get_source_systems(self):
         statement = (
             select(
-                data_source.c.source_name.label("name"),
+                upstream_system.c.system_pk.label("source_system_id"),
+                data_source.c.source_id.label("data_source_id"),
+                upstream_system.c.system_name.label("system_name"),
+                upstream_system.c.system_abbr.label("system_code"),
                 func.count().label("count"),
-                data_source.c.source_id.label("upstream_system_id"),
-                data_source.c.source_code.label("system_code"),
-                func.coalesce(data_source.c.source_type, "").label("system_abbr"),
             )
             .select_from(self._base_from())
-            .where(data_source.c.is_deleted == "N")
             .group_by(
+                upstream_system.c.system_pk,
                 data_source.c.source_id,
-                data_source.c.source_code,
-                data_source.c.source_name,
-                data_source.c.source_type,
+                upstream_system.c.system_name,
+                upstream_system.c.system_abbr,
             )
-            .order_by(data_source.c.source_name)
+            .order_by(
+                upstream_system.c.system_name,
+                upstream_system.c.system_abbr,
+                upstream_system.c.system_pk,
+            )
         )
         return [
             {
-                "name": row["name"],
-                "count": self._safe_int(row.get("count")),
-                "dataSourceId": row["upstream_system_id"],
-                "upstreamSystemId": row["upstream_system_id"],
+                "id": row["source_system_id"],
+                "sourceSystemId": row["source_system_id"],
+                "upstreamSystemId": row["source_system_id"],
+                "dataSourceId": row["data_source_id"],
+                "name": row["system_name"],
+                "systemName": row["system_name"],
                 "systemCode": row["system_code"],
-                "systemAbbr": row["system_abbr"],
+                "systemAbbr": row["system_code"],
+                "count": self._safe_int(row.get("count")),
             }
             for row in self._fetch_rows_logged(
                 statement,
@@ -962,7 +1100,7 @@ class FieldMappingService(AuditActorMixin):
             return cached
         statement = (
             select(
-                func.count(distinct(data_source.c.source_id)).label(
+                func.count(distinct(upstream_system.c.system_pk)).label(
                     "source_system_count"
                 ),
                 func.count(distinct(mapping_table.c.table_pk)).label(
@@ -1123,10 +1261,12 @@ class FieldMappingService(AuditActorMixin):
         ).label("source_table_cn")
         statement = (
             select(
-                data_source.c.source_id.label("upstream_system_id"),
-                data_source.c.source_code.label("system_code"),
-                data_source.c.source_name.label("system_name"),
-                func.coalesce(data_source.c.source_type, "").label("system_abbr"),
+                data_source.c.source_id.label("data_source_id"),
+                mapping_table.c.upstream_system_id.label("source_system_id"),
+                mapping_table.c.upstream_system_id.label("upstream_system_id"),
+                upstream_system.c.system_abbr.label("system_code"),
+                upstream_system.c.system_name.label("system_name"),
+                upstream_system.c.system_abbr.label("system_abbr"),
                 mapping_table.c.source_table_name,
                 source_table_cn,
                 func.coalesce(mapping_table.c.target_layer_code, "DWF").label(
@@ -1173,9 +1313,10 @@ class FieldMappingService(AuditActorMixin):
             .where(*where)
             .group_by(
                 data_source.c.source_id,
-                data_source.c.source_code,
-                data_source.c.source_name,
-                data_source.c.source_type,
+                mapping_table.c.upstream_system_id,
+                upstream_system.c.system_pk,
+                upstream_system.c.system_abbr,
+                upstream_system.c.system_name,
                 mapping_table.c.source_table_name,
                 mapping_table.c.source_table_cn,
                 mapping_table.c.target_layer_code,
@@ -1195,15 +1336,23 @@ class FieldMappingService(AuditActorMixin):
             page_size=page_size,
             keyword=(params or {}).get("keyword"),
         ):
+            source_system_id = row.get(
+                "source_system_id", row.get("upstream_system_id")
+            )
+            data_source_id = row.get("data_source_id", source_system_id)
+            system_name = row.get("system_name", row.get("src_system"))
+            system_code = row.get("system_code", row.get("system_abbr"))
             field_count = self._safe_int(row.get("field_count"))
             empty_comment_count = self._safe_int(row.get("empty_comment_count"))
             items.append(
                 {
-                    "dataSourceId": row["upstream_system_id"],
-                    "upstreamSystemId": row["upstream_system_id"],
-                    "systemCode": row["system_code"],
-                    "srcSystem": row["system_name"],
-                    "systemAbbr": row["system_abbr"],
+                    "dataSourceId": data_source_id,
+                    "sourceSystemId": source_system_id,
+                    "upstreamSystemId": source_system_id,
+                    "systemName": system_name,
+                    "systemCode": system_code,
+                    "srcSystem": system_name,
+                    "systemAbbr": row.get("system_abbr", system_code),
                     "srcTable": row["source_table_name"],
                     "srcTableCn": row["source_table_cn"],
                     "targetLayer": row["target_layer_code"],

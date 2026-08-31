@@ -47,7 +47,6 @@ from .operation_log_service import (
     operation_log_service,
 )
 
-
 USER_STATUSES = {"enabled", "disabled"}
 ROLE_STATUSES = {"enabled", "disabled"}
 DICT_STATUSES = {"enabled", "disabled"}
@@ -216,7 +215,7 @@ class SystemManagementService(AuditActorMixin):
             permission = str(value or "").strip().lower()
             if not permission_contract.is_registered_permission(permission):
                 details.append({"field": "permissionCodes", "message": f"unknown permission: {permission or value}"})
-            elif permission not in permission_codes:
+            elif permission_contract.is_role_assignable_permission(permission) and permission not in permission_codes:
                 permission_codes.append(permission)
         if details:
             raise SystemValidationError("Role validation failed", details)
@@ -251,7 +250,15 @@ class SystemManagementService(AuditActorMixin):
             .where(rbac_role_permission.c.role_code == role_code)
             .order_by(rbac_role_permission.c.permission_code)
         )
-        return [str(row["permission_code"]).strip().lower() for row in rows if row.get("permission_code")]
+        return [
+            code
+            for code in (
+                str(row["permission_code"]).strip().lower()
+                for row in rows
+                if row.get("permission_code")
+            )
+            if permission_contract.is_role_assignable_permission(code)
+        ]
 
     def _role_payload(self, row):
         role_code = str(row.get("role_code") or "").strip().lower()
@@ -297,6 +304,14 @@ class SystemManagementService(AuditActorMixin):
                 "description": item.description,
             }
             for item in permission_contract.PERMISSION_DEFINITIONS
+        ]
+
+    def get_role_assignable_permissions(self):
+        """Return only permissions that a role can grant as an incremental delta."""
+        return [
+            item
+            for item in self.get_permissions()
+            if permission_contract.is_role_assignable_permission(item["code"])
         ]
 
     def get_roles(self):
@@ -401,7 +416,8 @@ class SystemManagementService(AuditActorMixin):
     def _delete_role(self, role_code: str):
         current = self._get_role_row(role_code)
         code = str(current.get("role_code") or "").strip().lower()
-        if str(current.get("builtin") or "N").upper() == "Y":
+        builtin = str(current.get("builtin") or "N").strip().upper()
+        if code in permission_contract.BUILTIN_ROLE_PERMISSION_CODES or builtin in {"Y", "YES", "TRUE", "1"}:
             raise SystemRoleProtectedError(f"Built-in role cannot be deleted: {code}")
         assigned = self._core_fetch(
             select(func.count().label("count"))
@@ -409,9 +425,13 @@ class SystemManagementService(AuditActorMixin):
             .where(admin_user.c.role == code)
         )
         # pi-lens-ignore: unchecked-throwing-call-python
-        if assigned and int(assigned[0].get("count") or 0) > 0:
-            raise SystemRoleAssignedError(f"Role is assigned to users: {code}")
+        assigned_count = int(assigned[0].get("count") or 0) if assigned else 0
+        if assigned_count > 0:
+            raise SystemRoleAssignedError(
+                f"Role is assigned to {assigned_count} user(s); unassign them before deleting: {code}"
+            )
         before = self._role_payload(current)
+        # The audit() context owns one database transaction for both statements.
         self._core_execute([
             delete(rbac_role_permission).where(rbac_role_permission.c.role_code == code),
             delete(rbac_role).where(rbac_role.c.role_code == code),

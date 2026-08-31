@@ -2,7 +2,8 @@ import React from "react";
 import { getAssetTables, getDomains } from "../../api/assets.js";
 import { getIndicatorList } from "../../api/indicator.js";
 import { getReportList } from "../../api/report.js";
-import { getLegacyAwareOptions, useDictOptions } from "../../hooks/useDictOptions.js";
+import { buildReportOptionSets } from "../../config/reportOptions.js";
+import { getLegacyAwareOptions } from "../../utils/optionUtils.js";
 import {
   ActionErrorBanner,
   AssetReferencePicker,
@@ -126,11 +127,14 @@ export function ReportEditor({
   const [refError, setRefError] = React.useState("");
   const [domains, setDomains] = React.useState([]);
   const [people, setPeople] = React.useState([]);
-  const { options: reportTypeOptions } = useDictOptions("REPORT_TYPE");
-  const { options: periodOptions } = useDictOptions("REPORT_STAT_PERIOD");
-  const { options: statCaliberOptions } = useDictOptions("REPORT_DATE_CALIBER");
-  const { options: dataDelayOptions } = useDictOptions("REPORT_DATA_TIMELINESS");
-  const { options: departmentOptions } = useDictOptions("UPSTREAM_DEPT");
+  const [reportOptionSets, setReportOptionSets] = React.useState(() => buildReportOptionSets());
+  const {
+    reportTypes: reportTypeOptions,
+    periods: periodOptions,
+    statCalibers: statCaliberOptions,
+    dataDelays: dataDelayOptions,
+    departments: departmentOptions,
+  } = reportOptionSets;
   const initialSnapshotRef = React.useRef(JSON.stringify(form));
   const isDirty = initialSnapshotRef.current !== JSON.stringify(form);
 
@@ -153,6 +157,7 @@ export function ReportEditor({
         setTableCandidates((Array.isArray(tables) ? tables : []).map(normalizeTableCandidate));
         setIndicatorCandidates((Array.isArray(indicators) ? indicators : []).map(normalizeIndicatorCandidate));
         setDomains((Array.isArray(domainItems) ? domainItems : []).map((item) => item.name).filter(Boolean));
+        setReportOptionSets(buildReportOptionSets(reportItems));
         setPeople([...new Set([
           ...(Array.isArray(reportItems) ? reportItems : []).flatMap((item) => [item.ownerName, item.maintainerName]),
           ...(Array.isArray(tables) ? tables : []).map((item) => item.owner),
@@ -431,7 +436,7 @@ export function ReportEditor({
 
       {isEdit ? (
         <DangerZone
-          description="删除报表是高风险操作。若仅停止使用，应优先停用并保留历史台账。"
+          description="删除报表是高风险操作。若仅停止使用，应优先禁用并保留历史台账。"
           actions={[
             {
               key: "delete-report",

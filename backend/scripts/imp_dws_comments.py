@@ -52,7 +52,7 @@ class FieldMappingRow:
 
 @dataclass
 class TableMappingRow:
-    data_source_id: int
+    upstream_system_id: int
     file_path: str
     source_table: str
     source_table_name: str
@@ -78,7 +78,7 @@ class ParsedScriptRow:
     source_table_name: str
     target_table: str
     recv_dwf_meta: RecvDwfMeta
-    data_source_id: int
+    upstream_system_id: int
     description: str
     fields: list[FieldMappingRow]
 
@@ -400,14 +400,6 @@ def split_schema_table(table_name: str) -> tuple[str | None, str]:
     return schema_name.strip('"').upper(), raw_table.strip('"').upper()
 
 
-def escape_sql(value: object) -> str:
-    if value is None:
-        return "NULL"
-    if isinstance(value, (int, float)):
-        return str(value)
-    return "'" + str(value).replace("'", "''") + "'"
-
-
 def truncate_text(value: str, max_length: int) -> str:
     normalized = (value or "").strip()
     encoded = normalized.encode("utf-8")
@@ -441,27 +433,36 @@ def build_schema_name_set(table_names: list[str]) -> set[str]:
 # Source Metadata Read-only Adapter: the following queries only read DWS/source
 # metadata needed to construct the public import payload.
 def load_upstream_system_map(profile: str) -> dict[str, int]:
-    """Read source-system metadata and resolve the canonical data source ID."""
+    """Resolve only unique machine/readable upstream identities.
+
+    ``system_name`` is intentionally excluded: it is a display attribute and
+    may be shared by multiple upstream systems.  ``system_abbr`` is also
+    accepted only while it remains unambiguous; duplicate abbreviations are
+    omitted instead of silently selecting the first row.
+    """
     sql = """
 SELECT
-    data_source_id,
+    system_pk,
     UPPER(COALESCE(system_abbr, '')) AS system_abbr,
-    UPPER(COALESCE(system_id, '')) AS system_id,
-    UPPER(COALESCE(system_name, '')) AS system_name
+    UPPER(COALESCE(system_id, '')) AS system_id
 FROM dwp.p_upstream_system
 WHERE is_deleted = 'N'
 """
     columns, rows = fetch_all(profile, sql)
-    mapping: dict[str, int] = {}
+    candidates: dict[str, set[int]] = {}
     for row in rows_to_dicts(columns, rows):
-        data_source_id = _safe_int(row.get("data_source_id"))
-        if data_source_id <= 0:
+        system_pk = _safe_int(row.get("system_pk"))
+        if system_pk <= 0:
             continue
-        for key in ("system_abbr", "system_id", "system_name"):
+        for key in ("system_abbr", "system_id"):
             value = str(row.get(key) or "").strip().upper()
-            if value and value not in mapping:
-                mapping[value] = data_source_id
-    return mapping
+            if value:
+                candidates.setdefault(value, set()).add(system_pk)
+    return {
+        key: next(iter(system_pks))
+        for key, system_pks in candidates.items()
+        if len(system_pks) == 1
+    }
 
 
 def load_recv_dwf_map(profile: str) -> dict[str, RecvDwfMeta]:
@@ -494,14 +495,14 @@ def load_table_comment_map(
     comments: dict[tuple[str | None, str], str] = {}
     for schema_name in sorted(build_schema_name_set(table_names)):
         print(f"[meta] loading table comments for schema={schema_name}")
-        sql = f"""
+        sql = """
 SELECT COALESCE(MAX("comments"), '') AS table_comment
      , UPPER(table_name) AS raw_table
 FROM all_tab_comments
-WHERE UPPER(owner) = {escape_sql(schema_name)}
+WHERE UPPER(owner) = ?
 GROUP BY UPPER(table_name)
 """
-        columns, rows = fetch_all(profile, sql)
+        columns, rows = fetch_all(profile, sql, params=(schema_name,))
         for row in rows_to_dicts(columns, rows):
             raw_table = str(row["raw_table"]).upper()
             comments[(schema_name, raw_table)] = str(
@@ -519,13 +520,15 @@ def load_source_column_map(
     comments_by_table: dict[tuple[str | None, str], dict[str, str]] = {}
     for schema_name in sorted(build_schema_name_set(table_names)):
         print(f"[meta] loading column comments for schema={schema_name}")
-        comment_sql = f"""
+        comment_sql = """
 SELECT UPPER(column_name) AS column_name, COALESCE("comments", '') AS column_comment
      , UPPER(table_name) AS raw_table
 FROM all_col_comments
-WHERE UPPER(owner) = {escape_sql(schema_name)}
+WHERE UPPER(owner) = ?
 """
-        comment_columns, comment_rows = fetch_all(profile, comment_sql)
+        comment_columns, comment_rows = fetch_all(
+            profile, comment_sql, params=(schema_name,)
+        )
         for row in rows_to_dicts(comment_columns, comment_rows):
             raw_table = str(row["raw_table"]).upper()
             comments_by_table.setdefault((schema_name, raw_table), {})[
@@ -535,7 +538,7 @@ WHERE UPPER(owner) = {escape_sql(schema_name)}
     data_types_by_table: dict[tuple[str | None, str], dict[str, str]] = {}
     for schema_name in sorted(build_schema_name_set(table_names)):
         print(f"[meta] loading column types for schema={schema_name}")
-        type_sql = f"""
+        type_sql = """
 SELECT
     UPPER(COALESCE(table_schema, '')) AS table_schema,
     UPPER(table_name) AS raw_table,
@@ -550,9 +553,9 @@ SELECT
         ''
     ) AS data_type
 FROM information_schema.columns
-WHERE UPPER(table_schema) = {escape_sql(schema_name)}
+WHERE UPPER(table_schema) = ?
 """
-        type_columns, type_rows = fetch_all(profile, type_sql)
+        type_columns, type_rows = fetch_all(profile, type_sql, params=(schema_name,))
         for row in rows_to_dicts(type_columns, type_rows):
             raw_table = str(row["raw_table"]).upper()
             key = (schema_name, raw_table)
@@ -577,7 +580,7 @@ WHERE UPPER(table_schema) = {escape_sql(schema_name)}
 
 
 def build_table_rows(profile: str, directory: str) -> list[TableMappingRow]:
-    data_source_map = load_upstream_system_map(profile)
+    upstream_system_map = load_upstream_system_map(profile)
     recv_dwf_map = load_recv_dwf_map(profile)
 
     parsed_rows: list[ParsedScriptRow] = []
@@ -601,15 +604,15 @@ def build_table_rows(profile: str, directory: str) -> list[TableMappingRow]:
             print(f"[skip] missing p_recv_dwf metadata: {target_table} ({py_file})")
             continue
 
-        data_source_id = data_source_map.get(recv_dwf_meta.data_source)
-        if data_source_id is None:
+        upstream_system_id = upstream_system_map.get(recv_dwf_meta.data_source)
+        if upstream_system_id is None:
             skipped_tables.append(
-                f"skip: missing upstream system, data_source={recv_dwf_meta.data_source}, "
-                f"target_table={target_table}, file={py_file}"
+                f"skip: missing or ambiguous upstream system identity, "
+                f"data_source={recv_dwf_meta.data_source}, target_table={target_table}, file={py_file}"
             )
             print(
-                f"[skip] missing upstream system: data_source={recv_dwf_meta.data_source}, "
-                f"target_table={target_table} ({py_file})"
+                f"[skip] missing or ambiguous upstream system identity: "
+                f"data_source={recv_dwf_meta.data_source}, target_table={target_table} ({py_file})"
             )
             continue
 
@@ -625,7 +628,7 @@ def build_table_rows(profile: str, directory: str) -> list[TableMappingRow]:
                 recv_dwf_meta=RecvDwfMeta(
                     load_mode=load_mode, data_source=recv_dwf_meta.data_source
                 ),
-                data_source_id=data_source_id,
+                upstream_system_id=upstream_system_id,
                 description=description,
                 fields=fields,
             )
@@ -645,7 +648,7 @@ def build_table_rows(profile: str, directory: str) -> list[TableMappingRow]:
         )
         table_rows.append(
             TableMappingRow(
-                data_source_id=row.data_source_id,
+                upstream_system_id=row.upstream_system_id,
                 file_path=row.file_path,
                 source_table=row.source_table,
                 source_table_name=row.source_table_name,
@@ -720,7 +723,7 @@ def build_import_payload(
     for table_row in table_rows:
         items.append(
             {
-                "dataSourceId": table_row.data_source_id,
+                "sourceSystemId": table_row.upstream_system_id,
                 "sourceTable": table_row.source_table_name,
                 "sourceTableCn": table_row.source_table_cn or None,
                 "targetLayer": DEFAULT_TARGET_LAYER,
@@ -770,7 +773,7 @@ class FieldMappingApiClient:
         self._owns_client = client is None
         cookie = (session_cookie or "").strip()
         if cookie:
-            self._client.headers["Cookie"] = cookie
+            self._client.headers.update({"Cookie": cookie})
 
     def close(self) -> None:
         if self._owns_client:

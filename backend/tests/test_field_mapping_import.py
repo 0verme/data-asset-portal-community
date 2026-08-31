@@ -34,6 +34,15 @@ class FieldMappingImportContractTests(unittest.TestCase):
         self.assertEqual("upsert", request.mode)
         self.assertEqual(1, request.items[0].data_source_id)
 
+        canonical_item = self._valid_item()
+        canonical_item.pop("dataSourceId")
+        canonical_item["sourceSystemId"] = 101
+        canonical = FieldMappingImportRequest.model_validate(
+            {"items": [canonical_item]}
+        )
+        self.assertEqual(101, canonical.items[0].source_system_id)
+        self.assertIsNone(canonical.items[0].data_source_id)
+
         with self.assertRaises(ValidationError):
             FieldMappingImportRequest.model_validate({"items": []})
         with self.assertRaises(ValidationError):
@@ -112,6 +121,24 @@ class FieldMappingImportServiceTests(unittest.TestCase):
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (2, "DISABLED", "Disabled", "relational", "disabled", "N", "seed", "seed"),
         )
+        self.connection.execute(
+            "INSERT INTO dwp.p_upstream_system "
+            "(system_pk, data_source_id, system_id, system_abbr, system_name, db_type, host_name, status_code, is_deleted, created_by, updated_by) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                101,
+                1,
+                "up_source",
+                "SRC",
+                "Source",
+                "SQLite",
+                "source.demo.invalid",
+                "enabled",
+                "N",
+                "seed",
+                "seed",
+            ),
+        )
         self.connection.commit()
         clear_engine_cache()
         self.addCleanup(clear_engine_cache)
@@ -129,24 +156,27 @@ class FieldMappingImportServiceTests(unittest.TestCase):
         }
 
     def _request(
-        self, fields=None, *, data_source_id: int = 1, source_table: str = "ORDERS"
+        self,
+        fields=None,
+        *,
+        data_source_id: int | None = 1,
+        source_system_id: int | None = None,
+        source_table: str = "ORDERS",
     ):
-        return FieldMappingImportRequest.model_validate(
-            {
-                "items": [
-                    {
-                        "dataSourceId": data_source_id,
-                        "sourceTable": source_table,
-                        "sourceTableCn": "订单",
-                        "targetLayer": "DWF",
-                        "targetTable": "DWF_ORDERS",
-                        "loadMode": "full",
-                        "tableDesc": "订单映射",
-                        "fields": fields or [self._field("ORDER_ID")],
-                    }
-                ]
-            }
-        )
+        item = {
+            "dataSourceId": data_source_id,
+            "sourceTable": source_table,
+            "sourceTableCn": "订单",
+            "targetLayer": "DWF",
+            "targetTable": "DWF_ORDERS",
+            "loadMode": "full",
+            "tableDesc": "订单映射",
+            "fields": fields or [self._field("ORDER_ID")],
+        }
+        if source_system_id is not None:
+            item.pop("dataSourceId")
+            item["sourceSystemId"] = source_system_id
+        return FieldMappingImportRequest.model_validate({"items": [item]})
 
     def _count(self, table: str) -> int:
         statements = {
@@ -182,6 +212,19 @@ class FieldMappingImportServiceTests(unittest.TestCase):
             ("updated",),
             self.connection.execute(
                 "SELECT source_field_comment FROM dwp.p_field_mapping_field"
+            ).fetchone(),
+        )
+
+    def test_canonical_source_system_id_is_persisted_as_mapping_identity(self):
+        result = self.service.import_mappings(self._request(source_system_id=101))
+
+        self.assertEqual("created", result["items"][0]["action"])
+        self.assertEqual(101, result["items"][0]["identity"]["sourceSystemId"])
+        self.assertEqual(
+            (101, 1),
+            self.connection.execute(
+                "SELECT upstream_system_id, data_source_id "
+                "FROM dwp.p_field_mapping_table"
             ).fetchone(),
         )
 
@@ -248,9 +291,7 @@ class FieldMappingImportServiceTests(unittest.TestCase):
                 raise RuntimeError("field write failed")
             return original_execute(statement)
 
-        with patch.object(
-            self.service._db, "execute", side_effect=fail_on_first_field
-        ):
+        with patch.object(self.service._db, "execute", side_effect=fail_on_first_field):
             result = self.service.import_mappings(
                 FieldMappingImportRequest(items=[first, second])
             )

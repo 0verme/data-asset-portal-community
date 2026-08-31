@@ -9,7 +9,13 @@ function SidebarFilterItem({ item }) {
     .join(" ");
 
   return (
-    <div className={className} onClick={item.disabled ? undefined : item.onClick}>
+    <button
+      type="button"
+      className={className}
+      onClick={item.disabled ? undefined : item.onClick}
+      disabled={item.disabled}
+      aria-pressed={typeof item.active === "boolean" ? item.active : undefined}
+    >
       {item.content || (
         <>
           {item.leading}
@@ -19,15 +25,17 @@ function SidebarFilterItem({ item }) {
           ) : null}
         </>
       )}
-    </div>
+    </button>
   );
 }
 
-export function SidebarFilterGroup({ title, items = [] }) {
+export function SidebarFilterGroup({ title, items = [], allOption }) {
+  const renderedItems = allOption ? [allOption, ...items] : items;
+
   return (
     <div className="side-group">
       <div className="side-title">{title}</div>
-      {items.map((item) => (
+      {renderedItems.map((item) => (
         <SidebarFilterItem key={item.key} item={item} />
       ))}
     </div>

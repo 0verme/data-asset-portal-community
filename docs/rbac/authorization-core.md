@@ -27,18 +27,21 @@ for isolated adapter tests; unknown roles still receive no permissions.
 
 - `AuthorizationService.authenticate(identity)` checks current user and role
   state without a permission code.
-- `get_permissions(identity)` returns a deterministic sorted tuple of current
-  registered codes.
+- `get_permissions(identity)` returns a deterministic sorted tuple of effective
+  codes: public catalog permissions plus current role mappings for a valid
+  identity, or the public set for an anonymous identity.
 - `has_permission(identity, permission)` and `authorize(identity, permission)`
-  deny unknown codes, missing mappings, unknown roles, disabled roles, disabled
-  users, and deleted users.
+  recognize the public set without requiring a role, while denying unknown
+  codes, missing role mappings, unknown roles, disabled roles, disabled users,
+  and deleted users.
 - `current_subject(identity)` exposes the current role/status value object to
   adapters; it does not trust a role cached in the signed session.
 
 An enabled user with an unknown/disabled role remains an authenticated subject
 but receives no permissions, so a protected resource is `403`. A missing,
 deleted, or disabled user is not an authenticated subject, so the adapter maps
-it to `401`.
+it to `401`. Public permissions never include writes or system-management
+permissions.
 
 ## FastAPI adapter
 

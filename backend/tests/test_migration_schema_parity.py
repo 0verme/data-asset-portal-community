@@ -72,6 +72,14 @@ class MigrationSchemaParityTests(unittest.TestCase):
                 for column in columns:
                     self.assertRegex(body, rf"\b{column}\b", f"{dialect}.{table}.{column}")
 
+    def test_manual_code_table_status_is_binary_across_dialects(self):
+        for dialect, sql in self.sql.items():
+            body = _table_body(sql, "p_manual_code_table")
+            self.assertIn("default 'enabled'", body, dialect)
+            self.assertIn("status_code in ('enabled', 'disabled')", body, dialect)
+            self.assertNotIn("'active'", body, dialect)
+            self.assertNotIn("'draft'", body, dialect)
+
     def test_primary_and_unique_constraints_exist_across_dialects(self):
         for dialect, sql in self.sql.items():
             normalized = sql.lower()
@@ -82,6 +90,7 @@ class MigrationSchemaParityTests(unittest.TestCase):
         required = (
             "idx_p_api_asset_filter",
             "idx_p_field_mapping_table_source",
+            "idx_p_field_mapping_table_uk_01",
             "idx_p_upstream_system_ix_01",
             "idx_p_push_system_ix_01",
             "idx_p_report_asset_ix_01",
@@ -90,6 +99,7 @@ class MigrationSchemaParityTests(unittest.TestCase):
             "idx_p_role_permission_permission",
             "foreign key (system_id)",
             "foreign key (data_source_id)",
+            "foreign key (upstream_system_id)",
             "foreign key (table_pk)",
             "on delete cascade",
             "foreign key (master_system_id)",

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 # pyright: reportMissingImports=false
-
 import unittest
 from unittest.mock import MagicMock
 
@@ -131,3 +130,9 @@ class RbacSecurityRegressionTests(unittest.TestCase):
         )
         self.assertEqual(403, response.status_code)
         self.system_service.create_role.assert_not_called()
+
+    def test_authenticated_missing_role_write_cannot_delete_role_directly(self):
+        self.current_identity = Identity("role-reader", "role-reader", "Role reader")
+        response = self.client.delete("/api/system/roles/custom-role")
+        self.assertEqual(403, response.status_code)
+        self.system_service.delete_role.assert_not_called()

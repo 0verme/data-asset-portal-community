@@ -14,22 +14,29 @@
 
 
 import { DEFAULT_REPORT_FILTER } from "../../config/defaults.js";
-import { useDictOptions } from "../../hooks/useDictOptions.js";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.jsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.jsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.jsx";
 
 export function ReportSidebar({ report, requireLogin, canEdit = false, setReportRoute }) {
   const { reports, reportFilter, setReportFilter, reportFacets } = report;
-  const { options: reportTypeOptions } = useDictOptions("REPORT_TYPE");
+  // Report type is a facet of the current report-asset response, not a
+  // common-code endpoint. This also preserves types added in the database.
+  const reportTypeOptions = Object.keys(reportFacets.type)
+    .map((value) => ({ value, name: value }));
 
   return (
     <>
       <SidebarFilterGroup
         title="报表类型"
-        items={[...reportTypeOptions, ...Object.keys(reportFacets.type)
-          .filter((value) => !reportTypeOptions.some((item) => item.value === value))
-          .map((value) => ({ value, name: value, legacy: true }))]
+        allOption={{
+          key: "all-report-types",
+          label: "全部报表类型",
+          count: reports.length,
+          active: !reportFilter.type,
+          onClick: () => setReportFilter((prev) => ({ ...prev, type: null })),
+        }}
+        items={reportTypeOptions
           .filter((item) => reportFacets.type[item.value])
           .map((item) => ({
             key: item.value,
@@ -53,6 +60,13 @@ export function ReportSidebar({ report, requireLogin, canEdit = false, setReport
 
       <SidebarFilterGroup
         title="归属部门"
+        allOption={{
+          key: "all-owner-depts",
+          label: "全部归属部门",
+          count: reports.length,
+          active: !reportFilter.ownerDept,
+          onClick: () => setReportFilter((prev) => ({ ...prev, ownerDept: null })),
+        }}
         items={Object.entries(reportFacets.ownerDept)
           .sort((a, b) => a[0].localeCompare(b[0], "zh-CN"))
           .map(([ownerDept, count]) => ({

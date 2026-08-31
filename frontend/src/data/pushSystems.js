@@ -29,7 +29,7 @@ export const PUSH_SYSTEMS = OUTPUTS.map(([abbr, name, dept, protocol, table, job
   host: `${abbr.toLowerCase()}.consumer.demo.invalid`,
   port: protocol === "HTTP" ? 443 : 9000,
   account: "DEMO_ONLY",
-  auth: "演示占位配置",
+  auth: "密钥认证",
   downstreamContact: "演示业务维护组",
   dataDeveloperContact: "演示数据维护组",
   dept,

@@ -21,7 +21,7 @@ from backend.scripts.imp_dws_comments import (
 
 def _table_row(name: str) -> TableMappingRow:
     return TableMappingRow(
-        data_source_id=1,
+        upstream_system_id=1,
         file_path=f"{name}.py",
         source_table=f"SRC_{name.upper()}",
         source_table_name=f"SRC_{name.upper()}",
@@ -50,20 +50,34 @@ class DwsCommentImportApiTests(unittest.TestCase):
         self.assertEqual("ORDER_ID", fields[0].source_field_name)
         self.assertEqual("日期格式化", fields[1].mapping_rule)
 
-    def test_source_metadata_resolves_canonical_data_source_id(self):
+    def test_source_metadata_resolves_unique_upstream_id(self):
         with patch(
             "backend.scripts.imp_dws_comments.fetch_all",
             return_value=(
-                ["data_source_id", "system_abbr", "system_id", "system_name"],
-                [(17, "MEM", "up_member", "会员中心")],
+                ["system_pk", "system_abbr", "system_id"],
+                [(17, "MEM", "up_member")],
             ),
         ) as fetch:
             mapping = load_upstream_system_map("source-profile")
 
         self.assertEqual(17, mapping["MEM"])
         self.assertEqual(17, mapping["UP_MEMBER"])
-        self.assertIn("data_source_id", fetch.call_args.args[1])
-        self.assertNotIn("system_pk,", fetch.call_args.args[1])
+        self.assertIn("system_pk,", fetch.call_args.args[1])
+        self.assertNotIn("data_source_id", fetch.call_args.args[1])
+
+    def test_source_metadata_omits_ambiguous_abbreviations(self):
+        with patch(
+            "backend.scripts.imp_dws_comments.fetch_all",
+            return_value=(
+                ["system_pk", "system_abbr", "system_id"],
+                [(17, "MEM", "up_member"), (18, "MEM", "up_member_test")],
+            ),
+        ):
+            mapping = load_upstream_system_map("source-profile")
+
+        self.assertNotIn("MEM", mapping)
+        self.assertEqual(17, mapping["UP_MEMBER"])
+        self.assertEqual(18, mapping["UP_MEMBER_TEST"])
 
     def test_payload_uses_the_public_import_contract(self):
         payload = build_import_payload([_table_row("good_one")], dry_run=True)
@@ -79,7 +93,7 @@ class DwsCommentImportApiTests(unittest.TestCase):
         self.assertEqual(1, len(items))
         item = items[0]
         fields = cast(list[dict[str, Any]], item["fields"])
-        self.assertEqual(1, item["dataSourceId"])
+        self.assertEqual(1, item["sourceSystemId"])
         self.assertEqual("SRC_GOOD_ONE", item["sourceTable"])
         self.assertEqual("源字段", fields[0]["sourceComment"])
         self.assertNotIn("table_pk", item)

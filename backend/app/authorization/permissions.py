@@ -15,9 +15,9 @@
 """Stable Community RBAC permission registry.
 
 This module is the P0 contract, not an HTTP enforcement layer.  It contains
-only immutable permission definitions and the compatibility mappings that P1
-will persist.  No FastAPI, Request, Session, database, or frontend dependency
-belongs here.
+only immutable permission definitions and the public/role policy used by
+authorization and persistence adapters.  No FastAPI, Request, Session,
+database, or frontend dependency belongs here.
 """
 
 from __future__ import annotations
@@ -73,11 +73,11 @@ PERMISSION_DEFINITIONS: tuple[PermissionDefinition, ...] = (
         "api_asset:write", "API 资产维护", "维护 API 资产、参数、响应字段和关系。"
     ),
     _permission("upstream:read", "上游系统受限读取", "读取受保护的上游系统管理详情。"),
-    _permission("upstream:write", "上游系统维护", "创建、更新、停用和删除上游系统。"),
+    _permission("upstream:write", "上游系统维护", "创建、更新、禁用和删除上游系统。"),
     _permission("push:read", "下游推送受限读取", "读取受保护的下游系统管理详情。"),
     _permission("push:write", "下游推送维护", "维护下游系统、推送作业及字段。"),
     _permission("code_table:read", "码值表读取", "查询和导出手工码值表。"),
-    _permission("code_table:write", "码值表维护", "创建、更新、停用和删除手工码值表。"),
+    _permission("code_table:write", "码值表维护", "创建、更新、禁用和删除手工码值表。"),
     _permission("field_mapping:read", "字段映射读取", "查询字段映射和映射统计。"),
     _permission("field_mapping:write", "字段映射导入", "批量导入和幂等更新字段映射。"),
     _permission("lineage:read", "血缘读取", "查询血缘 bootstrap、节点和子图。"),
@@ -96,11 +96,11 @@ PERMISSION_DEFINITIONS: tuple[PermissionDefinition, ...] = (
         "读取完整菜单管理数据；公共菜单接口仍按公开契约过滤。",
     ),
     _permission(
-        "system:menu:write", "菜单管理维护", "创建、更新、排序、停用和删除菜单。"
+        "system:menu:write", "菜单管理维护", "创建、更新、排序、禁用和删除菜单。"
     ),
     _permission("system:param:read", "参数管理读取", "读取参数分类和参数字典。"),
     _permission(
-        "system:param:write", "参数管理维护", "创建、更新、停用和删除参数字典。"
+        "system:param:write", "参数管理维护", "创建、更新、禁用和删除参数字典。"
     ),
     _permission("system:role:read", "角色管理读取", "P6 读取角色及权限映射。"),
     _permission("system:role:write", "角色管理维护", "P6 创建、更新角色及权限映射。"),
@@ -111,30 +111,46 @@ _DEFINITIONS_BY_CODE = MappingProxyType(
     {item.code: item for item in PERMISSION_DEFINITIONS}
 )
 
-# The compatibility mapping deliberately remains explicit.  Public reads are
-# not made private by this set; the set describes the permissions a maintainer
-# receives whenever a later phase protects that operation.
-MAINTAINER_PERMISSION_CODES = frozenset(
+# This is the single permission-policy source for the public catalog.  It is
+# intentionally narrower than all read permissions: upstream/push read codes
+# protect admin-detail responses, while system, metadata, and audit reads are
+# never public.
+PUBLIC_PERMISSION_CODES = frozenset(
     {
         "asset:read",
-        "asset:write",
         "root:read",
-        "root:write",
         "indicator:read",
-        "indicator:write",
         "report:read",
-        "report:write",
         "api_asset:read",
+        "code_table:read",
+        "field_mapping:read",
+        "lineage:read",
+    }
+)
+
+# Keep the role-management candidate order aligned with the stable registry.
+ROLE_ASSIGNABLE_PERMISSION_CODES: tuple[str, ...] = tuple(
+    item.code
+    for item in PERMISSION_DEFINITIONS
+    if item.code not in PUBLIC_PERMISSION_CODES
+)
+
+# Built-in role mappings contain only role-controlled permissions for the
+# maintainer.  Public codes are inherited by the authorization core instead of
+# being repeated in this Role-Permission mapping.
+MAINTAINER_PERMISSION_CODES = frozenset(
+    {
+        "asset:write",
+        "root:write",
+        "indicator:write",
+        "report:write",
         "api_asset:write",
         "upstream:read",
         "upstream:write",
         "push:read",
         "push:write",
-        "code_table:read",
         "code_table:write",
-        "field_mapping:read",
         "field_mapping:write",
-        "lineage:read",
         "metadata:read",
         "metadata:write",
         "operation_log:read",
@@ -163,6 +179,16 @@ def is_registered_permission(code: str) -> bool:
     return code in _DEFINITIONS_BY_CODE
 
 
+def is_public_permission(code: str) -> bool:
+    """Return whether *code* is inherited by the public catalog."""
+    return code in PUBLIC_PERMISSION_CODES
+
+
+def is_role_assignable_permission(code: str) -> bool:
+    """Return whether a role may grant *code* as an incremental permission."""
+    return is_registered_permission(code) and not is_public_permission(code)
+
+
 def validate_permission_registry() -> None:
     """Raise ``ValueError`` when the checked-in contract is internally invalid."""
     if not PERMISSION_DEFINITIONS:
@@ -176,6 +202,21 @@ def validate_permission_registry() -> None:
             raise ValueError(f"permission fields do not match code: {item.code}")
         if not item.name.strip() or not item.description.strip():
             raise ValueError(f"permission metadata is incomplete: {item.code}")
+    unknown_public = PUBLIC_PERMISSION_CODES - set(PERMISSION_CODES)
+    if unknown_public:
+        raise ValueError(
+            f"public permissions are not registered: {', '.join(sorted(unknown_public))}"
+        )
+    if any(
+        _DEFINITIONS_BY_CODE[code].action != "read" for code in PUBLIC_PERMISSION_CODES
+    ):
+        raise ValueError("public permissions must be read permissions")
+    if set(ROLE_ASSIGNABLE_PERMISSION_CODES) != (
+        set(PERMISSION_CODES) - PUBLIC_PERMISSION_CODES
+    ):
+        raise ValueError(
+            "role-assignable permissions must complement public permissions"
+        )
     for role, permissions in BUILTIN_ROLE_PERMISSION_CODES.items():
         if not role.strip():
             raise ValueError("builtin role code must be non-empty")
@@ -184,5 +225,7 @@ def validate_permission_registry() -> None:
             raise ValueError(
                 f"{role} maps unknown permissions: {', '.join(sorted(unknown))}"
             )
+    if PUBLIC_PERMISSION_CODES & BUILTIN_ROLE_PERMISSION_CODES[MAINTAINER_ROLE]:
+        raise ValueError("maintainer must map only role-assignable permissions")
     if BUILTIN_ROLE_PERMISSION_CODES[ADMIN_ROLE] != frozenset(PERMISSION_CODES):
         raise ValueError("admin must explicitly map every registered permission")

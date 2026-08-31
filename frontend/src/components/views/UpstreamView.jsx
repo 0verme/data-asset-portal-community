@@ -7,7 +7,7 @@ const confirmDeleteUpstream = (system, run) => async () => {
   if (await confirmDeleteAction({
     name: system.name || system.id,
     typeLabel: "上游卸数系统",
-    impact: "该系统删除后，可能影响入仓表清单、卸数计划、字段映射和历史记录。若该系统不再使用，建议优先停用。",
+    impact: "该系统删除后，可能影响入仓表清单、卸数计划、字段映射和历史记录。若该系统不再使用，建议优先禁用。",
     consequences: [
       "删除前必须校验是否存在入仓表、字段映射、卸数计划和历史记录。",
       "存在任一关联时，应由后端拒绝删除并返回明确原因。",

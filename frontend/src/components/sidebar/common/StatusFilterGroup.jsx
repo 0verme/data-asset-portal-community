@@ -13,14 +13,14 @@ export function StatusFilterGroup({
   return (
     <SidebarFilterGroup
       title="状态"
+      allOption={{
+        key: "all",
+        label: "全部状态",
+        count: totalCount,
+        active: value === allValue,
+        onClick: () => onChange(allValue),
+      }}
       items={[
-        {
-          key: "all",
-          label: "全部状态",
-          count: totalCount,
-          active: value === allValue,
-          onClick: () => onChange(allValue),
-        },
         {
           key: "enabled",
           label: "启用",

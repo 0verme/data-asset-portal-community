@@ -36,8 +36,10 @@ import {
   compareValues,
   downloadCsv,
   isLinkedRoute,
+  formatSystemLabel,
+  getRouteSourceSystemId,
   isTransformRule,
-  resolveSourceSystemName,
+  resolveSourceSystemLabel,
   sortMarker,
 } from "./fieldMapping/fieldMappingUtils.js";
 import { Icon } from "./ui.jsx";
@@ -90,7 +92,7 @@ export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRo
 
   useEffect(() => {
     const nextTab = route.tab === "field" ? "field" : "table";
-    const linkedSourceSystem = resolveSourceSystemName(route, sourceSystems);
+    const linkedSourceSystem = resolveSourceSystemLabel(route, sourceSystems);
     const nextFilters = isLinkedRoute(route)
       ? buildLinkedFilters(route, linkedSourceSystem)
       : DEFAULT_FILTERS;
@@ -113,7 +115,7 @@ export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRo
       try {
         const baseParams = {
           ...requestFilters,
-          upstreamSystemId: route.upstreamSystemId || "",
+          sourceSystemId: requestFilters.sourceSystemId || "",
           keyword: keyword || "",
         };
         const requests = [getFieldMappingStats(baseParams)];
@@ -162,14 +164,13 @@ export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRo
   }, [
     requestFilters.emptyComment,
     requestFilters.srcField,
-    requestFilters.srcSystem,
+    requestFilters.sourceSystemId,
     requestFilters.srcTable,
     requestFilters.targetField,
     requestFilters.targetTable,
     keyword,
     pageSize,
     requestPage,
-    route.upstreamSystemId,
     sort.direction,
     sort.key,
     tab,
@@ -186,7 +187,7 @@ export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRo
     field: stats?.fieldCount ?? "-",
   };
   const linkedView = isLinkedRoute(route);
-  const currentSourceLabel = filters.srcSystem || resolveSourceSystemName(route, sourceSystems);
+  const currentSourceLabel = resolveSourceSystemLabel(route, sourceSystems);
 
   const sortedRows = useMemo(() => {
     if (tab === "field") return fieldRows;
@@ -284,7 +285,7 @@ export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRo
   const handleViewFieldMapping = (row) => {
     setRoute({
       tab: "field",
-      upstreamSystemId: route.upstreamSystemId || String(row.upstreamSystemId || ""),
+      sourceSystemId: getRouteSourceSystemId(route) || String(row.sourceSystemId || row.upstreamSystemId || ""),
       sourceTable: row.srcTable || "",
       dwfTable: row.targetTable || "",
     });
@@ -292,7 +293,7 @@ export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRo
 
   const renderTableCell = (row, column) => {
     if (column.key === "srcSystem") {
-      return <span className="fm-system"><span className="fm-dot"></span>{row.srcSystem}</span>;
+      return <span className="fm-system"><span className="fm-dot"></span>{formatSystemLabel(row)}</span>;
     }
     if (column.key === "srcTable") return row.srcTable;
     if (column.key === "srcTableCn") return row.srcTableCn;
@@ -326,11 +327,17 @@ export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRo
     return row[column.key] ?? "";
   };
 
+  const displayCellValue = (row, column) => {
+    if (column.key === "srcSystem") return formatSystemLabel(row);
+    if (column.key === "loadMode") return LOAD_MODE_META[row.loadMode]?.label ?? "";
+    return row[column.key] ?? "";
+  };
+
   const exportCurrentTab = () => {
     if (tab === "field") {
       downloadCsv("字段映射_字段视图.csv", [
         fieldColumns.map((item) => item.label),
-        ...pageRows.map((row) => fieldColumns.map((item) => row[item.key] || "")),
+        ...pageRows.map((row) => fieldColumns.map((item) => displayCellValue(row, item))),
       ]);
       return;
     }
@@ -339,9 +346,7 @@ export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRo
       orderedTableColumns.filter((item) => item.key !== "__actions").map((item) => item.label),
       ...sortedRows.map((row) => orderedTableColumns
         .filter((item) => item.key !== "__actions")
-        .map((item) => (item.key === "loadMode"
-          ? LOAD_MODE_META[row.loadMode]?.label ?? ""
-          : row[item.key] ?? ""))),
+        .map((item) => displayCellValue(row, item))),
     ]);
   };
 
@@ -469,8 +474,8 @@ export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRo
                 </thead>
                 <tbody>
                   {tab === "field" ? pageRows.map((row) => (
-                    <tr key={`${row.srcSystem}-${row.srcTable}-${row.srcField}-${row.targetField}`}>
-                      <td><span className="fm-system"><span className="fm-dot"></span>{row.srcSystem}</span></td>
+                    <tr key={`${row.sourceSystemId || row.upstreamSystemId}-${row.srcTable}-${row.srcField}-${row.targetField}`}>
+                      <td><span className="fm-system"><span className="fm-dot"></span>{formatSystemLabel(row)}</span></td>
                       <td className="mono">{row.srcTable}</td>
                       <td className="mono">{row.srcField}</td>
                       <td className="fm-muted mono">{row.srcType}</td>
@@ -488,7 +493,7 @@ export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRo
                       <td><span className={`tag ${RULE_TAGS[row.mappingRule] || "tag-neutral"}`}>{row.mappingRule}</span></td>
                     </tr>
                   )) : pageRows.map((row) => (
-                    <tr key={`${row.srcSystem}-${row.srcTable}`}>
+                    <tr key={`${row.sourceSystemId || row.upstreamSystemId}-${row.srcTable}`}>
                       {orderedTableColumns.map((column) => (
                         <td
                           key={column.key}

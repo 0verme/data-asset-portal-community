@@ -27,11 +27,14 @@ p_admin_user.role  ── role_code ──> p_role
 `p_user_role`, multiple roles, hierarchy, inheritance, or a role foreign key
 that would reject an existing custom/unknown value before P2 can fail closed.
 
-The forward-only Alembic revision is
-`backend/alembic/versions/0005_rbac_persistence.py`. Fresh baselines contain
+The forward-only RBAC Alembic revision is
+`backend/alembic/versions/0005_rbac_persistence.py`; the current Alembic head also
+contains the additive field-mapping identity revision `0006_field_mapping_upstream_id.py`
+and the binary-status contract revision `0007_binary_status_contract.py`.
+Fresh baselines contain
 the same tables so `schema_migrate.py verify --offline` and fresh initialization
 see one identical 39-table contract. Existing SQLite/PostgreSQL/MySQL
-installations at the previous head receive the tables through revision `0005`.
+installations at the previous RBAC head receive the tables through revision `0005`; field-mapping installations are then upgraded by revision `0006`.
 The GaussDB/DWS provider has no online Alembic path in the current repository;
 `seed_rbac` applies the same forward DDL when a pre-RBAC DWS database is
 encountered, while fresh DWS uses the canonical baseline.
@@ -43,10 +46,13 @@ read-before-insert seed:
 
 1. `p_role` inserts built-in `admin` and `maintainer` only when absent.
 2. `p_permission` inserts every P0 registry definition in registry order.
-3. `p_role_permission` inserts explicit admin-all and maintainer-compatibility
-   mappings only when absent.
+3. `p_role_permission` inserts explicit admin-all and maintainer role-delta
+   mappings only when absent; public catalog permissions are inherited at
+   authorization time and are not added to new maintainer mappings.
 4. Existing custom role descriptions, custom permissions, and extra mappings
-   are never overwritten or deleted.
+   are never overwritten or deleted. Historical public mappings remain
+   compatible and are filtered from effective role payloads; saving a role uses
+   the existing replacement semantics to normalize its submitted mapping.
 
 `schema_migrate.py apply` runs the seed after baseline/Alembic work and prints
 an insertion summary. The SQLite demo seed invokes the same function before
@@ -56,7 +62,8 @@ still intentionally left for the deployment/bootstrap operator in that SQL
 path.
 
 Repeated seed is a no-op. A new permission is an additive registry/seed diff;
-it does not silently grant unrelated permissions or reset custom mappings.
+it does not silently grant unrelated permissions or reset custom mappings. The
+public/role split is code policy, so Issue #185 requires no schema migration.
 
 ## Verification contract
 

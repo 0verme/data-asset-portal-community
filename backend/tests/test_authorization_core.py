@@ -15,6 +15,7 @@ from backend.app.authorization.core import (
     AuthorizationService,
     AuthorizationSubject,
 )
+from backend.app.authorization.permissions import PUBLIC_PERMISSION_CODES
 from backend.app.fastapi.dependencies import (
     RequestContextMiddleware,
     require_permission,
@@ -42,6 +43,7 @@ class AuthorizationCoreTests(unittest.TestCase):
                 "admin-user": AuthorizationSubject("admin-user", "admin"),
                 "maintainer-user": AuthorizationSubject("maintainer-user", "maintainer"),
                 "custom-user": AuthorizationSubject("custom-user", "indicator-maintainer"),
+                "empty-user": AuthorizationSubject("empty-user", "empty-role"),
                 "unknown-user": AuthorizationSubject("unknown-user", "retired", role_enabled=False),
                 "disabled-role-user": AuthorizationSubject("disabled-role-user", "maintainer", role_enabled=False),
                 "disabled-user": AuthorizationSubject("disabled-user", "admin", user_enabled=False),
@@ -52,6 +54,7 @@ class AuthorizationCoreTests(unittest.TestCase):
                 "admin": {"system:user:write", "indicator:write", "operation_log:read"},
                 "maintainer": {"indicator:write", "operation_log:read"},
                 "indicator-maintainer": {"indicator:read", "indicator:write", "operation_log:read"},
+                "empty-role": set(),
             }
         )
         self.service = AuthorizationService(self.repository)
@@ -61,18 +64,56 @@ class AuthorizationCoreTests(unittest.TestCase):
         maintainer = Identity("maintainer", "maintainer-user", "Maintainer")
 
         self.assertEqual(
-            ("indicator:write", "operation_log:read", "system:user:write"),
+            (
+                "api_asset:read",
+                "asset:read",
+                "code_table:read",
+                "field_mapping:read",
+                "indicator:read",
+                "indicator:write",
+                "lineage:read",
+                "operation_log:read",
+                "report:read",
+                "root:read",
+                "system:user:write",
+            ),
             self.service.get_permissions(admin),
         )
         self.assertTrue(self.service.has_permission(admin, "system:user:write"))
         self.assertFalse(self.service.has_permission(maintainer, "system:user:write"))
+        self.assertTrue(self.service.has_permission(maintainer, "asset:read"))
         self.assertTrue(self.service.has_permission(maintainer, "indicator:write"))
 
-    def test_custom_role_is_exact_and_does_not_inherit_admin(self):
+    def test_public_permissions_are_effective_for_anonymous_and_authenticated_users(self):
+        anonymous = self.service.get_permissions(None)
+        self.assertEqual(tuple(sorted(PUBLIC_PERMISSION_CODES)), anonymous)
+        self.assertTrue(self.service.has_permission(None, "asset:read"))
+        self.assertFalse(self.service.has_permission(None, "asset:write"))
+
+        custom = self.service.get_permissions(Identity("indicator-maintainer", "custom-user"))
+        self.assertTrue(set(PUBLIC_PERMISSION_CODES).issubset(custom))
+        self.assertFalse(self.service.has_permission(Identity("indicator-maintainer", "custom-user"), "asset:write"))
+
+        empty_role = Identity("empty-role", "empty-user")
+        self.assertTrue(self.service.has_permission(empty_role, "asset:read"))
+        self.assertFalse(self.service.has_permission(empty_role, "asset:write"))
+
+    def test_custom_role_inherits_public_without_inheriting_admin(self):
         identity = Identity("indicator-maintainer", "custom-user", "Custom")
 
         self.assertEqual(
-            ("indicator:read", "indicator:write", "operation_log:read"),
+            (
+                "api_asset:read",
+                "asset:read",
+                "code_table:read",
+                "field_mapping:read",
+                "indicator:read",
+                "indicator:write",
+                "lineage:read",
+                "operation_log:read",
+                "report:read",
+                "root:read",
+            ),
             self.service.get_permissions(identity),
         )
         self.assertFalse(self.service.has_permission(identity, "system:user:write"))
@@ -149,7 +190,12 @@ class FastApiAuthorizationAdapterTests(unittest.TestCase):
         def protected(_context=Depends(require_permission("indicator:write"))):
             return {"ok": True}
 
+        @app.get("/public")
+        def public(_context=Depends(require_permission("asset:read"))):
+            return {"ok": True}
+
         client = TestClient(app)
+        self.assertEqual(200, client.get("/public").status_code)
         self.assertEqual(401, client.get("/protected").status_code)
 
         current_identity = Identity("maintainer", "maintainer-user")

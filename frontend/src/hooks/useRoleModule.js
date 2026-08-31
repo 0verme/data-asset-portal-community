@@ -13,9 +13,16 @@
 // limitations under the License.
 
 import React from "react";
-import { createRole, deleteRole, getPermissions, getRoles, updateRole } from "../api/systemRoles.js";
+import {
+  createRole,
+  deleteRole,
+  getRoleAssignablePermissions,
+  getRoles,
+  updateRole,
+} from "../api/systemRoles.js";
 import { toast } from "../components/common/index.js";
 import { getErrorMessage } from "../utils/ui.js";
+import { normalizeRolePermissionCodes } from "../auth/permissions.ts";
 
 const DEFAULT_FORM = {
   roleCode: "",
@@ -39,14 +46,19 @@ export function useRoleModule({ active, requireLogin, actionIntent, onActionHand
   const [modal, setModal] = React.useState({ open: false, mode: "new", initial: null, busy: false });
   const [form, setForm] = React.useState(DEFAULT_FORM);
   const [errors, setErrors] = React.useState([]);
+  const [deletingRoleCode, setDeletingRoleCode] = React.useState("");
   const requestSeq = React.useRef(0);
+  const deletingRoleCodes = React.useRef(new Set());
 
   const load = React.useCallback(async () => {
     const requestId = ++requestSeq.current;
     setLoading(true);
     setError("");
     try {
-      const [nextRoles, nextPermissions] = await Promise.all([getRoles(), getPermissions()]);
+      const [nextRoles, nextPermissions] = await Promise.all([
+        getRoles(),
+        getRoleAssignablePermissions(),
+      ]);
       if (requestId !== requestSeq.current) return;
       setRoles(nextRoles);
       setPermissions(nextPermissions);
@@ -81,7 +93,7 @@ export function useRoleModule({ active, requireLogin, actionIntent, onActionHand
         name: role.name || "",
         description: role.description || "",
         enabled: role.enabled || "enabled",
-        permissionCodes: [...(role.permissionCodes || [])],
+        permissionCodes: normalizeRolePermissionCodes(role.permissionCodes),
       });
       setModal({ open: true, mode: "edit", initial: role, busy: false });
     }, "system:role:write");
@@ -112,7 +124,7 @@ export function useRoleModule({ active, requireLogin, actionIntent, onActionHand
         name: form.name.trim(),
         description: form.description.trim(),
         enabled: form.enabled,
-        permissionCodes: [...new Set(form.permissionCodes || [])].sort(),
+        permissionCodes: normalizeRolePermissionCodes(form.permissionCodes),
       };
       if (modal.mode === "edit") await updateRole(modal.initial.roleCode, payload);
       else await createRole(payload);
@@ -126,12 +138,25 @@ export function useRoleModule({ active, requireLogin, actionIntent, onActionHand
   }, [form, load, modal, validate]);
 
   const remove = React.useCallback(async (role) => {
+    const code = String(role?.roleCode || "").trim().toLowerCase();
+    if (!code || deletingRoleCodes.current.has(code)) return;
+    deletingRoleCodes.current.add(code);
+    setDeletingRoleCode(code);
+    setModal((previous) => ({ ...previous, busy: true }));
     try {
-      await deleteRole(role.roleCode);
+      await deleteRole(code);
+      setRoles((current) => current.filter((item) => item.roleCode !== code));
       await load();
       setModal({ open: false, mode: "new", initial: null, busy: false });
+      setForm(DEFAULT_FORM);
+      toast.success(`角色「${role?.name || code}」已删除`);
     } catch (nextError) {
       toast.error(getErrorMessage(nextError, "删除角色失败。"));
+      setModal((previous) => ({ ...previous, busy: false }));
+      throw nextError;
+    } finally {
+      deletingRoleCodes.current.delete(code);
+      setDeletingRoleCode((current) => (current === code ? "" : current));
     }
   }, [load]);
 
@@ -145,6 +170,7 @@ export function useRoleModule({ active, requireLogin, actionIntent, onActionHand
     form,
     setForm,
     errors,
+    deletingRoleCode,
     load,
     openNew,
     openEdit,

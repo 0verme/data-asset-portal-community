@@ -49,7 +49,7 @@ function CodeTableForm({ module }) {
           <div className="fl full">
             <label>状态</label>
             <select className="inp" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
-              <option value="active">启用</option><option value="draft">草稿</option><option value="disabled">停用</option>
+              <option value="enabled">启用</option><option value="disabled">禁用</option>
             </select>
           </div>
           <div className="fl full">
@@ -60,7 +60,7 @@ function CodeTableForm({ module }) {
       </FormSection>
       {formModal.mode === "edit" && formModal.initial ? (
         <DangerZone
-          description="删除后码表将从湖仓登记清单移除；若只是暂时下线，建议优先停用。"
+          description="删除后码表将从湖仓登记清单移除；若只是暂时下线，建议优先禁用。"
           actions={[{
             key: "delete-code-table", label: "删除码值表", icon: "trash", danger: true,
             onClick: async () => {
@@ -103,9 +103,8 @@ export function ManualCodeTablePage({ module, query, canEdit }) {
 
   const stats = [
     ["码表总数", module.items.length],
-    ["启用", module.items.filter((item) => item.status === "active").length],
-    ["草稿", module.items.filter((item) => item.status === "draft").length],
-    ["停用", module.items.filter((item) => item.status === "disabled").length],
+    ["启用", module.items.filter((item) => item.status === "enabled").length],
+    ["禁用", module.items.filter((item) => item.status === "disabled").length],
     ["样式种类", new Set(module.items.map((item) => item.style)).size],
   ];
 
@@ -127,7 +126,7 @@ export function ManualCodeTablePage({ module, query, canEdit }) {
       <div className="tbl-wrap code-table-list">
         <div className="field-toolbar">
           <select className="inp code-table-status-filter" value={module.statusFilter} onChange={(event) => module.setStatusFilter(event.target.value)} aria-label="状态筛选">
-            <option value="">全部状态</option><option value="active">启用</option><option value="draft">草稿</option><option value="disabled">停用</option>
+            <option value="">全部状态</option><option value="enabled">启用</option><option value="disabled">禁用</option>
           </select>
           <div className="ft-info">共 {module.filteredItems.length} 张码表{query ? `，匹配“${query}”` : ""}</div>
         </div>
@@ -149,7 +148,7 @@ export function ManualCodeTablePage({ module, query, canEdit }) {
                   <RowActions
                     onView={() => module.setDetailItem(item)}
                     onEdit={canEdit ? () => module.openEdit(item) : undefined}
-                    toggle={canEdit ? { enabled: item.status === "active", label: item.tableName, onToggle: () => module.changeStatus(item, item.status === "active" ? "disabled" : "active") } : undefined}
+                    toggle={canEdit ? { enabled: item.status === "enabled", label: item.tableName, onToggle: () => module.changeStatus(item, item.status === "enabled" ? "disabled" : "enabled") } : undefined}
                   />
                 </td>
               </tr>

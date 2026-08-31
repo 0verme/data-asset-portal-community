@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
+  getEffectivePermissions,
   hasAnyPermission,
   hasPermission,
   MOCK_ROLE_PERMISSIONS,
@@ -13,15 +14,16 @@ import {
 const here = fileURLToPath(new URL(".", import.meta.url));
 
 test("guest, builtin, maintainer, and custom role permission matrix is explicit", () => {
-  const guest = { role: "guest", permissions: [] };
-  const admin = { role: "admin", permissions: MOCK_ROLE_PERMISSIONS.admin };
-  const maintainer = { role: "maintainer", permissions: MOCK_ROLE_PERMISSIONS.maintainer };
-  const custom = { role: "indicator-reader", permissions: ["indicator:read"] };
+  const guest = { role: "guest", permissions: getEffectivePermissions([]) };
+  const admin = { role: "admin", permissions: getEffectivePermissions(MOCK_ROLE_PERMISSIONS.admin) };
+  const maintainer = { role: "maintainer", permissions: getEffectivePermissions(MOCK_ROLE_PERMISSIONS.maintainer) };
+  const custom = { role: "indicator-reader", permissions: getEffectivePermissions(["indicator:read"]) };
 
-  assert.equal(hasPermission(guest, "asset:read"), false);
+  assert.equal(hasPermission(guest, "asset:read"), true);
   assert.equal(hasPermission(admin, "system:role:write"), true);
   assert.equal(hasPermission(maintainer, "operation_log:read"), true);
   assert.equal(hasPermission(maintainer, "system:role:write"), false);
+  assert.equal(hasPermission(custom, "asset:read"), true);
   assert.equal(hasPermission(custom, "indicator:read"), true);
   assert.equal(hasAnyPermission(custom, ["system:role:read", "indicator:read"]), true);
 });

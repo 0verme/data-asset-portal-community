@@ -138,7 +138,7 @@ class PublicCatalogApiTests(unittest.TestCase):
         self.report.get_report_detail.return_value = {"code": "R1", "name": "Report"}
         self.api_asset.get_asset.return_value = {"code": "API_1", "name": "API", "params": [], "responseFields": [], "relations": []}
         self.manual_code_table.get_table.return_value = {
-            "id": "1", "tableCode": "DIM_ORDER", "tableName": "Orders", "style": "dim", "status": "active",
+            "id": "1", "tableCode": "DIM_ORDER", "tableName": "Orders", "style": "dim", "status": "enabled",
         }
         self.upstream.get_system_detail.return_value = {"id": "UP_1", "name": "Upstream", "unloadTimes": []}
         self.push.get_push_system_detail.return_value = {"id": "PUSH_1", "name": "Push", "jobs": []}
@@ -210,7 +210,7 @@ class PublicCatalogApiTests(unittest.TestCase):
 
         self.manual_code_table.get_tables.return_value = [{
             "id": "1", "tableCode": "DIM_ORDER", "tableName": "Orders", "style": "dim",
-            "status": "active", "createdBy": "admin", "updatedBy": "admin",
+            "status": "enabled", "createdBy": "admin", "updatedBy": "admin",
         }]
         manual = self.client.get("/api/manual-code-tables")
         self.assertEqual(200, manual.status_code)

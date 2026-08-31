@@ -64,9 +64,12 @@ logs, system users/roles/parameters, and all mutations remain protected.
 | system menu | `system:menu:write` on mutations; public navigation read is filtered |
 | system param | `system:param:read/write` |
 
-These permissions are not used as a blanket `*:read` requirement for ordinary
-business browsing. Sensitive reads and administration retain their existing
-permission vocabulary and `401`/`403` semantics.
+The public read contract is the explicit `PUBLIC_PERMISSION_CODES` registry
+set, not a blanket `*:read` rule. It covers the ordinary catalog projections
+for assets, roots, indicators, reports, API assets, code tables, field
+mappings, and lineage. Sensitive reads and administration retain their existing
+permission vocabulary and `401`/`403` semantics. Role configuration consumes
+only the complementary role-assignable set.
 
 ## Explicit authentication lifecycle exceptions
 

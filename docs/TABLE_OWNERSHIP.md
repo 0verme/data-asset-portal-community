@@ -4,7 +4,7 @@
 
 ## Canonical baseline
 
-`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0005_rbac_persistence` 共同覆盖以下 39 张 canonical tables：
+`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0007_binary_status_contract` 共同覆盖以下 39 张 canonical tables：
 
 | Owner | Tables |
 | --- | --- |
@@ -37,8 +37,9 @@
 
 ## Cross-module relationships
 
-- `p_field_mapping_table.data_source_id` 继续引用 shared `p_data_source`；mapping 不依赖 upstream route 才能读取。
+- `p_field_mapping_table.upstream_system_id` 是字段映射的系统身份，外键引用 `p_upstream_system.system_pk`；`data_source_id` 仅保留为可空的 shared `p_data_source` 兼容关系，不能用于系统身份筛选。
 - `p_upstream_system.data_source_id` 引用 shared `p_data_source`；upstream 的连接信息仍是 deployment metadata，不代表实际连接已经可用。
+- 字段映射查询、统计、表/字段维度和导出链路统一按 `upstream_system_id` 关联；系统名称只用于阅读，`system_abbr` 作为用户侧消歧编码。
 - `p_push_system.master_system_id` 引用 `p_system`；`p_push_job` / `p_push_job_field` 通过 cascade foreign keys 维护其所属层级。
 - lineage child tables 通过 `snapshot_id` cascade 引用 lineage snapshot。
 - API Asset、Mapping、Report 等服务继续使用现有 SQLAlchemy Core / Provider contract，不新增数据库访问层。

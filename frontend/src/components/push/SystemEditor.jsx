@@ -10,7 +10,7 @@ import {
   TimeInput,
 } from "../common/index.js";
 
-import { getLegacyAwareOptions, isLegacyDictValue } from "../../hooks/useDictOptions.js";
+import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.js";
 import { isValidLatestOutputTime, normalizeLatestOutputTime } from "../../utils/push.js";
 import { optionLabel } from "../../utils/ui.js";
 import {
@@ -263,7 +263,7 @@ export function SystemEditor({
       />
       {isEdit ? (
         <DangerZone
-          description="删除下游系统会影响其下所有推送作业、历史推送关系和审计追溯。若系统仅停用即可满足需求，应优先停用。"
+          description="删除下游系统会影响其下所有推送作业、历史推送关系和审计追溯。若系统仅禁用即可满足需求，应优先禁用。"
           actions={[
             {
               key: "delete-push-system",

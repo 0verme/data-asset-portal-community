@@ -22,7 +22,7 @@ export const DEFAULT_UP_ROUTE = { page: "list", id: null };
 export const DEFAULT_SYSTEM_ROUTE = { page: "users" };
 export const DEFAULT_MAPPING_ROUTE = {
   tab: "table",
-  upstreamSystemId: "",
+  sourceSystemId: "",
   sourceTable: "",
   dwfTable: "",
 };
@@ -51,7 +51,7 @@ export const DATA_MODE = (import.meta.env?.VITE_API_MODE || "mock").trim().toLow
 export const DEFAULT_UPSTREAM_DB_TYPES = ["PostgreSQL", "MySQL", "Oracle", "SQL Server", "MongoDB", "Kafka", "Object Storage", "其他"];
 export const DEFAULT_UPSTREAM_DEPTS = ["商品运营部", "会员运营部", "交易运营部", "门店运营部", "供应链部", "市场营销部", "履约运营部", "客户服务部"];
 export const DEFAULT_PUSH_PROTOCOL_OPTIONS = ["HTTP", "OSS"];
-export const DEFAULT_PUSH_AUTH_OPTIONS = ["演示占位配置", "无需认证"];
+export const DEFAULT_PUSH_AUTH_OPTIONS = ["密钥认证", "账号密码"];
 export const DEFAULT_PUSH_DELIMITER_OPTIONS = [
   { value: "|", name: "|" },
   { value: ",", name: "," },
@@ -74,6 +74,6 @@ export const DEFAULT_PUSH_FREQ_TYPE_OPTIONS = [
 ];
 export const DEFAULT_STATUS_OPTIONS = [
   { value: "enabled", name: "启用" },
-  { value: "disabled", name: "停用" },
+  { value: "disabled", name: "禁用" },
 ];
 export const INDICATOR_VIEW_OPTIONS = new Set(["list", "card", "group"]);

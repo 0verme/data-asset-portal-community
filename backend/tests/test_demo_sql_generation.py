@@ -12,6 +12,7 @@ PROJECT_ROOT = ROOT.parent
 DEMO_ROOT = PROJECT_ROOT / "demo"
 DATASET_ROOT = DEMO_ROOT / "datasets"
 GENERATOR = DEMO_ROOT / "generate_demo_sql.py"
+POSTGRES_SEED = DEMO_ROOT / "seed_postgres.py"
 MANIFEST_PATH = DEMO_ROOT / "manifest.json"
 
 
@@ -69,6 +70,25 @@ class DemoSqlManifestCoverageTests(unittest.TestCase):
             ]
             expected_includes = [f"\\i {name}.sql" for name in self.dataset_names]
             self.assertEqual(expected_includes, include_lines)
+
+    def test_database_seed_repairs_legacy_demo_auth_for_each_supported_sql_dialect(self):
+        for dialect in ("postgres", "dws"):
+            with self.subTest(dialect=dialect):
+                result = subprocess.run(
+                    [sys.executable, str(POSTGRES_SEED), "--dialect", dialect],
+                    cwd=PROJECT_ROOT,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    check=False,
+                )
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertIn(
+                    "UPDATE dwp.p_push_system SET auth_type = '密钥认证'",
+                    result.stdout,
+                )
+                self.assertIn("auth_type = '演示占位配置'", result.stdout)
+                self.assertIn("AND created_by = 'demo';", result.stdout)
 
 
 if __name__ == "__main__":

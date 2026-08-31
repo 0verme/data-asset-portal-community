@@ -1,13 +1,11 @@
 """Field Mapping batch import request and response contracts."""
 
-# pyright: reportMissingImports=false
-
 from __future__ import annotations
 
+# pyright: reportMissingImports=false
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 MAX_FIELD_MAPPING_IMPORT_ITEMS = 500
 MAX_FIELDS_PER_MAPPING_IMPORT_ITEM = 1_000
@@ -41,9 +39,16 @@ class FieldMappingImportFieldRequest(FieldMappingImportContractModel):
 
 
 class FieldMappingImportItemRequest(FieldMappingImportContractModel):
-    """One table mapping identified by a data source and source table name."""
+    """One table mapping identified by an upstream system and source table."""
 
-    data_source_id: int = Field(gt=0)
+    source_system_id: int | None = Field(
+        default=None,
+        gt=0,
+        validation_alias=AliasChoices(
+            "sourceSystemId", "upstreamSystemId", "source_system_id"
+        ),
+    )
+    data_source_id: int | None = Field(default=None, gt=0)
     source_table: str = Field(min_length=1, max_length=128)
     source_table_cn: str | None = Field(default=None, max_length=256)
     target_layer: str = Field(default="DWF", min_length=1, max_length=32)
@@ -54,6 +59,12 @@ class FieldMappingImportItemRequest(FieldMappingImportContractModel):
         min_length=1,
         max_length=MAX_FIELDS_PER_MAPPING_IMPORT_ITEM,
     )
+
+    @model_validator(mode="after")
+    def require_source_system_reference(self) -> FieldMappingImportItemRequest:
+        if self.source_system_id is None and self.data_source_id is None:
+            raise ValueError("sourceSystemId or dataSourceId is required")
+        return self
 
     @model_validator(mode="after")
     def require_unique_field_identities(self) -> FieldMappingImportItemRequest:
@@ -83,9 +94,22 @@ class FieldMappingImportRequest(FieldMappingImportContractModel):
 
 
 class FieldMappingImportIdentity(FieldMappingImportContractModel):
-    data_source_id: int
+    source_system_id: int | None = Field(
+        default=None,
+        gt=0,
+        validation_alias=AliasChoices(
+            "sourceSystemId", "upstreamSystemId", "source_system_id"
+        ),
+    )
+    data_source_id: int | None = Field(default=None, gt=0)
     source_table: str
     target_table: str | None = None
+
+    @model_validator(mode="after")
+    def require_identity_reference(self) -> FieldMappingImportIdentity:
+        if self.source_system_id is None and self.data_source_id is None:
+            raise ValueError("sourceSystemId or dataSourceId is required")
+        return self
 
 
 class FieldMappingImportError(FieldMappingImportContractModel):

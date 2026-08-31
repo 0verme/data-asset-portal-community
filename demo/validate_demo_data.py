@@ -90,6 +90,7 @@ def validate_relations(datasets):
     risks = []
     system_ids = {item["id"] for item in datasets["systems.json"]}
     source_ids = {item["id"] for item in datasets["data_sources.json"]}
+    upstream_ids = {item["id"] for item in datasets["systems.json"]}
     indicator_codes = {item["code"] for item in datasets["indicators.json"]}
     report_codes = {item["code"] for item in datasets["reports.json"]}
 
@@ -99,6 +100,8 @@ def validate_relations(datasets):
     for item in datasets["mappings.json"]:
         if item["dataSourceId"] not in source_ids:
             risks.append(f"mappings.json: unknown dataSourceId {item['dataSourceId']}")
+        if item.get("upstreamSystemId") not in upstream_ids:
+            risks.append(f"mappings.json: unknown upstreamSystemId {item.get('upstreamSystemId')}")
         field_ids = [field["id"] for field in item.get("fields", [])]
         if len(field_ids) != len(set(field_ids)):
             risks.append(f"mappings.json: duplicate field id in mapping {item['id']}")

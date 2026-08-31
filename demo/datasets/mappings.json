@@ -1,54 +1,54 @@
 [
-  {"id":1,"dataSourceId":2,"sourceTable":"PIM_SKU","sourceTableName":"商品 SKU","targetLayer":"DWD","targetTable":"DWD_PRODUCT_SKU","loadMode":"full_zip","fields":[
+  {"id":1,"dataSourceId":2,"upstreamSystemId":2,"sourceTable":"PIM_SKU","sourceTableName":"商品 SKU","targetLayer":"DWD","targetTable":"DWD_PRODUCT_SKU","loadMode":"full_zip","fields":[
     {"id":1,"source":"SKU_CODE","type":"VARCHAR(40)","comment":"SKU 编码","target":"sku_id","rule":"直接映射","order":1},
     {"id":2,"source":"SPU_CODE","type":"VARCHAR(40)","comment":"SPU 编码","target":"spu_id","rule":"直接映射","order":2},
     {"id":3,"source":"PRODUCT_NAME","type":"VARCHAR(200)","comment":"商品名称","target":"product_name","rule":"清理首尾空格","order":3},
     {"id":4,"source":"CATEGORY_CODE","type":"VARCHAR(40)","comment":"类目编码","target":"category_id","rule":"直接映射","order":4},
     {"id":5,"source":"LIST_PRICE_CENT","type":"BIGINT","comment":"零售价（分）","target":"sale_price","rule":"金额除以 100","order":5},
     {"id":6,"source":"UPDATED_TIME","type":"TIMESTAMP","comment":"更新时间","target":"business_time","rule":"时间格式转换","order":6}]},
-  {"id":2,"dataSourceId":1,"sourceTable":"MEMBER_PROFILE","sourceTableName":"会员档案","targetLayer":"DWD","targetTable":"DWD_MEMBER_PROFILE","loadMode":"full_zip","fields":[
+  {"id":2,"dataSourceId":1,"upstreamSystemId":1,"sourceTable":"MEMBER_PROFILE","sourceTableName":"会员档案","targetLayer":"DWD","targetTable":"DWD_MEMBER_PROFILE","loadMode":"full_zip","fields":[
     {"id":7,"source":"MEMBER_CODE","type":"VARCHAR(40)","comment":"会员编码","target":"member_id","rule":"不可逆演示编码","order":1},
     {"id":8,"source":"LEVEL_CODE","type":"VARCHAR(20)","comment":"会员等级","target":"member_level","rule":"字典转换","order":2},
     {"id":9,"source":"JOIN_DATE","type":"CHAR(8)","comment":"入会日期","target":"join_date","rule":"日期格式转换","order":3},
     {"id":10,"source":"CITY_CODE","type":"VARCHAR(20)","comment":"城市编码","target":"city_level","rule":"仅保留城市级别","order":4},
     {"id":11,"source":"CONTACT_TEXT","type":"VARCHAR(40)","comment":"联系信息","target":"contact_mask","rule":"固定掩码替换","order":5},
     {"id":12,"source":"CONSENT_FLAG","type":"CHAR(1)","comment":"营销授权","target":"consent_flag","rule":"Y/N 转 1/0","order":6}]},
-  {"id":3,"dataSourceId":3,"sourceTable":"ORDER_HEADER","sourceTableName":"订单主表","targetLayer":"DWD","targetTable":"DWD_TRADE_ORDER","loadMode":"incremental","fields":[
+  {"id":3,"dataSourceId":3,"upstreamSystemId":3,"sourceTable":"ORDER_HEADER","sourceTableName":"订单主表","targetLayer":"DWD","targetTable":"DWD_TRADE_ORDER","loadMode":"incremental","fields":[
     {"id":13,"source":"ORDER_CODE","type":"VARCHAR(40)","comment":"订单编码","target":"order_id","rule":"直接映射","order":1},
     {"id":14,"source":"MEMBER_CODE","type":"VARCHAR(40)","comment":"会员编码","target":"member_id","rule":"不可逆演示编码","order":2},
     {"id":15,"source":"STORE_CODE","type":"VARCHAR(40)","comment":"门店编码","target":"store_id","rule":"直接映射","order":3},
     {"id":16,"source":"ORDER_AMT_CENT","type":"BIGINT","comment":"订单金额（分）","target":"order_amount","rule":"金额除以 100","order":4},
     {"id":17,"source":"PAID_AMT_CENT","type":"BIGINT","comment":"实付金额（分）","target":"paid_amount","rule":"金额除以 100","order":5},
     {"id":18,"source":"ORDER_STATUS","type":"VARCHAR(20)","comment":"订单状态","target":"order_status","rule":"状态字典转换","order":6}]},
-  {"id":4,"dataSourceId":4,"sourceTable":"POS_RECEIPT","sourceTableName":"门店小票","targetLayer":"DWD","targetTable":"DWD_STORE_POS_ORDER","loadMode":"incremental","fields":[
+  {"id":4,"dataSourceId":4,"upstreamSystemId":4,"sourceTable":"POS_RECEIPT","sourceTableName":"门店小票","targetLayer":"DWD","targetTable":"DWD_STORE_POS_ORDER","loadMode":"incremental","fields":[
     {"id":19,"source":"RECEIPT_CODE","type":"VARCHAR(50)","comment":"小票编码","target":"pos_order_id","rule":"直接映射","order":1},
     {"id":20,"source":"STORE_CODE","type":"VARCHAR(40)","comment":"门店编码","target":"store_id","rule":"直接映射","order":2},
     {"id":21,"source":"TERMINAL_CODE","type":"VARCHAR(30)","comment":"终端编码","target":"terminal_id","rule":"直接映射","order":3},
     {"id":22,"source":"MEMBER_CODE","type":"VARCHAR(40)","comment":"会员编码","target":"member_id","rule":"不可逆演示编码","order":4},
     {"id":23,"source":"RECEIPT_AMT","type":"DECIMAL(18,2)","comment":"小票金额","target":"receipt_amount","rule":"直接映射","order":5},
     {"id":24,"source":"SHIFT_CODE","type":"VARCHAR(20)","comment":"收银班次","target":"cashier_shift","rule":"字典转换","order":6}]},
-  {"id":5,"dataSourceId":5,"sourceTable":"STOCK_SNAPSHOT","sourceTableName":"库存快照","targetLayer":"DWD","targetTable":"DWD_INVENTORY_STOCK","loadMode":"full","fields":[
+  {"id":5,"dataSourceId":5,"upstreamSystemId":5,"sourceTable":"STOCK_SNAPSHOT","sourceTableName":"库存快照","targetLayer":"DWD","targetTable":"DWD_INVENTORY_STOCK","loadMode":"full","fields":[
     {"id":25,"source":"STOCK_CODE","type":"VARCHAR(50)","comment":"库存记录编码","target":"stock_record_id","rule":"直接映射","order":1},
     {"id":26,"source":"LOCATION_CODE","type":"VARCHAR(40)","comment":"库存地点编码","target":"location_id","rule":"直接映射","order":2},
     {"id":27,"source":"SKU_CODE","type":"VARCHAR(40)","comment":"SKU 编码","target":"sku_id","rule":"直接映射","order":3},
     {"id":28,"source":"AVAILABLE_QTY","type":"BIGINT","comment":"可售数量","target":"available_quantity","rule":"空值补零","order":4},
     {"id":29,"source":"LOCKED_QTY","type":"BIGINT","comment":"锁定数量","target":"locked_quantity","rule":"空值补零","order":5},
     {"id":30,"source":"TRANSIT_QTY","type":"BIGINT","comment":"在途数量","target":"in_transit_quantity","rule":"空值补零","order":6}]},
-  {"id":6,"dataSourceId":6,"sourceTable":"CAMPAIGN_EVENT","sourceTableName":"活动互动事件","targetLayer":"DWD","targetTable":"DWD_MARKETING_INTERACTION","loadMode":"incremental","fields":[
+  {"id":6,"dataSourceId":6,"upstreamSystemId":6,"sourceTable":"CAMPAIGN_EVENT","sourceTableName":"活动互动事件","targetLayer":"DWD","targetTable":"DWD_MARKETING_INTERACTION","loadMode":"incremental","fields":[
     {"id":31,"source":"EVENT_CODE","type":"VARCHAR(50)","comment":"互动事件编码","target":"interaction_id","rule":"直接映射","order":1},
     {"id":32,"source":"CAMPAIGN_CODE","type":"VARCHAR(40)","comment":"活动编码","target":"campaign_id","rule":"直接映射","order":2},
     {"id":33,"source":"MEMBER_CODE","type":"VARCHAR(40)","comment":"会员编码","target":"member_id","rule":"不可逆演示编码","order":3},
     {"id":34,"source":"EVENT_TYPE","type":"VARCHAR(20)","comment":"互动类型","target":"interaction_type","rule":"事件类型归一","order":4},
     {"id":35,"source":"TOUCH_POINT","type":"VARCHAR(30)","comment":"触点","target":"touchpoint","rule":"字典转换","order":5},
     {"id":36,"source":"EVENT_TIME","type":"TIMESTAMP","comment":"互动时间","target":"business_time","rule":"时间格式转换","order":6}]},
-  {"id":7,"dataSourceId":7,"sourceTable":"PACKAGE_INFO","sourceTableName":"包裹信息","targetLayer":"DWD","targetTable":"DWD_FULFILLMENT_PACKAGE","loadMode":"incr_zip","fields":[
+  {"id":7,"dataSourceId":7,"upstreamSystemId":7,"sourceTable":"PACKAGE_INFO","sourceTableName":"包裹信息","targetLayer":"DWD","targetTable":"DWD_FULFILLMENT_PACKAGE","loadMode":"incr_zip","fields":[
     {"id":37,"source":"PACKAGE_CODE","type":"VARCHAR(50)","comment":"包裹编码","target":"package_id","rule":"直接映射","order":1},
     {"id":38,"source":"ORDER_CODE","type":"VARCHAR(40)","comment":"订单编码","target":"order_id","rule":"直接映射","order":2},
     {"id":39,"source":"WAREHOUSE_CODE","type":"VARCHAR(40)","comment":"发货仓编码","target":"warehouse_id","rule":"直接映射","order":3},
     {"id":40,"source":"CARRIER_CODE","type":"VARCHAR(30)","comment":"虚构承运商编码","target":"carrier_code","rule":"直接映射","order":4},
     {"id":41,"source":"PACKAGE_STATUS","type":"VARCHAR(20)","comment":"包裹状态","target":"package_status","rule":"状态字典转换","order":5},
     {"id":42,"source":"PROMISED_TIME","type":"TIMESTAMP","comment":"承诺时间","target":"promised_at","rule":"时间格式转换","order":6}]},
-  {"id":8,"dataSourceId":8,"sourceTable":"RETURN_REQUEST","sourceTableName":"退货申请","targetLayer":"DWD","targetTable":"DWD_SERVICE_RETURN","loadMode":"incr_zip","fields":[
+  {"id":8,"dataSourceId":8,"upstreamSystemId":8,"sourceTable":"RETURN_REQUEST","sourceTableName":"退货申请","targetLayer":"DWD","targetTable":"DWD_SERVICE_RETURN","loadMode":"incr_zip","fields":[
     {"id":43,"source":"RETURN_CODE","type":"VARCHAR(50)","comment":"退货编码","target":"return_id","rule":"直接映射","order":1},
     {"id":44,"source":"ORDER_CODE","type":"VARCHAR(40)","comment":"订单编码","target":"order_id","rule":"直接映射","order":2},
     {"id":45,"source":"SKU_CODE","type":"VARCHAR(40)","comment":"SKU 编码","target":"sku_id","rule":"直接映射","order":3},

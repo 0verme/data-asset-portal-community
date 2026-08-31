@@ -36,6 +36,8 @@ class FieldMappingImportApiTests(unittest.TestCase):
                 {
                     "index": 0,
                     "identity": {
+                        "sourceSystemId": 101,
+                        "upstreamSystemId": 101,
                         "dataSourceId": 1,
                         "sourceTable": "ORDERS",
                         "targetTable": "DWF_ORDERS",
@@ -65,7 +67,7 @@ class FieldMappingImportApiTests(unittest.TestCase):
             "dryRun": False,
             "items": [
                 {
-                    "dataSourceId": 1,
+                    "sourceSystemId": 101,
                     "sourceTable": "ORDERS",
                     "targetTable": "DWF_ORDERS",
                     "fields": [{"sourceField": "ORDER_ID", "fieldOrder": 1}],

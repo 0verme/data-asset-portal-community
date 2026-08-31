@@ -113,6 +113,8 @@ export function SystemManagementPage({
           canEdit={canEdit}
           onNew={roleModule.openNew}
           onEdit={roleModule.openEdit}
+          onDelete={roleModule.remove}
+          deletingRoleCode={roleModule.deletingRoleCode}
         />
       ) : route.page === "menus" ? (
         <MenuManagementPage

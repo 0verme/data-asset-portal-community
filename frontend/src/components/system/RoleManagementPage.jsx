@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { isPublicPermission } from "../../auth/permissions.ts";
 import { Highlight, Icon } from "../ui.jsx";
 import {
   ActionErrorBanner,
@@ -26,20 +27,38 @@ import {
 
 const ROLE_STATUS_META = {
   enabled: { label: "启用", className: "st-on" },
-  disabled: { label: "停用", className: "st-off" },
+  disabled: { label: "禁用", className: "st-off" },
 };
 
 function permissionName(permission) {
   return permission?.name || permission?.code || "未知权限";
 }
 
+function requestRoleDeletion(role, onDelete) {
+  const name = role.name || role.roleCode;
+  return confirmDeleteAction({
+    title: "删除角色",
+    name,
+    typeLabel: "角色",
+    impact: `确定删除角色「${name}」吗？删除后不可恢复。`,
+    consequences: ["内置角色不可删除。", "仍绑定用户的角色必须先解除用户关联。"],
+    confirmKeyword: role.roleCode,
+    confirmKeywordLabel: "请输入角色编码二次确认",
+    onConfirm: () => onDelete?.(role),
+  });
+}
+
 export function RoleForm({ form, setForm, permissions, errors = [], mode = "new", initial = null, onDelete }) {
   const isEdit = mode === "edit";
   const hasError = (field) => errors.some((item) => item.field === field);
-  const selected = new Set(form.permissionCodes || []);
+  const assignablePermissions = permissions.filter((permission) => !isPublicPermission(permission?.code));
+  const assignableCodes = new Set(assignablePermissions.map((permission) => permission.code));
+  const selected = new Set((form.permissionCodes || []).filter((code) => assignableCodes.has(code)));
   const togglePermission = (code) => {
     setForm((previous) => {
-      const current = new Set(previous.permissionCodes || []);
+      const current = new Set(
+        (previous.permissionCodes || []).filter((permission) => !isPublicPermission(permission)),
+      );
       if (current.has(code)) current.delete(code);
       else current.add(code);
       return { ...previous, permissionCodes: [...current].sort() };
@@ -99,8 +118,9 @@ export function RoleForm({ form, setForm, permissions, errors = [], mode = "new"
       </FormSection>
 
       <FormSection title={`权限映射（已选 ${selected.size} 项）`}>
+        <p className="form-hint">公共只读权限已默认开放，无需在角色中重复配置；此处仅配置角色的额外权限。</p>
         <div className="role-permission-grid">
-          {permissions.map((permission) => (
+          {assignablePermissions.map((permission) => (
             <label className="role-permission-option" key={permission.code}>
               <input
                 type="checkbox"
@@ -126,16 +146,7 @@ export function RoleForm({ form, setForm, permissions, errors = [], mode = "new"
               label: "删除角色",
               icon: "trash",
               danger: true,
-              onClick: async () => {
-                if (await confirmDeleteAction({
-                  name: initial.name || initial.roleCode,
-                  typeLabel: "角色",
-                  impact: "删除后，已绑定用户必须先改绑其他角色。",
-                  consequences: ["内置角色不可删除。", "删除操作会保留角色变更审计记录。"],
-                  confirmKeyword: initial.roleCode,
-                  confirmKeywordLabel: "请输入角色编码二次确认",
-                })) onDelete?.(initial);
-              },
+              onClick: () => requestRoleDeletion(initial, onDelete),
             },
           ]}
         />
@@ -144,7 +155,7 @@ export function RoleForm({ form, setForm, permissions, errors = [], mode = "new"
   );
 }
 
-export function RoleManagementPage({ roles, query, canEdit, onNew, onEdit }) {
+export function RoleManagementPage({ roles, query, canEdit, onNew, onEdit, onDelete, deletingRoleCode = "" }) {
   const normalizedQuery = query.trim().toLowerCase();
   const filteredRoles = roles.filter((role) => [role.roleCode, role.name, role.description]
     .some((value) => String(value || "").toLowerCase().includes(normalizedQuery)));
@@ -165,7 +176,7 @@ export function RoleManagementPage({ roles, query, canEdit, onNew, onEdit }) {
         <div className="tbl-wrap">
           <table className="dt mobile-card-table">
             <thead>
-              <tr><th>角色</th><th>类型</th><th>状态</th><th>权限</th><th>绑定用户</th><th>说明</th><th style={{ width: 120, textAlign: "right" }}>操作</th></tr>
+              <tr><th>角色</th><th>类型</th><th>状态</th><th>权限</th><th>绑定用户</th><th>说明</th><th style={{ width: 180, textAlign: "right" }}>操作</th></tr>
             </thead>
             <tbody>
               {filteredRoles.map((role) => (
@@ -176,7 +187,19 @@ export function RoleManagementPage({ roles, query, canEdit, onNew, onEdit }) {
                   <td data-label="权限">{role.permissionCodes?.length || 0} 项</td>
                   <td data-label="绑定用户">{role.userCount || 0} 个</td>
                   <td data-label="说明"><span className="system-line-clamp">{role.description || "-"}</span></td>
-                  <td data-label="" className="mobile-card-actions" style={{ textAlign: "right" }}><RowActions onEdit={canEdit && !role.builtin ? () => onEdit(role) : undefined} /></td>
+                  <td data-label="" className="mobile-card-actions" style={{ textAlign: "right" }}>
+                    <RowActions
+                      disabled={deletingRoleCode === role.roleCode}
+                      onEdit={canEdit && !role.builtin ? () => onEdit(role) : undefined}
+                      extraActions={canEdit && !role.builtin && onDelete ? [{
+                        key: "delete-role",
+                        label: "删除",
+                        icon: "trash",
+                        danger: true,
+                        onClick: () => requestRoleDeletion(role, onDelete),
+                      }] : []}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

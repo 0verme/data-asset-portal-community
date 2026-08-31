@@ -12,55 +12,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { getScheduleSteps } from "./scheduleStepper.js";
+
+export { getScheduleSteps, nextUnload } from "./scheduleStepper.js";
 
 export function DbBadge({ type }) {
   return <span className="tag tag-neutral">{type}</span>;
 }
 
-export function nextUnload(times) {
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const values = [...times]
-    .map((item) => {
-      const [hour, minute] = item.split(":").map(Number);
-      return hour * 60 + minute;
-    })
-    .sort((a, b) => a - b);
-  const nextValue = values.find((item) => item > currentMinutes);
-  const target = nextValue ?? values[0];
-  const nextDay = nextValue === undefined;
-  return {
-    label: `${String(Math.floor(target / 60)).padStart(2, "0")}:${String(target % 60).padStart(2, "0")}`,
-    nextDay,
-  };
-}
+const STATUS_SYMBOLS = {
+  completed: "✓",
+  next: "●",
+  pending: "○",
+};
 
-export function ScheduleTimeline({ times, muted }) {
-  const points = [...times]
-    .map((item) => {
-      const [hour, minute] = item.split(":").map(Number);
-      return { label: item, percent: ((hour * 60 + minute) / 1440) * 100 };
-    })
-    .sort((a, b) => a.percent - b.percent);
+export function ScheduleStepper({ times, muted, now }) {
+  const steps = getScheduleSteps(times, now);
+  if (!steps.length) return null;
 
   return (
-    <div className={"sched" + (muted ? " muted" : "")}>
-      <div className="sched-track">
-        {points.map((point) => (
-          <div key={point.label} className="sched-mark" style={{ left: `${point.percent}%` }}>
-            <span className="sm-flag">{point.label}</span>
-            <span className="sm-dot"></span>
-          </div>
-        ))}
-      </div>
-      <div className="sched-hours">
-        {[0, 6, 12, 18, 24].map((hour) => (
-          <span key={hour} className="sh" style={{ left: `${(hour / 24) * 100}%` }}>
-            {String(hour).padStart(2, "0")}:00
-          </span>
-        ))}
+    <div className={`schedule-stepper${muted ? " muted" : ""}`}>
+      <div className="schedule-stepper-scroll">
+        <ol className="schedule-steps" aria-label="卸数计划执行状态">
+          {steps.map((step, index) => (
+            <li
+              key={`${step.label}-${index}`}
+              className={`schedule-step schedule-step-${step.status}`}
+              aria-label={`${step.label}，${step.statusLabel}`}
+              aria-current={step.status === "next" ? "step" : undefined}
+            >
+              <div className="schedule-step-content">
+                <span className="schedule-step-node" aria-hidden="true">{STATUS_SYMBOLS[step.status]}</span>
+                <span className="schedule-step-time mono">{step.label}</span>
+                <span className="schedule-step-status">{step.statusLabel}</span>
+              </div>
+              {index < steps.length - 1 ? <span className="schedule-step-connector" aria-hidden="true" /> : null}
+            </li>
+          ))}
+        </ol>
       </div>
     </div>
   );
 }
-

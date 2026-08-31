@@ -57,8 +57,8 @@ CREATE INDEX IF NOT EXISTS idx_p_api_asset_filter
   ON dwp.p_api_asset(status_code, method_code, system_id);
 
 CREATE TABLE IF NOT EXISTS dwp.p_field_mapping_table (
-  table_pk BIGINT PRIMARY KEY, data_source_id BIGINT NOT NULL,
-  upstream_system_id BIGINT, source_table_name VARCHAR(128) NOT NULL,
+  table_pk BIGINT PRIMARY KEY, data_source_id BIGINT,
+  upstream_system_id BIGINT NOT NULL, source_table_name VARCHAR(128) NOT NULL,
   source_table_cn VARCHAR(256), target_layer_code VARCHAR(32) NOT NULL DEFAULT 'DWF',
   target_table_name VARCHAR(128), load_mode VARCHAR(32),
   field_total_count INTEGER NOT NULL DEFAULT 0, mapped_field_count INTEGER NOT NULL DEFAULT 0,
@@ -84,6 +84,8 @@ ALTER TABLE dwp.p_field_mapping_field ADD CONSTRAINT fk_p_field_mapping_field_ta
   FOREIGN KEY (table_pk) REFERENCES dwp.p_field_mapping_table(table_pk) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_p_field_mapping_table_source
   ON dwp.p_field_mapping_table(data_source_id, source_table_name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_p_field_mapping_table_uk_01
+  ON dwp.p_field_mapping_table(upstream_system_id, source_table_name);
 
 CREATE SCHEMA IF NOT EXISTS dwp;
 CREATE TABLE IF NOT EXISTS dwp.p_role (
@@ -278,6 +280,8 @@ CREATE INDEX IF NOT EXISTS idx_p_upstream_system_data_source
     ON dwp.p_upstream_system (data_source_id);
 CREATE INDEX IF NOT EXISTS idx_p_upstream_system_ix_01
     ON dwp.p_upstream_system (status_code, db_type);
+ALTER TABLE dwp.p_field_mapping_table ADD CONSTRAINT fk_p_field_mapping_table_upstream
+  FOREIGN KEY (upstream_system_id) REFERENCES dwp.p_upstream_system(system_pk) ON DELETE RESTRICT;
 
 CREATE TABLE IF NOT EXISTS dwp.p_upstream_unload_time (
     time_pk BIGINT PRIMARY KEY,
@@ -454,14 +458,14 @@ CREATE TABLE IF NOT EXISTS dwp.p_manual_code_table (
     table_name VARCHAR(128) NOT NULL,
     table_style VARCHAR(16) NOT NULL,
     owner_name VARCHAR(64),
-    status_code VARCHAR(16) NOT NULL DEFAULT 'active',
+    status_code VARCHAR(16) NOT NULL DEFAULT 'enabled',
     remark VARCHAR(1000),
     created_by VARCHAR(64) NOT NULL DEFAULT 'system',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (table_style IN ('enum', 'dim', 'status', 'map', 'custom')),
-    CHECK (status_code IN ('active', 'draft', 'disabled'))
+    CHECK (status_code IN ('enabled', 'disabled'))
 );
 CREATE INDEX IF NOT EXISTS idx_p_manual_code_table_filter
     ON dwp.p_manual_code_table (table_style, status_code, updated_at);
