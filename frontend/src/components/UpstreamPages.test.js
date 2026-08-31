@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 const upstreamListPath = fileURLToPath(new URL("./upstream/UpstreamList.jsx", import.meta.url));
 const upstreamDetailPath = fileURLToPath(new URL("./upstream/UpstreamDetail.jsx", import.meta.url));
 const upstreamEditorPath = fileURLToPath(new URL("./upstream/UpstreamEditor.jsx", import.meta.url));
+const upstreamPartsPath = fileURLToPath(new URL("./upstream/UpstreamParts.jsx", import.meta.url));
+const upstreamStylesPath = fileURLToPath(new URL("../styles/upstream.css", import.meta.url));
 
 test("upstream list offers card and list modes through shared views", async () => {
   const source = await readFile(upstreamListPath, "utf8");
@@ -31,6 +33,24 @@ test("upstream unload times use the shared time input", async () => {
   assert.match(source, /form\.unloadTimes\.map/);
   assert.match(source, /新增时间点/);
   assert.match(source, /至少保留一个卸数时间点/);
+});
+
+test("upstream detail renders one dynamic schedule stepper", async () => {
+  const [detailSource, partsSource, styles] = await Promise.all([
+    readFile(upstreamDetailPath, "utf8"),
+    readFile(upstreamPartsPath, "utf8"),
+    readFile(upstreamStylesPath, "utf8"),
+  ]);
+
+  assert.match(detailSource, /每日自动执行 · \{unloadTimes\.length\} 次/);
+  assert.match(detailSource, /<ScheduleStepper times=\{unloadTimes\} muted=\{!enabled\} now=\{scheduleNow\} \/>/);
+  assert.match(detailSource, /暂无卸数计划/);
+  assert.doesNotMatch(detailSource, /ScheduleTimeline|time-chip|sched-hours|next-pill/);
+  assert.match(partsSource, /steps\.map\(\(step, index\) =>/);
+  assert.match(partsSource, /schedule-step-\$\{step\.status\}/);
+  assert.match(styles, /\.schedule-stepper-scroll[\s\S]*overflow-x: auto/);
+  assert.match(styles, /\.schedule-step-(?:completed|next|pending)/);
+  assert.doesNotMatch(styles, /\.sched-(?:track|hours|mark)|\.sm-(?:flag|dot)/);
 });
 
 test("upstream detail consumes the shared field contract without ambiguous contacts", async () => {

@@ -17,14 +17,15 @@ import { MetaItem, PageHeader, StatusBadge } from "../common/index.js";
 import { buildModuleBreadcrumbs } from "../../routing/navigation.ts";
 import { isLegacyDictValue } from "../../utils/optionUtils.js";
 
-import { nextUnload, ScheduleTimeline } from "./UpstreamParts.jsx";
+import { nextUnload, ScheduleStepper } from "./UpstreamParts.jsx";
 import { displayUpstreamValue, getUpstreamDetailMetadata } from "./upstreamFieldContract.js";
 
 export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], onBack, onBackToList, onEdit }) {
   const status = system?.status ?? "";
   const enabled = status === "enabled";
   const unloadTimes = Array.isArray(system?.unloadTimes) ? system.unloadTimes : [];
-  const next = unloadTimes.length ? nextUnload(unloadTimes) : null;
+  const scheduleNow = new Date();
+  const next = unloadTimes.length ? nextUnload(unloadTimes, scheduleNow) : null;
   const systemName = displayUpstreamValue(system?.name);
   const systemAbbr = displayUpstreamValue(system?.abbr);
   const detailMetadata = getUpstreamDetailMetadata(system);
@@ -88,20 +89,24 @@ export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], o
         </div>
       </div>
 
-      <div className="file-head-card">
-        <h3 className="fh-h"><Icon name="clock" size={14} />卸数计划</h3>
-        <ScheduleTimeline times={unloadTimes} muted={!enabled} />
-        <div className="sched-foot">
-          <div className="next-pill">
-            <span className="np-k">下次卸数</span>
-            <span className="np-v">
-              {enabled ? (next ? `${next.label}${next.nextDay ? " / 次日" : ""}` : "—") : "已暂停"}
+      <div className="file-head-card schedule-card">
+        <div className="schedule-card-header">
+          <div className="schedule-card-heading">
+            <h3 className="schedule-card-title"><Icon name="clock" size={14} color="var(--ink-3)" />卸数计划</h3>
+            <div className="schedule-card-subtitle">每日自动执行 · {unloadTimes.length} 次</div>
+          </div>
+          <div className={`schedule-next${!enabled ? " is-muted" : ""}`}>
+            <span className="schedule-next-label">下一次卸数</span>
+            <span className="schedule-next-value">
+              {!enabled ? "已暂停" : next ? `${next.nextDay ? "明日 " : ""}${next.label}` : "暂无计划"}
             </span>
           </div>
-          <div className="time-chips">
-            {unloadTimes.map((time) => <span key={time} className="time-chip">{time}</span>)}
-          </div>
         </div>
+        {unloadTimes.length ? (
+          <ScheduleStepper times={unloadTimes} muted={!enabled} now={scheduleNow} />
+        ) : (
+          <div className="schedule-empty" role="status">暂无卸数计划</div>
+        )}
       </div>
     </div>
   );
