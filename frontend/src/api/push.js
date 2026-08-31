@@ -61,7 +61,9 @@ function toPublicSystem(system) {
     jobs: (system.jobs || []).map((job) => ({
       id: job.id,
       cn: job.cn,
+      sourcePath: job.sourcePath || "",
       sourceFileName: job.sourceFileName || job.targetFileName || "",
+      targetPath: job.targetPath || "",
       targetFileName: job.targetFileName || job.sourceFileName || "",
       freq: job.freq || "",
       freqType: job.freqType || "",

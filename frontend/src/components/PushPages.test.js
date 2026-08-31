@@ -10,6 +10,7 @@ import {
   normalizeLatestOutputTime,
 } from "../utils/push.js";
 import { DEFAULT_AUTH_OPTIONS } from "./push/pushConstants.js";
+import { PUSH_JOB_TABLE_COLUMNS, getPushJobTableValues } from "./push/pushJobTable.js";
 import { formatFreq, validateJob, validateSystem } from "./push/pushUtils.js";
 
 const defaultsPath = fileURLToPath(new URL("../config/defaults.js", import.meta.url));
@@ -23,6 +24,7 @@ const jobListPath = fileURLToPath(new URL("./push/PushJobList.jsx", import.meta.
 const systemEditorPath = fileURLToPath(new URL("./push/SystemEditor.jsx", import.meta.url));
 const jobEditorPath = fileURLToPath(new URL("./push/JobEditor.jsx", import.meta.url));
 const constantsPath = fileURLToPath(new URL("./push/pushConstants.js", import.meta.url));
+const pushApiPath = fileURLToPath(new URL("../api/push.js", import.meta.url));
 const utilsPath = fileURLToPath(new URL("./push/pushUtils.js", import.meta.url));
 const timeInputPath = fileURLToPath(new URL("./common/TimeInput.jsx", import.meta.url));
 const readSources = async (...paths) => (await Promise.all(paths.map((path) => readFile(path, "utf8")))).join("\n");
@@ -65,6 +67,76 @@ test("push jobs rely on system contacts instead of a duplicated owner", async ()
     PUSH_SYSTEMS.every((system) => system.jobs.every((job) => !("owner" in job))),
     true,
   );
+});
+
+test("push list mapping keeps both path fields available to the table", async () => {
+  const source = await readFile(pushApiPath, "utf8");
+
+  assert.match(source, /sourcePath: job\.sourcePath \|\| ""/);
+  assert.match(source, /targetPath: job\.targetPath \|\| ""/);
+});
+
+test("push job table keeps six semantic columns when paths are present or absent", async () => {
+  const source = await readFile(jobListPath, "utf8");
+  const columnKeys = ["job", "sourcePath", "targetPath", "frequency", "status", "action"];
+
+  assert.deepEqual(PUSH_JOB_TABLE_COLUMNS.map((column) => column.key), columnKeys);
+  assert.equal(PUSH_JOB_TABLE_COLUMNS.length, columnKeys.length);
+  assert.match(source, /PUSH_JOB_TABLE_COLUMNS\.map/);
+  assert.match(source, /getPushJobTableValues\(job\)/);
+  assert.doesNotMatch(source, /job\.sourcePath\s*&&|job\.targetPath\s*&&/);
+
+  const baseJob = {
+    cn: "客户声音分析台每日推送",
+    sourceFileName: "DWM_voc_stat_1d_{yyyyMMdd}.json",
+    targetFileName: "DWM_voc_stat_1d_{yyyyMMdd}.json",
+    freqType: "T+1",
+    freq: "",
+    enabled: true,
+  };
+  const cases = [
+    {
+      name: "both paths",
+      job: { ...baseJob, sourcePath: "/lakehouse/dwm/voc/dt={yyyy-MM-dd}", targetPath: "/oss/incoming/voc/" },
+      sourcePath: "/lakehouse/dwm/voc/dt={yyyy-MM-dd}",
+      targetPath: "/oss/incoming/voc/",
+    },
+    {
+      name: "source path missing",
+      job: { ...baseJob, sourcePath: "", targetPath: "/oss/incoming/voc/" },
+      sourcePath: "—",
+      targetPath: "/oss/incoming/voc/",
+    },
+    {
+      name: "target path missing",
+      job: { ...baseJob, sourcePath: "/lakehouse/dwm/voc/", targetPath: "" },
+      sourcePath: "/lakehouse/dwm/voc/",
+      targetPath: "—",
+    },
+    {
+      name: "both paths missing",
+      job: { ...baseJob, sourcePath: "", targetPath: "" },
+      sourcePath: "—",
+      targetPath: "—",
+    },
+    {
+      name: "disabled job",
+      job: { ...baseJob, sourcePath: "", targetPath: "", enabled: false },
+      sourcePath: "—",
+      targetPath: "—",
+      status: "禁用",
+    },
+  ];
+
+  for (const item of cases) {
+    const cells = getPushJobTableValues(item.job);
+    assert.deepEqual(Object.keys(cells), columnKeys, item.name);
+    assert.equal(cells.sourcePath, item.sourcePath, item.name);
+    assert.equal(cells.targetPath, item.targetPath, item.name);
+    assert.equal(cells.frequency, "T+1", item.name);
+    assert.equal(cells.status, item.status || "启用", item.name);
+    assert.equal(cells.action, "编辑", item.name);
+  }
 });
 
 test("push system importance defaults and latest output time rules are explicit", async () => {

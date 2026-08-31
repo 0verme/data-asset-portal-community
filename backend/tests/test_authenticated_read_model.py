@@ -241,6 +241,28 @@ class PublicCatalogApiTests(unittest.TestCase):
             {item["code"] for item in self.client.get("/api/system/menus").json()["items"]},
         )
 
+    def test_authenticated_push_reads_keep_job_paths_for_the_table(self):
+        self.current_identity = Identity("catalog-reader", "normal", "Normal")
+        self.push.get_push_systems.return_value = [{
+            "id": "PUSH_1",
+            "name": "Push",
+            "jobs": [{
+                "id": "JOB_1",
+                "cn": "Orders",
+                "sourcePath": "/lakehouse/orders",
+                "targetPath": "/oss/orders",
+                "freqType": "T+1",
+                "enabled": True,
+            }],
+        }]
+
+        response = self.client.get("/api/push/systems")
+
+        self.assertEqual(200, response.status_code, response.text)
+        job = response.json()["items"][0]["jobs"][0]
+        self.assertEqual("/lakehouse/orders", job["sourcePath"])
+        self.assertEqual("/oss/orders", job["targetPath"])
+
     def test_anonymous_admin_reads_and_all_write_methods_remain_protected(self):
         self.current_identity = None
         for path in (
