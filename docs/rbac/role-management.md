@@ -15,6 +15,7 @@ The FastAPI system adapter exposes:
 - `PUT /api/system/roles/{role_code}` — replace a custom role's metadata and
   permission mapping atomically;
 - `DELETE /api/system/roles/{role_code}` — delete an unassigned custom role;
+  built-in and user-assigned roles return a `409` conflict instead;
 - `PATCH /api/system/users/{username}/role` — bind exactly one role to a user.
 
 The existing user create/update contract also accepts the single `role` code.
@@ -30,7 +31,10 @@ All role-management writes require `system:role:write`; reads require
 - Public catalog read codes are inherited by the effective permission model and
   are ignored/removed from role mappings; they are not role-assignable.
 - Disabled or missing custom roles cannot be assigned to a user.
-- A role that is still assigned to any user cannot be deleted.
+- A role that is still assigned to any user cannot be deleted; the API reports the
+  current binding count so the administrator can resolve the conflict.
+- Deleting an unassigned custom role removes its `p_role_permission` mappings and
+  `p_role` row in the same transaction.
 - User binding remains single-role (`p_admin_user.role`); multi-role and ABAC/
   ACL/data-scope semantics are intentionally out of scope.
 - An active `admin` user must remain after role binding, user status, user

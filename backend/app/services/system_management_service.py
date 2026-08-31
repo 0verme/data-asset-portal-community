@@ -416,7 +416,8 @@ class SystemManagementService(AuditActorMixin):
     def _delete_role(self, role_code: str):
         current = self._get_role_row(role_code)
         code = str(current.get("role_code") or "").strip().lower()
-        if str(current.get("builtin") or "N").upper() == "Y":
+        builtin = str(current.get("builtin") or "N").strip().upper()
+        if code in permission_contract.BUILTIN_ROLE_PERMISSION_CODES or builtin in {"Y", "YES", "TRUE", "1"}:
             raise SystemRoleProtectedError(f"Built-in role cannot be deleted: {code}")
         assigned = self._core_fetch(
             select(func.count().label("count"))
@@ -424,9 +425,13 @@ class SystemManagementService(AuditActorMixin):
             .where(admin_user.c.role == code)
         )
         # pi-lens-ignore: unchecked-throwing-call-python
-        if assigned and int(assigned[0].get("count") or 0) > 0:
-            raise SystemRoleAssignedError(f"Role is assigned to users: {code}")
+        assigned_count = int(assigned[0].get("count") or 0) if assigned else 0
+        if assigned_count > 0:
+            raise SystemRoleAssignedError(
+                f"Role is assigned to {assigned_count} user(s); unassign them before deleting: {code}"
+            )
         before = self._role_payload(current)
+        # The audit() context owns one database transaction for both statements.
         self._core_execute([
             delete(rbac_role_permission).where(rbac_role_permission.c.role_code == code),
             delete(rbac_role).where(rbac_role.c.role_code == code),
