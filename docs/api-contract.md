@@ -344,8 +344,13 @@ Base Path: `/api/field-mappings`
 
 #### FieldMappingRow
 
+`sourceSystemId` 是上游卸数系统主键（对应 `p_upstream_system.system_pk`），用于程序关联和筛选；`srcSystem` / `systemName` 只承载展示名称，`systemCode` 是用户侧消歧编码。
+
 ```json
 {
+  "sourceSystemId": 1,
+  "systemCode": "MEM",
+  "systemName": "会员中心",
   "srcSystem": "会员中心",
   "srcTable": "MEMBER_PROFILE",
   "srcTableCn": "会员档案表",
@@ -380,6 +385,9 @@ Base Path: `/api/field-mappings`
 
 ```json
 {
+  "sourceSystemId": 1,
+  "systemCode": "MEM",
+  "systemName": "会员中心",
   "srcSystem": "会员中心",
   "srcTable": "MEMBER_PROFILE",
   "srcTableCn": "会员档案表",
@@ -394,6 +402,8 @@ Base Path: `/api/field-mappings`
 
 ### 3.2 接口
 
+`GET /api/field-mappings/source-systems` 的选项至少返回 `id`、`sourceSystemId`、`name`、`systemCode` 和 `count`。`id` / `sourceSystemId` 只供程序使用，常规 UI 不展示数据库主键；显示标签为 `name · systemCode`。
+
 - `GET /api/field-mappings/source-systems`
 - `GET /api/field-mappings/stats`
 - `GET /api/field-mappings/fields`
@@ -404,7 +414,10 @@ Base Path: `/api/field-mappings`
 下列参数由 `stats`、`fields`、`tables` 共用：
 
 - `keyword`：全局关键字
-- `srcSystem`：源系统名，精确匹配
+- `sourceSystemId`：规范的上游系统主键筛选，值为 `p_upstream_system.system_pk`；“全部”不发送该参数
+- `upstreamSystemId`：兼容别名，内部同样按上游系统主键（或既有唯一技术标识）解析
+- `srcSystem`：deprecated 的展示名称筛选，仅按名称匹配，不承担唯一系统身份；同名系统会同时返回
+- `dataSourceId`：deprecated 的公共数据源兼容筛选，不会被当作上游系统主键
 - `srcTable`：源表名，模糊匹配
 - `srcField`：源字段名，模糊匹配
 - `emptyComment`：`yes` / `no`

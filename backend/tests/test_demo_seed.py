@@ -190,6 +190,26 @@ class CommunityDemoSeedTests(unittest.TestCase):
         for indicator in indicators:
             self.assertIn(indicator["table"], asset_tables, indicator["code"])
 
+    def test_mapping_rows_reference_upstream_system_primary_keys(self):
+        self._seed()
+        connection = sqlite3.connect(self.database)
+        try:
+            rows = connection.execute(
+                "SELECT t.upstream_system_id, u.system_pk, u.system_abbr "
+                "FROM p_field_mapping_table t "
+                "JOIN p_upstream_system u ON u.system_pk = t.upstream_system_id "
+                "ORDER BY t.table_pk"
+            ).fetchall()
+            foreign_keys = connection.execute(
+                "PRAGMA foreign_key_list(p_field_mapping_table)"
+            ).fetchall()
+        finally:
+            connection.close()
+        self.assertEqual(8, len(rows))
+        self.assertTrue(all(row[0] == row[1] for row in rows))
+        self.assertEqual({"MEM", "PIM", "OMS", "POS", "IMS", "MKT", "FUL", "SVC"}, {row[2] for row in rows})
+        self.assertTrue(any(row[2] == "p_upstream_system" and row[3] == "upstream_system_id" for row in foreign_keys))
+
     def test_common_codes_and_paths_are_stable(self):
         self._seed()
         connection = sqlite3.connect(self.database)

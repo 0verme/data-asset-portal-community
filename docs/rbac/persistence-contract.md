@@ -27,11 +27,13 @@ p_admin_user.role  ── role_code ──> p_role
 `p_user_role`, multiple roles, hierarchy, inheritance, or a role foreign key
 that would reject an existing custom/unknown value before P2 can fail closed.
 
-The forward-only Alembic revision is
-`backend/alembic/versions/0005_rbac_persistence.py`. Fresh baselines contain
+The forward-only RBAC Alembic revision is
+`backend/alembic/versions/0005_rbac_persistence.py`; the current Alembic head also
+contains the additive field-mapping identity revision `0006_field_mapping_upstream_id.py`.
+Fresh baselines contain
 the same tables so `schema_migrate.py verify --offline` and fresh initialization
 see one identical 39-table contract. Existing SQLite/PostgreSQL/MySQL
-installations at the previous head receive the tables through revision `0005`.
+installations at the previous RBAC head receive the tables through revision `0005`; field-mapping installations are then upgraded by revision `0006`.
 The GaussDB/DWS provider has no online Alembic path in the current repository;
 `seed_rbac` applies the same forward DDL when a pre-RBAC DWS database is
 encountered, while fresh DWS uses the canonical baseline.

@@ -684,7 +684,21 @@ def _reflect_information_schema(connection, config: dict, expected: SchemaModel)
                     tuple(_identifier(item[6]) for item in ordered),
                     delete_rules.get(constraint_name),
                 )
-            elif kind in {"PRIMARY KEY", "UNIQUE"}:
+            elif kind == "UNIQUE":
+                # MySQL exposes CREATE UNIQUE INDEX as a UNIQUE table
+                # constraint in information_schema.  The baseline parser
+                # intentionally keeps explicit indexes separate from table
+                # constraints, so preserve that distinction during reflection.
+                expected_table = expected.tables.get(table_name)
+                expected_index = (
+                    expected_table.indexes.get(constraint_name)
+                    if expected_table is not None
+                    else None
+                )
+                if expected_index is not None and expected_index.unique and expected_index.columns == columns:
+                    continue
+                _add_actual_constraint(table, kind, constraint_name, columns)
+            elif kind == "PRIMARY KEY":
                 _add_actual_constraint(table, kind, constraint_name, columns)
         for table in model.tables.values():
             for column_name in table.primary_key:

@@ -20,7 +20,7 @@ import {
 } from "../config/request.js";
 import { createInFlightGetRequestGroup } from "./inFlightRequests.js";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 const runInFlightGetRequest = createInFlightGetRequestGroup();
 
 export function buildUrl(path, params) {

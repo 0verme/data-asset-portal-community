@@ -28,6 +28,8 @@ export interface Route {
   sys?: string | null;
   job?: string | null;
   tab?: string;
+  sourceSystemId?: string;
+  /** Legacy field retained for callers that have not migrated route objects. */
   upstreamSystemId?: string;
   sourceTable?: string;
   dwfTable?: string;
@@ -75,7 +77,7 @@ export interface UpstreamRoute extends Route {
 
 export interface MappingRoute extends Route {
   tab: string;
-  upstreamSystemId: string;
+  sourceSystemId: string;
   sourceTable: string;
   dwfTable: string;
 }

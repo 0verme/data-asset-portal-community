@@ -22,7 +22,7 @@ export const DEFAULT_UP_ROUTE = { page: "list", id: null };
 export const DEFAULT_SYSTEM_ROUTE = { page: "users" };
 export const DEFAULT_MAPPING_ROUTE = {
   tab: "table",
-  upstreamSystemId: "",
+  sourceSystemId: "",
   sourceTable: "",
   dwfTable: "",
 };

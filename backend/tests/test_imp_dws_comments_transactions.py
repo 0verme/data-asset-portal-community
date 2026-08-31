@@ -6,6 +6,7 @@ from backend.scripts.imp_dws_comments import (
     FieldMappingTableLayout,
     TableMappingRow,
     execute_import,
+    load_upstream_system_map,
 )
 
 
@@ -28,6 +29,18 @@ def _table_row(name: str) -> TableMappingRow:
 
 
 class DwsCommentImportTransactionTests(unittest.TestCase):
+    def test_upstream_map_never_uses_ambiguous_display_names(self):
+        columns = ["system_pk", "system_abbr", "system_id"]
+        rows = [(1, "MEM", "up_member"), (2, "MEM", "up_member_test")]
+        with patch(
+            "backend.scripts.imp_dws_comments.fetch_all",
+            return_value=(columns, rows),
+        ):
+            mapping = load_upstream_system_map("gauss_primary")
+        self.assertNotIn("MEM", mapping)
+        self.assertEqual(1, mapping["UP_MEMBER"])
+        self.assertEqual(2, mapping["UP_MEMBER_TEST"])
+
     def test_import_commits_cleanup_and_each_successful_table(self):
         conn = MagicMock()
         cursor = conn.cursor.return_value

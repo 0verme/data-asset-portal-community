@@ -213,7 +213,12 @@ class AssetPageResponse(ItemsResponse[AssetItem]):
 
 
 class SourceSystem(ContractModel):
+    # ``id``/``sourceSystemId`` are programmatic identities only. The
+    # frontend combines name and systemCode for the visible label.
+    id: int | str | None = None
+    sourceSystemId: int | str | None = None
     name: str
+    systemName: str | None = None
     count: int = 0
     dataSourceId: int | str | None = None
     upstreamSystemId: int | str | None = None
@@ -223,7 +228,9 @@ class SourceSystem(ContractModel):
 
 class FieldMappingItem(ContractModel):
     dataSourceId: int | str | None = None
+    sourceSystemId: int | str | None = None
     upstreamSystemId: int | str | None = None
+    systemName: str | None = None
     systemCode: str | None = None
     srcSystem: str | None = None
     systemAbbr: str | None = None
@@ -242,7 +249,9 @@ class FieldMappingItem(ContractModel):
 
 class FieldMappingTableItem(ContractModel):
     dataSourceId: int | str | None = None
+    sourceSystemId: int | str | None = None
     upstreamSystemId: int | str | None = None
+    systemName: str | None = None
     systemCode: str | None = None
     srcSystem: str | None = None
     systemAbbr: str | None = None

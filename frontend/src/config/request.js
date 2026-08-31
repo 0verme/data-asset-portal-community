@@ -7,7 +7,7 @@ function parseTimeout(value, fallback) {
 }
 
 export const REQUEST_TIMEOUT = parseTimeout(
-  import.meta.env.VITE_API_TIMEOUT,
+  import.meta.env?.VITE_API_TIMEOUT,
   DEFAULT_REQUEST_TIMEOUT,
 );
 
