@@ -17,6 +17,12 @@ from pathlib import Path
 
 DATASETS_DIR = Path(__file__).resolve().parent / "datasets"
 
+# Keep demo push rows inside the backend PUSH_AUTH_TYPE contract. The legacy
+# value is retained only so seeders can repair databases created by older
+# Community releases.
+DEMO_PUSH_AUTH_TYPE = "密钥认证"
+LEGACY_DEMO_PUSH_AUTH_TYPE = "演示占位配置"
+
 # Canonical asset domain codes (baseline: p_asset_domain.domain_code PK).
 DOMAIN_CODE_BY_NAME = {
     "商品": "PRODUCT",
@@ -59,6 +65,11 @@ DEMO_MENUS = [
 def load_dataset(name: str) -> list[dict]:
     path = DATASETS_DIR / name
     return __import__("json").loads(path.read_text(encoding="utf-8"))
+
+
+def demo_push_system_codes() -> tuple[str, ...]:
+    """Return the exact push-system codes owned by the Community demo."""
+    return tuple(item["code"] for item in load_dataset("push_systems.json"))
 
 
 def community_seed_plan() -> dict[str, dict]:
@@ -283,7 +294,7 @@ def community_seed_plan() -> dict[str, dict]:
             (
                 system_id, system_id, code, item["name"], abbr, item["protocol"],
                 f"{abbr.lower()}.consumer.demo.invalid", 443 if item["protocol"] == "HTTP" else 9000,
-                "DEMO_ONLY", "演示占位配置", "演示业务维护组", "演示数据维护组",
+                "DEMO_ONLY", DEMO_PUSH_AUTH_TYPE, "演示业务维护组", "演示数据维护组",
                 item["department"], f"{item['name']}消费完全虚构的零售主题数据。",
                 item["status"], "normal", None, 1, "N", "demo",
                 "2026-07-12 02:00:00", "demo", "2026-07-12 02:00:00",

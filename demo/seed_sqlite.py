@@ -22,10 +22,41 @@ if str(ROOT.parent) not in sys.path:
 
 try:
     from backend.app.authorization.persistence import seed_rbac  # noqa: E402
-    from seed_loader import ADMIN_USER, community_seed_plan  # noqa: E402
+    from seed_loader import (  # noqa: E402
+        ADMIN_USER,
+        DEMO_PUSH_AUTH_TYPE,
+        LEGACY_DEMO_PUSH_AUTH_TYPE,
+        community_seed_plan,
+        demo_push_system_codes,
+    )
 except ImportError:  # imported as demo.seed_sqlite from tests
     from backend.app.authorization.persistence import seed_rbac  # noqa: E402
-    from demo.seed_loader import ADMIN_USER, community_seed_plan  # noqa: E402
+    from demo.seed_loader import (  # noqa: E402
+        ADMIN_USER,
+        DEMO_PUSH_AUTH_TYPE,
+        LEGACY_DEMO_PUSH_AUTH_TYPE,
+        community_seed_plan,
+        demo_push_system_codes,
+    )
+
+
+def repair_legacy_demo_push_auth(connection):
+    """Normalize only the historical Community demo push-system rows."""
+    system_codes = demo_push_system_codes()
+    if not system_codes:
+        return
+    placeholders = ", ".join("?" for _ in system_codes)
+    connection.execute(
+        "UPDATE p_push_system SET auth_type = ? "
+        f"WHERE system_code IN ({placeholders}) "
+        "AND auth_type = ? AND created_by = ?",
+        (
+            DEMO_PUSH_AUTH_TYPE,
+            *system_codes,
+            LEGACY_DEMO_PUSH_AUTH_TYPE,
+            "demo",
+        ),
+    )
 
 
 def seed(database: Path):
@@ -59,6 +90,7 @@ def seed(database: Path):
             )
             for row in spec["rows"]:
                 connection.execute(statement, row)
+        repair_legacy_demo_push_auth(connection)
         connection.commit()
     except Exception:
         connection.rollback()

@@ -9,9 +9,11 @@ import {
   isValidLatestOutputTime,
   normalizeLatestOutputTime,
 } from "../utils/push.js";
+import { DEFAULT_AUTH_OPTIONS } from "./push/pushConstants.js";
 import { formatFreq, validateJob, validateSystem } from "./push/pushUtils.js";
 
 const defaultsPath = fileURLToPath(new URL("../config/defaults.js", import.meta.url));
+const commonCodesPath = fileURLToPath(new URL("../data/commonCodes.js", import.meta.url));
 const pushHookPath = fileURLToPath(new URL("../hooks/usePushModule.js", import.meta.url));
 const locationPath = fileURLToPath(new URL("../routing/location.ts", import.meta.url));
 const pagePath = fileURLToPath(new URL("./PushPages.jsx", import.meta.url));
@@ -44,6 +46,14 @@ test("public push cards omit protected connection and contact details", async ()
   assert.match(source, /连接协议/);
   assert.match(source, /下游对接人/);
   assert.match(source, /数据开发对接人/);
+});
+
+test("push demo auth values follow the backend contract", async () => {
+  const source = await readSources(defaultsPath, commonCodesPath);
+
+  assert.match(source, /DEFAULT_PUSH_AUTH_OPTIONS = \["密钥认证", "账号密码"\]/);
+  assert.match(source, /category\("PUSH_AUTH_TYPE", "下游认证方式", \["密钥认证", "账号密码"\]\)/);
+  assert.equal(PUSH_SYSTEMS.every((system) => DEFAULT_AUTH_OPTIONS.includes(system.auth)), true);
 });
 
 test("push jobs rely on system contacts instead of a duplicated owner", async () => {
