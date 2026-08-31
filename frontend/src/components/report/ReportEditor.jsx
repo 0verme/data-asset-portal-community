@@ -436,7 +436,7 @@ export function ReportEditor({
 
       {isEdit ? (
         <DangerZone
-          description="删除报表是高风险操作。若仅停止使用，应优先停用并保留历史台账。"
+          description="删除报表是高风险操作。若仅停止使用，应优先禁用并保留历史台账。"
           actions={[
             {
               key: "delete-report",

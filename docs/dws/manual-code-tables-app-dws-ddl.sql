@@ -10,12 +10,13 @@ CREATE TABLE IF NOT EXISTS dwp.p_manual_code_table (
     table_name   VARCHAR(128) NOT NULL,
     table_style  VARCHAR(16)  NOT NULL,
     owner_name   VARCHAR(64),
-    status_code  VARCHAR(16)  NOT NULL DEFAULT 'active',
+    status_code  VARCHAR(16)  NOT NULL DEFAULT 'enabled',
     remark       VARCHAR(1000),
     created_by   VARCHAR(64)  NOT NULL DEFAULT 'system',
     created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by   VARCHAR(64)  NOT NULL DEFAULT 'system',
     updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (status_code IN ('enabled', 'disabled')),
     PRIMARY KEY (table_id)
 )
 DISTRIBUTE BY REPLICATION;

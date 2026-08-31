@@ -5,7 +5,11 @@ from unittest.mock import MagicMock, patch
 
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
-from backend.app.services.manual_code_table_service import ManualCodeTableService
+from backend.app.services.manual_code_table_service import (
+    ManualCodeTableService,
+    ManualCodeTableValidationError,
+    TABLE_STATUSES,
+)
 
 
 class ManualCodeTableCoreCrudTests(unittest.TestCase):
@@ -17,7 +21,7 @@ class ManualCodeTableCoreCrudTests(unittest.TestCase):
             "table_name": "Customer status",
             "table_style": "status",
             "owner_name": "tester",
-            "status_code": "active",
+            "status_code": "enabled",
             "remark": "remark",
             "created_by": "tester",
             "created_at": "2026-08-20 00:00:00",
@@ -29,9 +33,16 @@ class ManualCodeTableCoreCrudTests(unittest.TestCase):
             "tableName": "Customer status",
             "style": "status",
             "owner": "tester",
-            "status": "active",
+            "status": "enabled",
             "remark": "remark",
         }
+
+    def test_binary_status_contract_rejects_legacy_values(self):
+        self.assertEqual({"enabled", "disabled"}, TABLE_STATUSES)
+        self.assertEqual("enabled", self.service._normalize_payload({**self.item, "status": None})["status"])
+        for status in ("active", "draft", "inactive"):
+            with self.subTest(status=status), self.assertRaises(ManualCodeTableValidationError):
+                self.service._normalize_payload({**self.item, "status": status})
 
     def _assert_portable(self, statement):
         for dialect in (sqlite.dialect(), postgresql.dialect(), mysql.dialect()):
@@ -68,23 +79,22 @@ class ManualCodeTableCoreCrudTests(unittest.TestCase):
     @patch("backend.app.services.manual_code_table_service.operation_log_service.audit")
     def test_update_status_and_delete_use_core_mutations(self, audit):
         audit.return_value.__enter__.return_value = MagicMock()
-        self.service._db.fetch_rows = MagicMock(side_effect=[
-            [self.row],
-            [self.row],
-            [self.row],
-            [self.row],
-            [self.row],
-            [self.row],
-        ])
+        self.service._db.fetch_rows = MagicMock(side_effect=[[self.row]] * 10)
         self.service._db.execute_statements = MagicMock()
 
         self.service.update_table("7", {**self.item, "tableName": "Updated"})
         update_statement = self.service._db.execute_statements.call_args.args[0][0]
         self._assert_portable(update_statement)
 
+        self.service.update_status("7", "enabled")
+        enable_statement = self.service._db.execute_statements.call_args.args[0][0]
+        self._assert_portable(enable_statement)
+        self.assertEqual("启用", audit.call_args_list[1].kwargs["operation_type"])
+
         self.service.update_status("7", "disabled")
-        status_statement = self.service._db.execute_statements.call_args.args[0][0]
-        self._assert_portable(status_statement)
+        disable_statement = self.service._db.execute_statements.call_args.args[0][0]
+        self._assert_portable(disable_statement)
+        self.assertEqual("禁用", audit.call_args_list[2].kwargs["operation_type"])
 
         self.service.delete_table("7")
         delete_statement = self.service._db.execute_statements.call_args.args[0][0]

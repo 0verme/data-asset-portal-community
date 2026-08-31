@@ -83,7 +83,7 @@ export function ParamForm({ form, categories, setForm, errors = [], mode = "new"
                 if (await confirmDeleteAction({
                   name: initial.name,
                   typeLabel: "参数字典",
-                  impact: "该参数删除后，可能影响码值解析、页面筛选和历史配置追溯。建议优先停用，而不是删除。",
+                  impact: "该参数删除后，可能影响码值解析、页面筛选和历史配置追溯。建议优先禁用，而不是删除。",
                   consequences: [
                     "删除前应以后端依赖校验结果为准。",
                     "若后端返回不可删除原因，页面会直接展示原因。",

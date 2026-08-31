@@ -24,4 +24,5 @@ export {
   getBinaryStatusValue,
   normalizeBinaryStatusLabel,
   normalizeBinaryStatusOptions,
+  normalizeBinaryStatusValue,
 } from "./status.js";

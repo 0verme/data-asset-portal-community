@@ -166,7 +166,7 @@ and the protected `admin-detail` boundaries are documented in
 | `maintainer` | Passes `require_maintainer`; cannot pass `require_admin`. | Preserve business maintenance and operation-log access; do not grant system user/menu/param/role management. |
 | `admin` | Passes both current gates. | Preserve all current access and explicitly map every registered permission. |
 | unknown role | Unknown or deleted roles resolve to no permissions. | Deny by default; protected APIs return `403` for a valid identity without the required permission. |
-| disabled/deleted user | Current authentication/authorization revalidates user and role state; inactive users cannot retain access through an old cookie. | Return `401` and revoke access. |
+| disabled/deleted user | Current authentication/authorization revalidates user and role state; disabled users cannot retain access through an old cookie. | Return `401` and revoke access. |
 
 ### Built-in permission mapping
 

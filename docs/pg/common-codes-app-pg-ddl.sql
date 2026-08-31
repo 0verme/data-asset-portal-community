@@ -188,7 +188,7 @@ WHERE NOT EXISTS (
 INSERT INTO dwp.p_code_item (
     item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
 )
-SELECT 14, 'SYSTEM_STATUS', 'ENABLED', '已启用', 'enabled', '系统已启用', 10, 'Y', '系统初始化'
+SELECT 14, 'SYSTEM_STATUS', 'ENABLED', '启用', 'enabled', '系统启用', 10, 'Y', '系统初始化'
 WHERE NOT EXISTS (
     SELECT 1 FROM dwp.p_code_item WHERE category_code = 'SYSTEM_STATUS' AND item_code = 'ENABLED'
 );
@@ -196,7 +196,7 @@ WHERE NOT EXISTS (
 INSERT INTO dwp.p_code_item (
     item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
 )
-SELECT 15, 'SYSTEM_STATUS', 'DISABLED', '已停用', 'disabled', '系统已停用', 20, 'Y', '系统初始化'
+SELECT 15, 'SYSTEM_STATUS', 'DISABLED', '禁用', 'disabled', '系统禁用', 20, 'Y', '系统初始化'
 WHERE NOT EXISTS (
     SELECT 1 FROM dwp.p_code_item WHERE category_code = 'SYSTEM_STATUS' AND item_code = 'DISABLED'
 );

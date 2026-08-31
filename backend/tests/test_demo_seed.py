@@ -221,6 +221,24 @@ class CommunityDemoSeedTests(unittest.TestCase):
         self.assertEqual({"MEM", "PIM", "OMS", "POS", "IMS", "MKT", "FUL", "SVC"}, {row[2] for row in rows})
         self.assertTrue(any(row[2] == "p_upstream_system" and row[3] == "upstream_system_id" for row in foreign_keys))
 
+    def test_manual_code_table_seed_uses_binary_status_values(self):
+        self._seed()
+        connection = sqlite3.connect(self.database)
+        try:
+            statuses = connection.execute(
+                "SELECT table_code, status_code FROM p_manual_code_table ORDER BY table_id"
+            ).fetchall()
+        finally:
+            connection.close()
+        self.assertEqual(
+            [
+                ("ORDER_STATUS", "enabled"),
+                ("CHANNEL_TYPE", "enabled"),
+                ("DELIVERY_MODE", "disabled"),
+            ],
+            statuses,
+        )
+
     def test_common_codes_and_paths_are_stable(self):
         self._seed()
         connection = sqlite3.connect(self.database)

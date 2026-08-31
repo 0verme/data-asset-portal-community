@@ -37,7 +37,7 @@ All role-management writes require `system:role:write`; reads require
   `p_role` row in the same transaction.
 - User binding remains single-role (`p_admin_user.role`); multi-role and ABAC/
   ACL/data-scope semantics are intentionally out of scope.
-- An active `admin` user must remain after role binding, user status, user
+- An enabled `admin` user must remain after role binding, user status, user
   update, or user deletion operations.
 
 The backend database authorization repository remains the security boundary.

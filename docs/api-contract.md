@@ -97,6 +97,10 @@ Accept: application/json
 - `422 Unprocessable Entity`：业务校验失败
 - `500 Internal Server Error`：服务端异常
 
+### Binary availability status
+
+凡表示资源当前是否可用、是否生效或是否启用的 `status` 字段，接口值统一为 `enabled` / `disabled`，展示文案统一为“启用 / 禁用”。码值表的创建、更新、筛选和状态变更接口不接受 `active`、`draft` 或其它 legacy 启停值；历史数据由 forward migration 收口。
+
 ### 1.7 前端运行模式
 
 前端通过 `VITE_API_MODE` 切换数据来源：`mock` 走前端内置数据并使用演示登录；`remote` 统一走 `/api` 调后端真实数据库。后端唯一由 `uvicorn backend.asgi:app` 运行 FastAPI Native；真正的 WAIT_DB / 外部 storage readiness 通过可诊断的 Service error 表达，不把仓库已有源码模块伪装成不存在。
@@ -760,7 +764,7 @@ Base Path: `/api/system`
 }
 ```
 
-`status` 取值：`enabled` / `disabled` / `locked`。
+`status` 取值：`enabled` / `disabled`。
 
 #### ParamDict
 

@@ -178,7 +178,7 @@ function buildFilterChips(filter, query) {
     chips.push({ key: "dimension", label: `维度：${dimensionMeta.label}` });
   }
   if (filter.status && filter.status !== "all") {
-    chips.push({ key: "status", label: `状态：${filter.status === "enabled" ? "启用" : "停用"}` });
+    chips.push({ key: "status", label: `状态：${filter.status === "enabled" ? "启用" : "禁用"}` });
   }
   if (query) {
     chips.push({ key: "query", label: `搜索：${query}` });
