@@ -1,7 +1,11 @@
 [CmdletBinding()]
 param(
     [switch]$InitOnly,
-    [switch]$Help
+    [switch]$Help,
+    [ValidateRange(1, 65535)]
+    [int]$BackendPort = 5099,
+    [ValidateRange(1, 65535)]
+    [int]$FrontendPort = 5173
 )
 
 $ErrorActionPreference = "Stop"
@@ -43,7 +47,13 @@ if (Test-Path -LiteralPath $venvPython -PathType Leaf) {
     }
 }
 
-$arguments = @("$(Join-Path $rootDir 'scripts\community_demo.py')")
+$arguments = @(
+    (Join-Path $rootDir "scripts\community_demo.py"),
+    "--backend-port",
+    $BackendPort,
+    "--frontend-port",
+    $FrontendPort
+)
 if ($InitOnly) { $arguments += "--init-only" }
 if ($Help) { $arguments += "--help" }
 

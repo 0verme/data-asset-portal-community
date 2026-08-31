@@ -22,7 +22,7 @@
 - npm 10+
 
 Bootstrap 不会安装系统级 Python、Node.js、npm、Homebrew、Chocolatey 或 apt 包。缺少工具时会给出安装提示。
-首次运行时，如果项目依赖不存在，脚本只会在仓库内创建 `backend/.venv` 并执行 `npm ci`；不会执行 global npm install、sudo 或系统级 pip 安装。
+首次运行时，如果项目依赖不存在，脚本只会在仓库内创建 `backend/.venv` 并执行 `npm ci`；随后检查 lineage workspace 的 package entry。entry 缺失时再执行现有的 `npm run build:lineage`，不会执行 global npm install、sudo 或系统级 pip 安装。构建产物已被 Git 忽略，重复运行时 entry 完整则不会重复构建。
 
 ## One-command Demo
 
@@ -64,11 +64,38 @@ Database:    <repository>/.demo/community-demo/community.sqlite
 Stop: Ctrl+C
 ```
 
-前端使用 Vite `/api` proxy 访问后端，浏览器不需要再编辑 remote/API 配置。代表性 API 为：
+前端使用 Vite `/api` proxy 访问后端，浏览器不需要再编辑 remote/API 配置。默认代表性 API 为：
 
 ```text
 http://127.0.0.1:5099/api/portal/stats
 ```
+
+### 端口参数
+
+默认端口仍为 backend `5099`、frontend `5173`。三个入口都会把参数同步到 CORS、`VITE_BACKEND_URL`、Uvicorn/Vite 启动参数、readiness URL、端口冲突检查和成功输出：
+
+```bash
+# Linux/macOS
+./scripts/demo.sh --backend-port 15099 --frontend-port 5173
+
+# 直接调用 Python
+python scripts/community_demo.py --backend-port 15099 --frontend-port 5173
+```
+
+```powershell
+# Windows PowerShell
+.\scripts\demo.ps1 -BackendPort 15099 -FrontendPort 5173
+```
+
+端口必须在 `1`～`65535` 之间。Windows 某些机器会把 `5041`～`5140` 标记为 excluded/reserved port；即使没有监听进程，socket 检查也可能显示未占用，实际启动仍可能失败并报 `WinError 10013`。因此 Windows 若默认 backend `5099` 启动失败，可改用上例的 `15099`（它不是默认值），并确认该端口未被其他服务使用。
+
+Lineage workspace 的 `dist/` 不属于 Git checkout 内容。bootstrap 会检查 `lineage-viewer`、`@lineage-viewer/domain-adapter` 和 `@lineage-viewer/react` 的 package entry；首次 checkout 缺失时自动在 `frontend/` 执行：
+
+```bash
+npm run build:lineage
+```
+
+该步骤只在 entry 缺失时执行，成功后后续启动保持幂等。
 
 ### Init-only
 
@@ -82,7 +109,7 @@ CI 或只想初始化数据库时，不启动常驻服务：
 .\scripts\demo.ps1 -InitOnly
 ```
 
-该模式会检查 runtime、依赖、Demo 配置、SQLite、migration、seed，并通过 bootstrap 注入前端 remote 配置，然后退出 `0`。
+该模式会检查 runtime、依赖、lineage workspace package entry、Demo 配置、SQLite、migration、seed，并通过 bootstrap 注入前端 remote 配置，然后退出 `0`。端口参数仍会校验，但不会启动服务或执行端口冲突检查。
 可连续运行多次；第二次会显示 `applied=-`，seed 不会复制用户、资产或关系数据。
 
 ## Generated files and safety
@@ -106,7 +133,7 @@ CI 或只想初始化数据库时，不启动常驻服务：
 
 完整 Demo 运行时按 `Ctrl+C`。Bootstrap 只会终止它自己创建的 backend/frontend child process；不会按进程名杀掉其他 Python、Node 或 Vite 进程。
 
-端口固定为 backend `5099`、frontend `5173`。如果任一端口被占用，脚本会安全失败并提示端口，不会终止未知进程。
+默认端口为 backend `5099`、frontend `5173`，也可使用上一节的参数选择其他端口。如果任一实际端口被占用，脚本会安全失败并提示端口，不会终止未知进程；Windows excluded/reserved port 即使没有监听进程也可能在启动时失败。
 
 完整 Demo 停止后可再次运行：
 
@@ -129,8 +156,8 @@ password: demo-change-me
 - **Python not found / version too old**：安装 Python 3.10+，重新执行入口脚本。
 - **Node.js not found / version too old**：安装 Node.js 22.13+（包含 npm），重新执行入口脚本。
 - **依赖安装失败**：查看终端中对应的 `pip` 或 `npm ci` 错误；脚本不会尝试系统级安装。
-- **端口冲突**：停止占用 `5099` 或 `5173` 的你自己的服务后重试；bootstrap 不会自动杀进程。
-- **frontend 返回 API 错误**：确认 backend 已在 `5099` ready；直接请求 `/api/portal/stats` 检查 API。
+- **端口冲突**：停止占用实际 backend/frontend 端口的你自己的服务后重试；Windows 若 `5099` 报 `WinError 10013`，改用 `-BackendPort 15099` 或对应的 `--backend-port 15099`；bootstrap 不会自动杀进程。
+- **frontend 返回 API 错误**：确认 backend 已在所选 backend 端口 ready；默认可直接请求 `http://127.0.0.1:5099/api/portal/stats` 检查 API。
 - **数据库异常**：确认 `.demo/community-demo/community.sqlite` 是本 Demo 路径。不要把外部 `DATABASE_URL` 改写到 Demo 配置中。
 
 ## Manual development workflow
@@ -144,15 +171,23 @@ python backend/scripts/schema_migrate.py apply \
 python demo/seed_sqlite.py --database <absolute-local-path>/community.sqlite
 ```
 
-后端默认监听 `127.0.0.1:5099`，使用与生产一致的 ASGI entrypoint：
+后端默认监听 `127.0.0.1:5099`，使用与生产一致的 ASGI entrypoint；也可以选择与前端配置匹配的其他端口：
 
 ```bash
+# 默认端口
 python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
+
+# Windows excluded/reserved port 时的示例
+python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 15099
 ```
 
-默认使用纯 FastAPI/Uvicorn runtime：`uvicorn backend.asgi:app --host 127.0.0.1 --port 5099`。Flask compatibility mode 与 direct Flask runtime 已退休；应用配置只读取 `APP_*` 名称，旧 `FLASK_*` 名称已移除。
+默认使用纯 FastAPI/Uvicorn runtime。Flask compatibility mode 与 direct Flask runtime 已退休；应用配置只读取 `APP_*` 名称，旧 `FLASK_*` 名称已移除。
 
-前端另开终端，使用 `frontend/.env.local` 设置：
+前端另开终端，先确保 lineage workspace 已构建，再使用 `frontend/.env.local` 设置：
+
+```bash
+npm --prefix frontend run build:lineage
+```
 
 ```env
 VITE_API_MODE=remote
@@ -160,13 +195,13 @@ VITE_API_BASE_URL=/api
 VITE_BACKEND_URL=http://127.0.0.1:5099
 ```
 
-然后运行：
+然后运行（默认 frontend `5173`、backend `5099`）：
 
 ```bash
-npm --prefix frontend run dev
+npm --prefix frontend run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
-手工路径中请自行确保 `APP_SECRET_KEY` 已设置、Community SQLite profile 和配置文件不会指向外部数据库。
+如果后端使用 `15099`，将 `VITE_BACKEND_URL` 改为 `http://127.0.0.1:15099`；PowerShell 可先执行 `$env:VITE_BACKEND_URL="http://127.0.0.1:15099"`。手工路径中请自行确保 `APP_SECRET_KEY` 已设置、Community SQLite profile 和配置文件不会指向外部数据库。
 
 ## 演示数据
 

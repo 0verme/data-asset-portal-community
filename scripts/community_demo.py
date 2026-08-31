@@ -27,15 +27,26 @@ import urllib.request
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from subprocess import TimeoutExpired
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-BACKEND_PORT = 5099
-FRONTEND_PORT = 5173
+DEFAULT_BACKEND_PORT = 5099
+DEFAULT_FRONTEND_PORT = 5173
 PYTHON_MINIMUM = (3, 10)
 NODE_MINIMUM = (22, 13, 0)
+LINEAGE_WORKSPACE_ENTRYPOINTS = (
+    "packages/lineage-viewer/dist/lineage-viewer.js",
+    "packages/lineage-viewer/dist/define.js",
+    "packages/lineage-viewer/dist/index.d.ts",
+    "packages/lineage-viewer/dist/define.d.ts",
+    "packages/lineage-viewer-react/dist/index.js",
+    "packages/lineage-viewer-react/dist/index.d.ts",
+    "packages/lineage-viewer-domain-adapter/dist/index.js",
+    "packages/lineage-viewer-domain-adapter/dist/index.d.ts",
+)
 
 
 class BootstrapError(RuntimeError):
@@ -170,12 +181,37 @@ def _is_database_environment_key(key: str) -> bool:
     return upper.startswith(("ASSET_DB_", "DB_", "PG_", "MYSQL_"))
 
 
+def _validate_port(value: int | str, *, option: str = "port") -> int:
+    try:
+        port = int(value)
+    except (TypeError, ValueError) as error:
+        raise BootstrapError(
+            f"{option} must be an integer between 1 and 65535 (got {value!r})."
+        ) from error
+    if not 1 <= port <= 65535:
+        raise BootstrapError(
+            f"{option} must be between 1 and 65535 (got {port})."
+        )
+    return port
+
+
+def _parse_port(value: str) -> int:
+    try:
+        return _validate_port(value)
+    except BootstrapError as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
+
+
 def build_demo_environment(
     base_environment: Mapping[str, str] | None,
     paths: DemoPaths,
     secret: str,
+    backend_port: int = DEFAULT_BACKEND_PORT,
+    frontend_port: int = DEFAULT_FRONTEND_PORT,
 ) -> dict[str, str]:
     """Build a child environment with an explicit SQLite-only boundary."""
+    backend_port = _validate_port(backend_port, option="backend port")
+    frontend_port = _validate_port(frontend_port, option="frontend port")
     environment = {
         key: value
         for key, value in (base_environment or os.environ).items()
@@ -204,11 +240,11 @@ def build_demo_environment(
             "APP_ENV": "development",
             "APP_DEBUG": "false",
             "APP_SECRET_KEY": secret,
-            "APP_CORS_ORIGINS": f"http://127.0.0.1:{FRONTEND_PORT},http://localhost:{FRONTEND_PORT}",
+            "APP_CORS_ORIGINS": f"http://127.0.0.1:{frontend_port},http://localhost:{frontend_port}",
             "LINEAGE_DB_PROFILE": "community_sqlite",
             "VITE_API_MODE": "remote",
             "VITE_API_BASE_URL": "/api",
-            "VITE_BACKEND_URL": f"http://127.0.0.1:{BACKEND_PORT}",
+            "VITE_BACKEND_URL": f"http://127.0.0.1:{backend_port}",
         }
     )
     return environment
@@ -370,13 +406,54 @@ def ensure_frontend_dependencies(paths: DemoPaths, npm: str) -> None:
     )
 
 
-def initialize_demo(paths: DemoPaths) -> tuple[dict[str, str], Path]:
+def _missing_lineage_workspace_entries(paths: DemoPaths) -> list[str]:
+    frontend_root = paths.root / "frontend"
+    return [
+        relative_path
+        for relative_path in LINEAGE_WORKSPACE_ENTRYPOINTS
+        if not (frontend_root / relative_path).is_file()
+    ]
+
+
+def ensure_lineage_workspace(paths: DemoPaths, npm: str) -> None:
+    missing = _missing_lineage_workspace_entries(paths)
+    if not missing:
+        return
+
+    print(
+        "[demo] lineage workspace package entries are missing; running npm run build:lineage",
+        flush=True,
+    )
+    _run(
+        [npm, "run", "build:lineage"],
+        cwd=paths.root / "frontend",
+        environment=_npm_environment(),
+        label="Build lineage workspace packages",
+    )
+    missing = _missing_lineage_workspace_entries(paths)
+    if missing:
+        raise BootstrapError(
+            "Lineage workspace build did not produce required entries: "
+            + ", ".join(missing)
+        )
+
+
+def initialize_demo(
+    paths: DemoPaths,
+    backend_port: int = DEFAULT_BACKEND_PORT,
+    frontend_port: int = DEFAULT_FRONTEND_PORT,
+) -> tuple[dict[str, str], Path]:
+    backend_port = _validate_port(backend_port, option="backend port")
+    frontend_port = _validate_port(frontend_port, option="frontend port")
     check_python()
     node, npm = find_node_and_npm()
     python = ensure_backend_python(paths)
     ensure_frontend_dependencies(paths, npm)
+    ensure_lineage_workspace(paths, npm)
     secret = prepare_demo_runtime(paths)
-    environment = build_demo_environment(os.environ, paths, secret)
+    environment = build_demo_environment(
+        os.environ, paths, secret, backend_port, frontend_port
+    )
     print(f"[demo] using Node.js {node} and backend Python {python}", flush=True)
     _run(
         [
@@ -469,9 +546,14 @@ def _port_is_open(port: int) -> bool:
         return connection.connect_ex(("127.0.0.1", port)) == 0
 
 
-def check_ports() -> None:
+def check_ports(
+    backend_port: int = DEFAULT_BACKEND_PORT,
+    frontend_port: int = DEFAULT_FRONTEND_PORT,
+) -> None:
+    backend_port = _validate_port(backend_port, option="backend port")
+    frontend_port = _validate_port(frontend_port, option="frontend port")
     conflicts = []
-    for port, service in ((BACKEND_PORT, "backend"), (FRONTEND_PORT, "frontend")):
+    for port, service in ((backend_port, "backend"), (frontend_port, "frontend")):
         if _port_is_open(port):
             conflicts.append(f"{service} port {port}")
     if conflicts:
@@ -509,7 +591,7 @@ def _terminate_process(process, label: str) -> None:
             return
     try:
         process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
+    except TimeoutExpired:
         if os.name != "nt":
             with contextlib.suppress(ProcessLookupError):
                 os.killpg(process.pid, signal.SIGKILL)
@@ -540,8 +622,16 @@ def _wait_for_http(url: str, process, label: str, timeout: float = 30) -> None:
     raise BootstrapError(f"{label} did not become ready at {url}: {last_error}")
 
 
-def run_demo(paths: DemoPaths, environment: Mapping[str, str], python: Path) -> None:
-    check_ports()
+def run_demo(
+    paths: DemoPaths,
+    environment: Mapping[str, str],
+    python: Path,
+    backend_port: int = DEFAULT_BACKEND_PORT,
+    frontend_port: int = DEFAULT_FRONTEND_PORT,
+) -> None:
+    backend_port = _validate_port(backend_port, option="backend port")
+    frontend_port = _validate_port(frontend_port, option="frontend port")
+    check_ports(backend_port, frontend_port)
     processes = []
     backend_command = [
         str(python),
@@ -551,7 +641,7 @@ def run_demo(paths: DemoPaths, environment: Mapping[str, str], python: Path) -> 
         "--host",
         "127.0.0.1",
         "--port",
-        str(BACKEND_PORT),
+        str(backend_port),
     ]
     frontend_command = [
         shutil.which("npm") or "npm",
@@ -561,7 +651,7 @@ def run_demo(paths: DemoPaths, environment: Mapping[str, str], python: Path) -> 
         "--host",
         "127.0.0.1",
         "--port",
-        str(FRONTEND_PORT),
+        str(frontend_port),
         "--strictPort",
     ]
     try:
@@ -571,7 +661,7 @@ def run_demo(paths: DemoPaths, environment: Mapping[str, str], python: Path) -> 
         )
         processes.append(("backend", backend))
         _wait_for_http(
-            f"http://127.0.0.1:{BACKEND_PORT}/api/portal/stats", backend, "Backend"
+            f"http://127.0.0.1:{backend_port}/healthz", backend, "Backend"
         )
 
         print("[demo] starting frontend", flush=True)
@@ -582,11 +672,11 @@ def run_demo(paths: DemoPaths, environment: Mapping[str, str], python: Path) -> 
             **_popen_kwargs(),
         )
         processes.append(("frontend", frontend))
-        _wait_for_http(f"http://127.0.0.1:{FRONTEND_PORT}/", frontend, "Frontend")
+        _wait_for_http(f"http://127.0.0.1:{frontend_port}/", frontend, "Frontend")
 
         print("\nCommunity Demo ready\n", flush=True)
-        print(f"Frontend:    http://127.0.0.1:{FRONTEND_PORT}/", flush=True)
-        print(f"Backend/API: http://127.0.0.1:{BACKEND_PORT}", flush=True)
+        print(f"Frontend:    http://127.0.0.1:{frontend_port}/", flush=True)
+        print(f"Backend/API: http://127.0.0.1:{backend_port}", flush=True)
         from demo.seed_loader import ADMIN_USER
 
         print("Demo account:", flush=True)
@@ -609,12 +699,25 @@ def run_demo(paths: DemoPaths, environment: Mapping[str, str], python: Path) -> 
 
 def _parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Initialize and run the local SQLite Community Demo. Generated files live under .demo/community-demo/."
+        description="Initialize and run the local SQLite Community Demo. Generated files live under .demo/community-demo/.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "--init-only",
         action="store_true",
         help="Validate tools, prepare SQLite, apply migrations, seed data, and exit without starting servers.",
+    )
+    parser.add_argument(
+        "--backend-port",
+        type=_parse_port,
+        default=DEFAULT_BACKEND_PORT,
+        help="Local backend/Uvicorn listening port.",
+    )
+    parser.add_argument(
+        "--frontend-port",
+        type=_parse_port,
+        default=DEFAULT_FRONTEND_PORT,
+        help="Local frontend/Vite listening port.",
     )
     return parser.parse_args(argv)
 
@@ -623,11 +726,19 @@ def main(argv: Iterable[str] | None = None) -> int:
     args = _parse_args(argv)
     paths = DemoPaths.for_root()
     try:
-        environment, python = initialize_demo(paths)
+        environment, python = initialize_demo(
+            paths, args.backend_port, args.frontend_port
+        )
         if args.init_only:
             print("Community Demo initialization complete (--init-only).", flush=True)
             return 0
-        run_demo(paths, environment, python)
+        run_demo(
+            paths,
+            environment,
+            python,
+            args.backend_port,
+            args.frontend_port,
+        )
         return 0
     except BootstrapError as error:
         print(f"Community Demo bootstrap failed: {error}", file=sys.stderr)
