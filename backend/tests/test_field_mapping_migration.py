@@ -108,7 +108,7 @@ class FieldMappingIdentityMigrationTests(unittest.TestCase):
                     ).fetchone(),
                 )
                 self.assertEqual(
-                    ("0006_field_mapping_upstream_id",),
+                    ("0007_binary_status_contract",),
                     connection.execute("SELECT version_num FROM alembic_version").fetchone(),
                 )
                 foreign_keys = connection.execute(
