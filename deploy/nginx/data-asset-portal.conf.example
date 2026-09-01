@@ -1,0 +1,66 @@
+# Data Asset Portal Nginx example.
+# Replace the example hostname and installation path before installing.
+# The HTTP block below is a Demo configuration.  For HTTPS Production,
+# choose the commented HTTPS blocks further down instead of this block.
+
+server {
+    listen 80;
+    server_name data-asset.example;
+
+    root /opt/data-asset-portal/frontend/dist;
+    index index.html;
+    client_max_body_size 16m;
+
+    # React/Vite client-side routes must fall back to the SPA entry document.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Keep the /api/ suffix on proxy_pass: the upstream receives the same
+    # /api/... path that FastAPI registers.
+    location /api/ {
+        proxy_pass http://127.0.0.1:5099/api/;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# ---------------- HTTPS Production (choose instead of the HTTP block above) ----------------
+# Use a certificate issued by an enterprise CA, an internal CA, or an existing
+# trusted internal gateway.  Do not commit the certificate or private key.
+#
+# server {
+#     listen 80;
+#     server_name data-asset.example;
+#     return 301 https://$host$request_uri;
+# }
+#
+# server {
+#     listen 443 ssl;
+#     server_name data-asset.example;
+#
+#     ssl_certificate /etc/nginx/ssl/data-asset-portal.crt;
+#     ssl_certificate_key /etc/nginx/ssl/data-asset-portal.key;
+#
+#     root /opt/data-asset-portal/frontend/dist;
+#     index index.html;
+#     client_max_body_size 16m;
+#
+#     location / {
+#         try_files $uri $uri/ /index.html;
+#     }
+#
+#     location /api/ {
+#         proxy_pass http://127.0.0.1:5099/api/;
+#         proxy_http_version 1.1;
+#
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#     }
+# }

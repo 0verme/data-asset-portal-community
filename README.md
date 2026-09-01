@@ -166,7 +166,7 @@ flowchart LR
 | [Good First Issue 提案](./docs/good-first-issues.md) | 已审计的 contributor-friendly backlog 提案 |
 | [贡献指南](./CONTRIBUTING.md) | Issue、PR、代码风格和标签语义 |
 | [开发指南](./DEVELOPMENT.md) | 环境变量、本地开发与测试矩阵 |
-| [部署说明](./DEPLOYMENT.md) | 构建、Nginx 反代和部署注意事项 |
+| [部署说明](./DEPLOYMENT.md) | Linux 单机部署、systemd、Nginx、HTTPS 与验收 |
 | [架构说明](./docs/architecture.md) | 前后端架构、数据流和数据库边界 |
 | [模块清单](./docs/modules.md) | 页面、接口入口和数据表对照 |
 | [API 契约](./docs/api-contract.md) | API 约定、端点和请求/响应模型 |
