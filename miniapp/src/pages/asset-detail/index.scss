@@ -1,0 +1,63 @@
+.detail-back {
+  display: block;
+  width: auto;
+  margin: 0 0 22rpx;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 26rpx;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.detail-hero-title {
+  display: block;
+  color: var(--ink);
+  font-size: 36rpx;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, .8fr);
+  gap: 12rpx;
+  align-items: center;
+  padding: 18rpx 12rpx;
+  border-bottom: 1rpx solid var(--line);
+  font-size: 23rpx;
+}
+
+.field-row:last-child {
+  border-bottom: 0;
+}
+
+.field-name {
+  color: var(--ink);
+  font-family: var(--mono);
+  word-break: break-all;
+}
+
+.field-cn,
+.field-type {
+  color: var(--ink-2);
+  word-break: break-all;
+}
+
+.field-pk {
+  display: inline-block;
+  margin-left: 8rpx;
+  padding: 2rpx 8rpx;
+  background: var(--warn-soft);
+  border-radius: var(--radius-sm);
+  color: var(--warn);
+  font-family: var(--sans);
+  font-size: 19rpx;
+}
+
+.related-note {
+  display: block;
+  color: var(--ink-3);
+  font-size: 24rpx;
+  line-height: 1.5;
+}

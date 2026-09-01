@@ -1,0 +1,26 @@
+.search-summary {
+  margin: 22rpx 0 0;
+  color: var(--ink-2);
+  font-size: 24rpx;
+}
+
+.result-type {
+  color: var(--accent);
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.result-ref {
+  display: block;
+  margin-top: 12rpx;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 22rpx;
+}
+
+.matched-field {
+  display: block;
+  margin-top: 8rpx;
+  color: var(--ink-3);
+  font-size: 22rpx;
+}
