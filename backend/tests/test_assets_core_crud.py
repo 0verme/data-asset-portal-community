@@ -1,13 +1,19 @@
+# pyright: reportMissingImports=false
+# pi-lens-ignore: I001
 from __future__ import annotations
 
 import unittest
 from unittest.mock import patch
 
-from sqlalchemy import select
-from sqlalchemy.dialects import mysql, postgresql, sqlite
+# pi-lens-ignore: reportMissingImports
+from sqlalchemy import select  # pyright: ignore[reportMissingImports]
+# pi-lens-ignore: reportMissingImports
+from sqlalchemy.dialects import mysql, postgresql, sqlite  # pyright: ignore[reportMissingImports]
 
-from backend.app.db.tables import asset_domain, asset_table
-from backend.app.services.assets_service import AssetsService
+# pi-lens-ignore: reportMissingImports
+from backend.app.db.tables import asset_domain, asset_table  # pyright: ignore[reportMissingImports]
+# pi-lens-ignore: reportMissingImports
+from backend.app.services.assets_service import AssetsService  # pyright: ignore[reportMissingImports]
 
 
 class AssetsCoreCrudTests(unittest.TestCase):
@@ -36,6 +42,25 @@ class AssetsCoreCrudTests(unittest.TestCase):
         self.assertNotIn("订单' OR 1=1", str(compiled))
         params_text = " ".join(str(value) for value in compiled.params.values()).lower()
         self.assertIn("订单' or 1=1", params_text)
+
+    def test_asset_and_field_projections_keep_stable_ids(self):
+        table = self.service._to_asset_table(
+            {
+                "asset_id": 7,
+                "table_name": "orders",
+                "table_cn_name": "订单表",
+                "layer_code": "DWM",
+                "owner_name": None,
+                "grain_desc": None,
+                "cycle_desc": None,
+                "table_desc": None,
+                "field_count": 1,
+            },
+            [{"fieldId": 8, "assetId": 7, "name": "amount"}],
+        )
+        self.assertEqual(7, table["assetId"])
+        self.assertEqual(8, table["fields"][0]["fieldId"])
+        self.assertEqual(7, table["fields"][0]["assetId"])
 
     def test_create_field_and_change_log_use_core_insert_statements(self):
         fields = [

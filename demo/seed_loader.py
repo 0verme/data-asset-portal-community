@@ -153,10 +153,12 @@ def community_seed_plan() -> dict[str, dict]:
     asset_id_by_table = {item["table"]: index for index, item in enumerate(assets, start=1)}
     field_counts = {spec_item["table"]: len(spec_item["fields"]) for spec_item in field_plan}
     asset_field_rows = []
+    field_id_by_asset_and_name = {}
     field_id = 1
     for spec_item in field_plan:
         asset_id = asset_id_by_table[spec_item["table"]]
         for order, field in enumerate(spec_item["fields"], start=1):
+            field_id_by_asset_and_name[(spec_item["table"], field["name"])] = field_id
             asset_field_rows.append(
                 (
                     field_id, asset_id, field["name"], field["cn"], field["type"],
@@ -234,7 +236,9 @@ def community_seed_plan() -> dict[str, dict]:
     indicator_items = [
         (
             index, item["code"], item["name"], "完全虚构的零售演示指标",
-            item["table"], item["field"], item["code"][:3].lower(),
+            item["table"], item["field"], asset_id_by_table[item["table"]],
+            field_id_by_asset_and_name.get((item["table"], item["field"])), None,
+            "candidate", item["code"][:3].lower(),
             item.get("caliber", ""), item.get("pathDesc", ""),
             "enabled", "演示数据维护组", "2026-07-01",
         )
@@ -468,8 +472,8 @@ def community_seed_plan() -> dict[str, dict]:
         "p_indicator_item": spec(
             (
                 "indicator_pk", "indicator_id", "indicator_name", "meaning_desc",
-                "result_table_name", "result_field_name", "dimension_code",
-                "caliber_desc", "path_desc",
+                "result_table_name", "result_field_name", "source_asset_id", "result_field_id",
+                "aggregation_code", "semantic_state", "dimension_code", "caliber_desc", "path_desc",
                 "status_code", "registrar_name", "registered_date",
             ),
             indicator_items,

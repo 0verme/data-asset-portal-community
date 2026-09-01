@@ -11,6 +11,11 @@
 
 ## [Unreleased]
 
+### 语义基础设施（Foundation）
+
+- 建立指标稳定资产/字段引用、最小聚合 contract 与 deterministic validation。
+- 既有指标只在唯一精确匹配时 backfill，保留原字符串快照；本变更不包含 LLM、Embedding、Vector DB 或语义推荐 API。
+
 ## [0.2.0] - 2026-08-25
 
 ### 安全与认证（Security）

@@ -24,7 +24,7 @@ from sqlalchemy import and_, func, insert, or_, select, update
 
 from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
-from ..db.tables import indicator_change_log, indicator_item
+from ..db.tables import asset_field, asset_table, indicator_change_log, indicator_item
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
@@ -37,6 +37,11 @@ from .operation_log_service import (
     OPERATION_TYPE_ENABLE,
     OPERATION_TYPE_UPDATE,
     operation_log_service,
+)
+from .semantic_validator import (
+    DEFAULT_SEMANTIC_STATE,
+    normalize_reference_id,
+    validate_indicator_semantics,
 )
 
 # pyright: reportMissingImports=false
@@ -58,6 +63,23 @@ DIMENSION_LABEL_MAP = {
     "库存维度": "inv", "营销维度": "mkt", "履约维度": "ful", "售后维度": "svc",
 }
 DEFAULT_STATUS = {"enabled", "disabled"}
+
+
+def _payload_value(payload, defaults, *keys, default=None):
+    for key in keys:
+        if key in payload:
+            return payload[key]
+    for key in keys:
+        if defaults and key in defaults:
+            return defaults[key]
+    return default
+
+
+def _optional_int(value):
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 class IndicatorNotFoundError(Exception):
@@ -144,7 +166,7 @@ class IndicatorService(AuditActorMixin):
         root = raw.split(" > ", 1)[0].strip()
         return self._normalize_dimension(root)
 
-    def _normalize_payload(self, payload):
+    def _normalize_payload(self, payload, *, defaults=None):
         if not isinstance(payload, dict):
             raise IndicatorValidationError([{"field": "body", "message": "Request body must be a JSON object"}])
 
@@ -160,6 +182,10 @@ class IndicatorService(AuditActorMixin):
         status = str(payload.get("status") or "").strip()
         registrar = str(payload.get("registrar") or "").strip()
         registered_at = str(payload.get("registeredAt") or "").strip()
+        source_asset_id = _payload_value(payload, defaults, "sourceAssetId", "source_asset_id")
+        result_field_id = _payload_value(payload, defaults, "resultFieldId", "result_field_id")
+        aggregation = _payload_value(payload, defaults, "aggregation", "aggregationCode", "aggregation_code")
+        semantic_state = _payload_value(payload, defaults, "semanticState", "semantic_state", "certificationStatus")
         allowed_status = self._allowed_status_values()
 
         if not indicator_id:
@@ -182,12 +208,16 @@ class IndicatorService(AuditActorMixin):
         if details:
             raise IndicatorValidationError(details)
 
-        return {
+        item = {
             "id": indicator_id.upper(),
             "name": name,
             "meaning": meaning,
             "resultTableName": result_table_name,
             "resultFieldName": result_field_name,
+            "sourceAssetId": source_asset_id,
+            "resultFieldId": result_field_id,
+            "aggregation": aggregation,
+            "semanticState": semantic_state,
             "dimension": dimension,
             "caliber": caliber,
             "path": path,
@@ -195,6 +225,67 @@ class IndicatorService(AuditActorMixin):
             "registrar": registrar,
             "registeredAt": registered_at,
         }
+        return self._validate_semantic_contract(item, allowed_status)
+
+    def _resolve_semantic_asset(self, asset_id):
+        rows = self._fetch_rows(
+            select(
+                asset_table.c.asset_id,
+                asset_table.c.table_name,
+                asset_table.c.qualified_name,
+                asset_table.c.is_deleted,
+            ).where(asset_table.c.asset_id == asset_id)
+        )
+        return rows[0] if rows else None
+
+    def _resolve_semantic_field(self, field_id):
+        rows = self._fetch_rows(
+            select(
+                asset_field.c.field_id,
+                asset_field.c.asset_id,
+                asset_field.c.field_name,
+                asset_field.c.is_deleted,
+            ).where(asset_field.c.field_id == field_id)
+        )
+        return rows[0] if rows else None
+
+    def _validate_semantic_contract(self, item, allowed_status):
+        source_asset_id, source_error = normalize_reference_id(
+            item.get("sourceAssetId"), "sourceAssetId"
+        )
+        result_field_id, field_error = normalize_reference_id(
+            item.get("resultFieldId"), "resultFieldId"
+        )
+        details = [error for error in (source_error, field_error) if error]
+        field_row = self._resolve_semantic_field(result_field_id) if result_field_id is not None else None
+        if source_asset_id is None and field_row is not None:
+            source_asset_id = _optional_int(field_row.get("asset_id"))
+        asset_row = self._resolve_semantic_asset(source_asset_id) if source_asset_id is not None else None
+        validation = validate_indicator_semantics(
+            source_asset_id=source_asset_id,
+            result_field_id=result_field_id,
+            aggregation=item.get("aggregation"),
+            semantic_state=item.get("semanticState"),
+            status=item.get("status"),
+            asset=asset_row,
+            field=field_row,
+            allowed_statuses=allowed_status,
+        )
+        details.extend(validation.errors)
+        if details:
+            raise IndicatorValidationError(details)
+
+        item["sourceAssetId"] = validation.source_asset_id
+        item["resultFieldId"] = validation.result_field_id
+        item["aggregation"] = validation.aggregation
+        item["semanticState"] = validation.semantic_state
+        item["sourceAssetName"] = asset_row.get("table_name") if asset_row else None
+        item["sourceAssetQualifiedName"] = asset_row.get("qualified_name") if asset_row else None
+        if asset_row and asset_row.get("table_name"):
+            item["resultTableName"] = str(asset_row["table_name"]).strip()
+        if field_row and field_row.get("field_name"):
+            item["resultFieldName"] = str(field_row["field_name"]).strip()
+        return item
 
     def _build_indicator_filters(self, keyword=None, dimension=None, status=None):
         clauses = [indicator_item.c.is_deleted == "N"]
@@ -223,12 +314,32 @@ class IndicatorService(AuditActorMixin):
         return clauses
 
     def _row_to_item(self, row):
+        source_asset_id = _optional_int(row.get("source_asset_id"))
+        result_field_id = _optional_int(row.get("result_field_id"))
+        result_table_name = row.get("result_table_name") or ""
+        result_field_name = row.get("result_field_name") or ""
+        source_asset_name = row.get("source_asset_name") or None
+        source_asset_qualified_name = row.get("source_asset_qualified_name") or None
+        resolved_field_name = row.get("resolved_result_field_name") or None
+        resolved_field_asset_id = _optional_int(row.get("resolved_result_field_asset_id"))
+        if source_asset_id is not None and source_asset_name:
+            result_table_name = source_asset_name
+        if result_field_id is not None and resolved_field_name and (
+            resolved_field_asset_id is None or resolved_field_asset_id == source_asset_id
+        ):
+            result_field_name = resolved_field_name
         return {
             "id": row["indicator_id"],
             "name": row["indicator_name"],
             "meaning": row.get("meaning_desc") or "",
-            "resultTableName": row.get("result_table_name") or "",
-            "resultFieldName": row.get("result_field_name") or "",
+            "resultTableName": result_table_name,
+            "resultFieldName": result_field_name,
+            "sourceAssetId": source_asset_id,
+            "sourceAssetName": source_asset_name,
+            "sourceAssetQualifiedName": source_asset_qualified_name,
+            "resultFieldId": result_field_id,
+            "aggregation": row.get("aggregation_code") or None,
+            "semanticState": row.get("semantic_state") or DEFAULT_SEMANTIC_STATE,
             "dimension": self._normalize_dimension(row["dimension_code"]),
             "caliber": row.get("caliber_desc") or "",
             "path": row.get("path_desc") or "",
@@ -245,12 +356,29 @@ class IndicatorService(AuditActorMixin):
             indicator_item.c.meaning_desc,
             indicator_item.c.result_table_name,
             indicator_item.c.result_field_name,
+            indicator_item.c.source_asset_id,
+            indicator_item.c.result_field_id,
+            indicator_item.c.aggregation_code,
+            indicator_item.c.semantic_state,
             indicator_item.c.dimension_code,
             indicator_item.c.caliber_desc,
             indicator_item.c.path_desc,
             indicator_item.c.status_code,
             indicator_item.c.registrar_name,
             indicator_item.c.registered_date,
+            asset_table.c.asset_id.label("resolved_source_asset_id"),
+            asset_table.c.table_name.label("source_asset_name"),
+            asset_table.c.qualified_name.label("source_asset_qualified_name"),
+            asset_field.c.field_name.label("resolved_result_field_name"),
+            asset_field.c.asset_id.label("resolved_result_field_asset_id"),
+        ).select_from(
+            indicator_item.outerjoin(
+                asset_table,
+                indicator_item.c.source_asset_id == asset_table.c.asset_id,
+            ).outerjoin(
+                asset_field,
+                indicator_item.c.result_field_id == asset_field.c.field_id,
+            )
         ).where(*self._build_indicator_filters(keyword, dimension, status)).order_by(indicator_item.c.indicator_id)
         return [self._row_to_item(row) for row in self._fetch_rows(statement)]
 
@@ -271,6 +399,10 @@ class IndicatorService(AuditActorMixin):
             meaning_desc=item["meaning"],
             result_table_name=item["resultTableName"],
             result_field_name=item["resultFieldName"],
+            source_asset_id=item["sourceAssetId"],
+            result_field_id=item["resultFieldId"],
+            aggregation_code=item["aggregation"],
+            semantic_state=item["semanticState"],
             dimension_code=item["dimension"],
             caliber_desc=item["caliber"],
             path_desc=item["path"],
@@ -346,7 +478,6 @@ class IndicatorService(AuditActorMixin):
             return item
 
     def _update_indicator(self, indicator_id, payload):
-        item = self._normalize_payload(payload)
         rows = self._fetch_rows(
             select(indicator_item.c.indicator_pk).where(
                 and_(indicator_item.c.indicator_id == indicator_id, indicator_item.c.is_deleted == "N")
@@ -354,10 +485,12 @@ class IndicatorService(AuditActorMixin):
         )
         if not rows:
             raise IndicatorNotFoundError(indicator_id)
+
+        current = self.get_indicator_detail(indicator_id)
+        item = self._normalize_payload(payload, defaults=current)
         if item["id"] != indicator_id and any(current["id"] == item["id"] for current in self.get_indicators()):
             raise IndicatorAlreadyExistsError(item["id"])
 
-        current = self.get_indicator_detail(indicator_id)
         indicator_pk = self._row_int(rows, "indicator_pk")
         change_id = self._next_id(indicator_change_log, indicator_change_log.c.change_id)
         self._execute([
@@ -367,6 +500,10 @@ class IndicatorService(AuditActorMixin):
                 meaning_desc=item["meaning"],
                 result_table_name=item["resultTableName"],
                 result_field_name=item["resultFieldName"],
+                source_asset_id=item["sourceAssetId"],
+                result_field_id=item["resultFieldId"],
+                aggregation_code=item["aggregation"],
+                semantic_state=item["semanticState"],
                 dimension_code=item["dimension"],
                 caliber_desc=item["caliber"],
                 path_desc=item["path"],

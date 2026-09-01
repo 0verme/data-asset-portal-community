@@ -176,6 +176,8 @@ CREATE TABLE IF NOT EXISTS p_indicator_item (
   indicator_pk BIGINT PRIMARY KEY, indicator_id VARCHAR(64) NOT NULL UNIQUE,
   indicator_name VARCHAR(256) NOT NULL, meaning_desc VARCHAR(4000),
   result_table_name VARCHAR(256), result_field_name VARCHAR(256),
+  source_asset_id BIGINT, result_field_id BIGINT,
+  aggregation_code VARCHAR(32), semantic_state VARCHAR(32) NOT NULL DEFAULT 'candidate',
   dimension_code VARCHAR(16) NOT NULL, caliber_desc VARCHAR(1000),
   path_desc VARCHAR(1000), status_code VARCHAR(32) NOT NULL,
   registrar_name VARCHAR(64) NOT NULL, registered_date VARCHAR(10) NOT NULL,
@@ -184,6 +186,8 @@ CREATE TABLE IF NOT EXISTS p_indicator_item (
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+CREATE INDEX idx_p_indicator_semantic_ref
+  ON p_indicator_item (source_asset_id, result_field_id);
 CREATE TABLE IF NOT EXISTS p_indicator_path_config (
   id BIGINT PRIMARY KEY, parent_id BIGINT, path_code VARCHAR(64) NOT NULL UNIQUE,
   path_name VARCHAR(256) NOT NULL, dimension_code VARCHAR(16) NOT NULL,

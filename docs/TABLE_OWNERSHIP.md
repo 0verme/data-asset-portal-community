@@ -4,7 +4,7 @@
 
 ## Canonical baseline
 
-`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0007_binary_status_contract` 共同覆盖以下 39 张 canonical tables：
+`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0008_indicator_semantic_contract` 共同覆盖以下 39 张 canonical tables：
 
 | Owner | Tables |
 | --- | --- |
@@ -41,6 +41,7 @@
 - `p_upstream_system.data_source_id` 引用 shared `p_data_source`；upstream 的连接信息仍是 deployment metadata，不代表实际连接已经可用。
 - 字段映射查询、统计、表/字段维度和导出链路统一按 `upstream_system_id` 关联；系统名称只用于阅读，`system_abbr` 作为用户侧消歧编码。
 - `p_push_system.master_system_id` 引用 `p_system`；`p_push_job` / `p_push_job_field` 通过 cascade foreign keys 维护其所属层级。
+- `p_indicator_item.source_asset_id` 与 `p_indicator_item.result_field_id` 分别引用 `p_asset_table.asset_id` 与 `p_asset_field.field_id` 的稳定身份；字段归属由 Indicator Service deterministic 校验，兼容快照字段不承担唯一关联职责。
 - lineage child tables 通过 `snapshot_id` cascade 引用 lineage snapshot。
 - API Asset、Mapping、Report 等服务继续使用现有 SQLAlchemy Core / Provider contract，不新增数据库访问层。
 

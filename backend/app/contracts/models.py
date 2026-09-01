@@ -5,11 +5,13 @@ legacy aliases and additive fields, so P2 documents the wire contract without
 silently narrowing or redesigning it.
 """
 
+# pyright: reportMissingImports=false
 from __future__ import annotations
 
 from typing import Any, Generic, TypeVar
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+# pi-lens-ignore: reportMissingImports
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field  # pyright: ignore[reportMissingImports]
 
 
 class ContractModel(BaseModel):
@@ -138,6 +140,12 @@ class IndicatorItem(ContractModel):
     meaning: str = ""
     resultTableName: str = ""
     resultFieldName: str = ""
+    sourceAssetId: int | None = None
+    sourceAssetName: str | None = None
+    sourceAssetQualifiedName: str | None = None
+    resultFieldId: int | None = None
+    aggregation: str | None = None
+    semanticState: str = "candidate"
     dimension: str = ""
     caliber: str = ""
     path: str = ""
@@ -150,6 +158,26 @@ class IndicatorRequest(ContractModel):
     id: str | None = None
     name: str | None = None
     meaning: str | None = None
+    sourceAssetId: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("sourceAssetId", "source_asset_id"),
+    )
+    resultFieldId: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("resultFieldId", "result_field_id"),
+    )
+    aggregation: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "aggregation", "aggregationCode", "aggregation_code"
+        ),
+    )
+    semanticState: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "semanticState", "semantic_state", "certificationStatus"
+        ),
+    )
     resultTableName: str | None = Field(
         default=None,
         validation_alias=AliasChoices("resultTableName", "result_table_name"),
@@ -171,6 +199,8 @@ class IndicatorListResponse(ItemsResponse[IndicatorItem]):
 
 
 class AssetField(ContractModel):
+    fieldId: int | None = None
+    assetId: int | None = None
     name: str
     cn: str
     type: str
@@ -181,6 +211,7 @@ class AssetField(ContractModel):
 
 
 class AssetItem(ContractModel):
+    assetId: int | None = None
     name: str
     cn: str | None = None
     domain: str = ""

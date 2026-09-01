@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import unittest
 
+# pi-lens-ignore: reportMissingImports
 from backend.app.migrations.schema import (
     SUPPORTED_DIALECTS,
     baseline_path,
@@ -52,6 +53,10 @@ class MigrationSchemaParityTests(unittest.TestCase):
         contracts = {
             "p_asset_table": {"asset_id", "table_name", "layer_code", "domain_code"},
             "p_asset_field": {"field_id", "asset_id", "field_name", "data_type"},
+            "p_indicator_item": {
+                "indicator_pk", "result_table_name", "result_field_name",
+                "source_asset_id", "result_field_id", "aggregation_code", "semantic_state",
+            },
             "p_admin_user": {"id", "username", "password_hash", "role"},
             "p_role": {"role_code", "name", "description", "builtin", "enabled"},
             "p_permission": {"permission_code", "resource", "action", "name"},
@@ -94,6 +99,7 @@ class MigrationSchemaParityTests(unittest.TestCase):
             "idx_p_upstream_system_ix_01",
             "idx_p_push_system_ix_01",
             "idx_p_report_asset_ix_01",
+            "idx_p_indicator_semantic_ref",
             "idx_p_manual_code_table_filter",
             "idx_p_lineage_node_lookup",
             "idx_p_role_permission_permission",

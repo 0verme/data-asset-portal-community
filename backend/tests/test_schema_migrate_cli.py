@@ -74,16 +74,32 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
 
             status = _run_cli(["status", "--profile", "fresh", "--config", str(config)])
             self.assertEqual(0, status.returncode, status.stderr)
-            self.assertIn("revision=0007_binary_status_contract", status.stdout)
+            self.assertIn("revision=0008_indicator_semantic_contract", status.stdout)
             connection = sqlite3.connect(database)
             try:
                 row = connection.execute(
                     "SELECT name FROM sqlite_master WHERE type='index' "
                     "AND name='idx_p_asset_table_filter'"
                 ).fetchone()
+                semantic_index = connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='index' "
+                    "AND name='idx_p_indicator_semantic_ref'"
+                ).fetchone()
+                indicator_columns = {
+                    item[1] for item in connection.execute("PRAGMA table_info(p_indicator_item)")
+                }
             finally:
                 connection.close()
             self.assertEqual(("idx_p_asset_table_filter",), row)
+            self.assertEqual(("idx_p_indicator_semantic_ref",), semantic_index)
+            self.assertTrue(
+                {
+                    "source_asset_id",
+                    "result_field_id",
+                    "aggregation_code",
+                    "semantic_state",
+                } <= indicator_columns
+            )
 
     def test_existing_pre_116_database_upgrades_without_losing_rows(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -123,7 +139,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 self.assertEqual(("Legacy system",), connection.execute(
                     "SELECT system_name FROM dwp.p_system WHERE system_id = 99"
                 ).fetchone())
-                self.assertEqual(("0007_binary_status_contract",), connection.execute(
+                self.assertEqual(("0008_indicator_semantic_contract",), connection.execute(
                     "SELECT version_num FROM dwp.alembic_version"
                 ).fetchone())
                 self.assertIsNotNone(connection.execute(

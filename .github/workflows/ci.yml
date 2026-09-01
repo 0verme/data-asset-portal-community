@@ -1,11 +1,12 @@
 # CI — Community quality gates for data-asset-portal.
 #
 # Every PR and main push must pass:
-#   1. Repository Guard  — public data guard (BLOCKER/SUSPICIOUS = 0), repo hygiene
-#   2. Backend           — unit tests on Python 3.11 + 3.13, migration verify
-#   3. PostgreSQL        — fresh migration -> seed -> integration tests on PG 16
-#   4. MySQL             — fresh baseline + CRUD/transaction contracts on MySQL 8
-#   5. Frontend          — npm ci / lint / test / build on Node 22 + 24, audit gate
+#   1. Repository Guard — public data guard; BLOCKER/SUSPICIOUS = 0
+#      plus repository hygiene
+#   2. Backend — unit tests on Python 3.11 + 3.13, migration verify
+#   3. PostgreSQL — fresh migration -> seed -> integration tests on PG 16
+#   4. MySQL — fresh baseline + CRUD/transaction contracts on MySQL 8
+#   5. Frontend — npm ci / lint / test / build on Node 22 + 24
 #   6. Community Migration — SQLite fresh apply / verify / seed / repeat no-op
 #
 # Security posture:
@@ -41,14 +42,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
       - name: Install backend requirements
-        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
 
       - name: Repository Public Data Guard (BLOCKER and SUSPICIOUS must be 0)
         run: python demo/validate_demo_data.py --strict
@@ -61,19 +64,25 @@ jobs:
           set -euo pipefail
           BAD="$(git ls-files | grep -iE '\.(jar|dump|sqlite|db)$' || true)"
           if [ -n "$BAD" ]; then
-            echo "Forbidden tracked artifacts found:"; echo "$BAD"; exit 1
+            echo "Forbidden tracked artifacts found:"
+            echo "$BAD"
+            exit 1
           fi
           if git ls-files | grep -q '^backend/resources/jars/.*\.jar$'; then
-            echo "GaussDB commercial JDBC jar must never be tracked"; exit 1
+            echo "GaussDB commercial JDBC jar must never be tracked"
+            exit 1
           fi
           echo "No tracked jar / dump / database artifacts."
 
       - name: No local-only or environment files tracked
         run: |
           set -euo pipefail
-          BAD="$(git ls-files | grep -E '(^|/)(\.env|\.env\.local)$|database\.yaml$|database\.local' || true)"
+          pattern='(^|/)(\.env|\.env\.local)$|database\.yaml$|database\.local'
+          BAD="$(git ls-files | grep -E "$pattern" || true)"
           if [ -n "$BAD" ]; then
-            echo "Environment/local config must not be tracked:"; echo "$BAD"; exit 1
+            echo "Environment/local config must not be tracked:"
+            echo "$BAD"
+            exit 1
           fi
           echo "No tracked local environment files."
 
@@ -102,28 +111,48 @@ jobs:
                   data = yaml.safe_load(text.replace("\non:", "\ntriggers:", 1))
                   assert "triggers" in data, "missing trigger key"
                   required = expected_triggers.get(path.name)
-                  assert required, "workflow is not included in the trigger policy"
-                  assert required <= set(data["triggers"]), f"missing required trigger(s): {required}"
-                  assert data.get("permissions", {}).get("contents") == "read", "top-level contents permission must be read-only"
+                  assert required, (
+                      "workflow is not included in the trigger policy"
+                  )
+                  assert required <= set(data["triggers"]), (
+                      f"missing required trigger(s): {required}"
+                  )
+                  contents_permission = data.get("permissions", {}).get(
+                      "contents"
+                  )
+                  assert contents_permission == "read", (
+                      "top-level contents permission must be read-only"
+                  )
 
                   jobs = data.get("jobs", {}).values()
-                  steps = [step for job in jobs for step in job.get("steps", [])]
+                  steps = [
+                      step for job in jobs for step in job.get("steps", [])
+                  ]
                   for step in steps:
                       action = step.get("uses")
                       if action:
-                          assert sha_ref.fullmatch(action), f"action must use a full commit SHA: {action}"
+                          assert sha_ref.fullmatch(action), (
+                              f"action must use a full commit SHA: {action}"
+                          )
 
                   if "pull_request_target" in data["triggers"]:
-                      assert path.name == "community-metadata.yml", "pull_request_target is not allowlisted"
+                      assert path.name == "community-metadata.yml", (
+                          "pull_request_target is not allowlisted"
+                      )
                       assert data["permissions"] == {
                           "contents": "read",
                           "issues": "write",
                           "pull-requests": "write",
                       }, "metadata workflow permissions changed"
                       for step in steps:
-                          assert "run" not in step, "metadata workflow must not execute shell commands"
+                          assert "run" not in step, (
+                              "metadata workflow must not execute "
+                              "shell commands"
+                          )
                           action = step.get("uses", "").split("@", 1)[0]
-                          assert action in metadata_actions, f"metadata action is not allowlisted: {action}"
+                          assert action in metadata_actions, (
+                              f"metadata action is not allowlisted: {action}"
+                          )
                   print(f"workflow ok: {path}")
               except Exception as exc:
                   ok = False
@@ -144,14 +173,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
       - name: Install backend requirements
-        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
 
       - name: Community backend unit tests (0 failures, 0 errors)
         run: python -m unittest discover -s backend/tests
@@ -164,13 +195,19 @@ jobs:
 
       - name: Baseline offline verify (SQLite / PostgreSQL / MySQL / DWS)
         run: |
-          python backend/scripts/schema_migrate.py verify --offline --dialect sqlite
-          python backend/scripts/schema_migrate.py verify --offline --dialect postgresql
-          python backend/scripts/schema_migrate.py verify --offline --dialect mysql
-          python backend/scripts/schema_migrate.py verify --offline --dialect dws
+          python backend/scripts/schema_migrate.py verify --offline \
+            --dialect sqlite
+          python backend/scripts/schema_migrate.py verify --offline \
+            --dialect postgresql
+          python backend/scripts/schema_migrate.py verify --offline \
+            --dialect mysql
+          python backend/scripts/schema_migrate.py verify --offline \
+            --dialect dws
 
       - name: Packaging contract tests (clean-clone reproducibility)
-        run: python -m unittest discover -s backend/tests -p "test_packaging_contracts.py"
+        run: |
+          python -m unittest discover -s backend/tests \
+            -p "test_packaging_contracts.py"
 
   postgres:
     name: PostgreSQL Integration
@@ -198,14 +235,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
       - name: Install backend requirements
-        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
 
       - name: Create isolated test schema
         run: |
@@ -239,17 +278,27 @@ jobs:
           YAML
 
       - name: Fresh migration apply
-        run: python backend/scripts/schema_migrate.py apply --profile pg_ci --config /tmp/pg-ci-config.yaml
+        run: |
+          python backend/scripts/schema_migrate.py apply \
+            --profile pg_ci \
+            --config /tmp/pg-ci-config.yaml
 
       - name: Migration verify
-        run: python backend/scripts/schema_migrate.py verify --profile pg_ci --config /tmp/pg-ci-config.yaml
+        run: |
+          python backend/scripts/schema_migrate.py verify \
+            --profile pg_ci \
+            --config /tmp/pg-ci-config.yaml
 
       - name: Migration status (Alembic head)
         run: |
-          STATUS="$(python backend/scripts/schema_migrate.py status --profile pg_ci --config /tmp/pg-ci-config.yaml)"
+          STATUS="$(
+            python backend/scripts/schema_migrate.py status \
+              --profile pg_ci \
+              --config /tmp/pg-ci-config.yaml
+          )"
           echo "$STATUS"
           case "$STATUS" in
-            *"revision=0007_binary_status_contract"*) : ;;
+            *"revision=0008_indicator_semantic_contract"*) : ;;
             *) echo "unexpected Alembic migration state"; exit 1 ;;
           esac
 
@@ -269,9 +318,19 @@ jobs:
 
       - name: Repeat migration apply must be a no-op
         run: |
-          OUT="$(python backend/scripts/schema_migrate.py apply --profile pg_ci --config /tmp/pg-ci-config.yaml)"
+          OUT="$(
+            python backend/scripts/schema_migrate.py apply \
+              --profile pg_ci \
+              --config /tmp/pg-ci-config.yaml
+          )"
           echo "$OUT"
-          case "$OUT" in *"applied=-"*) ;; *) echo "repeat apply was not a no-op"; exit 1 ;; esac
+          case "$OUT" in
+            *"applied=-"*) ;;
+            *)
+              echo "repeat apply was not a no-op"
+              exit 1
+              ;;
+          esac
 
       - name: Canonical repository schema contract
         run: |
@@ -286,9 +345,14 @@ jobs:
           tables = {row[0] for row in cur.fetchall()}
           expected = set(community_seed_plan())
           missing = sorted(expected - tables)
-          print(f"repository tables: {len(tables)}; canonical tables: {len(expected)}")
+          print(
+              f"repository tables: {len(tables)}; "
+              f"canonical tables: {len(expected)}"
+          )
           if missing:
-              raise SystemExit(f"missing canonical repository tables: {missing}")
+              raise SystemExit(
+                  f"missing canonical repository tables: {missing}"
+              )
           print("canonical repository schema: OK")
           conn.close()
           EOF
@@ -320,14 +384,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
       - name: Install backend and MySQL requirements
-        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt -r backend/requirements-mysql.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt \
+            -r backend/requirements-mysql.txt
 
       - name: Write ephemeral MySQL test config
         run: |
@@ -349,17 +416,31 @@ jobs:
 
       - name: Fresh baseline apply and verify
         run: |
-          python backend/scripts/schema_migrate.py apply --profile mysql_ci --config /tmp/mysql-ci-config.yaml
-          python backend/scripts/schema_migrate.py verify --profile mysql_ci --config /tmp/mysql-ci-config.yaml
+          python backend/scripts/schema_migrate.py apply \
+            --profile mysql_ci \
+            --config /tmp/mysql-ci-config.yaml
+          python backend/scripts/schema_migrate.py verify \
+            --profile mysql_ci \
+            --config /tmp/mysql-ci-config.yaml
 
       - name: MySQL CRUD, pagination, uniqueness and rollback contracts
         run: python -m unittest backend.tests.test_mysql_integration
 
       - name: Repeat migration apply must be a no-op
         run: |
-          OUT="$(python backend/scripts/schema_migrate.py apply --profile mysql_ci --config /tmp/mysql-ci-config.yaml)"
+          OUT="$(
+            python backend/scripts/schema_migrate.py apply \
+              --profile mysql_ci \
+              --config /tmp/mysql-ci-config.yaml
+          )"
           echo "$OUT"
-          case "$OUT" in *"applied=-"*) ;; *) echo "repeat apply was not a no-op"; exit 1 ;; esac
+          case "$OUT" in
+            *"applied=-"*) ;;
+            *)
+              echo "repeat apply was not a no-op"
+              exit 1
+              ;;
+          esac
 
   frontend:
     name: Frontend / Node ${{ matrix.node }}
@@ -376,7 +457,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -414,13 +495,22 @@ jobs:
 
       - name: Lineage workspace packages resolve inside the repository
         run: |
-          npm ls lineage-viewer @lineage-viewer/react @lineage-viewer/domain-adapter --depth=0
+          npm ls lineage-viewer \
+            @lineage-viewer/react \
+            @lineage-viewer/domain-adapter \
+            --depth=0
           node - <<'EOF'
           const fs = require("fs");
-          for (const pkg of ["lineage-viewer", "@lineage-viewer/react", "@lineage-viewer/domain-adapter"]) {
+          for (const pkg of [
+            "lineage-viewer",
+            "@lineage-viewer/react",
+            "@lineage-viewer/domain-adapter",
+          ]) {
             const p = require.resolve(`${pkg}/package.json`);
             if (!p.includes(`${process.cwd()}/packages/`)) {
-              console.error(`workspace package ${pkg} resolved outside repository: ${p}`);
+              console.error(
+                `workspace package ${pkg} resolved outside repository: ${p}`
+              );
               process.exit(1);
             }
             console.log(`${pkg} -> ${p}`);
@@ -447,14 +537,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22"
           cache: npm

@@ -52,6 +52,12 @@ function getAdditionalFields(indicator) {
     "meaning",
     "resultTableName",
     "resultFieldName",
+    "sourceAssetId",
+    "sourceAssetName",
+    "sourceAssetQualifiedName",
+    "resultFieldId",
+    "aggregation",
+    "semanticState",
     "dimension",
     "caliber",
     "path",
@@ -129,6 +135,7 @@ export function MetricDetailDrawer({ indicator, open, onClose }) {
                 <div className="indicator-detail-label">状态</div>
                 <div className="indicator-detail-value"><StatusBadge status={indicator.status} /></div>
               </div>
+              <DetailItem label="语义生命周期" value={indicator.semanticState} />
             </div>
           </div>
 
@@ -136,8 +143,10 @@ export function MetricDetailDrawer({ indicator, open, onClose }) {
             <h3><Icon name="info" size={14} />口径信息</h3>
             <div className="indicator-detail-grid">
               <DetailItem label="指标含义" value={indicator.meaning} full fallback />
-              <DetailItem label="结果表" value={indicator.resultTableName} type="mono" fallback />
+              <DetailItem label="来源资产" value={indicator.sourceAssetName || indicator.sourceAssetQualifiedName} fallback />
+              <DetailItem label="结果表兼容快照" value={indicator.resultTableName} type="mono" fallback />
               <DetailItem label="结果字段" value={indicator.resultFieldName} type="mono" fallback />
+              <DetailItem label="聚合方式" value={indicator.aggregation} type="mono" fallback />
               <DetailItem label="指标口径" value={indicator.caliber} fallback />
               <DetailItem label="指标路径" value={indicator.path} type="mono" full fallback />
             </div>

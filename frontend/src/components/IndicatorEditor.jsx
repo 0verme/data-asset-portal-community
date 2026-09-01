@@ -1,5 +1,6 @@
 import React from "react";
 
+import { getAssetFields, getAssetTables } from "../api/assets.js";
 import { getIndicatorPathTree } from "../api/indicator.js";
 import {
   getIndicatorDimensionFromPath,
@@ -12,6 +13,26 @@ import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { Icon } from "./ui.jsx";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const AGGREGATION_OPTIONS = ["SUM", "COUNT", "COUNT_DISTINCT", "AVG", "MIN", "MAX", "NONE"];
+const SEMANTIC_STATE_OPTIONS = [
+  { value: "candidate", label: "候选" },
+  { value: "certified", label: "已认证" },
+  { value: "deprecated", label: "已废弃" },
+];
+
+function normalizeOptionalId(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  const normalized = Number(value);
+  return Number.isInteger(normalized) && normalized > 0 ? normalized : null;
+}
+
+function assetLabel(asset) {
+  return [asset?.cn, asset?.name].filter(Boolean).join(" · ") || "未命名资产";
+}
+
+function fieldLabel(field) {
+  return [field?.cn, field?.name].filter(Boolean).join(" · ") || "未命名字段";
+}
 
 function createDefaultForm() {
   return {
@@ -20,6 +41,12 @@ function createDefaultForm() {
     meaning: "",
     resultTableName: "",
     resultFieldName: "",
+    sourceAssetId: null,
+    sourceAssetName: "",
+    sourceAssetQualifiedName: "",
+    resultFieldId: null,
+    aggregation: "",
+    semanticState: "candidate",
     dimension: "",
     caliber: "",
     path: "",
@@ -41,6 +68,10 @@ function createFormState(initial) {
     ...next,
     resultTableName: String(next.resultTableName || "").trim(),
     resultFieldName: String(next.resultFieldName || "").trim(),
+    sourceAssetId: normalizeOptionalId(next.sourceAssetId ?? next.source_asset_id),
+    resultFieldId: normalizeOptionalId(next.resultFieldId ?? next.result_field_id),
+    aggregation: String(next.aggregation || next.aggregationCode || next.aggregation_code || "").trim().toUpperCase(),
+    semanticState: String(next.semanticState || next.semantic_state || "candidate").trim().toLowerCase() || "candidate",
     dimension: getIndicatorDimensionFromPath(normalizedPath) || normalizedDimension,
     path: normalizedPath || (normalizedDimension ? INDICATOR_DIMENSION_CODE_MAP[normalizedDimension] : ""),
   };
@@ -62,6 +93,12 @@ export function IndicatorEditor({
   const [pathOptions, setPathOptions] = React.useState([]);
   const [pathLoading, setPathLoading] = React.useState(false);
   const [pathError, setPathError] = React.useState("");
+  const [assetOptions, setAssetOptions] = React.useState([]);
+  const [assetLoading, setAssetLoading] = React.useState(false);
+  const [assetError, setAssetError] = React.useState("");
+  const [fieldOptions, setFieldOptions] = React.useState([]);
+  const [fieldLoading, setFieldLoading] = React.useState(false);
+  const [fieldError, setFieldError] = React.useState("");
   const initialSnapshotRef = React.useRef(JSON.stringify(form));
   const isDirty = initialSnapshotRef.current !== JSON.stringify(form);
 
@@ -71,6 +108,65 @@ export function IndicatorEditor({
     setTouched(false);
     initialSnapshotRef.current = JSON.stringify(nextForm);
   }, [initial]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadAssetOptions() {
+      setAssetLoading(true);
+      setAssetError("");
+      try {
+        const items = await getAssetTables();
+        if (!cancelled) {
+          setAssetOptions(Array.isArray(items) ? items.filter((item) => normalizeOptionalId(item?.assetId ?? item?.asset_id)) : []);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAssetOptions([]);
+          setAssetError(error instanceof Error ? error.message : "来源资产加载失败。");
+        }
+      } finally {
+        if (!cancelled) setAssetLoading(false);
+      }
+    }
+
+    loadAssetOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const selectedAsset = assetOptions.find((item) => normalizeOptionalId(item?.assetId ?? item?.asset_id) === form.sourceAssetId);
+    if (!selectedAsset) {
+      setFieldOptions([]);
+      setFieldError("");
+      setFieldLoading(false);
+      return undefined;
+    }
+
+    async function loadFieldOptions() {
+      setFieldLoading(true);
+      setFieldError("");
+      try {
+        const items = await getAssetFields(selectedAsset.name);
+        if (!cancelled) setFieldOptions(Array.isArray(items) ? items : []);
+      } catch (error) {
+        if (!cancelled) {
+          setFieldOptions([]);
+          setFieldError(error instanceof Error ? error.message : "来源资产字段加载失败。");
+        }
+      } finally {
+        if (!cancelled) setFieldLoading(false);
+      }
+    }
+
+    loadFieldOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, [assetOptions, form.sourceAssetId]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -126,6 +222,27 @@ export function IndicatorEditor({
     });
   };
 
+  const handleAssetChange = (event) => {
+    const sourceAssetId = normalizeOptionalId(event.target.value);
+    const selectedAsset = assetOptions.find((item) => normalizeOptionalId(item?.assetId ?? item?.asset_id) === sourceAssetId);
+    setValues({
+      sourceAssetId,
+      resultFieldId: null,
+      resultTableName: selectedAsset?.name || form.resultTableName,
+      resultFieldName: selectedAsset ? "" : form.resultFieldName,
+      sourceAssetName: selectedAsset?.cn || selectedAsset?.name || "",
+    });
+  };
+
+  const handleFieldChange = (event) => {
+    const resultFieldId = normalizeOptionalId(event.target.value);
+    const selectedField = fieldOptions.find((item) => normalizeOptionalId(item?.fieldId ?? item?.field_id) === resultFieldId);
+    setValues({
+      resultFieldId,
+      resultFieldName: selectedField?.name || form.resultFieldName,
+    });
+  };
+
   const submit = () => {
     setTouched(true);
     if (errors.length || saveBusy) return;
@@ -139,6 +256,10 @@ export function IndicatorEditor({
       meaning: form.meaning.trim(),
       resultTableName: form.resultTableName.trim(),
       resultFieldName: form.resultFieldName.trim(),
+      sourceAssetId: form.sourceAssetId,
+      resultFieldId: form.resultFieldId,
+      aggregation: form.aggregation || null,
+      semanticState: form.semanticState || "candidate",
       dimension: derivedDimension,
       caliber: form.caliber.trim(),
       path: normalizedPath,
@@ -198,22 +319,64 @@ export function IndicatorEditor({
             <textarea className="ta" value={form.meaning} onChange={(event) => setValue("meaning", event.target.value)} placeholder="描述该指标的业务含义、取值逻辑和使用范围。" />
           </div>
           <div className="fl">
-            <label>结果表</label>
+            <label>来源资产（稳定引用）</label>
+            <select className="inp" value={form.sourceAssetId || ""} onChange={handleAssetChange} disabled={assetLoading}>
+              <option value="">未绑定稳定资产（保留兼容快照）</option>
+              {form.sourceAssetId && !assetOptions.some((item) => normalizeOptionalId(item?.assetId ?? item?.asset_id) === form.sourceAssetId) ? (
+                <option value={form.sourceAssetId}>{form.sourceAssetName || form.resultTableName || "当前来源资产"}</option>
+              ) : null}
+              {assetOptions.map((asset) => (
+                <option key={asset.assetId} value={asset.assetId}>{assetLabel(asset)}</option>
+              ))}
+            </select>
+            {assetError ? <div className="match-hint" style={{ color: "var(--danger)" }}>{assetError}</div> : null}
+            {!assetLoading && !assetError && !assetOptions.length ? <div className="match-hint">当前数据源未提供稳定资产 ID，保留兼容文本录入。</div> : null}
+          </div>
+          <div className="fl">
+            <label>结果字段（稳定引用）</label>
+            <select className="inp" value={form.resultFieldId || ""} onChange={handleFieldChange} disabled={!form.sourceAssetId || fieldLoading}>
+              <option value="">未绑定稳定字段（保留兼容快照）</option>
+              {form.resultFieldId && !fieldOptions.some((item) => normalizeOptionalId(item?.fieldId ?? item?.field_id) === form.resultFieldId) ? (
+                <option value={form.resultFieldId}>{form.resultFieldName || "当前结果字段"}</option>
+              ) : null}
+              {fieldOptions.map((field) => (
+                <option key={field.fieldId} value={field.fieldId}>{fieldLabel(field)}</option>
+              ))}
+            </select>
+            {fieldError ? <div className="match-hint" style={{ color: "var(--danger)" }}>{fieldError}</div> : null}
+          </div>
+          <div className="fl">
+            <label>结果表兼容快照</label>
             <input
               className="inp mono"
               value={form.resultTableName}
+              readOnly={Boolean(form.sourceAssetId)}
               onChange={(event) => setValue("resultTableName", event.target.value)}
               placeholder="例如：dws.ads_indicator_result_di"
             />
           </div>
           <div className="fl">
-            <label>结果字段</label>
+            <label>结果字段兼容快照</label>
             <input
               className="inp mono"
               value={form.resultFieldName}
+              readOnly={Boolean(form.resultFieldId)}
               onChange={(event) => setValue("resultFieldName", event.target.value)}
               placeholder="例如：first_loan_flag"
             />
+          </div>
+          <div className="fl">
+            <label>聚合方式</label>
+            <select className="inp mono" value={form.aggregation} onChange={(event) => setValue("aggregation", event.target.value)}>
+              <option value="">未指定（兼容历史指标）</option>
+              {AGGREGATION_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </div>
+          <div className="fl">
+            <label>语义生命周期</label>
+            <select className="inp" value={form.semanticState} onChange={(event) => setValue("semanticState", event.target.value)}>
+              {SEMANTIC_STATE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
           </div>
           <div className="fl">
             <label>指标口径</label>

@@ -81,7 +81,7 @@
 
 **数据表**：`p_indicator_item`、`p_indicator_path_config`、`p_indicator_change_log`。
 
-**说明**：维护指标标识、业务口径、分层路径、来源字段和结果字段，支持路径 / 维度筛选、状态筛选、启停及删除；指标路径级联选项由独立配置表驱动。
+**说明**：维护指标标识、业务口径、分层路径以及通过 `asset_id` / `field_id` 的稳定来源资产和结果字段引用；旧表名/字段名保留为兼容快照。支持路径 / 维度筛选、状态筛选、启停及删除，聚合契约与 `candidate` / `certified` / `deprecated` 语义生命周期独立于 `enabled` / `disabled` 状态；指标路径级联选项由独立配置表驱动。
 
 ## 7. 报表资产
 

@@ -52,6 +52,32 @@ EXPECTED_COUNTS = {
     "p_lineage_edge": 7,
 }
 
+COUNT_QUERIES = {
+    "p_asset_table": "SELECT COUNT(*) FROM p_asset_table",
+    "p_asset_field": "SELECT COUNT(*) FROM p_asset_field",
+    "p_code_category": "SELECT COUNT(*) FROM p_code_category",
+    "p_code_item": "SELECT COUNT(*) FROM p_code_item",
+    "p_indicator_path_config": "SELECT COUNT(*) FROM p_indicator_path_config",
+    "p_root_item": "SELECT COUNT(*) FROM p_root_item",
+    "p_indicator_item": "SELECT COUNT(*) FROM p_indicator_item",
+    "p_system": "SELECT COUNT(*) FROM p_system",
+    "p_data_source": "SELECT COUNT(*) FROM p_data_source",
+    "p_api_asset": "SELECT COUNT(*) FROM p_api_asset",
+    "p_menu": "SELECT COUNT(*) FROM p_menu",
+    "p_upstream_system": "SELECT COUNT(*) FROM p_upstream_system",
+    "p_upstream_unload_time": "SELECT COUNT(*) FROM p_upstream_unload_time",
+    "p_upstream_change_log": "SELECT COUNT(*) FROM p_upstream_change_log",
+    "p_push_system": "SELECT COUNT(*) FROM p_push_system",
+    "p_push_job": "SELECT COUNT(*) FROM p_push_job",
+    "p_push_job_field": "SELECT COUNT(*) FROM p_push_job_field",
+    "p_push_change_log": "SELECT COUNT(*) FROM p_push_change_log",
+    "p_report_asset": "SELECT COUNT(*) FROM p_report_asset",
+    "p_manual_code_table": "SELECT COUNT(*) FROM p_manual_code_table",
+    "p_lineage_snapshot": "SELECT COUNT(*) FROM p_lineage_snapshot",
+    "p_lineage_node": "SELECT COUNT(*) FROM p_lineage_node",
+    "p_lineage_edge": "SELECT COUNT(*) FROM p_lineage_edge",
+}
+
 
 def _load_dataset(name: str) -> list[dict]:
     path = PROJECT_ROOT / "demo" / "datasets" / name
@@ -72,7 +98,7 @@ class CommunityDemoSeedTests(unittest.TestCase):
                 "ASSET_DB_PROFILE": "community_sqlite",
                 "ASSET_DB_DATABASE": str(self.database),
                 "APP_ENV": "production",
-                "APP_SECRET_KEY": "demo-seed-test-only",
+                "APP_SECRET_KEY": os.urandom(24).hex(),
                 "LINEAGE_DB_PROFILE": "",
             },
             clear=False,
@@ -86,7 +112,8 @@ class CommunityDemoSeedTests(unittest.TestCase):
             self.assertTrue(initialize(connection, config, "sqlite"))
             self.assertEqual("0001_baseline", verify_database(connection, config, "sqlite"))
         finally:
-            connection.close()
+            if connection is not None:
+                connection.close()
 
     def _seed(self):
         from demo.seed_sqlite import seed
@@ -95,8 +122,9 @@ class CommunityDemoSeedTests(unittest.TestCase):
     def _counts(self):
         connection = sqlite3.connect(self.database)
         try:
+            # pi-lens-ignore: python-sql-injection
             return {
-                table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                table: connection.execute(COUNT_QUERIES[table]).fetchone()[0]
                 for table in EXPECTED_COUNTS
             }
         finally:
@@ -159,6 +187,28 @@ class CommunityDemoSeedTests(unittest.TestCase):
                 f"field rows for {table}",
             )
             self.assertEqual(declared_counts[table], len(spec["fields"]), table)
+
+    def test_demo_indicators_use_stable_refs_when_the_field_matches_exactly(self):
+        self._seed()
+        connection = sqlite3.connect(self.database)
+        try:
+            rows = connection.execute(
+                "SELECT i.indicator_id, i.source_asset_id, i.result_field_id, f.asset_id "
+                "FROM p_indicator_item i "
+                "LEFT JOIN p_asset_field f ON f.field_id = i.result_field_id "
+                "ORDER BY i.indicator_pk"
+            ).fetchall()
+        finally:
+            connection.close()
+
+        self.assertEqual(16, len(rows))
+        self.assertTrue(all(row[1] is not None for row in rows))
+        self.assertTrue(all(row[3] == row[1] for row in rows if row[2] is not None))
+        unresolved = {row[0] for row in rows if row[2] is None}
+        self.assertEqual(
+            {"MEM00002", "MEM00003", "INV00001", "INV00002", "SVC00002"},
+            unresolved,
+        )
 
     def test_fields_have_unique_names_per_table_and_valid_pk_rules(self):
         self._seed()
