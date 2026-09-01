@@ -20,11 +20,15 @@ import {
   normalizeIndicatorDimension,
 } from "../data/indicatorPathOptions.js";
 
-const API_MODE = import.meta.env.VITE_API_MODE || "mock";
+const API_MODE = import.meta.env?.VITE_API_MODE || "mock";
 let mockIndicators = clone(INDICATORS);
 
 function clone(value) {
-  return JSON.parse(JSON.stringify(value));
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return value;
+  }
 }
 
 function normalizeCollection(payload, fallbackKey) {
@@ -52,6 +56,12 @@ function firstPresent(item, keys, fallback = "") {
   return fallback;
 }
 
+function normalizeOptionalId(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  const normalized = Number(value);
+  return Number.isInteger(normalized) && normalized > 0 ? normalized : null;
+}
+
 function normalizeIndicator(item) {
   if (!item || typeof item !== "object") return item;
   const path = firstPresent(item, ["path", "path_desc", "indicator_path", "metric_path", "path_name"], "");
@@ -60,12 +70,22 @@ function normalizeIndicator(item) {
   );
   const resultTableName = firstPresent(item, ["resultTableName", "result_table_name", "resultTable", "result_table"], "");
   const resultFieldName = firstPresent(item, ["resultFieldName", "result_field_name", "resultField", "result_field"], "");
+  const sourceAssetId = normalizeOptionalId(firstPresent(item, ["sourceAssetId", "source_asset_id"], null));
+  const resultFieldId = normalizeOptionalId(firstPresent(item, ["resultFieldId", "result_field_id"], null));
+  const aggregation = firstPresent(item, ["aggregation", "aggregationCode", "aggregation_code"], null);
+  const semanticState = firstPresent(item, ["semanticState", "semantic_state", "certificationStatus"], "candidate");
   return {
     ...item,
     path,
     dimension,
     resultTableName,
     resultFieldName,
+    sourceAssetId,
+    sourceAssetName: firstPresent(item, ["sourceAssetName", "source_asset_name"], null),
+    sourceAssetQualifiedName: firstPresent(item, ["sourceAssetQualifiedName", "source_asset_qualified_name"], null),
+    resultFieldId,
+    aggregation,
+    semanticState,
   };
 }
 
@@ -108,7 +128,7 @@ export async function getIndicatorList(params = {}) {
     const payload = await requestRemote("/indicators", { params });
     return normalizeCollection(payload, "items").map(normalizeIndicator);
   }
-  return filterIndicators(readStore(), params);
+  return filterIndicators(readStore().map(normalizeIndicator), params);
 }
 
 export async function getIndicatorDetail(indicatorId) {
@@ -118,7 +138,7 @@ export async function getIndicatorDetail(indicatorId) {
   }
   const item = readStore().find((indicator) => indicator.id === indicatorId);
   if (!item) throw new Error(`Indicator not found: ${indicatorId}`);
-  return clone(item);
+  return normalizeIndicator(clone(item));
 }
 
 export async function getIndicatorPathTree(params = {}) {
@@ -140,7 +160,7 @@ export async function createIndicator(payload) {
   }
   items.unshift(clone(payload));
   writeStore(items);
-  return clone(payload);
+  return normalizeIndicator(clone(payload));
 }
 
 export async function updateIndicator(indicatorId, payload) {
@@ -158,7 +178,7 @@ export async function updateIndicator(indicatorId, payload) {
     throw new Error(`Indicator already exists: ${payload.id}`);
   }
   writeStore([clone(payload), ...items.filter((item) => item.id !== indicatorId && item.id !== payload.id)]);
-  return clone(payload);
+  return normalizeIndicator(clone(payload));
 }
 
 export async function deleteIndicator(indicatorId) {

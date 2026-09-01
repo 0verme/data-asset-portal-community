@@ -44,7 +44,13 @@ function packPreview(packageDir) {
   const result = spawnSync(
     npmCommand,
     ["pack", "--dry-run", "--json", "--ignore-scripts"],
-    { cwd: packageDir, encoding: "utf8" },
+    {
+      cwd: packageDir,
+      encoding: "utf8",
+      // Node 24 cannot launch .cmd files directly on Windows; the arguments
+      // are fixed below, so the shell fallback does not accept user input.
+      shell: process.platform === "win32",
+    },
   );
   if (result.error) fail(`npm pack failed to start for ${packageDir}: ${result.error.message}`);
   if (result.status !== 0) {

@@ -21,7 +21,7 @@ import re
 from copy import deepcopy
 from time import perf_counter
 
-from sqlalchemy import delete, exists, func, insert, or_, select, update
+from sqlalchemy import delete, exists, func, insert, or_, select, update  # pyright: ignore[reportMissingImports]
 
 from ..application import AuditActorMixin, actor_aware
 from ..db.facade import database_transaction, get_db_profile, resolve_db_profile_name
@@ -442,6 +442,7 @@ class AssetsService(AuditActorMixin):
             return {}
         rows = self._fetch_rows_logged(
             select(
+                asset_field.c.field_id,
                 asset_field.c.asset_id,
                 asset_field.c.field_name,
                 asset_field.c.field_cn_name,
@@ -462,6 +463,8 @@ class AssetsService(AuditActorMixin):
         for row in rows:
             grouped.setdefault(int(row["asset_id"]), []).append(
                 {
+                    "fieldId": int(row["field_id"]),
+                    "assetId": int(row["asset_id"]),
                     "name": row["field_name"],
                     "cn": row["field_cn_name"] or row["field_desc"] or row["field_name"],
                     "type": self._normalize_field_type(row.get("data_type")),
@@ -475,6 +478,7 @@ class AssetsService(AuditActorMixin):
 
     def _to_asset_table(self, row, fields):
         return {
+            "assetId": int(row["asset_id"]),
             "name": row["table_name"],
             "cn": row["table_cn_name"] or row["table_name"],
             "domain": row.get("domain_name") or "",

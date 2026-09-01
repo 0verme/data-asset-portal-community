@@ -1,6 +1,6 @@
 # 智能问数底座与语义推荐路线
 
-> 状态：**方案提案，尚未实现**。本文描述产品定位和候选技术路线，不代表当前 API、数据库或部署能力。任何落地都必须先完成数据口径与跨数据库方案评审。
+> 状态：**Phase 1 — Semantic Contract：已实现基础能力**。本文描述产品定位和后续技术路线；Phase 1 已提供稳定资产引用、最小聚合契约和确定性校验，但不代表 AI 推荐或语义检索已经上线。任何后续能力仍必须完成数据口径与跨数据库方案评审。
 
 ## 1. 产品定位
 
@@ -10,14 +10,23 @@
 
 ## 2. 当前依赖与缺口
 
-当前仓库已有统一搜索 Provider、资产/字段/指标/词根/上下游/血缘元数据和 `/api/search` 契约，但尚未实现：
+当前仓库已有统一搜索 Provider、资产/字段/指标/词根/上下游/血缘元数据和 `/api/search` 契约。Semantic Foundation Phase 1 已实现：
+
+- 指标通过 `source_asset_id` / `result_field_id` 稳定引用 `p_asset_table.asset_id` / `p_asset_field.field_id`。
+- 保留 `result_table_name` / `result_field_name` 作为兼容与展示快照，稳定 ID 为机器校验依据。
+- 提供小集合 `SUM`、`COUNT`、`COUNT_DISTINCT`、`AVG`、`MIN`、`MAX`、`NONE` 聚合契约。
+- 提供独立于 `enabled` / `disabled` 的 `semantic_state` 生命周期（`candidate`、`certified`、`deprecated`）。
+- 创建/更新时执行 asset、field、归属关系、聚合、生命周期和状态的 deterministic validation。
+- 既有指标只在表名/字段名精确且唯一匹配时 backfill；歧义或无法匹配保持 NULL，不猜测。
+
+以下能力仍未实现：
 
 - 向量表、Embedding 生成与增量刷新。
-- LLM 调用、结构化输出校验和推荐结果持久化。
-- 可执行指标语义 schema 与认证流程。
+- LLM 调用、结构化输出组装和推荐结果持久化。
+- Semantic Retrieval 与离线评测集。
 - 跨 PostgreSQL、GaussDB/DWS、Community SQLite 的统一向量检索方案。
 
-因此不能把关键词搜索无结果直接等同于触发 LLM，也不能在现有 `suggestion` 字段上暗示功能已经可用。
+因此不能把关键词搜索无结果直接等同于触发 LLM，也不能把 `candidate` 或现有 `suggestion` 字段表达为已认证指标。
 
 ## 3. 候选推荐链路
 
@@ -25,8 +34,8 @@
 
 1. **召回**：从主题域、表字段、词根和已认证指标中检索候选资产。
 2. **组装**：LLM 只能在召回集合中选择并生成受 schema 约束的候选指标。
-3. **校验**：确定性验证资产 ID、字段、聚合方式、来源和结果字段均真实存在。
-4. **人工确认**：推荐结果进入指标维护流程，不直接成为可执行生产口径。
+3. **校验**：未来推荐候选必须复用 Phase 1 的确定性验证，检查资产 ID、字段归属、聚合方式、来源和结果字段均真实存在。
+4. **人工确认**：推荐结果进入指标维护流程，不直接成为可执行生产口径；`semantic_state=certified` 只能代表后续人工认证结果。
 
 建议输出至少包含候选指标名称、业务定义、聚合方式、来源资产、结果字段、主题域、证据和置信度。所有引用使用稳定资产 ID，不允许模型自由编造表、字段或归属。
 
@@ -50,17 +59,35 @@
 
 ## 6. 建议落地顺序
 
-1. 定义并验证最小可执行指标语义 schema。
-2. 补齐指标与表字段、维度、来源和结果字段的稳定引用。
-3. 用确定性检索实现候选召回与离线评测集。
-4. 在单一受控数据库环境验证可选向量召回，不修改通用部署基线。
-5. 接入结构化 LLM 组装、确定性校验和人工确认流程。
-6. 评估准确率、延迟、离线部署成本后再决定是否进入搜索兜底链路。
+### Already implemented — Phase 1 Foundation
+
+1. 最小指标语义 contract 与聚合枚举。
+2. 指标与表字段的稳定 ID 引用及兼容快照。
+3. 历史数据的唯一精确匹配 migration backfill。
+4. 可复用的 deterministic validator 与 API/维护页适配。
+
+### Next — Phase 2 Deterministic Retrieval + Offline Evaluation
+
+1. 建立 golden semantic query dataset。
+2. 基于 keyword / aliases / roots / fields / indicators 做确定性召回。
+3. 输出 Recall@K / Precision@K 等 baseline。
+4. 在没有 Embedding 的情况下评估真实召回质量。
+5. 只有离线评测数据充分后，才决定是否需要 Embedding、Vector DB 或后续 LLM 组装。
 
 ## 7. 验收前置条件
+
+### Phase 1 Foundation（已满足）
+
+- API/Service 接受并返回稳定 asset/field ID，且保留旧字符串字段。
+- field 必须属于 source asset；不存在或已删除的引用不能写入。
+- 历史 backfill 只接受唯一精确匹配，歧义保持 NULL。
+- `status` 继续使用 `enabled` / `disabled`，不把 `draft` 引入通用状态。
+- PostgreSQL、GaussDB/DWS 和 Community SQLite 的通用 baseline 不依赖额外扩展。
+- `/api/search` 保持原关键词搜索路径，不触发 AI fallback。
+
+### 后续推荐能力
 
 - 推荐所引用的资产和字段 100% 可解析到门户实体。
 - 未认证候选不会被表达为正式指标。
 - 模型不可用时关键词搜索无回归。
-- PostgreSQL、GaussDB/DWS 和 Community SQLite 未启用该能力时均可正常运行。
 - 有离线评测集覆盖同义词、歧义词、无匹配、复合聚合和恶意输入。

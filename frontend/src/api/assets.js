@@ -20,10 +20,14 @@ import { getAssetLayerValue, normalizeAssetLayerFields } from "../utils/assetFil
 import { generateDDLByDialect, getDDLDialectLabel, normalizeDDLResponse } from "../utils/ddlDialect.js";
 import { requestRemote } from "./http.js";
 
-const API_MODE = import.meta.env.VITE_API_MODE || "mock";
+const API_MODE = import.meta.env?.VITE_API_MODE || "mock";
 
 function clone(value) {
-  return JSON.parse(JSON.stringify(value));
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return value;
+  }
 }
 
 function buildLayerVariantName(name, layerCode) {
@@ -52,6 +56,18 @@ const MOCK_TABLES = [
     .filter((layer) => layer.code !== "DWM")
     .flatMap((layer) => createLayerVariants(DWM_TABLES, layer.code)),
 ];
+
+// Mock mode has no database-issued identity, so assign deterministic local
+// IDs solely to exercise the same selector contract as remote mode.
+const MOCK_ASSET_IDS = new Map(MOCK_TABLES.map((table, index) => [table.name, index + 1]));
+const MOCK_FIELD_IDS = new Map();
+let nextMockFieldId = 1;
+MOCK_TABLES.forEach((table) => {
+  (table.fields || []).forEach((field) => {
+    MOCK_FIELD_IDS.set(`${table.name}:${field.name}`, nextMockFieldId);
+    nextMockFieldId += 1;
+  });
+});
 
 let mockOverrides = { upserts: {}, deletedNames: [] };
 
@@ -88,7 +104,20 @@ function applyOverrides(tables) {
 }
 
 function normalizeTable(table) {
-  return normalizeAssetLayerFields(normalizeAssetDataTypes(clone(table)));
+  const normalized = normalizeAssetLayerFields(normalizeAssetDataTypes(clone(table)));
+  if (!normalized || typeof normalized !== "object") return normalized;
+  const assetId = normalized.assetId ?? normalized.asset_id
+    ?? (API_MODE === "mock" ? MOCK_ASSET_IDS.get(normalized.name) : null);
+  return {
+    ...normalized,
+    assetId: assetId || null,
+    fields: (normalized.fields || []).map((field) => ({
+      ...field,
+      fieldId: field.fieldId ?? field.field_id
+        ?? (API_MODE === "mock" ? MOCK_FIELD_IDS.get(`${normalized.name}:${field.name}`) : null),
+      assetId: field.assetId ?? field.asset_id ?? (assetId || null),
+    })),
+  };
 }
 
 function normalizeTableCollection(tables) {

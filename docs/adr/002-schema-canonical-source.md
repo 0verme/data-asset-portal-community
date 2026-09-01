@@ -20,7 +20,7 @@
 | `backend/schema/mysql.sql` | MySQL 8 fresh-install deployment artifact；baseline contract | Runtime initialization input | Yes | No | `schema_migrate.py apply` → `initialize()`；MySQL deployment/seed | offline verify/plan；MySQL provider/CI migration contract |
 | `backend/schema/dws.sql` | GaussDB/DWS fresh-install deployment artifact；vendor-compatible baseline | Runtime initialization input | Yes | No | `schema_migrate.py apply` through JDBC baseline path；DWS deployment | offline verify/plan；static DWS/provider checks; no local vendor execution |
 | `backend/alembic/versions/0001_baseline.py` | Ledger marker for the baseline; it does not create tables | Runtime migration ledger | Yes | No | Alembic ledger and `schema_migrate.py` | fresh apply/status tests |
-| `backend/alembic/versions/0002_*.py`–`0006_*.py` | Immutable forward revisions for existing databases and post-baseline changes | Runtime upgrade path | Yes | No | Alembic for SQLite/PostgreSQL/MySQL; DWS has no online Alembic path | migration lifecycle, CI integration and revision-head gates |
+| `backend/alembic/versions/0002_*.py`–`0008_*.py` | Immutable forward revisions for existing databases and post-baseline changes | Runtime upgrade path | Yes | No | Alembic for SQLite/PostgreSQL/MySQL; DWS has no online Alembic path | migration lifecycle, CI integration and revision-head gates |
 | `backend/app/migrations/schema.py` | Baseline path resolution, lightweight SQL parsing, reflection and drift comparison | Runtime verification/build-time test helper | Yes | No | migration CLI and schema tests | parity, reflection and migration tests |
 | `backend/scripts/schema_migrate.py` | Orchestrates offline checks, baseline initialization, stamp, verify and Alembic head upgrade | Runtime/build-time CLI | Yes | No | operators, CI and release checks | CLI contract and offline checks |
 | `backend/app/db/metadata.py` + `backend/app/db/tables.py` | Logical-schema namespace and runtime SQLAlchemy Core query declarations | Runtime query compilation | Yes | No | migrated services and provider adapters | Core dialect compilation and provider contracts |
@@ -58,7 +58,7 @@ selected backend/schema/<dialect>.sql
         → Alembic head (SQLite/PostgreSQL/MySQL)
 ```
 
-`0002`–`0005` 同时承担两项职责：为已有数据库提供 forward upgrade，为 baseline 之后的 head 提供增量行为。fresh baseline 已经包含当前模块表，因此后续 revision 中存在兼容/补齐逻辑；不能把 revision history 改写成 generator 输出。
+`0002`–`0008` 同时承担两项职责：为已有数据库提供 forward upgrade，为 baseline 之后的 head 提供增量行为。fresh baseline 已经包含当前模块表，因此后续 revision 中存在兼容/补齐逻辑；不能把 revision history 改写成 generator 输出。
 
 `backend/alembic/env.py` 的 `target_metadata` 为 `None`，当前 Alembic 不是从 SQLAlchemy metadata 自动 diff 的 model registry。GaussDB provider 声明 `JDBC`、没有 SQLAlchemy engine，也没有 `ALEMBIC_ONLINE`；`schema_migrate.py` 对 GaussDB 不运行 online Alembic。DWS 因此保留 baseline/offline/static compatibility 边界，不能假设 PostgreSQL Alembic compiler 可以表达完整 DWS physical schema。
 
@@ -66,10 +66,9 @@ selected backend/schema/<dialect>.sql
 
 `metadata = MetaData(schema="__app__")` 和 `tables.py` 是 runtime query metadata，不是完整 physical schema。静态审计结果：
 
-- baseline 有 39 张表、474 个列；metadata 声明 34 张表、393 个列；
-- metadata 缺少 `p_indicator_path_config`、`p_push_system`、`p_push_job`、`p_push_job_field`、`p_push_change_log`，合计 81 个列；
-- 34 张交集表的列名目前与 baseline 对齐，但相对 SQLite baseline 有 57 个 nullable 差异、141 个 server-default 未声明；
-- metadata 没有 physical baseline 的显式 index、foreign-key、unique/check constraint；`p_lineage_node`/`p_lineage_edge` 的复合主键也没有完整表达；
+- baseline 与 runtime metadata 当前均声明 39 张表、478 个列；metadata 仍是面向运行时查询的 SQLAlchemy Core 声明，不是 DDL generator；
+- runtime metadata 的列名与 baseline 的公共列名保持对齐，包括 Phase 1 的指标语义列；
+- metadata 没有完整表达 physical baseline 的显式 index、foreign-key、unique/check constraint；`p_lineage_node`/`p_lineage_edge` 的复合主键也没有完整表达；
 - `__app__` 是 provider translation 的逻辑 schema，不等于 SQLite attached database、PostgreSQL/DWS `dwp` 或 MySQL database。
 
 所以 metadata 可以继续服务 runtime query portability，但当前信息不完整，不能成为 fresh-install canonical source。
@@ -101,10 +100,10 @@ selected backend/schema/<dialect>.sql
 
 ```text
 39 tables
-474 columns
-20 explicit indexes
+478 columns
+22 explicit indexes
 24 unique constraints
-12 foreign-key constraints
+13 foreign-key constraints
 ```
 
 四方言的 table-name、column-name、primary-key、unique、foreign-key 和 index-name/columns inventory 一致。以下差异是物理 dialect contract，不应被逐行 diff 机械归类为 drift：

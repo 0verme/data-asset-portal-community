@@ -164,6 +164,8 @@ Base Path: `/api/assets`
 
 ```json
 {
+  "fieldId": 1001,
+  "assetId": 101,
   "name": "trans_status",
   "cn": "交易状态",
   "type": "string",
@@ -178,6 +180,7 @@ Base Path: `/api/assets`
 
 ```json
 {
+  "assetId": 101,
   "name": "dwm_trade_order_detail_di",
   "cn": "零售订单明细中间表",
   "domain": "交易",
@@ -214,6 +217,8 @@ Base Path: `/api/assets`
 前端数据仓库首页默认不传 `layer`，展示全部层级；DWM 是推荐筛选项。首页侧边栏提供“全部层级”和各已配置层级入口，筛选状态通过 URL 的 `layer` 参数保留并可分享、刷新及前进后退恢复。mock 与 remote 模式遵循相同的筛选语义。
 
 ### 2.4 DDL 返回
+
+资产列表/详情与字段响应会以 `assetId` / `fieldId` 暴露已有稳定身份；这些 ID 只用于程序引用，展示层仍使用资产中文名、表名和字段中文名。
 
 `GET /api/assets/tables/{tableName}/ddl`
 
@@ -542,6 +547,14 @@ Base Path: `/api/indicators`
   "id": "CUST00001",
   "name": "个体工商户标识",
   "meaning": "客户是否为个体工商户",
+  "sourceAssetId": 101,
+  "sourceAssetName": "DWS_CUSTOMER_PROFILE",
+  "sourceAssetQualifiedName": "dws.DWS_CUSTOMER_PROFILE",
+  "resultFieldId": 1001,
+  "resultTableName": "DWS_CUSTOMER_PROFILE",
+  "resultFieldName": "customer_type_flag",
+  "aggregation": "NONE",
+  "semanticState": "candidate",
   "dimension": "cus",
   "caliber": "涉农信息表口径",
   "path": "CUS > 客户基础 > 涉农标签",
@@ -567,6 +580,8 @@ Base Path: `/api/indicators`
 - `keyword`：模糊匹配 `id`、`name`、`meaning`、`caliber`、`path`、`registrar`
 - `dimension`：`cus` / `con` / `due` / `emp` / `org`
 - `status`：`enabled` / `disabled`
+
+`sourceAssetId` 与 `resultFieldId` 是稳定的机器引用；`resultTableName` / `resultFieldName` 保留为展示和兼容快照。两者同时存在时，服务会校验字段属于来源资产；只提交 `resultFieldId` 时会 deterministic 推导来源资产。历史指标无法唯一精确匹配时这些 ID 可以为 `null`，不会按名称猜测。`aggregation` 只接受 `SUM`、`COUNT`、`COUNT_DISTINCT`、`AVG`、`MIN`、`MAX`、`NONE` 或 `null`；`semanticState` 与 `status` 分离，取 `candidate`、`certified`、`deprecated`，而 `status` 继续只表示 `enabled` / `disabled`。
 
 ### 4.4 状态变更
 

@@ -1,3 +1,4 @@
+# pi-lens-ignore: I001
 from __future__ import annotations
 
 import os
@@ -7,7 +8,9 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+# pi-lens-ignore: reportMissingImports
 from backend.app.db.sqlite_adapter import connect
+# pi-lens-ignore: reportMissingImports
 from backend.app.migrations.schema import initialize
 
 
@@ -82,7 +85,7 @@ class FieldMappingIdentityMigrationTests(unittest.TestCase):
 
     def _run_migration(self, config: Path):
         environment = dict(os.environ)
-        environment["APP_SECRET_KEY"] = "field-mapping-migration-test-only"
+        environment["APP_SECRET_KEY"] = os.urandom(24).hex()
         return subprocess.run(
             [sys.executable, str(MIGRATE), "apply", "--profile", "legacy", "--config", str(config)],
             cwd=PROJECT_ROOT,
@@ -108,7 +111,7 @@ class FieldMappingIdentityMigrationTests(unittest.TestCase):
                     ).fetchone(),
                 )
                 self.assertEqual(
-                    ("0007_binary_status_contract",),
+                    ("0008_indicator_semantic_contract",),
                     connection.execute("SELECT version_num FROM alembic_version").fetchone(),
                 )
                 foreign_keys = connection.execute(

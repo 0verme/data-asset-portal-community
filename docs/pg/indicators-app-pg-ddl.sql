@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS dwp.p_indicator_item (
     meaning_desc        VARCHAR(4000),
     result_table_name   VARCHAR(256),
     result_field_name   VARCHAR(256),
+    source_asset_id     BIGINT,
+    result_field_id     BIGINT,
+    aggregation_code    VARCHAR(32),
+    semantic_state      VARCHAR(32)   NOT NULL DEFAULT 'candidate',
     dimension_code      VARCHAR(16)   NOT NULL,
     caliber_desc        VARCHAR(1000),
     path_desc           VARCHAR(1000),
@@ -31,6 +35,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_p_indicator_item_uk_01
 
 CREATE INDEX IF NOT EXISTS idx_p_indicator_item_ix_01
     ON dwp.p_indicator_item (dimension_code, status_code, registered_date);
+
+CREATE INDEX IF NOT EXISTS idx_p_indicator_item_semantic_ref
+    ON dwp.p_indicator_item (source_asset_id, result_field_id);
 
 CREATE TABLE IF NOT EXISTS dwp.p_indicator_path_config (
     id                  BIGINT        NOT NULL PRIMARY KEY,

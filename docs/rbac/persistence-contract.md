@@ -29,8 +29,9 @@ that would reject an existing custom/unknown value before P2 can fail closed.
 
 The forward-only RBAC Alembic revision is
 `backend/alembic/versions/0005_rbac_persistence.py`; the current Alembic head also
-contains the additive field-mapping identity revision `0006_field_mapping_upstream_id.py`
-and the binary-status contract revision `0007_binary_status_contract.py`.
+contains the additive field-mapping identity revision `0006_field_mapping_upstream_id.py`,
+the binary-status contract revision `0007_binary_status_contract.py`, and the
+indicator semantic contract revision `0008_indicator_semantic_contract.py`.
 Fresh baselines contain
 the same tables so `schema_migrate.py verify --offline` and fresh initialization
 see one identical 39-table contract. Existing SQLite/PostgreSQL/MySQL

@@ -13,6 +13,12 @@ export const INDICATORS: readonly {
   meaning: string;
   resultTableName: string;
   resultFieldName: string;
+  sourceAssetId: number | null;
+  sourceAssetName: string | null;
+  sourceAssetQualifiedName: string | null;
+  resultFieldId: number | null;
+  aggregation: string | null;
+  semanticState: string;
   dimension: string;
   caliber: string;
   path: string;
