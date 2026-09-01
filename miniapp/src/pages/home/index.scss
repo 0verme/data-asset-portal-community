@@ -1,0 +1,57 @@
+.home-hero {
+  margin-bottom: 24rpx;
+}
+
+.home-caption {
+  display: block;
+  margin-bottom: 22rpx;
+  color: var(--ink-2);
+  font-size: 28rpx;
+}
+
+.recent-card {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid var(--line);
+}
+
+.recent-card:last-child {
+  border-bottom: 0;
+}
+
+.recent-type {
+  width: 66rpx;
+  height: 66rpx;
+  border-radius: 16rpx;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 23rpx;
+  line-height: 66rpx;
+  text-align: center;
+}
+
+.recent-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-title,
+.recent-subtitle {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-title {
+  color: var(--ink);
+  font-size: 27rpx;
+}
+
+.recent-subtitle {
+  margin-top: 6rpx;
+  color: var(--ink-3);
+  font-size: 23rpx;
+}

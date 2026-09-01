@@ -11,7 +11,7 @@ trace field/table mappings, and maintain roots, indicators, and downstream metad
 [![CI](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml)
 ![Stack](https://img.shields.io/badge/React%2018%20%2B%20Vite%208%20%7C%20FastAPI%20%2B%20Uvicorn?logo=react)
 
-[快速开始](#-快速开始) · [社区入口](#-社区入口) · [功能模块](#-功能模块) · [文档](#-文档导航)
+[快速开始](#-快速开始) · [社区入口](#-社区入口) · [功能模块](#-功能模块) · [微信小程序](#-微信小程序) · [文档](#-文档导航)
 
 </div>
 
@@ -119,6 +119,10 @@ mock 数据只用于前端体验，不会写入数据库。
 所有模块默认注册 route、进入 repository-module capability response、进入 canonical schema/seed；管理员仍可通过 `p_menu.status` 配置单个实例的菜单可见性。需要数据库驱动、凭据、外部系统、持久化 lineage storage 或危险写操作时，业务 service 会报告真实 deployment readiness/diagnostic 状态，而不是隐藏源码模块。`/api/capabilities` 本身只表示 source-backed open module contract，不是 license、Edition、菜单、RBAC 或 runtime profile gate。
 
 完整的 Source / Runtime / Schema / Demo 对照见 [docs/modules.md](./docs/modules.md)。
+
+## 📱 微信小程序
+
+仓库提供独立的 [Data Asset Portal Pocket 小程序 MVP](./miniapp/README.md)，位于根目录 `miniapp/`，使用 Taro + React + TypeScript，面向微信小程序 `weapp`，当前为匿名只读的数据目录浏览体验。
 
 ### API 安全边界
 
