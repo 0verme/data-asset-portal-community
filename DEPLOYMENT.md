@@ -1,209 +1,528 @@
 # 部署说明 · Deployment
 
-面向内网 / 服务器部署，覆盖前端构建、后端启动、Nginx 反向代理、环境变量与数据库初始化。
+本说明面向 Linux 内网单机部署，覆盖前端构建、Python 环境、数据库迁移、管理员初始化、FastAPI/Uvicorn、systemd、Nginx、HTTP Demo、HTTPS Production 和部署验收。
 本地开发请参见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
 
-> 下文以 `/opt/data-asset-portal` 作为示例安装目录，请按实际路径替换。
+> 文中的 `/opt/data-asset-portal`、`dataasset`、`data-asset.example` 和证书路径均为示例，请按实际服务器替换。不要把真实密码、`APP_SECRET_KEY`、证书或 TLS private key 提交到仓库。
 
-## 部署产物
+## 1. 部署架构
 
-- 前端静态资源：`frontend/dist/`
-- 后端服务入口：`backend/asgi.py`（纯 FastAPI/Uvicorn）
-- Community/local 数据库初始化：`backend/schema/<dialect>.sql` + `backend/scripts/schema_migrate.py` + 对应 seed 脚本
-- 完整部署或扩展模块的补充 DDL：`docs/pg/`、`docs/dws/`；它们不是 Community/local 默认初始化入口
+推荐的正式拓扑如下：
 
-## 一、准备配置
-
-### 前端环境变量
-
-```env
-VITE_API_MODE=remote
-VITE_API_BASE_URL=/api
-VITE_BACKEND_URL=http://127.0.0.1:5099
+```text
+浏览器
+  │ HTTP Demo: :80 / HTTPS Production: :443
+  ▼
+Nginx ──────────────── frontend/dist（静态文件）
+  │ /api/ ──────────── 127.0.0.1:5099
+  ▼
+FastAPI Native / Uvicorn（backend.asgi:app）
+  │
+  ▼
+Database Provider → PostgreSQL / MySQL / GaussDB-DWS / SQLite
 ```
 
-### 后端环境变量
+当前 Runtime Truth：
 
-后端始终连库、无模式开关，只需指定数据库 profile。下列 `APP_*` 是唯一的安全、Session Cookie、CORS 和请求体限制配置 contract：
+| 部件 | 生产部署契约 |
+| --- | --- |
+| 前端源码 / 构建器 | React + Vite；`npm run build` 会先构建 lineage workspaces，再执行 Vite build |
+| 前端产物 | `frontend/dist/`，入口文件为 `frontend/dist/index.html` |
+| 后端 | FastAPI Native |
+| ASGI entrypoint | `backend.asgi:app` |
+| 进程运行时 | Uvicorn |
+| 后端监听 | `127.0.0.1:5099`，只允许本机 Nginx 访问 |
+| Nginx API 入口 | `/api/` → `http://127.0.0.1:5099/api/` |
+| 健康检查 | 后端本机 `http://127.0.0.1:5099/healthz` |
+
+`backend/run.py`、Waitress、Flask/WSGI fallback 和旧 runtime switch 不是当前生产运行方式。不要为了部署重新引入它们。
+
+示例 Nginx 与 systemd 文件：
+
+- [`deploy/systemd/data-asset-portal.service.example`](./deploy/systemd/data-asset-portal.service.example)
+- [`deploy/nginx/data-asset-portal.conf.example`](./deploy/nginx/data-asset-portal.conf.example)
+
+## 2. Prerequisites
+
+### 2.1 服务器组件
+
+- Linux、systemd 和 Nginx。
+- Python 3.10 或更高版本。
+- PostgreSQL、MySQL 8.0、GaussDB/DWS 或受支持的 SQLite 数据库；正式内网部署通常使用 PostgreSQL、MySQL 或 GaussDB/DWS。
+- Node.js **22.13+** 和 npm **10+**，仅在服务器构建前端时需要。版本要求来自 `frontend/package.json` 的 `engines.node` 和 lineage workspace。
+- 一个专用的服务账号，例如示例中的 `dataasset`；请按组织账号规范替换。
+
+将防火墙或安全组配置为只暴露 Nginx 的 80/443（按部署模式选择）；后端固定监听 loopback，不要将 `5099` 作为外部入口暴露。
+
+### 2.2 获取固定版本
+
+正式部署建议从固定 release、tag 或 commit 获取源码，而不是依赖某次未记录的工作树状态：
+
+```bash
+git fetch --tags origin
+git checkout <release-tag-or-commit>
+```
+
+`<release-tag-or-commit>` 是示例占位符。升级时也应记录实际版本，详见[升级](#12-升级)。
+
+## 3. Runtime Configuration
+
+### 3.1 准备本地配置文件
+
+从仓库模板复制配置；两个目标文件都被 `.gitignore` 排除，不要提交：
+
+```bash
+cd /opt/data-asset-portal
+cp backend/.env.example backend/.env.local
+cp backend/configs/database.example.yaml backend/configs/database.yaml
+```
+
+编辑 `backend/.env.local`，至少准备以下生产配置：
 
 ```env
+APP_ENV=production
+APP_SECRET_KEY=<generate-a-strong-random-value>
+APP_DEBUG=false
+
 ASSET_DB_PROFILE=primary
 ASSET_AUTH_DB_PROFILE=primary
 ASSET_DB_CONFIG_PATH=/opt/data-asset-portal/backend/configs/database.yaml
-APP_DEBUG=false
-APP_SECRET_KEY=<generate-a-strong-random-value>
-# APP_ENV defaults to production; production cookies are Secure.
-# APP_ENV=production
-# Same-origin Nginx deployment does not need this. If API is cross-origin,
-# provide exact comma-separated origins; never use * with session cookies.
-# APP_CORS_ORIGINS=https://portal.example.com
+
+# 只有后端只监听 127.0.0.1 且只能由可信 Nginx 访问时才开启。
+ASSET_TRUST_PROXY_HEADERS=true
 ```
 
-`APP_SECRET_KEY` 是所有环境的必填 signed-session 安全配置：缺失、空字符串或纯空白会在应用启动时失败。Issue #145 移除了 `FLASK_*` fallback；部署升级前请将旧值迁移到同名 `APP_*` 变量，并在更换配置名称时保留原 secret，以便 rolling cookie migration 继续验证已有会话。使用密码管理器或部署平台的 secret store 生成和保存强随机值；不要把真实值提交到仓库、写入日志或拼进 shell 命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`。
+编辑 `backend/configs/database.yaml` 中的 `primary` profile，填写目标数据库的 type、host、port、database、schema、user 和 password。`change_me` 等模板值不是生产凭据；真实值应由受控文件或 secret store 提供。GaussDB/DWS 还需要通过 `ASSET_DB_JAR_PATH` 指向自行获取的 JDBC 驱动，仓库不分发商业驱动。
 
-`APP_DEBUG` 默认关闭，只有 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会开启。`APP_ENV` 未设置时采用安全的生产行为：Session Cookie 为 `HttpOnly=True`、`SameSite=Lax`、`Secure=True`。仅本地 HTTP 开发可显式设置 `APP_ENV=development` 使 `Secure=False`。旧 `FLASK_*` 变量不会被读取。
+`APP_SECRET_KEY` 是必填的 signed-session 密钥。请使用密码管理器、部署平台 secret store 或受控终端生成并保存强随机值；不要把真实值写进 Git、日志或命令历史。若使用 secret store 将它注入进程环境，请从 `backend/.env.local` 删除对应的占位行，让注入值不被本地模板覆盖；若使用受控 `.env.local` 保存，则将占位符替换为真实值并限制文件权限。
 
-Production contract：当 `APP_ENV=production` 或未设置时，FastAPI application construction 不注册 `/docs`、`/redoc` 和 `/openapi.json`，访问这些路径应返回 `404`。只有显式的 `APP_ENV=development` 默认开启这三个开发文档端点；`staging`、`test`、`qa` 等非 development 环境同样保持关闭。关闭 interactive docs/OpenAPI HTTP endpoint 是减少 API 枚举面的 deployment hardening，不是 authentication control，也不替代业务 API 的 Authentication / Authorization。
+### 3.2 配置加载与环境变量优先级
 
-此文档的 Nginx 配置将静态前端和 `/api` 放在同一来源，因此不需要 CORS。若必须拆分来源，设置 `APP_CORS_ORIGINS` 为完整、精确的逗号分隔 allowlist（如 `https://portal.example.com`）；未设置时不会返回 CORS 允许头，空项会忽略，且不会允许 `*` 与 Cookie 凭据的组合。
+`backend/asgi.py` 会在创建 FastAPI application 前自动加载以下文件，后加载文件覆盖先加载文件：
 
-如使用 GaussDB JDBC 覆盖路径，可额外设置：
+1. 仓库根目录 `.env`
+2. 仓库根目录 `.env.local`
+3. `backend/.env`
+4. `backend/.env.local`
 
-```env
-ASSET_DB_JAR_PATH=/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
+`backend/scripts/schema_migrate.py` 和 `backend/scripts/create_admin.py` 也会加载同一套 runtime env。systemd 示例因此**没有**另设 `EnvironmentFile`，避免 systemd 和应用各维护一套可能冲突的配置。请确保 `backend/.env.local` 对 service `User` 可读，并将其权限限制为只有部署账号/服务账号可读，例如：
+
+```bash
+# dataasset 是 systemd 示例中的 User；若改用其他账号，请替换它
+sudo chown dataasset:dataasset backend/.env.local backend/configs/database.yaml
+sudo chmod 600 backend/.env.local backend/configs/database.yaml
 ```
 
-## 二、后端部署
+如果系统环境或 systemd `Environment=` 设置了同名变量，而上述文件也定义了该变量，应用加载文件时会以最后一个文件的值为准；不要让两处出现不同值。使用 secret store 注入 `APP_SECRET_KEY` 等变量时，先删除 `.env.local` 中同名占位行。`PYTHONUNBUFFERED=1` 这类只由 unit 使用、且不在应用配置文件中的变量可以保留在 systemd 中。
 
-当前生产入口是 `backend.asgi:app`：由 Uvicorn 启动纯 FastAPI native backend。Auth、Capabilities、Portal、Search、Operation Log 以及仓库已有模块 routes 均由 FastAPI 承载；数据库、驱动、凭据、storage 或外部 integration 未就绪时，由对应 Service error contract 返回诊断状态，不把源码模块变成 404。FastAPI 使用 application-owned signed-session codec；旧 cookie 在有限迁移窗口内只读并成功请求后重新签发。
+单机部署推荐让 `ASSET_AUTH_DB_PROFILE` 与 `ASSET_DB_PROFILE` 相同。只有在明确设计了分离的用户/授权数据库时才使用不同 profile，并确保认证 profile 对应的用户和授权表已按仓库 schema 初始化；不要只迁移资产 profile 后直接启动。
+
+### 3.3 生产安全配置
+
+- `APP_ENV` 未设置时也采用生产安全行为；正式环境保持 `production`。
+- `APP_DEBUG=false`。生产环境开启 debug 会导致应用启动失败。
+- Session Cookie 保持 `HttpOnly=True`、`SameSite=Lax`、`Secure=True`。
+- 同源 Nginx 部署不需要 `APP_CORS_ORIGINS`。只有前后端确实跨来源时，才配置精确的来源 allowlist，不要使用 `*` 配合 Cookie。
+- `ASSET_TRUST_PROXY_HEADERS=true` 只适用于后端保持 loopback、外部请求只能经过可信 Nginx 的拓扑；如果 `5099` 可被不可信客户端直接访问，应保持 `false`。
+- 应用只读取 `APP_*` 安全配置名称；旧 `FLASK_*` 名称不会作为 runtime 配置读取。升级既有部署时迁移变量名称，并保留原 `APP_SECRET_KEY`，避免已有 signed session 无法迁移。
+- `APP_MAX_CONTENT_LENGTH_MB` 默认限制为 16 MB；应用同时返回 `nosniff`、`SAMEORIGIN` 和严格来源策略等安全响应头。若调整请求体上限，应同时检查 Nginx 的 `client_max_body_size`。
+- `APP_ENV=production` 或未设置时不会注册 `/docs`、`/redoc`、`/openapi.json`；只有显式 `development` 才启用它们。关闭 HTTP interactive docs 不是业务 API 的 authentication/authorization 替代。
+
+### 3.4 API authentication boundary
+
+Community Edition 使用 `Public Catalog + Authenticated Management`：普通业务目录 GET 可以匿名浏览并按规则脱敏；写操作、管理 API、操作日志、Metadata ingestion、上/下游 `admin-detail`、用户/角色/参数和连接/凭据字段仍由后端 authentication 与 permission-based RBAC 保护。不要用 Nginx、隐藏菜单或关闭 OpenAPI 代替后端授权。完整 route inventory 见 [`docs/rbac/authenticated-read-model.md`](./docs/rbac/authenticated-read-model.md)。
+
+## 4. Backend Installation
+
+从仓库根目录创建虚拟环境并安装固定依赖：
 
 ```bash
 cd /opt/data-asset-portal
 python3 -m venv backend/.venv
-source backend/.venv/bin/activate
-pip install -r backend/requirements.txt
-# 唯一推荐 production runtime
-uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
+backend/.venv/bin/python -m pip install -r backend/requirements.txt
 ```
 
-Runtime：
+交互式 shell 可以使用 `source backend/.venv/bin/activate`，但 systemd 不依赖 shell activate，而是直接调用虚拟环境中的绝对路径。
 
-- `uvicorn backend.asgi:app --host 127.0.0.1 --port 5099` 是唯一推荐 production runtime；
-- `backend/run.py`、Waitress 以及旧 runtime switch 均已退休；当前没有 Flask/WSGI fallback。
+手动前台启动（用于首次验证，不是最终托管方式）：
 
-健康检查：
+```bash
+backend/.venv/bin/uvicorn \
+  backend.asgi:app \
+  --host 127.0.0.1 \
+  --port 5099
+```
+
+## 5. Database Migration
+
+应用启动**不会自动执行 schema migration**。必须先完成配置、依赖安装和 migration，再创建管理员、启动服务。
+
+### 5.1 Fresh database
+
+`schema_migrate.py apply` 使用对应数据库 profile 的 canonical baseline，应用 Alembic head，并初始化仓库要求的 RBAC 数据。生产 PostgreSQL 示例：
+
+```bash
+cd /opt/data-asset-portal
+
+# 可选：只检查仓库内 PostgreSQL baseline，不连接数据库
+backend/.venv/bin/python backend/scripts/schema_migrate.py \
+  verify --offline --dialect postgresql
+
+# primary 必须是 database.yaml 中真实存在的 profile 名称
+backend/.venv/bin/python backend/scripts/schema_migrate.py \
+  apply \
+  --profile primary \
+  --config /opt/data-asset-portal/backend/configs/database.yaml
+
+backend/.venv/bin/python backend/scripts/schema_migrate.py \
+  status \
+  --profile primary \
+  --config /opt/data-asset-portal/backend/configs/database.yaml
+
+backend/.venv/bin/python backend/scripts/schema_migrate.py \
+  verify \
+  --profile primary \
+  --config /opt/data-asset-portal/backend/configs/database.yaml
+```
+
+如果使用 MySQL 8.0，先安装可选依赖 `backend/requirements-mysql.txt`，再将 `--profile` 替换为实际 MySQL profile；GaussDB/DWS 使用对应的 profile 和 JDBC 驱动。不要编造 profile，也不要把数据库密码放进命令行参数。
+
+`demo/seed_sqlite.py`、`demo/seed_postgres.py` 只用于受控 Community Demo 数据。正式数据库是否导入虚构 Demo 数据应由部署方明确决定，不要把 Demo seed 当作生产业务数据初始化。
+
+如果是 Community/local 隔离运行，并已在 runtime env 中设置 `ASSET_RUNTIME_PROFILE=community`，可以使用仓库提供的 Community profile：
+
+```bash
+backend/.venv/bin/python backend/scripts/schema_migrate.py apply --profile community_sqlite
+backend/.venv/bin/python demo/seed_sqlite.py --database /opt/data-asset-portal/instance/community.db
+
+# 或使用隔离的 Community PostgreSQL 数据库
+backend/.venv/bin/python backend/scripts/schema_migrate.py apply --profile community_postgres
+backend/.venv/bin/python demo/seed_postgres.py --dialect postgres
+```
+
+`docs/pg/`、`docs/dws/` 中的方言 SQL 和 external integration 说明是补充参考，不是 `backend/schema` + Alembic 的替代。需要 vendor-specific DDL 时先确认目标 profile、依赖和对象归属，不要无条件执行全部 SQL。
+
+如果启用了 persistent lineage，先设置 `LINEAGE_DB_PROFILE`，再按 [`血缘快照采集与发布指南`](./docs/lineage_bulk_import_guide.md) 执行 `collect_lineage_snapshot.py --dry-run` 和正式发布；采集失败应保留原 ACTIVE 快照。
+
+### 5.2 Existing database
+
+既有数据库先备份，再检查当前 ledger 和 schema：
+
+```bash
+backend/.venv/bin/python backend/scripts/schema_migrate.py status \
+  --profile primary \
+  --config /opt/data-asset-portal/backend/configs/database.yaml
+
+backend/.venv/bin/python backend/scripts/schema_migrate.py verify \
+  --profile primary \
+  --config /opt/data-asset-portal/backend/configs/database.yaml
+```
+
+如果 schema 已存在但没有 Alembic ledger，只有在备份完成且 `verify` 已确认 baseline 一致时，才使用以下安全流程：
+
+```bash
+backend/.venv/bin/python backend/scripts/schema_migrate.py baseline \
+  --profile primary \
+  --config /opt/data-asset-portal/backend/configs/database.yaml \
+  --dry-run
+
+# 确认 dry-run 成功、备份可恢复且对象属于本次部署后，再执行实际 stamp
+backend/.venv/bin/python backend/scripts/schema_migrate.py baseline \
+  --profile primary \
+  --config /opt/data-asset-portal/backend/configs/database.yaml
+
+backend/.venv/bin/python backend/scripts/schema_migrate.py apply \
+  --profile primary \
+  --config /opt/data-asset-portal/backend/configs/database.yaml
+```
+
+不要用初始化 SQL 覆盖已有数据库，也不要对生产库执行未经确认的 destructive downgrade 或 reset。后续结构变更只通过新的 Alembic forward revision 管理。
+
+## 6. Admin Initialization
+
+migration 成功后，使用交互式 CLI 创建第一个管理员：
+
+```bash
+cd /opt/data-asset-portal
+backend/.venv/bin/python backend/scripts/create_admin.py
+```
+
+CLI 会提示用户名、显示名、密码和密码确认；密码不会作为命令行参数或环境变量传入。脚本会读取当前 runtime 配置，不支持通过 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 自动创建管理员，也没有弱默认密码。若数据库 schema 尚未初始化，先回到[migration](#5-database-migration)。
+
+## 7. Frontend Build
+
+### 7.1 在服务器构建
+
+只有选择服务器构建模式时，才需要在生产服务器安装 Node.js。前端当前的 build contract 必须从 `frontend` 目录执行完整 `npm run build`：
+
+```bash
+cd /opt/data-asset-portal/frontend
+npm ci
+
+VITE_API_MODE=remote \
+VITE_API_BASE_URL=/api \
+npm run build
+
+test -f dist/index.html
+```
+
+`npm run build` 等价于先按顺序构建三个仓库内 lineage workspaces，再执行 Vite production build；不要用单独的 `vite build` 或 `npm run build:frontend` 替代它。最终产物是：
+
+```text
+/opt/data-asset-portal/frontend/dist/index.html
+/opt/data-asset-portal/frontend/dist/assets/...
+```
+
+`VITE_API_BASE_URL=/api` 让 production bundle 使用同源 `/api`。`VITE_BACKEND_URL` 只用于 Vite development server 的 proxy target，不参与 production bundle；同源生产构建不需要设置它。生产构建不需要把后端 loopback 地址暴露到浏览器。
+
+### 7.2 在构建机或 CI 构建
+
+更推荐在构建机/CI 使用相同 Node/npm contract 执行：
+
+```text
+构建机或 CI
+  └─ npm ci + npm run build
+       └─ frontend/dist/
+            └─ 以版本化 artifact 部署到生产服务器
+```
+
+服务器只托管已经构建的 `frontend/dist` 时，不需要长期安装 Node.js 或 npm。无论哪种模式，都要确认 `frontend/dist/index.html` 与静态资源属于同一个版本，不要跨 worktree 复制旧的 `dist`。
+
+## 8. systemd
+
+仓库示例 [`deploy/systemd/data-asset-portal.service.example`](./deploy/systemd/data-asset-portal.service.example) 使用当前唯一的 FastAPI/Uvicorn runtime：
+
+```ini
+WorkingDirectory=/opt/data-asset-portal
+ExecStart=/opt/data-asset-portal/backend/.venv/bin/uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
+```
+
+复制并编辑 unit：
+
+```bash
+cd /opt/data-asset-portal
+sudo cp deploy/systemd/data-asset-portal.service.example \
+  /etc/systemd/system/data-asset-portal.service
+sudoedit /etc/systemd/system/data-asset-portal.service
+```
+
+至少确认并按实际环境修改：
+
+- `User` / `Group`：示例是 `dataasset`，不是仓库强制名称；
+- `WorkingDirectory`：实际 checkout 根目录；
+- `ExecStart`：实际 `.venv/bin/uvicorn` 绝对路径、`backend.asgi:app`、`127.0.0.1:5099`；
+- service 账号对仓库、`backend/.env.local`、数据库配置和所需本地 snapshot 有读取权限。
+
+示例 unit 不使用 `source backend/.venv/bin/activate`，也不加入未经验证的 `ProtectSystem`、`ProtectHome`、`ReadWritePaths` 等 sandbox 参数，避免遮断 SQLite、配置、snapshot 或其他项目运行所需访问。
+
+加载、开机自启和常用生命周期操作：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now data-asset-portal
+
+sudo systemctl status data-asset-portal
+sudo systemctl restart data-asset-portal
+sudo systemctl stop data-asset-portal
+
+journalctl -u data-asset-portal -f
+journalctl -u data-asset-portal -n 200 --no-pager
+```
+
+## 9. Nginx
+
+### 9.1 HTTP Demo
+
+示例 [`deploy/nginx/data-asset-portal.conf.example`](./deploy/nginx/data-asset-portal.conf.example) 的第一个 server block 是 HTTP Demo 配置。安装前替换 `server_name` 和 `root`：
+
+```bash
+sudo cp deploy/nginx/data-asset-portal.conf.example \
+  /etc/nginx/sites-available/data-asset-portal.conf
+sudoedit /etc/nginx/sites-available/data-asset-portal.conf
+
+# Debian/Ubuntu 常见布局；如果系统没有 sites-enabled，放入已被 nginx.conf include 的 conf.d 目录
+sudo ln -s /etc/nginx/sites-available/data-asset-portal.conf \
+  /etc/nginx/sites-enabled/data-asset-portal.conf
+
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+如果目标系统使用 `/etc/nginx/conf.d/`，将最终 `.conf` 文件放入该目录，不要同时加载两份相同 server 配置。关键路径必须保持如下语义：
+
+```nginx
+location / {
+    try_files $uri $uri/ /index.html;
+}
+
+location /api/ {
+    proxy_pass http://127.0.0.1:5099/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+`location /api/` 与带 `/api/` 的 `proxy_pass` 会把 `/api/assets/tables` 原样转发为 FastAPI 的 `/api/assets/tables`；不要删除 `proxy_pass` 末尾的 `/api/`，也不要再拼接一层 `/api`。`try_files` 保证直接刷新 `/assets`、`/indicators`、`/reports`、`/system/...` 等 React client-side route 时回到 `index.html` 而不是 404。
+
+示例还将 `client_max_body_size` 设为 `16m`，与应用默认请求体限制保持一致；如部署方有不同限制，应同时评估 Nginx 和应用配置。
+
+### 9.2 HTTPS Production
+
+正式需要登录/session 的内网部署应使用 HTTPS。可以使用企业 CA、内网 CA 或现有可信内网网关签发的证书；不要假设公网 Let's Encrypt 一定能验证内网域名，也不要关闭浏览器 TLS 校验。证书和 private key 只放在服务器受控路径，绝不提交仓库。
+
+示例文件中已提供一组注释掉的 HTTPS server blocks。启用正式配置时：
+
+1. 准备证书和 key，例如示例中的 `/etc/nginx/ssl/data-asset-portal.crt` 与 `/etc/nginx/ssl/data-asset-portal.key`；
+2. 修改 `server_name`、静态 root 和证书路径；
+3. 用 HTTP → HTTPS redirect block 和 443 block 替换/注释 HTTP Demo block，避免同一 hostname 同时运行两个互相冲突的 HTTP server；
+4. 保留相同的 SPA fallback、`/api/` proxy 和 `X-Forwarded-Proto`；
+5. 执行 `nginx -t` 后再 reload。
+
+HTTPS Production 保持：
+
+```env
+APP_ENV=production
+ASSET_TRUST_PROXY_HEADERS=true
+```
+
+当 Nginx 终止 TLS 并将请求转给 loopback backend 时，浏览器通过 HTTPS 访问，Production 的 `Secure` Cookie 才会随后续请求发送。普通 HTTP 不会发送 `Secure` Cookie，因此 HTTP Demo 可以用于静态页面、通过 loopback 执行的 `/healthz` 和 `/api` 连通性检查，但不适合验证需要登录/session 的管理操作。不要用 `APP_ENV=development` 绕过正式内网 HTTP 的 Cookie 行为；`development` 只用于本地 HTTP 开发联调，正式部署应改用 HTTPS。
+
+本示例没有将 `/healthz` 暴露为 Nginx 外部路径；请按下一节使用后端 loopback 地址检查它，不要把 `https://data-asset.example/healthz` 当作既有契约。
+
+## 10. Verification
+
+### 10.1 后端进程
+
+```bash
+sudo systemctl status data-asset-portal
+curl --fail --silent --show-error http://127.0.0.1:5099/healthz
+```
+
+预期 JSON 至少包含：
+
+```json
+{"status":"ok","runtime":"fastapi","fastapiPrimary":true}
+```
+
+`/healthz` 只报告进程和 native runtime 状态，不执行数据库查询；数据库可用性还要通过 migration 和业务 API 验收。
+
+### 10.2 Nginx
+
+```bash
+sudo nginx -t
+sudo systemctl status nginx
+```
+
+### 10.3 外部入口与 SPA
+
+将 `data-asset.example` 替换为实际 DNS/hosts 中可解析的内网 hostname：
+
+```bash
+# 首页应返回 frontend/dist/index.html
+curl --fail --silent --show-error -I http://data-asset.example/
+
+# 业务 API 应返回 JSON，而不是 Nginx/SPA HTML
+curl --fail --silent --show-error \
+  -H 'Accept: application/json' \
+  http://data-asset.example/api/assets/tables
+
+# client-side route 直接访问/刷新不能返回 404
+curl --fail --silent --show-error http://data-asset.example/assets > /dev/null
+curl --fail --silent --show-error http://data-asset.example/indicators > /dev/null
+curl --fail --silent --show-error http://data-asset.example/reports > /dev/null
+```
+
+HTTPS Production 将上述 `http://` 替换为 `https://`。最终至少确认：
+
+```text
+/                 → 前端 index
+/api/assets/tables → FastAPI JSON
+127.0.0.1:5099/healthz → fastapi runtime health JSON
+```
+
+然后在浏览器通过 HTTPS 登录，确认 session 在页面刷新和后续管理请求中保持。HTTP Demo 下不要把 Secure Cookie 登录失败误判为后端进程故障。
+
+## 11. Recommended Deployment Sequence
+
+全新单机部署按以下顺序执行：
+
+1. 获取固定 release/tag/commit，准备安装目录、服务账号、Nginx 和数据库。
+2. 复制并填写 `backend/.env.local` 与 `backend/configs/database.yaml`；生成 `APP_SECRET_KEY`。
+3. 创建 `backend/.venv` 并安装 `backend/requirements.txt`（MySQL/GaussDB 按需安装额外依赖/驱动）。
+4. 执行 `schema_migrate.py apply`，再执行 `status`/`verify`。
+5. 执行 `create_admin.py` 创建管理员。
+6. 通过服务器或构建机执行 `cd frontend && npm ci && npm run build`，确认 `frontend/dist/index.html`；或部署已验证的 `frontend/dist` artifact。
+7. 安装并启用 systemd unit，确认 backend 监听 `127.0.0.1:5099`。
+8. 安装 Nginx HTTP Demo 或 HTTPS Production 配置，执行 `nginx -t` 并 reload。
+9. 按[验收命令](#10-verification)检查 systemd、`/healthz`、Nginx、首页、`/api` 和 SPA refresh。
+
+## 12. 升级
+
+正式升级使用固定 release/tag/commit，并保留数据库备份和回滚路径；不要把 `git pull main` 作为唯一生产升级契约：
+
+```bash
+cd /opt/data-asset-portal
+git fetch --tags origin
+git checkout <new-release-tag-or-commit>
+
+sudo systemctl stop data-asset-portal
+backend/.venv/bin/python -m pip install -r backend/requirements.txt
+backend/.venv/bin/python backend/scripts/schema_migrate.py apply \
+  --profile primary \
+  --config /opt/data-asset-portal/backend/configs/database.yaml
+
+cd frontend
+npm ci
+VITE_API_MODE=remote VITE_API_BASE_URL=/api npm run build
+test -f dist/index.html
+cd ..
+
+sudo systemctl start data-asset-portal
+sudo nginx -t
+sudo systemctl reload nginx
+curl --fail --silent --show-error http://127.0.0.1:5099/healthz
+```
+
+如果前端由 CI/build machine 构建，则在停止服务前将该版本的 `frontend/dist` artifact 部署到服务器。升级后重新执行 API JSON、SPA refresh 和 HTTPS 登录验收。
+
+## 13. Troubleshooting
+
+### systemd 启动失败
+
+```bash
+sudo systemctl status data-asset-portal
+journalctl -u data-asset-portal -n 200 --no-pager
+```
+
+优先检查 `.venv/bin/uvicorn` 是否存在、`WorkingDirectory`/`ExecStart` 是否为实际绝对路径、service 账号是否可读配置，以及 `APP_SECRET_KEY` 是否非空。不要把 `source .../activate` 写进 `ExecStart`。
+
+### API 返回 502 或 HTML
+
+先检查 loopback runtime：
 
 ```bash
 curl --fail http://127.0.0.1:5099/healthz
 ```
 
-Native FastAPI 下预期响应包含 `"status":"ok"`、`"runtime":"fastapi"` 和 `"fastapiPrimary":true`。`/healthz` 只报告进程/runtime 状态，不执行数据库查询；数据库与业务 API 的可用性仍由对应回归和监控验证。默认监听值为 `127.0.0.1:5099`（仅本机，前端由 Nginx 反代）。`asgi.py` 加载仓库 runtime env 文件；系统环境变量和 demo bootstrap 规则保持现有行为。
+然后检查 Nginx `location /api/` 与 `proxy_pass http://127.0.0.1:5099/api/;` 是否同时保留 `/api/`，并执行 `nginx -t`。前端收到 HTML 而不是 JSON 通常表示 `/api` 没有正确代理到 backend。
 
-### Authentication boundary
+### SPA 刷新返回 404
 
-部署后的 Community Edition 使用 `Public Catalog + Authenticated Management`：资产、指标、搜索、血缘、字段映射、菜单、报表、API 资产、码值表、上/下游目录和统计等普通业务 GET 无需 signed-session cookie 即可浏览，响应按公开目录规则执行必要脱敏。公开读取不代表写权限，也不代表所有 GET 无条件开放。
-
-写操作、管理 API、操作日志、metadata lookup 和上/下游 `admin-detail` 仍要求认证与既有 RBAC permission；匿名请求返回 `401`，身份有效但未授权返回 `403`。不要通过 Nginx、菜单隐藏或 OpenAPI visibility 替代后端保护；Production OpenAPI docs policy 仍由 #144 单独维护。完整 route inventory 与 redaction 规则见 [Public Catalog + Authenticated Management](./docs/rbac/authenticated-read-model.md)。
-
-### 安全默认值（生产）
-
-- `APP_DEBUG` 默认关闭；**生产环境显式开启 debug 会在启动时失败**（fail-fast），禁止 Werkzeug debugger 运行
-- Session Cookie：`HttpOnly=True`、`SameSite=Lax`、`Secure=True`（仅 `APP_ENV=development` 本地 HTTP 开发关闭 `Secure`）
-- 请求体上限：`APP_MAX_CONTENT_LENGTH_MB`（默认 16，上限存在时超限返回统一 JSON 413）
-- 响应安全头：`X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy: strict-origin-when-cross-origin`
-- 4xx/5xx 错误响应统一为 JSON 结构，不向客户端泄露内部路径/连接串/底层驱动异常
-- 转发头信任：**默认不受信任**。审计日志如需真实客户端 IP，仅当请求只经受信反代（如 Nginx）时设置 `ASSET_TRUST_PROXY_HEADERS=true`；否则客户端可直接伪造 `X-Forwarded-For`。Nginx 已设置 `X-Forwarded-For` 的同源部署请开启该项
-- 登录保护：`/api/auth/login` 默认启用进程内的轻量失败窗口与临时 backoff，按用户名和已解析的 request-context client identity 计数；默认 60 秒窗口内第 5 次失败后临时限制，backoff 最高 30 秒。状态有 15 分钟 TTL 和 10,000 条容量上限，不需要 Redis，也不会永久锁定账号。
-- 登录保护只在当前进程内共享；多实例部署不会共享失败状态。需要跨实例共享限流时，应在后续设计中替换为外部共享实现。默认不信任伪造的 `X-Forwarded-For`，只有显式启用 `ASSET_TRUST_PROXY_HEADERS=true` 时才使用受信代理解析出的地址。
-
-## 三、前端构建
-
-```bash
-cd /opt/data-asset-portal/frontend
-npm ci
-VITE_API_MODE=remote \
-VITE_API_BASE_URL=/api \
-VITE_BACKEND_URL=http://127.0.0.1:5099 \
-npm run build
-```
-
-构建输出到 `frontend/dist/`。
-
-## 四、数据库初始化与迁移
-
-应用启动不会自动迁移 schema。新用户应先选择与部署 profile 对应的 canonical repository baseline，再使用 `schema_migrate.py` 应用 Alembic head；不要把方言参考 DDL 当作默认入口。
-
-### Community / local 默认路径
-
-`backend/schema/<dialect>.sql` 是覆盖全部仓库模块的四方言 canonical baseline，`backend/alembic/versions/` 管理后续 forward revisions，`backend/scripts/schema_migrate.py` 负责 apply、verify、plan 和既有库 baseline stamp。推荐顺序：
-
-```bash
-# SQLite 本地 / Community Demo
-python backend/scripts/schema_migrate.py apply --profile community_sqlite
-python demo/seed_sqlite.py --database <absolute-local-path>/community.sqlite
-
-# PostgreSQL Community 部署（使用隔离的 Community 数据库）
-python backend/scripts/schema_migrate.py apply --profile community_postgres
-python demo/seed_postgres.py --dialect postgres
-```
-
-既有环境必须先备份并执行 `verify`；只有在 schema 与 baseline 契约一致时才允许 `baseline` stamp，不能用初始化 SQL 覆盖升级。后续结构变更只通过新的 Alembic revision 管理。
-
-### 方言参考 / external dependency 路径
-
-`docs/pg/` 与 `docs/dws/` 保存按模块拆分的 PostgreSQL、GaussDB/DWS 方言参考、历史兼容 DDL 与外部 storage/collector 说明。它们不是 `backend/schema` + Alembic 的替代，也不是隐藏仓库模块的产品边界。
-
-如果部署需要 vendor-specific DDL 或 external integration，应先阅读对应 SQL、确认 profile 和依赖，再使用 `psql -f` 或 `gsql -f` 按模块执行；不要把所有 SQL 无条件应用到目标数据库。
-
-persistent lineage 模式需要配置 `LINEAGE_DB_PROFILE`；development/test 未配置时使用受控 POC，Community Demo 会在隔离 SQLite 中准备 demo snapshot 并使用其 profile。
-
-> 🚫 仓库不再包含整库快照（`app-*-init-data.sql` 与 `docs/*/sample/*.sql` 已从公开树移除）；
-> 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。
-
-### 血缘快照
-
-血缘查询不在请求过程中实时扫描调度源表。初始化 `lineage-app-*-ddl.sql` 后，先验证并发布首个快照：
-
-```bash
-python backend/scripts/collect_lineage_snapshot.py --profile <profile> --dry-run
-python backend/scripts/collect_lineage_snapshot.py --profile <profile>
-```
-
-生产环境设置 `LINEAGE_DB_PROFILE=<profile>`，并由现有调度平台、cron 或 Windows Task Scheduler
-在调度元数据表更新后定时执行采集命令。采集失败会回滚并继续保留原 ACTIVE 快照。
-完整运行、验证和回退方法见 [血缘快照采集与发布指南](docs/lineage_bulk_import_guide.md)。
-
-## 五、管理员初始化
-
-Schema migration 不通过 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 环境变量创建管理员。首次部署完成数据库初始化后，使用交互式 CLI 创建或确认管理员：
-
-```bash
-python backend/scripts/create_admin.py
-```
-
-CLI 使用当前 runtime 配置（`ASSET_DB_PROFILE`、`ASSET_DB_CONFIG_PATH`）并交互式提示用户名、显示名和密码；它不接受 `--profile` 或 `ADMIN_*` 参数。真实凭据只应通过受控终端或 secret store 提供，不写入文档、日志或 shell 历史。Community Demo 的 `community_demo` 是受控演示账号，不是生产管理员凭据。
-
-## 六、Nginx 示例
+确认 Nginx 的前端 location 包含：
 
 ```nginx
-server {
-    listen 80;
-    server_name _;
-
-    root /opt/data-asset-portal/frontend/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:5099/api/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+try_files $uri $uri/ /index.html;
 ```
 
-## 七、部署检查项
+同时确认 `root` 指向当前版本的 `frontend/dist`，且 `dist/index.html` 存在并可被 Nginx 读取。
 
-- 确认 `ASSET_DB_CONFIG_PATH` 指向正确文件，且 `ASSET_DB_PROFILE` 在配置中存在
-- 如使用 GaussDB，确认 JDBC jar 可访问
-- 确认数据库 `schema` 与 SQL 脚本一致（当前为 `dwp`）
-- 确认 `/healthz` 返回 `status=ok`，并确认 runtime 为预期值
-- 确认 `/api/assets/tables` 返回 JSON 而不是 HTML
-- 确认前端为 `VITE_API_MODE=remote`，且 `/api` 已正确代理到纯 FastAPI ASGI runtime
-- 确认 `APP_SECRET_KEY` 由部署 secret store 提供，且 `APP_DEBUG=false`；不要同时轮换 secret 和配置名称
-- HTTPS 终止后仍应保持 `APP_ENV=production`，以发送 Secure Cookie；FastAPI native auth 使用 signed cookie contract；本阶段未扩大转发头信任范围
-- `backend/configs/database.yaml` 与 `.env.local` 不入库（见 `.gitignore`）；请从 `backend/configs/database.example.yaml` 与 `backend/.env.example` 复制后按环境填写
+### 登录后刷新丢失 session
 
-## 八、配置来源
+如果入口是 HTTP，Production `Secure` Cookie 不会被浏览器发送。为正式内网部署配置企业 CA、内网 CA 或可信网关 HTTPS，并保持 `APP_ENV=production`；不要改成 `APP_ENV=development`。
 
-- 数据库实连配置：复制 `backend/configs/database.example.yaml` → `backend/configs/database.yaml`（或用 `ASSET_DB_CONFIG_PATH` 指向环境专用路径）
-- 后端环境变量：复制 `backend/.env.example` → `backend/.env.local`
-- 前端环境变量：复制 `frontend/.env.example` → `frontend/.env.local`
+### migration 或管理员初始化失败
 
-以上三类实配文件均不提交到仓库，仓库仅保留 `.example` 模板。
+确认 `ASSET_DB_CONFIG_PATH`、`ASSET_DB_PROFILE` 与 YAML 中 profile 名称一致，数据库 schema 已准备且 service/部署账号可访问。先执行 `status`/`verify`，不要跳过 baseline 一致性检查，也不要把真实密码写进命令行或日志。

@@ -1,0 +1,25 @@
+[Unit]
+Description=Data Asset Portal FastAPI backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# These names and paths are examples; replace them for the target host.
+User=dataasset
+Group=dataasset
+WorkingDirectory=/opt/data-asset-portal
+
+Environment=PYTHONUNBUFFERED=1
+
+# backend.asgi loads the repository .env/.env.local files itself.  Keep the
+# runtime configuration in backend/.env.local; do not define a second,
+# divergent systemd environment definition here.
+ExecStart=/opt/data-asset-portal/backend/.venv/bin/uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
+
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
