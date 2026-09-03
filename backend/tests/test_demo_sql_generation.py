@@ -89,6 +89,8 @@ class DemoSqlManifestCoverageTests(unittest.TestCase):
                 )
                 self.assertIn("auth_type = '演示占位配置'", result.stdout)
                 self.assertIn("AND created_by = 'demo';", result.stdout)
+                self.assertIn("ON CONFLICT (category_code) DO NOTHING", result.stdout)
+                self.assertIn("ON CONFLICT (category_code,item_code) DO NOTHING", result.stdout)
 
 
 if __name__ == "__main__":
