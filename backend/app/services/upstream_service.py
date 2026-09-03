@@ -21,6 +21,7 @@ import re
 from copy import deepcopy
 from time import perf_counter
 
+# pi-lens-ignore: python-hallucinated-import
 from sqlalchemy import delete, func, insert, or_, select, update
 
 from ..application import AuditActorMixin, actor_aware

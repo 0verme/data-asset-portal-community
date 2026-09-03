@@ -69,6 +69,7 @@ def _table(name: str, bind):
 
 
 def _next_id(bind, table, column) -> int:
+    # pi-lens-ignore: python-sql-injection
     value = bind.execute(
         sa.select(sa.func.coalesce(sa.func.max(column), 0) + 1)
     ).scalar_one()
@@ -76,6 +77,7 @@ def _next_id(bind, table, column) -> int:
 
 
 def _ensure_category(bind, table, spec: dict) -> None:
+    # pi-lens-ignore: python-sql-injection
     existing = bind.execute(
         sa.select(table.c.category_id).where(
             table.c.category_code == spec["code"]
@@ -84,6 +86,7 @@ def _ensure_category(bind, table, spec: dict) -> None:
     if existing is not None:
         return
 
+    # pi-lens-ignore: python-sql-injection
     bind.execute(
         sa.insert(table).values(
             category_id=_next_id(bind, table, table.c.category_id),
@@ -101,6 +104,7 @@ def _ensure_category(bind, table, spec: dict) -> None:
 
 def _ensure_item(bind, table, category_code: str, item: tuple) -> None:
     code, name, value, description, display_order = item
+    # pi-lens-ignore: python-sql-injection
     existing = bind.execute(
         sa.select(table.c.item_id).where(
             table.c.category_code == category_code,
@@ -110,6 +114,7 @@ def _ensure_item(bind, table, category_code: str, item: tuple) -> None:
     if existing is not None:
         return
 
+    # pi-lens-ignore: python-sql-injection
     bind.execute(
         sa.insert(table).values(
             item_id=_next_id(bind, table, table.c.item_id),
