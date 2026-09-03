@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const upstreamListPath = fileURLToPath(new URL("./upstream/UpstreamList.jsx", import.meta.url));
 const upstreamDetailPath = fileURLToPath(new URL("./upstream/UpstreamDetail.jsx", import.meta.url));
 const upstreamEditorPath = fileURLToPath(new URL("./upstream/UpstreamEditor.jsx", import.meta.url));
+const upstreamFormErrorsPath = fileURLToPath(new URL("./upstream/upstreamFormErrors.ts", import.meta.url));
 const upstreamPartsPath = fileURLToPath(new URL("./upstream/UpstreamParts.jsx", import.meta.url));
 const upstreamStylesPath = fileURLToPath(new URL("../styles/upstream.css", import.meta.url));
 
@@ -27,12 +28,15 @@ test("upstream cards preserve detail and row actions", async () => {
 });
 
 test("upstream unload times use the shared time input", async () => {
-  const source = await readFile(upstreamEditorPath, "utf8");
+  const [source, formErrorsSource] = await Promise.all([
+    readFile(upstreamEditorPath, "utf8"),
+    readFile(upstreamFormErrorsPath, "utf8"),
+  ]);
 
   assert.match(source, /<TimeInput/);
-  assert.match(source, /form\.unloadTimes\.map/);
+  assert.match(source, /unloadTimes\.map/);
   assert.match(source, /新增时间点/);
-  assert.match(source, /至少保留一个卸数时间点/);
+  assert.match(formErrorsSource, /至少保留一个卸数时间点/);
 });
 
 test("upstream detail renders one dynamic schedule stepper", async () => {
@@ -69,4 +73,18 @@ test("upstream detail consumes the shared field contract without ambiguous conta
   ["id", "abbr", "name", "dbType", "owner", "dept", "status", "desc"].forEach((key) => {
     assert.match(editorSource, new RegExp(`getUpstreamFieldLabel\\("${key}"\\)`));
   });
+});
+
+test("upstream save failures use one summary, inline field errors, and first-error navigation", async () => {
+  const source = await readFile(upstreamEditorPath, "utf8");
+
+  assert.match(source, /const nextErrors = validateUpstreamForm\(form\)/);
+  assert.match(source, /if \(nextErrors\.length\)/);
+  assert.match(source, /scrollToFirstUpstreamError\(nextErrors\)/);
+  assert.match(source, /toast\.error\(`保存失败，还有 \$\{nextErrors\.length\} 项需要修改`\)/);
+  assert.match(source, /data-form-field="abbr"/);
+  assert.match(source, /renderFieldError\("abbr"\)/);
+  assert.match(source, /messages=\{errorSummary\}/);
+  assert.doesNotMatch(source, /title="请先修正以下问题"/);
+  assert.match(source, /saving=\{saving\}/);
 });

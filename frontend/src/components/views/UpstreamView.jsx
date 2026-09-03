@@ -29,7 +29,8 @@ export function UpstreamView({ upstream, query, statusOptions, requireLogin, can
     upstreamDetailLoading,
     upstreamError,
     upstreamSaveError,
-    setUpstreamSaveError,
+    upstreamSaveFieldErrors,
+    clearUpstreamSaveError,
     upstreamView,
     setUpstreamView,
     loadUpstreamData,
@@ -88,7 +89,7 @@ export function UpstreamView({ upstream, query, statusOptions, requireLogin, can
     return <UpstreamDetail system={currentUpstream} statusOptions={statusOptions} dbTypeOptions={upstreamDbTypes} deptOptions={upstreamDeptOptions} onBack={upGoList} onBackToList={upGoList} onEdit={canEdit ? () => requireLogin(() => upGoEdit(currentUpstream.id), "upstream:write") : undefined} />;
   }
   if (upRoute.page === "new") {
-    return <UpstreamEditor mode="new" dbTypeOptions={upstreamDbTypes} deptOptions={upstreamDeptOptions} statusOptions={statusOptions} onSave={handleSaveUpstream} onCancel={upBack} onBackToList={upGoList} saveError={upstreamSaveError} onClearSaveError={() => setUpstreamSaveError("")} />;
+    return <UpstreamEditor mode="new" dbTypeOptions={upstreamDbTypes} deptOptions={upstreamDeptOptions} statusOptions={statusOptions} onSave={handleSaveUpstream} onCancel={upBack} onBackToList={upGoList} saveError={upstreamSaveError} saveFieldErrors={upstreamSaveFieldErrors} onClearSaveError={clearUpstreamSaveError} />;
   }
   if (upRoute.page === "edit") {
     if (upstreamDetailLoading && !currentUpstreamEdit) {
@@ -100,7 +101,7 @@ export function UpstreamView({ upstream, query, statusOptions, requireLogin, can
     if (!currentUpstreamEdit) {
       return <div className="empty"><div className="ec"><Icon name="inbox" size={26} /></div><h4>系统不存在</h4></div>;
     }
-    return <UpstreamEditor mode="edit" initial={currentUpstreamEdit} dbTypeOptions={upstreamDbTypes} deptOptions={upstreamDeptOptions} statusOptions={statusOptions} onSave={handleSaveUpstream} onCancel={() => upGoDetail(currentUpstreamEdit.id)} onBackToList={upGoList} onBackToDetail={() => upGoDetail(currentUpstreamEdit.id)} onDelete={confirmDeleteUpstream(currentUpstreamEdit, handleDeleteUpstream)} saveError={upstreamSaveError} onClearSaveError={() => setUpstreamSaveError("")} />;
+    return <UpstreamEditor mode="edit" initial={currentUpstreamEdit} dbTypeOptions={upstreamDbTypes} deptOptions={upstreamDeptOptions} statusOptions={statusOptions} onSave={handleSaveUpstream} onCancel={() => upGoDetail(currentUpstreamEdit.id)} onBackToList={upGoList} onBackToDetail={() => upGoDetail(currentUpstreamEdit.id)} onDelete={confirmDeleteUpstream(currentUpstreamEdit, handleDeleteUpstream)} saveError={upstreamSaveError} saveFieldErrors={upstreamSaveFieldErrors} onClearSaveError={clearUpstreamSaveError} />;
   }
   return <div className="empty"><div className="ec"><Icon name="inbox" size={26} /></div><h4>页面不存在</h4></div>;
 }

@@ -14,14 +14,20 @@
 
 import React from "react";
 import { Icon } from "../ui.tsx";
-import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, isValidTime, PageHeader, TimeInput } from "../common/index.ts";
+import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader, TimeInput, toast } from "../common/index.ts";
 import { buildModuleBreadcrumbs } from "../../routing/navigation.ts";
 import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.ts";
 import { optionLabel } from "../../utils/ui.ts";
 
 import { getUpstreamFieldLabel } from "./upstreamFieldContract.js";
+import {
+  getUpstreamErrorSummary,
+  mergeUpstreamFieldErrors,
+  scrollToFirstUpstreamError,
+  validateUpstreamForm,
+} from "./upstreamFormErrors.ts";
 
-export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions = [], statusOptions = [], onSave, onCancel, onBackToList, onBackToDetail, onDelete, saveError = "", onClearSaveError }) {
+export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions = [], statusOptions = [], onSave, onCancel, onBackToList, onBackToDetail, onDelete, saveError = "", saveFieldErrors = [], onClearSaveError }) {
   const isEdit = mode === "edit";
   const oldId = initial?.id || "";
   const defaultStatus = statusOptions[0]?.value || "enabled";
@@ -44,7 +50,9 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
   });
   const [touched, setTouched] = React.useState(false);
   const initialSnapshotRef = React.useRef(JSON.stringify(form));
+  const previousSaveErrorCountRef = React.useRef(saveFieldErrors.length);
   const isDirty = initialSnapshotRef.current !== JSON.stringify(form);
+  const unloadTimes = Array.isArray(form.unloadTimes) ? form.unloadTimes : [];
 
   React.useEffect(() => {
     const nextForm = initial || {
@@ -68,17 +76,27 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
     initialSnapshotRef.current = JSON.stringify(nextForm);
   }, [initial, defaultDbType, defaultStatus]);
 
-  const errors = [];
-  if (touched) {
-    if (!form.id.trim()) errors.push("系统标识不能为空");
-    if (!form.abbr.trim()) errors.push("系统简称不能为空");
-    if (!form.name.trim()) errors.push("系统名称不能为空");
-    if (!form.host.trim()) errors.push("JDBC 地址不能为空");
-    if (!form.unloadTimes.length) errors.push("至少保留一个卸数时间点");
-    if (form.unloadTimes.some((item) => !isValidTime(item))) errors.push("卸数时间点格式必须为 HH:mm");
-  }
+  const clientErrors = touched ? validateUpstreamForm(form) : [];
+  const fieldErrors = mergeUpstreamFieldErrors(clientErrors, saveFieldErrors);
+  const getFieldError = (field) => fieldErrors.find((item) => item.field === field);
+  const fieldErrorId = (field) => `upstream-error-${field.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const renderFieldError = (field) => {
+    const error = getFieldError(field);
+    return error ? <div id={fieldErrorId(field)} className="upstream-field-error" role="alert">{error.message}</div> : null;
+  };
+  const errorSummary = fieldErrors.length
+    ? getUpstreamErrorSummary(fieldErrors)
+    : saveError
+      ? [saveError]
+      : [];
 
-  if (touched && !form.dbType.trim()) errors.push("数据库类型不能为空");
+  React.useEffect(() => {
+    const hadSaveErrors = previousSaveErrorCountRef.current > 0;
+    previousSaveErrorCountRef.current = saveFieldErrors.length;
+    if (!hadSaveErrors && saveFieldErrors.length) {
+      scrollToFirstUpstreamError(saveFieldErrors);
+    }
+  }, [saveFieldErrors]);
 
   const dbTypeSelectOptions = getLegacyAwareOptions(dbTypeOptions, form.dbType);
   const deptSelectOptions = getLegacyAwareOptions(deptOptions, form.dept);
@@ -86,45 +104,53 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
   const deptLegacy = Boolean(form.dept) && isLegacyDictValue(deptOptions, form.dept);
 
   const setValue = (key, value) => {
-    if (saveError) onClearSaveError?.();
+    if (saveError || saveFieldErrors.length) onClearSaveError?.(key);
     setForm((prev) => ({ ...prev, [key]: value }));
   };
   const setTime = (index, value) => {
-    if (saveError) onClearSaveError?.();
+    if (saveError || saveFieldErrors.length) onClearSaveError?.(`unloadTimes[${index}]`);
     setForm((prev) => ({
       ...prev,
-      unloadTimes: prev.unloadTimes.map((item, current) => current === index ? value : item),
+      unloadTimes: (Array.isArray(prev.unloadTimes) ? prev.unloadTimes : []).map((item, current) => current === index ? value : item),
     }));
   };
 
-  const save = () => {
+  const save = async () => {
     if (saving || saveLockRef.current) return;
+    const nextErrors = validateUpstreamForm(form);
     setTouched(true);
-    if (errors.length) return;
+    onClearSaveError?.();
+    if (nextErrors.length) {
+      scrollToFirstUpstreamError(nextErrors);
+      toast.error(`保存失败，还有 ${nextErrors.length} 项需要修改`);
+      return;
+    }
     const normalizedAbbr = form.abbr.trim().toUpperCase();
     saveLockRef.current = true;
     setSaving(true);
-    Promise.resolve(onSave({
-      id: form.id.trim() || oldId,
-      abbr: normalizedAbbr,
-      name: form.name.trim(),
-      dbType: form.dbType,
-      host: form.host.trim(),
-      db: form.db.trim(),
-      schema: form.schema.trim(),
-      unloadTimes: [...new Set(form.unloadTimes.map((item) => item.trim()))].sort(),
-      status: form.status,
-      owner: form.owner.trim() || "未指定",
-      dept: form.dept.trim() || "未分配",
-      desc: form.desc.trim() || "暂无说明",
-    }, oldId || undefined)).finally(() => {
+    try {
+      await onSave({
+        id: form.id.trim() || oldId,
+        abbr: normalizedAbbr,
+        name: form.name.trim(),
+        dbType: form.dbType,
+        host: form.host.trim(),
+        db: form.db.trim(),
+        schema: form.schema.trim(),
+        unloadTimes: [...new Set(unloadTimes.map((item) => item.trim()))].sort(),
+        status: form.status,
+        owner: form.owner.trim() || "未指定",
+        dept: form.dept.trim() || "未分配",
+        desc: form.desc.trim() || "暂无说明",
+      }, oldId || undefined);
+    } finally {
       saveLockRef.current = false;
       setSaving(false);
-    });
+    }
   };
 
   return (
-    <div>
+    <div className="upstream-editor-page">
       <PageHeader
         back={{ onClick: onCancel, text: isEdit ? "返回上一层" : "返回上游卸数列表" }}
         breadcrumbs={buildModuleBreadcrumbs("upstream", [
@@ -136,53 +162,59 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
         subtitle={isEdit ? oldId : "配置上游系统连接和卸数时间点"}
       />
 
-      <ActionErrorBanner title="保存失败" message={saveError} />
-
-      <ActionErrorBanner title="请先修正以下问题" messages={errors} />
+      <ActionErrorBanner title="保存失败" messages={errorSummary} />
 
       <div className="form-card">
         <h3><Icon name="server" size={14} />基本信息</h3>
         <div className="form-grid">
-          <div className="fl">
+          <div className="fl upstream-field" data-form-field="id">
             <label>{getUpstreamFieldLabel("id")}</label>
-            <input className={`inp mono${touched && !form.id.trim() ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder="例如：up_cbs" />
+            <input className={`inp mono${getFieldError("id") ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder="例如：up_cbs" data-form-control aria-invalid={Boolean(getFieldError("id")) || undefined} aria-describedby={getFieldError("id") ? fieldErrorId("id") : undefined} />
+            {renderFieldError("id")}
           </div>
-          <div className="fl">
+          <div className="fl upstream-field" data-form-field="abbr">
             <label>{getUpstreamFieldLabel("abbr")}</label>
-            <input className={`inp mono${touched && !form.abbr.trim() ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setValue("abbr", event.target.value)} placeholder="例如：CBS" />
+            <input className={`inp mono${getFieldError("abbr") ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setValue("abbr", event.target.value)} placeholder="例如：CBS" data-form-control aria-invalid={Boolean(getFieldError("abbr")) || undefined} aria-describedby={getFieldError("abbr") ? fieldErrorId("abbr") : undefined} />
+            {renderFieldError("abbr")}
           </div>
-          <div className="fl">
+          <div className="fl upstream-field" data-form-field="name">
             <label>{getUpstreamFieldLabel("name")}</label>
-            <input className={`inp${touched && !form.name.trim() ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：商品中心" />
+            <input className={`inp${getFieldError("name") ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：商品中心" data-form-control aria-invalid={Boolean(getFieldError("name")) || undefined} aria-describedby={getFieldError("name") ? fieldErrorId("name") : undefined} />
+            {renderFieldError("name")}
           </div>
-          <div className="fl">
+          <div className="fl upstream-field" data-form-field="dbType">
             <label>{getUpstreamFieldLabel("dbType")}</label>
-            <select className={`sel${touched && !form.dbType.trim() ? " invalid" : ""}`} value={form.dbType} onChange={(event) => setValue("dbType", event.target.value)}>
+            <select className={`sel${getFieldError("dbType") ? " invalid" : ""}`} value={form.dbType} onChange={(event) => setValue("dbType", event.target.value)} data-form-control aria-invalid={Boolean(getFieldError("dbType")) || undefined} aria-describedby={getFieldError("dbType") ? fieldErrorId("dbType") : undefined}>
               <option value="">请选择数据库类型</option>
               {dbTypeSelectOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item)}</option>)}
             </select>
-            {dbTypeLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>当前值未在码值中维护，请补充码值或重新选择。</div> : null}
+            {dbTypeLegacy && !getFieldError("dbType") ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>当前值未在码值中维护，请补充码值或重新选择。</div> : null}
+            {renderFieldError("dbType")}
           </div>
           <div className="fl">
             <label>{getUpstreamFieldLabel("owner")}</label>
             <input className="inp" value={form.owner} onChange={(event) => setValue("owner", event.target.value)} placeholder="例如：王芳" />
           </div>
-          <div className="fl">
+          <div className="fl upstream-field" data-form-field="dept">
             <label>{getUpstreamFieldLabel("dept")}</label>
-            <select className="sel" value={form.dept} onChange={(event) => setValue("dept", event.target.value)}>
+            <select className={`sel${getFieldError("dept") ? " invalid" : ""}`} value={form.dept} onChange={(event) => setValue("dept", event.target.value)} data-form-control aria-invalid={Boolean(getFieldError("dept")) || undefined} aria-describedby={getFieldError("dept") ? fieldErrorId("dept") : undefined}>
               <option value="">请选择业务部门</option>
               {deptSelectOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item)}</option>)}
             </select>
-            {deptLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>当前值未在码值中维护，请补充码值或重新选择。</div> : null}
+            {deptLegacy && !getFieldError("dept") ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>当前值未在码值中维护，请补充码值或重新选择。</div> : null}
+            {renderFieldError("dept")}
           </div>
-          <div className="fl">
+          <div className="fl upstream-field" data-form-field="status">
             <label>{getUpstreamFieldLabel("status")}</label>
-            <BinaryStatusToggle
-              mode="status"
-              value={form.status}
-              options={statusOptions}
-              onChange={(value) => setValue("status", value)}
-            />
+            <div data-form-control>
+              <BinaryStatusToggle
+                mode="status"
+                value={form.status}
+                options={statusOptions}
+                onChange={(value) => setValue("status", value)}
+              />
+            </div>
+            {renderFieldError("status")}
           </div>
           <div className="fl full">
             <label>{getUpstreamFieldLabel("desc")}</label>
@@ -194,9 +226,10 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
       <div className="form-card">
         <h3><Icon name="db" size={14} />数据库连接</h3>
         <div className="form-grid">
-          <div className="fl">
+          <div className="fl upstream-field" data-form-field="host">
             <label>{getUpstreamFieldLabel("host")}</label>
-            <input className={`inp mono${touched && !form.host.trim() ? " invalid" : ""}`} value={form.host} onChange={(event) => setValue("host", event.target.value)} placeholder="例如：product.source.demo.invalid" />
+            <input className={`inp mono${getFieldError("host") ? " invalid" : ""}`} value={form.host} onChange={(event) => setValue("host", event.target.value)} placeholder="例如：product.source.demo.invalid" data-form-control aria-invalid={Boolean(getFieldError("host")) || undefined} aria-describedby={getFieldError("host") ? fieldErrorId("host") : undefined} />
+            {renderFieldError("host")}
           </div>
           <div className="fl">
             <label>{getUpstreamFieldLabel("schema")}</label>
@@ -205,30 +238,46 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
         </div>
       </div>
 
-      <div className="form-card">
+      <div className="form-card upstream-field" data-form-field="unloadTimes">
         <div className="form-card-head">
           <h3><Icon name="clock" size={14} />卸数时间点</h3>
-          <span className="form-card-meta">{form.unloadTimes.length} 个</span>
+          <span className="form-card-meta">{unloadTimes.length} 个</span>
         </div>
         <div className="time-rows">
-          {form.unloadTimes.map((item, index) => (
-            <div key={`${item}_${index}`} className="time-row">
-              <span className="tr-idx">{index + 1}</span>
-              <TimeInput
-                value={item}
-                invalid={touched && !isValidTime(item)}
-                onChange={(event) => setTime(index, event.target.value)}
-                aria-label={`卸数时间点 ${index + 1}`}
-              />
-              <button className="icon-btn danger" disabled={form.unloadTimes.length === 1} onClick={() => setForm((prev) => ({ ...prev, unloadTimes: prev.unloadTimes.filter((_, current) => current !== index) }))}>
-                <Icon name="trash" size={14} />
-              </button>
-            </div>
-          ))}
+          {unloadTimes.map((item, index) => {
+            const timeError = getFieldError(`unloadTimes[${index}]`);
+            return (
+              <div key={`${item}_${index}`} className="time-row upstream-field" data-form-field={`unloadTimes[${index}]`}>
+                <span className="tr-idx">{index + 1}</span>
+                <div className="upstream-time-control">
+                  <TimeInput
+                    value={item}
+                    invalid={Boolean(timeError)}
+                    onChange={(event) => setTime(index, event.target.value)}
+                    aria-label={`卸数时间点 ${index + 1}`}
+                    data-form-control
+                    aria-invalid={Boolean(timeError) || undefined}
+                    aria-describedby={timeError ? fieldErrorId(`unloadTimes[${index}]`) : undefined}
+                  />
+                  {renderFieldError(`unloadTimes[${index}]`)}
+                </div>
+                <button className="icon-btn danger" type="button" disabled={unloadTimes.length === 1} onClick={() => {
+                  onClearSaveError?.("unloadTimes");
+                  setForm((prev) => ({ ...prev, unloadTimes: (Array.isArray(prev.unloadTimes) ? prev.unloadTimes : []).filter((_, current) => current !== index) }));
+                }}>
+                  <Icon name="trash" size={14} />
+                </button>
+              </div>
+            );
+          })}
         </div>
-        <button className="add-field" type="button" onClick={() => setForm((prev) => ({ ...prev, unloadTimes: [...prev.unloadTimes, "00:00"] }))}>
+        <button className="add-field" type="button" onClick={() => {
+          onClearSaveError?.("unloadTimes");
+          setForm((prev) => ({ ...prev, unloadTimes: [...(Array.isArray(prev.unloadTimes) ? prev.unloadTimes : []), "00:00"] }));
+        }}>
           <Icon name="plus" size={14} />新增时间点
         </button>
+        {renderFieldError("unloadTimes")}
       </div>
 
       <FormActionBar
