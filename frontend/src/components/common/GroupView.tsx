@@ -12,12 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { Key, ReactNode } from "react";
+
+export interface GroupViewProps<T> {
+  items: readonly T[];
+  getKey: (item: T) => Key;
+  onItemClick: (item: T) => void;
+  groupBy: (item: T) => string;
+  groupOrder?: readonly string[] | undefined;
+  renderGroupLabel: (key: string) => ReactNode;
+  renderGroupCount: (count: number) => ReactNode;
+  renderCardName: (item: T) => ReactNode;
+  renderCardBody: (item: T) => ReactNode;
+}
 
 /**
  * 通用分组视图（纯展示 + 配置驱动）。
  * 按 groupBy 分组、按 groupOrder 排序，分组标题、计数与卡片内容均由调用方提供。
  */
-export function GroupView({
+export function GroupView<T>({
   items,
   getKey,
   onItemClick,
@@ -27,14 +40,16 @@ export function GroupView({
   renderGroupCount,
   renderCardName,
   renderCardBody,
-}) {
-  const groups = {};
+}: GroupViewProps<T>) {
+  const groups: Record<string, T[]> = {};
   items.forEach((item) => {
     const key = groupBy(item);
-    (groups[key] = groups[key] || []).push(item);
+    (groups[key] ||= []).push(item);
   });
 
-  const keys = Object.keys(groups).sort((a, b) => groupOrder.indexOf(a) - groupOrder.indexOf(b));
+  const keys = Object.keys(groups).sort(
+    (a, b) => groupOrder.indexOf(a) - groupOrder.indexOf(b),
+  );
 
   return (
     <div>
@@ -42,11 +57,11 @@ export function GroupView({
         <div className="group-sec" key={key}>
           <div className="group-head">
             <h3>{renderGroupLabel(key)}</h3>
-            <span className="gcount">{renderGroupCount(groups[key].length)}</span>
+            <span className="gcount">{renderGroupCount(groups[key]?.length || 0)}</span>
             <span className="gline"></span>
           </div>
           <div className="group-grid">
-            {groups[key].map((item) => (
+            {(groups[key] || []).map((item) => (
               <div className="gcard" key={getKey(item)} onClick={() => onItemClick(item)}>
                 <div className="gc-name">{renderCardName(item)}</div>
                 <div className="gc-cn">{renderCardBody(item)}</div>

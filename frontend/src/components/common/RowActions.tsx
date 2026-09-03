@@ -1,8 +1,43 @@
-import { Icon } from "../ui.jsx";
-import { confirmAction } from "./confirmService.jsx";
+import type { MouseEventHandler, ReactNode } from "react";
 
-export function RowActions({ onView, onEdit, extraActions = [], toggle, disabled = false }) {
-  const runConfirm = async (options, action) => {
+import { Icon } from "../ui.tsx";
+import { confirmAction } from "./confirmService.tsx";
+import type { ConfirmOptions } from "./ConfirmDialog.tsx";
+
+export interface RowAction {
+  key: string;
+  label: ReactNode;
+  icon?: string | undefined;
+  danger?: boolean | undefined;
+  confirm?: true | ConfirmOptions | undefined;
+  onClick: () => void | Promise<unknown>;
+}
+
+export interface RowToggleAction {
+  enabled: boolean;
+  label?: string | undefined;
+  onToggle: () => void | Promise<unknown>;
+}
+
+export interface RowActionsProps {
+  onView?: MouseEventHandler<HTMLButtonElement> | undefined;
+  onEdit?: MouseEventHandler<HTMLButtonElement> | undefined;
+  extraActions?: readonly RowAction[] | undefined;
+  toggle?: RowToggleAction | undefined;
+  disabled?: boolean | undefined;
+}
+
+export function RowActions({
+  onView,
+  onEdit,
+  extraActions = [],
+  toggle,
+  disabled = false,
+}: RowActionsProps) {
+  const runConfirm = async (
+    options: true | ConfirmOptions | undefined,
+    action: (() => void | Promise<unknown>) | undefined,
+  ): Promise<void> => {
     if (!action) return;
     if (!options) {
       action();
@@ -15,7 +50,7 @@ export function RowActions({ onView, onEdit, extraActions = [], toggle, disabled
   const handleToggle = () => {
     if (!toggle) return;
     const acting = toggle.enabled ? "禁用" : "启用";
-    runConfirm(
+    void runConfirm(
       {
         title: acting,
         content: `确认${acting}${toggle.label ? ` ${toggle.label}` : ""}吗？`,
@@ -55,7 +90,7 @@ export function RowActions({ onView, onEdit, extraActions = [], toggle, disabled
           className={"btn" + (action.danger ? " ghost-danger" : "")}
           type="button"
           disabled={disabled}
-          onClick={() => runConfirm(action.confirm, action.onClick)}
+          onClick={() => void runConfirm(action.confirm, action.onClick)}
         >
           {action.icon ? <Icon name={action.icon} size={14} /> : null}
           {action.label}

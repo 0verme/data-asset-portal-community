@@ -1,14 +1,42 @@
-import React from "react";
-import { Icon } from "../ui.jsx";
-import { confirmAction } from "./confirmService.jsx";
+import { Fragment, type ReactNode } from "react";
 
-export function PageHeader({ breadcrumbs = [], icon, title, subtitle, status, back }) {
+import { Icon } from "../ui.tsx";
+import { confirmAction } from "./confirmService.tsx";
+import type { ConfirmOptions } from "./ConfirmDialog.tsx";
+
+export interface BreadcrumbItem {
+  label: string;
+  onClick?: (() => void) | undefined;
+}
+
+export interface BackLink {
+  onClick: () => void;
+  text?: string | undefined;
+}
+
+export interface PageHeaderProps {
+  breadcrumbs?: readonly BreadcrumbItem[] | undefined;
+  icon?: string | undefined;
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  status?: ReactNode;
+  back?: BackLink | null | undefined;
+}
+
+export function PageHeader({
+  breadcrumbs = [],
+  icon,
+  title,
+  subtitle,
+  status,
+  back,
+}: PageHeaderProps) {
   const hasHeading = Boolean(title || subtitle || status);
-  const derivedBack = back?.onClick
+  const derivedBack: BackLink | null = back?.onClick
     ? back
     : (() => {
         const firstClickable = breadcrumbs.find((item) => item.onClick);
-        if (!firstClickable) return null;
+        if (!firstClickable?.onClick) return null;
         return {
           onClick: firstClickable.onClick,
           text: back?.text || "返回上一层",
@@ -27,7 +55,7 @@ export function PageHeader({ breadcrumbs = [], icon, title, subtitle, status, ba
       {breadcrumbs.length ? (
         <nav className="crumb" aria-label="面包屑">
           {breadcrumbs.map((item, index) => (
-            <React.Fragment key={`${item.label}-${index}`}>
+            <Fragment key={`${item.label}-${index}`}>
               {index ? <span className="sep"><Icon name="chevron" size={13} /></span> : null}
               {item.onClick ? (
                 <button type="button" className="crumb-link" onClick={item.onClick}>
@@ -38,7 +66,7 @@ export function PageHeader({ breadcrumbs = [], icon, title, subtitle, status, ba
                   {item.label}
                 </span>
               )}
-            </React.Fragment>
+            </Fragment>
           ))}
         </nav>
       ) : null}
@@ -59,6 +87,20 @@ export function PageHeader({ breadcrumbs = [], icon, title, subtitle, status, ba
   );
 }
 
+export interface FormActionBarProps {
+  note?: ReactNode;
+  onCancel?: (() => void) | undefined;
+  onSave?: (() => void | Promise<unknown>) | undefined;
+  cancelText?: string | undefined;
+  saveText?: string | undefined;
+  savingText?: string | undefined;
+  saveDisabled?: boolean | undefined;
+  cancelDisabled?: boolean | undefined;
+  saving?: boolean | undefined;
+  isDirty?: boolean | undefined;
+  cancelConfirmOptions?: ConfirmOptions | undefined;
+}
+
 export function FormActionBar({
   note,
   onCancel,
@@ -71,7 +113,7 @@ export function FormActionBar({
   saving = false,
   isDirty = false,
   cancelConfirmOptions,
-}) {
+}: FormActionBarProps) {
   const handleCancel = async () => {
     if (saving || !onCancel) return;
     if (isDirty) {

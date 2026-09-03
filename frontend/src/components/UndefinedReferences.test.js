@@ -26,7 +26,7 @@ test("rendered components import their referenced helpers", async () => {
   );
   assert.match(
     reportDetail,
-    /import \{ RowActions, StatusBadge \} from "\.\.\/common\/index\.js";/,
+    /import \{ RowActions, StatusBadge \} from "\.\.\/common\/index\.ts";/,
   );
   assert.match(
     upstreamDetail,

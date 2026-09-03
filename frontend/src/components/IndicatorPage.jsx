@@ -1,8 +1,8 @@
 
 import { INDICATOR_DIMENSION_OPTIONS } from "../data/indicators.ts";
 import { formatDate, formatDateTime } from "../utils/date.ts";
-import { ActionErrorBanner, CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "./common/index.js";
-import { Highlight, Icon, initial } from "./ui.jsx";
+import { ActionErrorBanner, CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "./common/index.ts";
+import { Highlight, Icon, initial } from "./ui.tsx";
 
 const DIMENSION_ORDER = ["prd", "mem", "ord", "str", "inv", "mkt", "ful", "svc"];
 

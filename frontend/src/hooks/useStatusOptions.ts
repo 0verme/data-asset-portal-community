@@ -1,4 +1,4 @@
-import { BINARY_STATUS_OPTIONS } from '../components/common/status.js';
+import { BINARY_STATUS_OPTIONS } from '../components/common/status.ts';
 
 export interface StatusOptionItem {
   value: string;
@@ -13,7 +13,7 @@ export interface UseStatusOptionsResult {
 
 export function useStatusOptions(): UseStatusOptionsResult {
   return {
-    statusOptions: BINARY_STATUS_OPTIONS as StatusOptionItem[],
+    statusOptions: [...BINARY_STATUS_OPTIONS],
     statusLoading: false,
     statusError: '',
   };

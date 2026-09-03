@@ -1,8 +1,8 @@
-import { Highlight, Icon } from "../ui.jsx";
+import { Highlight, Icon } from "../ui.tsx";
 import {
   EmptyState,
   StatusBadge,
-} from "../common/index.js";
+} from "../common/index.ts";
 
 import { getSystemBadgeText } from "../../utils/push.ts";
 

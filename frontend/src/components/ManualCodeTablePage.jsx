@@ -1,4 +1,4 @@
-import { Highlight, Icon } from "./ui.jsx";
+import { Highlight, Icon } from "./ui.tsx";
 import {
   ActionErrorBanner,
   DangerZone,
@@ -10,7 +10,7 @@ import {
   RowActions,
   StatusBadge,
   confirmDeleteAction,
-} from "./common/index.js";
+} from "./common/index.ts";
 import {
   MANUAL_CODE_TABLE_STATUS_META,
   MANUAL_CODE_TABLE_STYLES,

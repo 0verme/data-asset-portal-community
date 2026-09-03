@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { isPublicPermission } from "../../auth/permissions.ts";
-import { Highlight, Icon } from "../ui.jsx";
+import { Highlight, Icon } from "../ui.tsx";
 import {
   ActionErrorBanner,
   BinaryStatusToggle,
@@ -23,7 +23,7 @@ import {
   FormSection,
   RowActions,
   StatusBadge,
-} from "../common/index.js";
+} from "../common/index.ts";
 
 const ROLE_STATUS_META = {
   enabled: { label: "启用", className: "st-on" },

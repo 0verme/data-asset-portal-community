@@ -6,7 +6,7 @@ import {
   formatIndicatorPath,
   getIndicatorDimensionFromPath,
 } from "../data/indicatorPathOptions.ts";
-import { Icon } from "./ui.jsx";
+import { Icon } from "./ui.tsx";
 
 function buildColumns(options, activeValues) {
   const columns = [];

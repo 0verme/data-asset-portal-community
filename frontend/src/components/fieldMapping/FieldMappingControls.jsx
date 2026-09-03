@@ -1,5 +1,5 @@
 
-import { Icon } from "../ui.jsx";
+import { Icon } from "../ui.tsx";
 import { formatSystemLabel, getSourceSystemId } from "./fieldMappingUtils.js";
 
 function StatCard({ label, value, hint }) {

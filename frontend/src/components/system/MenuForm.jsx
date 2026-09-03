@@ -1,4 +1,4 @@
-import { ActionErrorBanner, BinaryStatusToggle, confirmDeleteAction, DangerZone, FormSection } from "../common/index.js";
+import { ActionErrorBanner, BinaryStatusToggle, confirmDeleteAction, DangerZone, FormSection } from "../common/index.ts";
 import { MENU_ICON_OPTIONS } from "./constants.js";
 
 export function MenuForm({ form, setForm, errors = [], mode = "new", initial = null, onDelete }) {

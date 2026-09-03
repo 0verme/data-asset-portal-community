@@ -13,8 +13,8 @@
 // limitations under the License.
 
 import React from "react";
-import { Icon } from "../ui.jsx";
-import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, isValidTime, PageHeader, TimeInput } from "../common/index.js";
+import { Icon } from "../ui.tsx";
+import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, isValidTime, PageHeader, TimeInput } from "../common/index.ts";
 import { buildModuleBreadcrumbs } from "../../routing/navigation.ts";
 import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.ts";
 import { optionLabel } from "../../utils/ui.ts";

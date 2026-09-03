@@ -26,7 +26,7 @@ const jobEditorPath = fileURLToPath(new URL("./push/JobEditor.jsx", import.meta.
 const constantsPath = fileURLToPath(new URL("./push/pushConstants.js", import.meta.url));
 const pushApiPath = fileURLToPath(new URL("../api/push.ts", import.meta.url));
 const utilsPath = fileURLToPath(new URL("./push/pushUtils.js", import.meta.url));
-const timeInputPath = fileURLToPath(new URL("./common/TimeInput.jsx", import.meta.url));
+const timeInputPath = fileURLToPath(new URL("./common/TimeInput.tsx", import.meta.url));
 const readSources = async (...paths) => (await Promise.all(paths.map((path) => readFile(path, "utf8")))).join("\n");
 
 test("push systems keep downstream and data-developer contacts separate", async () => {

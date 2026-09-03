@@ -24,7 +24,7 @@ import {
 } from '../api/upstream.ts';
 import type { MockUpstreamSystem } from '../data/upstreamSystems.ts';
 import { isUnauthorizedError } from '../api/http.ts';
-import { toast } from '../components/common/index.js';
+import { toast } from '../components/common/index.ts';
 import {
   DEFAULT_UP_FILTER,
   DEFAULT_UP_VIEW,

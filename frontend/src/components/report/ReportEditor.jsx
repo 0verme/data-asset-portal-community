@@ -11,8 +11,8 @@ import {
   DangerZone,
   FormActionBar,
   PageHeader,
-} from "../common/index.js";
-import { Icon } from "../ui.jsx";
+} from "../common/index.ts";
+import { Icon } from "../ui.tsx";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 

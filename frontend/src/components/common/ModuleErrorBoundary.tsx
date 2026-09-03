@@ -12,24 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React from "react";
-import { ErrorState } from "./StateCards.jsx";
+import React, { type ReactNode } from "react";
 
-class ModuleErrorBoundaryInner extends React.Component {
-  constructor(props) {
+import { ErrorState } from "./StateCards.tsx";
+
+export interface ModuleErrorBoundaryProps {
+  title?: string | undefined;
+  desc?: string | undefined;
+  onRetry?: (() => void) | undefined;
+  resetKey?: unknown;
+  children?: ReactNode;
+}
+
+interface ModuleErrorBoundaryState {
+  error: Error | null;
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+class ModuleErrorBoundaryInner extends React.Component<ModuleErrorBoundaryProps, ModuleErrorBoundaryState> {
+  constructor(props: ModuleErrorBoundaryProps) {
     super(props);
     this.state = { error: null };
   }
 
-  static getDerivedStateFromError(error) {
-    return { error };
+  static getDerivedStateFromError(error: unknown): ModuleErrorBoundaryState {
+    return { error: toError(error) };
   }
 
-  componentDidCatch(error) {
+  componentDidCatch(error: Error): void {
     console.error("Module render failed:", error);
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps: ModuleErrorBoundaryProps): void {
     if (this.state.error && prevProps.resetKey !== this.props.resetKey) {
       this.setState({ error: null });
     }
@@ -42,7 +59,7 @@ class ModuleErrorBoundaryInner extends React.Component {
       return (
         <ErrorState
           title={title || "模块渲染失败"}
-          desc={error?.message || desc || "页面渲染时发生异常，请稍后重试。"}
+          desc={error.message || desc || "页面渲染时发生异常，请稍后重试。"}
           onRetry={onRetry}
         />
       );
@@ -51,6 +68,6 @@ class ModuleErrorBoundaryInner extends React.Component {
   }
 }
 
-export function ModuleErrorBoundary(props) {
+export function ModuleErrorBoundary(props: ModuleErrorBoundaryProps) {
   return <ModuleErrorBoundaryInner {...props} />;
 }

@@ -1,7 +1,7 @@
 import React from "react";
 import { findLineageNodes, getLineageInitialView } from "../api/lineage.ts";
-import { ActionErrorBanner, ErrorState, LoadingState } from "./common/index.js";
-import { Icon } from "./ui.jsx";
+import { ActionErrorBanner, ErrorState, LoadingState } from "./common/index.ts";
+import { Icon } from "./ui.tsx";
 import { formatDateTime } from "../utils/date.ts";
 import { LineageCanvas } from "./lineage/LineageCanvas.jsx";
 

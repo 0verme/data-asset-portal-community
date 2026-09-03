@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const apiAssetViewPath = fileURLToPath(new URL("./ApiAssetView.jsx", import.meta.url));
 const indicatorEditorPath = fileURLToPath(new URL("../IndicatorEditor.jsx", import.meta.url));
 const apiClientPath = fileURLToPath(new URL("../../api/apiAssets.ts", import.meta.url));
-const assetReferenceSelectorPath = fileURLToPath(new URL("../common/AssetReferenceSelector.jsx", import.meta.url));
+const assetReferenceSelectorPath = fileURLToPath(new URL("../common/AssetReferenceSelector.tsx", import.meta.url));
 
 test("API asset editor reuses the binary status toggle for create and edit", async () => {
   const [apiAssetView, indicatorEditor] = await Promise.all([
@@ -14,7 +14,7 @@ test("API asset editor reuses the binary status toggle for create and edit", asy
     readFile(indicatorEditorPath, "utf8"),
   ]);
 
-  assert.match(apiAssetView, /import \{[^}]*BinaryStatusToggle[^}]*\} from "\.\.\/common\/index\.js"/);
+  assert.match(apiAssetView, /import \{[^}]*BinaryStatusToggle[^}]*\} from "\.\.\/common\/index\.ts"/);
   assert.match(apiAssetView, /<BinaryStatusToggle mode="status" name="status" value=\{form\.status\} onChange=\{\(value\) => set\("status", value\)\} \/>/);
   assert.doesNotMatch(apiAssetView, /<select className="sel" value=\{form\.status\}/);
   assert.match(indicatorEditor, /<BinaryStatusToggle mode="status" value=\{form\.status\}/);

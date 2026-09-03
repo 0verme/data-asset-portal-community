@@ -13,8 +13,8 @@
 // limitations under the License.
 
 import React from "react";
-import { Icon } from "../ui.jsx";
-import { ActionErrorBanner, StatusBadge } from "../common/index.js";
+import { Icon } from "../ui.tsx";
+import { ActionErrorBanner, StatusBadge } from "../common/index.ts";
 import { formatDateTime } from "../../utils/date.ts";
 import { formatCost } from "./OperationLogTable.jsx";
 

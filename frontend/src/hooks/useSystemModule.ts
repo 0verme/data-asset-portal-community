@@ -43,7 +43,7 @@ import {
 } from '../api/menus.ts';
 import type { MenuItem } from '../data/menus.ts';
 import { getErrorMessage, type ErrorWithPayload } from '../utils/ui.ts';
-import { toast } from '../components/common/index.js';
+import { toast } from '../components/common/index.ts';
 import { DEFAULT_MENU_FORM, DEFAULT_PARAM_FORM, DEFAULT_USER_FORM } from '../components/system/constants.js';
 
 export interface UserFormData {

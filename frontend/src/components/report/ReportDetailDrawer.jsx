@@ -1,6 +1,6 @@
 import { formatDate, formatDateTime } from "../../utils/date.ts";
-import { RowActions, StatusBadge } from "../common/index.js";
-import { Icon } from "../ui.jsx";
+import { RowActions, StatusBadge } from "../common/index.ts";
+import { Icon } from "../ui.tsx";
 
 function MetaItem({ label, value, mono = false }) {
   return (

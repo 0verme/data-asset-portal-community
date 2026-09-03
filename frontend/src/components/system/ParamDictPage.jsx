@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Highlight, Icon } from "../ui.jsx";
-import { EmptyState, RowActions, StatusBadge } from "../common/index.js";
+import { Highlight, Icon } from "../ui.tsx";
+import { EmptyState, RowActions, StatusBadge } from "../common/index.ts";
 import { formatDateTime } from "../../utils/date.ts";
 import { PARAM_STATUS_META } from "./constants.js";
 

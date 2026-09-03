@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Icon } from "../ui.jsx";
-import { CardGridView, EmptyState, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.js";
+import { Icon } from "../ui.tsx";
+import { CardGridView, EmptyState, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.ts";
 
 import { DbBadge } from "./UpstreamParts.jsx";
 

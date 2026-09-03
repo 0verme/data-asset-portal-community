@@ -13,8 +13,8 @@
 // limitations under the License.
 
 import React from "react";
-import { Highlight, Icon } from "./ui.jsx";
-import { ActionErrorBanner, confirmDeleteAction, DangerZone, EmptyState, FormActionBar, PageHeader, RowActions } from "./common/index.js";
+import { Highlight, Icon } from "./ui.tsx";
+import { ActionErrorBanner, confirmDeleteAction, DangerZone, EmptyState, FormActionBar, PageHeader, RowActions } from "./common/index.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { ROOT_ABBR_RULE_MESSAGE, isValidRootAbbr } from "../utils/rootValidation.ts";
 

@@ -1,5 +1,5 @@
-import { Icon } from "../ui.jsx";
-import { StatusBadge } from "../common/index.js";
+import { Icon } from "../ui.tsx";
+import { StatusBadge } from "../common/index.ts";
 
 
 import { FREQ_PARAM_CONFIG } from "./pushConstants.js";

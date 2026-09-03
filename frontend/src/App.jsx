@@ -20,8 +20,8 @@ import { AuthBar, AuthContext, LoginModal } from "./components/AuthControls.jsx"
 import { AppShell } from "./components/app/AppShell.jsx";
 import { ModuleContent } from "./components/app/ModuleContent.jsx";
 import { ModuleSidebar } from "./components/app/ModuleSidebar.jsx";
-import { ConfirmDialogHost, ModuleErrorBoundary, ToastHost } from "./components/common/index.js";
-import { Icon } from "./components/ui.jsx";
+import { ConfirmDialogHost, ModuleErrorBoundary, ToastHost } from "./components/common/index.ts";
+import { Icon } from "./components/ui.tsx";
 import {
   APP_VERSION,
   DEFAULT_ASSET_ROUTE,

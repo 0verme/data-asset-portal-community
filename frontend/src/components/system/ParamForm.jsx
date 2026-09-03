@@ -1,4 +1,4 @@
-import { ActionErrorBanner, BinaryStatusToggle, confirmDeleteAction, DangerZone, FormSection } from "../common/index.js";
+import { ActionErrorBanner, BinaryStatusToggle, confirmDeleteAction, DangerZone, FormSection } from "../common/index.ts";
 
 export function ParamForm({ form, categories, setForm, errors = [], mode = "new", initial = null, onDelete }) {
   const hasError = (field) => errors.some((item) => item.field === field);

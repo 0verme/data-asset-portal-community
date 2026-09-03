@@ -12,13 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Icon } from "../ui.jsx";
+import type { Key, ReactNode } from "react";
+
+import { Icon } from "../ui.tsx";
 
 /**
  * 通用卡片网格视图（纯展示 + 配置驱动）。
  * 不内置任何业务字段，所有内容由调用方通过 render-* props 提供。
  */
-export function CardGridView({
+export interface CardGridViewProps<T> {
+  items: readonly T[];
+  getKey: (item: T) => Key;
+  onItemClick: (item: T) => void;
+  renderBadges: (item: T) => ReactNode;
+  renderTitle: (item: T) => ReactNode;
+  renderSubtitle: (item: T) => ReactNode;
+  renderDesc: (item: T) => ReactNode;
+  renderFootLeft: (item: T) => ReactNode;
+  renderFootMeta: (item: T) => ReactNode;
+  renderFootActions?: ((item: T) => ReactNode) | undefined;
+}
+
+export function CardGridView<T>({
   items,
   getKey,
   onItemClick,
@@ -29,7 +44,7 @@ export function CardGridView({
   renderFootLeft,
   renderFootMeta,
   renderFootActions,
-}) {
+}: CardGridViewProps<T>) {
   return (
     <div className="card-grid">
       {items.map((item) => (

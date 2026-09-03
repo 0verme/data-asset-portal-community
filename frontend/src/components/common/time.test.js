@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { isValidTime } from "./time.js";
+import { isValidTime } from "./time.ts";
 
 test("time validation accepts HH:mm boundaries and common values", () => {
   assert.equal(isValidTime("00:00"), true);

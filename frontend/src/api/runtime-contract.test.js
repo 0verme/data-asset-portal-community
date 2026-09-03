@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { buildReportOptionSets } from "../config/reportOptions.ts";
-import { BINARY_STATUS_OPTIONS } from "../components/common/status.js";
+import { BINARY_STATUS_OPTIONS } from "../components/common/status.ts";
 
 const sourcePath = (relativePath) => fileURLToPath(new URL(relativePath, import.meta.url));
 const readSource = (relativePath) => readFile(sourcePath(relativePath), "utf8");

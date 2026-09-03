@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Icon } from "./ui.jsx";
+import { Icon } from "./ui.tsx";
 import { getPortalStats } from "../api/portal.ts";
 import { unifiedSearch } from "../api/search.ts";
 import {
