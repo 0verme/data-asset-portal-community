@@ -1,4 +1,4 @@
-export const DEFAULT_API_BASE_URL = 'http://127.0.0.1:5099/api'
+export const DEFAULT_API_BASE_URL = 'http://127.0.0.1:15099/api'
 
 export function normalizeBaseUrl(value: string) {
   return String(value || '').trim().replace(/\/+$/, '')

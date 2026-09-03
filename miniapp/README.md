@@ -46,7 +46,7 @@ npm --prefix miniapp run dev
 Taro 只会把 `TARO_APP_` 前缀变量编译进小程序。可复制 `.env.example` 为 `.env.development` 或 `.env.development.local`，按环境设置：
 
 ```text
-TARO_APP_API_BASE_URL=http://127.0.0.1:5099/api
+TARO_APP_API_BASE_URL=http://127.0.0.1:15099/api
 TARO_APP_ID=touristappid
 ```
 
@@ -55,7 +55,7 @@ TARO_APP_ID=touristappid
 本地后端可按根 README 启动：
 
 ```powershell
-uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
+uvicorn backend.asgi:app --host 127.0.0.1 --port 15099
 ```
 
 微信开发者工具访问宿主机地址时，开发阶段可按工具提示勾选“不校验合法域名、web-view、TLS 版本以及 HTTPS 证书”。这只用于本地开发，不是生产方案。
