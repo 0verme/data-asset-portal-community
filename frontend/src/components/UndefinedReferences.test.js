@@ -16,7 +16,7 @@ test("rendered components import their referenced helpers", async () => {
 
   assert.match(
     systemEditor,
-    /import \{ isValidLatestOutputTime, normalizeLatestOutputTime \} from "\.\.\/\.\.\/utils\/push\.js";/,
+    /import \{ isValidLatestOutputTime, normalizeLatestOutputTime \} from "\.\.\/\.\.\/utils\/push\.(js|ts)";/,
   );
   assert.match(
     systemEditor,
@@ -42,6 +42,6 @@ test("data hooks import the shared error formatter", async () => {
   ]);
 
   for (const source of sources) {
-    assert.match(source, /import \{[^}]*getErrorMessage[^}]*\} from "\.\.\/utils\/ui\.js";/);
+    assert.match(source, /import \{[^}]*getErrorMessage[^}]*\} from "\.\.\/utils\/ui\.(js|ts)";/);
   }
 });

@@ -16,8 +16,8 @@ import { DWM_TABLES } from "../data/tables.ts";
 import { DOMAIN_ORDER, LAYER_OPTIONS } from "../config/assets.ts";
 import { LONG_REQUEST_TIMEOUT } from "../config/request.ts";
 import { normalizeAssetDataTypes, normalizeFieldList } from "../constants/dataTypes.ts";
-import { getAssetLayerValue, normalizeAssetLayerFields } from "../utils/assetFilters.js";
-import { generateDDLByDialect, getDDLDialectLabel, normalizeDDLResponse } from "../utils/ddlDialect.js";
+import { getAssetLayerValue, normalizeAssetLayerFields } from "../utils/assetFilters.ts";
+import { generateDDLByDialect, getDDLDialectLabel, normalizeDDLResponse } from "../utils/ddlDialect.ts";
 import { requestRemote } from "./http.js";
 
 const API_MODE = import.meta.env?.VITE_API_MODE || "mock";

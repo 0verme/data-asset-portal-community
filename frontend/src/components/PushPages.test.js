@@ -8,7 +8,7 @@ import {
   comparePushSystemImportance,
   isValidLatestOutputTime,
   normalizeLatestOutputTime,
-} from "../utils/push.js";
+} from "../utils/push.ts";
 import { DEFAULT_AUTH_OPTIONS } from "./push/pushConstants.js";
 import { PUSH_JOB_TABLE_COLUMNS, getPushJobTableValues } from "./push/pushJobTable.js";
 import { formatFreq, validateJob, validateSystem } from "./push/pushUtils.js";

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { runOptimisticStatusMutation } from "./statusMutation.js";
+import { runOptimisticStatusMutation } from "./statusMutation.ts";
 
 test("failed optimistic status mutation rolls back and reports once", async () => {
   let status = "enabled";

@@ -19,7 +19,7 @@ import {
   ROOT_ABBR_RULE_MESSAGE,
   assertValidRootAbbr,
   isValidRootAbbr,
-} from "./rootValidation.js";
+} from "./rootValidation.ts";
 
 test("accepts lowercase letters and numbers", () => {
   assert.equal(isValidRootAbbr("trans"), true);

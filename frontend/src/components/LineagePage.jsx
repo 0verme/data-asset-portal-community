@@ -2,7 +2,7 @@ import React from "react";
 import { findLineageNodes, getLineageInitialView } from "../api/lineage.js";
 import { ActionErrorBanner, ErrorState, LoadingState } from "./common/index.js";
 import { Icon } from "./ui.jsx";
-import { formatDateTime } from "../utils/date.js";
+import { formatDateTime } from "../utils/date.ts";
 import { LineageCanvas } from "./lineage/LineageCanvas.jsx";
 
 const MAX_NODES = 100;

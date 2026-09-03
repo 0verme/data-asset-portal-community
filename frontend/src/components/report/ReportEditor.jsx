@@ -3,7 +3,7 @@ import { getAssetTables, getDomains } from "../../api/assets.js";
 import { getIndicatorList } from "../../api/indicator.js";
 import { getReportList } from "../../api/report.js";
 import { buildReportOptionSets } from "../../config/reportOptions.ts";
-import { getLegacyAwareOptions } from "../../utils/optionUtils.js";
+import { getLegacyAwareOptions } from "../../utils/optionUtils.ts";
 import {
   ActionErrorBanner,
   AssetReferencePicker,

@@ -14,7 +14,7 @@
 
 import { Highlight, Icon } from "../ui.jsx";
 import { EmptyState, RowActions, StatusBadge } from "../common/index.js";
-import { formatDateTime } from "../../utils/date.js";
+import { formatDateTime } from "../../utils/date.ts";
 import { PARAM_STATUS_META } from "./constants.js";
 
 export function ParamDictPage({

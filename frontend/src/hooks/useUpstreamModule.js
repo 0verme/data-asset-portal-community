@@ -38,8 +38,8 @@ import {
 import { useSmartBack } from "./useSmartBack.js";
 import { DEFAULT_UPSTREAM_DEPTS } from "../config/defaults.ts";
 import { DB_TYPE_OPTIONS } from "../data/upstreamSystems.ts";
-import { normalizeDictOptions } from "../utils/optionUtils.js";
-import { getErrorMessage, scrollMainToTop } from "../utils/ui.js";
+import { normalizeDictOptions } from "../utils/optionUtils.ts";
+import { getErrorMessage, scrollMainToTop } from "../utils/ui.ts";
 
 function fallbackOptions(values) {
   const seen = new Set();

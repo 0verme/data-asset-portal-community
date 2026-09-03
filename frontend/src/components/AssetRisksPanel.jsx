@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { Icon } from "./ui.jsx";
-import { formatDateTime } from "../utils/date.js";
+import { formatDateTime } from "../utils/date.ts";
 
 const SEVERITY_META = {
   error: { label: "严重", tagClass: "tag-danger" },

@@ -7,7 +7,7 @@ import {
   updateManualCodeTableStatus,
 } from "../api/manualCodeTables.js";
 import { getBinaryStatusValue, toast } from "../components/common/index.js";
-import { getErrorMessage } from "../utils/ui.js";
+import { getErrorMessage } from "../utils/ui.ts";
 
 export const MANUAL_CODE_TABLE_STYLES = [
   { value: "enum", label: "标准枚举" },

@@ -1,4 +1,4 @@
-import { isValidLatestOutputTime } from "../../utils/push.js";
+import { isValidLatestOutputTime } from "../../utils/push.ts";
 import { FREQ_PARAM_CONFIG, ID_RE, SYSTEM_ID_RE } from "./pushConstants.js";
 
 let pushFieldSeed = 0;

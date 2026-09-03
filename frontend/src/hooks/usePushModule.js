@@ -41,9 +41,9 @@ import {
   DEFAULT_PROTOCOL_OPTIONS,
 } from "../components/push/pushConstants.js";
 import { DEFAULT_UPSTREAM_DEPTS } from "../config/defaults.ts";
-import { normalizeDictOptions } from "../utils/optionUtils.js";
-import { comparePushSystemImportance } from "../utils/push.js";
-import { getErrorMessage, scrollMainToTop } from "../utils/ui.js";
+import { normalizeDictOptions } from "../utils/optionUtils.ts";
+import { comparePushSystemImportance } from "../utils/push.ts";
+import { getErrorMessage, scrollMainToTop } from "../utils/ui.ts";
 
 function fallbackOptions(values) {
   const seen = new Set();

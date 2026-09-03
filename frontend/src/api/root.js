@@ -14,7 +14,7 @@
 
 import { requestRemote } from "./http.js";
 import { LONG_REQUEST_TIMEOUT } from "../config/request.ts";
-import { assertValidRootAbbr } from "../utils/rootValidation.js";
+import { assertValidRootAbbr } from "../utils/rootValidation.ts";
 
 import { ROOT_CATEGORIES, WORD_ROOTS } from "../data/roots.ts";
 
