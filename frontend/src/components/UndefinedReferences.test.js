@@ -3,16 +3,18 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const sourcePath = (relativePath) => fileURLToPath(new URL(relativePath, import.meta.url));
+const sourcePath = (relativePath) =>
+  fileURLToPath(new URL(relativePath, import.meta.url));
 const readSource = (relativePath) => readFile(sourcePath(relativePath), "utf8");
 
 test("rendered components import their referenced helpers", async () => {
-  const [systemEditor, reportDetail, upstreamDetail, upstreamParts] = await Promise.all([
-    readSource("./push/SystemEditor.jsx"),
-    readSource("./report/ReportDetailDrawer.jsx"),
-    readSource("./upstream/UpstreamDetail.jsx"),
-    readSource("./upstream/UpstreamParts.jsx"),
-  ]);
+  const [systemEditor, reportDetail, upstreamDetail, upstreamParts] =
+    await Promise.all([
+      readSource("./push/SystemEditor.jsx"),
+      readSource("./report/ReportDetailDrawer.jsx"),
+      readSource("./upstream/UpstreamDetail.jsx"),
+      readSource("./upstream/UpstreamParts.jsx"),
+    ]);
 
   assert.match(
     systemEditor,
@@ -30,8 +32,14 @@ test("rendered components import their referenced helpers", async () => {
     upstreamDetail,
     /import \{ nextUnload, ScheduleStepper \} from "\.\/UpstreamParts\.jsx";/,
   );
-  assert.match(upstreamParts, /export \{ getScheduleSteps, nextUnload \} from "\.\/scheduleStepper\.js"/);
-  assert.match(upstreamParts, /export function ScheduleStepper\(\{ times, muted, now \}\)/);
+  assert.match(
+    upstreamParts,
+    /export \{ getScheduleSteps, nextUnload \} from "\.\/scheduleStepper\.js"/,
+  );
+  assert.match(
+    upstreamParts,
+    /export function ScheduleStepper\(\{ times, muted, now \}\)/,
+  );
 });
 
 test("data hooks import the shared error formatter", async () => {
@@ -42,6 +50,9 @@ test("data hooks import the shared error formatter", async () => {
   ]);
 
   for (const source of sources) {
-    assert.match(source, /import \{[^}]*getErrorMessage[^}]*\} from ["']\.\.\/utils\/ui\.(js|ts)["'];/);
+    assert.match(
+      source,
+      /import \{[^}]*getErrorMessage[^}]*\} from ["']\.\.\/utils\/ui\.(js|ts)["'];/,
+    );
   }
 });
