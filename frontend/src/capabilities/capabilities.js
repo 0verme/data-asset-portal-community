@@ -86,7 +86,7 @@ export async function loadCapabilities() {
     return buildMockCapabilities();
   }
   try {
-    const { requestRemote } = await import("../api/http.js");
+    const { requestRemote } = await import("../api/http.ts");
     const payload = await requestRemote("/capabilities");
     return modulesFromPayload(payload);
   } catch (error) {

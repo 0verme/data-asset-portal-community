@@ -20,8 +20,8 @@ import {
   getUpstreamSystems,
   patchUpstreamStatus,
   saveUpstreamSystem,
-} from "../api/upstream.js";
-import { isUnauthorizedError } from "../api/http.js";
+} from "../api/upstream.ts";
+import { isUnauthorizedError } from "../api/http.ts";
 import { toast } from "../components/common/index.js";
 import {
   DEFAULT_UP_FILTER,

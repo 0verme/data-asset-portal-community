@@ -19,7 +19,7 @@ import {
   getRoots,
   importRoots,
   saveRoot,
-} from "../api/root.js";
+} from "../api/root.ts";
 import { DEFAULT_ROOT_CATEGORY, DEFAULT_ROOT_ROUTE } from "../config/defaults.ts";
 import { clearModuleNavigationState, MODULE_META } from "../routing/navigation.ts";
 import { useSmartBack } from "./useSmartBack.js";

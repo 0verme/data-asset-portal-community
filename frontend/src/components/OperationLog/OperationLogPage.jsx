@@ -14,7 +14,7 @@
 
 import React from "react";
 import { Icon } from "../ui.jsx";
-import { getOperationLogDetail, getOperationLogList } from "../../api/operationLogs.js";
+import { getOperationLogDetail, getOperationLogList } from "../../api/operationLogs.ts";
 import { OperationLogFilter } from "./OperationLogFilter.jsx";
 import { OperationLogTable } from "./OperationLogTable.jsx";
 import { OperationLogDetail } from "./OperationLogDetail.jsx";

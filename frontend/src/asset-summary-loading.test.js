@@ -6,7 +6,7 @@ const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 test("asset home uses paged summaries while detail fields load on navigation", async () => {
   const [api, hook, home, view] = await Promise.all([
-    read("./api/assets.js"),
+    read("./api/assets.ts"),
     read("./hooks/useAssetModule.js"),
     read("./components/HomePage.jsx"),
     read("./components/views/AssetView.jsx"),

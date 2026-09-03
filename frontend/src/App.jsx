@@ -14,7 +14,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-import { getMenus, MENUS_CHANGED_EVENT } from "./api/menus.js";
+import { getMenus, MENUS_CHANGED_EVENT } from "./api/menus.ts";
 import { isDbAuthMode } from "./auth.js";
 import { AuthBar, AuthContext, LoginModal } from "./components/AuthControls.jsx";
 import { AppShell } from "./components/app/AppShell.jsx";

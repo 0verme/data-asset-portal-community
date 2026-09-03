@@ -19,8 +19,8 @@ import {
   getIndicatorList,
   updateIndicator,
   updateIndicatorStatus,
-} from "../api/indicator.js";
-import { isUnauthorizedError } from "../api/http.js";
+} from "../api/indicator.ts";
+import { isUnauthorizedError } from "../api/http.ts";
 import { DEFAULT_INDICATOR_ROUTE } from "../config/defaults.ts";
 import { getErrorMessage, scrollMainToTop } from "../utils/ui.ts";
 

@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   filterFieldMappingRows,
   getFieldMappingSourceSystems,
-} from "./fieldMapping.js";
+} from "./fieldMapping.ts";
 import { formatSystemLabel } from "../components/fieldMapping/fieldMappingUtils.js";
 
 test("same-name mock systems are filtered by stable source system id", () => {

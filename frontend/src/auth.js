@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { getCurrentRemoteUser, loginRemote, logoutRemote } from "./api/auth.js";
+import { getCurrentRemoteUser, loginRemote, logoutRemote } from "./api/auth.ts";
 import {
   getEffectivePermissions,
   MOCK_ROLE_PERMISSIONS,

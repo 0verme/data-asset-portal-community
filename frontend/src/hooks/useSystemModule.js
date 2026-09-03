@@ -20,7 +20,7 @@ import {
   getParamDicts,
   updateParamDict,
   updateParamDictStatus,
-} from "../api/paramDicts.js";
+} from "../api/paramDicts.ts";
 import {
   createUser,
   deleteUser,
@@ -28,7 +28,7 @@ import {
   resetUserPassword,
   updateUser,
   updateUserStatus,
-} from "../api/systemUsers.js";
+} from "../api/systemUsers.ts";
 import {
   createMenu,
   deleteMenu,
@@ -36,7 +36,7 @@ import {
   moveMenu,
   updateMenu,
   updateMenuStatus,
-} from "../api/menus.js";
+} from "../api/menus.ts";
 import { getErrorMessage } from "../utils/ui.ts";
 import { toast } from "../components/common/index.js";
 import { DEFAULT_MENU_FORM, DEFAULT_PARAM_FORM, DEFAULT_USER_FORM } from "../components/system/constants.js";

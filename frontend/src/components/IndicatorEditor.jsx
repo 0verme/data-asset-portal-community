@@ -1,7 +1,7 @@
 import React from "react";
 
-import { getAssetFields, getAssetTables } from "../api/assets.js";
-import { getIndicatorPathTree } from "../api/indicator.js";
+import { getAssetFields, getAssetTables } from "../api/assets.ts";
+import { getIndicatorPathTree } from "../api/indicator.ts";
 import {
   getIndicatorDimensionFromPath,
   INDICATOR_DIMENSION_CODE_MAP,

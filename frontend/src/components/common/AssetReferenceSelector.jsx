@@ -1,7 +1,7 @@
 import React from "react";
 
-import { getAssetTables } from "../../api/assets.js";
-import { getIndicatorList } from "../../api/indicator.js";
+import { getAssetTables } from "../../api/assets.ts";
+import { getIndicatorList } from "../../api/indicator.ts";
 import { Icon } from "../ui.jsx";
 
 const uniqueBy = (items, key) => [...new Map(items.filter(Boolean).map((item) => [item[key], item])).values()];

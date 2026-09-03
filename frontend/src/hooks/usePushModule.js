@@ -20,7 +20,7 @@ import {
   getPushSystems,
   savePushJob,
   savePushSystem,
-} from "../api/push.js";
+} from "../api/push.ts";
 import {
   DEFAULT_PUSH_FILTER,
   DEFAULT_PUSH_VIEW,
