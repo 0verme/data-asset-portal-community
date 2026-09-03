@@ -12,7 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export const PARAM_DICT_CATEGORIES = [
+export interface ParamDictCategory {
+  code: string;
+  name: string;
+  desc: string;
+  status: string;
+}
+
+export const PARAM_DICT_CATEGORIES: readonly ParamDictCategory[] = [
   {
     code: "USER_STATUS",
     name: "用户状态",
@@ -37,9 +44,23 @@ export const PARAM_DICT_CATEGORIES = [
     desc: "文件传输常用编码配置",
     status: "enabled",
   },
-];
+] as const;
 
-function createParamDict(item) {
+export interface ParamDictItem {
+  id: string;
+  categoryCode: string;
+  code: string;
+  name: string;
+  value: string;
+  status: string;
+  desc: string;
+  updatedAt: string;
+}
+
+function createParamDict(
+  item: Partial<ParamDictItem> &
+    Pick<ParamDictItem, "id" | "categoryCode" | "code" | "name" | "value">,
+): ParamDictItem {
   return {
     status: "enabled",
     updatedAt: "2026-06-17 18:00:00",
@@ -48,7 +69,7 @@ function createParamDict(item) {
   };
 }
 
-export const PARAM_DICT_ITEMS = [
+export const PARAM_DICT_ITEMS: readonly ParamDictItem[] = [
   createParamDict({
     id: "DICT001",
     categoryCode: "USER_STATUS",
@@ -121,4 +142,4 @@ export const PARAM_DICT_ITEMS = [
     updatedAt: "2026-06-14 15:46:00",
     desc: "兼容部分存量文件传输",
   }),
-];
+] as const;

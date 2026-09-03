@@ -13,9 +13,9 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
-import { LONG_REQUEST_TIMEOUT } from "../config/request.js";
+import { LONG_REQUEST_TIMEOUT } from "../config/request.ts";
 
-import { PUSH_SYSTEMS } from "../data/pushSystems.js";
+import { PUSH_SYSTEMS } from "../data/pushSystems.ts";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));

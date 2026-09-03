@@ -13,17 +13,17 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
-import { LONG_REQUEST_TIMEOUT } from "../config/request.js";
+import { LONG_REQUEST_TIMEOUT } from "../config/request.ts";
 import { getMenus } from "./menus.js";
-import { SEARCH_SCOPE_TO_MODULE } from "../config/portalSearch.js";
-import { DWM_TABLES } from "../data/tables.js";
-import { WORD_ROOTS } from "../data/roots.js";
-import { UPSTREAM_SYSTEMS } from "../data/upstreamSystems.js";
-import { INDICATORS } from "../data/indicators.js";
-import { PUSH_SYSTEMS } from "../data/pushSystems.js";
-import { REPORTS } from "../data/reports.js";
-import { API_ASSETS } from "../data/apiAssets.js";
-import { MANUAL_CODE_TABLES } from "../data/manualCodeTables.js";
+import { SEARCH_SCOPE_TO_MODULE } from "../config/portalSearch.ts";
+import { DWM_TABLES } from "../data/tables.ts";
+import { WORD_ROOTS } from "../data/roots.ts";
+import { UPSTREAM_SYSTEMS } from "../data/upstreamSystems.ts";
+import { INDICATORS } from "../data/indicators.ts";
+import { PUSH_SYSTEMS } from "../data/pushSystems.ts";
+import { REPORTS } from "../data/reports.ts";
+import { API_ASSETS } from "../data/apiAssets.ts";
+import { MANUAL_CODE_TABLES } from "../data/manualCodeTables.ts";
 
 const API_MODE = (import.meta.env.VITE_API_MODE || "mock").trim().toLowerCase();
 const SCOPE_ALL = "all";

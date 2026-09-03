@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-import { DEFAULT_REPORT_FILTER } from "../../config/defaults.js";
+import { DEFAULT_REPORT_FILTER } from "../../config/defaults.ts";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.jsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.jsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.jsx";

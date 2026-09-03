@@ -24,7 +24,7 @@ import {
 import {
   DEFAULT_PUSH_FILTER,
   DEFAULT_PUSH_VIEW,
-} from "../config/defaults.js";
+} from "../config/defaults.ts";
 import {
   clearModuleNavigationState,
   getModuleListRoute,
@@ -40,7 +40,7 @@ import {
   DEFAULT_FREQ_TYPE_OPTIONS,
   DEFAULT_PROTOCOL_OPTIONS,
 } from "../components/push/pushConstants.js";
-import { DEFAULT_UPSTREAM_DEPTS } from "../config/defaults.js";
+import { DEFAULT_UPSTREAM_DEPTS } from "../config/defaults.ts";
 import { normalizeDictOptions } from "../utils/optionUtils.js";
 import { comparePushSystemImportance } from "../utils/push.js";
 import { getErrorMessage, scrollMainToTop } from "../utils/ui.js";

@@ -2,7 +2,7 @@ import { IndicatorPage } from "../IndicatorPage.jsx";
 import IndicatorEditor from "../IndicatorEditor.jsx";
 import { Icon } from "../ui.jsx";
 import { confirmDeleteAction, EmptyState, ErrorState, LoadingState } from "../common/index.js";
-import { DEFAULT_INDICATOR_FILTER } from "../../config/defaults.js";
+import { DEFAULT_INDICATOR_FILTER } from "../../config/defaults.ts";
 
 export function IndicatorView({
   indicator,

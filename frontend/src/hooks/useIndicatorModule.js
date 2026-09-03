@@ -21,7 +21,7 @@ import {
   updateIndicatorStatus,
 } from "../api/indicator.js";
 import { isUnauthorizedError } from "../api/http.js";
-import { DEFAULT_INDICATOR_ROUTE } from "../config/defaults.js";
+import { DEFAULT_INDICATOR_ROUTE } from "../config/defaults.ts";
 import { getErrorMessage, scrollMainToTop } from "../utils/ui.js";
 
 export function useIndicatorModule({

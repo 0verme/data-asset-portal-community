@@ -20,7 +20,7 @@
     "jsx": "react-jsx",
     "allowJs": true,
     "checkJs": false,
-    "types": []
+    "types": ["vite/client"]
   },
   "include": [
     "src/**/*.ts",

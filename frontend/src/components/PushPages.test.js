@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-import { PUSH_SYSTEMS } from "../data/pushSystems.js";
+import { PUSH_SYSTEMS } from "../data/pushSystems.ts";
 import {
   comparePushSystemImportance,
   isValidLatestOutputTime,
@@ -13,8 +13,8 @@ import { DEFAULT_AUTH_OPTIONS } from "./push/pushConstants.js";
 import { PUSH_JOB_TABLE_COLUMNS, getPushJobTableValues } from "./push/pushJobTable.js";
 import { formatFreq, validateJob, validateSystem } from "./push/pushUtils.js";
 
-const defaultsPath = fileURLToPath(new URL("../config/defaults.js", import.meta.url));
-const commonCodesPath = fileURLToPath(new URL("../data/commonCodes.js", import.meta.url));
+const defaultsPath = fileURLToPath(new URL("../config/defaults.ts", import.meta.url));
+const commonCodesPath = fileURLToPath(new URL("../data/commonCodes.ts", import.meta.url));
 const pushHookPath = fileURLToPath(new URL("../hooks/usePushModule.js", import.meta.url));
 const locationPath = fileURLToPath(new URL("../routing/location.ts", import.meta.url));
 const pagePath = fileURLToPath(new URL("./PushPages.jsx", import.meta.url));

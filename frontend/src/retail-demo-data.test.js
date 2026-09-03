@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { API_ASSETS } from "./data/apiAssets.js";
-import { FIELD_MAPPING_ROWS } from "./data/fieldMappings.js";
-import { INDICATORS } from "./data/indicators.js";
-import { PUSH_SYSTEMS } from "./data/pushSystems.js";
-import { REPORTS } from "./data/reports.js";
-import { WORD_ROOTS } from "./data/roots.js";
-import { SYSTEMS } from "./data/systems.js";
-import { DWM_TABLES } from "./data/tables.js";
-import { UPSTREAM_SYSTEMS } from "./data/upstreamSystems.js";
+import { API_ASSETS } from "./data/apiAssets.ts";
+import { FIELD_MAPPING_ROWS } from "./data/fieldMappings.ts";
+import { INDICATORS } from "./data/indicators.ts";
+import { PUSH_SYSTEMS } from "./data/pushSystems.ts";
+import { REPORTS } from "./data/reports.ts";
+import { WORD_ROOTS } from "./data/roots.ts";
+import { SYSTEMS } from "./data/systems.ts";
+import { DWM_TABLES } from "./data/tables.ts";
+import { UPSTREAM_SYSTEMS } from "./data/upstreamSystems.ts";
 
 test("retail demo exposes the planned deterministic data volume", () => {
   assert.equal(SYSTEMS.length, 8);

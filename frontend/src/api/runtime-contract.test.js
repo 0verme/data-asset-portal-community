@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { buildReportOptionSets } from "../config/reportOptions.js";
+import { buildReportOptionSets } from "../config/reportOptions.ts";
 import { BINARY_STATUS_OPTIONS } from "../components/common/status.js";
 
 const sourcePath = (relativePath) => fileURLToPath(new URL(relativePath, import.meta.url));

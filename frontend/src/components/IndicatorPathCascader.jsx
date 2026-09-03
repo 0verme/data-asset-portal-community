@@ -5,7 +5,7 @@ import {
   findIndicatorPathValuePath,
   formatIndicatorPath,
   getIndicatorDimensionFromPath,
-} from "../data/indicatorPathOptions.js";
+} from "../data/indicatorPathOptions.ts";
 import { Icon } from "./ui.jsx";
 
 function buildColumns(options, activeValues) {

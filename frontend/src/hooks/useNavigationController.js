@@ -18,7 +18,7 @@ import {
   DEFAULT_DETAIL_TAB,
   DEFAULT_PUSH_VIEW,
   DEFAULT_UP_VIEW,
-} from "../config/defaults.js";
+} from "../config/defaults.ts";
 import { createNavigationState } from "../routing/navigation.ts";
 import { getPortalPushNavigation } from "../routing/portalNavigation.js";
 import { parseInitialLocation } from "../routing/location.ts";

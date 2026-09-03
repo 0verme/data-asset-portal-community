@@ -1,4 +1,4 @@
-import { LAYER_OPTIONS } from "../config/assets.js";
+import { LAYER_OPTIONS } from "../config/assets.ts";
 
 const LAYER_CODES = new Set(
   LAYER_OPTIONS.map((item) => String(item.code || "").trim().toUpperCase()),

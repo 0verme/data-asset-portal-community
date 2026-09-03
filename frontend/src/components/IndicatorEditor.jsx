@@ -6,7 +6,7 @@ import {
   getIndicatorDimensionFromPath,
   INDICATOR_DIMENSION_CODE_MAP,
   normalizeIndicatorDimension,
-} from "../data/indicatorPathOptions.js";
+} from "../data/indicatorPathOptions.ts";
 import IndicatorPathCascader from "./IndicatorPathCascader.jsx";
 import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader } from "./common/index.js";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";

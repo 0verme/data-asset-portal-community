@@ -1,6 +1,6 @@
 import { requestRemote } from "./http.js";
-import { API_ASSETS } from "../data/apiAssets.js";
-import { SYSTEMS } from "../data/systems.js";
+import { API_ASSETS } from "../data/apiAssets.ts";
+import { SYSTEMS } from "../data/systems.ts";
 const remote=(import.meta.env.VITE_API_MODE||"mock").trim().toLowerCase()==="remote";
 let store=JSON.parse(JSON.stringify(API_ASSETS)); const clone=(value)=>JSON.parse(JSON.stringify(value));
 export async function getApiAssets(params={}) { if(remote){const r=await requestRemote("/api-assets",{params});return r.items||[];} const q=String(params.keyword||"").toLowerCase();return clone(store.filter(x=>(!params.status||x.status===params.status)&&(!params.method||x.method===params.method)&&(!params.downstreamSystemId||String(x.downstreamSystemId)===String(params.downstreamSystemId))&&(!q||[x.code,x.name,x.path,x.description,x.ownerName,x.downstreamSystemName,x.downstreamSystemShortName].some(v=>String(v||"").toLowerCase().includes(q))))); }

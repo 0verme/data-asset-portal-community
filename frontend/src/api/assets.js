@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { DWM_TABLES } from "../data/tables.js";
-import { DOMAIN_ORDER, LAYER_OPTIONS } from "../config/assets.js";
-import { LONG_REQUEST_TIMEOUT } from "../config/request.js";
-import { normalizeAssetDataTypes, normalizeFieldList } from "../constants/dataTypes.js";
+import { DWM_TABLES } from "../data/tables.ts";
+import { DOMAIN_ORDER, LAYER_OPTIONS } from "../config/assets.ts";
+import { LONG_REQUEST_TIMEOUT } from "../config/request.ts";
+import { normalizeAssetDataTypes, normalizeFieldList } from "../constants/dataTypes.ts";
 import { getAssetLayerValue, normalizeAssetLayerFields } from "../utils/assetFilters.js";
 import { generateDDLByDialect, getDDLDialectLabel, normalizeDDLResponse } from "../utils/ddlDialect.js";
 import { requestRemote } from "./http.js";

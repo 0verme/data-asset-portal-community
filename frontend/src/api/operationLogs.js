@@ -13,8 +13,8 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
-import { LONG_REQUEST_TIMEOUT } from "../config/request.js";
-import { OPERATION_LOGS } from "../data/operationLogs.js";
+import { LONG_REQUEST_TIMEOUT } from "../config/request.ts";
+import { OPERATION_LOGS } from "../data/operationLogs.ts";
 
 const API_MODE = (import.meta.env.VITE_API_MODE || "mock").trim().toLowerCase();
 

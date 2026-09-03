@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
-import { SYSTEM_USERS } from "../data/systemUsers.js";
+import { SYSTEM_USERS } from "../data/systemUsers.ts";
 
 const API_MODE = (import.meta.env.VITE_API_MODE || "mock").trim().toLowerCase();
 let mockUsers = clone(SYSTEM_USERS);

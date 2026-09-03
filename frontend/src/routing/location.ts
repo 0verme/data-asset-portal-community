@@ -36,9 +36,9 @@ import {
   DEFAULT_UP_VIEW,
   INDICATOR_VIEW_OPTIONS,
   ASSET_VIEW_OPTIONS,
-} from "../config/defaults.js";
-import { INDICATOR_DIMENSION_OPTIONS } from "../data/indicators.js";
-import { LAYER_OPTIONS } from "../config/assets.js";
+} from "../config/defaults.ts";
+import { INDICATOR_DIMENSION_OPTIONS } from "../data/indicators.ts";
+import { LAYER_OPTIONS } from "../config/assets.ts";
 import { getActiveModuleRoute } from "./navigation.ts";
 import type {
   ApiAssetFilter,
@@ -54,7 +54,7 @@ import type {
   HistoryActionOptions,
   PushFilter,
   UpstreamFilter,
-} from "./types.js";
+} from "./types.ts";
 
 const DEFAULT_LINEAGE_ROUTE: LineageRoute = {
   rootId: null,

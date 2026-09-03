@@ -31,7 +31,7 @@ import {
   DEFAULT_ROOT_ROUTE,
   DEFAULT_SYSTEM_ROUTE,
   DEFAULT_UP_ROUTE,
-} from "./config/defaults.js";
+} from "./config/defaults.ts";
 import { useAssetModule } from "./hooks/useAssetModule.js";
 import { useApiAssetModule } from "./hooks/useApiAssetModule.js";
 import { useAuthSession } from "./hooks/useAuthSession.js";

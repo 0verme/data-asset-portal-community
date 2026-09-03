@@ -13,10 +13,10 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
-import { LONG_REQUEST_TIMEOUT } from "../config/request.js";
+import { LONG_REQUEST_TIMEOUT } from "../config/request.ts";
 import { assertValidRootAbbr } from "../utils/rootValidation.js";
 
-import { ROOT_CATEGORIES, WORD_ROOTS } from "../data/roots.js";
+import { ROOT_CATEGORIES, WORD_ROOTS } from "../data/roots.ts";
 
 const API_MODE = import.meta.env.VITE_API_MODE || "mock";
 const DEFAULT_ROOT_CATEGORY = "公共词根";
