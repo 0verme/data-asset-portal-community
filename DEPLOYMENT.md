@@ -202,6 +202,21 @@ backend/.venv/bin/python demo/seed_postgres.py --dialect postgres
 
 `docs/pg/`、`docs/dws/` 中的方言 SQL 和 external integration 说明是补充参考，不是 `backend/schema` + Alembic 的替代。需要 vendor-specific DDL 时先确认目标 profile、依赖和对象归属，不要无条件执行全部 SQL。
 
+## Community Demo 默认管理员
+
+Community Demo 初始化过程中会自动创建演示管理员：
+
+| 项目 | 默认值 |
+| --- | --- |
+| 用户名 | `admin` |
+| 密码 | `12346` |
+| 角色 | 管理员 |
+
+- 仅用于 Community Demo / 本地测试
+- 不应作为生产环境长期凭据
+- 正式部署后应修改管理员密码或创建独立管理员
+- `admin / 12346` 不是生产环境固定默认密码
+
 如果启用了 persistent lineage，先设置 `LINEAGE_DB_PROFILE`，再按 [`血缘快照采集与发布指南`](./docs/lineage_bulk_import_guide.md) 执行 `collect_lineage_snapshot.py --dry-run` 和正式发布；采集失败应保留原 ACTIVE 快照。
 
 ### 5.2 Existing database

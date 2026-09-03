@@ -38,8 +38,8 @@ DOMAIN_CODE_BY_NAME = {
 # Community demo admin account. Seed scripts hash the password themselves.
 ADMIN_USER = {
     "id": 1,
-    "username": "community_demo",
-    "password": "demo-change-me",
+    "username": "admin",
+    "password": "12346",
     "display_name": "演示管理员",
     "role": "admin",
     "status": "ACTIVE",

@@ -57,9 +57,9 @@ preflight
 Community Demo ready
 Frontend:    http://127.0.0.1:5173/
 Backend/API: http://127.0.0.1:5099
-Demo account:
-  username: community_demo
-  password: demo-change-me
+Demo administrator:
+  Username: admin
+  Password: 12346
 Database:    <repository>/.demo/community-demo/community.sqlite
 Stop: Ctrl+C
 ```
@@ -145,11 +145,11 @@ Run #2 → migration no-op/seed idempotent → HTTP smoke
 ## Demo account
 
 ```text
-username: community_demo
-password: demo-change-me
+username: admin
+password: 12346
 ```
 
-这是 canonical Community seed 的虚构本地账号，不是生产凭据。不要在共享环境或部署环境复用它。
+这是 canonical Community seed 的虚构本地账号，仅用于 Community Demo / 本地体验，不是生产环境默认管理员。正式部署请修改密码或创建独立管理员账号。
 
 ## Troubleshooting
 

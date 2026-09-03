@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import io
 import importlib
 import os
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import call, patch
 
@@ -157,8 +159,10 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
     def test_run_demo_uses_requested_ports_for_processes_and_readiness(self):
         backend_process = object()
         frontend_process = object()
+        output = io.StringIO()
 
         with (
+            redirect_stdout(output),
             patch.object(_demo, "check_ports") as check_ports_mock,
             patch.object(
                 _demo.subprocess,
@@ -182,6 +186,9 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         frontend_command = popen_mock.call_args_list[1].args[0]
         self.assertEqual("15099", backend_command[-1])
         self.assertEqual("15173", frontend_command[-2])
+        self.assertIn("Demo administrator:", output.getvalue())
+        self.assertIn("Username: admin", output.getvalue())
+        self.assertIn("Password: 12346", output.getvalue())
         wait_mock.assert_any_call(
             "http://127.0.0.1:15099/healthz", backend_process, "Backend"
         )
@@ -191,6 +198,23 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         terminate_mock.assert_has_calls(
             [call(frontend_process, "frontend"), call(backend_process, "backend")]
         )
+
+    def test_init_only_prints_demo_admin_credentials(self):
+        output = io.StringIO()
+        with (
+            redirect_stdout(output),
+            patch.object(
+                _demo,
+                "initialize_demo",
+                return_value=({}, Path("python")),
+            ),
+        ):
+            result = _demo.main(["--init-only"])
+
+        self.assertEqual(0, result)
+        self.assertIn("Demo administrator:", output.getvalue())
+        self.assertIn("Username: admin", output.getvalue())
+        self.assertIn("Password: 12346", output.getvalue())
 
     def test_missing_lineage_entries_trigger_one_idempotent_workspace_build(self):
         commands = []

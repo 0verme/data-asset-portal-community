@@ -13,6 +13,7 @@ from backend.app.core.capabilities import resolve_capabilities, set_resolved_cap
 from backend.app.db.facade import connect_with_profile
 from backend.app.migrations.schema import initialize, verify_database
 from fastapi.testclient import TestClient
+from demo.seed_loader import ADMIN_USER
 
 ROOT = Path(__file__).resolve().parents[1]
 COMMUNITY_CONFIG = ROOT / "configs" / "database.community.yaml"
@@ -69,7 +70,10 @@ class RepositoryOpenBoundaryTests(unittest.TestCase):
         if authenticated:
             login = client.post(
                 "/api/auth/login",
-                json={"username": "community_demo", "password": "demo-change-me"},
+                json={
+                    "username": ADMIN_USER["username"],
+                    "password": ADMIN_USER["password"],
+                },
             )
             self.assertEqual(200, login.status_code, login.text)
             session = login.cookies.get("session")
@@ -128,7 +132,10 @@ class RepositoryOpenBoundaryTests(unittest.TestCase):
     def test_seeded_admin_contract_still_works(self):
         response = self.client().post(
             "/api/auth/login",
-            json={"username": "community_demo", "password": "demo-change-me"},
+            json={
+                "username": ADMIN_USER["username"],
+                "password": ADMIN_USER["password"],
+            },
         )
         self.assertEqual(200, response.status_code)
 

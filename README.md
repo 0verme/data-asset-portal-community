@@ -191,6 +191,15 @@ Windows PowerShell：
 .\scripts\demo.ps1
 ```
 
+#### 演示管理员
+
+Community Demo 初始化完成后，可以使用：
+
+- 用户名：`admin`
+- 密码：`12346`
+
+该账号仅用于 Community Demo / 本地体验环境，不是生产环境默认管理员。正式部署请创建独立管理员账号，并立即修改默认凭据。
+
 详细说明见 [Community Demo 指南](./docs/community-demo.md)。
 
 ### 只看前端（mock mode）

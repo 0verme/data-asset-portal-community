@@ -49,6 +49,18 @@ LINEAGE_WORKSPACE_ENTRYPOINTS = (
 )
 
 
+def _print_demo_admin() -> None:
+    from demo.seed_loader import ADMIN_USER
+
+    print("Demo administrator:", flush=True)
+    print(f"  Username: {ADMIN_USER['username']}", flush=True)
+    print(f"  Password: {ADMIN_USER['password']}", flush=True)
+    print(
+        "WARNING: Demo credentials only. Change them for real deployments.",
+        flush=True,
+    )
+
+
 class BootstrapError(RuntimeError):
     """An actionable bootstrap failure."""
 
@@ -677,11 +689,7 @@ def run_demo(
         print("\nCommunity Demo ready\n", flush=True)
         print(f"Frontend:    http://127.0.0.1:{frontend_port}/", flush=True)
         print(f"Backend/API: http://127.0.0.1:{backend_port}", flush=True)
-        from demo.seed_loader import ADMIN_USER
-
-        print("Demo account:", flush=True)
-        print(f"  username: {ADMIN_USER['username']}", flush=True)
-        print("  password: see docs/community-demo.md", flush=True)
+        _print_demo_admin()
         print(f"Database:    {paths.database}", flush=True)
         print("\nStop: Ctrl+C\n", flush=True)
         while True:
@@ -731,6 +739,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         )
         if args.init_only:
             print("Community Demo initialization complete (--init-only).", flush=True)
+            _print_demo_admin()
             return 0
         run_demo(
             paths,
