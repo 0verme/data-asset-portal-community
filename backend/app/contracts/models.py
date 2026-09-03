@@ -11,7 +11,12 @@ from __future__ import annotations
 from typing import Any, Generic, TypeVar
 
 # pi-lens-ignore: reportMissingImports
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field  # pyright: ignore[reportMissingImports]
+from pydantic import (  # pyright: ignore[reportMissingImports]
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+)
 
 
 class ContractModel(BaseModel):
@@ -427,8 +432,55 @@ class SystemResponse(ContractModel):
     total: int | None = None
 
 
+class UpstreamSystemItem(ContractModel):
+    """Shared public/admin representation for an upstream system."""
+
+    upstreamSystemId: int | str | None = None
+    id: str | None = None
+    abbr: str | None = None
+    name: str | None = None
+    dbType: str | None = None
+    host: str | None = None
+    db: str | None = None
+    schema_name: str | None = Field(default=None, alias="schema")
+    unloadTimes: list[str] = Field(default_factory=list)
+    status: str | None = None
+    owner: str | None = None
+    dept: str | None = None
+    desc: str | None = None
+
+
+class UpstreamSystemRequest(ContractModel):
+    """Create/update payload; service validation remains the business boundary."""
+
+    id: str | None = None
+    abbr: str | None = None
+    name: str | None = None
+    dbType: str | None = None
+    host: str | None = None
+    db: str | None = None
+    schema_name: str | None = Field(default=None, alias="schema")
+    unloadTimes: list[Any] | None = None
+    status: str | None = None
+    owner: str | None = None
+    dept: str | None = None
+    desc: str | None = None
+
+
+class UpstreamListResponse(ItemsResponse[UpstreamSystemItem]):
+    pass
+
+
+class UpstreamDataResponse(DataEnvelope[UpstreamSystemItem]):
+    pass
+
+
+class UpstreamMessageResponse(MessageDataResponse[UpstreamSystemItem]):
+    pass
+
+
 class UpstreamResponse(ContractModel):
-    """Envelope for the existing upstream-system API shapes."""
+    """Backward-compatible envelope for existing upstream responses."""
 
     message: str | None = None
     data: Any = None

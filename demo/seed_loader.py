@@ -17,6 +17,12 @@ from pathlib import Path
 
 DATASETS_DIR = Path(__file__).resolve().parent / "datasets"
 
+# Keep code-table seed IDs outside the small IDs used by the forward migration.
+# Natural-key conflict handling then lets the demo seed run after migrations and
+# remain compatible with older databases that used IDs starting at one.
+DEMO_CODE_CATEGORY_ID_BASE = 1000
+DEMO_CODE_ITEM_ID_BASE = 10000
+
 # Keep demo push rows inside the backend PUSH_AUTH_TYPE contract. The legacy
 # value is retained only so seeders can repair databases created by older
 # Community releases.
@@ -200,13 +206,13 @@ def community_seed_plan() -> dict[str, dict]:
     code_categories = load_dataset("common_codes.json")
     code_category_rows = [
         (
-            index, category["categoryCode"], category["categoryName"],
+            DEMO_CODE_CATEGORY_ID_BASE + index, category["categoryCode"], category["categoryName"],
             category.get("categoryDesc"), index, "Y",
         )
         for index, category in enumerate(code_categories, start=1)
     ]
     code_item_rows = []
-    code_item_id = 1
+    code_item_id = DEMO_CODE_ITEM_ID_BASE
     for category in code_categories:
         for order, item in enumerate(category.get("items", []), start=1):
             code_item_rows.append(

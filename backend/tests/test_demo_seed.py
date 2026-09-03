@@ -14,10 +14,15 @@ from unittest.mock import patch
 
 from backend.app.db.facade import clear_engine_cache, connect_with_profile
 from backend.app.migrations.schema import initialize, verify_database
+from backend.app.services.common_code_service import common_code_service
 from backend.app.services.push_service import (
     DEFAULT_PUSH_AUTH_TYPES,
     PushService,
     PushValidationError,
+)
+from backend.app.services.upstream_service import (
+    UpstreamService,
+    UpstreamValidationError,
 )
 from demo.seed_loader import ADMIN_USER, DEMO_PUSH_AUTH_TYPE, LEGACY_DEMO_PUSH_AUTH_TYPE
 from werkzeug.security import check_password_hash
@@ -30,8 +35,8 @@ COMMUNITY_CONFIG = ROOT / "configs" / "database.community.yaml"
 EXPECTED_COUNTS = {
     "p_asset_table": 30,
     "p_asset_field": 251,
-    "p_code_category": 9,
-    "p_code_item": 33,
+    "p_code_category": 11,
+    "p_code_item": 49,
     "p_indicator_path_config": 10,
     "p_root_item": 40,
     "p_indicator_item": 16,
@@ -119,6 +124,7 @@ class CommunityDemoSeedTests(unittest.TestCase):
     def _seed(self):
         from demo.seed_sqlite import seed
         seed(self.database)
+        common_code_service.invalidate()
 
     def test_seed_creates_demo_admin_with_hashed_password(self):
         self.assertEqual("admin", ADMIN_USER["username"])
@@ -296,6 +302,133 @@ class CommunityDemoSeedTests(unittest.TestCase):
         self.assertTrue(all(row[0] == row[1] for row in rows))
         self.assertEqual({"MEM", "PIM", "OMS", "POS", "IMS", "MKT", "FUL", "SVC"}, {row[2] for row in rows})
         self.assertTrue(any(row[2] == "p_upstream_system" and row[3] == "upstream_system_id" for row in foreign_keys))
+
+    def test_upstream_option_catalog_matches_form_values(self):
+        self._seed()
+        connection = sqlite3.connect(self.database)
+        try:
+            db_types = connection.execute(
+                "SELECT item_code, item_name, item_value FROM p_code_item "
+                "WHERE category_code = 'UPSTREAM_DB_TYPE' ORDER BY display_order"
+            ).fetchall()
+            depts = connection.execute(
+                "SELECT item_code, item_name, item_value FROM p_code_item "
+                "WHERE category_code = 'UPSTREAM_DEPT' ORDER BY display_order"
+            ).fetchall()
+        finally:
+            connection.close()
+
+        self.assertEqual(
+            [
+                ("POSTGRESQL", "PostgreSQL", "PostgreSQL"),
+                ("MYSQL", "MySQL", "MySQL"),
+                ("ORACLE", "Oracle", "Oracle"),
+                ("SQL_SERVER", "SQL Server", "SQL Server"),
+                ("MONGODB", "MongoDB", "MongoDB"),
+                ("KAFKA", "Kafka", "Kafka"),
+                ("OBJECT_STORAGE", "Object Storage", "Object Storage"),
+                ("OTHER", "其他", "其他"),
+            ],
+            db_types,
+        )
+        self.assertEqual(
+            [
+                ("PRODUCT_OPERATIONS", "商品运营部", "商品运营部"),
+                ("MEMBER_OPERATIONS", "会员运营部", "会员运营部"),
+                ("TRADE_OPERATIONS", "交易运营部", "交易运营部"),
+                ("STORE_OPERATIONS", "门店运营部", "门店运营部"),
+                ("SUPPLY_CHAIN", "供应链部", "供应链部"),
+                ("MARKETING", "市场营销部", "市场营销部"),
+                ("FULFILLMENT", "履约运营部", "履约运营部"),
+                ("CUSTOMER_SERVICE", "客户服务部", "客户服务部"),
+            ],
+            depts,
+        )
+
+    def test_upstream_create_read_edit_and_historical_values(self):
+        self._seed()
+        service = UpstreamService()
+        payload = {
+            "id": "uo_ccbs",
+            "abbr": "UO_CCBS",
+            "name": "uo_ccbs",
+            "dbType": "PostgreSQL",
+            "host": "uo_ccbs.demo.invalid",
+            "db": "UO_CCBS",
+            "schema": "PUBLIC",
+            "unloadTimes": ["02:00"],
+            "status": "enabled",
+            "owner": "uo_ccbs",
+            "dept": "供应链部",
+            "desc": "uo_ccbs",
+        }
+
+        created = service._create_system(payload)
+        self.assertEqual("PostgreSQL", created["dbType"])
+        self.assertEqual("供应链部", created["dept"])
+        self.assertEqual(
+            {"dbType": "PostgreSQL", "dept": "供应链部"},
+            {
+                key: service.get_system_detail("uo_ccbs")[key]
+                for key in ("dbType", "dept")
+            },
+        )
+
+        current = service.get_system_admin_detail("uo_ccbs")
+        current.update({"dbType": "MySQL", "dept": "商品运营部"})
+        _before, updated = service._update_system("uo_ccbs", current)
+        self.assertEqual("MySQL", updated["dbType"])
+        self.assertEqual("商品运营部", updated["dept"])
+        self.assertEqual("MySQL", service.get_system_admin_detail("uo_ccbs")["dbType"])
+        self.assertEqual("商品运营部", service.get_system_admin_detail("uo_ccbs")["dept"])
+
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute(
+                "UPDATE p_upstream_system SET db_type = ?, dept_name = ? WHERE system_id = ?",
+                ("POSTGRESQL", "SUPPLY_CHAIN", "uo_ccbs"),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        historical = service.get_system_admin_detail("uo_ccbs")
+        self.assertEqual("PostgreSQL", historical["dbType"])
+        self.assertEqual("供应链部", historical["dept"])
+        normalized = service._normalize_payload(
+            {**payload, "id": "uo_ccbs", "dbType": "postgresql", "dept": "SUPPLY_CHAIN"},
+            current=historical,
+        )
+        self.assertEqual("PostgreSQL", normalized["dbType"])
+        self.assertEqual("供应链部", normalized["dept"])
+
+    def test_upstream_invalid_options_remain_rejected(self):
+        self._seed()
+        service = UpstreamService()
+        payload = {
+            "id": "uo_invalid",
+            "abbr": "UO_INVALID",
+            "name": "invalid",
+            "dbType": "PostgreSQL",
+            "host": "invalid.demo.invalid",
+            "unloadTimes": ["02:00"],
+            "status": "enabled",
+            "dept": "供应链部",
+        }
+
+        with self.assertRaises(UpstreamValidationError) as db_error:
+            service._normalize_payload({**payload, "dbType": "__INVALID__"})
+        self.assertEqual(
+            [{"field": "dbType", "message": "“__INVALID__”不是有效选项"}],
+            db_error.exception.details,
+        )
+
+        with self.assertRaises(UpstreamValidationError) as dept_error:
+            service._normalize_payload({**payload, "dept": "__INVALID__"})
+        self.assertEqual(
+            [{"field": "dept", "message": "“__INVALID__”不是有效选项"}],
+            dept_error.exception.details,
+        )
 
     def test_manual_code_table_seed_uses_binary_status_values(self):
         self._seed()

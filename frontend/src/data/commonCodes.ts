@@ -25,24 +25,38 @@ export interface CommonCodeCatalog {
   categories: CommonCodeCategory[];
 }
 
-function items(values: readonly string[]): CommonCodeItem[] {
-  return values.map((value, index) => ({
-    code:
-      String(value)
-        .toUpperCase()
-        .replaceAll(/[^A-Z0-9]+/g, "_") || `ITEM_${index + 1}`,
-    name: value,
-    value,
-    desc: `${value}演示选项`,
-    order: (index + 1) * 10,
-    active: true,
-  }));
+export interface UpstreamOption {
+  code: string;
+  name: string;
+  value: string;
+}
+
+type OptionSeed = string | UpstreamOption;
+
+function items(values: readonly OptionSeed[]): CommonCodeItem[] {
+  return values.map((item, index) => {
+    const option = typeof item === "string"
+      ? { code: "", name: item, value: item }
+      : item;
+    return {
+      code:
+        option.code ||
+        String(option.value)
+          .toUpperCase()
+          .replaceAll(/[^A-Z0-9]+/g, "_") || `ITEM_${index + 1}`,
+      name: option.name,
+      value: option.value,
+      desc: `${option.name}演示选项`,
+      order: (index + 1) * 10,
+      active: true,
+    };
+  });
 }
 
 function category(
   code: string,
   name: string,
-  values: readonly string[],
+  values: readonly OptionSeed[],
 ): CommonCodeCategory {
   return {
     code,
@@ -53,28 +67,35 @@ function category(
   };
 }
 
+export const UPSTREAM_DB_TYPE_OPTIONS = [
+  { code: "POSTGRESQL", name: "PostgreSQL", value: "PostgreSQL" },
+  { code: "MYSQL", name: "MySQL", value: "MySQL" },
+  { code: "ORACLE", name: "Oracle", value: "Oracle" },
+  { code: "SQL_SERVER", name: "SQL Server", value: "SQL Server" },
+  { code: "MONGODB", name: "MongoDB", value: "MongoDB" },
+  { code: "KAFKA", name: "Kafka", value: "Kafka" },
+  { code: "OBJECT_STORAGE", name: "Object Storage", value: "Object Storage" },
+  { code: "OTHER", name: "其他", value: "其他" },
+] as const satisfies readonly UpstreamOption[];
+
+export const UPSTREAM_DEPT_OPTIONS = [
+  { code: "PRODUCT_OPERATIONS", name: "商品运营部", value: "商品运营部" },
+  { code: "MEMBER_OPERATIONS", name: "会员运营部", value: "会员运营部" },
+  { code: "TRADE_OPERATIONS", name: "交易运营部", value: "交易运营部" },
+  { code: "STORE_OPERATIONS", name: "门店运营部", value: "门店运营部" },
+  { code: "SUPPLY_CHAIN", name: "供应链部", value: "供应链部" },
+  { code: "MARKETING", name: "市场营销部", value: "市场营销部" },
+  { code: "FULFILLMENT", name: "履约运营部", value: "履约运营部" },
+  { code: "CUSTOMER_SERVICE", name: "客户服务部", value: "客户服务部" },
+] as const satisfies readonly UpstreamOption[];
+
+export const UPSTREAM_DB_TYPE_VALUES = UPSTREAM_DB_TYPE_OPTIONS.map(({ value }) => value);
+export const UPSTREAM_DEPT_VALUES = UPSTREAM_DEPT_OPTIONS.map(({ value }) => value);
+
 const COMMON_CODES: CommonCodeCatalog = {
   categories: [
-    category("UPSTREAM_DB_TYPE", "上游数据库类型", [
-      "PostgreSQL",
-      "MySQL",
-      "Oracle",
-      "SQL Server",
-      "MongoDB",
-      "Kafka",
-      "Object Storage",
-      "其他",
-    ]),
-    category("UPSTREAM_DEPT", "零售业务部门", [
-      "商品运营部",
-      "会员运营部",
-      "交易运营部",
-      "门店运营部",
-      "供应链部",
-      "市场营销部",
-      "履约运营部",
-      "客户服务部",
-    ]),
+    category("UPSTREAM_DB_TYPE", "上游数据库类型", UPSTREAM_DB_TYPE_OPTIONS),
+    category("UPSTREAM_DEPT", "零售业务部门", UPSTREAM_DEPT_OPTIONS),
     category("PUSH_PROTOCOL", "下游推送协议", ["HTTP", "OSS"]),
     category("PUSH_AUTH_TYPE", "下游认证方式", ["密钥认证", "账号密码"]),
     category("PUSH_DELIMITER", "字段分隔符", ["|", ",", "\\t", ";", "\\u0001"]),

@@ -39,6 +39,15 @@ test("upstream unload times use the shared time input", async () => {
   assert.match(formErrorsSource, /至少保留一个卸数时间点/);
 });
 
+test("upstream editor submits canonical dictionary values and normalizes edit values", async () => {
+  const source = await readFile(upstreamEditorPath, "utf8");
+
+  assert.match(source, /value=\{item\.value\}/);
+  assert.match(source, /normalizeDictValue\(dbTypeOptions, form\.dbType\)/);
+  assert.match(source, /normalizeDictValue\(deptOptions, form\.dept\)/);
+  assert.match(source, /dept: normalizeDictValue\(deptOptions, form\.dept\)/);
+});
+
 test("upstream detail renders one dynamic schedule stepper", async () => {
   const [detailSource, partsSource, styles] = await Promise.all([
     readFile(upstreamDetailPath, "utf8"),

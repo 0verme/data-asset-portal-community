@@ -49,5 +49,25 @@
     {"code":"WECHAT","name":"微信支付","value":"WECHAT","desc":"微信扫码支付"},
     {"code":"ALIPAY","name":"支付宝","value":"ALIPAY","desc":"支付宝扫码支付"},
     {"code":"UNIONPAY","name":"银联卡","value":"UNIONPAY","desc":"银联卡刷卡支付"}
+  ]},
+  {"categoryCode":"UPSTREAM_DB_TYPE","categoryName":"上游数据库类型","categoryDesc":"上游卸数系统数据库类型选项","items":[
+    {"code":"POSTGRESQL","name":"PostgreSQL","value":"PostgreSQL","desc":"PostgreSQL 数据库"},
+    {"code":"MYSQL","name":"MySQL","value":"MySQL","desc":"MySQL 数据库"},
+    {"code":"ORACLE","name":"Oracle","value":"Oracle","desc":"Oracle 数据库"},
+    {"code":"SQL_SERVER","name":"SQL Server","value":"SQL Server","desc":"SQL Server 数据库"},
+    {"code":"MONGODB","name":"MongoDB","value":"MongoDB","desc":"MongoDB 数据库"},
+    {"code":"KAFKA","name":"Kafka","value":"Kafka","desc":"Kafka 消息系统"},
+    {"code":"OBJECT_STORAGE","name":"Object Storage","value":"Object Storage","desc":"对象存储"},
+    {"code":"OTHER","name":"其他","value":"其他","desc":"其他数据库类型"}
+  ]},
+  {"categoryCode":"UPSTREAM_DEPT","categoryName":"零售业务部门","categoryDesc":"上游卸数和下游推送共用的归属部门选项","items":[
+    {"code":"PRODUCT_OPERATIONS","name":"商品运营部","value":"商品运营部","desc":"商品运营部"},
+    {"code":"MEMBER_OPERATIONS","name":"会员运营部","value":"会员运营部","desc":"会员运营部"},
+    {"code":"TRADE_OPERATIONS","name":"交易运营部","value":"交易运营部","desc":"交易运营部"},
+    {"code":"STORE_OPERATIONS","name":"门店运营部","value":"门店运营部","desc":"门店运营部"},
+    {"code":"SUPPLY_CHAIN","name":"供应链部","value":"供应链部","desc":"供应链部"},
+    {"code":"MARKETING","name":"市场营销部","value":"市场营销部","desc":"市场营销部"},
+    {"code":"FULFILLMENT","name":"履约运营部","value":"履约运营部","desc":"履约运营部"},
+    {"code":"CUSTOMER_SERVICE","name":"客户服务部","value":"客户服务部","desc":"客户服务部"}
   ]}
 ]

@@ -55,7 +55,7 @@
 
 ## 系统管理 · 参数字典
 
-9 类参数字典、33 项字典值统一维护（需以 Community Demo 演示账号登录）。
+11 类参数字典、49 项字典值统一维护（需以 Community Demo 演示账号登录）。
 
 ![参数字典](./images/demo-param-dictionaries.png)
 

@@ -28,7 +28,6 @@ import { toast } from '../components/common/index.ts';
 import {
   DEFAULT_UP_FILTER,
   DEFAULT_UP_VIEW,
-  DEFAULT_UPSTREAM_DEPTS,
 } from '../config/defaults.ts';
 import {
   clearModuleNavigationState,
@@ -39,7 +38,10 @@ import {
   pushModuleNavigationState,
 } from '../routing/navigation.ts';
 import { useSmartBack } from './useSmartBack.ts';
-import { DB_TYPE_OPTIONS } from '../data/upstreamSystems.ts';
+import {
+  UPSTREAM_DB_TYPE_OPTIONS,
+  UPSTREAM_DEPT_OPTIONS,
+} from '../data/commonCodes.ts';
 import { normalizeDictOptions, type DictOption } from '../utils/optionUtils.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
 import {
@@ -181,8 +183,8 @@ export function useUpstreamModule({
     try {
       const systems = await getUpstreamSystems();
       setUpstreamSystems(systems);
-      setUpstreamDbTypes(fallbackOptions([...DB_TYPE_OPTIONS, ...systems.map((item) => item.dbType)]));
-      setUpstreamDeptOptions(fallbackOptions([...DEFAULT_UPSTREAM_DEPTS, ...systems.map((item) => item.dept)]));
+      setUpstreamDbTypes(fallbackOptions([...UPSTREAM_DB_TYPE_OPTIONS, ...systems.map((item) => item.dbType)]));
+      setUpstreamDeptOptions(fallbackOptions([...UPSTREAM_DEPT_OPTIONS, ...systems.map((item) => item.dept)]));
       setUpstreamLoaded(true);
     } catch (error: unknown) {
       setUpstreamError(getErrorMessage(error, '上游卸数系统加载失败。'));

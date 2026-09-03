@@ -4,7 +4,7 @@
 
 ## Canonical baseline
 
-`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0008_indicator_semantic_contract` 共同覆盖以下 39 张 canonical tables：
+`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0009_upstream_option_contract` 共同覆盖以下 39 张 canonical tables：
 
 | Owner | Tables |
 | --- | --- |

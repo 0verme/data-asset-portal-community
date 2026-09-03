@@ -15,7 +15,10 @@
 import { Icon } from "../ui.tsx";
 import { MetaItem, PageHeader, StatusBadge } from "../common/index.ts";
 import { buildModuleBreadcrumbs } from "../../routing/navigation.ts";
-import { isLegacyDictValue } from "../../utils/optionUtils.ts";
+import {
+  displayDictValue,
+  isLegacyDictValue,
+} from "../../utils/optionUtils.ts";
 
 import { nextUnload, ScheduleStepper } from "./UpstreamParts.jsx";
 import { displayUpstreamValue, getUpstreamDetailMetadata } from "./upstreamFieldContract.js";
@@ -28,7 +31,14 @@ export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], o
   const next = unloadTimes.length ? nextUnload(unloadTimes, scheduleNow) : null;
   const systemName = displayUpstreamValue(system?.name);
   const systemAbbr = displayUpstreamValue(system?.abbr);
-  const detailMetadata = getUpstreamDetailMetadata(system);
+  const displaySystem = system
+    ? {
+        ...system,
+        dbType: displayDictValue(dbTypeOptions, system.dbType),
+        dept: displayDictValue(deptOptions, system.dept),
+      }
+    : null;
+  const detailMetadata = getUpstreamDetailMetadata(displaySystem);
   const dbTypeLegacy = isLegacyDictValue(dbTypeOptions, system?.dbType);
   const deptLegacy = Boolean(system?.dept) && isLegacyDictValue(deptOptions, system?.dept);
 
@@ -73,7 +83,7 @@ export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], o
           <span className="fn-abbr">{systemAbbr}</span>
           <div className="fn-txt">
             <div className="fn-k">上游业务库</div>
-            <div className="fn-v mono">{displayUpstreamValue(system?.dbType)}</div>
+            <div className="fn-v mono">{displayUpstreamValue(displaySystem?.dbType)}</div>
           </div>
         </div>
         <div className="flow-arrow">

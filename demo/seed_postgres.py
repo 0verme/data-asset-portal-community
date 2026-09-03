@@ -70,10 +70,12 @@ def main():
             continue
         columns = ", ".join(spec["columns"])
         # Canonical unique key used for idempotent upsert:
-        # p_system/p_data_source key on their code columns, others on PK.
+        # p_system/p_data_source and code tables use natural keys; others use PK.
         key_column = {
             "p_system": "system_code",
             "p_data_source": "source_code",
+            "p_code_category": "category_code",
+            "p_code_item": "category_code,item_code",
             "p_lineage_node": "snapshot_id,node_id",
             "p_lineage_edge": "snapshot_id,edge_id",
             "p_role_permission": "role_code,permission_code",
@@ -84,6 +86,7 @@ def main():
             + f"\nON CONFLICT ({key_column}) DO NOTHING;"
         )
     system_codes = ", ".join(literal(code) for code in demo_push_system_codes())
+    # pi-lens-ignore: python-sql-injection
     print(
         "UPDATE dwp.p_push_system "
         f"SET auth_type = {literal(DEMO_PUSH_AUTH_TYPE)} "

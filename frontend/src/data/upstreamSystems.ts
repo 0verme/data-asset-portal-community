@@ -1,16 +1,11 @@
 // Copyright 2025 Jearhe
 // Licensed under the Apache License, Version 2.0.
 
-export const DB_TYPE_OPTIONS = [
-  "PostgreSQL",
-  "MySQL",
-  "Oracle",
-  "SQL Server",
-  "MongoDB",
-  "Kafka",
-  "Object Storage",
-  "其他",
-] as const;
+import { UPSTREAM_DB_TYPE_VALUES } from "./commonCodes.ts";
+
+// Keep the fixture-facing name for existing consumers while sourcing values
+// from the same local catalog used by the form options.
+export const DB_TYPE_OPTIONS = UPSTREAM_DB_TYPE_VALUES;
 
 export interface MockUpstreamSystem {
   upstreamSystemId: number;

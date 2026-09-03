@@ -748,7 +748,32 @@ Base Path: `/api/upstreams`
 `host`、`db`、`schema` 只在受 `upstream:read` 保护的
 `GET /api/upstreams/systems/{systemId}/admin-detail` 响应中返回。
 
-### 7.2 接口
+### 7.2 新增 / 编辑字段契约
+
+`POST /api/upstreams/systems` 与 `PUT /api/upstreams/systems/{systemId}` 使用同一请求体字段。`dbType` 与 `dept` 都来自共享码值目录：请求提交 `value`，界面显示 `name`，`code` 仅作为稳定的程序标识。
+
+当前 Community 前端目录的 `dbType` 值为 `PostgreSQL`、`MySQL`、`Oracle`、`SQL Server`、`MongoDB`、`Kafka`、`Object Storage`、`其他`；`dept` 值为 `商品运营部`、`会员运营部`、`交易运营部`、`门店运营部`、`供应链部`、`市场营销部`、`履约运营部`、`客户服务部`。后端从 `UPSTREAM_DB_TYPE` / `UPSTREAM_DEPT` 读取同一目录，并对 `code`、`name`、`value` 做不区分大小写的兼容归一化。旧安装中已经存在的 `DB2` 或旧部门条目不被迁移删除，作为历史值继续保留。
+
+```json
+{
+  "id": "up_inventory",
+  "abbr": "IMS",
+  "name": "库存中心",
+  "dbType": "PostgreSQL",
+  "host": "inventory.demo.invalid",
+  "db": "INVENTORY",
+  "schema": "PUBLIC",
+  "unloadTimes": ["02:00"],
+  "status": "enabled",
+  "owner": "演示数据维护组",
+  "dept": "供应链部",
+  "desc": "库存数据按固定时点卸数至 ODS"
+}
+```
+
+新增时不在目录中的新值会返回字段级 `422`；编辑历史记录时，已有历史值允许原样保存，详情和编辑页会保留并提示该值未在码值中维护，不执行破坏性数据迁移。成功响应使用同一 `data` 字段返回规范化后的系统对象。
+
+### 7.3 接口
 
 - `GET /api/upstreams/systems`
 - `GET /api/upstreams/systems/{systemId}`
@@ -757,7 +782,7 @@ Base Path: `/api/upstreams`
 - `PATCH /api/upstreams/systems/{systemId}/status`
 - `DELETE /api/upstreams/systems/{systemId}`
 
-### 7.3 查询参数
+### 7.4 查询参数
 
 `GET /api/upstreams/systems`
 
@@ -765,7 +790,7 @@ Base Path: `/api/upstreams`
 - `status`：如 `enabled` / `disabled`
 - `dbType`：如 `Oracle`、`MySQL`、`PostgreSQL`
 
-### 7.4 状态变更
+### 7.5 状态变更
 
 `PATCH /api/upstreams/systems/{systemId}/status`
 

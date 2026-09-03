@@ -47,8 +47,28 @@ from .operation_log_service import (
 SYSTEM_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 DEFAULT_UPSTREAM_STATUS = {"enabled", "disabled"}
-DEFAULT_UPSTREAM_DB_TYPES = set()
-DEFAULT_UPSTREAM_DEPTS = set()
+# Keep the service usable while an older installation is waiting for the
+# dictionary migration; an existing catalog still remains the source of truth.
+DEFAULT_UPSTREAM_DB_TYPES = {
+    "POSTGRESQL": "PostgreSQL",
+    "MYSQL": "MySQL",
+    "ORACLE": "Oracle",
+    "SQL_SERVER": "SQL Server",
+    "MONGODB": "MongoDB",
+    "KAFKA": "Kafka",
+    "OBJECT_STORAGE": "Object Storage",
+    "OTHER": "其他",
+}
+DEFAULT_UPSTREAM_DEPTS = {
+    "PRODUCT_OPERATIONS": "商品运营部",
+    "MEMBER_OPERATIONS": "会员运营部",
+    "TRADE_OPERATIONS": "交易运营部",
+    "STORE_OPERATIONS": "门店运营部",
+    "SUPPLY_CHAIN": "供应链部",
+    "MARKETING": "市场营销部",
+    "FULFILLMENT": "履约运营部",
+    "CUSTOMER_SERVICE": "客户服务部",
+}
 LOGGER = logging.getLogger(__name__)
 
 
@@ -121,17 +141,63 @@ class UpstreamService(AuditActorMixin):
     def _next_id(self, table, column):
         return self._db.next_pk(table, column)
 
+    @staticmethod
+    def _coerce_db_integer(value, field):
+        try:
+            return int(value)
+        except (TypeError, ValueError) as error:
+            raise UpstreamDataSourceError(f"数据库字段 {field} 不是有效整数") from error
+
     def _get_allowed_status_values(self):
         try:
             return {value for value in common_code_service.get_item_values("SYSTEM_STATUS") if value}
         except (CommonCodeCategoryNotFoundError, CommonCodeDataSourceError):
             return set(DEFAULT_UPSTREAM_STATUS)
 
-    def _get_allowed_values(self, category_code, fallback):
+    def _get_option_contract(self, category_code, fallback):
         try:
-            return {value for value in common_code_service.get_item_values(category_code) if value}
+            items = common_code_service.get_items(category_code)
         except (CommonCodeCategoryNotFoundError, CommonCodeDataSourceError):
-            return set(fallback)
+            if isinstance(fallback, dict):
+                items = [
+                    {"code": str(code), "name": str(value), "value": str(value)}
+                    for code, value in fallback.items()
+                    if value
+                ]
+            else:
+                items = [
+                    {"code": str(value), "name": str(value), "value": str(value)}
+                    for value in fallback
+                    if value
+                ]
+
+        values = set()
+        aliases = {}
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            value = str(item.get("value") or item.get("name") or "").strip()
+            if not value:
+                continue
+            values.add(value)
+            for alias in (value, item.get("name"), item.get("code")):
+                alias_key = str(alias or "").strip().casefold()
+                if alias_key:
+                    aliases.setdefault(alias_key, value)
+        return values, aliases
+
+    def _get_allowed_values(self, category_code, fallback):
+        values, _aliases = self._get_option_contract(category_code, fallback)
+        return values
+
+    @staticmethod
+    def _normalize_option_value(value, aliases):
+        normalized = str(value or "").strip()
+        return aliases.get(normalized.casefold(), normalized)
+
+    def _display_option_value(self, category_code, value):
+        _values, aliases = self._get_option_contract(category_code, set())
+        return self._normalize_option_value(value, aliases)
 
     def _normalize_payload(self, payload, current=None):
         details = []
@@ -147,8 +213,14 @@ class UpstreamService(AuditActorMixin):
         unload_times = payload.get("unloadTimes")
         status = str(payload.get("status") or "").strip()
         allowed_status = self._get_allowed_status_values()
-        allowed_db_types = self._get_allowed_values("UPSTREAM_DB_TYPE", DEFAULT_UPSTREAM_DB_TYPES)
-        allowed_depts = self._get_allowed_values("UPSTREAM_DEPT", DEFAULT_UPSTREAM_DEPTS)
+        allowed_db_types, db_type_aliases = self._get_option_contract(
+            "UPSTREAM_DB_TYPE", DEFAULT_UPSTREAM_DB_TYPES
+        )
+        allowed_depts, dept_aliases = self._get_option_contract(
+            "UPSTREAM_DEPT", DEFAULT_UPSTREAM_DEPTS
+        )
+        db_type = self._normalize_option_value(db_type, db_type_aliases)
+        dept = self._normalize_option_value(dept, dept_aliases)
 
         if not system_id:
             details.append({"field": "id", "message": "id is required"})
@@ -161,23 +233,24 @@ class UpstreamService(AuditActorMixin):
         if not db_type:
             details.append({"field": "dbType", "message": "dbType is required"})
         elif db_type not in allowed_db_types and (current or {}).get("dbType") != db_type:
-            details.append({"field": "dbType", "message": f"dbType is not allowed: {db_type}"})
+            details.append({"field": "dbType", "message": f"“{db_type}”不是有效选项"})
         if not host:
             details.append({"field": "host", "message": "host is required"})
         if dept and dept not in allowed_depts and (current or {}).get("dept") != dept:
-            details.append({"field": "dept", "message": f"dept is not allowed: {dept}"})
+            details.append({"field": "dept", "message": f"“{dept}”不是有效选项"})
         if status not in allowed_status:
             details.append({"field": "status", "message": f"status is not allowed: {status}"})
-        if not isinstance(unload_times, list) or not unload_times:
+        normalized_unload_times = unload_times if isinstance(unload_times, list) else []
+        if not normalized_unload_times:
             details.append({"field": "unloadTimes", "message": "unloadTimes must contain at least one time"})
         else:
-            for index, value in enumerate(unload_times):
+            for index, value in enumerate(normalized_unload_times):
                 if not isinstance(value, str) or not TIME_RE.fullmatch(value.strip()):
                     details.append({"field": f"unloadTimes[{index}]", "message": "time format must be HH:mm"})
 
         if details:
             raise UpstreamValidationError(details)
-        unload_times = [value.strip() for value in unload_times]
+        unload_times = [value.strip() for value in normalized_unload_times]
 
         return {
             "id": system_id,
@@ -239,7 +312,9 @@ class UpstreamService(AuditActorMixin):
             select(upstream_unload_time.c.system_pk, upstream_unload_time.c.unload_time)
             .where(
                 upstream_unload_time.c.is_deleted == "N",
-                upstream_unload_time.c.system_pk.in_([int(value) for value in system_pks]),
+                upstream_unload_time.c.system_pk.in_([
+                    self._coerce_db_integer(value, "system_pk") for value in system_pks
+                ]),
             )
             .order_by(upstream_unload_time.c.system_pk, upstream_unload_time.c.unload_time),
             purpose=purpose,
@@ -247,20 +322,23 @@ class UpstreamService(AuditActorMixin):
         )
         grouped = {}
         for row in rows:
-            grouped.setdefault(int(row["system_pk"]), []).append(row["unload_time"])
+            grouped.setdefault(
+                self._coerce_db_integer(row["system_pk"], "system_pk"),
+                [],
+            ).append(row["unload_time"])
         return grouped
 
     def _row_to_system(self, row, unload_times=None, include_connection=False):
         system = {
-            "upstreamSystemId": int(row["system_pk"]),
+            "upstreamSystemId": self._coerce_db_integer(row["system_pk"], "system_pk"),
             "id": row["system_id"],
             "abbr": row["system_abbr"],
             "name": row["system_name"],
-            "dbType": row["db_type"],
+            "dbType": self._display_option_value("UPSTREAM_DB_TYPE", row["db_type"]),
             "unloadTimes": list(unload_times or []),
             "status": row["status_code"],
             "owner": row.get("owner_name") or "",
-            "dept": row.get("dept_name") or "",
+            "dept": self._display_option_value("UPSTREAM_DEPT", row.get("dept_name")),
             "desc": row.get("system_desc") or "",
         }
         if include_connection:
@@ -312,7 +390,15 @@ class UpstreamService(AuditActorMixin):
             purpose="upstream system unload times",
             method="_db_systems",
         )
-        return [self._row_to_system(row, unload_times_by_pk.get(int(row["system_pk"]), [])) for row in rows]
+        return [
+            self._row_to_system(
+                row,
+                unload_times_by_pk.get(
+                    self._coerce_db_integer(row["system_pk"], "system_pk"), []
+                ),
+            )
+            for row in rows
+        ]
 
     def _get_system_row(self, system_id, include_connection=False):
         statement = (
@@ -340,7 +426,9 @@ class UpstreamService(AuditActorMixin):
         return deepcopy(
             self._row_to_system(
                 row,
-                unload_times.get(int(row["system_pk"]), []),
+                unload_times.get(
+                    self._coerce_db_integer(row["system_pk"], "system_pk"), []
+                ),
                 include_connection=include_connection,
             )
         )
@@ -450,8 +538,8 @@ class UpstreamService(AuditActorMixin):
                 upstream_system.c.system_id == item["id"], upstream_system.c.is_deleted == "N"
             ).limit(1), purpose="upstream uniqueness check", method="_update_system"):
             raise UpstreamSystemAlreadyExistsError(item["id"])
-        system_pk = int(rows[0]["system_pk"])
-        data_source_id = int(rows[0]["data_source_id"])
+        system_pk = self._coerce_db_integer(rows[0]["system_pk"], "system_pk")
+        data_source_id = self._coerce_db_integer(rows[0]["data_source_id"], "data_source_id")
         time_pk = self._next_id(upstream_unload_time, upstream_unload_time.c.time_pk)
         change_id = self._next_id(upstream_change_log, upstream_change_log.c.change_id)
         statements = [
@@ -497,7 +585,7 @@ class UpstreamService(AuditActorMixin):
                 ).limit(1), purpose="upstream status id lookup", method="patch_status")
             if not rows:
                 raise UpstreamSystemNotFoundError(system_id)
-            system_pk = int(rows[0]["system_pk"])
+            system_pk = self._coerce_db_integer(rows[0]["system_pk"], "system_pk")
             item = {**current, "status": normalized}
             change_id = self._next_id(upstream_change_log, upstream_change_log.c.change_id)
             self._execute([
@@ -540,7 +628,7 @@ class UpstreamService(AuditActorMixin):
             purpose="upstream detail unload times",
             method="_delete_system",
         )
-        system_pk = int(rows[0]["system_pk"])
+        system_pk = self._coerce_db_integer(rows[0]["system_pk"], "system_pk")
         change_id = self._next_id(upstream_change_log, upstream_change_log.c.change_id)
         statements = [
             delete(upstream_unload_time).where(upstream_unload_time.c.system_pk == system_pk),

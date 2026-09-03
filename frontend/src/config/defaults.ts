@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {
+  UPSTREAM_DB_TYPE_VALUES,
+  UPSTREAM_DEPT_VALUES,
+} from "../data/commonCodes.ts";
+
 export interface AssetRoute {
   page: string;
   table: string | null;
@@ -169,27 +174,10 @@ export const DATA_MODE = (
   .trim()
   .toLowerCase();
 
-export const DEFAULT_UPSTREAM_DB_TYPES = [
-  "PostgreSQL",
-  "MySQL",
-  "Oracle",
-  "SQL Server",
-  "MongoDB",
-  "Kafka",
-  "Object Storage",
-  "其他",
-] as const;
-
-export const DEFAULT_UPSTREAM_DEPTS = [
-  "商品运营部",
-  "会员运营部",
-  "交易运营部",
-  "门店运营部",
-  "供应链部",
-  "市场营销部",
-  "履约运营部",
-  "客户服务部",
-] as const;
+// Compatibility aliases retained for modules that use the defaults namespace.
+// The option values themselves are defined by the local common-code catalog.
+export const DEFAULT_UPSTREAM_DB_TYPES = UPSTREAM_DB_TYPE_VALUES;
+export const DEFAULT_UPSTREAM_DEPTS = UPSTREAM_DEPT_VALUES;
 
 export const DEFAULT_PUSH_PROTOCOL_OPTIONS = ["HTTP", "OSS"] as const;
 export const DEFAULT_PUSH_AUTH_OPTIONS = ["密钥认证", "账号密码"] as const;

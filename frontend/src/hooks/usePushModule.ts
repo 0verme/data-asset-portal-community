@@ -27,7 +27,6 @@ import type { PushSystemItem, PushJobItem } from '../data/pushSystems.ts';
 import {
   DEFAULT_PUSH_FILTER,
   DEFAULT_PUSH_VIEW,
-  DEFAULT_UPSTREAM_DEPTS,
 } from '../config/defaults.ts';
 import {
   clearModuleNavigationState,
@@ -44,6 +43,7 @@ import {
   DEFAULT_FREQ_TYPE_OPTIONS,
   DEFAULT_PROTOCOL_OPTIONS,
 } from '../components/push/pushConstants.js';
+import { UPSTREAM_DEPT_OPTIONS } from '../data/commonCodes.ts';
 import { normalizeDictOptions, type DictOption } from '../utils/optionUtils.ts';
 import { comparePushSystemImportance } from '../utils/push.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
@@ -171,7 +171,7 @@ export function usePushModule({
         ...DEFAULT_FREQ_TYPE_OPTIONS,
         ...allJobs.map((job) => job.freqType),
       ]);
-      const deptItems = fallbackOptions([...DEFAULT_UPSTREAM_DEPTS, ...systems.map((system) => system.dept)]);
+      const deptItems = fallbackOptions([...UPSTREAM_DEPT_OPTIONS, ...systems.map((system) => system.dept)]);
       setPushSystems(systems);
       setPushProtocolOptions(protocolItems);
       setPushAuthOptions(authItems);

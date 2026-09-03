@@ -20,6 +20,32 @@ class SchemaContractTests(unittest.TestCase):
         self.assertEqual(pg_files, dws_files)
         self.assertFalse(any("sqlite" in name for name in pg_files))
 
+    def test_common_code_ddl_keeps_item_ids_unique_and_current_upstream_options(self):
+        expected_options = {
+            "MONGODB",
+            "KAFKA",
+            "OBJECT_STORAGE",
+            "PRODUCT_OPERATIONS",
+            "MEMBER_OPERATIONS",
+            "TRADE_OPERATIONS",
+            "STORE_OPERATIONS",
+            "SUPPLY_CHAIN",
+            "MARKETING",
+            "FULFILLMENT",
+            "CUSTOMER_SERVICE",
+        }
+        for docs, suffix in ((DOCS_PG, "pg"), (DOCS_DWS, "dws")):
+            sql = read_sql(docs / f"common-codes-app-{suffix}-ddl.sql")
+            item_ids = re.findall(
+                r"INSERT INTO dwp\.p_code_item\s*\([\s\S]*?\)\s*"
+                r"SELECT\s+(\d+),",
+                sql,
+                re.I,
+            )
+            self.assertEqual(len(item_ids), len(set(item_ids)), f"{suffix} item ids")
+            for code in expected_options:
+                self.assertIn(f"'{code}'", sql)
+
     def test_operation_log_uses_sequence_backed_id(self):
         for docs, suffix in ((DOCS_PG, "pg"), (DOCS_DWS, "dws")):
             sql = read_sql(docs / f"operation-logs-app-{suffix}-ddl.sql")
