@@ -14,8 +14,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./ui.jsx";
-import { getPortalStats } from "../api/portal.js";
-import { unifiedSearch } from "../api/search.js";
+import { getPortalStats } from "../api/portal.ts";
+import { unifiedSearch } from "../api/search.ts";
 import {
   DEFAULT_PORTAL_SCOPE,
   filterPortalHotTagsByModules,

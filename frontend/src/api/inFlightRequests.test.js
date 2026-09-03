@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   createInFlightGetRequestGroup,
   createInFlightRequestGroup,
-} from "./inFlightRequests.js";
+} from "./inFlightRequests.ts";
 
 test("coalesces matching in-flight requests and clears after completion", async () => {
   const runOnce = createInFlightRequestGroup();

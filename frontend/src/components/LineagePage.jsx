@@ -1,5 +1,5 @@
 import React from "react";
-import { findLineageNodes, getLineageInitialView } from "../api/lineage.js";
+import { findLineageNodes, getLineageInitialView } from "../api/lineage.ts";
 import { ActionErrorBanner, ErrorState, LoadingState } from "./common/index.js";
 import { Icon } from "./ui.jsx";
 import { formatDateTime } from "../utils/date.ts";

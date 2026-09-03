@@ -1,7 +1,7 @@
 import React from "react";
-import { getAssetTables, getDomains } from "../../api/assets.js";
-import { getIndicatorList } from "../../api/indicator.js";
-import { getReportList } from "../../api/report.js";
+import { getAssetTables, getDomains } from "../../api/assets.ts";
+import { getIndicatorList } from "../../api/indicator.ts";
+import { getReportList } from "../../api/report.ts";
 import { buildReportOptionSets } from "../../config/reportOptions.ts";
 import { getLegacyAwareOptions } from "../../utils/optionUtils.ts";
 import {

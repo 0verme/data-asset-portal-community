@@ -21,7 +21,7 @@ import {
   getFieldMappingStats,
   getFieldMappings,
   getFieldMappingTables,
-} from "../api/fieldMapping.js";
+} from "../api/fieldMapping.ts";
 import { DEFAULT_MAPPING_ROUTE } from "../config/defaults.ts";
 import { EmptyState } from "./common/index.js";
 import { FieldMappingFilters, FieldMappingStats } from "./fieldMapping/FieldMappingControls.jsx";

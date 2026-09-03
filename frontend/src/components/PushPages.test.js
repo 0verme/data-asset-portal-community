@@ -24,7 +24,7 @@ const jobListPath = fileURLToPath(new URL("./push/PushJobList.jsx", import.meta.
 const systemEditorPath = fileURLToPath(new URL("./push/SystemEditor.jsx", import.meta.url));
 const jobEditorPath = fileURLToPath(new URL("./push/JobEditor.jsx", import.meta.url));
 const constantsPath = fileURLToPath(new URL("./push/pushConstants.js", import.meta.url));
-const pushApiPath = fileURLToPath(new URL("../api/push.js", import.meta.url));
+const pushApiPath = fileURLToPath(new URL("../api/push.ts", import.meta.url));
 const utilsPath = fileURLToPath(new URL("./push/pushUtils.js", import.meta.url));
 const timeInputPath = fileURLToPath(new URL("./common/TimeInput.jsx", import.meta.url));
 const readSources = async (...paths) => (await Promise.all(paths.map((path) => readFile(path, "utf8")))).join("\n");
@@ -72,8 +72,8 @@ test("push jobs rely on system contacts instead of a duplicated owner", async ()
 test("push list mapping keeps both path fields available to the table", async () => {
   const source = await readFile(pushApiPath, "utf8");
 
-  assert.match(source, /sourcePath: job\.sourcePath \|\| ""/);
-  assert.match(source, /targetPath: job\.targetPath \|\| ""/);
+  assert.match(source, /sourcePath: job\.sourcePath \|\| ["']/);
+  assert.match(source, /targetPath: job\.targetPath \|\| ["']/);
 });
 
 test("push job table keeps six semantic columns when paths are present or absent", async () => {

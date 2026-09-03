@@ -21,7 +21,7 @@ import {
   getDomains,
   getLayers,
   saveAssetTable,
-} from "../api/assets.js";
+} from "../api/assets.ts";
 import { DOMAIN_ORDER, LAYER_OPTIONS } from "../config/assets.ts";
 import {
   DEFAULT_DETAIL_TAB,

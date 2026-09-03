@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getAssetTables } from "./assets.js";
-import { getIndicatorList } from "./indicator.js";
+import { getAssetTables } from "./assets.ts";
+import { getIndicatorList } from "./indicator.ts";
 
 test("mock asset selector exposes deterministic local identities", async () => {
   const tables = await getAssetTables({ layer: "DWM" });

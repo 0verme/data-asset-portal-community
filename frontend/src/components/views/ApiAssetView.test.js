@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const apiAssetViewPath = fileURLToPath(new URL("./ApiAssetView.jsx", import.meta.url));
 const indicatorEditorPath = fileURLToPath(new URL("../IndicatorEditor.jsx", import.meta.url));
-const apiClientPath = fileURLToPath(new URL("../../api/apiAssets.js", import.meta.url));
+const apiClientPath = fileURLToPath(new URL("../../api/apiAssets.ts", import.meta.url));
 const assetReferenceSelectorPath = fileURLToPath(new URL("../common/AssetReferenceSelector.jsx", import.meta.url));
 
 test("API asset editor reuses the binary status toggle for create and edit", async () => {
@@ -28,8 +28,8 @@ test("API asset create and edit keep enabled/disabled payload values", async () 
 
   assert.match(apiAssetView, /status: "enabled"/);
   assert.match(apiAssetView, /const submit = \(\) => onSave\(\{ \.\.\.form,/);
-  assert.match(apiClient, /body:payload/);
-  assert.match(apiClient, /body:\{status\}/);
+  assert.match(apiClient, /body:\s*payload/);
+  assert.match(apiClient, /body:\s*\{\s*status\s*\}/);
 });
 
 test("related asset pickers expose stable search accessible names", async () => {

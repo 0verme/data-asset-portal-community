@@ -14,7 +14,7 @@ import {
 
 const manualHookPath = fileURLToPath(new URL("../hooks/useManualCodeTableModule.js", import.meta.url));
 const manualPagePath = fileURLToPath(new URL("./ManualCodeTablePage.jsx", import.meta.url));
-const manualApiPath = fileURLToPath(new URL("../api/manualCodeTables.js", import.meta.url));
+const manualApiPath = fileURLToPath(new URL("../api/manualCodeTables.ts", import.meta.url));
 const manualDataPath = fileURLToPath(new URL("../data/manualCodeTables.ts", import.meta.url));
 
 const read = (path) => readFile(path, "utf8");

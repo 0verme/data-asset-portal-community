@@ -5,7 +5,7 @@ import {
   getManualCodeTables,
   updateManualCodeTable,
   updateManualCodeTableStatus,
-} from "../api/manualCodeTables.js";
+} from "../api/manualCodeTables.ts";
 import { getBinaryStatusValue, toast } from "../components/common/index.js";
 import { getErrorMessage } from "../utils/ui.ts";
 

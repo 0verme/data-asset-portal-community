@@ -43,7 +43,7 @@ test("anonymous UI exposes catalog actions only and keeps write controls permiss
 });
 
 test("public push mock projection does not retain connection or contact fields", async () => {
-  const source = await read("api/push.js");
+  const source = await read("api/push.ts");
   assert.doesNotMatch(source, /host: system\.host/);
   assert.doesNotMatch(source, /downstreamContact: system\.downstreamContact/);
   assert.doesNotMatch(source, /dataDeveloperContact: system\.dataDeveloperContact/);

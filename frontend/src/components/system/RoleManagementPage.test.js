@@ -8,7 +8,7 @@ const readSource = (name) => readFile(`${here}/${name}`, "utf8");
 
 test("role management consumes role and permission APIs", async () => {
   const [api, hook, page] = await Promise.all([
-    readFile(`${here}/../../api/systemRoles.js`, "utf8"),
+    readFile(`${here}/../../api/systemRoles.ts`, "utf8"),
     readFile(`${here}/../../hooks/useRoleModule.js`, "utf8"),
     readFile(`${here}/RoleManagementPage.jsx`, "utf8"),
   ]);
@@ -17,7 +17,7 @@ test("role management consumes role and permission APIs", async () => {
   assert.match(api, /assignableOnly/);
   assert.match(api, /getRoleAssignablePermissions/);
   assert.match(api, /Built-in role cannot be deleted/);
-  assert.match(api, /method: "DELETE"/);
+  assert.match(api, /method:\s*["']DELETE["']/);
   assert.match(hook, /getRoleAssignablePermissions/);
   assert.match(hook, /normalizeRolePermissionCodes/);
   assert.match(hook, /system:role:write/);

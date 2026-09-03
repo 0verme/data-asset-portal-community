@@ -7,7 +7,7 @@ const canvasPath = fileURLToPath(new URL("./lineage/LineageCanvas.jsx", import.m
 const adapterPath = fileURLToPath(new URL("./lineage/lineageAdapter.js", import.meta.url));
 const stylesPath = fileURLToPath(new URL("../styles/app.css", import.meta.url));
 const pagePath = fileURLToPath(new URL("./LineagePage.jsx", import.meta.url));
-const apiPath = fileURLToPath(new URL("../api/lineage.js", import.meta.url));
+const apiPath = fileURLToPath(new URL("../api/lineage.ts", import.meta.url));
 const packagePath = fileURLToPath(new URL("../../package.json", import.meta.url));
 
 test("lineage layout keeps the graph independent from the detail panel", async () => {
@@ -65,7 +65,7 @@ test("lineage search accepts table and task nodes", async () => {
   assert.match(page, /表或作业名称查询/);
   assert.match(page, /aria-label="血缘节点候选项"/);
   assert.match(page, /candidate\.kind === "task" \? "detail"/);
-  assert.match(api, /\["table", "task"\]\.includes\(node\.kind\)/);
+  assert.match(api, /\[["']table["'],\s*["']task["']\]\.includes\(node\.kind\)/);
   assert.doesNotMatch(api, /findLineageTables/);
 });
 

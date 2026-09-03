@@ -14,8 +14,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { createReport, deleteReport, getReportList, updateReport } from "../api/report.js";
-import { isUnauthorizedError } from "../api/http.js";
+import { createReport, deleteReport, getReportList, updateReport } from "../api/report.ts";
+import { isUnauthorizedError } from "../api/http.ts";
 import { DEFAULT_REPORT_FILTER, DEFAULT_REPORT_ROUTE } from "../config/defaults.ts";
 import { getErrorMessage, scrollMainToTop } from "../utils/ui.ts";
 
