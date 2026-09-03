@@ -14,7 +14,7 @@
   │ HTTP Demo: :80 / HTTPS Production: :443
   ▼
 Nginx ──────────────── frontend/dist（静态文件）
-  │ /api/ ──────────── 127.0.0.1:5099
+  │ /api/ ──────────── 127.0.0.1:15099
   ▼
 FastAPI Native / Uvicorn（backend.asgi:app）
   │
@@ -31,9 +31,9 @@ Database Provider → PostgreSQL / MySQL / GaussDB-DWS / SQLite
 | 后端 | FastAPI Native |
 | ASGI entrypoint | `backend.asgi:app` |
 | 进程运行时 | Uvicorn |
-| 后端监听 | `127.0.0.1:5099`，只允许本机 Nginx 访问 |
-| Nginx API 入口 | `/api/` → `http://127.0.0.1:5099/api/` |
-| 健康检查 | 后端本机 `http://127.0.0.1:5099/healthz` |
+| 后端监听 | `127.0.0.1:15099`，只允许本机 Nginx 访问 |
+| Nginx API 入口 | `/api/` → `http://127.0.0.1:15099/api/` |
+| 健康检查 | 后端本机 `http://127.0.0.1:15099/healthz` |
 
 `backend/run.py`、Waitress、Flask/WSGI fallback 和旧 runtime switch 不是当前生产运行方式。不要为了部署重新引入它们。
 
@@ -52,7 +52,7 @@ Database Provider → PostgreSQL / MySQL / GaussDB-DWS / SQLite
 - Node.js **22.13+** 和 npm **10+**，仅在服务器构建前端时需要。版本要求来自 `frontend/package.json` 的 `engines.node` 和 lineage workspace。
 - 一个专用的服务账号，例如示例中的 `dataasset`；请按组织账号规范替换。
 
-将防火墙或安全组配置为只暴露 Nginx 的 80/443（按部署模式选择）；后端固定监听 loopback，不要将 `5099` 作为外部入口暴露。
+将防火墙或安全组配置为只暴露 Nginx 的 80/443（按部署模式选择）；后端固定监听 loopback，不要将 `15099` 作为外部入口暴露。
 
 ### 2.2 获取固定版本
 
@@ -123,7 +123,7 @@ sudo chmod 600 backend/.env.local backend/configs/database.yaml
 - `APP_DEBUG=false`。生产环境开启 debug 会导致应用启动失败。
 - Session Cookie 保持 `HttpOnly=True`、`SameSite=Lax`、`Secure=True`。
 - 同源 Nginx 部署不需要 `APP_CORS_ORIGINS`。只有前后端确实跨来源时，才配置精确的来源 allowlist，不要使用 `*` 配合 Cookie。
-- `ASSET_TRUST_PROXY_HEADERS=true` 只适用于后端保持 loopback、外部请求只能经过可信 Nginx 的拓扑；如果 `5099` 可被不可信客户端直接访问，应保持 `false`。
+- `ASSET_TRUST_PROXY_HEADERS=true` 只适用于后端保持 loopback、外部请求只能经过可信 Nginx 的拓扑；如果 `15099` 可被不可信客户端直接访问，应保持 `false`。
 - 应用只读取 `APP_*` 安全配置名称；旧 `FLASK_*` 名称不会作为 runtime 配置读取。升级既有部署时迁移变量名称，并保留原 `APP_SECRET_KEY`，避免已有 signed session 无法迁移。
 - `APP_MAX_CONTENT_LENGTH_MB` 默认限制为 16 MB；应用同时返回 `nosniff`、`SAMEORIGIN` 和严格来源策略等安全响应头。若调整请求体上限，应同时检查 Nginx 的 `client_max_body_size`。
 - `APP_ENV=production` 或未设置时不会注册 `/docs`、`/redoc`、`/openapi.json`；只有显式 `development` 才启用它们。关闭 HTTP interactive docs 不是业务 API 的 authentication/authorization 替代。
@@ -150,7 +150,7 @@ backend/.venv/bin/python -m pip install -r backend/requirements.txt
 backend/.venv/bin/uvicorn \
   backend.asgi:app \
   --host 127.0.0.1 \
-  --port 5099
+  --port 15099
 ```
 
 ## 5. Database Migration
@@ -309,7 +309,7 @@ test -f dist/index.html
 
 ```ini
 WorkingDirectory=/opt/data-asset-portal
-ExecStart=/opt/data-asset-portal/backend/.venv/bin/uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
+ExecStart=/opt/data-asset-portal/backend/.venv/bin/uvicorn backend.asgi:app --host 127.0.0.1 --port 15099
 ```
 
 复制并编辑 unit：
@@ -325,7 +325,7 @@ sudoedit /etc/systemd/system/data-asset-portal.service
 
 - `User` / `Group`：示例是 `dataasset`，不是仓库强制名称；
 - `WorkingDirectory`：实际 checkout 根目录；
-- `ExecStart`：实际 `.venv/bin/uvicorn` 绝对路径、`backend.asgi:app`、`127.0.0.1:5099`；
+- `ExecStart`：实际 `.venv/bin/uvicorn` 绝对路径、`backend.asgi:app`、`127.0.0.1:15099`；
 - service 账号对仓库、`backend/.env.local`、数据库配置和所需本地 snapshot 有读取权限。
 
 示例 unit 不使用 `source backend/.venv/bin/activate`，也不加入未经验证的 `ProtectSystem`、`ProtectHome`、`ReadWritePaths` 等 sandbox 参数，避免遮断 SQLite、配置、snapshot 或其他项目运行所需访问。
@@ -371,7 +371,7 @@ location / {
 }
 
 location /api/ {
-    proxy_pass http://127.0.0.1:5099/api/;
+    proxy_pass http://127.0.0.1:15099/api/;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -413,7 +413,7 @@ ASSET_TRUST_PROXY_HEADERS=true
 
 ```bash
 sudo systemctl status data-asset-portal
-curl --fail --silent --show-error http://127.0.0.1:5099/healthz
+curl --fail --silent --show-error http://127.0.0.1:15099/healthz
 ```
 
 预期 JSON 至少包含：
@@ -455,7 +455,7 @@ HTTPS Production 将上述 `http://` 替换为 `https://`。最终至少确认�
 ```text
 /                 → 前端 index
 /api/assets/tables → FastAPI JSON
-127.0.0.1:5099/healthz → fastapi runtime health JSON
+127.0.0.1:15099/healthz → fastapi runtime health JSON
 ```
 
 然后在浏览器通过 HTTPS 登录，确认 session 在页面刷新和后续管理请求中保持。HTTP Demo 下不要把 Secure Cookie 登录失败误判为后端进程故障。
@@ -470,7 +470,7 @@ HTTPS Production 将上述 `http://` 替换为 `https://`。最终至少确认�
 4. 执行 `schema_migrate.py apply`，再执行 `status`/`verify`。
 5. 执行 `create_admin.py` 创建管理员。
 6. 通过服务器或构建机执行 `cd frontend && npm ci && npm run build`，确认 `frontend/dist/index.html`；或部署已验证的 `frontend/dist` artifact。
-7. 安装并启用 systemd unit，确认 backend 监听 `127.0.0.1:5099`。
+7. 安装并启用 systemd unit，确认 backend 监听 `127.0.0.1:15099`。
 8. 安装 Nginx HTTP Demo 或 HTTPS Production 配置，执行 `nginx -t` 并 reload。
 9. 按[验收命令](#10-verification)检查 systemd、`/healthz`、Nginx、首页、`/api` 和 SPA refresh。
 
@@ -498,7 +498,7 @@ cd ..
 sudo systemctl start data-asset-portal
 sudo nginx -t
 sudo systemctl reload nginx
-curl --fail --silent --show-error http://127.0.0.1:5099/healthz
+curl --fail --silent --show-error http://127.0.0.1:15099/healthz
 ```
 
 如果前端由 CI/build machine 构建，则在停止服务前将该版本的 `frontend/dist` artifact 部署到服务器。升级后重新执行 API JSON、SPA refresh 和 HTTPS 登录验收。
@@ -519,10 +519,10 @@ journalctl -u data-asset-portal -n 200 --no-pager
 先检查 loopback runtime：
 
 ```bash
-curl --fail http://127.0.0.1:5099/healthz
+curl --fail http://127.0.0.1:15099/healthz
 ```
 
-然后检查 Nginx `location /api/` 与 `proxy_pass http://127.0.0.1:5099/api/;` 是否同时保留 `/api/`，并执行 `nginx -t`。前端收到 HTML 而不是 JSON 通常表示 `/api` 没有正确代理到 backend。
+然后检查 Nginx `location /api/` 与 `proxy_pass http://127.0.0.1:15099/api/;` 是否同时保留 `/api/`，并执行 `nginx -t`。前端收到 HTML 而不是 JSON 通常表示 `/api` 没有正确代理到 backend。
 
 ### SPA 刷新返回 404
 

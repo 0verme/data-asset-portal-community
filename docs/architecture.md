@@ -22,7 +22,7 @@ Database Provider
 生产和默认开发入口均为：
 
 ```bash
-uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
+uvicorn backend.asgi:app --host 127.0.0.1 --port 15099
 ```
 
 `backend/run.py`、Waitress、WSGI fallback 和 runtime switch 均已退休；当前没有第二套 Flask runtime。`GET /healthz` 只报告进程状态，固定返回 `runtime=fastapi` 和 `fastapiPrimary=true`，不执行数据库查询。

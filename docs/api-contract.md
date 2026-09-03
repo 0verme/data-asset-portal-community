@@ -33,7 +33,7 @@ FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract�
 
 - 统一使用 `/api` 作为接口前缀
 - 前端使用相对路径访问，例如 `/api/assets/tables`、`/api/field-mappings/stats`、`/api/roots`
-- 本地 development / Community Demo 的后端默认监听 `http://127.0.0.1:5099`
+- 本地 development / Community Demo 的后端默认监听 `http://127.0.0.1:15099`
 
 ### 1.2 Health 与版本语义
 
@@ -234,10 +234,10 @@ Base Path: `/api/assets`
 
 ### 2.5 可复制的详情请求
 
-资产详情端点属于 Public Catalog reads，无需先建立登录态。下面的示例使用仓库 Demo 中的虚构表名；本地默认服务地址为 `http://127.0.0.1:5099`，如使用其他 profile 请替换为实际服务地址。
+资产详情端点属于 Public Catalog reads，无需先建立登录态。下面的示例使用仓库 Demo 中的虚构表名；本地默认服务地址为 `http://127.0.0.1:15099`，如使用其他 profile 请替换为实际服务地址。
 
 ```bash
-curl --get "http://127.0.0.1:5099/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D" \
+curl --get "http://127.0.0.1:15099/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D" \
   --header "Accept: application/json"
 ```
 
@@ -303,7 +303,7 @@ Base Path: `/api/search`
 ### 可复制的搜索请求
 
 ```bash
-curl --get "http://127.0.0.1:5099/api/search" \
+curl --get "http://127.0.0.1:15099/api/search" \
   --header "Accept: application/json" \
   --data-urlencode "q=会员" \
   --data-urlencode "scope=asset" \
@@ -529,7 +529,7 @@ DWS 解析脚本保留源端只读 metadata 查询，但不再连接或写入 Po
 $env:DAP_SESSION_COOKIE = 'session=<signed-cookie-value>'
 python backend/scripts/imp_dws_comments.py `
   --directory 'D:\dws-scripts' `
-  --api-base-url 'http://127.0.0.1:5099' `
+  --api-base-url 'http://127.0.0.1:15099' `
   --batch-size 100 `
   --dry-run
 ```

@@ -25,7 +25,7 @@ function resolveFrontendApiBaseUrl(env) {
 }
 
 function resolveBackendTarget(env) {
-  return (env.VITE_BACKEND_URL?.trim() || "http://127.0.0.1:5099").replace(/\/$/, "");
+  return (env.VITE_BACKEND_URL?.trim() || "http://127.0.0.1:15099").replace(/\/$/, "");
 }
 
 function buildApiProxyKey(apiBaseUrl) {

@@ -131,7 +131,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
 
     def test_ports_are_parsed_with_defaults_and_range_validation(self):
         defaults = parse_args([])
-        self.assertEqual(5099, defaults.backend_port)
+        self.assertEqual(15099, defaults.backend_port)
         self.assertEqual(5173, defaults.frontend_port)
 
         custom = parse_args(["--backend-port", "15099", "--frontend-port", "15173"])

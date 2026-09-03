@@ -84,16 +84,16 @@ pip install -r backend/requirements.txt
 npm --prefix frontend run dev
 
 # 后端（FastAPI Native）
-python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
+python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 15099
 ```
 
 `backend/asgi.py` 是唯一开发与生产共用的 FastAPI Native ASGI entrypoint。`python backend/run.py` 已退休，不再提供 Flask development/WSGI runtime。
 
-> **端口约定**：后端固定使用 **5099** 端口，绝不自动切换到 5001/5002。
-> 下面的写日志脚本会在启动前自动检测 5099 是否被占用，若被占用则找出 PID 并结束该进程，
-> 再以 5099 端口启动。直接启动 Uvicorn 不会自动清理端口，请优先使用脚本启动。
+> **端口约定**：后端固定使用 **15099** 端口，绝不自动切换到 5001/5002。
+> 下面的写日志脚本会在启动前自动检测 15099 是否被占用，若被占用则找出 PID 并结束该进程，
+> 再以 15099 端口启动。直接启动 Uvicorn 不会自动清理端口，请优先使用脚本启动。
 
-### 写日志启动（自动清理 5099 端口）
+### 写日志启动（自动清理 15099 端口）
 
 前后端均提供后台运行并写日志到 `logs/` 的脚本：
 
@@ -101,13 +101,13 @@ python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
 # Windows（PowerShell）
 # 前端
 powershell -ExecutionPolicy Bypass -File .\frontend\scripts\dev-frontend.ps1
-# 后端（启动前自动结束占用 5099 端口的进程）
+# 后端（启动前自动结束占用 15099 端口的进程）
 powershell -ExecutionPolicy Bypass -File .\backend\scripts\dev-backend.ps1
 ```
 
 ```bash
 # Mac / Linux
-# 后端（启动前自动结束占用 5099 端口的进程）
+# 后端（启动前自动结束占用 15099 端口的进程）
 bash backend/scripts/dev-backend.sh
 ```
 
@@ -122,10 +122,10 @@ npm --prefix frontend run dev:backend:sh
 
 #### 端口清理实现说明
 
-- **Windows**：`Get-NetTCPConnection -LocalPort 5099 -State Listen` 取得占用进程 PID，
+- **Windows**：`Get-NetTCPConnection -LocalPort 15099 -State Listen` 取得占用进程 PID，
   `Stop-Process -Force` 结束（旧系统回退 `netstat -ano`）。
-- **Mac / Linux**：`lsof -nP -iTCP:5099 -sTCP:LISTEN -t` 取得 PID，`kill -9` 结束
-  （无 `lsof` 时回退 `fuser 5099/tcp`）。
+- **Mac / Linux**：`lsof -nP -iTCP:15099 -sTCP:LISTEN -t` 取得 PID，`kill -9` 结束
+  （无 `lsof` 时回退 `fuser 15099/tcp`）。
 
 ### 统一启动（Windows）
 
@@ -154,8 +154,8 @@ VITE_API_MODE=mock
 # frontend/.env.local
 VITE_API_MODE=remote
 VITE_API_BASE_URL=/api
-# 后端固定 5099，请勿改成 5001/5002
-VITE_BACKEND_URL=http://localhost:5099
+# 后端固定 15099，请勿改成 5001/5002
+VITE_BACKEND_URL=http://localhost:15099
 ```
 
 ```env
@@ -189,9 +189,9 @@ Remote API 的普通业务目录 GET 支持匿名浏览：资产、字段/DDL、
 
 本地后端显式设置 `APP_ENV=development` 后，FastAPI 的开发文档端点可用：
 
-- Swagger UI：`http://127.0.0.1:5099/docs`
-- ReDoc：`http://127.0.0.1:5099/redoc`
-- OpenAPI JSON：`http://127.0.0.1:5099/openapi.json`
+- Swagger UI：`http://127.0.0.1:15099/docs`
+- ReDoc：`http://127.0.0.1:15099/redoc`
+- OpenAPI JSON：`http://127.0.0.1:15099/openapi.json`
 
 `APP_ENV` 未设置或不是 `development` 时，这些 HTTP 端点默认关闭；这不影响应用内部通过 `app.openapi()` 生成 schema。
 
@@ -309,8 +309,8 @@ PostgreSQL integration 测试（16 个）通过 `TEST_DATABASE_PROFILE` + `TEST_
 | --- | --- |
 | `scripts/dev-all.ps1` | 统一启动前后端 |
 | `frontend/scripts/dev-frontend.ps1` | 前端后台运行并写日志 |
-| `backend/scripts/dev-backend.ps1` | 后端后台运行并写日志（Windows，启动前清理 5099 端口） |
-| `backend/scripts/dev-backend.sh` | 后端后台运行并写日志（Mac/Linux，启动前清理 5099 端口） |
+| `backend/scripts/dev-backend.ps1` | 后端后台运行并写日志（Windows，启动前清理 15099 端口） |
+| `backend/scripts/dev-backend.sh` | 后端后台运行并写日志（Mac/Linux，启动前清理 15099 端口） |
 | `backend/scripts/db_to_init_sql.py` | 从数据库导出整库快照 SQL（默认输出到 git-ignored `tmp/db-init-sql/`，写仓库需显式 `--allow-repository-output`） |
 
 ## 代码组织约定

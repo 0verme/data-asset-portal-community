@@ -7,7 +7,7 @@ $venvPython = Join-Path $backendDir ".venv\\Scripts\\python.exe"
 
 # 后端固定端口，禁止自动切换到其他端口
 $backendHost = "127.0.0.1"
-$backendPort = 5099
+$backendPort = 15099
 
 if (-not (Test-Path $venvPython)) {
   throw "Project virtualenv python not found: $venvPython"

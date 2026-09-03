@@ -16,7 +16,7 @@ Environment=PYTHONUNBUFFERED=1
 # backend.asgi loads the repository .env/.env.local files itself.  Keep the
 # runtime configuration in backend/.env.local; do not define a second,
 # divergent systemd environment definition here.
-ExecStart=/opt/data-asset-portal/backend/.venv/bin/uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
+ExecStart=/opt/data-asset-portal/backend/.venv/bin/uvicorn backend.asgi:app --host 127.0.0.1 --port 15099
 
 Restart=on-failure
 RestartSec=3

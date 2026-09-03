@@ -145,7 +145,7 @@ flowchart LR
 | --- | --- |
 | 前端 | React 18 + Vite 8，现有代码以 JS/JSX 为主，新增边界代码采用 TypeScript |
 | 后端 | FastAPI + Uvicorn，入口 `backend/asgi.py` |
-| Production / local entrypoint | `uvicorn backend.asgi:app --host 127.0.0.1 --port 5099` |
+| Production / local entrypoint | `uvicorn backend.asgi:app --host 127.0.0.1 --port 15099` |
 | 健康检查 | `GET /healthz`，只报告进程状态，不查询数据库 |
 | 数据访问 | Service Layer → Database Provider → SQLite / PostgreSQL / MySQL / GaussDB-DWS |
 | 部署 | Nginx 托管前端静态资源并反代 `/api`，见 [部署说明](./DEPLOYMENT.md) |

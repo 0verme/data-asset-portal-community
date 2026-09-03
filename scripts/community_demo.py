@@ -33,7 +33,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-DEFAULT_BACKEND_PORT = 5099
+DEFAULT_BACKEND_PORT = 15099
 DEFAULT_FRONTEND_PORT = 5173
 PYTHON_MINIMUM = (3, 10)
 NODE_MINIMUM = (22, 13, 0)

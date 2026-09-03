@@ -18,7 +18,7 @@ pip install -r requirements.txt
 从仓库根目录以前台方式启动默认 runtime：
 
 ```bash
-python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
+python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 15099
 ```
 
 生产与本地联调均使用同一条 FastAPI/Uvicorn entrypoint；不再提供 Flask compatibility mode 或 direct Flask runtime。应用配置只读取 `APP_*` 名称；旧 `FLASK_*` 名称已移除。
@@ -288,9 +288,9 @@ python backend/scripts/schema_migrate.py verify \
 在新终端使用同一个隔离 profile 启动后端并保持进程运行（端口约定见 [开发指南](../DEVELOPMENT.md)），再验证健康检查和一个只读资产请求：
 
 ```bash
-python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
-curl --fail http://127.0.0.1:5099/healthz
-curl --fail --get http://127.0.0.1:5099/api/assets/tables \
+python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 15099
+curl --fail http://127.0.0.1:15099/healthz
+curl --fail --get http://127.0.0.1:15099/api/assets/tables \
   --data-urlencode "keyword=DWM_MEMBER_ACTIVITY_STAT_1D"
 ```
 

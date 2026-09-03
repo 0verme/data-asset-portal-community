@@ -56,7 +56,7 @@ preflight
 ```text
 Community Demo ready
 Frontend:    http://127.0.0.1:5173/
-Backend/API: http://127.0.0.1:5099
+Backend/API: http://127.0.0.1:15099
 Demo administrator:
   Username: admin
   Password: 12346
@@ -67,12 +67,12 @@ Stop: Ctrl+C
 前端使用 Vite `/api` proxy 访问后端，浏览器不需要再编辑 remote/API 配置。默认代表性 API 为：
 
 ```text
-http://127.0.0.1:5099/api/portal/stats
+http://127.0.0.1:15099/api/portal/stats
 ```
 
 ### 端口参数
 
-默认端口仍为 backend `5099`、frontend `5173`。三个入口都会把参数同步到 CORS、`VITE_BACKEND_URL`、Uvicorn/Vite 启动参数、readiness URL、端口冲突检查和成功输出：
+默认端口为 backend `15099`、frontend `5173`。三个入口都会把参数同步到 CORS、`VITE_BACKEND_URL`、Uvicorn/Vite 启动参数、readiness URL、端口冲突检查和成功输出：
 
 ```bash
 # Linux/macOS
@@ -87,7 +87,7 @@ python scripts/community_demo.py --backend-port 15099 --frontend-port 5173
 .\scripts\demo.ps1 -BackendPort 15099 -FrontendPort 5173
 ```
 
-端口必须在 `1`～`65535` 之间。Windows 某些机器会把 `5041`～`5140` 标记为 excluded/reserved port；即使没有监听进程，socket 检查也可能显示未占用，实际启动仍可能失败并报 `WinError 10013`。因此 Windows 若默认 backend `5099` 启动失败，可改用上例的 `15099`（它不是默认值），并确认该端口未被其他服务使用。
+端口必须在 `1`～`65535` 之间。Windows 某些机器会把 `5041`～`5140` 标记为 excluded/reserved port；即使没有监听进程，socket 检查也可能显示未占用，实际启动仍可能失败并报 `WinError 10013`。当前默认 backend `15099` 已避开该范围；如果自定义其他端口，请确认该端口未被其他服务使用。
 
 Lineage workspace 的 `dist/` 不属于 Git checkout 内容。bootstrap 会检查 `lineage-viewer`、`@lineage-viewer/domain-adapter` 和 `@lineage-viewer/react` 的 package entry；首次 checkout 缺失时自动在 `frontend/` 执行：
 
@@ -133,7 +133,7 @@ CI 或只想初始化数据库时，不启动常驻服务：
 
 完整 Demo 运行时按 `Ctrl+C`。Bootstrap 只会终止它自己创建的 backend/frontend child process；不会按进程名杀掉其他 Python、Node 或 Vite 进程。
 
-默认端口为 backend `5099`、frontend `5173`，也可使用上一节的参数选择其他端口。如果任一实际端口被占用，脚本会安全失败并提示端口，不会终止未知进程；Windows excluded/reserved port 即使没有监听进程也可能在启动时失败。
+默认端口为 backend `15099`、frontend `5173`，也可使用上一节的参数选择其他端口。如果任一实际端口被占用，脚本会安全失败并提示端口，不会终止未知进程；Windows excluded/reserved port 即使没有监听进程也可能在启动时失败。
 
 完整 Demo 停止后可再次运行：
 
@@ -156,8 +156,8 @@ password: 12346
 - **Python not found / version too old**：安装 Python 3.10+，重新执行入口脚本。
 - **Node.js not found / version too old**：安装 Node.js 22.13+（包含 npm），重新执行入口脚本。
 - **依赖安装失败**：查看终端中对应的 `pip` 或 `npm ci` 错误；脚本不会尝试系统级安装。
-- **端口冲突**：停止占用实际 backend/frontend 端口的你自己的服务后重试；Windows 若 `5099` 报 `WinError 10013`，改用 `-BackendPort 15099` 或对应的 `--backend-port 15099`；bootstrap 不会自动杀进程。
-- **frontend 返回 API 错误**：确认 backend 已在所选 backend 端口 ready；默认可直接请求 `http://127.0.0.1:5099/api/portal/stats` 检查 API。
+- **端口冲突**：停止占用实际 backend/frontend 端口的你自己的服务后重试；如果 `15099` 报 `WinError 10013`，改用其他未被占用的端口，例如 `-BackendPort 15100` 或对应的 `--backend-port 15100`；bootstrap 不会自动杀进程。
+- **frontend 返回 API 错误**：确认 backend 已在所选 backend 端口 ready；默认可直接请求 `http://127.0.0.1:15099/api/portal/stats` 检查 API。
 - **数据库异常**：确认 `.demo/community-demo/community.sqlite` 是本 Demo 路径。不要把外部 `DATABASE_URL` 改写到 Demo 配置中。
 
 ## Manual development workflow
@@ -171,14 +171,14 @@ python backend/scripts/schema_migrate.py apply \
 python demo/seed_sqlite.py --database <absolute-local-path>/community.sqlite
 ```
 
-后端默认监听 `127.0.0.1:5099`，使用与生产一致的 ASGI entrypoint；也可以选择与前端配置匹配的其他端口：
+后端默认监听 `127.0.0.1:15099`，使用与生产一致的 ASGI entrypoint；也可以选择与前端配置匹配的其他端口：
 
 ```bash
 # 默认端口
-python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 5099
-
-# Windows excluded/reserved port 时的示例
 python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 15099
+
+# 自定义端口示例
+python -m uvicorn backend.asgi:app --host 127.0.0.1 --port 15100
 ```
 
 默认使用纯 FastAPI/Uvicorn runtime。Flask compatibility mode 与 direct Flask runtime 已退休；应用配置只读取 `APP_*` 名称，旧 `FLASK_*` 名称已移除。
@@ -192,16 +192,16 @@ npm --prefix frontend run build:lineage
 ```env
 VITE_API_MODE=remote
 VITE_API_BASE_URL=/api
-VITE_BACKEND_URL=http://127.0.0.1:5099
+VITE_BACKEND_URL=http://127.0.0.1:15099
 ```
 
-然后运行（默认 frontend `5173`、backend `5099`）：
+然后运行（默认 frontend `5173`、backend `15099`）：
 
 ```bash
 npm --prefix frontend run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
-如果后端使用 `15099`，将 `VITE_BACKEND_URL` 改为 `http://127.0.0.1:15099`；PowerShell 可先执行 `$env:VITE_BACKEND_URL="http://127.0.0.1:15099"`。手工路径中请自行确保 `APP_SECRET_KEY` 已设置、Community SQLite profile 和配置文件不会指向外部数据库。
+如果后端使用其他端口，将 `VITE_BACKEND_URL` 改为对应的后端地址；例如使用 `15100` 时，PowerShell 可先执行 `$env:VITE_BACKEND_URL="http://127.0.0.1:15100"`。手工路径中请自行确保 `APP_SECRET_KEY` 已设置、Community SQLite profile 和配置文件不会指向外部数据库。
 
 ## 演示数据
 

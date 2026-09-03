@@ -8,7 +8,7 @@ venvPython="$backendDir/.venv/bin/python"
 
 # 后端固定端口，禁止自动切换到其他端口
 backendHost="127.0.0.1"
-backendPort=5099
+backendPort=15099
 
 if [ ! -x "$venvPython" ]; then
   echo "Project virtualenv python not found: $venvPython" >&2
