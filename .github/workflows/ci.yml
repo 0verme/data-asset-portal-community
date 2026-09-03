@@ -32,7 +32,6 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-
 jobs:
   repository-guard:
     name: Repository Guard
@@ -298,7 +297,7 @@ jobs:
           )"
           echo "$STATUS"
           case "$STATUS" in
-            *"revision=0008_indicator_semantic_contract"*) : ;;
+            *"revision=0009_upstream_option_contract"*) : ;;
             *) echo "unexpected Alembic migration state"; exit 1 ;;
           esac
 

@@ -45,12 +45,40 @@ export function optionsFromValues(values: readonly OptionInputItem[] = []): Dict
   });
 }
 
+function optionKey(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
 export function findDictOption<T extends OptionInputItem | DictOption>(options: readonly T[] = [], value = ''): T | null {
+  const target = optionKey(value);
+  if (!target) return null;
   return options.find((item) => {
-    if (typeof item === 'string') return item === value;
+    if (typeof item === 'string') return optionKey(item) === target;
     const record = item as Record<string, unknown>;
-    return record['value'] === value;
+    return ['value', 'code', 'name'].some((key) => optionKey(record[key]) === target);
   }) || null;
+}
+
+export function normalizeDictValue(options: readonly OptionInputItem[] = [], value = ''): string {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  const option = findDictOption(options, normalized);
+  if (!option) return normalized;
+  if (typeof option === 'string') return option;
+  const record = option as Record<string, unknown>;
+  if (typeof record['value'] === 'string') return record['value'];
+  if (typeof record['name'] === 'string') return record['name'];
+  return normalized;
+}
+
+export function displayDictValue(options: readonly OptionInputItem[] = [], value = ''): string {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  const option = findDictOption(options, normalized);
+  if (!option) return normalized;
+  if (typeof option === 'string') return option;
+  const record = option as Record<string, unknown>;
+  if (typeof record['name'] === 'string') return record['name'];
+  if (typeof record['value'] === 'string') return record['value'];
+  return normalized;
 }
 
 export function isLegacyDictValue(options: readonly OptionInputItem[] = [], value = ''): boolean {

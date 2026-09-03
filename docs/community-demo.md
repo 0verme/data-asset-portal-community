@@ -207,7 +207,7 @@ npm --prefix frontend run dev -- --host 127.0.0.1 --port 5173 --strictPort
 
 - 11 个业务菜单（portal landing page 不占菜单行）
 - 30 张 DWD / DWM / DWS 主题表、251 个字段、40 个词根、16 个指标和 10 个 API 资产
-- 8 个数据源、8 个上游系统、48 个字段映射、9 类 / 33 项参数字典
+- 8 个数据源、8 个上游系统、48 个字段映射、11 类 / 49 项参数字典
 - 6 个下游系统、6 个推送作业、8 个报表资产和 3 个手工码值表元数据
 - 关系数据包含指标路径、持久化 lineage snapshot/node/edge 和有限血缘示例
 

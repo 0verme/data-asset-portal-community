@@ -105,6 +105,31 @@ WHERE NOT EXISTS (
     SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DB_TYPE' AND item_code = 'OTHER'
 );
 
+-- The current frontend catalog also supports these database types.
+INSERT INTO dwp.p_code_item (
+    item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
+)
+SELECT 44, 'UPSTREAM_DB_TYPE', 'MONGODB', 'MongoDB', 'MongoDB', 'MongoDB 数据库', 60, 'Y', '系统初始化'
+WHERE NOT EXISTS (
+    SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DB_TYPE' AND item_code = 'MONGODB'
+);
+
+INSERT INTO dwp.p_code_item (
+    item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
+)
+SELECT 45, 'UPSTREAM_DB_TYPE', 'KAFKA', 'Kafka', 'Kafka', 'Kafka 消息系统', 70, 'Y', '系统初始化'
+WHERE NOT EXISTS (
+    SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DB_TYPE' AND item_code = 'KAFKA'
+);
+
+INSERT INTO dwp.p_code_item (
+    item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
+)
+SELECT 46, 'UPSTREAM_DB_TYPE', 'OBJECT_STORAGE', 'Object Storage', 'Object Storage', '对象存储', 80, 'Y', '系统初始化'
+WHERE NOT EXISTS (
+    SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DB_TYPE' AND item_code = 'OBJECT_STORAGE'
+);
+
 INSERT INTO dwp.p_code_category (
     category_id, category_code, category_name, category_desc, display_order, is_active, remark
 )
@@ -238,6 +263,71 @@ INSERT INTO dwp.p_code_item (
 SELECT 19, 'UPSTREAM_DEPT', 'CUSTOMER_OPS', '客户运营部', '客户运营部', '客户运营部', 40, 'Y', '系统初始化'
 WHERE NOT EXISTS (
     SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DEPT' AND item_code = 'CUSTOMER_OPS'
+);
+
+-- Keep the department options aligned with the Community retail demo.
+INSERT INTO dwp.p_code_item (
+    item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
+)
+SELECT 47, 'UPSTREAM_DEPT', 'PRODUCT_OPERATIONS', '商品运营部', '商品运营部', '商品运营部', 50, 'Y', '系统初始化'
+WHERE NOT EXISTS (
+    SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DEPT' AND item_code = 'PRODUCT_OPERATIONS'
+);
+
+INSERT INTO dwp.p_code_item (
+    item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
+)
+SELECT 48, 'UPSTREAM_DEPT', 'MEMBER_OPERATIONS', '会员运营部', '会员运营部', '会员运营部', 60, 'Y', '系统初始化'
+WHERE NOT EXISTS (
+    SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DEPT' AND item_code = 'MEMBER_OPERATIONS'
+);
+
+INSERT INTO dwp.p_code_item (
+    item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
+)
+SELECT 49, 'UPSTREAM_DEPT', 'TRADE_OPERATIONS', '交易运营部', '交易运营部', '交易运营部', 70, 'Y', '系统初始化'
+WHERE NOT EXISTS (
+    SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DEPT' AND item_code = 'TRADE_OPERATIONS'
+);
+
+INSERT INTO dwp.p_code_item (
+    item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
+)
+SELECT 50, 'UPSTREAM_DEPT', 'STORE_OPERATIONS', '门店运营部', '门店运营部', '门店运营部', 80, 'Y', '系统初始化'
+WHERE NOT EXISTS (
+    SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DEPT' AND item_code = 'STORE_OPERATIONS'
+);
+
+INSERT INTO dwp.p_code_item (
+    item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
+)
+SELECT 51, 'UPSTREAM_DEPT', 'SUPPLY_CHAIN', '供应链部', '供应链部', '供应链部', 90, 'Y', '系统初始化'
+WHERE NOT EXISTS (
+    SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DEPT' AND item_code = 'SUPPLY_CHAIN'
+);
+
+INSERT INTO dwp.p_code_item (
+    item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
+)
+SELECT 52, 'UPSTREAM_DEPT', 'MARKETING', '市场营销部', '市场营销部', '市场营销部', 100, 'Y', '系统初始化'
+WHERE NOT EXISTS (
+    SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DEPT' AND item_code = 'MARKETING'
+);
+
+INSERT INTO dwp.p_code_item (
+    item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
+)
+SELECT 53, 'UPSTREAM_DEPT', 'FULFILLMENT', '履约运营部', '履约运营部', '履约运营部', 110, 'Y', '系统初始化'
+WHERE NOT EXISTS (
+    SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DEPT' AND item_code = 'FULFILLMENT'
+);
+
+INSERT INTO dwp.p_code_item (
+    item_id, category_code, item_code, item_name, item_value, item_desc, display_order, is_active, remark
+)
+SELECT 54, 'UPSTREAM_DEPT', 'CUSTOMER_SERVICE', '客户服务部', '客户服务部', '客户服务部', 120, 'Y', '系统初始化'
+WHERE NOT EXISTS (
+    SELECT 1 FROM dwp.p_code_item WHERE category_code = 'UPSTREAM_DEPT' AND item_code = 'CUSTOMER_SERVICE'
 );
 
 INSERT INTO dwp.p_code_category (

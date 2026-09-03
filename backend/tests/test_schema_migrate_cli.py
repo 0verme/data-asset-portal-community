@@ -74,7 +74,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
 
             status = _run_cli(["status", "--profile", "fresh", "--config", str(config)])
             self.assertEqual(0, status.returncode, status.stderr)
-            self.assertIn("revision=0008_indicator_semantic_contract", status.stdout)
+            self.assertIn("revision=0009_upstream_option_contract", status.stdout)
             connection = sqlite3.connect(database)
             try:
                 row = connection.execute(
@@ -88,6 +88,14 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 indicator_columns = {
                     item[1] for item in connection.execute("PRAGMA table_info(p_indicator_item)")
                 }
+                upstream_db_type = connection.execute(
+                    "SELECT item_code, item_value FROM p_code_item "
+                    "WHERE category_code = 'UPSTREAM_DB_TYPE' ORDER BY display_order"
+                ).fetchall()
+                upstream_dept = connection.execute(
+                    "SELECT item_code, item_value FROM p_code_item "
+                    "WHERE category_code = 'UPSTREAM_DEPT' ORDER BY display_order"
+                ).fetchall()
             finally:
                 connection.close()
             self.assertEqual(("idx_p_asset_table_filter",), row)
@@ -100,6 +108,79 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                     "semantic_state",
                 } <= indicator_columns
             )
+            self.assertIn(("POSTGRESQL", "PostgreSQL"), upstream_db_type)
+            self.assertIn(("SUPPLY_CHAIN", "供应链部"), upstream_dept)
+
+    def test_upstream_option_migration_preserves_legacy_items(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "legacy-upstream-options.sqlite"
+            config = root / "database.yaml"
+            config.write_text(
+                "profiles:\n  legacy_options:\n    type: sqlite\n"
+                f"    database: {database.as_posix()}\n",
+                encoding="utf-8",
+            )
+            connection = connect({"type": "sqlite", "database": str(database)})
+            try:
+                self.assertTrue(initialize(connection, {"type": "sqlite", "database": str(database)}, "sqlite"))
+                connection.execute(
+                    "INSERT INTO dwp.p_code_category "
+                    "(category_id, category_code, category_name, category_desc, display_order, is_active) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (100, "UPSTREAM_DB_TYPE", "Legacy database types", "legacy", 10, "Y"),
+                )
+                connection.execute(
+                    "INSERT INTO dwp.p_code_item "
+                    "(item_id, category_code, item_code, item_name, item_value, display_order, is_active) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (100, "UPSTREAM_DB_TYPE", "DB2", "Legacy DB2", "legacy-db2", 10, "Y"),
+                )
+                connection.execute(
+                    "INSERT INTO dwp.p_code_category "
+                    "(category_id, category_code, category_name, category_desc, display_order, is_active) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (101, "UPSTREAM_DEPT", "Legacy departments", "legacy", 20, "Y"),
+                )
+                connection.execute(
+                    "INSERT INTO dwp.p_code_item "
+                    "(item_id, category_code, item_code, item_name, item_value, display_order, is_active) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (101, "UPSTREAM_DEPT", "CUSTOMER_OPS", "Legacy customer ops", "legacy-customer-ops", 10, "Y"),
+                )
+                connection.execute(
+                    "UPDATE dwp.alembic_version SET version_num = '0008_indicator_semantic_contract'"
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            apply = _run_cli(["apply", "--profile", "legacy_options", "--config", str(config)])
+            self.assertEqual(0, apply.returncode, apply.stderr)
+            self.assertIn("applied=-", apply.stdout)
+            connection = connect({"type": "sqlite", "database": str(database)})
+            try:
+                revision = connection.execute(
+                    "SELECT version_num FROM dwp.alembic_version"
+                ).fetchone()
+                db_items = connection.execute(
+                    "SELECT item_code, item_name, item_value FROM dwp.p_code_item "
+                    "WHERE category_code = 'UPSTREAM_DB_TYPE' ORDER BY item_id"
+                ).fetchall()
+                dept_items = connection.execute(
+                    "SELECT item_code, item_name, item_value FROM dwp.p_code_item "
+                    "WHERE category_code = 'UPSTREAM_DEPT' ORDER BY item_id"
+                ).fetchall()
+            finally:
+                connection.close()
+
+            self.assertEqual(("0009_upstream_option_contract",), revision)
+            self.assertIn(("DB2", "Legacy DB2", "legacy-db2"), db_items)
+            self.assertIn(("POSTGRESQL", "PostgreSQL", "PostgreSQL"), db_items)
+            self.assertIn(("CUSTOMER_OPS", "Legacy customer ops", "legacy-customer-ops"), dept_items)
+            self.assertIn(("SUPPLY_CHAIN", "供应链部", "供应链部"), dept_items)
+            self.assertEqual(len({item[0] for item in db_items}), len(db_items))
+            self.assertEqual(len({item[0] for item in dept_items}), len(dept_items))
 
     def test_existing_pre_116_database_upgrades_without_losing_rows(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -139,7 +220,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 self.assertEqual(("Legacy system",), connection.execute(
                     "SELECT system_name FROM dwp.p_system WHERE system_id = 99"
                 ).fetchone())
-                self.assertEqual(("0008_indicator_semantic_contract",), connection.execute(
+                self.assertEqual(("0009_upstream_option_contract",), connection.execute(
                     "SELECT version_num FROM dwp.alembic_version"
                 ).fetchone())
                 self.assertIsNotNone(connection.execute(

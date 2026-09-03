@@ -16,7 +16,11 @@ import React from "react";
 import { Icon } from "../ui.tsx";
 import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader, TimeInput, toast } from "../common/index.ts";
 import { buildModuleBreadcrumbs } from "../../routing/navigation.ts";
-import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.ts";
+import {
+  getLegacyAwareOptions,
+  isLegacyDictValue,
+  normalizeDictValue,
+} from "../../utils/optionUtils.ts";
 import { optionLabel } from "../../utils/ui.ts";
 
 import { getUpstreamFieldLabel } from "./upstreamFieldContract.js";
@@ -27,14 +31,15 @@ import {
   validateUpstreamForm,
 } from "./upstreamFormErrors.ts";
 
-export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions = [], statusOptions = [], onSave, onCancel, onBackToList, onBackToDetail, onDelete, saveError = "", saveFieldErrors = [], onClearSaveError }) {
-  const isEdit = mode === "edit";
-  const oldId = initial?.id || "";
-  const defaultStatus = statusOptions[0]?.value || "enabled";
-  const defaultDbType = dbTypeOptions[0]?.value || "";
-  const saveLockRef = React.useRef(false);
-  const [saving, setSaving] = React.useState(false);
-  const [form, setForm] = React.useState(() => initial || {
+function createUpstreamForm(initial, defaultDbType, defaultStatus, dbTypeOptions, deptOptions) {
+  if (initial) {
+    return {
+      ...initial,
+      dbType: normalizeDictValue(dbTypeOptions, initial.dbType),
+      dept: normalizeDictValue(deptOptions, initial.dept),
+    };
+  }
+  return {
     id: "",
     abbr: "",
     name: "",
@@ -47,7 +52,21 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
     owner: "",
     dept: "",
     desc: "",
-  });
+  };
+}
+
+export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions = [], statusOptions = [], onSave, onCancel, onBackToList, onBackToDetail, onDelete, saveError = "", saveFieldErrors = [], onClearSaveError }) {
+  const isEdit = mode === "edit";
+  const oldId = initial?.id || "";
+  const defaultStatus = statusOptions[0]?.value || "enabled";
+  const defaultDbType = dbTypeOptions[0]?.value || "";
+  const initialForm = React.useMemo(
+    () => createUpstreamForm(initial, defaultDbType, defaultStatus, dbTypeOptions, deptOptions),
+    [initial, defaultDbType, defaultStatus, dbTypeOptions, deptOptions],
+  );
+  const saveLockRef = React.useRef(false);
+  const [saving, setSaving] = React.useState(false);
+  const [form, setForm] = React.useState(() => initialForm);
   const [touched, setTouched] = React.useState(false);
   const initialSnapshotRef = React.useRef(JSON.stringify(form));
   const previousSaveErrorCountRef = React.useRef(saveFieldErrors.length);
@@ -55,26 +74,12 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
   const unloadTimes = Array.isArray(form.unloadTimes) ? form.unloadTimes : [];
 
   React.useEffect(() => {
-    const nextForm = initial || {
-      id: "",
-      abbr: "",
-      name: "",
-      dbType: defaultDbType,
-      host: "",
-      db: "",
-      schema: "",
-      unloadTimes: ["02:00"],
-      status: defaultStatus,
-      owner: "",
-      dept: "",
-      desc: "",
-    };
-    setForm(nextForm);
+    setForm(initialForm);
     setTouched(false);
     saveLockRef.current = false;
     setSaving(false);
-    initialSnapshotRef.current = JSON.stringify(nextForm);
-  }, [initial, defaultDbType, defaultStatus]);
+    initialSnapshotRef.current = JSON.stringify(initialForm);
+  }, [initialForm]);
 
   const clientErrors = touched ? validateUpstreamForm(form) : [];
   const fieldErrors = mergeUpstreamFieldErrors(clientErrors, saveFieldErrors);
@@ -133,14 +138,14 @@ export function UpstreamEditor({ mode, initial, dbTypeOptions = [], deptOptions 
         id: form.id.trim() || oldId,
         abbr: normalizedAbbr,
         name: form.name.trim(),
-        dbType: form.dbType,
+        dbType: normalizeDictValue(dbTypeOptions, form.dbType),
         host: form.host.trim(),
         db: form.db.trim(),
         schema: form.schema.trim(),
         unloadTimes: [...new Set(unloadTimes.map((item) => item.trim()))].sort(),
         status: form.status,
         owner: form.owner.trim() || "未指定",
-        dept: form.dept.trim() || "未分配",
+        dept: normalizeDictValue(deptOptions, form.dept),
         desc: form.desc.trim() || "暂无说明",
       }, oldId || undefined);
     } finally {

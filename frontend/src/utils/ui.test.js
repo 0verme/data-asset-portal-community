@@ -26,6 +26,23 @@ test("getErrorMessage displays backend validation details with field paths", () 
   );
 });
 
+test("getErrorMessage keeps upstream validation details user-readable", () => {
+  const error = new Error("请求参数校验失败");
+  error.payload = {
+    error: {
+      details: [
+        { field: "dbType", message: "“PostgreSQL”不是有效选项" },
+        { field: "dept", message: "“供应链部”不是有效选项" },
+      ],
+    },
+  };
+
+  assert.equal(
+    getErrorMessage(error),
+    "数据库类型：“PostgreSQL”不是有效选项；业务部门：“供应链部”不是有效选项",
+  );
+});
+
 test("getErrorMessage keeps the normal error message without validation details", () => {
   assert.equal(getErrorMessage(new Error("保存失败")), "保存失败");
 });

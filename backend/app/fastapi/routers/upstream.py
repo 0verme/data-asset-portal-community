@@ -11,7 +11,14 @@ from fastapi import APIRouter, Body, Depends, FastAPI, Query
 from fastapi.responses import JSONResponse
 
 from ...application import RequestContext
-from ...contracts import UpstreamResponse, validate_contract
+from ...contracts import (
+    UpstreamDataResponse,
+    UpstreamListResponse,
+    UpstreamMessageResponse,
+    UpstreamResponse,
+    UpstreamSystemRequest,
+    validate_contract,
+)
 from ...services.upstream_service import (
     UpstreamDataSourceError,
     UpstreamSystemAlreadyExistsError,
@@ -34,6 +41,12 @@ def _upstream_error_status(error: Any) -> int:
 
 def _upstream_error_response(error: Any) -> JSONResponse:
     return _service_error_response(error, _upstream_error_status(error))
+
+
+def _upstream_payload(payload: UpstreamSystemRequest | None) -> dict[str, Any] | None:
+    if payload is None:
+        return None
+    return payload.model_dump(by_alias=True, exclude_unset=True)
 
 
 def _register_upstream_routes(app: FastAPI, service: Any) -> None:
@@ -66,7 +79,7 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
         except UpstreamDataSourceError as error:
             return _upstream_error_response(error)
         return JSONResponse(
-            content=validate_contract({"items": items}, UpstreamResponse)
+            content=validate_contract({"items": items}, UpstreamListResponse)
         )
 
     @router.get("/systems/{system_id}", response_model=None)
@@ -78,7 +91,9 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
             data = current_service.get_system_detail(system_id)
         except (UpstreamSystemNotFoundError, UpstreamDataSourceError) as error:
             return _upstream_error_response(error)
-        return JSONResponse(content=validate_contract({"data": data}, UpstreamResponse))
+        return JSONResponse(
+            content=validate_contract({"data": data}, UpstreamDataResponse)
+        )
 
     @router.get("/systems/{system_id}/admin-detail", response_model=None)
     def get_system_admin_detail(
@@ -90,16 +105,18 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
             data = current_service.get_system_admin_detail(system_id)
         except (UpstreamSystemNotFoundError, UpstreamDataSourceError) as error:
             return _upstream_error_response(error)
-        return JSONResponse(content=validate_contract({"data": data}, UpstreamResponse))
+        return JSONResponse(
+            content=validate_contract({"data": data}, UpstreamDataResponse)
+        )
 
     @router.post("/systems", response_model=None, status_code=201)
     def create_system(
-        payload: Any = Body(default=None),
+        payload: UpstreamSystemRequest | None = Body(default=None),
         _context: RequestContext = Depends(require_permission("upstream:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
-            data = current_service.create_system(payload)
+            data = current_service.create_system(_upstream_payload(payload))
         except (
             UpstreamValidationError,
             UpstreamSystemAlreadyExistsError,
@@ -109,19 +126,22 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
         return JSONResponse(
             status_code=201,
             content=validate_contract(
-                {"message": "上游系统创建成功", "data": data}, UpstreamResponse
+                {"message": "上游系统创建成功", "data": data},
+                UpstreamMessageResponse,
             ),
         )
 
     @router.put("/systems/{system_id}", response_model=None)
     def update_system(
         system_id: str,
-        payload: Any = Body(default=None),
+        payload: UpstreamSystemRequest | None = Body(default=None),
         _context: RequestContext = Depends(require_permission("upstream:write")),
         current_service: Any = Depends(get_service),
     ):
         try:
-            data = current_service.update_system(system_id, payload)
+            data = current_service.update_system(
+                system_id, _upstream_payload(payload)
+            )
         except (
             UpstreamSystemNotFoundError,
             UpstreamValidationError,
@@ -131,20 +151,21 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
             return _upstream_error_response(error)
         return JSONResponse(
             content=validate_contract(
-                {"message": "上游系统更新成功", "data": data}, UpstreamResponse
+                {"message": "上游系统更新成功", "data": data},
+                UpstreamMessageResponse,
             )
         )
 
     @router.patch("/systems/{system_id}/status", response_model=None)
     def patch_system_status(
         system_id: str,
-        payload: Any = Body(default=None),
+        payload: UpstreamSystemRequest | None = Body(default=None),
         _context: RequestContext = Depends(require_permission("upstream:write")),
         current_service: Any = Depends(get_service),
     ):
-        payload = payload or {}
+        body = _upstream_payload(payload) or {}
         try:
-            data = current_service.patch_status(system_id, payload.get("status"))
+            data = current_service.patch_status(system_id, body.get("status"))
         except (
             UpstreamSystemNotFoundError,
             UpstreamValidationError,
@@ -153,7 +174,8 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
             return _upstream_error_response(error)
         return JSONResponse(
             content=validate_contract(
-                {"message": "上游系统状态更新成功", "data": data}, UpstreamResponse
+                {"message": "上游系统状态更新成功", "data": data},
+                UpstreamMessageResponse,
             )
         )
 

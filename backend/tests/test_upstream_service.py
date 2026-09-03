@@ -1,9 +1,36 @@
+# pyright: reportMissingImports=false
+
 import unittest
 from unittest.mock import MagicMock, patch
 
+from backend.app.services.common_code_service import CommonCodeCategoryNotFoundError
+from backend.app.services.upstream_service import UpstreamService
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
-from backend.app.services.upstream_service import UpstreamService
+
+class UpstreamOptionContractTestCase(unittest.TestCase):
+    def test_missing_dictionary_categories_use_canonical_fallback_aliases(self):
+        service = UpstreamService()
+        payload = {
+            "id": "up_fallback",
+            "abbr": "FALLBACK",
+            "name": "Fallback upstream",
+            "dbType": "POSTGRESQL",
+            "host": "fallback.demo.invalid",
+            "unloadTimes": ["02:00"],
+            "status": "enabled",
+            "dept": "SUPPLY_CHAIN",
+        }
+
+        with patch.object(service, "_get_allowed_status_values", return_value={"enabled", "disabled"}), \
+                patch(
+                    "backend.app.services.upstream_service.common_code_service.get_items",
+                    side_effect=CommonCodeCategoryNotFoundError("missing"),
+                ):
+            normalized = service._normalize_payload(payload)
+
+        self.assertEqual("PostgreSQL", normalized["dbType"])
+        self.assertEqual("供应链部", normalized["dept"])
 
 
 class UpstreamStatusUpdateTestCase(unittest.TestCase):

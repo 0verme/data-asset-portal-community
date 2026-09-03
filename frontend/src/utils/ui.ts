@@ -56,6 +56,11 @@ export interface ErrorWithPayload extends Error {
   } | undefined;
 }
 
+const VALIDATION_FIELD_LABELS: Record<string, string> = {
+  dbType: "数据库类型",
+  dept: "业务部门",
+};
+
 export function getErrorMessage(error?: unknown, fallback = '操作失败，请稍后重试。'): string {
   const errWithPayload = error as ErrorWithPayload | undefined;
   const details = errWithPayload?.payload?.error?.details;
@@ -66,7 +71,8 @@ export function getErrorMessage(error?: unknown, fallback = '操作失败，请�
         if (!detail || typeof detail.message !== 'string') return '';
         const message = detail.message.trim();
         const field = typeof detail.field === 'string' ? detail.field.trim() : '';
-        return field && message ? `${field}：${message}` : message;
+        const fieldLabel = VALIDATION_FIELD_LABELS[field] || field;
+        return fieldLabel && message ? `${fieldLabel}：${message}` : message;
       })
       .filter(Boolean);
     if (messages.length) return [...new Set(messages)].join('；');

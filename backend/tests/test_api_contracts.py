@@ -15,6 +15,9 @@ from backend.app.contracts import (
     IndicatorListResponse,
     ReportListResponse,
     ReportRequest,
+    UpstreamDataResponse,
+    UpstreamMessageResponse,
+    UpstreamSystemRequest,
     validate_contract,
 )
 from backend.app.core.capabilities import resolve_capabilities
@@ -61,6 +64,92 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual("R1", request.code)
         self.assertIsNone(request.relatedTables)
         self.assertEqual("日", request.model_extra["legacyFreq"])
+
+    def test_upstream_request_and_response_keep_one_wire_shape(self):
+        request = UpstreamSystemRequest.model_validate(
+            {
+                "id": "up_inventory",
+                "dbType": "POSTGRESQL",
+                "dept": "SUPPLY_CHAIN",
+                "schema": "PUBLIC",
+                "unloadTimes": ["02:00"],
+                "legacyField": "preserved",
+            }
+        )
+        self.assertEqual(
+            {
+                "id": "up_inventory",
+                "dbType": "POSTGRESQL",
+                "dept": "SUPPLY_CHAIN",
+                "schema": "PUBLIC",
+                "unloadTimes": ["02:00"],
+                "legacyField": "preserved",
+            },
+            request.model_dump(by_alias=True, exclude_unset=True),
+        )
+
+        response = UpstreamMessageResponse.model_validate(
+            {
+                "message": "上游系统创建成功",
+                "data": {
+                    "id": "up_inventory",
+                    "dbType": "PostgreSQL",
+                    "dept": "供应链部",
+                    "unloadTimes": ["02:00"],
+                    "host": "inventory.demo.invalid",
+                },
+            }
+        )
+        self.assertEqual("PostgreSQL", response.data.dbType)
+        self.assertEqual("供应链部", response.data.dept)
+        self.assertEqual("inventory.demo.invalid", response.data.host)
+        self.assertEqual(
+            "up_inventory",
+            UpstreamDataResponse.model_validate({"data": response.data}).data.id,
+        )
+
+    def test_native_upstream_route_passes_canonical_payload_to_service(self):
+        upstream_service = MagicMock()
+        upstream_service.create_system.return_value = {
+            "id": "up_inventory",
+            "abbr": "IMS",
+            "name": "库存中心",
+            "dbType": "PostgreSQL",
+            "host": "inventory.demo.invalid",
+            "unloadTimes": ["02:00"],
+            "status": "enabled",
+            "dept": "供应链部",
+        }
+        authorization = MagicMock()
+        authorization.authenticate.return_value = MagicMock(
+            authenticated=True,
+            allowed=True,
+            reason="authenticated",
+        )
+        authorization.authorize.return_value = MagicMock(allowed=True)
+        app = create_fastapi_app(
+            identity_resolver=lambda _request: Identity("admin", "admin", "Admin"),
+            authorization_service_instance=authorization,
+            upstream_service_instance=upstream_service,
+        )
+
+        payload = {
+            "id": "up_inventory",
+            "abbr": "IMS",
+            "name": "库存中心",
+            "dbType": "POSTGRESQL",
+            "host": "inventory.demo.invalid",
+            "schema": "PUBLIC",
+            "unloadTimes": ["02:00"],
+            "status": "enabled",
+            "dept": "SUPPLY_CHAIN",
+            "legacyField": "preserved",
+        }
+        response = TestClient(app).post("/api/upstreams/systems", json=payload)
+
+        self.assertEqual(201, response.status_code, response.text)
+        upstream_service.create_system.assert_called_once_with(payload)
+        self.assertEqual("PostgreSQL", response.json()["data"]["dbType"])
 
     def test_native_report_route_output_is_declared_contract(self):
         self.report_service.get_reports.return_value = [

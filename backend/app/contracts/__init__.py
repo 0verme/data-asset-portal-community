@@ -74,7 +74,12 @@ from .models import (
     SourceSystem,
     SourceSystemListResponse,
     SystemResponse,
+    UpstreamDataResponse,
+    UpstreamListResponse,
+    UpstreamMessageResponse,
     UpstreamResponse,
+    UpstreamSystemItem,
+    UpstreamSystemRequest,
 )
 from .validation import validate_contract
 
@@ -131,7 +136,12 @@ __all__ = [
     "MetadataStatusResult",
     "MetadataSummary",
     "SystemResponse",
+    "UpstreamDataResponse",
+    "UpstreamListResponse",
+    "UpstreamMessageResponse",
     "UpstreamResponse",
+    "UpstreamSystemItem",
+    "UpstreamSystemRequest",
     "ManualCodeTableItem",
     "ManualCodeTableListResponse",
     "ManualCodeTableRequest",
