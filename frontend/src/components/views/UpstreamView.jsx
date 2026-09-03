@@ -1,6 +1,6 @@
 import { UpstreamDetail, UpstreamEditor, UpstreamList } from "../UpstreamPages.jsx";
-import { Icon } from "../ui.jsx";
-import { confirmDeleteAction, EmptyState, ErrorState, LoadingState } from "../common/index.js";
+import { Icon } from "../ui.tsx";
+import { confirmDeleteAction, EmptyState, ErrorState, LoadingState } from "../common/index.ts";
 
 const confirmDeleteUpstream = (system, run) => async () => {
   if (!system) return;

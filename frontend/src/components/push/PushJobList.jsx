@@ -1,10 +1,10 @@
-import { Highlight, Icon } from "../ui.jsx";
+import { Highlight, Icon } from "../ui.tsx";
 import {
   EmptyState,
   MetaItem,
   RowActions,
   StatusBadge,
-} from "../common/index.js";
+} from "../common/index.ts";
 
 import { getSystemBadgeText } from "../../utils/push.ts";
 import { ProtocolTag } from "./PushSystemList.jsx";

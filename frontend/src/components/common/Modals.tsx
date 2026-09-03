@@ -12,13 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React from "react";
-import { Icon } from "../ui.jsx";
+import React, { type ReactNode } from "react";
 
-export function FormModal({ open, title, subtitle, icon = "edit", children, onClose, onSubmit, submitText = "保存修改", cancelText = "取消", busy = false, showSubmit = true }) {
+import { Icon } from "../ui.tsx";
+
+export interface FormModalProps {
+  open: boolean;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  icon?: string | undefined;
+  children?: ReactNode;
+  onClose?: (() => void) | undefined;
+  onSubmit?: (() => void | Promise<unknown>) | undefined;
+  submitText?: string | undefined;
+  cancelText?: string | undefined;
+  busy?: boolean | undefined;
+  showSubmit?: boolean | undefined;
+}
+
+export function FormModal({
+  open,
+  title,
+  subtitle,
+  icon = "edit",
+  children,
+  onClose,
+  onSubmit,
+  submitText = "保存修改",
+  cancelText = "取消",
+  busy = false,
+  showSubmit = true,
+}: FormModalProps) {
   React.useEffect(() => {
     if (!open) return undefined;
-    const onKey = (event) => {
+    const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !busy) onClose?.();
     };
     window.addEventListener("keydown", onKey);
@@ -29,7 +56,7 @@ export function FormModal({ open, title, subtitle, icon = "edit", children, onCl
 
   return (
     <div className="confirm-mask system-modal-mask" onMouseDown={() => !busy && onClose?.()}>
-      <div className="system-modal-card" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="system-modal-title">
+      <div className="system-modal-card" onMouseDown={(event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="system-modal-title">
         <div className="editor-head system-modal-head">
           <div className="system-modal-heading">
             <div className="editor-title">

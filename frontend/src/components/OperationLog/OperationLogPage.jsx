@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import React from "react";
-import { Icon } from "../ui.jsx";
+import { Icon } from "../ui.tsx";
 import { getOperationLogDetail, getOperationLogList } from "../../api/operationLogs.ts";
 import { OperationLogFilter } from "./OperationLogFilter.jsx";
 import { OperationLogTable } from "./OperationLogTable.jsx";

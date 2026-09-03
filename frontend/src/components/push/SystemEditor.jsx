@@ -1,5 +1,5 @@
 import React from "react";
-import { Icon } from "../ui.jsx";
+import { Icon } from "../ui.tsx";
 import {
   ActionErrorBanner,
   BinaryStatusToggle,
@@ -8,7 +8,7 @@ import {
   FormActionBar,
   PageHeader,
   TimeInput,
-} from "../common/index.js";
+} from "../common/index.ts";
 
 import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.ts";
 import { isValidLatestOutputTime, normalizeLatestOutputTime } from "../../utils/push.ts";

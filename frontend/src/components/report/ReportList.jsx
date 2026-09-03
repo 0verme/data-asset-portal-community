@@ -1,5 +1,5 @@
-import { CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.js";
-import { Highlight, Icon } from "../ui.jsx";
+import { CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.ts";
+import { Highlight, Icon } from "../ui.tsx";
 
 function ReportCardLayout({ reports, query, onView, onEdit, canEdit }) {
   return <CardGridView

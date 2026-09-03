@@ -1,5 +1,5 @@
 import React from "react";
-import { Icon } from "../ui.jsx";
+import { Icon } from "../ui.tsx";
 import {
   ActionErrorBanner,
   BinaryStatusToggle,
@@ -7,7 +7,7 @@ import {
   DangerZone,
   FormActionBar,
   PageHeader,
-} from "../common/index.js";
+} from "../common/index.ts";
 
 
 import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.ts";

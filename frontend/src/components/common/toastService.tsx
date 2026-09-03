@@ -13,27 +13,36 @@
 // limitations under the License.
 
 import React from "react";
-import { Icon } from "../ui.jsx";
 
-/**
- * 命令式轻量消息提示（Toast）。
- *
- *   toast.success("保存成功");
- *   toast.error("更新用户状态失败。");
- *   toast.info("已复制到剪贴板", { duration: 2000 });
- *
- * 用于替换浏览器原生 window.alert 的「消息通知」场景（成功 / 失败 / 提示），
- * 注意：删除等需要用户确认的场景请使用 confirmDelete / ConfirmDialog。
- *
- * 需在应用根节点挂载一次 <ToastHost />（见 App.jsx）。宿主未挂载时退化为
- * window.alert 以保证消息不丢失。
- */
-const TONE_ICON = { success: "check", error: "close", warning: "info", info: "info" };
+import { Icon } from "../ui.tsx";
+
+export type ToastTone = "success" | "error" | "warning" | "info";
+
+export interface ToastOptions {
+  duration?: number | undefined;
+}
+
+interface ToastPayload {
+  message: string;
+  tone: ToastTone;
+  duration: number;
+}
+
+interface ToastItem extends Omit<ToastPayload, "duration"> {
+  id: number;
+}
+
+const TONE_ICON: Record<ToastTone, string> = {
+  success: "check",
+  error: "close",
+  warning: "info",
+  info: "info",
+};
 const DEFAULT_DURATION = 3200;
 
-let pushToast = null;
+let pushToast: ((payload: ToastPayload) => void) | null = null;
 
-function emit(message, tone, options = {}) {
+function emit(message: unknown, tone: ToastTone, options: ToastOptions = {}): void {
   const text = typeof message === "string" ? message : String(message ?? "");
   if (!pushToast) {
     // 兜底：宿主未挂载时退化为原生 alert，保证消息不丢失
@@ -48,18 +57,18 @@ function emit(message, tone, options = {}) {
 }
 
 export const toast = {
-  success: (message, options) => emit(message, "success", options),
-  error: (message, options) => emit(message, "error", options),
-  warning: (message, options) => emit(message, "warning", options),
-  info: (message, options) => emit(message, "info", options),
+  success: (message: unknown, options?: ToastOptions): void => emit(message, "success", options),
+  error: (message: unknown, options?: ToastOptions): void => emit(message, "error", options),
+  warning: (message: unknown, options?: ToastOptions): void => emit(message, "warning", options),
+  info: (message: unknown, options?: ToastOptions): void => emit(message, "info", options),
 };
 
 export function ToastHost() {
-  const [items, setItems] = React.useState([]);
+  const [items, setItems] = React.useState<ToastItem[]>([]);
   const idRef = React.useRef(0);
-  const timersRef = React.useRef(new Map());
+  const timersRef = React.useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
-  const dismiss = React.useCallback((id) => {
+  const dismiss = React.useCallback((id: number) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
     const timer = timersRef.current.get(id);
     if (timer) {
@@ -70,7 +79,7 @@ export function ToastHost() {
 
   React.useEffect(() => {
     const timers = timersRef.current;
-    pushToast = ({ message, tone, duration }) => {
+    pushToast = ({ message, tone, duration }: ToastPayload) => {
       const id = ++idRef.current;
       setItems((prev) => [...prev, { id, message, tone }]);
       if (duration > 0) {

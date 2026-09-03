@@ -27,7 +27,7 @@ import type { AuthSession } from '../api/auth.ts';
 import { hasAnyPermission } from '../auth/permissions.ts';
 import { isUnauthorizedError } from '../api/http.ts';
 import { getErrorMessage } from '../utils/ui.ts';
-import { toast } from '../components/common/index.js';
+import { toast } from '../components/common/index.ts';
 
 export interface UseAuthSessionResult {
   auth: AuthSession;

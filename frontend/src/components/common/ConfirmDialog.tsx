@@ -1,5 +1,26 @@
-import React from "react";
-import { Icon } from "../ui.jsx";
+import React, { type ReactNode } from "react";
+
+import { Icon } from "../ui.tsx";
+
+export interface ConfirmDialogProps {
+  open: boolean;
+  title?: string | undefined;
+  content?: ReactNode | undefined;
+  desc?: ReactNode | undefined;
+  details?: readonly string[] | undefined;
+  confirmKeyword?: string | undefined;
+  confirmKeywordLabel?: string | undefined;
+  keywordPlaceholder?: string | undefined;
+  confirmText?: string | undefined;
+  cancelText?: string | undefined;
+  busy?: boolean | undefined;
+  danger?: boolean | undefined;
+  maskClosable?: boolean | undefined;
+  onConfirm?: (() => void | Promise<unknown>) | undefined;
+  onCancel?: (() => void) | undefined;
+}
+
+export type ConfirmOptions = Omit<ConfirmDialogProps, "open" | "busy">;
 
 const DEFAULT_TITLE = "确认删除该数据？";
 const DEFAULT_CONTENT = "删除后将无法恢复，请谨慎操作。";
@@ -20,7 +41,7 @@ export function ConfirmDialog({
   maskClosable = true,
   onConfirm,
   onCancel,
-}) {
+}: ConfirmDialogProps) {
   const [internalBusy, setInternalBusy] = React.useState(false);
   const [keywordValue, setKeywordValue] = React.useState("");
   const pending = busy || internalBusy;
@@ -30,7 +51,7 @@ export function ConfirmDialog({
 
   React.useEffect(() => {
     if (!open) return undefined;
-    const onKey = (event) => {
+    const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !pending) onCancel?.();
     };
     window.addEventListener("keydown", onKey);
@@ -63,7 +84,7 @@ export function ConfirmDialog({
     <div className="confirm-mask" onMouseDown={() => maskClosable && !pending && onCancel?.()}>
       <div
         className={`confirm-card${danger ? " confirm-card-danger" : ""}`}
-        onMouseDown={(event) => event.stopPropagation()}
+        onMouseDown={(event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation()}
         role="alertdialog"
         aria-modal="true"
       >

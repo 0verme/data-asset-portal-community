@@ -14,8 +14,8 @@
 
 import React from "react";
 import { AssetRisksPanel } from "./AssetRisksPanel.jsx";
-import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.jsx";
-import { MetaItem, PageHeader } from "./common/index.js";
+import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.tsx";
+import { MetaItem, PageHeader } from "./common/index.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 
 const DDL_KEYWORDS = new Set([

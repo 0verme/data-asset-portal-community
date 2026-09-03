@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Icon } from "../ui.jsx";
-import { FormModal } from "../common/index.js";
+import { Icon } from "../ui.tsx";
+import { FormModal } from "../common/index.ts";
 import { useRoleModule } from "../../hooks/useRoleModule.ts";
 import { useSystemModule } from "../../hooks/useSystemModule.ts";
 import { UserForm } from "./UserForm.jsx";

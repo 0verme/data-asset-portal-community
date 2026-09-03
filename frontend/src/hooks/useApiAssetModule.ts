@@ -10,7 +10,7 @@ import type { MockApiAsset } from '../data/apiAssets.ts';
 import type { MockSystem } from '../data/systems.ts';
 import { DEFAULT_API_ASSET_ROUTE } from '../config/defaults.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
-import { toast } from '../components/common/index.js';
+import { toast } from '../components/common/index.ts';
 import { runOptimisticStatusMutation } from '../utils/statusMutation.ts';
 import type { ApiAssetFilter, ApiAssetRoute } from '../routing/types.ts';
 

@@ -13,12 +13,30 @@
 // limitations under the License.
 
 /* ===== 共享 UI 组件与工具 ===== */
+import type { ReactNode, SVGProps } from "react";
+
 import { DOMAIN_HUE_MAP } from "../config/assets.ts";
 
 // ---- 图标 (inline SVG, 1.6px stroke) ----
-export function Icon({ name, size = 16, color = "currentColor", strokeWidth = 1.7 }) {
-  const p = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth, strokeLinecap: "round", strokeLinejoin: "round" };
-  const paths = {
+export interface IconProps {
+  name: string;
+  size?: number | undefined;
+  color?: string | undefined;
+  strokeWidth?: number | undefined;
+}
+
+export function Icon({ name, size = 16, color = "currentColor", strokeWidth = 1.7 }: IconProps) {
+  const svgProps: SVGProps<SVGSVGElement> = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: color,
+    strokeWidth,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+  };
+  const paths: Record<string, ReactNode> = {
     search: <><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></>,
     close: <><path d="M18 6 6 18M6 6l12 12" /></>,
     arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
@@ -62,12 +80,14 @@ export function Icon({ name, size = 16, color = "currentColor", strokeWidth = 1.
     logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></>,
     shield: <><path d="M12 3 5 6v5c0 5 3.4 9.4 7 10 3.6-.6 7-5 7-10V6l-7-3Z" /></>,
   };
-  return <svg {...p}>{paths[name] || null}</svg>;
+  return <svg {...svgProps}>{paths[name] || null}</svg>;
 }
 
 // ---- 配色: 主题域 → oklch ----
-export function domainColors(domain) {
-  const h = (DOMAIN_HUE_MAP && DOMAIN_HUE_MAP[domain]) || 260;
+export function domainColors(domain: string | null | undefined) {
+  const h = domain && domain in DOMAIN_HUE_MAP
+    ? DOMAIN_HUE_MAP[domain as keyof typeof DOMAIN_HUE_MAP]
+    : 260;
   return {
     bg: `oklch(0.62 0.15 ${h} / 0.16)`,
     text: `oklch(0.82 0.12 ${h})`,
@@ -76,16 +96,29 @@ export function domainColors(domain) {
   };
 }
 
-export function DomainBadge({ domain }) {
+export interface DomainBadgeProps {
+  domain: string;
+}
+
+export function DomainBadge({ domain }: DomainBadgeProps) {
   return <span className="tag tag-neutral">{domain}</span>;
 }
 
-export function LayerBadge({ layer }) {
+export interface LayerBadgeProps {
+  layer: string;
+}
+
+export function LayerBadge({ layer }: LayerBadgeProps) {
   return <span className="badge-layer">{layer}</span>;
 }
 
 // 高亮匹配文本
-export function Highlight({ text, q }) {
+export interface HighlightProps {
+  text: string;
+  q?: string | null | undefined;
+}
+
+export function Highlight({ text, q }: HighlightProps) {
   if (!q) return <>{text}</>;
   const s = String(text);
   const idx = s.toLowerCase().indexOf(q.toLowerCase());
@@ -96,6 +129,6 @@ export function Highlight({ text, q }) {
 }
 
 // 取首字符做头像
-export function initial(name) {
+export function initial(name: string | null | undefined): string {
   return name ? name.trim().charAt(0) : "?";
 }

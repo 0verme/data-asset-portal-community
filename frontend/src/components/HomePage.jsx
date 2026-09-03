@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.jsx";
-import { CardGridView, EmptyState, GroupView } from "./common/index.js";
+import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.tsx";
+import { CardGridView, EmptyState, GroupView } from "./common/index.ts";
 
 function fieldCount(table) {
   return Number.isFinite(Number(table.fieldCount)) ? Number(table.fieldCount) : table.fields.length;

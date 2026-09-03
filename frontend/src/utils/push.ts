@@ -1,4 +1,4 @@
-import { isValidTime } from "../components/common/time.js";
+import { isValidTime } from "../components/common/time.ts";
 
 export function getSystemBadgeText(value?: unknown): string {
   if (value == null) return "";

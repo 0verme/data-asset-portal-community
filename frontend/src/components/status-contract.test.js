@@ -10,7 +10,7 @@ import {
   normalizeBinaryStatusLabel,
   normalizeBinaryStatusOptions,
   normalizeBinaryStatusValue,
-} from "./common/status.js";
+} from "./common/status.ts";
 
 const manualHookPath = fileURLToPath(
   new URL("../hooks/useManualCodeTableModule.ts", import.meta.url),

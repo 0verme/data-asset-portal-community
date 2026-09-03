@@ -1,6 +1,6 @@
 import React from "react";
 
-import { ActionErrorBanner, AssetReferenceSelector, BinaryStatusToggle, CardGridView, EmptyState, ErrorState, GroupView, LoadingState, PageHeader, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.js";
+import { ActionErrorBanner, AssetReferenceSelector, BinaryStatusToggle, CardGridView, EmptyState, ErrorState, GroupView, LoadingState, PageHeader, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.ts";
 
 const blank = { code: "", name: "", method: "GET", path: "", version: "v1", downstreamSystemId: "", type: "", status: "enabled", ownerDept: "", ownerName: "", maintainerName: "", description: "", remark: "", params: [], responseFields: [], relations: [] };
 

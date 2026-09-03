@@ -7,7 +7,7 @@ import {
   updateManualCodeTableStatus,
 } from '../api/manualCodeTables.ts';
 import type { MockManualCodeTable } from '../data/manualCodeTables.ts';
-import { getBinaryStatusValue, toast } from '../components/common/index.js';
+import { getBinaryStatusValue, toast } from '../components/common/index.ts';
 import { getErrorMessage, type ErrorWithPayload } from '../utils/ui.ts';
 
 export interface ManualCodeTableStyleOption {

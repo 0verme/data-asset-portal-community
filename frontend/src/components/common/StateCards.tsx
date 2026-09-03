@@ -12,10 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Icon } from "../ui.jsx";
-import { getBinaryStatusValue, normalizeBinaryStatusLabel, normalizeBinaryStatusValue } from "./status.js";
+import type { MouseEventHandler, ReactNode } from "react";
 
-export function LoadingState({ title, desc }) {
+import { Icon } from "../ui.tsx";
+import {
+  getBinaryStatusValue,
+  normalizeBinaryStatusLabel,
+  normalizeBinaryStatusValue,
+} from "./status.ts";
+
+export interface LoadingStateProps {
+  title: ReactNode;
+  desc: ReactNode;
+}
+
+export function LoadingState({ title, desc }: LoadingStateProps) {
   return (
     <div className="state-card" role="status" aria-live="polite">
       <div className="state-spinner" aria-hidden="true"></div>
@@ -25,7 +36,13 @@ export function LoadingState({ title, desc }) {
   );
 }
 
-export function ErrorState({ title, desc, onRetry }) {
+export interface ErrorStateProps {
+  title: ReactNode;
+  desc: ReactNode;
+  onRetry?: MouseEventHandler<HTMLButtonElement> | undefined;
+}
+
+export function ErrorState({ title, desc, onRetry }: ErrorStateProps) {
   return (
     <div className="state-card state-card-error" role="alert">
       <div className="ec"><Icon name="inbox" size={24} /></div>
@@ -36,7 +53,14 @@ export function ErrorState({ title, desc, onRetry }) {
   );
 }
 
-export function EmptyState({ title, desc, actionText, onAction }) {
+export interface EmptyStateProps {
+  title: ReactNode;
+  desc?: ReactNode;
+  actionText?: string | undefined;
+  onAction?: MouseEventHandler<HTMLButtonElement> | undefined;
+}
+
+export function EmptyState({ title, desc, actionText, onAction }: EmptyStateProps) {
   return (
     <div className="empty">
       <div className="ec"><Icon name="inbox" size={26} /></div>
@@ -51,17 +75,41 @@ export function EmptyState({ title, desc, actionText, onAction }) {
   );
 }
 
-const STATUS_TAG = {
+type StatusTone = "st-on" | "st-warn" | "st-off";
+
+interface StatusTag {
+  tag: string;
+  mark: string;
+}
+
+const STATUS_TAG: Record<StatusTone, StatusTag> = {
   "st-on": { tag: "tag-ok", mark: "●" },
   "st-warn": { tag: "tag-warn", mark: "●" },
   "st-off": { tag: "tag-danger", mark: "○" },
 };
 
+function isStatusTone(value: string | undefined): value is StatusTone {
+  return value === "st-on" || value === "st-warn" || value === "st-off";
+}
+
 // 默认状态映射：仅 enabled/disabled 两态（启用/禁用）。
-const DEFAULT_STATUS_META = {
+const DEFAULT_STATUS_META: Record<string, StatusMeta> = {
   enabled: { label: "启用", className: "st-on" },
   disabled: { label: "禁用", className: "st-off" },
 };
+
+export interface StatusMeta {
+  label?: string | undefined;
+  className?: string | undefined;
+  [key: string]: unknown;
+}
+
+export interface StatusBadgeProps {
+  status?: unknown;
+  metaMap?: Record<string, StatusMeta> | undefined;
+  on?: unknown;
+  label?: string | undefined;
+}
 
 /**
  * 全站唯一的只读状态 pill。支持两种调用方式：
@@ -69,15 +117,19 @@ const DEFAULT_STATUS_META = {
  *      不传 metaMap 时回退到 enabled/disabled → 启用/禁用。
  *   2) on(布尔) + 可选 label：二态开关型，统一显示 启用/禁用。
  */
-export function StatusBadge({ status, metaMap, on, label }) {
-  let tone;
-  let text;
+export function StatusBadge({ status, metaMap, on, label }: StatusBadgeProps) {
+  let tone: StatusTag;
+  let text: string;
   if (status !== undefined) {
     const statusMap = metaMap || DEFAULT_STATUS_META;
     const normalizedStatus = normalizeBinaryStatusValue(status);
-    const sourceMeta = normalizedStatus ? statusMap[normalizedStatus] : statusMap[status];
-    const meta = sourceMeta || { label: label || status || "-", className: "st-off" };
-    tone = STATUS_TAG[meta.className] || STATUS_TAG["st-off"];
+    const sourceMeta = normalizedStatus
+      ? statusMap[normalizedStatus]
+      : typeof status === "string"
+        ? statusMap[status]
+        : undefined;
+    const meta = sourceMeta || { label: label || (typeof status === "string" ? status : "-"), className: "st-off" };
+    tone = isStatusTone(meta.className) ? STATUS_TAG[meta.className] : STATUS_TAG["st-off"];
     text = normalizeBinaryStatusLabel(status, meta.label);
   } else {
     const binaryStatus = getBinaryStatusValue(on);

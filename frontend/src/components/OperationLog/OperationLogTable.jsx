@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Highlight } from "../ui.jsx";
-import { RowActions, StatusBadge } from "../common/index.js";
+import { Highlight } from "../ui.tsx";
+import { RowActions, StatusBadge } from "../common/index.ts";
 import { formatDateTime } from "../../utils/date.ts";
 
 function formatCost(ms) {

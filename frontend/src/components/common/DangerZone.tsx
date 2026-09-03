@@ -1,11 +1,31 @@
-import { Icon } from "../ui.jsx";
+import type { ReactNode } from "react";
+
+import { Icon } from "../ui.tsx";
+
+export interface DangerZoneAction {
+  key: string;
+  label: ReactNode;
+  danger?: boolean | undefined;
+  onClick: () => void | Promise<unknown>;
+  disabled?: boolean | undefined;
+  hint?: string | undefined;
+  icon?: string | undefined;
+}
+
+export interface DangerZoneProps {
+  title?: string | undefined;
+  description?: string | undefined;
+  actions?: readonly (DangerZoneAction | null | undefined)[] | undefined;
+}
 
 export function DangerZone({
   title = "危险操作",
   description = "以下操作不可逆，请确认影响范围后再继续。",
   actions = [],
-}) {
-  const visibleActions = actions.filter(Boolean);
+}: DangerZoneProps) {
+  const visibleActions = actions.filter(
+    (action): action is DangerZoneAction => Boolean(action),
+  );
   if (!visibleActions.length) return null;
 
   return (
@@ -23,7 +43,7 @@ export function DangerZone({
             key={action.key}
             className={action.danger ? "btn ghost-danger" : "btn"}
             type="button"
-            onClick={action.onClick}
+            onClick={() => action.onClick()}
             disabled={action.disabled}
             title={action.hint || ""}
           >

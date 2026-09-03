@@ -8,9 +8,9 @@ import {
   normalizeIndicatorDimension,
 } from "../data/indicatorPathOptions.ts";
 import IndicatorPathCascader from "./IndicatorPathCascader.jsx";
-import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader } from "./common/index.js";
+import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader } from "./common/index.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
-import { Icon } from "./ui.jsx";
+import { Icon } from "./ui.tsx";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const AGGREGATION_OPTIONS = ["SUM", "COUNT", "COUNT_DISTINCT", "AVG", "MIN", "MAX", "NONE"];

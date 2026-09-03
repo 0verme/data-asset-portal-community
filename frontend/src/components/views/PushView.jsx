@@ -19,8 +19,8 @@ import {
   PushSystemList,
   SystemEditor,
 } from "../PushPages.jsx";
-import { Icon } from "../ui.jsx";
-import { EmptyState, ErrorState, LoadingState, ViewModeSwitcher } from "../common/index.js";
+import { Icon } from "../ui.tsx";
+import { EmptyState, ErrorState, LoadingState, ViewModeSwitcher } from "../common/index.ts";
 
 export function PushView({ push, query, statusOptions, requireLogin, canEdit, pushRoute }) {
   const {

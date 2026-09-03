@@ -15,8 +15,8 @@
 import { DetailPage } from "../DetailPage.jsx";
 import { HomePage } from "../HomePage.jsx";
 import { TableEditor } from "../TableEditor.jsx";
-import { Icon } from "../ui.jsx";
-import { EmptyState, ErrorState, LoadingState, ViewModeSwitcher } from "../common/index.js";
+import { Icon } from "../ui.tsx";
+import { EmptyState, ErrorState, LoadingState, ViewModeSwitcher } from "../common/index.ts";
 import { DOMAIN_ORDER } from "../../config/assets.ts";
 
 export function AssetView({ asset, query, route, canEdit = false }) {

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Icon } from "../ui.jsx";
-import { MetaItem, PageHeader, StatusBadge } from "../common/index.js";
+import { Icon } from "../ui.tsx";
+import { MetaItem, PageHeader, StatusBadge } from "../common/index.ts";
 import { buildModuleBreadcrumbs } from "../../routing/navigation.ts";
 import { isLegacyDictValue } from "../../utils/optionUtils.ts";
 

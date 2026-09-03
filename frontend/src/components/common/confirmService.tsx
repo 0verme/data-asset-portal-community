@@ -1,16 +1,17 @@
 import React from "react";
-import { ConfirmDialog } from "./ConfirmDialog.jsx";
 
-let openConfirm = null;
+import { ConfirmDialog, type ConfirmOptions } from "./ConfirmDialog.tsx";
 
-export function confirmAction(options = {}) {
+let openConfirm: ((options: ConfirmOptions) => Promise<boolean>) | null = null;
+
+export function confirmAction(options: ConfirmOptions = {}): Promise<boolean> {
   if (!openConfirm) {
     return Promise.resolve(false);
   }
   return openConfirm(options);
 }
 
-export function confirmDelete(options = {}) {
+export function confirmDelete(options: ConfirmOptions = {}): Promise<boolean> {
   return confirmAction({
     title: "确认删除该数据？",
     confirmText: "确认删除",
@@ -18,6 +19,13 @@ export function confirmDelete(options = {}) {
     danger: true,
     ...options,
   });
+}
+
+export interface ConfirmDeleteActionOptions extends ConfirmOptions {
+  name?: string | undefined;
+  typeLabel?: string | undefined;
+  impact?: string | undefined;
+  consequences?: readonly string[] | undefined;
 }
 
 export function confirmDeleteAction({
@@ -29,7 +37,7 @@ export function confirmDeleteAction({
   confirmKeywordLabel,
   keywordPlaceholder,
   ...options
-} = {}) {
+}: ConfirmDeleteActionOptions = {}): Promise<boolean> {
   const content = impact || `${typeLabel}${name ? `“${name}”` : ""}删除后将无法恢复，请谨慎操作。`;
   return confirmDelete({
     content,
@@ -41,22 +49,28 @@ export function confirmDeleteAction({
   });
 }
 
+interface ConfirmDialogState {
+  open: boolean;
+  options: ConfirmOptions;
+  busy: boolean;
+}
+
 export function ConfirmDialogHost() {
-  const [state, setState] = React.useState({ open: false, options: {}, busy: false });
-  const resolverRef = React.useRef(null);
+  const [state, setState] = React.useState<ConfirmDialogState>({ open: false, options: {}, busy: false });
+  const resolverRef = React.useRef<((result: boolean) => void) | null>(null);
 
   React.useEffect(() => {
-    openConfirm = (options) =>
-      new Promise((resolve) => {
+    openConfirm = (options: ConfirmOptions) =>
+      new Promise<boolean>((resolve) => {
         resolverRef.current = resolve;
-        setState({ open: true, options: options || {}, busy: false });
+        setState({ open: true, options, busy: false });
       });
     return () => {
       openConfirm = null;
     };
   }, []);
 
-  const settle = (result) => {
+  const settle = (result: boolean) => {
     const resolve = resolverRef.current;
     resolverRef.current = null;
     setState((prev) => ({ ...prev, open: false, busy: false }));

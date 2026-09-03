@@ -23,7 +23,7 @@ import {
   getFieldMappingTables,
 } from "../api/fieldMapping.ts";
 import { DEFAULT_MAPPING_ROUTE } from "../config/defaults.ts";
-import { EmptyState } from "./common/index.js";
+import { EmptyState } from "./common/index.ts";
 import { FieldMappingFilters, FieldMappingStats } from "./fieldMapping/FieldMappingControls.jsx";
 import {
   DEFAULT_FILTERS,
@@ -42,7 +42,7 @@ import {
   resolveSourceSystemLabel,
   sortMarker,
 } from "./fieldMapping/fieldMappingUtils.js";
-import { Icon } from "./ui.jsx";
+import { Icon } from "./ui.tsx";
 
 export function FieldMappingPage({ keyword, route = DEFAULT_MAPPING_ROUTE, setRoute, onBackToUpstream }) {
   const initialFilters = isLinkedRoute(route)

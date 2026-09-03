@@ -22,7 +22,7 @@ import {
   type SystemPermissionItem,
   type SystemRoleItem,
 } from '../api/systemRoles.ts';
-import { toast } from '../components/common/index.js';
+import { toast } from '../components/common/index.ts';
 import { getErrorMessage, type ErrorWithPayload } from '../utils/ui.ts';
 import { normalizeRolePermissionCodes } from '../auth/permissions.ts';
 

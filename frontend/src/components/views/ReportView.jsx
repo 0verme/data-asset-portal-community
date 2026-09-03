@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-import { ActionErrorBanner, confirmDeleteAction, EmptyState, ErrorState, LoadingState } from "../common/index.js";
+import { ActionErrorBanner, confirmDeleteAction, EmptyState, ErrorState, LoadingState } from "../common/index.ts";
 import { ReportDetailDrawer, ReportEditor, ReportList } from "../ReportPages.jsx";
 
 export function ReportView({ report, query, reportRoute, view, onChangeView, canEdit = false }) {

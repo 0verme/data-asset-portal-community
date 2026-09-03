@@ -13,8 +13,8 @@
 // limitations under the License.
 
 import React from "react";
-import { Icon } from "./ui.jsx";
-import { ActionErrorBanner, confirmDeleteAction, DangerZone, FormActionBar, PageHeader } from "./common/index.js";
+import { Icon } from "./ui.tsx";
+import { ActionErrorBanner, confirmDeleteAction, DangerZone, FormActionBar, PageHeader } from "./common/index.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import {
   buildColumnType,

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Icon } from "../ui.jsx";
+import { Icon } from "../ui.tsx";
 import {
   OPERATION_MODULES,
   OPERATION_RESULTS,
