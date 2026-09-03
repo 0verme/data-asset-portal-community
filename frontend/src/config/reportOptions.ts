@@ -3,7 +3,7 @@
 
 import mockCommonCodes, { type CommonCodeItem } from "../data/commonCodes.ts";
 import { REPORTS, type MockReportItem } from "../data/reports.ts";
-import { optionsFromValues } from "../utils/optionUtils.js";
+import { optionsFromValues } from "../utils/optionUtils.ts";
 
 function localCategoryValues(categoryCode: string): CommonCodeItem[] {
   const category = (mockCommonCodes.categories || []).find(
@@ -30,7 +30,7 @@ function actualOrLocal(
   key: string,
   categoryCode: string,
   mockKey?: keyof MockReportItem,
-): unknown[] {
+): Array<string | CommonCodeItem> {
   const actualValues = reportValues(reports, key);
   if (actualValues.length) return actualValues;
   const mockValues = mockReportValues(mockKey || (key as keyof MockReportItem));

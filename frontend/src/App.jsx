@@ -48,7 +48,7 @@ import { loadNavigationMenus } from "./routing/navigationMenus.js";
 import { splitNavigationMenus } from "./routing/navigationMenuGrouping.js";
 import { useLocationSynchronization } from "./hooks/useLocationSynchronization.js";
 import { useNavigationController } from "./hooks/useNavigationController.js";
-import { scrollMainToTop } from "./utils/ui.js";
+import { scrollMainToTop } from "./utils/ui.ts";
 
 export default function App() {
   const hamburgerRef = React.useRef(null);

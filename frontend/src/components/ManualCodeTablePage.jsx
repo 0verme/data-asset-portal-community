@@ -15,7 +15,7 @@ import {
   MANUAL_CODE_TABLE_STATUS_META,
   MANUAL_CODE_TABLE_STYLES,
 } from "../hooks/useManualCodeTableModule.js";
-import { formatDateTime } from "../utils/date.js";
+import { formatDateTime } from "../utils/date.ts";
 
 const STYLE_LABELS = Object.fromEntries(MANUAL_CODE_TABLE_STYLES.map((item) => [item.value, item.label]));
 

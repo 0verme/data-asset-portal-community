@@ -21,7 +21,7 @@ import {
   updateRole,
 } from "../api/systemRoles.js";
 import { toast } from "../components/common/index.js";
-import { getErrorMessage } from "../utils/ui.js";
+import { getErrorMessage } from "../utils/ui.ts";
 import { normalizeRolePermissionCodes } from "../auth/permissions.ts";
 
 const DEFAULT_FORM = {

@@ -26,7 +26,7 @@ import {
   parseColumnType,
   validateColumnType,
 } from "../constants/dataTypes.ts";
-import { ASSET_NAME_RULE_MESSAGE, isValidAssetName } from "../utils/assetName.js";
+import { ASSET_NAME_RULE_MESSAGE, isValidAssetName } from "../utils/assetName.ts";
 import { LAYER_OPTIONS } from "../config/assets.ts";
 
 function createField() {

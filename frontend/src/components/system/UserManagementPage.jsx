@@ -14,7 +14,7 @@
 
 import { Highlight, Icon, initial } from "../ui.jsx";
 import { EmptyState, RowActions, StatusBadge } from "../common/index.js";
-import { formatDateTime } from "../../utils/date.js";
+import { formatDateTime } from "../../utils/date.ts";
 import { USER_ROLE_META, USER_STATUS_META } from "./constants.js";
 
 // 用户账号状态统一为启用/禁用，重置密码和状态切换作为业务动作展示。

@@ -4,7 +4,7 @@ import {
   StatusBadge,
 } from "../common/index.js";
 
-import { getSystemBadgeText } from "../../utils/push.js";
+import { getSystemBadgeText } from "../../utils/push.ts";
 
 export function ProtocolTag({ protocol }) {
   return <span className="tag tag-neutral">{protocol}</span>;

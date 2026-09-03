@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getErrorMessage, optionLabel } from "./ui.js";
+import { getErrorMessage, optionLabel } from "./ui.ts";
 
 test("optionLabel supports string and dictionary options", () => {
   assert.equal(optionLabel("PostgreSQL"), "PostgreSQL");

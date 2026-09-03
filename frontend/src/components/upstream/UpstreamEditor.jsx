@@ -16,8 +16,8 @@ import React from "react";
 import { Icon } from "../ui.jsx";
 import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, isValidTime, PageHeader, TimeInput } from "../common/index.js";
 import { buildModuleBreadcrumbs } from "../../routing/navigation.ts";
-import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.js";
-import { optionLabel } from "../../utils/ui.js";
+import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.ts";
+import { optionLabel } from "../../utils/ui.ts";
 
 import { getUpstreamFieldLabel } from "./upstreamFieldContract.js";
 

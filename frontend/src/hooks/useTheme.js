@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { useEffect, useState } from "react";
-import { getInitialTheme, THEME_STORAGE_KEY } from "../utils/ui.js";
+import { getInitialTheme, THEME_STORAGE_KEY } from "../utils/ui.ts";
 
 export function useTheme() {
   const [theme, setTheme] = useState(getInitialTheme);

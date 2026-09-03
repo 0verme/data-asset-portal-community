@@ -37,7 +37,7 @@ import {
   updateMenu,
   updateMenuStatus,
 } from "../api/menus.js";
-import { getErrorMessage } from "../utils/ui.js";
+import { getErrorMessage } from "../utils/ui.ts";
 import { toast } from "../components/common/index.js";
 import { DEFAULT_MENU_FORM, DEFAULT_PARAM_FORM, DEFAULT_USER_FORM } from "../components/system/constants.js";
 

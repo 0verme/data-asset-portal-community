@@ -6,7 +6,7 @@ import {
   StatusBadge,
 } from "../common/index.js";
 
-import { getSystemBadgeText } from "../../utils/push.js";
+import { getSystemBadgeText } from "../../utils/push.ts";
 import { ProtocolTag } from "./PushSystemList.jsx";
 import { PUSH_JOB_TABLE_COLUMNS, getPushJobTableValues } from "./pushJobTable.js";
 import { isRenameJob } from "./pushUtils.js";

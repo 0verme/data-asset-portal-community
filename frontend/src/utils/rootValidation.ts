@@ -13,12 +13,12 @@
 // limitations under the License.
 
 export const ROOT_ABBR_RE = /^[a-z0-9]+$/;
-export const ROOT_ABBR_RULE_MESSAGE = "词根缩写仅支持小写字母和数字，不允许下划线";
+export const ROOT_ABBR_RULE_MESSAGE = '词根缩写仅支持小写字母和数字，不允许下划线';
 
-export function isValidRootAbbr(value) {
-  return ROOT_ABBR_RE.test(String(value || "").trim());
+export function isValidRootAbbr(value?: unknown): boolean {
+  return ROOT_ABBR_RE.test(String(value ?? '').trim());
 }
 
-export function assertValidRootAbbr(value) {
+export function assertValidRootAbbr(value?: unknown): void {
   if (!isValidRootAbbr(value)) throw new Error(ROOT_ABBR_RULE_MESSAGE);
 }

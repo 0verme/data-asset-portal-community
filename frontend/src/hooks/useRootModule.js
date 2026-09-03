@@ -23,7 +23,7 @@ import {
 import { DEFAULT_ROOT_CATEGORY, DEFAULT_ROOT_ROUTE } from "../config/defaults.ts";
 import { clearModuleNavigationState, MODULE_META } from "../routing/navigation.ts";
 import { useSmartBack } from "./useSmartBack.js";
-import { getErrorMessage, scrollMainToTop } from "../utils/ui.js";
+import { getErrorMessage, scrollMainToTop } from "../utils/ui.ts";
 
 export function useRootModule({ active, query, setQuery, rootRoute, setRootRoute, runProtectedMutation }) {
   const [roots, setRoots] = useState([]);

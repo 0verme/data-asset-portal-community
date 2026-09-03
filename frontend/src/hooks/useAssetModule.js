@@ -36,8 +36,8 @@ import {
   pushModuleNavigationState,
 } from "../routing/navigation.ts";
 import { useSmartBack } from "./useSmartBack.js";
-import { getAssetLayerValue } from "../utils/assetFilters.js";
-import { getErrorMessage, scrollMainToTop } from "../utils/ui.js";
+import { getAssetLayerValue } from "../utils/assetFilters.ts";
+import { getErrorMessage, scrollMainToTop } from "../utils/ui.ts";
 
 const ASSET_PAGE_SIZE = 20;
 

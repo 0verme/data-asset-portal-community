@@ -14,7 +14,7 @@
 
 import { Highlight } from "../ui.jsx";
 import { RowActions, StatusBadge } from "../common/index.js";
-import { formatDateTime } from "../../utils/date.js";
+import { formatDateTime } from "../../utils/date.ts";
 
 function formatCost(ms) {
   const value = Number(ms);

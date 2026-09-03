@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from "../../utils/date.js";
+import { formatDate, formatDateTime } from "../../utils/date.ts";
 import { RowActions, StatusBadge } from "../common/index.js";
 import { Icon } from "../ui.jsx";
 

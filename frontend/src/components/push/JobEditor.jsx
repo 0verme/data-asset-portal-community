@@ -10,8 +10,8 @@ import {
 } from "../common/index.js";
 
 
-import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.js";
-import { optionLabel } from "../../utils/ui.js";
+import { getLegacyAwareOptions, isLegacyDictValue } from "../../utils/optionUtils.ts";
+import { optionLabel } from "../../utils/ui.ts";
 import {
   DEFAULT_DELIMITER_OPTIONS,
   DEFAULT_ENCODING_OPTIONS,

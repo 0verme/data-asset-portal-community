@@ -15,7 +15,7 @@
 import React from "react";
 import { Icon } from "../ui.jsx";
 import { ActionErrorBanner, StatusBadge } from "../common/index.js";
-import { formatDateTime } from "../../utils/date.js";
+import { formatDateTime } from "../../utils/date.ts";
 import { formatCost } from "./OperationLogTable.jsx";
 
 function Row({ label, children, mono, full }) {
