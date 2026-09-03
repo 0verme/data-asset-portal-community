@@ -3,7 +3,7 @@ param(
     [switch]$InitOnly,
     [switch]$Help,
     [ValidateRange(1, 65535)]
-    [int]$BackendPort = 5099,
+    [int]$BackendPort = 15099,
     [ValidateRange(1, 65535)]
     [int]$FrontendPort = 5173
 )
