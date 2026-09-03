@@ -22,7 +22,7 @@ import {
   getFieldMappings,
   getFieldMappingTables,
 } from "../api/fieldMapping.js";
-import { DEFAULT_MAPPING_ROUTE } from "../config/defaults.js";
+import { DEFAULT_MAPPING_ROUTE } from "../config/defaults.ts";
 import { EmptyState } from "./common/index.js";
 import { FieldMappingFilters, FieldMappingStats } from "./fieldMapping/FieldMappingControls.jsx";
 import {

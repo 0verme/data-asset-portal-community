@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
-import { REPORTS } from "../data/reports.js";
+import { REPORTS } from "../data/reports.ts";
 
 const API_MODE = (import.meta.env.VITE_API_MODE || "mock").trim().toLowerCase();
 let mockReports = clone(REPORTS);

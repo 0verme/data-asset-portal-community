@@ -34,7 +34,7 @@ import {
   DEFAULT_UP_FILTER,
   DEFAULT_UP_ROUTE,
   DEFAULT_UP_VIEW,
-} from "../config/defaults.js";
+} from "../config/defaults.ts";
 import type {
   BreadcrumbItem,
   ModuleId,
@@ -44,7 +44,7 @@ import type {
   NavigationRoutes,
   NavigationState,
   LocationSnapshotInput,
-} from "./types.js";
+} from "./types.ts";
 
 const MODULE_NAV_STACK_PREFIX = "dap:nav-stack:";
 

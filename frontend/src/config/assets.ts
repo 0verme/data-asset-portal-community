@@ -1,4 +1,15 @@
-export const DOMAIN_ORDER = ["商品", "会员", "交易", "门店", "库存", "营销", "履约", "售后"];
+export const DOMAIN_ORDER = [
+  "商品",
+  "会员",
+  "交易",
+  "门店",
+  "库存",
+  "营销",
+  "履约",
+  "售后",
+] as const;
+
+export type DomainName = (typeof DOMAIN_ORDER)[number];
 
 export const DOMAIN_HUE_MAP = {
   商品: 255,
@@ -9,9 +20,15 @@ export const DOMAIN_HUE_MAP = {
   营销: 332,
   履约: 28,
   售后: 196,
-};
+} as const satisfies Record<string, number>;
 
-export const LAYER_OPTIONS = [
+export interface LayerOption {
+  code: string;
+  cn: string;
+  active: boolean;
+}
+
+export const LAYER_OPTIONS: readonly LayerOption[] = [
   { code: "ODS", cn: "贴源层", active: false },
   { code: "DWD", cn: "明细层", active: false },
   { code: "DWA", cn: "应用明细层", active: false },
@@ -19,4 +36,4 @@ export const LAYER_OPTIONS = [
   { code: "DWS", cn: "汇总层", active: false },
   { code: "DM", cn: "数据集市层", active: false },
   { code: "ADS", cn: "应用层", active: false },
-];
+] as const;

@@ -17,7 +17,7 @@ import {
   formatTimeoutLabel,
   resolveRequestTimeout,
   summarizeRequestPayload,
-} from "../config/request.js";
+} from "../config/request.ts";
 import { createInFlightGetRequestGroup } from "./inFlightRequests.js";
 
 const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || "/api").replace(/\/$/, "");

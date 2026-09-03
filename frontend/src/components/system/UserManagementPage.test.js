@@ -4,8 +4,8 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import { USER_STATUS_META } from "./constants.js";
-import { SYSTEM_USERS } from "../../data/systemUsers.js";
-import { PARAM_DICT_ITEMS } from "../../data/paramDicts.js";
+import { SYSTEM_USERS } from "../../data/systemUsers.ts";
+import { PARAM_DICT_ITEMS } from "../../data/paramDicts.ts";
 
 const pagePath = fileURLToPath(new URL("./UserManagementPage.jsx", import.meta.url));
 

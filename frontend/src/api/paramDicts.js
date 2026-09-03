@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
-import { PARAM_DICT_CATEGORIES, PARAM_DICT_ITEMS } from "../data/paramDicts.js";
+import { PARAM_DICT_CATEGORIES, PARAM_DICT_ITEMS } from "../data/paramDicts.ts";
 
 const API_MODE = (import.meta.env.VITE_API_MODE || "mock").trim().toLowerCase();
 let mockCategories = clone(PARAM_DICT_CATEGORIES);

@@ -25,9 +25,9 @@ import {
   DEFAULT_VARCHAR_LENGTH,
   parseColumnType,
   validateColumnType,
-} from "../constants/dataTypes.js";
+} from "../constants/dataTypes.ts";
 import { ASSET_NAME_RULE_MESSAGE, isValidAssetName } from "../utils/assetName.js";
-import { LAYER_OPTIONS } from "../config/assets.js";
+import { LAYER_OPTIONS } from "../config/assets.ts";
 
 function createField() {
   const typeParts = parseColumnType(DEFAULT_DATA_TYPE);

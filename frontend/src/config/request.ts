@@ -1,30 +1,38 @@
 const DEFAULT_REQUEST_TIMEOUT = 60000;
 const DEFAULT_LONG_REQUEST_TIMEOUT = 120000;
 
-function parseTimeout(value, fallback) {
+function parseTimeout(value: unknown, fallback: number): number {
   const timeout = Number(value);
   return Number.isFinite(timeout) && timeout > 0 ? timeout : fallback;
 }
 
 export const REQUEST_TIMEOUT = parseTimeout(
-  import.meta.env?.VITE_API_TIMEOUT,
+  typeof import.meta !== "undefined"
+    ? import.meta.env?.["VITE_API_TIMEOUT"]
+    : undefined,
   DEFAULT_REQUEST_TIMEOUT,
 );
 
-export const LONG_REQUEST_TIMEOUT = Math.max(REQUEST_TIMEOUT, DEFAULT_LONG_REQUEST_TIMEOUT);
+export const LONG_REQUEST_TIMEOUT = Math.max(
+  REQUEST_TIMEOUT,
+  DEFAULT_LONG_REQUEST_TIMEOUT,
+);
 
-export function resolveRequestTimeout(value, fallback = REQUEST_TIMEOUT) {
+export function resolveRequestTimeout(
+  value?: unknown,
+  fallback = REQUEST_TIMEOUT,
+): number {
   return parseTimeout(value, fallback);
 }
 
-export function formatTimeoutLabel(timeoutMs) {
+export function formatTimeoutLabel(timeoutMs: number): string {
   if (timeoutMs % 1000 === 0) {
     return `${timeoutMs / 1000}秒`;
   }
   return `${timeoutMs}ms`;
 }
 
-export function summarizeRequestPayload(value) {
+export function summarizeRequestPayload(value: unknown): string {
   if (value == null) return "";
 
   try {

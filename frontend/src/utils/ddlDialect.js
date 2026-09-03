@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { DEFAULT_DATA_TYPE, normalizeDataType } from "../constants/dataTypes.js";
+import { DEFAULT_DATA_TYPE, normalizeDataType } from "../constants/dataTypes.ts";
 
 const POSTGRESQL_DIALECT = "postgresql";
 const DWS_DIALECT = "dws";

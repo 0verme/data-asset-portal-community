@@ -17,7 +17,7 @@ import { HomePage } from "../HomePage.jsx";
 import { TableEditor } from "../TableEditor.jsx";
 import { Icon } from "../ui.jsx";
 import { EmptyState, ErrorState, LoadingState, ViewModeSwitcher } from "../common/index.js";
-import { DOMAIN_ORDER } from "../../config/assets.js";
+import { DOMAIN_ORDER } from "../../config/assets.ts";
 
 export function AssetView({ asset, query, route, canEdit = false }) {
   const {

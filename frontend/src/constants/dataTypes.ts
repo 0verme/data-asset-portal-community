@@ -9,7 +9,7 @@ export const PG_DWS_DATA_TYPES = [
   "DATE",
   "TIMESTAMP",
   "BOOLEAN",
-];
+] as const;
 
 export const DATA_TYPE_BASE_OPTIONS = [
   "VARCHAR",
@@ -20,7 +20,9 @@ export const DATA_TYPE_BASE_OPTIONS = [
   "DATE",
   "TIMESTAMP",
   "BOOLEAN",
-];
+] as const;
+
+export type DataTypeBaseOption = (typeof DATA_TYPE_BASE_OPTIONS)[number];
 
 export const DEFAULT_DATA_TYPE = "VARCHAR(64)";
 export const DEFAULT_VARCHAR_LENGTH = 64;
@@ -30,7 +32,7 @@ export const DEFAULT_NUMERIC_SCALE = 2;
 const DECIMAL_TYPE_RE = /^(?:decimal|numeric)\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)$/i;
 const VARCHAR_TYPE_RE = /^(?:varchar|character varying)\s*\(\s*(\d+)\s*\)$/i;
 
-const LEGACY_TYPE_MAP = {
+const LEGACY_TYPE_MAP: Record<string, string> = {
   string: DEFAULT_DATA_TYPE,
   text: "TEXT",
   int: "INTEGER",
@@ -43,20 +45,39 @@ const LEGACY_TYPE_MAP = {
   float: "NUMERIC(20,6)",
 };
 
-export function normalizeDataType(type) {
-  const rawType = String(type || "").trim();
+export interface ColumnTypeParts {
+  baseType: string;
+  length: string;
+  precision: string;
+  scale: string;
+  normalizedType: string;
+}
+
+export interface ColumnTypeInput {
+  baseType?: string | undefined;
+  typeBase?: string | undefined;
+  length?: string | number | undefined;
+  typeLength?: string | number | undefined;
+  precision?: string | number | undefined;
+  typePrecision?: string | number | undefined;
+  scale?: string | number | undefined;
+  typeScale?: string | number | undefined;
+}
+
+export function normalizeDataType(type?: unknown): string {
+  const rawType = String(type ?? "").trim();
   if (!rawType) {
     return DEFAULT_DATA_TYPE;
   }
 
   const normalized = rawType.toLowerCase();
   const decimalMatch = normalized.match(DECIMAL_TYPE_RE);
-  if (decimalMatch) {
+  if (decimalMatch && decimalMatch[1] && decimalMatch[2]) {
     return `NUMERIC(${decimalMatch[1]},${decimalMatch[2]})`;
   }
 
   const varcharMatch = normalized.match(VARCHAR_TYPE_RE);
-  if (varcharMatch) {
+  if (varcharMatch && varcharMatch[1]) {
     return `VARCHAR(${varcharMatch[1]})`;
   }
 
@@ -69,23 +90,25 @@ export function normalizeDataType(type) {
   }
 
   if (LEGACY_TYPE_MAP[normalized]) {
-    return LEGACY_TYPE_MAP[normalized];
+    return LEGACY_TYPE_MAP[normalized]!;
   }
 
   return rawType.toUpperCase();
 }
 
-export function normalizeFieldDataType(field) {
+export function normalizeFieldDataType<T extends { type?: unknown }>(
+  field: T,
+): T & { type: string } {
   return {
     ...field,
     type: normalizeDataType(field?.type),
   };
 }
 
-export function parseColumnType(type) {
+export function parseColumnType(type?: unknown): ColumnTypeParts {
   const normalized = normalizeDataType(type);
   const varcharMatch = normalized.match(VARCHAR_TYPE_RE);
-  if (varcharMatch) {
+  if (varcharMatch && varcharMatch[1]) {
     return {
       baseType: "VARCHAR",
       length: varcharMatch[1],
@@ -96,7 +119,7 @@ export function parseColumnType(type) {
   }
 
   const decimalMatch = normalized.match(DECIMAL_TYPE_RE);
-  if (decimalMatch) {
+  if (decimalMatch && decimalMatch[1] && decimalMatch[2]) {
     return {
       baseType: "NUMERIC",
       length: "",
@@ -115,29 +138,44 @@ export function parseColumnType(type) {
   };
 }
 
-export function parseDataTypeParts(type) {
+export function parseDataTypeParts(type?: unknown): ColumnTypeParts {
   return parseColumnType(type);
 }
 
-function sanitizePositiveInteger(value) {
+function sanitizePositiveInteger(value?: unknown): string {
   return String(value ?? "").replace(/\D/g, "");
 }
 
-export function buildColumnType(input, legacyLength) {
-  const source = typeof input === "object" && input !== null
-    ? input
-    : { baseType: input, length: legacyLength };
-  const normalizedBaseType = String(source.baseType || source.typeBase || "").trim().toUpperCase();
+export function buildColumnType(
+  input?: ColumnTypeInput | string,
+  legacyLength?: string | number,
+): string {
+  const source: ColumnTypeInput =
+    typeof input === "object" && input !== null
+      ? input
+      : {
+          baseType: typeof input === "string" ? input : undefined,
+          length: legacyLength,
+        };
+  const normalizedBaseType = String(source.baseType || source.typeBase || "")
+    .trim()
+    .toUpperCase();
 
   if (normalizedBaseType === "VARCHAR") {
-    const numericLength = sanitizePositiveInteger(source.length ?? source.typeLength);
+    const numericLength = sanitizePositiveInteger(
+      source.length ?? source.typeLength,
+    );
     const finalLength = numericLength || String(DEFAULT_VARCHAR_LENGTH);
     return `VARCHAR(${finalLength})`;
   }
 
   if (normalizedBaseType === "NUMERIC") {
-    const precisionValue = sanitizePositiveInteger(source.precision ?? source.typePrecision);
-    const scaleValue = sanitizePositiveInteger(source.scale ?? source.typeScale);
+    const precisionValue = sanitizePositiveInteger(
+      source.precision ?? source.typePrecision,
+    );
+    const scaleValue = sanitizePositiveInteger(
+      source.scale ?? source.typeScale,
+    );
     const finalPrecision = precisionValue || String(DEFAULT_NUMERIC_PRECISION);
     const finalScale = scaleValue || String(DEFAULT_NUMERIC_SCALE);
     return `NUMERIC(${finalPrecision},${finalScale})`;
@@ -146,13 +184,21 @@ export function buildColumnType(input, legacyLength) {
   return normalizeDataType(normalizedBaseType || DEFAULT_DATA_TYPE);
 }
 
-export function buildDataType(baseType, length) {
+export function buildDataType(
+  baseType?: ColumnTypeInput | string,
+  length?: string | number,
+): string {
   return buildColumnType(baseType, length);
 }
 
-export function validateColumnType(input) {
-  const source = typeof input === "object" && input !== null ? input : parseColumnType(input);
-  const baseType = String(source.baseType || source.typeBase || "").trim().toUpperCase();
+export function validateColumnType(input?: ColumnTypeInput | string): string {
+  const source: ColumnTypeInput =
+    typeof input === "object" && input !== null
+      ? input
+      : parseColumnType(input);
+  const baseType = String(source.baseType || source.typeBase || "")
+    .trim()
+    .toUpperCase();
 
   if (baseType === "VARCHAR") {
     const length = String(source.length ?? source.typeLength ?? "").trim();
@@ -163,7 +209,9 @@ export function validateColumnType(input) {
   }
 
   if (baseType === "NUMERIC") {
-    const precision = String(source.precision ?? source.typePrecision ?? "").trim();
+    const precision = String(
+      source.precision ?? source.typePrecision ?? "",
+    ).trim();
     const scale = String(source.scale ?? source.typeScale ?? "").trim();
 
     if (!/^\d+$/.test(precision) || Number(precision) <= 0) {
@@ -182,15 +230,25 @@ export function validateColumnType(input) {
   return "";
 }
 
-export function normalizeFieldList(fields) {
+export function normalizeFieldList<T extends { type?: unknown }>(
+  fields?: T[] | null,
+): Array<T & { type: string }> {
   return Array.isArray(fields) ? fields.map(normalizeFieldDataType) : [];
 }
 
-export function normalizeAssetRiskList(assetRisks) {
+export function normalizeAssetRiskList<T>(assetRisks?: T[] | null): T[] {
   return Array.isArray(assetRisks) ? assetRisks : [];
 }
 
-export function normalizeAssetDataTypes(asset) {
+export interface NormalizeAssetInput {
+  fields?: Array<{ type?: unknown }> | null;
+  assetRisks?: unknown[] | null;
+  [key: string]: unknown;
+}
+
+export function normalizeAssetDataTypes<T extends NormalizeAssetInput>(
+  asset?: T | null,
+): T | null | undefined {
   if (!asset || typeof asset !== "object") return asset;
   return {
     ...asset,

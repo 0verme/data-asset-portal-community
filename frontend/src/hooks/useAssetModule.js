@@ -22,11 +22,11 @@ import {
   getLayers,
   saveAssetTable,
 } from "../api/assets.js";
-import { DOMAIN_ORDER, LAYER_OPTIONS } from "../config/assets.js";
+import { DOMAIN_ORDER, LAYER_OPTIONS } from "../config/assets.ts";
 import {
   DEFAULT_DETAIL_TAB,
   DEFAULT_LAYOUT,
-} from "../config/defaults.js";
+} from "../config/defaults.ts";
 import {
   clearModuleNavigationState,
   getModuleDetailRoute,

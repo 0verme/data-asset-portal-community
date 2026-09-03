@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
-import { MENU_ITEMS } from "../data/menus.js";
+import { MENU_ITEMS } from "../data/menus.ts";
 
 const API_MODE = (import.meta.env.VITE_API_MODE || "mock").trim().toLowerCase();
 export const MENUS_CHANGED_EVENT = "data-asset-portal:menus-changed";

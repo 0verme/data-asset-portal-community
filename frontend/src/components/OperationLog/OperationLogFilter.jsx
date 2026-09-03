@@ -17,7 +17,7 @@ import {
   OPERATION_MODULES,
   OPERATION_RESULTS,
   OPERATION_TYPES,
-} from "../../data/operationLogs.js";
+} from "../../data/operationLogs.ts";
 
 /**
  * 操作日志查询筛选组件。

@@ -13,12 +13,12 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
-import { INDICATORS } from "../data/indicators.js";
+import { INDICATORS } from "../data/indicators.ts";
 import {
   getIndicatorDimensionFromPath,
   INDICATOR_PATH_OPTIONS,
   normalizeIndicatorDimension,
-} from "../data/indicatorPathOptions.js";
+} from "../data/indicatorPathOptions.ts";
 
 const API_MODE = import.meta.env?.VITE_API_MODE || "mock";
 let mockIndicators = clone(INDICATORS);

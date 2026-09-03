@@ -13,8 +13,8 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
-import { LONG_REQUEST_TIMEOUT } from "../config/request.js";
-import { FIELD_MAPPING_ROWS } from "../data/fieldMappings.js";
+import { LONG_REQUEST_TIMEOUT } from "../config/request.ts";
+import { FIELD_MAPPING_ROWS } from "../data/fieldMappings.ts";
 const API_MODE = import.meta.env?.VITE_API_MODE || "mock";
 export const FIELD_MAPPING_PAGE_SIZE_OPTIONS = [50, 100, 150];
 export const FIELD_MAPPING_DEFAULT_PAGE_SIZE = FIELD_MAPPING_PAGE_SIZE_OPTIONS[0];

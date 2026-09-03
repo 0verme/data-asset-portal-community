@@ -12,12 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-function createMenu(item) {
+export interface MenuItem {
+  id: string;
+  code: string;
+  name: string;
+  icon: string;
+  path: string;
+  order: number;
+  status: string;
+  adminOnly: boolean;
+  desc: string;
+  navPlacement: string;
+  updatedAt: string;
+}
+
+function createMenu(
+  item: Partial<MenuItem> &
+    Pick<MenuItem, "id" | "code" | "name" | "path" | "order">,
+): MenuItem {
   return {
     status: "enabled",
     adminOnly: false,
     icon: "grid",
-    path: "",
     desc: "",
     navPlacement: "more",
     updatedAt: "2026-06-17 18:00:00",
@@ -25,7 +41,7 @@ function createMenu(item) {
   };
 }
 
-export const MENU_ITEMS = [
+export const MENU_ITEMS: readonly MenuItem[] = [
   createMenu({
     id: "1",
     code: "upstream",
@@ -131,4 +147,4 @@ export const MENU_ITEMS = [
     adminOnly: true,
     desc: "用户、菜单、参数字典与操作日志（仅管理员可见）",
   }),
-];
+] as const;

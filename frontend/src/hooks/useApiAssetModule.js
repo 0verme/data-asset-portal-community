@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deleteApiAsset, getApiAssets, getApiDownstreamSystems, saveApiAsset, setApiAssetStatus } from "../api/apiAssets.js";
-import { DEFAULT_API_ASSET_ROUTE } from "../config/defaults.js";
+import { DEFAULT_API_ASSET_ROUTE } from "../config/defaults.ts";
 import { getErrorMessage, scrollMainToTop } from "../utils/ui.js";
 import { toast } from "../components/common/index.js";
 import { runOptimisticStatusMutation } from "../utils/statusMutation.js";

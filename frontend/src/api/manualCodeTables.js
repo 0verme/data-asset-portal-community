@@ -1,5 +1,5 @@
 import { requestRemote } from "./http.js";
-import { MANUAL_CODE_TABLES } from "../data/manualCodeTables.js";
+import { MANUAL_CODE_TABLES } from "../data/manualCodeTables.ts";
 
 const API_MODE = (import.meta.env.VITE_API_MODE || "mock").trim().toLowerCase();
 let mockItems = structuredClone(MANUAL_CODE_TABLES);

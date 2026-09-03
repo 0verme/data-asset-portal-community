@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /* ===== 共享 UI 组件与工具 ===== */
-import { DOMAIN_HUE_MAP } from "../config/assets.js";
+import { DOMAIN_HUE_MAP } from "../config/assets.ts";
 
 // ---- 图标 (inline SVG, 1.6px stroke) ----
 export function Icon({ name, size = 16, color = "currentColor", strokeWidth = 1.7 }) {

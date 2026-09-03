@@ -20,7 +20,7 @@ import {
   DEFAULT_PORTAL_SCOPE,
   filterPortalHotTagsByModules,
   filterPortalScopesByModules,
-} from "../config/portalSearch.js";
+} from "../config/portalSearch.ts";
 
 function readPortalSearchParams(validScopeKeys) {
   if (typeof window === "undefined") {

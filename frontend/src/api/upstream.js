@@ -13,9 +13,9 @@
 // limitations under the License.
 
 import { requestRemote } from "./http.js";
-import { LONG_REQUEST_TIMEOUT } from "../config/request.js";
+import { LONG_REQUEST_TIMEOUT } from "../config/request.ts";
 
-import { UPSTREAM_SYSTEMS } from "../data/upstreamSystems.js";
+import { UPSTREAM_SYSTEMS } from "../data/upstreamSystems.ts";
 
 const API_MODE = import.meta.env.VITE_API_MODE || "mock";
 

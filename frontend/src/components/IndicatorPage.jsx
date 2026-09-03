@@ -1,5 +1,5 @@
 
-import { INDICATOR_DIMENSION_OPTIONS } from "../data/indicators.js";
+import { INDICATOR_DIMENSION_OPTIONS } from "../data/indicators.ts";
 import { formatDate, formatDateTime } from "../utils/date.js";
 import { ActionErrorBanner, CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "./common/index.js";
 import { Highlight, Icon, initial } from "./ui.jsx";

@@ -26,7 +26,7 @@ import { toast } from "../components/common/index.js";
 import {
   DEFAULT_UP_FILTER,
   DEFAULT_UP_VIEW,
-} from "../config/defaults.js";
+} from "../config/defaults.ts";
 import {
   clearModuleNavigationState,
   getModuleDetailRoute,
@@ -36,8 +36,8 @@ import {
   pushModuleNavigationState,
 } from "../routing/navigation.ts";
 import { useSmartBack } from "./useSmartBack.js";
-import { DEFAULT_UPSTREAM_DEPTS } from "../config/defaults.js";
-import { DB_TYPE_OPTIONS } from "../data/upstreamSystems.js";
+import { DEFAULT_UPSTREAM_DEPTS } from "../config/defaults.ts";
+import { DB_TYPE_OPTIONS } from "../data/upstreamSystems.ts";
 import { normalizeDictOptions } from "../utils/optionUtils.js";
 import { getErrorMessage, scrollMainToTop } from "../utils/ui.js";
 
