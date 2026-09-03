@@ -1,6 +1,9 @@
 # 架构说明
 
-## Runtime Truth
+面向维护者与贡献者的技术实现说明。产品定位与能力边界见 [README](../README.md)，
+数据库验证等级见 [数据库支持矩阵](./database-support.md)。
+
+## 运行时
 
 当前后端是纯 FastAPI ASGI 运行时：
 
@@ -41,7 +44,8 @@ flowchart LR
 
 ## Terminology and responsibility boundaries
 
-以下职责矩阵是 backend、frontend、API 和文档共同遵循的 repository truth。它把“仓库里有什么”“实例显示什么”“用户能做什么”“部署如何运行”和“依赖是否可用”分成正交维度：
+以下矩阵把「仓库里有什么」「实例显示什么」「用户能做什么」「部署如何运行」和「依赖是否可用」拆成正交维度，
+backend、frontend、API 和文档共用同一套定义：
 
 | 概念 | 职责 / Source of truth | 可以影响 | 明确不能影响 |
 | --- | --- | --- | --- |
@@ -52,7 +56,13 @@ flowchart LR
 | **RBAC Permission** | 当前用户授权，事实源是 permission registry 与 role → permission mapping；后端 `require_permission` 是 enforcement | 受保护 API 的读写/管理操作；前端隐藏按钮仅是 UX | Module 是否存在、菜单实例配置、deployment readiness、runtime profile |
 | **Runtime / DB Profile** | 连接、provider 和部署选择，事实源是 `ASSET_RUNTIME_PROFILE`、`ASSET_DB_PROFILE` 与 profile config | 数据库/provider、连接参数、部署默认值和集成选择 | Module identity、license、菜单、用户 permission |
 
-因此：**Module availability is not a licensing gate.** 仓库中的 source-backed 模块默认属于同一 open product surface；菜单隐藏不等于 route 删除或 API 禁止，RBAC 不等于模块存在性，runtime/DB profile 不等于 feature flag。**Menu visibility is not authorization. RBAC authorization is not module availability. Runtime/DB profile is not feature gating. Readiness failure does not remove repository routes. Capabilities must not be interpreted as Community/Private Edition locking.**
+由此得到几条实现约束，新增模块或诊断逻辑时必须遵守：
+
+- 模块存在性由源码 manifest 决定，**不是** license / Edition gate；
+- 菜单隐藏只是实例导航配置，不等于删除 route 或禁止 API；
+- RBAC 授权不等于模块存在性；
+- runtime / DB profile 只是部署选择，不是 feature flag；
+- readiness 失败只产生可诊断错误，不会移除仓库 route。
 
 数据库层的 `BackendCapability` / `BackendCapabilities` 是 provider adapter 的基础设施支持矩阵（例如 transaction、JDBC 或 connection pool），虽然复用了 capability 这个英文词，也不属于 `/api/capabilities` module payload，更不是 license 或模块隐藏开关。
 
@@ -80,7 +90,8 @@ flowchart LR
 - Upstream：`/api/upstreams`
 - Push：`/api/push`
 
-模块级 parity 和 migration 状态见 [FastAPI P4 Migration Matrix](./fastapi-p4-migration-matrix.md)。
+模块级 parity 与历史 migration 状态见
+[工程历史归档 · FastAPI P4 Migration Matrix](./archive/engineering-history/fastapi-p4-migration-matrix.md)。
 
 ### Scope exclusions
 
@@ -104,7 +115,7 @@ FastAPI adapter ── Application / Service Layer ── Database Provider ─�
 
 - `backend/asgi.py` 负责纯 FastAPI composition、CORS/security headers、native signed-session identity resolver 和 healthz。
 - `backend/app/fastapi_app.py` 是保留历史 import path 的 thin compatibility facade。
-- `backend/app/fastapi/app.py` 负责 FastAPI app bootstrap、explicit Service injection、capability payload 与静态 Router registration；capability、menu、profile 或 readiness 状态都不作为 route gate。`dependencies.py`、`errors.py` 和 `routers/` 承载共享 adapter seam 与模块边界。渐进迁移的 module-level router convention、inventory 和 operation-log pilot 见 [`fastapi-router-convention.md`](fastapi-router-convention.md)。
+- `backend/app/fastapi/app.py` 负责 FastAPI app bootstrap、explicit Service injection、capability payload 与静态 Router registration；capability、menu、profile 或 readiness 状态都不作为 route gate。`dependencies.py`、`errors.py` 和 `routers/` 承载共享 adapter seam 与模块边界。native router 的 module-level 约定与历史 inventory 见 [工程历史归档 · FastAPI Router Convention](./archive/engineering-history/fastapi-router-convention.md)。
 - `backend/app/__init__.py` 仅保留 production composition 说明；历史 Flask factory/blueprint 已删除，native package import 不加载 Flask。
 - `backend/app/services/` 和 `backend/app/db/` 是 FastAPI native 复用的业务与数据库边界。
 
@@ -133,19 +144,23 @@ V1 lineage 只支持 self-contained `replace` snapshot：新 snapshot 先以 `IN
 
 ## Rollback
 
-F6 不再提供 Flask runtime rollback switch。应用回滚通过部署上一版已验证的 Git commit/image 完成；不回滚数据库 schema、migration、Service 或 API Contract。`uvicorn backend.asgi:app` 是唯一当前推荐入口。
+应用回滚通过部署上一版已验证的 Git commit / image 完成；不回滚数据库 schema、migration、Service 或 API Contract。
+`uvicorn backend.asgi:app` 是唯一推荐入口，没有 runtime rollback switch。
 
-## Transitional Debt
+## 已知保留项
 
-### F7 cleanup result
+- `Werkzeug` 保留用于 AuthService 的 password hashing，`itsdangerous` 保留用于 native signed session。
+- `backend/app/fastapi_app.py` 是保留历史 import path 的薄兼容性 facade。
+- 旧格式 signed cookie 在有限生命周期内只读迁移为 HMAC-SHA256 native cookie。
 
-F5 gate 已证明 production native composition 不加载 Flask；F7 已删除 Flask/Flask-Cors dependencies、Flask factory/blueprints/routes 与 obsolete compatibility tests。#145 进一步移除了 `FLASK_*` runtime names 和历史 health flag；保留的 `Werkzeug`（AuthService password hashing）、`itsdangerous`（native signed session）和薄 `fastapi_app.py` facade 均有明确 native reason。旧 signed cookie 仅在有限生命周期内只读迁移为 HMAC-SHA256 native cookie。当前生成的 architecture artifact 以可审计 source revision 为证据；历史 migration notes 中的旧图示不应被当作 current runtime truth。
+历史迁移过程记录见 [工程历史归档](./archive/engineering-history/README.md)。
 
 ## 前端与数据层
 
 - `frontend/src/App.jsx` 负责应用编排、登录态和模块路由；`frontend/src/api/` 统一访问 `/api`。
 - `VITE_API_MODE=mock` 使用受控前端演示数据；`remote` 访问真实后端数据库。两种模式默认使用同一仓库模块集合，数据和外部执行能力可以不同。
 - Schema deployment contract 是 `backend/schema` 下四份 versioned dialect baseline 加 `backend/alembic` immutable forward revisions；baseline 是 fresh-install/offline physical artifact set，Alembic 负责 existing-database/head upgrade，二者不是同一个来源。`backend/app/db/tables.py` 只承载 runtime SQLAlchemy Core 查询子集，`demo/seed_*.py` 负责完整仓库模块的虚构演示数据。完整职责与编辑顺序见 [ADR-002](./adr/002-schema-canonical-source.md)。
+- 前端 TypeScript 分布：主应用 `frontend/src/` 目前仍以 JS/JSX 为主，只有少量 TS 边界文件（routing、auth permissions、共享 contract 的 `.d.ts`）；`frontend/packages/lineage-viewer*` 三个 workspace 是完整 TypeScript；`miniapp/` 是 Taro 4 + React + TypeScript。渐进采用策略见 [DEVELOPMENT.md](../DEVELOPMENT.md)。
 - `backend/app/db/` 隔离 SQLite、PostgreSQL、MySQL 和 GaussDB/DWS 的 Provider 差异；数据库 profile 只表达部署连接能力。`docs/pg/`、`docs/dws/` 是方言参考和部署说明，不再作为隐藏模块的 schema 边界。
 - 正式部署由 Nginx 托管前端静态资源，并将 `/api` 代理到 ASGI runtime；详细环境变量、health check 与 Nginx 配置见 [DEPLOYMENT.md](../DEPLOYMENT.md)。
 

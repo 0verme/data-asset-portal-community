@@ -1,6 +1,6 @@
 # P0 — Flask Security / Production Audit (Issue #16 第一阶段)
 
-> **Historical audit record**：本文记录 Issue #16 初期的安全审计基线与整改决策。Flask/Flask-Cors runtime 与 dependency 结论已由 F7 收口；当前安全配置与 FastAPI runtime 以 [DEPLOYMENT.md](../DEPLOYMENT.md)、[DEVELOPMENT.md](../DEVELOPMENT.md) 和 [docs/architecture.md](./architecture.md) 为准。
+> **Historical audit record**：本文记录 Issue #16 初期的安全审计基线与整改决策。Flask/Flask-Cors runtime 与 dependency 结论已由 F7 收口；当前安全配置与 FastAPI runtime 以 [DEPLOYMENT.md](../../../DEPLOYMENT.md)、[DEVELOPMENT.md](../../../DEVELOPMENT.md) 和 [docs/architecture.md](../../architecture.md) 为准。
 
 ## Audit Matrix
 

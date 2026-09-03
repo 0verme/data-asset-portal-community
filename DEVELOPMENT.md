@@ -238,6 +238,11 @@ python demo/seed_postgres.py --dialect postgres
 
 MySQL 8.0 先执行 `pip install -r backend/requirements-mysql.txt`，再使用 `community_mysql` profile 执行 `schema_migrate.py apply`；真实 CRUD、分页、唯一约束、中文/emoji、NULL 和 rollback 由 CI MySQL 8 integration job 验证。既有数据库先 `verify`，只有与 baseline 契约一致时才允许 `baseline` stamp；后续结构变更只走 Alembic forward revision。
 
+GaussDB / DWS 只有 `backend/schema/dws.sql` 方言 baseline 与离线结构校验
+（`schema_migrate.py verify --offline --dialect dws`），**没有在线 CI 实例与端到端回归**，
+因此其公开等级是 `Compatible` 而不是 `Verified`。部署前请按目标环境自行完成验证，
+详见 [数据库支持矩阵](./docs/database-support.md)。
+
 ### 方言参考 / external dependency 路径
 
 `docs/pg/` 与 `docs/dws/` 是 PostgreSQL、GaussDB/DWS 的方言参考、历史兼容 DDL 和 external integration 说明，不是隐藏仓库模块的产品边界，也不是 local 新库的默认入口。需要 vendor-specific DDL 或 external storage/collector 时，确认 profile、依赖和目标数据库后再按 SQL 文件说明执行。
@@ -323,6 +328,15 @@ PostgreSQL integration 测试（16 个）通过 `TEST_DATABASE_PROFILE` + `TEST_
 
 ### 前端渐进 TypeScript 采用
 
+**当前状态：主应用仍以 JS/JSX 为主，TypeScript 处于渐进采用阶段，不是已完成 TypeScript 化。**
+仓库里三个区域的 TypeScript 成熟度并不相同，描述时应分别说明：
+
+| 区域 | 当前状态 |
+| --- | --- |
+| `frontend/src/`（主应用） | 以 JS / JSX 为主，仅少量 TS 边界文件（routing、auth permissions、共享 contract 的 `.d.ts`） |
+| `frontend/packages/lineage-viewer*` | 完整 TypeScript（三个 npm workspace） |
+| `miniapp/` | 完整 TypeScript（Taro 4 + React） |
+
 主应用采用 **JS/TS 共存**，不是一次性重写。`frontend/tsconfig.app.json` 只覆盖已经建立类型边界的基础模块；它不会通过 `checkJs` 扫描 legacy JavaScript。主应用边界和既有 lineage workspace 可以分别检查，也可以用统一命令检查：
 
 ```bash
@@ -360,7 +374,8 @@ npm run typecheck          # app boundary + lineage workspaces
 ## 相关文档
 
 - [架构说明](./docs/architecture.md)
-- [FastAPI cutover 与兼容边界](./docs/fastapi-cutover.md)
+- [数据库支持矩阵](./docs/database-support.md)
 - [模块清单](./docs/modules.md)
 - [API 契约](./docs/api-contract.md)
+- [工程历史归档](./docs/archive/engineering-history/README.md)
 - [部署说明](./DEPLOYMENT.md)

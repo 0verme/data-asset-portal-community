@@ -137,7 +137,7 @@ profiles:
     password: change_me
 ```
 
-完整版正式部署支持 `postgres`、`mysql` 与 `gaussdb`；Community/local 隔离 profile 还可使用 `sqlite`（定位见 `docs/SQLITE_DECISION.md`）。Cloudflare D1 不受支持。非法 `type`、缺失连接信息或未安装可选驱动会 fail fast，不会静默回退到其他数据库。
+完整版正式部署支持 `postgres`、`mysql` 与 `gaussdb`；Community/local 隔离 profile 还可使用 `sqlite`（定位决策见 [工程历史归档 · SQLite Decision](../docs/archive/engineering-history/SQLITE_DECISION.md)）。各数据库的验证等级见 [数据库支持矩阵](../docs/database-support.md)。Cloudflare D1 不受支持。非法 `type`、缺失连接信息或未安装可选驱动会 fail fast，不会静默回退到其他数据库。
 
 ## 初始化数据库
 
@@ -162,7 +162,7 @@ python backend/scripts/schema_migrate.py apply --profile community_mysql
 Full/module-specific/external-dependency 部署可手动逐个执行模块 DDL，没有一键脚本，后端启动也不会自动初始化：
 按数据库类型选 `docs/pg/*-app-pg-ddl.sql`（PostgreSQL）或 `docs/dws/*-app-dws-ddl.sql`（DWS / GaussDB），
 用对应客户端（`psql -f` / `gsql -f`）逐个执行。它们是补充 DDL，不是 Community/local 的默认入口；后者必须走 `backend/schema` + `schema_migrate.py` + seed。具体边界见
-[根目录部署说明](../DEPLOYMENT.md#四数据库初始化与迁移)。
+[根目录部署说明](../DEPLOYMENT.md#5-database-migration)。
 
 > 🚫 仓库不再包含整库快照（`app-*-init-data.sql` 与 `docs/*/sample/*.sql` 已从公开树移除）；
 > 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。

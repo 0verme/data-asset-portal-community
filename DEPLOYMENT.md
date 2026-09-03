@@ -22,7 +22,7 @@ FastAPI Native / Uvicorn（backend.asgi:app）
 Database Provider → PostgreSQL / MySQL / GaussDB-DWS / SQLite
 ```
 
-当前 Runtime Truth：
+生产部署契约：
 
 | 部件 | 生产部署契约 |
 | --- | --- |
