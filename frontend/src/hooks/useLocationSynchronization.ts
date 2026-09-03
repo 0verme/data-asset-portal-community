@@ -1,11 +1,47 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef } from 'react';
 
 import {
   buildNavigationLocation,
   resolveHistoryAction,
-} from "../routing/location.ts";
+} from '../routing/location.ts';
+import type {
+  ModuleId,
+  NavigationRoutes,
+  NavigationState,
+  NavigationUrlState,
+  PushFilter,
+  UpstreamFilter,
+} from '../routing/types.ts';
 
-function getRoutes(navigation) {
+export interface LocationSyncNavigation extends NavigationState {
+  locationRevision: number;
+}
+
+export interface LocationSyncAsset {
+  domain?: string | null | undefined;
+  selectedLayer?: string | null | undefined;
+  layout?: string | undefined;
+  detailTab?: string | undefined;
+}
+
+export interface LocationSyncPush {
+  pushFilter?: PushFilter | undefined;
+  pushView?: string | undefined;
+}
+
+export interface LocationSyncUpstream {
+  upFilter?: UpstreamFilter | undefined;
+  upstreamView?: string | undefined;
+}
+
+export interface LocationSynchronizationProps {
+  navigation: LocationSyncNavigation;
+  asset: LocationSyncAsset;
+  push: LocationSyncPush;
+  upstream: LocationSyncUpstream;
+}
+
+function getRoutes(navigation: LocationSyncNavigation): NavigationRoutes {
   return {
     asset: navigation.route,
     push: navigation.pushRoute,
@@ -20,7 +56,12 @@ function getRoutes(navigation) {
   };
 }
 
-function getRuntimeUrlState({ navigation, asset, push, upstream }) {
+function getRuntimeUrlState({
+  navigation,
+  asset,
+  push,
+  upstream,
+}: LocationSynchronizationProps): NavigationUrlState {
   return {
     asset: {
       domain: asset.domain,
@@ -51,7 +92,7 @@ function getRuntimeUrlState({ navigation, asset, push, upstream }) {
   };
 }
 
-function getRestoredUrlState(navigation) {
+function getRestoredUrlState(navigation: LocationSyncNavigation): NavigationUrlState {
   return {
     asset: {
       domain: navigation.assetDomainFromUrl,
@@ -82,18 +123,23 @@ function getRestoredUrlState(navigation) {
   };
 }
 
-export function useLocationSynchronization({ navigation, asset, push, upstream }) {
+export function useLocationSynchronization({
+  navigation,
+  asset,
+  push,
+  upstream,
+}: LocationSynchronizationProps): void {
   const historyReadyRef = useRef(false);
   const lastPopstateRevisionRef = useRef(navigation.locationRevision);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
 
     const isPopstate = lastPopstateRevisionRef.current !== navigation.locationRevision;
     const nextLocation = buildNavigationLocation({
-      module: navigation.module,
+      module: navigation.module as ModuleId,
       routes: getRoutes(navigation),
-      query: navigation.query,
+      query: navigation.query || '',
       urlState: isPopstate
         ? getRestoredUrlState(navigation)
         : getRuntimeUrlState({ navigation, asset, push, upstream }),
@@ -109,16 +155,15 @@ export function useLocationSynchronization({ navigation, asset, push, upstream }
       isPopstate,
     });
 
-    if (action === "push") {
-      window.history.pushState({}, "", nextLocation.url);
-    } else if (action === "replace") {
-      window.history.replaceState({}, "", nextLocation.url);
+    if (action === 'push') {
+      window.history.pushState({}, '', nextLocation.url);
+    } else if (action === 'replace') {
+      window.history.replaceState({}, '', nextLocation.url);
     }
     if (isPopstate) lastPopstateRevisionRef.current = navigation.locationRevision;
     historyReadyRef.current = true;
     // The dependency list intentionally tracks the primitive route and URL-state
     // values above instead of the render-scoped container objects.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     asset.detailTab,
     asset.domain,

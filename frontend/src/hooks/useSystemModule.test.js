@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const hookPath = fileURLToPath(new URL("./useSystemModule.js", import.meta.url));
+const hookPath = fileURLToPath(new URL("./useSystemModule.ts", import.meta.url));
 
 test("user validation allows flexible usernames and reset feedback does not disclose passwords", async () => {
   const source = await readFile(hookPath, "utf8");

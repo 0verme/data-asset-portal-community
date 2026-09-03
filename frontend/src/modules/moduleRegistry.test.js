@@ -9,7 +9,7 @@ import {
   resolveDefaultEnabledModules,
   resolveRepositoryModuleCodes,
   validateModuleRegistry,
-} from "./moduleRegistry.js";
+} from "./moduleRegistry.ts";
 
 test("module registry is internally consistent and complete", () => {
   assert.equal(validateModuleRegistry(), true);

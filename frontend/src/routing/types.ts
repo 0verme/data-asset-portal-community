@@ -224,35 +224,35 @@ export interface BreadcrumbItem {
 }
 
 export interface AssetUrlState {
-  domain?: string | null;
-  selectedLayer?: string | null;
-  layout?: string | null;
-  detailTab?: string | null;
+  domain?: string | null | undefined;
+  selectedLayer?: string | null | undefined;
+  layout?: string | null | undefined;
+  detailTab?: string | null | undefined;
 }
 
 export interface IndicatorUrlState {
-  filter?: IndicatorFilter;
-  view?: string;
+  filter?: IndicatorFilter | undefined;
+  view?: string | undefined;
 }
 
 export interface ReportUrlState {
-  filter?: ReportFilter;
-  view?: string;
+  filter?: ReportFilter | undefined;
+  view?: string | undefined;
 }
 
 export interface ApiAssetUrlState {
-  filter?: ApiAssetFilter;
-  view?: string;
+  filter?: ApiAssetFilter | undefined;
+  view?: string | undefined;
 }
 
 export interface UpstreamUrlState {
-  filter?: UpstreamFilter;
-  view?: string;
+  filter?: UpstreamFilter | undefined;
+  view?: string | undefined;
 }
 
 export interface PushUrlState {
-  filter?: PushFilter;
-  view?: string;
+  filter?: PushFilter | undefined;
+  view?: string | undefined;
 }
 
 export interface NavigationUrlState {

@@ -12,7 +12,7 @@ import {
   normalizeBinaryStatusValue,
 } from "./common/status.js";
 
-const manualHookPath = fileURLToPath(new URL("../hooks/useManualCodeTableModule.js", import.meta.url));
+const manualHookPath = fileURLToPath(new URL("../hooks/useManualCodeTableModule.ts", import.meta.url));
 const manualPagePath = fileURLToPath(new URL("./ManualCodeTablePage.jsx", import.meta.url));
 const manualApiPath = fileURLToPath(new URL("../api/manualCodeTables.ts", import.meta.url));
 const manualDataPath = fileURLToPath(new URL("../data/manualCodeTables.ts", import.meta.url));
@@ -61,9 +61,9 @@ test("manual code table surfaces only expose the binary status contract", async 
     read(manualDataPath),
   ]);
 
-  assert.match(hook, /enabled: \{ label: "启用"/);
-  assert.match(hook, /disabled: \{ label: "禁用"/);
-  assert.match(hook, /status: "enabled"/);
+  assert.match(hook, /enabled:\s*\{\s*label:\s*["']启用["']/);
+  assert.match(hook, /disabled:\s*\{\s*label:\s*["']禁用["']/);
+  assert.match(hook, /status:\s*["']enabled["']/);
   assert.doesNotMatch(hook, /status:\s*"active"|status\s*===\s*"active"|\bdraft\b|草稿|停用/);
   assert.doesNotMatch(page, /value="active"|value="draft"|草稿|停用/);
   assert.match(page, /value="enabled">启用/);

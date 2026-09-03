@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 // Copyright 2025 Jearhe
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,13 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { listModuleCodes, resolveRepositoryModuleCodes } from "../modules/moduleRegistry.js";
+import { listModuleCodes, resolveRepositoryModuleCodes } from '../modules/moduleRegistry.ts';
 
-function readApiMode() {
+function readApiMode(): string {
   try {
-    return String(import.meta.env?.VITE_API_MODE || "mock").trim().toLowerCase();
+    return String(import.meta.env?.['VITE_API_MODE'] || 'mock').trim().toLowerCase();
   } catch (_error) {
-    return "mock";
+    return 'mock';
   }
 }
 
@@ -27,13 +28,26 @@ function readApiMode() {
  * a fake 404. Deployment readiness may be unknown, while source-backed modules
  * stay navigable and can render their own dependency error state.
  */
-export const SAFE_FALLBACK_MODULES = Object.freeze(listModuleCodes());
+export const SAFE_FALLBACK_MODULES: readonly string[] = Object.freeze(listModuleCodes());
 
-export function isRemoteCapabilitiesMode() {
-  return readApiMode() === "remote";
+export function isRemoteCapabilitiesMode(): boolean {
+  return readApiMode() === 'remote';
 }
 
-function openModuleItems() {
+export interface OpenModuleItem {
+  code: string;
+  enabled: boolean;
+  reason: string | null;
+}
+
+export interface CapabilitiesState {
+  modules: OpenModuleItem[];
+  enabledCodes: Set<string>;
+  loadStatus: 'ready' | 'error';
+  loadError: string | null;
+}
+
+function openModuleItems(): OpenModuleItem[] {
   return listModuleCodes().map((code) => ({
     code,
     enabled: true,
@@ -41,7 +55,7 @@ function openModuleItems() {
   }));
 }
 
-export function modulesFromPayload(_payload) {
+export function modulesFromPayload(_payload?: unknown): CapabilitiesState {
   // The current payload describes the source-backed module contract. Any
   // future dependency diagnostics must remain separate from this module set.
   const modules = openModuleItems();
@@ -50,28 +64,28 @@ export function modulesFromPayload(_payload) {
     // Retained field name: this is the source-backed module set, not a gate.
     enabledCodes: new Set(SAFE_FALLBACK_MODULES),
     // These fields describe the HTTP capability-contract loader only.
-    loadStatus: "ready",
+    loadStatus: 'ready',
     loadError: null,
   };
 }
 
-export function buildMockCapabilities() {
+export function buildMockCapabilities(): CapabilitiesState {
   const enabledCodes = resolveRepositoryModuleCodes();
   return {
     modules: openModuleItems(),
     enabledCodes,
-    loadStatus: "ready",
+    loadStatus: 'ready',
     loadError: null,
   };
 }
 
-export function buildSafeFallbackCapabilities(error) {
+export function buildSafeFallbackCapabilities(error: unknown): CapabilitiesState {
   const enabledCodes = new Set(SAFE_FALLBACK_MODULES);
   return {
     modules: openModuleItems(),
     enabledCodes,
-    loadStatus: "error",
-    loadError: error instanceof Error ? error.message : String(error || "capabilities unavailable"),
+    loadStatus: 'error',
+    loadError: error instanceof Error ? error.message : String(error || 'capabilities unavailable'),
   };
 }
 
@@ -81,16 +95,16 @@ export function buildSafeFallbackCapabilities(error) {
  * request only changes the HTTP loader's loadStatus/loadError; it never hides
  * source-backed routes or claims that a module is unavailable.
  */
-export async function loadCapabilities() {
+export async function loadCapabilities(): Promise<CapabilitiesState> {
   if (!isRemoteCapabilitiesMode()) {
     return buildMockCapabilities();
   }
   try {
-    const { requestRemote } = await import("../api/http.ts");
-    const payload = await requestRemote("/capabilities");
+    const { requestRemote } = await import('../api/http.ts');
+    const payload = await requestRemote('/capabilities');
     return modulesFromPayload(payload);
   } catch (error) {
-    console.error("Failed to load repository-module capability contract; using open module fallback.", error);
+    console.error('Failed to load repository-module capability contract; using open module fallback.', error);
     return buildSafeFallbackCapabilities(error);
   }
 }

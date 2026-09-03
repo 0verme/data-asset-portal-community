@@ -19,11 +19,12 @@ const LAYER_FIELD_CANDIDATES = [
 ] as const;
 
 export function getAssetLayerValue(
-  asset?: Record<string, unknown> | null,
+  asset?: object | null,
 ): string {
   if (!asset || typeof asset !== "object") return "";
+  const record = asset as Record<string, unknown>;
   for (const fieldName of LAYER_FIELD_CANDIDATES) {
-    const value = asset[fieldName];
+    const value = record[fieldName];
     if (typeof value !== "string") continue;
 
     const normalized = value.trim().toUpperCase();

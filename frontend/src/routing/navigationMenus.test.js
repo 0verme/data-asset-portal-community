@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { loadNavigationMenus } from "./navigationMenus.js";
+import { loadNavigationMenus } from "./navigationMenus.ts";
 
 test("navigation loading preserves the exact API menu collection and order", async () => {
   const expected = [
@@ -30,7 +30,7 @@ test("navigation loading propagates request failures and rejects malformed paylo
 test("app exposes retry states without using built-in menu fallback data", () => {
   const appSource = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
   const apiSource = readFileSync(new URL("../api/menus.ts", import.meta.url), "utf8");
-  const loaderSource = readFileSync(new URL("./navigationMenus.js", import.meta.url), "utf8");
+  const loaderSource = readFileSync(new URL("./navigationMenus.ts", import.meta.url), "utf8");
 
   assert.match(appSource, /const \[navMenus, setNavMenus\] = useState\(\[\]\)/);
   assert.match(appSource, /菜单加载失败，点击重试/);

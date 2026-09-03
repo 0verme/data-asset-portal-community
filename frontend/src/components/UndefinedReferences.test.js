@@ -36,12 +36,12 @@ test("rendered components import their referenced helpers", async () => {
 
 test("data hooks import the shared error formatter", async () => {
   const sources = await Promise.all([
-    readSource("../hooks/useAssetModule.js"),
-    readSource("../hooks/usePushModule.js"),
-    readSource("../hooks/useRootModule.js"),
+    readSource("../hooks/useAssetModule.ts"),
+    readSource("../hooks/usePushModule.ts"),
+    readSource("../hooks/useRootModule.ts"),
   ]);
 
   for (const source of sources) {
-    assert.match(source, /import \{[^}]*getErrorMessage[^}]*\} from "\.\.\/utils\/ui\.(js|ts)";/);
+    assert.match(source, /import \{[^}]*getErrorMessage[^}]*\} from ["']\.\.\/utils\/ui\.(js|ts)["'];/);
   }
 });
