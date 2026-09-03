@@ -1,5 +1,5 @@
 import { isValidTime } from "../common/time.ts";
-import { getUpstreamFieldLabel } from "./upstreamFieldContract.js";
+import { getUpstreamFieldLabel } from "./upstreamFieldContract.ts";
 
 export const UPSTREAM_SAVE_GENERIC_ERROR = "保存失败，请检查填写内容。";
 export const UPSTREAM_SAVE_RETRY_ERROR = "保存失败，请稍后重试。";

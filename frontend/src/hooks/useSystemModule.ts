@@ -44,7 +44,7 @@ import {
 import type { MenuItem } from '../data/menus.ts';
 import { getErrorMessage, type ErrorWithPayload } from '../utils/ui.ts';
 import { toast } from '../components/common/index.ts';
-import { DEFAULT_MENU_FORM, DEFAULT_PARAM_FORM, DEFAULT_USER_FORM } from '../components/system/constants.js';
+import { DEFAULT_MENU_FORM, DEFAULT_PARAM_FORM, DEFAULT_USER_FORM } from '../components/system/constants.ts';
 
 export interface UserFormData {
   username: string;

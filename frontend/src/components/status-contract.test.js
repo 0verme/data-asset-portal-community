@@ -16,7 +16,7 @@ const manualHookPath = fileURLToPath(
   new URL("../hooks/useManualCodeTableModule.ts", import.meta.url),
 );
 const manualPagePath = fileURLToPath(
-  new URL("./ManualCodeTablePage.jsx", import.meta.url),
+  new URL("./ManualCodeTablePage.tsx", import.meta.url),
 );
 const manualApiPath = fileURLToPath(
   new URL("../api/manualCodeTables.ts", import.meta.url),

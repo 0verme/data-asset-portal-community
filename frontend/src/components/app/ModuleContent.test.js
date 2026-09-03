@@ -3,31 +3,39 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const moduleContentPath = fileURLToPath(new URL("./ModuleContent.jsx", import.meta.url));
+const moduleContentPath = fileURLToPath(
+  new URL("./ModuleContent.jsx", import.meta.url),
+);
 
 test("business modules are lazy-loaded while the portal remains in the app shell", async () => {
   const source = await readFile(moduleContentPath, "utf8");
 
-  assert.match(source, /import \{ SearchPortalPage \} from "\.\.\/SearchPortalPage\.jsx"/);
+  assert.match(
+    source,
+    /import \{ SearchPortalPage \} from "\.\.\/SearchPortalPage\.(jsx|tsx)"/,
+  );
   assert.match(source, /React\.Suspense/);
   assert.doesNotMatch(source, /from "\.\.\/views\/index\.js"/);
   assert.match(source, /MODULE_RENDERERS/);
   assert.doesNotMatch(source, /enabledModuleCodes/);
 
   for (const modulePath of [
-    "../views/AssetView.jsx",
-    "../views/ApiAssetView.jsx",
-    "../views/IndicatorView.jsx",
-    "../views/PushView.jsx",
-    "../views/ReportView.jsx",
-    "../views/RootView.jsx",
-    "../views/SystemView.jsx",
-    "../views/UpstreamView.jsx",
-    "../FieldMappingPage.jsx",
-    "../LineagePage.jsx",
-    "../ManualCodeTablePage.jsx",
+    "../views/AssetView.tsx",
+    "../views/ApiAssetView.tsx",
+    "../views/IndicatorView.tsx",
+    "../views/PushView.tsx",
+    "../views/ReportView.tsx",
+    "../views/RootView.tsx",
+    "../views/SystemView.tsx",
+    "../views/UpstreamView.tsx",
+    "../FieldMappingPage.tsx",
+    "../LineagePage.tsx",
+    "../ManualCodeTablePage.tsx",
   ]) {
-    assert.match(source, new RegExp(`import\\("${modulePath.replaceAll(".", "\\.")}"\\)`));
+    assert.match(
+      source,
+      new RegExp(`import\\("${modulePath.replaceAll(".", "\\.")}"\\)`),
+    );
   }
 });
 

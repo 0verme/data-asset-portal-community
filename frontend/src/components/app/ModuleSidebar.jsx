@@ -9,7 +9,7 @@ import {
   RootSidebar,
   SystemSidebar,
   UpstreamSidebar,
-} from "../sidebar/index.js";
+} from "../sidebar/index.ts";
 
 export function ModuleSidebar({ module, context }) {
   const {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getScheduleSteps, nextUnload } from "./upstream/scheduleStepper.js";
+import { getScheduleSteps, nextUnload } from "./upstream/scheduleStepper.ts";
 
 const at = (hour, minute = 0) => new Date(2025, 0, 1, hour, minute);
 

@@ -4,25 +4,25 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const commonSidebarPath = fileURLToPath(
-	new URL("./sidebar/common/SidebarFilterGroup.jsx", import.meta.url),
+	new URL("./sidebar/common/SidebarFilterGroup.tsx", import.meta.url),
 );
 const statusSidebarPath = fileURLToPath(
-	new URL("./sidebar/common/StatusFilterGroup.jsx", import.meta.url),
+	new URL("./sidebar/common/StatusFilterGroup.tsx", import.meta.url),
 );
 const assetSidebarPath = fileURLToPath(
-	new URL("./sidebar/AssetSidebar.jsx", import.meta.url),
+	new URL("./sidebar/AssetSidebar.tsx", import.meta.url),
 );
 const upstreamSidebarPath = fileURLToPath(
-	new URL("./sidebar/UpstreamSidebar.jsx", import.meta.url),
+	new URL("./sidebar/UpstreamSidebar.tsx", import.meta.url),
 );
 const reportSidebarPath = fileURLToPath(
-	new URL("./sidebar/ReportSidebar.jsx", import.meta.url),
+	new URL("./sidebar/ReportSidebar.tsx", import.meta.url),
 );
 const apiSidebarPath = fileURLToPath(
-	new URL("./sidebar/ApiAssetSidebar.jsx", import.meta.url),
+	new URL("./sidebar/ApiAssetSidebar.tsx", import.meta.url),
 );
 const pushSidebarPath = fileURLToPath(
-	new URL("./sidebar/PushSidebar.jsx", import.meta.url),
+	new URL("./sidebar/PushSidebar.tsx", import.meta.url),
 );
 const stylesPath = fileURLToPath(new URL("../styles/app.css", import.meta.url));
 
@@ -42,7 +42,7 @@ test("shared sidebar groups prepend an all option and expose accessible button s
 
 	assert.match(
 		common,
-		/export function SidebarFilterGroup\(\{ title, items = \[\], allOption \}\)/,
+		/export function SidebarFilterGroup\(\{[\s\S]*?title,[\s\S]*?items = \[\],[\s\S]*?allOption,[\s\S]*?\}: SidebarFilterGroupProps\)/,
 	);
 	assert.match(
 		common,
@@ -111,14 +111,14 @@ test("sidebar all entries clear only their own dimension while preserving peer f
 	);
 	assert.match(
 		push,
-		/onClick: \(\) => setPushFilter\(\(prev\) => \(\{ \.\.\.prev, importanceLevel: null \}\)\)/,
+		/onClick:\s*\(\)\s*=>\s*setPushFilter\(\(prev\)\s*=>\s*\(\{\s*\.\.\.prev,\s*importanceLevel:\s*null\s*\}\)\)/,
 	);
 
 	assert.match(upstream, /active: !upFilter\.dbType/);
 	assert.match(report, /active: !reportFilter\.type/);
 	assert.match(
 		api,
-		/active: filter\[key\] === null \|\| filter\[key\] === undefined \|\| filter\[key\] === ""/,
+		/active:\s*filter\[key\]\s*===\s*null\s*\|\|\s*filter\[key\]\s*===\s*undefined\s*\|\|\s*filter\[key\]\s*===\s*""/,
 	);
 	assert.match(push, /active: !pushFilter\.protocol/);
 	assert.match(push, /active: !pushFilter\.importanceLevel/);

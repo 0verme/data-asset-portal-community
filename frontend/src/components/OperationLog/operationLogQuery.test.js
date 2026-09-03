@@ -5,7 +5,7 @@ import {
   createOperationLogQueryState,
   resolveOperationLogRequestPage,
   withOperationLogFilter,
-} from "./operationLogQuery.js";
+} from "./operationLogQuery.ts";
 
 test("operation log filter changes reset pagination in the same state update", () => {
   const current = { ...createOperationLogQueryState(), page: 4 };

@@ -9,7 +9,7 @@ import {
   UPSTREAM_SYSTEM_FIELD_CONTRACT,
   displayUpstreamValue,
   getUpstreamDetailMetadata,
-} from "./upstreamFieldContract.js";
+} from "./upstreamFieldContract.ts";
 
 const fieldKeys = (fields) => fields.map(({ key }) => key);
 

@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const pagePath = fileURLToPath(new URL("./UserManagementPage.jsx", import.meta.url));
+const pagePath = fileURLToPath(new URL("./UserManagementPage.tsx", import.meta.url));
 
 test("password reset uses a non-danger confirmation without exposing a password", async () => {
   const source = await readFile(pagePath, "utf8");

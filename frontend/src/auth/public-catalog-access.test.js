@@ -9,7 +9,7 @@ const read = (relativePath) => readFile(`${src}/${relativePath}`, "utf8");
 test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog access", async () => {
   const [app, search, moduleContent] = await Promise.all([
     read("App.jsx"),
-    read("components/SearchPortalPage.jsx"),
+    read("components/SearchPortalPage.tsx"),
     read("components/app/ModuleContent.jsx"),
   ]);
 
@@ -23,13 +23,13 @@ test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog acce
 
 test("anonymous UI exposes catalog actions only and keeps write controls permission-gated", async () => {
   const sources = await Promise.all([
-    read("components/views/AssetView.jsx"),
-    read("components/IndicatorPage.jsx"),
-    read("components/report/ReportList.jsx"),
-    read("components/views/ApiAssetView.jsx"),
-    read("components/views/UpstreamView.jsx"),
-    read("components/views/PushView.jsx"),
-    read("components/RootPages.jsx"),
+    read("components/views/AssetView.tsx"),
+    read("components/IndicatorPage.tsx"),
+    read("components/report/ReportList.tsx"),
+    read("components/views/ApiAssetView.tsx"),
+    read("components/views/UpstreamView.tsx"),
+    read("components/views/PushView.tsx"),
+    read("components/RootPages.tsx"),
   ]);
 
   for (const source of sources) assert.match(source, /canEdit/);

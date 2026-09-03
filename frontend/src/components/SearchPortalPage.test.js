@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const searchPagePath = fileURLToPath(new URL("./SearchPortalPage.jsx", import.meta.url));
+const searchPagePath = fileURLToPath(new URL("./SearchPortalPage.tsx", import.meta.url));
 const searchStylesPath = fileURLToPath(new URL("../styles/search.css", import.meta.url));
 
 test("empty search results expose a clear action that preserves scope and focus", async () => {
