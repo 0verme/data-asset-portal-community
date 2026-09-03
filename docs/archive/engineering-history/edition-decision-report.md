@@ -1,7 +1,7 @@
 # Edition Decision Report — Private Module Source Publication
 
 > [!NOTE]
-> **Historical / Superseded.** 本文记录旧的 Edition gating 决策，不代表当前运行时。v0.1.1 采用 open repository module contract；当前事实请参阅 [README](../README.md)、[架构说明](./architecture.md) 与 [模块清单](./modules.md)。
+> **Historical / Superseded.** 本文记录旧的 Edition gating 决策，不代表当前运行时。v0.1.1 采用 open repository module contract；当前事实请参阅 [README](../../../README.md)、[架构说明](../../architecture.md) 与 [模块清单](../../modules.md)。
 
 > **Historical record — superseded by #116**：本文记录首次公开发布阶段的 Source/License 与旧 runtime boundary 决策。#115 已完成 Repository Truth Alignment，#116 已删除 Edition / Optional artificial runtime gating；本文中的 disabled route/table/profile 描述只保留为历史证据，不是当前产品或部署原则。
 >
