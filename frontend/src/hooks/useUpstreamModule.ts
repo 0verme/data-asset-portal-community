@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   deleteUpstreamSystem,
   getUpstreamSystem,
@@ -42,6 +42,11 @@ import { useSmartBack } from './useSmartBack.ts';
 import { DB_TYPE_OPTIONS } from '../data/upstreamSystems.ts';
 import { normalizeDictOptions, type DictOption } from '../utils/optionUtils.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
+import {
+  isSameUpstreamField,
+  normalizeUpstreamApiError,
+  type UpstreamFormError,
+} from '../components/upstream/upstreamFormErrors.ts';
 import type { UpstreamFilter, UpstreamRoute } from '../routing/types.ts';
 
 function fallbackOptions(values: readonly unknown[]): DictOption[] {
@@ -89,7 +94,8 @@ export interface UseUpstreamModuleResult {
   upstreamDetailLoading: boolean;
   upstreamError: string;
   upstreamSaveError: string;
-  setUpstreamSaveError: React.Dispatch<React.SetStateAction<string>>;
+  upstreamSaveFieldErrors: UpstreamFormError[];
+  clearUpstreamSaveError: (field?: string) => void;
   upstreamLoaded: boolean;
   upstreamView: string;
   setUpstreamView: React.Dispatch<React.SetStateAction<string>>;
@@ -133,6 +139,16 @@ export function useUpstreamModule({
   const [upstreamDetailLoading, setUpstreamDetailLoading] = useState(false);
   const [upstreamError, setUpstreamError] = useState('');
   const [upstreamSaveError, setUpstreamSaveError] = useState('');
+  const [upstreamSaveFieldErrors, setUpstreamSaveFieldErrors] = useState<UpstreamFormError[]>([]);
+  const upstreamSaveRawErrorRef = useRef('');
+  const clearUpstreamSaveError = useCallback((field?: string): void => {
+    setUpstreamSaveError('');
+    upstreamSaveRawErrorRef.current = '';
+    setUpstreamSaveFieldErrors((previous) => {
+      if (!field) return [];
+      return previous.filter((item) => !isSameUpstreamField(item.field, field));
+    });
+  }, []);
   const [upstreamLoaded, setUpstreamLoaded] = useState(false);
   const [upstreamView, setUpstreamView] = useState(initialView);
   const [upFilter, setUpFilter] = useState(initialFilter);
@@ -153,10 +169,10 @@ export function useUpstreamModule({
       setUpFilter(snapshot?.upFilter || DEFAULT_UP_FILTER);
       setUpstreamView(snapshot?.upstreamView || DEFAULT_UP_VIEW);
       setUpRoute(snapshot?.upRoute || (MODULE_META.upstream.defaultRoute as UpstreamRoute));
-      setUpstreamSaveError('');
+      clearUpstreamSaveError();
       scrollMainToTop();
     },
-    [setQuery, setUpRoute],
+    [clearUpstreamSaveError, setQuery, setUpRoute],
   );
 
   const loadUpstreamData = useCallback(async (): Promise<void> => {
@@ -228,7 +244,7 @@ export function useUpstreamModule({
     onFallback: () => {
       setQuery('');
       setUpFilter(DEFAULT_UP_FILTER);
-      setUpstreamSaveError('');
+      clearUpstreamSaveError();
       setUpRoute(getModuleListRoute('upstream') as UpstreamRoute);
       scrollMainToTop();
     },
@@ -239,38 +255,38 @@ export function useUpstreamModule({
     setQuery('');
     setUpstreamView(DEFAULT_UP_VIEW);
     setUpFilter(DEFAULT_UP_FILTER);
-    setUpstreamSaveError('');
+    clearUpstreamSaveError();
     setUpRoute(getModuleListRoute('upstream') as UpstreamRoute);
-  }, [setQuery, setUpRoute]);
+  }, [clearUpstreamSaveError, setQuery, setUpRoute]);
 
   const upGoList = useCallback((): void => {
     clearModuleNavigationState('upstream');
-    setUpstreamSaveError('');
+    clearUpstreamSaveError();
     setUpRoute(getModuleListRoute('upstream') as UpstreamRoute);
     scrollMainToTop();
-  }, [setUpRoute]);
+  }, [clearUpstreamSaveError, setUpRoute]);
 
   const upGoDetail = useCallback(
     (systemId: string): void => {
-      setUpstreamSaveError('');
+      clearUpstreamSaveError();
       setUpRoute(getModuleDetailRoute('upstream', systemId) as UpstreamRoute);
       scrollMainToTop();
     },
-    [setUpRoute],
+    [clearUpstreamSaveError, setUpRoute],
   );
 
   const upGoEdit = useCallback(
     (systemId: string): void => {
-      setUpstreamSaveError('');
+      clearUpstreamSaveError();
       setUpRoute(getModuleEditRoute('upstream', systemId) as UpstreamRoute);
       scrollMainToTop();
     },
-    [setUpRoute],
+    [clearUpstreamSaveError, setUpRoute],
   );
 
   const upOpen = (systemId: string): void => {
     pushModuleNavigationState('upstream', buildNavigationSnapshot());
-    setUpstreamSaveError('');
+    clearUpstreamSaveError();
     setUpRoute(getModuleDetailRoute('upstream', systemId) as UpstreamRoute);
     scrollMainToTop();
   };
@@ -281,7 +297,7 @@ export function useUpstreamModule({
       setLoginOpen(true);
       return false;
     }
-    setUpstreamSaveError('');
+    clearUpstreamSaveError();
     try {
       await saveUpstreamSystem(system, oldId);
       await loadUpstreamData();
@@ -292,7 +308,13 @@ export function useUpstreamModule({
       return true;
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return false;
-      setUpstreamSaveError(getErrorMessage(error, '保存上游系统失败。'));
+      const normalizedError = normalizeUpstreamApiError(error);
+      upstreamSaveRawErrorRef.current = normalizedError.rawMessage;
+      setUpstreamSaveError(normalizedError.message);
+      setUpstreamSaveFieldErrors(normalizedError.fieldErrors);
+      toast.error(normalizedError.fieldErrors.length
+        ? `保存失败，还有 ${normalizedError.fieldErrors.length} 项需要修改`
+        : normalizedError.message);
       return false;
     }
   };
@@ -306,7 +328,7 @@ export function useUpstreamModule({
         clearModuleNavigationState('upstream');
         setQuery('');
         setUpFilter(DEFAULT_UP_FILTER);
-        setUpstreamSaveError('');
+        clearUpstreamSaveError();
         setUpRoute(getModuleListRoute('upstream') as UpstreamRoute);
         scrollMainToTop();
       },
@@ -372,7 +394,8 @@ export function useUpstreamModule({
     upstreamDetailLoading,
     upstreamError,
     upstreamSaveError,
-    setUpstreamSaveError,
+    upstreamSaveFieldErrors,
+    clearUpstreamSaveError,
     upstreamLoaded,
     upstreamView,
     setUpstreamView,
