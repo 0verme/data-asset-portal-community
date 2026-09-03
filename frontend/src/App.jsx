@@ -15,7 +15,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { getMenus, MENUS_CHANGED_EVENT } from "./api/menus.ts";
-import { isDbAuthMode } from "./auth.js";
+import { isDbAuthMode } from "./auth.ts";
 import { AuthBar, AuthContext, LoginModal } from "./components/AuthControls.jsx";
 import { AppShell } from "./components/app/AppShell.jsx";
 import { ModuleContent } from "./components/app/ModuleContent.jsx";
@@ -32,22 +32,22 @@ import {
   DEFAULT_SYSTEM_ROUTE,
   DEFAULT_UP_ROUTE,
 } from "./config/defaults.ts";
-import { useAssetModule } from "./hooks/useAssetModule.js";
-import { useApiAssetModule } from "./hooks/useApiAssetModule.js";
-import { useAuthSession } from "./hooks/useAuthSession.js";
-import { useIndicatorModule } from "./hooks/useIndicatorModule.js";
-import { useManualCodeTableModule } from "./hooks/useManualCodeTableModule.js";
-import { usePushModule } from "./hooks/usePushModule.js";
-import { useReportModule } from "./hooks/useReportModule.js";
-import { useRootModule } from "./hooks/useRootModule.js";
-import { useStatusOptions } from "./hooks/useStatusOptions.js";
-import { useTheme } from "./hooks/useTheme.js";
-import { useUpstreamModule } from "./hooks/useUpstreamModule.js";
-import { loadCapabilities } from "./capabilities/capabilities.js";
-import { loadNavigationMenus } from "./routing/navigationMenus.js";
-import { splitNavigationMenus } from "./routing/navigationMenuGrouping.js";
-import { useLocationSynchronization } from "./hooks/useLocationSynchronization.js";
-import { useNavigationController } from "./hooks/useNavigationController.js";
+import { useAssetModule } from "./hooks/useAssetModule.ts";
+import { useApiAssetModule } from "./hooks/useApiAssetModule.ts";
+import { useAuthSession } from "./hooks/useAuthSession.ts";
+import { useIndicatorModule } from "./hooks/useIndicatorModule.ts";
+import { useManualCodeTableModule } from "./hooks/useManualCodeTableModule.ts";
+import { usePushModule } from "./hooks/usePushModule.ts";
+import { useReportModule } from "./hooks/useReportModule.ts";
+import { useRootModule } from "./hooks/useRootModule.ts";
+import { useStatusOptions } from "./hooks/useStatusOptions.ts";
+import { useTheme } from "./hooks/useTheme.ts";
+import { useUpstreamModule } from "./hooks/useUpstreamModule.ts";
+import { loadCapabilities } from "./capabilities/capabilities.ts";
+import { loadNavigationMenus } from "./routing/navigationMenus.ts";
+import { splitNavigationMenus } from "./routing/navigationMenuGrouping.ts";
+import { useLocationSynchronization } from "./hooks/useLocationSynchronization.ts";
+import { useNavigationController } from "./hooks/useNavigationController.ts";
 import { scrollMainToTop } from "./utils/ui.ts";
 
 export default function App() {

@@ -14,8 +14,8 @@
 
 import { Icon } from "../ui.jsx";
 import { FormModal } from "../common/index.js";
-import { useRoleModule } from "../../hooks/useRoleModule.js";
-import { useSystemModule } from "../../hooks/useSystemModule.js";
+import { useRoleModule } from "../../hooks/useRoleModule.ts";
+import { useSystemModule } from "../../hooks/useSystemModule.ts";
 import { UserForm } from "./UserForm.jsx";
 import { ParamForm } from "./ParamForm.jsx";
 import { MenuForm } from "./MenuForm.jsx";

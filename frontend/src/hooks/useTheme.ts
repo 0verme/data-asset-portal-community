@@ -12,19 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useEffect, useState } from "react";
-import { getInitialTheme, THEME_STORAGE_KEY } from "../utils/ui.ts";
+import { useEffect, useState } from 'react';
+import { getInitialTheme, THEME_STORAGE_KEY, type ThemeMode } from '../utils/ui.ts';
 
-export function useTheme() {
-  const [theme, setTheme] = useState(getInitialTheme);
+export interface UseThemeResult {
+  theme: ThemeMode;
+  toggleTheme: () => void;
+}
+
+export function useTheme(): UseThemeResult {
+  const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset['theme'] = theme;
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  const toggleTheme = (): void => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
   return { theme, toggleTheme };

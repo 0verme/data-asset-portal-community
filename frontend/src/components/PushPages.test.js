@@ -15,7 +15,7 @@ import { formatFreq, validateJob, validateSystem } from "./push/pushUtils.js";
 
 const defaultsPath = fileURLToPath(new URL("../config/defaults.ts", import.meta.url));
 const commonCodesPath = fileURLToPath(new URL("../data/commonCodes.ts", import.meta.url));
-const pushHookPath = fileURLToPath(new URL("../hooks/usePushModule.js", import.meta.url));
+const pushHookPath = fileURLToPath(new URL("../hooks/usePushModule.ts", import.meta.url));
 const locationPath = fileURLToPath(new URL("../routing/location.ts", import.meta.url));
 const pagePath = fileURLToPath(new URL("./PushPages.jsx", import.meta.url));
 const pushSidebarPath = fileURLToPath(new URL("./sidebar/PushSidebar.jsx", import.meta.url));

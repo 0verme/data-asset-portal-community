@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getPortalPushNavigation } from "./portalNavigation.js";
-import { splitNavigationMenus } from "./navigationMenuGrouping.js";
+import { getPortalPushNavigation } from "./portalNavigation.ts";
+import { splitNavigationMenus } from "./navigationMenuGrouping.ts";
 
 test("desktop navigation groups menus by configured placement", () => {
   const menus = [

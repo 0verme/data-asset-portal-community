@@ -14,7 +14,7 @@
 
 import React from "react";
 
-import { AUTH_MODE, getAuthModeLabel, getMockHint } from "../auth.js";
+import { AUTH_MODE, getAuthModeLabel, getMockHint } from "../auth.ts";
 import { Icon, initial } from "./ui.jsx";
 
 function getSafeDisplayName(auth) {

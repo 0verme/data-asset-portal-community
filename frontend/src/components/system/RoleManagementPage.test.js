@@ -9,7 +9,7 @@ const readSource = (name) => readFile(`${here}/${name}`, "utf8");
 test("role management consumes role and permission APIs", async () => {
   const [api, hook, page] = await Promise.all([
     readFile(`${here}/../../api/systemRoles.ts`, "utf8"),
-    readFile(`${here}/../../hooks/useRoleModule.js`, "utf8"),
+    readFile(`${here}/../../hooks/useRoleModule.ts`, "utf8"),
     readFile(`${here}/RoleManagementPage.jsx`, "utf8"),
   ]);
   assert.match(api, /\/system\/roles/);
@@ -47,7 +47,7 @@ test("custom role rows expose a confirmed delete action while builtin rows do no
 
 test("role deletion refreshes state, reports success, and preserves backend errors", async () => {
   const [hook, systemPage] = await Promise.all([
-    readFile(`${here}/../../hooks/useRoleModule.js`, "utf8"),
+    readFile(`${here}/../../hooks/useRoleModule.ts`, "utf8"),
     readFile(`${here}/SystemManagementPage.jsx`, "utf8"),
   ]);
   assert.match(hook, /setDeletingRoleCode/);

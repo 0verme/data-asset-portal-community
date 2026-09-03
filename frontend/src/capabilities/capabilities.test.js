@@ -6,8 +6,8 @@ import {
   buildMockCapabilities,
   buildSafeFallbackCapabilities,
   modulesFromPayload,
-} from "./capabilities.js";
-import { listModuleCodes } from "../modules/moduleRegistry.js";
+} from "./capabilities.ts";
+import { listModuleCodes } from "../modules/moduleRegistry.ts";
 
 test("remote payload cannot hide repository modules", () => {
   const result = modulesFromPayload({

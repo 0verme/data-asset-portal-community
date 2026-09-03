@@ -13,9 +13,9 @@ const readSource = (relativePath) => readFile(sourcePath(relativePath), "utf8");
 const optionRuntimeSources = [
   "../components/report/ReportEditor.jsx",
   "../components/sidebar/ReportSidebar.jsx",
-  "../hooks/useStatusOptions.js",
-  "../hooks/usePushModule.js",
-  "../hooks/useUpstreamModule.js",
+  "../hooks/useStatusOptions.ts",
+  "../hooks/usePushModule.ts",
+  "../hooks/useUpstreamModule.ts",
 ];
 
 test("the retired common-code client and hook are removed", () => {

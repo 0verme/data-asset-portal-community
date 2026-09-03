@@ -18,7 +18,15 @@ import { LONG_REQUEST_TIMEOUT } from '../config/request.ts';
 import { PUSH_SYSTEMS, type PushSystemItem, type PushJobItem } from '../data/pushSystems.ts';
 
 function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  try {
+    return structuredClone(value);
+  } catch {
+    try {
+      return JSON.parse(JSON.stringify(value)) as T;
+    } catch {
+      return value;
+    }
+  }
 }
 
 const API_MODE = (
@@ -64,6 +72,8 @@ export interface PublicPushJob {
   freqType: string;
   enabled: boolean;
   desc: string;
+  delimiter?: string | undefined;
+  encoding?: string | undefined;
 }
 
 export interface PublicPushSystem {
@@ -73,6 +83,7 @@ export interface PublicPushSystem {
   abbr: string;
   desc: string;
   protocol: string;
+  auth?: string | undefined;
   dept: string;
   status: string;
   importanceLevel: string;
