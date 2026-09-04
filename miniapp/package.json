@@ -38,6 +38,27 @@
     "tsx": "^4.20.6",
     "typescript": "^6.0.3"
   },
+  "overrides": {
+    "@tarojs/cli": {
+      "adm-zip": "0.6.0",
+      "glob": "10.5.0"
+    },
+    "@tarojs/components": {
+      "swiper": "12.1.2"
+    },
+    "@tarojs/helper": {
+      "esbuild": "0.25.0"
+    },
+    "@tarojs/webpack5-runner": {
+      "esbuild": "0.25.0",
+      "miniprogram-simulate": {
+        "less": "4.9.0",
+        "postcss": "8.5.28"
+      },
+      "serialize-javascript": "7.0.5"
+    },
+    "qs": "6.16.0"
+  },
   "engines": {
     "node": ">=18"
   }
