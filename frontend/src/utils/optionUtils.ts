@@ -6,6 +6,7 @@ export interface DictOption {
   value: string;
   name: string;
   legacy?: boolean;
+  [key: string]: unknown;
 }
 
 export interface RawOptionItem {

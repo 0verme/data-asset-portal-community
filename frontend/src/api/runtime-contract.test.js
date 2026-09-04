@@ -11,8 +11,8 @@ const sourcePath = (relativePath) => fileURLToPath(new URL(relativePath, import.
 const readSource = (relativePath) => readFile(sourcePath(relativePath), "utf8");
 
 const optionRuntimeSources = [
-  "../components/report/ReportEditor.jsx",
-  "../components/sidebar/ReportSidebar.jsx",
+  "../components/report/ReportEditor.tsx",
+  "../components/sidebar/ReportSidebar.tsx",
   "../hooks/useStatusOptions.ts",
   "../hooks/usePushModule.ts",
   "../hooks/useUpstreamModule.ts",

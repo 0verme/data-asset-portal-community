@@ -42,7 +42,7 @@ import {
   DEFAULT_ENCODING_OPTIONS,
   DEFAULT_FREQ_TYPE_OPTIONS,
   DEFAULT_PROTOCOL_OPTIONS,
-} from '../components/push/pushConstants.js';
+} from '../components/push/pushConstants.ts';
 import { UPSTREAM_DEPT_OPTIONS } from '../data/commonCodes.ts';
 import { normalizeDictOptions, type DictOption } from '../utils/optionUtils.ts';
 import { comparePushSystemImportance } from '../utils/push.ts';
@@ -100,8 +100,8 @@ export interface UsePushModuleResult {
   pushGoList: () => void;
   pushGoSystem: (systemId: string) => void;
   pushGoJob: (systemId: string, jobId: string) => void;
-  pushGoSystemEdit: (systemId: string) => void;
-  pushGoJobEdit: (systemId: string, jobId: string) => void;
+  pushGoSystemEdit: (systemId: string | null) => void;
+  pushGoJobEdit: (systemId: string, jobId: string | null) => void;
   resetPushNavigation: () => void;
   pushOpenSystem: (systemId: string) => void;
   pushOpenJob: (systemId: string, jobId: string) => void;
@@ -256,7 +256,7 @@ export function usePushModule({
   );
 
   const pushGoSystemEdit = useCallback(
-    (systemId: string): void => {
+    (systemId: string | null): void => {
       setPushRoute(getPushSystemEditRoute(systemId) as PushRoute);
       scrollMainToTop();
     },
@@ -264,7 +264,7 @@ export function usePushModule({
   );
 
   const pushGoJobEdit = useCallback(
-    (systemId: string, jobId: string): void => {
+    (systemId: string, jobId: string | null): void => {
       setPushRoute(getPushInterfaceEditRoute(systemId, jobId) as PushRoute);
       scrollMainToTop();
     },

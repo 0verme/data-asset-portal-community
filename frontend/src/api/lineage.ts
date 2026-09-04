@@ -35,6 +35,7 @@ export interface LineageEdge {
   confidence: string;
   generatedAt: string;
   diagnostics: unknown[];
+  viaJobs?: string[] | undefined;
 }
 
 const nodeSpecs: ReadonlyArray<[string, string, string, string, string]> = [

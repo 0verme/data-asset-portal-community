@@ -10,7 +10,7 @@ test("role management consumes role and permission APIs", async () => {
   const [api, hook, page] = await Promise.all([
     readFile(`${here}/../../api/systemRoles.ts`, "utf8"),
     readFile(`${here}/../../hooks/useRoleModule.ts`, "utf8"),
-    readFile(`${here}/RoleManagementPage.jsx`, "utf8"),
+    readFile(`${here}/RoleManagementPage.tsx`, "utf8"),
   ]);
   assert.match(api, /\/system\/roles/);
   assert.match(api, /\/system\/permissions/);
@@ -28,27 +28,30 @@ test("role management consumes role and permission APIs", async () => {
 });
 
 test("role form hides public permissions and explains inherited read access", async () => {
-  const source = await readSource("RoleManagementPage.jsx");
+  const source = await readSource("RoleManagementPage.tsx");
   assert.match(source, /isPublicPermission/);
   assert.match(source, /已选 \$\{selected\.size\} 项/);
   assert.match(source, /公共只读权限已默认开放/);
 });
 
 test("custom role rows expose a confirmed delete action while builtin rows do not", async () => {
-  const page = await readSource("RoleManagementPage.jsx");
+  const page = await readSource("RoleManagementPage.tsx");
   assert.match(page, /function requestRoleDeletion/);
   assert.match(page, /title: "删除角色"/);
   assert.match(page, /仍绑定用户的角色必须先解除用户关联/);
-  assert.match(page, /extraActions=\{canEdit && !role\.builtin && onDelete/);
+  assert.match(page, /extraActions=\{\s*canEdit && !role\.builtin\s*\?/);
   assert.match(page, /label: "删除"/);
-  assert.match(page, /onClick: \(\) => requestRoleDeletion\(role, onDelete\)/);
+  assert.match(
+    page,
+    /onClick:\s*\(\)\s*=>\s*requestRoleDeletion\(role, onDelete\)/,
+  );
   assert.match(page, /confirmKeyword: role\.roleCode/);
 });
 
 test("role deletion refreshes state, reports success, and preserves backend errors", async () => {
   const [hook, systemPage] = await Promise.all([
     readFile(`${here}/../../hooks/useRoleModule.ts`, "utf8"),
-    readFile(`${here}/SystemManagementPage.jsx`, "utf8"),
+    readFile(`${here}/SystemManagementPage.tsx`, "utf8"),
   ]);
   assert.match(hook, /setDeletingRoleCode/);
   assert.match(hook, /setRoles\(\(current\) => current\.filter/);
@@ -67,8 +70,8 @@ test("role route is addressable without changing the public module registry", as
 });
 
 test("user form exposes custom roles while preserving builtin fallback", async () => {
-  const source = await readSource("UserForm.jsx");
-  assert.match(source, /roleOptions = roles\.length/);
+  const source = await readSource("UserForm.tsx");
+  assert.match(source, /roleOptions[^=]*= roles\.length/);
   assert.match(source, /role\.roleCode/);
   assert.match(source, /role\.enabled !== "disabled"/);
 });

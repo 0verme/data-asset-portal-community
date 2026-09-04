@@ -3,10 +3,18 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const apiAssetViewPath = fileURLToPath(new URL("./ApiAssetView.jsx", import.meta.url));
-const indicatorEditorPath = fileURLToPath(new URL("../IndicatorEditor.jsx", import.meta.url));
-const apiClientPath = fileURLToPath(new URL("../../api/apiAssets.ts", import.meta.url));
-const assetReferenceSelectorPath = fileURLToPath(new URL("../common/AssetReferenceSelector.tsx", import.meta.url));
+const apiAssetViewPath = fileURLToPath(
+  new URL("./ApiAssetView.tsx", import.meta.url),
+);
+const indicatorEditorPath = fileURLToPath(
+  new URL("../IndicatorEditor.tsx", import.meta.url),
+);
+const apiClientPath = fileURLToPath(
+  new URL("../../api/apiAssets.ts", import.meta.url),
+);
+const assetReferenceSelectorPath = fileURLToPath(
+  new URL("../common/AssetReferenceSelector.tsx", import.meta.url),
+);
 
 test("API asset editor reuses the binary status toggle for create and edit", async () => {
   const [apiAssetView, indicatorEditor] = await Promise.all([
@@ -14,10 +22,26 @@ test("API asset editor reuses the binary status toggle for create and edit", asy
     readFile(indicatorEditorPath, "utf8"),
   ]);
 
-  assert.match(apiAssetView, /import \{[^}]*BinaryStatusToggle[^}]*\} from "\.\.\/common\/index\.ts"/);
-  assert.match(apiAssetView, /<BinaryStatusToggle mode="status" name="status" value=\{form\.status\} onChange=\{\(value\) => set\("status", value\)\} \/>/);
-  assert.doesNotMatch(apiAssetView, /<select className="sel" value=\{form\.status\}/);
-  assert.match(indicatorEditor, /<BinaryStatusToggle mode="status" value=\{form\.status\}/);
+  assert.match(
+    apiAssetView,
+    /import \{[^}]*BinaryStatusToggle[^}]*\} from "\.\.\/common\/index\.ts"/,
+  );
+  assert.match(
+    apiAssetView,
+    /<BinaryStatusToggle\s+mode="status"\s+name="status"\s+value=\{form\.status\}/,
+  );
+  assert.match(
+    apiAssetView,
+    /onChange=\{\s*\(value\)\s*=>\s*set\(\s*"status",\s*typeof value === "boolean"/,
+  );
+  assert.doesNotMatch(
+    apiAssetView,
+    /<select className="sel" value=\{form\.status\}/,
+  );
+  assert.match(
+    indicatorEditor,
+    /<BinaryStatusToggle\s+mode="status"\s+value=\{form\.status\}/,
+  );
 });
 
 test("API asset create and edit keep enabled/disabled payload values", async () => {
@@ -27,17 +51,29 @@ test("API asset create and edit keep enabled/disabled payload values", async () 
   ]);
 
   assert.match(apiAssetView, /status: "enabled"/);
-  assert.match(apiAssetView, /const submit = \(\) => onSave\(\{ \.\.\.form,/);
+  assert.match(
+    apiAssetView,
+    /const submit = \(\): void => \{\s*onSave\(\{\s*\.\.\.form,/,
+  );
   assert.match(apiClient, /body:\s*payload/);
   assert.match(apiClient, /body:\s*\{\s*status\s*\}/);
 });
 
 test("related asset pickers expose stable search accessible names", async () => {
-  const assetReferenceSelector = await readFile(assetReferenceSelectorPath, "utf8");
+  const assetReferenceSelector = await readFile(
+    assetReferenceSelectorPath,
+    "utf8",
+  );
 
   assert.match(assetReferenceSelector, /aria-label=\{`搜索\$\{title\}`\}/);
   assert.match(assetReferenceSelector, /<Picker title="关联表"/);
   assert.match(assetReferenceSelector, /<Picker title="关联指标"/);
-  assert.match(assetReferenceSelector, /const locked = disabled \|\| readonly;/);
-  assert.match(assetReferenceSelector, /<input value=\{search\} disabled=\{disabled\}/);
+  assert.match(
+    assetReferenceSelector,
+    /const locked = disabled \|\| readonly;/,
+  );
+  assert.match(
+    assetReferenceSelector,
+    /<input value=\{search\} disabled=\{disabled\}/,
+  );
 });

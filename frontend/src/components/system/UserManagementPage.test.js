@@ -3,11 +3,13 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-import { USER_STATUS_META } from "./constants.js";
+import { USER_STATUS_META } from "./constants.ts";
 import { SYSTEM_USERS } from "../../data/systemUsers.ts";
 import { PARAM_DICT_ITEMS } from "../../data/paramDicts.ts";
 
-const pagePath = fileURLToPath(new URL("./UserManagementPage.jsx", import.meta.url));
+const pagePath = fileURLToPath(
+  new URL("./UserManagementPage.tsx", import.meta.url),
+);
 
 test("user management actions exclude lock and use binary status labels", async () => {
   const source = await readFile(pagePath, "utf8");
@@ -29,7 +31,18 @@ test("password reset uses a non-danger confirmation without exposing a password"
 });
 
 test("user status metadata is binary", () => {
-  assert.deepEqual(Object.keys(USER_STATUS_META).sort(), ["disabled", "enabled"]);
-  assert.equal(SYSTEM_USERS.some((user) => user.status === "locked"), false);
-  assert.equal(PARAM_DICT_ITEMS.some((item) => item.categoryCode === "USER_STATUS" && item.value === "locked"), false);
+  assert.deepEqual(Object.keys(USER_STATUS_META).sort(), [
+    "disabled",
+    "enabled",
+  ]);
+  assert.equal(
+    SYSTEM_USERS.some((user) => user.status === "locked"),
+    false,
+  );
+  assert.equal(
+    PARAM_DICT_ITEMS.some(
+      (item) => item.categoryCode === "USER_STATUS" && item.value === "locked",
+    ),
+    false,
+  );
 });

@@ -1,22 +1,22 @@
 import React from "react";
 
-import { SearchPortalPage } from "../SearchPortalPage.jsx";
+import { SearchPortalPage } from "../SearchPortalPage.tsx";
 
 function lazyNamed(loader, exportName) {
   return React.lazy(() => loader().then((module) => ({ default: module[exportName] })));
 }
 
-const AssetView = lazyNamed(() => import("../views/AssetView.jsx"), "AssetView");
-const ApiAssetView = lazyNamed(() => import("../views/ApiAssetView.jsx"), "ApiAssetView");
-const IndicatorView = lazyNamed(() => import("../views/IndicatorView.jsx"), "IndicatorView");
-const PushView = lazyNamed(() => import("../views/PushView.jsx"), "PushView");
-const ReportView = lazyNamed(() => import("../views/ReportView.jsx"), "ReportView");
-const RootView = lazyNamed(() => import("../views/RootView.jsx"), "RootView");
-const SystemView = lazyNamed(() => import("../views/SystemView.jsx"), "SystemView");
-const UpstreamView = lazyNamed(() => import("../views/UpstreamView.jsx"), "UpstreamView");
-const FieldMappingPage = lazyNamed(() => import("../FieldMappingPage.jsx"), "FieldMappingPage");
-const LineagePage = lazyNamed(() => import("../LineagePage.jsx"), "LineagePage");
-const ManualCodeTablePage = lazyNamed(() => import("../ManualCodeTablePage.jsx"), "ManualCodeTablePage");
+const AssetView = lazyNamed(() => import("../views/AssetView.tsx"), "AssetView");
+const ApiAssetView = lazyNamed(() => import("../views/ApiAssetView.tsx"), "ApiAssetView");
+const IndicatorView = lazyNamed(() => import("../views/IndicatorView.tsx"), "IndicatorView");
+const PushView = lazyNamed(() => import("../views/PushView.tsx"), "PushView");
+const ReportView = lazyNamed(() => import("../views/ReportView.tsx"), "ReportView");
+const RootView = lazyNamed(() => import("../views/RootView.tsx"), "RootView");
+const SystemView = lazyNamed(() => import("../views/SystemView.tsx"), "SystemView");
+const UpstreamView = lazyNamed(() => import("../views/UpstreamView.tsx"), "UpstreamView");
+const FieldMappingPage = lazyNamed(() => import("../FieldMappingPage.tsx"), "FieldMappingPage");
+const LineagePage = lazyNamed(() => import("../LineagePage.tsx"), "LineagePage");
+const ManualCodeTablePage = lazyNamed(() => import("../ManualCodeTablePage.tsx"), "ManualCodeTablePage");
 
 /** Module code → lazy page renderer (registry-driven dispatch). */
 function canAccess(context, permission) {

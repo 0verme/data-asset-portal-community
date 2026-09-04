@@ -8,8 +8,8 @@ test("asset home uses paged summaries while detail fields load on navigation", a
   const [api, hook, home, view] = await Promise.all([
     read("./api/assets.ts"),
     read("./hooks/useAssetModule.ts"),
-    read("./components/HomePage.jsx"),
-    read("./components/views/AssetView.jsx"),
+    read("./components/HomePage.tsx"),
+    read("./components/views/AssetView.tsx"),
   ]);
 
   assert.match(api, /summary: true/);

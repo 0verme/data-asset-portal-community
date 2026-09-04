@@ -10,7 +10,7 @@ import {
   isLinkedRoute,
   isTransformRule,
   sortMarker,
-} from "./fieldMappingUtils.js";
+} from "./fieldMappingUtils.ts";
 
 test("field mapping rules identify only known transformations", () => {
   assert.equal(isTransformRule("直接映射"), false);

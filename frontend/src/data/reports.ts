@@ -6,6 +6,7 @@ export interface RelatedTableSummary {
   tableCn?: string | undefined;
   domain?: string | undefined;
   layer?: string | undefined;
+  [key: string]: unknown;
 }
 
 export interface RelatedIndicatorSummary {
@@ -13,6 +14,7 @@ export interface RelatedIndicatorSummary {
   indicatorName?: string | undefined;
   dimension?: string | undefined;
   path?: string | undefined;
+  [key: string]: unknown;
 }
 
 export interface MockReportItem {
@@ -27,6 +29,11 @@ export interface MockReportItem {
   dateCaliberOther: string;
   dataTimeliness: string;
   dataTimelinessCustom: string;
+  statCaliber?: string | undefined;
+  dataDelay?: string | undefined;
+  businessScopeTags?: string | undefined;
+  legacyFreq?: string | undefined;
+  legacyTimeCaliber?: string | undefined;
   status: string;
   effectiveDate: string;
   expireDate: string;
@@ -44,6 +51,7 @@ export interface MockReportItem {
   remark: string;
   updatedBy: string;
   updatedAt: string;
+  [key: string]: unknown;
 }
 
 const SPECS: ReadonlyArray<

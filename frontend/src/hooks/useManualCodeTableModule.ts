@@ -26,6 +26,7 @@ export const MANUAL_CODE_TABLE_STYLES: readonly ManualCodeTableStyleOption[] = [
 export interface StatusMetaItem {
   label: string;
   className: string;
+  [key: string]: unknown;
 }
 
 export const MANUAL_CODE_TABLE_STATUS_META: Readonly<Record<string, StatusMetaItem>> = Object.freeze({

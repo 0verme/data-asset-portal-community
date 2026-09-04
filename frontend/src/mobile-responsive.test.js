@@ -35,18 +35,18 @@ test("mobile navigation exposes accessible state and focus targets", () => {
 
 test("core list tables opt into mobile cards with field labels", () => {
   const listFiles = [
-    "./components/HomePage.jsx",
-    "./components/IndicatorPage.jsx",
-    "./components/report/ReportList.jsx",
-    "./components/RootPages.jsx",
-    "./components/upstream/UpstreamList.jsx",
-    "./components/push/PushSystemList.jsx",
-    "./components/push/PushJobList.jsx",
-    "./components/OperationLog/OperationLogTable.jsx",
-    "./components/system/UserManagementPage.jsx",
-    "./components/system/MenuManagementPage.jsx",
-    "./components/system/ParamDictPage.jsx",
-    "./components/views/ApiAssetView.jsx",
+    "./components/HomePage.tsx",
+    "./components/IndicatorPage.tsx",
+    "./components/report/ReportList.tsx",
+    "./components/RootPages.tsx",
+    "./components/upstream/UpstreamList.tsx",
+    "./components/push/PushSystemList.tsx",
+    "./components/push/PushJobList.tsx",
+    "./components/OperationLog/OperationLogTable.tsx",
+    "./components/system/UserManagementPage.tsx",
+    "./components/system/MenuManagementPage.tsx",
+    "./components/system/ParamDictPage.tsx",
+    "./components/views/ApiAssetView.tsx",
   ];
 
   listFiles.forEach((file) => {
@@ -57,11 +57,11 @@ test("core list tables opt into mobile cards with field labels", () => {
 });
 
 test("comparison and editor tables keep dedicated mobile strategies", () => {
-  assert.match(read("./components/FieldMappingPage.jsx"), /className="fm-table"/);
-  assert.doesNotMatch(read("./components/FieldMappingPage.jsx"), /mobile-card-table/);
-  assert.match(read("./components/views/ApiAssetView.jsx"), /mobile-edit-table/);
-  assert.match(read("./components/TableEditor.jsx"), /fields-edit mobile-edit-table/);
-  assert.match(read("./components/push/JobEditor.jsx"), /fields-edit mobile-edit-table/);
+  assert.match(read("./components/FieldMappingPage.tsx"), /className="fm-table"/);
+  assert.doesNotMatch(read("./components/FieldMappingPage.tsx"), /mobile-card-table/);
+  assert.match(read("./components/views/ApiAssetView.tsx"), /mobile-edit-table/);
+  assert.match(read("./components/TableEditor.tsx"), /fields-edit mobile-edit-table/);
+  assert.match(read("./components/push/JobEditor.tsx"), /fields-edit mobile-edit-table/);
   assert.match(styles, /\.fm-table-wrap::after/);
   assert.match(styles, /table\.mobile-edit-table/);
 });

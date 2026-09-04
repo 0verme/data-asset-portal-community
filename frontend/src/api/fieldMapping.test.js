@@ -5,7 +5,7 @@ import {
   filterFieldMappingRows,
   getFieldMappingSourceSystems,
 } from "./fieldMapping.ts";
-import { formatSystemLabel } from "../components/fieldMapping/fieldMappingUtils.js";
+import { formatSystemLabel } from "../components/fieldMapping/fieldMappingUtils.ts";
 
 test("same-name mock systems are filtered by stable source system id", () => {
   const rows = [

@@ -9,7 +9,7 @@ const read = (relativePath) => readFile(`${src}/${relativePath}`, "utf8");
 test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog access", async () => {
   const [app, search, moduleContent] = await Promise.all([
     read("App.jsx"),
-    read("components/SearchPortalPage.jsx"),
+    read("components/SearchPortalPage.tsx"),
     read("components/app/ModuleContent.jsx"),
   ]);
 
@@ -23,23 +23,24 @@ test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog acce
 
 test("anonymous UI exposes catalog actions only and keeps write controls permission-gated", async () => {
   const sources = await Promise.all([
-    read("components/views/AssetView.jsx"),
-    read("components/IndicatorPage.jsx"),
-    read("components/report/ReportList.jsx"),
-    read("components/views/ApiAssetView.jsx"),
-    read("components/views/UpstreamView.jsx"),
-    read("components/views/PushView.jsx"),
-    read("components/RootPages.jsx"),
+    read("components/views/AssetView.tsx"),
+    read("components/IndicatorPage.tsx"),
+    read("components/report/ReportList.tsx"),
+    read("components/views/ApiAssetView.tsx"),
+    read("components/views/UpstreamView.tsx"),
+    read("components/views/PushView.tsx"),
+    read("components/RootPages.tsx"),
   ]);
 
   for (const source of sources) assert.match(source, /canEdit/);
-  assert.match(sources[0], /canEdit \? <button/);
-  assert.match(sources[1], /canEdit \? <button/);
-  assert.match(sources[2], /canEdit \? <button/);
-  assert.match(sources[3], /canEdit \? <button/);
-  assert.match(sources[4], /onNew=\{canEdit \?/);
-  assert.match(sources[5], /canEdit \? <button/);
-  assert.match(sources[6], /canEdit \? <button/);
+  const gatedButton = /canEdit\s*\?\s*\(?\s*<button/;
+  assert.match(sources[0], gatedButton);
+  assert.match(sources[1], gatedButton);
+  assert.match(sources[2], gatedButton);
+  assert.match(sources[3], gatedButton);
+  assert.match(sources[4], /onNew=\{\s*canEdit\s*\?/);
+  assert.match(sources[5], gatedButton);
+  assert.match(sources[6], gatedButton);
 });
 
 test("public push mock projection does not retain connection or contact fields", async () => {

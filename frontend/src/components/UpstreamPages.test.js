@@ -3,17 +3,32 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const upstreamListPath = fileURLToPath(new URL("./upstream/UpstreamList.jsx", import.meta.url));
-const upstreamDetailPath = fileURLToPath(new URL("./upstream/UpstreamDetail.jsx", import.meta.url));
-const upstreamEditorPath = fileURLToPath(new URL("./upstream/UpstreamEditor.jsx", import.meta.url));
-const upstreamFormErrorsPath = fileURLToPath(new URL("./upstream/upstreamFormErrors.ts", import.meta.url));
-const upstreamPartsPath = fileURLToPath(new URL("./upstream/UpstreamParts.jsx", import.meta.url));
-const upstreamStylesPath = fileURLToPath(new URL("../styles/upstream.css", import.meta.url));
+const upstreamListPath = fileURLToPath(
+  new URL("./upstream/UpstreamList.tsx", import.meta.url),
+);
+const upstreamDetailPath = fileURLToPath(
+  new URL("./upstream/UpstreamDetail.tsx", import.meta.url),
+);
+const upstreamEditorPath = fileURLToPath(
+  new URL("./upstream/UpstreamEditor.tsx", import.meta.url),
+);
+const upstreamFormErrorsPath = fileURLToPath(
+  new URL("./upstream/upstreamFormErrors.ts", import.meta.url),
+);
+const upstreamPartsPath = fileURLToPath(
+  new URL("./upstream/UpstreamParts.tsx", import.meta.url),
+);
+const upstreamStylesPath = fileURLToPath(
+  new URL("../styles/upstream.css", import.meta.url),
+);
 
 test("upstream list offers card and list modes through shared views", async () => {
   const source = await readFile(upstreamListPath, "utf8");
 
-  assert.match(source, /<ViewModeSwitcher value=\{view\} onChange=\{onChangeView\} modes=\{\["card", "list"\]\} \/>/);
+  assert.match(
+    source,
+    /<ViewModeSwitcher value=\{view\} onChange=\{onChangeView\} modes=\{\["card", "list"\](?: as const)?\} \/>/,
+  );
   assert.match(source, /view === "card" \? \(/);
   assert.match(source, /<CardGridView/);
 });
@@ -56,9 +71,15 @@ test("upstream detail renders one dynamic schedule stepper", async () => {
   ]);
 
   assert.match(detailSource, /每日自动执行 · \{unloadTimes\.length\} 次/);
-  assert.match(detailSource, /<ScheduleStepper times=\{unloadTimes\} muted=\{!enabled\} now=\{scheduleNow\} \/>/);
+  assert.match(
+    detailSource,
+    /<ScheduleStepper times=\{unloadTimes\} muted=\{!enabled\} now=\{scheduleNow\} \/>/,
+  );
   assert.match(detailSource, /暂无卸数计划/);
-  assert.doesNotMatch(detailSource, /ScheduleTimeline|time-chip|sched-hours|next-pill/);
+  assert.doesNotMatch(
+    detailSource,
+    /ScheduleTimeline|time-chip|sched-hours|next-pill/,
+  );
   assert.match(partsSource, /steps\.map\(\(step, index\) =>/);
   assert.match(partsSource, /schedule-step-\$\{step\.status\}/);
   assert.match(styles, /\.schedule-stepper-scroll[\s\S]*overflow-x: auto/);
@@ -75,13 +96,18 @@ test("upstream detail consumes the shared field contract without ambiguous conta
   assert.match(detailSource, /getUpstreamDetailMetadata/);
   assert.match(detailSource, /className="dh-meta upstream-detail-meta"/);
   assert.match(detailSource, /<StatusBadge status=\{status\} \/>/);
-  assert.match(detailSource, /displayUpstreamValue\(system\?\.desc\)/);
+  assert.match(detailSource, /displayUpstreamValue\(system(?:\?\.|\.)desc\)/);
   assert.doesNotMatch(detailSource, /system\.owner\}\s*\/\s*\$\{system\.dept/);
   assert.doesNotMatch(detailSource, /<DbBadge/);
 
-  ["id", "abbr", "name", "dbType", "owner", "dept", "status", "desc"].forEach((key) => {
-    assert.match(editorSource, new RegExp(`getUpstreamFieldLabel\\("${key}"\\)`));
-  });
+  ["id", "abbr", "name", "dbType", "owner", "dept", "status", "desc"].forEach(
+    (key) => {
+      assert.match(
+        editorSource,
+        new RegExp(`getUpstreamFieldLabel\\("${key}"\\)`),
+      );
+    },
+  );
 });
 
 test("upstream save failures use one summary, inline field errors, and first-error navigation", async () => {

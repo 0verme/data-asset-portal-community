@@ -5,8 +5,9 @@ import { confirmAction } from "./confirmService.tsx";
 import type { ConfirmOptions } from "./ConfirmDialog.tsx";
 
 export interface BreadcrumbItem {
-  label: string;
+  label?: string;
   onClick?: (() => void) | undefined;
+  [key: string]: unknown;
 }
 
 export interface BackLink {

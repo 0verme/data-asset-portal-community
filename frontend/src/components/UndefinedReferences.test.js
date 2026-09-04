@@ -10,10 +10,10 @@ const readSource = (relativePath) => readFile(sourcePath(relativePath), "utf8");
 test("rendered components import their referenced helpers", async () => {
   const [systemEditor, reportDetail, upstreamDetail, upstreamParts] =
     await Promise.all([
-      readSource("./push/SystemEditor.jsx"),
-      readSource("./report/ReportDetailDrawer.jsx"),
-      readSource("./upstream/UpstreamDetail.jsx"),
-      readSource("./upstream/UpstreamParts.jsx"),
+      readSource("./push/SystemEditor.tsx"),
+      readSource("./report/ReportDetailDrawer.tsx"),
+      readSource("./upstream/UpstreamDetail.tsx"),
+      readSource("./upstream/UpstreamParts.tsx"),
     ]);
 
   assert.match(
@@ -22,7 +22,7 @@ test("rendered components import their referenced helpers", async () => {
   );
   assert.match(
     systemEditor,
-    /DEFAULT_STATUS_OPTIONS,\s+SYSTEM_ID_RE,\s+\} from "\.\/pushConstants\.js";/,
+    /DEFAULT_STATUS_OPTIONS,\s+SYSTEM_ID_RE,\s+\} from "\.\/pushConstants\.(js|ts)";/,
   );
   assert.match(
     reportDetail,
@@ -30,15 +30,15 @@ test("rendered components import their referenced helpers", async () => {
   );
   assert.match(
     upstreamDetail,
-    /import \{ nextUnload, ScheduleStepper \} from "\.\/UpstreamParts\.jsx";/,
+    /import \{ nextUnload, ScheduleStepper \} from "\.\/UpstreamParts\.(jsx|tsx)";/,
   );
   assert.match(
     upstreamParts,
-    /export \{ getScheduleSteps, nextUnload \} from "\.\/scheduleStepper\.js"/,
+    /export \{ getScheduleSteps, nextUnload \} from "\.\/scheduleStepper\.(js|ts)"/,
   );
   assert.match(
     upstreamParts,
-    /export function ScheduleStepper\(\{ times, muted, now \}\)/,
+    /export function ScheduleStepper\(\{[\s\S]*?times[\s\S]*?muted[\s\S]*?now[\s\S]*?\}: ScheduleStepperProps\)/,
   );
 });
 
