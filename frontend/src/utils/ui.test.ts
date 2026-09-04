@@ -3,6 +3,20 @@ import test from "node:test";
 
 import { getErrorMessage, optionLabel } from "./ui.ts";
 
+interface TestErrorDetail {
+  field: string;
+  message: string;
+}
+
+class TestApiError extends Error {
+  payload: { error: { details: TestErrorDetail[] } };
+
+  constructor(details: TestErrorDetail[]) {
+    super("请求参数校验失败");
+    this.payload = { error: { details } };
+  }
+}
+
 test("optionLabel supports string and dictionary options", () => {
   assert.equal(optionLabel("PostgreSQL"), "PostgreSQL");
   assert.equal(optionLabel({ name: "文件传输", value: "SFTP" }), "文件传输");
@@ -11,14 +25,9 @@ test("optionLabel supports string and dictionary options", () => {
 });
 
 test("getErrorMessage displays backend validation details with field paths", () => {
-  const error = new Error("请求参数校验失败");
-  error.payload = {
-    error: {
-      details: [
-        { field: "jobs[1].id", message: "同一系统内作业 ID 必须唯一" },
-      ],
-    },
-  };
+  const error = new TestApiError([
+    { field: "jobs[1].id", message: "同一系统内作业 ID 必须唯一" },
+  ]);
 
   assert.equal(
     getErrorMessage(error),
@@ -27,15 +36,10 @@ test("getErrorMessage displays backend validation details with field paths", () 
 });
 
 test("getErrorMessage keeps upstream validation details user-readable", () => {
-  const error = new Error("请求参数校验失败");
-  error.payload = {
-    error: {
-      details: [
-        { field: "dbType", message: "“PostgreSQL”不是有效选项" },
-        { field: "dept", message: "“供应链部”不是有效选项" },
-      ],
-    },
-  };
+  const error = new TestApiError([
+    { field: "dbType", message: "“PostgreSQL”不是有效选项" },
+    { field: "dept", message: "“供应链部”不是有效选项" },
+  ]);
 
   assert.equal(
     getErrorMessage(error),

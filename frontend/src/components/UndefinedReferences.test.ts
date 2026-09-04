@@ -3,9 +3,9 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const sourcePath = (relativePath) =>
+const sourcePath = (relativePath: string) =>
   fileURLToPath(new URL(relativePath, import.meta.url));
-const readSource = (relativePath) => readFile(sourcePath(relativePath), "utf8");
+const readSource = (relativePath: string) => readFile(sourcePath(relativePath), "utf8");
 
 test("rendered components import their referenced helpers", async () => {
   const [systemEditor, reportDetail, upstreamDetail, upstreamParts] =

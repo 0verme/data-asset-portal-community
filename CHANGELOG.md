@@ -80,7 +80,7 @@
 
 ### 优化（Changed）
 
-- **运行模式精简（4 → 1）**：前端收敛为唯一开关 `VITE_API_MODE=mock|remote`，同时决定数据来源与认证方式（`src/auth.js` 的 `AUTH_MODE` 跟随它）；后端始终连库、无模式开关。
+- **运行模式精简（4 → 1）**：前端收敛为唯一开关 `VITE_API_MODE=mock|remote`，同时决定数据来源与认证方式（`src/auth.ts` 的 `AUTH_MODE` 跟随它）；后端始终连库、无模式开关。
 - **前端构建链升级**：Vite 5 → 7、`@vitejs/plugin-react` 4 → 5（修复 vite/esbuild 安全公告，`npm audit` 清零），并声明 Node engines `>=22.13.0`。
 - **版本元数据对齐**：`frontend/package.json` 与 README / CHANGELOG 统一为 `0.1.0`。
 

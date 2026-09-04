@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 
 const sourceFiles = ["src/**/*.{js,jsx}"];
 const tsSourceFiles = ["src/**/*.{ts,tsx}"];
-const nodeFiles = ["scripts/**/*.{js,mjs}", "src/**/*.test.js"];
+const nodeFiles = ["scripts/**/*.{js,mjs}", "src/**/*.test.ts"];
 const lintFiles = [...sourceFiles, ...tsSourceFiles, ...nodeFiles];
 
 export default [

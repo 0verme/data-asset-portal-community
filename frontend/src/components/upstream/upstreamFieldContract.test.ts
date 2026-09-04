@@ -9,9 +9,11 @@ import {
   UPSTREAM_SYSTEM_FIELD_CONTRACT,
   displayUpstreamValue,
   getUpstreamDetailMetadata,
+  type UpstreamFieldDefinition,
 } from "./upstreamFieldContract.ts";
 
-const fieldKeys = (fields) => fields.map(({ key }) => key);
+const fieldKeys = (fields: readonly UpstreamFieldDefinition[]): UpstreamFieldDefinition["key"][] =>
+  fields.map(({ key }) => key);
 
 test("ordinary editable upstream fields have a detail read location", () => {
   assert.deepEqual(fieldKeys(UPSTREAM_EDITABLE_BUSINESS_FIELDS), [
@@ -59,12 +61,12 @@ test("upstream detail metadata uses a single empty-value fallback", () => {
     owner: null,
     dept: "",
   });
-  const values = Object.fromEntries(metadata.map(({ key, value }) => [key, value]));
+  const values = new Map(metadata.map(({ key, value }) => [key, value]));
 
-  assert.equal(values.id, "up_member");
-  assert.equal(values.abbr, "MEM");
-  assert.equal(values.dbType, "PostgreSQL");
-  assert.equal(values.owner, EMPTY_UPSTREAM_VALUE);
-  assert.equal(values.dept, EMPTY_UPSTREAM_VALUE);
-  assert.doesNotMatch(JSON.stringify(values), /undefined|null/);
+  assert.equal(values.get("id"), "up_member");
+  assert.equal(values.get("abbr"), "MEM");
+  assert.equal(values.get("dbType"), "PostgreSQL");
+  assert.equal(values.get("owner"), EMPTY_UPSTREAM_VALUE);
+  assert.equal(values.get("dept"), EMPTY_UPSTREAM_VALUE);
+  assert.doesNotMatch(JSON.stringify(Object.fromEntries(values)), /undefined|null/);
 });

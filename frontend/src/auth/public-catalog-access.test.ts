@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const src = fileURLToPath(new URL("..", import.meta.url));
-const read = (relativePath) => readFile(`${src}/${relativePath}`, "utf8");
+const read = (relativePath: string) => readFile(`${src}/${relativePath}`, "utf8");
 
 test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog access", async () => {
   const [app, search, moduleContent] = await Promise.all([

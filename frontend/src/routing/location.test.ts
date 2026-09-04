@@ -10,30 +10,54 @@ import {
   createNavigationState,
   getActiveModuleRoute,
 } from "./navigation.ts";
+import type {
+  LocationSnapshot,
+  NavigationRoute,
+  NavigationRoutes,
+} from "./types.ts";
 
-function parseLocation(url) {
+type LocationRouteKey =
+  | "assetRoute"
+  | "reportRoute"
+  | "apiAssetRoute"
+  | "upRoute"
+  | "pushRoute"
+  | "systemRoute";
+
+type LocationCase = readonly [
+  url: string,
+  module: LocationSnapshot["module"],
+  route: NavigationRoute | null,
+  routeKey: LocationRouteKey | null,
+];
+
+function parseLocation(url: string): LocationSnapshot {
   const previousWindow = globalThis.window;
   const parsedUrl = new URL(url, "http://localhost");
-  globalThis.window = {
-    location: {
-      pathname: parsedUrl.pathname,
-      search: parsedUrl.search,
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      location: {
+        pathname: parsedUrl.pathname,
+        search: parsedUrl.search,
+      },
     },
-  };
+  });
   try {
     return parseInitialLocation();
   } finally {
-    if (previousWindow === undefined) delete globalThis.window;
-    else globalThis.window = previousWindow;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: previousWindow,
+    });
   }
 }
 
-const emptyRoutes = {
+const emptyRoutes: NavigationRoutes = {
   asset: { page: "home", table: null },
   push: { page: "systems", sys: null, job: null },
   indicator: { page: "list", id: null },
   report: { page: "list", code: null },
-  apiAsset: { page: "list", code: null },
   root: { page: "library", abbr: null },
   upstream: { page: "list", id: null },
   mapping: { tab: "table", sourceSystemId: "", sourceTable: "", dwfTable: "" },
@@ -54,7 +78,7 @@ test("initial location parsing restores deep links and query state", () => {
 });
 
 test("canonical module paths restore their existing route shapes", () => {
-  const cases = [
+  const cases: LocationCase[] = [
     ["/data-warehouse/orders/edit", "dwm", { page: "edit", table: "orders" }, "assetRoute"],
     ["/report-assets/RPT%2F001/edit", "report", { page: "edit", code: "RPT/001" }, "reportRoute"],
     ["/api-assets/API%2F001", "apiAsset", { page: "view", code: "API/001" }, "apiAssetRoute"],
@@ -229,23 +253,23 @@ test("API asset filter deep links distinguish a selected method from all methods
 });
 
 test("module route mapping is centralized for representative and special modules", () => {
-  const routes = {
-    asset: "asset",
-    push: "push",
-    upstream: "upstream",
-    indicator: "indicator",
-    report: "report",
-    apiAsset: "apiAsset",
-    system: "system",
+  const routes: NavigationRoutes = {
+    asset: { page: "asset", table: null },
+    push: { page: "push", sys: null, job: null },
+    upstream: { page: "upstream", id: null },
+    indicator: { page: "indicator", id: null },
+    report: { page: "report", code: null },
+    apiAsset: { page: "apiAsset", code: null },
+    system: { page: "system" },
   };
 
-  assert.equal(getActiveModuleRoute("dwm", routes), "asset");
-  assert.equal(getActiveModuleRoute("push", routes), "push");
-  assert.equal(getActiveModuleRoute("upstream", routes), "upstream");
-  assert.equal(getActiveModuleRoute("indicator", routes), "indicator");
-  assert.equal(getActiveModuleRoute("report", routes), "report");
-  assert.equal(getActiveModuleRoute("apiAsset", routes), "apiAsset");
-  assert.equal(getActiveModuleRoute("system", routes), "system");
+  assert.strictEqual(getActiveModuleRoute("dwm", routes), routes.asset);
+  assert.strictEqual(getActiveModuleRoute("push", routes), routes.push);
+  assert.strictEqual(getActiveModuleRoute("upstream", routes), routes.upstream);
+  assert.strictEqual(getActiveModuleRoute("indicator", routes), routes.indicator);
+  assert.strictEqual(getActiveModuleRoute("report", routes), routes.report);
+  assert.strictEqual(getActiveModuleRoute("apiAsset", routes), routes.apiAsset);
+  assert.strictEqual(getActiveModuleRoute("system", routes), routes.system);
 });
 
 test("parsed location state is restored as one navigation snapshot", () => {

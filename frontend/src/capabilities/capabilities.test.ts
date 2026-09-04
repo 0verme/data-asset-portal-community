@@ -27,6 +27,7 @@ test("remote payload cannot hide repository modules", () => {
 test("safe fallback keeps every repository module navigable", () => {
   const result = buildSafeFallbackCapabilities(new Error("network down"));
   assert.equal(result.loadStatus, "error");
+  assert.ok(result.loadError);
   assert.match(result.loadError, /network down/);
   assert.deepEqual([...result.enabledCodes].sort(), [...SAFE_FALLBACK_MODULES].sort());
   assert.deepEqual([...result.enabledCodes].sort(), [...listModuleCodes()].sort());

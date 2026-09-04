@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
-const readSource = (name) => readFile(`${here}/${name}`, "utf8");
+const readSource = (name: string) => readFile(`${here}/${name}`, "utf8");
 
 test("role management consumes role and permission APIs", async () => {
   const [api, hook, page] = await Promise.all([

@@ -42,11 +42,11 @@ class ConfigurationSurfaceTests(unittest.TestCase):
             self.assertIn(value, documentation)
 
     def test_mock_credentials_remain_discoverable_and_aligned(self):
-        auth_js = (ROOT / "frontend/src/auth.js").read_text(encoding="utf-8")
+        auth_ts = (ROOT / "frontend/src/auth.ts").read_text(encoding="utf-8")
         frontend_env = (ROOT / "frontend/.env.example").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn('"community-demo-password"', auth_js)
-        self.assertNotIn("admin123", auth_js)
+        self.assertIn("community-demo-password", auth_ts)
+        self.assertNotIn("admin123", auth_ts)
         self.assertIn("community-demo-password", frontend_env)
         self.assertNotIn("admin123", frontend_env)
         self.assertIn("community-demo-password", readme)
