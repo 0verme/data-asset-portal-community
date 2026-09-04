@@ -20,7 +20,7 @@
     "typecheck:lineage": "npm run typecheck --workspace=lineage-viewer && npm run typecheck --workspace=@lineage-viewer/domain-adapter && npm run typecheck --workspace=@lineage-viewer/react",
     "typecheck": "npm run typecheck:app && npm run typecheck:lineage",
     "verify:lineage-packages": "node scripts/verify-lineage-packages.mjs",
-    "test": "node --experimental-strip-types --test src/**/*.test.ts",
+    "test": "node --experimental-strip-types --test \"src/**/*.test.ts\"",
     "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\" \"scripts/**/*.{js,mjs}\" --max-warnings 0",
     "preview": "vite preview",
     "export:assets": "node scripts/export-assets.mjs"
