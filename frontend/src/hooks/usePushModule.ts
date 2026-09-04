@@ -50,8 +50,12 @@ import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
 import type { PushFilter, PushRoute } from '../routing/types.ts';
 
 function fallbackOptions(values: readonly unknown[]): DictOption[] {
+  const normalizedValues = values.filter(
+    (value): value is string | Record<string, unknown> =>
+      typeof value === 'string' || (typeof value === 'object' && value !== null),
+  );
   const seen = new Set<string>();
-  return normalizeDictOptions(values as string[]).filter((item) => {
+  return normalizeDictOptions(normalizedValues).filter((item) => {
     if (seen.has(item.value)) return false;
     seen.add(item.value);
     return true;
