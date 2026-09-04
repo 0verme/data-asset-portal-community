@@ -14,6 +14,7 @@
 // limitations under the License.
 
 import { listModuleCodes, resolveRepositoryModuleCodes } from '../modules/moduleRegistry.ts';
+import { requestRemote } from '../api/http.ts';
 
 function readApiMode(): string {
   try {
@@ -100,7 +101,6 @@ export async function loadCapabilities(): Promise<CapabilitiesState> {
     return buildMockCapabilities();
   }
   try {
-    const { requestRemote } = await import('../api/http.ts');
     const payload = await requestRemote('/capabilities');
     return modulesFromPayload(payload);
   } catch (error) {
