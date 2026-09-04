@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const moduleContentPath = fileURLToPath(
-  new URL("./ModuleContent.jsx", import.meta.url),
+  new URL("./ModuleContent.tsx", import.meta.url),
 );
 
 test("business modules are lazy-loaded while the portal remains in the app shell", async () => {

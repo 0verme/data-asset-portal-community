@@ -52,7 +52,7 @@ PUBLIC_FRONTEND_FILES = [
     REPO_ROOT / "frontend" / "src" / "components" / "push" / "SystemEditor.jsx",
     REPO_ROOT / "frontend" / "src" / "components" / "push" / "pushConstants.js",
     REPO_ROOT / "frontend" / "src" / "components" / "LineagePage.jsx",
-    REPO_ROOT / "frontend" / "src" / "components" / "app" / "ModuleSidebar.jsx",
+    REPO_ROOT / "frontend" / "src" / "components" / "app" / "ModuleSidebar.tsx",
     REPO_ROOT / "frontend" / "src" / "components" / "fieldMapping" / "FieldMappingControls.jsx",
 ]
 

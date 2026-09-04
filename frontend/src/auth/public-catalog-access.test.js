@@ -8,9 +8,9 @@ const read = (relativePath) => readFile(`${src}/${relativePath}`, "utf8");
 
 test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog access", async () => {
   const [app, search, moduleContent] = await Promise.all([
-    read("App.jsx"),
+    read("App.tsx"),
     read("components/SearchPortalPage.tsx"),
-    read("components/app/ModuleContent.jsx"),
+    read("components/app/ModuleContent.tsx"),
   ]);
 
   assert.match(app, /businessAccessReady = !isDbAuthMode\(\) \|\| authReady/);

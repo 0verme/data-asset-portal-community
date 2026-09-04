@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 test("application footer keeps the version and exposes the project GitHub link", async () => {
-  const [app, styles] = await Promise.all([read("./App.jsx"), read("./styles/app.css")]);
+  const [app, styles] = await Promise.all([read("./App.tsx"), read("./styles/app.css")]);
 
   assert.match(app, /数据资产管理与血缘分析平台 \{APP_VERSION\}/);
   assert.match(

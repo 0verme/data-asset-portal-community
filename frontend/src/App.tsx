@@ -14,12 +14,15 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+import type { LineageBootstrap } from "./api/lineage.ts";
 import { getMenus, MENUS_CHANGED_EVENT } from "./api/menus.ts";
+import type { MenuItem } from "./data/menus.ts";
 import { isDbAuthMode } from "./auth.ts";
 import { AuthBar, AuthContext, LoginModal } from "./components/AuthControls.tsx";
-import { AppShell } from "./components/app/AppShell.jsx";
-import { ModuleContent } from "./components/app/ModuleContent.jsx";
-import { ModuleSidebar } from "./components/app/ModuleSidebar.jsx";
+import { AppShell } from "./components/app/AppShell.tsx";
+import { ModuleContent } from "./components/app/ModuleContent.tsx";
+import { ModuleSidebar } from "./components/app/ModuleSidebar.tsx";
+import type { AppModuleContext } from "./components/app/appTypes.ts";
 import { ConfirmDialogHost, ModuleErrorBoundary, ToastHost } from "./components/common/index.ts";
 import { Icon } from "./components/ui.tsx";
 import {
@@ -47,26 +50,54 @@ import { loadCapabilities } from "./capabilities/capabilities.ts";
 import { loadNavigationMenus } from "./routing/navigationMenus.ts";
 import { splitNavigationMenus } from "./routing/navigationMenuGrouping.ts";
 import { useLocationSynchronization } from "./hooks/useLocationSynchronization.ts";
-import { useNavigationController } from "./hooks/useNavigationController.ts";
+import {
+  useNavigationController,
+  type NavigationActions,
+} from "./hooks/useNavigationController.ts";
 import { scrollMainToTop } from "./utils/ui.ts";
+import type { MappingRoute, ModuleId, SystemRoute } from "./routing/types.ts";
+import type { DictOption } from "./utils/optionUtils.ts";
 
-export default function App() {
-  const hamburgerRef = React.useRef(null);
-  const sidebarRef = React.useRef(null);
-  const searchToggleRef = React.useRef(null);
-  const searchInputRef = React.useRef(null);
-  const moreNavRef = useRef(null);
+const MODULE_CODES = new Set<string>([
+  "portal",
+  "dwm",
+  "upstream",
+  "mapping",
+  "lineage",
+  "root",
+  "indicator",
+  "report",
+  "apiAsset",
+  "push",
+  "codeTable",
+  "system",
+]);
+
+function isModuleId(value: string): value is ModuleId {
+  return MODULE_CODES.has(value);
+}
+
+type NavigationTarget = Parameters<NavigationActions["goToModuleWithQuery"]>[0];
+
+type NavigationMenuStatus = "loading" | "ready" | "error";
+
+export default function App(): React.ReactElement {
+  const hamburgerRef = React.useRef<HTMLButtonElement | null>(null);
+  const sidebarRef = React.useRef<HTMLElement | null>(null);
+  const searchToggleRef = React.useRef<HTMLButtonElement | null>(null);
+  const searchInputRef = React.useRef<HTMLInputElement | null>(null);
+  const moreNavRef = useRef<HTMLDivElement | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [moreNavOpen, setMoreNavOpen] = useState(false);
-  const [lineageBootstrap, setLineageBootstrap] = useState(null);
+  const [lineageBootstrap, setLineageBootstrap] = useState<LineageBootstrap | null>(null);
   const [systemActionIntent, setSystemActionIntent] = useState("");
-  const [navMenus, setNavMenus] = useState([]);
-  const [navMenuStatus, setNavMenuStatus] = useState("loading");
+  const [navMenus, setNavMenus] = useState<MenuItem[]>([]);
+  const [navMenuStatus, setNavMenuStatus] = useState<NavigationMenuStatus>("loading");
   const navMenuRequestRef = useRef(0);
 
-  const handlePopState = React.useCallback(() => {
+  const handlePopState = React.useCallback((): void => {
     setSidebarOpen(false);
     setSystemActionIntent("");
   }, []);
@@ -118,7 +149,11 @@ export default function App() {
   } = navigation;
 
   const { theme, toggleTheme } = useTheme();
-  const { statusOptions } = useStatusOptions();
+  const { statusOptions: rawStatusOptions } = useStatusOptions();
+  const statusOptions = useMemo<DictOption[]>(
+    () => rawStatusOptions.map((item) => ({ code: item.value, ...item })),
+    [rawStatusOptions],
+  );
   const {
     auth,
     authReady,
@@ -148,7 +183,7 @@ export default function App() {
   const canManageMenus = can("system:menu:write");
   const canManageParams = can("system:param:write");
 
-  const loadMenus = React.useCallback(async () => {
+  const loadMenus = React.useCallback(async (): Promise<void> => {
     const requestId = navMenuRequestRef.current + 1;
     navMenuRequestRef.current = requestId;
     setNavMenuStatus("loading");
@@ -165,7 +200,7 @@ export default function App() {
     }
   }, []);
 
-  const refreshCapabilities = React.useCallback(async () => {
+  const refreshCapabilities = React.useCallback(async (): Promise<void> => {
     try {
       // The capability contract load is observed for diagnostics only. Its
       // HTTP load state must never control module navigation or deep links.
@@ -198,7 +233,7 @@ export default function App() {
   useEffect(() => {
     if (!sidebarOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
-    const closeOnEscape = (event) => {
+    const closeOnEscape = (event: KeyboardEvent): void => {
       if (event.key !== "Escape") return;
       setSidebarOpen(false);
       requestAnimationFrame(() => hamburgerRef.current?.focus());
@@ -215,7 +250,7 @@ export default function App() {
   useEffect(() => {
     if (!mobileSearchOpen) return undefined;
     requestAnimationFrame(() => searchInputRef.current?.focus());
-    const closeOnEscape = (event) => {
+    const closeOnEscape = (event: KeyboardEvent): void => {
       if (event.key !== "Escape") return;
       setMobileSearchOpen(false);
       requestAnimationFrame(() => searchToggleRef.current?.focus());
@@ -226,12 +261,14 @@ export default function App() {
 
   useEffect(() => {
     if (!moreNavOpen) return undefined;
-    const closeOnEscape = (event) => {
+    const closeOnEscape = (event: KeyboardEvent): void => {
       if (event.key !== "Escape") return;
       setMoreNavOpen(false);
     };
-    const closeOnOutsideClick = (event) => {
-      if (!moreNavRef.current?.contains(event.target)) setMoreNavOpen(false);
+    const closeOnOutsideClick = (event: PointerEvent): void => {
+      if (!(event.target instanceof Node) || !moreNavRef.current?.contains(event.target)) {
+        setMoreNavOpen(false);
+      }
     };
     window.addEventListener("keydown", closeOnEscape);
     document.addEventListener("pointerdown", closeOnOutsideClick);
@@ -243,7 +280,7 @@ export default function App() {
 
   useEffect(() => {
     const desktopViewport = window.matchMedia("(min-width: 769px)");
-    const closeMobilePanels = (event) => {
+    const closeMobilePanels = (event: MediaQueryListEvent): void => {
       if (!event.matches) return;
       setSidebarOpen(false);
       setMobileSearchOpen(false);
@@ -434,7 +471,7 @@ export default function App() {
     setUpRoute,
   ]);
 
-  const systemLandingRoute = useMemo(() => {
+  const systemLandingRoute = useMemo<SystemRoute>(() => {
     if (canViewUsers) return { page: "users" };
     if (canViewRoles) return { page: "roles" };
     if (canViewMenus) return { page: "menus" };
@@ -445,7 +482,7 @@ export default function App() {
 
   useEffect(() => {
     if (!authReady || module !== "system") return;
-    const accessible = {
+    const accessible: Record<string, boolean> = {
       users: canViewUsers,
       roles: canViewRoles,
       menus: canViewMenus,
@@ -473,7 +510,7 @@ export default function App() {
     goToModuleWithQuery: navigateToModuleWithQuery,
   } = navigation.actions;
 
-  const switchModule = (nextModule) => {
+  const switchModule = (nextModule: ModuleId): void => {
     setSidebarOpen(false);
     setMobileSearchOpen(false);
     resetAssetNavigation();
@@ -485,25 +522,29 @@ export default function App() {
     scrollMainToTop();
   };
 
-  const goToMapping = (nextMappingRoute) => {
+  const goToMapping = (nextMappingRoute?: Partial<MappingRoute>): void => {
     navigateToMapping(nextMappingRoute);
     setSidebarOpen(false);
     scrollMainToTop();
   };
 
-  const backToUpstreamList = () => {
+  const backToUpstreamList = (): void => {
     navigateBackToUpstreamList();
     setSidebarOpen(false);
     scrollMainToTop();
   };
 
-  const goToModuleWithQuery = (target, nextQuery) => {
-    const nextModule = target?.module || target;
+  const goToModuleWithQuery = (target: NavigationTarget, nextQuery?: string): void => {
+    const nextModule = typeof target === "string" ? target : target.module;
     if (!nextModule) return;
     navigateToModuleWithQuery(target, nextQuery, { systemRoute: systemLandingRoute });
     setSidebarOpen(false);
     setSystemActionIntent("");
     scrollMainToTop();
+  };
+
+  const switchModuleFromMenu = (code: string): void => {
+    if (isModuleId(code)) switchModule(code);
   };
 
   const isPush = module === "push";
@@ -567,39 +608,76 @@ export default function App() {
     logout: handleLogout,
   }), [auth, can, canEdit, requireLogin, handleLogout]);
 
-  const moduleContent = (
-    <ModuleContent
-      module={module}
-      context={{
-        apiAsset, apiAssetRoute, apiAssetView, asset, auth, backToUpstreamList, businessAccessReady, can,
-        canEdit, canManageMenus, canManageParams, canManageRoles, canManageSystem, canManageUsers,
-        canViewMenus, canViewOperationLog, canViewParams,
-        canViewRoles, canViewUsers, goToMapping, goToModuleWithQuery, indicator, indicatorFilter,
-        indicatorRoute, indicatorView, lineageRoute, manualCodeTable, mappingRoute,
-        push, pushRoute, query, report, reportRoute, reportView, requireLogin, root,
-        rootRoute, route, setApiAssetView, setIndicatorFilter, setIndicatorRoute,
-        setIndicatorView, setLineageBootstrap, setLineageRoute, setMappingRoute,
-        setPushRoute, setQuery, setReportView, setRootRoute, setSystemActionIntent,
-        setUpRoute, statusOptions, systemActionIntent, systemRoute, upRoute, upstream,
-        visibleModuleKeys,
-      }}
-    />
-  );
-  const moduleSidebar = (
-    <ModuleSidebar
-      module={module}
-      context={{
-        apiAsset, apiAssetFilter, asset, can, canEdit, canManageMenus, canManageParams, canManageRoles,
-        canManageSystem, canManageUsers, canViewMenus,
-        canViewOperationLog, canViewParams, canViewRoles, canViewUsers, indicator,
-        indicatorFilter, lineageBootstrap, manualCodeTable, push, pushRoute, report,
-        reportFilter, requireLogin, root, setApiAssetFilter, setIndicatorFilter,
-        setIndicatorRoute, setPushRoute, setReportFilter, setReportRoute, setRootRoute,
-        setSystemActionIntent, setSystemRoute, setUpRoute, statusOptions, systemRoute,
-        upstream,
-      }}
-    />
-  );
+  const moduleContext: AppModuleContext = {
+    apiAsset,
+    apiAssetFilter,
+    apiAssetRoute,
+    apiAssetView,
+    asset,
+    auth,
+    backToUpstreamList,
+    businessAccessReady,
+    can,
+    canEdit,
+    canManageMenus,
+    canManageParams,
+    canManageRoles,
+    canManageSystem,
+    canManageUsers,
+    canViewMenus,
+    canViewOperationLog,
+    canViewParams,
+    canViewRoles,
+    canViewUsers,
+    goToMapping,
+    goToModuleWithQuery,
+    indicator,
+    indicatorFilter,
+    indicatorRoute,
+    indicatorView,
+    lineageBootstrap,
+    lineageRoute,
+    manualCodeTable,
+    mappingRoute,
+    push,
+    pushRoute,
+    query,
+    report,
+    reportFilter,
+    reportRoute,
+    reportView,
+    requireLogin,
+    root,
+    rootRoute,
+    route,
+    setApiAssetFilter,
+    setApiAssetRoute,
+    setApiAssetView,
+    setAuthError,
+    setIndicatorFilter,
+    setIndicatorRoute,
+    setIndicatorView,
+    setLineageBootstrap,
+    setLineageRoute,
+    setMappingRoute,
+    setPushRoute,
+    setQuery,
+    setReportFilter,
+    setReportRoute,
+    setReportView,
+    setRootRoute,
+    setSystemActionIntent,
+    setSystemRoute,
+    setUpRoute,
+    statusOptions,
+    systemActionIntent,
+    systemRoute,
+    upRoute,
+    upstream,
+    visibleModuleKeys,
+  };
+  const moduleContent = <ModuleContent module={module} context={moduleContext} />;
+  const moduleSidebar = <ModuleSidebar module={module} context={moduleContext} />;
 
   return (
     <AuthContext.Provider value={authContextValue}>
@@ -639,7 +717,7 @@ export default function App() {
               <button
                 key={item.code}
                 className={module === item.code ? "active" : ""}
-                onClick={() => switchModule(item.code)}
+                onClick={() => switchModuleFromMenu(item.code)}
               >
                 <Icon name={item.icon} size={15} />{item.name}
               </button>
@@ -665,7 +743,7 @@ export default function App() {
                         role="menuitem"
                         onClick={() => {
                           setMoreNavOpen(false);
-                          switchModule(item.code);
+                          switchModuleFromMenu(item.code);
                         }}
                       >
                         <Icon name={item.icon} size={15} />{item.name}
@@ -753,7 +831,9 @@ export default function App() {
                 aria-label="模块导航与筛选"
                 tabIndex={-1}
                 onClick={(event) => {
-                  if (event.target.closest(".side-item")) setSidebarOpen(false);
+                  if (event.target instanceof Element && event.target.closest(".side-item")) {
+                    setSidebarOpen(false);
+                  }
                 }}
               >
                 <nav className="mobile-module-nav" aria-label="模块导航">
@@ -770,7 +850,7 @@ export default function App() {
                       key={item.code}
                       className={`mobile-module-link${module === item.code ? " active" : ""}`}
                       type="button"
-                      onClick={() => switchModule(item.code)}
+                      onClick={() => switchModuleFromMenu(item.code)}
                     >
                       <Icon name={item.icon} size={16} />{item.name}
                     </button>

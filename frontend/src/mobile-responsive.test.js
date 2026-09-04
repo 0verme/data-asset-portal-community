@@ -11,7 +11,7 @@ const moduleStyles = {
   indicator: read("./styles/indicator.css"),
   system: read("./styles/system.css"),
 };
-const app = read("./App.jsx");
+const app = read("./App.tsx");
 
 test("mobile shell behavior is scoped to the 768px breakpoint", () => {
   const mobileSection = styles.match(/\/\* ===== Mobile ≤ 768px ===== \*\/[\s\S]*?\/\* ===== Small phone ≤ 480px ===== \*\//)?.[0] || "";
