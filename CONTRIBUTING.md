@@ -70,7 +70,7 @@ CI（`.github/workflows/ci.yml`）会运行 Public Data Guard、后端测试、P
 - 后端：FastAPI Native + Uvicorn，入口为 `backend/asgi.py`；service 位于 `backend/app/services/`，native routers 位于 `backend/app/fastapi/routers/`
 - 推荐先用 `VITE_API_MODE=mock` 快速验证前端改动
 - 新增 routing、serialization、API/auth 或 domain contract 时优先使用 TypeScript；既有 JS/JSX 不要求仅因触碰就迁移
-- 不要通过 `checkJs` 一次打开 legacy JavaScript 全量检查，也不要把 `App.jsx` 或既有 UI 机械改成 TSX
+- 不要通过 `checkJs` 一次打开 legacy JavaScript 全量检查，也不要为更换扩展名机械改写与当前 Issue 无关的测试、兼容入口或既有 UI
 
 最小验证命令：
 

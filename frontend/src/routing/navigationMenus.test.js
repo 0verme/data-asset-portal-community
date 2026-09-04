@@ -28,11 +28,11 @@ test("navigation loading propagates request failures and rejects malformed paylo
 });
 
 test("app exposes retry states without using built-in menu fallback data", () => {
-  const appSource = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
+  const appSource = readFileSync(new URL("../App.tsx", import.meta.url), "utf8");
   const apiSource = readFileSync(new URL("../api/menus.ts", import.meta.url), "utf8");
   const loaderSource = readFileSync(new URL("./navigationMenus.ts", import.meta.url), "utf8");
 
-  assert.match(appSource, /const \[navMenus, setNavMenus\] = useState\(\[\]\)/);
+  assert.match(appSource, /const \[navMenus, setNavMenus\] = useState(?:<[^>]+>)?\(\[\]\)/);
   assert.match(appSource, /菜单加载失败，点击重试/);
   assert.match(appSource, /onClick=\{loadMenus\}/);
   assert.match(apiSource, /suppressUnauthorizedEvent: true/);

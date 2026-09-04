@@ -318,7 +318,7 @@ PostgreSQL integration 测试（16 个）通过 `TEST_DATABASE_PROFILE` + `TEST_
 
 ### 前端（`frontend/src/`）
 
-- `api/` —— 按模块拆分的数据访问层，公共 HTTP 封装在 `api/http.js`
+- `api/` —— 按模块拆分的数据访问层，公共 HTTP 封装在 `api/http.ts`
 - `components/views/` —— 各模块主视图
 - `components/sidebar/` —— 各模块侧边栏
 - `components/common/` —— 公共组件（确认弹窗、toast、弹窗、状态卡片）
@@ -329,12 +329,12 @@ PostgreSQL integration 测试（16 个）通过 `TEST_DATABASE_PROFILE` + `TEST_
 
 ### 前端渐进 TypeScript 采用
 
-**当前状态：主应用仍以 JS/JSX 为主，TypeScript 处于渐进采用阶段，不是已完成 TypeScript 化。**
+**当前状态：主应用已完成 P4C 顶层容器迁移，P5 strict hardening 尚未完成。**
 仓库里三个区域的 TypeScript 成熟度并不相同，描述时应分别说明：
 
 | 区域 | 当前状态 |
 | --- | --- |
-| `frontend/src/`（主应用） | 以 JS / JSX 为主，仅少量 TS 边界文件（routing、auth permissions、共享 contract 的 `.d.ts`） |
+| `frontend/src/`（主应用） | 业务模块、顶层 `App.tsx` / `main.tsx` 与容器编排层已采用 TypeScript；仍保留 41 个 JavaScript 测试文件和 `auth.js` 兼容入口，`allowJs` 尚未关闭 |
 | `frontend/packages/lineage-viewer*` | 完整 TypeScript（三个 npm workspace） |
 | `miniapp/` | 完整 TypeScript（Taro 4 + React） |
 
@@ -352,7 +352,7 @@ npm run typecheck          # app boundary + lineage workspaces
 | 新增 API / auth / domain adapter boundary | TypeScript preferred |
 | 既有 JS hooks | 只有发生实质重构时迁移 |
 | 既有 JSX components / views | JS/JSX allowed |
-| `src/App.jsx` | 本阶段保持 JSX |
+| `src/App.tsx`、`src/main.tsx` 与 `src/components/app/*` | P4C 已迁移；P5 负责清理测试 JavaScript、兼容入口并关闭 `allowJs` |
 | `packages/lineage-viewer*` | 继续遵循现有 workspace TypeScript policy |
 
 新增代码不应仅为更换扩展名制造 churn；迁移应当带来边界类型价值。边界可以用靠近 legacy JS 配置的 `.d.ts` 描述文件接入，但不复制完整后端 schema。已有 URL、API/auth wire contract 和模块代码保持不变。Node 22+ 的原生 type stripping 仅用于现有 Node tests 加载少量 `.ts` runtime boundary，不引入 `ts-node`、`tsx` 或新的测试运行时。

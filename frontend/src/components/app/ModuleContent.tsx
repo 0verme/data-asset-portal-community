@@ -1,32 +1,100 @@
 import React from "react";
 
+import type { SearchResultGroup, SearchResultItem } from "../../api/search.ts";
+import type { NavigationActions } from "../../hooks/useNavigationController.ts";
+import type { PortalTarget } from "../../routing/portalNavigation.ts";
+import type { ModuleId } from "../../routing/types.ts";
 import { SearchPortalPage } from "../SearchPortalPage.tsx";
+import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
+import type { AppModuleContext } from "./appTypes.ts";
 
-function lazyNamed(loader, exportName) {
-  return React.lazy(() => loader().then((module) => ({ default: module[exportName] })));
+const AssetView = React.lazy(() =>
+  import("../views/AssetView.tsx").then(({ AssetView: component }) => ({ default: component })),
+);
+const ApiAssetView = React.lazy(() =>
+  import("../views/ApiAssetView.tsx").then(({ ApiAssetView: component }) => ({ default: component })),
+);
+const IndicatorView = React.lazy(() =>
+  import("../views/IndicatorView.tsx").then(({ IndicatorView: component }) => ({ default: component })),
+);
+const PushView = React.lazy(() =>
+  import("../views/PushView.tsx").then(({ PushView: component }) => ({ default: component })),
+);
+const ReportView = React.lazy(() =>
+  import("../views/ReportView.tsx").then(({ ReportView: component }) => ({ default: component })),
+);
+const RootView = React.lazy(() =>
+  import("../views/RootView.tsx").then(({ RootView: component }) => ({ default: component })),
+);
+const SystemView = React.lazy(() =>
+  import("../views/SystemView.tsx").then(({ SystemView: component }) => ({ default: component })),
+);
+const UpstreamView = React.lazy(() =>
+  import("../views/UpstreamView.tsx").then(({ UpstreamView: component }) => ({ default: component })),
+);
+const FieldMappingPage = React.lazy(() =>
+  import("../FieldMappingPage.tsx").then(({ FieldMappingPage: component }) => ({ default: component })),
+);
+const LineagePage = React.lazy(() =>
+  import("../LineagePage.tsx").then(({ LineagePage: component }) => ({ default: component })),
+);
+const ManualCodeTablePage = React.lazy(() =>
+  import("../ManualCodeTablePage.tsx").then(({ ManualCodeTablePage: component }) => ({ default: component })),
+);
+
+interface ModuleRendererProps {
+  context: AppModuleContext;
 }
 
-const AssetView = lazyNamed(() => import("../views/AssetView.tsx"), "AssetView");
-const ApiAssetView = lazyNamed(() => import("../views/ApiAssetView.tsx"), "ApiAssetView");
-const IndicatorView = lazyNamed(() => import("../views/IndicatorView.tsx"), "IndicatorView");
-const PushView = lazyNamed(() => import("../views/PushView.tsx"), "PushView");
-const ReportView = lazyNamed(() => import("../views/ReportView.tsx"), "ReportView");
-const RootView = lazyNamed(() => import("../views/RootView.tsx"), "RootView");
-const SystemView = lazyNamed(() => import("../views/SystemView.tsx"), "SystemView");
-const UpstreamView = lazyNamed(() => import("../views/UpstreamView.tsx"), "UpstreamView");
-const FieldMappingPage = lazyNamed(() => import("../FieldMappingPage.tsx"), "FieldMappingPage");
-const LineagePage = lazyNamed(() => import("../LineagePage.tsx"), "LineagePage");
-const ManualCodeTablePage = lazyNamed(() => import("../ManualCodeTablePage.tsx"), "ManualCodeTablePage");
+type ModuleRenderer = (props: ModuleRendererProps) => React.ReactElement;
+type SearchNavigationTarget = SearchResultItem | SearchResultGroup;
+type PortalNavigationTarget = Extract<
+  Parameters<NavigationActions["goToModuleWithQuery"]>[0],
+  object
+>;
 
-/** Module code → lazy page renderer (registry-driven dispatch). */
-function canAccess(context, permission) {
-  return typeof context.can === "function" ? context.can(permission) : Boolean(context.canEdit);
+const MODULE_CODES: ReadonlySet<string> = new Set([
+  "portal",
+  "dwm",
+  "upstream",
+  "mapping",
+  "lineage",
+  "root",
+  "indicator",
+  "report",
+  "apiAsset",
+  "push",
+  "codeTable",
+  "system",
+]);
+
+function isModuleId(value: string): value is ModuleId {
+  return MODULE_CODES.has(value);
 }
 
-const MODULE_RENDERERS = {
+function toPortalRef(value: unknown): PortalTarget["ref"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return value as NonNullable<PortalTarget["ref"]>;
+}
+
+function toNavigationTarget(target: SearchNavigationTarget): PortalNavigationTarget {
+  const navigationTarget: PortalNavigationTarget = {};
+  if (isModuleId(target.module)) navigationTarget.module = target.module;
+  if ("ref" in target) {
+    const ref = toPortalRef(target.ref);
+    if (ref) navigationTarget.ref = ref;
+  }
+  return navigationTarget;
+}
+
+function canAccess(context: AppModuleContext, permission: string): boolean {
+  return context.can(permission);
+}
+
+const MODULE_RENDERERS: Record<ModuleId, ModuleRenderer> = {
   portal: ({ context }) => (
     <SearchPortalPage
-      onNavigate={context.goToModuleWithQuery}
+      onNavigate={(target, term) => context.goToModuleWithQuery(toNavigationTarget(target), term)}
       availableModules={context.visibleModuleKeys}
       publicAccessReady={context.businessAccessReady}
     />
@@ -46,7 +114,6 @@ const MODULE_RENDERERS = {
       requireLogin={context.requireLogin}
       canEdit={canAccess(context, "push:write")}
       pushRoute={context.pushRoute}
-      setPushRoute={context.setPushRoute}
     />
   ),
   indicator: ({ context }) => (
@@ -57,7 +124,7 @@ const MODULE_RENDERERS = {
       indicatorRoute={context.indicatorRoute}
       indicatorFilter={context.indicatorFilter}
       setIndicatorFilter={context.setIndicatorFilter}
-      indicatorView={context.indicatorView}
+      indicatorView={context.indicatorView as ViewMode}
       setIndicatorView={context.setIndicatorView}
     />
   ),
@@ -66,7 +133,7 @@ const MODULE_RENDERERS = {
       report={context.report}
       query={context.query}
       reportRoute={context.reportRoute}
-      view={context.reportView}
+      view={context.reportView as ViewMode}
       onChangeView={context.setReportView}
       canEdit={canAccess(context, "report:write")}
     />
@@ -76,7 +143,7 @@ const MODULE_RENDERERS = {
       apiAsset={context.apiAsset}
       query={context.query}
       route={context.apiAssetRoute}
-      view={context.apiAssetView}
+      view={context.apiAssetView as ViewMode}
       onChangeView={context.setApiAssetView}
       canEdit={canAccess(context, "api_asset:write")}
     />
@@ -96,7 +163,7 @@ const MODULE_RENDERERS = {
     <SystemView
       systemRoute={context.systemRoute}
       query={context.query}
-      authenticated={Boolean(context.auth?.user)}
+      authenticated={Boolean(context.auth.user)}
       canManageMenus={context.canManageMenus}
       canManageParams={context.canManageParams}
       canManageRoles={context.canManageRoles}
@@ -144,7 +211,7 @@ const MODULE_RENDERERS = {
   ),
 };
 
-function ModuleLoadingState() {
+function ModuleLoadingState(): React.ReactElement {
   return (
     <div className="state-card" role="status" aria-live="polite">
       <div className="state-spinner" aria-hidden="true"></div>
@@ -154,7 +221,7 @@ function ModuleLoadingState() {
   );
 }
 
-function PublicAccessLoadingState() {
+function PublicAccessLoadingState(): React.ReactElement {
   return (
     <div className="state-card" role="status" aria-live="polite">
       <div className="state-spinner" aria-hidden="true"></div>
@@ -164,7 +231,12 @@ function PublicAccessLoadingState() {
   );
 }
 
-export function ModuleContent({ module, context }) {
+export interface ModuleContentProps {
+  module: ModuleId;
+  context: AppModuleContext;
+}
+
+export function ModuleContent({ module, context }: ModuleContentProps): React.ReactElement {
   const renderer = MODULE_RENDERERS[module] || MODULE_RENDERERS.dwm;
   if (context.businessAccessReady === false) {
     return <PublicAccessLoadingState />;
