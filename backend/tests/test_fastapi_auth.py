@@ -265,7 +265,7 @@ class FastApiNativeAuthTests(unittest.TestCase):
 
     def test_data_source_failure_returns_service_unavailable(self):
         self.auth_service.authenticate.side_effect = AuthDataSourceUnavailableError(
-            "底层数据库 password=secret host=internal.example"
+            "底层数据库 password=secret host=private.invalid"
         )
         client = TestClient(
             self.app({"role": "admin", "user": "alice", "name": "Alice"})
@@ -280,11 +280,11 @@ class FastApiNativeAuthTests(unittest.TestCase):
         self.assertEqual("AUTH_DATA_SOURCE_ERROR", response.json()["error"]["code"])
         self.assertEqual("认证数据源暂不可用，请稍后重试。", response.json()["error"]["message"])
         self.assertNotIn("secret", response.text)
-        self.assertNotIn("internal.example", response.text)
+        self.assertNotIn("private.invalid", response.text)
 
     def test_diagnostic_mode_exposes_business_hint_without_provider_details(self):
         self.auth_service.authenticate.side_effect = AuthConfigurationError(
-            "DSN=postgresql://user:secret@internal.example/app"
+            "数据库配置 password=secret host=private.invalid"
         )
         client = TestClient(
             self.app({"role": "admin", "user": "alice", "name": "Alice"})
@@ -303,11 +303,11 @@ class FastApiNativeAuthTests(unittest.TestCase):
         self.assertIn("数据库配置", error["details"]["hint"])
         self.assertNotIn("DSN", response.text)
         self.assertNotIn("secret", response.text)
-        self.assertNotIn("internal.example", response.text)
+        self.assertNotIn("private.invalid", response.text)
 
     def test_production_never_includes_diagnostic_details(self):
         self.auth_service.authenticate.side_effect = AuthConfigurationError(
-            "SQL password=secret DSN=postgresql://user:secret@internal.example/app"
+            "SQL password=secret host=private.invalid"
         )
         client = TestClient(
             self.app({"role": "admin", "user": "alice", "name": "Alice"})
@@ -324,7 +324,7 @@ class FastApiNativeAuthTests(unittest.TestCase):
         self.assertEqual("AUTH_CONFIGURATION_ERROR", error["code"])
         self.assertNotIn("details", error)
         self.assertNotIn("secret", response.text)
-        self.assertNotIn("internal.example", response.text)
+        self.assertNotIn("private.invalid", response.text)
 
 
 if __name__ == "__main__":
