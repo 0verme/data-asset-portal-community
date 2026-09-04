@@ -157,7 +157,7 @@ V1 lineage 只支持 self-contained `replace` snapshot：新 snapshot 先以 `IN
 
 ## 前端与数据层
 
-- `frontend/src/App.jsx` 负责应用编排、登录态和模块路由；`frontend/src/api/` 统一访问 `/api`。
+- `frontend/src/App.tsx` 负责应用编排、登录态和模块路由；`frontend/src/components/app/` 负责容器边界，`frontend/src/api/` 统一访问 `/api`。
 - `VITE_API_MODE=mock` 使用受控前端演示数据；`remote` 访问真实后端数据库。两种模式默认使用同一仓库模块集合，数据和外部执行能力可以不同。
 - Schema deployment contract 是 `backend/schema` 下四份 versioned dialect baseline 加 `backend/alembic` immutable forward revisions；baseline 是 fresh-install/offline physical artifact set，Alembic 负责 existing-database/head upgrade，二者不是同一个来源。`backend/app/db/tables.py` 只承载 runtime SQLAlchemy Core 查询子集，`demo/seed_*.py` 负责完整仓库模块的虚构演示数据。完整职责与编辑顺序见 [ADR-002](./adr/002-schema-canonical-source.md)。
 - 前端 TypeScript 分布：主应用 `frontend/src/` 目前仍以 JS/JSX 为主，只有少量 TS 边界文件（routing、auth permissions、共享 contract 的 `.d.ts`）；`frontend/packages/lineage-viewer*` 三个 workspace 是完整 TypeScript；`miniapp/` 是 Taro 4 + React + TypeScript。渐进采用策略见 [DEVELOPMENT.md](../DEVELOPMENT.md)。
