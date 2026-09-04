@@ -23,7 +23,13 @@ from backend.app.authorization import (
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi.auth import get_native_session_identity
 from backend.app.fastapi_app import create_fastapi_app
-from backend.app.services.auth_service import AuthService, AuthValidationError
+from backend.app.services.auth_service import (
+    AuthConfigurationError,
+    AuthDataSourceError,
+    AuthDataSourceUnavailableError,
+    AuthService,
+    AuthValidationError,
+)
 
 
 class FastApiNativeAuthTests(unittest.TestCase):
@@ -256,6 +262,69 @@ class FastApiNativeAuthTests(unittest.TestCase):
             {"code": "INVALID_CREDENTIALS", "message": "账号或密码不正确，请重试。"},
             response.json()["error"],
         )
+
+    def test_data_source_failure_returns_service_unavailable(self):
+        self.auth_service.authenticate.side_effect = AuthDataSourceUnavailableError(
+            "底层数据库 password=secret host=internal.example"
+        )
+        client = TestClient(
+            self.app({"role": "admin", "user": "alice", "name": "Alice"})
+        )
+
+        response = client.post(
+            "/api/auth/login",
+            json={"username": "alice", "password": "wrong"},
+        )
+
+        self.assertEqual(503, response.status_code)
+        self.assertEqual("AUTH_DATA_SOURCE_ERROR", response.json()["error"]["code"])
+        self.assertEqual("认证数据源暂不可用，请稍后重试。", response.json()["error"]["message"])
+        self.assertNotIn("secret", response.text)
+        self.assertNotIn("internal.example", response.text)
+
+    def test_diagnostic_mode_exposes_business_hint_without_provider_details(self):
+        self.auth_service.authenticate.side_effect = AuthConfigurationError(
+            "DSN=postgresql://user:secret@internal.example/app"
+        )
+        client = TestClient(
+            self.app({"role": "admin", "user": "alice", "name": "Alice"})
+        )
+
+        with patch.dict(os.environ, {"APP_ENV": "development", "APP_DEBUG": "true"}):
+            response = client.post(
+                "/api/auth/login",
+                json={"username": "alice", "password": "wrong"},
+            )
+
+        self.assertEqual(503, response.status_code)
+        error = response.json()["error"]
+        self.assertEqual("AUTH_CONFIGURATION_ERROR", error["code"])
+        self.assertEqual("configuration", error["details"]["category"])
+        self.assertIn("数据库配置", error["details"]["hint"])
+        self.assertNotIn("DSN", response.text)
+        self.assertNotIn("secret", response.text)
+        self.assertNotIn("internal.example", response.text)
+
+    def test_production_never_includes_diagnostic_details(self):
+        self.auth_service.authenticate.side_effect = AuthConfigurationError(
+            "SQL password=secret DSN=postgresql://user:secret@internal.example/app"
+        )
+        client = TestClient(
+            self.app({"role": "admin", "user": "alice", "name": "Alice"})
+        )
+
+        with patch.dict(os.environ, {"APP_ENV": "production", "APP_DEBUG": "true"}):
+            response = client.post(
+                "/api/auth/login",
+                json={"username": "alice", "password": "wrong"},
+            )
+
+        self.assertEqual(503, response.status_code)
+        error = response.json()["error"]
+        self.assertEqual("AUTH_CONFIGURATION_ERROR", error["code"])
+        self.assertNotIn("details", error)
+        self.assertNotIn("secret", response.text)
+        self.assertNotIn("internal.example", response.text)
 
 
 if __name__ == "__main__":
