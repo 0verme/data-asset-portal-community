@@ -54,7 +54,7 @@ const utilsPath = fileURLToPath(
 const timeInputPath = fileURLToPath(
   new URL("./common/TimeInput.tsx", import.meta.url),
 );
-const readSources = async (...paths) =>
+const readSources = async (...paths: string[]) =>
   (await Promise.all(paths.map((path) => readFile(path, "utf8")))).join("\n");
 
 test("push systems keep downstream and data-developer contacts separate", async () => {
@@ -339,10 +339,10 @@ test("push utilities preserve frequency formatting and validation", () => {
     latestOutputTime: "",
   };
   assert.deepEqual(validateSystem(validSystem, [], ""), []);
-  assert.match(
-    validateSystem({ ...validSystem, id: "CORE-ID" }, [], "")[0],
-    /字母、数字和下划线/,
-  );
+  const invalidSystemErrors = validateSystem({ ...validSystem, id: "CORE-ID" }, [], "");
+  const [invalidSystemError] = invalidSystemErrors;
+  assert.ok(invalidSystemError);
+  assert.match(invalidSystemError, /字母、数字和下划线/);
 
   const validJob = {
     cn: "客户推送",
@@ -350,7 +350,14 @@ test("push utilities preserve frequency formatting and validation", () => {
     freqType: "T+1",
     freq: "",
   };
-  const validField = { _key: "field-1", name: "customer_id", cn: "客户编号" };
+  const validField = {
+    _key: "field-1",
+    name: "customer_id",
+    cn: "客户编号",
+    meaning: "客户编号",
+    src: "DWM",
+    type: "string",
+  };
   assert.deepEqual(validateJob(validJob, [validField]), {
     errors: [],
     fieldErrors: {},

@@ -7,8 +7,8 @@ import { getIndicatorList } from "./indicator.ts";
 test("mock asset selector exposes deterministic local identities", async () => {
   const tables = await getAssetTables({ layer: "DWM" });
   assert.ok(tables.length > 0);
-  assert.ok(tables.every((table) => Number.isInteger(table.assetId) && table.assetId > 0));
-  assert.ok(tables.every((table) => table.fields.every((field) => field.fieldId > 0)));
+  assert.ok(tables.every((table) => typeof table.assetId === "number" && Number.isInteger(table.assetId) && table.assetId > 0));
+  assert.ok(tables.every((table) => table.fields.every((field) => typeof field.fieldId === "number" && field.fieldId > 0)));
   assert.ok(tables.every((table) => table.fields.every((field) => field.assetId === table.assetId)));
 });
 

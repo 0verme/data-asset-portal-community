@@ -69,8 +69,8 @@ CI（`.github/workflows/ci.yml`）会运行 Public Data Guard、后端测试、P
 - 前端：React 18 + Vite 7，视图在 `frontend/src/components/views/`，业务逻辑在 `frontend/src/hooks/`，API 层按模块拆分于 `frontend/src/api/`
 - 后端：FastAPI Native + Uvicorn，入口为 `backend/asgi.py`；service 位于 `backend/app/services/`，native routers 位于 `backend/app/fastapi/routers/`
 - 推荐先用 `VITE_API_MODE=mock` 快速验证前端改动
-- 新增 routing、serialization、API/auth 或 domain contract 时优先使用 TypeScript；既有 JS/JSX 不要求仅因触碰就迁移
-- 不要通过 `checkJs` 一次打开 legacy JavaScript 全量检查，也不要为更换扩展名机械改写与当前 Issue 无关的测试、兼容入口或既有 UI
+- `frontend/src/` 主应用与测试已完成 TypeScript 收口；新增或维护 routing、serialization、API/auth、domain contract、components 与 hooks 时使用 TypeScript/TSX
+- 不要通过 `checkJs` 或其他例外绕过严格类型检查；`frontend/src/` 不应重新引入 JS/JSX fallback。仓库配置与 Node tooling 的 JavaScript 文件按各自 runtime contract 维护
 
 最小验证命令：
 

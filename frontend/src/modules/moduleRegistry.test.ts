@@ -30,8 +30,12 @@ test("all repository modules are source-backed and open by default", () => {
   assert.deepEqual([...resolveDefaultEnabledModules()].sort(), [...moduleCodes].sort());
   assert.equal(isRegisteredModule("dwm"), true);
   assert.equal(isRegisteredModule("not-a-repository-module"), false);
-  assert.equal(getModuleDefinition("mapping").requires.length, 0);
-  assert.equal(getModuleDefinition("apiAsset").requires.length, 0);
+  const mapping = getModuleDefinition("mapping");
+  const apiAsset = getModuleDefinition("apiAsset");
+  assert.ok(mapping);
+  assert.ok(apiAsset);
+  assert.equal(mapping.requires.length, 0);
+  assert.equal(apiAsset.requires.length, 0);
 });
 
 test("path prefixes are unique across modules", () => {

@@ -9,20 +9,20 @@ FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract�
 
 | 模块 | 前端 API | Base Path | Community 当前状态 | 说明 |
 | --- | --- | --- | --- | --- |
-| 门户 / Repository Module Contract / 搜索 | `api/portal.js`、`api/search.js` | `/api/portal`、`/api/capabilities`、`/api/search` | 已注册 | 门户统计、兼容的仓库模块 capability contract、统一搜索 |
-| 认证 | `api/auth.js` | `/api/auth` | 已注册 | 登录、登出、获取当前用户 |
-| 上游卸数 | `api/upstream.js` | `/api/upstreams` | 已注册 | 管理上游源系统与卸数状态 |
-| 数据仓库 | `api/assets.js` | `/api/assets` | 已注册 | 管理已配置层级的表资产、字段、DDL |
-| 字段映射 | `api/fieldMapping.js` | `/api/field-mappings` | 已注册 | 查询源字段到目标字段映射关系 |
-| 血缘分析 | `api/lineage.js` | `/api/lineage` | 已注册 | POC 或配置后的 persistent 快照查询 |
-| 指标维护 | `api/indicator.js` | `/api/indicators` | 已注册 | 管理口径指标、维度、启停状态 |
-| 报表资产 | `api/report.js` | `/api/reports` | 已注册 | 管理报表台账、归属信息与关联引用 |
-| 词根管理 | `api/root.js` | `/api/roots` | 已注册 | 管理命名词根字典 |
-| 下游推送 | `api/push.js` | `/api/push` | 已注册 | 管理下游系统、推送作业与字段元数据 |
-| API 资产 | `api/apiAssets.js` | `/api/api-assets` | 已注册 | 管理 API 元数据、参数、响应字段与关系 |
-| 码值表维护 | `api/manualCodeTables.js` | `/api/manual-code-tables` | 已注册 | 管理手工码值表元数据 |
-| 系统管理 | `api/systemUsers.js`、`api/paramDicts.js`、`api/menus.js` | `/api/system` | 已注册 | 用户、菜单、参数字典与角色边界 |
-| 操作日志 | `api/operationLogs.js` | `/api/operation-logs` | 已注册（随 system） | 查询全站操作审计日志 |
+| 门户 / Repository Module Contract / 搜索 | `api/portal.ts`、`api/search.ts` | `/api/portal`、`/api/capabilities`、`/api/search` | 已注册 | 门户统计、兼容的仓库模块 capability contract、统一搜索 |
+| 认证 | `api/auth.ts` | `/api/auth` | 已注册 | 登录、登出、获取当前用户 |
+| 上游卸数 | `api/upstream.ts` | `/api/upstreams` | 已注册 | 管理上游源系统与卸数状态 |
+| 数据仓库 | `api/assets.ts` | `/api/assets` | 已注册 | 管理已配置层级的表资产、字段、DDL |
+| 字段映射 | `api/fieldMapping.ts` | `/api/field-mappings` | 已注册 | 查询源字段到目标字段映射关系 |
+| 血缘分析 | `api/lineage.ts` | `/api/lineage` | 已注册 | POC 或配置后的 persistent 快照查询 |
+| 指标维护 | `api/indicator.ts` | `/api/indicators` | 已注册 | 管理口径指标、维度、启停状态 |
+| 报表资产 | `api/report.ts` | `/api/reports` | 已注册 | 管理报表台账、归属信息与关联引用 |
+| 词根管理 | `api/root.ts` | `/api/roots` | 已注册 | 管理命名词根字典 |
+| 下游推送 | `api/push.ts` | `/api/push` | 已注册 | 管理下游系统、推送作业与字段元数据 |
+| API 资产 | `api/apiAssets.ts` | `/api/api-assets` | 已注册 | 管理 API 元数据、参数、响应字段与关系 |
+| 码值表维护 | `api/manualCodeTables.ts` | `/api/manual-code-tables` | 已注册 | 管理手工码值表元数据 |
+| 系统管理 | `api/systemUsers.ts`、`api/paramDicts.ts`、`api/menus.ts` | `/api/system` | 已注册 | 用户、菜单、参数字典与角色边界 |
+| 操作日志 | `api/operationLogs.ts` | `/api/operation-logs` | 已注册（随 system） | 查询全站操作审计日志 |
 | 通用码值（历史） | — | `/api/common-codes` | WAIT_DB，当前未注册 | 历史数据模型；前端运行时不得调用，参数字典管理见 `/api/system/param-dicts*` |
 
 仓库已有 module codes 默认进入同一 open runtime contract；菜单 `status`、外部依赖、database driver、credential 和 persistent lineage storage readiness 是实例/部署状态，不是 Edition feature gate。Module availability is not a licensing gate；menu visibility is not authorization，RBAC authorization is not module availability，runtime/DB profile is not feature gating。
@@ -135,7 +135,7 @@ VITE_API_MODE=remote
 - `modules[].reason` 是保留的兼容字段；当前模块 contract 对 source-backed modules 返回 `null`。数据库/驱动/存储/外部服务未就绪时，使用各业务 service 的诊断/error contract，不通过 capability payload 隐藏模块。
 - endpoint 不返回 Edition，也不根据 capability 状态取消 FastAPI router registration。当前没有为术语清理新增 `/api/modules` 或 `/api/readiness`，以避免无必要的 public API 扩张。
 
-前端 `frontend/src/capabilities/capabilities.js` 继续请求该 endpoint，但返回对象的 `loadStatus` / `loadError` 只表示 HTTP loader 状态（请求成功或失败）。网络失败保留完整的 repository module registry；它不能被解释为模块不存在或假 404。`ModuleCapabilityError`、`resolve_capabilities()` 等 backend 名称同样是保留的 capability compatibility terminology，不代表 readiness 或 licensing gate。
+前端 `frontend/src/capabilities/capabilities.ts` 继续请求该 endpoint，但返回对象的 `loadStatus` / `loadError` 只表示 HTTP loader 状态（请求成功或失败）。网络失败保留完整的 repository module registry；它不能被解释为模块不存在或假 404。`ModuleCapabilityError`、`resolve_capabilities()` 等 backend 名称同样是保留的 capability compatibility terminology，不代表 readiness 或 licensing gate。
 
 ### 1.10 Authentication boundary
 

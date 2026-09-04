@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const read = (relativePath) => readFileSync(new URL(relativePath, import.meta.url), "utf8");
+const read = (relativePath: string) => readFileSync(new URL(relativePath, import.meta.url), "utf8");
 const styles = read("./styles/app.css");
 const pushStyles = read("./styles/push.css");
 const moduleStyles = {

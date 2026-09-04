@@ -49,7 +49,7 @@ backend、frontend、API 和文档共用同一套定义：
 
 | 概念 | 职责 / Source of truth | 可以影响 | 明确不能影响 |
 | --- | --- | --- | --- |
-| **Module** | 仓库/产品领域身份；backend `app/core/modules.py`、frontend `src/modules/moduleRegistry.js` 及静态 composition/provider registry | module code、名称、路径、route/provider/search/stat identity | RBAC、菜单可见性、license/Edition、数据库连接或外部 readiness |
+| **Module** | 仓库/产品领域身份；backend `app/core/modules.py`、frontend `src/modules/moduleRegistry.ts` 及静态 composition/provider registry | module code、名称、路径、route/provider/search/stat identity | RBAC、菜单可见性、license/Edition、数据库连接或外部 readiness |
 | **Capability** | 现有 `/api/capabilities` 的兼容性公开表示；当前实际是 source-backed open module contract，由 module manifest 生成 | capability payload 及前端加载诊断；`modules[].enabled` / `reason` 是兼容字段 | license/Edition entitlement、菜单 status、RBAC、runtime profile、route registration 或依赖 readiness |
 | **Readiness / Diagnostics** | 运行时依赖和集成的实际状态：database connectivity、driver、storage、credentials、external service 等，由 provider/service error contract 表达 | 请求级成功、降级或可诊断错误 | Module identity、源码/route 存在性、菜单、RBAC、Edition |
 | **Menu Status** | 实例导航配置，事实源是 `p_menu.status` 及菜单排序/位置字段 | 导航展示，以及门户/搜索/统计的实例可见性过滤 | 删除源码模块、取消 route、后端授权、license、数据库可用性 |
@@ -66,7 +66,7 @@ backend、frontend、API 和文档共用同一套定义：
 
 数据库层的 `BackendCapability` / `BackendCapabilities` 是 provider adapter 的基础设施支持矩阵（例如 transaction、JDBC 或 connection pool），虽然复用了 capability 这个英文词，也不属于 `/api/capabilities` module payload，更不是 license 或模块隐藏开关。
 
-前端 `frontend/src/capabilities/capabilities.js` 中的 `loadStatus` / `loadError` 只表示 `/api/capabilities` HTTP 请求的加载结果（`ready` 或 `error`），不是 deployment readiness。请求失败时保留全部 registry module codes；具体模块若依赖数据库或外部集成，会在自己的 service/API contract 中报告诊断状态。
+前端 `frontend/src/capabilities/capabilities.ts` 中的 `loadStatus` / `loadError` 只表示 `/api/capabilities` HTTP 请求的加载结果（`ready` 或 `error`），不是 deployment readiness。请求失败时保留全部 registry module codes；具体模块若依赖数据库或外部集成，会在自己的 service/API contract 中报告诊断状态。
 
 ### FastAPI current route surface
 
@@ -160,7 +160,7 @@ V1 lineage 只支持 self-contained `replace` snapshot：新 snapshot 先以 `IN
 - `frontend/src/App.tsx` 负责应用编排、登录态和模块路由；`frontend/src/components/app/` 负责容器边界，`frontend/src/api/` 统一访问 `/api`。
 - `VITE_API_MODE=mock` 使用受控前端演示数据；`remote` 访问真实后端数据库。两种模式默认使用同一仓库模块集合，数据和外部执行能力可以不同。
 - Schema deployment contract 是 `backend/schema` 下四份 versioned dialect baseline 加 `backend/alembic` immutable forward revisions；baseline 是 fresh-install/offline physical artifact set，Alembic 负责 existing-database/head upgrade，二者不是同一个来源。`backend/app/db/tables.py` 只承载 runtime SQLAlchemy Core 查询子集，`demo/seed_*.py` 负责完整仓库模块的虚构演示数据。完整职责与编辑顺序见 [ADR-002](./adr/002-schema-canonical-source.md)。
-- 前端 TypeScript 分布：主应用 `frontend/src/` 目前仍以 JS/JSX 为主，只有少量 TS 边界文件（routing、auth permissions、共享 contract 的 `.d.ts`）；`frontend/packages/lineage-viewer*` 三个 workspace 是完整 TypeScript；`miniapp/` 是 Taro 4 + React + TypeScript。渐进采用策略见 [DEVELOPMENT.md](../DEVELOPMENT.md)。
+- 前端 TypeScript 分布：主应用 `frontend/src/`、其中的业务测试以及 `frontend/packages/lineage-viewer*` 三个 workspace 均采用 TypeScript/TSX；`miniapp/` 是 Taro 4 + React + TypeScript。主应用已关闭 `allowJs`，严格规则与迁移状态见 [DEVELOPMENT.md](../DEVELOPMENT.md)。
 - `backend/app/db/` 隔离 SQLite、PostgreSQL、MySQL 和 GaussDB/DWS 的 Provider 差异；数据库 profile 只表达部署连接能力。`docs/pg/`、`docs/dws/` 是方言参考和部署说明，不再作为隐藏模块的 schema 边界。
 - 正式部署由 Nginx 托管前端静态资源，并将 `/api` 代理到 ASGI runtime；详细环境变量、health check 与 Nginx 配置见 [DEPLOYMENT.md](../DEPLOYMENT.md)。
 

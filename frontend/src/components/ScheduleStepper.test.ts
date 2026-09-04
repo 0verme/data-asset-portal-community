@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { getScheduleSteps, nextUnload } from "./upstream/scheduleStepper.ts";
 
-const at = (hour, minute = 0) => new Date(2025, 0, 1, hour, minute);
+const at = (hour: number, minute = 0) => new Date(2025, 0, 1, hour, minute);
 
 test("classifies a four-point schedule around the next unload", () => {
   const times = ["01:00", "07:00", "13:00", "19:00"];

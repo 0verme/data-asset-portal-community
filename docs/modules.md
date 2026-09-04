@@ -8,17 +8,17 @@
 
 | 菜单 | Source / 前端视图 | Current remote API | Schema / seed / Demo 状态 |
 | --- | --- | --- | --- |
-| 上游卸数 | `UpstreamView.jsx` | `/api/upstreams/*` | canonical baseline/migration + demo seed；实际连接需要外部上游配置 |
-| 数据仓库 | `AssetView.jsx` | `/api/assets/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
-| 字段映射 | `FieldMappingPage.jsx` | `/api/field-mappings/*` | mapping core 表在 baseline；变更日志 DDL 为补充；Community seed |
-| 血缘分析 | `LineagePage.jsx` | `/api/lineage/*` | canonical `p_lineage_*` baseline/migration + demo snapshot；无 storage profile 时使用开发/测试 POC |
-| 词根管理 | `RootView.jsx` | `/api/roots/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
-| 指标维护 | `IndicatorView.jsx` | `/api/indicators/*` | indicator item/path baseline；Community seed；当前没有独立 `/api/indicator-path/*` route |
-| 报表资产 | `ReportView.jsx` | `/api/reports/*` | canonical baseline/migration + demo seed；外部数据集不是本模块 route 前置条件 |
-| API 资产 | `ApiAssetView.jsx` | `/api/api-assets/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
-| 下游推送 | `PushView.jsx` | `/api/push/*` | canonical baseline/migration + demo metadata；实际推送执行不在当前职责内 |
-| 码值表维护 | `ManualCodeTablePage.jsx` | `/api/manual-code-tables/*` | canonical baseline/migration + demo seed；当前只维护元数据 |
-| 系统管理 | `SystemView.jsx` | `/api/system/*`、`/api/operation-logs/*` | system/operation-log core 表在 baseline；Community seed；按角色控制菜单 |
+| 上游卸数 | `UpstreamView.tsx` | `/api/upstreams/*` | canonical baseline/migration + demo seed；实际连接需要外部上游配置 |
+| 数据仓库 | `AssetView.tsx` | `/api/assets/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
+| 字段映射 | `FieldMappingPage.tsx` | `/api/field-mappings/*` | mapping core 表在 baseline；变更日志 DDL 为补充；Community seed |
+| 血缘分析 | `LineagePage.tsx` | `/api/lineage/*` | canonical `p_lineage_*` baseline/migration + demo snapshot；无 storage profile 时使用开发/测试 POC |
+| 词根管理 | `RootView.tsx` | `/api/roots/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
+| 指标维护 | `IndicatorView.tsx` | `/api/indicators/*` | indicator item/path baseline；Community seed；当前没有独立 `/api/indicator-path/*` route |
+| 报表资产 | `ReportView.tsx` | `/api/reports/*` | canonical baseline/migration + demo seed；外部数据集不是本模块 route 前置条件 |
+| API 资产 | `ApiAssetView.tsx` | `/api/api-assets/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
+| 下游推送 | `PushView.tsx` | `/api/push/*` | canonical baseline/migration + demo metadata；实际推送执行不在当前职责内 |
+| 码值表维护 | `ManualCodeTablePage.tsx` | `/api/manual-code-tables/*` | canonical baseline/migration + demo seed；当前只维护元数据 |
+| 系统管理 | `SystemView.tsx` | `/api/system/*`、`/api/operation-logs/*` | system/operation-log core 表在 baseline；Community seed；按角色控制菜单 |
 
 所有 12 个仓库模块均由 backend manifest、FastAPI composition root、frontend registry 和 canonical schema/seed 覆盖。`/api/capabilities` 是保留的兼容 endpoint，只描述 source-backed open module set；它不读取数据库/外部依赖 readiness，也不包含 Edition 产品锁。管理员仍可通过 `p_menu.status` 配置实例菜单可见性，但菜单隐藏不会删除 route 或撤销 RBAC。
 
@@ -157,11 +157,11 @@
 
 ### 前端 mock 数据
 
-`VITE_API_MODE=mock` 和 `remote` 默认依据 `frontend/src/modules/moduleRegistry.js` 暴露全部 module registry；数据来源、部署 readiness 和线上 bundle revision 可以不同，但不会因为 mode 或产品名称隐藏仓库模块。
+`VITE_API_MODE=mock` 和 `remote` 默认依据 `frontend/src/modules/moduleRegistry.ts` 暴露全部 module registry；数据来源、部署 readiness 和线上 bundle revision 可以不同，但不会因为 mode 或产品名称隐藏仓库模块。
 
 `VITE_API_MODE=mock` 时，业务 API 使用 `frontend/src/data/` 中的演示数据或对应 API 文件内的受控演示数据。当前数据文件包括：
 
-`apiAssets.js`、`commonCodes.js`、`fieldMappings.js`、`indicatorPathOptions.js`、`indicators.js`、`manualCodeTables.js`、`menus.js`、`operationLogs.js`、`paramDicts.js`、`pushSystems.js`、`reports.js`、`roots.js`、`systemUsers.js`、`tables.js`、`upstreamSystems.js`。其中 `commonCodes.js` 仅保留为本地演示选项目录，不对应远程 `/api/common-codes` 请求。
+`apiAssets.ts`、`commonCodes.ts`、`fieldMappings.ts`、`indicatorPathOptions.ts`、`indicators.ts`、`manualCodeTables.ts`、`menus.ts`、`operationLogs.ts`、`paramDicts.ts`、`pushSystems.ts`、`reports.ts`、`roots.ts`、`systemUsers.ts`、`tables.ts`、`upstreamSystems.ts`。其中 `commonCodes.ts` 仅保留为本地演示选项目录，不对应远程 `/api/common-codes` 请求。
 
 门户统计、统一搜索和血缘分析的 mock 数据分别由对应前端 API 模块聚合或内置，不使用独立数据文件。
 

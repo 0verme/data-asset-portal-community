@@ -4,13 +4,16 @@ import test from "node:test";
 import {
   createInFlightGetRequestGroup,
   createInFlightRequestGroup,
+  type InFlightGetOptions,
 } from "./inFlightRequests.ts";
 
 test("coalesces matching in-flight requests and clears after completion", async () => {
   const runOnce = createInFlightRequestGroup();
   let calls = 0;
-  let release;
-  const request = () => {
+  let release: (value: { ok: boolean } | PromiseLike<{ ok: boolean }>) => void = () => {
+    throw new Error("request was not initialized");
+  };
+  const request = (): Promise<{ ok: boolean }> => {
     calls += 1;
     return new Promise((resolve) => {
       release = resolve;
@@ -52,14 +55,16 @@ test("clears rejected requests so retries can run", async () => {
 test("coalesces equivalent GET URLs with a stable request policy key", async () => {
   const run = createInFlightGetRequestGroup();
   let calls = 0;
-  let release;
-  const request = () => {
+  let release: (value: string | PromiseLike<string>) => void = () => {
+    throw new Error("request was not initialized");
+  };
+  const request = (): Promise<string> => {
     calls += 1;
     return new Promise((resolve) => {
       release = resolve;
     });
   };
-  const policy = {
+  const policy: Omit<InFlightGetOptions, "requestUrl"> = {
     method: "GET",
     credentials: "include",
     timeoutMs: 30_000,
@@ -83,7 +88,7 @@ test("keeps different GET request policies independent", async () => {
     calls += 1;
     return calls;
   };
-  const base = {
+  const base: InFlightGetOptions = {
     method: "GET",
     requestUrl: "/api/items",
     credentials: "include",
@@ -104,7 +109,7 @@ test("keeps different GET request policies independent", async () => {
 test("preserves caller cancellation ownership by bypassing GET coalescing", async () => {
   const run = createInFlightGetRequestGroup();
   let calls = 0;
-  const options = {
+  const options: InFlightGetOptions = {
     method: "GET",
     requestUrl: "/api/items",
     credentials: "include",
@@ -123,14 +128,14 @@ test("preserves caller cancellation ownership by bypassing GET coalescing", asyn
 test("invalidates pending GET entries before a mutation", async () => {
   const run = createInFlightGetRequestGroup();
   let calls = 0;
-  const releases = [];
-  const getOptions = {
+  const releases: Array<(value: string | PromiseLike<string>) => void> = [];
+  const getOptions: InFlightGetOptions = {
     method: "GET",
     requestUrl: "/api/items",
     credentials: "include",
     timeoutMs: 30_000,
   };
-  const request = () => {
+  const request = (): Promise<string> => {
     calls += 1;
     return new Promise((resolve) => {
       releases.push(resolve);
@@ -145,8 +150,11 @@ test("invalidates pending GET entries before a mutation", async () => {
 
   assert.equal(calls, 2);
   assert.notStrictEqual(stale, fresh);
-  releases[0]("stale");
-  releases[1]("fresh");
+  const staleRelease = releases[0];
+  const freshRelease = releases[1];
+  if (!staleRelease || !freshRelease) throw new Error("both pending requests should be releasable");
+  staleRelease("stale");
+  freshRelease("fresh");
   assert.equal(await stale, "stale");
   assert.equal(await fresh, "fresh");
 });

@@ -7,8 +7,8 @@ import test from "node:test";
 import { buildReportOptionSets } from "../config/reportOptions.ts";
 import { BINARY_STATUS_OPTIONS } from "../components/common/status.ts";
 
-const sourcePath = (relativePath) => fileURLToPath(new URL(relativePath, import.meta.url));
-const readSource = (relativePath) => readFile(sourcePath(relativePath), "utf8");
+const sourcePath = (relativePath: string) => fileURLToPath(new URL(relativePath, import.meta.url));
+const readSource = (relativePath: string) => readFile(sourcePath(relativePath), "utf8");
 
 const optionRuntimeSources = [
   "../components/report/ReportEditor.tsx",
@@ -25,15 +25,19 @@ test("the retired common-code client and hook are removed", () => {
 
 test("runtime option loaders do not call the retired common-codes API", async () => {
   const sources = await Promise.all(optionRuntimeSources.map(readSource));
+  const [reportSource, reportSidebarSource, statusSource, pushSource, upstreamSource] = sources;
+  if (!reportSource || !reportSidebarSource || !statusSource || !pushSource || !upstreamSource) {
+    throw new Error("Expected all option runtime sources to be readable");
+  }
   const source = sources.join("\n");
 
   assert.doesNotMatch(source, /common-codes/);
   assert.doesNotMatch(source, /useDictOptions|getDictOptions|getCodeItems/);
-  assert.match(sources[0], /buildReportOptionSets\(reportItems\)/);
-  assert.match(sources[1], /Object\.keys\(reportFacets\.type\)/);
-  assert.match(sources[2], /BINARY_STATUS_OPTIONS/);
-  assert.doesNotMatch(sources[3], /getDictOptionsBatch/);
-  assert.doesNotMatch(sources[4], /getDictOptions/);
+  assert.match(reportSource, /buildReportOptionSets\(reportItems\)/);
+  assert.match(reportSidebarSource, /Object\.keys\(reportFacets\.type\)/);
+  assert.match(statusSource, /BINARY_STATUS_OPTIONS/);
+  assert.doesNotMatch(pushSource, /getDictOptionsBatch/);
+  assert.doesNotMatch(upstreamSource, /getDictOptions/);
 });
 
 test("report type options prefer the current report asset values", () => {

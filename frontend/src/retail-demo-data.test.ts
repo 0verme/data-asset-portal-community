@@ -46,7 +46,9 @@ test("retail indicator, report, api and mapping references resolve", () => {
   INDICATORS.forEach((indicator) => {
     const baseName = indicator.resultTableName.replace(/^dws_/, "dwm_");
     assert.ok(tableFields.has(baseName), `${indicator.id} result table`);
-    assert.ok(tableFields.get(baseName).has(indicator.resultFieldName), `${indicator.id} result field`);
+    const fields = tableFields.get(baseName);
+    assert.ok(fields, `${indicator.id} result table fields`);
+    assert.ok(fields.has(indicator.resultFieldName), `${indicator.id} result field`);
   });
 
   const indicatorIds = new Set(INDICATORS.map((item) => item.id));

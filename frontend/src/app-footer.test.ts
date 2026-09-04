@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
-const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
+const read = (path: string) => readFile(new URL(path, import.meta.url), "utf8");
 
 test("application footer keeps the version and exposes the project GitHub link", async () => {
   const [app, styles] = await Promise.all([read("./App.tsx"), read("./styles/app.css")]);

@@ -25,7 +25,7 @@ const manualDataPath = fileURLToPath(
   new URL("../data/manualCodeTables.ts", import.meta.url),
 );
 
-const read = (path) => readFile(path, "utf8");
+const read = (path: string) => readFile(path, "utf8");
 
 test("binary status values and labels are canonical", () => {
   assert.deepEqual(BINARY_STATUS_LABELS, { enabled: "启用", disabled: "禁用" });

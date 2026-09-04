@@ -26,10 +26,10 @@ const pushSidebarPath = fileURLToPath(
 );
 const stylesPath = fileURLToPath(new URL("../styles/app.css", import.meta.url));
 
-const readSources = async (...paths) =>
+const readSources = async (...paths: string[]) =>
 	(await Promise.all(paths.map((path) => readFile(path, "utf8")))).join("\n");
 
-function assertAllOption(source, label) {
+function assertAllOption(source: string, label: string) {
 	assert.match(source, new RegExp(`allOption=\\{[\\s\\S]*?label: "${label}"`));
 }
 

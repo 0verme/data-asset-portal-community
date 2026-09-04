@@ -143,7 +143,7 @@ flowchart LR
 
 | 部件 | 说明 |
 | --- | --- |
-| 前端 | React 18 + Vite 8，现有代码以 JS/JSX 为主，新增边界代码采用 TypeScript |
+| 前端 | React 18 + Vite 8，`frontend/src/` 主应用与测试已全量采用 TypeScript/TSX，严格模式关闭 JavaScript fallback |
 | 后端 | FastAPI + Uvicorn，入口 `backend/asgi.py` |
 | Production / local entrypoint | `uvicorn backend.asgi:app --host 127.0.0.1 --port 15099` |
 | 健康检查 | `GET /healthz`，只报告进程状态，不查询数据库 |

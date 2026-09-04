@@ -28,14 +28,17 @@ test("hasPermission is the single permission predicate", () => {
 
 test("public permissions are inherited while role payloads keep only deltas", () => {
   const effective = getEffectivePermissions(["asset:write"]);
-  assert.deepEqual(effective.filter((code) => PUBLIC_PERMISSION_CODES.includes(code)), [...PUBLIC_PERMISSION_CODES].sort());
+  const publicPermissions = new Set<string>(PUBLIC_PERMISSION_CODES);
+  assert.deepEqual(effective.filter((code) => publicPermissions.has(code)), [...PUBLIC_PERMISSION_CODES].sort());
   assert.deepEqual(normalizeRolePermissionCodes(["asset:read", "asset:write"]), ["asset:write"]);
 });
 
 test("mock built-in maps remain deterministic while remote state stays explicit", () => {
   assert.equal(MOCK_ROLE_PERMISSIONS.admin.includes("system:user:write"), true);
-  assert.equal(MOCK_ROLE_PERMISSIONS.maintainer.includes("system:user:write"), false);
-  assert.equal(MOCK_ROLE_PERMISSIONS.maintainer.includes("asset:read"), false);
-  assert.equal(hasPermission({ role: "guest", permissions: getEffectivePermissions([]) }, "asset:read"), true);
-  assert.equal(hasPermission({ role: "guest", permissions: getEffectivePermissions([]) }, "asset:write"), false);
+  const maintainerPermissions: readonly string[] = MOCK_ROLE_PERMISSIONS.maintainer;
+  assert.equal(maintainerPermissions.includes("system:user:write"), false);
+  assert.equal(maintainerPermissions.includes("asset:read"), false);
+  const guest = { permissions: getEffectivePermissions([]) };
+  assert.equal(hasPermission(guest, "asset:read"), true);
+  assert.equal(hasPermission(guest, "asset:write"), false);
 });
