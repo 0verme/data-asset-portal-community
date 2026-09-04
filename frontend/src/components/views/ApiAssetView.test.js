@@ -28,11 +28,11 @@ test("API asset editor reuses the binary status toggle for create and edit", asy
   );
   assert.match(
     apiAssetView,
-    /<BinaryStatusToggle mode="status" name="status" value=\{form\.status\}/,
+    /<BinaryStatusToggle\s+mode="status"\s+name="status"\s+value=\{form\.status\}/,
   );
   assert.match(
     apiAssetView,
-    /onChange=\{\(value\) => set\("status", typeof value === "boolean"/,
+    /onChange=\{\s*\(value\)\s*=>\s*set\(\s*"status",\s*typeof value === "boolean"/,
   );
   assert.doesNotMatch(
     apiAssetView,
@@ -40,7 +40,7 @@ test("API asset editor reuses the binary status toggle for create and edit", asy
   );
   assert.match(
     indicatorEditor,
-    /<BinaryStatusToggle mode="status" value=\{form\.status\}/,
+    /<BinaryStatusToggle\s+mode="status"\s+value=\{form\.status\}/,
   );
 });
 

@@ -33,13 +33,14 @@ test("anonymous UI exposes catalog actions only and keeps write controls permiss
   ]);
 
   for (const source of sources) assert.match(source, /canEdit/);
-  assert.match(sources[0], /canEdit \? <button/);
-  assert.match(sources[1], /canEdit \? <button/);
-  assert.match(sources[2], /canEdit \? <button/);
-  assert.match(sources[3], /canEdit \? <button/);
-  assert.match(sources[4], /onNew=\{canEdit \?/);
-  assert.match(sources[5], /canEdit \? <button/);
-  assert.match(sources[6], /canEdit \? <button/);
+  const gatedButton = /canEdit\s*\?\s*\(?\s*<button/;
+  assert.match(sources[0], gatedButton);
+  assert.match(sources[1], gatedButton);
+  assert.match(sources[2], gatedButton);
+  assert.match(sources[3], gatedButton);
+  assert.match(sources[4], /onNew=\{\s*canEdit\s*\?/);
+  assert.match(sources[5], gatedButton);
+  assert.match(sources[6], gatedButton);
 });
 
 test("public push mock projection does not retain connection or contact fields", async () => {
