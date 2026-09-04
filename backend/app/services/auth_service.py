@@ -22,12 +22,106 @@ import os
 from sqlalchemy import func, select, update
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from ..db.base import DatabaseConnectionError, redact_sensitive_text
 from ..db.facade import AUTH_PROFILE_ENV, DEFAULT_PROFILE_ENV, load_db_profiles, resolve_db_profile_name
 from ..db.service import CoreAccess
 from ..db.tables import admin_user
+from ..settings import get_runtime_debug, get_runtime_environment
+
 ADMIN_ROLE = "admin"
 MAINTAINER_ROLE = "maintainer"
 LOGGER = logging.getLogger(__name__)
+
+_AUTH_FAILURE_MESSAGES = {
+    "configuration": "认证数据库配置异常，请联系管理员。",
+    "unavailable": "认证数据源暂不可用，请稍后重试。",
+    "query": "认证数据源查询失败，请稍后重试。",
+    "execution": "认证数据源写入失败，请稍后重试。",
+}
+_AUTH_FAILURE_CODES = {
+    "configuration": "AUTH_CONFIGURATION_ERROR",
+    # Keep the established data-source code for connection failures while
+    # using distinct codes for configuration, query, and write failures.
+    "unavailable": "AUTH_DATA_SOURCE_ERROR",
+    "query": "AUTH_DATA_SOURCE_QUERY_ERROR",
+    "execution": "AUTH_DATA_SOURCE_EXECUTION_ERROR",
+}
+_AUTH_FAILURE_HINTS = {
+    "configuration": "检查数据库配置文件路径、认证 profile 及其必填字段。",
+    "unavailable": "检查数据库进程、网络连通性和认证 profile。",
+    "query": "检查认证表结构、迁移状态和数据库权限。",
+    "execution": "检查认证表结构、数据库写权限和事务状态。",
+}
+_AUTH_FAILURE_CATEGORIES = frozenset(_AUTH_FAILURE_MESSAGES)
+
+
+def _diagnostic_mode_enabled() -> bool:
+    """Expose only business-level diagnostics outside production."""
+    return get_runtime_debug() and get_runtime_environment() != "production"
+
+
+def _exception_chain(error: Exception) -> list[Exception]:
+    chain: list[Exception] = []
+    current: Exception | None = error
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        chain.append(current)
+        cause = current.__cause__ or current.__context__
+        current = cause if isinstance(cause, Exception) else None
+    return chain
+
+
+def _is_configuration_failure(error: Exception) -> bool:
+    if isinstance(error, (FileNotFoundError, KeyError, ValueError)):
+        return True
+    if isinstance(error, RuntimeError) and not isinstance(error, DatabaseConnectionError):
+        message = str(error).lower()
+        return any(
+            marker in message
+            for marker in (
+                "missing required database profile",
+                "database profile not found",
+                "requires database",
+                "requires user",
+                "requires password",
+                "requires jdbc",
+                "requires a positive",
+                "requires a safe",
+            )
+        )
+    return False
+
+
+def _is_connection_failure(error: Exception) -> bool:
+    if isinstance(error, (DatabaseConnectionError, ConnectionError, TimeoutError, BrokenPipeError)):
+        return True
+    if isinstance(error, OSError) and not isinstance(error, FileNotFoundError):
+        return True
+
+    error_name = type(error).__name__.lower()
+    if error_name in {"interfaceerror", "disconnectionerror", "connectionexception"}:
+        return True
+    if error_name in {"operationalerror", "databaseerror"}:
+        message = str(error).lower()
+        return any(
+            marker in message
+            for marker in ("connect", "connection", "refused", "timeout", "server", "unavailable")
+        )
+    return False
+
+
+def _classify_data_source_failure(error: Exception, operation: str) -> str:
+    chain = _exception_chain(error)
+    if any(_is_configuration_failure(item) for item in chain):
+        return "configuration"
+    if any(_is_connection_failure(item) for item in chain):
+        return "unavailable"
+    return "query" if operation == "query" else "execution"
+
+
+def _root_cause(error: Exception) -> Exception:
+    return _exception_chain(error)[-1]
 
 
 class AuthError(Exception):
@@ -49,7 +143,52 @@ class AuthValidationError(AuthError):
 
 class AuthDataSourceError(AuthError):
     code = "AUTH_DATA_SOURCE_ERROR"
-    status_code = 500
+    status_code = 503
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        category: str = "unavailable",
+        cause_type: str | None = None,
+    ):
+        normalized_category = category if category in _AUTH_FAILURE_CATEGORIES else "unavailable"
+        self.category = normalized_category
+        self.code = _AUTH_FAILURE_CODES[normalized_category]
+        self.cause_type = cause_type or self.__class__.__name__
+        # Messages crossing the HTTP boundary are always controlled copies;
+        # callers must never be able to place SQL, DSNs, or credentials here.
+        super().__init__(_AUTH_FAILURE_MESSAGES[normalized_category])
+
+    def to_dict(self):
+        payload = super().to_dict()
+        if _diagnostic_mode_enabled():
+            payload["details"] = {
+                "category": self.category,
+                "causeType": self.cause_type,
+                "hint": _AUTH_FAILURE_HINTS[self.category],
+            }
+        return payload
+
+
+class AuthConfigurationError(AuthDataSourceError):
+    def __init__(self, message: str, *, cause_type: str | None = None):
+        super().__init__(message, category="configuration", cause_type=cause_type)
+
+
+class AuthDataSourceUnavailableError(AuthDataSourceError):
+    def __init__(self, message: str, *, cause_type: str | None = None):
+        super().__init__(message, category="unavailable", cause_type=cause_type)
+
+
+class AuthQueryError(AuthDataSourceError):
+    def __init__(self, message: str, *, cause_type: str | None = None):
+        super().__init__(message, category="query", cause_type=cause_type)
+
+
+class AuthExecutionError(AuthDataSourceError):
+    def __init__(self, message: str, *, cause_type: str | None = None):
+        super().__init__(message, category="execution", cause_type=cause_type)
 
 
 class AuthService:
@@ -75,15 +214,56 @@ class AuthService:
 
         return resolve_db_profile_name()
 
-    def _fetch_rows(self, statement) -> list[dict]:
-        selected_profile = self._profile()
-        LOGGER.info(
-            "Auth query profile resolved to %s (ASSET_AUTH_DB_PROFILE=%s, ASSET_DB_PROFILE=%s)",
-            selected_profile,
-            os.getenv(AUTH_PROFILE_ENV),
-            os.getenv(DEFAULT_PROFILE_ENV),
+    @staticmethod
+    def _map_data_source_error(error: Exception, operation: str) -> AuthDataSourceError:
+        category = _classify_data_source_failure(error, operation)
+        cause = _root_cause(error)
+        cause_type = type(cause).__name__
+        safe_reason = redact_sensitive_text(str(cause))
+        LOGGER.error(
+            "Authentication data source failure: operation=%s category=%s cause=%s reason=%s",
+            operation,
+            category,
+            cause_type,
+            safe_reason,
         )
-        return self._db.fetch_rows(statement)
+        error_types = {
+            "configuration": AuthConfigurationError,
+            "unavailable": AuthDataSourceUnavailableError,
+            "query": AuthQueryError,
+            "execution": AuthExecutionError,
+        }
+        error_type = error_types[category]
+        return error_type(
+            _AUTH_FAILURE_MESSAGES[category],
+            cause_type=cause_type,
+        )
+
+    def _fetch_rows(self, statement) -> list[dict]:
+        try:
+            selected_profile = self._profile()
+            LOGGER.info(
+                "Auth query profile resolved to %s (ASSET_AUTH_DB_PROFILE=%s, ASSET_DB_PROFILE=%s)",
+                selected_profile,
+                os.getenv(AUTH_PROFILE_ENV),
+                os.getenv(DEFAULT_PROFILE_ENV),
+            )
+            return self._db.fetch_rows(statement)
+        except Exception as error:
+            raise self._map_data_source_error(error, "query") from error
+
+    def _execute(self, statement) -> int:
+        try:
+            selected_profile = self._profile()
+            LOGGER.info(
+                "Auth update profile resolved to %s (ASSET_AUTH_DB_PROFILE=%s, ASSET_DB_PROFILE=%s)",
+                selected_profile,
+                os.getenv(AUTH_PROFILE_ENV),
+                os.getenv(DEFAULT_PROFILE_ENV),
+            )
+            return self._db.execute(statement)
+        except Exception as error:
+            raise self._map_data_source_error(error, "execution") from error
 
     def _fetch_user(self, username: str) -> dict | None:
         statement = (
@@ -113,21 +293,14 @@ class AuthService:
         if not check_password_hash(user.get("password_hash") or "", password):
             raise AuthValidationError("账号或密码不正确，请重试。")
 
-        try:
-            selected_profile = self._profile()
-            LOGGER.info("Auth update profile resolved to %s", selected_profile)
-            self._db.execute(
-                update(admin_user)
-                .where(admin_user.c.username == normalized_user)
-                .values(
-                    last_login_at=func.current_timestamp(),
-                    updated_at=func.current_timestamp(),
-                )
+        self._execute(
+            update(admin_user)
+            .where(admin_user.c.username == normalized_user)
+            .values(
+                last_login_at=func.current_timestamp(),
+                updated_at=func.current_timestamp(),
             )
-        except AuthDataSourceError:
-            raise
-        except Exception as error:
-            raise AuthDataSourceError("认证服务暂不可用，请稍后重试") from error
+        )
 
         return {
             # Preserve an unknown role as a constrained identity. The

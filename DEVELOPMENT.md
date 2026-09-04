@@ -173,6 +173,7 @@ APP_ENV=development
 
 - `APP_DEBUG` 默认关闭；仅 `1`、`true`、`yes`、`on`（忽略大小写和首尾空格）会启用它。不要在共享或生产环境设置它。
 - `APP_SECRET_KEY` 在所有环境均为必填项；缺失、空字符串或纯空白会使应用在启动时失败。用密码管理器或部署平台的 secret store 保存它，不要提交到仓库、写入日志，或把真实值粘贴进命令历史。可在受控终端本地生成候选值：`python -c "import secrets; print(secrets.token_urlsafe(32))"`，然后直接保存到 secret store / `.env.local`。
+- `POST /api/auth/login` 将无效凭据与认证数据源故障分开处理：无效凭据返回 `401/INVALID_CREDENTIALS`；数据库配置、连接、查询或最后登录时间写入故障返回 `503` 及对应 `AUTH_*` 错误码。非生产排查可显式设置 `APP_ENV=development` 与 `APP_DEBUG=true` 获取受控的故障分类和排查提示；生产响应不会返回 SQL、DSN、密码或 traceback，服务端日志记录脱敏原因。
 - `APP_ENV` 默认为安全的生产行为：Cookie 使用 `Secure=True`。本地 HTTP 联调必须显式设置 `APP_ENV=development`，此时 `Secure=False`；`HttpOnly=True` 与 `SameSite=Lax` 始终保留。
 - `backend/asgi.py` 运行纯 FastAPI Native backend；Auth 使用 application-owned signed-session cookie，新格式写入、旧格式在有限窗口内只读迁移，仓库已有模块 routes 默认注册，数据库/驱动/外部依赖 readiness 通过 error contract 表达。应用配置只读取 `APP_*` 名称；旧 `FLASK_*` 名称已移除。
 - Nginx + Vite 的 `/api` 反代是同源部署，不需要 CORS。只有前端和 API 确实处于不同来源时，才设置 `APP_CORS_ORIGINS`，使用逗号分隔的完整来源，例如 `https://portal.example.com,https://admin.example.com`；空项会忽略，未配置时不发送跨域允许头，绝不使用 `*`。

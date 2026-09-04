@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
 from backend.app.core.capabilities import resolve_capabilities
+from backend.app.db.base import DatabaseConnectionError
 from backend.app.fastapi.auth import get_native_session_identity
 from backend.app.fastapi_app import create_fastapi_app
 from backend.app.security.login_protection import (
@@ -20,7 +21,11 @@ from backend.app.security.login_protection import (
     LoginProtectionPolicy,
 )
 from backend.app.services.auth_service import (
+    AuthConfigurationError,
     AuthDataSourceError,
+    AuthDataSourceUnavailableError,
+    AuthExecutionError,
+    AuthQueryError,
     AuthService,
     AuthValidationError,
     build_password_hash,
@@ -242,6 +247,49 @@ class AuthFailureSemanticsTests(unittest.TestCase):
             {(401, "INVALID_CREDENTIALS", "账号或密码不正确，请重试。")},
         )
 
+    def test_provider_failures_keep_configuration_availability_query_and_write_distinct(self):
+        service = AuthService()
+        with patch.object(service, "_profile", return_value="primary"):
+            with patch.object(service._db, "fetch_rows", side_effect=FileNotFoundError):
+                with self.assertRaises(AuthConfigurationError) as configuration:
+                    service._fetch_rows(None)
+            with patch.object(
+                service._db,
+                "fetch_rows",
+                side_effect=DatabaseConnectionError(
+                    "primary", "postgres", "connection refused"
+                ),
+            ):
+                with self.assertRaises(AuthDataSourceUnavailableError) as unavailable:
+                    service._fetch_rows(None)
+            with patch.object(
+                service._db, "fetch_rows", side_effect=RuntimeError("query failed")
+            ):
+                with self.assertRaises(AuthQueryError) as query:
+                    service._fetch_rows(None)
+            with patch.object(
+                service._db, "execute", side_effect=RuntimeError("write failed")
+            ):
+                with self.assertRaises(AuthExecutionError) as execution:
+                    service._execute(None)
+
+        self.assertEqual(
+            (503, "AUTH_CONFIGURATION_ERROR", "configuration"),
+            (configuration.exception.status_code, configuration.exception.code, configuration.exception.category),
+        )
+        self.assertEqual(
+            (503, "AUTH_DATA_SOURCE_ERROR", "unavailable"),
+            (unavailable.exception.status_code, unavailable.exception.code, unavailable.exception.category),
+        )
+        self.assertEqual(
+            (503, "AUTH_DATA_SOURCE_QUERY_ERROR", "query"),
+            (query.exception.status_code, query.exception.code, query.exception.category),
+        )
+        self.assertEqual(
+            (503, "AUTH_DATA_SOURCE_EXECUTION_ERROR", "execution"),
+            (execution.exception.status_code, execution.exception.code, execution.exception.category),
+        )
+
 
 class LoginProtectionFastApiTests(unittest.TestCase):
     def setUp(self):
@@ -355,7 +403,7 @@ class LoginProtectionFastApiTests(unittest.TestCase):
             auth_service=auth,
         )
 
-        self.assertEqual(500, self.login(client).status_code)
+        self.assertEqual(503, self.login(client).status_code)
         self.assertEqual(0, limiter.failure_count_for("alice", "testclient"))
         self.assertEqual(401, self.login(client).status_code)
         self.assertEqual(1, limiter.failure_count_for("alice", "testclient"))

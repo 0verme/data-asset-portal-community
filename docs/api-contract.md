@@ -95,7 +95,8 @@ Accept: application/json
 - `404 Not Found`：资源不存在
 - `409 Conflict`：唯一键冲突
 - `422 Unprocessable Entity`：业务校验失败
-- `500 Internal Server Error`：服务端异常
+- `500 Internal Server Error`：未预期的服务端异常
+- `503 Service Unavailable`：依赖的数据源或认证配置暂不可用
 
 ### Binary availability status
 
@@ -1046,6 +1047,21 @@ Base Path: `/api/auth`
 ```json
 { "data": { "role": "admin", "user": "linxiao", "name": "林晓" } }
 ```
+
+### 登录失败与认证数据源错误
+
+- 用户名或密码错误、账号不存在或账号被禁用：`401`，错误码为
+  `INVALID_CREDENTIALS`；这些情况对外保持相同提示，不暴露账号是否存在。
+- 数据库配置异常：`503`，错误码为 `AUTH_CONFIGURATION_ERROR`。
+- 认证数据源连接不可用：`503`，错误码为 `AUTH_DATA_SOURCE_ERROR`。
+- 认证查询失败：`503`，错误码为 `AUTH_DATA_SOURCE_QUERY_ERROR`。
+- 登录成功后的最后登录时间写入失败：`503`，错误码为
+  `AUTH_DATA_SOURCE_EXECUTION_ERROR`。
+
+这些响应只返回业务级安全提示，不包含密码、SQL、DSN、完整连接串或 traceback。
+在显式的非生产 `APP_DEBUG=true` 场景，错误 `details` 仅增加受控的故障分类、
+异常类型名和排查提示；生产环境不会返回这些诊断字段。服务端会记录分类、操作阶段
+和脱敏后的原因，便于定位配置、连接、查询或写入问题。
 
 ## API 资产模块 `api-assets`
 
