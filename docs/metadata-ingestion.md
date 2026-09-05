@@ -202,9 +202,11 @@ GET /api/metadata/ingestions/{ingestionId}
 
 ## Reference implementations
 
-### PostgreSQL Reference Collector
+### PostgreSQL Official Collector
 
-[examples/metadata_ingestion/postgresql_collector.py](../examples/metadata_ingestion/postgresql_collector.py) 读取 PostgreSQL `information_schema` / `pg_catalog`，生成 Asset Contract，并使用 HTTP POST 调用 DAP。它是 reference implementation，不代表 DAP 自动支持所有数据库；Oracle、DWS、调度平台或报表系统的 parser/adapter 应由独立项目实现。
+[PostgreSQL Collector 10 分钟指南](./postgresql-collector.md) 和 [配置模板](../examples/metadata_ingestion/postgresql.yml) 提供仓库官方 PostgreSQL MVP。实现位于 [examples/metadata_ingestion/postgresql_collector.py](../examples/metadata_ingestion/postgresql_collector.py)，读取 PostgreSQL `pg_catalog`，生成当前 Asset Contract，并通过 HTTP POST 调用 DAP。
+
+它是 Metadata Contract 的外部参考实现，不代表 DAP 自动支持所有数据库；Oracle、DWS、Hive、Doris、MySQL、调度平台或报表系统的 parser/adapter 应由独立项目实现。当前 Contract 没有完整 DDL/default/owner 字段，Collector 会在指南中明确这些边界，不伪造字段。
 
 ### Lineage JSON producer
 
