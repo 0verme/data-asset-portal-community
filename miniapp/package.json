@@ -31,17 +31,18 @@
     "@types/react-dom": "^18.3.7",
     "@typescript-eslint/parser": "^8.68.0",
     "babel-preset-taro": "4.2.1",
+    "decompress": "file:./overrides/decompress",
     "eslint": "^9.39.5",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "git-clone": "file:./overrides/git-clone",
     "sass": "^1.89.2",
     "tsx": "^4.20.6",
     "typescript": "^6.0.3"
   },
   "overrides": {
     "@tarojs/cli": {
-      "adm-zip": "0.6.0",
-      "glob": "10.5.0"
+      "adm-zip": "0.6.0"
     },
     "@tarojs/components": {
       "swiper": "12.1.2"
@@ -49,15 +50,29 @@
     "@tarojs/helper": {
       "esbuild": "0.25.0"
     },
+    "@tarojs/plugin-doctor": {
+      "glob": "10.5.0"
+    },
     "@tarojs/webpack5-runner": {
       "esbuild": "0.25.0",
+      "html-minifier": "npm:html-minifier-terser@7.2.0",
       "miniprogram-simulate": {
         "less": "4.9.0",
         "postcss": "8.5.28"
       },
       "serialize-javascript": "7.0.5"
     },
-    "qs": "6.16.0"
+    "cacheable-request": {
+      "http-cache-semantics": "4.1.1"
+    },
+    "decompress": "$decompress",
+    "download-git-repo": {
+      "git-clone": "$git-clone"
+    },
+    "qs": "6.16.0",
+    "sockjs": {
+      "uuid": "11.1.1"
+    }
   },
   "engines": {
     "node": ">=18"

@@ -26,7 +26,7 @@
 在仓库根目录执行：
 
 ```powershell
-npm --prefix miniapp ci
+npm --prefix miniapp ci --include=dev
 npm --prefix miniapp run typecheck
 npm --prefix miniapp run lint
 npm --prefix miniapp test
@@ -35,41 +35,46 @@ npm --prefix miniapp run build:weapp
 
 ## 依赖安全审计
 
-小程序依赖树同时包含 Taro 的构建工具链和运行时包。审计必须针对
-`package-lock.json` 实际解析的完整树执行，不使用 `npm audit fix --force` 自动降级
-Taro 主版本：
+小程序依赖树同时包含 Taro 的构建工具链和运行时包。审计必须覆盖
+`package-lock.json` 实际解析的完整开发依赖树；不要使用
+`npm audit fix --force` 自动降级 Taro 主版本：
 
 ```bash
-npm --prefix miniapp audit --audit-level=high
+npm --prefix miniapp audit --include=dev --audit-level=high
 ```
 
-当前锁文件保留 Taro `4.2.1`，并对已验证可兼容的传递依赖使用 `overrides`：
+本次保留 Taro `4.2.1`、React `18` 和 Node `>=18`，仅对已验证的兼容链路使用
+`overrides`：
 
-| 依赖链 | 锁定的安全版本 | 验证范围 |
+| 依赖链 | 收口方式 | 验证范围 |
 | --- | --- | --- |
-| `@tarojs/components` → `swiper` | `12.1.2` | 解决 `swiper` critical 告警；未修改小程序源码引用 |
-| `@tarojs/helper` / `@tarojs/webpack5-runner` → `esbuild` | `0.25.0` | 解决旧版开发服务告警；typecheck、lint、test、weapp build 通过 |
-| `@tarojs/cli` → `adm-zip`、`@tarojs/plugin-doctor` → `glob` | `adm-zip 0.6.0`、`glob 10.5.0` | CLI/build 回归通过 |
-| `@tarojs/webpack5-runner` → `serialize-javascript` | `7.0.5` | weapp build 回归通过 |
-| `@tarojs/webpack5-runner` → `miniprogram-simulate` → `postcss` / `less` | `postcss 8.5.28`、`less 4.9.0` | 兼容性回归与 weapp build 通过 |
+| `@tarojs/components` → `swiper` | `12.1.2` | weapp build 通过；未修改小程序源码引用 |
+| `@tarojs/helper` / runner → `esbuild` | `0.25.0` | typecheck、lint、test、weapp build 通过 |
+| CLI → `adm-zip`；plugin-doctor → `glob` | `adm-zip 0.6.0`、`glob 10.5.0` | 使用精确父依赖范围，`npm ls` 无 invalid |
+| runner → `serialize-javascript` | `7.0.5` | weapp build 通过 |
+| runner → `miniprogram-simulate` → `postcss` / `less` | `postcss 8.5.28`、`less 4.9.0` | weapp build 通过 |
+| `sockjs` → `uuid` | `11.1.1` | webpack-dev-server / weapp build 加载回归通过 |
+| `cacheable-request` → `http-cache-semantics` | `4.1.1` | `got` 与 cache adapter 加载回归通过 |
+| runner → `html-minifier` | `html-minifier-terser 7.2.0` alias | Taro 4.2.1 weapp 路径不加载旧模块；weapp build 通过 |
 
-当前 Taro `4.2.1` 稳定版尚未提供完整无破坏升级路径。审计仍会报告以下未能安全
-通过兼容 override 消除的链路：
+Taro CLI 的模板下载链路没有可用的上游修复，因此使用仓库内可审计的最小适配层：
 
-- `@tarojs/cli` → `download-git-repo` → `download` → `decompress@4.2.1`：critical；上游
-  `decompress` 当前没有修复版本。
-- `@tarojs/cli` → `download-git-repo` → `git-clone@0.2.0`：high；当前包没有修复版本。
-- `@tarojs/webpack5-runner` → `html-minifier@4.0.0`：high；上游没有修复版本，替换为
-  `html-minifier-terser` 不是无风险的 API 等价升级。
-- `@tarojs/webpack5-runner` → `webpack@5.91.0`、`webpack-dev-server@4.15.2` 及其
-  `sockjs` / `uuid` 链路：包含 audit 告警；强行升级 webpack 会与 Taro runner 的
-  `ProgressPlugin` 配置契约冲突。
-- CLI 的 `cacheable-request` → `http-cache-semantics` / `got` 旧链路仍需随 Taro 上游
-  版本一起升级，不能只靠不受支持的跨主版本替换解决。
+- `miniapp/overrides/decompress` 以 CommonJS 适配器调用维护中的
+  `@xhmikosr/decompress@10.2.1`，保留 `download@7` 所需的异步函数 API，并启用归档
+  路径、符号链接/硬链接和特殊文件权限防护。
+- `miniapp/overrides/git-clone` 使用 `spawn` 参数数组和 `--` 选项终止符，拒绝
+  `opts.args` 及危险 checkout ref，保留 `download-git-repo` 成功回调契约；不经 shell
+  执行用户输入。
 
-因此，以上是短期、可回滚的风险收敛，不宣称当前 Issue 已完全解决；在 Taro 上游提供
-稳定且兼容的安全依赖链后，应重新执行完整审计、安装和 weapp 产物验收，再关闭对应
-Issue。构建工具依赖仅用于受控本地/CI 构建，不应将小程序开发服务暴露到不可信网络。
+在 Node 22 / npm 10、显式包含 dev 依赖的本次锁文件验证中，`npm audit` 结果为
+`critical=0`、`high=0`、`moderate=21`、`low=2`。剩余 moderate 主要来自 Taro
+4.2.1 声明的精确 `webpack@5.91.0` / `webpack-dev-server@4.15.2` 兼容边界、CLI
+旧版 `got` 链路，以及适配器依赖的 `file-type`；跨大版本替换会破坏 Taro 构建契约，
+因此不在本次范围内。构建工具仅用于受控本地/CI 构建，不应将小程序开发服务暴露到
+不可信网络。
+
+上述适配器和 overrides 均可独立回滚；待 Taro 上游提供稳定且兼容的安全依赖链后，
+应重新执行完整审计、安装和 weapp 产物验收。
 
 本地监听编译：
 
@@ -115,6 +120,7 @@ miniapp/
 │  ├─ app.config.ts
 │  └─ app.ts
 ├─ tests/
+├─ overrides/             # Taro CLI archive/clone security adapters
 ├─ project.config.json
 ├─ package.json
 └─ README.md

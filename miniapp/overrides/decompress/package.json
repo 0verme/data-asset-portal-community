@@ -1,0 +1,13 @@
+{
+  "name": "decompress",
+  "version": "10.2.1",
+  "private": true,
+  "description": "CommonJS adapter for the maintained @xhmikosr/decompress security fork",
+  "main": "index.cjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@xhmikosr/decompress": "10.2.1"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "git-clone",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Safe local adapter for Taro template cloning",
+  "main": "index.cjs",
+  "engines": {
+    "node": ">=18"
+  }
+}
