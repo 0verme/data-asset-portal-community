@@ -1,0 +1,32 @@
+# Copy this file and commit the copy if you want to version your topology.
+# Keep all secrets in environment variables; do not add a password field here.
+source:
+  type: postgresql
+  name: warehouse-prod       # Defaults to database when omitted.
+  namespace: finance         # Optional logical namespace in DAP.
+  host: 127.0.0.1
+  port: 5432
+  database: warehouse
+  username: dap_reader
+  password_env: DAP_PG_PASSWORD
+  connect_timeout: 10
+  statement_timeout_ms: 120000
+  schemas:
+    include:
+      - dwm
+      - dwd
+      - dm
+
+sink:
+  # A DAP base URL is accepted; the collector appends the Metadata API path.
+  url: http://127.0.0.1:15099
+  timeout: 60
+  # Option A: export the raw `session` cookie value from an authenticated DAP
+  # session. Option B: configure username_env/password_env below and the
+  # collector will call /api/auth/login without printing the password.
+  session_cookie_env: DAP_SESSION_COOKIE
+  # username_env: DAP_DAP_USERNAME
+  # password_env: DAP_DAP_PASSWORD
+
+collector:
+  version: 0.1.0

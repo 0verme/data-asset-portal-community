@@ -10,7 +10,7 @@ A lightweight, intranet-friendly data asset catalog for data warehouse teams.
 [![CI](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml)
 ![Stack](https://img.shields.io/badge/React%2018%20%2B%20Vite%208%20%7C%20FastAPI%20%2B%20Uvicorn?logo=react)
 
-[快速开始](#-快速开始) · [为什么选 DAP](#-为什么选-dap) · [与 OpenMetadata 的差异](#-与-openmetadata-和-datahub-的定位差异) · [功能](#-功能) · [数据库兼容性](#-数据库兼容性) · [文档](#-文档导航)
+[从 Demo 到 My Data](#-从-demo-到-my-data) · [为什么选 DAP](#-为什么选-dap) · [与 OpenMetadata 的差异](#-与-openmetadata-和-datahub-的定位差异) · [功能](#-功能) · [数据库兼容性](#-数据库兼容性) · [文档](#-文档导航)
 
 </div>
 
@@ -29,7 +29,7 @@ DAP 把这些元数据集中到一个可搜索、可维护的界面里，服务�
 
 ### 它明确不做
 
-- 不负责真实数据采集、任务编排或文件推送执行
+- DAP Core 不直接连接业务库做采集；仓库提供一个 PostgreSQL 官方 Collector MVP，但不负责任务编排或文件推送执行
 - 不内置 SQL / DAG / 调度系统的自动血缘解析
 - 不提供数据质量、Profiling、数据合约与治理工作流
 - 不提供开箱即用的数百个数据源 connector
@@ -65,6 +65,78 @@ DAP 把这些元数据集中到一个可搜索、可维护的界面里，服务�
 
 更多页面见 [截图画廊](./docs/screenshots.md)。
 
+## 🚀 从 Demo 到 My Data
+
+### 3 分钟跑 Demo
+
+需要 Python 3.10+、Node.js 22.13+ 和 npm 10+：
+
+```bash
+./scripts/demo.sh
+```
+
+Windows PowerShell：
+
+```powershell
+.\scripts\demo.ps1
+```
+
+按终端输出打开 DAP 页面。Community Demo 的 `admin / 12346` 只用于本地体验，不是生产凭据。
+
+### 10 分钟导入自己的 PostgreSQL
+
+1. **启动 DAP**：先运行上面的 Community Demo，或使用已部署的 DAP URL。
+2. **创建 metadata readonly 用户**：只授予 PostgreSQL catalog / 目标 schema 所需的元数据读取权限；不要把业务库密码写入 Git。
+3. **创建配置**：
+
+   ```bash
+   cp examples/metadata_ingestion/postgresql.yml ./postgresql.yml
+   ```
+
+   修改 `source.host`、`port`、`database`、`username` 和 `schemas.include`。不填写 include 时扫描所有非系统 schema。
+
+4. **设置 secret**：配置文件只保存环境变量名；PostgreSQL 密码和 DAP 密码不写 YAML。
+
+   ```bash
+   export DAP_PG_PASSWORD='<postgres-readonly-password>'
+   export DAP_DAP_USERNAME='admin'       # 本地 Demo；生产请使用 maintainer 用户
+   read -r -s DAP_DAP_PASSWORD
+   export DAP_DAP_PASSWORD
+   ```
+
+5. **检查连接**：
+
+   ```bash
+   python examples/metadata_ingestion/postgresql_collector.py check -c ./postgresql.yml
+   ```
+
+6. **预览扫描**：
+
+   ```bash
+   python examples/metadata_ingestion/postgresql_collector.py preview -c ./postgresql.yml
+   ```
+
+   预览只显示 schema/table/column 摘要和受限 payload，不读取业务行，也不打印密码或 token。
+
+7. **导入**：
+
+   ```bash
+   python examples/metadata_ingestion/postgresql_collector.py sync -c ./postgresql.yml
+   ```
+
+8. **查看结果**：打开 DAP 页面，搜索刚导入的 schema/table/column。重复执行 sync 会复用现有 Contract 的 natural key，并返回 `unchanged` 而不是无脑复制资产。
+
+完整权限、配置字段、支持边界和故障排查见 [PostgreSQL Collector 指南](./docs/postgresql-collector.md)。
+
+官方 source collector 当前只有：
+
+| 范围 | 支持情况 |
+| --- | --- |
+| DAP Runtime DB | SQLite、PostgreSQL、MySQL 8.0；GaussDB/DWS 为 Compatible |
+| Official Metadata Collector | **PostgreSQL（MVP）** |
+
+Runtime DB 支持 MySQL 不代表已经提供 MySQL metadata collector。
+
 ## 🎯 为什么选 DAP
 
 DAP 面向的是**没有精力、也没有条件部署一整套元数据平台**的团队：
@@ -75,7 +147,7 @@ DAP 面向的是**没有精力、也没有条件部署一整套元数据平台**
 | 内网 / 离线环境 | 支持完全离线的内网单机部署（systemd + Nginx，见 [部署说明](./DEPLOYMENT.md)） |
 | 以数仓为中心的元数据 | 表、字段、DDL、指标口径、词根、字段映射、上下游、报表、API 资产都是一等公民 |
 | 中国企业常见数据库环境 | PostgreSQL、MySQL 8.0、GaussDB / DWS 均有适配；SQLite 可用于本地与 CI |
-| 已有采集能力，只缺一个目录 | 外部 Collector 通过版本化 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 接入，DAP 不侵入你的采集链路 |
+| 想把 PostgreSQL 资产快速放进目录 | 仓库提供 PostgreSQL Collector MVP；其他 source 通过版本化 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 接入，DAP 不侵入采集链路 |
 | 需要移动端查阅 | 提供微信小程序只读资产目录 MVP，见 [miniapp/](./miniapp/README.md) |
 
 ## 🪶 与 OpenMetadata 和 DataHub 的定位差异
@@ -102,7 +174,7 @@ DAP 只在一个更窄的范围里做取舍：**用更少的组件、更低的�
 | 运维复杂度 | 低 | 中高 | 中高 |
 | 数仓为中心 | 是（核心范围） | 是，但覆盖范围更广 | 是，但覆盖范围更广 |
 | 离线 / 内网单机部署 | 重点支持的场景 | 可行，但依赖组件更多 | 可行，但依赖组件更多 |
-| 内置 connector 生态 | 不提供 | 丰富 | 丰富 |
+| 内置 connector 生态 | PostgreSQL MVP；不承诺 connector 生态 | 丰富 | 丰富 |
 | 内置自动采集与调度 | 不提供 | 提供 | 提供 |
 | 自动血缘解析 | 不提供，只展示导入的血缘 | 提供 | 提供 |
 | 数据质量 / Profiling | 不提供 | 提供 | 提供（随版本与配置） |
@@ -173,34 +245,7 @@ DAP 用两个标签描述数据库支持程度：
 
 完整矩阵、验证命令与边界说明见 [数据库支持矩阵](./docs/database-support.md)。
 
-## 🚀 快速开始
-
-### Repository Community Demo（真实 remote API，推荐首次体验）
-
-需要 Python 3.10+、Node.js 22.13+ 和 npm 10+。执行以下一键命令后，按终端输出打开 Demo。
-
-Linux/macOS：
-
-```bash
-./scripts/demo.sh
-```
-
-Windows PowerShell：
-
-```powershell
-.\scripts\demo.ps1
-```
-
-#### 演示管理员
-
-Community Demo 初始化完成后，可以使用：
-
-- 用户名：`admin`
-- 密码：`12346`
-
-该账号仅用于 Community Demo / 本地体验环境，不是生产环境默认管理员。正式部署请创建独立管理员账号，并立即修改默认凭据。
-
-详细说明见 [Community Demo 指南](./docs/community-demo.md)。
+## 🛠 其他启动方式
 
 ### 只看前端（mock mode）
 
@@ -230,13 +275,13 @@ npm --prefix frontend run dev
 
 ## 🔌 元数据接入 Metadata Ingestion
 
-DAP Core 不直接连接业务库做采集。外部系统通过版本化契约把元数据推给 DAP：
+DAP Core 不直接连接业务库做采集；仓库同时提供一个通过现有 Contract 调用 API 的 PostgreSQL Official Collector。其他外部系统通过版本化契约把元数据推给 DAP：
 
 ```text
 Customer System → Collector / Adapter → Versioned Metadata Contract → DAP Metadata API
 ```
 
-- **Collector 负责**：source access、parse、schedule、retry。
+- **Collector 负责**：source access、parse、schedule、retry；官方 PostgreSQL MVP 当前只负责一次性 metadata scan / sync。
 - **DAP 负责**：Receive、Validate、Normalize、Persist、Audit、Expose。
 
 Collector 不需要了解 DAP 的内部 schema。示例见 `examples/metadata_ingestion/`，
@@ -283,6 +328,7 @@ V1 血缘只支持 self-contained `replace` snapshot：新快照先以 `INACTIVE
 | [模块清单](./docs/modules.md) | 页面、接口入口和数据表对照 |
 | [API 契约](./docs/api-contract.md) | API 约定、端点和请求/响应模型 |
 | [Metadata Ingestion Contract](./docs/metadata-ingestion.md) | 外部 Collector 接入、版本、幂等、血缘 snapshot 与示例 |
+| [PostgreSQL Collector 指南](./docs/postgresql-collector.md) | PostgreSQL readonly 配置、check/preview/sync、支持边界与 10 分钟导入 |
 | [ADR-001](./docs/adr/001-metadata-ingestion-contract.md) | Metadata Contract 架构决策记录 |
 | [数据库迁移](./backend/schema/README.md) | Alembic baseline、stamp 与 forward migration 运维规则 |
 | [截图画廊](./docs/screenshots.md) | Community Demo 全量界面截图 |
@@ -333,8 +379,8 @@ SQLite（本地 / Demo / CI）、PostgreSQL、MySQL 8.0 为 **Verified**；Gauss
 
 ### 这个项目负责真实数据采集吗？
 
-不负责 source-specific 采集和调度。DAP 提供稳定的 Metadata Ingestion Contract / API，接收 Collector 已解析的资产和血缘 snapshot；
-采集连接、解析、调度、失败重试和真实文件推送仍属于外部 Collector / Adapter 或独立集成项目。
+DAP Core 不直接连接业务库，也不负责 source-specific 调度；仓库现在提供一个 PostgreSQL Official Collector MVP，负责一次性读取 PostgreSQL catalog 并通过 Metadata Contract/API 写入 DAP。
+Hive、Doris、Oracle、MySQL 等其他 source collector，以及调度、重试、Profiling 和真实文件推送仍不在仓库范围内。
 
 ### 它和 OpenMetadata / DataHub 是什么关系？
 
