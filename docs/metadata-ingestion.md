@@ -3,21 +3,22 @@
 Data Asset Portal 的外部元数据边界是：
 
 ```text
-Customer System
+External System
       ↓
-Collector / Adapter
+curated metadata
       ↓
-Versioned Metadata Contract
+DAP Metadata Contract
       ↓
-POST /api/metadata/assets/ingestions
-POST /api/metadata/lineage/ingestions
+Metadata API
       ↓
-FastAPI → MetadataIngestionService → Database Provider
+DAP
 ```
 
-`p_asset_table`、`p_asset_field`、`p_lineage_snapshot`、`p_lineage_node`、`p_lineage_edge`、内部 asset ID、物理 schema 和 migration 都是 DAP implementation detail。Collector 不应 import 或直接写这些表。
+DAP 是元数据消费者和资产目录：它接收外部系统已经整理好的资产数据，校验、归一化、幂等比较、持久化、审计并展示。DAP 不主动发现数据、不扫描数据库、不解析 SQL、不计算血缘，也不承担数据生产或离线计算能力。
 
-## DAP 与 Collector 的职责
+`p_asset_table`、`p_asset_field`、`p_lineage_snapshot`、`p_lineage_node`、`p_lineage_edge`、内部 asset ID、物理 schema 和 migration 都是 DAP implementation detail。外部生产者只依赖 versioned JSON/HTTP Contract，不应 import 或直接写这些表。
+
+## DAP 与外部生产者的职责
 
 DAP Core 负责：
 
@@ -25,13 +26,11 @@ DAP Core 负责：
 Receive → Validate → Normalize → Idempotency → Persist → Audit → Expose
 ```
 
-Collector / Adapter 负责：
+外部系统（例如治理平台、lakehouse-toolkit、ETL 平台或自定义程序）负责自行采集、筛选、识别并整理元数据，然后提交 HTTP。它们可以自行决定如何连接 source、解析 SQL/血缘、调度和重试；这些能力不属于 DAP Core。
 
-```text
-connect → collect → parse → schedule → retry source access → submit HTTP
-```
+DAP 不提供数据库 connector、扫描 runtime、统一调度器、SQL/Python/Shell parser、血缘计算引擎或通用 plugin framework。内部 migration、seed、repair、maintenance 和 tests 仍可在明确内部边界内直接操作数据库。
 
-DAP 不负责统一调度 Collector，也不实现万能 SQL/Python/Shell parser、connector framework、OpenLineage Server、DataHub/OpenMetadata compatibility 或 plugin marketplace。内部 migration、seed、repair、maintenance 和 tests 仍可在明确内部边界内直接操作数据库。
+当前最小文件导入路径见 [Metadata API 最小资产导入 Demo](../examples/metadata_ingestion/README.md)。
 
 ## Versioning
 
@@ -202,13 +201,20 @@ GET /api/metadata/ingestions/{ingestionId}
 
 ## Reference implementations
 
-### PostgreSQL Reference Collector
+### 当前推荐：准备好的资产 JSON 导入
 
-[examples/metadata_ingestion/postgresql_collector.py](../examples/metadata_ingestion/postgresql_collector.py) 读取 PostgreSQL `information_schema` / `pg_catalog`，生成 Asset Contract，并使用 HTTP POST 调用 DAP。它是 reference implementation，不代表 DAP 自动支持所有数据库；Oracle、DWS、调度平台或报表系统的 parser/adapter 应由独立项目实现。
+[examples/metadata_ingestion/README.md](../examples/metadata_ingestion/README.md) 和
+[ingest_assets.py](../examples/metadata_ingestion/ingest_assets.py) 提供最小的通用 HTTP 导入 Demo。
+它只读取外部系统已经整理好的 JSON，复用当前 Asset Contract，并调用
+`POST /api/metadata/assets/ingestions`；不连接或扫描任何数据库。
+
+仓库中早期的 [postgresql_collector.py](../examples/metadata_ingestion/postgresql_collector.py)
+仍作为历史 reference script 保留，但不代表 DAP Core 自动支持 PostgreSQL，也不在本方向
+继续扩展。数据库采集、资产识别和血缘解析应由独立的外部系统完成。
 
 ### Lineage JSON producer
 
 - [sample-lineage.json](../examples/metadata_ingestion/sample-lineage.json)
 - [publish_lineage.py](../examples/metadata_ingestion/publish_lineage.py)
 
-Producer 只加载公共 JSON Contract 并通过 HTTP 调用 API，不 import DAP DB schema、Provider 或内部 Service。
+Producer 只加载公共 JSON Contract 并通过 HTTP 调用 API，不 import DAP DB schema、Provider 或内部 Service。DAP 只接收和展示已经生成的 self-contained lineage snapshot，不负责解析或计算血缘。
