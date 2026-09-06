@@ -1,0 +1,144 @@
+{
+  "contractVersion": "1.0",
+  "source": {
+    "type": "governance-platform",
+    "name": "customer-domain-catalog",
+    "namespace": "customer-domain",
+    "instance": "community-demo"
+  },
+  "collector": {
+    "name": "curated-json-export",
+    "version": "1.0.0"
+  },
+  "assets": [
+    {
+      "externalId": "customer.customer_info",
+      "qualifiedName": "customer.customer_info",
+      "assetType": "table",
+      "catalog": "customer-domain",
+      "schema": "customer",
+      "name": "customer_info",
+      "description": "客户基础信息主题表",
+      "fields": [
+        {
+          "name": "customer_id",
+          "dataType": "bigint",
+          "nullable": false,
+          "primaryKey": true,
+          "ordinalPosition": 1,
+          "description": "客户唯一标识"
+        },
+        {
+          "name": "customer_name",
+          "dataType": "varchar(100)",
+          "nullable": false,
+          "primaryKey": false,
+          "ordinalPosition": 2,
+          "description": "客户姓名"
+        },
+        {
+          "name": "customer_level",
+          "dataType": "varchar(20)",
+          "nullable": true,
+          "primaryKey": false,
+          "ordinalPosition": 3,
+          "description": "客户等级"
+        },
+        {
+          "name": "registered_at",
+          "dataType": "timestamp",
+          "nullable": false,
+          "primaryKey": false,
+          "ordinalPosition": 4,
+          "description": "注册时间"
+        }
+      ]
+    },
+    {
+      "externalId": "customer.account_info",
+      "qualifiedName": "customer.account_info",
+      "assetType": "table",
+      "catalog": "customer-domain",
+      "schema": "customer",
+      "name": "account_info",
+      "description": "账户基础信息主题表",
+      "fields": [
+        {
+          "name": "account_id",
+          "dataType": "bigint",
+          "nullable": false,
+          "primaryKey": true,
+          "ordinalPosition": 1,
+          "description": "账户唯一标识"
+        },
+        {
+          "name": "customer_id",
+          "dataType": "bigint",
+          "nullable": false,
+          "primaryKey": false,
+          "ordinalPosition": 2,
+          "description": "所属客户标识"
+        },
+        {
+          "name": "account_status",
+          "dataType": "varchar(20)",
+          "nullable": false,
+          "primaryKey": false,
+          "ordinalPosition": 3,
+          "description": "账户状态"
+        },
+        {
+          "name": "balance",
+          "dataType": "decimal(18,2)",
+          "nullable": false,
+          "primaryKey": false,
+          "ordinalPosition": 4,
+          "description": "账户余额"
+        }
+      ]
+    },
+    {
+      "externalId": "customer.customer_asset_summary",
+      "qualifiedName": "customer.customer_asset_summary",
+      "assetType": "table",
+      "catalog": "customer-domain",
+      "schema": "customer",
+      "name": "customer_asset_summary",
+      "description": "客户资产汇总主题表",
+      "fields": [
+        {
+          "name": "customer_id",
+          "dataType": "bigint",
+          "nullable": false,
+          "primaryKey": true,
+          "ordinalPosition": 1,
+          "description": "客户唯一标识"
+        },
+        {
+          "name": "account_count",
+          "dataType": "integer",
+          "nullable": false,
+          "primaryKey": false,
+          "ordinalPosition": 2,
+          "description": "账户数量"
+        },
+        {
+          "name": "total_balance",
+          "dataType": "decimal(18,2)",
+          "nullable": false,
+          "primaryKey": false,
+          "ordinalPosition": 3,
+          "description": "客户资产总余额"
+        },
+        {
+          "name": "snapshot_date",
+          "dataType": "date",
+          "nullable": false,
+          "primaryKey": false,
+          "ordinalPosition": 4,
+          "description": "汇总日期"
+        }
+      ]
+    }
+  ]
+}

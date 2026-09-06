@@ -30,6 +30,7 @@ DAP 把这些元数据集中到一个可搜索、可维护的界面里，服务�
 ### 它明确不做
 
 - 不负责真实数据采集、任务编排或文件推送执行
+- 不主动发现数据、不扫描数据库、不解析 SQL，也不计算血缘
 - 不内置 SQL / DAG / 调度系统的自动血缘解析
 - 不提供数据质量、Profiling、数据合约与治理工作流
 - 不提供开箱即用的数百个数据源 connector
@@ -75,7 +76,7 @@ DAP 面向的是**没有精力、也没有条件部署一整套元数据平台**
 | 内网 / 离线环境 | 支持完全离线的内网单机部署（systemd + Nginx，见 [部署说明](./DEPLOYMENT.md)） |
 | 以数仓为中心的元数据 | 表、字段、DDL、指标口径、词根、字段映射、上下游、报表、API 资产都是一等公民 |
 | 中国企业常见数据库环境 | PostgreSQL、MySQL 8.0、GaussDB / DWS 均有适配；SQLite 可用于本地与 CI |
-| 已有采集能力，只缺一个目录 | 外部 Collector 通过版本化 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 接入，DAP 不侵入你的采集链路 |
+| 已有整理元数据的程序，只缺一个目录 | 外部系统通过版本化 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 接入，DAP 不侵入你的采集链路 |
 | 需要移动端查阅 | 提供微信小程序只读资产目录 MVP，见 [miniapp/](./miniapp/README.md) |
 
 ## 🪶 与 OpenMetadata 和 DataHub 的定位差异
@@ -107,7 +108,7 @@ DAP 只在一个更窄的范围里做取舍：**用更少的组件、更低的�
 | 自动血缘解析 | 不提供，只展示导入的血缘 | 提供 | 提供 |
 | 数据质量 / Profiling | 不提供 | 提供 | 提供（随版本与配置） |
 | 治理广度 | 资产目录 + permission RBAC + 操作日志 | 目录 + 质量 + 血缘 + 词汇表 + 策略 | 目录 + 血缘 + 策略与元数据自动化 |
-| 外部 Collector 接入模型 | 核心集成方式，版本化契约 | 支持，但更强调内置 ingestion | 支持，但更强调内置 ingestion |
+| 外部整理元数据导入 | 核心集成方式，版本化契约 | 支持，但更强调内置 ingestion | 支持，但更强调内置 ingestion |
 | 微信小程序只读目录 | 提供（MVP） | 未提供 | 未提供 |
 | 小团队友好度 | 高 | 需要更多运维投入 | 需要更多运维投入 |
 
@@ -138,7 +139,7 @@ flowchart LR
   S --> D["Database Provider"]
   D --> DB[("SQLite / PostgreSQL / MySQL / GaussDB-DWS")]
   R -.->|"mock"| M["受控演示数据"]
-  C["外部 Collector / Adapter"] -->|"Metadata Contract"| A
+  C["外部系统 / 自定义程序"] -->|"curated Metadata Contract"| A
 ```
 
 | 部件 | 说明 |
@@ -150,9 +151,9 @@ flowchart LR
 | 数据访问 | Service Layer → Database Provider → SQLite / PostgreSQL / MySQL / GaussDB-DWS |
 | 部署 | Nginx 托管前端静态资源并反代 `/api`，见 [部署说明](./DEPLOYMENT.md) |
 
-外部元数据的接入链路是 `业务系统 → Collector / Adapter → 版本化 Metadata Contract → DAP Metadata API`：
-DAP 负责接收、校验、归一化、持久化、审计与发布；**采集连接、解析、调度和重试属于外部 Collector**。
-详见 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 与 [ADR-001](./docs/adr/001-metadata-ingestion-contract.md)。
+外部元数据的接入链路是 `外部系统 → 已整理的 Metadata Contract → DAP Metadata API → DAP`：
+DAP 负责接收、校验、归一化、幂等、持久化、审计与展示；**采集、筛选、资产识别、血缘解析、调度和重试由外部系统负责**。
+DAP 不主动连接或扫描你的数据库。详见 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 与 [ADR-001](./docs/adr/001-metadata-ingestion-contract.md)。
 
 技术栈与架构边界的完整说明见 [架构说明](./docs/architecture.md)。
 
@@ -230,17 +231,28 @@ npm --prefix frontend run dev
 
 ## 🔌 元数据接入 Metadata Ingestion
 
-DAP Core 不直接连接业务库做采集。外部系统通过版本化契约把元数据推给 DAP：
+DAP 不主动发现数据、不扫描数据库、不解析 SQL、不计算血缘，也不承担数据生产或离线计算能力。
+请由现有数据治理程序、`lakehouse-toolkit`、ETL 平台或自定义脚本先筛选并整理需要管理的资产，
+再通过通用 Metadata API 导入：
 
 ```text
-Customer System → Collector / Adapter → Versioned Metadata Contract → DAP Metadata API
+External System
+    ↓
+curated metadata
+    ↓
+DAP Metadata Contract
+    ↓
+Metadata API
+    ↓
+DAP
 ```
 
-- **Collector 负责**：source access、parse、schedule、retry。
-- **DAP 负责**：Receive、Validate、Normalize、Persist、Audit、Expose。
+- **外部系统负责**：采集、筛选、资产识别、血缘解析，以及自己的调度和重试；
+- **DAP 负责**：Receive、Validate、Normalize、Idempotency、Persist、Audit、Expose。
 
-Collector 不需要了解 DAP 的内部 schema。示例见 `examples/metadata_ingestion/`，
-完整字段与语义见 [Metadata Ingestion Contract](./docs/metadata-ingestion.md)。
+从一份 JSON 在几分钟内完成首次导入，请看 [Metadata API 最小资产导入 Demo](./examples/metadata_ingestion/README.md)。
+示例 payload 是 [assets.example.json](./examples/metadata_ingestion/assets.example.json)，完整字段与语义见
+[Metadata Ingestion Contract](./docs/metadata-ingestion.md)。DAP API 保持通用，不绑定任何外部工具。
 
 ## 🔍 血缘浏览 Lineage
 
@@ -248,8 +260,8 @@ Collector 不需要了解 DAP 的内部 schema。示例见 `examples/metadata_in
 
 页面上的血缘来自**已导入的血缘快照（imported lineage snapshot）**，来源有两种：
 
-1. 外部 Collector / Adapter 通过 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 推送；
-2. 使用 `backend/scripts/collect_lineage_snapshot.py` 手工导入（见 [血缘快照采集与发布指南](./docs/lineage_bulk_import_guide.md)）。
+1. 外部系统通过 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 推送已经整理好的 snapshot；
+2. 使用仓库已有的导入脚本手工发布（见 [血缘快照采集与发布指南](./docs/lineage_bulk_import_guide.md)）。
 
 因此这个能力的准确定位是**血缘浏览 / 血缘视图（Lineage Viewer）**：查询、过滤和展示已经导入的血缘关系，
 而不是血缘分析引擎。UI 中该模块的中文名称保留为「血缘分析」，指的就是这个浏览功能。
@@ -282,7 +294,7 @@ V1 血缘只支持 self-contained `replace` snapshot：新快照先以 `INACTIVE
 | [架构说明](./docs/architecture.md) | 前后端架构、数据流和数据库边界 |
 | [模块清单](./docs/modules.md) | 页面、接口入口和数据表对照 |
 | [API 契约](./docs/api-contract.md) | API 约定、端点和请求/响应模型 |
-| [Metadata Ingestion Contract](./docs/metadata-ingestion.md) | 外部 Collector 接入、版本、幂等、血缘 snapshot 与示例 |
+| [Metadata Ingestion Contract](./docs/metadata-ingestion.md) | 外部整理元数据导入、版本、幂等、血缘 snapshot 与示例 |
 | [ADR-001](./docs/adr/001-metadata-ingestion-contract.md) | Metadata Contract 架构决策记录 |
 | [数据库迁移](./backend/schema/README.md) | Alembic baseline、stamp 与 forward migration 运维规则 |
 | [截图画廊](./docs/screenshots.md) | Community Demo 全量界面截图 |
@@ -333,8 +345,8 @@ SQLite（本地 / Demo / CI）、PostgreSQL、MySQL 8.0 为 **Verified**；Gauss
 
 ### 这个项目负责真实数据采集吗？
 
-不负责 source-specific 采集和调度。DAP 提供稳定的 Metadata Ingestion Contract / API，接收 Collector 已解析的资产和血缘 snapshot；
-采集连接、解析、调度、失败重试和真实文件推送仍属于外部 Collector / Adapter 或独立集成项目。
+不负责 source-specific 采集和调度。DAP 提供稳定的 Metadata Ingestion Contract / API，接收外部系统已经整理好的资产和血缘 snapshot；
+采集连接、筛选、资产识别、解析、调度、失败重试和真实文件推送仍属于外部系统或独立集成项目。DAP 不提供数据库 Collector。
 
 ### 它和 OpenMetadata / DataHub 是什么关系？
 
