@@ -122,7 +122,8 @@ class MetadataIngestionDemoTests(unittest.TestCase):
     def test_sync_posts_the_contract_with_an_existing_session(self):
         response = FakeResponse(
             201,
-            '{"status":"completed","summary":{"received":3,"create":3}}',
+            '{"ingestionId":"ingestion-1","status":"completed",'
+            '"summary":{"received":3,"create":3}}',
         )
         stdout = io.StringIO()
         with (
@@ -143,6 +144,7 @@ class MetadataIngestionDemoTests(unittest.TestCase):
         self.assertEqual("session=signed-session", request.get_header("Cookie"))
         self.assertEqual(self.payload, json.loads(request.data))
         self.assertIn("HTTP 201", stdout.getvalue())
+        self.assertIn("Ingestion ID: ingestion-1", stdout.getvalue())
         self.assertNotIn("signed-session", stdout.getvalue())
 
     def test_sync_logs_in_with_environment_credentials_and_uses_session_cookie(self):
@@ -237,6 +239,20 @@ class MetadataIngestionDemoTests(unittest.TestCase):
             )
         self.assertIn("HTTP 401", str(raised.exception))
         self.assertNotIn("demo-password", str(raised.exception))
+
+    def test_base_url_is_normalized_to_the_canonical_ingestion_endpoint(self):
+        response = FakeResponse(201, '{"status":"completed"}')
+        with patch.object(DEMO, "urlopen", return_value=response) as urlopen:
+            status, _body = DEMO.post_assets(
+                f"{DAP_URL}/",
+                self.payload,
+                session_cookie="session-value",
+            )
+        self.assertEqual(201, status)
+        request = urlopen.call_args.args[0]
+        self.assertEqual(
+            f"{DAP_URL}/api/metadata/assets/ingestions", request.full_url
+        )
 
     def test_unchanged_result_is_forwarded_from_existing_api_semantics(self):
         response = FakeResponse(

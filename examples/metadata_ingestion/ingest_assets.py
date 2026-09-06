@@ -446,6 +446,8 @@ def run_sync(payload: Mapping[str, Any], dap_url: str, *, timeout: int) -> int:
     except (TypeError, ValueError):
         result = None
     if isinstance(result, Mapping):
+        if result.get("ingestionId"):
+            print(f"Ingestion ID: {_redact(result['ingestionId'])}")
         if result.get("status"):
             print(f"Status: {_redact(result['status'])}")
         summary = result.get("summary")
