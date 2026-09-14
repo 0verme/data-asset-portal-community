@@ -30,7 +30,7 @@
     "@lineage-viewer/react": "1.1.0",
     "lineage-viewer": "1.1.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
