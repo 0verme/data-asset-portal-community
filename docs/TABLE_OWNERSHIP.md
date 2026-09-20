@@ -46,6 +46,17 @@
 - lineage child tables 通过 `snapshot_id` cascade 引用 lineage snapshot。
 - API Asset、Mapping、Report 等服务继续使用现有 SQLAlchemy Core / Provider contract，不新增数据库访问层。
 
+## p_asset_table / p_asset_field ownership
+
+`p_asset_table` 与 `p_asset_field` 的列按资产类别划分写入方：
+
+- `source_key IS NOT NULL`（source-bound）：`table_name` / `schema_name` / `catalog_name` / `database_name` / `table_desc` 及字段技术列（`field_name` / `data_type` / flags / `field_order` / `field_desc`）由 metadata ingestion 独占；`table_cn_name` / `layer_code` / `domain_code` / `owner_name` / `grain_desc` / `cycle_desc` 与字段 `field_cn_name` / `enum_desc` 属于 portal，ingestion update 永不写入。
+- `source_key IS NULL`（portal-only）：全部非 system 列由人工编辑维护。
+- source-bound 资产的人工编辑只允许 portal-owned 列；修改 source-owned 列返回 `422 SOURCE_OWNED_ATTRIBUTE`，整请求不落库。
+- ingestion `unchanged` 判定只使用 source-owned projection：人工修改 portal-owned 列后重复同步不会触发写入。
+
+完整列级矩阵与 merge / presence 语义见 [metadata-ingestion.md](./metadata-ingestion.md)。
+
 ## Supplementary DDL
 
 `docs/pg/` 和 `docs/dws/` 保留为方言说明、历史迁移参考和部署 catalog。它们不能再被解释为某个仓库模块的产品锁或 baseline 排除清单。

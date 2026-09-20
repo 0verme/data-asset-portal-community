@@ -108,6 +108,58 @@ POST /api/metadata/assets/ingestions?dryRun=false
 
 重复提交返回 `unchanged`，内容变化返回 `update`，首次提交返回 `create`。同一请求中的 duplicate natural key 是 conflict；语义校验在写库前完成，出现 invalid/conflict 时整批不写入。正式 ingestion 使用一个 transaction；持久化失败 rollback 整批。`dryRun=true` 或 `mode=preview` 只返回比较结果，不写业务数据，也不写 audit。
 
+## Asset ownership 与 merge policy
+
+`p_asset_table` 的列按资产类别划分 owner。资产类别由 `source_key` 决定：
+
+- `source-bound`（`source_key IS NOT NULL`）：由 ingestion 依据 `(source_key, assetType, externalId)` 创建 / 更新，source 是技术元数据的 system of record；
+- `portal-only`（`source_key IS NULL`）：人工创建、legacy 行或 demo seed；没有 source，因此没有 source-owned 列。
+
+| 列 | Owner | ingestion create | ingestion update | manual source-bound | manual portal-only |
+| --- | --- | --- | --- | --- | --- |
+| `asset_id` | system | `next_pk` | 不变 | 只读 | 只读 |
+| `source_key` | system | 写入 | identity，不参与 merge | 只读 | 保持 NULL |
+| `asset_type` / `external_id` / `qualified_name` | source | 写入 | identity / rename | 只读 | 不适用 |
+| `table_name` | source | 写入 | 更新（source rename） | 只读 | 可写 |
+| `schema_name` | source | 写入（absent 时按 `qualifiedName` 派生） | 更新（派生值） | 只读 | 可写（absent 时按 layer 派生） |
+| `catalog_name` / `database_name` | source | 写入（absent → NULL） | 三态 | 不适用 | 不适用 |
+| `table_desc` | source | 写入（absent → NULL） | 三态 | 只读 | 可写 |
+| `table_cn_name` | portal | fallback = `description` or `name` | **永不写** | 可写 | 可写 |
+| `layer_code` / `domain_code` / `owner_name` / `grain_desc` / `cycle_desc` | portal | NULL | **永不写** | 可写 | 可写 |
+| `field_count` | system | 实际 field 行数 | merge 后实际行数 | 写后重算 | 写后重算 |
+| `is_deleted` | system | 默认 `N` | 不写 | 不写 | 不写 |
+| `created_by` / `created_at` | system | actor / now | 不变 | 不变 | 不变 |
+| `updated_by` / `updated_at` | system | actor / now | 仅在真实写入时更新 | actor | actor |
+
+`source_key` / `asset_type` / `external_id` 是 identity 键，不是 merge 对象；`externalId` 变化 = 新 key = 新资产。`table_cn_name` 的 create fallback 之后只属于 portal：source description 的后续变化只反映在 `table_desc`。
+
+### Merge 与 compare 规则
+
+- ingestion 的 `unchanged` 判定只使用 source-owned projection（`assetType` / `qualifiedName` / `catalog` / `database` / `schema` / `name` / `description` 与字段级 source-owned 投影）；portal-owned 列与读模型 display fallback（`table.cn = table_cn_name or table_name`、`field.cn = field_cn_name or field_desc or field_name`）不参与比较。
+- 人工只修改 portal-owned 属性后提交相同 source payload 必须返回 `unchanged`，并且**零写入**：asset / field 行不 UPDATE，`updated_at` / `updated_by` 不变，`p_asset_change_log` 不新增。
+- ingestion update 只写 source-owned 列；`table_cn_name` / `layer_code` / `domain_code` / `owner_name` / `grain_desc` / `cycle_desc` 在 update 分支一律 preserve，不会因为上游修改任意技术元数据而被清空或覆盖。
+- create 是唯一写入 portal-owned 列的 ingestion 分支：`table_cn_name = description or name`，其余 governance 列为 NULL。
+- `p_asset_change_log` 的 before / after JSON 记录完整 source-owned projection（不保存原始 payload），使 source-owned 变化可审计。
+
+### source-owned 标量三态
+
+`description` / `catalog` / `database` 采用同一 presence 规则：
+
+| wire 状态 | 语义 |
+| --- | --- |
+| key absent | update 保留现值；create 写 NULL |
+| explicit `null` | 显式清空为 NULL |
+| 空字符串 / 纯空白 | 显式清空为 NULL |
+| 非空值 | strip 后写入 |
+
+实现使用 Pydantic v2 `model_fields_set` 判定 presence，不修改 JSON wire shape；空值统一存 NULL，读 API 继续把 NULL 渲染为 `""`。
+
+### 人工编辑 ownership enforcement
+
+- `source-bound` 资产：`name` / `schema` / `desc` 属于 source-owned，人工修改返回确定性 `422 SOURCE_OWNED_ATTRIBUTE`，`error.details[]` 给出具体列；整请求原子失败，不写入任何列。
+- `portal-only` 资产：全部非 system 列可编辑，`PUT /api/assets/{assetId}` 保持原语义（含 rename）。
+- 只回传当前值（normalize 后相等）不视为修改，不触发拒绝；字段级约束见 [Field identity 与增量 merge](#field-identity-与增量-merge)。
+
 ## Field identity 与增量 merge
 
 `p_asset_field.field_id` 是字段的 historical identity，也是 `p_indicator_item.result_field_id` 的稳定引用。Ingestion 与人工编辑都不再 `DELETE ALL + recreate`，而是按稳定键增量 merge。

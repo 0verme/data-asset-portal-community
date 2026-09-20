@@ -138,17 +138,17 @@ class AssetValidationError(Exception):
 
 
 class AssetSourceOwnedError(AssetValidationError):
-    """Deterministic 422 when a manual edit touches source-owned field values.
+    """Deterministic 422 when a manual edit touches source-owned values.
 
     ``source_key IS NOT NULL`` assets have a source system of record. Manual
-    editing may only touch portal-owned columns (``field_cn_name`` /
-    ``enum_desc``); adding, removing or renaming fields and changing
-    technical attributes is rejected instead of silently ignored.
+    editing may only touch portal-owned columns; field add / remove / rename /
+    technical mutation and asset-level ``name`` / ``schema`` / ``desc`` changes
+    are rejected instead of silently ignored.
     """
 
     def __init__(self, details):
         super().__init__(details)
-        self.message = "source-bound 资产不允许人工修改 source-owned 字段属性"
+        self.message = "source-bound 资产不允许人工修改 source-owned 属性"
 
     def to_dict(self):
         return {
@@ -949,6 +949,47 @@ class AssetsService(AuditActorMixin):
             "current_name": current_name,
         }
 
+    def _source_bound_asset_violations(self, payload, current_row, table):
+        """Deterministic source-owned violations for a manual asset edit.
+
+        Only ``source_key IS NOT NULL`` assets are constrained, and only keys
+        explicitly present in the request participate. Values are compared
+        after normalization (strip; NULL and "" are equivalent for the
+        optional description) so a client echoing the current read model is
+        not rejected, while a real mutation returns ``422
+        SOURCE_OWNED_ATTRIBUTE`` before anything is written.
+        """
+        if not current_row.get("source_key"):
+            return []
+        problems = []
+        stored_name = str(current_row.get("table_name") or "").strip()
+        if table["name"] != stored_name:
+            problems.append(
+                {
+                    "field": "name",
+                    "message": "source-bound 资产的表英文名由 source 维护，不允许人工修改",
+                }
+            )
+        if "schema" in payload:
+            stored_schema = str(current_row.get("schema_name") or "").strip()
+            if str(table.get("schema") or "").strip() != stored_schema:
+                problems.append(
+                    {
+                        "field": "schema",
+                        "message": "source-bound 资产的 schema 由 source 维护，不允许人工修改",
+                    }
+                )
+        if "desc" in payload:
+            stored_desc = str(current_row.get("table_desc") or "").strip()
+            if str(table.get("desc") or "").strip() != stored_desc:
+                problems.append(
+                    {
+                        "field": "desc",
+                        "message": "source-bound 资产的表说明由 source 维护，不允许人工修改",
+                    }
+                )
+        return problems
+
     def _ensure_db_table_absent(self, table_name, exclude_asset_id=None):
         """Manual create / rename guard; existence check, not an identity lookup."""
         safe_name = self._ensure_safe_name(table_name)
@@ -1199,6 +1240,10 @@ class AssetsService(AuditActorMixin):
             current = self._asset_detail_from_row(current_row)
         current_name = current_row.get("table_name") or ""
         table = self._validate_table_payload(payload, current_name=current_name)
+        source_bound = bool(current_row.get("source_key"))
+        violations = self._source_bound_asset_violations(payload, current_row, table)
+        if violations:
+            raise AssetSourceOwnedError(violations)
         try:
             asset_id = int(current_row["asset_id"])
         except (KeyError, TypeError, ValueError) as error:
@@ -1207,6 +1252,13 @@ class AssetsService(AuditActorMixin):
             self._ensure_db_table_absent(table["name"], exclude_asset_id=asset_id)
         _, name_to_code = self._load_domain_mappings()
         after_data = {key: deepcopy(value) for key, value in table.items() if key != "current_name"}
+        if source_bound:
+            # Source-owned columns are not written by the manual path, so the
+            # audit view reports the preserved stored values instead of a
+            # derived/requested value that was never persisted.
+            after_data["name"] = current_row.get("table_name") or after_data["name"]
+            after_data["schema"] = current_row.get("schema_name") or after_data["schema"]
+            after_data["desc"] = current_row.get("table_desc") or ""
         active = self._load_active_field_rows(asset_id)
         incoming = [
             IncomingField(
@@ -1222,27 +1274,33 @@ class AssetsService(AuditActorMixin):
         ]
         field_statements, active_after = self._reconcile_manual_fields(
             asset_id=asset_id,
-            source_bound=bool(current_row.get("source_key")),
+            source_bound=source_bound,
             active=active,
             incoming=incoming,
         )
+        asset_values = {
+            "table_cn_name": table["cn"],
+            "layer_code": table["layer"],
+            "domain_code": name_to_code[table["domain"]],
+            "owner_name": table["owner"],
+            "grain_desc": table["grain"],
+            "cycle_desc": table["cycle"],
+            "field_count": active_after,
+            "updated_by": self._default_operator,
+            "updated_at": func.current_timestamp(),
+        }
+        if not source_bound:
+            # portal-only assets have no source of record: every non-system
+            # column stays manually editable.
+            asset_values.update(
+                table_name=table["name"],
+                schema_name=table["schema"],
+                table_desc=table["desc"],
+            )
         statements = [
             update(asset_table)
             .where(asset_table.c.asset_id == asset_id)
-            .values(
-                table_name=table["name"],
-                table_cn_name=table["cn"],
-                schema_name=table["schema"],
-                layer_code=table["layer"],
-                domain_code=name_to_code[table["domain"]],
-                owner_name=table["owner"],
-                grain_desc=table["grain"],
-                cycle_desc=table["cycle"],
-                table_desc=table["desc"],
-                field_count=active_after,
-                updated_by=self._default_operator,
-                updated_at=func.current_timestamp(),
-            ),
+            .values(**asset_values),
             *field_statements,
             self._insert_change_log(asset_id, table["name"], "UPDATE_TABLE", current, after_data),
         ]
