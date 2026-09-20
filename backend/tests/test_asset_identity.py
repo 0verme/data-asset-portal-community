@@ -77,7 +77,9 @@ def _asset_ref(row):
     }
 
 
-def asset_update_payload(*, name: str = "orders", cn: str = "人工维护订单表"):
+def asset_update_payload(*, name: str = "orders", cn: str = "人工维护订单表", desc: str = "订单表"):
+    # ``desc`` is source-owned on source-bound assets (#260); these identity
+    # tests echo the ingested value and only mutate portal-owned ``cn``.
     return {
         "name": name,
         "cn": cn,
@@ -86,7 +88,7 @@ def asset_update_payload(*, name: str = "orders", cn: str = "人工维护订单�
         "owner": "zhangsan",
         "grain": "一行订单",
         "cycle": "每日",
-        "desc": "人工描述",
+        "desc": desc,
         "fields": [
             {
                 "name": "order_id",
