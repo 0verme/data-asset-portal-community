@@ -23,6 +23,7 @@ from ...contracts import (
 )
 from ...services.assets_service import (
     AssetAlreadyExistsError,
+    AssetAmbiguousError,
     AssetDataSourceError,
     AssetNotFoundError,
     AssetValidationError,
@@ -100,6 +101,8 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             data = current_service.get_asset_detail(table_name)
         except AssetNotFoundError as error:
             return _service_error_response(error, 404)
+        except AssetAmbiguousError as error:
+            return _service_error_response(error, 409)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
         return JSONResponse(
@@ -115,6 +118,8 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             items = current_service.get_asset_fields(table_name)
         except AssetNotFoundError as error:
             return _service_error_response(error, 404)
+        except AssetAmbiguousError as error:
+            return _service_error_response(error, 409)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
         return JSONResponse(
@@ -130,6 +135,8 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             data = current_service.get_asset_ddl(table_name)
         except AssetNotFoundError as error:
             return _service_error_response(error, 404)
+        except AssetAmbiguousError as error:
+            return _service_error_response(error, 409)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
         return JSONResponse(
@@ -197,6 +204,8 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             )
         except AssetNotFoundError as error:
             return _service_error_response(error, 404)
+        except AssetAmbiguousError as error:
+            return _service_error_response(error, 409)
         except AssetValidationError as error:
             return _service_error_response(error, 422)
         except AssetAlreadyExistsError as error:
@@ -223,6 +232,8 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             )
         except AssetNotFoundError as error:
             return _service_error_response(error, 404)
+        except AssetAmbiguousError as error:
+            return _service_error_response(error, 409)
         except AssetValidationError as error:
             return _service_error_response(error, 422)
         except AssetDataSourceError as error:
@@ -242,6 +253,122 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     ):
         try:
             current_service.delete_asset_table(table_name)
+        except AssetNotFoundError as error:
+            return _service_error_response(error, 404)
+        except AssetAmbiguousError as error:
+            return _service_error_response(error, 409)
+        except AssetDataSourceError as error:
+            return _service_error_response(error, 500)
+        return JSONResponse(content={"message": "数据表删除成功"})
+
+    # Canonical identity routes. ``asset_id`` is the portal-internal stable
+    # reference; the ``/tables/{table_name}`` routes above stay as an additive
+    # compatibility surface. These must stay registered after the literal
+    # ``/tables``, ``/domains`` and ``/layers`` routes so path matching keeps
+    # literal segments first.
+    @router.get("/{asset_id}", response_model=None)
+    def get_asset_detail_by_id(
+        asset_id: str,
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.get_asset_detail_by_id(asset_id)
+        except AssetNotFoundError as error:
+            return _service_error_response(error, 404)
+        except AssetDataSourceError as error:
+            return _service_error_response(error, 500)
+        return JSONResponse(
+            content=validate_contract({"data": data}, DataEnvelope[AssetItem])
+        )
+
+    @router.get("/{asset_id}/fields", response_model=None)
+    def get_asset_fields_by_id(
+        asset_id: str,
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            items = current_service.get_asset_fields_by_id(asset_id)
+        except AssetNotFoundError as error:
+            return _service_error_response(error, 404)
+        except AssetDataSourceError as error:
+            return _service_error_response(error, 500)
+        return JSONResponse(
+            content=validate_contract({"items": items}, ItemsResponse[AssetField])
+        )
+
+    @router.get("/{asset_id}/ddl", response_model=None)
+    def get_asset_ddl_by_id(
+        asset_id: str,
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.get_asset_ddl_by_id(asset_id)
+        except AssetNotFoundError as error:
+            return _service_error_response(error, 404)
+        except AssetDataSourceError as error:
+            return _service_error_response(error, 500)
+        return JSONResponse(
+            content=validate_contract({"data": data}, DataEnvelope[object])
+        )
+
+    @router.put("/{asset_id}", response_model=None)
+    def update_asset_table_by_id(
+        asset_id: str,
+        payload: AssetTableRequest | None = Body(default=None),
+        _context: RequestContext = Depends(require_permission("asset:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_asset_table_by_id(
+                asset_id, _asset_payload(payload)
+            )
+        except AssetNotFoundError as error:
+            return _service_error_response(error, 404)
+        except AssetValidationError as error:
+            return _service_error_response(error, 422)
+        except AssetAlreadyExistsError as error:
+            return _service_error_response(error, 409)
+        except AssetDataSourceError as error:
+            return _service_error_response(error, 500)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "数据表更新成功", "data": data},
+                MessageDataResponse[AssetItem],
+            )
+        )
+
+    @router.put("/{asset_id}/fields", response_model=None)
+    def update_asset_fields_by_id(
+        asset_id: str,
+        payload: AssetTableRequest | None = Body(default=None),
+        _context: RequestContext = Depends(require_permission("asset:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_asset_fields_by_id(
+                asset_id, _asset_payload(payload)
+            )
+        except AssetNotFoundError as error:
+            return _service_error_response(error, 404)
+        except AssetValidationError as error:
+            return _service_error_response(error, 422)
+        except AssetDataSourceError as error:
+            return _service_error_response(error, 500)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "字段列表更新成功", "data": data},
+                MessageDataResponse[object],
+            )
+        )
+
+    @router.delete("/{asset_id}", response_model=None)
+    def delete_asset_table_by_id(
+        asset_id: str,
+        _context: RequestContext = Depends(require_permission("asset:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            current_service.delete_asset_table_by_id(asset_id)
         except AssetNotFoundError as error:
             return _service_error_response(error, 404)
         except AssetDataSourceError as error:

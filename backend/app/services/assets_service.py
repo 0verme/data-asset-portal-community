@@ -94,6 +94,30 @@ class AssetAlreadyExistsError(Exception):
         }
 
 
+class AssetAmbiguousError(Exception):
+    """Raised when a legacy table_name lookup matches more than one asset.
+
+    Table name is a compatibility lookup, not a canonical identity: different
+    sources may legitimately own the same table name. Callers must resolve the
+    ambiguity with ``asset_id`` instead of silently picking the first row.
+    """
+
+    def __init__(self, table_name, matches):
+        self.table_name = table_name
+        self.matches = list(matches or [])
+        super().__init__(f"数据表名存在多个资产: {table_name}")
+
+    def to_dict(self):
+        return {
+            "code": "ASSET_AMBIGUOUS",
+            "message": (
+                f"数据表名 {self.table_name} 匹配到 {len(self.matches)} 个资产，"
+                "请使用 asset_id 精确访问"
+            ),
+            "details": self.matches,
+        }
+
+
 class AssetValidationError(Exception):
     def __init__(self, details):
         self.details = details
@@ -176,13 +200,22 @@ class AssetsService(AuditActorMixin):
     def _normalize_asset_order(self, order_by=None):
         text = str(order_by or "").strip()
         if not text:
-            return (asset_table.c.layer_code.asc(), asset_table.c.table_name.asc())
+            return (
+                asset_table.c.layer_code.asc(),
+                asset_table.c.table_name.asc(),
+                asset_table.c.asset_id.asc(),
+            )
         parts = text.split()
         column = ASSET_SORT_COLUMNS.get(parts[0].lower())
         if column is None:
-            return (asset_table.c.layer_code.asc(), asset_table.c.table_name.asc())
+            return (
+                asset_table.c.layer_code.asc(),
+                asset_table.c.table_name.asc(),
+                asset_table.c.asset_id.asc(),
+            )
         direction = column.desc() if len(parts) > 1 and parts[1].lower() == "desc" else column.asc()
-        return (direction, asset_table.c.table_name.asc())
+        # asset_id tiebreaker keeps same-name assets in a deterministic order.
+        return (direction, asset_table.c.table_name.asc(), asset_table.c.asset_id.asc())
 
     def _resolve_active_profile_name(self):
         return self._db_profile or resolve_db_profile_name()
@@ -482,7 +515,9 @@ class AssetsService(AuditActorMixin):
             "name": row["table_name"],
             "cn": row["table_cn_name"] or row["table_name"],
             "domain": row.get("domain_name") or "",
-            "layer": row["layer_code"],
+            # Portal-owned governance classification may be empty right after
+            # metadata ingestion; the public read contract stays string-typed.
+            "layer": row.get("layer_code") or "",
             "owner": row.get("owner_name") or "",
             "grain": row.get("grain_desc") or "",
             "cycle": row.get("cycle_desc") or "",
@@ -505,23 +540,17 @@ class AssetsService(AuditActorMixin):
             "ddlDialectLabel": get_ddl_dialect_label(dialect),
         }
 
-    def _load_single_table_row(self, *, asset_id=None, table_name=None, schema_name=None):
-        clauses = []
-        if asset_id is not None:
-            clauses.append(asset_table.c.asset_id == int(asset_id))
-        if table_name is not None:
-            clauses.append(asset_table.c.table_name == self._ensure_safe_name(table_name, "table_name"))
-        if schema_name:
-            clauses.append(asset_table.c.schema_name == schema_name)
-        if not clauses:
-            raise AssetValidationError([{"field": "table", "message": "missing table lookup condition"}])
-
-        code_to_name, _ = self._load_domain_mappings()
-        statement = select(
+    def _asset_row_columns(self):
+        """Canonical asset row projection shared by every read path."""
+        return (
             asset_table.c.asset_id,
             asset_table.c.table_name,
             asset_table.c.table_cn_name,
             asset_table.c.schema_name,
+            asset_table.c.source_key,
+            asset_table.c.asset_type,
+            asset_table.c.external_id,
+            asset_table.c.qualified_name,
             asset_table.c.layer_code,
             asset_table.c.domain_code,
             asset_table.c.owner_name,
@@ -532,24 +561,74 @@ class AssetsService(AuditActorMixin):
             asset_table.c.created_at,
             asset_table.c.updated_at,
         )
-        for clause in clauses:
-            statement = statement.where(clause)
-        rows = self._fetch_rows_logged(
-            statement.limit(1),
-            purpose="asset table detail",
-            method="_load_single_table_row",
-        )
-        if not rows:
-            raise AssetNotFoundError(table_name or asset_id)
-        row = rows[0]
+
+    def _decorate_asset_row(self, row):
+        code_to_name, _ = self._load_domain_mappings()
         row["domain_name"] = code_to_name.get(row.get("domain_code"), row.get("domain_code") or "")
         return row
 
+    def _asset_identity_ref(self, row):
+        """Identity summary used by ambiguity errors and cross-module consumers."""
+        return {
+            "assetId": int(row["asset_id"]),
+            "tableName": row.get("table_name") or "",
+            "schema": row.get("schema_name") or "",
+            "sourceKey": row.get("source_key"),
+            "externalId": row.get("external_id"),
+        }
+
+    def _coerce_asset_id(self, value):
+        try:
+            asset_id = int(value)
+        except (TypeError, ValueError) as error:
+            raise AssetNotFoundError(value) from error
+        if asset_id <= 0:
+            raise AssetNotFoundError(value)
+        return asset_id
+
+    def _resolve_single_asset_row(self, rows, *, table_name=None):
+        """Return the only matching row; legacy table-name ambiguity never first-matches."""
+        if not rows:
+            raise AssetNotFoundError(table_name if table_name is not None else "?")
+        if len(rows) > 1:
+            raise AssetAmbiguousError(
+                table_name or "",
+                [self._asset_identity_ref(row) for row in rows],
+            )
+        return self._decorate_asset_row(rows[0])
+
+    def _load_asset_row_by_id(self, asset_id):
+        """Canonical identity lookup: ``asset_id`` is the primary key."""
+        rows = self._fetch_rows_logged(
+            select(*self._asset_row_columns()).where(
+                asset_table.c.asset_id == self._coerce_asset_id(asset_id)
+            ),
+            purpose="asset table detail",
+            method="_load_asset_row_by_id",
+        )
+        if not rows:
+            raise AssetNotFoundError(asset_id)
+        return self._decorate_asset_row(rows[0])
+
+    def _load_asset_rows_by_table_name(self, table_name, schema_name=None):
+        """Compatibility lookup: table_name may match zero, one, or many assets."""
+        statement = select(*self._asset_row_columns()).where(
+            asset_table.c.table_name == self._ensure_safe_name(table_name, "table_name")
+        )
+        if schema_name:
+            statement = statement.where(asset_table.c.schema_name == schema_name)
+        return self._fetch_rows_logged(
+            statement.order_by(asset_table.c.asset_id),
+            purpose="asset table compatibility lookup",
+            method="_load_asset_rows_by_table_name",
+        )
+
     def get_table_by_id(self, table_id):
-        return self._load_single_table_row(asset_id=table_id)
+        return self._load_asset_row_by_id(table_id)
 
     def get_table_by_name(self, schema_name, table_name):
-        return self._load_single_table_row(table_name=table_name, schema_name=schema_name)
+        rows = self._load_asset_rows_by_table_name(table_name, schema_name)
+        return self._resolve_single_asset_row(rows, table_name=table_name)
 
     def get_table_fields(self, table_id):
         return deepcopy(
@@ -563,17 +642,28 @@ class AssetsService(AuditActorMixin):
     def get_table_ddl_metadata(self, table_id):
         return self._build_metadata_ddl(self.get_table_detail(table_id))
 
-    def _get_db_asset_detail_row(self, table_name):
-        return self._load_single_table_row(table_name=self._ensure_safe_name(table_name))
-
-    def _get_db_asset_detail(self, table_name):
-        row = self._get_db_asset_detail_row(table_name)
+    def _asset_detail_from_row(self, row, *, method="_get_db_asset_detail"):
         fields = self._load_field_rows(
             [row["asset_id"]],
             purpose="asset detail fields",
-            method="_get_db_asset_detail",
+            method=method,
         ).get(int(row["asset_id"]), [])
         return self._to_asset_table(row, fields)
+
+    def _get_db_asset_detail_row(self, table_name):
+        rows = self._load_asset_rows_by_table_name(
+            self._ensure_safe_name(table_name, "table_name")
+        )
+        return self._resolve_single_asset_row(rows, table_name=table_name)
+
+    def _get_db_asset_detail_row_by_id(self, asset_id):
+        return self._load_asset_row_by_id(asset_id)
+
+    def _get_db_asset_detail(self, table_name):
+        return self._asset_detail_from_row(self._get_db_asset_detail_row(table_name))
+
+    def _get_db_asset_detail_by_id(self, asset_id):
+        return self._asset_detail_from_row(self._get_db_asset_detail_row_by_id(asset_id))
 
     def _validate_fields(self, fields, details):
         names = set()
@@ -671,17 +761,18 @@ class AssetsService(AuditActorMixin):
         }
 
     def _ensure_db_table_absent(self, table_name, exclude_asset_id=None):
+        """Manual create / rename guard; existence check, not an identity lookup."""
         safe_name = self._ensure_safe_name(table_name)
+        statement = select(asset_table.c.asset_id).where(asset_table.c.table_name == safe_name)
+        if exclude_asset_id is not None:
+            statement = statement.where(asset_table.c.asset_id != int(exclude_asset_id))
         rows = self._fetch_rows_logged(
-            select(asset_table.c.asset_id).where(asset_table.c.table_name == safe_name).limit(1),
+            statement,
             purpose="asset uniqueness check",
             method="_ensure_db_table_absent",
         )
-        if not rows:
-            return
-        if exclude_asset_id is not None and int(rows[0]["asset_id"]) == int(exclude_asset_id):
-            return
-        raise AssetAlreadyExistsError(table_name)
+        if rows:
+            raise AssetAlreadyExistsError(table_name)
 
     def _insert_db_fields(self, asset_id, fields):
         field_id = self._get_next_id(asset_field, asset_field.c.field_id)
@@ -795,16 +886,30 @@ class AssetsService(AuditActorMixin):
             }
 
     def get_asset_detail(self, table_name):
+        """Compatibility read by table_name; ambiguous matches raise AssetAmbiguousError."""
         with database_transaction():
             return self._with_empty_asset_risks(self._get_db_asset_detail(table_name))
+
+    def get_asset_detail_by_id(self, asset_id):
+        """Canonical read by asset_id."""
+        with database_transaction():
+            return self._with_empty_asset_risks(self._get_db_asset_detail_by_id(asset_id))
 
     def get_asset_fields(self, table_name):
         with database_transaction():
             return deepcopy(self._get_db_asset_detail(table_name)["fields"])
 
+    def get_asset_fields_by_id(self, asset_id):
+        with database_transaction():
+            return deepcopy(self._get_db_asset_detail_by_id(asset_id)["fields"])
+
     def get_asset_ddl(self, table_name):
         with database_transaction():
             return self._build_metadata_ddl(self._get_db_asset_detail(table_name))
+
+    def get_asset_ddl_by_id(self, asset_id):
+        with database_transaction():
+            return self._build_metadata_ddl(self._get_db_asset_detail_by_id(asset_id))
 
     def get_domains(self, layer=None):
         return [
@@ -864,7 +969,7 @@ class AssetsService(AuditActorMixin):
             self._insert_change_log(asset_id, table["name"], "CREATE_TABLE", None, after_data),
         ]
         self._execute_statements(statements)
-        return self._with_empty_asset_risks(self._get_db_asset_detail(table["name"])), table, after_data
+        return self._with_empty_asset_risks(self._get_db_asset_detail_by_id(asset_id)), table, after_data
 
     @actor_aware
     def update_asset_table(self, table_name, payload):
@@ -880,17 +985,39 @@ class AssetsService(AuditActorMixin):
             audit.after = after_data
             return result
 
+    @actor_aware
+    def update_asset_table_by_id(self, asset_id, payload):
+        current_row = self._get_db_asset_detail_row_by_id(asset_id)
+        with operation_log_service.audit(
+            module_name="数据仓库",
+            operation_type=OPERATION_TYPE_UPDATE,
+            operation_object=current_row["table_name"],
+            operation_desc="编辑数据表",
+        ) as audit:
+            result, current, after_data, new_name = self._update_asset_record(current_row, payload)
+            audit.operation_object = new_name
+            audit.before = current
+            audit.after = after_data
+            return result
+
     def _update_asset_table(self, table_name, payload):
         current = self._get_db_asset_detail(table_name)
         current_row = self._get_db_asset_detail_row(table_name)
-        table = self._validate_table_payload(payload, current_name=table_name)
-        self._ensure_db_table_absent(table["name"], exclude_asset_id=current_row["asset_id"])
-        _, name_to_code = self._load_domain_mappings()
-        after_data = {key: deepcopy(value) for key, value in table.items() if key != "current_name"}
+        return self._update_asset_record(current_row, payload, current=current)
+
+    def _update_asset_record(self, current_row, payload, *, current=None):
+        if current is None:
+            current = self._asset_detail_from_row(current_row)
+        current_name = current_row.get("table_name") or ""
+        table = self._validate_table_payload(payload, current_name=current_name)
         try:
             asset_id = int(current_row["asset_id"])
         except (KeyError, TypeError, ValueError) as error:
             raise AssetDataSourceError("数据库查询失败") from error
+        if table["name"] != current_name:
+            self._ensure_db_table_absent(table["name"], exclude_asset_id=asset_id)
+        _, name_to_code = self._load_domain_mappings()
+        after_data = {key: deepcopy(value) for key, value in table.items() if key != "current_name"}
         statements = [
             update(asset_table)
             .where(asset_table.c.asset_id == asset_id)
@@ -913,7 +1040,12 @@ class AssetsService(AuditActorMixin):
             self._insert_change_log(asset_id, table["name"], "UPDATE_TABLE", current, after_data),
         ]
         self._execute_statements(statements)
-        return self._with_empty_asset_risks(self._get_db_asset_detail(table["name"])), current, after_data, table["name"]
+        return (
+            self._with_empty_asset_risks(self._get_db_asset_detail_by_id(asset_id)),
+            current,
+            after_data,
+            table["name"],
+        )
 
     @actor_aware
     def update_asset_fields(self, table_name, payload):
@@ -928,7 +1060,26 @@ class AssetsService(AuditActorMixin):
             audit.after = after_data
             return result
 
+    @actor_aware
+    def update_asset_fields_by_id(self, asset_id, payload):
+        current_row = self._get_db_asset_detail_row_by_id(asset_id)
+        with operation_log_service.audit(
+            module_name="数据仓库",
+            operation_type=OPERATION_TYPE_UPDATE,
+            operation_object=current_row["table_name"],
+            operation_desc="编辑数据表字段",
+        ) as audit:
+            result, current, after_data = self._update_asset_fields_record(current_row, payload)
+            audit.before = current
+            audit.after = after_data
+            return result
+
     def _update_asset_fields(self, table_name, payload):
+        current = self._get_db_asset_detail(table_name)
+        current_row = self._get_db_asset_detail_row(table_name)
+        return self._update_asset_fields_record(current_row, payload, current=current)
+
+    def _update_asset_fields_record(self, current_row, payload, *, current=None):
         if not isinstance(payload, dict):
             raise AssetValidationError([{"field": "body", "message": "请求体必须为 JSON 对象"}])
         fields = payload.get("fields")
@@ -940,8 +1091,9 @@ class AssetsService(AuditActorMixin):
             self._validate_fields(field_items, details)
         if details:
             raise AssetValidationError(details)
-        current = self._get_db_asset_detail(table_name)
-        current_row = self._get_db_asset_detail_row(table_name)
+        if current is None:
+            current = self._asset_detail_from_row(current_row)
+        current_name = current_row.get("table_name") or ""
         normalized_fields = [
             {
                 "name": field["name"].strip(),
@@ -969,30 +1121,50 @@ class AssetsService(AuditActorMixin):
                 updated_by=self._default_operator,
                 updated_at=func.current_timestamp(),
             ),
-            self._insert_change_log(asset_id, table_name, "UPDATE_FIELDS", current, after_data),
+            self._insert_change_log(asset_id, current_name, "UPDATE_FIELDS", current, after_data),
         ]
         self._execute_statements(statements)
-        return {"tableName": table_name, "fields": deepcopy(normalized_fields)}, current, after_data
+        return {"tableName": current_name, "fields": deepcopy(normalized_fields)}, current, after_data
 
     @actor_aware
     def delete_asset_table(self, table_name):
+        current_row = self._get_db_asset_detail_row(table_name)
+        current = self._asset_detail_from_row(current_row)
         with operation_log_service.audit(
             module_name="数据仓库",
             operation_type=OPERATION_TYPE_DELETE,
-            operation_object=table_name,
+            operation_object=current_row["table_name"],
             operation_desc="删除数据表",
         ) as audit:
-            audit.before = self._delete_asset_table(table_name)
+            audit.before = self._delete_asset_record(current_row, current=current)
+
+    @actor_aware
+    def delete_asset_table_by_id(self, asset_id):
+        current_row = self._get_db_asset_detail_row_by_id(asset_id)
+        current = self._asset_detail_from_row(current_row)
+        with operation_log_service.audit(
+            module_name="数据仓库",
+            operation_type=OPERATION_TYPE_DELETE,
+            operation_object=current_row["table_name"],
+            operation_desc="删除数据表",
+        ) as audit:
+            audit.before = self._delete_asset_record(current_row, current=current)
 
     def _delete_asset_table(self, table_name):
-        current = self._get_db_asset_detail(table_name)
         current_row = self._get_db_asset_detail_row(table_name)
+        current = self._asset_detail_from_row(current_row)
+        return self._delete_asset_record(current_row, current=current)
+
+    def _delete_asset_record(self, current_row, *, current=None):
+        if current is None:
+            current = self._asset_detail_from_row(current_row)
+        current_name = current_row.get("table_name") or ""
         try:
             asset_id = int(current_row["asset_id"])
         except (KeyError, TypeError, ValueError) as error:
             raise AssetDataSourceError("数据库查询失败") from error
         self._execute_statements([
-            self._insert_change_log(asset_id, table_name, "DELETE_TABLE", current, None),
+            self._insert_change_log(asset_id, current_name, "DELETE_TABLE", current, None),
             delete(asset_field).where(asset_field.c.asset_id == asset_id),
             delete(asset_table).where(asset_table.c.asset_id == asset_id),
         ])

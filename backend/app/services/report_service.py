@@ -176,26 +176,43 @@ class ReportService(AuditActorMixin):
         return []
 
     def _asset_lookup(self):
+        """Return ``(by_asset_id, by_table_name)`` indexes for related tables.
+
+        ``table_name`` is intentionally kept as a list per name: reviews of
+        stored report payloads must see ambiguity instead of silently keeping
+        the latest row.
+        """
         rows = self._fetch_rows(
             select(
+                asset_table.c.asset_id,
                 asset_table.c.table_name,
                 asset_table.c.table_cn_name,
                 asset_table.c.layer_code,
                 asset_table.c.domain_code,
             )
             .where(asset_table.c.is_deleted == "N")
-            .order_by(asset_table.c.table_name)
+            .order_by(asset_table.c.table_name, asset_table.c.asset_id)
         )
-        return {
-            str(row["table_name"]): {
-                "tableName": str(row["table_name"]),
-                "tableCn": row.get("table_cn_name") or row["table_name"],
+        by_asset_id = {}
+        by_table_name = {}
+        for row in rows:
+            table_name = str(row.get("table_name") or "")
+            if not table_name:
+                continue
+            try:
+                asset_id = int(row["asset_id"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            entry = {
+                "assetId": asset_id,
+                "tableName": table_name,
+                "tableCn": row.get("table_cn_name") or table_name,
                 "layer": row.get("layer_code") or "",
                 "domain": row.get("domain_code") or "",
             }
-            for row in rows
-            if row.get("table_name")
-        }
+            by_asset_id[asset_id] = entry
+            by_table_name.setdefault(table_name, []).append(entry)
+        return by_asset_id, by_table_name
 
     def _indicator_lookup(self):
         rows = self._fetch_rows(
@@ -284,25 +301,47 @@ class ReportService(AuditActorMixin):
 
         related_tables = cast(list[dict[str, Any]], related_tables)
         related_indicators = cast(list[dict[str, Any]], related_indicators)
-        asset_lookup = self._asset_lookup()
+        asset_by_id, asset_by_name = self._asset_lookup()
         indicator_lookup = self._indicator_lookup()
         normalized_tables = []
         normalized_indicators = []
-        seen_table_names = set()
+        seen_table_keys = set()
         seen_indicator_ids = set()
 
         for index, item in enumerate(related_tables):
-            table_name = str((item or {}).get("tableName") or "").strip()
-            if not table_name:
-                details.append({"field": f"relatedTables[{index}].tableName", "message": "tableName is required"})
+            raw = item if isinstance(item, dict) else {}
+            raw_asset_id = raw.get("assetId")
+            if raw_asset_id is not None and str(raw_asset_id).strip():
+                try:
+                    asset_id = int(raw_asset_id)
+                except (TypeError, ValueError):
+                    details.append({"field": f"relatedTables[{index}].assetId", "message": f"assetId is invalid: {raw_asset_id}"})
+                    continue
+                match = asset_by_id.get(asset_id)
+                if not match:
+                    details.append({"field": f"relatedTables[{index}].assetId", "message": f"related asset does not exist: {asset_id}"})
+                    continue
+                dedupe_key = f"asset:{asset_id}"
+            else:
+                table_name = str(raw.get("tableName") or "").strip()
+                if not table_name:
+                    details.append({"field": f"relatedTables[{index}].tableName", "message": "tableName is required"})
+                    continue
+                matches = asset_by_name.get(table_name, [])
+                if not matches:
+                    details.append({"field": f"relatedTables[{index}].tableName", "message": f"related table does not exist: {table_name}"})
+                    continue
+                if len(matches) > 1:
+                    details.append({
+                        "field": f"relatedTables[{index}].tableName",
+                        "message": f"related table is ambiguous, use assetId: {table_name}",
+                    })
+                    continue
+                match = matches[0]
+                dedupe_key = f"table:{table_name}"
+            if dedupe_key in seen_table_keys:
                 continue
-            if table_name in seen_table_names:
-                continue
-            match = asset_lookup.get(table_name)
-            if not match:
-                details.append({"field": f"relatedTables[{index}].tableName", "message": f"related table does not exist: {table_name}"})
-                continue
-            seen_table_names.add(table_name)
+            seen_table_keys.add(dedupe_key)
             normalized_tables.append(match)
 
         for index, item in enumerate(related_indicators):

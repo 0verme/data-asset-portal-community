@@ -53,6 +53,7 @@ class MessageDataResponse(ContractModel, Generic[T]):
 
 
 class ReportRelatedTable(ContractModel):
+    assetId: int | None = None
     tableName: str
     tableCn: str | None = None
     layer: str | None = None

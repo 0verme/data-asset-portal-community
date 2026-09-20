@@ -65,7 +65,7 @@ class ReportCoreCrudTests(unittest.TestCase):
         )
         self.service._legacy_values = MagicMock(return_value=set())
         self.service._domain_names = MagicMock(return_value={"支付"})
-        self.service._asset_lookup = MagicMock(return_value={})
+        self.service._asset_lookup = MagicMock(return_value=({}, {}))
         self.service._indicator_lookup = MagicMock(return_value={})
 
     def _assert_portable(self, statement):

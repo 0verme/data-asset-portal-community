@@ -36,6 +36,9 @@ def _build_asset(row: dict[str, Any], matched_fields: list[dict[str, str]]) -> d
         "title": row.get("table_name") or "",
         "subtitle": row.get("table_cn_name") or "",
         "meta": _join_meta(row.get("domain_name"), row.get("layer_code"), row.get("owner_name")),
+        # ``assetId`` is the canonical asset identity. ``id`` / ``ref`` stay
+        # table_name for display and legacy consumers.
+        "assetId": row.get("asset_id"),
         "ref": row.get("table_name"),
         "matchedFields": matched_fields,
     }
@@ -160,6 +163,7 @@ register_search_entity({
         {"expr": "t.table_desc", "label": "描述"},
     ],
     "select": (
+        "t.asset_id, "
         "t.table_name, "
         "t.table_cn_name, "
         "t.layer_code, "
