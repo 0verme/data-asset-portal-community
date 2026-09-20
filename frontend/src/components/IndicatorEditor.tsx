@@ -209,7 +209,7 @@ export function IndicatorEditor({
     let cancelled = false;
     const selectedAsset = assetOptions.find((item) => getAssetOptionId(item) === form.sourceAssetId);
     const selectedAssetName = selectedAsset?.name || "";
-    if (!selectedAssetName) {
+    if (!selectedAssetName && !selectedAsset?.assetId) {
       setFieldOptions([]);
       setFieldError("");
       setFieldLoading(false);
@@ -220,7 +220,7 @@ export function IndicatorEditor({
       setFieldLoading(true);
       setFieldError("");
       try {
-        const items = await getAssetFields(selectedAssetName);
+        const items = await getAssetFields({ assetId: selectedAsset?.assetId, tableName: selectedAssetName });
         if (!cancelled) setFieldOptions(Array.isArray(items) ? items : []);
       } catch (error: unknown) {
         if (!cancelled) {

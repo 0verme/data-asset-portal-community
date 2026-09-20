@@ -196,11 +196,19 @@ export function getModuleListRoute(moduleKey: string): NavigationRoute | null {
   return meta ? cloneRoute(meta.defaultRoute) || null : null;
 }
 
-export function getModuleDetailRoute(moduleKey: string, id: string | null | undefined): NavigationRoute | null {
+export function getModuleDetailRoute(
+  moduleKey: string,
+  id: string | null | undefined,
+  assetId?: number | null,
+): NavigationRoute | null {
+  if (moduleKey === "dwm") {
+    if (!id && assetId == null) return getModuleListRoute(moduleKey);
+    return assetId == null
+      ? { page: "detail", table: id ?? null }
+      : { page: "detail", table: id ?? null, assetId };
+  }
   if (!id) return getModuleListRoute(moduleKey);
   switch (moduleKey) {
-    case "dwm":
-      return { page: "detail", table: id };
     case "upstream":
       return { page: "detail", id };
     case "indicator":
@@ -216,10 +224,18 @@ export function getModuleDetailRoute(moduleKey: string, id: string | null | unde
   }
 }
 
-export function getModuleEditRoute(moduleKey: string, id?: string | null): NavigationRoute | null {
+export function getModuleEditRoute(
+  moduleKey: string,
+  id?: string | null,
+  assetId?: number | null,
+): NavigationRoute | null {
+  if (moduleKey === "dwm") {
+    if (!id && assetId == null) return { page: "new", table: null };
+    return assetId == null
+      ? { page: "edit", table: id ?? null }
+      : { page: "edit", table: id ?? null, assetId };
+  }
   switch (moduleKey) {
-    case "dwm":
-      return id ? { page: "edit", table: id } : { page: "new", table: null };
     case "upstream":
       return id ? { page: "edit", id } : { page: "new", id: null };
     case "indicator":

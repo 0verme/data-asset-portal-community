@@ -188,7 +188,7 @@ export function AssetView({
         <ErrorState
           title="表详情加载失败"
           desc={detailError}
-          onRetry={() => loadDetailData(routeTable)}
+          onRetry={() => loadDetailData({ assetId: route.assetId, tableName: routeTable })}
         />
       );
     }
@@ -205,7 +205,7 @@ export function AssetView({
         onTabChange={setDetailTab}
         onBack={assetGoList}
         onBackToList={assetGoList}
-        onEdit={canEdit ? () => assetEdit(detailAsset.name) : undefined}
+        onEdit={canEdit ? () => assetEdit(detailAsset.name, detailAsset.assetId) : undefined}
       />
     );
   }
@@ -224,7 +224,7 @@ export function AssetView({
         <ErrorState
           title="编辑页加载失败"
           desc={detailError}
-          onRetry={() => loadDetailData(routeTable)}
+          onRetry={() => loadDetailData({ assetId: route.assetId, tableName: routeTable })}
         />
       );
     }
@@ -239,9 +239,9 @@ export function AssetView({
         domains={visibleDomains.length ? visibleDomains : DOMAIN_ORDER}
         layers={visibleLayers}
         onSave={handleSaveTable}
-        onCancel={() => assetGoDetail(editingAsset.name)}
+        onCancel={() => assetGoDetail(editingAsset.name, editingAsset.assetId)}
         onBackToList={assetGoList}
-        onBackToDetail={() => assetGoDetail(editingAsset.name)}
+        onBackToDetail={() => assetGoDetail(editingAsset.name, editingAsset.assetId)}
         onDelete={handleDeleteTable}
       />
     );

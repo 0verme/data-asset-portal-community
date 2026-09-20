@@ -23,7 +23,7 @@ function fieldCount(table: AssetTableItem): number {
 interface TableLayoutProps {
   tables: readonly AssetTableItem[];
   query: string;
-  onOpen: (name: string) => void;
+  onOpen: (table: AssetTableItem) => void;
 }
 
 function ListLayout({ tables, query, onOpen }: TableLayoutProps) {
@@ -42,7 +42,7 @@ function ListLayout({ tables, query, onOpen }: TableLayoutProps) {
         </thead>
         <tbody>
           {tables.map((table) => (
-            <tr key={table.name} onClick={() => onOpen(table.name)}>
+            <tr key={table.name} onClick={() => onOpen(table)}>
               <td data-label="">
                 <div className="t-name">
                   <Icon name="table" size={15} color="var(--ink-3)" />
@@ -77,7 +77,7 @@ function CardLayout({ tables, query, onOpen }: TableLayoutProps) {
     <CardGridView
       items={tables}
       getKey={(table) => table.name}
-      onItemClick={(table) => onOpen(table.name)}
+      onItemClick={(table) => onOpen(table)}
       renderBadges={(table) => (
         <>
           <DomainBadge domain={table.domain} />
@@ -106,7 +106,7 @@ function GroupLayout({ tables, query, onOpen }: TableLayoutProps) {
     <GroupView
       items={tables}
       getKey={(table) => table.name}
-      onItemClick={(table) => onOpen(table.name)}
+      onItemClick={(table) => onOpen(table)}
       groupBy={(table) => table.domain}
       groupOrder={order}
       renderGroupLabel={(domain) => <span className="tag tag-neutral">{domain}</span>}

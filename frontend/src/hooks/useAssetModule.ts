@@ -21,6 +21,7 @@ import {
   getDomains,
   getLayers,
   saveAssetTable,
+  type AssetIdentity,
   type AssetTableItem,
   type AssetTableField,
   type DomainCountItem,
@@ -94,7 +95,7 @@ export interface UseAssetModuleResult {
   detailDDL: DDLNormalizedResult;
   detailLoading: boolean;
   detailError: string;
-  loadDetailData: (tableName: string) => Promise<void>;
+  loadDetailData: (identity: AssetIdentity) => Promise<void>;
   layout: string;
   setLayout: React.Dispatch<React.SetStateAction<string>>;
   domain: string | null;
@@ -104,11 +105,11 @@ export interface UseAssetModuleResult {
   detailTab: string;
   setDetailTab: React.Dispatch<React.SetStateAction<string>>;
   assetBack: () => void;
-  assetOpen: (tableName: string) => void;
+  assetOpen: (table: AssetTableItem | string) => void;
   assetGoList: () => void;
-  assetGoDetail: (tableName: string) => void;
+  assetGoDetail: (tableName: string, assetId?: number | null) => void;
   assetCreate: () => void;
-  assetEdit: (tableName: string) => void;
+  assetEdit: (tableName: string, assetId?: number | null) => void;
   handleSaveTable: (table: AssetTableItem, oldName?: string) => Promise<void>;
   handleDeleteTable: (tableName: string) => Promise<void>;
   resetAssetNavigation: () => void;
@@ -240,11 +241,11 @@ export function useAssetModule({
     }
   }, [domain, page, query, selectedLayer]);
 
-  const loadDetailData = useCallback(async (tableName: string): Promise<void> => {
+  const loadDetailData = useCallback(async (identity: AssetIdentity): Promise<void> => {
     setDetailLoading(true);
     setDetailError('');
     try {
-      const [asset, ddlData] = await Promise.all([getAssetDetail(tableName), getAssetDDL(tableName)]);
+      const [asset, ddlData] = await Promise.all([getAssetDetail(identity), getAssetDDL(identity)]);
       setDetailAsset(asset);
       setDetailFields(asset.fields || []);
       setDetailDDL(ddlData);
@@ -273,8 +274,8 @@ export function useAssetModule({
   }, [active, loadHomeData, query]);
 
   useEffect(() => {
-    if (active && (route.page === 'detail' || route.page === 'edit') && route.table) {
-      loadDetailData(route.table);
+    if (active && (route.page === 'detail' || route.page === 'edit') && (route.table || route.assetId)) {
+      loadDetailData({ assetId: route.assetId, tableName: route.table });
     } else {
       setDetailAsset(null);
       setDetailFields([]);
@@ -298,10 +299,12 @@ export function useAssetModule({
     },
   });
 
-  const assetOpen = (tableName: string): void => {
+  const assetOpen = (table: AssetTableItem | string): void => {
+    const tableName = typeof table === 'string' ? table : table.name;
+    const assetId = typeof table === 'string' ? null : table.assetId ?? null;
     pushModuleNavigationState('dwm', buildNavigationSnapshot());
     setDetailTab(DEFAULT_DETAIL_TAB);
-    setRoute(getModuleDetailRoute('dwm', tableName) as AssetRoute);
+    setRoute(getModuleDetailRoute('dwm', tableName, assetId) as AssetRoute);
     scrollMainToTop();
   };
 
@@ -312,14 +315,14 @@ export function useAssetModule({
   }, [setRoute]);
 
   const assetGoDetail = useCallback(
-    (tableName: string): void => {
-      if (!tableName) {
+    (tableName: string, assetId?: number | null): void => {
+      if (!tableName && !assetId) {
         setRoute(getModuleListRoute('dwm') as AssetRoute);
         scrollMainToTop();
         return;
       }
       setDetailTab(DEFAULT_DETAIL_TAB);
-      setRoute(getModuleDetailRoute('dwm', tableName) as AssetRoute);
+      setRoute(getModuleDetailRoute('dwm', tableName, assetId ?? null) as AssetRoute);
       scrollMainToTop();
     },
     [setRoute],
@@ -333,9 +336,9 @@ export function useAssetModule({
     }, 'asset:write');
   };
 
-  const assetEdit = (tableName: string): void => {
+  const assetEdit = (tableName: string, assetId?: number | null): void => {
     requireLogin(() => {
-      setRoute(getModuleEditRoute('dwm', tableName) as AssetRoute);
+      setRoute(getModuleEditRoute('dwm', tableName, assetId ?? null) as AssetRoute);
       scrollMainToTop();
     }, 'asset:write');
   };
@@ -343,10 +346,13 @@ export function useAssetModule({
   const handleSaveTable = async (table: AssetTableItem, oldName?: string): Promise<void> => {
     await runProtectedMutation(
       async () => {
-        await saveAssetTable(table, oldName);
+        const saved = await saveAssetTable(table, {
+          assetId: route.assetId ?? table.assetId,
+          tableName: oldName,
+        });
         facetCacheRef.current.clear();
         await loadHomeData();
-        setRoute(getModuleDetailRoute('dwm', table.name) as AssetRoute);
+        setRoute(getModuleDetailRoute('dwm', saved.name, saved.assetId) as AssetRoute);
         setDetailTab(DEFAULT_DETAIL_TAB);
         scrollMainToTop();
       },
@@ -358,7 +364,7 @@ export function useAssetModule({
   const handleDeleteTable = async (tableName: string): Promise<void> => {
     await runProtectedMutation(
       async () => {
-        await deleteAssetTable(tableName);
+        await deleteAssetTable({ assetId: route.assetId, tableName });
         facetCacheRef.current.clear();
         await loadHomeData();
         clearModuleNavigationState('dwm');
@@ -426,7 +432,13 @@ export function useAssetModule({
   }, [layers, layerCounts, selectedLayer]);
 
   const editingAsset = useMemo(() => {
-    if (route.page !== 'edit' || !route.table) return null;
+    if (route.page !== 'edit') return null;
+    if (route.assetId != null) {
+      if (detailAsset && detailAsset.assetId === route.assetId) return detailAsset;
+      const byId = tables.find((table) => table.assetId === route.assetId);
+      if (byId) return byId;
+    }
+    if (!route.table) return null;
     return detailAsset?.name === route.table
       ? detailAsset
       : tables.find((table) => table.name === route.table);

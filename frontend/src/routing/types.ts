@@ -42,6 +42,8 @@ export interface Route {
 export interface AssetRoute extends Route {
   page: string;
   table: string | null;
+  /** Canonical asset identity carried in the URL as ``?assetId=``. */
+  assetId?: number | null;
 }
 
 export interface PushRoute extends Route {

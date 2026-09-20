@@ -179,6 +179,10 @@ export function parseInitialLocation(): LocationSnapshot {
   const upstreamView = readAllowedString(searchParams.get("view"), ["card", "list"], DEFAULT_UP_VIEW);
   const assetLayout = readOption(ASSET_LAYOUT_OPTIONS, searchParams.get("layout"), DEFAULT_LAYOUT);
   const assetDetailTab = searchParams.get("tab") === "ddl" ? "ddl" : DEFAULT_DETAIL_TAB;
+  const requestedAssetId = Number(searchParams.get("assetId"));
+  const assetId = Number.isInteger(requestedAssetId) && requestedAssetId > 0
+    ? requestedAssetId
+    : null;
   const requestedLayer = searchParams.get("layer")?.trim().toUpperCase() || "";
   const assetLayer = LAYER_OPTIONS.some((item) => item.code === requestedLayer)
     ? requestedLayer
@@ -279,14 +283,18 @@ export function parseInitialLocation(): LocationSnapshot {
       return {
         ...base,
         module: "dwm",
-        assetRoute: { page: "edit", table: decodeURIComponent(segments[1]) },
+        assetRoute: assetId !== null
+          ? { page: "edit", table: decodeURIComponent(segments[1]), assetId }
+          : { page: "edit", table: decodeURIComponent(segments[1]) },
       };
     }
     if (segments[1]) {
       return {
         ...base,
         module: "dwm",
-        assetRoute: { page: "detail", table: decodeURIComponent(segments[1]) },
+        assetRoute: assetId !== null
+          ? { page: "detail", table: decodeURIComponent(segments[1]), assetId }
+          : { page: "detail", table: decodeURIComponent(segments[1]) },
       };
     }
     return { ...base, module: "dwm" };
@@ -498,6 +506,7 @@ export function buildNavigationLocation({
     if (asset.domain) params.set("domain", asset.domain);
     if (asset.selectedLayer) params.set("layer", asset.selectedLayer);
     if (assetLayout !== DEFAULT_LAYOUT) params.set("layout", assetLayout);
+    if (routes.asset?.assetId) params.set("assetId", String(routes.asset.assetId));
     if (routes.asset?.page === "detail" && assetDetailTab !== DEFAULT_DETAIL_TAB) {
       params.set("tab", assetDetailTab);
     }

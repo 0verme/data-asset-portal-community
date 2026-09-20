@@ -51,6 +51,8 @@ export interface SearchResultItem {
   ref: unknown;
   type: string;
   category: string;
+  /** Canonical asset identity when the entity is an asset-backed result. */
+  assetId?: number | null;
   matchedFields: MatchedFieldItem[];
 }
 

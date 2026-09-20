@@ -283,6 +283,32 @@ test("parsed location state is restored as one navigation snapshot", () => {
   assert.equal(state.pushFilterFromUrl.importanceLevel, "important");
 });
 
+test("asset deep links carry the canonical assetId without changing the legacy table path", () => {
+  const parsed = parseLocation("/data-warehouse/orders?assetId=42");
+  assert.deepEqual(parsed.assetRoute, { page: "detail", table: "orders", assetId: 42 });
+
+  const edit = parseLocation("/data-warehouse/orders/edit?assetId=42");
+  assert.deepEqual(edit.assetRoute, { page: "edit", table: "orders", assetId: 42 });
+
+  const built = buildNavigationLocation({
+    module: "dwm",
+    routes: { ...emptyRoutes, asset: { page: "detail", table: "orders", assetId: 42 } },
+  });
+  assert.equal(built.url, "/data-warehouse/orders?assetId=42");
+});
+
+test("legacy asset URLs stay valid and never invent an assetId", () => {
+  const parsed = parseLocation("/data-warehouse/orders");
+  assert.deepEqual(parsed.assetRoute, { page: "detail", table: "orders" });
+  assert.equal(Object.prototype.hasOwnProperty.call(parsed.assetRoute, "assetId"), false);
+
+  const invalid = parseLocation("/data-warehouse/orders?assetId=abc");
+  assert.deepEqual(invalid.assetRoute, { page: "detail", table: "orders" });
+
+  const zero = parseLocation("/data-warehouse/orders?assetId=0");
+  assert.deepEqual(zero.assetRoute, { page: "detail", table: "orders" });
+});
+
 test("history policy distinguishes initial replace, pathname push, query replace, and no-op", () => {
   const common = { currentUrl: "/data-warehouse", currentPathname: "/data-warehouse" };
 

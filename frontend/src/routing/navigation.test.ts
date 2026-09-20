@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { getPortalPushNavigation } from "./portalNavigation.ts";
+import { getModuleDetailRoute, getModuleEditRoute } from "./navigation.ts";
 import { splitNavigationMenus } from "./navigationMenuGrouping.ts";
 
 test("desktop navigation groups menus by configured placement", () => {
@@ -49,4 +50,27 @@ test("portal push-job navigation clears the portal query while preserving the jo
 
   assert.deepEqual(systemRoute, { page: "jobs", sys: "DEMO_MKT", job: null });
   assert.equal(visibleJobs.length, 1);
+});
+
+test("asset module routes keep the canonical assetId when it is known", () => {
+  assert.deepEqual(getModuleDetailRoute("dwm", "orders", 42), {
+    page: "detail",
+    table: "orders",
+    assetId: 42,
+  });
+  assert.deepEqual(getModuleEditRoute("dwm", "orders", 42), {
+    page: "edit",
+    table: "orders",
+    assetId: 42,
+  });
+
+  // Legacy callers without an assetId keep the previous route shape.
+  assert.deepEqual(getModuleDetailRoute("dwm", "orders"), {
+    page: "detail",
+    table: "orders",
+  });
+  assert.deepEqual(getModuleEditRoute("dwm", "orders"), {
+    page: "edit",
+    table: "orders",
+  });
 });
