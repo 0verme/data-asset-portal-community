@@ -1163,7 +1163,7 @@ Base Path: `/api/lineage`
 - `POST /api/metadata/assets/ingestions`：bulk upsert Asset Contract；兼容 alias `POST /api/metadata/assets:bulk-upsert`。
 - query `dryRun=true` 或 `mode=preview`：只校验、normalize、compare，不修改业务数据或 audit。
 - 请求包含 `contractVersion`、`source`、`collector`、`assets[]`；natural key 是 source identity + assetType + externalId，缺少 externalId 时使用 qualifiedName。
-- 响应包含 `ingestionId`、`correlationId`、`status`、`summary` 和 item results；summary 区分 create/update/unchanged/conflict/invalid/deleteCandidate。
+- 响应包含 `ingestionId`、`correlationId`、`status`、`summary` 和 item results；summary 区分 create/update/unchanged/conflict/invalid/deleteCandidate。item result 只暴露 contract 身份（`index` / `externalKey` / `status` / `action` / `code` / `message` / `field`），不返回内部 `assetId`；调用方经 `GET /api/assets/tables/{tableName}`（唯一匹配）或列表反解 canonical `assetId`，多个同名匹配返回 `409 ASSET_AMBIGUOUS`。
 - ownership：ingestion update 永不写 portal-owned 列（`table_cn_name` / `layer_code` / `domain_code` / `owner_name` / `grain_desc` / `cycle_desc` 及字段 `field_cn_name` / `enum_desc`）；`unchanged` 只由 source-owned projection 决定；`description` / `catalog` / `database` 按 absent / `null` / `""` 三态处理。完整矩阵见 [metadata-ingestion.md](./metadata-ingestion.md)。
 
 ### 13.2 Lineage snapshot ingestion

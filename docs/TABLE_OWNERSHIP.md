@@ -54,6 +54,7 @@
 - `source_key IS NULL`（portal-only）：全部非 system 列由人工编辑维护。
 - source-bound 资产的人工编辑只允许 portal-owned 列；修改 source-owned 列返回 `422 SOURCE_OWNED_ATTRIBUTE`，整请求不落库。
 - ingestion `unchanged` 判定只使用 source-owned projection：人工修改 portal-owned 列后重复同步不会触发写入。
+- 长期 invariant：portal-owned 列不得被 metadata 同步静默清空或覆盖；`asset_id` 是 canonical read identity，`table_name` 只承担 0 / 1 / N 兼容查找；字段被 source 删除时 `field_id` 软删除且不复用。完整 Identity Map 与 I1–I6 见 [metadata-ingestion.md](./metadata-ingestion.md)，逐条验收由 `backend/tests/test_asset_sync_lifecycle.py` 守护。
 
 完整列级矩阵与 merge / presence 语义见 [metadata-ingestion.md](./metadata-ingestion.md)。
 
