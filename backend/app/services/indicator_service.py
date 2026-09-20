@@ -377,7 +377,10 @@ class IndicatorService(AuditActorMixin):
                 indicator_item.c.source_asset_id == asset_table.c.asset_id,
             ).outerjoin(
                 asset_field,
-                indicator_item.c.result_field_id == asset_field.c.field_id,
+                and_(
+                    indicator_item.c.result_field_id == asset_field.c.field_id,
+                    asset_field.c.is_deleted == "N",
+                ),
             )
         ).where(*self._build_indicator_filters(keyword, dimension, status)).order_by(indicator_item.c.indicator_id)
         return [self._row_to_item(row) for row in self._fetch_rows(statement)]

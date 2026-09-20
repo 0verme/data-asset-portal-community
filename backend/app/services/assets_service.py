@@ -31,6 +31,12 @@ from ..settings import get_page_size_limits
 from ..utils.data_types import DEFAULT_DATA_TYPE, normalize_data_type
 from ..utils.ddl_generator import generate_table_ddl, get_ddl_dialect_label, normalize_db_dialect
 from ..utils.service_perf import log_slow_service_call
+from .field_merge import (
+    ActiveField,
+    FieldIdentityConflict,
+    IncomingField,
+    plan_field_collection,
+)
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
     OPERATION_TYPE_DELETE,
@@ -127,6 +133,27 @@ class AssetValidationError(Exception):
         return {
             "code": "ASSET_VALIDATION_FAILED",
             "message": "请求参数校验失败",
+            "details": self.details,
+        }
+
+
+class AssetSourceOwnedError(AssetValidationError):
+    """Deterministic 422 when a manual edit touches source-owned field values.
+
+    ``source_key IS NOT NULL`` assets have a source system of record. Manual
+    editing may only touch portal-owned columns (``field_cn_name`` /
+    ``enum_desc``); adding, removing or renaming fields and changing
+    technical attributes is rejected instead of silently ignored.
+    """
+
+    def __init__(self, details):
+        super().__init__(details)
+        self.message = "source-bound 资产不允许人工修改 source-owned 字段属性"
+
+    def to_dict(self):
+        return {
+            "code": "SOURCE_OWNED_ATTRIBUTE",
+            "message": self.message,
             "details": self.details,
         }
 
@@ -487,7 +514,10 @@ class AssetsService(AuditActorMixin):
                 asset_field.c.enum_desc,
                 asset_field.c.field_desc,
             )
-            .where(asset_field.c.asset_id.in_([int(asset_id) for asset_id in asset_ids]))
+            .where(
+                asset_field.c.asset_id.in_([int(asset_id) for asset_id in asset_ids]),
+                asset_field.c.is_deleted == "N",
+            )
             .order_by(asset_field.c.asset_id, asset_field.c.field_order, asset_field.c.field_name),
             purpose=purpose,
             method=method,
@@ -508,6 +538,165 @@ class AssetsService(AuditActorMixin):
                 }
             )
         return grouped
+
+    def _load_active_field_rows(self, asset_id):
+        """Load raw active field rows (with order) for identity matching."""
+        rows = self._fetch_rows_logged(
+            select(
+                asset_field.c.field_id,
+                asset_field.c.field_name,
+                asset_field.c.field_cn_name,
+                asset_field.c.data_type,
+                asset_field.c.field_order,
+                asset_field.c.nullable_flag,
+                asset_field.c.pk_flag,
+                asset_field.c.partition_flag,
+                asset_field.c.enum_desc,
+                asset_field.c.field_desc,
+            )
+            .where(
+                asset_field.c.asset_id == int(asset_id),
+                asset_field.c.is_deleted == "N",
+            )
+            .order_by(asset_field.c.field_order, asset_field.c.field_id),
+            purpose="asset field merge rows",
+            method="_load_active_field_rows",
+        )
+        return [ActiveField.from_row(row) for row in rows]
+
+    def _field_display_cn(self, row):
+        """Read-model display fallback; never used for source compare/merge."""
+        return row.field_cn_name or row.field_desc or row.field_name
+
+    def _reconcile_manual_fields(self, *, asset_id, source_bound, active, incoming):
+        """Reconcile a manual field payload against active rows.
+
+        Unchanged fields keep their ``field_id``; new fields receive fresh
+        IDs; fields missing from the payload are soft deleted. source-bound
+        assets only accept portal-owned ``field_cn_name`` / ``enum_desc``
+        edits and reject field add / remove / rename / technical mutation
+        deterministically.
+        """
+        try:
+            plan = plan_field_collection(active, incoming)
+        except FieldIdentityConflict as error:
+            raise AssetValidationError([{"field": "fields", "message": str(error)}]) from error
+
+        index_by_key = {field.key: index for index, field in enumerate(incoming)}
+        if source_bound:
+            problems = []
+            for current, field in plan.matched:
+                index = index_by_key[field.key]
+                technical = (
+                    ("dataType", current.data_type, field.data_type),
+                    ("nullable", current.nullable, bool(field.nullable)),
+                    ("primaryKey", current.pk, bool(field.pk)),
+                    ("partitionKey", current.part, bool(field.part)),
+                )
+                for label, stored, requested in technical:
+                    if stored != requested:
+                        problems.append(
+                            {
+                                "field": f"fields[{index}].{label}",
+                                "message": f"source-bound 资产的 {label} 由 source 维护，不允许人工修改",
+                            }
+                        )
+            for field in plan.inserted:
+                index = index_by_key[field.key]
+                problems.append(
+                    {
+                        "field": f"fields[{index}].name",
+                        "message": f"source-bound 资产不允许人工新增字段: {field.name}",
+                    }
+                )
+            for row in plan.deleted:
+                problems.append(
+                    {
+                        "field": "fields",
+                        "message": f"source-bound 资产不允许人工删除字段: {row.field_name}",
+                    }
+                )
+            if problems:
+                raise AssetSourceOwnedError(problems)
+
+        statements = []
+        if plan.deleted:
+            statements.append(
+                update(asset_field)
+                .where(asset_field.c.field_id.in_(tuple(row.field_id for row in plan.deleted)))
+                .values(
+                    is_deleted="Y",
+                    updated_by=self._default_operator,
+                    updated_at=func.current_timestamp(),
+                )
+            )
+        for current, field in plan.matched:
+            display_cn = self._field_display_cn(current)
+            portal_changed = display_cn != field.cn or current.enum_desc != field.enum
+            if source_bound:
+                if not portal_changed:
+                    continue
+                statements.append(
+                    update(asset_field)
+                    .where(asset_field.c.field_id == current.field_id)
+                    .values(
+                        field_cn_name=field.cn,
+                        enum_desc=field.enum,
+                        updated_by=self._default_operator,
+                        updated_at=func.current_timestamp(),
+                    )
+                )
+                continue
+            if (
+                not portal_changed
+                and current.field_name == field.name
+                and current.data_type == field.data_type
+                and current.nullable == bool(field.nullable)
+                and current.pk == bool(field.pk)
+                and current.part == bool(field.part)
+            ):
+                continue
+            statements.append(
+                update(asset_field)
+                .where(asset_field.c.field_id == current.field_id)
+                .values(
+                    field_name=field.name,
+                    field_cn_name=field.cn,
+                    data_type=field.data_type,
+                    nullable_flag=self._flag(field.nullable),
+                    pk_flag=self._flag(field.pk),
+                    partition_flag=self._flag(field.part),
+                    enum_desc=field.enum,
+                    field_desc=field.cn,
+                    updated_by=self._default_operator,
+                    updated_at=func.current_timestamp(),
+                )
+            )
+        next_field_id = None
+        base_order = max([row.field_order for row in active] + [0])
+        for field in plan.inserted:
+            if next_field_id is None:
+                next_field_id = self._get_next_id(asset_field, asset_field.c.field_id)
+            base_order += 1
+            statements.append(
+                insert(asset_field).values(
+                    field_id=next_field_id,
+                    asset_id=int(asset_id),
+                    field_name=field.name,
+                    field_cn_name=field.cn,
+                    data_type=field.data_type,
+                    field_order=base_order,
+                    nullable_flag=self._flag(field.nullable),
+                    pk_flag=self._flag(field.pk),
+                    partition_flag=self._flag(field.part),
+                    enum_desc=field.enum,
+                    field_desc=field.cn,
+                    created_by=self._default_operator,
+                    updated_by=self._default_operator,
+                )
+            )
+            next_field_id += 1
+        return statements, len(active) - len(plan.deleted) + len(plan.inserted)
 
     def _to_asset_table(self, row, fields):
         return {
@@ -682,10 +871,10 @@ class AssetsService(AuditActorMixin):
                 details.append({"field": f"{prefix}.name", "message": "字段英文名不能为空"})
             elif not NAME_PATTERN.fullmatch(name.strip()):
                 details.append({"field": f"{prefix}.name", "message": "字段英文名格式不正确"})
-            elif name.strip() in names:
-                details.append({"field": f"{prefix}.name", "message": "同一张表内字段名必须唯一"})
+            elif name.strip().casefold() in names:
+                details.append({"field": f"{prefix}.name", "message": "同一张表内字段名必须唯一（不区分大小写）"})
             else:
-                names.add(name.strip())
+                names.add(name.strip().casefold())
             if not isinstance(cn, str) or not cn.strip():
                 details.append({"field": f"{prefix}.cn", "message": "字段中文注释不能为空"})
             if not isinstance(field_type, str) or not field_type.strip():
@@ -1018,6 +1207,25 @@ class AssetsService(AuditActorMixin):
             self._ensure_db_table_absent(table["name"], exclude_asset_id=asset_id)
         _, name_to_code = self._load_domain_mappings()
         after_data = {key: deepcopy(value) for key, value in table.items() if key != "current_name"}
+        active = self._load_active_field_rows(asset_id)
+        incoming = [
+            IncomingField(
+                name=field["name"],
+                data_type=field["type"],
+                nullable=bool(field["nullable"]),
+                pk=bool(field["pk"]),
+                part=bool(field["part"]),
+                cn=field["cn"],
+                enum=field.get("enum"),
+            )
+            for field in table["fields"]
+        ]
+        field_statements, active_after = self._reconcile_manual_fields(
+            asset_id=asset_id,
+            source_bound=bool(current_row.get("source_key")),
+            active=active,
+            incoming=incoming,
+        )
         statements = [
             update(asset_table)
             .where(asset_table.c.asset_id == asset_id)
@@ -1031,12 +1239,11 @@ class AssetsService(AuditActorMixin):
                 grain_desc=table["grain"],
                 cycle_desc=table["cycle"],
                 table_desc=table["desc"],
-                field_count=len(table["fields"]),
+                field_count=active_after,
                 updated_by=self._default_operator,
                 updated_at=func.current_timestamp(),
             ),
-            delete(asset_field).where(asset_field.c.asset_id == asset_id),
-            *self._insert_db_fields(asset_id, table["fields"]),
+            *field_statements,
             self._insert_change_log(asset_id, table["name"], "UPDATE_TABLE", current, after_data),
         ]
         self._execute_statements(statements)
@@ -1111,13 +1318,31 @@ class AssetsService(AuditActorMixin):
             asset_id = int(current_row["asset_id"])
         except (KeyError, TypeError, ValueError) as error:
             raise AssetDataSourceError("数据库查询失败") from error
+        active = self._load_active_field_rows(asset_id)
+        incoming = [
+            IncomingField(
+                name=field["name"],
+                data_type=field["type"],
+                nullable=bool(field["nullable"]),
+                pk=bool(field["pk"]),
+                part=bool(field["part"]),
+                cn=field["cn"],
+                enum=field.get("enum"),
+            )
+            for field in normalized_fields
+        ]
+        field_statements, active_after = self._reconcile_manual_fields(
+            asset_id=asset_id,
+            source_bound=bool(current_row.get("source_key")),
+            active=active,
+            incoming=incoming,
+        )
         statements = [
-            delete(asset_field).where(asset_field.c.asset_id == asset_id),
-            *self._insert_db_fields(asset_id, normalized_fields),
+            *field_statements,
             update(asset_table)
             .where(asset_table.c.asset_id == asset_id)
             .values(
-                field_count=len(normalized_fields),
+                field_count=active_after,
                 updated_by=self._default_operator,
                 updated_at=func.current_timestamp(),
             ),
