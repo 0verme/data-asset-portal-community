@@ -31,6 +31,10 @@ from ..settings import get_page_size_limits
 from ..utils.data_types import DEFAULT_DATA_TYPE, normalize_data_type
 from ..utils.ddl_generator import generate_table_ddl, get_ddl_dialect_label, normalize_db_dialect
 from ..utils.service_perf import log_slow_service_call
+from .asset_field_match import (
+    ASSET_FIELD_ACTIVE_VALUE,
+    ASSET_FIELD_MATCH_COLUMNS,
+)
 from .field_merge import (
     ActiveField,
     FieldIdentityConflict,
@@ -322,21 +326,26 @@ class AssetsService(AuditActorMixin):
             name_to_code[name] = code
         return code_to_name, name_to_code
 
+    def _asset_field_keyword_condition(self, keyword):
+        """Shared asset-field keyword predicate (see ``services.asset_field_match``)."""
+        like = f"%{str(keyword or '').strip().lower()}%"
+        return or_(
+            *(
+                func.lower(func.coalesce(asset_field.c[column], "")).like(like)
+                for column, _label in ASSET_FIELD_MATCH_COLUMNS
+            )
+        )
+
     def _build_asset_filters(self, *, keyword=None, schema_name=None, layer=None, domain=None, owner=None):
         code_to_name, name_to_code = self._load_domain_mappings()
         clauses = []
         normalized_keyword = str(keyword or "").strip().lower()
         if normalized_keyword:
-            like = f"%{normalized_keyword}%"
             field_match = exists(
                 select(1).where(
                     asset_field.c.asset_id == asset_table.c.asset_id,
-                    asset_field.c.is_deleted == "N",
-                    or_(
-                        func.lower(func.coalesce(asset_field.c.field_name, "")).like(like),
-                        func.lower(func.coalesce(asset_field.c.field_cn_name, "")).like(like),
-                        func.lower(func.coalesce(asset_field.c.field_desc, "")).like(like),
-                    ),
+                    asset_field.c.is_deleted == ASSET_FIELD_ACTIVE_VALUE,
+                    self._asset_field_keyword_condition(normalized_keyword),
                 )
             )
             clauses.append(
@@ -345,6 +354,8 @@ class AssetsService(AuditActorMixin):
                     self._like(asset_table.c.table_cn_name, keyword),
                     self._like(asset_table.c.owner_name, keyword),
                     self._like(asset_table.c.schema_name, keyword),
+                    self._like(asset_table.c.layer_code, keyword),
+                    self._like(asset_table.c.domain_code, keyword),
                     self._like(asset_table.c.grain_desc, keyword),
                     self._like(asset_table.c.cycle_desc, keyword),
                     self._like(asset_table.c.table_desc, keyword),
@@ -387,7 +398,6 @@ class AssetsService(AuditActorMixin):
         normalized_keyword = str(keyword or "").strip().lower()
         field_match_sql = None
         if normalized_keyword:
-            like = f"%{normalized_keyword}%"
             field_match_sql = (
                 select(
                     asset_field.c.field_name.concat(" ").concat(
@@ -396,12 +406,8 @@ class AssetsService(AuditActorMixin):
                 )
                 .where(
                     asset_field.c.asset_id == asset_table.c.asset_id,
-                    asset_field.c.is_deleted == "N",
-                    or_(
-                        func.lower(func.coalesce(asset_field.c.field_name, "")).like(like),
-                        func.lower(func.coalesce(asset_field.c.field_cn_name, "")).like(like),
-                        func.lower(func.coalesce(asset_field.c.field_desc, "")).like(like),
-                    ),
+                    asset_field.c.is_deleted == ASSET_FIELD_ACTIVE_VALUE,
+                    self._asset_field_keyword_condition(normalized_keyword),
                 )
                 .order_by(asset_field.c.field_order, asset_field.c.field_name)
                 .limit(1)
