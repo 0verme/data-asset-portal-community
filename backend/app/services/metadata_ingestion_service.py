@@ -250,34 +250,52 @@ class MetadataIngestionService(AuditActorMixin):
             "external_id": natural_id,
             "qualified_name": qualified_name,
             "catalog": (item.catalog or "").strip(),
+            "catalog_present": "catalog" in item.model_fields_set,
             "database": (item.database or "").strip(),
+            "database_present": "database" in item.model_fields_set,
             "schema": (item.schema_name or "").strip() or (qualified_name.rsplit(".", 1)[-2] if "." in qualified_name else "external"),
             "name": name,
             "description": (item.description or "").strip(),
+            "description_present": "description" in item.model_fields_set,
             "fields": fields,
             "fields_present": "fields" in item.model_fields_set,
         }
-        normalized["content"] = self._asset_content(normalized)
         normalized["key"] = self._asset_key(source_key, normalized)
         return normalized
 
     @staticmethod
-    def _asset_content(asset: dict[str, Any]) -> dict[str, Any]:
+    def _asset_content(asset: dict[str, Any], fallback: dict[str, Any] | None = None) -> dict[str, Any]:
         """Source-owned asset-level compare projection (#260 §8.4).
 
         Field-level comparison is handled by ``plan_source_merge`` so that
         portal-owned field columns never participate in "has content
         changed" decisions.
+
+        ``fallback`` resolves absent optional attributes to their stored
+        values, so a payload that omits ``description`` / ``catalog`` /
+        ``database`` neither looks changed nor clears the column on update
+        (#260 §6). Explicit ``null`` / empty string stay as normalized
+        clears, and ``fallback=None`` is the create path.
         """
-        return {
+        content = {
             "assetType": asset["asset_type"],
             "qualifiedName": asset["qualified_name"],
-            "catalog": asset["catalog"],
-            "database": asset["database"],
             "schema": asset["schema"],
             "name": asset["name"],
-            "description": asset["description"],
         }
+        for key, presence_key in (
+            ("catalog", "catalog_present"),
+            ("database", "database_present"),
+            ("description", "description_present"),
+        ):
+            if fallback is not None and not asset.get(presence_key, True):
+                value = fallback[key]
+            else:
+                value = asset[key]
+            # Storage canonicalizes empty values to NULL, so the projection
+            # (compare + change log) does the same.
+            content[key] = value or None
+        return content
 
     def _preflight_assets(self, request: AssetMetadataIngestionRequest) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         count = len(request.assets)
@@ -406,36 +424,58 @@ class MetadataIngestionService(AuditActorMixin):
             plan = plan_source_merge((), list(item.get("fields") or []))
         active_before = len(current["fields"]) if current else 0
         fields_present = bool(item.get("fields_present", True))
-        values = {
+        identity_values = {
             "asset_id": asset_id,
             "table_name": item["name"],
-            "table_cn_name": item["description"] or item["name"],
             "schema_name": item["schema"],
-            "catalog_name": item["catalog"] or None,
-            "database_name": item["database"] or None,
             "source_key": item["source_key"],
             "asset_type": item["asset_type"],
             "external_id": item["external_id"],
             "qualified_name": item["qualified_name"],
-            "layer_code": None,
-            "domain_code": None,
-            "owner_name": None,
-            "table_desc": item["description"] or None,
-            "updated_by": self._operator,
         }
+        # Three-state source-owned scalars: absent preserves the stored value
+        # on update (and maps to NULL on create); explicit null / "" clears.
+        source_values: dict[str, Any] = {}
+        for key, presence_key, column in (
+            ("catalog", "catalog_present", "catalog_name"),
+            ("database", "database_present", "database_name"),
+            ("description", "description_present", "table_desc"),
+        ):
+            if current is None or item.get(presence_key, True):
+                source_values[column] = item[key] or None
         statements: list[Any] = []
         if current is None:
+            # Portal-owned governance columns are only seeded on create; the
+            # table_cn_name display fallback is description or name.
             statements.append(
                 insert(asset_table).values(
-                    {**values, "field_count": len(plan.inserts), "created_by": self._operator}
+                    {
+                        **identity_values,
+                        **source_values,
+                        "table_cn_name": item["description"] or item["name"],
+                        "layer_code": None,
+                        "domain_code": None,
+                        "owner_name": None,
+                        "grain_desc": None,
+                        "cycle_desc": None,
+                        "field_count": len(plan.inserts),
+                        "created_by": self._operator,
+                        "updated_by": self._operator,
+                    }
                 )
             )
             change_type = "CREATE_TABLE"
             before = None
         else:
+            # Ingestion update writes source-owned columns plus system
+            # bookkeeping only; portal-owned columns are never touched.
             # ``fields`` absent is a collection NOOP: field_count, field rows
             # and their timestamps must stay untouched.
-            asset_values = {**values}
+            asset_values = {
+                **identity_values,
+                **source_values,
+                "updated_by": self._operator,
+            }
             if fields_present:
                 asset_values["field_count"] = plan.active_count_after(active_before)
             statements.append(
@@ -445,7 +485,8 @@ class MetadataIngestionService(AuditActorMixin):
             )
             statements.extend(self._field_merge_statements(plan))
             change_type = "UPDATE_TABLE"
-            before = {"qualifiedName": current["qualified_name"], "fieldCount": active_before}
+            before = self._asset_content(current)
+            before["fieldCount"] = active_before
         field_rows: list[dict[str, Any]] = []
         next_field_id = field_id_start
         for insert_plan in plan.inserts:
@@ -467,10 +508,10 @@ class MetadataIngestionService(AuditActorMixin):
                 }
             )
             next_field_id += 1
-        after = {
-            "qualifiedName": item["qualified_name"],
-            "fieldCount": plan.active_count_after(active_before),
-        }
+        # Audit the full source-owned projection so AC1/AC3 are traceable
+        # through before/after without storing the raw payload (#260 §9).
+        after = self._asset_content(item, fallback=before)
+        after["fieldCount"] = plan.active_count_after(active_before)
         statements.append(
             insert(asset_change_log).values(
                 change_id=change_id,
@@ -558,7 +599,7 @@ class MetadataIngestionService(AuditActorMixin):
                 summary.create += 1
                 action = "create"
                 status = "create"
-            elif current["content"] == item["content"] and not plan.source_changed:
+            elif current["content"] == self._asset_content(item, fallback=current["content"]) and not plan.source_changed:
                 summary.unchanged += 1
                 action = "unchanged"
                 status = "unchanged"
