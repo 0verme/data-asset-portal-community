@@ -30,7 +30,7 @@
 | 15 | Ingestion audit 复用 `OperationLogService.batch_audit` / `p_operation_log`；`GET /api/metadata/ingestions/{id}` 从 audit summary 读取结果。 | 不创建重复的 metadata ingestion read table。 | audit 只存 source、collector、ID、counts、snapshot、result 和 error summary，不存完整 payload。 |
 | 16 | API resource family 为 `/api/metadata`，当前 contract major 为 v1；breaking API 变化使用新的 `/api/v2/metadata` family，contract major 同步升级。 | 保持仓库已有 `/api` prefix，同时区分 API path version 与 `contractVersion`。 | V1 不建立 schema registry 或自动 migration registry。 |
 | 17 | Ingestion 写入复用当前 `require_maintainer` auth seam；Contract / Service 不依赖 FastAPI 或具体 auth framework。 | 当前即可工作并兼容未来 #32 RBAC。 | 不在 #114 实现 RBAC；未来只替换 route dependency。 |
-| 18 | Asset mapping 只把 source metadata 映射到现有 asset/field service model；`layer_code`、`domain_code` 等 DAP governance classification 不强制由 Collector 提供。 | 防止 source metadata 与 DAP enrichment 混淆。 | V1 允许这些内部分类为空，维护 API 仍保留现有语义。 |
+| 18 | Asset mapping 只把 source metadata 映射到现有 asset/field service model；`layer_code`、`domain_code` 等 DAP governance classification 不强制由 Collector 提供。 | 防止 source metadata 与 DAP enrichment 混淆。 | V1 允许这些内部分类为空，维护 API 仍保留现有语义；#260 决策 21 把该原则固化为列级 merge 规则（ingestion update 永不写 portal-owned 列）。 |
 | 19 | Reference implementation 只包含 PostgreSQL catalog collector 与 JSON lineage producer，通过 HTTP Contract 调用 DAP。 | 证明边界可被第三方实现。 | 不做 scheduler、connector framework、parser、OpenLineage、DataHub/OpenMetadata compatibility。 |
 
 ## Ownership / Merge Policy（#260 补充决策，已实现）
@@ -44,6 +44,15 @@
 | 22 | `unchanged` 判定只使用 source-owned projection；人工修改 portal-owned 列后 re-import 必须 `unchanged` 且零写入。 | 防止人工编辑改变“已存内容”并触发 ingestion 覆盖。 | 读模型 display fallback 保留，但不参与 compare；`p_asset_change_log` before/after 记录 source-owned projection。 |
 | 23 | source-owned 可选标量（`description` / `catalog` / `database` 与字段 `description` / flags / `ordinalPosition`）按 absent / `null` / `""` 三态处理：absent 保留现值，`null` 与空字符串显式清空。 | “未采集到”不等于“显式清空”，采集器能力退化不得清空已有数据。 | 使用 Pydantic v2 `model_fields_set` 判定 presence，不修改 JSON wire shape；空值统一存 NULL。 |
 | 24 | `source-bound` 资产人工修改 source-owned 属性（asset 级 `name` / `schema` / `desc`，字段级新增 / 删除 / rename / 技术属性）返回确定性 `422 SOURCE_OWNED_ATTRIBUTE`，整请求原子失败；`portal-only` 保持全列可编辑。 | 静默忽略会造成“保存成功但值回滚”，允许写入则违反 source of record。 | 与 #258 的 `409 ASSET_AMBIGUOUS` 同属确定性失败风格；normalize 后比较，回传现值不视为修改。 |
+
+## Identity Map 与 Invariants（#261 补充决策，已实现）
+
+> 本节是 Epic #257 Child D（#261）在 ADR-001 之上补充的读写身份对齐与长期 invariant 决策，记录于 2026-09-20。完整 Identity Map 与 Invariants 表见 [metadata-ingestion.md](../metadata-ingestion.md)，逐条验收证据见 `backend/tests/test_asset_sync_lifecycle.py`。
+
+| # | Decision | Reason | Alternatives / Consequences |
+| --- | --- | --- | --- |
+| 25 | 写路径身份 `(source_key, asset_type, external_id)` 与读路径 canonical identity `asset_id` 必须一一可达：任何由 ingestion 写入的资产都必须能通过 `asset_id` 精确读取与变更；`table_name` 降级为兼容查找（0 → `404` / 1 → `200` / N → `409 ASSET_AMBIGUOUS`），ingestion item result 不返回内部 `assetId`。 | 写路径与读路径使用不同身份会导致同名资产的 `LIMIT 1` 随机命中；把内部主键写进外部 Contract 会把 implementation detail 变成外部依赖。 | 不引入 UUID / URN / Entity Resolution；`asset_id` 保持内部稳定主键，兼容入口继续服务旧书签与旧客户端。 |
+| 26 | Epic #257 的六条 invariant（I1 asset identity 稳定、I2 field identity 稳定、I3 ownership 分离、I4 读写身份一致、I5 幂等可重放、I6 引用安全优先）作为长期契约固化；每条必须有真实跨模块 E2E 证据，禁止用 unit test 或推断替代。 | 身份与同步契约的失效模式都是长期、跨模块的（重复同步丢治理属性、引用孤儿、同名误寻址），只有真实生命周期测试能阻止回归。 | 不新增测试框架；验收测试沿用仓库既有 TestClient + 隔离 SQLite + Alembic initialize 方式。 |
 
 ## Contract shape
 

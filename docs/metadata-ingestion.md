@@ -62,6 +62,27 @@ DAP 不提供数据库 connector、扫描 runtime、统一调度器、SQL/Python
 - 不同 source 的 `public.orders` 相互隔离。
 - payload 默认不是 authoritative snapshot；缺失对象不会删除。`authoritative=true` 只返回 `deleteCandidate`，V1 不执行 destructive delete。
 
+### Identity Map：写入身份与读取身份
+
+同一份资产在写路径与读路径必须使用同一套身份。DAP 的身份定义如下：
+
+| 场景 | 身份 | source-scoped | 读路径 |
+| --- | --- | --- | --- |
+| ingestion 写入 / compare / update | `(source_key, asset_type, external_id)`（缺 `externalId` 时用 `qualifiedName`） | 是 | — |
+| 资产 canonical read identity | `asset_id` | 是（内部稳定主键） | `GET /api/assets/{assetId}`、`/fields`、`/ddl`、`PUT`、`DELETE` |
+| 兼容查找 | `table_name` | 否（仅展示 / 旧书签） | `GET /api/assets/tables/{tableName}`：0 匹配 → `404`，1 匹配 → `200`，>1 匹配 → `409 ASSET_AMBIGUOUS` |
+| 字段 historical identity | `field_id` | 是 | `fieldId` 出现在资产字段响应 |
+| 指标语义引用 | `asset_id` + `field_id` | 是 | `p_indicator_item.source_asset_id` / `result_field_id` |
+| 字段映射 | `(upstream_system_id, source_table)` + 字段名 | 是 | 字段映射模块 |
+| 血缘 snapshot | `(source_key, importId)` + node externalId | 是 | 血缘模块 |
+
+规则：
+
+- 任何能写入的资产身份都必须能被读路径精确寻址；禁止用 `WHERE table_name = ? LIMIT 1` 作为跨 source 的定位方式。
+- ingestion item result 只暴露 contract 身份（`index` / `externalKey` / `status` / `action` / `code` / `message` / `field`），**不返回内部 `assetId`**；由写路径创建的资产必须经读路径（列表 / 详情）反解 canonical `assetId`，不得把内部主键写进外部 Contract。
+- `409 ASSET_AMBIGUOUS` 的 `error.details[]` 列出候选 `assetId`，调用方据此改用 `assetId` 精确定位。
+- `source_key IS NULL` 的 legacy / portal-only 行不会被 ingestion claim；同表名的 source 资产是独立一行。
+
 ## Asset ingestion
 
 Canonical endpoint：
@@ -221,6 +242,24 @@ normalized_field_name = field_name.casefold()
 - 字段仍存活：无关 re-import 后引用仍可解析；
 - 字段被 source 删除：原字段软删除，semantic validation 返回 `result field is deleted: <id>`，不会自动迁移到未来重新出现的同名字段；
 - 不新增外键，不自动 repair indicator。
+
+## Invariants 与 E2E 验收
+
+Epic #257 把身份与同步语义固化为六条长期 invariant。它们不是设计口号：每一条都由 `backend/tests/test_asset_sync_lifecycle.py`（跨模块生命周期验收，真实 HTTP / DB / service）逐项执行。
+
+| Invariant | 内容 | 验收测试 |
+| --- | --- | --- |
+| I1 Asset identity 稳定 | 同一 `(source, assetType, externalId)` 重复导入映射到同一 `asset_id`，不新建重复行 | `test_golden_path_import_govern_indicator_reimport_and_validate`、`test_reimport_targets_only_the_named_source_and_keeps_lookup_contract` |
+| I2 Field identity 稳定 | 未变化字段重复同步后 `field_id` 不变；新字段新 ID；rename = delete + add；ID 不复用 | `test_field_lifecycle_add_remove_rename_and_recreate_by_http_ingestion` |
+| I3 Ownership 分离 | source-owned 由同步更新，portal-owned 只能人工写入且同步永不覆盖 / 清空，system-owned 不由任何写入方手工设置 | `test_golden_path_import_govern_indicator_reimport_and_validate`、`test_source_bound_asset_manual_technical_edit_is_rejected_atomically` |
+| I4 读写身份一致 | 写入的资产必须能被读路径精确寻址；同名多 source 不使用 first match | `test_golden_path_import_govern_indicator_reimport_and_validate`、`test_reimport_targets_only_the_named_source_and_keeps_lookup_contract` |
+| I5 幂等可重放 | 相同 payload 重复提交不产生新行、不改变任何 ID、不改变 portal-owned 属性、不产生业务 UPDATE | `test_repeat_import_is_unchanged_without_business_write_but_keeps_audit_log`、`test_asset_source_owned_scalar_presence_during_lifecycle` |
+| I6 引用安全优先 | 字段删除 / rename 不产生静默孤儿；引用要么保持可解析，要么返回确定性 validation failure，不允许随机命中或自动迁移 | `test_removed_field_breaks_indicator_reference_without_migration` |
+
+补充边界：
+
+- 「零写入」特指业务表与 `p_asset_change_log`；`p_operation_log` 仍在每次正式 ingestion 记录 audit（见 [Audit and status](#audit-and-status)），两者语义不同，不能相互推导。
+- portal-only 资产（含 API 创建与 legacy 行）不参与 I1 的 claim 判定：出现同表名的 source 资产时两者独立共存，各自通过 `assetId` 精确访问。
 
 ## Lineage snapshot ingestion
 
