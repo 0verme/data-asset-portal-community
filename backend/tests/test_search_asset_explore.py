@@ -346,7 +346,7 @@ class AssetFieldMatchContractTestCase(unittest.TestCase):
         with patch.object(
             service, "_load_domain_mappings", return_value=({}, {})
         ):
-            clauses, _ = service._build_asset_filters(keyword="存款余额")
+            clauses, _ = service._build_asset_filters(keyword="包裹数")
 
         from sqlalchemy import select  # pyright: ignore[reportMissingImports]
         from sqlalchemy.dialects import postgresql  # pyright: ignore[reportMissingImports]
