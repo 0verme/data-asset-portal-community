@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0.
 
 export interface RelatedTableSummary {
+  assetId?: number | null | undefined;
+  refKey?: string | undefined;
   tableName: string;
   tableCn?: string | undefined;
   domain?: string | undefined;

@@ -136,7 +136,18 @@ export function ReportDetailDrawer({ report, open, onClose, onEdit, onDelete, ca
             <h3><Icon name="link" size={14} />关联引用</h3>
             <div className="report-detail-section">
               <div className="report-detail-subtitle">关联表</div>
-              <ReferenceChips<RelatedTableSummary> items={report.relatedTables || []} itemKey="tableName" labelKey="tableName" mono empty="暂无关联表" />
+              <ReferenceChips<RelatedTableSummary>
+                items={(report.relatedTables || []).map((item) => ({
+                  ...item,
+                  refKey: Number(item.assetId) > 0
+                    ? `asset:${item.assetId}`
+                    : `table:${String(item.tableName || "")}`,
+                }))}
+                itemKey="refKey"
+                labelKey="tableName"
+                mono
+                empty="暂无关联表"
+              />
             </div>
             <div className="report-detail-section">
               <div className="report-detail-subtitle">关联指标</div>

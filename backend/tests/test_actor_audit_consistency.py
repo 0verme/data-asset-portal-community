@@ -75,6 +75,7 @@ class AssetAuditConsistencyTests(unittest.TestCase):
         self.service._ensure_db_table_absent = MagicMock()
         self.service._load_domain_mappings = MagicMock(return_value=({}, {"客户域": "D01"}))
         self.service._get_db_asset_detail = MagicMock(return_value={"name": "orders", "fields": []})
+        self.service._get_db_asset_detail_by_id = MagicMock(return_value={"name": "orders", "fields": []})
         self.service._with_empty_asset_risks = MagicMock(side_effect=lambda value: value)
         self.service._execute_statements = MagicMock()
 

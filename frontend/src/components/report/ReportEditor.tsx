@@ -145,12 +145,26 @@ function readText(item: AssetTableItem, key: string): string {
 }
 
 function normalizeTableCandidate(item: AssetTableItem): RelatedTableSummary {
+  const assetId = Number(item.assetId);
   return {
+    assetId: Number.isInteger(assetId) && assetId > 0 ? assetId : null,
     tableName: item.name,
     tableCn: readText(item, "labelCn") || readText(item, "cnName") || item.cn || item.desc || "",
     domain: item.domain || "",
     layer: item.layer || item.dataLayer || item.schemaLayer || "",
   };
+}
+
+/** Stable picker key: same-name assets stay distinguishable via assetId. */
+function tableReferenceKey(item: RelatedTableSummary): string {
+  const assetId = Number(item.assetId);
+  return Number.isInteger(assetId) && assetId > 0
+    ? `asset:${assetId}`
+    : `table:${String(item.tableName || "")}`;
+}
+
+function withReferenceKey(item: RelatedTableSummary): RelatedTableSummary {
+  return { ...item, refKey: tableReferenceKey(item) };
 }
 
 function normalizeIndicatorCandidate(item: MockIndicatorItem): RelatedIndicatorSummary {
@@ -263,14 +277,19 @@ export function ReportEditor({
 
   const tableOptions = React.useMemo(() => {
     const keyword = tableSearch.trim().toLowerCase();
-    const selected = new Set(form.relatedTables.map((item) => item.tableName));
-    return tableCandidates.filter((item) => {
-      if (selected.has(item.tableName)) return false;
+    const selected = new Set(form.relatedTables.map(tableReferenceKey));
+    return tableCandidates.map(withReferenceKey).filter((item) => {
+      if (selected.has(tableReferenceKey(item))) return false;
       if (!keyword) return true;
       return [item.tableName, item.tableCn, item.domain, item.layer]
         .some((value) => String(value || "").toLowerCase().includes(keyword));
     }).slice(0, 20);
   }, [form.relatedTables, tableCandidates, tableSearch]);
+
+  const selectedTableReferences = React.useMemo(
+    () => form.relatedTables.map(withReferenceKey),
+    [form.relatedTables],
+  );
 
   const indicatorOptions = React.useMemo(() => {
     const keyword = indicatorSearch.trim().toLowerCase();
@@ -284,11 +303,11 @@ export function ReportEditor({
   }, [form.relatedIndicators, indicatorCandidates, indicatorSearch]);
 
   const addRelatedTable = (item: RelatedTableSummary) => {
-    setValues({ relatedTables: [...form.relatedTables, item] });
+    setValues({ relatedTables: [...form.relatedTables, withReferenceKey(item)] });
   };
 
-  const removeRelatedTable = (tableName: string) => {
-    setValues({ relatedTables: form.relatedTables.filter((item) => item.tableName !== tableName) });
+  const removeRelatedTable = (referenceKey: string) => {
+    setValues({ relatedTables: form.relatedTables.filter((item) => tableReferenceKey(item) !== referenceKey) });
   };
 
   const addRelatedIndicator = (item: RelatedIndicatorSummary) => {
@@ -463,8 +482,8 @@ export function ReportEditor({
             searchValue={tableSearch}
             onSearchChange={setTableSearch}
             candidates={tableOptions}
-            selectedItems={form.relatedTables}
-            itemKey="tableName"
+            selectedItems={selectedTableReferences}
+            itemKey="refKey"
             titleKey="tableName"
             subtitleBuilder={(item) => [item.layer, item.domain, item.tableCn].filter(Boolean).join(" / ")}
             onAdd={addRelatedTable}

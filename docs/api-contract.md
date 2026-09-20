@@ -196,6 +196,17 @@ Base Path: `/api/assets`
 
 ### 2.2 接口
 
+Canonical（以 `assetId` 定位资产）：
+
+- `GET /api/assets/{assetId}`
+- `GET /api/assets/{assetId}/fields`
+- `GET /api/assets/{assetId}/ddl`
+- `PUT /api/assets/{assetId}`
+- `PUT /api/assets/{assetId}/fields`
+- `DELETE /api/assets/{assetId}`
+
+Compatibility（按表名读取，保留给旧书签 / 旧客户端）：
+
 - `GET /api/assets/tables`
 - `GET /api/assets/tables/{tableName}`
 - `GET /api/assets/tables/{tableName}/fields`
@@ -206,6 +217,8 @@ Base Path: `/api/assets`
 - `PUT /api/assets/tables/{tableName}`
 - `PUT /api/assets/tables/{tableName}/fields`
 - `DELETE /api/assets/tables/{tableName}`
+
+写路径（Metadata Ingestion）使用 source-scoped `(source_key, asset_type, external_id)`；Portal internal read identity 是 `asset_id`；`table_name` 只承担展示与兼容查找，不再作为跨 source 的唯一身份。
 
 ### 2.3 查询参数
 
@@ -247,6 +260,7 @@ curl --get "http://127.0.0.1:15099/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D
 ```json
 {
   "data": {
+    "assetId": 101,
     "name": "DWM_MEMBER_ACTIVITY_STAT_1D",
     "cn": "会员活跃统计日表",
     "domain": "会员",
@@ -284,6 +298,20 @@ curl --get "http://127.0.0.1:15099/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D
 }
 ```
 
+### 2.6 资产身份与兼容查找
+
+- 列表 / 详情 / 字段响应中的 `assetId` 是程序使用的 canonical read identity；`table_name` 只用于展示与兼容查找。
+- 前端路由与小程序详情页在已知身份时通过 `assetId` 访问；旧 URL（如 `/data-warehouse/{tableName}`）继续可用。
+- `GET /api/assets/tables/{tableName}` 及对应的 fields / ddl / PUT / DELETE 兼容入口按确定规则处理：
+
+| 匹配数量 | 行为 |
+| --- | --- |
+| 0 | `404` `ASSET_NOT_FOUND` |
+| 1 | 正常返回 |
+| >1 | `409` `ASSET_AMBIGUOUS`，`error.details[]` 列出候选资产的 `assetId`、`tableName`、`schema`、`sourceKey` |
+
+禁止 first match；同名资产必须通过 `assetId` 精确访问。`source_key IS NULL` 的 legacy 资产不会被 metadata ingestion 自动 claim，仍可通过自身 `assetId` 访问。
+
 ## 统一搜索
 
 Base Path: `/api/search`
@@ -299,7 +327,7 @@ Base Path: `/api/search`
 
 ### 返回格式
 
-成功响应包含 `query`、归一化后的 `scope`、`groups`、`total`、`estimatedTotal` 和 `hasMore`。每个分组包含 `type`、`label`、`module`、`count` 和 `items`；结果项包含 `id`、`title`、`subtitle`、`meta`、`module`、`ref`、`type`、`category` 和 `matchedFields`。
+成功响应包含 `query`、归一化后的 `scope`、`groups`、`total`、`estimatedTotal` 和 `hasMore`。每个分组包含 `type`、`label`、`module`、`count` 和 `items`；结果项包含 `id`、`title`、`subtitle`、`meta`、`module`、`ref`、`type`、`category` 和 `matchedFields`。资产类型结果额外包含 `assetId`，作为导航与后续读取的 canonical identity；`id` / `ref` 仍为表名，只用于展示。
 
 ### 可复制的搜索请求
 
@@ -330,6 +358,7 @@ curl --get "http://127.0.0.1:15099/api/search" \
           "subtitle": "会员活跃统计日表",
           "meta": "会员 / DWM / 林晓",
           "module": "dwm",
+          "assetId": 101,
           "ref": "DWM_MEMBER_ACTIVITY_STAT_1D",
           "type": "asset",
           "category": "资产",
@@ -622,6 +651,7 @@ Base Path: `/api/reports`
   "maintainerName": "吴迪",
   "relatedTables": [
     {
+      "assetId": 101,
       "tableName": "dwm_trade_order_detail_di",
       "tableCn": "零售订单明细中间表",
       "domain": "交易",
@@ -667,6 +697,7 @@ Base Path: `/api/reports`
 - `effectiveDate`、`expireDate` 如传入必须为 `yyyy-mm-dd`
 - `expireDate` 不得早于 `effectiveDate`
 - `relatedTables`、`relatedIndicators` 必须为数组，且引用对象必须在现有资产表 / 指标台账中存在
+- `relatedTables[]` 优先使用 canonical `assetId`；仅传 `tableName` 时，0 个匹配或多个同名匹配都会返回确定失败，不会 first match
 - 写操作受 `require_maintainer` 保护，`admin` 与 `maintainer` 均可执行
 
 ## 6. 词根管理模块 `roots`

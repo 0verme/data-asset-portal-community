@@ -3,6 +3,7 @@ export interface RecentItem {
   type: 'asset' | 'indicator'
   title: string
   subtitle: string
+  assetId?: number | undefined
   visitedAt: number
 }
 
@@ -15,12 +16,14 @@ export function normalizeRecentItems(value: unknown): RecentItem[] {
     if (!item || typeof item !== 'object') return []
     const record = item as Record<string, unknown>
     if (!record.id || (record.type !== 'asset' && record.type !== 'indicator')) return []
+    const assetId = Number(record.assetId)
     return [{
       id: String(record.id),
       type: record.type,
       title: String(record.title || ''),
       subtitle: String(record.subtitle || ''),
+      ...(Number.isInteger(assetId) && assetId > 0 ? { assetId } : {}),
       visitedAt: Number(record.visitedAt) || 0,
-    }]
+    } as RecentItem]
   })
 }

@@ -48,6 +48,44 @@ export interface AssetTableField extends TableField {
   assetId?: number | null | undefined;
 }
 
+/**
+ * Portal asset identity.
+ *
+ * ``assetId`` is the canonical read identity returned by the backend;
+ * ``tableName`` is only a display / compatibility fallback for legacy URLs.
+ */
+export interface AssetIdentity {
+  assetId?: number | null | undefined;
+  tableName?: string | null | undefined;
+}
+
+function normalizeAssetIdentity(identity: AssetIdentity | string | null | undefined): AssetIdentity {
+  if (typeof identity === 'string') return { tableName: identity };
+  return identity || {};
+}
+
+function positiveInteger(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+/**
+ * Canonical vs compatibility asset resource path, defined once for every
+ * frontend caller. New code should always pass ``assetId`` when it is known.
+ */
+export function assetResourcePath(identity: AssetIdentity | string, suffix = ''): string {
+  const resolved = normalizeAssetIdentity(identity);
+  const hasAssetId = resolved.assetId !== null && resolved.assetId !== undefined && String(resolved.assetId).trim() !== '';
+  if (hasAssetId) {
+    const assetId = positiveInteger(resolved.assetId);
+    if (assetId === null) throw new Error(`资产身份无效：assetId=${String(resolved.assetId)}`);
+    return `/assets/${assetId}${suffix}`;
+  }
+  const tableName = String(resolved.tableName || '').trim();
+  if (!tableName) throw new Error('资产身份缺失：需要 assetId 或 tableName。');
+  return `/assets/tables/${encodeURIComponent(tableName)}${suffix}`;
+}
+
 export interface AssetTableItem {
   name: string;
   cn: string;
@@ -91,6 +129,9 @@ const MOCK_TABLES: AssetTableItem[] = [
 // Mock mode has no database-issued identity, so assign deterministic local
 // IDs solely to exercise the same selector contract as remote mode.
 const MOCK_ASSET_IDS = new Map<string, number>(MOCK_TABLES.map((table, index) => [table.name, index + 1]));
+const MOCK_ASSET_ID_INDEX = new Map<number, string>(
+  MOCK_TABLES.map((table, index) => [index + 1, table.name]),
+);
 const MOCK_FIELD_IDS = new Map<string, number>();
 let nextMockFieldId = 1;
 MOCK_TABLES.forEach((table) => {
@@ -204,21 +245,24 @@ async function getMockAssetTables(params: AssetQueryParams = {}): Promise<AssetT
   return normalizeTableCollection(applyOverrides(clone(getMockTables(params))));
 }
 
-async function getMockAssetDetail(tableName: string): Promise<AssetTableItem> {
+async function getMockAssetDetail(identity: AssetIdentity | string): Promise<AssetTableItem> {
+  const resolved = normalizeAssetIdentity(identity);
+  const assetId = positiveInteger(resolved.assetId);
+  const tableName = assetId !== null ? MOCK_ASSET_ID_INDEX.get(assetId) || '' : String(resolved.tableName || '');
   const table = normalizeTableCollection(applyOverrides(clone(getMockTables()))).find((item) => item.name === tableName);
   if (!table) {
-    throw new Error(`未找到数据表: ${tableName}`);
+    throw new Error(`未找到数据表: ${assetId !== null ? `assetId=${assetId}` : tableName}`);
   }
   return table;
 }
 
-async function getMockAssetFields(tableName: string): Promise<TableField[]> {
-  const detail = await getMockAssetDetail(tableName);
+async function getMockAssetFields(identity: AssetIdentity | string): Promise<TableField[]> {
+  const detail = await getMockAssetDetail(identity);
   return normalizeFieldList(clone(detail.fields)) as TableField[];
 }
 
-async function getMockAssetDDL(tableName: string): Promise<DDLNormalizedResult> {
-  const table = await getMockAssetDetail(tableName);
+async function getMockAssetDDL(identity: AssetIdentity | string): Promise<DDLNormalizedResult> {
+  const table = await getMockAssetDetail(identity);
   const ddlDialect = 'postgresql';
   return {
     ddl: generateDDLByDialect(table, ddlDialect),
@@ -349,33 +393,33 @@ export async function getAssetTablePage(params: AssetQueryParams = {}): Promise<
   };
 }
 
-export async function getAssetDetail(tableName: string): Promise<AssetTableItem> {
+export async function getAssetDetail(identity: AssetIdentity | string): Promise<AssetTableItem> {
   if (API_MODE === 'remote') {
-    const payload = await requestRemote(`/assets/tables/${encodeURIComponent(tableName)}`);
+    const payload = await requestRemote(assetResourcePath(identity));
     return normalizeTable(normalizeDetail(payload));
   }
 
-  return getMockAssetDetail(tableName);
+  return getMockAssetDetail(identity);
 }
 
-export async function getAssetFields(tableName: string): Promise<TableField[]> {
+export async function getAssetFields(identity: AssetIdentity | string): Promise<TableField[]> {
   if (API_MODE === 'remote') {
-    const payload = await requestRemote(`/assets/tables/${encodeURIComponent(tableName)}/fields`);
+    const payload = await requestRemote(assetResourcePath(identity, '/fields'));
     return normalizeFieldList(normalizeCollection(payload, 'fields')) as TableField[];
   }
 
-  return getMockAssetFields(tableName);
+  return getMockAssetFields(identity);
 }
 
-export async function getAssetDDL(tableName: string): Promise<DDLNormalizedResult> {
+export async function getAssetDDL(identity: AssetIdentity | string): Promise<DDLNormalizedResult> {
   if (API_MODE === 'remote') {
-    const payload = await requestRemote(`/assets/tables/${encodeURIComponent(tableName)}/ddl`, {
+    const payload = await requestRemote(assetResourcePath(identity, '/ddl'), {
       timeout: LONG_REQUEST_TIMEOUT,
     });
     return normalizeDDLResponse(payload);
   }
 
-  return getMockAssetDDL(tableName);
+  return getMockAssetDDL(identity);
 }
 
 export async function getDomains(params: { layer?: string | undefined } = {}): Promise<DomainCountItem[]> {
@@ -396,11 +440,13 @@ export async function getLayers(params: { domain?: string | undefined } = {}): P
   return getMockLayers(params);
 }
 
-export async function saveAssetTable(table: unknown, oldName?: string): Promise<AssetTableItem> {
+export async function saveAssetTable(table: unknown, identity: AssetIdentity | string = {}): Promise<AssetTableItem> {
   const normalizedTable = normalizeTable(table);
+  const resolved = normalizeAssetIdentity(identity);
   if (API_MODE === 'remote') {
-    if (oldName) {
-      const payload = await requestRemote(`/assets/tables/${encodeURIComponent(oldName)}`, {
+    const hasAssetId = resolved.assetId !== null && resolved.assetId !== undefined && String(resolved.assetId).trim() !== '';
+    if (hasAssetId || String(resolved.tableName || '').trim()) {
+      const payload = await requestRemote(assetResourcePath(resolved), {
         method: 'PUT',
         body: normalizedTable,
         timeout: LONG_REQUEST_TIMEOUT,
@@ -416,6 +462,10 @@ export async function saveAssetTable(table: unknown, oldName?: string): Promise<
     return normalizeTable(normalizeDetail(payload));
   }
 
+  const assetId = positiveInteger(resolved.assetId);
+  const oldName = assetId !== null
+    ? MOCK_ASSET_ID_INDEX.get(assetId) || ''
+    : String(resolved.tableName || '').trim();
   const overrides = readOverrides();
   const nextUpserts = { ...overrides.upserts };
   const nextDeleted = new Set(overrides.deletedNames);
@@ -436,14 +486,19 @@ export async function saveAssetTable(table: unknown, oldName?: string): Promise<
   return normalizeTable(normalizedTable);
 }
 
-export async function deleteAssetTable(tableName: string): Promise<void> {
+export async function deleteAssetTable(identity: AssetIdentity | string): Promise<void> {
+  const resolved = normalizeAssetIdentity(identity);
   if (API_MODE === 'remote') {
-    await requestRemote(`/assets/tables/${encodeURIComponent(tableName)}`, {
+    await requestRemote(assetResourcePath(resolved), {
       method: 'DELETE',
     });
     return;
   }
 
+  const assetId = positiveInteger(resolved.assetId);
+  const tableName = assetId !== null
+    ? MOCK_ASSET_ID_INDEX.get(assetId) || ''
+    : String(resolved.tableName || '').trim();
   const overrides = readOverrides();
   const nextUpserts = { ...overrides.upserts };
   delete nextUpserts[tableName];

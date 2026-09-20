@@ -251,7 +251,7 @@ class KeywordSearchProvider(SearchProvider):
         payload = build_item(row, matched_fields) or {}
         entity_type = config["type"]
         module = config["module"]
-        return {
+        item = {
             "id": payload.get("id"),
             "title": payload.get("title") or "",
             "subtitle": payload.get("subtitle") or "",
@@ -262,6 +262,11 @@ class KeywordSearchProvider(SearchProvider):
             "category": config.get("label") or entity_type,
             "matchedFields": payload.get("matchedFields") if payload.get("matchedFields") is not None else matched_fields,
         }
+        # Additive identity field: only emitted when the entity actually owns
+        # a canonical asset identity, so existing item shapes stay unchanged.
+        if payload.get("assetId") is not None:
+            item["assetId"] = payload["assetId"]
+        return item
 
     def _empty_group(self, config):
         return {

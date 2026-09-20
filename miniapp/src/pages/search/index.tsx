@@ -50,7 +50,9 @@ export default function SearchPage() {
 
   const openItem = (group: SearchGroup, item: SearchItem) => {
     const ref = typeof item.ref === 'string' ? item.ref : ''
-    if (group.type === 'asset' && ref) Taro.navigateTo({ url: withQuery(ROUTES.assetDetail, { table: ref }) })
+    if (group.type === 'asset' && (ref || item.assetId)) {
+      Taro.navigateTo({ url: withQuery(ROUTES.assetDetail, { table: ref, assetId: item.assetId || undefined }) })
+    }
     if (group.type === 'field' && ref) Taro.navigateTo({ url: withQuery(ROUTES.assetDetail, { table: ref }) })
     if (group.type === 'indicator' && ref) {
       Taro.setStorageSync(PENDING_INDICATOR_KEY, ref)

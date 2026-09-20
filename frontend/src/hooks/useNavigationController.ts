@@ -85,12 +85,20 @@ export interface UseNavigationControllerOptions {
   onPopState?: () => void;
 }
 
+/** Portal search / cross-module target with canonical asset identity. */
+export interface ModuleNavigationTarget extends PortalTarget {
+  module?: ModuleId;
+  mappingRoute?: MappingRoute;
+  assetId?: number | null;
+  assetName?: string | null;
+}
+
 export interface NavigationActions {
   switchModule: (nextModule: ModuleId, options?: { systemRoute?: SystemRoute }) => void;
   goToMapping: (nextMappingRoute?: Partial<MappingRoute>) => void;
   backToUpstreamList: () => void;
   goToModuleWithQuery: (
-    target: ModuleId | (PortalTarget & { module?: ModuleId; mappingRoute?: MappingRoute }),
+    target: ModuleId | ModuleNavigationTarget,
     nextQuery?: string,
     options?: { systemRoute?: SystemRoute },
   ) => void;
@@ -210,7 +218,7 @@ export function useNavigationController({
 
   const goToModuleWithQuery = useCallback(
     (
-      target: ModuleId | (PortalTarget & { module?: ModuleId; mappingRoute?: MappingRoute }),
+      target: ModuleId | ModuleNavigationTarget,
       nextQuery?: string,
       { systemRoute }: { systemRoute?: SystemRoute } = {},
     ) => {
@@ -220,6 +228,8 @@ export function useNavigationController({
 
       const pushNavigation =
         nextModule === 'push' ? getPortalPushNavigation(typeof target === 'object' ? target : null, DEFAULT_PUSH_ROUTE) : null;
+      const targetAssetId = typeof target === 'object' && target ? Number(target.assetId) : NaN;
+      const assetId = Number.isInteger(targetAssetId) && targetAssetId > 0 ? targetAssetId : null;
 
       setNavigationState((current) => {
         const next: ExtendedNavigationState = {
@@ -227,6 +237,13 @@ export function useNavigationController({
           module: nextModule,
           query: (pushNavigation?.query ?? nextQuery) || '',
         };
+        if (nextModule === 'dwm' && assetId !== null) {
+          next.route = {
+            page: 'detail',
+            table: typeof target === 'object' ? target.assetName ?? null : null,
+            assetId,
+          } as AssetRoute;
+        }
         if (nextModule === 'indicator') next.indicatorRoute = DEFAULT_INDICATOR_ROUTE;
         if (nextModule === 'report') {
           next.reportRoute = DEFAULT_REPORT_ROUTE;

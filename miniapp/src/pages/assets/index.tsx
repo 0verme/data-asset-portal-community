@@ -98,7 +98,7 @@ export default function AssetsPage() {
         <View>
           <Text className="assets-total">已加载 {items.length} / {total} 张数据表</Text>
           <View className="section-header"><Text className="section-title">资产列表</Text></View>
-          {items.map((asset) => <AssetCard key={asset.name} asset={asset} onView={() => Taro.navigateTo({ url: withQuery(ROUTES.assetDetail, { table: asset.name }) })} />)}
+          {items.map((asset) => <AssetCard key={asset.name} asset={asset} onView={() => Taro.navigateTo({ url: withQuery(ROUTES.assetDetail, { table: asset.name, assetId: asset.assetId || undefined }) })} />)}
           {items.length < total ? <Button className="load-more-button" onClick={loadMore}>{loadingMore ? '加载中…' : '加载更多'}</Button> : null}
           {loadMoreError ? <StateView status="error" message="加载更多失败，请稍后重试" onRetry={loadMore} /> : null}
         </View>

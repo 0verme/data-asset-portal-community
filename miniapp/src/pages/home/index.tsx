@@ -89,7 +89,7 @@ export default function HomePage() {
             className="recent-card"
             key={`${item.type}-${item.id}`}
             onClick={() => item.type === 'asset'
-              ? Taro.navigateTo({ url: withQuery(ROUTES.assetDetail, { table: item.id }) })
+              ? Taro.navigateTo({ url: withQuery(ROUTES.assetDetail, { table: item.id, assetId: item.assetId }) })
               : openIndicator(item.id)}
           >
             <Text className="recent-type">{item.type === 'asset' ? '数据表' : '指标'}</Text>

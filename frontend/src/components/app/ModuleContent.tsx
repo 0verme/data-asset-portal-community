@@ -84,6 +84,13 @@ function toNavigationTarget(target: SearchNavigationTarget): PortalNavigationTar
     const ref = toPortalRef(target.ref);
     if (ref) navigationTarget.ref = ref;
   }
+  if ("assetId" in target && target.assetId != null) {
+    const assetId = Number(target.assetId);
+    if (Number.isInteger(assetId) && assetId > 0) navigationTarget.assetId = assetId;
+  }
+  if (target.type === "asset" && "ref" in target && typeof target.ref === "string" && target.ref) {
+    navigationTarget.assetName = target.ref;
+  }
   return navigationTarget;
 }
 
