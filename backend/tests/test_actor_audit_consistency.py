@@ -13,6 +13,7 @@ from sqlalchemy.dialects import sqlite
 from backend.app.application import ActorSource, Identity, RequestContext, actor_scope, request_context_scope, resolve_actor
 from backend.app.services.api_asset_service import ApiAssetService
 from backend.app.services.assets_service import AssetsService
+from backend.app.services.field_merge import IncomingField, plan_source_merge
 from backend.app.services.metadata_ingestion_service import MetadataIngestionService
 
 
@@ -76,6 +77,7 @@ class AssetAuditConsistencyTests(unittest.TestCase):
         self.service._load_domain_mappings = MagicMock(return_value=({}, {"客户域": "D01"}))
         self.service._get_db_asset_detail = MagicMock(return_value={"name": "orders", "fields": []})
         self.service._get_db_asset_detail_by_id = MagicMock(return_value={"name": "orders", "fields": []})
+        self.service._load_active_field_rows = MagicMock(return_value=[])
         self.service._with_empty_asset_risks = MagicMock(side_effect=lambda value: value)
         self.service._execute_statements = MagicMock()
 
@@ -164,12 +166,27 @@ class MetadataIngestionAuditRegressionTests(unittest.TestCase):
         }
 
         with actor_scope(resolve_actor(explicit_actor="metadata-ingestion")):
+            plan = plan_source_merge(
+                (),
+                [
+                    IncomingField(
+                        name="order_id",
+                        data_type="string",
+                        nullable=False,
+                        pk=True,
+                        part=False,
+                        description="订单号",
+                        description_present=True,
+                    )
+                ],
+            )
             statements, field_rows, _ = service._asset_statements(
                 item,
                 asset_id=7,
                 field_id_start=8,
                 change_id=9,
                 current=None,
+                plan=plan,
             )
 
         asset_params = _statement_params(statements[0])

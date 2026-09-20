@@ -15,7 +15,7 @@ from datetime import timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import delete, func, insert, select, update  # type: ignore
+from sqlalchemy import func, insert, select, update  # type: ignore
 
 from ..application import AuditActorMixin, actor_aware, current_request_context
 from ..application.errors import ApplicationError
@@ -44,6 +44,15 @@ from ..db.tables import (
     lineage_snapshot,
 )
 from ..utils.data_types import normalize_data_type
+from .field_merge import (
+    ActiveField,
+    EMPTY_SOURCE_MERGE_PLAN,
+    FieldIdentityConflict,
+    IncomingField,
+    SourceMergePlan,
+    normalize_field_name,
+    plan_source_merge,
+)
 from .operation_log_service import OperationLogService, operation_log_service
 
 
@@ -203,29 +212,38 @@ class MetadataIngestionService(AuditActorMixin):
         seen_ordinals: set[int] = set()
         for index, field in enumerate(item.fields, start=1):
             field_name = field.name.strip()
-            field_key = field_name.casefold()
+            field_key = normalize_field_name(field_name)
             if field_key in seen_names:
-                raise _ItemProblem("INVALID_DUPLICATE_FIELD", "field names must be unique", f"fields[{index - 1}].name")
+                raise _ItemProblem(
+                    "INVALID_DUPLICATE_FIELD",
+                    "field names must be unique (case-insensitive)",
+                    f"fields[{index - 1}].name",
+                )
             seen_names.add(field_key)
-            ordinal = field.ordinal_position or index
-            if ordinal in seen_ordinals:
-                raise _ItemProblem("INVALID_DUPLICATE_ORDINAL", "field ordinal positions must be unique", f"fields[{index - 1}].ordinalPosition")
-            seen_ordinals.add(ordinal)
+            ordinal = field.ordinal_position
+            if ordinal is not None:
+                if ordinal in seen_ordinals:
+                    raise _ItemProblem("INVALID_DUPLICATE_ORDINAL", "field ordinal positions must be unique", f"fields[{index - 1}].ordinalPosition")
+                seen_ordinals.add(ordinal)
             if field.primary_key and field.nullable:
                 raise _ItemProblem("INVALID_PRIMARY_KEY_NULLABILITY", "primary key fields must be non-nullable", f"fields[{index - 1}].nullable")
-            description = (field.description or "").strip() or field_name
+            present = field.model_fields_set
+            description_present = "description" in present
+            # Empty / whitespace-only is an explicit clear; absent preserves
+            # the stored description on update and maps to NULL on insert.
+            description = (field.description or "").strip() or None
             fields.append(
-                {
-                    "name": field_name,
-                    "type": normalize_data_type(field.data_type),
-                    "nullable": field.nullable,
-                    "pk": field.primary_key,
-                    "part": field.partition_key,
-                    "ordinal": ordinal,
-                    "description": description,
-                }
+                IncomingField(
+                    name=field_name,
+                    data_type=normalize_data_type(field.data_type),
+                    nullable=field.nullable if "nullable" in present else None,
+                    pk=field.primary_key if "primary_key" in present else None,
+                    part=field.partition_key if "partition_key" in present else None,
+                    field_order=ordinal,
+                    description=description,
+                    description_present=description_present,
+                )
             )
-        fields.sort(key=lambda value: (value["ordinal"], value["name"].casefold()))
         normalized = {
             "source_key": source_key,
             "asset_type": asset_type,
@@ -237,6 +255,7 @@ class MetadataIngestionService(AuditActorMixin):
             "name": name,
             "description": (item.description or "").strip(),
             "fields": fields,
+            "fields_present": "fields" in item.model_fields_set,
         }
         normalized["content"] = self._asset_content(normalized)
         normalized["key"] = self._asset_key(source_key, normalized)
@@ -244,6 +263,12 @@ class MetadataIngestionService(AuditActorMixin):
 
     @staticmethod
     def _asset_content(asset: dict[str, Any]) -> dict[str, Any]:
+        """Source-owned asset-level compare projection (#260 §8.4).
+
+        Field-level comparison is handled by ``plan_source_merge`` so that
+        portal-owned field columns never participate in "has content
+        changed" decisions.
+        """
         return {
             "assetType": asset["asset_type"],
             "qualifiedName": asset["qualified_name"],
@@ -252,18 +277,6 @@ class MetadataIngestionService(AuditActorMixin):
             "schema": asset["schema"],
             "name": asset["name"],
             "description": asset["description"],
-            "fields": [
-                {
-                    "name": field["name"],
-                    "type": field["type"],
-                    "nullable": field["nullable"],
-                    "pk": field["pk"],
-                    "part": field["part"],
-                    "ordinal": field["ordinal"],
-                    "description": field["description"],
-                }
-                for field in asset["fields"]
-            ],
         }
 
     def _preflight_assets(self, request: AssetMetadataIngestionRequest) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -304,12 +317,19 @@ class MetadataIngestionService(AuditActorMixin):
         normalized = [item for item in normalized if item["index"] not in duplicate_indexes]
         return normalized, errors
 
-    def _asset_fields(self, asset_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+    def _asset_fields(self, asset_ids: list[int]) -> dict[int, list[ActiveField]]:
+        """Load active (``is_deleted = 'N'``) fields for merge matching.
+
+        Deleted historical rows are intentionally invisible here: the active
+        matching key only ever resolves live rows, and a name that later
+        returns must receive a new ``field_id``.
+        """
         if not asset_ids:
             return {}
         rows = self._db.fetch_rows(
             select(
                 asset_field.c.asset_id,
+                asset_field.c.field_id,
                 asset_field.c.field_name,
                 asset_field.c.field_cn_name,
                 asset_field.c.data_type,
@@ -317,23 +337,19 @@ class MetadataIngestionService(AuditActorMixin):
                 asset_field.c.nullable_flag,
                 asset_field.c.pk_flag,
                 asset_field.c.partition_flag,
+                asset_field.c.enum_desc,
                 asset_field.c.field_desc,
-            ).where(asset_field.c.asset_id.in_(asset_ids)).order_by(asset_field.c.asset_id, asset_field.c.field_order)
+            )
+            .where(
+                asset_field.c.asset_id.in_(asset_ids),
+                asset_field.c.is_deleted == "N",
+            )
+            .order_by(asset_field.c.asset_id, asset_field.c.field_order, asset_field.c.field_id)
         )
-        result: dict[int, list[dict[str, Any]]] = {}
+        result: dict[int, list[ActiveField]] = {}
         for row in rows:
             asset_id = self._safe_int(row.get("asset_id"))
-            result.setdefault(asset_id, []).append(
-                {
-                    "name": row["field_name"],
-                    "type": normalize_data_type(row.get("data_type")),
-                    "nullable": str(row.get("nullable_flag") or "Y").upper() == "Y",
-                    "pk": str(row.get("pk_flag") or "N").upper() == "Y",
-                    "part": str(row.get("partition_flag") or "N").upper() == "Y",
-                    "ordinal": self._safe_int(row.get("field_order")),
-                    "description": row.get("field_desc") or row.get("field_cn_name") or row["field_name"],
-                }
-            )
+            result.setdefault(asset_id, []).append(ActiveField.from_row(row))
         return result
 
     def _load_existing_assets(self, source_keys: set[str]) -> dict[tuple[str, str, str], dict[str, Any]]:
@@ -376,7 +392,20 @@ class MetadataIngestionService(AuditActorMixin):
         field_id_start: int,
         change_id: int,
         current: dict[str, Any] | None,
+        plan: SourceMergePlan | None = None,
     ) -> tuple[list[Any], list[dict[str, Any]], dict[str, Any]]:
+        """Build asset + field statements for one create / update action.
+
+        Field rows are merged by stable identity: matched active rows keep
+        their ``field_id`` (only genuinely changed source-owned columns are
+        written), rows missing from an authoritative collection are soft
+        deleted, and new rows receive fresh monotonically allocated IDs.
+        Portal-owned columns are never written on update.
+        """
+        if plan is None:
+            plan = plan_source_merge((), list(item.get("fields") or []))
+        active_before = len(current["fields"]) if current else 0
+        fields_present = bool(item.get("fields_present", True))
         values = {
             "asset_id": asset_id,
             "table_name": item["name"],
@@ -391,42 +420,57 @@ class MetadataIngestionService(AuditActorMixin):
             "layer_code": None,
             "domain_code": None,
             "owner_name": None,
-            "field_count": len(item["fields"]),
             "table_desc": item["description"] or None,
             "updated_by": self._operator,
         }
         statements: list[Any] = []
         if current is None:
-            statements.append(insert(asset_table).values({**values, "created_by": self._operator}))
+            statements.append(
+                insert(asset_table).values(
+                    {**values, "field_count": len(plan.inserts), "created_by": self._operator}
+                )
+            )
             change_type = "CREATE_TABLE"
             before = None
         else:
-            statements.extend(
-                [
-                    update(asset_table).where(asset_table.c.asset_id == asset_id).values(**values, updated_at=func.current_timestamp()),
-                    delete(asset_field).where(asset_field.c.asset_id == asset_id),
-                ]
+            # ``fields`` absent is a collection NOOP: field_count, field rows
+            # and their timestamps must stay untouched.
+            asset_values = {**values}
+            if fields_present:
+                asset_values["field_count"] = plan.active_count_after(active_before)
+            statements.append(
+                update(asset_table)
+                .where(asset_table.c.asset_id == asset_id)
+                .values(**asset_values, updated_at=func.current_timestamp())
             )
+            statements.extend(self._field_merge_statements(plan))
             change_type = "UPDATE_TABLE"
-            before = {"qualifiedName": current["qualified_name"], "fieldCount": len(current["fields"])}
-        field_rows = [
-            {
-                "field_id": field_id_start + offset,
-                "asset_id": asset_id,
-                "field_name": field["name"],
-                "field_cn_name": field["description"],
-                "data_type": field["type"],
-                "field_order": offset + 1,
-                "nullable_flag": "Y" if field["nullable"] else "N",
-                "pk_flag": "Y" if field["pk"] else "N",
-                "partition_flag": "Y" if field["part"] else "N",
-                "field_desc": field["description"],
-                "created_by": self._operator,
-                "updated_by": self._operator,
-            }
-            for offset, field in enumerate(item["fields"])
-        ]
-        after = {"qualifiedName": item["qualified_name"], "fieldCount": len(item["fields"])}
+            before = {"qualifiedName": current["qualified_name"], "fieldCount": active_before}
+        field_rows: list[dict[str, Any]] = []
+        next_field_id = field_id_start
+        for insert_plan in plan.inserts:
+            resolved = insert_plan.resolved
+            field_rows.append(
+                {
+                    "field_id": next_field_id,
+                    "asset_id": asset_id,
+                    "field_name": resolved.field_name,
+                    "field_cn_name": resolved.field_desc or resolved.field_name,
+                    "data_type": resolved.data_type,
+                    "field_order": resolved.field_order,
+                    "nullable_flag": "Y" if resolved.nullable else "N",
+                    "pk_flag": "Y" if resolved.pk else "N",
+                    "partition_flag": "Y" if resolved.part else "N",
+                    "field_desc": resolved.field_desc,
+                    "created_by": self._operator,
+                    "updated_by": self._operator,
+                }
+            )
+            next_field_id += 1
+        after = {
+            "qualifiedName": item["qualified_name"],
+            "fieldCount": plan.active_count_after(active_before),
+        }
         statements.append(
             insert(asset_change_log).values(
                 change_id=change_id,
@@ -440,6 +484,53 @@ class MetadataIngestionService(AuditActorMixin):
             )
         )
         return statements, field_rows, after
+
+    def _field_merge_statements(self, plan: SourceMergePlan) -> list[Any]:
+        """Field-level statements: soft delete misses, update real changes only."""
+        statements: list[Any] = []
+        if plan.deletes:
+            statements.append(
+                update(asset_field)
+                .where(asset_field.c.field_id.in_(tuple(row.field_id for row in plan.deletes)))
+                .values(
+                    is_deleted="Y",
+                    updated_by=self._operator,
+                    updated_at=func.current_timestamp(),
+                )
+            )
+        for update_plan in plan.updates:
+            if not update_plan.changed:
+                continue
+            resolved = update_plan.resolved
+            statements.append(
+                update(asset_field)
+                .where(asset_field.c.field_id == resolved.field_id)
+                .values(
+                    field_name=resolved.field_name,
+                    data_type=resolved.data_type,
+                    field_order=resolved.field_order,
+                    nullable_flag="Y" if resolved.nullable else "N",
+                    pk_flag="Y" if resolved.pk else "N",
+                    partition_flag="Y" if resolved.part else "N",
+                    field_desc=resolved.field_desc,
+                    updated_by=self._operator,
+                    updated_at=func.current_timestamp(),
+                )
+            )
+        return statements
+
+    def _source_merge_plan(
+        self,
+        item: dict[str, Any],
+        current: dict[str, Any] | None,
+    ) -> SourceMergePlan:
+        if not item.get("fields_present", True):
+            return EMPTY_SOURCE_MERGE_PLAN
+        active = current["fields"] if current is not None else ()
+        try:
+            return plan_source_merge(active, item["fields"])
+        except FieldIdentityConflict as error:
+            raise MetadataConflictError(str(error)) from error
 
     def _classify_assets(
         self,
@@ -462,11 +553,12 @@ class MetadataIngestionService(AuditActorMixin):
         for item in normalized:
             normalized_keys.add(item["key"])
             current = existing.get(item["key"])
+            plan = self._source_merge_plan(item, current)
             if current is None:
                 summary.create += 1
                 action = "create"
                 status = "create"
-            elif current["content"] == item["content"]:
+            elif current["content"] == item["content"] and not plan.source_changed:
                 summary.unchanged += 1
                 action = "unchanged"
                 status = "unchanged"
@@ -476,7 +568,7 @@ class MetadataIngestionService(AuditActorMixin):
                 status = "update"
             items.append(self._result_item(item["index"], item["external_id"], status, action=action))
             if action in {"create", "update"}:
-                actions.append({"item": item, "current": current, "action": action})
+                actions.append({"item": item, "current": current, "action": action, "plan": plan})
         if request.authoritative:
             source_key = self._source_key(request.source)
             for key, current in existing.items():
@@ -488,9 +580,9 @@ class MetadataIngestionService(AuditActorMixin):
         return summary, items, actions
 
     def _persist_asset_actions(self, actions: list[dict[str, Any]]) -> None:
-        field_count = sum(len(action["item"]["fields"]) for action in actions)
+        insert_count = sum(len(action["plan"].inserts) for action in actions)
         next_asset_id = self._db.next_pk(asset_table, asset_table.c.asset_id)
-        next_field_id = self._db.next_pk(asset_field, asset_field.c.field_id) if field_count else 0
+        next_field_id = self._db.next_pk(asset_field, asset_field.c.field_id) if insert_count else 0
         next_change_id = self._db.next_pk(asset_change_log, asset_change_log.c.change_id)
         statements = []
         field_rows = []
@@ -506,6 +598,7 @@ class MetadataIngestionService(AuditActorMixin):
                 field_id_start=next_field_id,
                 change_id=next_change_id + offset,
                 current=current,
+                plan=action["plan"],
             )
             next_field_id += len(fields)
             statements.extend(built)
