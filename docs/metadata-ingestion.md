@@ -197,7 +197,7 @@ GET /api/metadata/ingestions/{ingestionId}
 - `p_lineage_snapshot` 的 source key、content hash、ingestion ID；
 - 从旧 `table_name UNIQUE` 到 source-scoped identity 的 forward migration。
 
-现有 legacy rows 的新增列保持 nullable；现有 CRUD 仍按原 table name 工作。升级前按仓库数据库备份策略保留 backup；仓库不提供 destructive automatic downgrade。
+现有 legacy rows 的新增列保持 nullable。资产读路径的 canonical identity 是 `asset_id`（#258）；`/api/assets/tables/{tableName}` 等兼容入口在唯一匹配时保持原行为，同名多匹配时返回确定的 `409 ASSET_AMBIGUOUS`，不再 first match。`source_key IS NULL` 的 legacy 行不会被 ingestion 自动 claim，仍可通过自身 `asset_id` 访问。升级前按仓库数据库备份策略保留 backup；仓库不提供 destructive automatic downgrade。
 
 ## Reference implementations
 
