@@ -15,12 +15,12 @@ test('route constants keep the five-page navigation contract', () => {
 
 test('recent storage mapper keeps only safe read-only fields', () => {
   const result = normalizeRecentItems([
-    { id: 'dwm_order', type: 'asset', title: '订单表', subtitle: 'dwm_order', visitedAt: 10, secret: 'must drop' },
+    { id: 'dwm_order', type: 'asset', title: '订单表', subtitle: 'dwm_order', assetId: 42, visitedAt: 10, secret: 'must drop' },
     { id: 'I1', type: 'indicator', title: '订单数', subtitle: '订单', visitedAt: 9 },
     { id: 'bad', type: 'user', title: '不支持', subtitle: '', visitedAt: 8 },
   ])
   assert.deepEqual(result, [
-    { id: 'dwm_order', type: 'asset', title: '订单表', subtitle: 'dwm_order', visitedAt: 10 },
+    { id: 'dwm_order', type: 'asset', title: '订单表', subtitle: 'dwm_order', assetId: 42, visitedAt: 10 },
     { id: 'I1', type: 'indicator', title: '订单数', subtitle: '订单', visitedAt: 9 },
   ])
 })

@@ -1,14 +1,14 @@
 import Taro, { useLoad } from '@tarojs/taro'
 import { Button, Text, View } from '@tarojs/components'
 import { useState } from 'react'
-import { Asset, AssetField, getAssetDdl, getAssetDetail, getAssetFields } from '../../api/assets'
+import { Asset, AssetField, AssetIdentity, getAssetDdl, getAssetDetail, getAssetFields } from '../../api/assets'
 import { BottomTabBar } from '../../components/BottomTabBar'
 import { SectionHeader } from '../../components/SectionHeader'
 import { StateView } from '../../components/StateView'
 import { addRecentItem } from '../../utils/recent'
 
 export default function AssetDetailPage() {
-  const [tableName, setTableName] = useState('')
+  const [assetRef, setAssetRef] = useState({} as AssetIdentity)
   const [asset, setAsset] = useState(null as Asset | null)
   const [fields, setFields] = useState([] as AssetField[])
   const [expandedFields, setExpandedFields] = useState(false)
@@ -17,38 +17,47 @@ export default function AssetDetailPage() {
   const [ddlError, setDdlError] = useState(false)
   const [status, setStatus] = useState('loading')
 
-  const load = async (name: string) => {
-    if (!name) {
+  const load = async (identity: AssetIdentity) => {
+    if (!identity.assetId && !identity.tableName) {
       setStatus('error')
       return
     }
     setStatus('loading')
     try {
-      const [detail, fieldList] = await Promise.all([getAssetDetail(name), getAssetFields(name)])
+      const [detail, fieldList] = await Promise.all([getAssetDetail(identity), getAssetFields(identity)])
       setAsset(detail)
       setFields(fieldList.length ? fieldList : detail.fields)
       setStatus('success')
-      addRecentItem({ id: name, type: 'asset', title: detail.cn || name, subtitle: name })
+      addRecentItem({
+        id: detail.name || identity.tableName || '',
+        type: 'asset',
+        title: detail.cn || detail.name || identity.tableName || '',
+        subtitle: detail.name || identity.tableName || '',
+        assetId: detail.assetId || identity.assetId || undefined,
+      })
     } catch {
       setStatus('error')
     }
   }
 
   useLoad((options) => {
-    const name = String(options?.table || '')
-    setTableName(name)
-    void load(name)
+    const tableName = String(options?.table || '')
+    const rawAssetId = Number(options?.assetId)
+    const assetId = Number.isInteger(rawAssetId) && rawAssetId > 0 ? rawAssetId : null
+    const identity = { tableName, assetId }
+    setAssetRef(identity)
+    void load(identity)
   })
 
   const loadDdl = () => {
-    if (!tableName || ddlLoading) return
+    if ((!assetRef.assetId && !assetRef.tableName) || ddlLoading) return
     setDdlLoading(true)
     setDdlError(false)
-    void getAssetDdl(tableName).then(setDdl).catch(() => setDdlError(true)).finally(() => setDdlLoading(false))
+    void getAssetDdl(assetRef).then(setDdl).catch(() => setDdlError(true)).finally(() => setDdlLoading(false))
   }
 
   if (status === 'loading') return <View className="app-page"><StateView status="loading" /></View>
-  if (status === 'error' || !asset) return <View className="app-page"><StateView status="error" onRetry={() => load(tableName)} /></View>
+  if (status === 'error' || !asset) return <View className="app-page"><StateView status="error" onRetry={() => load(assetRef)} /></View>
 
   const visibleFields = expandedFields ? fields : fields.slice(0, 8)
   return (

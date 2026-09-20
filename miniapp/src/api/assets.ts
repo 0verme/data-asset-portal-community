@@ -27,6 +27,12 @@ export interface Asset {
   updatedAt?: string
 }
 
+/** Portal asset identity: assetId is canonical, tableName is compatibility. */
+export interface AssetIdentity {
+  assetId?: number | null
+  tableName?: string | null
+}
+
 export interface AssetPage {
   items: Asset[]
   page: number
@@ -139,16 +145,26 @@ export async function getAssetPage(params: { layer?: string; domain?: string; ke
   }), page, pageSize)
 }
 
-export async function getAssetDetail(tableName: string) {
-  return mapAssetDetail(await requestJson(`/assets/tables/${encodeURIComponent(tableName)}`))
+/** Canonical vs compatibility asset resource path, shared by every caller. */
+export function assetResourcePath(identity: AssetIdentity | string, suffix = '') {
+  const resolved = typeof identity === 'string' ? { tableName: identity } : (identity || {})
+  const assetId = numberOrNull(resolved.assetId)
+  if (assetId) return `/assets/${assetId}${suffix}`
+  const tableName = stringValue(resolved.tableName).trim()
+  if (!tableName) throw new Error('资产身份缺失：需要 assetId 或 tableName')
+  return `/assets/tables/${encodeURIComponent(tableName)}${suffix}`
 }
 
-export async function getAssetFields(tableName: string) {
-  return mapAssetFields(await requestJson(`/assets/tables/${encodeURIComponent(tableName)}/fields`))
+export async function getAssetDetail(identity: AssetIdentity | string) {
+  return mapAssetDetail(await requestJson(assetResourcePath(identity)))
 }
 
-export async function getAssetDdl(tableName: string) {
-  return mapAssetDdl(await requestJson(`/assets/tables/${encodeURIComponent(tableName)}/ddl`, { timeout: 15000 }))
+export async function getAssetFields(identity: AssetIdentity | string) {
+  return mapAssetFields(await requestJson(assetResourcePath(identity, '/fields')))
+}
+
+export async function getAssetDdl(identity: AssetIdentity | string) {
+  return mapAssetDdl(await requestJson(assetResourcePath(identity, '/ddl'), { timeout: 15000 }))
 }
 
 export async function getAssetLayers() {

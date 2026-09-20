@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { buildApiUrl, normalizeApiError, normalizeBaseUrl } from '../src/api/http-utils'
-import { mapAsset, mapAssetDetail, mapAssetFilterOptions, mapAssetPage } from '../src/api/assets'
+import { assetResourcePath, mapAsset, mapAssetDetail, mapAssetFilterOptions, mapAssetPage } from '../src/api/assets'
 import { mapIndicator, mapIndicatorList } from '../src/api/indicators'
 import { mapPortalStats } from '../src/api/portal'
 import { normalizeSearchResponse } from '../src/api/search'
@@ -56,4 +56,12 @@ test('indicator mapper preserves runtime status separately from lifecycle', () =
   assert.equal(indicator.semanticState, 'certified')
   assert.equal(indicator.sourceAssetName, 'dwm_order')
   assert.equal(mapIndicatorList({ items: [{ id: 'I1', name: '订单数' }] }).length, 1)
+})
+
+test('asset identity prefers assetId and keeps the legacy table path as fallback', () => {
+  assert.equal(assetResourcePath({ assetId: 42, tableName: 'orders' }), '/assets/42')
+  assert.equal(assetResourcePath({ assetId: 42 }, '/fields'), '/assets/42/fields')
+  assert.equal(assetResourcePath({ tableName: 'public.orders' }), '/assets/tables/public.orders')
+  assert.equal(assetResourcePath('order daily'), '/assets/tables/order%20daily')
+  assert.throws(() => assetResourcePath({}), /资产身份缺失/)
 })

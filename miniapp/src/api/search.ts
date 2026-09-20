@@ -6,6 +6,7 @@ export interface SearchItem {
   subtitle: string
   meta: string
   ref: unknown
+  assetId?: number | null
   matchedFields: Array<{ label: string; value: string }>
 }
 
@@ -65,12 +66,14 @@ export function normalizeSearchResponse(payload: unknown): SearchResponse {
               return [{ label: stringValue(entry.label), value: stringValue(entry.value) }]
             })
             : []
+          const assetId = Number(result.assetId)
           return [{
             id: stringValue(result.id),
             title: stringValue(result.title),
             subtitle: stringValue(result.subtitle),
             meta: stringValue(result.meta),
             ref: result.ref,
+            ...(Number.isInteger(assetId) && assetId > 0 ? { assetId } : {}),
             matchedFields,
           }]
         }),
