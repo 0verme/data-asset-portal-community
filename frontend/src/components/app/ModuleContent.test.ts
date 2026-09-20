@@ -44,3 +44,11 @@ test("module dispatch uses registry map instead of long switch chain", async () 
   assert.doesNotMatch(source, /else if \(module === "/);
   assert.match(source, /MODULE_RENDERERS\[module\]/);
 });
+
+test("asset search results keep canonical assetId navigation", async () => {
+  const source = await readFile(moduleContentPath, "utf8");
+
+  assert.match(source, /if \("assetId" in target && target\.assetId != null\)/);
+  assert.match(source, /navigationTarget\.assetId = assetId;/);
+  assert.match(source, /navigationTarget\.assetName = target\.ref;/);
+});
