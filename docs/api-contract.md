@@ -312,6 +312,19 @@ curl --get "http://127.0.0.1:15099/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D
 
 禁止 first match；同名资产必须通过 `assetId` 精确访问。`source_key IS NULL` 的 legacy 资产不会被 metadata ingestion 自动 claim，仍可通过自身 `assetId` 访问。
 
+### 2.7 资产 ownership 与人工编辑
+
+`PUT /api/assets/{assetId}` 与兼容入口 `PUT /api/assets/tables/{tableName}` 的列级行为由资产类别决定：
+
+| 资产类别 | 可人工编辑 | 拒绝 |
+| --- | --- | --- |
+| `source_key IS NOT NULL`（source-bound） | portal-owned 列：`cn` / `layer` / `domain` / `owner` / `grain` / `cycle` 及字段 `cn` / `enum` | asset 级 `name` / `schema` / `desc` 与字段级新增 / 删除 / rename / 技术属性 → `422 SOURCE_OWNED_ATTRIBUTE`，整请求不落库 |
+| `source_key IS NULL`（portal-only） | 全部非 system 列（含 `name` / `schema` / `desc` / rename / 字段增删改） | — |
+
+- 只回传当前值（strip / normalize 后相等）不视为修改；可选 `desc` 的 `null` 与 `""` 等价。
+- 拒绝响应沿用统一 error envelope：`error.code = "SOURCE_OWNED_ATTRIBUTE"`，`error.details[]` 列出具体列或字段。
+- `PUT /api/assets/{assetId}/fields` 只写字段与 `field_count`；source-bound 资产的字段级约束同上。完整 ownership / merge 矩阵见 [metadata-ingestion.md](./metadata-ingestion.md)。
+
 ## 统一搜索
 
 Base Path: `/api/search`
@@ -1151,6 +1164,7 @@ Base Path: `/api/lineage`
 - query `dryRun=true` 或 `mode=preview`：只校验、normalize、compare，不修改业务数据或 audit。
 - 请求包含 `contractVersion`、`source`、`collector`、`assets[]`；natural key 是 source identity + assetType + externalId，缺少 externalId 时使用 qualifiedName。
 - 响应包含 `ingestionId`、`correlationId`、`status`、`summary` 和 item results；summary 区分 create/update/unchanged/conflict/invalid/deleteCandidate。
+- ownership：ingestion update 永不写 portal-owned 列（`table_cn_name` / `layer_code` / `domain_code` / `owner_name` / `grain_desc` / `cycle_desc` 及字段 `field_cn_name` / `enum_desc`）；`unchanged` 只由 source-owned projection 决定；`description` / `catalog` / `database` 按 absent / `null` / `""` 三态处理。完整矩阵见 [metadata-ingestion.md](./metadata-ingestion.md)。
 
 ### 13.2 Lineage snapshot ingestion
 

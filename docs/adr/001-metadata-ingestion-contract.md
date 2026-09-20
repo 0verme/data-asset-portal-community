@@ -33,6 +33,18 @@
 | 18 | Asset mapping 只把 source metadata 映射到现有 asset/field service model；`layer_code`、`domain_code` 等 DAP governance classification 不强制由 Collector 提供。 | 防止 source metadata 与 DAP enrichment 混淆。 | V1 允许这些内部分类为空，维护 API 仍保留现有语义。 |
 | 19 | Reference implementation 只包含 PostgreSQL catalog collector 与 JSON lineage producer，通过 HTTP Contract 调用 DAP。 | 证明边界可被第三方实现。 | 不做 scheduler、connector framework、parser、OpenLineage、DataHub/OpenMetadata compatibility。 |
 
+## Ownership / Merge Policy（#260 补充决策，已实现）
+
+> 本节是 Epic #257 Child C（#260）在 ADR-001 之上补充并落地的列级 ownership / merge 决策，记录于 2026-09-20。决策 18 的“governance classification 不强制由 Collector 提供”由此进一步固化为可执行的列级规则；完整矩阵见 [metadata-ingestion.md](../metadata-ingestion.md)。
+
+| # | Decision | Reason | Alternatives / Consequences |
+| --- | --- | --- | --- |
+| 20 | `p_asset_table` / `p_asset_field` 按资产类别 + 列划分 owner：`source-bound`（`source_key IS NOT NULL`）与 `portal-only`（`source_key IS NULL`）；owner 分为 source / portal / system 三类。 | ingestion 与人工治理写同一行，必须明确每一列的 system of record。 | 不引入 per-attribute provenance 表 / 列；`updated_by` 只反映最后一个写入方，历史通过 change log 追踪。 |
+| 21 | ingestion update 永不写 portal-owned 列（`table_cn_name` / `layer_code` / `domain_code` / `owner_name` / `grain_desc` / `cycle_desc` 及字段 `field_cn_name` / `enum_desc`）；只在 create 写 fallback。 | 上游技术元数据变化不得清空或覆盖人工治理分类。 | 明确接受：create fallback 之后 `table_cn_name` 不跟随 source 变化；要做到“未人工编辑时跟随 source”需要 provenance，本轮不做。 |
+| 22 | `unchanged` 判定只使用 source-owned projection；人工修改 portal-owned 列后 re-import 必须 `unchanged` 且零写入。 | 防止人工编辑改变“已存内容”并触发 ingestion 覆盖。 | 读模型 display fallback 保留，但不参与 compare；`p_asset_change_log` before/after 记录 source-owned projection。 |
+| 23 | source-owned 可选标量（`description` / `catalog` / `database` 与字段 `description` / flags / `ordinalPosition`）按 absent / `null` / `""` 三态处理：absent 保留现值，`null` 与空字符串显式清空。 | “未采集到”不等于“显式清空”，采集器能力退化不得清空已有数据。 | 使用 Pydantic v2 `model_fields_set` 判定 presence，不修改 JSON wire shape；空值统一存 NULL。 |
+| 24 | `source-bound` 资产人工修改 source-owned 属性（asset 级 `name` / `schema` / `desc`，字段级新增 / 删除 / rename / 技术属性）返回确定性 `422 SOURCE_OWNED_ATTRIBUTE`，整请求原子失败；`portal-only` 保持全列可编辑。 | 静默忽略会造成“保存成功但值回滚”，允许写入则违反 source of record。 | 与 #258 的 `409 ASSET_AMBIGUOUS` 同属确定性失败风格；normalize 后比较，回传现值不视为修改。 |
+
 ## Contract shape
 
 Asset request 的最小公共字段为：
