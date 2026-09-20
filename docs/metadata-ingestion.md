@@ -108,6 +108,68 @@ POST /api/metadata/assets/ingestions?dryRun=false
 
 重复提交返回 `unchanged`，内容变化返回 `update`，首次提交返回 `create`。同一请求中的 duplicate natural key 是 conflict；语义校验在写库前完成，出现 invalid/conflict 时整批不写入。正式 ingestion 使用一个 transaction；持久化失败 rollback 整批。`dryRun=true` 或 `mode=preview` 只返回比较结果，不写业务数据，也不写 audit。
 
+## Field identity 与增量 merge
+
+`p_asset_field.field_id` 是字段的 historical identity，也是 `p_indicator_item.result_field_id` 的稳定引用。Ingestion 与人工编辑都不再 `DELETE ALL + recreate`，而是按稳定键增量 merge。
+
+### Active matching key
+
+```text
+(asset_id, normalized_field_name)
+WHERE is_deleted = 'N'
+
+normalized_field_name = field_name.casefold()
+```
+
+- 同一 asset 最多一个 active field 命中同一 normalized name。
+- 已删除（`is_deleted = 'Y'`）的历史行不参与匹配，也不会被重新激活。
+- V1 不支持同一资产中仅大小写不同的字段名：payload 出现 `Foo` / `foo` 时 deterministic reject（`INVALID_DUPLICATE_FIELD`），不依赖数据库 collation，也不新增 DB unique constraint。
+
+### field_id 生命周期
+
+| 事件 | 行为 |
+| --- | --- |
+| 字段未变化 re-import | 不改 `field_id`，不产生字段 UPDATE，不刷新 `updated_at` |
+| 字段 source-owned 技术属性变化 | 更新该字段行，`field_id` 不变 |
+| 新字段 | 分配新的、单调递增的 `field_id` |
+| 字段从权威集合消失 | 软删除：`is_deleted = 'Y'`，保留 `field_id` 与全部历史列 |
+| rename（如 `customer_no` → `customer_id`） | 老字段软删除 + 新字段插入；`field_id` 不复用、不猜测 |
+| 删除后同名字段再次出现 | 分配新的 `field_id`，绝不重新激活旧 ID |
+
+没有 upstream 字段级 stable external key，因此禁止 Levenshtein / 相似度 / `field_order` / datatype / position 猜测 rename，也禁止 AI / embedding 判断。`field_id` 单调分配、不回收。
+
+### fields collection 三态语义
+
+| payload | 行为 |
+| --- | --- |
+| `fields` key 不存在 | NOOP：不新增、不更新、不删除、不重排，也不改写 `field_count` / `updated_at` |
+| `fields: []` | 权威空集合：该资产全部 active field 软删除 |
+| `fields: [...]` | 权威集合：命中字段增量更新，新字段插入，未列出的 active 字段软删除 |
+
+### Ownership 与 presence
+
+- source-owned：`field_name` / `data_type` / `nullable` / `primaryKey` / `partitionKey` / `ordinalPosition` / `description`（`field_desc`）。
+- portal-owned：`field_cn_name` / `enum_desc`。Ingestion update 永不写这两列；只有新字段插入时写 display fallback（`field_cn_name = description or name`）。
+- `description` 三态：absent → update 保留现值 / insert 写 NULL；`null` 或空字符串（含纯空白）→ 显式清空为 NULL；非空 → strip 后写入。merge / compare 不再使用 `field_desc or field_cn_name or field_name`。
+- `ordinalPosition`：existing field present → 更新 `field_order`；absent → 保留；new field present → 使用提供值；absent → deterministic append（排在当前最大 order 之后）。仅数组顺序变化不会重排 existing fields。
+- `unchanged` 判定只使用 source-owned projection；人工只修改 `field_cn_name` / `enum_desc` 后 re-import 必须为 `unchanged` 且零写入。
+- `field_count` 永远表示 active field（`is_deleted = 'N'`）数量。
+
+### Manual edit 路径
+
+人工编辑走同一套 merge：
+
+- `portal-only` 资产（`source_key IS NULL`）：字段可增删改，未变化字段保留 `field_id`，新字段新 ID，删除字段软删除；
+- `source-bound` 资产：`field_cn_name` / `enum_desc` 可编辑；新增 / 删除 / rename / 修改 `dataType` / `nullable` / `primaryKey` / `partitionKey` 等技术属性返回确定性的 `422 SOURCE_OWNED_ATTRIBUTE`，整请求不落库。
+
+### Indicator 引用
+
+`p_indicator_item.result_field_id` 引用原 `field_id`：
+
+- 字段仍存活：无关 re-import 后引用仍可解析；
+- 字段被 source 删除：原字段软删除，semantic validation 返回 `result field is deleted: <id>`，不会自动迁移到未来重新出现的同名字段；
+- 不新增外键，不自动 repair indicator。
+
 ## Lineage snapshot ingestion
 
 Canonical endpoint：

@@ -42,6 +42,7 @@
 - 字段映射查询、统计、表/字段维度和导出链路统一按 `upstream_system_id` 关联；系统名称只用于阅读，`system_abbr` 作为用户侧消歧编码。
 - `p_push_system.master_system_id` 引用 `p_system`；`p_push_job` / `p_push_job_field` 通过 cascade foreign keys 维护其所属层级。
 - `p_indicator_item.source_asset_id` 与 `p_indicator_item.result_field_id` 分别引用 `p_asset_table.asset_id` 与 `p_asset_field.field_id` 的稳定身份；字段归属由 Indicator Service deterministic 校验，兼容快照字段不承担唯一关联职责。
+- `p_asset_field.field_id` 是字段 historical identity：字段从 source 集合消失时以 `is_deleted = 'Y'` 软删除并保留 ID，ID 单调分配、不复用；active 匹配键为 `(asset_id, casefold(field_name))`，读路径只返回 `is_deleted = 'N'` 的字段。
 - lineage child tables 通过 `snapshot_id` cascade 引用 lineage snapshot。
 - API Asset、Mapping、Report 等服务继续使用现有 SQLAlchemy Core / Provider contract，不新增数据库访问层。
 
