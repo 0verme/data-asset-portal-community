@@ -1,5 +1,26 @@
 #!/usr/bin/env python3
-"""Seed or remove deterministic DWA/DM asset metadata in a safe test database."""
+"""Seed or remove deterministic DWA/DM asset metadata in a safe test database.
+
+This is a developer/test seeding tool, not a product capability:
+
+* it only targets a named ``postgres`` / ``gaussdb`` profile whose profile name,
+  host or database marks it as ``dev``, ``test`` or ``local``; production
+  markers are refused (see :func:`_safe_target`);
+* it writes portal-only seed rows: ``source_key`` / ``asset_type`` /
+  ``external_id`` stay ``NULL``, so seeded assets are never presented as
+  source-bound metadata owned by the ingestion contract (#258 / #260);
+* ``--apply`` is idempotent: assets already owned by this script are skipped, so
+  replaying it against the same profile inserts nothing;
+* ``--cleanup`` removes only rows this script created (``created_by`` /
+  ``operator_name`` = :data:`SEED_OPERATOR`).
+
+Demo data is a separate concern owned by ``demo/seed_loader.py``.
+
+Every INSERT lives in a module constant below so the offline canonical-schema
+guard in ``backend/tests/test_asset_layer_seed_data.py`` can prove that each
+target column still exists in ``backend/schema/{sqlite,postgresql,mysql,dws}.sql``.
+Schema is the source of truth: follow it instead of re-adding removed columns.
+"""
 from __future__ import annotations
 
 import argparse
@@ -16,6 +37,39 @@ from app.db.facade import database_transaction, execute_sql, fetch_all, get_db_p
 
 SEED_OPERATOR = "asset_layer_test_seed"
 SEED_CHANGE_TYPE = "CREATE_TABLE"
+
+# Seed statements are module constants (not inline literals) so the offline
+# canonical-schema guard can assert that every targeted column exists.  The
+# asset INSERT deliberately omits the source-scoped identity columns
+# (source_key / asset_type / external_id) to keep seeded rows portal-only.
+ASSET_INSERT_SQL = """
+INSERT INTO dwp.p_asset_table (
+  asset_id, table_name, table_cn_name, schema_name, layer_code, domain_code,
+  owner_name, grain_desc, cycle_desc, table_desc, field_count,
+  is_deleted, created_by, updated_by
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'N', ?, ?)
+"""
+
+FIELD_INSERT_SQL = """
+INSERT INTO dwp.p_asset_field (
+  field_id, asset_id, field_name, field_cn_name, data_type, field_order,
+  nullable_flag, pk_flag, partition_flag, enum_desc, field_desc,
+  is_deleted, created_by, updated_by
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'N', ?, ?)
+"""
+
+CHANGE_LOG_INSERT_SQL = """
+INSERT INTO dwp.p_asset_change_log (
+  change_id, asset_id, table_name, change_type, change_summary,
+  before_json, after_json, operator_name
+) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)
+"""
+
+INSERT_STATEMENTS = {
+    "p_asset_table": ASSET_INSERT_SQL,
+    "p_asset_field": FIELD_INSERT_SQL,
+    "p_asset_change_log": CHANGE_LOG_INSERT_SQL,
+}
 
 
 def _field(
@@ -470,13 +524,7 @@ def _apply(profile, config):
             asset_id = next_asset_id + asset_offset
             execute_sql(
                 profile,
-                """
-INSERT INTO dwp.p_asset_table (
-  asset_id, table_name, table_cn_name, schema_name, layer_code, domain_code,
-  owner_name, grain_desc, cycle_desc, table_desc, source_type, storage_type,
-  status_code, field_count, is_deleted, created_by, updated_by
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'MANUAL', 'DWS', 'ACTIVE', ?, 'N', ?, ?)
-""",
+                ASSET_INSERT_SQL,
                 autocommit=False,
                 params=[
                     asset_id,
@@ -497,13 +545,7 @@ INSERT INTO dwp.p_asset_table (
             for field_order, field in enumerate(asset["fields"], start=1):
                 execute_sql(
                     profile,
-                    """
-INSERT INTO dwp.p_asset_field (
-  field_id, asset_id, field_name, field_cn_name, data_type, field_order,
-  nullable_flag, pk_flag, partition_flag, enum_desc, field_desc,
-  is_deleted, created_by, updated_by
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'N', ?, ?)
-""",
+                    FIELD_INSERT_SQL,
                     autocommit=False,
                     params=[
                         next_field_id,
@@ -524,12 +566,7 @@ INSERT INTO dwp.p_asset_field (
                 next_field_id += 1
             execute_sql(
                 profile,
-                """
-INSERT INTO dwp.p_asset_change_log (
-  change_id, asset_id, table_name, change_type, change_summary,
-  before_json, after_json, operator_name
-) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)
-""",
+                CHANGE_LOG_INSERT_SQL,
                 autocommit=False,
                 params=[
                     next_change_id + asset_offset,
@@ -545,6 +582,7 @@ INSERT INTO dwp.p_asset_change_log (
 
 
 def _cleanup(profile):
+    """Delete only the rows this script owns, leaving other dev/test data intact."""
     names = _asset_names()
     with database_transaction():
         seeded = _rows(
@@ -562,9 +600,10 @@ WHERE created_by = ? AND table_name IN ({_placeholders(names)})
         placeholders = _placeholders(asset_ids)
         execute_sql(
             profile,
-            f"DELETE FROM dwp.p_asset_change_log WHERE asset_id IN ({placeholders})",
+            f"DELETE FROM dwp.p_asset_change_log "
+            f"WHERE asset_id IN ({placeholders}) AND operator_name = ?",
             autocommit=False,
-            params=asset_ids,
+            params=[*asset_ids, SEED_OPERATOR],
         )
         execute_sql(
             profile,
