@@ -25,12 +25,8 @@ import {
   DEFAULT_PORTAL_SCOPE,
   filterPortalHotTagsByModules,
   filterPortalScopesByModules,
+  readPortalSearchParams,
 } from "../config/portalSearch.ts";
-
-interface PortalSearchParams {
-  query: string;
-  scope: string;
-}
 
 type SearchNavigationTarget = SearchResultItem | SearchResultGroup;
 
@@ -42,29 +38,14 @@ export interface SearchPortalPageProps {
   publicAccessReady?: boolean | undefined;
 }
 
-function readPortalSearchParams(
-  validScopeKeys: ReadonlySet<string>,
-): PortalSearchParams {
-  if (typeof window === "undefined") {
-    return { query: "", scope: DEFAULT_PORTAL_SCOPE };
-  }
-
-  const searchParams = new URLSearchParams(window.location.search || "");
-  const nextScope = searchParams.get("scope");
-
-  return {
-    query: searchParams.get("q") || "",
-    scope:
-      nextScope && validScopeKeys.has(nextScope)
-        ? nextScope
-        : DEFAULT_PORTAL_SCOPE,
-  };
-}
+const MAX_MATCHED_FIELD_LABELS = 2;
 
 function formatMatchedField(item: SearchResultItem): string {
-  const first = item.matchedFields?.[0];
-  if (!first?.label || !first?.value) return "";
-  return `命中：${first.label} ${first.value}`;
+  const parts = (item.matchedFields || [])
+    .filter((match) => match?.label && match?.value)
+    .slice(0, MAX_MATCHED_FIELD_LABELS)
+    .map((match) => `${match.label} ${match.value}`);
+  return parts.length ? `命中：${parts.join(" / ")}` : "";
 }
 
 export function SearchPortalPage({
@@ -369,7 +350,11 @@ export function SearchPortalPage({
                 <div key={group.type} className="sp-group">
                   <div className="sp-group-head">
                     <span className="sp-group-title">{group.label}</span>
-                    <span className="sp-group-count">{group.count} 条</span>
+                    <span className="sp-group-count">
+                      {group.hasMore
+                        ? `已显示 ${group.items.length} / ${group.count} 条`
+                        : `${group.count} 条`}
+                    </span>
                   </div>
                   <div className="sp-group-list">
                     {group.items.map((item) => (
@@ -402,10 +387,11 @@ export function SearchPortalPage({
                       </button>
                     ))}
                   </div>
-                  {group.count > group.items.length ? (
+                  {group.hasMore === true ? (
                     <button
                       type="button"
                       className="sp-group-more"
+                      aria-label={`查看全部${group.label}结果`}
                       onClick={() => handleNavigate(group, searchedTerm)}
                     >
                       查看全部 {group.count} 条

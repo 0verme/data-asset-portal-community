@@ -30,6 +30,7 @@ from contextlib import contextmanager
 
 from ..db.facade import _prepare_execute_args, connect_with_profile, fetch_all, resolve_db_profile_name
 from ..settings import get_int_env
+from .asset_field_match import asset_field_match_value
 from .providers import entity_module_codes, list_search_entities, module_scope_aliases
 from .system_management_service import system_management_service
 
@@ -153,8 +154,25 @@ class KeywordSearchProvider(SearchProvider):
     def _matcher_condition(self, matcher):
         return f"LOWER({self._text_expr(matcher['expr'])}) LIKE ? ESCAPE ?"
 
+    def _field_match_spec(self, config):
+        """Optional child-table matcher (e.g. asset fields) declared by the entity."""
+        spec = config.get("field_match")
+        return spec if isinstance(spec, dict) else None
+
+    def _field_match_condition(self, spec):
+        """Correlated EXISTS clause: the parent row must not be duplicated."""
+        conditions = [self._matcher_condition(matcher) for matcher in spec["matchers"]]
+        inner = "(" + " OR ".join(conditions) + ")"
+        return (
+            f"EXISTS (SELECT 1 FROM {spec['table']} "
+            f"WHERE {spec['asset_ref']} AND {spec['active_where']} AND {inner})"
+        )
+
     def _build_where(self, config):
         conditions = [self._matcher_condition(matcher) for matcher in config["matchers"]]
+        field_match = self._field_match_spec(config)
+        if field_match:
+            conditions.append(self._field_match_condition(field_match))
         clause = "(" + " OR ".join(conditions) + ")"
         if config.get("base_where"):
             clause = f"{config['base_where']} AND {clause}"
@@ -182,6 +200,15 @@ class KeywordSearchProvider(SearchProvider):
         params = []
         for _matcher in config["matchers"]:
             params.extend([pattern, self.LIKE_ESCAPE])
+        return params
+
+    def _build_where_params(self, config, pattern):
+        """Parameters for ``_build_where`` in clause order (entity, then fields)."""
+        params = self._build_match_params(config, pattern)
+        field_match = self._field_match_spec(config)
+        if field_match:
+            for _matcher in field_match["matchers"]:
+                params.extend([pattern, self.LIKE_ESCAPE])
         return params
 
     def _normalize_limit(self, limit):
@@ -245,8 +272,10 @@ class KeywordSearchProvider(SearchProvider):
             return []
         return [{"label": label, "value": value}]
 
-    def _map_item(self, config, row):
+    def _map_item(self, config, row, extra_matched_fields=None):
         matched_fields = self._matched_fields(row)
+        if extra_matched_fields:
+            matched_fields = [*matched_fields, *extra_matched_fields]
         build_item = config["build_item"]
         payload = build_item(row, matched_fields) or {}
         entity_type = config["type"]
@@ -274,6 +303,7 @@ class KeywordSearchProvider(SearchProvider):
             "label": config["label"],
             "module": config["module"],
             "count": 0,
+            "hasMore": False,
             "items": [],
         }
 
@@ -287,11 +317,65 @@ class KeywordSearchProvider(SearchProvider):
             LOGGER.exception("search unexpected failure for type=%s", config["type"])
             return self._empty_group(config)
 
+    def _count_matches(self, conn, config, query):
+        """Exact matched total for one entity (single COUNT, never per-row)."""
+        pattern = self._like_pattern(query)
+        count_sql = f"SELECT COUNT(*) AS matched_total FROM {config['from']} WHERE {self._build_where(config)}"
+        rows = self._fetch_rows_with_conn(
+            conn,
+            count_sql,
+            params=self._build_where_params(config, pattern),
+        )
+        if not rows:
+            return 0
+        return int(rows[0].get("matched_total") or 0)
+
+    def _load_field_matches(self, conn, config, rows, pattern):
+        """Batch matched child fields for the current page (one query, no N+1)."""
+        field_match = self._field_match_spec(config)
+        if not field_match or not rows:
+            return {}
+        row_key = field_match["row_key"]
+        keys = []
+        for row in rows:
+            value = row.get(row_key)
+            if value is None or value in keys:
+                continue
+            keys.append(value)
+        if not keys:
+            return {}
+
+        conditions = [self._matcher_condition(matcher) for matcher in field_match["matchers"]]
+        inner = "(" + " OR ".join(conditions) + ")"
+        placeholders = ", ".join("?" for _ in keys)
+        select_columns = ", ".join(field_match["display"])
+        sql = (
+            f"SELECT {field_match['field_key']}, {select_columns} "
+            f"FROM {field_match['table']} "
+            f"WHERE {field_match['active_where']} "
+            f"AND {field_match['field_key']} IN ({placeholders}) "
+            f"AND {inner} "
+            f"ORDER BY {field_match['order']}"
+        )
+        params = list(keys) + self._build_match_params(field_match, pattern)
+        matches = {}
+        max_fields = int(field_match.get("max_fields") or 1)
+        for row in self._fetch_rows_with_conn(conn, sql, params=params):
+            key = row.get(row_key)
+            bucket = matches.setdefault(key, [])
+            if len(bucket) >= max_fields:
+                continue
+            value = asset_field_match_value(row)
+            if not value:
+                continue
+            bucket.append({"label": field_match["label"], "value": value})
+        return matches
+
     def _search_one(self, conn, config, query, limit):
         started_at = time.perf_counter()
         pattern = self._like_pattern(query)
         where = self._build_where(config)
-        where_params = self._build_match_params(config, pattern)
+        where_params = self._build_where_params(config, pattern)
         match_select = self._build_match_select(config)
         match_params = self._build_match_params(config, pattern)
         list_sql = (
@@ -305,19 +389,28 @@ class KeywordSearchProvider(SearchProvider):
         )
         default_module_limit = get_int_env("SEARCH_MODULE_LIMIT", 10, minimum=1)
         max_limit = get_int_env("SEARCH_MAX_LIMIT", 50, minimum=default_module_limit)
-        fetch_limit = min(max_limit, max(1, int(limit or default_module_limit))) + 1
-        list_params = match_params + match_params + where_params + [fetch_limit]
+        page_limit = min(max_limit, max(1, int(limit or default_module_limit)))
+        list_params = match_params + match_params + where_params + [page_limit]
         rows = self._fetch_rows_with_conn(conn, list_sql, params=list_params)
-        has_more = len(rows) > fetch_limit - 1
-        visible_rows = rows[: fetch_limit - 1]
-        items = [self._map_item(config, row) for row in visible_rows]
+        total_matches = self._count_matches(conn, config, query)
+        field_match = self._field_match_spec(config)
+        field_matches = self._load_field_matches(conn, config, rows, pattern)
+        row_key = field_match["row_key"] if field_match else None
+        items = [
+            self._map_item(config, row, field_matches.get(row.get(row_key)) if row_key else None)
+            for row in rows
+        ]
+        # ``count`` is the matched total, so ``hasMore`` only reports whether the
+        # current page is truncated instead of re-probing with an extra row.
+        has_more = total_matches > len(items)
         elapsed_ms = round((time.perf_counter() - started_at) * 1000, 2)
         LOGGER.info(
-            "search module timing type=%s elapsed_ms=%s limit=%s returned=%s has_more=%s",
+            "search module timing type=%s elapsed_ms=%s limit=%s returned=%s matched_total=%s has_more=%s",
             config["type"],
             elapsed_ms,
-            fetch_limit - 1,
+            page_limit,
             len(items),
+            total_matches,
             has_more,
         )
 
@@ -325,7 +418,7 @@ class KeywordSearchProvider(SearchProvider):
             "type": config["type"],
             "label": config["label"],
             "module": config["module"],
-            "count": len(items),
+            "count": total_matches,
             "hasMore": has_more,
             "items": items,
         }
@@ -345,15 +438,17 @@ class KeywordSearchProvider(SearchProvider):
             groups = [self._search_one_safe(conn, config, keyword, normalized_limit) for config in configs]
         if normalized_scope == SCOPE_ALL:
             groups = [group for group in groups if group["count"] > 0]
-        estimated_total = sum(group["count"] for group in groups)
+        matched_total = sum(group["count"] for group in groups)
         has_more = any(group.get("hasMore") for group in groups)
 
         return {
             "query": keyword,
             "scope": normalized_scope,
             "groups": groups,
-            "total": estimated_total,
-            "estimatedTotal": estimated_total,
+            # ``total`` sums the per-group matched totals; ``estimatedTotal`` is
+            # the retained compatibility alias for the same value.
+            "total": matched_total,
+            "estimatedTotal": matched_total,
             "hasMore": has_more,
         }
 

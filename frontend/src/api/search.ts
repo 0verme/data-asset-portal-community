@@ -37,6 +37,10 @@ const SCOPE_ALIASES: Record<string, string> = { metric: 'indicator', push: 'down
 const DEFAULT_LIMIT = 5;
 const REMOTE_SEARCH_TIMEOUT_MS = LONG_REQUEST_TIMEOUT;
 
+/** Matched-field entries per asset are capped, mirroring the remote provider. */
+const ASSET_FIELD_MATCH_LIMIT = 3;
+const ASSET_FIELD_MATCH_LABEL = '字段';
+
 export interface MatchedFieldItem {
   label: string;
   value: string;
@@ -60,7 +64,10 @@ export interface SearchResultGroup {
   type: string;
   label: string;
   module: string;
+  /** Exact matched total for this group (not the number of returned items). */
   count: number;
+  /** True when ``count`` exceeds ``items.length``, i.e. the group is truncated. */
+  hasMore: boolean;
   items: SearchResultItem[];
 }
 
@@ -68,7 +75,12 @@ export interface SearchResult {
   query: string;
   scope: string;
   groups: SearchResultGroup[];
+  /** Sum of the per-group matched totals. */
   total: number;
+  /** Compatibility alias for ``total``; still returned by the remote API. */
+  estimatedTotal?: number;
+  /** True when at least one group is truncated. */
+  hasMore?: boolean;
 }
 
 export async function unifiedSearch(
@@ -165,35 +177,76 @@ interface PushJobSearchRow extends PushJobItem {
   system?: PushSystemItem | undefined;
 }
 
-const MOCK_ENTITIES: readonly SearchEntity[] = [
-  createSearchEntity<MockDwmTable>(
+const ASSET_TABLE_FIELDS: readonly EntityField<MockDwmTable>[] = [
+  { label: '资产表', getValue: (row) => row.name },
+  { label: '资产中文名', getValue: (row) => row.cn },
+  { label: '主题域', getValue: (row) => row.domain },
+  { label: '分层', getValue: (row) => row.layer },
+  { label: '负责人', getValue: (row) => row.owner },
+  { label: '描述', getValue: (row) => row.desc },
+  { label: '粒度', getValue: (row) => row.grain },
+  { label: '周期', getValue: (row) => row.cycle },
+];
+
+function mapAssetItem(
+  row: MockDwmTable,
+  matchedFields: MatchedFieldItem[],
+): SearchResultItem {
+  return makeItem(
     'asset',
     '资产',
     'dwm',
-    () => DWM_TABLES,
-    [
-      { label: '资产表', getValue: (row) => row.name },
-      { label: '资产中文名', getValue: (row) => row.cn },
-      { label: '主题域', getValue: (row) => row.domain },
-      { label: '分层', getValue: (row) => row.layer },
-      { label: '负责人', getValue: (row) => row.owner },
-      { label: '描述', getValue: (row) => row.desc },
-      { label: '粒度', getValue: (row) => row.grain },
-      { label: '周期', getValue: (row) => row.cycle },
-    ],
-    (row, matchedFields) =>
-      makeItem(
-        'asset',
-        '资产',
-        'dwm',
-        row.name,
-        row.name || '',
-        row.cn || '',
-        [row.domain, row.layer, row.owner].filter(Boolean).join(' / '),
-        row.name,
-        matchedFields,
-      ),
-  ),
+    row.name,
+    row.name || '',
+    row.cn || '',
+    [row.domain, row.layer, row.owner].filter(Boolean).join(' / '),
+    row.name,
+    matchedFields,
+  );
+}
+
+/**
+ * Active asset fields recall the owning asset, mirroring the backend
+ * `p_asset_field` field match (name / Chinese name). The asset itself is only
+ * returned once, no matter how many of its fields match.
+ */
+function matchAssetFields(row: MockDwmTable, needle: string): MatchedFieldItem[] {
+  const matches: MatchedFieldItem[] = [];
+  for (const field of row.fields || []) {
+    const name = String(field.name || '');
+    const cn = String(field.cn || '');
+    if (!name.toLowerCase().includes(needle) && !cn.toLowerCase().includes(needle)) continue;
+    matches.push({ label: ASSET_FIELD_MATCH_LABEL, value: `${name} ${cn}`.trim() });
+    if (matches.length >= ASSET_FIELD_MATCH_LIMIT) break;
+  }
+  return matches;
+}
+
+const assetSearchEntity: SearchEntity = {
+  type: 'asset',
+  label: '资产',
+  module: 'dwm',
+  search(needle: string, limit: number) {
+    const matched = DWM_TABLES.flatMap((row) => {
+      const tableMatch = findFirstMatch(row, ASSET_TABLE_FIELDS, needle);
+      const fieldMatches = matchAssetFields(row, needle);
+      if (!tableMatch && fieldMatches.length === 0) return [];
+      return [{
+        row,
+        matchedFields: tableMatch ? [tableMatch, ...fieldMatches] : fieldMatches,
+      }];
+    });
+    return {
+      count: matched.length,
+      items: matched
+        .slice(0, limit)
+        .map(({ row, matchedFields }) => mapAssetItem(row, matchedFields)),
+    };
+  },
+};
+
+const MOCK_ENTITIES: readonly SearchEntity[] = [
+  assetSearchEntity,
   createSearchEntity<MockUpstreamSystem>(
     'system',
     '系统',
@@ -442,9 +495,27 @@ async function mockSearch(keyword: string, scope: string, limit: number): Promis
     return { query: '', scope, groups: [], total: 0 };
   }
 
+  const enabledMenuCodes = await getEnabledMenuCodes();
+  return buildMockSearchResult(keyword, scope, limit, enabledMenuCodes);
+}
+
+/**
+ * Pure mock search used by the API mode and by contract tests. It mirrors the
+ * remote group contract: ``count`` is the matched total, ``items`` is the
+ * current page, and ``hasMore`` reports truncation.
+ */
+export function buildMockSearchResult(
+  keyword: string,
+  scope: string,
+  limit: number,
+  enabledMenuCodes: ReadonlySet<string>,
+): SearchResult {
+  if (!keyword) {
+    return { query: '', scope, groups: [], total: 0 };
+  }
+
   const needle = toSearchString(keyword);
   const safeLimit = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), 50);
-  const enabledMenuCodes = await getEnabledMenuCodes();
   const entities = (
     scope === SCOPE_ALL ? MOCK_ENTITIES : MOCK_ENTITIES.filter((entity) => entity.type === scope)
   ).filter((entity) => {
@@ -459,12 +530,14 @@ async function mockSearch(keyword: string, scope: string, limit: number): Promis
       label: entity.label,
       module: entity.module,
       count,
+      hasMore: count > items.length,
       items,
     };
   });
 
   const visibleGroups = scope === SCOPE_ALL ? groups.filter((group) => group.count > 0) : groups;
   const total = visibleGroups.reduce((sum, group) => sum + group.count, 0);
+  const hasMore = visibleGroups.some((group) => group.hasMore);
 
-  return { query: keyword, scope, groups: visibleGroups, total };
+  return { query: keyword, scope, groups: visibleGroups, total, estimatedTotal: total, hasMore };
 }

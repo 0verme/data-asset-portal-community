@@ -39,3 +39,32 @@ test("empty recovery remains separate from loading, error, and result branches",
   assert.ok(emptyIndex > errorIndex, "empty state should follow the error branch");
   assert.ok(resultIndex > emptyIndex, "successful results should remain after the empty branch");
 });
+
+test("truncated groups render 查看全部 from the formal hasMore flag", async () => {
+  const source = await readFile(searchPagePath, "utf8");
+
+  assert.match(source, /group\.hasMore === true \? \(/);
+  assert.doesNotMatch(
+    source,
+    /group\.count > group\.items\.length \? \(/,
+    "hasMore must not be inferred from count vs items",
+  );
+  assert.match(source, /className="sp-group-more"/);
+  assert.match(source, /查看全部 \{group\.count\} 条/);
+  assert.match(source, /已显示 \$\{group\.items\.length\} \/ \$\{group\.count\} 条/);
+});
+
+test("查看全部 navigates the group with the searched keyword", async () => {
+  const source = await readFile(searchPagePath, "utf8");
+
+  assert.match(source, /onClick=\{\(\) => handleNavigate\(group, searchedTerm\)\}/);
+  assert.match(source, /onNavigate\?\.\(itemOrGroup, term\)/);
+  assert.match(source, /aria-label=\{`查看全部\$\{group\.label\}结果`\}/);
+});
+
+test("portal scope parsing is the shared whitelist parser", async () => {
+  const source = await readFile(searchPagePath, "utf8");
+
+  assert.match(source, /readPortalSearchParams/);
+  assert.match(source, /useRef\(readPortalSearchParams\(validScopeKeys\)\)/);
+});

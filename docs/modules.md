@@ -131,6 +131,8 @@
 
 **说明**：门户首页根据实例菜单状态展示模块入口和资产统计；统一搜索按资产、上游系统、字段、词根、指标、报表、API、下游推送和码值表分组返回结果，并可跳转到对应模块。搜索/统计实体由 `backend/app/services/providers` 注册，菜单状态只影响实例可见性，缺少数据库/外部依赖时使用已有 degradation/error contract。
 
+资产范围（`scope=asset`）是独立 chip，URL 中的 `?scope=asset` 可分享、刷新和前进/后退；资产分组支持按字段（`p_asset_field` 字段名 / 中文字段名 / 描述）召回，`matchedFields` 说明命中字段；分组 `count` 是实际命中总数，`hasMore` 为 true 时显示“查看全部”，资产组跳转数据仓库资产列表并保留同一关键字（详情语义见 [api-contract.md](./api-contract.md) 统一搜索章节）。
+
 ## 13. 认证
 
 **数据表**：`p_admin_user`。

@@ -309,6 +309,31 @@ test("legacy asset URLs stay valid and never invent an assetId", () => {
   assert.deepEqual(zero.assetRoute, { page: "detail", table: "orders" });
 });
 
+test("查看全部 group navigation keeps the keyword on the asset list URL", () => {
+  const group = buildNavigationLocation({
+    module: "dwm",
+    routes: emptyRoutes,
+    query: " 包裹数 ",
+  });
+  assert.deepEqual(group, {
+    pathname: "/data-warehouse",
+    search: "?q=%E5%8C%85%E8%A3%B9%E6%95%B0",
+    url: "/data-warehouse?q=%E5%8C%85%E8%A3%B9%E6%95%B0",
+  });
+  assert.equal(
+    parseLocation(group.url).query,
+    "包裹数",
+    "the asset list must reload with the same keyword",
+  );
+
+  const canonical = buildNavigationLocation({
+    module: "dwm",
+    routes: { ...emptyRoutes, asset: { page: "detail", table: "orders", assetId: 42 } },
+    query: "包裹数",
+  });
+  assert.equal(canonical.url, "/data-warehouse/orders?q=%E5%8C%85%E8%A3%B9%E6%95%B0&assetId=42");
+});
+
 test("history policy distinguishes initial replace, pathname push, query replace, and no-op", () => {
   const common = { currentUrl: "/data-warehouse", currentPathname: "/data-warehouse" };
 

@@ -23,6 +23,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..asset_field_match import (
+    ASSET_FIELD_ACTIVE_VALUE,
+    ASSET_FIELD_MATCH_COLUMNS,
+    ASSET_FIELD_MATCH_DISPLAY_COLUMNS,
+)
 from .registry import register_portal_stat, register_search_entity
 
 
@@ -162,6 +167,23 @@ register_search_entity({
         {"expr": "t.cycle_desc", "label": "周期"},
         {"expr": "t.table_desc", "label": "描述"},
     ],
+    # Active asset fields recall the owning asset, sharing the same column
+    # contract as the data-warehouse asset list (services.asset_field_match).
+    "field_match": {
+        "table": "dwp.p_asset_field f",
+        "asset_ref": "f.asset_id = t.asset_id",
+        "active_where": f"f.is_deleted = '{ASSET_FIELD_ACTIVE_VALUE}'",
+        "row_key": "asset_id",
+        "field_key": "f.asset_id",
+        "label": "字段",
+        "matchers": [
+            {"expr": f"f.{column}", "label": label}
+            for column, label in ASSET_FIELD_MATCH_COLUMNS
+        ],
+        "display": ASSET_FIELD_MATCH_DISPLAY_COLUMNS,
+        "order": "f.field_order, f.field_name",
+        "max_fields": 3,
+    },
     "select": (
         "t.asset_id, "
         "t.table_name, "

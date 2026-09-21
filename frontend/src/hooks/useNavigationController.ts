@@ -20,7 +20,7 @@ import {
   DEFAULT_UP_VIEW,
 } from '../config/defaults.ts';
 import { createNavigationState } from '../routing/navigation.ts';
-import { getPortalPushNavigation, type PortalTarget } from '../routing/portalNavigation.ts';
+import { getPortalPushNavigation, resolvePortalNavigationQuery, type PortalTarget } from '../routing/portalNavigation.ts';
 import { parseInitialLocation } from '../routing/location.ts';
 import type {
   AssetRoute,
@@ -226,8 +226,9 @@ export function useNavigationController({
         typeof target === 'string' ? (target as ModuleId) : target?.module;
       if (!nextModule) return;
 
+      const pushTarget = typeof target === 'object' && target ? target : null;
       const pushNavigation =
-        nextModule === 'push' ? getPortalPushNavigation(typeof target === 'object' ? target : null, DEFAULT_PUSH_ROUTE) : null;
+        nextModule === 'push' ? getPortalPushNavigation(pushTarget, DEFAULT_PUSH_ROUTE) : null;
       const targetAssetId = typeof target === 'object' && target ? Number(target.assetId) : NaN;
       const assetId = Number.isInteger(targetAssetId) && targetAssetId > 0 ? targetAssetId : null;
 
@@ -235,7 +236,7 @@ export function useNavigationController({
         const next: ExtendedNavigationState = {
           ...current,
           module: nextModule,
-          query: (pushNavigation?.query ?? nextQuery) || '',
+          query: resolvePortalNavigationQuery(pushTarget, nextQuery, pushNavigation),
         };
         if (nextModule === 'dwm' && assetId !== null) {
           next.route = {

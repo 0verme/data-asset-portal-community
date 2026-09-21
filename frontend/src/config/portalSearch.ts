@@ -31,6 +31,7 @@ export interface PortalScopeConfig {
 /** Scope chips shown on the portal homepage (order preserved). */
 export const PORTAL_SCOPE_CONFIGS: readonly PortalScopeConfig[] = [
  { key: "all", label: "全部" },
+ { key: "asset", label: "资产", moduleKey: "dwm" },
  { key: "system", label: "系统", moduleKey: "upstream" },
  { key: "field", label: "字段", moduleKey: "mapping" },
  { key: "root", label: "词根", moduleKey: "root" },
@@ -89,4 +90,30 @@ export function filterPortalHotTagsByModules(
    return true;
   return item.moduleKeys.some((moduleKey) => enabledModules.has(moduleKey));
  });
+}
+
+export interface PortalSearchParams {
+ query: string;
+ scope: string;
+}
+
+/**
+ * Parse `?q=` / `?scope=` for the portal. The scope whitelist is the visible
+ * scope chips, so a shared or refreshed `?scope=asset` URL keeps the asset
+ * scope instead of being reset to `all`.
+ */
+export function readPortalSearchParams(
+ validScopeKeys: ReadonlySet<string>,
+ search: string = typeof window === "undefined"
+  ? ""
+  : window.location.search || "",
+): PortalSearchParams {
+ const searchParams = new URLSearchParams(search || "");
+ const nextScope = searchParams.get("scope");
+
+ return {
+  query: searchParams.get("q") || "",
+  scope:
+   nextScope && validScopeKeys.has(nextScope) ? nextScope : DEFAULT_PORTAL_SCOPE,
+ };
 }

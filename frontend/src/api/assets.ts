@@ -369,14 +369,24 @@ export async function getAssetTablePage(params: AssetQueryParams = {}): Promise<
       matches.push({ ...table, _fieldMatch: null });
       continue;
     }
-    const nameHit = [table.name, table.cn, table.owner].some((value) =>
-      String(value || '').toLowerCase().includes(keyword),
-    );
+    // Same asset match contract as the remote list (and portal unified search):
+    // table metadata plus active field name / Chinese name.
+    const nameHit = [
+      table.name,
+      table.cn,
+      table.owner,
+      table.schema,
+      table.layer,
+      table.grain,
+      table.cycle,
+      table.desc,
+      table.domain,
+    ].some((value) => String(value || '').toLowerCase().includes(keyword));
     const fieldHit = table.fields.find((field) =>
       [field.name, field.cn].some((value) => String(value || '').toLowerCase().includes(keyword)),
     );
     if (nameHit || fieldHit) {
-      matches.push({ ...table, _fieldMatch: fieldHit ? `${fieldHit.name} ${fieldHit.cn}` : null });
+      matches.push({ ...table, _fieldMatch: fieldHit ? `${fieldHit.name} ${fieldHit.cn}`.trim() : null });
     }
   }
 

@@ -335,58 +335,103 @@ Base Path: `/api/search`
 
 - `GET /api/search`
 - `q`：搜索关键字；服务端会去除首尾空白
-- `scope`：搜索范围，默认 `all`；当前别名包括 `metric` → `indicator`、`apiAsset` → `api`
-- `limit`：每个结果分组的上限，默认 `5`，超过当前 `SEARCH_MAX_LIMIT`（默认 `50`）时截断
+- `scope`：搜索范围，默认 `all`；当前别名包括 `metric` → `indicator`、`apiAsset` → `api`；`scope=asset` 只返回资产组（结果为稳定排序，URL 可分享、可刷新、可重复）
+- `limit`：每个结果分组返回的 item 上限，默认 `5`，超过当前 `SEARCH_MAX_LIMIT`（默认 `50`）时截断；`limit` 不影响 `count`
 
 ### 返回格式
 
-成功响应包含 `query`、归一化后的 `scope`、`groups`、`total`、`estimatedTotal` 和 `hasMore`。每个分组包含 `type`、`label`、`module`、`count` 和 `items`；结果项包含 `id`、`title`、`subtitle`、`meta`、`module`、`ref`、`type`、`category` 和 `matchedFields`。资产类型结果额外包含 `assetId`，作为导航与后续读取的 canonical identity；`id` / `ref` 仍为表名，只用于展示。
+成功响应包含 `query`、归一化后的 `scope`、`groups`、`total`、`estimatedTotal` 和 `hasMore`。每个分组包含 `type`、`label`、`module`、`count`、`hasMore` 和 `items`；结果项包含 `id`、`title`、`subtitle`、`meta`、`module`、`ref`、`type`、`category` 和 `matchedFields`。资产类型结果额外包含 `assetId`，作为导航与后续读取的 canonical identity；`id` / `ref` 仍为表名，只用于展示。
+
+### 分组计数语义（mock 与 remote 一致）
+
+| 字段 | 语义 |
+| --- | --- |
+| `groups[].count` | 该分组**实际命中总数**（不受 `limit` 截断影响） |
+| `groups[].items` | 当前响应返回的分组条目（最多 `limit` 条） |
+| `groups[].hasMore` | `count > len(items)`，即当前分组被截断 |
+| `total` | 各分组 `count` 之和 |
+| `estimatedTotal` | 兼容字段，与 `total` 同值 |
+| `hasMore`（顶层） | 任一分组 `hasMore` 为 true |
+
+精确 `count` 由每个实体一次 `COUNT(*)` 查询得出，不按结果行逐条查询（无 N+1）；`scope=all` 时仍只返回命中数大于 0 的分组。
+
+### 资产匹配范围（`matchedFields`）
+
+资产实体（`type: "asset"`）的命中范围：
+
+1. 表级元数据：`table_name` / `table_cn_name` / 主题域名称与编码 / `schema_name` / `layer_code` / 负责人 / 粒度 / 周期 / `table_desc`；
+2. 资产字段（`p_asset_field`，仅 `is_deleted = 'N'`）：`field_name` / `field_cn_name` / `field_desc`。
+
+字段命中时：
+
+- 资产只返回一次（同一资产多个字段命中不会重复）；
+- `matchedFields` 追加轻量解释项：`{ "label": "字段", "value": "<field_name> <field_cn_name|field_desc>" }`，最多 3 条，不返回字段类型、可空等完整字段定义；
+- 表级元数据命中仍使用原有 `label`（例如 `资产中文名`、`描述`），可同时出现。
+
+`GET /api/assets/tables?keyword=`（数据仓库资产列表）与统一搜索共享同一份资产匹配契约（字段列由 `backend/app/services/asset_field_match.py` 单点声明），因此门户搜索结果的“查看全部”进入资产列表后仍按同一关键字召回，不会出现搜索页有结果、列表页 0 条的假闭环。
 
 ### 可复制的搜索请求
 
 ```bash
 curl --get "http://127.0.0.1:15099/api/search" \
   --header "Accept: application/json" \
-  --data-urlencode "q=会员" \
+  --data-urlencode "q=包裹数" \
   --data-urlencode "scope=asset" \
   --data-urlencode "limit=5"
 ```
 
-成功响应（`200 OK`）：
+成功响应（`200 OK`，只存在于字段中的业务词）：
 
 ```json
 {
-  "query": "会员",
+  "query": "包裹数",
   "scope": "asset",
   "groups": [
     {
       "type": "asset",
       "label": "资产",
       "module": "dwm",
-      "count": 1,
+      "count": 2,
+      "hasMore": false,
       "items": [
         {
-          "id": "DWM_MEMBER_ACTIVITY_STAT_1D",
-          "title": "DWM_MEMBER_ACTIVITY_STAT_1D",
-          "subtitle": "会员活跃统计日表",
-          "meta": "会员 / DWM / 林晓",
+          "id": "DWM_FULFILLMENT_DELIVERY_1D",
+          "title": "DWM_FULFILLMENT_DELIVERY_1D",
+          "subtitle": "履约配送日汇总",
+          "meta": "履约 / DWM / 林晓",
           "module": "dwm",
           "assetId": 101,
-          "ref": "DWM_MEMBER_ACTIVITY_STAT_1D",
+          "ref": "DWM_FULFILLMENT_DELIVERY_1D",
           "type": "asset",
           "category": "资产",
           "matchedFields": [
-            { "label": "资产中文名", "value": "会员活跃统计日表" }
+            { "label": "字段", "value": "package_count 包裹数" },
+            { "label": "字段", "value": "on_time_count 准时包裹数" }
           ]
         }
       ]
     }
   ],
-  "total": 1,
-  "estimatedTotal": 1,
+  "total": 2,
+  "estimatedTotal": 2,
   "hasMore": false
 }
 ```
+
+分组被 `limit` 截断时（例如命中 10 条、`limit=5`）：
+
+```json
+{
+  "type": "asset",
+  "label": "资产",
+  "module": "dwm",
+  "count": 10,
+  "hasMore": true,
+  "items": [{ "...": "最多 limit 条" }]
+}
+```
+
+门户对 `hasMore` 为 true 的分组展示“查看全部 N 条”，点击后跳转到对应模块（资产组进入数据仓库资产列表）并携带同一关键字；门户不提供第二套搜索结果详情页。
 
 ## 3. 字段映射模块 `field-mappings`
 
