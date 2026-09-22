@@ -1,2 +1,2 @@
 # Optional MySQL provider dependency
-PyMySQL==1.2.0
+PyMySQL==1.2.3
