@@ -386,6 +386,7 @@ class MetadataIngestionService(AuditActorMixin):
                 continue
             value = {
                 "asset_id": self._safe_int(row.get("asset_id")),
+                "is_deleted": str(row.get("is_deleted") or "N").upper(),
                 "source_key": source_key,
                 "asset_type": asset_type,
                 "external_id": external_id,
@@ -474,6 +475,7 @@ class MetadataIngestionService(AuditActorMixin):
             asset_values = {
                 **identity_values,
                 **source_values,
+                "is_deleted": "N",
                 "updated_by": self._operator,
             }
             if fields_present:
@@ -599,6 +601,12 @@ class MetadataIngestionService(AuditActorMixin):
                 summary.create += 1
                 action = "create"
                 status = "create"
+            elif current.get("is_deleted") == "Y":
+                # A source-scoped identity returning after deletion revives its
+                # original asset_id; its deleted fields remain retired.
+                summary.update += 1
+                action = "update"
+                status = "update"
             elif current["content"] == self._asset_content(item, fallback=current["content"]) and not plan.source_changed:
                 summary.unchanged += 1
                 action = "unchanged"

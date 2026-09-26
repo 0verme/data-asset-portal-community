@@ -21,7 +21,7 @@ import re
 from copy import deepcopy
 from time import perf_counter
 
-from sqlalchemy import delete, exists, func, insert, or_, select, update  # pyright: ignore[reportMissingImports]
+from sqlalchemy import exists, func, insert, or_, select, update  # pyright: ignore[reportMissingImports]
 
 from ..application import AuditActorMixin, actor_aware
 from ..db.facade import database_transaction, get_db_profile, resolve_db_profile_name
@@ -282,6 +282,7 @@ class AssetsService(AuditActorMixin):
         counted = select(asset_table.c.domain_code, func.count().label("table_count"))
         if str(layer or "").strip():
             counted = counted.where(func.upper(asset_table.c.layer_code) == str(layer).strip().upper())
+        counted = counted.where(asset_table.c.is_deleted == "N")
         counted = counted.group_by(asset_table.c.domain_code).subquery()
         return self._fetch_rows(
             select(
@@ -301,6 +302,7 @@ class AssetsService(AuditActorMixin):
             counted = counted.join(asset_domain, asset_domain.c.domain_code == asset_table.c.domain_code).where(
                 func.lower(asset_domain.c.domain_name) == str(domain).strip().lower()
             )
+        counted = counted.where(asset_table.c.is_deleted == "N")
         counted = counted.group_by(asset_table.c.layer_code).subquery()
         return self._fetch_rows(
             select(
@@ -338,7 +340,7 @@ class AssetsService(AuditActorMixin):
 
     def _build_asset_filters(self, *, keyword=None, schema_name=None, layer=None, domain=None, owner=None):
         code_to_name, name_to_code = self._load_domain_mappings()
-        clauses = []
+        clauses = [asset_table.c.is_deleted == "N"]
         normalized_keyword = str(keyword or "").strip().lower()
         if normalized_keyword:
             field_match = exists(
@@ -796,7 +798,8 @@ class AssetsService(AuditActorMixin):
         """Canonical identity lookup: ``asset_id`` is the primary key."""
         rows = self._fetch_rows_logged(
             select(*self._asset_row_columns()).where(
-                asset_table.c.asset_id == self._coerce_asset_id(asset_id)
+                asset_table.c.asset_id == self._coerce_asset_id(asset_id),
+                asset_table.c.is_deleted == "N",
             ),
             purpose="asset table detail",
             method="_load_asset_row_by_id",
@@ -808,7 +811,8 @@ class AssetsService(AuditActorMixin):
     def _load_asset_rows_by_table_name(self, table_name, schema_name=None):
         """Compatibility lookup: table_name may match zero, one, or many assets."""
         statement = select(*self._asset_row_columns()).where(
-            asset_table.c.table_name == self._ensure_safe_name(table_name, "table_name")
+            asset_table.c.table_name == self._ensure_safe_name(table_name, "table_name"),
+            asset_table.c.is_deleted == "N",
         )
         if schema_name:
             statement = statement.where(asset_table.c.schema_name == schema_name)
@@ -999,7 +1003,10 @@ class AssetsService(AuditActorMixin):
     def _ensure_db_table_absent(self, table_name, exclude_asset_id=None):
         """Manual create / rename guard; existence check, not an identity lookup."""
         safe_name = self._ensure_safe_name(table_name)
-        statement = select(asset_table.c.asset_id).where(asset_table.c.table_name == safe_name)
+        statement = select(asset_table.c.asset_id).where(
+            asset_table.c.table_name == safe_name,
+            asset_table.c.is_deleted == "N",
+        )
         if exclude_asset_id is not None:
             statement = statement.where(asset_table.c.asset_id != int(exclude_asset_id))
         rows = self._fetch_rows_logged(
@@ -1454,8 +1461,21 @@ class AssetsService(AuditActorMixin):
             raise AssetDataSourceError("数据库查询失败") from error
         self._execute_statements([
             self._insert_change_log(asset_id, current_name, "DELETE_TABLE", current, None),
-            delete(asset_field).where(asset_field.c.asset_id == asset_id),
-            delete(asset_table).where(asset_table.c.asset_id == asset_id),
+            update(asset_field)
+            .where(asset_field.c.asset_id == asset_id, asset_field.c.is_deleted == "N")
+            .values(
+                is_deleted="Y",
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            ),
+            update(asset_table)
+            .where(asset_table.c.asset_id == asset_id)
+            .values(
+                field_count=0,
+                is_deleted="Y",
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            ),
         ])
         return current
 

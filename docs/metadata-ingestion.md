@@ -235,12 +235,23 @@ normalized_field_name = field_name.casefold()
 - `portal-only` 资产（`source_key IS NULL`）：字段可增删改，未变化字段保留 `field_id`，新字段新 ID，删除字段软删除；
 - `source-bound` 资产：`field_cn_name` / `enum_desc` 可编辑；新增 / 删除 / rename / 修改 `dataType` / `nullable` / `primaryKey` / `partitionKey` 等技术属性返回确定性的 `422 SOURCE_OWNED_ATTRIBUTE`，整请求不落库。
 
+### Asset identity 生命周期
+
+`p_asset_table.asset_id` 是资产的 lifetime identity；`(source_key, asset_type, external_id)` 标识同一个 source-scoped logical asset。删除不能让已分配的 identity 回到可分配集合：
+
+- 整表删除将资产行标记为 `is_deleted = 'Y'`，并将该资产全部 active 字段软删除；两类 tombstone 都保留原 numeric ID；
+- 常规资产列表、详情、字段、DDL、名称兼容查询和目录计数只暴露 `is_deleted = 'N'` 的资产；
+- 指标引用继续保留原 `source_asset_id` / `result_field_id`。验证会读取 tombstone 并确定性拒绝已删除资产/字段，不允许 fallback 到别的对象；
+- 相同 source-scoped logical asset 再次导入时恢复原 asset row / `asset_id`；此前被删除的字段不会复活，按 field identity contract 分配新 `field_id`；
+- 无关资产与字段只会取得新的 ID。这里复用既有 tombstone 列，不改变全局 `next_pk()`，也不需要 schema / migration 变更。
+
 ### Indicator 引用
 
-`p_indicator_item.result_field_id` 引用原 `field_id`：
+`p_indicator_item.source_asset_id` / `result_field_id` 分别引用原 `asset_id` / `field_id`：
 
-- 字段仍存活：无关 re-import 后引用仍可解析；
-- 字段被 source 删除：原字段软删除，semantic validation 返回 `result field is deleted: <id>`，不会自动迁移到未来重新出现的同名字段；
+- 资产与字段仍存活：无关 re-import 后引用仍可解析；
+- 字段被 source 删除或资产整表删除：identity tombstone 保留，semantic validation 返回现有的 `result field is deleted: <id>` / `asset is deleted: <id>` 错误，不会自动迁移到未来新对象；
+- indicator read 保留持久化 stable IDs；引用落到 tombstone 时仍解析原 tombstone，不会借由其他对象补位；create/update 沿用现有 `422` semantic validation 契约；
 - 不新增外键，不自动 repair indicator。
 
 ## Invariants 与 E2E 验收
@@ -249,12 +260,12 @@ Epic #257 把身份与同步语义固化为六条长期 invariant。它们不是
 
 | Invariant | 内容 | 验收测试 |
 | --- | --- | --- |
-| I1 Asset identity 稳定 | 同一 `(source, assetType, externalId)` 重复导入映射到同一 `asset_id`，不新建重复行 | `test_golden_path_import_govern_indicator_reimport_and_validate`、`test_reimport_targets_only_the_named_source_and_keeps_lookup_contract` |
+| I1 Asset identity 稳定 | 同一 `(source, assetType, externalId)` 重复导入或从 tombstone 恢复时映射到同一 `asset_id`；删除不释放 ID 给其他逻辑资产 | `test_golden_path_import_govern_indicator_reimport_and_validate`、`test_reimport_targets_only_the_named_source_and_keeps_lookup_contract`、`test_same_source_reimport_restores_asset_but_not_deleted_field_id` |
 | I2 Field identity 稳定 | 未变化字段重复同步后 `field_id` 不变；新字段新 ID；rename = delete + add；ID 不复用 | `test_field_lifecycle_add_remove_rename_and_recreate_by_http_ingestion` |
 | I3 Ownership 分离 | source-owned 由同步更新，portal-owned 只能人工写入且同步永不覆盖 / 清空，system-owned 不由任何写入方手工设置 | `test_golden_path_import_govern_indicator_reimport_and_validate`、`test_source_bound_asset_manual_technical_edit_is_rejected_atomically` |
 | I4 读写身份一致 | 写入的资产必须能被读路径精确寻址；同名多 source 不使用 first match | `test_golden_path_import_govern_indicator_reimport_and_validate`、`test_reimport_targets_only_the_named_source_and_keeps_lookup_contract` |
 | I5 幂等可重放 | 相同 payload 重复提交不产生新行、不改变任何 ID、不改变 portal-owned 属性、不产生业务 UPDATE | `test_repeat_import_is_unchanged_without_business_write_but_keeps_audit_log`、`test_asset_source_owned_scalar_presence_during_lifecycle` |
-| I6 引用安全优先 | 字段删除 / rename 不产生静默孤儿；引用要么保持可解析，要么返回确定性 validation failure，不允许随机命中或自动迁移 | `test_removed_field_breaks_indicator_reference_without_migration` |
+| I6 引用安全优先 | 资产/字段删除与字段 rename 不产生静默错绑；引用要么保持原 identity，要么返回确定性 validation failure，不允许重用 ID 或自动迁移 | `test_removed_field_breaks_indicator_reference_without_migration`、`test_deleted_ids_stay_reserved_and_old_indicator_never_rebinds` |
 
 补充边界：
 

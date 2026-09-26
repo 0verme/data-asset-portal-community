@@ -23,8 +23,9 @@ route（``POST /api/metadata/assets/ingestions``），读取与人工治理走�
   asset 级 ``422 SOURCE_OWNED_ATTRIBUTE`` 与原子性、change log
   projection。本文件只验证「HTTP ingestion 创建的资产」走同一条契约，
   并补齐业务 change log 与 operation / audit log 的区分。
+* ``#274`` 补充整表删除的 stable identity 生命周期：asset 与 fields 保留 tombstone、普通读取隐藏 tombstone、同一 source identity 恢复原 ``asset_id``、deleted indicator refs 确定失败；不重构全局 PK。
 
-因此断言全部落在可以直接对应 #257 AC1–AC6 的生命周期上。
+因此断言全部落在可以直接对应 #257 / #274 验收目标的生命周期上。
 
 覆盖对照（test 名 → 验收目标）：
 
@@ -38,6 +39,9 @@ route（``POST /api/metadata/assets/ingestions``），读取与人工治理走�
 | `test_reimport_targets_only_the_named_source_and_keeps_lookup_contract` | AC4：多 source 同名、0/1/N 兼容查找、单 source 隔离 |
 | `test_portal_only_asset_is_not_claimed_by_ingestion_and_stays_editable` | AC4 / I3：portal-only 不被 claim、不被改写、仍可维护 |
 | `test_source_bound_asset_manual_technical_edit_is_rejected_atomically` | AC1 / I3：source-owned 人工修改 422 + 原子性 |
+| `test_deleted_ids_stay_reserved_and_old_indicator_never_rebinds` | #274：删除后 IDs 不复用，旧 indicator 读取稳定且 create/update 422 |
+| `test_same_source_reimport_restores_asset_but_not_deleted_field_id` | #274 / I1 / I2：同一 source identity 恢复 asset ID、已删除 field ID 不复活 |
+| `test_name_id_and_internal_delete_paths_leave_the_same_tombstones` | #274：按名称、按 ID 与内部 helper 统一软删除语义 |
 | `test_change_log_distinguishes_business_change_from_audit` | AC1 / AC3：change log 与 operation log 语义分离 |
 """
 
@@ -892,14 +896,15 @@ class AssetSyncLifecycleIdentityTests(AssetSyncLifecycleTestCase):
         self.assertEqual(200, single.status_code, single.text)
         self.assertEqual(asset_b, single.json()["data"]["assetId"])
 
-        # Source A re-appears: the source stays authoritative for its own key
-        # and B is still untouched.
+        # The same source-scoped natural key is the same logical asset. Its
+        # tombstone is restored with the original ID; B remains untouched.
         self.assertEqual(
-            "create",
+            "update",
             self._ingest_status([source_asset(description="A 源订单表 v3", fields=fields)], source_name="source-a"),
         )
         asset_a2 = self._db_asset_id(source_name="source-a")
-        self.assertNotEqual(asset_a, asset_a2)
+        self.assertEqual(asset_a, asset_a2)
+        self.assertEqual("A 源订单表 v3", self._read_asset(asset_a2)["desc"])
         self.assertEqual(before_b, self._snapshot(asset_b))
         self.assertNotEqual(asset_a2, asset_b)
 
@@ -1058,6 +1063,147 @@ class AssetSyncLifecycleChangeLogTests(AssetSyncLifecycleTestCase):
             self._ingest_status([source_asset(description="订单表 v2", fields=fields)]),
         )
         self.assertEqual(logs_before, len(self._change_log_rows(asset_id)))
+
+
+class AssetDeleteIdentityLifecycleTests(AssetSyncLifecycleTestCase):
+    """整表删除遵守 asset / field stable identity 与 indicator 引用契约。"""
+
+    def test_deleted_ids_stay_reserved_and_old_indicator_never_rebinds(self):
+        self._ingest(
+            [source_asset(name="orders", fields=[source_field("amount", ordinal=1, data_type="decimal")])],
+            source_name="source-a",
+        )
+        asset_response = self._lookup_by_legacy_table_name("orders")
+        self.assertEqual(200, asset_response.status_code, asset_response.text)
+        asset_id = asset_response.json()["data"]["assetId"]
+        field_id = self._read_fields(asset_id)[0]["fieldId"]
+        created = self.client.post(
+            "/api/indicators",
+            json=indicator_body(source_asset_id=asset_id, result_field_id=field_id),
+        )
+        self.assertEqual(201, created.status_code, created.text)
+
+        deleted = self.client.delete(f"/api/assets/{asset_id}")
+        self.assertEqual(200, deleted.status_code, deleted.text)
+        self.assertEqual("Y", self._asset_row(asset_id)["is_deleted"])
+        self.assertEqual("Y", self._field_row(asset_id, field_id)["is_deleted"])
+        self.assertEqual(404, self.client.get(f"/api/assets/{asset_id}").status_code)
+        self.assertEqual(404, self.client.get(f"/api/assets/{asset_id}/fields").status_code)
+        self.assertEqual(404, self._lookup_by_legacy_table_name("orders").status_code)
+        listed = self.client.get("/api/assets/tables")
+        self.assertEqual(200, listed.status_code, listed.text)
+        self.assertNotIn(asset_id, {item["assetId"] for item in listed.json()["items"]})
+
+        unrelated_ids = []
+        unrelated_field_ids = []
+        for source_name, table_name, field_name in (
+            ("source-b", "payroll", "salary"),
+            ("source-c", "employees", "employee_id"),
+        ):
+            self._ingest(
+                [source_asset(name=table_name, fields=[source_field(field_name, ordinal=1)])],
+                source_name=source_name,
+            )
+            response = self._lookup_by_legacy_table_name(table_name)
+            self.assertEqual(200, response.status_code, response.text)
+            unrelated_asset_id = response.json()["data"]["assetId"]
+            unrelated_field_id = self._read_fields(unrelated_asset_id)[0]["fieldId"]
+            unrelated_ids.append(unrelated_asset_id)
+            unrelated_field_ids.append(unrelated_field_id)
+
+        self.assertNotIn(asset_id, unrelated_ids)
+        self.assertNotIn(field_id, unrelated_field_ids)
+        self.assertEqual(len(unrelated_ids), len(set(unrelated_ids)))
+        self.assertEqual(len(unrelated_field_ids), len(set(unrelated_field_ids)))
+
+        old_indicator = self._read_indicator()
+        self.assertEqual(asset_id, old_indicator["sourceAssetId"])
+        self.assertEqual(field_id, old_indicator["resultFieldId"])
+        self.assertEqual("orders", old_indicator["sourceAssetName"])
+        self.assertEqual("amount", old_indicator["resultFieldName"])
+
+        rejected_update = self.client.put(
+            "/api/indicators/ORD001",
+            json=indicator_body(
+                source_asset_id=asset_id,
+                result_field_id=field_id,
+                name="订单金额更新",
+            ),
+        )
+        self.assertEqual(422, rejected_update.status_code, rejected_update.text)
+        update_details = rejected_update.json()["error"]["details"]
+        self.assertTrue(
+            any(item["message"] == f"result field is deleted: {field_id}" for item in update_details),
+            update_details,
+        )
+        self.assertTrue(
+            any(item["message"] == f"asset is deleted: {asset_id}" for item in update_details),
+            update_details,
+        )
+
+        rejected_create = self.client.post(
+            "/api/indicators",
+            json=indicator_body(
+                source_asset_id=asset_id,
+                result_field_id=field_id,
+                indicator_id="ORD002",
+            ),
+        )
+        self.assertEqual(422, rejected_create.status_code, rejected_create.text)
+
+    def test_same_source_reimport_restores_asset_but_not_deleted_field_id(self):
+        payload = [
+            source_asset(name="orders", fields=[source_field("amount", ordinal=1, data_type="decimal")])
+        ]
+        self._ingest(payload, source_name="source-a")
+        original = self._lookup_by_legacy_table_name("orders").json()["data"]
+        original_asset_id = original["assetId"]
+        original_field_id = self._read_fields(original_asset_id)[0]["fieldId"]
+
+        deleted = self.client.delete("/api/assets/tables/orders")
+        self.assertEqual(200, deleted.status_code, deleted.text)
+        self.assertEqual("Y", self._asset_row(original_asset_id)["is_deleted"])
+
+        reimport = self._ingest(payload, source_name="source-a")
+        self.assertEqual("update", reimport.json()["items"][0]["status"])
+        restored = self._lookup_by_legacy_table_name("orders")
+        self.assertEqual(200, restored.status_code, restored.text)
+        self.assertEqual(original_asset_id, restored.json()["data"]["assetId"])
+        restored_field_id = self._read_fields(original_asset_id)[0]["fieldId"]
+        self.assertNotEqual(original_field_id, restored_field_id)
+        self.assertEqual("Y", self._field_row(original_asset_id, original_field_id)["is_deleted"])
+        self.assertEqual("N", self._field_row(original_asset_id, restored_field_id)["is_deleted"])
+
+    def test_name_id_and_internal_delete_paths_leave_the_same_tombstones(self):
+        assets = (
+            ("source-a", "orders"),
+            ("source-b", "payroll"),
+            ("source-c", "employees"),
+        )
+        identities = {}
+        for source_name, table_name in assets:
+            self._ingest(
+                [source_asset(name=table_name, fields=[source_field("id", ordinal=1)])],
+                source_name=source_name,
+            )
+            response = self._lookup_by_legacy_table_name(table_name)
+            self.assertEqual(200, response.status_code, response.text)
+            asset_id = response.json()["data"]["assetId"]
+            field_id = self._read_fields(asset_id)[0]["fieldId"]
+            identities[table_name] = (asset_id, field_id)
+
+        by_name = self.client.delete("/api/assets/tables/orders")
+        by_id = self.client.delete(f"/api/assets/{identities['payroll'][0]}")
+        internal = self.assets._delete_asset_table("employees")
+        self.assertEqual(200, by_name.status_code, by_name.text)
+        self.assertEqual(200, by_id.status_code, by_id.text)
+        self.assertEqual("employees", internal["name"])
+
+        for table_name, (asset_id, field_id) in identities.items():
+            with self.subTest(table=table_name):
+                self.assertEqual("Y", self._asset_row(asset_id)["is_deleted"])
+                self.assertEqual("Y", self._field_row(asset_id, field_id)["is_deleted"])
+                self.assertEqual(404, self.client.get(f"/api/assets/{asset_id}").status_code)
 
 
 if __name__ == "__main__":
