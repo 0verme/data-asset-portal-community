@@ -42,6 +42,7 @@
 - 字段映射查询、统计、表/字段维度和导出链路统一按 `upstream_system_id` 关联；系统名称只用于阅读，`system_abbr` 作为用户侧消歧编码。
 - `p_push_system.master_system_id` 引用 `p_system`；`p_push_job` / `p_push_job_field` 通过 cascade foreign keys 维护其所属层级。
 - `p_indicator_item.source_asset_id` 与 `p_indicator_item.result_field_id` 分别引用 `p_asset_table.asset_id` 与 `p_asset_field.field_id` 的稳定身份；字段归属由 Indicator Service deterministic 校验，兼容快照字段不承担唯一关联职责。
+- `p_asset_table.asset_id` 与 `p_asset_field.field_id` 都是 lifetime identity：整表删除保留资产与字段 tombstone（`is_deleted = 'Y'`），已分配 ID 永不代表另一个逻辑对象；同一 source-scoped asset re-import 恢复原 `asset_id`，已删除字段仍按字段生命周期分配新 ID。
 - `p_asset_field.field_id` 是字段 historical identity：字段从 source 集合消失时以 `is_deleted = 'Y'` 软删除并保留 ID，ID 单调分配、不复用；active 匹配键为 `(asset_id, casefold(field_name))`，读路径只返回 `is_deleted = 'N'` 的字段。
 - lineage child tables 通过 `snapshot_id` cascade 引用 lineage snapshot。
 - API Asset、Mapping、Report 等服务继续使用现有 SQLAlchemy Core / Provider contract，不新增数据库访问层。
@@ -54,7 +55,7 @@
 - `source_key IS NULL`（portal-only）：全部非 system 列由人工编辑维护。
 - source-bound 资产的人工编辑只允许 portal-owned 列；修改 source-owned 列返回 `422 SOURCE_OWNED_ATTRIBUTE`，整请求不落库。
 - ingestion `unchanged` 判定只使用 source-owned projection：人工修改 portal-owned 列后重复同步不会触发写入。
-- 长期 invariant：portal-owned 列不得被 metadata 同步静默清空或覆盖；`asset_id` 是 canonical read identity，`table_name` 只承担 0 / 1 / N 兼容查找；字段被 source 删除时 `field_id` 软删除且不复用。完整 Identity Map 与 I1–I6 见 [metadata-ingestion.md](./metadata-ingestion.md)，逐条验收由 `backend/tests/test_asset_sync_lifecycle.py` 守护。
+- 长期 invariant：portal-owned 列不得被 metadata 同步静默清空或覆盖；`asset_id` 是 canonical read identity，`table_name` 只承担 0 / 1 / N 兼容查找；资产与字段删除都保留 tombstone，stable ID 永不被其他逻辑对象复用，deleted-reference validation 必须确定性失败。完整 Identity Map 与 I1–I6 见 [metadata-ingestion.md](./metadata-ingestion.md)，逐条验收由 `backend/tests/test_asset_sync_lifecycle.py` 守护。
 
 完整列级矩阵与 merge / presence 语义见 [metadata-ingestion.md](./metadata-ingestion.md)。
 

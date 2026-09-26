@@ -334,7 +334,17 @@ class AssetIdentityApiTests(unittest.TestCase):
 
         deleted = self.client.delete("/api/assets/tables/orders")
         self.assertEqual(200, deleted.status_code, deleted.text)
-        self.assertEqual([], self._asset_rows("orders"))
+        rows = self._asset_rows("orders")
+        self.assertEqual(1, len(rows))
+        self.assertEqual(asset_id, rows[0]["asset_id"])
+        connection = connect({"type": "sqlite", "database": str(self.database)})
+        try:
+            tombstone = connection.execute(
+                "SELECT is_deleted FROM dwp.p_asset_table WHERE asset_id = ?", (asset_id,)
+            ).fetchone()
+            self.assertEqual("Y", tombstone[0])
+        finally:
+            connection.close()
 
     # -- Case 5: unknown ids and route ordering --------------------------
 
