@@ -42,6 +42,17 @@ class FieldMappingImportContractTests(unittest.TestCase):
         )
         self.assertEqual(101, canonical.items[0].source_system_id)
         self.assertIsNone(canonical.items[0].data_source_id)
+        with_table_pk = FieldMappingImportRequest.model_validate(
+            {
+                "items": [
+                    {
+                        **canonical_item,
+                        "tablePk": 201,
+                    }
+                ]
+            }
+        )
+        self.assertEqual(201, with_table_pk.items[0].table_pk)
 
         with self.assertRaises(ValidationError):
             FieldMappingImportRequest.model_validate({"items": []})
@@ -162,17 +173,23 @@ class FieldMappingImportServiceTests(unittest.TestCase):
         data_source_id: int | None = 1,
         source_system_id: int | None = None,
         source_table: str = "ORDERS",
+        target_layer: str = "DWF",
+        target_table: str | None = "DWF_ORDERS",
+        load_mode: str | None = "full",
+        table_pk: int | None = None,
     ):
         item = {
             "dataSourceId": data_source_id,
             "sourceTable": source_table,
             "sourceTableCn": "订单",
-            "targetLayer": "DWF",
-            "targetTable": "DWF_ORDERS",
-            "loadMode": "full",
+            "targetLayer": target_layer,
+            "targetTable": target_table,
+            "loadMode": load_mode,
             "tableDesc": "订单映射",
             "fields": fields or [self._field("ORDER_ID")],
         }
+        if table_pk is not None:
+            item["tablePk"] = table_pk
         if source_system_id is not None:
             item.pop("dataSourceId")
             item["sourceSystemId"] = source_system_id
@@ -213,6 +230,176 @@ class FieldMappingImportServiceTests(unittest.TestCase):
             self.connection.execute(
                 "SELECT source_field_comment FROM dwp.p_field_mapping_field"
             ).fetchone(),
+        )
+
+    def test_same_upstream_source_can_map_to_multiple_targets(self):
+        self.connection.execute(
+            "INSERT INTO p_upstream_system "
+            "(system_pk, data_source_id, system_id, system_abbr, system_name, "
+            "db_type, host_name, status_code) "
+            "VALUES (166, NULL, 'up_finance', 'FIN', 'Finance', 'DWS', "
+            "'finance.demo.invalid', 'enabled')"
+        )
+        self.connection.commit()
+        first = self._request(
+            source_system_id=166,
+            source_table="EXTR_FINANCE_BOOK",
+            target_table="DWF.F_AGT_EXTR_FINANCE_BOOK",
+            load_mode="incr_zip",
+        ).items[0]
+        second = self._request(
+            source_system_id=166,
+            source_table="EXTR_FINANCE_BOOK",
+            target_table="DWF.F_EVT_EXTR_FINANCE_BOOK",
+            load_mode="incr",
+        ).items[0]
+
+        created = self.service.import_mappings(FieldMappingImportRequest(items=[first, second]))
+
+        self.assertEqual(2, created["summary"]["created"])
+        self.assertEqual(
+            [
+                ("DWF.F_AGT_EXTR_FINANCE_BOOK", "incr_zip"),
+                ("DWF.F_EVT_EXTR_FINANCE_BOOK", "incr"),
+            ],
+            self.connection.execute(
+                "SELECT target_table_name, load_mode FROM p_field_mapping_table "
+                "WHERE upstream_system_id = 166 AND source_table_name = 'EXTR_FINANCE_BOOK' "
+                "ORDER BY target_table_name"
+            ).fetchall(),
+        )
+        replay = self.service.import_mappings(
+            FieldMappingImportRequest(items=[first])
+        )
+        self.assertEqual("unchanged", replay["items"][0]["action"])
+        self.assertEqual(2, self._count("p_field_mapping_table"))
+        table_page = self.service.get_table_mappings({"sourceSystemId": 166})
+        self.assertEqual(2, table_page["total"])
+        self.assertEqual(
+            {
+                "DWF.F_AGT_EXTR_FINANCE_BOOK",
+                "DWF.F_EVT_EXTR_FINANCE_BOOK",
+            },
+            {item["targetTable"] for item in table_page["items"]},
+        )
+
+    def test_load_mode_is_part_of_mapping_business_identity(self):
+        first = self._request(
+            source_table="ORDERS",
+            target_table="DWF.ORDERS",
+            load_mode="incr",
+        ).items[0]
+        second = self._request(
+            source_table="ORDERS",
+            target_table="DWF.ORDERS",
+            load_mode="full",
+        ).items[0]
+
+        result = self.service.import_mappings(FieldMappingImportRequest(items=[first, second]))
+
+        self.assertEqual(2, result["summary"]["created"])
+        self.assertEqual(
+            [("DWF.ORDERS", "full"), ("DWF.ORDERS", "incr")],
+            self.connection.execute(
+                "SELECT target_table_name, load_mode FROM p_field_mapping_table "
+                "WHERE upstream_system_id = 101 AND source_table_name = 'ORDERS' "
+                "ORDER BY load_mode"
+            ).fetchall(),
+        )
+
+    def test_duplicate_existing_business_identity_is_rejected_without_choosing_a_row(self):
+        request = self._request()
+        self.service.import_mappings(request)
+        self.connection.execute(
+            "INSERT INTO p_field_mapping_table "
+            "(table_pk, upstream_system_id, data_source_id, source_table_name, target_layer_code, "
+            "target_table_name, load_mode) VALUES (999, 101, 1, 'ORDERS', 'DWF', 'DWF_ORDERS', 'full')"
+        )
+        self.connection.execute(
+            "INSERT INTO p_field_mapping_field "
+            "(field_pk, table_pk, source_field_name, source_field_type, source_field_comment, "
+            "target_field_name, mapping_rule, field_order) "
+            "SELECT 999, 999, source_field_name, source_field_type, source_field_comment, "
+            "target_field_name, mapping_rule, field_order FROM p_field_mapping_field LIMIT 1"
+        )
+        self.connection.commit()
+
+        result = self.service.import_mappings(request)
+
+        self.assertEqual("failed", result["items"][0]["action"])
+        self.assertEqual(
+            "DUPLICATE_MAPPING_IDENTITY", result["items"][0]["error"]["code"]
+        )
+        self.assertEqual(2, self._count("p_field_mapping_table"))
+        table_page = self.service.get_table_mappings({"sourceSystemId": 101})
+        self.assertEqual(2, table_page["total"])
+        self.assertEqual(2, len(table_page["items"]))
+        self.assertEqual(
+            2, len({item["tablePk"] for item in table_page["items"]})
+        )
+
+    def test_duplicate_identity_with_nullable_target_fields_is_rejected(self):
+        request = self._request(target_table=None, load_mode=None)
+        created = self.service.import_mappings(request)
+        self.assertEqual("created", created["items"][0]["action"])
+        self.connection.execute(
+            "INSERT INTO p_field_mapping_table "
+            "(table_pk, upstream_system_id, data_source_id, source_table_name, target_layer_code, "
+            "target_table_name, load_mode) VALUES (999, 101, 1, 'ORDERS', 'DWF', NULL, NULL)"
+        )
+        self.connection.commit()
+
+        result = self.service.import_mappings(request)
+
+        self.assertEqual("failed", result["items"][0]["action"])
+        self.assertEqual(
+            "DUPLICATE_MAPPING_IDENTITY", result["items"][0]["error"]["code"]
+        )
+        self.assertEqual(2, self._count("p_field_mapping_table"))
+
+    def test_different_source_and_upstream_systems_have_independent_identities(self):
+        self.connection.execute(
+            "INSERT INTO p_upstream_system "
+            "(system_pk, data_source_id, system_id, system_abbr, system_name, "
+            "db_type, host_name, status_code) "
+            "VALUES (102, NULL, 'up_source_alt', 'SRC_ALT', 'Source Alt', 'SQLite', "
+            "'alt.demo.invalid', 'enabled')"
+        )
+        self.connection.commit()
+        requests = [
+            self._request(source_table="ORDERS").items[0],
+            self._request(source_table="CUSTOMERS").items[0],
+            self._request(source_system_id=102, source_table="ORDERS").items[0],
+        ]
+
+        result = self.service.import_mappings(FieldMappingImportRequest(items=requests))
+
+        self.assertEqual(3, result["summary"]["created"])
+        identities = self.connection.execute(
+            "SELECT upstream_system_id, source_table_name "
+            "FROM p_field_mapping_table ORDER BY upstream_system_id, source_table_name"
+        ).fetchall()
+        self.assertEqual([(101, "CUSTOMERS"), (101, "ORDERS"), (102, "ORDERS")], identities)
+
+    def test_table_pk_updates_the_exact_mapping_entity(self):
+        created = self.service.import_mappings(self._request())
+        table_pk = created["items"][0]["identity"]["tablePk"]
+
+        updated = self.service.import_mappings(
+            self._request(
+                table_pk=table_pk,
+                fields=[self._field("ORDER_ID", comment="updated by pk")],
+            )
+        )
+
+        self.assertEqual("updated", updated["items"][0]["action"])
+        self.assertEqual(table_pk, updated["items"][0]["identity"]["tablePk"])
+        self.assertEqual(
+            [(table_pk, "updated by pk")],
+            self.connection.execute(
+                "SELECT t.table_pk, f.source_field_comment "
+                "FROM p_field_mapping_table t JOIN p_field_mapping_field f USING (table_pk)"
+            ).fetchall(),
         )
 
     def test_canonical_source_system_id_is_persisted_as_mapping_identity(self):

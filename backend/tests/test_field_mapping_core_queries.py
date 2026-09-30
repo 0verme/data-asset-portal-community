@@ -12,6 +12,7 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
     def setUp(self):
         self.service = FieldMappingService()
         self.field_row = {
+            "table_pk": 301,
             "upstream_system_id": 3,
             "system_code": "CRM",
             "system_name": "CRM",
@@ -29,6 +30,7 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
             "updated_at": "2026-08-20 00:00:00",
         }
         self.table_row = {
+            "table_pk": 301,
             "upstream_system_id": 3,
             "system_code": "CRM",
             "system_name": "CRM",
@@ -66,6 +68,7 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
             self._assert_portable(statement)
         self.assertNotIn("customer' OR 1=1", str(statements[1].compile(dialect=sqlite.dialect())))
         self.assertEqual(result["items"][0]["srcField"], "customer_id")
+        self.assertEqual(result["items"][0]["tablePk"], 301)
 
     def test_source_system_filter_uses_upstream_primary_key(self):
         self.service._db.fetch_rows = MagicMock(return_value=[{
@@ -102,6 +105,7 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
         for statement in statements:
             self._assert_portable(statement)
         self.assertEqual(result["items"][0]["fieldCount"], 2)
+        self.assertEqual(result["items"][0]["tablePk"], 301)
 
 
 if __name__ == "__main__":

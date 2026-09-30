@@ -441,10 +441,11 @@ Base Path: `/api/field-mappings`
 
 #### FieldMappingRow
 
-`sourceSystemId` 是上游卸数系统主键（对应 `p_upstream_system.system_pk`），用于程序关联和筛选；`srcSystem` / `systemName` 只承载展示名称，`systemCode` 是用户侧消歧编码。
+`tablePk` 是所属表映射的持久化主键；`sourceSystemId` 是上游卸数系统主键（对应 `p_upstream_system.system_pk`），用于程序关联和筛选；`srcSystem` / `systemName` 只承载展示名称，`systemCode` 是用户侧消歧编码。
 
 ```json
 {
+  "tablePk": 201,
   "sourceSystemId": 1,
   "systemCode": "MEM",
   "systemName": "会员中心",
@@ -456,6 +457,7 @@ Base Path: `/api/field-mappings`
   "srcComment": "会员编码",
   "targetLayer": "DWD",
   "targetTable": "DWD_MEMBER_PROFILE",
+  "loadMode": "incr_zip",
   "targetField": "member_id",
   "mappingRule": "直接映射",
   "updatedAt": "2026-06-05"
@@ -463,6 +465,8 @@ Base Path: `/api/field-mappings`
 ```
 
 #### FieldMappingStats
+
+`sourceTableCount` counts persisted table-mapping entities, not unique `(sourceSystemId, srcTable)` pairs.
 
 ```json
 {
@@ -478,10 +482,11 @@ Base Path: `/api/field-mappings`
 
 #### TableMappingRow
 
-`GET /api/field-mappings/tables` 返回的表维度聚合行。`loadMode` 为入仓方式码值，取值 `full`（全量）/ `incr`（增量）/ `incr_zip`（增量拉链）/ `full_zip`（全量拉链）。
+`GET /api/field-mappings/tables` 按持久化映射实体 `tablePk` 返回表维度聚合行；同一上游系统和源表映射到不同目标表或入仓方式时分别返回。`loadMode` 为入仓方式码值，取值 `full`（全量）/ `incr`（增量）/ `incr_zip`（增量拉链）/ `full_zip`（全量拉链）。
 
 ```json
 {
+  "tablePk": 201,
   "sourceSystemId": 1,
   "systemCode": "MEM",
   "systemName": "会员中心",
@@ -521,6 +526,7 @@ Base Path: `/api/field-mappings`
 - `emptyComment`：`yes` / `no`
 - `targetTable`：目标表名，模糊匹配
 - `targetField`：目标字段名，模糊匹配
+- `tablePk`：字段所属表映射的持久化主键，用于精确定位一条表映射及其字段
 
 `GET /api/field-mappings/fields` 额外支持：
 
@@ -572,7 +578,7 @@ Base Path: `/api/field-mappings`
 }
 ```
 
-表映射业务身份按当前 canonical schema 的 `sourceSystemId + sourceTable` 解析，其中 `sourceSystemId` 对应 `p_upstream_system.system_pk`；`dataSourceId` 仅作为兼容输入，只有能唯一解析到一个有效上游系统时才接受。字段映射身份按所属表的 `sourceField + targetField` 解析。已有记录会返回 `created`、`updated` 或 `unchanged`，同一请求中的异常 item 返回 `failed`、`index`、`identity` 和错误码。请求遗漏的旧字段不会被删除；table 与 fields 在每个 item 的事务内一起提交。成功的真实 create/update 会清理映射统计缓存；`unchanged` 不写入伪修改审计。`dryRun: true` 只做校验和 action 预判，不写业务表、审计或缓存。
+表映射业务身份为 `sourceSystemId + sourceTable + targetLayer + targetTable + loadMode`，其中 `sourceSystemId` 对应 `p_upstream_system.system_pk`；同一上游系统和源表可以合法映射到多个目标表。`targetTable` 与 `loadMode` 保持可空，因此数据库使用普通查询索引，应用按完整五元组校验重复身份。`dataSourceId` 仅作为兼容输入，只有能唯一解析到一个有效上游系统时才接受。更新已有映射优先传 `tablePk` 精确定位实体；真实写入响应会返回生成/使用的 `tablePk`，`dryRun` 新建预览不生成主键。不传时由请求中的完整五元组定位，不能只按上游系统和源表取一条。允许空目标配置：省略/传空的目标字段按 NULL 参与业务身份；若要更新有目标值的映射，应提供完整身份或 `tablePk`。发现数据库中有多个完全相同身份时，导入返回 `DUPLICATE_MAPPING_IDENTITY`，不会任选其一。字段映射身份按所属表的 `sourceField + targetField` 解析。已有记录会返回 `created`、`updated` 或 `unchanged`，同一请求中的异常 item 返回 `failed`、`index`、`identity` 和错误码。请求遗漏的旧字段不会被删除；table 与 fields 在每个 item 的事务内一起提交。成功的真实 create/update 会清理映射统计缓存；`unchanged` 不写入伪修改审计。`dryRun: true` 只做校验和 action 预判，不写业务表、审计或缓存。
 
 接口返回直接的导入响应：
 
@@ -596,10 +602,11 @@ Base Path: `/api/field-mappings`
       "index": 0,
       "identity": {
         "sourceSystemId": 103,
-        "upstreamSystemId": 103,
         "dataSourceId": 12,
         "sourceTable": "ODS_CORE_ACCOUNT",
-        "targetTable": "DWF_ACCOUNT"
+        "targetLayer": "DWF",
+        "targetTable": "DWF_ACCOUNT",
+        "loadMode": "incr"
       },
       "action": "created",
       "fieldCount": 1,

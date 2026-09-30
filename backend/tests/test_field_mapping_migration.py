@@ -95,7 +95,7 @@ class FieldMappingIdentityMigrationTests(unittest.TestCase):
             timeout=120,
         )
 
-    def test_unique_legacy_relation_is_backfilled_and_constrained(self):
+    def test_legacy_two_column_unique_is_replaced_by_identity_lookup_index(self):
         with tempfile.TemporaryDirectory(prefix="field-mapping-migration-") as directory:
             database = Path(directory) / "legacy.sqlite"
             config = self._prepare_legacy_database(database)
@@ -111,19 +111,85 @@ class FieldMappingIdentityMigrationTests(unittest.TestCase):
                     ).fetchone(),
                 )
                 self.assertEqual(
-                    ("0009_upstream_option_contract",),
+                    ("0010_field_mapping_identity",),
                     connection.execute("SELECT version_num FROM alembic_version").fetchone(),
                 )
                 foreign_keys = connection.execute(
                     "PRAGMA foreign_key_list(p_field_mapping_table)"
                 ).fetchall()
                 indexes = connection.execute(
-                    "PRAGMA index_list(p_field_mapping_table)"
+                    "SELECT name, sql FROM sqlite_master "
+                    "WHERE type = 'index' AND tbl_name = 'p_field_mapping_table'"
                 ).fetchall()
             finally:
                 connection.close()
             self.assertTrue(any(row[2] == "p_upstream_system" and row[3] == "upstream_system_id" for row in foreign_keys))
-            self.assertTrue(any(row[1] == "idx_p_field_mapping_table_uk_01" and row[2] for row in indexes))
+            self.assertFalse(any(row[0] == "idx_p_field_mapping_table_uk_01" for row in indexes))
+            identity_index = next(
+                row for row in indexes if row[0] == "idx_p_field_mapping_table_identity"
+            )
+            self.assertIn("CREATE INDEX", identity_index[1].upper())
+            self.assertIn(
+                "upstream_system_id, source_table_name, target_layer_code, target_table_name, load_mode",
+                identity_index[1],
+            )
+
+    def test_duplicate_business_identities_are_preserved_without_data_loss(self):
+        with tempfile.TemporaryDirectory(prefix="field-mapping-migration-duplicates-") as directory:
+            database = Path(directory) / "duplicate-identities.sqlite"
+            config = database.with_suffix(".yaml")
+            config.write_text(
+                "profiles:\n  legacy:\n    type: sqlite\n"
+                f"    database: {database.as_posix()}\n",
+                encoding="utf-8",
+            )
+            connection = connect({"type": "sqlite", "database": str(database)})
+            try:
+                initialize(connection, {"type": "sqlite", "database": str(database)}, "sqlite")
+                connection.execute(
+                    "INSERT INTO p_data_source "
+                    "(source_id, source_code, source_name, source_type, status_code) "
+                    "VALUES (1, 'MEM', 'Member', 'relational', 'enabled')"
+                )
+                connection.execute(
+                    "INSERT INTO p_upstream_system "
+                    "(system_pk, data_source_id, system_id, system_abbr, system_name, "
+                    "db_type, host_name, status_code) "
+                    "VALUES (101, 1, 'up_member', 'MEM', 'Member', 'PostgreSQL', "
+                    "'member.demo.invalid', 'enabled')"
+                )
+                connection.executemany(
+                    "INSERT INTO p_field_mapping_table "
+                    "(table_pk, data_source_id, upstream_system_id, source_table_name, target_layer_code, "
+                    "target_table_name, load_mode) "
+                    "VALUES (?, 1, 101, 'MEMBER_A', 'DWF', 'DWF_MEMBER_A', 'incr')",
+                    [(201,), (202,)],
+                )
+                connection.execute(
+                    "UPDATE dwp.alembic_version SET version_num = '0009_upstream_option_contract'"
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            result = self._run_migration(config)
+            self.assertEqual(0, result.returncode, result.stderr)
+            connection = sqlite3.connect(database)
+            try:
+                rows = connection.execute(
+                    "SELECT table_pk, target_table_name, load_mode "
+                    "FROM p_field_mapping_table ORDER BY table_pk"
+                ).fetchall()
+                revision = connection.execute(
+                    "SELECT version_num FROM alembic_version"
+                ).fetchone()
+            finally:
+                connection.close()
+            self.assertEqual(
+                [(201, "DWF_MEMBER_A", "incr"), (202, "DWF_MEMBER_A", "incr")],
+                rows,
+            )
+            self.assertEqual(("0010_field_mapping_identity",), revision)
 
     def test_ambiguous_legacy_relation_fails_without_guessing(self):
         with tempfile.TemporaryDirectory(prefix="field-mapping-migration-ambiguous-") as directory:

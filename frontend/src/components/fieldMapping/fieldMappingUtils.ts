@@ -3,10 +3,12 @@ export interface FieldMappingRoute {
   upstreamSystemId?: string | number | null | undefined;
   sourceTable?: string | null | undefined;
   dwfTable?: string | null | undefined;
+  tablePk?: string | number | null | undefined;
 }
 
 export interface FieldMappingFilters {
   sourceSystemId: string | number;
+  tablePk: string | number;
   srcTable: string;
   srcField: string;
   emptyComment: string;
@@ -18,6 +20,7 @@ export interface FieldMappingFilters {
 
 export const DEFAULT_FILTERS: FieldMappingFilters = {
   sourceSystemId: "",
+  tablePk: "",
   srcTable: "",
   srcField: "",
   emptyComment: "",
@@ -128,6 +131,7 @@ export function buildLinkedFilters(
   return {
     ...DEFAULT_FILTERS,
     sourceSystemId: getRouteSourceSystemId(route),
+    tablePk: route?.tablePk || "",
     srcTable: route?.sourceTable || "",
     targetTable: route?.dwfTable || "",
   };
@@ -157,7 +161,7 @@ export function isLinkedRoute(
   route: FieldMappingRoute | null | undefined,
 ): boolean {
   return Boolean(
-    getRouteSourceSystemId(route) || route?.sourceTable || route?.dwfTable,
+    getRouteSourceSystemId(route) || route?.sourceTable || route?.dwfTable || route?.tablePk,
   );
 }
 

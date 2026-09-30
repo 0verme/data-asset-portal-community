@@ -249,6 +249,9 @@ class FieldMappingService(AuditActorMixin):
         self._append_like(
             clauses, mapping_table.c.target_table_name, params.get("targetTable")
         )
+        table_pk = str(params.get("tablePk") or "").strip()
+        if table_pk.isdigit() and int(table_pk) > 0:
+            clauses.append(mapping_table.c.table_pk == int(table_pk))
         self._append_like(
             clauses, mapping_field.c.target_field_name, params.get("targetField")
         )
@@ -319,6 +322,7 @@ class FieldMappingService(AuditActorMixin):
             "emptyComment": (params or {}).get("emptyComment"),
             "targetTable": (params or {}).get("targetTable"),
             "targetField": (params or {}).get("targetField"),
+            "tablePk": (params or {}).get("tablePk"),
         }
         return json.dumps(relevant, ensure_ascii=False, sort_keys=True)
 
@@ -483,10 +487,31 @@ class FieldMappingService(AuditActorMixin):
             self._load_import_data_source(owner_data_source_id)
         return owner, resolved_source_system_id, owner_data_source_id
 
-    def _load_import_table(
+    @classmethod
+    def _mapping_business_identity(
+        cls,
+        source_system_id: Any,
+        source_table: Any,
+        target_layer: Any,
+        target_table: Any,
+        load_mode: Any,
+    ) -> tuple[Any, ...]:
+        def normalized(value: Any) -> str | None:
+            text = cls._optional_text(value)
+            return text.casefold() if text else None
+
+        return (
+            cls._safe_int(source_system_id),
+            normalized(source_table),
+            normalized(target_layer) or "dwf",
+            normalized(target_table),
+            normalized(load_mode),
+        )
+
+    def _load_mapping_candidates(
         self, source_system_id: int, source_table: str
-    ) -> dict[str, Any] | None:
-        rows = self._fetch_rows(
+    ) -> list[dict[str, Any]]:
+        return self._fetch_rows(
             select(mapping_table)
             .where(
                 and_(
@@ -497,21 +522,93 @@ class FieldMappingService(AuditActorMixin):
             )
             .order_by(mapping_table.c.table_pk.asc())
         )
-        active = [row for row in rows if self._is_active(row.get("is_deleted"))]
-        if len(active) > 1:
-            raise FieldMappingImportItemError(
-                "DUPLICATE_TABLE_IDENTITY",
-                "同一上游系统和源表名存在多条有效表映射",
+
+    @staticmethod
+    def _raise_duplicate_mapping_identity(rows: list[dict[str, Any]]) -> None:
+        table_pks = sorted(
+            FieldMappingService._safe_int(row.get("table_pk")) for row in rows
+        )
+        raise FieldMappingImportItemError(
+            "DUPLICATE_MAPPING_IDENTITY",
+            "完整表映射业务身份对应多条记录，需先人工核对："
+            f"table_pk={table_pks}",
+        )
+
+    def _load_import_table(
+        self,
+        source_system_id: int,
+        source_table: str,
+        *,
+        target_layer: str,
+        target_table: str | None,
+        load_mode: str | None,
+        table_pk: int | None = None,
+    ) -> dict[str, Any] | None:
+        rows = self._load_mapping_candidates(source_system_id, source_table)
+        if table_pk is not None:
+            current = next(
+                (row for row in rows if self._safe_int(row.get("table_pk")) == table_pk),
+                None,
             )
-        if active:
-            return active[0]
-        deleted = [row for row in rows if not self._is_active(row.get("is_deleted"))]
-        if len(deleted) > 1:
-            raise FieldMappingImportItemError(
-                "DUPLICATE_TABLE_IDENTITY",
-                "同一上游系统和源表名存在多条已删除表映射",
+            if current is None:
+                raise FieldMappingImportItemError(
+                    "TABLE_MAPPING_NOT_FOUND",
+                    "tablePk 不属于指定的上游系统和源表映射",
+                )
+            return current
+
+        requested_identity = self._mapping_business_identity(
+            source_system_id,
+            source_table,
+            target_layer,
+            target_table,
+            load_mode,
+        )
+        matches = [
+            row
+            for row in rows
+            if self._mapping_business_identity(
+                row.get("upstream_system_id"),
+                row.get("source_table_name"),
+                row.get("target_layer_code"),
+                row.get("target_table_name"),
+                row.get("load_mode"),
             )
-        return deleted[0] if deleted else None
+            == requested_identity
+        ]
+        if len(matches) > 1:
+            self._raise_duplicate_mapping_identity(matches)
+        return matches[0] if matches else None
+
+    def _assert_mapping_identity_available(
+        self, values: dict[str, Any], *, excluding_table_pk: int | None
+    ) -> None:
+        rows = self._load_mapping_candidates(
+            self._safe_int(values.get("upstream_system_id")),
+            str(values.get("source_table_name") or ""),
+        )
+        requested_identity = self._mapping_business_identity(
+            values.get("upstream_system_id"),
+            values.get("source_table_name"),
+            values.get("target_layer_code"),
+            values.get("target_table_name"),
+            values.get("load_mode"),
+        )
+        conflicts = [
+            row
+            for row in rows
+            if self._safe_int(row.get("table_pk")) != excluding_table_pk
+            and self._mapping_business_identity(
+                row.get("upstream_system_id"),
+                row.get("source_table_name"),
+                row.get("target_layer_code"),
+                row.get("target_table_name"),
+                row.get("load_mode"),
+            )
+            == requested_identity
+        ]
+        if conflicts:
+            self._raise_duplicate_mapping_identity(conflicts)
 
     def _load_import_fields(
         self, table_pk: int
@@ -616,7 +713,19 @@ class FieldMappingService(AuditActorMixin):
     ) -> dict[str, Any]:
         _owner, source_system_id, data_source_id = self._load_import_source_system(item)
         source_table = item.source_table.strip()
-        current_table = self._load_import_table(source_system_id, source_table)
+        provided = getattr(item, "model_fields_set", set())
+        requested_target_layer = item.target_layer.strip().upper()
+        requested_target_table = self._optional_text(item.target_table)
+        requested_load_mode = self._optional_text(item.load_mode)
+        requested_load_mode = requested_load_mode.casefold() if requested_load_mode else None
+        current_table = self._load_import_table(
+            source_system_id,
+            source_table,
+            target_layer=requested_target_layer,
+            target_table=requested_target_table,
+            load_mode=requested_load_mode,
+            table_pk=item.table_pk,
+        )
         current_fields = (
             self._load_import_fields(self._safe_int(current_table.get("table_pk")))
             if current_table is not None
@@ -652,7 +761,6 @@ class FieldMappingService(AuditActorMixin):
             )
             final_fields[identity] = desired
 
-        provided = getattr(item, "model_fields_set", set())
         if current_table is None or "source_table_cn" in provided:
             source_table_cn = item.source_table_cn
         else:
@@ -696,6 +804,14 @@ class FieldMappingService(AuditActorMixin):
             ),
             "table_desc": table_desc,
         }
+        self._assert_mapping_identity_available(
+            table_values,
+            excluding_table_pk=(
+                self._safe_int(current_table.get("table_pk"))
+                if current_table is not None
+                else None
+            ),
+        )
         table_changed = (
             current_table is None
             or not self._is_active(current_table.get("is_deleted"))
@@ -716,7 +832,9 @@ class FieldMappingService(AuditActorMixin):
             "upstreamSystemId": source_system_id,
             "dataSourceId": data_source_id,
             "sourceTable": table_values["source_table_name"],
+            "targetLayer": table_values["target_layer_code"],
             "targetTable": table_values["target_table_name"],
+            "loadMode": table_values["load_mode"],
         }
         before = None
         if current_table is not None:
@@ -759,9 +877,13 @@ class FieldMappingService(AuditActorMixin):
 
     @staticmethod
     def _import_item_result(prepared: dict[str, Any]) -> dict[str, Any]:
+        identity = {
+            **prepared["identity"],
+            "tablePk": prepared.get("table_pk"),
+        }
         return FieldMappingImportItemResult(
             index=prepared["index"],
-            identity=prepared["identity"],
+            identity=identity,
             action=prepared["action"],
             field_count=prepared["field_count"],
             created_field_count=prepared["created_field_count"],
@@ -864,6 +986,7 @@ class FieldMappingService(AuditActorMixin):
                 return result
 
             self._persist_import_item(prepared)
+            result = self._import_item_result(prepared)
             connection = active_transaction_connection(self._profile())
             if connection is None:
                 raise RuntimeError(
@@ -895,7 +1018,10 @@ class FieldMappingService(AuditActorMixin):
                 "upstreamSystemId": item.source_system_id,
                 "dataSourceId": item.data_source_id,
                 "sourceTable": item.source_table,
+                "targetLayer": item.target_layer,
                 "targetTable": item.target_table,
+                "loadMode": item.load_mode,
+                "tablePk": item.table_pk,
             },
             action="failed",
             field_count=0,
@@ -976,6 +1102,7 @@ class FieldMappingService(AuditActorMixin):
             + [upstream_system.c.system_pk.asc()]
             + self._null_last_text_order_terms(mapping_table.c.source_table_name)
             + self._null_last_text_order_terms(mapping_table.c.target_table_name)
+            + [mapping_table.c.table_pk.asc()]
         )
 
     def _field_default_order_terms(self):
@@ -994,6 +1121,7 @@ class FieldMappingService(AuditActorMixin):
     @staticmethod
     def _field_select():
         return (
+            mapping_table.c.table_pk.label("table_pk"),
             data_source.c.source_id.label("data_source_id"),
             mapping_table.c.upstream_system_id.label("source_system_id"),
             mapping_table.c.upstream_system_id.label("upstream_system_id"),
@@ -1033,6 +1161,7 @@ class FieldMappingService(AuditActorMixin):
         system_name = row.get("system_name", row.get("src_system"))
         system_code = row.get("system_code", row.get("system_abbr"))
         return {
+            "tablePk": row["table_pk"],
             "dataSourceId": data_source_id,
             "sourceSystemId": source_system_id,
             "upstreamSystemId": source_system_id,
@@ -1261,6 +1390,7 @@ class FieldMappingService(AuditActorMixin):
         ).label("source_table_cn")
         statement = (
             select(
+                mapping_table.c.table_pk.label("table_pk"),
                 data_source.c.source_id.label("data_source_id"),
                 mapping_table.c.upstream_system_id.label("source_system_id"),
                 mapping_table.c.upstream_system_id.label("upstream_system_id"),
@@ -1313,6 +1443,7 @@ class FieldMappingService(AuditActorMixin):
             .where(*where)
             .group_by(
                 data_source.c.source_id,
+                mapping_table.c.table_pk,
                 mapping_table.c.upstream_system_id,
                 upstream_system.c.system_pk,
                 upstream_system.c.system_abbr,
@@ -1346,6 +1477,7 @@ class FieldMappingService(AuditActorMixin):
             empty_comment_count = self._safe_int(row.get("empty_comment_count"))
             items.append(
                 {
+                    "tablePk": row["table_pk"],
                     "dataSourceId": data_source_id,
                     "sourceSystemId": source_system_id,
                     "upstreamSystemId": source_system_id,

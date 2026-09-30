@@ -39,7 +39,7 @@ class FieldMappingImportFieldRequest(FieldMappingImportContractModel):
 
 
 class FieldMappingImportItemRequest(FieldMappingImportContractModel):
-    """One table mapping identified by an upstream system and source table."""
+    """One table mapping, located by tablePk or its complete business identity."""
 
     source_system_id: int | None = Field(
         default=None,
@@ -49,6 +49,7 @@ class FieldMappingImportItemRequest(FieldMappingImportContractModel):
         ),
     )
     data_source_id: int | None = Field(default=None, gt=0)
+    table_pk: int | None = Field(default=None, gt=0)
     source_table: str = Field(min_length=1, max_length=128)
     source_table_cn: str | None = Field(default=None, max_length=256)
     target_layer: str = Field(default="DWF", min_length=1, max_length=32)
@@ -103,7 +104,10 @@ class FieldMappingImportIdentity(FieldMappingImportContractModel):
     )
     data_source_id: int | None = Field(default=None, gt=0)
     source_table: str
+    target_layer: str = "DWF"
     target_table: str | None = None
+    load_mode: str | None = None
+    table_pk: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def require_identity_reference(self) -> FieldMappingImportIdentity:

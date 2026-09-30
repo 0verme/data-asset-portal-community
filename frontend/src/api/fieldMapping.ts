@@ -109,6 +109,7 @@ function compareByOrder<T>(left: T, right: T, resolvers: readonly Resolver<T>[])
 }
 
 export interface EnrichedFieldMappingRow {
+  tablePk?: string | number | null | undefined;
   sourceSystemId?: string | number | undefined;
   upstreamSystemId?: string | number | undefined;
   systemCode?: string | undefined;
@@ -146,6 +147,7 @@ function compareFieldRowsDefault(left: EnrichedFieldMappingRow, right: EnrichedF
 
 export interface FieldMappingTableSummary {
   __mockIndex: number;
+  tablePk?: string | number | null | undefined;
   sourceSystemId: string | number;
   upstreamSystemId: string | number;
   systemCode: string;
@@ -203,6 +205,7 @@ export interface FieldMappingQueryParams {
   keyword?: string | undefined;
   sourceSystemId?: string | number | undefined;
   upstreamSystemId?: string | number | undefined;
+  tablePk?: string | number | undefined;
   srcSystem?: string | undefined;
   srcTable?: string | undefined;
   srcField?: string | undefined;
@@ -223,6 +226,7 @@ export function filterFieldMappingRows(
 ): EnrichedFieldMappingRow[] {
   const keyword = String(params.keyword || '').trim().toLowerCase();
   const sourceSystemId = String(params.sourceSystemId || params.upstreamSystemId || '').trim();
+  const tablePk = String(params.tablePk || '').trim();
   const srcSystem = String(params.srcSystem || '').trim();
   const srcTable = String(params.srcTable || '').trim().toLowerCase();
   const srcField = String(params.srcField || '').trim().toLowerCase();
@@ -232,6 +236,7 @@ export function filterFieldMappingRows(
 
   return rows.filter((row) => {
     if (sourceSystemId && String(row.sourceSystemId || row.upstreamSystemId || '') !== sourceSystemId) return false;
+    if (tablePk && String(row.tablePk ?? '') !== tablePk) return false;
     if (srcSystem && row.srcSystem !== srcSystem) return false;
     if (srcTable && !includesValue(row.srcTable, srcTable)) return false;
     if (srcField && !includesValue(row.srcField, srcField)) return false;
@@ -254,15 +259,32 @@ export function filterFieldMappingRows(
   });
 }
 
-function summarizeTables(rows: readonly EnrichedFieldMappingRow[]): FieldMappingTableSummary[] {
+export function fieldMappingTableIdentityKey(
+  row: Pick<EnrichedFieldMappingRow, "sourceSystemId" | "upstreamSystemId" | "srcTable" | "targetLayer" | "targetTable" | "loadMode">,
+): string {
+  const rawSourceSystemId = row.sourceSystemId ?? row.upstreamSystemId;
+  const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase();
+  return JSON.stringify([
+    String(rawSourceSystemId ?? ""),
+    normalize(row.srcTable),
+    normalize(row.targetLayer) || "dwf",
+    normalize(row.targetTable),
+    normalize(row.loadMode),
+  ]);
+}
+
+export function summarizeTables(rows: readonly EnrichedFieldMappingRow[]): FieldMappingTableSummary[] {
   const groups = new Map<string, Omit<FieldMappingTableSummary, 'emptyCommentRate'>>();
 
   rows.forEach((row) => {
     const rawSourceSystemId = row.sourceSystemId ?? row.upstreamSystemId;
     const sourceSystemId = rawSourceSystemId !== undefined && rawSourceSystemId !== null ? rawSourceSystemId : '';
-    const key = `${sourceSystemId}::${String(row.srcTable || '')}`;
+    const key = row.tablePk !== undefined && row.tablePk !== null
+      ? `pk:${row.tablePk}`
+      : fieldMappingTableIdentityKey(row);
     const current = groups.get(key) || {
       __mockIndex: row.__mockIndex ?? 0,
+      tablePk: row.tablePk,
       sourceSystemId,
       upstreamSystemId: row.upstreamSystemId ?? sourceSystemId,
       systemCode: String(row.systemCode || ''),

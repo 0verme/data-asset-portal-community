@@ -213,7 +213,7 @@ class IndicatorSemanticMigrationTests(unittest.TestCase):
             connection = sqlite3.connect(database)
             try:
                 self.assertEqual(
-                    ("0009_upstream_option_contract",),
+                    ("0010_field_mapping_identity",),
                     connection.execute("SELECT version_num FROM alembic_version").fetchone(),
                 )
                 columns = {

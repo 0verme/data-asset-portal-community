@@ -19,10 +19,11 @@ test("field mapping rules identify only known transformations", () => {
 });
 
 test("linked field mapping routes build stable filters", () => {
-  const route = { sourceSystemId: "101", sourceTable: "MEMBER_PROFILE", dwfTable: "DWF_MEMBER_PROFILE" };
+  const route = { sourceSystemId: "101", sourceTable: "MEMBER_PROFILE", dwfTable: "DWF_MEMBER_PROFILE", tablePk: "301" };
   assert.equal(isLinkedRoute(route), true);
   assert.deepEqual(buildLinkedFilters(route, "核心系统"), {
     sourceSystemId: "101",
+    tablePk: "301",
     srcTable: "MEMBER_PROFILE",
     srcField: "",
     emptyComment: "",

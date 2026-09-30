@@ -74,7 +74,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
 
             status = _run_cli(["status", "--profile", "fresh", "--config", str(config)])
             self.assertEqual(0, status.returncode, status.stderr)
-            self.assertIn("revision=0009_upstream_option_contract", status.stdout)
+            self.assertIn("revision=0010_field_mapping_identity", status.stdout)
             connection = sqlite3.connect(database)
             try:
                 row = connection.execute(
@@ -174,7 +174,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
             finally:
                 connection.close()
 
-            self.assertEqual(("0009_upstream_option_contract",), revision)
+            self.assertEqual(("0010_field_mapping_identity",), revision)
             self.assertIn(("DB2", "Legacy DB2", "legacy-db2"), db_items)
             self.assertIn(("POSTGRESQL", "PostgreSQL", "PostgreSQL"), db_items)
             self.assertIn(("CUSTOMER_OPS", "Legacy customer ops", "legacy-customer-ops"), dept_items)
@@ -220,7 +220,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 self.assertEqual(("Legacy system",), connection.execute(
                     "SELECT system_name FROM dwp.p_system WHERE system_id = 99"
                 ).fetchone())
-                self.assertEqual(("0009_upstream_option_contract",), connection.execute(
+                self.assertEqual(("0010_field_mapping_identity",), connection.execute(
                     "SELECT version_num FROM dwp.alembic_version"
                 ).fetchone())
                 self.assertIsNotNone(connection.execute(
