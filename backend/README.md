@@ -57,7 +57,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 | `ASSET_DB_PROFILE` | 资产接口使用的数据库 profile | `primary` |
 | `ASSET_AUTH_DB_PROFILE` | 登录鉴权使用的数据库 profile | `primary` |
 | `ASSET_DB_CONFIG_PATH` | 数据库配置文件路径 | `backend/configs/database.yaml` |
-| `ASSET_DB_JAR_PATH` | GaussDB JDBC jar 路径（驱动不随仓库分发，自行从官方渠道获取） | `/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar` |
+| `ASSET_DB_JAR_PATH` | GaussDB JDBC jar 的环境特定绝对路径（驱动需自行从官方渠道获取；优先于 profile 的 `jar_path`） | `<absolute path to vendor JDBC jar>` |
 | `ASSET_DB_CONNECT_TIMEOUT_SECONDS` | 数据库连接超时秒数 | `30` |
 | `ASSET_DB_STATEMENT_TIMEOUT_MS` | PostgreSQL / GaussDB 查询超时毫秒数 | `120000` |
 | `APP_DEBUG` | Native FastAPI 的 debug 配置（默认关闭；仅 `1`/`true`/`yes`/`on` 为真） | `false` |
@@ -90,10 +90,8 @@ PostgreSQL 示例：
 
 ```yaml
 defaults:
-  type: postgres
   connect_timeout: 30
   statement_timeout_ms: 120000
-  socket_timeout: 120
 
 profiles:
   primary:
@@ -124,17 +122,17 @@ profiles:
 GaussDB 示例（JDBC 驱动不随仓库分发，需自行获取并指定路径，见 `resources/jars/README.md`）：
 
 ```yaml
-defaults:
-  type: gaussdb
-  driver: com.huawei.gauss200.jdbc.Driver
-  jar_path: /opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
-
 profiles:
   gauss_primary:
     type: gaussdb
+    driver: com.huawei.gauss200.jdbc.Driver
+    # Relative to backend/; ASSET_DB_JAR_PATH can provide an environment-specific absolute path.
+    jar_path: resources/jars/gaussdb200.jar
     jdbc_url: jdbc:gaussdb://127.0.0.1:25308/asset_portal?currentSchema=dwp
+    schema: dwp
     user: change_me
     password: change_me
+    socket_timeout: 120
 ```
 
 完整版正式部署支持 `postgres`、`mysql` 与 `gaussdb`；Community/local 隔离 profile 还可使用 `sqlite`（定位决策见 [工程历史归档 · SQLite Decision](../docs/archive/engineering-history/SQLITE_DECISION.md)）。各数据库的验证等级见 [数据库支持矩阵](../docs/database-support.md)。Cloudflare D1 不受支持。非法 `type`、缺失连接信息或未安装可选驱动会 fail fast，不会静默回退到其他数据库。

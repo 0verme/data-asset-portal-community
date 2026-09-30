@@ -14,22 +14,31 @@ GaussDB / DWS 的 JDBC 驱动（如 `gaussdb200.jar`）为第三方商业软件�
 
 ## 配置方式
 
-下载后将驱动放到本目录（或任意本地路径），并通过以下任一方式指定：
+将驱动放到 `backend/resources/jars/` 后，在 `backend/configs/database.yaml` 的 GaussDB profile 中推荐使用相对于 `backend/` 的路径：
 
-1. 环境变量（推荐）：
+```yaml
+profiles:
+  gauss_primary:
+    type: gaussdb
+    driver: com.huawei.gauss200.jdbc.Driver
+    jar_path: resources/jars/gaussdb200.jar
+    jdbc_url: jdbc:gaussdb://127.0.0.1:25308/asset_portal?currentSchema=dwp
+    schema: dwp
+```
 
-   ```bash
-   export ASSET_DB_JAR_PATH=/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
-   ```
+相对路径以 `backend/` 为基准（即 `backend/configs/database.yaml` 的上两级目录），不依赖启动时的当前工作目录；Linux 和 Windows 均无需修改仓库源码。
 
-2. `backend/configs/database.yaml` 中 gaussdb profile 的 `jar_path` 字段：
+也可以通过 `ASSET_DB_JAR_PATH` 指定部署环境自己的绝对路径。该变量优先于 profile 中的 `jar_path`。例如 Linux：
 
-   ```yaml
-   gauss_primary:
-     type: gaussdb
-     jar_path: /opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
-     jdbc_url: jdbc:gaussdb://127.0.0.1:25308/asset_portal?currentSchema=dwp
-   ```
+```bash
+export ASSET_DB_JAR_PATH=/opt/data-asset-portal/backend/resources/jars/gaussdb200.jar
+```
 
-未配置驱动时，GaussDB profile 连接会失败并给出明确错误提示（见
-`backend/app/db/facade.py`）。
+或 Windows PowerShell：
+
+```powershell
+$env:ASSET_DB_JAR_PATH = 'C:\data-asset-portal\backend\resources\jars\gaussdb200.jar'
+```
+
+未配置可用驱动时，GaussDB profile 连接会失败并给出明确错误提示（见
+`backend/app/db/providers.py`）。

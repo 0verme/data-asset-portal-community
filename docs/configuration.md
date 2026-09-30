@@ -125,7 +125,12 @@ Resolution is:
 2. YAML `defaults` are merged with the selected profile.
 3. Non-empty `ASSET_DB_*` environment overrides replace YAML/profile values.
 4. `ASSET_DB_JAR_PATH` overrides a GaussDB `jar_path`.
-5. PostgreSQL uses `dsn` when present; otherwise it uses host, port, database,
+5. A relative GaussDB `jar_path` is resolved against `backend/` (the parent of
+   `configs/`); with the default `backend/configs/database.yaml`,
+   `resources/jars/gaussdb200.jar` resolves to `backend/resources/jars/gaussdb200.jar`,
+   independent of process cwd.
+   Use `ASSET_DB_JAR_PATH` for an environment-specific absolute path.
+6. PostgreSQL uses `dsn` when present; otherwise it uses host, port, database,
    user, and password.
 
 The profile/provider abstraction remains the supported path for SQLite,
