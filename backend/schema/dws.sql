@@ -282,6 +282,8 @@ CREATE INDEX idx_p_upstream_system_ix_01 ON dwp.p_upstream_system (status_code, 
 ALTER TABLE dwp.p_field_mapping_table ADD CONSTRAINT fk_p_field_mapping_table_upstream
   FOREIGN KEY (upstream_system_id) REFERENCES dwp.p_upstream_system(system_pk) ON DELETE RESTRICT;
 
+-- Low-volume configuration tables stay replicated so their existing business
+-- keys and foreign-key contracts do not need DWS-specific composite-key changes.
 CREATE TABLE IF NOT EXISTS dwp.p_upstream_unload_time (
     time_pk BIGINT PRIMARY KEY,
     system_pk BIGINT NOT NULL,
@@ -294,7 +296,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_upstream_unload_time (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (system_pk, unload_time),
     FOREIGN KEY (system_pk) REFERENCES dwp.p_upstream_system(system_pk) ON DELETE CASCADE
-) DISTRIBUTE BY HASH (system_pk);
+) DISTRIBUTE BY REPLICATION;
 CREATE INDEX idx_p_upstream_unload_time_ix_01 ON dwp.p_upstream_unload_time (system_pk, display_order);
 
 CREATE TABLE IF NOT EXISTS dwp.p_upstream_change_log (
@@ -339,6 +341,8 @@ CREATE TABLE IF NOT EXISTS dwp.p_push_system (
 CREATE INDEX idx_p_push_system_master ON dwp.p_push_system (master_system_id);
 CREATE INDEX idx_p_push_system_ix_01 ON dwp.p_push_system (status_code, protocol_type, dept_name);
 
+-- Push jobs and fields are low-volume configuration metadata; replication
+-- preserves their single-column business primary keys and existing foreign keys.
 CREATE TABLE IF NOT EXISTS dwp.p_push_job (
     job_id BIGINT PRIMARY KEY,
     system_id BIGINT NOT NULL,
@@ -363,7 +367,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_push_job (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (system_id, job_code),
     FOREIGN KEY (system_id) REFERENCES dwp.p_push_system(system_id) ON DELETE CASCADE
-) DISTRIBUTE BY HASH (system_id);
+) DISTRIBUTE BY REPLICATION;
 CREATE INDEX idx_p_push_job_ix_01 ON dwp.p_push_job (system_id, enabled_flag, freq_type);
 CREATE INDEX idx_p_push_job_ix_02 ON dwp.p_push_job (system_id, is_deleted, job_code);
 
@@ -383,7 +387,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_push_job_field (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (job_id, field_name),
     FOREIGN KEY (job_id) REFERENCES dwp.p_push_job(job_id) ON DELETE CASCADE
-) DISTRIBUTE BY HASH (job_id);
+) DISTRIBUTE BY REPLICATION;
 CREATE INDEX idx_p_push_job_field_ix_01 ON dwp.p_push_job_field (job_id, field_order);
 
 CREATE TABLE IF NOT EXISTS dwp.p_push_change_log (
