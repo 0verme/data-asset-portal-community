@@ -92,7 +92,7 @@ ASSET_DB_CONFIG_PATH=/opt/data-asset-portal/backend/configs/database.yaml
 ASSET_TRUST_PROXY_HEADERS=true
 ```
 
-编辑 `backend/configs/database.yaml` 中的 `primary` profile，填写目标数据库的 type、host、port、database、schema、user 和 password。`change_me` 等模板值不是生产凭据；真实值应由受控文件或 secret store 提供。GaussDB/DWS 还需要通过 `ASSET_DB_JAR_PATH` 指向自行获取的 JDBC 驱动，仓库不分发商业驱动。
+编辑 `backend/configs/database.yaml` 中的 `primary` profile，填写目标数据库的 type、host、port、database、schema、user 和 password。`change_me` 等模板值不是生产凭据；真实值应由受控文件或 secret store 提供。GaussDB/DWS 还需要自行获取 JDBC 驱动（仓库不分发商业驱动）：profile 推荐使用相对于 `backend/` 的 `jar_path: resources/jars/gaussdb200.jar`；也可通过 `ASSET_DB_JAR_PATH` 提供环境特定绝对路径，该变量优先于 YAML 配置。
 
 `APP_SECRET_KEY` 是必填的 signed-session 密钥。请使用密码管理器、部署平台 secret store 或受控终端生成并保存强随机值；不要把真实值写进 Git、日志或命令历史。若使用 secret store 将它注入进程环境，请从 `backend/.env.local` 删除对应的占位行，让注入值不被本地模板覆盖；若使用受控 `.env.local` 保存，则将占位符替换为真实值并限制文件权限。
 
