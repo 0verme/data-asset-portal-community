@@ -1,3 +1,4 @@
+# Java 11+ deployment baseline; Java 8 uses requirements-gaussdb-java8.txt.
 -r requirements.txt
 JayDeBeApi==1.2.3
 JPype1==1.7.1
