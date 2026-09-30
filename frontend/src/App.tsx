@@ -47,7 +47,12 @@ import { useStatusOptions } from "./hooks/useStatusOptions.ts";
 import { useTheme } from "./hooks/useTheme.ts";
 import { useUpstreamModule } from "./hooks/useUpstreamModule.ts";
 import { loadCapabilities } from "./capabilities/capabilities.ts";
-import { loadNavigationMenus } from "./routing/navigationMenus.ts";
+import {
+  getNavigationAuthKey,
+  getNavigationMenusForAuth,
+  getVisibleNavigationMenus,
+  loadNavigationMenus,
+} from "./routing/navigationMenus.ts";
 import { splitNavigationMenus } from "./routing/navigationMenuGrouping.ts";
 import { useLocationSynchronization } from "./hooks/useLocationSynchronization.ts";
 import {
@@ -93,7 +98,10 @@ export default function App(): React.ReactElement {
   const [moreNavOpen, setMoreNavOpen] = useState(false);
   const [lineageBootstrap, setLineageBootstrap] = useState<LineageBootstrap | null>(null);
   const [systemActionIntent, setSystemActionIntent] = useState("");
-  const [navMenus, setNavMenus] = useState<MenuItem[]>([]);
+  const [navMenuSnapshot, setNavMenuSnapshot] = useState<{ authKey: string; menus: MenuItem[] }>({
+    authKey: "",
+    menus: [],
+  });
   const [navMenuStatus, setNavMenuStatus] = useState<NavigationMenuStatus>("loading");
   const navMenuRequestRef = useRef(0);
 
@@ -179,23 +187,27 @@ export default function App(): React.ReactElement {
   // `/auth/me` is an identity probe. A 401 means anonymous, not that the
   // public catalog must be disabled; wait only for the probe to settle.
   const businessAccessReady = !isDbAuthMode() || authReady;
+  const navigationAuthKey = getNavigationAuthKey(auth);
+  const navMenus = getNavigationMenusForAuth(navMenuSnapshot, navigationAuthKey);
+  const currentNavMenuStatus = navMenuSnapshot.authKey === navigationAuthKey ? navMenuStatus : "loading";
   const canManageUsers = can("system:user:write");
   const canManageMenus = can("system:menu:write");
   const canManageParams = can("system:param:write");
 
-  const loadMenus = React.useCallback(async (): Promise<void> => {
+  const loadMenus = React.useCallback(async (authKey: string): Promise<void> => {
     const requestId = navMenuRequestRef.current + 1;
     navMenuRequestRef.current = requestId;
+    setNavMenuSnapshot({ authKey, menus: [] });
     setNavMenuStatus("loading");
     try {
       const menus = await loadNavigationMenus(getMenus);
       if (requestId !== navMenuRequestRef.current) return;
-      setNavMenus(menus);
+      setNavMenuSnapshot({ authKey, menus });
       setNavMenuStatus("ready");
     } catch (error) {
       if (requestId !== navMenuRequestRef.current) return;
       console.error("Failed to load navigation menus.", error);
-      setNavMenus([]);
+      setNavMenuSnapshot({ authKey, menus: [] });
       setNavMenuStatus("error");
     }
   }, []);
@@ -213,17 +225,20 @@ export default function App(): React.ReactElement {
   useEffect(() => {
     if (!businessAccessReady) {
       navMenuRequestRef.current += 1;
-      setNavMenus([]);
+      setNavMenuSnapshot({ authKey: navigationAuthKey, menus: [] });
       setNavMenuStatus(authReady ? "ready" : "loading");
       return undefined;
     }
-    loadMenus();
-    window.addEventListener(MENUS_CHANGED_EVENT, loadMenus);
+    const refreshMenus = (): void => {
+      void loadMenus(navigationAuthKey);
+    };
+    refreshMenus();
+    window.addEventListener(MENUS_CHANGED_EVENT, refreshMenus);
     return () => {
       navMenuRequestRef.current += 1;
-      window.removeEventListener(MENUS_CHANGED_EVENT, loadMenus);
+      window.removeEventListener(MENUS_CHANGED_EVENT, refreshMenus);
     };
-  }, [authReady, businessAccessReady, loadMenus]);
+  }, [authReady, businessAccessReady, loadMenus, navigationAuthKey]);
 
   useEffect(() => {
     refreshCapabilities();
@@ -289,16 +304,10 @@ export default function App(): React.ReactElement {
     return () => desktopViewport.removeEventListener("change", closeMobilePanels);
   }, []);
 
-  const visibleNavMenus = useMemo(() => {
-    return navMenus
-      .filter((item) => item.status !== "disabled")
-      .filter((item) => !item.adminOnly || canManageSystem || (item.code === "system" && canViewOperationLog))
-      .map((item) => item.code === "system" && canViewOperationLog && !canManageSystem
-        ? { ...item, name: "操作日志", icon: "file", path: "/system-management/operation-logs" }
-        : item)
-      .slice()
-      .sort((a, b) => (a.order - b.order) || String(a.id).localeCompare(String(b.id)));
-  }, [canManageSystem, canViewOperationLog, navMenus]);
+  const visibleNavMenus = useMemo(
+    () => getVisibleNavigationMenus(navMenus, { canManageSystem, canViewOperationLog }),
+    [canManageSystem, canViewOperationLog, navMenus],
+  );
 
   const { primary: primaryNavMenus, more: moreNavMenus } = useMemo(
     () => splitNavigationMenus(visibleNavMenus),
@@ -708,10 +717,10 @@ export default function App(): React.ReactElement {
           </div>
 
           <div className="mainnav">
-            {navMenuStatus === "loading" ? (
+            {currentNavMenuStatus === "loading" ? (
               <button type="button" disabled>菜单加载中…</button>
-            ) : navMenuStatus === "error" ? (
-              <button type="button" onClick={loadMenus}>菜单加载失败，点击重试</button>
+            ) : currentNavMenuStatus === "error" ? (
+              <button type="button" onClick={() => void loadMenus(navigationAuthKey)}>菜单加载失败，点击重试</button>
             ) : null}
             {primaryNavMenus.map((item) => (
               <button
@@ -838,10 +847,10 @@ export default function App(): React.ReactElement {
               >
                 <nav className="mobile-module-nav" aria-label="模块导航">
                   <div className="side-title">模块导航</div>
-                  {navMenuStatus === "loading" ? (
+                  {currentNavMenuStatus === "loading" ? (
                     <button className="mobile-module-link" type="button" disabled>菜单加载中…</button>
-                  ) : navMenuStatus === "error" ? (
-                    <button className="mobile-module-link" type="button" onClick={loadMenus}>
+                  ) : currentNavMenuStatus === "error" ? (
+                    <button className="mobile-module-link" type="button" onClick={() => void loadMenus(navigationAuthKey)}>
                       菜单加载失败，点击重试
                     </button>
                   ) : null}

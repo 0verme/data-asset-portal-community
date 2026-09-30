@@ -14,7 +14,7 @@ test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog acce
   ]);
 
   assert.match(app, /businessAccessReady = !isDbAuthMode\(\) \|\| authReady/);
-  assert.match(app, /loadMenus\(\)/);
+  assert.match(app, /loadMenus\(navigationAuthKey\)/);
   assert.match(search, /publicAccessReady = true/);
   assert.doesNotMatch(search, /请先登录后搜索/);
   assert.doesNotMatch(moduleContent, /AuthenticatedBusinessPrompt/);
