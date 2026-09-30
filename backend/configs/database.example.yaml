@@ -9,7 +9,11 @@ defaults:
   statement_timeout_ms: 120000
 
 profiles:
+  sqlite_local:
+    type: sqlite
+    database: instance/community.db
   # Host/user/password/JDBC URL may be supplied by ASSET_DB_* environment overrides.
+  
   primary:
     type: postgres
     host: 127.0.0.1
