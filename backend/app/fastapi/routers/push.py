@@ -40,9 +40,14 @@ from ...services.push_service import (
     PushSystemNotFoundError,
     PushValidationError,
 )
-from ..dependencies import get_authorization_service, get_request_context, require_permission
+from ..dependencies import (
+    get_authorization_service,
+    get_request_context,
+    require_permission,
+    require_public_catalog_access,
+)
 from ..errors import _service_error_response
-from ..public_catalog import is_authenticated_request, redact_public_push_system
+from ..public_catalog import profile_for_request, redact_public_push_system
 
 
 def _push_error_status(error: Any) -> int:
@@ -66,6 +71,7 @@ def _register_push_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/push",
         tags=["push"],
+        dependencies=[Depends(require_public_catalog_access)],
     )
 
     def get_service() -> Any:
@@ -97,8 +103,8 @@ def _register_push_routes(app: FastAPI, service: Any) -> None:
             if isinstance(error, (PushDataSourceError, PushSystemNotFoundError)):
                 return _push_error_response(error)
             raise
-        if not is_authenticated_request(context, authorization):
-            items = [redact_public_push_system(item) for item in items]
+        profile = profile_for_request(context, authorization)
+        items = [redact_public_push_system(item, profile=profile) for item in items]
         return JSONResponse(content={"items": items})
 
     @router.get("/systems/{system_id}/admin-detail", response_model=None)
@@ -122,8 +128,8 @@ def _register_push_routes(app: FastAPI, service: Any) -> None:
     ):
         try:
             data = current_service.get_push_system_detail(system_id)
-            if not is_authenticated_request(context, authorization):
-                data = redact_public_push_system(data)
+            profile = profile_for_request(context, authorization)
+            data = redact_public_push_system(data, profile=profile)
         except Exception as error:
             return _push_error_response(error)
         return JSONResponse(content={"data": data})

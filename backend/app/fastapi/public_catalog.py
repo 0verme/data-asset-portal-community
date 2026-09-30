@@ -8,124 +8,307 @@ from typing import Any
 
 from ..application import RequestContext
 from ..authorization.core import AuthorizationService
-
+from ..settings import PublicCatalogProfile, get_public_catalog_profile
 
 _PUBLIC_MENU_EXCLUDED_CODES = {"system", "system-management"}
-_PUBLIC_AUDIT_KEYS = {"createdby", "updatedby"}
-_PUBLIC_SENSITIVE_KEYS = {
-    "account",
+
+# These fields are never included in ordinary catalog projections, regardless
+# of profile or caller identity. Privileged connection details remain available
+# only through the protected admin-detail routes.
+_PUBLIC_ALWAYS_HIDDEN_KEYS = frozenset(
+    {
+        "account",
+        "accountname",
+        "accountusername",
+        "databaseaccount",
+        "dbaccount",
+        "serviceaccount",
+        "accesskey",
+        "authentication",
+        "authtype",
+        "authmode",
+        "apikey",
+        "auth",
+        "authorization",
+        "connection",
+        "connectionconfig",
+        "connectiondetails",
+        "connectionoptions",
+        "connectionstring",
+        "connectionuser",
+        "connectionusername",
+        "connectionaccount",
+        "connectionaccountname",
+        "connectionurl",
+        "connectionuri",
+        "connectiondsn",
+        "cookie",
+        "credential",
+        "createdby",
+        "createdbyid",
+        "createdbyname",
+        "createby",
+        "createbyname",
+        "createduser",
+        "createdusername",
+        "creator",
+        "creatorname",
+        "delimiter",
+        "encoding",
+        "rowcnt",
+        "fieldcount",
+        "database",
+        "databaseconnection",
+        "databaseconfig",
+        "databasehost",
+        "databasename",
+        "databaseusername",
+        "databasepassword",
+        "databaseport",
+        "databaseurl",
+        "databaseuser",
+        "dbconfig",
+        "dbhost",
+        "dbname",
+        "dbusername",
+        "dbpassword",
+        "dbport",
+        "dbuser",
+        "diagnostics",
+        "dsn",
+        "endpoint",
+        "filepath",
+        "confpath",
+        "configpath",
+        "host",
+        "hostname",
+        "ip",
+        "ipaddress",
+        "server",
+        "serveraddress",
+        "serverip",
+        "serverhost",
+        "hostaddress",
+        "serverport",
+        "portnumber",
+        "jdbcurl",
+        "lastmodifiedby",
+        "lastupdatedby",
+        "lastupdatedbyname",
+        "logpath",
+        "modifiedby",
+        "modifiedbyname",
+        "operator",
+        "operatorid",
+        "operatorname",
+        "password",
+        "port",
+        "portno",
+        "privatekey",
+        "registeredby",
+        "reviewer",
+        "reviewerid",
+        "reviewername",
+        "auditedby",
+        "audituser",
+        "approvedby",
+        "session",
+        "sourcerecordid",
+        "sourcepath",
+        "sourcefilepath",
+        "targetpath",
+        "updatedby",
+        "updateby",
+        "updatebyname",
+        "updatedbyid",
+        "updatedbyname",
+        "updateduser",
+        "updatedusername",
+        "updater",
+        "updatername",
+        "targetfilepath",
+        "token",
+        "uri",
+        "url",
+        "user",
+        "userid",
+        "useridentifier",
+        "username",
+        "workdir",
+        "workingdirectory",
+    }
+)
+
+# Exact normalized keys only: ownerDepartment, ownerTeam and ownershipType are
+# ordinary business metadata and must not be removed by matching "owner".
+_PUBLIC_PERSON_IDENTITY_KEYS = frozenset(
+    {
+        "owner",
+        "ownername",
+        "ownerid",
+        "owneruserid",
+        "ownerusername",
+        "owneremail",
+        "ownerphone",
+        "maintainer",
+        "maintainername",
+        "maintainerid",
+        "maintaineruserid",
+        "maintainerusername",
+        "maintaineremail",
+        "maintainerphone",
+        "contact",
+        "contactname",
+        "contactperson",
+        "contactid",
+        "contactemail",
+        "contactphone",
+        "contactmobile",
+        "downstreamcontact",
+        "downstreamcontactname",
+        "downstreamcontactid",
+        "downstreamcontactemail",
+        "downstreamcontactphone",
+        "datadevelopercontact",
+        "datadevelopercontactname",
+        "datadevelopercontactid",
+        "datadevelopercontactemail",
+        "datadevelopercontactphone",
+        "registrar",
+        "registrarname",
+        "responsible",
+        "responsiblename",
+        "responsibleperson",
+        "responsiblepersonname",
+        "dutyowner",
+        "dutyownername",
+        "employee",
+        "employeename",
+        "staff",
+        "staffname",
+        "person",
+        "personname",
+        "registrarid",
+        "email",
+        "phone",
+        "mobile",
+        "telephone",
+    }
+)
+
+_PUBLIC_API_SAMPLE_KEYS = frozenset(
+    {
+        "example",
+        "examples",
+        "examplevalue",
+        "default",
+        "defaultvalue",
+        "sample",
+        "sampledata",
+        "samplevalue",
+    }
+)
+
+_CREDENTIAL_KEY_PARTS = (
+    "password",
+    "secret",
+    "token",
+    "credential",
+    "authorization",
+    "cookie",
+    "privatekey",
     "accesskey",
     "apikey",
-    "auth",
-    "authorization",
-    "connectionstring",
-    "cookie",
-    "credential",
-    "dsn",
-    "host",
-    "jdbcurl",
-    "password",
-    "port",
-    "privatekey",
-    "secret",
-    "session",
-    "token",
-    "uri",
-    "url",
-    "user",
-    "username",
-}
-_PUBLIC_PUSH_SYSTEM_HIDDEN_KEYS = {
-    "host",
-    "port",
-    "account",
-    "auth",
-    "downstreamcontact",
-    "datadevelopercontact",
-    "contact",
-    "credential",
-    "password",
-    "secret",
-    "token",
-    "username",
-}
-_PUBLIC_PUSH_JOB_HIDDEN_KEYS = {
-    "sourcepath",
-    "targetpath",
-    "delimiter",
-    "encoding",
-    "rowcnt",
-    "fields",
-    "password",
-    "secret",
-    "token",
-    "credential",
-}
+)
 _SENSITIVE_PARAMETER_NAME = re.compile(
-    r"(?:authorization|cookie|password|secret|token|credential|signature|"
-    r"api[-_]?key|access[-_]?key|private[-_]?key)",
+    r"(?:authorization|authentication|auth[-_]?type|cookie|password|secret|token|"
+    r"credential|signature|api[-_]?key|access[-_]?key|private[-_]?key|"
+    r"user[-_]?name|login[-_]?name|account[-_]?name|service[-_]?account|"
+    r"db[-_]?user|database[-_]?user)",
     re.IGNORECASE,
 )
-_SENSITIVE_LINEAGE_KEYS = {
-    "account",
-    "accesskey",
-    "apikey",
-    "auth",
-    "authorization",
-    "connectionstring",
-    "cookie",
-    "credential",
-    "dsn",
-    "host",
-    "jdbcurl",
-    "password",
-    "port",
-    "privatekey",
-    "secret",
-    "session",
-    "sourcerecordid",
-    "token",
-    "uri",
-    "url",
-    "user",
-    "username",
-}
-_SENSITIVE_LINEAGE_KEY_PARTS = (
-    "password",
-    "secret",
-    "token",
-    "credential",
-    "authorization",
-    "cookie",
-    "connectionstring",
-    "jdbcurl",
-    "privatekey",
-    "accesskey",
-    "apikey",
-)
 _CONNECTION_VALUE = re.compile(
-    r"(?:jdbc:[^\s]+|(?:https?|ftp)://[^\s]+|(?:postgres(?:ql)?|mysql)://[^\s]+)",
+    r"(?:jdbc:[^\s]+|(?:https?|ftp)://[^\s]+|"
+    r"(?:postgres(?:ql)?|mysql)://[^\s]+)",
     re.IGNORECASE,
 )
 _SENSITIVE_TEXT_VALUE = re.compile(
-    r"(?:password|token|secret|authorization|api[-_]?key|access[-_]?key)"
+    r"(?:authorization|authentication|cookie|password|passphrase|secret|token|"
+    r"credential|signature|api[-_]?key|access[-_]?key|private[-_]?key|"
+    r"account(?:name)?|user(?:name)?|database(?:user|name)?|db(?:user|name)?|"
+    r"schema|host|hostname|port|url|uri|dsn|"
+    r"path|directory|(?:file|source|target|config|log|work)[-_]?"
+    r"(?:path|dir|directory))"
     r"\s*[:=]\s*[^\s,;]+",
     re.IGNORECASE,
 )
 
 
+def _normalized_key(key: Any) -> str:
+    return str(key).replace("_", "").replace("-", "").lower()
+
+
+def _is_always_hidden_key(key: Any) -> bool:
+    normalized = _normalized_key(key)
+    if normalized in _PUBLIC_ALWAYS_HIDDEN_KEYS:
+        return True
+    return any(part in normalized for part in _CREDENTIAL_KEY_PARTS) or "diagnostic" in normalized
+
+
+def _is_person_identity_key(key: Any) -> bool:
+    return _normalized_key(key) in _PUBLIC_PERSON_IDENTITY_KEYS
+
+
 def _redact_text(value: str) -> str:
-    return _SENSITIVE_TEXT_VALUE.sub("[已隐藏]", _CONNECTION_VALUE.sub("[已隐藏]", value))
+    return _SENSITIVE_TEXT_VALUE.sub(
+        "[已隐藏]", _CONNECTION_VALUE.sub("[已隐藏]", value)
+    )
 
 
-def _redact_public_value(value: Any) -> Any:
+def project_public_catalog_value(
+    value: Any,
+    *,
+    profile: PublicCatalogProfile | None = None,
+    hide_person_identity: bool | None = None,
+) -> Any:
+    """Project nested catalog data using the centralized field policy."""
+    selected_profile = profile or get_public_catalog_profile()
+    hide_people = (
+        selected_profile == "strict"
+        if hide_person_identity is None
+        else hide_person_identity
+    )
     if isinstance(value, dict):
-        return {key: _redact_public_value(child) for key, child in value.items()}
+        return {
+            key: project_public_catalog_value(
+                child,
+                profile=selected_profile,
+                hide_person_identity=hide_people,
+            )
+            for key, child in value.items()
+            if not _is_always_hidden_key(key)
+            and not (hide_people and _is_person_identity_key(key))
+        }
     if isinstance(value, list):
-        return [_redact_public_value(child) for child in value]
+        return [
+            project_public_catalog_value(
+                child,
+                profile=selected_profile,
+                hide_person_identity=hide_people,
+            )
+            for child in value
+        ]
     if isinstance(value, str):
         return _redact_text(value)
     return deepcopy(value)
+
+
+def profile_for_request(
+    context: RequestContext,
+    authorization: AuthorizationService,
+) -> PublicCatalogProfile:
+    """Use anonymous policy for guests while keeping authenticated metadata behavior."""
+    return "internal" if is_authenticated_request(context, authorization) else get_public_catalog_profile()
 
 
 def is_authenticated_request(
@@ -134,21 +317,20 @@ def is_authenticated_request(
 ) -> bool:
     """Return whether the current identity is still valid.
 
-    Public routes may receive an expired or otherwise invalid session cookie.
-    Such a request must use the anonymous/redacted projection rather than
-    trusting the cookie's role string.
+    An expired or otherwise invalid session cookie must use the anonymous
+    projection rather than trusting the cookie's role string.
     """
     try:
         decision = authorization.authenticate(context.identity)
         return bool(decision.authenticated and decision.reason == "authenticated")
     except Exception:
-        # Fail closed for the projection decision. The business service still
-        # owns its normal data-source error contract.
         return False
 
 
 def public_navigation_menus(items: Any) -> list[dict[str, Any]]:
-    """Keep only enabled, non-management menu entries for anonymous users."""
+    """Keep enabled, non-management menus and apply the active public profile."""
+    if get_public_catalog_profile() == "disabled":
+        return []
     result: list[dict[str, Any]] = []
     for item in items if isinstance(items, list) else []:
         if not isinstance(item, dict):
@@ -163,120 +345,86 @@ def public_navigation_menus(items: Any) -> list[dict[str, Any]]:
             or path.startswith("/system-management")
         ):
             continue
-        result.append(_redact_public_value({
-            key: deepcopy(value)
-            for key, value in item.items()
-            if str(key).replace("_", "").replace("-", "").lower()
-            not in _PUBLIC_AUDIT_KEYS | _PUBLIC_SENSITIVE_KEYS
-        }))
+        result.append(project_public_catalog_value(item))
     return result
 
 
-def redact_public_manual_code_table(item: Any) -> Any:
-    """Remove audit actor and credential fields from a public code-table record."""
-    if not isinstance(item, dict):
-        return item
-    return _redact_public_value({
-        key: deepcopy(value)
-        for key, value in item.items()
-        if str(key).replace("_", "").replace("-", "").lower()
-        not in _PUBLIC_AUDIT_KEYS | _PUBLIC_SENSITIVE_KEYS
-    })
+def redact_public_manual_code_table(
+    item: Any, *, profile: PublicCatalogProfile | None = None
+) -> Any:
+    """Project a manual code-table record through the shared field policy."""
+    return project_public_catalog_value(item, profile=profile)
 
 
-def redact_public_report(item: Any) -> Any:
-    """Remove audit actor and credential fields from a public report record."""
-    if not isinstance(item, dict):
-        return item
-    return _redact_public_value({
-        key: deepcopy(value)
-        for key, value in item.items()
-        if str(key).replace("_", "").replace("-", "").lower()
-        not in _PUBLIC_AUDIT_KEYS | _PUBLIC_SENSITIVE_KEYS
-    })
+def redact_public_report(
+    item: Any, *, profile: PublicCatalogProfile | None = None
+) -> Any:
+    """Project a report record through the shared field policy."""
+    return project_public_catalog_value(item, profile=profile)
 
 
-def redact_public_api_asset(item: Any) -> Any:
-    """Publish API documentation without credentials or audit actors."""
-    if not isinstance(item, dict):
-        return item
-    result = _redact_public_value({
-        key: deepcopy(value)
-        for key, value in item.items()
-        if str(key).replace("_", "").replace("-", "").lower()
-        not in _PUBLIC_AUDIT_KEYS | _PUBLIC_SENSITIVE_KEYS
-    })
+def redact_public_api_asset(
+    item: Any, *, profile: PublicCatalogProfile | None = None
+) -> Any:
+    """Publish API schema without credentials, audit samples, or connection data."""
+    result = project_public_catalog_value(item, profile=profile)
+    if not isinstance(result, dict):
+        return result
 
-    params = []
-    for parameter in result.get("params") if isinstance(result.get("params"), list) else []:
-        if not isinstance(parameter, dict):
+    def remove_examples(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: remove_examples(child)
+                for key, child in value.items()
+                if _normalized_key(key) not in _PUBLIC_API_SAMPLE_KEYS
+            }
+        if isinstance(value, list):
+            return [remove_examples(child) for child in value]
+        return value
+
+    result = remove_examples(result)
+    for collection_key in ("params", "responseFields"):
+        rows = result.get(collection_key)
+        if not isinstance(rows, list):
             continue
-        name = str(parameter.get("name") or "")
-        if _SENSITIVE_PARAMETER_NAME.search(name):
-            continue
-        # Parameter examples are arbitrary user data; they are not required
-        # to browse the API catalog and may contain secrets.
-        params.append({key: deepcopy(value) for key, value in parameter.items() if key != "example"})
-    result["params"] = params
-
-    response_fields = []
-    for field in result.get("responseFields") if isinstance(result.get("responseFields"), list) else []:
-        if not isinstance(field, dict):
-            continue
-        if _SENSITIVE_PARAMETER_NAME.search(str(field.get("name") or "")):
-            continue
-        # Response examples can contain real payloads. Keep the field contract
-        # while omitting the sample value from the public projection.
-        response_fields.append({key: deepcopy(value) for key, value in field.items() if key != "example"})
-    result["responseFields"] = response_fields
+        result[collection_key] = [
+            row
+            for row in rows
+            if isinstance(row, dict)
+            and not _SENSITIVE_PARAMETER_NAME.search(str(row.get("name") or ""))
+        ]
     return result
 
 
-def redact_public_push_system(item: Any) -> Any:
-    """Remove connection and contact details from public push metadata."""
-    if not isinstance(item, dict):
-        return item
-    result = _redact_public_value({
-        key: deepcopy(value)
-        for key, value in item.items()
-        if str(key).replace("_", "").replace("-", "").lower()
-        not in _PUBLIC_PUSH_SYSTEM_HIDDEN_KEYS | _PUBLIC_SENSITIVE_KEYS
-    })
-    jobs = []
-    for job in result.get("jobs") if isinstance(result.get("jobs"), list) else []:
-        if not isinstance(job, dict):
-            continue
-        jobs.append(_redact_public_value({
-            key: deepcopy(value)
-            for key, value in job.items()
-            if str(key).replace("_", "").replace("-", "").lower()
-            not in _PUBLIC_PUSH_JOB_HIDDEN_KEYS | _PUBLIC_SENSITIVE_KEYS
-        }))
-    result["jobs"] = jobs
-    return result
+def redact_public_upstream_system(
+    item: Any, *, profile: PublicCatalogProfile | None = None
+) -> Any:
+    """Hide source connection names in addition to shared sensitive fields."""
+    projected = project_public_catalog_value(item, profile=profile)
+
+    def remove_connection_schema(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: remove_connection_schema(child)
+                for key, child in value.items()
+                if _normalized_key(key) not in {"db", "database", "schema", "schemaname"}
+            }
+        if isinstance(value, list):
+            return [remove_connection_schema(child) for child in value]
+        return value
+
+    return remove_connection_schema(projected)
 
 
-def _safe_lineage_key(key: Any) -> bool:
-    normalized = str(key).replace("_", "").replace("-", "").lower()
-    if normalized in _SENSITIVE_LINEAGE_KEYS:
-        return False
-    return not any(part in normalized for part in _SENSITIVE_LINEAGE_KEY_PARTS)
+def redact_public_push_system(
+    item: Any, *, profile: PublicCatalogProfile | None = None
+) -> Any:
+    """Remove connection configuration while retaining safe business metadata."""
+    return project_public_catalog_value(item, profile=profile)
 
 
-def _redact_lineage_value(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            key: _redact_lineage_value(child)
-            for key, child in value.items()
-            if _safe_lineage_key(key) and str(key).replace("_", "").replace("-", "").lower() != "diagnostics"
-        }
-    if isinstance(value, list):
-        return [_redact_lineage_value(child) for child in value]
-    if isinstance(value, str):
-        return _redact_text(value)
-    return deepcopy(value)
-
-
-def redact_public_lineage(value: Any) -> Any:
-    """Redact connection-like values from lineage nodes and evidence."""
-    return _redact_lineage_value(value)
+def redact_public_lineage(
+    value: Any, *, profile: PublicCatalogProfile | None = None
+) -> Any:
+    """Redact internal IDs, connection values and diagnostic evidence in lineage."""
+    return project_public_catalog_value(value, profile=profile)

@@ -12,7 +12,6 @@ export function getSystemBadgeText(value?: unknown): string {
 
 export interface PushSystemImportanceTarget {
   importanceLevel?: string | undefined;
-  [key: string]: unknown;
 }
 
 export function comparePushSystemImportance(

@@ -35,6 +35,7 @@ from ..dependencies import (
 )
 from ..errors import _service_error_response
 from ..public_catalog import is_authenticated_request, public_navigation_menus
+from ...settings import get_public_catalog_profile
 
 
 def _system_error_status(error: SystemManagementError) -> int:
@@ -270,9 +271,12 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
         context: RequestContext = Depends(get_request_context),
         authorization: Any = Depends(get_authorization_service),
     ):
+        authenticated = is_authenticated_request(context, authorization)
+        if not authenticated and get_public_catalog_profile() == "disabled":
+            return JSONResponse(content=validate_contract({"items": []}, SystemResponse))
         try:
             items = current_service.get_menus()
-            if not is_authenticated_request(context, authorization):
+            if not authenticated:
                 items = public_navigation_menus(items)
         except SystemManagementError as error:
             return _system_error_response(error)

@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from ..application.identity import Identity
+from ..settings import get_public_catalog_profile
 from .permissions import (
     ADMIN_ROLE,
     BUILTIN_ROLE_PERMISSION_CODES,
@@ -146,6 +147,8 @@ class AuthorizationService:
         """Return the effective public-plus-role permission snapshot."""
         authentication = authentication or self.authenticate(identity)
         if identity is None:
+            if get_public_catalog_profile() == "disabled":
+                return ()
             return tuple(sorted(PUBLIC_PERMISSION_CODES))
         if (
             not authentication.authenticated
@@ -169,7 +172,11 @@ class AuthorizationService:
         """Check one registered permission against current repository state."""
         authentication = authentication or self.authenticate(identity)
         if not authentication.authenticated:
-            public_allowed = identity is None and permission in PUBLIC_PERMISSION_CODES
+            public_allowed = (
+                identity is None
+                and get_public_catalog_profile() != "disabled"
+                and permission in PUBLIC_PERMISSION_CODES
+            )
             return AuthorizationDecision(
                 authenticated=False,
                 allowed=public_allowed,

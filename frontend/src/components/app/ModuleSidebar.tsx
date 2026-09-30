@@ -27,6 +27,9 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
     asset,
     can,
     canEdit,
+    auth,
+    catalogAccessDisabled,
+    catalogExportEnabled,
     canManageMenus,
     canManageParams,
     canManageRoles,
@@ -66,6 +69,9 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
       <ManualCodeTableSidebar
         module={manualCodeTable}
         canEdit={canPermission("code_table:write")}
+        canExport={auth.user
+          ? canPermission("code_table:read")
+          : catalogExportEnabled && !catalogAccessDisabled}
       />
     );
   }
@@ -151,7 +157,15 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
       />
     );
   }
-  if (module === "mapping") return <MappingSidebar />;
+  if (module === "mapping") {
+    return (
+      <MappingSidebar
+        canExport={auth.user
+          ? canPermission("field_mapping:read")
+          : catalogExportEnabled && !catalogAccessDisabled}
+      />
+    );
+  }
   if (module === "lineage") {
     const details = lineageBootstrap;
     const note = details?.mode === "persistent"

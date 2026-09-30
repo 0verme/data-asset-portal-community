@@ -27,15 +27,25 @@ from ...services.manual_code_table_service import (
     ManualCodeTableNotFoundError,
     ManualCodeTableValidationError,
 )
-from ..dependencies import get_authorization_service, get_request_context, require_permission
+from ..dependencies import (
+    get_authorization_service,
+    get_request_context,
+    require_catalog_export,
+    require_permission,
+    require_public_catalog_access,
+)
 from ..errors import _service_error_response
-from ..public_catalog import is_authenticated_request, redact_public_manual_code_table
+from ..public_catalog import (
+    profile_for_request,
+    redact_public_manual_code_table,
+)
 
 
 def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/manual-code-tables",
         tags=["manual-code-table-migration"],
+        dependencies=[Depends(require_public_catalog_access)],
     )
     style_labels = {
         "enum": "标准枚举",
@@ -83,8 +93,8 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
             ManualCodeTableDataSourceError,
         ) as error:
             return error_response(error)
-        if not is_authenticated_request(context, authorization):
-            items = [redact_public_manual_code_table(item) for item in items]
+        profile = profile_for_request(context, authorization)
+        items = [redact_public_manual_code_table(item, profile=profile) for item in items]
         return JSONResponse(
             content=validate_contract({"items": items}, ManualCodeTableListResponse)
         )
@@ -94,7 +104,10 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
         keyword: str | None = Query(default=None),
         style: str | None = Query(default=None),
         status: str | None = Query(default=None),
+        _context: RequestContext = Depends(require_catalog_export("code_table:read")),
         current_service: Any = Depends(get_service),
+        context: Any = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             items = current_service.get_tables(
@@ -105,23 +118,29 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
             ManualCodeTableDataSourceError,
         ) as error:
             return error_response(error)
+        profile = profile_for_request(context, authorization)
+        items = [redact_public_manual_code_table(item, profile=profile) for item in items]
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(
             ["表编码", "表名称", "表样式", "负责人", "状态", "说明", "更新时间"]
         )
         for item in items:
-            writer.writerow(
-                [
-                    item["tableCode"],
-                    item["tableName"],
-                    style_labels.get(item["style"], item["style"]),
-                    item["owner"],
-                    status_labels.get(item["status"], item["status"]),
-                    item["remark"],
-                    item["updatedAt"],
-                ]
-            )
+            cells = [
+                item["tableCode"],
+                item["tableName"],
+                style_labels.get(item["style"], item["style"]),
+                item.get("owner", ""),
+                status_labels.get(item["status"], item["status"]),
+                item["remark"],
+                item["updatedAt"],
+            ]
+            writer.writerow([
+                "'" + str(value)
+                if str(value or "").lstrip(" \t\r\n").startswith(("=", "+", "-", "@"))
+                else value
+                for value in cells
+            ])
         return Response(
             "\ufeff" + output.getvalue(),
             media_type="text/csv",
@@ -141,8 +160,8 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
             data = current_service.get_table(table_id)
         except (ManualCodeTableNotFoundError, ManualCodeTableDataSourceError) as error:
             return error_response(error)
-        if not is_authenticated_request(context, authorization):
-            data = redact_public_manual_code_table(data)
+        profile = profile_for_request(context, authorization)
+        data = redact_public_manual_code_table(data, profile=profile)
         return JSONResponse(
             content=validate_contract({"data": data}, DataEnvelope[ManualCodeTableItem])
         )

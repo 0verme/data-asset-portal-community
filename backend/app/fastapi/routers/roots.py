@@ -26,7 +26,13 @@ from ...services.root_service import (
     RootNotFoundError,
     RootValidationError,
 )
-from ..dependencies import require_permission
+from ..dependencies import (
+    get_authorization_service,
+    get_request_context,
+    require_permission,
+    require_public_catalog_access,
+)
+from ..public_catalog import profile_for_request, project_public_catalog_value
 from ..errors import _service_error_response
 
 
@@ -34,10 +40,16 @@ def _register_root_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/roots",
         tags=["root-migration"],
+        dependencies=[Depends(require_public_catalog_access)],
     )
 
     def get_service() -> Any:
         return service
+
+    def project_for_request(value: Any, context: RequestContext, authorization: Any) -> Any:
+        return project_public_catalog_value(
+            value, profile=profile_for_request(context, authorization)
+        )
 
     def root_payload(payload: RootRequest | None) -> dict[str, Any] | None:
         if payload is None:
@@ -49,33 +61,47 @@ def _register_root_routes(app: FastAPI, service: Any) -> None:
         keyword: str | None = Query(default=None),
         cat: str | None = Query(default=None),
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             items = current_service.get_roots(keyword=keyword, cat=cat)
         except RootDataSourceError as error:
             return _service_error_response(error, 500)
+        items = project_for_request(items, context, authorization)
         return JSONResponse(
             content=validate_contract({"items": items}, RootListResponse)
         )
 
     @router.get("/categories", response_model=None)
-    def get_root_categories(current_service: Any = Depends(get_service)):
+    def get_root_categories(
+        current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
+    ):
         try:
             items = current_service.get_root_categories()
         except RootDataSourceError as error:
             return _service_error_response(error, 500)
+        items = project_for_request(items, context, authorization)
         return JSONResponse(
             content=validate_contract({"items": items}, RootCategoryListResponse)
         )
 
     @router.get("/{abbr}", response_model=None)
-    def get_root_detail(abbr: str, current_service: Any = Depends(get_service)):
+    def get_root_detail(
+        abbr: str,
+        current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
+    ):
         try:
             data = current_service.get_root_detail(abbr)
         except RootNotFoundError as error:
             return _service_error_response(error, 404)
         except RootDataSourceError as error:
             return _service_error_response(error, 500)
+        data = project_for_request(data, context, authorization)
         return JSONResponse(
             content=validate_contract({"data": data}, DataEnvelope[RootItem])
         )

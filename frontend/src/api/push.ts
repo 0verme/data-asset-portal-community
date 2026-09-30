@@ -15,7 +15,7 @@
 
 import { requestRemote } from './http.ts';
 import { LONG_REQUEST_TIMEOUT } from '../config/request.ts';
-import { PUSH_SYSTEMS, type PushSystemItem, type PushJobItem } from '../data/pushSystems.ts';
+import { PUSH_SYSTEMS, type PushSystemItem, type PushJobItem, type PushJobField } from '../data/pushSystems.ts';
 
 function clone<T>(value: T): T {
   try {
@@ -64,16 +64,13 @@ function normalizeDetail<T>(payload: unknown): T {
 export interface PublicPushJob {
   id: string;
   cn: string;
-  sourcePath: string;
   sourceFileName: string;
-  targetPath: string;
   targetFileName: string;
   freq: string;
   freqType: string;
   enabled: boolean;
   desc: string;
-  delimiter?: string | undefined;
-  encoding?: string | undefined;
+  fields: PushJobField[];
 }
 
 export interface PublicPushSystem {
@@ -83,13 +80,13 @@ export interface PublicPushSystem {
   abbr: string;
   desc: string;
   protocol: string;
-  auth?: string | undefined;
+  downstreamContact?: string | undefined;
+  dataDeveloperContact?: string | undefined;
   dept: string;
   status: string;
   importanceLevel: string;
   latestOutputTime: string;
   jobs: PublicPushJob[];
-  [key: string]: unknown;
 }
 
 function toPublicSystem(system: PushSystemItem & { systemId?: number | undefined }): PublicPushSystem {
@@ -100,6 +97,8 @@ function toPublicSystem(system: PushSystemItem & { systemId?: number | undefined
     abbr: system.abbr,
     desc: system.desc || '',
     protocol: system.protocol,
+    downstreamContact: system.downstreamContact || '',
+    dataDeveloperContact: system.dataDeveloperContact || '',
     dept: system.dept || '',
     status: system.status,
     importanceLevel: system.importanceLevel || 'normal',
@@ -107,14 +106,13 @@ function toPublicSystem(system: PushSystemItem & { systemId?: number | undefined
     jobs: (system.jobs || []).map((job) => ({
       id: job.id,
       cn: job.cn,
-      sourcePath: job.sourcePath || '',
       sourceFileName: job.sourceFileName || job.targetFileName || '',
-      targetPath: job.targetPath || '',
       targetFileName: job.targetFileName || job.sourceFileName || '',
       freq: job.freq || '',
       freqType: job.freqType || '',
       enabled: Boolean(job.enabled),
       desc: job.desc || '',
+      fields: clone(job.fields || []),
     })),
   };
 }

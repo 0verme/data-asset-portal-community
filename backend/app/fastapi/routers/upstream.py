@@ -25,7 +25,13 @@ from ...services.upstream_service import (
     UpstreamSystemNotFoundError,
     UpstreamValidationError,
 )
-from ..dependencies import require_permission
+from ..dependencies import (
+    get_authorization_service,
+    get_request_context,
+    require_permission,
+    require_public_catalog_access,
+)
+from ..public_catalog import profile_for_request, redact_public_upstream_system
 from ..errors import _service_error_response
 
 
@@ -53,10 +59,16 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/upstreams",
         tags=["upstream-migration"],
+        dependencies=[Depends(require_public_catalog_access)],
     )
 
     def get_service() -> Any:
         return service
+
+    def project_for_request(value: Any, context: RequestContext, authorization: Any) -> Any:
+        return redact_public_upstream_system(
+            value, profile=profile_for_request(context, authorization)
+        )
 
     @router.get("/systems", response_model=None)
     def get_systems(
@@ -67,6 +79,8 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
         page_size: str | None = Query(default=None, alias="pageSize"),
         limit: str | None = Query(default=None),
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             items = current_service.get_systems(
@@ -78,6 +92,7 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
             )
         except UpstreamDataSourceError as error:
             return _upstream_error_response(error)
+        items = project_for_request(items, context, authorization)
         return JSONResponse(
             content=validate_contract({"items": items}, UpstreamListResponse)
         )
@@ -86,11 +101,14 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
     def get_system_detail(
         system_id: str,
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             data = current_service.get_system_detail(system_id)
         except (UpstreamSystemNotFoundError, UpstreamDataSourceError) as error:
             return _upstream_error_response(error)
+        data = project_for_request(data, context, authorization)
         return JSONResponse(
             content=validate_contract({"data": data}, UpstreamDataResponse)
         )

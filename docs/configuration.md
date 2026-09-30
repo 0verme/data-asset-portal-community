@@ -57,12 +57,20 @@ cannot read cookies already reissued in the native format.
 | `backend/app/fastapi_app.py` | KEEP — stable internal import path | Thin facade with no framework compatibility logic |
 | Werkzeug | KEEP — password hashing | Used directly by `AuthService`; not a Flask runtime dependency |
 
-There is intentionally no Public Catalog feature flag. Community Edition
-uses the fixed `Public Catalog + Authenticated Management` contract: ordinary
-catalog GET routes are public with necessary response redaction, while
-mutations, administration, sensitive reads, connection data, credentials and
-audit data remain protected. The complete route inventory is listed in [the
-Public Catalog contract](./rbac/authenticated-read-model.md).
+The Community Edition route inventory remains static, but anonymous catalog
+visibility is configurable independently from route registration:
+
+| Setting | Default | Values / behavior |
+|---|---|---|
+| `PUBLIC_CATALOG_PROFILE` | `internal` | `internal` retains business contact names; `strict` hides person identity while keeping organization metadata; `disabled` rejects anonymous business reads and hides guest menus. Invalid values fail startup. |
+| `PUBLIC_CATALOG_EXPORT_ENABLED` | `false` | Enables anonymous batch export only; an enabled export still uses the selected public projection, and `disabled` always blocks guest export. |
+
+Credentials, database accounts and connection details, internal paths, and
+diagnostics are always removed from ordinary catalog responses in every
+profile. Health checks, authentication, and the non-secret catalog policy
+endpoint remain available. Mutations, administration, sensitive reads, and
+audit data continue to use their existing backend authentication/RBAC rules.
+See the [deployment guide](../DEPLOYMENT.md) and [Public Catalog contract](./rbac/authenticated-read-model.md).
 
 ## OpenAPI and interactive docs exposure
 

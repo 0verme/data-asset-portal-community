@@ -13,12 +13,16 @@ test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog acce
     read("components/app/ModuleContent.tsx"),
   ]);
 
-  assert.match(app, /businessAccessReady = !isDbAuthMode\(\) \|\| authReady/);
+  assert.match(app, /businessAccessReady = \(!isDbAuthMode\(\) \|\| authReady\) && publicCatalogConfigReady/);
+  assert.match(app, /catalogAccessDisabled = publicCatalogConfig\.profile === "disabled" && !auth\.user/);
+  assert.match(app, /navMenus = getNavigationMenusForAuth\(navMenuSnapshot, navigationAuthKey\)/);
+  assert.match(app, /if \(!catalogDataAccessReady\)\s*\{\s*navMenuRequestRef\.current \+= 1;\s*setNavMenuSnapshot\(\{ authKey: navigationAuthKey, menus: \[\] \}\)/);
   assert.match(app, /loadMenus\(navigationAuthKey\)/);
   assert.match(search, /publicAccessReady = true/);
   assert.doesNotMatch(search, /请先登录后搜索/);
   assert.doesNotMatch(moduleContent, /AuthenticatedBusinessPrompt/);
   assert.match(moduleContent, /publicAccessReady=\{context\.businessAccessReady\}/);
+  assert.match(moduleContent, /匿名目录访问已关闭/);
 });
 
 test("anonymous UI exposes catalog actions only and keeps write controls permission-gated", async () => {
@@ -43,9 +47,33 @@ test("anonymous UI exposes catalog actions only and keeps write controls permiss
   assert.match(sources[6], gatedButton);
 });
 
-test("public push mock projection does not retain connection or contact fields", async () => {
+test("anonymous CSV export stays hidden unless the server explicitly enables it", async () => {
+  const [moduleContent, codeTables, mappings, codeSidebar, mappingSidebar, mappingApi, codeTableApi, codeTableHook] = await Promise.all([
+    read("components/app/ModuleContent.tsx"),
+    read("components/ManualCodeTablePage.tsx"),
+    read("components/FieldMappingPage.tsx"),
+    read("components/sidebar/ManualCodeTableSidebar.tsx"),
+    read("components/sidebar/MappingSidebar.tsx"),
+    read("api/fieldMapping.ts"),
+    read("api/manualCodeTables.ts"),
+    read("hooks/useManualCodeTableModule.ts"),
+  ]);
+
+  assert.match(moduleContent, /catalogExportEnabled/);
+  assert.match(codeTables, /canExport \? <button/);
+  assert.match(mappings, /canExport \? <button/);
+  assert.match(codeSidebar, /canExport\s*\?/);
+  assert.match(mappingSidebar, /canExport\s*\?/);
+  assert.match(mappingApi, /field-mappings\/export/);
+  assert.match(codeTableApi, /manual-code-tables\/export/);
+  assert.match(codeTableHook, /exportManualCodeTablesCsv/);
+});
+
+test("public push mock projection retains contacts but omits connection fields", async () => {
   const source = await read("api/push.ts");
   assert.doesNotMatch(source, /host: system\.host/);
-  assert.doesNotMatch(source, /downstreamContact: system\.downstreamContact/);
-  assert.doesNotMatch(source, /dataDeveloperContact: system\.dataDeveloperContact/);
+  assert.doesNotMatch(source, /account: system\.account/);
+  assert.match(source, /downstreamContact: system\.downstreamContact/);
+  assert.match(source, /dataDeveloperContact: system\.dataDeveloperContact/);
+  assert.match(source, /fields: clone\(job\.fields \|\| \[\]\)/);
 });

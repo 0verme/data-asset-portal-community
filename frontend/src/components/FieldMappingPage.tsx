@@ -20,6 +20,7 @@ import {
   getFieldMappingSourceSystems,
   getFieldMappingStats,
   getFieldMappings,
+  exportFieldMappingCsv,
   getFieldMappingTables,
   type EnrichedFieldMappingRow,
   type FieldMappingQueryParams,
@@ -29,7 +30,7 @@ import {
 } from "../api/fieldMapping.ts";
 import { DEFAULT_MAPPING_ROUTE } from "../config/defaults.ts";
 import type { MappingRoute } from "../routing/types.ts";
-import { EmptyState } from "./common/index.ts";
+import { ActionErrorBanner, EmptyState } from "./common/index.ts";
 import { FieldMappingFilters, FieldMappingStats } from "./fieldMapping/FieldMappingControls.tsx";
 import {
   DEFAULT_FILTERS,
@@ -41,6 +42,7 @@ import {
   buildLinkedFilters,
   compareValues,
   downloadCsv,
+  downloadCsvContent,
   isLinkedRoute,
   formatSystemLabel,
   getRouteSourceSystemId,
@@ -92,6 +94,7 @@ export interface FieldMappingPageProps {
   route?: MappingRoute | undefined;
   setRoute: Dispatch<SetStateAction<MappingRoute>>;
   onBackToUpstream: () => void;
+  canExport: boolean;
 }
 
 export function FieldMappingPage({
@@ -99,6 +102,7 @@ export function FieldMappingPage({
   route = DEFAULT_MAPPING_ROUTE,
   setRoute,
   onBackToUpstream,
+  canExport,
 }: FieldMappingPageProps) {
   const initialFilters = isLinkedRoute(route)
     ? buildLinkedFilters(route, "")
@@ -118,6 +122,7 @@ export function FieldMappingPage({
   const [tableTotal, setTableTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [exportError, setExportError] = useState("");
   const previousKeywordRef = useRef(keyword);
   const requestPage = previousKeywordRef.current === keyword ? page : 1;
   const requestFilters = useMemo(
@@ -394,21 +399,44 @@ export function FieldMappingPage({
     return readMappingValue(row, column.key) ?? "";
   };
 
-  const exportCurrentTab = () => {
-    if (tab === "field") {
-      downloadCsv("字段映射_字段视图.csv", [
-        fieldColumns.map((item) => item.label),
-        ...fieldPageRows.map((row) => fieldColumns.map((item) => displayCellValue(row, item))),
+  const exportCurrentTab = async () => {
+    setExportError("");
+    try {
+      const csv = await exportFieldMappingCsv(tab, {
+        ...requestFilters,
+        sourceSystemId: requestFilters.sourceSystemId || "",
+        keyword: keyword || "",
+        page: requestPage,
+        pageSize,
+        ...(tab === "field" && sort.key
+          ? { sortKey: sort.key, sortDirection: sort.direction }
+          : {}),
+      });
+      if (csv !== null) {
+        downloadCsvContent(
+          tab === "field" ? "字段映射_字段视图.csv" : "字段映射_表视图.csv",
+          csv,
+        );
+        return;
+      }
+      if (tab === "field") {
+        downloadCsv("字段映射_字段视图.csv", [
+          fieldColumns.map((item) => item.label),
+          ...fieldPageRows.map((row) => fieldColumns.map((item) => displayCellValue(row, item))),
+        ]);
+        return;
+      }
+      downloadCsv("字段映射_表视图.csv", [
+        orderedTableColumns.filter((item) => item.key !== "__actions").map((item) => item.label),
+        ...tablePageRows.map((row) => orderedTableColumns
+          .filter((item) => item.key !== "__actions")
+          .map((item) => displayCellValue(row, item))),
       ]);
-      return;
+    } catch (exportError: unknown) {
+      setExportError(
+        `导出失败：${exportError instanceof Error ? exportError.message : "请稍后重试。"}`,
+      );
     }
-
-    downloadCsv("字段映射_表视图.csv", [
-      orderedTableColumns.filter((item) => item.key !== "__actions").map((item) => item.label),
-      ...tablePageRows.map((row) => orderedTableColumns
-        .filter((item) => item.key !== "__actions")
-        .map((item) => displayCellValue(row, item))),
-    ]);
   };
 
   return (
@@ -419,6 +447,9 @@ export function FieldMappingPage({
           <div className="page-sub">查询源字段与 DWF 字段之间的映射关系，支持字段维度和表维度查看。</div>
         </div>
       </div>
+      {exportError ? (
+        <ActionErrorBanner message={exportError} onClose={() => setExportError("")} />
+      ) : null}
 
       {linkedView ? (
         <section className="fm-context-bar">
@@ -475,10 +506,10 @@ export function FieldMappingPage({
           </div>
           <div className="fm-result-tools">
             <span>共 <b>{totalRows}</b> 条</span>
-            <button className="btn" type="button" onClick={exportCurrentTab}>
+            {canExport ? <button className="btn" type="button" onClick={exportCurrentTab}>
               <Icon name="download" size={15} />
               导出 CSV
-            </button>
+            </button> : null}
           </div>
         </div>
 

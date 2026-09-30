@@ -111,6 +111,9 @@ const MODULE_RENDERERS: Record<ModuleId, ModuleRenderer> = {
       module={context.manualCodeTable}
       query={context.query}
       canEdit={canAccess(context, "code_table:write")}
+      canExport={context.auth.user
+        ? canAccess(context, "code_table:read")
+        : context.catalogExportEnabled && !context.catalogAccessDisabled}
     />
   ),
   push: ({ context }) => (
@@ -199,6 +202,9 @@ const MODULE_RENDERERS: Record<ModuleId, ModuleRenderer> = {
       route={context.mappingRoute}
       setRoute={context.setMappingRoute}
       onBackToUpstream={context.backToUpstreamList}
+      canExport={context.auth.user
+        ? canAccess(context, "field_mapping:read")
+        : context.catalogExportEnabled && !context.catalogAccessDisabled}
     />
   ),
   lineage: ({ context }) => (
@@ -238,6 +244,18 @@ function PublicAccessLoadingState(): React.ReactElement {
   );
 }
 
+function DisabledAnonymousCatalogState({ context }: { context: AppModuleContext }): React.ReactElement {
+  return (
+    <div className="state-card">
+      <h4>匿名目录访问已关闭</h4>
+      <p>此站点需要登录后才能浏览业务目录。登录不会改变后端的权限控制。</p>
+      <button className="btn primary" type="button" onClick={() => context.requireLogin()}>
+        登录后继续
+      </button>
+    </div>
+  );
+}
+
 export interface ModuleContentProps {
   module: ModuleId;
   context: AppModuleContext;
@@ -247,6 +265,9 @@ export function ModuleContent({ module, context }: ModuleContentProps): React.Re
   const renderer = MODULE_RENDERERS[module] || MODULE_RENDERERS.dwm;
   if (context.businessAccessReady === false) {
     return <PublicAccessLoadingState />;
+  }
+  if (context.catalogAccessDisabled) {
+    return <DisabledAnonymousCatalogState context={context} />;
   }
   if (module === "portal") {
     return renderer({ context });

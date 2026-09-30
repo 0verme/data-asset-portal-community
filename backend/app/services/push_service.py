@@ -670,18 +670,17 @@ class PushService(AuditActorMixin):
             "jobs": deepcopy(jobs),
         }
 
-    def _to_public_job(self, row):
+    def _to_public_job(self, row, fields):
         return {
             "id": row["job_code"],
             "cn": row["job_name"],
-            "sourcePath": row.get("source_path") or "",
             "sourceFileName": row.get("source_file_name") or row.get("target_file_name") or "",
-            "targetPath": row.get("target_path") or "",
             "targetFileName": row.get("target_file_name") or row.get("source_file_name") or "",
             "freq": row.get("freq_desc") or "",
             "freqType": row.get("freq_type") or "",
             "enabled": str(row.get("enabled_flag") or "").upper() == "Y",
             "desc": row.get("job_desc") or "",
+            "fields": deepcopy(fields),
         }
 
     def _to_public_system(self, row, jobs):
@@ -692,14 +691,13 @@ class PushService(AuditActorMixin):
             "abbr": row["system_abbr"],
             "desc": row.get("system_desc") or "",
             "protocol": row["protocol_type"],
-            "host": row.get("host_name") or "",
             "downstreamContact": row.get("contact_name") or "",
             "dataDeveloperContact": row.get("data_developer_contact_name") or "",
             "dept": row.get("dept_name") or "",
             "status": row["status_code"],
             "importanceLevel": row.get("importance_level_code") or "normal",
             "latestOutputTime": row.get("latest_output_time") or "",
-            "jobs": [self._to_public_job(job) for job in jobs],
+            "jobs": deepcopy(jobs),
         }
 
     def _load_public_job_rows(self, system_ids):
@@ -712,9 +710,7 @@ class PushService(AuditActorMixin):
                 push_job.c.system_id,
                 push_job.c.job_code,
                 push_job.c.job_name,
-                push_job.c.source_path,
                 push_job.c.source_file_name,
-                push_job.c.target_path,
                 push_job.c.target_file_name,
                 push_job.c.freq_desc,
                 push_job.c.freq_type,
@@ -732,9 +728,14 @@ class PushService(AuditActorMixin):
             purpose="public push job list",
             method="_load_public_job_rows",
         )
+        fields_by_job = self._load_field_rows([row["job_id"] for row in rows])
         grouped = {}
         for row in rows:
-            grouped.setdefault(int(row["system_id"]), []).append(row)
+            job = self._to_public_job(
+                row,
+                fields_by_job.get(int(row["job_id"]), []),
+            )
+            grouped.setdefault(int(row["system_id"]), []).append(job)
         return grouped
 
     def _load_public_system_rows(self, status=None, protocol=None, dept=None, keyword=None, page=None, page_size=None):
@@ -748,7 +749,6 @@ class PushService(AuditActorMixin):
                 push_system.c.system_name,
                 push_system.c.system_abbr,
                 push_system.c.protocol_type,
-                push_system.c.host_name,
                 push_system.c.contact_name,
                 push_system.c.data_developer_contact_name,
                 push_system.c.dept_name,

@@ -7,9 +7,9 @@ import { Icon } from "../ui.tsx";
 interface PushJobDisplay extends PushJobLike {
   id: string;
   cn: string;
-  sourcePath: string;
+  sourcePath?: string | undefined;
   sourceFileName: string;
-  targetPath: string;
+  targetPath?: string | undefined;
   targetFileName: string;
   freqType: string;
   enabled: boolean;
@@ -70,17 +70,16 @@ function PushJobDetails({ system, job }: PushJobDetailsProps) {
       <div className="file-head-card">
         <h3 className="file-head-title"><Icon name="info" size={14} />文件头信息</h3>
         <div className="fh-grid">
-          <div className="fh-item fh-full"><div className="k">湖仓来源信息</div><div className="v"></div></div>
-          <div className="fh-item"><div className="k">湖仓来源路径</div><div className="v mono">{job.sourcePath}</div></div>
+          <div className="fh-item fh-full"><div className="k">推送文件</div><div className="v"></div></div>
+          {job.sourcePath ? <div className="fh-item"><div className="k">湖仓来源路径</div><div className="v mono">{job.sourcePath}</div></div> : null}
           <div className="fh-item"><div className="k">湖仓来源文件名</div><div className="v mono">{job.sourceFileName}</div></div>
-          <div className="fh-item fh-full"><div className="k">目标推送信息</div><div className="v"></div></div>
-          <div className="fh-item"><div className="k">目标推送路径</div><div className="v mono">{system.protocol} {"->"} {system.host || ""}{system.port ? `:${system.port}` : ""}{job.targetPath}</div></div>
+          {job.targetPath || system.host || system.port ? <div className="fh-item"><div className="k">目标推送路径</div><div className="v mono">{system.protocol} {"->"} {system.host || ""}{system.port ? `:${system.port}` : ""}{job.targetPath || ""}</div></div> : null}
           <div className="fh-item"><div className="k">目标推送文件名</div><div className="v mono">{job.targetFileName}</div></div>
           {isRenameJob(job) ? <div className="fh-item fh-full"><div className="k">提示</div><div className="v mono">推送时重命名 {formatRenameHint(job)}</div></div> : null}
-          <div className="fh-item"><div className="k">字段分隔符</div><div className="v mono">{job.delimiter === "\\t" ? "\\t (Tab)" : job.delimiter || "-"}</div></div>
-          <div className="fh-item"><div className="k">文件编码</div><div className="v mono">{job.encoding || "-"}</div></div>
+          {job.delimiter ? <div className="fh-item"><div className="k">字段分隔符</div><div className="v mono">{job.delimiter === "\\t" ? "\\t (Tab)" : job.delimiter}</div></div> : null}
+          {job.encoding ? <div className="fh-item"><div className="k">文件编码</div><div className="v mono">{job.encoding}</div></div> : null}
           <div className="fh-item"><div className="k">推送频率</div><div className="v">{job.freqType}{FREQ_PARAM_CONFIG[job.freqType] ? ` · ${formatFreq(job)}` : ""}</div></div>
-          <div className="fh-item"><div className="k">预估行数</div><div className="v mono">{job.rowCnt || "-"}</div></div>
+          {job.rowCnt ? <div className="fh-item"><div className="k">预估行数</div><div className="v mono">{job.rowCnt}</div></div> : null}
           <div className="fh-item fh-full"><div className="k">业务逻辑说明</div><div className="v file-desc">{job.desc}</div></div>
         </div>
       </div>

@@ -188,6 +188,7 @@ class RoutePermissionInventoryTests(unittest.TestCase):
             ("GET", "/api/auth/me"),
             ("POST", "/api/auth/logout"),
             ("GET", "/api/capabilities"),
+            ("GET", "/api/public-catalog/config"),
         }
         for path, operations in app.openapi()["paths"].items():
             for method in operations:

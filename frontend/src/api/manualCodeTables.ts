@@ -52,6 +52,15 @@ interface ManualCodeTableListEnvelope {
   items?: MockManualCodeTable[] | undefined;
 }
 
+export async function exportManualCodeTablesCsv(
+  filters: ManualCodeTableFilterParams = {},
+): Promise<string | null> {
+  if (API_MODE !== 'remote') return null;
+  const payload = await requestRemote<unknown>('/manual-code-tables/export', { params: filters });
+  if (typeof payload !== 'string') throw new Error('码值表导出接口返回格式无效');
+  return payload;
+}
+
 export async function getManualCodeTables(filters: ManualCodeTableFilterParams = {}): Promise<MockManualCodeTable[]> {
   if (API_MODE === 'remote') {
     const payload = await requestRemote<ManualCodeTableListEnvelope>('/manual-code-tables', { params: filters });

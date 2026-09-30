@@ -65,32 +65,7 @@ export function compareValues(left: unknown, right: unknown): number {
   return String(left || "").localeCompare(String(right || ""), "zh-CN");
 }
 
-export function downloadCsv(
-  fileName: string,
-  rows: readonly (readonly unknown[])[],
-): void {
-  const csv = rows
-    .map((row) =>
-      row
-        .map((value) => {
-          const text = String(value ?? "");
-          return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-        })
-        .join(","),
-    )
-    .join("\n");
-  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  window.setTimeout(() => {
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }, 100);
-}
+export { downloadCsvContent, downloadCsvRows as downloadCsv } from "../../utils/csv.ts";
 
 function normalizeValue(value: unknown): string {
   return String(value || "")

@@ -159,18 +159,9 @@ export function usePushModule({
       const systems = await getPushSystems();
       const allJobs = systems.flatMap((system) => system.jobs || []);
       const protocolItems = fallbackOptions([...DEFAULT_PROTOCOL_OPTIONS, ...systems.map((system) => system.protocol)]);
-      const authItems = fallbackOptions([
-        ...DEFAULT_AUTH_OPTIONS,
-        ...systems.map((system) => system.auth),
-      ]);
-      const delimiterItems = fallbackOptions([
-        ...DEFAULT_DELIMITER_OPTIONS,
-        ...allJobs.map((job) => job.delimiter),
-      ]);
-      const encodingItems = fallbackOptions([
-        ...DEFAULT_ENCODING_OPTIONS,
-        ...allJobs.map((job) => job.encoding),
-      ]);
+      const authItems = fallbackOptions(DEFAULT_AUTH_OPTIONS);
+      const delimiterItems = fallbackOptions(DEFAULT_DELIMITER_OPTIONS);
+      const encodingItems = fallbackOptions(DEFAULT_ENCODING_OPTIONS);
       const freqTypeItems = fallbackOptions([
         ...DEFAULT_FREQ_TYPE_OPTIONS,
         ...allJobs.map((job) => job.freqType),

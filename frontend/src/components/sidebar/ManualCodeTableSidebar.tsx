@@ -6,11 +6,13 @@ import { SidebarFilterGroup } from "./common/SidebarFilterGroup.tsx";
 export interface ManualCodeTableSidebarProps {
   module: UseManualCodeTableModuleResult;
   canEdit: boolean;
+  canExport: boolean;
 }
 
 export function ManualCodeTableSidebar({
   module,
   canEdit,
+  canExport,
 }: ManualCodeTableSidebarProps) {
   const counts = Object.fromEntries(
     MANUAL_CODE_TABLE_STYLES.map((style) => [
@@ -44,7 +46,9 @@ export function ManualCodeTableSidebar({
           canEdit
             ? { key: "new", label: "新增码值表", onClick: module.openNew }
             : null,
-          { key: "export", label: "导出表名清单", onClick: module.exportCsv },
+          canExport
+            ? { key: "export", label: "导出表名清单", onClick: module.exportCsv }
+            : null,
         ].filter((action): action is NonNullable<typeof action> =>
           Boolean(action),
         )}

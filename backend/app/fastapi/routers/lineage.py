@@ -16,9 +16,13 @@ from ...services.lineage import (
     get_subgraph as get_lineage_subgraph,
     search_nodes as search_lineage_nodes,
 )
-from ..dependencies import get_authorization_service, get_request_context
+from ..dependencies import (
+    get_authorization_service,
+    get_request_context,
+    require_public_catalog_access,
+)
 from ..errors import _service_error_response
-from ..public_catalog import is_authenticated_request, redact_public_lineage
+from ..public_catalog import profile_for_request, redact_public_lineage
 
 
 class _LineageServiceAdapter:
@@ -47,6 +51,7 @@ def _register_lineage_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/lineage",
         tags=["lineage-migration"],
+        dependencies=[Depends(require_public_catalog_access)],
     )
 
     def get_service() -> Any:
@@ -56,11 +61,17 @@ def _register_lineage_routes(app: FastAPI, service: Any) -> None:
         return _service_error_response(error, getattr(error, "status_code", 422))
 
     @router.get("/bootstrap", response_model=None)
-    def get_bootstrap(current_service: Any = Depends(get_service)):
+    def get_bootstrap(
+        current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
+    ):
         try:
             data = current_service.get_bootstrap()
         except LineageValidationError as error:
             return error_response(error)
+        profile = profile_for_request(context, authorization)
+        data = redact_public_lineage(data, profile=profile)
         return JSONResponse(content=validate_contract({"data": data}, LineageResponse))
 
     @router.get("/assets", response_model=None)
@@ -72,8 +83,8 @@ def _register_lineage_routes(app: FastAPI, service: Any) -> None:
     ):
         try:
             data = current_service.search_nodes(name)
-            if not is_authenticated_request(context, authorization):
-                data = redact_public_lineage(data)
+            profile = profile_for_request(context, authorization)
+            data = redact_public_lineage(data, profile=profile)
         except LineageValidationError as error:
             return error_response(error)
         return JSONResponse(content=validate_contract({"data": data}, LineageResponse))
@@ -93,8 +104,8 @@ def _register_lineage_routes(app: FastAPI, service: Any) -> None:
             data = current_service.get_subgraph(
                 root_id, direction, depth, max_nodes, view
             )
-            if not is_authenticated_request(context, authorization):
-                data = redact_public_lineage(data)
+            profile = profile_for_request(context, authorization)
+            data = redact_public_lineage(data, profile=profile)
         except LineageValidationError as error:
             return error_response(error)
         return JSONResponse(content=validate_contract({"data": data}, LineageResponse))
@@ -114,8 +125,8 @@ def _register_lineage_routes(app: FastAPI, service: Any) -> None:
             data = current_service.get_initial_view(
                 root_id, direction, depth, max_nodes, view
             )
-            if not is_authenticated_request(context, authorization):
-                data = redact_public_lineage(data)
+            profile = profile_for_request(context, authorization)
+            data = redact_public_lineage(data, profile=profile)
         except LineageValidationError as error:
             return error_response(error)
         return JSONResponse(content=validate_contract({"data": data}, LineageResponse))

@@ -78,14 +78,17 @@ test("push systems keep downstream and data-developer contacts separate", async 
   );
 });
 
-test("public push cards omit protected connection and contact details", async () => {
-  const source = await readFile(systemListPath, "utf8");
+test("public push cards keep business contacts without exposing connection details", async () => {
+  const [source, api] = await Promise.all([
+    readFile(systemListPath, "utf8"),
+    readFile(pushApiPath, "utf8"),
+  ]);
 
-  assert.match(source, /showContactDetails/);
-  assert.match(source, /getSystemText\(system, "host"\)/);
-  assert.match(source, /连接协议/);
   assert.match(source, /下游对接人/);
   assert.match(source, /数据开发对接人/);
+  assert.doesNotMatch(api, /host: system\.host/);
+  assert.match(api, /downstreamContact: system\.downstreamContact/);
+  assert.match(api, /dataDeveloperContact: system\.dataDeveloperContact/);
 });
 
 test("push demo auth values follow the backend contract", async () => {
@@ -118,23 +121,18 @@ test("push jobs rely on system contacts instead of a duplicated owner", async ()
   );
 });
 
-test("push list mapping keeps both path fields available to the table", async () => {
+test("push public job projection retains filenames and omits internal paths", async () => {
   const source = await readFile(pushApiPath, "utf8");
 
-  assert.match(source, /sourcePath: job\.sourcePath \|\| ["']/);
-  assert.match(source, /targetPath: job\.targetPath \|\| ["']/);
+  assert.doesNotMatch(source, /sourcePath: job\.sourcePath/);
+  assert.doesNotMatch(source, /targetPath: job\.targetPath/);
+  assert.match(source, /sourceFileName: job\.sourceFileName/);
+  assert.match(source, /fields: clone\(job\.fields \|\| \[\]\)/);
 });
 
-test("push job table keeps six semantic columns when paths are present or absent", async () => {
+test("push job table keeps public business columns without connection paths", async () => {
   const source = await readFile(jobListPath, "utf8");
-  const columnKeys = [
-    "job",
-    "sourcePath",
-    "targetPath",
-    "frequency",
-    "status",
-    "action",
-  ];
+  const columnKeys = ["job", "frequency", "status", "action"];
 
   assert.deepEqual(
     PUSH_JOB_TABLE_COLUMNS.map((column) => column.key),
@@ -143,63 +141,21 @@ test("push job table keeps six semantic columns when paths are present or absent
   assert.equal(PUSH_JOB_TABLE_COLUMNS.length, columnKeys.length);
   assert.match(source, /PUSH_JOB_TABLE_COLUMNS\.map/);
   assert.match(source, /getPushJobTableValues\(job\)/);
-  assert.doesNotMatch(source, /job\.sourcePath\s*&&|job\.targetPath\s*&&/);
+  assert.doesNotMatch(source, /job\.sourcePath|job\.targetPath/);
 
-  const baseJob = {
+  const cells = getPushJobTableValues({
     cn: "客户声音分析台每日推送",
-    sourceFileName: "DWM_voc_stat_1d_{yyyyMMdd}.json",
-    targetFileName: "DWM_voc_stat_1d_{yyyyMMdd}.json",
+    sourceFileName: "source.json",
+    targetFileName: "target.json",
     freqType: "T+1",
-    freq: "",
     enabled: true,
-  };
-  const cases = [
-    {
-      name: "both paths",
-      job: {
-        ...baseJob,
-        sourcePath: "/lakehouse/dwm/voc/dt={yyyy-MM-dd}",
-        targetPath: "/oss/incoming/voc/",
-      },
-      sourcePath: "/lakehouse/dwm/voc/dt={yyyy-MM-dd}",
-      targetPath: "/oss/incoming/voc/",
-    },
-    {
-      name: "source path missing",
-      job: { ...baseJob, sourcePath: "", targetPath: "/oss/incoming/voc/" },
-      sourcePath: "—",
-      targetPath: "/oss/incoming/voc/",
-    },
-    {
-      name: "target path missing",
-      job: { ...baseJob, sourcePath: "/lakehouse/dwm/voc/", targetPath: "" },
-      sourcePath: "/lakehouse/dwm/voc/",
-      targetPath: "—",
-    },
-    {
-      name: "both paths missing",
-      job: { ...baseJob, sourcePath: "", targetPath: "" },
-      sourcePath: "—",
-      targetPath: "—",
-    },
-    {
-      name: "disabled job",
-      job: { ...baseJob, sourcePath: "", targetPath: "", enabled: false },
-      sourcePath: "—",
-      targetPath: "—",
-      status: "禁用",
-    },
-  ];
-
-  for (const item of cases) {
-    const cells = getPushJobTableValues(item.job);
-    assert.deepEqual(Object.keys(cells), columnKeys, item.name);
-    assert.equal(cells.sourcePath, item.sourcePath, item.name);
-    assert.equal(cells.targetPath, item.targetPath, item.name);
-    assert.equal(cells.frequency, "T+1", item.name);
-    assert.equal(cells.status, item.status || "启用", item.name);
-    assert.equal(cells.action, "编辑", item.name);
-  }
+  });
+  assert.deepEqual(Object.keys(cells), columnKeys);
+  assert.equal(cells.job.sourceFileName, "source.json");
+  assert.equal(cells.job.targetFileName, "target.json");
+  assert.equal(cells.frequency, "T+1");
+  assert.equal(cells.status, "启用");
+  assert.equal(cells.action, "编辑");
 });
 
 test("push system importance defaults and latest output time rules are explicit", async () => {

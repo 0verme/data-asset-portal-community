@@ -204,7 +204,7 @@ export function PushView({
       <PushJobDetail
         system={detailSystem || currentSystem}
         job={detailJob || currentJob}
-        showDetails={Boolean(detailJob)}
+        showDetails={Boolean(detailJob) || Array.isArray(currentJob.fields)}
         onBackSystems={pushGoList}
         onBackJobs={() => pushGoSystem(currentSystem.id)}
         onEdit={
