@@ -197,9 +197,9 @@ Windows PowerShell：
 Community Demo 初始化完成后，可以使用：
 
 - 用户名：`admin`
-- 密码：`12346`
+- 密码：`123456`
 
-该账号仅用于 Community Demo / 本地体验环境，不是生产环境默认管理员。正式部署请创建独立管理员账号，并立即修改默认凭据。
+该账号仅用于 Community Demo / 本地体验环境，不是生产环境默认管理员。正式部署请使用 `backend/scripts/create_admin.py` 交互创建管理员；生产 bootstrap 不提供默认密码。
 
 详细说明见 [Community Demo 指南](./docs/community-demo.md)。
 
@@ -213,7 +213,7 @@ cp frontend/.env.example frontend/.env.local
 npm --prefix frontend run dev
 ```
 
-确认 `frontend/.env.local` 中为 `VITE_API_MODE=mock` 后，使用公开演示账号 `admin` / `community-demo-password` 登录
+确认 `frontend/.env.local` 中为 `VITE_API_MODE=mock` 后，使用公开演示账号 `admin` / `123456` 登录
 （仅 mock 模式有效；可用 `VITE_MOCK_AUTH_*` 覆盖）。mock 数据不会写入数据库。
 
 ### 在线静态 Demo
@@ -340,7 +340,7 @@ SQLite（本地 / Demo / CI）、PostgreSQL、MySQL 8.0 为 **Verified**；Gauss
 
 ### mock 和 remote 有什么区别？
 
-`VITE_API_MODE=mock` 只读取前端内置数据，使用公开演示账号 `admin` / `community-demo-password` 登录；
+`VITE_API_MODE=mock` 只读取前端内置数据，使用公开演示账号 `admin` / `123456` 登录；
 `remote` 通过 `/api` 访问后端真实数据库，需要先按 [Community Demo](./docs/community-demo.md) 或 [开发指南](./DEVELOPMENT.md) 配置。
 
 ### 这个项目负责真实数据采集吗？

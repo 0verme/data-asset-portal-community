@@ -92,7 +92,7 @@ export DAP_PASSWORD='your-password'
 preview、成功输出或错误信息。为兼容仓库中已有脚本，也接受 `DAP_SESSION_COOKIE` 作为
 session 的备用环境变量。
 
-Community Demo 可以使用 `admin / 12346` 做本地体验，但这只是本地 Community Demo
+Community Demo 可以使用 `admin / 123456` 做本地体验，但这只是本地 Community Demo
 凭据，不能作为生产环境默认账号。生产环境请使用独立账号和安全的 secret 管理方式。
 
 ## 3. 运行 Demo
@@ -114,7 +114,7 @@ python3 examples/metadata_ingestion/ingest_assets.py \
 ### 正式 sync
 
 ```bash
-DAP_USERNAME=admin DAP_PASSWORD=12346 \
+DAP_USERNAME=admin DAP_PASSWORD=123456 \
 python3 examples/metadata_ingestion/ingest_assets.py \
   --file examples/metadata_ingestion/assets.example.json \
   --dap-url http://127.0.0.1:15099 \
@@ -142,7 +142,7 @@ Cookie: session=<signed session>
 ```bash
 export DAP_URL='http://127.0.0.1:15099'
 export DAP_USERNAME='admin'
-export DAP_PASSWORD='12346' # 仅用于本地 Community Demo
+export DAP_PASSWORD='123456' # 仅用于本地 Community Demo
 COOKIE_JAR=$(mktemp)
 trap 'rm -f "$COOKIE_JAR"' EXIT
 

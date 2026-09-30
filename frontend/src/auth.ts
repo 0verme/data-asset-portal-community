@@ -47,10 +47,16 @@ const MOCK_USER = (
     : 'admin'
 ).trim() || 'admin';
 
-const MOCK_PASSWORD = (
-  typeof import.meta !== 'undefined' && import.meta.env?.['VITE_MOCK_AUTH_PASSWORD']
-    ? String(import.meta.env['VITE_MOCK_AUTH_PASSWORD'])
-    : 'community-demo-password'
+export function resolveMockPassword(environment: unknown): string {
+  const configuredPassword =
+    environment && typeof environment === 'object'
+      ? (environment as { VITE_MOCK_AUTH_PASSWORD?: unknown }).VITE_MOCK_AUTH_PASSWORD
+      : undefined;
+  return configuredPassword ? String(configuredPassword) : '123456';
+}
+
+const MOCK_PASSWORD = resolveMockPassword(
+  typeof import.meta !== 'undefined' ? import.meta.env : undefined,
 );
 
 const MOCK_NAME = (

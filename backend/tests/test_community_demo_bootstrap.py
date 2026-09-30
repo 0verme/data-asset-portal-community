@@ -188,7 +188,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         self.assertEqual("15173", frontend_command[-2])
         self.assertIn("Demo administrator:", output.getvalue())
         self.assertIn("Username: admin", output.getvalue())
-        self.assertIn("Password: 12346", output.getvalue())
+        self.assertIn("Password: 123456", output.getvalue())
         wait_mock.assert_any_call(
             "http://127.0.0.1:15099/healthz", backend_process, "Backend"
         )
@@ -214,7 +214,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         self.assertEqual(0, result)
         self.assertIn("Demo administrator:", output.getvalue())
         self.assertIn("Username: admin", output.getvalue())
-        self.assertIn("Password: 12346", output.getvalue())
+        self.assertIn("Password: 123456", output.getvalue())
 
     def test_missing_lineage_entries_trigger_one_idempotent_workspace_build(self):
         commands = []

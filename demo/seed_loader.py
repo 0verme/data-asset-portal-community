@@ -45,7 +45,7 @@ DOMAIN_CODE_BY_NAME = {
 ADMIN_USER = {
     "id": 1,
     "username": "admin",
-    "password": "12346",
+    "password": "123456",
     "display_name": "演示管理员",
     "role": "admin",
     "status": "ACTIVE",
