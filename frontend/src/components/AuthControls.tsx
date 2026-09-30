@@ -231,20 +231,10 @@ export interface AuthBarProps {
 
 export function AuthBar({ auth, onLogin, onLogout }: AuthBarProps) {
   const displayName = getSafeDisplayName(auth);
-  const roleLabel =
-    auth.role === "admin"
-      ? "系统管理员"
-      : auth.role === "maintainer"
-        ? "业务维护员"
-        : auth.role || "未登录";
 
   if (!auth.user) {
     return (
       <div className="authbar">
-        <span className="role-pill guest">
-          <Icon name="eye" size={13} />
-          未登录
-        </span>
         <button className="login-cta" onClick={onLogin}>
           <Icon name="login" size={15} />
           登录
@@ -255,10 +245,6 @@ export function AuthBar({ auth, onLogin, onLogout }: AuthBarProps) {
 
   return (
     <div className="authbar">
-      <span className="role-pill admin">
-        <Icon name="shield" size={13} />
-        {roleLabel}
-      </span>
       <div className="user-chip">
         <span className="uc-av">{initial(displayName)}</span>
         <span className="uc-name">{displayName}</span>
