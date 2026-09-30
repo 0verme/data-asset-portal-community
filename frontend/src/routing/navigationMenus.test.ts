@@ -73,7 +73,7 @@ test("app scopes menu state to auth and reloads after identity or permission cha
   assert.match(authSessionSource, /const nextAuth = await login\(credentials\);\s*setAuth\(nextAuth\)/);
   assert.match(authSessionSource, /clearAuthStorage\(\);\s*setAuth\(\{ \.\.\.GUEST_AUTH \}\)/);
   assert.match(appSource, /const navigationAuthKey = getNavigationAuthKey\(auth\)/);
-  assert.match(appSource, /\}, \[authReady, businessAccessReady, loadMenus, navigationAuthKey\]\);/);
+  assert.match(appSource, /\}, \[authReady, catalogDataAccessReady, loadMenus, navigationAuthKey\]\);/);
   assert.match(appSource, /void loadMenus\(navigationAuthKey\)/);
   assert.match(appSource, /getNavigationMenusForAuth\(navMenuSnapshot, navigationAuthKey\)/);
   assert.match(appSource, /if \(requestId !== navMenuRequestRef\.current\) return;/);

@@ -21,7 +21,11 @@ from ..application.errors import (
     PermissionDeniedError,
 )
 from ..authorization.core import AuthorizationService
-from ..settings import get_trust_proxy_headers
+from ..settings import (
+    get_public_catalog_export_enabled,
+    get_public_catalog_profile,
+    get_trust_proxy_headers,
+)
 
 IdentityResolver = Callable[[Request], Any]
 
@@ -148,6 +152,62 @@ def require_admin(
 ) -> RequestContext:
     """Compatibility gate resolved against the current database role."""
     return _require_authenticated(context, service, admin_only=True, request=request)
+
+
+def require_public_catalog_access(
+    request: Request,
+    context: RequestContext = Depends(get_request_context),
+    service: AuthorizationService = Depends(get_authorization_service),
+) -> RequestContext:
+    """Enforce the disabled profile across a public-catalog router."""
+    if get_public_catalog_profile() != "disabled":
+        return context
+    decision = _authentication_decision(request, context, service)
+    if not decision.authenticated:
+        raise AuthenticationRequiredError("匿名业务目录访问已关闭，请先登录。")
+    if decision.reason == "role_unknown_or_disabled":
+        raise PermissionDeniedError("当前角色不可访问业务目录。")
+    return context
+
+
+def require_catalog_export(permission: str) -> Callable[..., RequestContext]:
+    """Allow configured guest export or authenticated access under existing RBAC."""
+    normalized = str(permission or "").strip()
+    if not normalized:
+        raise ValueError("permission code must be non-empty")
+
+    def dependency(
+        request: Request,
+        context: RequestContext = Depends(get_request_context),
+        service: AuthorizationService = Depends(get_authorization_service),
+    ) -> RequestContext:
+        authentication = _authentication_decision(request, context, service)
+        if authentication.authenticated:
+            decision = service.authorize(
+                context.identity,
+                normalized,
+                authentication=authentication,
+            )
+            if not decision.allowed:
+                raise PermissionDeniedError("无权限执行此导出操作。")
+            return context
+
+        if (
+            get_public_catalog_profile() == "disabled"
+            or not get_public_catalog_export_enabled()
+        ):
+            raise AuthenticationRequiredError("匿名批量导出未启用，请先登录。")
+        decision = service.authorize(
+            context.identity,
+            normalized,
+            authentication=authentication,
+        )
+        if not decision.allowed:
+            raise AuthenticationRequiredError("匿名批量导出未启用，请先登录。")
+        return context
+
+    dependency.__name__ = f"require_catalog_export_{normalized.replace(':', '_')}"
+    return dependency
 
 
 def require_permission(permission: str) -> Callable[..., RequestContext]:

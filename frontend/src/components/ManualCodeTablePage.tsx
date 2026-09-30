@@ -116,9 +116,10 @@ export interface ManualCodeTablePageProps {
   module: UseManualCodeTableModuleResult;
   query: string;
   canEdit: boolean;
+  canExport: boolean;
 }
 
-export function ManualCodeTablePage({ module, query, canEdit }: ManualCodeTablePageProps) {
+export function ManualCodeTablePage({ module, query, canEdit, canExport }: ManualCodeTablePageProps) {
   if (module.loading) return <LoadingState title="加载码值表维护模块" desc="正在读取湖仓手工码值表登记信息。" />;
   if (module.error) return <ErrorState title="码值表加载失败" desc={module.error} onRetry={module.load} />;
 
@@ -137,7 +138,7 @@ export function ManualCodeTablePage({ module, query, canEdit }: ManualCodeTableP
           <div className="page-sub">注册并维护湖仓手工码值表的表级元数据，不维护表内码值条目。</div>
         </div>
         <div className="head-actions">
-          <button className="btn" type="button" onClick={module.exportCsv}><Icon name="download" size={15} />导出</button>
+          {canExport ? <button className="btn" type="button" onClick={module.exportCsv}><Icon name="download" size={15} />导出</button> : null}
           {canEdit ? <button className="btn primary" type="button" onClick={module.openNew}><Icon name="plus" size={15} />新增码值表</button> : null}
         </div>
       </div>

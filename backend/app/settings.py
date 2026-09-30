@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Literal
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT_DIR / "backend"
@@ -29,6 +30,8 @@ _ENV_FILES = (
 )
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
+_PUBLIC_CATALOG_PROFILES = frozenset({"internal", "strict", "disabled"})
+PublicCatalogProfile = Literal["internal", "strict", "disabled"]
 
 
 def parse_bool(value: str | None) -> bool:
@@ -101,6 +104,34 @@ def get_session_secret() -> str:
             "APP_SECRET_KEY must be set to a non-empty secret value before starting the application."
         )
     return secret_key
+
+
+def get_public_catalog_profile() -> PublicCatalogProfile:
+    """Return the validated anonymous catalog exposure profile.
+
+    Invalid values fail startup/request configuration loudly instead of silently
+    broadening the anonymous data surface.
+    """
+    profile = get_string_env("PUBLIC_CATALOG_PROFILE", "internal").lower()
+    if profile not in _PUBLIC_CATALOG_PROFILES:
+        allowed = ", ".join(sorted(_PUBLIC_CATALOG_PROFILES))
+        raise RuntimeError(
+            f"PUBLIC_CATALOG_PROFILE must be one of: {allowed}."
+        )
+    return profile  # type: ignore[return-value]
+
+
+def get_public_catalog_export_enabled() -> bool:
+    """Return whether anonymous bulk export is explicitly enabled."""
+    return parse_bool(os.getenv("PUBLIC_CATALOG_EXPORT_ENABLED"))
+
+
+def get_public_catalog_config() -> dict[str, object]:
+    """Return the non-secret public catalog behavior needed by the UI."""
+    return {
+        "profile": get_public_catalog_profile(),
+        "exportEnabled": get_public_catalog_export_enabled(),
+    }
 
 
 def get_runtime_environment() -> str:

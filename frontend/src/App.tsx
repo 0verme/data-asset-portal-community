@@ -40,6 +40,7 @@ import { useApiAssetModule } from "./hooks/useApiAssetModule.ts";
 import { useAuthSession } from "./hooks/useAuthSession.ts";
 import { useIndicatorModule } from "./hooks/useIndicatorModule.ts";
 import { useManualCodeTableModule } from "./hooks/useManualCodeTableModule.ts";
+import { usePublicCatalogConfig } from "./hooks/usePublicCatalogConfig.ts";
 import { usePushModule } from "./hooks/usePushModule.ts";
 import { useReportModule } from "./hooks/useReportModule.ts";
 import { useRootModule } from "./hooks/useRootModule.ts";
@@ -184,9 +185,12 @@ export default function App(): React.ReactElement {
     handleLoginSubmit,
     handleLogout,
   } = useAuthSession();
-  // `/auth/me` is an identity probe. A 401 means anonymous, not that the
-  // public catalog must be disabled; wait only for the probe to settle.
-  const businessAccessReady = !isDbAuthMode() || authReady;
+  // `/auth/me` is an identity probe; wait for both identity and public policy
+  // before issuing business-data requests.
+  const { config: publicCatalogConfig, ready: publicCatalogConfigReady } = usePublicCatalogConfig();
+  const businessAccessReady = (!isDbAuthMode() || authReady) && publicCatalogConfigReady;
+  const catalogAccessDisabled = publicCatalogConfig.profile === "disabled" && !auth.user;
+  const catalogDataAccessReady = businessAccessReady && !catalogAccessDisabled;
   const navigationAuthKey = getNavigationAuthKey(auth);
   const navMenus = getNavigationMenusForAuth(navMenuSnapshot, navigationAuthKey);
   const currentNavMenuStatus = navMenuSnapshot.authKey === navigationAuthKey ? navMenuStatus : "loading";
@@ -223,7 +227,7 @@ export default function App(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    if (!businessAccessReady) {
+    if (!catalogDataAccessReady) {
       navMenuRequestRef.current += 1;
       setNavMenuSnapshot({ authKey: navigationAuthKey, menus: [] });
       setNavMenuStatus(authReady ? "ready" : "loading");
@@ -238,7 +242,7 @@ export default function App(): React.ReactElement {
       navMenuRequestRef.current += 1;
       window.removeEventListener(MENUS_CHANGED_EVENT, refreshMenus);
     };
-  }, [authReady, businessAccessReady, loadMenus, navigationAuthKey]);
+  }, [authReady, catalogDataAccessReady, loadMenus, navigationAuthKey]);
 
   useEffect(() => {
     refreshCapabilities();
@@ -321,7 +325,7 @@ export default function App(): React.ReactElement {
   );
 
   const asset = useAssetModule({
-    active: businessAccessReady && module === "dwm",
+    active: catalogDataAccessReady && module === "dwm",
     query,
     setQuery,
     route,
@@ -335,7 +339,7 @@ export default function App(): React.ReactElement {
   });
 
   const root = useRootModule({
-    active: businessAccessReady && module === "root",
+    active: catalogDataAccessReady && module === "root",
     query,
     setQuery,
     rootRoute,
@@ -344,7 +348,7 @@ export default function App(): React.ReactElement {
   });
 
   const indicator = useIndicatorModule({
-    active: businessAccessReady && module === "indicator",
+    active: catalogDataAccessReady && module === "indicator",
     query,
     indicatorRoute,
     setIndicatorRoute,
@@ -356,7 +360,7 @@ export default function App(): React.ReactElement {
   });
 
   const report = useReportModule({
-    active: businessAccessReady && module === "report",
+    active: catalogDataAccessReady && module === "report",
     query,
     reportRoute,
     setReportRoute,
@@ -367,12 +371,12 @@ export default function App(): React.ReactElement {
     setLoginOpen,
   });
   const apiAsset = useApiAssetModule({
-    active: businessAccessReady && module === "apiAsset", query, route: apiAssetRoute, setRoute: setApiAssetRoute,
+    active: catalogDataAccessReady && module === "apiAsset", query, route: apiAssetRoute, setRoute: setApiAssetRoute,
     filter: apiAssetFilter, canEdit: can("api_asset:write"), requireLogin, setAuthError, setLoginOpen,
   });
 
   const push = usePushModule({
-    active: businessAccessReady && module === "push",
+    active: catalogDataAccessReady && module === "push",
     query,
     setQuery,
     pushRoute,
@@ -385,7 +389,7 @@ export default function App(): React.ReactElement {
   });
 
   const upstream = useUpstreamModule({
-    active: businessAccessReady && module === "upstream",
+    active: catalogDataAccessReady && module === "upstream",
     query,
     setQuery,
     upRoute,
@@ -400,7 +404,7 @@ export default function App(): React.ReactElement {
   });
 
   const manualCodeTable = useManualCodeTableModule({
-    active: businessAccessReady && module === "codeTable",
+    active: catalogDataAccessReady && module === "codeTable",
     query,
     requireLogin,
   });
@@ -626,6 +630,8 @@ export default function App(): React.ReactElement {
     auth,
     backToUpstreamList,
     businessAccessReady,
+    catalogAccessDisabled,
+    catalogExportEnabled: publicCatalogConfig.exportEnabled,
     can,
     canEdit,
     canManageMenus,

@@ -25,7 +25,13 @@ from ...services.indicator_service import (
     IndicatorNotFoundError,
     IndicatorValidationError,
 )
-from ..dependencies import require_permission
+from ..dependencies import (
+    get_authorization_service,
+    get_request_context,
+    require_permission,
+    require_public_catalog_access,
+)
+from ..public_catalog import profile_for_request, project_public_catalog_value
 from ..errors import _service_error_response
 
 
@@ -39,10 +45,16 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/indicators",
         tags=["indicator-pilot"],
+        dependencies=[Depends(require_public_catalog_access)],
     )
 
     def get_service() -> Any:
         return service
+
+    def project_for_request(value: Any, context: RequestContext, authorization: Any) -> Any:
+        return project_public_catalog_value(
+            value, profile=profile_for_request(context, authorization)
+        )
 
     @router.get("", response_model=None)
     def get_indicators(
@@ -50,6 +62,8 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
         dimension: str | None = Query(default=None),
         status: str | None = Query(default=None),
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             items = current_service.get_indicators(
@@ -59,6 +73,7 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
             )
         except IndicatorDataSourceError as error:
             return _service_error_response(error, 500)
+        items = project_for_request(items, context, authorization)
         return JSONResponse(
             content=validate_contract({"items": items}, IndicatorListResponse)
         )
@@ -67,6 +82,8 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
     def get_indicator_detail(
         indicator_id: str,
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             data = current_service.get_indicator_detail(indicator_id)
@@ -74,6 +91,7 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
             return _service_error_response(error, 404)
         except IndicatorDataSourceError as error:
             return _service_error_response(error, 500)
+        data = project_for_request(data, context, authorization)
         return JSONResponse(
             content=validate_contract({"data": data}, DataEnvelope[IndicatorItem])
         )

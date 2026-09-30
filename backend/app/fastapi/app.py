@@ -26,7 +26,11 @@ from ..services.search_provider import search_provider
 from ..services.system_management_service import system_management_service
 from ..services.upstream_service import upstream_service
 from ..security.login_protection import LoginAttemptLimiter
-from ..settings import get_openapi_docs_enabled
+from ..settings import (
+    get_openapi_docs_enabled,
+    get_public_catalog_export_enabled,
+    get_public_catalog_profile,
+)
 from .auth import LegacySessionMigrationMiddleware
 from .dependencies import IdentityResolver, RequestContextMiddleware
 from .errors import register_exception_handlers
@@ -80,6 +84,10 @@ def create_fastapi_app(
     ``openapi_enabled`` argument is a factory-only override; when omitted,
     only an explicit ``APP_ENV=development`` enables the HTTP docs endpoints.
     """
+    # Validate anonymous catalog policy at startup: invalid profiles must not
+    # silently widen public access.
+    get_public_catalog_profile()
+    get_public_catalog_export_enabled()
     docs_enabled = (
         get_openapi_docs_enabled() if openapi_enabled is None else openapi_enabled
     )

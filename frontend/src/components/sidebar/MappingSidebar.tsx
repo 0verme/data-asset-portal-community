@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export function MappingSidebar() {
+export function MappingSidebar({ canExport }: { canExport: boolean }) {
   return (
     <>
       <div className="side-group">
         <div className="side-title">查询说明</div>
         <div className="side-item active">源字段到 DWF 字段映射</div>
         <div className="side-item disabled">字段维度与表维度双视图</div>
-        <div className="side-item disabled">支持按当前结果导出 CSV</div>
+        {canExport ? <div className="side-item disabled">支持按当前结果导出 CSV</div> : null}
       </div>
 
       <div className="side-group">

@@ -39,7 +39,7 @@ class PublicCatalogApiTests(unittest.TestCase):
             "admin": AuthorizationSubject("admin", "admin"),
         }
         self.permission_sets = {
-            "catalog-reader": set(),
+            "catalog-reader": {"push:read"},
             "admin": BUILTIN_ROLE_PERMISSION_CODES["admin"],
         }
         repository = MagicMock()
@@ -205,8 +205,10 @@ class PublicCatalogApiTests(unittest.TestCase):
             self.client.get("/api/push/systems/PUSH_1"),
         ):
             self.assertEqual(200, response.status_code, response.text)
-            for value in ("198.51.100.8", "service-account", "Alice", "Bob", "/private"):
+            for value in ("198.51.100.8", "service-account", "/private"):
                 self.assertNotIn(value, response.text)
+            self.assertIn("Alice", response.text)
+            self.assertIn("Bob", response.text)
 
         self.manual_code_table.get_tables.return_value = [{
             "id": "1", "tableCode": "DIM_ORDER", "tableName": "Orders", "style": "dim",
@@ -241,7 +243,7 @@ class PublicCatalogApiTests(unittest.TestCase):
             {item["code"] for item in self.client.get("/api/system/menus").json()["items"]},
         )
 
-    def test_authenticated_push_reads_keep_job_paths_for_the_table(self):
+    def test_ordinary_push_reads_hide_connection_details_even_when_authenticated(self):
         self.current_identity = Identity("catalog-reader", "normal", "Normal")
         self.push.get_push_systems.return_value = [{
             "id": "PUSH_1",
@@ -260,8 +262,18 @@ class PublicCatalogApiTests(unittest.TestCase):
 
         self.assertEqual(200, response.status_code, response.text)
         job = response.json()["items"][0]["jobs"][0]
-        self.assertEqual("/lakehouse/orders", job["sourcePath"])
-        self.assertEqual("/oss/orders", job["targetPath"])
+        self.assertNotIn("sourcePath", job)
+        self.assertNotIn("targetPath", job)
+
+        self.push.get_push_system_admin_detail.return_value = {
+            "id": "PUSH_1",
+            "host": "198.51.100.10",
+            "jobs": [{"id": "JOB_1", "sourcePath": "/lakehouse/orders", "targetPath": "/oss/orders"}],
+        }
+        admin_detail = self.client.get("/api/push/systems/PUSH_1/admin-detail")
+        self.assertEqual(200, admin_detail.status_code, admin_detail.text)
+        self.assertIn("/lakehouse/orders", admin_detail.text)
+        self.assertIn("198.51.100.10", admin_detail.text)
 
     def test_anonymous_admin_reads_and_all_write_methods_remain_protected(self):
         self.current_identity = None

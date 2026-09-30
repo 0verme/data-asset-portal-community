@@ -25,15 +25,21 @@ from ...services.report_service import (
     ReportNotFoundError,
     ReportValidationError,
 )
-from ..dependencies import get_authorization_service, get_request_context, require_permission
+from ..dependencies import (
+    get_authorization_service,
+    get_request_context,
+    require_permission,
+    require_public_catalog_access,
+)
 from ..errors import _service_error_response
-from ..public_catalog import is_authenticated_request, redact_public_report
+from ..public_catalog import profile_for_request, redact_public_report
 
 
 def _register_report_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/reports",
         tags=["report-migration"],
+        dependencies=[Depends(require_public_catalog_access)],
     )
 
     def get_service() -> Any:
@@ -68,8 +74,8 @@ def _register_report_routes(app: FastAPI, service: Any) -> None:
             )
         except ReportDataSourceError as error:
             return error_response(error, 500)
-        if not is_authenticated_request(context, authorization):
-            items = [redact_public_report(item) for item in items]
+        profile = profile_for_request(context, authorization)
+        items = [redact_public_report(item, profile=profile) for item in items]
         return JSONResponse(
             content=validate_contract({"items": items}, ReportListResponse)
         )
@@ -87,8 +93,8 @@ def _register_report_routes(app: FastAPI, service: Any) -> None:
             return error_response(error, 404)
         except ReportDataSourceError as error:
             return error_response(error, 500)
-        if not is_authenticated_request(context, authorization):
-            data = redact_public_report(data)
+        profile = profile_for_request(context, authorization)
+        data = redact_public_report(data, profile=profile)
         return JSONResponse(
             content=validate_contract({"data": data}, DataEnvelope[ReportItem])
         )

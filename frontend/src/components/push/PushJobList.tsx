@@ -27,9 +27,6 @@ function renderPushJobCell(
           </span>
         </div>
       );
-    case "sourcePath":
-    case "targetPath":
-      return <span className="path-txt push-job-path" title={values[columnKey]}>{values[columnKey]}</span>;
     case "frequency":
       return <span className="freq-cell"><Icon name="clock" size={13} color="var(--ink-3)" />{values.frequency}</span>;
     case "status":
@@ -167,7 +164,9 @@ export function PushJobList({
   );
 }
 
-function getSystemText(system: PublicPushSystem, key: string): string {
-  const value = system[key];
-  return typeof value === "string" ? value : "";
+function getSystemText(
+  system: PublicPushSystem,
+  key: "downstreamContact" | "dataDeveloperContact",
+): string {
+  return system[key] || "";
 }

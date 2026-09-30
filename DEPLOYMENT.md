@@ -128,7 +128,26 @@ sudo chmod 600 backend/.env.local backend/configs/database.yaml
 - `APP_MAX_CONTENT_LENGTH_MB` 默认限制为 16 MB；应用同时返回 `nosniff`、`SAMEORIGIN` 和严格来源策略等安全响应头。若调整请求体上限，应同时检查 Nginx 的 `client_max_body_size`。
 - `APP_ENV=production` 或未设置时不会注册 `/docs`、`/redoc`、`/openapi.json`；只有显式 `development` 才启用它们。关闭 HTTP interactive docs 不是业务 API 的 authentication/authorization 替代。
 
-### 3.4 API authentication boundary
+### 3.4 匿名目录公开策略
+
+通过 `PUBLIC_CATALOG_PROFILE` 控制匿名业务目录投影，通过 `PUBLIC_CATALOG_EXPORT_ENABLED` 独立控制匿名批量导出：
+
+```env
+PUBLIC_CATALOG_PROFILE=internal
+PUBLIC_CATALOG_EXPORT_ENABLED=false
+```
+
+| Profile | 匿名访问策略 | 推荐场景 |
+| --- | --- | --- |
+| `internal`（默认） | 可浏览业务目录，允许负责人、维护人和业务联系人姓名；仍隐藏凭据、账号和连接/内部诊断信息 | 企业内网部署 |
+| `strict` | 在 internal 基础上隐藏负责人、维护人、联系人和审计人员身份；保留部门、团队、数据域等组织信息 | 公网 Demo 或较高安全场景 |
+| `disabled` | 后端拒绝匿名业务目录 API，匿名菜单为空；登录和健康检查不受影响 | 完全禁止匿名目录访问 |
+
+建议：内网使用 `PUBLIC_CATALOG_PROFILE=internal`，公网 Demo 使用 `strict`，完全关闭匿名目录使用 `disabled`。非法 profile 会阻止应用启动，不会默默回退到更宽松策略。
+
+匿名批量导出默认关闭（`PUBLIC_CATALOG_EXPORT_ENABLED=false`）。开启后手工码值表与字段映射 CSV endpoint 均在后端执行该开关，并复用页面相同的 public projection；`disabled` profile 仍禁止匿名业务读取与导出。永久敏感字段（password、token、secret、credential、数据库账号及连接信息、内部路径/诊断等）不会因 profile 或导出开关而公开。受保护的 `admin-detail`、写操作、系统管理和操作日志边界不随该配置放宽。
+
+### 3.5 API authentication boundary
 
 Community Edition 使用 `Public Catalog + Authenticated Management`：普通业务目录 GET 可以匿名浏览并按规则脱敏；写操作、管理 API、操作日志、Metadata ingestion、上/下游 `admin-detail`、用户/角色/参数和连接/凭据字段仍由后端 authentication 与 permission-based RBAC 保护。不要用 Nginx、隐藏菜单或关闭 OpenAPI 代替后端授权。完整 route inventory 见 [`docs/rbac/authenticated-read-model.md`](./docs/rbac/authenticated-read-model.md)。
 

@@ -9,7 +9,7 @@ The API separates anonymous catalog browsing from authenticated management:
 
 ```text
 Anonymous
-  → public business/catalog reads with necessary redaction
+  → public business/catalog reads with necessary redaction, unless the `disabled` profile is selected
 Authenticated user
   → public reads plus the user's existing capabilities
 Registered RBAC permission
@@ -46,9 +46,10 @@ ingestion, audit, or system-management data.
 The effective permission snapshot is:
 
 ```text
-anonymous          = public permissions
-valid authenticated = public permissions ∪ role permissions
-admin              = existing full registered permission set
+anonymous (internal/strict) = public permissions
+anonymous (disabled)        = no public catalog permissions
+valid authenticated         = public permissions ∪ role permissions
+admin                       = existing full registered permission set
 ```
 
 The role UI requests `/api/system/permissions?assignableOnly=true`, while the
@@ -66,23 +67,31 @@ The following routes intentionally accept anonymous requests:
 | `GET /api/capabilities` | `200`; bounded source-backed module metadata |
 | `GET /api/portal/stats` | `200`; public catalog-level counts |
 | `GET /api/search` | `200`; public search result projection |
-| `GET /api/system/menus` | `200`; enabled, non-management navigation entries only |
+| `GET /api/system/menus` | `200`; enabled, non-management navigation entries only; `disabled` returns an empty list |
 | `GET /api/assets/*` | `200`; tables, fields, DDL, facets, and summaries |
 | `GET /api/field-mappings/*` | `200`; field/table mapping metadata and statistics |
+| `GET /api/field-mappings/export` | `401` for guests by default; `PUBLIC_CATALOG_EXPORT_ENABLED=true` opts into profile-projected anonymous CSV export |
 | `GET /api/lineage/*` | `200`; public graph metadata with sensitive nested values redacted |
 | `GET /api/roots/*` | `200`; root dictionary metadata |
 | `GET /api/indicators/*` | `200`; indicator metadata |
 | `GET /api/reports/*` | `200`; report metadata without audit actors |
 | `GET /api/api-assets/*` | `200`; API catalog metadata without examples/credentials/audit actors |
-| `GET /api/manual-code-tables/*` | `200`; table-level code metadata without audit actors |
+| `GET /api/manual-code-tables` and `GET /api/manual-code-tables/{table_id}` | `200`; table-level code metadata without audit actors |
+| `GET /api/manual-code-tables/export` | `401` for guests by default; `PUBLIC_CATALOG_EXPORT_ENABLED=true` opts into profile-projected anonymous CSV export |
 | `GET /api/upstreams/systems` and `GET /api/upstreams/systems/{system_id}` | `200`; public system metadata; connection fields remain excluded |
-| `GET /api/push/systems` and `GET /api/push/systems/{system_id}` | `200`; public system/job metadata; connection and contact fields are redacted |
+| `GET /api/push/systems` and `GET /api/push/systems/{system_id}` | `200`; public system/job metadata; connection fields are always excluded; people fields depend on profile |
 | `POST /api/auth/login` | Authentication lifecycle; no existing session required |
 | `GET /api/auth/me` | `401` without a valid identity; never returns business data |
 | `POST /api/auth/logout` | Idempotent authentication lifecycle cleanup |
 
-The `admin-detail` upstream/push routes are not part of the public family.
-They retain their existing read permissions.
+Set `PUBLIC_CATALOG_PROFILE` to `internal` (default), `strict`, or `disabled`.
+In `internal`, business owner/contact names remain visible; `strict` hides
+person-identity fields while preserving organization metadata; `disabled`
+returns `401` for anonymous business reads and returns no anonymous menus.
+Authentication, health checks, and the non-secret `/api/public-catalog/config`
+policy endpoint remain available. Invalid profile values fail application
+startup. The `admin-detail` upstream/push routes are not part of the public
+family and retain their existing read permissions.
 
 ## Public business route inventory
 
@@ -110,10 +119,15 @@ require authentication and/or a registered RBAC permission.
 ## Necessary redaction
 
 The public projection is implemented at the FastAPI response boundary in
-`backend/app/fastapi/public_catalog.py`:
+`backend/app/fastapi/public_catalog.py` and applies to ordinary catalog
+responses for every caller, not only guests:
 
+- credentials, database account/connection details, internal paths, and
+  diagnostics are always removed from ordinary responses; protected
+  `admin-detail` routes remain the explicit exception;
 - upstream/push public responses do not include host, port, account, auth,
-  internal paths, or contact fields;
+  database/schema identifiers, or internal paths; business contacts remain in
+  `internal` and are removed in `strict`;
 - API catalog responses omit audit actors and arbitrary parameter/response
   examples, and drop credential-like parameters;
 - manual code-table and report responses omit audit actor fields;
@@ -145,22 +159,27 @@ catalog capability merely because its role omits that code.
 
 ## Frontend compatibility
 
-Remote mode hydrates identity through `/api/auth/me` before public business
-requests. The outcomes are:
+Remote mode loads `/api/public-catalog/config` and hydrates identity through
+`/api/auth/me` before business requests. The outcomes are:
 
 ```text
-/auth/me 200
+/auth/me 200 + any profile
   → authenticated user + current permissions
-/auth/me 401
+/auth/me 401 + internal/strict
   → anonymous user + public menus/stats/search/catalog
+/auth/me 401 + disabled
+  → no business data requests; show sign-in prompt
 ```
 
 The shared HTTP client continues to dispatch the normal unauthorized event for
 unexpected protected `401` responses, while the `/auth/me` probe suppresses the
 login prompt. Public catalog requests do not depend on a successful identity.
-The UI uses current write permissions to hide mutation buttons and keeps
-system-management navigation out of the anonymous menu; these are UX layers,
-not the security boundary.
+The UI uses current write permissions to hide mutation buttons, keeps
+system-management navigation out of the anonymous menu, and hides anonymous
+CSV exports unless explicitly enabled. The manual-code-table and field-mapping
+CSV endpoints both enforce the setting server-side and apply the public
+projection before producing output. These UI controls are UX layers, not
+substitutes for backend profile and RBAC enforcement.
 
 ## Regression coverage
 

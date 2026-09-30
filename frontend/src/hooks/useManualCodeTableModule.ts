@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createManualCodeTable,
   deleteManualCodeTable,
+  exportManualCodeTablesCsv,
   getManualCodeTables,
   updateManualCodeTable,
   updateManualCodeTableStatus,
 } from '../api/manualCodeTables.ts';
 import type { MockManualCodeTable } from '../data/manualCodeTables.ts';
 import { getBinaryStatusValue, toast } from '../components/common/index.ts';
+import { downloadCsvRows, downloadCsvContent } from '../utils/csv.ts';
 import { getErrorMessage, type ErrorWithPayload } from '../utils/ui.ts';
 
 export interface ManualCodeTableStyleOption {
@@ -92,7 +94,7 @@ export interface UseManualCodeTableModuleResult {
   setDetailItem: React.Dispatch<React.SetStateAction<MockManualCodeTable | null>>;
   changeStatus: (item: MockManualCodeTable, status: string) => void;
   remove: (item: MockManualCodeTable) => void;
-  exportCsv: () => void;
+  exportCsv: () => Promise<void>;
 }
 
 export function useManualCodeTableModule({
@@ -247,33 +249,38 @@ export function useManualCodeTableModule({
     }, 'code_table:write');
   };
 
-  const exportCsv = (): void => {
-    const styleMap = Object.fromEntries(MANUAL_CODE_TABLE_STYLES.map((item) => [item.value, item.label]));
-    const statusMap = Object.fromEntries(
-      Object.entries(MANUAL_CODE_TABLE_STATUS_META).map(([key, value]) => [key, value.label]),
-    );
-    const escapeCell = (value: unknown): string => `"${String(value ?? '').replaceAll('"', '""')}"`;
-    const rows = [
-      ['表编码', '表名称', '表样式', '负责人', '状态', '说明', '更新时间'],
-      ...filteredItems.map((item) => [
-        item.tableCode,
-        item.tableName,
-        styleMap[item.style] || item.style,
-        item.owner,
-        statusMap[item.status] || item.status,
-        item.remark,
-        item.updatedAt,
-      ]),
-    ];
-    const blob = new Blob(['\uFEFF' + rows.map((row) => row.map(escapeCell).join(',')).join('\n')], {
-      type: 'text/csv;charset=utf-8',
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = '手工码值表清单.csv';
-    link.click();
-    URL.revokeObjectURL(url);
+  const exportCsv = async (): Promise<void> => {
+    try {
+      const csv = await exportManualCodeTablesCsv({
+        keyword: query || '',
+        style: styleFilter,
+        status: statusFilter,
+      });
+      if (csv !== null) {
+        downloadCsvContent('手工码值表清单.csv', csv);
+        return;
+      }
+
+      const styleMap = Object.fromEntries(MANUAL_CODE_TABLE_STYLES.map((item) => [item.value, item.label]));
+      const statusMap = Object.fromEntries(
+        Object.entries(MANUAL_CODE_TABLE_STATUS_META).map(([key, value]) => [key, value.label]),
+      );
+      const rows = [
+        ['表编码', '表名称', '表样式', '负责人', '状态', '说明', '更新时间'],
+        ...filteredItems.map((item) => [
+          item.tableCode,
+          item.tableName,
+          styleMap[item.style] || item.style,
+          item.owner,
+          statusMap[item.status] || item.status,
+          item.remark,
+          item.updatedAt,
+        ]),
+      ];
+      downloadCsvRows('手工码值表清单.csv', rows);
+    } catch (exportError: unknown) {
+      toast.error(getErrorMessage(exportError, '导出码值表失败。'));
+    }
   };
 
   return {

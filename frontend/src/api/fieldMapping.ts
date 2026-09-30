@@ -419,6 +419,21 @@ export async function getFieldMappings(
   };
 }
 
+export async function exportFieldMappingCsv(
+  view: "field" | "table",
+  params: FieldMappingQueryParams = {},
+): Promise<string | null> {
+  if (API_MODE !== "remote") return null;
+  const payload = await requestRemote<unknown>("/field-mappings/export", {
+    params: { ...params, view },
+    timeout: LONG_REQUEST_TIMEOUT,
+  });
+  if (typeof payload !== "string") {
+    throw new Error("字段映射导出接口返回格式无效");
+  }
+  return payload;
+}
+
 export async function getFieldMappingTables(
   params: FieldMappingQueryParams = {},
 ): Promise<PagedFieldMappingResult<FieldMappingTableSummary>> {

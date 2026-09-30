@@ -28,7 +28,13 @@ from ...services.assets_service import (
     AssetNotFoundError,
     AssetValidationError,
 )
-from ..dependencies import require_permission
+from ..dependencies import (
+    get_authorization_service,
+    get_request_context,
+    require_permission,
+    require_public_catalog_access,
+)
+from ..public_catalog import profile_for_request, project_public_catalog_value
 from ..errors import _service_error_response
 
 
@@ -42,10 +48,16 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     router = APIRouter(
         prefix="/api/assets",
         tags=["assets-migration"],
+        dependencies=[Depends(require_public_catalog_access)],
     )
 
     def get_service() -> Any:
         return service
+
+    def project_for_request(value: Any, context: RequestContext, authorization: Any) -> Any:
+        return project_public_catalog_value(
+            value, profile=profile_for_request(context, authorization)
+        )
 
     @router.get("/tables", response_model=None)
     def get_asset_tables(
@@ -59,6 +71,8 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
         order_by: str | None = Query(default=None, alias="orderBy"),
         summary: str | None = Query(default=None),
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             if str(summary or "").strip().lower() in {"1", "true", "yes"}:
@@ -87,6 +101,7 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
                 }
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
+        payload = project_for_request(payload, context, authorization)
         response_model = (
             AssetPageResponse if "page" in payload else ItemsResponse[AssetItem]
         )
@@ -96,6 +111,8 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     def get_asset_detail(
         table_name: str,
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             data = current_service.get_asset_detail(table_name)
@@ -105,6 +122,7 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             return _service_error_response(error, 409)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
+        data = project_for_request(data, context, authorization)
         return JSONResponse(
             content=validate_contract({"data": data}, DataEnvelope[AssetItem])
         )
@@ -113,6 +131,8 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     def get_asset_fields(
         table_name: str,
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             items = current_service.get_asset_fields(table_name)
@@ -122,6 +142,7 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             return _service_error_response(error, 409)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
+        items = project_for_request(items, context, authorization)
         return JSONResponse(
             content=validate_contract({"items": items}, ItemsResponse[AssetField])
         )
@@ -130,6 +151,8 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     def get_asset_ddl(
         table_name: str,
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             data = current_service.get_asset_ddl(table_name)
@@ -139,6 +162,7 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             return _service_error_response(error, 409)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
+        data = project_for_request(data, context, authorization)
         return JSONResponse(
             content=validate_contract({"data": data}, DataEnvelope[object])
         )
@@ -147,11 +171,14 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     def get_domains(
         layer: str | None = Query(default=None),
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             items = current_service.get_domains(layer=layer)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
+        items = project_for_request(items, context, authorization)
         return JSONResponse(
             content=validate_contract({"items": items}, ItemsResponse[object])
         )
@@ -160,11 +187,14 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     def get_layers(
         domain: str | None = Query(default=None),
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             items = current_service.get_layers(domain=domain)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
+        items = project_for_request(items, context, authorization)
         return JSONResponse(
             content=validate_contract({"items": items}, ItemsResponse[object])
         )
@@ -270,6 +300,8 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     def get_asset_detail_by_id(
         asset_id: str,
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             data = current_service.get_asset_detail_by_id(asset_id)
@@ -277,6 +309,7 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             return _service_error_response(error, 404)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
+        data = project_for_request(data, context, authorization)
         return JSONResponse(
             content=validate_contract({"data": data}, DataEnvelope[AssetItem])
         )
@@ -285,6 +318,8 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     def get_asset_fields_by_id(
         asset_id: str,
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             items = current_service.get_asset_fields_by_id(asset_id)
@@ -292,6 +327,7 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             return _service_error_response(error, 404)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
+        items = project_for_request(items, context, authorization)
         return JSONResponse(
             content=validate_contract({"items": items}, ItemsResponse[AssetField])
         )
@@ -300,6 +336,8 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
     def get_asset_ddl_by_id(
         asset_id: str,
         current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             data = current_service.get_asset_ddl_by_id(asset_id)
@@ -307,6 +345,7 @@ def _register_asset_routes(app: FastAPI, service: Any) -> None:
             return _service_error_response(error, 404)
         except AssetDataSourceError as error:
             return _service_error_response(error, 500)
+        data = project_for_request(data, context, authorization)
         return JSONResponse(
             content=validate_contract({"data": data}, DataEnvelope[object])
         )

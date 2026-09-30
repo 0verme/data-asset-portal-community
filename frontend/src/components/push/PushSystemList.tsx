@@ -11,9 +11,11 @@ export function ProtocolTag({ protocol }: ProtocolTagProps) {
   return <span className="tag tag-neutral">{protocol}</span>;
 }
 
-function getSystemText(system: PublicPushSystem, key: string): string {
-  const value = system[key];
-  return typeof value === "string" ? value : "";
+function getSystemText(
+  system: PublicPushSystem,
+  key: "downstreamContact" | "dataDeveloperContact",
+): string {
+  return system[key] || "";
 }
 
 export interface PushSystemListProps {
@@ -25,7 +27,7 @@ export interface PushSystemListProps {
 
 export function PushSystemList({ systems, query, view, onOpen }: PushSystemListProps) {
   const showContactDetails = systems.some((system) => (
-    getSystemText(system, "host") || getSystemText(system, "downstreamContact") || getSystemText(system, "dataDeveloperContact")
+    getSystemText(system, "downstreamContact") || getSystemText(system, "dataDeveloperContact")
   ));
 
   if (!systems.length) {
@@ -89,7 +91,6 @@ export function PushSystemList({ systems, query, view, onOpen }: PushSystemListP
       {systems.map((system) => {
         const badgeText = getSystemBadgeText(system.abbr);
         const isImportant = system.importanceLevel === "important";
-        const host = getSystemText(system, "host");
         const downstreamContact = getSystemText(system, "downstreamContact");
         const dataDeveloperContact = getSystemText(system, "dataDeveloperContact");
         return (
@@ -118,10 +119,6 @@ export function PushSystemList({ systems, query, view, onOpen }: PushSystemListP
                 <span className="cv mono">{system.latestOutputTime || "未配置"}</span>
               </div>
             ) : null}
-            {host ? <div className="sys-conn">
-              <span className="ck">下游 IP</span>
-              <span className="cv mono">{host}</span>
-            </div> : null}
             {downstreamContact ? <div className="sys-conn">
               <span className="ck">下游对接人</span>
               <span className="cv">{downstreamContact}</span>

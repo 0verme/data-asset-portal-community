@@ -165,6 +165,8 @@ ASSET_AUTH_DB_PROFILE=primary
 APP_SECRET_KEY=<generate-a-strong-random-value>
 # Explicit local-development setting: permits HTTP session cookies locally.
 APP_ENV=development
+PUBLIC_CATALOG_PROFILE=internal
+PUBLIC_CATALOG_EXPORT_ENABLED=false
 # Vite uses a same-origin /api proxy by default, so normally leave this unset.
 # APP_CORS_ORIGINS=http://localhost:5173
 ```
@@ -185,6 +187,8 @@ Remote API 的普通业务目录 GET 支持匿名浏览：资产、字段/DDL、
 写操作、管理 API 和敏感读取继续使用现有 RBAC `require_permission(...)`；匿名访问这些接口返回 `401`，已有身份但缺少授权返回 `403`。系统用户/角色/参数、操作日志、Metadata ingestion、上/下游 `admin-detail` 以及连接/凭据字段不属于公开目录。
 
 `/api/auth/me` 未登录仍返回 `401`，这是正常的身份探测结果。前端将其转换为 anonymous 状态，然后继续加载公开菜单、统计、搜索和业务模块，而不是停止应用数据加载。完整清单见 [Public Catalog + Authenticated Management](./docs/rbac/authenticated-read-model.md)。
+
+匿名目录策略由后端统一配置：`PUBLIC_CATALOG_PROFILE=internal`（默认）允许业务负责人/维护人姓名；`strict` 隐藏人员身份但保留组织元数据；`disabled` 由后端拒绝匿名业务目录 API 并隐藏匿名菜单。`PUBLIC_CATALOG_EXPORT_ENABLED=false` 默认关闭匿名批量导出。永久敏感字段（凭据、数据库账号、连接信息、内部路径和诊断信息等）不会因为 profile 改变而公开。非法 profile 会明确阻止应用启动。
 
 ### FastAPI 开发文档
 

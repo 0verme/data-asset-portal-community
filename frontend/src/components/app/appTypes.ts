@@ -41,6 +41,8 @@ export interface AppModuleContext {
   auth: AuthSession;
   backToUpstreamList: () => void;
   businessAccessReady: boolean;
+  catalogAccessDisabled: boolean;
+  catalogExportEnabled: boolean;
   can: UseAuthSessionResult['can'];
   canEdit: boolean;
   canManageMenus: boolean;
