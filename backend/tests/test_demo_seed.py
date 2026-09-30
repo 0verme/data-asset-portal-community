@@ -25,7 +25,7 @@ from backend.app.services.upstream_service import (
     UpstreamValidationError,
 )
 from demo.seed_loader import ADMIN_USER, DEMO_PUSH_AUTH_TYPE, LEGACY_DEMO_PUSH_AUTH_TYPE
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = ROOT.parent
@@ -128,7 +128,7 @@ class CommunityDemoSeedTests(unittest.TestCase):
 
     def test_seed_creates_demo_admin_with_hashed_password(self):
         self.assertEqual("admin", ADMIN_USER["username"])
-        self.assertEqual("12346", ADMIN_USER["password"])
+        self.assertEqual("123456", ADMIN_USER["password"])
         self.assertEqual("admin", ADMIN_USER["role"])
         self.assertEqual("ACTIVE", ADMIN_USER["status"])
 
@@ -146,10 +146,37 @@ class CommunityDemoSeedTests(unittest.TestCase):
         self.assertIsNotNone(row)
         username, password_hash, role, status = row
         self.assertEqual("admin", username)
-        self.assertNotEqual("12346", password_hash)
-        self.assertTrue(check_password_hash(password_hash, "12346"))
+        self.assertNotEqual("123456", password_hash)
+        self.assertTrue(check_password_hash(password_hash, "123456"))
         self.assertEqual("admin", role)
         self.assertEqual("ACTIVE", status)
+
+    def test_reseeding_does_not_reset_existing_demo_admin_password(self):
+        self._seed()
+        legacy_password_hash = generate_password_hash("12346")
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute(
+                "UPDATE p_admin_user SET password_hash = ? WHERE id = ?",
+                (legacy_password_hash, ADMIN_USER["id"]),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        self._seed()
+        connection = sqlite3.connect(self.database)
+        try:
+            password_hash = connection.execute(
+                "SELECT password_hash FROM p_admin_user WHERE id = ?",
+                (ADMIN_USER["id"],),
+            ).fetchone()[0]
+        finally:
+            connection.close()
+
+        self.assertEqual(legacy_password_hash, password_hash)
+        self.assertTrue(check_password_hash(password_hash, "12346"))
+        self.assertFalse(check_password_hash(password_hash, "123456"))
 
     def _counts(self):
         connection = sqlite3.connect(self.database)

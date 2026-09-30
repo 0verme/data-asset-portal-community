@@ -74,6 +74,10 @@ class CreateAdminCliTests(unittest.TestCase):
         load_runtime.assert_called_once_with()
         self.assertIn("Admin user 'admin' created successfully.", output.getvalue())
         self.assertNotIn("not-a-default-password", output.getvalue())
+        self.assertEqual(
+            ["Password: ", "Confirm password: "],
+            [entry.args[0] for entry in getpass.call_args_list],
+        )
         create.assert_called_once_with("admin", "Administrator", "not-a-default-password")
 
     @patch.object(create_admin, "_load_runtime")

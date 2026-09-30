@@ -45,11 +45,13 @@ class ConfigurationSurfaceTests(unittest.TestCase):
         auth_ts = (ROOT / "frontend/src/auth.ts").read_text(encoding="utf-8")
         frontend_env = (ROOT / "frontend/.env.example").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("community-demo-password", auth_ts)
-        self.assertNotIn("admin123", auth_ts)
-        self.assertIn("community-demo-password", frontend_env)
-        self.assertNotIn("admin123", frontend_env)
-        self.assertIn("community-demo-password", readme)
+        self.assertIn("VITE_MOCK_AUTH_PASSWORD", auth_ts)
+        self.assertIn("123456", auth_ts)
+        self.assertNotIn("community-demo-password", auth_ts)
+        self.assertIn("VITE_MOCK_AUTH_PASSWORD=123456", frontend_env)
+        self.assertNotIn("community-demo-password", frontend_env)
+        self.assertIn("admin` / `123456`", readme)
+        self.assertNotIn("community-demo-password", readme)
         self.assertNotIn("the demo credentials configured by the mock demo", readme)
 
 

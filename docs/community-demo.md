@@ -59,7 +59,7 @@ Frontend:    http://127.0.0.1:5173/
 Backend/API: http://127.0.0.1:15099
 Demo administrator:
   Username: admin
-  Password: 12346
+  Password: 123456
 Database:    <repository>/.demo/community-demo/community.sqlite
 Stop: Ctrl+C
 ```
@@ -146,10 +146,12 @@ Run #2 → migration no-op/seed idempotent → HTTP smoke
 
 ```text
 username: admin
-password: 12346
+password: 123456
 ```
 
-这是 canonical Community seed 的虚构本地账号，仅用于 Community Demo / 本地体验，不是生产环境默认管理员。正式部署请修改密码或创建独立管理员账号。
+这是 canonical Community seed 的虚构本地账号，仅用于 Community Demo / 本地体验，不是生产环境默认管理员。正式部署请使用 `backend/scripts/create_admin.py` 交互创建管理员，不提供默认密码。
+
+已有 Demo SQLite 数据库不会因重复执行 seed 自动重置管理员密码；需要验证新的默认凭据时，请重新初始化 Demo 数据库。
 
 ## Troubleshooting
 
