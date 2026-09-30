@@ -65,7 +65,7 @@ class DatabaseExampleConfigTests(unittest.TestCase):
             "com.huawei.gauss200.jdbc.Driver", profiles["gauss_primary"]["driver"]
         )
         self.assertEqual(120, profiles["gauss_primary"]["socket_timeout"])
-        self.assertEqual("dwp", profiles["gauss_primary"]["schema"])
+        self.assertEqual("dap", profiles["gauss_primary"]["schema"])
         self.assertIn("currentSchema=dwp", profiles["gauss_primary"]["jdbc_url"])
 
         env_example = (ROOT / "backend/.env.example").read_text(encoding="utf-8")
@@ -94,16 +94,16 @@ class DatabaseExampleConfigTests(unittest.TestCase):
     def test_gauss_schema_drives_physical_schema_sql_and_migration_prefix(self):
         with self.configured_runtime():
             profile = get_db_profile("gauss_primary")
-            self.assertEqual("dwp", profile["schema"])
-            self.assertEqual("dwp", GaussDBProvider().physical_schema(profile))
-            self.assertEqual({"__app__": "dwp"}, _schema_translate_map(profile))
+            self.assertEqual("dap", profile["schema"])
+            self.assertEqual("dap", GaussDBProvider().physical_schema(profile))
+            self.assertEqual({"__app__": "dap"}, _schema_translate_map(profile))
             self.assertIn(
-                "dwp.assets",
+                "dap.assets",
                 normalize_sql_for_profile(
                     "gauss_primary", "SELECT * FROM __app__.assets"
                 ),
             )
-        self.assertEqual("dwp.", _prefix(profile))
+        self.assertEqual("dap.", _prefix(profile))
 
 
 if __name__ == "__main__":
