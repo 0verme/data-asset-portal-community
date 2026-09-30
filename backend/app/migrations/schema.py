@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from ..db.providers import gaussdb_schema_sql_identifier
 from ..db.registry import get_provider
 
 BASELINE_REVISION = "0001_baseline"
@@ -93,28 +94,94 @@ def baseline_tables(dialect: str, root: Path = SCHEMA_ROOT) -> tuple[str, ...]:
 
 
 def _split_sql_statements(sql: str) -> list[str]:
+    """Split the baseline SQL subset without splitting quoted text or comments."""
     statements: list[str] = []
     current: list[str] = []
     quote: str | None = None
+    line_comment = False
+    block_depth = 0
+    dollar_quote: str | None = None
     index = 0
     while index < len(sql):
         character = sql[index]
-        current.append(character)
+        pair = sql[index:index + 2]
+
+        if line_comment:
+            current.append(character)
+            if character == "\n":
+                line_comment = False
+            index += 1
+            continue
+        if block_depth:
+            if pair == "/*":
+                current.extend(pair)
+                block_depth += 1
+                index += 2
+            elif pair == "*/":
+                current.extend(pair)
+                block_depth -= 1
+                index += 2
+            else:
+                current.append(character)
+                index += 1
+            continue
+        if dollar_quote:
+            if sql.startswith(dollar_quote, index):
+                current.extend(dollar_quote)
+                index += len(dollar_quote)
+                dollar_quote = None
+            else:
+                current.append(character)
+                index += 1
+            continue
         if quote:
+            current.append(character)
+            if character == "\\" and quote in {"'", "`"} and index + 1 < len(sql):
+                current.append(sql[index + 1])
+                index += 2
+                continue
             if character == quote:
                 if index + 1 < len(sql) and sql[index + 1] == quote:
                     current.append(sql[index + 1])
-                    index += 1
-                else:
-                    quote = None
+                    index += 2
+                    continue
+                quote = None
+            index += 1
+            continue
+
+        if pair == "--":
+            current.extend(pair)
+            line_comment = True
+            index += 2
+        elif pair == "/*":
+            current.extend(pair)
+            block_depth = 1
+            index += 2
+        elif character == "$":
+            match = re.match(r"\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$", sql[index:])
+            if match:
+                dollar_quote = match.group(0)
+                current.extend(dollar_quote)
+                index += len(dollar_quote)
+            else:
+                current.append(character)
+                index += 1
         elif character in "'\"`":
             quote = character
+            current.append(character)
+            index += 1
         elif character == ";":
-            statement = "".join(current[:-1]).strip()
+            statement = "".join(current).strip()
             if statement:
                 statements.append(statement)
             current = []
-        index += 1
+            index += 1
+        else:
+            current.append(character)
+            index += 1
+
+    if quote or block_depth or dollar_quote:
+        raise ValueError("unterminated quote or comment in SQL baseline")
     statement = "".join(current).strip()
     if statement:
         statements.append(statement)
@@ -410,10 +477,154 @@ def verify_baselines(root: Path = SCHEMA_ROOT) -> tuple[str, ...]:
     return tuple(sorted(expected or ()))
 
 
+def _dws_schema(config: dict) -> str:
+    provider = get_provider(config["type"])
+    if provider.name != "gaussdb":
+        raise ValueError("DWS migration requires a GaussDB profile")
+    return provider.physical_schema(config)
+
+
 def _prefix(config: dict) -> str:
     provider = get_provider(config["type"])
     schema = provider.physical_schema(config)
+    if provider.name == "gaussdb":
+        schema = gaussdb_schema_sql_identifier(schema)
     return f"{schema}." if schema else ""
+
+
+def _render_schema_qualified_identifiers(
+    sql: str, canonical_schema: str, target_schema: str
+) -> str:
+    """Map only SQL schema identifiers, leaving literals and comments intact."""
+    rendered: list[str] = []
+    target = gaussdb_schema_sql_identifier(target_schema)
+    index = 0
+    while index < len(sql):
+        pair = sql[index:index + 2]
+        character = sql[index]
+
+        if pair == "--":
+            end = sql.find("\n", index)
+            if end < 0:
+                rendered.append(sql[index:])
+                break
+            rendered.append(sql[index:end + 1])
+            index = end + 1
+            continue
+        if pair == "/*":
+            depth = 1
+            end = index + 2
+            while end < len(sql) and depth:
+                nested = sql[end:end + 2]
+                if nested == "/*":
+                    depth += 1
+                    end += 2
+                elif nested == "*/":
+                    depth -= 1
+                    end += 2
+                else:
+                    end += 1
+            rendered.append(sql[index:end])
+            index = end
+            continue
+        if character == "$":
+            match = re.match(r"\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$", sql[index:])
+            if match:
+                delimiter = match.group(0)
+                close = sql.find(delimiter, index + len(delimiter))
+                end = len(sql) if close < 0 else close + len(delimiter)
+                rendered.append(sql[index:end])
+                index = end
+                continue
+        if character == "'":
+            end = index + 1
+            while end < len(sql):
+                if sql[end] == "\\" and end + 1 < len(sql):
+                    end += 2
+                elif sql[end] == "'":
+                    if end + 1 < len(sql) and sql[end + 1] == "'":
+                        end += 2
+                    else:
+                        end += 1
+                        break
+                else:
+                    end += 1
+            rendered.append(sql[index:end])
+            index = end
+            continue
+        if character == '"':
+            end = index + 1
+            identifier: list[str] = []
+            while end < len(sql):
+                if sql[end] == '"':
+                    if end + 1 < len(sql) and sql[end + 1] == '"':
+                        identifier.append('"')
+                        end += 2
+                    else:
+                        end += 1
+                        break
+                else:
+                    identifier.append(sql[end])
+                    end += 1
+            after = end
+            while after < len(sql) and sql[after].isspace():
+                after += 1
+            if (
+                "".join(identifier) == canonical_schema
+                and after < len(sql)
+                and sql[after] == "."
+            ):
+                rendered.append(target + sql[end:after + 1])
+                index = after + 1
+            else:
+                rendered.append(sql[index:end])
+                index = end
+            continue
+        if character == "`":
+            end = index + 1
+            while end < len(sql):
+                if sql[end] == "`":
+                    if end + 1 < len(sql) and sql[end + 1] == "`":
+                        end += 2
+                    else:
+                        end += 1
+                        break
+                else:
+                    end += 1
+            rendered.append(sql[index:end])
+            index = end
+            continue
+
+        match = re.match(r"[A-Za-z_][A-Za-z0-9_$]*", sql[index:])
+        if match:
+            token = match.group(0)
+            end = index + len(token)
+            after = end
+            while after < len(sql) and sql[after].isspace():
+                after += 1
+            is_schema = token.lower() == canonical_schema.lower()
+            if is_schema and after < len(sql) and sql[after] == ".":
+                rendered.append(target + sql[end:after + 1])
+                index = after + 1
+            else:
+                rendered.append(token)
+                index = end
+            continue
+
+        rendered.append(character)
+        index += 1
+    return "".join(rendered)
+
+
+def render_baseline_for_profile(
+    config: dict, dialect: str, root: Path = SCHEMA_ROOT
+) -> str:
+    """Render a canonical baseline for a profile without rewriting SQL values."""
+    sql = baseline_path(dialect, root).read_text(encoding="utf-8")
+    if dialect != "dws":
+        return sql
+    schema = _dws_schema(config)
+    return _render_schema_qualified_identifiers(sql, "dwp", schema)
 
 
 def _execute(connection, sql: str, *, split: bool):
@@ -443,6 +654,23 @@ def current_revision(connection, config: dict) -> str | None:
         cursor.close()
 
 
+def _assert_dws_schema_exists(connection, config: dict):
+    schema = _dws_schema(config)
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "SELECT 1 FROM information_schema.schemata WHERE schema_name = ?",
+            (schema,),
+        )
+        exists = cursor.fetchone() is not None
+    finally:
+        cursor.close()
+    if not exists:
+        raise RuntimeError(
+            f"target schema '{schema}' does not exist; create it before applying migrations"
+        )
+
+
 def _has_user_tables(connection, config: dict) -> bool:
     db_type = config["type"]
     cursor = connection.cursor()
@@ -458,7 +686,9 @@ def _has_user_tables(connection, config: dict) -> bool:
                 "AND table_name <> 'alembic_version' LIMIT 1"
             )
         else:
-            schema = get_provider(db_type).physical_schema(config) or "dwp"
+            schema = get_provider(db_type).physical_schema(config)
+            if not schema:
+                raise ValueError("database profile requires a physical schema for migration checks")
             placeholder = get_provider(db_type).placeholder
             cursor.execute(
                 "SELECT 1 FROM information_schema.tables WHERE table_schema = " + placeholder
@@ -490,13 +720,15 @@ def _stamp(connection, config: dict):
 
 
 def initialize(connection, config: dict, dialect: str, root: Path = SCHEMA_ROOT) -> bool:
+    if dialect == "dws":
+        _assert_dws_schema_exists(connection, config)
     if current_revision(connection, config) is not None:
         return False
     if _has_user_tables(connection, config):
         raise RuntimeError("database already contains user tables; verify it and use baseline/stamp")
-    sql = baseline_path(dialect, root).read_text(encoding="utf-8")
+    sql = render_baseline_for_profile(config, dialect, root)
     try:
-        _execute(connection, sql, split=dialect in {"sqlite", "mysql"})
+        _execute(connection, sql, split=dialect in {"sqlite", "mysql", "dws"})
         _stamp(connection, config)
         connection.commit()
         return True
@@ -581,7 +813,7 @@ def _reflect_sqlite(connection, expected: SchemaModel) -> SchemaModel:
 
 
 def _schema_for_reflection(config: dict) -> str:
-    return get_provider(config["type"]).physical_schema(config) or "dwp"
+    return get_provider(config["type"]).physical_schema(config)
 
 
 def _column_type(data_type: Any, length: Any, precision: Any, scale: Any) -> str:
