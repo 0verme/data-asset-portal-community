@@ -66,7 +66,7 @@ class DatabaseExampleConfigTests(unittest.TestCase):
         )
         self.assertEqual(120, profiles["gauss_primary"]["socket_timeout"])
         self.assertEqual("dap", profiles["gauss_primary"]["schema"])
-        self.assertIn("currentSchema=dwp", profiles["gauss_primary"]["jdbc_url"])
+        self.assertIn("currentSchema=dap", profiles["gauss_primary"]["jdbc_url"])
 
         env_example = (ROOT / "backend/.env.example").read_text(encoding="utf-8")
         self.assertRegex(env_example, r"(?m)^ASSET_DB_PROFILE=primary$")

@@ -73,6 +73,8 @@ GaussDB / DWS 的准确边界是：
 - **CI 中只有 `schema_migrate.py verify --offline --dialect dws` 一项静态校验**；
 - 没有在线 GaussDB / DWS 实例，没有 CRMA/CRUD 集成测试，没有 seed 回归；
 - 商业 JDBC 驱动（如 `gaussdb200.jar`）不包含在仓库中，由部署方自行提供。
+- 在线 `apply` 必须在 GaussDB profile 中显式配置安全的 `schema`，并由部署方预先创建该 schema；migration 会先检查它存在，不会创建 schema，也不会回退到 `dwp`。
+- DWS canonical baseline 使用 `dwp` 作为逻辑 schema；运行时只将 schema-qualified identifiers 映射到 profile 的物理 schema。在线 GaussDB 仍需部署方自行验收。
 
 因此它只能被描述为 **Compatible**，不能被描述为「已验证支持」或与 PostgreSQL / MySQL 同级。
 

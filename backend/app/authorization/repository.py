@@ -30,6 +30,7 @@ from ..db.facade import (
     load_db_profiles,
     resolve_db_profile_name,
 )
+from ..db.providers import gaussdb_schema_sql_identifier
 from ..db.registry import get_provider
 from .core import AuthorizationSubject
 
@@ -54,9 +55,12 @@ def _qualified_table(config: dict[str, Any], table: str) -> str:
     if not _IDENTIFIER.fullmatch(table):
         raise ValueError(f"unsupported authorization table: {table}")
     if schema:
-        if not _IDENTIFIER.fullmatch(str(schema)):
+        schema_identifier = str(schema)
+        if not _IDENTIFIER.fullmatch(schema_identifier):
             raise ValueError("database schema must be a simple identifier")
-        return f"{schema}.{table}"
+        if provider.name == "gaussdb":
+            schema_identifier = gaussdb_schema_sql_identifier(schema_identifier)
+        return f"{schema_identifier}.{table}"
     return table
 
 

@@ -38,7 +38,7 @@ profiles:
     driver: com.huawei.gauss200.jdbc.Driver
     # Relative to backend/. ASSET_DB_JAR_PATH can override this per environment.
     jar_path: resources/jars/gaussdb200.jar
-    jdbc_url: jdbc:gaussdb://127.0.0.1:25308/asset_portal?currentSchema=dwp
+    jdbc_url: jdbc:gaussdb://127.0.0.1:25308/asset_portal?currentSchema=dap
     schema: dap
     user: change_me
     password: change_me

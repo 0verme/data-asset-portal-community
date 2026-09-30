@@ -86,9 +86,29 @@ class ProviderContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "requires jdbc_url, user, password"):
                 GaussDBProvider().validate(
                     "dws",
-                    {"type": "gaussdb", "jar_path": str(jar)},
+                    {"type": "gaussdb", "schema": "dap", "jar_path": str(jar)},
                     config_path=Path(directory) / "database.yaml",
                 )
+
+    def test_dws_profile_requires_safe_explicit_schema(self):
+        with tempfile.TemporaryDirectory() as directory:
+            jar = Path(directory) / "driver.jar"
+            jar.touch()
+            for schema in (None, "", "   ", "dap;DROP SCHEMA xxx", "foo.bar"):
+                with self.subTest(schema=schema):
+                    config = {
+                        "type": "gaussdb",
+                        "jdbc_url": "jdbc:gaussdb://db.example.test:25308/database",
+                        "user": "test-user",
+                        "password": "test-password",
+                        "jar_path": str(jar),
+                    }
+                    if schema is not None:
+                        config["schema"] = schema
+                    with self.assertRaisesRegex(ValueError, "safe SQL identifier"):
+                        GaussDBProvider().validate(
+                            "dws", config, config_path=Path(directory) / "database.yaml"
+                        )
 
     def test_third_party_provider_uses_the_same_contract_and_aliases(self):
         @dataclass(frozen=True)
