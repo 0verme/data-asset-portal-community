@@ -30,7 +30,11 @@ from .base import (
     DatabaseTransactionError,
     redact_sensitive_text,
 )
-from .providers import DEFAULT_GAUSS_DRIVER, LOGICAL_SCHEMA
+from .providers import (
+    DEFAULT_GAUSS_DRIVER,
+    LOGICAL_SCHEMA,
+    gaussdb_schema_sql_identifier,
+)
 from .registry import get_provider
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -445,7 +449,12 @@ def normalize_sql_for_profile(profile: str, sql_text: str) -> str:
     config = get_db_profile(profile)
     provider = get_provider(config["type"])
     physical_schema = provider.physical_schema(config)
-    schema_prefix = f"{physical_schema}." if physical_schema else ""
+    schema_identifier = (
+        gaussdb_schema_sql_identifier(physical_schema)
+        if provider.name == "gaussdb"
+        else physical_schema
+    )
+    schema_prefix = f"{schema_identifier}." if schema_identifier else ""
     sql_text = sql_text.replace(f"{LOGICAL_SCHEMA}.", schema_prefix)
     if physical_schema is None:
         sql_text = sql_text.replace("dwp.", "")

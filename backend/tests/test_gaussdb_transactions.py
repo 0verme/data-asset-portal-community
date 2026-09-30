@@ -130,7 +130,7 @@ class DatabaseTransactionTests(unittest.TestCase):
             patch("backend.app.db.facade.connect_with_profile", return_value=conn),
             patch(
                 "backend.app.db.facade.get_db_profile",
-                return_value={"type": "gaussdb"},
+                return_value={"type": "gaussdb", "schema": "dap"},
             ),
         ):
             execute_statements(
@@ -165,7 +165,7 @@ class DatabaseTransactionTests(unittest.TestCase):
             patch("backend.app.db.facade.connect_with_profile", return_value=conn),
             patch(
                 "backend.app.db.facade.get_db_profile",
-                return_value={"type": "gaussdb"},
+                return_value={"type": "gaussdb", "schema": "dap"},
             ),
         ):
             with self.assertRaisesRegex(RuntimeError, "write failed"):

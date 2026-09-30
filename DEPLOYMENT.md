@@ -187,6 +187,8 @@ backend/.venv/bin/python backend/scripts/schema_migrate.py \
 
 如果使用 MySQL 8.0，先安装可选依赖 `backend/requirements-mysql.txt`，再将 `--profile` 替换为实际 MySQL profile；GaussDB/DWS 使用对应的 profile 和 JDBC 驱动。不要编造 profile，也不要把数据库密码放进命令行参数。
 
+GaussDB/DWS profile 必须显式设置安全的 `schema`。执行 `apply` 前，由 DBA / 部署方预先创建该 schema，并确认它专属于本次 DAP 部署；migration 会检查目标 schema 是否存在，只在该 schema 内创建应用对象，不会创建 schema，也不会回退到 `dwp`。
+
 `demo/seed_sqlite.py`、`demo/seed_postgres.py` 只用于受控 Community Demo 数据。正式数据库是否导入虚构 Demo 数据应由部署方明确决定，不要把 Demo seed 当作生产业务数据初始化。
 
 如果是 Community/local 隔离运行，并已在 runtime env 中设置 `ASSET_RUNTIME_PROFILE=community`，可以使用仓库提供的 Community profile：
