@@ -133,6 +133,14 @@ Resolution is:
 6. PostgreSQL uses `dsn` when present; otherwise it uses host, port, database,
    user, and password.
 
+### GaussDB/DWS JDBC Java compatibility
+
+GaussDB/DWS JDBC dependencies are selected for the JVM used by the backend, not
+for the database release. Choose the Java 8 legacy profile or the Java 11+
+current profile before installing optional dependencies; the compatibility
+matrix, install commands, upstream evidence, and preflight checks are maintained
+in the [canonical GaussDB/DWS JDBC compatibility section](../backend/README.md#gaussdbdws-jdbc-compatibility-by-java-version).
+
 The profile/provider abstraction remains the supported path for SQLite,
 PostgreSQL, MySQL, and GaussDB/DWS, including SQLAlchemy, DBAPI, and JDBC
 providers. `TEST_DATABASE_PROFILE` and `TEST_DATABASE_CONFIG_PATH` are test/CI

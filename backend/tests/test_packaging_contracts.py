@@ -36,6 +36,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND = REPO_ROOT / "backend"
 FRONTEND = REPO_ROOT / "frontend"
 PKG_JSON = FRONTEND / "package.json"
 PKG_LOCK = FRONTEND / "package-lock.json"
@@ -61,6 +62,36 @@ DOC_README = REPO_ROOT / "README.md"
 
 def _load_json(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+class GaussDBRequirementsContractTests(unittest.TestCase):
+    """Keep optional JDBC dependency pins explicit for supported JVM profiles."""
+
+    PROFILES = (
+        ("requirements-gaussdb.txt", "1.7.1"),
+        ("requirements-gaussdb-java8.txt", "1.5.2"),
+    )
+
+    @staticmethod
+    def _direct_pins(path: Path) -> dict[str, str]:
+        pins = {}
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith(("#", "-")) or "==" not in line:
+                continue
+            name, version = line.split("==", 1)
+            pins[name.strip().lower().replace("_", "-")] = version.strip()
+        return pins
+
+    def test_java_profiles_pin_distinct_jpype_versions_and_shared_jaydebeapi(self):
+        for filename, jpype_version in self.PROFILES:
+            with self.subTest(filename=filename):
+                path = BACKEND / filename
+                lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines()]
+                self.assertIn("-r requirements.txt", lines)
+                pins = self._direct_pins(path)
+                self.assertEqual("1.2.3", pins.get("jaydebeapi"))
+                self.assertEqual(jpype_version, pins.get("jpype1"))
 
 
 class DependencyContractTests(unittest.TestCase):

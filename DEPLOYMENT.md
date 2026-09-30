@@ -142,6 +142,22 @@ python3 -m venv backend/.venv
 backend/.venv/bin/python -m pip install -r backend/requirements.txt
 ```
 
+GaussDB/DWS 还需要安装与 JVM 版本匹配的可选 JDBC 依赖。Java 8 使用
+`backend/requirements-gaussdb-java8.txt`；Java 11+ 使用默认的
+`backend/requirements-gaussdb.txt`。从仓库根目录、用服务虚拟环境执行，例如：
+
+```bash
+# 二选一：Java 8
+backend/.venv/bin/python -m pip install -r backend/requirements-gaussdb-java8.txt
+
+# 二选一：Java 11+
+backend/.venv/bin/python -m pip install -r backend/requirements-gaussdb.txt
+```
+
+不要在 Java 8 上照默认示例安装 JPype1 1.7.1，也不要把所有环境统一降级到
+JPype1 1.5.2。完整兼容矩阵、上游依据和部署前自检命令见
+[GaussDB/DWS JDBC compatibility by Java version](./backend/README.md#gaussdbdws-jdbc-compatibility-by-java-version)。
+
 交互式 shell 可以使用 `source backend/.venv/bin/activate`，但 systemd 不依赖 shell activate，而是直接调用虚拟环境中的绝对路径。
 
 手动前台启动（用于首次验证，不是最终托管方式）：
@@ -185,7 +201,7 @@ backend/.venv/bin/python backend/scripts/schema_migrate.py \
   --config /opt/data-asset-portal/backend/configs/database.yaml
 ```
 
-如果使用 MySQL 8.0，先安装可选依赖 `backend/requirements-mysql.txt`，再将 `--profile` 替换为实际 MySQL profile；GaussDB/DWS 使用对应的 profile 和 JDBC 驱动。不要编造 profile，也不要把数据库密码放进命令行参数。
+如果使用 MySQL 8.0，先安装可选依赖 `backend/requirements-mysql.txt`，再将 `--profile` 替换为实际 MySQL profile；GaussDB/DWS 使用与 JVM 版本匹配的 requirements、对应 profile 和 JDBC 驱动（见[兼容矩阵](./backend/README.md#gaussdbdws-jdbc-compatibility-by-java-version)）。不要编造 profile，也不要把数据库密码放进命令行参数。
 
 GaussDB/DWS profile 必须显式设置安全的 `schema`。执行 `apply` 前，由 DBA / 部署方预先创建该 schema，并确认它专属于本次 DAP 部署；migration 会检查目标 schema 是否存在，只在该 schema 内创建应用对象，不会创建 schema，也不会回退到 `dwp`。
 
@@ -467,7 +483,7 @@ HTTPS Production 将上述 `http://` 替换为 `https://`。最终至少确认�
 
 1. 获取固定 release/tag/commit，准备安装目录、服务账号、Nginx 和数据库。
 2. 复制并填写 `backend/.env.local` 与 `backend/configs/database.yaml`；生成 `APP_SECRET_KEY`。
-3. 创建 `backend/.venv` 并安装 `backend/requirements.txt`（MySQL/GaussDB 按需安装额外依赖/驱动）。
+3. 创建 `backend/.venv` 并安装 `backend/requirements.txt`；MySQL 按需安装可选依赖，GaussDB/DWS 按运行时 Java 版本选择对应 JDBC requirements（见[兼容矩阵](./backend/README.md#gaussdbdws-jdbc-compatibility-by-java-version)），并由部署方提供 JDBC 驱动。
 4. 执行 `schema_migrate.py apply`，再执行 `status`/`verify`。
 5. 执行 `create_admin.py` 创建管理员。
 6. 通过服务器或构建机执行 `cd frontend && npm ci && npm run build`，确认 `frontend/dist/index.html`；或部署已验证的 `frontend/dist` artifact。

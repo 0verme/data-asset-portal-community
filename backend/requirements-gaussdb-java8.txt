@@ -1,0 +1,4 @@
+# Legacy dependency profile for Java 8; see backend/README.md for the compatibility matrix.
+-r requirements.txt
+JayDeBeApi==1.2.3
+JPype1==1.5.2

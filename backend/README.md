@@ -13,6 +13,55 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+## GaussDB/DWS JDBC compatibility by Java version
+
+本节是 GaussDB/DWS JDBC 依赖与 JVM 版本的 canonical 安装契约。先确认运行后端的 Java 版本，再选择对应 requirements；不要按 GaussDB/DWS 数据库版本推断 Java 版本。
+
+| JVM runtime | 安装入口 | JayDeBeApi | JPype1 |
+| --- | --- | --- | --- |
+| Java 8（legacy） | `backend/requirements-gaussdb-java8.txt` | `1.2.3` | `1.5.2` |
+| Java 11+（当前依赖的受支持基线） | `backend/requirements-gaussdb.txt` | `1.2.3` | `1.7.1` |
+
+从仓库根目录执行，并使用部署时运行后端的同一个 Python 环境：
+
+```powershell
+# Java 8 legacy JVM
+.\backend\.venv\Scripts\python.exe -m pip install -r backend/requirements-gaussdb-java8.txt
+
+# Java 11+
+.\backend\.venv\Scripts\python.exe -m pip install -r backend/requirements-gaussdb.txt
+```
+
+以上两条是**二选一**，不要同时安装。Java 8 环境不要使用默认的 `requirements-gaussdb.txt`；Java 11+ 环境继续使用默认入口，不需要降级到 JPype1 1.5.2。
+
+### 兼容策略依据与边界
+
+- JPype 1.5.2 的[上游安装文档](https://github.com/jpype-project/jpype/blob/v1.5.2/doc/install.rst)写明该版本测试过 Java 1.8–13。
+- JPype 1.6.0 的[发布说明](https://github.com/jpype-project/jpype/releases/tag/v1.6.0)与 1.7.1 的[发布说明](https://github.com/jpype-project/jpype/releases/tag/v1.7.1)都没有声明最低 JVM 版本；但 v1.6.0 [安装文档](https://github.com/jpype-project/jpype/blob/v1.6.0/doc/install.rst)和 v1.7.1 [安装文档](https://github.com/jpype-project/jpype/blob/v1.7.1/doc/install.rst)仍保留“测试 Java 1.8–13”的文字。JPype 的 [Java 8 兼容讨论](https://github.com/jpype-project/jpype/issues/1312#issuecomment-3113987535)则建议 Java 8 用户 pin 到 1.5.2，后续说明把 Java 11+ 作为持续兼容基线，并指出 Java 9/10 虽可构建但不在构建云验证范围（[上游说明](https://github.com/jpype-project/jpype/issues/1312#issuecomment-3114333732)）。因此上游文档与维护者讨论并不完全一致。
+- 为避免把“可构建”误当作持续支持，本项目对 JPype1 1.7.1 采用保守的 Java 11+ 部署基线，并为 Java 8 保留 JPype1 1.5.2 legacy profile。该矩阵是本项目的安装策略，不表示已在本机验证 Java 8/JVM 启动或 GaussDB 连接。
+- 这是 **JVM ↔ JPype** 兼容性问题，不是 GaussDB SQL 方言或数据库 schema 问题。JVM/JPype、JayDeBeApi Python DB-API bridge、部署方提供的 vendor JDBC JAR、GaussDB/DWS 数据库版本是不同层次；Java 版本与数据库版本不能相互推断。
+- 不使用 Python environment marker 自动选择 JPype：pip marker 不能可靠判定机器上的 JVM 版本。选择 requirements 后，仍需单独验证实际 JVM、vendor JDBC driver 和目标数据库。
+
+### 部署前自检
+
+Windows PowerShell（从仓库根目录执行；确保虚拟环境与服务使用同一解释器）：
+
+```powershell
+java -version
+.\backend\.venv\Scripts\python.exe -m pip show JayDeBeApi
+.\backend\.venv\Scripts\python.exe -m pip show JPype1
+```
+
+Linux：
+
+```bash
+java -version
+backend/.venv/bin/python -m pip show JayDeBeApi
+backend/.venv/bin/python -m pip show JPype1
+```
+
+`pip show` 的 `Version` 字段用于核对已安装发行包；不要依赖 `jaydebeapi.__version__`。这些命令只检查 Java 命令和 Python 包信息，不等于 JVM startup、JDBC driver loading 或真实 GaussDB/DWS 连接验证。
+
 ## 启动
 
 从仓库根目录以前台方式启动默认 runtime：
