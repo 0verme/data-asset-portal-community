@@ -19,7 +19,7 @@ profiles:
     host: 127.0.0.1
     port: 5432
     database: asset_portal
-    schema: dwp
+    schema: dap
     user: change_me
     password: change_me
 
@@ -39,7 +39,7 @@ profiles:
     # Relative to backend/. ASSET_DB_JAR_PATH can override this per environment.
     jar_path: resources/jars/gaussdb200.jar
     jdbc_url: jdbc:gaussdb://127.0.0.1:25308/asset_portal?currentSchema=dwp
-    schema: dwp
+    schema: dap
     user: change_me
     password: change_me
     socket_timeout: 120
