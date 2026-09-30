@@ -18,6 +18,7 @@ from .facade import (
     get_engine,
 )
 from .metadata import LOGICAL_SCHEMA
+from .providers import gaussdb_schema_sql_identifier
 from .registry import get_provider
 _SCHEMA_TOKEN_RE = re.compile(r"__\[SCHEMA___app__\]")
 
@@ -38,10 +39,15 @@ def _compile(profile: str, statement, dialect=None):
         compile_kwargs={"render_postcompile": True},
     )
     physical_schema = provider.physical_schema(config)
+    sql_schema = (
+        gaussdb_schema_sql_identifier(physical_schema)
+        if provider.name == "gaussdb"
+        else physical_schema
+    )
     sql = str(compiled)
-    if physical_schema:
-        sql = _SCHEMA_TOKEN_RE.sub(physical_schema, sql)
-        sql = sql.replace(f"{LOGICAL_SCHEMA}.", f"{physical_schema}.")
+    if sql_schema:
+        sql = _SCHEMA_TOKEN_RE.sub(sql_schema, sql)
+        sql = sql.replace(f"{LOGICAL_SCHEMA}.", f"{sql_schema}.")
     else:
         sql = re.sub(_SCHEMA_TOKEN_RE.pattern + r"\.", "", sql)
         sql = sql.replace(f"{LOGICAL_SCHEMA}.", "")

@@ -15,6 +15,25 @@ from .base import BackendCapabilities
 
 LOGICAL_SCHEMA = "__app__"
 DEFAULT_GAUSS_DRIVER = "com.huawei.gauss200.jdbc.Driver"
+GAUSSDB_SCHEMA_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+
+
+def _gaussdb_schema(config: dict, profile: str | None = None) -> str:
+    schema = config.get("schema")
+    if not isinstance(schema, str) or not GAUSSDB_SCHEMA_IDENTIFIER.fullmatch(schema):
+        label = f" profile '{profile}'" if profile else " profile"
+        raise ValueError(
+            f"gaussdb{label} requires schema to be a non-empty safe SQL identifier "
+            "matching [A-Za-z_][A-Za-z0-9_]*"
+        )
+    return schema
+
+
+def gaussdb_schema_sql_identifier(schema: str) -> str:
+    """Render a validated GaussDB schema name without changing its case."""
+    if not isinstance(schema, str) or not GAUSSDB_SCHEMA_IDENTIFIER.fullmatch(schema):
+        raise ValueError("GaussDB schema must be a safe SQL identifier")
+    return schema if schema.islower() else f'"{schema}"'
 
 
 def with_jdbc_timeouts(jdbc_url: str, *, connect_timeout_seconds=None, socket_timeout_seconds=None) -> str:
@@ -214,6 +233,7 @@ class GaussDBProvider:
 
     def validate(self, profile: str, config: dict, *, config_path: Path):
         config.setdefault("driver", DEFAULT_GAUSS_DRIVER)
+        _gaussdb_schema(config, profile)
         _positive_int(config, "connect_timeout", get_db_connect_timeout_seconds(), profile)
         _positive_int(config, "socket_timeout", max(1, get_db_statement_timeout_ms() // 1000), profile)
         _positive_int(config, "statement_timeout_ms", get_db_statement_timeout_ms(), profile)
@@ -247,7 +267,7 @@ class GaussDBProvider:
         return connect(config)
 
     def physical_schema(self, config: dict):
-        return str(config.get("schema") or "dwp")
+        return _gaussdb_schema(config)
 
 
 BUILTIN_PROVIDERS = (SQLiteProvider(), PostgreSQLProvider(), MySQLProvider(), GaussDBProvider())

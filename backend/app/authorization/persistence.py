@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..db.facade import connect_with_profile, get_db_profile
+from ..db.providers import gaussdb_schema_sql_identifier
 from ..db.registry import get_provider
 from .permissions import (
     ADMIN_ROLE,
@@ -71,12 +72,18 @@ def _safe_identifier(value: str, allowed: frozenset[str]) -> str:
     return value
 
 
-def _qualified_table(table: str, schema: str | None) -> str:
+def _qualified_table(
+    table: str, schema: str | None, *, gaussdb: bool = False
+) -> str:
     safe_table = _safe_identifier(table, _RBAC_TABLES)
     if schema:
-        if not schema.replace("_", "").isalnum() or not schema[0].isalpha():
-            raise ValueError("database schema must be a simple identifier")
-        return f"{schema}.{safe_table}"
+        if gaussdb:
+            schema_identifier = gaussdb_schema_sql_identifier(schema)
+        else:
+            if not schema.replace("_", "").isalnum() or not schema[0].isalpha():
+                raise ValueError("database schema must be a simple identifier")
+            schema_identifier = schema
+        return f"{schema_identifier}.{safe_table}"
     return safe_table
 
 
@@ -103,9 +110,9 @@ def ensure_gaussdb_rbac_schema(
         return False
     provider = get_provider("gaussdb")
     physical_schema = provider.physical_schema(config) if schema is None else schema
-    safe_role_table = _qualified_table("p_role", physical_schema)
-    safe_permission_table = _qualified_table("p_permission", physical_schema)
-    safe_mapping_table = _qualified_table("p_role_permission", physical_schema)
+    safe_role_table = _qualified_table("p_role", physical_schema, gaussdb=True)
+    safe_permission_table = _qualified_table("p_permission", physical_schema, gaussdb=True)
+    safe_mapping_table = _qualified_table("p_role_permission", physical_schema, gaussdb=True)
     placeholder = provider.placeholder
     cursor = connection.cursor()
     try:
@@ -211,9 +218,15 @@ def seed_rbac(
         config,
         schema=physical_schema,
     )
-    role_table = _qualified_table("p_role", physical_schema)
-    permission_table = _qualified_table("p_permission", physical_schema)
-    mapping_table = _qualified_table("p_role_permission", physical_schema)
+    role_table = _qualified_table(
+        "p_role", physical_schema, gaussdb=provider.name == "gaussdb"
+    )
+    permission_table = _qualified_table(
+        "p_permission", physical_schema, gaussdb=provider.name == "gaussdb"
+    )
+    mapping_table = _qualified_table(
+        "p_role_permission", physical_schema, gaussdb=provider.name == "gaussdb"
+    )
 
     roles_inserted = 0
     permissions_inserted = 0

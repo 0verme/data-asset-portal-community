@@ -1,5 +1,4 @@
 -- Current Community schema baseline for GaussDB / DWS.
-CREATE SCHEMA IF NOT EXISTS dwp;
 CREATE TABLE IF NOT EXISTS dwp.p_system (
     system_id BIGINT PRIMARY KEY, system_code VARCHAR(64) NOT NULL UNIQUE,
     system_name VARCHAR(256) NOT NULL, system_abbr VARCHAR(32) NOT NULL DEFAULT '',
@@ -87,7 +86,6 @@ CREATE INDEX IF NOT EXISTS idx_p_field_mapping_table_source
 CREATE UNIQUE INDEX IF NOT EXISTS idx_p_field_mapping_table_uk_01
   ON dwp.p_field_mapping_table(upstream_system_id, source_table_name);
 
-CREATE SCHEMA IF NOT EXISTS dwp;
 CREATE TABLE IF NOT EXISTS dwp.p_role (
   role_code VARCHAR(64) PRIMARY KEY, name VARCHAR(128) NOT NULL,
   description VARCHAR(2000), builtin CHAR(1) NOT NULL DEFAULT 'N',
@@ -208,7 +206,6 @@ CREATE TABLE IF NOT EXISTS dwp.p_operation_log (
   remark VARCHAR(512), created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE SCHEMA IF NOT EXISTS dwp;
 CREATE TABLE IF NOT EXISTS dwp.p_menu (
   menu_id BIGINT PRIMARY KEY, menu_code VARCHAR(64) NOT NULL UNIQUE,
   menu_name VARCHAR(128) NOT NULL, menu_icon VARCHAR(64) NOT NULL DEFAULT 'grid',
