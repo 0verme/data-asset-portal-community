@@ -42,7 +42,7 @@
   },
   "overrides": {
     "@tarojs/cli": {
-      "adm-zip": "0.6.0"
+      "adm-zip": "0.6.1"
     },
     "@tarojs/components": {
       "swiper": "12.1.2"

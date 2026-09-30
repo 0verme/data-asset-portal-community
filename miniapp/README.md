@@ -50,7 +50,8 @@ npm --prefix miniapp audit --include=dev --audit-level=high
 | --- | --- | --- |
 | `@tarojs/components` → `swiper` | `12.1.2` | weapp build 通过；未修改小程序源码引用 |
 | `@tarojs/helper` / runner → `esbuild` | `0.25.0` | typecheck、lint、test、weapp build 通过 |
-| CLI → `adm-zip`；plugin-doctor → `glob` | `adm-zip 0.6.0`、`glob 10.5.0` | 使用精确父依赖范围，`npm ls` 无 invalid |
+| CLI → `adm-zip`；plugin-doctor → `glob` | `adm-zip 0.6.1`、`glob 10.5.0` | ZIP 安全修复使用兼容 patch；`npm ls` 无 invalid |
+| 各 minimatch 父依赖 → `brace-expansion` | `1.1.21` / `2.1.7` / `5.0.12` | 在父依赖允许的版本范围内刷新 lockfile |
 | runner → `serialize-javascript` | `7.0.5` | weapp build 通过 |
 | runner → `miniprogram-simulate` → `postcss` / `less` | `postcss 8.5.28`、`less 4.9.0` | weapp build 通过 |
 | `sockjs` → `uuid` | `11.1.1` | webpack-dev-server / weapp build 加载回归通过 |
@@ -60,21 +61,24 @@ npm --prefix miniapp audit --include=dev --audit-level=high
 Taro CLI 的模板下载链路没有可用的上游修复，因此使用仓库内可审计的最小适配层：
 
 - `miniapp/overrides/decompress` 以 CommonJS 适配器调用维护中的
-  `@xhmikosr/decompress@10.2.1`，保留 `download@7` 所需的异步函数 API，并启用归档
+  `@xhmikosr/decompress@10.2.2`，保留 `download@7` 所需的异步函数 API，并启用归档
   路径、符号链接/硬链接和特殊文件权限防护。
 - `miniapp/overrides/git-clone` 使用 `spawn` 参数数组和 `--` 选项终止符，拒绝
   `opts.args` 及危险 checkout ref，保留 `download-git-repo` 成功回调契约；不经 shell
   执行用户输入。
 
-在 Node 22 / npm 10、显式包含 dev 依赖的本次锁文件验证中，`npm audit` 结果为
-`critical=0`、`high=0`、`moderate=21`、`low=2`。剩余 moderate 主要来自 Taro
-4.2.1 声明的精确 `webpack@5.91.0` / `webpack-dev-server@4.15.2` 兼容边界、CLI
-旧版 `got` 链路，以及适配器依赖的 `file-type`；跨大版本替换会破坏 Taro 构建契约，
-因此不在本次范围内。构建工具仅用于受控本地/CI 构建，不应将小程序开发服务暴露到
-不可信网络。
+在 2026-09-30 的 Node 22 / npm 10、完整开发依赖审计中，lockfile 为
+`critical=0`、`moderate=20`、`low=2`；仍有一个 High advisory：
+`@tarojs/webpack5-runner@4.2.1` → `webpack-dev-server@4.15.2` →
+`webpack-dev-middleware@5.3.4`。修复版本要求 webpack-dev-middleware 7.4.5+，而
+Taro 4.2.1 / 4.3.0 仍声明 webpack-dev-server 4.x；npm 给出的自动修复会跨越 Taro
+主版本，直接 override 会违反父依赖范围并引入未验证兼容风险。本轮不把它标记为已修复，
+待 Taro 发布兼容的依赖链或完成受控构建工具升级后再处理。该链路属于 miniapp 开发/构建
+工具，不随小程序产物部署；运行开发预览时仍应避免暴露到不可信网络。
 
-上述适配器和 overrides 均可独立回滚；待 Taro 上游提供稳定且兼容的安全依赖链后，
-应重新执行完整审计、安装和 weapp 产物验收。
+其余 moderate 主要来自 Taro CLI 旧版 `got` 链路、Webpack/Taro 兼容约束和
+`@xhmikosr/decompress` 的内部 `file-type` 依赖；按本轮优先级暂不升级。所有剩余告警均保留
+在完整 audit 结果中，没有降低审计等级或使用 `--force`。
 
 本地监听编译：
 
