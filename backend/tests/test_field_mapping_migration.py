@@ -12,6 +12,7 @@ from pathlib import Path
 from backend.app.db.sqlite_adapter import connect
 # pi-lens-ignore: reportMissingImports
 from backend.app.migrations.schema import initialize
+from backend.scripts.schema_migrate import repository_alembic_head
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -111,7 +112,7 @@ class FieldMappingIdentityMigrationTests(unittest.TestCase):
                     ).fetchone(),
                 )
                 self.assertEqual(
-                    ("0010_field_mapping_identity",),
+                    (repository_alembic_head(),),
                     connection.execute("SELECT version_num FROM alembic_version").fetchone(),
                 )
                 foreign_keys = connection.execute(
@@ -189,7 +190,7 @@ class FieldMappingIdentityMigrationTests(unittest.TestCase):
                 [(201, "DWF_MEMBER_A", "incr"), (202, "DWF_MEMBER_A", "incr")],
                 rows,
             )
-            self.assertEqual(("0010_field_mapping_identity",), revision)
+            self.assertEqual((repository_alembic_head(),), revision)
 
     def test_ambiguous_legacy_relation_fails_without_guessing(self):
         with tempfile.TemporaryDirectory(prefix="field-mapping-migration-ambiguous-") as directory:

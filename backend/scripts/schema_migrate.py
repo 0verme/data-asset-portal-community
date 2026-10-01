@@ -24,7 +24,7 @@ PROFILE_TYPE_TO_DIALECT = {
 
 def _parser():
     parser = argparse.ArgumentParser(description="Manage the database schema baseline and Alembic revision.")
-    parser.add_argument("command", choices=("status", "plan", "verify", "apply", "baseline"))
+    parser.add_argument("command", choices=("head", "status", "plan", "verify", "apply", "baseline"))
     parser.add_argument("--profile", help="Named database profile; never a connection string.")
     parser.add_argument("--offline", action="store_true", help="Verify or plan baseline files without connecting.")
     parser.add_argument(
@@ -36,6 +36,18 @@ def _parser():
     parser.add_argument("--version", help="Baseline revision; only 0001_baseline is supported.")
     parser.add_argument("--dry-run", action="store_true", help="Validate baseline stamping without writing it.")
     return parser
+
+
+def repository_alembic_head() -> str:
+    """Return the repository's configured Alembic head revision."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    config = Config(str(BACKEND / "alembic.ini"))
+    head = ScriptDirectory.from_config(config).get_current_head()
+    if head is None:
+        raise RuntimeError("repository has no Alembic migration head")
+    return head
 
 
 def _load_runtime():
@@ -81,6 +93,9 @@ def _alembic_upgrade(profile: str):
 
 def main(argv=None):
     args = _parser().parse_args(argv)
+    if args.command == "head":
+        print(repository_alembic_head())
+        return 0
     # Mirror native startup: load backend/.env.local using the same environment
     # profile handling as the runtime, then apply the named database profile.
     # This keeps the local quick-start commands reproducible in a clean clone.
