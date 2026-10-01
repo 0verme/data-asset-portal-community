@@ -206,6 +206,23 @@ class MigrationSchemaParityTests(unittest.TestCase):
             r"\(\s*layer_code\s*,\s*domain_code\s*\)",
         )
 
+    def test_postgresql_and_mysql_index_names_are_unqualified(self):
+        # PostgreSQL and MySQL reject `CREATE INDEX schema.name ON ...`; the
+        # index is created in the target table's schema.  Only SQLite uses the
+        # attached-database qualified form.
+        for dialect in ("postgresql", "mysql"):
+            with self.subTest(dialect=dialect):
+                sql = _mask_sql_non_code(
+                    baseline_path(dialect).read_text(encoding="utf-8")
+                )
+                qualified = re.findall(
+                    r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+"
+                    r"(?:IF\s+NOT\s+EXISTS\s+)?[A-Za-z_][A-Za-z0-9_]*\s*\.",
+                    sql,
+                    re.I,
+                )
+                self.assertEqual([], qualified)
+
     def test_dws_baseline_avoids_unsupported_813_identity_syntax(self):
         sql = baseline_path("dws").read_text(encoding="utf-8")
         violations = [
