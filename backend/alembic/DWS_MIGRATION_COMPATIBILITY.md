@@ -41,7 +41,7 @@ Git history confirms the released baselines form a *prefix* of the revision chai
 | `43d6548` | baseline | 24 tables; no RBAC/open-module tables; `p_asset_table.table_name` unique; no indicator semantic columns |
 | `7a438a4` | #118 | + `0003` open repository module tables |
 | `47f4bf6` | #119 | + `0004` metadata ingestion identity columns/unique |
-| `9ac81d4` | #193 | + `0005` RBAC tables |
+| `9ac81d4` | #123 | + `0005` RBAC tables |
 | `f090887` | #196 | + `0006` field mapping upstream identity |
 | `a76521f` | #200 | + `0007` binary status contract |
 | `71a8921` | #210 | + `0008` indicator semantic columns/index |
