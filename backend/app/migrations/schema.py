@@ -37,6 +37,7 @@ class ColumnSpec:
     nullable: bool
     default: str | None
     primary_key: bool = False
+    generated_by_default: bool = False
 
 
 @dataclass
@@ -264,7 +265,7 @@ def _type_name(declaration: str) -> str:
     declaration = " ".join(declaration.strip().upper().split())
     match = re.match(
         r"(DOUBLE\s+PRECISION|CHARACTER\s+VARYING|CHARACTER|TIMESTAMP(?:\s+WITH(?:OUT)?\s+TIME\s+ZONE)?|"
-        r"VARCHAR|CHAR|TEXT|BIGINT|SMALLINT|INTEGER|INT|DECIMAL|NUMERIC|DATE|DATETIME|JSON|BOOLEAN|"
+        r"VARCHAR|CHAR|TEXT|BIGSERIAL|BIGINT|SMALLINT|INTEGER|INT|DECIMAL|NUMERIC|DATE|DATETIME|JSON|BOOLEAN|"
         r"REAL|FLOAT|BLOB)(?:\s*\(([^)]*)\))?",
         declaration,
         re.I,
@@ -276,6 +277,7 @@ def _type_name(declaration: str) -> str:
     aliases = {
         "CHARACTER VARYING": "VARCHAR",
         "CHARACTER": "CHAR",
+        "BIGSERIAL": "BIGINT",
         "INT": "INTEGER",
         "NUMERIC": "DECIMAL",
         "DOUBLE PRECISION": "FLOAT",
@@ -349,6 +351,36 @@ def normalize_default(value: Any, type_name: str | None = None) -> str | None:
     return expression
 
 
+def _is_sequence_default(value: Any) -> bool:
+    if value is None:
+        return False
+    return bool(
+        re.fullmatch(
+            r"\s*nextval\s*\(\s*'(?:''|[^'])*'\s*(?:::\s*regclass)?\s*\)"
+            r"\s*(?:::\s*(?:bigint|int8))?\s*",
+            str(value),
+            re.I,
+        )
+    )
+
+
+def _normalize_reflected_column_default(
+    value: Any,
+    type_name: str,
+    *,
+    db_type: str,
+    expected_column: ColumnSpec | None,
+) -> str | None:
+    if (
+        db_type == "gaussdb"
+        and expected_column is not None
+        and expected_column.generated_by_default
+        and _is_sequence_default(value)
+    ):
+        return None
+    return normalize_default(value, type_name)
+
+
 def _foreign_key_from_text(text: str) -> ForeignKeySpec | None:
     match = re.search(
         r"FOREIGN\s+KEY\s*\((?P<columns>[^)]*)\)\s+REFERENCES\s+"
@@ -417,6 +449,10 @@ def _parse_baseline_schema(dialect: str, root: Path) -> SchemaModel:
                 nullable=not bool(re.search(r"\bNOT\s+NULL\b", rest, re.I)) and not primary,
                 default=normalize_default(_default_token(rest), type_name),
                 primary_key=primary,
+                generated_by_default=(
+                    bool(re.match(r"\s*BIGSERIAL\b", rest, re.I))
+                    or bool(re.search(r"\bGENERATED\s+BY\s+DEFAULT\s+AS\s+IDENTITY\b", rest, re.I))
+                ),
             )
             table.columns[name] = column
             if primary:
@@ -850,9 +886,24 @@ def _reflect_information_schema(connection, config: dict, expected: SchemaModel)
             if name == "alembic_version" or (name not in expected.tables and not name.startswith("p_")):
                 continue
             table = model.tables.setdefault(name, TableSpec(name))
+            column_name = _identifier(row[1])
             type_name = _column_type(row[2], row[3], row[4], row[5])
-            table.columns[_identifier(row[1])] = ColumnSpec(
-                _identifier(row[1]), type_name, str(row[6]).upper() == "YES", normalize_default(row[7], type_name)
+            expected_table = expected.tables.get(name)
+            expected_column = (
+                expected_table.columns.get(column_name)
+                if expected_table is not None
+                else None
+            )
+            table.columns[column_name] = ColumnSpec(
+                column_name,
+                type_name,
+                str(row[6]).upper() == "YES",
+                _normalize_reflected_column_default(
+                    row[7],
+                    type_name,
+                    db_type=db_type,
+                    expected_column=expected_column,
+                ),
             )
 
         if db_type == "mysql":
