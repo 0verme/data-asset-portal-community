@@ -50,8 +50,6 @@ CREATE TABLE IF NOT EXISTS dwp.p_api_relation (
   target_name VARCHAR(256), sort_no INTEGER NOT NULL DEFAULT 0,
   UNIQUE(api_code,relation_type,target_code)
 ) DISTRIBUTE BY REPLICATION;
-ALTER TABLE dwp.p_api_asset ADD CONSTRAINT fk_p_api_asset_system
-  FOREIGN KEY (system_id) REFERENCES dwp.p_system(system_id) ON DELETE RESTRICT;
 CREATE INDEX IF NOT EXISTS idx_p_api_asset_filter
   ON dwp.p_api_asset(status_code, method_code, system_id);
 
@@ -77,10 +75,6 @@ CREATE TABLE IF NOT EXISTS dwp.p_field_mapping_field (
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) DISTRIBUTE BY REPLICATION;
-ALTER TABLE dwp.p_field_mapping_table ADD CONSTRAINT fk_p_field_mapping_data_source
-  FOREIGN KEY (data_source_id) REFERENCES dwp.p_data_source(source_id) ON DELETE RESTRICT;
-ALTER TABLE dwp.p_field_mapping_field ADD CONSTRAINT fk_p_field_mapping_field_table
-  FOREIGN KEY (table_pk) REFERENCES dwp.p_field_mapping_table(table_pk) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_p_field_mapping_table_source
   ON dwp.p_field_mapping_table(data_source_id, source_table_name);
 CREATE INDEX IF NOT EXISTS idx_p_field_mapping_table_identity
@@ -102,9 +96,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_permission (
 ) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_role_permission (
   role_code VARCHAR(64) NOT NULL, permission_code VARCHAR(128) NOT NULL,
-  PRIMARY KEY (role_code, permission_code),
-  FOREIGN KEY (role_code) REFERENCES dwp.p_role(role_code) ON DELETE CASCADE,
-  FOREIGN KEY (permission_code) REFERENCES dwp.p_permission(permission_code) ON DELETE CASCADE
+  PRIMARY KEY (role_code, permission_code)
 ) DISTRIBUTE BY REPLICATION;
 CREATE INDEX IF NOT EXISTS idx_p_role_permission_permission
   ON dwp.p_role_permission(permission_code);
@@ -276,16 +268,13 @@ CREATE TABLE IF NOT EXISTS dwp.p_upstream_system (
     created_by VARCHAR(64) NOT NULL DEFAULT 'system',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (data_source_id) REFERENCES dwp.p_data_source(source_id) ON DELETE RESTRICT
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) DISTRIBUTE BY REPLICATION;
 CREATE INDEX idx_p_upstream_system_data_source ON dwp.p_upstream_system (data_source_id);
 CREATE INDEX idx_p_upstream_system_ix_01 ON dwp.p_upstream_system (status_code, db_type);
-ALTER TABLE dwp.p_field_mapping_table ADD CONSTRAINT fk_p_field_mapping_table_upstream
-  FOREIGN KEY (upstream_system_id) REFERENCES dwp.p_upstream_system(system_pk) ON DELETE RESTRICT;
 
 -- Low-volume configuration tables stay replicated so their existing business
--- keys and foreign-key contracts do not need DWS-specific composite-key changes.
+-- primary keys remain unchanged; logical relationships are checked separately.
 CREATE TABLE IF NOT EXISTS dwp.p_upstream_unload_time (
     time_pk BIGINT PRIMARY KEY,
     system_pk BIGINT NOT NULL,
@@ -296,8 +285,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_upstream_unload_time (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (system_pk, unload_time),
-    FOREIGN KEY (system_pk) REFERENCES dwp.p_upstream_system(system_pk) ON DELETE CASCADE
+    UNIQUE (system_pk, unload_time)
 ) DISTRIBUTE BY REPLICATION;
 CREATE INDEX idx_p_upstream_unload_time_ix_01 ON dwp.p_upstream_unload_time (system_pk, display_order);
 
@@ -337,14 +325,13 @@ CREATE TABLE IF NOT EXISTS dwp.p_push_system (
     created_by VARCHAR(64) NOT NULL DEFAULT 'system',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (master_system_id) REFERENCES dwp.p_system(system_id) ON DELETE RESTRICT
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) DISTRIBUTE BY REPLICATION;
 CREATE INDEX idx_p_push_system_master ON dwp.p_push_system (master_system_id);
 CREATE INDEX idx_p_push_system_ix_01 ON dwp.p_push_system (status_code, protocol_type, dept_name);
 
 -- Push jobs and fields are low-volume configuration metadata; replication
--- preserves their single-column business primary keys and existing foreign keys.
+-- preserves their single-column business primary keys and logical relationships.
 CREATE TABLE IF NOT EXISTS dwp.p_push_job (
     job_id BIGINT PRIMARY KEY,
     system_id BIGINT NOT NULL,
@@ -367,8 +354,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_push_job (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (system_id, job_code),
-    FOREIGN KEY (system_id) REFERENCES dwp.p_push_system(system_id) ON DELETE CASCADE
+    UNIQUE (system_id, job_code)
 ) DISTRIBUTE BY REPLICATION;
 CREATE INDEX idx_p_push_job_ix_01 ON dwp.p_push_job (system_id, enabled_flag, freq_type);
 CREATE INDEX idx_p_push_job_ix_02 ON dwp.p_push_job (system_id, is_deleted, job_code);
@@ -387,8 +373,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_push_job_field (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (job_id, field_name),
-    FOREIGN KEY (job_id) REFERENCES dwp.p_push_job(job_id) ON DELETE CASCADE
+    UNIQUE (job_id, field_name)
 ) DISTRIBUTE BY REPLICATION;
 CREATE INDEX idx_p_push_job_field_ix_01 ON dwp.p_push_job_field (job_id, field_order);
 
@@ -483,8 +468,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_lineage_node (
     display_name VARCHAR(512) NOT NULL,
     namespace_name VARCHAR(128) NOT NULL,
     attributes_json TEXT NOT NULL,
-    PRIMARY KEY (snapshot_id, node_id),
-    FOREIGN KEY (snapshot_id) REFERENCES dwp.p_lineage_snapshot(snapshot_id) ON DELETE CASCADE
+    PRIMARY KEY (snapshot_id, node_id)
 ) DISTRIBUTE BY HASH (snapshot_id);
 CREATE INDEX idx_p_lineage_node_lookup ON dwp.p_lineage_node (snapshot_id, kind_code, node_name);
 CREATE TABLE IF NOT EXISTS dwp.p_lineage_edge (
@@ -499,8 +483,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_lineage_edge (
     confidence_code VARCHAR(16) NOT NULL,
     generated_at TIMESTAMP NOT NULL,
     diagnostics_json TEXT NOT NULL,
-    PRIMARY KEY (snapshot_id, edge_id),
-    FOREIGN KEY (snapshot_id) REFERENCES dwp.p_lineage_snapshot(snapshot_id) ON DELETE CASCADE
+    PRIMARY KEY (snapshot_id, edge_id)
 ) DISTRIBUTE BY HASH (snapshot_id);
 CREATE INDEX idx_p_lineage_edge_source ON dwp.p_lineage_edge (snapshot_id, source_node_id);
 CREATE INDEX idx_p_lineage_edge_target ON dwp.p_lineage_edge (snapshot_id, target_node_id);

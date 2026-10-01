@@ -9,7 +9,10 @@ from unittest.mock import patch
 from sqlalchemy import Column, Integer, MetaData, Table, select
 from sqlalchemy.dialects import postgresql
 
-from backend.app.authorization.persistence import _qualified_table as _rbac_qualified_table
+from backend.app.authorization.persistence import (
+    _qualified_table as _rbac_qualified_table,
+    ensure_gaussdb_rbac_schema,
+)
 from backend.app.authorization.repository import _qualified_table as _auth_qualified_table
 from backend.app.db.core import _compile
 from backend.app.db.facade import normalize_sql_for_profile
@@ -319,6 +322,29 @@ class DwsSchemaSafetyTests(unittest.TestCase):
         self.assertFalse(
             any("dwp.alembic_version" in sql for sql, _ in verify_connection.executed)
         )
+
+    def test_gaussdb_rbac_compatibility_ddl_keeps_logical_relation_without_physical_fk(self):
+        connection = RecordingConnection()
+        self.assertTrue(
+            ensure_gaussdb_rbac_schema(
+                connection,
+                {"type": "gaussdb", "schema": "dap"},
+            )
+        )
+        create_statements = [
+            sql for sql, _ in connection.executed
+            if sql.startswith(("CREATE TABLE", "CREATE INDEX"))
+        ]
+        self.assertEqual(4, len(create_statements))
+        combined = "\n".join(create_statements)
+        self.assertNotRegex(
+            _mask_literals_and_comments(combined),
+            r"\b(?:FOREIGN\s+KEY|REFERENCES)\b",
+        )
+        self.assertIn("PRIMARY KEY (role_code, permission_code)", combined)
+        self.assertIn("DISTRIBUTE BY REPLICATION", combined)
+        self.assertIn("idx_p_role_permission_permission", combined)
+        self.assertEqual(1, connection.commits)
 
     def test_four_dialect_baseline_table_parity_remains_intact(self):
         self.assertEqual(39, len(verify_baselines()))

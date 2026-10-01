@@ -1,10 +1,19 @@
 # pyright: reportMissingImports=false
 
+import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from backend.app.db.sqlite_adapter import connect
+from backend.app.fastapi.routers.upstream import _upstream_error_response
+from backend.app.migrations.schema import initialize
 from backend.app.services.common_code_service import CommonCodeCategoryNotFoundError
-from backend.app.services.upstream_service import UpstreamService
+from backend.app.services.upstream_service import (
+    UpstreamService,
+    UpstreamSystemReferencedError,
+)
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
 
@@ -31,6 +40,86 @@ class UpstreamOptionContractTestCase(unittest.TestCase):
 
         self.assertEqual("PostgreSQL", normalized["dbType"])
         self.assertEqual("供应链部", normalized["dept"])
+
+
+class UpstreamDeleteRelationshipTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory(prefix="upstream-delete-relationship-")
+        self.addCleanup(self.temp_dir.cleanup)
+        root = Path(self.temp_dir.name)
+        self.database = root / "upstream.sqlite"
+        self.config_path = root / "database.yaml"
+        self.config_path.write_text(
+            "profiles:\n"
+            "  primary:\n"
+            "    type: sqlite\n"
+            f"    database: '{self.database.as_posix()}'\n",
+            encoding="utf-8",
+        )
+        environment = patch.dict(
+            os.environ,
+            {
+                "ASSET_DB_CONFIG_PATH": str(self.config_path),
+                "ASSET_DB_PROFILE": "primary",
+            },
+            clear=False,
+        )
+        environment.start()
+        self.addCleanup(environment.stop)
+
+        config = {"type": "sqlite", "database": str(self.database)}
+        self.connection = connect(config)
+        self.addCleanup(self.connection.close)
+        self.assertTrue(initialize(self.connection, config, "sqlite"))
+        self.connection.execute(
+            "INSERT INTO dwp.p_data_source "
+            "(source_id, source_code, source_name, source_type) "
+            "VALUES (1, 'upstream-db', 'Upstream DB', 'POSTGRESQL')"
+        )
+        self.connection.execute(
+            "INSERT INTO dwp.p_upstream_system "
+            "(system_pk, data_source_id, system_id, system_abbr, system_name, db_type, host_name) "
+            "VALUES (7, 1, 'upstream_system', 'UP', 'Upstream System', 'POSTGRESQL', 'db.demo.invalid')"
+        )
+        self.connection.execute(
+            "INSERT INTO dwp.p_upstream_unload_time (time_pk, system_pk, unload_time) "
+            "VALUES (9, 7, '01:00')"
+        )
+        self.connection.execute(
+            "INSERT INTO dwp.p_field_mapping_table "
+            "(table_pk, data_source_id, upstream_system_id, source_table_name, is_deleted) "
+            "VALUES (11, 1, 7, 'source_table', 'Y')"
+        )
+        self.connection.commit()
+        self.service = UpstreamService()
+        self.service._db_profile = "primary"
+
+    def test_referenced_hard_delete_is_rejected_without_changing_rows(self):
+        with self.assertRaises(UpstreamSystemReferencedError) as context:
+            self.service.delete_system("upstream_system")
+
+        self.assertIn("field mappings still reference it", str(context.exception))
+        self.assertEqual(409, _upstream_error_response(context.exception).status_code)
+        self.assertEqual(
+            1,
+            self.connection.execute(
+                "SELECT COUNT(*) FROM dwp.p_upstream_system WHERE system_pk = 7"
+            ).fetchone()[0],
+        )
+        self.assertEqual(
+            1,
+            self.connection.execute(
+                "SELECT COUNT(*) FROM dwp.p_field_mapping_table "
+                "WHERE table_pk = 11 AND is_deleted = 'Y'"
+            ).fetchone()[0],
+        )
+        self.assertEqual(
+            1,
+            self.connection.execute(
+                "SELECT COUNT(*) FROM dwp.p_upstream_unload_time "
+                "WHERE time_pk = 9 AND system_pk = 7"
+            ).fetchone()[0],
+        )
 
 
 class UpstreamStatusUpdateTestCase(unittest.TestCase):

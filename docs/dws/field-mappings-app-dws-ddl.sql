@@ -51,14 +51,9 @@ CREATE INDEX idx_p_field_mapping_table_ix_01
 CREATE INDEX idx_p_field_mapping_table_ix_02
     ON dwp.p_field_mapping_table (is_deleted, upstream_system_id, table_pk);
 
-ALTER TABLE dwp.p_field_mapping_table
-    DROP CONSTRAINT IF EXISTS fk_p_field_mapping_table_upstream;
-
-ALTER TABLE dwp.p_field_mapping_table
-    ADD CONSTRAINT fk_p_field_mapping_table_upstream
-    FOREIGN KEY (upstream_system_id)
-    REFERENCES dwp.p_upstream_system (system_pk)
-    ON DELETE RESTRICT;
+-- Logical relationship: p_field_mapping_table.upstream_system_id identifies
+-- p_upstream_system.system_pk. DWS does not support physical FOREIGN KEY
+-- constraints; the application rejects deleting a referenced upstream system.
 
 
 CREATE TABLE IF NOT EXISTS dwp.p_field_mapping_field (

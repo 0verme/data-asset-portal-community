@@ -3,6 +3,9 @@
 -- scope: administrator accounts and login metadata
 -- schema: dwp
 -- target: dws-compatible
+-- Physical FOREIGN KEY constraints are intentionally absent: DWS does not
+-- support them. Role deletion explicitly removes role-permission rows first;
+-- permissions are a static registry and have no hard-delete path.
 
 CREATE TABLE IF NOT EXISTS dwp.p_role (
     role_code VARCHAR(64) PRIMARY KEY,
@@ -25,9 +28,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_permission (
 CREATE TABLE IF NOT EXISTS dwp.p_role_permission (
     role_code VARCHAR(64) NOT NULL,
     permission_code VARCHAR(128) NOT NULL,
-    PRIMARY KEY (role_code, permission_code),
-    FOREIGN KEY (role_code) REFERENCES dwp.p_role(role_code) ON DELETE CASCADE,
-    FOREIGN KEY (permission_code) REFERENCES dwp.p_permission(permission_code) ON DELETE CASCADE
+    PRIMARY KEY (role_code, permission_code)
 ) DISTRIBUTE BY REPLICATION;
 
 CREATE INDEX idx_p_role_permission_permission

@@ -14,6 +14,7 @@ from backend.app.migrations.schema import (
     baseline_path,
     baseline_schema,
 )
+from backend.tests.dws_relationship_contract import DWS_LOGICAL_RELATIONSHIPS
 
 
 def _dws_distribution_scan(sql: str, schema):
@@ -124,55 +125,44 @@ def _hash_constraint_violations(distributions, schema) -> list[str]:
     return violations
 
 
-def _foreign_key_distribution_violations(distributions, schema) -> list[str]:
+def _logical_relationship_distribution_violations(
+    distributions, relationships=DWS_LOGICAL_RELATIONSHIPS
+) -> list[str]:
     violations: list[str] = []
-    for table_name, table in schema.tables.items():
-        child_strategy, child_columns = distributions.get(table_name, ("", ()))
-        for foreign_key in table.foreign_keys:
-            parent = schema.tables.get(foreign_key.referenced_table)
-            parent_distribution = distributions.get(foreign_key.referenced_table)
-            if parent is None or parent_distribution is None:
-                violations.append(
-                    f"{table_name}: FK references missing table/strategy "
-                    f"{foreign_key.referenced_table}"
-                )
-                continue
+    for relationship in relationships:
+        child_distribution = distributions.get(relationship.child_table)
+        parent_distribution = distributions.get(relationship.parent_table)
+        label = (
+            f"{relationship.child_table}{relationship.child_columns} -> "
+            f"{relationship.parent_table}{relationship.parent_columns}"
+        )
+        if child_distribution is None or parent_distribution is None:
+            violations.append(f"{label}: missing logical relationship table strategy")
+            continue
 
-            candidate_keys = {parent.primary_key, *parent.unique_constraints}
-            candidate_keys.update(
-                index.columns for index in parent.indexes.values() if index.unique
+        child_strategy, child_columns = child_distribution
+        parent_strategy, parent_columns = parent_distribution
+        if child_strategy == "HASH" and not set(child_columns).issubset(
+            relationship.child_columns
+        ):
+            violations.append(
+                f"{label}: logical child columns omit HASH column(s) {child_columns}"
             )
-            if foreign_key.referenced_columns not in candidate_keys:
+        if parent_strategy == "HASH" and not set(parent_columns).issubset(
+            relationship.parent_columns
+        ):
+            violations.append(
+                f"{label}: logical parent columns omit HASH column(s) {parent_columns}"
+            )
+        if child_strategy == parent_strategy == "HASH":
+            if len(relationship.child_columns) != len(relationship.parent_columns):
+                violations.append(f"{label}: logical relationship column counts differ")
+                continue
+            mapping = dict(zip(relationship.child_columns, relationship.parent_columns))
+            if tuple(mapping.get(column) for column in child_columns) != parent_columns:
                 violations.append(
-                    f"{table_name}: FK target {foreign_key.referenced_table}"
-                    f"{foreign_key.referenced_columns} is not a PK/UNIQUE key"
+                    f"{label}: logical HASH columns do not map to parent HASH columns"
                 )
-
-            parent_strategy, parent_columns = parent_distribution
-            if child_strategy == "HASH" and not set(child_columns).issubset(
-                foreign_key.columns
-            ):
-                violations.append(
-                    f"{table_name}: FK columns {foreign_key.columns} omit child "
-                    f"HASH column(s) {child_columns}"
-                )
-            if parent_strategy == "HASH" and not set(parent_columns).issubset(
-                foreign_key.referenced_columns
-            ):
-                violations.append(
-                    f"{table_name}: FK target columns {foreign_key.referenced_columns} "
-                    f"omit parent HASH column(s) {parent_columns}"
-                )
-            if child_strategy == parent_strategy == "HASH":
-                mapping = dict(zip(foreign_key.columns, foreign_key.referenced_columns))
-                if (
-                    tuple(mapping.get(column) for column in child_columns)
-                    != parent_columns
-                ):
-                    violations.append(
-                        f"{table_name}: FK HASH columns do not map to "
-                        f"{foreign_key.referenced_table} HASH columns"
-                    )
     return violations
 
 
@@ -206,15 +196,32 @@ class DwsDistributionContractTests(unittest.TestCase):
         self.assertEqual([], violations)
         self.assertEqual([], _hash_constraint_violations(distributions, schema))
 
-    def test_foreign_keys_keep_candidate_keys_and_distribution_compatibility(self):
+    def test_logical_relationships_keep_hash_distribution_compatibility(self):
         sql = baseline_path("dws").read_text(encoding="utf-8")
         schema = baseline_schema("dws")
         distributions, violations, _ = _dws_distribution_scan(sql, schema)
 
+        self.assertEqual(13, len(DWS_LOGICAL_RELATIONSHIPS))
         self.assertEqual([], violations)
         self.assertEqual(
-            [], _foreign_key_distribution_violations(distributions, schema)
+            [], _logical_relationship_distribution_violations(distributions)
         )
+
+    def test_hash_distribution_must_cover_logical_child_columns(self):
+        lineage_node = next(
+            relation
+            for relation in DWS_LOGICAL_RELATIONSHIPS
+            if relation.child_table == "p_lineage_node"
+        )
+        violations = _logical_relationship_distribution_violations(
+            {
+                "p_lineage_node": ("HASH", ("node_id",)),
+                "p_lineage_snapshot": ("REPLICATION", ()),
+            },
+            (lineage_node,),
+        )
+        self.assertEqual(1, len(violations), violations)
+        self.assertIn("logical child columns omit HASH column(s)", violations[0])
 
     def test_missing_distribution_is_reported_with_table_name(self):
         _, violations, _, _ = _fixture_contract(
