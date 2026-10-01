@@ -55,12 +55,14 @@ read-before-insert seed:
    compatible and are filtered from effective role payloads; saving a role uses
    the existing replacement semantics to normalize its submitted mapping.
 
-`schema_migrate.py apply` runs the seed after baseline/Alembic work and prints
-an insertion summary. The SQLite demo seed invokes the same function before
-creating the fictional demo administrator. PostgreSQL/DWS demo SQL renders the
-same registry and mapping rows with conflict-safe inserts; `p_admin_user` is
-still intentionally left for the deployment/bootstrap operator in that SQL
-path.
+`schema_migrate.py apply` runs the RBAC seed after baseline/Alembic work and prints
+an insertion summary. It then seeds the canonical 11 system menus from
+`config/default-menus.json`; this application-level seed inserts missing
+`menu_code` values only and preserves instance-managed menu settings. The
+SQLite demo seed invokes the same RBAC function before creating the fictional
+demo administrator. PostgreSQL/DWS demo SQL renders the same registry and
+mapping rows with conflict-safe inserts; `p_admin_user` is still intentionally
+left for the deployment/bootstrap operator in that SQL path.
 
 Repeated seed is a no-op. A new permission is an additive registry/seed diff;
 it does not silently grant unrelated permissions or reset custom mappings. The
