@@ -151,8 +151,8 @@ register_search_entity({
     "label": "资产",
     "module": "dwm",
     "from": (
-        "dwp.p_asset_table t "
-        "LEFT JOIN dwp.p_asset_domain d ON t.domain_code = d.domain_code"
+        "p_asset_table t "
+        "LEFT JOIN p_asset_domain d ON t.domain_code = d.domain_code"
     ),
     "base_where": "t.is_deleted = 'N'",
     "matchers": [
@@ -170,7 +170,7 @@ register_search_entity({
     # Active asset fields recall the owning asset, sharing the same column
     # contract as the data-warehouse asset list (services.asset_field_match).
     "field_match": {
-        "table": "dwp.p_asset_field f",
+        "table": "p_asset_field f",
         "asset_ref": "f.asset_id = t.asset_id",
         "active_where": f"f.is_deleted = '{ASSET_FIELD_ACTIVE_VALUE}'",
         "row_key": "asset_id",
@@ -200,7 +200,7 @@ register_search_entity({
     "type": "system",
     "label": "系统",
     "module": "upstream",
-    "from": "dwp.p_upstream_system",
+    "from": "p_upstream_system",
     "base_where": "is_deleted = 'N'",
     "matchers": [
         {"expr": "system_abbr", "label": "系统简称"},
@@ -218,9 +218,9 @@ register_search_entity({
     "label": "字段",
     "module": "mapping",
     "from": (
-        "dwp.p_field_mapping_field f "
-        "JOIN dwp.p_field_mapping_table t ON f.table_pk = t.table_pk "
-        "JOIN dwp.p_data_source s ON t.data_source_id = s.source_id"
+        "p_field_mapping_field f "
+        "JOIN p_field_mapping_table t ON f.table_pk = t.table_pk "
+        "JOIN p_data_source s ON t.data_source_id = s.source_id"
     ),
     "base_where": "f.is_deleted = 'N' AND t.is_deleted = 'N' AND s.is_deleted = 'N'",
     "matchers": [
@@ -245,7 +245,7 @@ register_search_entity({
     "type": "root",
     "label": "词根",
     "module": "root",
-    "from": "dwp.p_root_item",
+    "from": "p_root_item",
     "base_where": "is_deleted = 'N'",
     "matchers": [
         {"expr": "root_abbr", "label": "词根缩写"},
@@ -263,7 +263,7 @@ register_search_entity({
     "type": "indicator",
     "label": "指标",
     "module": "indicator",
-    "from": "dwp.p_indicator_item",
+    "from": "p_indicator_item",
     "base_where": "is_deleted = 'N'",
     "matchers": [
         {"expr": "indicator_id", "label": "指标ID"},
@@ -292,8 +292,8 @@ register_search_entity({
     "label": "下游推送",
     "module": "push",
     "from": (
-        "dwp.p_push_system s "
-        "LEFT JOIN dwp.p_push_job j ON j.system_id = s.system_id AND j.is_deleted = 'N'"
+        "p_push_system s "
+        "LEFT JOIN p_push_job j ON j.system_id = s.system_id AND j.is_deleted = 'N'"
     ),
     "base_where": "s.is_deleted = 'N'",
     "matchers": [
@@ -326,7 +326,7 @@ register_search_entity({
     "type": "report",
     "label": "报表",
     "module": "report",
-    "from": "dwp.p_report_asset",
+    "from": "p_report_asset",
     "base_where": "is_deleted = 'N'",
     "matchers": [
         {"expr": "report_code", "label": "报表编码"},
@@ -356,7 +356,7 @@ register_search_entity({
     "type": "api",
     "label": "API",
     "module": "apiAsset",
-    "from": "dwp.p_api_asset",
+    "from": "p_api_asset",
     "base_where": "is_deleted = 'N'",
     "matchers": [
         {"expr": "api_code", "label": "API编码"},
@@ -383,7 +383,7 @@ register_search_entity({
     "type": "codeTable",
     "label": "码值表",
     "module": "codeTable",
-    "from": "dwp.p_manual_code_table",
+    "from": "p_manual_code_table",
     "base_where": None,
     "matchers": [
         {"expr": "table_code", "label": "表编码"},
@@ -402,85 +402,85 @@ register_search_entity({
 register_portal_stat({
     "key": "system",
     "label": "源系统",
-    "from": "dwp.p_upstream_system",
+    "from": "p_upstream_system",
     "where": "is_deleted = 'N'",
     "module": "upstream",
 })
 register_portal_stat({
     "key": "table",
     "label": "源表",
-    "from": "dwp.p_field_mapping_table",
+    "from": "p_field_mapping_table",
     "where": "is_deleted = 'N'",
     "module": "mapping",
 })
 register_portal_stat({
     "key": "field",
     "label": "源字段",
-    "from": "dwp.p_field_mapping_field",
+    "from": "p_field_mapping_field",
     "where": "is_deleted = 'N'",
     "module": "mapping",
 })
 register_portal_stat({
     "key": "indicator",
     "label": "指标",
-    "from": "dwp.p_indicator_item",
+    "from": "p_indicator_item",
     "where": "is_deleted = 'N'",
     "module": "indicator",
 })
 register_portal_stat({
     "key": "downstream_system",
     "label": "下游系统",
-    "from": "dwp.p_push_system",
+    "from": "p_push_system",
     "where": "is_deleted = 'N'",
     "module": "push",
 })
 register_portal_stat({
     "key": "downstream_push",
     "label": "下游推送文件",
-    "from": "dwp.p_push_job",
+    "from": "p_push_job",
     "where": "is_deleted = 'N'",
     "module": "push",
 })
 register_portal_stat({
     "key": "domain",
     "label": "主题域",
-    "from": "dwp.p_asset_table",
+    "from": "p_asset_table",
     "count_expr": "COUNT(DISTINCT domain_code)",
-    "where": None,
+    "where": "is_deleted = 'N'",
     "module": "dwm",
 })
 register_portal_stat({
     "key": "asset_table",
     "label": "主题表",
-    "from": "dwp.p_asset_table",
+    "from": "p_asset_table",
     "where": "is_deleted = 'N'",
     "module": "dwm",
 })
 register_portal_stat({
     "key": "report",
     "label": "报表",
-    "from": "dwp.p_report_asset",
+    "from": "p_report_asset",
     "where": "is_deleted = 'N'",
     "module": "report",
 })
 register_portal_stat({
     "key": "api_asset",
     "label": "API",
-    "from": "dwp.p_api_asset",
+    "from": "p_api_asset",
     "where": "is_deleted = 'N'",
     "module": "apiAsset",
 })
 register_portal_stat({
     "key": "root",
     "label": "词根",
-    "from": "dwp.p_root_item",
+    "from": "p_root_item",
     "where": "is_deleted = 'N'",
     "module": "root",
 })
 register_portal_stat({
     "key": "code_table",
     "label": "码值表",
-    "from": "dwp.p_manual_code_table",
+    "from": "p_manual_code_table",
     "where": None,
     "module": "codeTable",
 })

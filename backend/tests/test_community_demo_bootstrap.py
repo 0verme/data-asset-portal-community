@@ -242,19 +242,26 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             "backend.app.services.lineage_service"
         )
 
-        with patch.dict(
-            os.environ,
-            {
-                "APP_ENV": "production",
-                "LINEAGE_DB_PROFILE": "production_lineage",
-            },
-            clear=False,
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "production",
+                    "LINEAGE_DB_PROFILE": "production_lineage",
+                },
+                clear=False,
+            ),
+            patch.object(
+                lineage_service,
+                "get_db_profile",
+                return_value={"type": "gaussdb", "schema": "dap"},
+            ),
         ):
             self.assertEqual(
                 {
                     "mode": "persistent",
                     "profile": "production_lineage",
-                    "schema": "dwp",
+                    "schema": "dap",
                 },
                 lineage_service.lineage_storage_status(),
             )

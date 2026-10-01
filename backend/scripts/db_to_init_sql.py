@@ -29,33 +29,34 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from app.db.facade import fetch_all, get_db_profile, resolve_db_profile_name
+from app.db.registry import get_provider
 from app.settings import load_runtime_env
 
 
 TABLES = [
-    "dwp.p_code_category",
-    "dwp.p_code_item",
-    "dwp.p_asset_domain",
-    "dwp.p_asset_layer",
-    "dwp.p_asset_table",
-    "dwp.p_asset_field",
-    "dwp.p_asset_change_log",
-    "dwp.p_upstream_system",
-    "dwp.p_upstream_unload_time",
-    "dwp.p_upstream_change_log",
-    "dwp.p_field_mapping_table",
-    "dwp.p_field_mapping_field",
-    "dwp.p_field_mapping_change_log",
-    "dwp.p_indicator_item",
-    "dwp.p_indicator_change_log",
-    "dwp.p_root_category",
-    "dwp.p_root_item",
-    "dwp.p_root_change_log",
-    "dwp.p_push_system",
-    "dwp.p_push_job",
-    "dwp.p_push_job_field",
-    "dwp.p_push_change_log",
-    "dwp.p_admin_user",
+    "p_code_category",
+    "p_code_item",
+    "p_asset_domain",
+    "p_asset_layer",
+    "p_asset_table",
+    "p_asset_field",
+    "p_asset_change_log",
+    "p_upstream_system",
+    "p_upstream_unload_time",
+    "p_upstream_change_log",
+    "p_field_mapping_table",
+    "p_field_mapping_field",
+    "p_field_mapping_change_log",
+    "p_indicator_item",
+    "p_indicator_change_log",
+    "p_root_category",
+    "p_root_item",
+    "p_root_change_log",
+    "p_push_system",
+    "p_push_job",
+    "p_push_job_field",
+    "p_push_change_log",
+    "p_admin_user",
 ]
 
 DIALECT_TO_OUTPUT = {
@@ -69,14 +70,15 @@ REPO_DIALECT_TO_OUTPUT = {
 }
 
 
-def fetch_rows(profile: str, sql: str) -> list[dict]:
-    columns, rows = fetch_all(profile, sql)
+def fetch_rows(profile: str, sql: str, params=None) -> list[dict]:
+    columns, rows = fetch_all(profile, sql, params=params)
     return [dict(zip(columns, row)) for row in rows]
 
 
-def split_table_name(qualified_name: str) -> tuple[str, str]:
-    schema_name, table_name = qualified_name.split(".", 1)
-    return schema_name, table_name
+def profile_schema(profile: str) -> str:
+    config = get_db_profile(profile)
+    provider = get_provider(config["type"])
+    return str(provider.physical_schema(config) or config.get("database") or "")
 
 
 def sql_literal(value) -> str:
@@ -100,22 +102,23 @@ def sql_literal(value) -> str:
 def load_table_columns(profile: str, schema_name: str, table_name: str) -> list[str]:
     rows = fetch_rows(
         profile,
-        f"""
+        """
 SELECT column_name
 FROM information_schema.columns
-WHERE table_schema = '{schema_name}'
-  AND table_name = '{table_name}'
+WHERE table_schema = ?
+  AND table_name = ?
 ORDER BY ordinal_position
 """.strip(),
+        params=[schema_name, table_name],
     )
     return [row["column_name"] for row in rows]
 
 
-def load_table_rows(profile: str, qualified_name: str, columns: list[str]) -> list[dict]:
+def load_table_rows(profile: str, table_name: str, columns: list[str]) -> list[dict]:
     if not columns:
         return []
     order_by = ", ".join(columns[:3])
-    sql = f"SELECT {', '.join(columns)} FROM {qualified_name}"
+    sql = f"SELECT {', '.join(columns)} FROM {table_name}"
     if order_by:
         sql += f" ORDER BY {order_by}"
     return fetch_rows(profile, sql)
@@ -136,26 +139,26 @@ def resolve_output_paths(profile: str, dialect: str, allow_repository_output: bo
 
 def build_delete_block() -> list[str]:
     lines = ["-- Clear current data before replaying inserts"]
-    for qualified_name in reversed(TABLES):
-        lines.append(f"DELETE FROM {qualified_name};")
+    for table_name in reversed(TABLES):
+        lines.append(f"DELETE FROM {table_name};")
     return lines
 
 
 def build_insert_block(profile: str) -> list[str]:
     lines = ["-- Replay current database snapshot"]
-    for qualified_name in TABLES:
-        schema_name, table_name = split_table_name(qualified_name)
+    schema_name = profile_schema(profile)
+    for table_name in TABLES:
         columns = load_table_columns(profile, schema_name, table_name)
-        rows = load_table_rows(profile, qualified_name, columns)
+        rows = load_table_rows(profile, table_name, columns)
         if not rows:
-            lines.append(f"-- {qualified_name}: 0 rows")
+            lines.append(f"-- {table_name}: 0 rows")
             continue
 
         col_sql = ", ".join(columns)
-        lines.append(f"-- {qualified_name}: {len(rows)} rows")
+        lines.append(f"-- {table_name}: {len(rows)} rows")
         for row in rows:
             values_sql = ", ".join(sql_literal(row[column]) for column in columns)
-            lines.append(f"INSERT INTO {qualified_name} ({col_sql}) VALUES ({values_sql});")
+            lines.append(f"INSERT INTO {table_name} ({col_sql}) VALUES ({values_sql});")
     return lines
 
 

@@ -17,7 +17,8 @@ import os
 
 from sqlalchemy import select
 
-from ..db.facade import database_transaction
+from ..db.facade import database_transaction, get_db_profile
+from ..db.registry import get_provider
 from ..db.service import CoreAccess
 from ..db.tables import lineage_edge, lineage_node, lineage_snapshot
 from ..settings import get_runtime_environment
@@ -85,7 +86,10 @@ def lineage_storage_status():
     """Return the safe, explicit storage mode selected for this process."""
     profile = os.getenv(LINEAGE_PROFILE_ENV, "").strip()
     if profile:
-        return {"mode": "persistent", "profile": profile, "schema": "dwp"}
+        config = get_db_profile(profile)
+        provider = get_provider(config["type"])
+        schema = provider.physical_schema(config) or config.get("database")
+        return {"mode": "persistent", "profile": profile, "schema": schema}
 
     environment = get_runtime_environment()
     if environment in POC_ENVIRONMENTS:

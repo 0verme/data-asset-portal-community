@@ -21,7 +21,7 @@ VALID_ABBR = re.compile(r"^[a-z0-9_]+$")
 
 # Keep the test corpus explicit: it is a maintained naming-reference sample,
 # not randomly generated display data.  Categories intentionally use only the
-# values already configured in dwp.p_root_category.
+# values already configured in p_root_category.
 _ROWS = """
 acct|account|账户|业务对象|用于 acct_no、acct_name
 cust|customer|客户|业务对象|用于 cust_id、cust_name
@@ -245,11 +245,11 @@ def _rows(profile, sql, params=None):
 
 
 def _existing(profile):
-    return {row["root_abbr"] for row in _rows(profile, "SELECT root_abbr FROM dwp.p_root_item")}
+    return {row["root_abbr"] for row in _rows(profile, "SELECT root_abbr FROM p_root_item")}
 
 
 def _active_categories(profile):
-    return {row["category_name"] for row in _rows(profile, "SELECT category_name FROM dwp.p_root_category WHERE is_deleted = 'N'")}
+    return {row["category_name"] for row in _rows(profile, "SELECT category_name FROM p_root_category WHERE is_deleted = 'N'")}
 
 
 def _plan(profile, limit):
@@ -268,22 +268,22 @@ def _plan(profile, limit):
 
 def _apply(profile, items):
     with database_transaction():
-        execute_sql(profile, "LOCK TABLE dwp.p_root_item, dwp.p_root_change_log IN EXCLUSIVE MODE", autocommit=False)
+        execute_sql(profile, "LOCK TABLE p_root_item, p_root_change_log IN EXCLUSIVE MODE", autocommit=False)
         existing = _existing(profile)
         pending = [item for item in items if item["abbr"] not in existing]
         if not pending:
             return 0, len(items)
-        next_root_id = int(_rows(profile, "SELECT COALESCE(MAX(root_id), 0) + 1 AS next_id FROM dwp.p_root_item")[0]["next_id"])
-        next_change_id = int(_rows(profile, "SELECT COALESCE(MAX(change_id), 0) + 1 AS next_id FROM dwp.p_root_change_log")[0]["next_id"])
+        next_root_id = int(_rows(profile, "SELECT COALESCE(MAX(root_id), 0) + 1 AS next_id FROM p_root_item")[0]["next_id"])
+        next_change_id = int(_rows(profile, "SELECT COALESCE(MAX(change_id), 0) + 1 AS next_id FROM p_root_change_log")[0]["next_id"])
         for offset, item in enumerate(pending):
             root_id = next_root_id + offset
             execute_sql(profile, """
-INSERT INTO dwp.p_root_item
+INSERT INTO p_root_item
   (root_id, root_abbr, root_en_name, root_cn_name, category_name, root_desc, created_by, updated_by)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 """, autocommit=False, params=[root_id, item["abbr"], item["en"], item["cn"], item["cat"], item["desc"], SEED_OPERATOR, SEED_OPERATOR])
             execute_sql(profile, """
-INSERT INTO dwp.p_root_change_log
+INSERT INTO p_root_change_log
   (change_id, root_id, root_abbr, change_type, change_summary, after_json, operator_name)
 VALUES (?, ?, ?, ?, ?, ?, ?)
 """, autocommit=False, params=[next_change_id + offset, root_id, item["abbr"], SEED_CHANGE_TYPE, "seed curated term root", json.dumps(item, ensure_ascii=False, sort_keys=True), SEED_OPERATOR])
@@ -292,13 +292,13 @@ VALUES (?, ?, ?, ?, ?, ?, ?)
 
 def _cleanup(profile):
     with database_transaction():
-        seeded = _rows(profile, "SELECT root_id FROM dwp.p_root_item WHERE created_by = ?", params=[SEED_OPERATOR])
+        seeded = _rows(profile, "SELECT root_id FROM p_root_item WHERE created_by = ?", params=[SEED_OPERATOR])
         root_ids = [int(row["root_id"]) for row in seeded]
         if not root_ids:
             return 0
         placeholders = ", ".join("?" for _ in root_ids)
-        execute_sql(profile, f"DELETE FROM dwp.p_root_change_log WHERE change_type = ? AND root_id IN ({placeholders})", autocommit=False, params=[SEED_CHANGE_TYPE, *root_ids])
-        execute_sql(profile, f"DELETE FROM dwp.p_root_item WHERE root_id IN ({placeholders}) AND created_by = ?", autocommit=False, params=[*root_ids, SEED_OPERATOR])
+        execute_sql(profile, f"DELETE FROM p_root_change_log WHERE change_type = ? AND root_id IN ({placeholders})", autocommit=False, params=[SEED_CHANGE_TYPE, *root_ids])
+        execute_sql(profile, f"DELETE FROM p_root_item WHERE root_id IN ({placeholders}) AND created_by = ?", autocommit=False, params=[*root_ids, SEED_OPERATOR])
         return len(root_ids)
 
 

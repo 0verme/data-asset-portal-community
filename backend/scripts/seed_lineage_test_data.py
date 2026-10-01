@@ -52,27 +52,27 @@ def _safe_profile(name, config):
 
 def _delete_snapshot(profile):
     # Delete dependants explicitly so re-seed works even when FK cascade is unavailable.
-    execute_sql(profile, "DELETE FROM dwp.p_lineage_edge WHERE snapshot_id = ?", autocommit=False, params=[SNAPSHOT_ID])
-    execute_sql(profile, "DELETE FROM dwp.p_lineage_node WHERE snapshot_id = ?", autocommit=False, params=[SNAPSHOT_ID])
-    execute_sql(profile, "DELETE FROM dwp.p_lineage_snapshot WHERE import_batch_id = ?", autocommit=False, params=[SNAPSHOT_ID])
+    execute_sql(profile, "DELETE FROM p_lineage_edge WHERE snapshot_id = ?", autocommit=False, params=[SNAPSHOT_ID])
+    execute_sql(profile, "DELETE FROM p_lineage_node WHERE snapshot_id = ?", autocommit=False, params=[SNAPSHOT_ID])
+    execute_sql(profile, "DELETE FROM p_lineage_snapshot WHERE import_batch_id = ?", autocommit=False, params=[SNAPSHOT_ID])
 
 
 def _apply(profile, snapshot):
     with database_transaction():
         _delete_snapshot(profile)
         execute_sql(profile, """
-INSERT INTO dwp.p_lineage_snapshot (snapshot_id, generated_at, generator_name, generator_version, import_batch_id, status_code)
+INSERT INTO p_lineage_snapshot (snapshot_id, generated_at, generator_name, generator_version, import_batch_id, status_code)
 VALUES (?, ?, ?, ?, ?, 'ACTIVE')
 """, autocommit=False, params=[snapshot["snapshotId"], snapshot["generatedAt"], snapshot["generator"]["name"], snapshot["generator"]["version"], SNAPSHOT_ID])
         for node in snapshot["nodes"]:
             execute_sql(profile, """
-INSERT INTO dwp.p_lineage_node (snapshot_id, node_id, kind_code, node_name, display_name, namespace_name, attributes_json)
+INSERT INTO p_lineage_node (snapshot_id, node_id, kind_code, node_name, display_name, namespace_name, attributes_json)
 VALUES (?, ?, ?, ?, ?, ?, ?)
 """, autocommit=False, params=[SNAPSHOT_ID, node["id"], node["kind"], node["name"], node["displayName"], node["namespace"], json.dumps(node["attributes"], ensure_ascii=False, sort_keys=True)])
         for edge in snapshot["edges"]:
             evidence = edge["evidence"]
             execute_sql(profile, """
-INSERT INTO dwp.p_lineage_edge (snapshot_id, edge_id, source_node_id, target_node_id, kind_code, evidence_type, source_record_id, evidence_description, confidence_code, generated_at, diagnostics_json)
+INSERT INTO p_lineage_edge (snapshot_id, edge_id, source_node_id, target_node_id, kind_code, evidence_type, source_record_id, evidence_description, confidence_code, generated_at, diagnostics_json)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """, autocommit=False, params=[SNAPSHOT_ID, edge["id"], edge["sourceId"], edge["targetId"], edge["kind"], evidence["type"], evidence["sourceRecordId"], evidence["description"], edge["confidence"], edge["generatedAt"], json.dumps(edge["diagnostics"], ensure_ascii=False)])
 

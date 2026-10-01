@@ -43,7 +43,7 @@ SEED_CHANGE_TYPE = "CREATE_TABLE"
 # asset INSERT deliberately omits the source-scoped identity columns
 # (source_key / asset_type / external_id) to keep seeded rows portal-only.
 ASSET_INSERT_SQL = """
-INSERT INTO dwp.p_asset_table (
+INSERT INTO p_asset_table (
   asset_id, table_name, table_cn_name, schema_name, layer_code, domain_code,
   owner_name, grain_desc, cycle_desc, table_desc, field_count,
   is_deleted, created_by, updated_by
@@ -51,7 +51,7 @@ INSERT INTO dwp.p_asset_table (
 """
 
 FIELD_INSERT_SQL = """
-INSERT INTO dwp.p_asset_field (
+INSERT INTO p_asset_field (
   field_id, asset_id, field_name, field_cn_name, data_type, field_order,
   nullable_flag, pk_flag, partition_flag, enum_desc, field_desc,
   is_deleted, created_by, updated_by
@@ -59,7 +59,7 @@ INSERT INTO dwp.p_asset_field (
 """
 
 CHANGE_LOG_INSERT_SQL = """
-INSERT INTO dwp.p_asset_change_log (
+INSERT INTO p_asset_change_log (
   change_id, asset_id, table_name, change_type, change_summary,
   before_json, after_json, operator_name
 ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)
@@ -437,7 +437,7 @@ def _plan(profile):
         profile,
         f"""
 SELECT asset_id, table_name, schema_name, layer_code, created_by
-FROM dwp.p_asset_table
+FROM p_asset_table
 WHERE table_name IN ({_placeholders(names)})
 """,
         names,
@@ -466,11 +466,11 @@ WHERE table_name IN ({_placeholders(names)})
 
     configured_domains = {
         row["domain_code"]
-        for row in _rows(profile, "SELECT domain_code FROM dwp.p_asset_domain WHERE is_active = 'Y'")
+        for row in _rows(profile, "SELECT domain_code FROM p_asset_domain WHERE is_active = 'Y'")
     }
     configured_layers = {
         row["layer_code"]
-        for row in _rows(profile, "SELECT layer_code FROM dwp.p_asset_layer WHERE is_active = 'Y'")
+        for row in _rows(profile, "SELECT layer_code FROM p_asset_layer WHERE is_active = 'Y'")
     }
     missing_domains = sorted({asset["domain"] for asset in ASSETS} - configured_domains)
     missing_layers = sorted({asset["layer"] for asset in ASSETS} - configured_layers)
@@ -503,7 +503,7 @@ def _apply(profile, config):
         if config["type"] == "postgres":
             execute_sql(
                 profile,
-                "LOCK TABLE dwp.p_asset_table, dwp.p_asset_field, dwp.p_asset_change_log IN EXCLUSIVE MODE",
+                "LOCK TABLE p_asset_table, p_asset_field, p_asset_change_log IN EXCLUSIVE MODE",
                 autocommit=False,
             )
         pending, already_seeded = _plan(profile)
@@ -511,13 +511,13 @@ def _apply(profile, config):
             return 0, len(already_seeded)
 
         next_asset_id = int(
-            _rows(profile, "SELECT COALESCE(MAX(asset_id), 0) + 1 AS next_id FROM dwp.p_asset_table")[0]["next_id"]
+            _rows(profile, "SELECT COALESCE(MAX(asset_id), 0) + 1 AS next_id FROM p_asset_table")[0]["next_id"]
         )
         next_field_id = int(
-            _rows(profile, "SELECT COALESCE(MAX(field_id), 0) + 1 AS next_id FROM dwp.p_asset_field")[0]["next_id"]
+            _rows(profile, "SELECT COALESCE(MAX(field_id), 0) + 1 AS next_id FROM p_asset_field")[0]["next_id"]
         )
         next_change_id = int(
-            _rows(profile, "SELECT COALESCE(MAX(change_id), 0) + 1 AS next_id FROM dwp.p_asset_change_log")[0]["next_id"]
+            _rows(profile, "SELECT COALESCE(MAX(change_id), 0) + 1 AS next_id FROM p_asset_change_log")[0]["next_id"]
         )
 
         for asset_offset, asset in enumerate(pending):
@@ -589,7 +589,7 @@ def _cleanup(profile):
             profile,
             f"""
 SELECT asset_id
-FROM dwp.p_asset_table
+FROM p_asset_table
 WHERE created_by = ? AND table_name IN ({_placeholders(names)})
 """,
             [SEED_OPERATOR, *names],
@@ -600,20 +600,20 @@ WHERE created_by = ? AND table_name IN ({_placeholders(names)})
         placeholders = _placeholders(asset_ids)
         execute_sql(
             profile,
-            f"DELETE FROM dwp.p_asset_change_log "
+            f"DELETE FROM p_asset_change_log "
             f"WHERE asset_id IN ({placeholders}) AND operator_name = ?",
             autocommit=False,
             params=[*asset_ids, SEED_OPERATOR],
         )
         execute_sql(
             profile,
-            f"DELETE FROM dwp.p_asset_field WHERE asset_id IN ({placeholders}) AND created_by = ?",
+            f"DELETE FROM p_asset_field WHERE asset_id IN ({placeholders}) AND created_by = ?",
             autocommit=False,
             params=[*asset_ids, SEED_OPERATOR],
         )
         execute_sql(
             profile,
-            f"DELETE FROM dwp.p_asset_table WHERE asset_id IN ({placeholders}) AND created_by = ?",
+            f"DELETE FROM p_asset_table WHERE asset_id IN ({placeholders}) AND created_by = ?",
             autocommit=False,
             params=[*asset_ids, SEED_OPERATOR],
         )
