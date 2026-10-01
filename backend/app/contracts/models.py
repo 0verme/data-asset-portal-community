@@ -264,6 +264,7 @@ class SourceSystem(ContractModel):
 
 
 class FieldMappingItem(ContractModel):
+    tablePk: int | str | None = None
     dataSourceId: int | str | None = None
     sourceSystemId: int | str | None = None
     upstreamSystemId: int | str | None = None
@@ -285,6 +286,7 @@ class FieldMappingItem(ContractModel):
 
 
 class FieldMappingTableItem(ContractModel):
+    tablePk: int | str | None = None
     dataSourceId: int | str | None = None
     sourceSystemId: int | str | None = None
     upstreamSystemId: int | str | None = None

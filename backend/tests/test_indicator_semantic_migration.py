@@ -14,6 +14,7 @@ from pathlib import Path
 from backend.app.db.sqlite_adapter import connect
 # pi-lens-ignore: reportMissingImports
 from backend.app.migrations.schema import initialize
+from backend.scripts.schema_migrate import repository_alembic_head
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = ROOT.parent
@@ -213,7 +214,7 @@ class IndicatorSemanticMigrationTests(unittest.TestCase):
             connection = sqlite3.connect(database)
             try:
                 self.assertEqual(
-                    ("0009_upstream_option_contract",),
+                    (repository_alembic_head(),),
                     connection.execute("SELECT version_num FROM alembic_version").fetchone(),
                 )
                 columns = {

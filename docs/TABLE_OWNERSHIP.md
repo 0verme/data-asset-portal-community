@@ -4,7 +4,7 @@
 
 ## Canonical baseline
 
-`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0009_upstream_option_contract` 共同覆盖以下 39 张 canonical tables：
+`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0010_field_mapping_identity` 共同覆盖以下 39 张 canonical tables：
 
 | Owner | Tables |
 | --- | --- |
@@ -37,7 +37,7 @@
 
 ## Cross-module relationships
 
-- `p_field_mapping_table.upstream_system_id` 是字段映射的系统身份，外键引用 `p_upstream_system.system_pk`；`data_source_id` 仅保留为可空的 shared `p_data_source` 兼容关系，不能用于系统身份筛选。
+- `p_field_mapping_table.upstream_system_id` 是字段映射的系统身份，外键引用 `p_upstream_system.system_pk`；`data_source_id` 仅保留为可空的 shared `p_data_source` 兼容关系，不能用于系统身份筛选。单条表映射由 `table_pk` 持久化定位，应用层业务身份为 `(upstream_system_id, source_table_name, target_layer_code, target_table_name, load_mode)`；对应索引不设 UNIQUE，避免 nullable 目标字段在不同数据库中的唯一语义差异，导入服务负责阻止完全相同身份冲突。
 - `p_upstream_system.data_source_id` 引用 shared `p_data_source`；upstream 的连接信息仍是 deployment metadata，不代表实际连接已经可用。
 - 字段映射查询、统计、表/字段维度和导出链路统一按 `upstream_system_id` 关联；系统名称只用于阅读，`system_abbr` 作为用户侧消歧编码。
 - `p_push_system.master_system_id` 引用 `p_system`；`p_push_job` / `p_push_job_field` 通过 cascade foreign keys 维护其所属层级。

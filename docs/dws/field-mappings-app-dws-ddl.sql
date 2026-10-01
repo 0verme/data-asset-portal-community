@@ -38,8 +38,12 @@ COMMENT ON COLUMN dwp.p_field_mapping_table.field_total_count IS '源表字段�
 COMMENT ON COLUMN dwp.p_field_mapping_table.mapped_field_count IS '已映射字段数';
 COMMENT ON COLUMN dwp.p_field_mapping_table.latest_mapping_time IS '最近一次映射维护时间';
 
-CREATE UNIQUE INDEX idx_p_field_mapping_table_uk_01
-    ON dwp.p_field_mapping_table (upstream_system_id, source_table_name);
+-- The target table and load mode are nullable, so application-level identity
+-- validation enforces uniqueness consistently across supported databases.
+CREATE INDEX idx_p_field_mapping_table_identity
+    ON dwp.p_field_mapping_table (
+        upstream_system_id, source_table_name, target_layer_code, target_table_name, load_mode
+    );
 
 CREATE INDEX idx_p_field_mapping_table_ix_01
     ON dwp.p_field_mapping_table (target_table_name, latest_mapping_time);

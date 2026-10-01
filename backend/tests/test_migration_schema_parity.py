@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import unittest
+from pathlib import Path
 
 # pi-lens-ignore: reportMissingImports
 from backend.app.migrations.schema import (
@@ -95,7 +96,7 @@ class MigrationSchemaParityTests(unittest.TestCase):
         required = (
             "idx_p_api_asset_filter",
             "idx_p_field_mapping_table_source",
-            "idx_p_field_mapping_table_uk_01",
+            "idx_p_field_mapping_table_identity",
             "idx_p_upstream_system_ix_01",
             "idx_p_push_system_ix_01",
             "idx_p_report_asset_ix_01",
@@ -117,6 +118,53 @@ class MigrationSchemaParityTests(unittest.TestCase):
             normalized = " ".join(sql.lower().split())
             for fragment in required:
                 self.assertIn(fragment, normalized, f"{dialect}: {fragment}")
+
+    def test_field_mapping_business_identity_has_a_non_unique_cross_dialect_index(self):
+        expected_identity = (
+            "upstream_system_id",
+            "source_table_name",
+            "target_layer_code",
+            "target_table_name",
+            "load_mode",
+        )
+        for dialect in SUPPORTED_DIALECTS:
+            table = baseline_schema(dialect).tables["p_field_mapping_table"]
+            identity_index = table.indexes.get("idx_p_field_mapping_table_identity")
+            self.assertIsNotNone(identity_index, dialect)
+            self.assertEqual(expected_identity, identity_index.columns, dialect)
+            self.assertFalse(identity_index.unique, dialect)
+            self.assertNotIn("idx_p_field_mapping_table_uk_01", table.indexes, dialect)
+            self.assertTrue(table.columns["target_table_name"].nullable, dialect)
+            self.assertTrue(table.columns["load_mode"].nullable, dialect)
+            self.assertNotIn(
+                ("upstream_system_id", "source_table_name"),
+                table.unique_constraints,
+                dialect,
+            )
+
+    def test_supplementary_pg_and_dws_ddl_use_the_same_non_unique_identity_index(self):
+        project_root = Path(__file__).resolve().parents[2]
+        for relative_path in (
+            "docs/pg/field-mappings-app-pg-ddl.sql",
+            "docs/dws/field-mappings-app-dws-ddl.sql",
+        ):
+            sql = (project_root / relative_path).read_text(encoding="utf-8")
+            self.assertNotIn("idx_p_field_mapping_table_uk_01", sql.lower())
+            self.assertRegex(
+                sql.lower(),
+                re.compile(
+                    r"create\s+index(?:\s+if\s+not\s+exists)?\s+"
+                    r"idx_p_field_mapping_table_identity\s+on\s+"
+                    r"(?:dwp\.)?p_field_mapping_table\s*\(\s*"
+                    r"upstream_system_id\s*,\s*source_table_name\s*,\s*"
+                    r"target_layer_code\s*,\s*target_table_name\s*,\s*load_mode\s*\)",
+                    re.I | re.S,
+                ),
+            )
+            self.assertNotRegex(
+                sql.lower(),
+                r"create\s+unique\s+index[^;]*p_field_mapping_table",
+            )
 
     def test_portable_defaults_are_preserved(self):
         required = (

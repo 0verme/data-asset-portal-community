@@ -111,6 +111,29 @@ test("mapping keeps the canonical sourceSystemId parameter", () => {
   });
 });
 
+test("mapping routes retain the persistent table identity", () => {
+  const location = parseLocation("/field-mapping?sourceSystemId=101&tablePk=301");
+  assert.equal(location.mappingRoute.tablePk, "301");
+
+  const serialized = buildNavigationLocation({
+    module: "mapping",
+    routes: {
+      ...emptyRoutes,
+      mapping: {
+        tab: "field",
+        sourceSystemId: "101",
+        sourceTable: "src",
+        dwfTable: "dwf",
+        tablePk: 301,
+      },
+    },
+  });
+  assert.equal(
+    serialized.url,
+    "/field-mapping?sourceSystemId=101&sourceTable=src&dwfTable=dwf&tablePk=301&tab=field",
+  );
+});
+
 test("mapping normalizes the legacy upstreamSystemId URL alias", () => {
   const location = parseLocation("/field-mapping?upstreamSystemId=101");
   assert.equal(location.mappingRoute.sourceSystemId, "101");

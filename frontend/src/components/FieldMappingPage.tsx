@@ -22,6 +22,7 @@ import {
   getFieldMappings,
   exportFieldMappingCsv,
   getFieldMappingTables,
+  fieldMappingTableIdentityKey,
   type EnrichedFieldMappingRow,
   type FieldMappingQueryParams,
   type FieldMappingSourceSystemOption,
@@ -228,6 +229,7 @@ export function FieldMappingPage({
     requestFilters.emptyComment,
     requestFilters.srcField,
     requestFilters.sourceSystemId,
+    requestFilters.tablePk,
     requestFilters.srcTable,
     requestFilters.targetField,
     requestFilters.targetTable,
@@ -275,8 +277,10 @@ export function FieldMappingPage({
     { key: "srcComment", label: "字段注释" },
   ];
   const targetColumns: MappingColumn[] = [
-    { key: "targetTable", label: "DWF 表名" },
-    { key: "targetField", label: "DWF 字段" },
+    { key: "targetLayer", label: "目标层" },
+    { key: "targetTable", label: "目标表名" },
+    { key: "loadMode", label: "入仓方式" },
+    { key: "targetField", label: "目标字段" },
     { key: "mappingRule", label: "映射规则" },
   ];
   const fieldColumns = [...sourceColumns, ...targetColumns];
@@ -284,7 +288,8 @@ export function FieldMappingPage({
     { key: "srcSystem", label: "源系统" },
     { key: "srcTable", label: "源系统表" },
     { key: "srcTableCn", label: "表中文名" },
-    { key: "targetTable", label: "DWF 表名" },
+    { key: "targetLayer", label: "目标层" },
+    { key: "targetTable", label: "目标表名" },
     { key: "mappedCount", label: "已映射", align: "right" },
     { key: "loadMode", label: "入仓方式" },
     { key: "emptyCommentRate", label: "空注释率", align: "right" },
@@ -294,6 +299,7 @@ export function FieldMappingPage({
     "srcSystem",
     "srcTable",
     "srcTableCn",
+    "targetLayer",
     "targetTable",
     "loadMode",
     "__actions",
@@ -350,6 +356,7 @@ export function FieldMappingPage({
       sourceSystemId: String(getRouteSourceSystemId(route) || row.sourceSystemId || row.upstreamSystemId || ""),
       sourceTable: row.srcTable || "",
       dwfTable: row.targetTable || "",
+      tablePk: row.tablePk ?? "",
     });
   };
 
@@ -444,7 +451,7 @@ export function FieldMappingPage({
       <div className="page-head">
         <div>
           <div className="page-title"><Icon name="link" size={20} color="var(--ink-2)" />字段映射查询</div>
-          <div className="page-sub">查询源字段与 DWF 字段之间的映射关系，支持字段维度和表维度查看。</div>
+          <div className="page-sub">查询源字段与目标字段之间的映射关系，支持字段维度和表维度查看。</div>
         </div>
       </div>
       {exportError ? (
@@ -566,7 +573,7 @@ export function FieldMappingPage({
                 </thead>
                 <tbody>
                   {tab === "field" ? fieldPageRows.map((row) => (
-                    <tr key={`${row.sourceSystemId || row.upstreamSystemId}-${row.srcTable}-${row.srcField}-${row.targetField}`}>
+                    <tr key={`${row.tablePk ?? fieldMappingTableIdentityKey(row)}-${row.srcField}-${row.targetField || ""}`}>
                       <td><span className="fm-system"><span className="fm-dot"></span>{formatSystemLabel(row)}</span></td>
                       <td className="mono">{row.srcTable}</td>
                       <td className="mono">{row.srcField}</td>
@@ -585,7 +592,7 @@ export function FieldMappingPage({
                       <td><span className={`tag ${RULE_TAGS[row.mappingRule || ""] || "tag-neutral"}`}>{row.mappingRule}</span></td>
                     </tr>
                   )) : tablePageRows.map((row) => (
-                    <tr key={`${row.sourceSystemId || row.upstreamSystemId}-${row.srcTable}`}>
+                    <tr key={row.tablePk ?? fieldMappingTableIdentityKey(row)}>
                       {orderedTableColumns.map((column) => (
                         <td
                           key={column.key}

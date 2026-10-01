@@ -32,6 +32,7 @@ from pathlib import Path
 
 from backend.app.db.sqlite_adapter import connect  # type: ignore
 from backend.app.migrations.schema import initialize  # type: ignore
+from backend.scripts.schema_migrate import repository_alembic_head  # type: ignore
 
 BACKEND = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND.parent
@@ -57,6 +58,11 @@ def _run_cli(args, env_extra=None):
 
 
 class SchemaMigrateCliContractTests(unittest.TestCase):
+    def test_head_reports_repository_alembic_head(self):
+        result = _run_cli(["head"])
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(repository_alembic_head(), result.stdout.strip())
+
     def test_fresh_sqlite_baseline_upgrades_to_alembic_head(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -74,7 +80,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
 
             status = _run_cli(["status", "--profile", "fresh", "--config", str(config)])
             self.assertEqual(0, status.returncode, status.stderr)
-            self.assertIn("revision=0009_upstream_option_contract", status.stdout)
+            self.assertIn(f"revision={repository_alembic_head()}", status.stdout)
             connection = sqlite3.connect(database)
             try:
                 row = connection.execute(
@@ -174,7 +180,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
             finally:
                 connection.close()
 
-            self.assertEqual(("0009_upstream_option_contract",), revision)
+            self.assertEqual((repository_alembic_head(),), revision)
             self.assertIn(("DB2", "Legacy DB2", "legacy-db2"), db_items)
             self.assertIn(("POSTGRESQL", "PostgreSQL", "PostgreSQL"), db_items)
             self.assertIn(("CUSTOMER_OPS", "Legacy customer ops", "legacy-customer-ops"), dept_items)
@@ -220,7 +226,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 self.assertEqual(("Legacy system",), connection.execute(
                     "SELECT system_name FROM dwp.p_system WHERE system_id = 99"
                 ).fetchone())
-                self.assertEqual(("0009_upstream_option_contract",), connection.execute(
+                self.assertEqual((repository_alembic_head(),), connection.execute(
                     "SELECT version_num FROM dwp.alembic_version"
                 ).fetchone())
                 self.assertIsNotNone(connection.execute(

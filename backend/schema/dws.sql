@@ -83,8 +83,10 @@ ALTER TABLE dwp.p_field_mapping_field ADD CONSTRAINT fk_p_field_mapping_field_ta
   FOREIGN KEY (table_pk) REFERENCES dwp.p_field_mapping_table(table_pk) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_p_field_mapping_table_source
   ON dwp.p_field_mapping_table(data_source_id, source_table_name);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_p_field_mapping_table_uk_01
-  ON dwp.p_field_mapping_table(upstream_system_id, source_table_name);
+CREATE INDEX IF NOT EXISTS idx_p_field_mapping_table_identity
+  ON dwp.p_field_mapping_table(
+    upstream_system_id, source_table_name, target_layer_code, target_table_name, load_mode
+  );
 
 CREATE TABLE IF NOT EXISTS dwp.p_role (
   role_code VARCHAR(64) PRIMARY KEY, name VARCHAR(128) NOT NULL,

@@ -116,6 +116,14 @@ class FieldMappingSourceSystemIdentityTests(unittest.TestCase):
         self.assertEqual(["MEMBER_B"], [item["srcTable"] for item in response.json()["items"]])
         self.assertEqual(102, response.json()["items"][0]["sourceSystemId"])
         self.assertEqual("MEM_TEST", response.json()["items"][0]["systemCode"])
+        table_pk = response.json()["items"][0]["tablePk"]
+
+        exact_table = TestClient(app).get(
+            "/api/field-mappings/fields",
+            params={"tablePk": str(table_pk), "pageSize": "20"},
+        )
+        self.assertEqual(200, exact_table.status_code, exact_table.text)
+        self.assertEqual(["MEMBER_B"], [item["srcTable"] for item in exact_table.json()["items"]])
 
 
 if __name__ == "__main__":

@@ -82,8 +82,10 @@ ALTER TABLE p_field_mapping_field ADD CONSTRAINT fk_p_field_mapping_field_table
   FOREIGN KEY (table_pk) REFERENCES p_field_mapping_table(table_pk) ON DELETE CASCADE;
 CREATE INDEX idx_p_field_mapping_table_source
   ON p_field_mapping_table(data_source_id, source_table_name);
-CREATE UNIQUE INDEX idx_p_field_mapping_table_uk_01
-  ON p_field_mapping_table(upstream_system_id, source_table_name);
+CREATE INDEX idx_p_field_mapping_table_identity
+  ON p_field_mapping_table(
+    upstream_system_id, source_table_name, target_layer_code, target_table_name, load_mode
+  );
 
 CREATE TABLE IF NOT EXISTS p_role (
   role_code VARCHAR(64) PRIMARY KEY, name VARCHAR(128) NOT NULL,

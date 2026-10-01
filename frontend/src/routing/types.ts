@@ -33,6 +33,7 @@ export interface Route {
   upstreamSystemId?: string;
   sourceTable?: string;
   dwfTable?: string;
+  tablePk?: string | number;
   rootId?: string | null;
   direction?: string;
   depth?: number;

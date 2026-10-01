@@ -271,6 +271,7 @@ export function parseInitialLocation(): LocationSnapshot {
           || "",
         sourceTable: searchParams.get("sourceTable") || "",
         dwfTable: searchParams.get("dwfTable") || "",
+        ...(searchParams.get("tablePk") ? { tablePk: searchParams.get("tablePk") || "" } : {}),
       },
     };
   }
@@ -546,6 +547,7 @@ export function buildNavigationLocation({
     if (sourceSystemId) params.set("sourceSystemId", sourceSystemId);
     if (mappingRoute.sourceTable) params.set("sourceTable", mappingRoute.sourceTable);
     if (mappingRoute.dwfTable) params.set("dwfTable", mappingRoute.dwfTable);
+    if (mappingRoute.tablePk) params.set("tablePk", String(mappingRoute.tablePk));
     if (mappingRoute.tab && mappingRoute.tab !== DEFAULT_MAPPING_ROUTE.tab) {
       params.set("tab", mappingRoute.tab);
     }
