@@ -3,6 +3,8 @@
 -- scope: downstream systems, push jobs, job fields, and change logs
 -- schema: dwp
 -- target: dws-compatible
+-- Physical FOREIGN KEY constraints are intentionally absent on DWS. The
+-- application retains the relationships and deletes push children first.
 
 CREATE TABLE IF NOT EXISTS dwp.p_push_system (
     system_id            BIGINT                 NOT NULL,
@@ -27,9 +29,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_push_system (
     created_by           VARCHAR(64)            NOT NULL DEFAULT 'system',
     created_at           TIMESTAMP              NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by           VARCHAR(64)            NOT NULL DEFAULT 'system',
-    updated_at           TIMESTAMP              NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_p_push_system_master FOREIGN KEY (master_system_id)
-        REFERENCES dwp.p_system(system_id) ON DELETE RESTRICT
+    updated_at           TIMESTAMP              NOT NULL DEFAULT CURRENT_TIMESTAMP
 )
 DISTRIBUTE BY REPLICATION;
 

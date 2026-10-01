@@ -23,6 +23,7 @@ from ...services.upstream_service import (
     UpstreamDataSourceError,
     UpstreamSystemAlreadyExistsError,
     UpstreamSystemNotFoundError,
+    UpstreamSystemReferencedError,
     UpstreamValidationError,
 )
 from ..dependencies import (
@@ -38,7 +39,7 @@ from ..errors import _service_error_response
 def _upstream_error_status(error: Any) -> int:
     if isinstance(error, UpstreamSystemNotFoundError):
         return 404
-    if isinstance(error, UpstreamSystemAlreadyExistsError):
+    if isinstance(error, (UpstreamSystemAlreadyExistsError, UpstreamSystemReferencedError)):
         return 409
     if isinstance(error, UpstreamValidationError):
         return 422
@@ -205,7 +206,11 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
     ):
         try:
             current_service.delete_system(system_id)
-        except (UpstreamSystemNotFoundError, UpstreamDataSourceError) as error:
+        except (
+            UpstreamSystemNotFoundError,
+            UpstreamSystemReferencedError,
+            UpstreamDataSourceError,
+        ) as error:
             return _upstream_error_response(error)
         return JSONResponse(
             content=validate_contract({"message": "上游系统删除成功"}, UpstreamResponse)

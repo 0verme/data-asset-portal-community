@@ -22,7 +22,7 @@
 | codeTable | `p_manual_code_table` |
 | lineage | `p_lineage_snapshot`, `p_lineage_node`, `p_lineage_edge` |
 
-四方言保持相同的 table/column/primary-key/unique/foreign-key/index inventory；类型使用各数据库的等价表示。`p_asset_table` 的 source-scoped identity columns 与 `uq_p_asset_ingestion_identity` unique constraint 由 #114 contract mapping 使用，不能作为外部 Collector 的 wire shape。`p_push_system.master_system_id` 关联 shared `p_system`，用于复用现有 Push Service 的 master-system contract。
+四方言保持相同的 table/column/primary-key/unique/logical relationship/index contract；SQLite、PostgreSQL、MySQL 保持相同的 physical FK inventory，DWS 因目标版本不支持 FOREIGN KEY constraint 而仅保留 logical relationship。类型使用各数据库的等价表示。`p_asset_table` 的 source-scoped identity columns 与 `uq_p_asset_ingestion_identity` unique constraint 由 #114 contract mapping 使用，不能作为外部 Collector 的 wire shape。`p_push_system.master_system_id` 关联 shared `p_system`，用于复用现有 Push Service 的 master-system contract。
 
 ## Lineage storage boundary
 
@@ -37,14 +37,15 @@
 
 ## Cross-module relationships
 
-- `p_field_mapping_table.upstream_system_id` 是字段映射的系统身份，外键引用 `p_upstream_system.system_pk`；`data_source_id` 仅保留为可空的 shared `p_data_source` 兼容关系，不能用于系统身份筛选。单条表映射由 `table_pk` 持久化定位，应用层业务身份为 `(upstream_system_id, source_table_name, target_layer_code, target_table_name, load_mode)`；对应索引不设 UNIQUE，避免 nullable 目标字段在不同数据库中的唯一语义差异，导入服务负责阻止完全相同身份冲突。
-- `p_upstream_system.data_source_id` 引用 shared `p_data_source`；upstream 的连接信息仍是 deployment metadata，不代表实际连接已经可用。
+- `p_field_mapping_table.upstream_system_id` 是字段映射的系统身份，逻辑关联 `p_upstream_system.system_pk`（RESTRICT）；`data_source_id` 仅保留为可空的 shared `p_data_source` 兼容关系，不能用于系统身份筛选。单条表映射由 `table_pk` 持久化定位，应用层业务身份为 `(upstream_system_id, source_table_name, target_layer_code, target_table_name, load_mode)`；对应索引不设 UNIQUE，避免 nullable 目标字段在不同数据库中的唯一语义差异，导入服务负责阻止完全相同身份冲突。
+- `p_upstream_system.data_source_id` 逻辑关联 shared `p_data_source`（RESTRICT）；upstream 的连接信息仍是 deployment metadata，不代表实际连接已经可用。
 - 字段映射查询、统计、表/字段维度和导出链路统一按 `upstream_system_id` 关联；系统名称只用于阅读，`system_abbr` 作为用户侧消歧编码。
-- `p_push_system.master_system_id` 引用 `p_system`；`p_push_job` / `p_push_job_field` 通过 cascade foreign keys 维护其所属层级。
+- `p_push_system.master_system_id` 逻辑关联 `p_system`；`p_push_job` / `p_push_job_field` 保留 CASCADE 关系语义，hard-delete 服务在同一事务中显式按 child → parent 顺序删除。
 - `p_indicator_item.source_asset_id` 与 `p_indicator_item.result_field_id` 分别引用 `p_asset_table.asset_id` 与 `p_asset_field.field_id` 的稳定身份；字段归属由 Indicator Service deterministic 校验，兼容快照字段不承担唯一关联职责。
 - `p_asset_table.asset_id` 与 `p_asset_field.field_id` 都是 lifetime identity：整表删除保留资产与字段 tombstone（`is_deleted = 'Y'`），已分配 ID 永不代表另一个逻辑对象；同一 source-scoped asset re-import 恢复原 `asset_id`，已删除字段仍按字段生命周期分配新 ID。
 - `p_asset_field.field_id` 是字段 historical identity：字段从 source 集合消失时以 `is_deleted = 'Y'` 软删除并保留 ID，ID 单调分配、不复用；active 匹配键为 `(asset_id, casefold(field_name))`，读路径只返回 `is_deleted = 'N'` 的字段。
-- lineage child tables 通过 `snapshot_id` cascade 引用 lineage snapshot。
+- lineage child tables 通过 `snapshot_id` 逻辑关联 lineage snapshot，关系契约保留 CASCADE 语义；当前 snapshot 通过 ACTIVE/INACTIVE 状态切换，没有 hard-delete 路径。
+- DWS 不物理执行上述 relationship contract；RESTRICT 所保护的 `p_system`、`p_data_source` 等 parent 当前没有 hard-delete 路径。上游系统 hard-delete 在同一事务内拒绝仍被字段映射（包含软删除映射）引用的系统，并先删除 unload-time children；RBAC role 删除先删 role-permission rows；Push hard-delete 按 field → job → system 顺序显式清理，字段映射只软删除，lineage snapshot 不 hard-delete。`p_api_asset` 和 `p_push_system` 对 `p_system` 的关系同样保留 RESTRICT 语义。
 - API Asset、Mapping、Report 等服务继续使用现有 SQLAlchemy Core / Provider contract，不新增数据库访问层。
 
 ## p_asset_table / p_asset_field ownership
@@ -61,7 +62,7 @@
 
 ## Supplementary DDL
 
-`docs/pg/` 和 `docs/dws/` 保留为方言说明、历史迁移参考和部署 catalog。它们不能再被解释为某个仓库模块的产品锁或 baseline 排除清单。
+`docs/pg/` 和 `docs/dws/` 保留为方言说明、历史迁移参考和部署 catalog。PostgreSQL supplementary DDL 保留 physical FK；DWS supplementary DDL 不创建 physical FK，并依赖 logical relationship contract 与 application-level delete behavior。它们不能再被解释为某个仓库模块的产品锁或 baseline 排除清单。
 
 `p_field_mapping_change_log` 的旧 DDL 目前没有对应 runtime service/SQLAlchemy declaration，也不在 canonical 39-table inventory；它作为 docs-only historical/reference artifact 保留，待实际 runtime 使用时再按正常 migration 流程纳入，不得作为当前 module availability 判据。
 
@@ -72,4 +73,4 @@
 - database profile、driver、credential、external API、storage profile 和 dangerous write readiness：deployment/runtime selection and diagnostics；它们不是 module availability 或 license gate。
 - source/runtime module set：由仓库 manifest 和 route composition 固定为 open by default。
 
-新增表时先确定 owner，再同时更新四方言 schema、Alembic revision、reflection/verify、seed 和相关 contract tests。禁止通过缺表、静默跳过 provider 或 route 404 制造产品 Edition 边界。
+新增表时先确定 owner，再更新四份方言 schema 的逻辑契约、适用的 physical FK、Alembic revision、reflection/verify、seed 和相关 contract tests。禁止通过缺表、静默跳过 provider 或 route 404 制造产品 Edition 边界。

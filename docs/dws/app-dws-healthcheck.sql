@@ -9,7 +9,8 @@
 --      - migration_fingerprint: which upgrade signatures are missing
 --      - table_checklist: which tables are missing
 --      - column_checklist: which columns/types/lengths are missing or drifted
---      - index_constraint_checklist: key unique indexes / PK / FK
+--      - index_constraint_checklist: expected indexes / PK / UNIQUE
+--      - logical_relationship_checklist: expected child/parent columns and parent candidate keys
 --
 -- This script is read-only.
 
@@ -167,22 +168,24 @@ FROM (
                   AND UPPER(column_name) = 'SYSTEM_PK'
             ) = 0
              AND NOT EXISTS (SELECT 1 FROM actual_tables WHERE table_name = 'P_FIELD_MAPPING_SYSTEM')
-             AND (
-                SELECT COUNT(*)
+             AND EXISTS (
+                SELECT 1
                 FROM information_schema.table_constraints tc
                 JOIN information_schema.key_column_usage kcu
                   ON tc.constraint_name = kcu.constraint_name
                  AND tc.table_schema = kcu.table_schema
                  AND tc.table_name = kcu.table_name
                 WHERE UPPER(tc.table_schema) = (SELECT schema_name FROM params)
-                  AND UPPER(tc.table_name) = 'P_FIELD_MAPPING_TABLE'
-                  AND tc.constraint_type = 'FOREIGN KEY'
-                  AND UPPER(kcu.column_name) = 'UPSTREAM_SYSTEM_ID'
-            ) >= 1
+                  AND UPPER(tc.table_name) = 'P_UPSTREAM_SYSTEM'
+                  AND UPPER(tc.constraint_type) = 'PRIMARY KEY'
+                  AND UPPER(kcu.column_name) = 'SYSTEM_PK'
+                GROUP BY tc.table_name, tc.constraint_name
+                HAVING COUNT(*) = 1
+            )
             THEN 'OK'
             ELSE 'DRIFT'
         END,
-        'UPSTREAM_SYSTEM_ID present, SYSTEM_PK removed, P_FIELD_MAPPING_SYSTEM removed, FK exists',
+        'UPSTREAM_SYSTEM_ID present, SYSTEM_PK removed, P_FIELD_MAPPING_SYSTEM removed, parent PK exists; no physical FK expected',
         'new_col=' ||
         CAST((
             SELECT COUNT(*)
@@ -201,7 +204,7 @@ FROM (
         ) AS VARCHAR(20)) ||
         ', legacy_table=' ||
         CASE WHEN EXISTS (SELECT 1 FROM actual_tables WHERE table_name = 'P_FIELD_MAPPING_SYSTEM') THEN 'exists' ELSE 'missing' END,
-        '异常说明 2026-06-28 字段映射上游系统外键升级未完全生效'
+        '异常说明 2026-06-28 字段映射逻辑关系升级未完全生效'
 ) t
 ORDER BY sort_order;
 
@@ -707,8 +710,7 @@ expected_indexes AS (
             ('INDEX', 'P_UPSTREAM_SYSTEM', 'IDX_P_UPSTREAM_SYSTEM_UK_02'),
             ('INDEX', 'P_UPSTREAM_UNLOAD_TIME', 'IDX_P_UPSTREAM_UNLOAD_TIME_UK_01'),
             ('CONSTRAINT', 'P_REPORT_ASSET', 'PK_P_REPORT_ASSET'),
-            ('CONSTRAINT', 'P_REPORT_ASSET', 'UK_P_REPORT_ASSET_01'),
-            ('CONSTRAINT', 'P_FIELD_MAPPING_TABLE', 'FK_P_FIELD_MAPPING_TABLE_UPSTREAM')
+            ('CONSTRAINT', 'P_REPORT_ASSET', 'UK_P_REPORT_ASSET_01')
     ) AS t(object_type, table_name, object_name)
 ),
 actual_indexes AS (
@@ -747,6 +749,68 @@ LEFT JOIN actual_constraints ac
  AND ac.object_name = e.object_name
 ORDER BY e.object_type, e.table_name, e.object_name;
 
+
+-- Logical relationship structure audit (metadata-only; it does not scan application rows).
+WITH params AS (
+    SELECT UPPER('dwp') AS schema_name
+),
+expected_relationships AS (
+    SELECT * FROM (
+        VALUES
+            ('P_API_ASSET', 'SYSTEM_ID', 'P_SYSTEM', 'SYSTEM_ID', 'RESTRICT'),
+            ('P_FIELD_MAPPING_TABLE', 'DATA_SOURCE_ID', 'P_DATA_SOURCE', 'SOURCE_ID', 'RESTRICT'),
+            ('P_FIELD_MAPPING_FIELD', 'TABLE_PK', 'P_FIELD_MAPPING_TABLE', 'TABLE_PK', 'CASCADE'),
+            ('P_ROLE_PERMISSION', 'ROLE_CODE', 'P_ROLE', 'ROLE_CODE', 'CASCADE'),
+            ('P_ROLE_PERMISSION', 'PERMISSION_CODE', 'P_PERMISSION', 'PERMISSION_CODE', 'CASCADE'),
+            ('P_UPSTREAM_SYSTEM', 'DATA_SOURCE_ID', 'P_DATA_SOURCE', 'SOURCE_ID', 'RESTRICT'),
+            ('P_FIELD_MAPPING_TABLE', 'UPSTREAM_SYSTEM_ID', 'P_UPSTREAM_SYSTEM', 'SYSTEM_PK', 'RESTRICT'),
+            ('P_UPSTREAM_UNLOAD_TIME', 'SYSTEM_PK', 'P_UPSTREAM_SYSTEM', 'SYSTEM_PK', 'CASCADE'),
+            ('P_PUSH_SYSTEM', 'MASTER_SYSTEM_ID', 'P_SYSTEM', 'SYSTEM_ID', 'RESTRICT'),
+            ('P_PUSH_JOB', 'SYSTEM_ID', 'P_PUSH_SYSTEM', 'SYSTEM_ID', 'CASCADE'),
+            ('P_PUSH_JOB_FIELD', 'JOB_ID', 'P_PUSH_JOB', 'JOB_ID', 'CASCADE'),
+            ('P_LINEAGE_NODE', 'SNAPSHOT_ID', 'P_LINEAGE_SNAPSHOT', 'SNAPSHOT_ID', 'CASCADE'),
+            ('P_LINEAGE_EDGE', 'SNAPSHOT_ID', 'P_LINEAGE_SNAPSHOT', 'SNAPSHOT_ID', 'CASCADE')
+    ) AS t(child_table, child_column, parent_table, parent_column, on_delete_semantics)
+),
+actual_columns AS (
+    SELECT UPPER(table_name) AS table_name, UPPER(column_name) AS column_name
+    FROM information_schema.columns
+    WHERE UPPER(table_schema) = (SELECT schema_name FROM params)
+),
+actual_single_column_keys AS (
+    SELECT UPPER(tc.table_name) AS table_name,
+           MAX(UPPER(kcu.column_name)) AS column_name
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu
+      ON tc.constraint_name = kcu.constraint_name
+     AND tc.table_schema = kcu.table_schema
+     AND tc.table_name = kcu.table_name
+    WHERE UPPER(tc.table_schema) = (SELECT schema_name FROM params)
+      AND UPPER(tc.constraint_type) IN ('PRIMARY KEY', 'UNIQUE')
+    GROUP BY UPPER(tc.table_name), tc.constraint_name
+    HAVING COUNT(*) = 1
+)
+SELECT
+    'logical_relationship_checklist' AS report_name,
+    e.child_table,
+    e.child_column,
+    e.parent_table,
+    e.parent_column,
+    e.on_delete_semantics,
+    CASE
+        WHEN child.column_name IS NULL THEN 'MISSING_CHILD_COLUMN'
+        WHEN parent.column_name IS NULL THEN 'MISSING_PARENT_COLUMN'
+        WHEN parent_key.column_name IS NULL THEN 'MISSING_PARENT_KEY'
+        ELSE 'OK'
+    END AS status
+FROM expected_relationships e
+LEFT JOIN actual_columns child
+  ON child.table_name = e.child_table AND child.column_name = e.child_column
+LEFT JOIN actual_columns parent
+  ON parent.table_name = e.parent_table AND parent.column_name = e.parent_column
+LEFT JOIN actual_single_column_keys parent_key
+  ON parent_key.table_name = e.parent_table AND parent_key.column_name = e.parent_column
+ORDER BY e.child_table, e.child_column;
 
 -- Optional second-stage data audit
 -- Run these only after the structure checklist is basically OK.

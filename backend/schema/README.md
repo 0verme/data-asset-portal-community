@@ -1,6 +1,6 @@
 # 数据库 Schema 与增量迁移
 
-`backend/schema/` 是新库初始化的唯一结构基线，四份 SQL 是一个 versioned schema artifact set：必须保持相同的 repository module table/column/primary-key/unique/foreign-key/index inventory，同时保留各方言的物理语法和部署约束。所有仓库已有模块均进入 baseline：
+`backend/schema/` 是新库初始化的唯一结构基线，四份 SQL 是一个 versioned schema artifact set：必须保持相同的逻辑 table/column/primary-key/unique/relationship/index contract，同时保留各方言的物理语法和部署约束。SQLite、PostgreSQL、MySQL 保持完整且相同的 physical foreign-key inventory；GaussDB(DWS) 当前不支持 `FOREIGN KEY ... REFERENCES` constraint，因此仅保留 logical relationship，不创建 physical FK。该数据库能力差异不代表业务 schema 或 Community feature 分叉。所有仓库已有模块均进入 baseline：
 
 - `sqlite.sql`
 - `postgresql.sql`
@@ -26,6 +26,8 @@ python backend/scripts/schema_migrate.py verify --offline --dialect postgresql
 python backend/scripts/schema_migrate.py verify --offline --dialect mysql
 python backend/scripts/schema_migrate.py verify --offline --dialect dws
 ```
+
+DWS logical relationship inventory 由测试层的显式 contract 守护：逐项检查 child/parent table、列、类型和 parent PK/UNIQUE candidate key，并对 HASH child 检查 distribution compatibility；DWS baseline physical FK 必须为 0。该 baseline 调整只影响 fresh initialization，不会自动修改已有数据库。
 
 后续结构变更只新增 `backend/alembic/versions/` revision，不修改已发布 revision，不提供自动 downgrade。`0002_portable_asset_filter`、`0003_open_repository_modules`、`0004_metadata_ingestion_identity`、`0005_rbac_persistence`、`0006_field_mapping_upstream_id`、`0007_binary_status_contract`、`0008_indicator_semantic_contract`、`0009_upstream_option_contract` 和 `0010_field_mapping_identity` 是增量示例；`0004` 为 Asset source-scoped identity、Lineage import/content bookkeeping 提供 forward migration，并移除 legacy `table_name` global unique 约束；`0006` 将字段映射已有的 `upstream_system_id` 收口为 `p_upstream_system.system_pk` 外键，并对历史数据执行不猜测的 backfill；`0007` 将码值表可用状态从 legacy `active/draft/disabled` 收口为 `enabled/disabled`，并将历史 `active` / `draft` 分别迁移为 `enabled` / `disabled`；`0008` 为指标增加稳定 asset/field ID、聚合和语义生命周期字段，只对唯一精确的非删除资产/字段执行 backfill，歧义值保持 NULL，并保留原字符串快照；`0009` 仅补齐上游/下游系统表单共用的缺失码值分类和条目，不改写已有字典或业务记录；`0010` 移除字段映射旧的 source-only 唯一索引，并创建完整五元身份的普通查询索引，不改写映射数据。SQLite、PostgreSQL 与 MySQL 的 fresh/upgrade 路径都会从 baseline 升级到同一 head。DWS 目前保留离线基线验证与静态兼容验证；其 JDBC/provider 路径不宣称 online Alembic parity。
 

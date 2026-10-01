@@ -104,7 +104,8 @@ def ensure_gaussdb_rbac_schema(
     The current GaussDB provider intentionally uses the repository baseline
     rather than online Alembic.  This small compatibility step lets an
     existing pre-RBAC DWS installation upgrade without pretending that DWS
-    has an Alembic online path.
+    has an Alembic online path. DWS has no physical FOREIGN KEY constraints;
+    application services retain the relationship and delete mapping rows first.
     """
     if config.get("type") != "gaussdb":
         return False
@@ -143,9 +144,7 @@ def ensure_gaussdb_rbac_schema(
             "description VARCHAR(2000)) DISTRIBUTE BY REPLICATION",
             f"CREATE TABLE IF NOT EXISTS {safe_mapping_table} ("
             "role_code VARCHAR(64) NOT NULL, permission_code VARCHAR(128) NOT NULL, "
-            "PRIMARY KEY (role_code, permission_code), "
-            f"FOREIGN KEY (role_code) REFERENCES {safe_role_table}(role_code) ON DELETE CASCADE, "
-            f"FOREIGN KEY (permission_code) REFERENCES {safe_permission_table}(permission_code) ON DELETE CASCADE) "
+            "PRIMARY KEY (role_code, permission_code)) "
             "DISTRIBUTE BY REPLICATION",
             f"CREATE INDEX idx_p_role_permission_permission ON {safe_mapping_table}(permission_code)",
         )

@@ -31,7 +31,13 @@ from .common_code_service import (
 )
 from ..db.facade import database_transaction
 from ..db.service import CoreAccess
-from ..db.tables import data_source, upstream_change_log, upstream_system, upstream_unload_time
+from ..db.tables import (
+    data_source,
+    mapping_table,
+    upstream_change_log,
+    upstream_system,
+    upstream_unload_time,
+)
 from ..settings import get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
 from .operation_log_service import (
@@ -88,6 +94,20 @@ class UpstreamSystemAlreadyExistsError(Exception):
 
     def to_dict(self):
         return {"code": "UPSTREAM_SYSTEM_ALREADY_EXISTS", "message": f"Upstream system already exists: {self.system_id}"}
+
+
+class UpstreamSystemReferencedError(Exception):
+    def __init__(self, system_id):
+        self.system_id = system_id
+        super().__init__(
+            f"Cannot delete upstream system {system_id}: field mappings still reference it"
+        )
+
+    def to_dict(self):
+        return {
+            "code": "UPSTREAM_SYSTEM_REFERENCED",
+            "message": str(self),
+        }
 
 
 class UpstreamValidationError(Exception):
@@ -621,6 +641,17 @@ class UpstreamService(AuditActorMixin):
             upstream_system.c.system_id == str(system_id), upstream_system.c.is_deleted == "N"))
         if not rows:
             raise UpstreamSystemNotFoundError(system_id)
+        # The audit context owns the transaction. Check every mapping row (including
+        # soft-deleted rows) before hard deletion; this mirrors the physical
+        # RESTRICT relationship on SQLite/PostgreSQL/MySQL and is required on DWS.
+        system_pk = self._coerce_db_integer(rows[0]["system_pk"], "system_pk")
+        references = self._fetch_rows(
+            select(mapping_table.c.table_pk)
+            .where(mapping_table.c.upstream_system_id == system_pk)
+            .limit(1)
+        )
+        if references:
+            raise UpstreamSystemReferencedError(system_id)
         # Must not open a nested database_transaction: callers run under audit().
         current = self._load_system_detail(
             system_id,
@@ -628,7 +659,6 @@ class UpstreamService(AuditActorMixin):
             purpose="upstream detail unload times",
             method="_delete_system",
         )
-        system_pk = self._coerce_db_integer(rows[0]["system_pk"], "system_pk")
         change_id = self._next_id(upstream_change_log, upstream_change_log.c.change_id)
         statements = [
             delete(upstream_unload_time).where(upstream_unload_time.c.system_pk == system_pk),

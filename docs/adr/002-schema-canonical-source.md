@@ -41,12 +41,12 @@
 
 四个文件组成一个**versioned schema artifact set**。它们是当前 fresh-install 的物理部署输入、offline artifact 和 baseline contract，而不是可以被一份可移植业务模型无损替代的单一逻辑模型。
 
-当前四方言共享 table/column/primary-key/unique/foreign-key/index inventory，但物理表达必须保留方言语义：
+当前四方言共享 table/column/primary-key/unique/logical relationship/index contract，但物理表达必须保留数据库能力差异：SQLite、PostgreSQL、MySQL 保留相同的 physical foreign-key inventory；当前 GaussDB(DWS) 目标版本不支持 `FOREIGN KEY ... REFERENCES` constraint，因此 DWS 只保留字段与 logical relationship contract，不创建 physical FK。这是数据库能力差异，不是业务 schema 漂移或 Community feature divergence。
 
 - SQLite 使用 attached `dwp` database、SQLite 类型和 `AUTOINCREMENT`；
 - PostgreSQL 使用 `dwp` schema、`BIGINT`/`VARCHAR`/identity；
 - MySQL 不使用 schema qualification，使用 InnoDB、`utf8mb4_0900_ai_ci`、`AUTO_INCREMENT`，并将报表长文本使用 `TEXT` 以满足 InnoDB row-size 约束；
-- DWS 使用 JDBC/provider 路径以及 `DISTRIBUTE BY REPLICATION/HASH` 等 vendor storage clauses。
+- DWS 使用 JDBC/provider 路径以及 `DISTRIBUTE BY REPLICATION/HASH` 等 vendor storage clauses；logical relationship expectations 由静态测试检查。
 
 ### Alembic
 
@@ -77,7 +77,8 @@ selected backend/schema/<dialect>.sql
 
 当前测试能发现：
 
-- 四方言的 table/column-name、primary-key、unique、foreign-key 和 explicit-index inventory 漂移；
+- 四方言的 table/column-name、primary-key、unique、logical relationship 和 explicit-index inventory 漂移；
+- SQLite/PostgreSQL/MySQL physical FK inventory 漂移，以及 DWS 中意外出现 physical FK；
 - SQLite fresh schema 的 table、column、type、nullable、default、primary-key、unique、foreign-key 和 expected-index 漂移；
 - fresh baseline → Alembic head、existing compatible database stamp、repeat apply、demo seed 和 provider capability contract 问题。
 
@@ -96,17 +97,18 @@ selected backend/schema/<dialect>.sql
 
 ### Static and structural inventory
 
-在 `origin/main` 的当前 revision 上，四份 baseline 的 parser inventory 均为：
+在 PR #302 merge 后的 baseline 上，parser inventory 为：
 
 ```text
 39 tables
 478 columns
 22 explicit indexes
 24 unique constraints
-13 foreign-key constraints
+SQLite / PostgreSQL / MySQL: 13 physical foreign-key constraints each
+DWS: 0 physical foreign-key constraints; 13 explicit logical relationships
 ```
 
-四方言的 table-name、column-name、primary-key、unique、foreign-key 和 index-name/columns inventory 一致。以下差异是物理 dialect contract，不应被逐行 diff 机械归类为 drift：
+四方言的 table-name、column-name、primary-key、unique、logical relationship 和 index-name/columns inventory 一致。SQLite/PostgreSQL/MySQL physical FK inventory 保持一致；DWS 的 0 physical FK 是已测试、已文档化的 capability exception。以下差异是物理 dialect contract，不应被逐行 diff 机械归类为 drift：
 
 - SQLite `INTEGER/TEXT` 与其他方言的 `BIGINT/VARCHAR/CHAR`；
 - SQLite `AUTOINCREMENT`、PostgreSQL/DWS identity、MySQL `AUTO_INCREMENT`；
@@ -153,7 +155,7 @@ PostgreSQL 有 CI ephemeral migration/reflection/seed；MySQL 8 有独立 provid
 
 ### DWS
 
-DWS provider 是 JDBC-only compatibility boundary，当前没有 SQLAlchemy engine 或 online Alembic。baseline 中的 `DISTRIBUTE BY`、identity、schema qualification 和 vendor syntax 必须保留；没有真实 vendor execution 证据，不宣称 PostgreSQL dialect 能完整生成 DWS。
+DWS provider 是 JDBC-only compatibility boundary，当前没有 SQLAlchemy engine 或 online Alembic。baseline 中的 `DISTRIBUTE BY`、identity、schema qualification 和 vendor syntax 必须保留。当前目标 DWS 版本不支持 physical `FOREIGN KEY ... REFERENCES` constraint：DWS baseline / supplementary DDL 不创建 physical FK，测试层显式验证 13 条 logical relationship 的列、类型、parent candidate key 与 HASH distribution compatibility。关系上的 hard-delete 行为由 application service 显式实现或拒绝；没有真实 vendor execution 证据，不宣称 PostgreSQL dialect 能完整生成 DWS。
 
 ### Alembic and existing databases
 
@@ -261,13 +263,13 @@ The maintenance cost is accepted and is controlled by the editing contract below
 
 ### Add an index or constraint
 
-- Put the fresh-install definition in all applicable baseline files, with vendor syntax where needed.
+- Put the fresh-install definition in all applicable baseline files, with vendor syntax where needed. For relationships, preserve the shared logical contract and physical FK on SQLite/PostgreSQL/MySQL; do not emit physical FK DDL for DWS.
 - Put existing-database creation in a new revision; never rely on changing a baseline to upgrade an existing database.
 - Keep metadata constraints/indexes synchronized only when they are part of a runtime Core expression or a future explicitly expanded metadata contract; baseline/reflection tests remain the physical contract.
 
 ### PostgreSQL versus DWS difference
 
-Write the difference in `postgresql.sql` and `dws.sql` (and in their forward/provider-specific migration paths when required). Do not “fix” it by copying PostgreSQL text into DWS or by claiming SQLAlchemy’s PostgreSQL dialect fully renders DWS.
+Write the difference in `postgresql.sql` and `dws.sql` (and in their forward/provider-specific migration paths when required). SQLite/PostgreSQL/MySQL retain physical FK constraints; DWS represents the same logical relationships without physical FK because the target database capability does not support them. Do not “fix” this by copying PostgreSQL text into DWS or by claiming SQLAlchemy’s PostgreSQL dialect fully renders DWS.
 
 ### Revision and baseline meaning
 
