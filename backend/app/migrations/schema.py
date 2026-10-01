@@ -63,6 +63,13 @@ class SchemaModel:
 
 
 @dataclass(frozen=True)
+class ReflectionQuery:
+    name: str
+    sql: str
+    params: tuple[Any, ...] = ()
+
+
+@dataclass(frozen=True)
 class SchemaMismatch:
     table: str
     object_type: str
@@ -861,26 +868,154 @@ def _column_type(data_type: Any, length: Any, precision: Any, scale: Any) -> str
     return _type_name(name)
 
 
-def _reflect_information_schema(connection, config: dict, expected: SchemaModel) -> SchemaModel:
-    db_type = config["type"]
-    placeholder = get_provider(db_type).placeholder
-    schema = _schema_for_reflection(config)
-    model = SchemaModel()
-    cursor = connection.cursor()
-    try:
-        cursor.execute(
+def _reflection_metadata_queries(config: dict) -> tuple[ReflectionQuery, ...]:
+    """Build the exact catalog queries consumed by information-schema reflection.
+
+    PostgreSQL and GaussDB(DWS) deliberately have separate catalog SQL. DWS
+    expands ordered catalog vectors with its documented generate_subscripts()
+    function rather than PostgreSQL's LATERAL unnest(... WITH ORDINALITY) path.
+    """
+    provider = get_provider(config["type"])
+    db_type = provider.name
+    placeholder = provider.placeholder
+    schema = provider.physical_schema(config)
+
+    if db_type == "mysql":
+        columns = ReflectionQuery(
+            "columns reflection",
+            "SELECT table_name, column_name, data_type, character_maximum_length, "
+            "numeric_precision, numeric_scale, is_nullable, column_default "
+            "FROM information_schema.columns WHERE table_schema = DATABASE() "
+            "ORDER BY table_name, ordinal_position",
+        )
+    else:
+        columns = ReflectionQuery(
+            "columns reflection",
             "SELECT table_name, column_name, data_type, character_maximum_length, "
             "numeric_precision, numeric_scale, is_nullable, column_default "
             "FROM information_schema.columns WHERE table_schema = " + placeholder + " "
             "ORDER BY table_name, ordinal_position",
-            (schema,) if db_type != "mysql" else (),
-        ) if db_type != "mysql" else cursor.execute(
-            "SELECT table_name, column_name, data_type, character_maximum_length, "
-            "numeric_precision, numeric_scale, is_nullable, column_default "
-            "FROM information_schema.columns WHERE table_schema = DATABASE() "
-            "ORDER BY table_name, ordinal_position"
+            (schema,),
         )
-        rows = cursor.fetchall()
+
+    if db_type == "mysql":
+        constraints = ReflectionQuery(
+            "constraints reflection",
+            "SELECT tc.table_name, tc.constraint_type, tc.constraint_name, kcu.column_name, "
+            "kcu.ordinal_position, kcu.referenced_table_name, kcu.referenced_column_name "
+            "FROM information_schema.table_constraints tc "
+            "JOIN information_schema.key_column_usage kcu ON tc.constraint_schema=kcu.constraint_schema "
+            "AND tc.table_name=kcu.table_name AND tc.constraint_name=kcu.constraint_name "
+            "WHERE tc.constraint_schema=DATABASE() "
+            "ORDER BY tc.table_name,kcu.constraint_name,kcu.ordinal_position",
+        )
+    elif db_type == "postgres":
+        # Keep PostgreSQL's existing catalog query and ordered array expansion
+        # unchanged; the DWS branch below is intentionally separate.
+        constraints = ReflectionQuery(
+            "constraints reflection",
+            "SELECT t.relname, CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' "
+            "WHEN 'u' THEN 'UNIQUE' WHEN 'f' THEN 'FOREIGN KEY' END, c.conname, "
+            "a.attname, k.ord, rt.relname, ra.attname, "
+            "CASE c.confdeltype WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' "
+            "WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END "
+            "FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid "
+            "JOIN pg_namespace n ON n.oid=t.relnamespace "
+            "JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum,ord) ON TRUE "
+            "JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=k.attnum "
+            "LEFT JOIN pg_class rt ON rt.oid=c.confrelid "
+            "LEFT JOIN LATERAL unnest(c.confkey) WITH ORDINALITY AS rk(attnum,ord) ON rk.ord=k.ord "
+            "LEFT JOIN pg_attribute ra ON ra.attrelid=c.confrelid AND ra.attnum=rk.attnum "
+            "WHERE n.nspname=" + placeholder + " AND c.contype IN ('p','u','f') "
+            "ORDER BY t.relname,c.conname,k.ord",
+            (schema,),
+        )
+    elif db_type == "gaussdb":
+        constraints = ReflectionQuery(
+            "constraints reflection",
+            "SELECT t.relname, CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' "
+            "WHEN 'u' THEN 'UNIQUE' WHEN 'f' THEN 'FOREIGN KEY' END, c.conname, "
+            "a.attname, k.ord, rt.relname, ra.attname, "
+            "CASE c.confdeltype WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' "
+            "WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END "
+            "FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid "
+            "JOIN pg_namespace n ON n.oid=t.relnamespace "
+            "CROSS JOIN generate_subscripts(c.conkey, 1) AS k(ord) "
+            "JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=c.conkey[k.ord] "
+            "LEFT JOIN pg_class rt ON rt.oid=c.confrelid "
+            "LEFT JOIN pg_attribute ra ON ra.attrelid=c.confrelid "
+            "AND ra.attnum=c.confkey[k.ord] "
+            "WHERE n.nspname=" + placeholder + " AND c.contype IN ('p','u','f') "
+            "ORDER BY t.relname,c.conname,k.ord",
+            (schema,),
+        )
+    else:
+        raise ValueError(f"schema reflection is not supported for provider: {db_type}")
+
+    if db_type == "mysql":
+        referential_constraints = ReflectionQuery(
+            "referential constraints",
+            "SELECT constraint_name, delete_rule FROM information_schema.referential_constraints "
+            "WHERE constraint_schema=DATABASE()",
+        )
+        indexes = ReflectionQuery(
+            "indexes reflection",
+            "SELECT table_name, index_name, non_unique, seq_in_index, column_name "
+            "FROM information_schema.statistics WHERE table_schema=DATABASE() "
+            "ORDER BY table_name,index_name,seq_in_index",
+        )
+    else:
+        referential_constraints = ReflectionQuery(
+            "referential constraints",
+            "SELECT constraint_name, delete_rule FROM information_schema.referential_constraints "
+            "WHERE constraint_schema=" + placeholder,
+            (schema,),
+        )
+        if db_type == "postgres":
+            indexes = ReflectionQuery(
+                "indexes reflection",
+                "SELECT t.relname, i.relname, ix.indisunique, k.ord, a.attname "
+                "FROM pg_class t JOIN pg_namespace n ON n.oid=t.relnamespace "
+                "JOIN pg_index ix ON t.oid=ix.indrelid JOIN pg_class i ON i.oid=ix.indexrelid "
+                "JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS k(attnum,ord) ON TRUE "
+                "JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=k.attnum "
+                "WHERE n.nspname=" + placeholder + " AND t.relkind='r' "
+                "ORDER BY t.relname,i.relname,k.ord",
+                (schema,),
+            )
+        else:
+            indexes = ReflectionQuery(
+                "indexes reflection",
+                "SELECT t.relname, i.relname, ix.indisunique, k.ord, a.attname "
+                "FROM pg_class t JOIN pg_namespace n ON n.oid=t.relnamespace "
+                "JOIN pg_index ix ON t.oid=ix.indrelid JOIN pg_class i ON i.oid=ix.indexrelid "
+                "CROSS JOIN generate_subscripts(ix.indkey, 1) AS k(ord) "
+                "JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=ix.indkey[k.ord] "
+                "WHERE n.nspname=" + placeholder + " AND t.relkind='r' "
+                "ORDER BY t.relname,i.relname,k.ord",
+                (schema,),
+            )
+
+    return (columns, constraints, referential_constraints, indexes)
+
+
+def _execute_reflection_query(cursor, query: ReflectionQuery) -> list[Any]:
+    if query.params:
+        cursor.execute(query.sql, query.params)
+    else:
+        cursor.execute(query.sql)
+    return cursor.fetchall()
+
+
+def _reflect_information_schema(connection, config: dict, expected: SchemaModel) -> SchemaModel:
+    db_type = get_provider(config["type"]).name
+    queries = {
+        query.name: query for query in _reflection_metadata_queries(config)
+    }
+    model = SchemaModel()
+    cursor = connection.cursor()
+    try:
+        rows = _execute_reflection_query(cursor, queries["columns reflection"])
         for row in rows:
             name = _identifier(row[0])
             if name == "alembic_version" or (name not in expected.tables and not name.startswith("p_")):
@@ -906,56 +1041,15 @@ def _reflect_information_schema(connection, config: dict, expected: SchemaModel)
                 ),
             )
 
-        if db_type == "mysql":
-            constraint_sql = (
-                "SELECT tc.table_name, tc.constraint_type, tc.constraint_name, kcu.column_name, "
-                "kcu.ordinal_position, kcu.referenced_table_name, kcu.referenced_column_name "
-                "FROM information_schema.table_constraints tc "
-                "JOIN information_schema.key_column_usage kcu ON tc.constraint_schema=kcu.constraint_schema "
-                "AND tc.table_name=kcu.table_name AND tc.constraint_name=kcu.constraint_name "
-                "WHERE tc.constraint_schema=DATABASE() ORDER BY tc.table_name,kcu.constraint_name,kcu.ordinal_position"
-            )
-            cursor.execute(constraint_sql)
-        else:
-            # PostgreSQL exposes referenced columns through pg_constraint rather
-            # than information_schema.key_column_usage.  DWS follows this
-            # catalog shape for the offline-compatible path as well.
-            constraint_sql = (
-                "SELECT t.relname, CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' "
-                "WHEN 'u' THEN 'UNIQUE' WHEN 'f' THEN 'FOREIGN KEY' END, c.conname, "
-                "a.attname, k.ord, rt.relname, ra.attname, "
-                "CASE c.confdeltype WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' "
-                "WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END "
-                "FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid "
-                "JOIN pg_namespace n ON n.oid=t.relnamespace "
-                "JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum,ord) ON TRUE "
-                "JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=k.attnum "
-                "LEFT JOIN pg_class rt ON rt.oid=c.confrelid "
-                "LEFT JOIN LATERAL unnest(c.confkey) WITH ORDINALITY AS rk(attnum,ord) ON rk.ord=k.ord "
-                "LEFT JOIN pg_attribute ra ON ra.attrelid=c.confrelid AND ra.attnum=rk.attnum "
-                "WHERE n.nspname=" + placeholder + " AND c.contype IN ('p','u','f') "
-                "ORDER BY t.relname,c.conname,k.ord"
-            )
-            cursor.execute(constraint_sql, (schema,))
         grouped: dict[tuple[str, str, str], list[Any]] = {}
-        for row in cursor.fetchall():
+        for row in _execute_reflection_query(cursor, queries["constraints reflection"]):
             table_name = _identifier(row[0])
             if table_name in model.tables:
                 grouped.setdefault((table_name, str(row[1]).upper(), _identifier(row[2])), []).append(row)
-        delete_rules: dict[str, str] = {}
-        if db_type == "mysql":
-            cursor.execute(
-                "SELECT constraint_name, delete_rule FROM information_schema.referential_constraints "
-                "WHERE constraint_schema=DATABASE()"
-            )
-        else:
-            cursor.execute(
-                "SELECT constraint_name, delete_rule FROM information_schema.referential_constraints "
-                "WHERE constraint_schema=" + placeholder,
-                (schema,),
-            )
-        for row in cursor.fetchall():
-            delete_rules[_identifier(row[0])] = " ".join(str(row[1]).upper().split())
+        delete_rules = {
+            _identifier(row[0]): " ".join(str(row[1]).upper().split())
+            for row in _execute_reflection_query(cursor, queries["referential constraints"])
+        }
         for (table_name, kind, constraint_name), rows in grouped.items():
             table = model.tables[table_name]
             ordered = sorted(rows, key=lambda item: int(item[4]))
@@ -970,8 +1064,8 @@ def _reflect_information_schema(connection, config: dict, expected: SchemaModel)
             elif kind == "UNIQUE":
                 # MySQL exposes CREATE UNIQUE INDEX as a UNIQUE table
                 # constraint in information_schema.  The baseline parser
-                # intentionally keeps explicit indexes separate from table
-                # constraints, so preserve that distinction during reflection.
+                # intentionally keeps explicit indexes separate, so preserve
+                # that distinction during reflection.
                 expected_table = expected.tables.get(table_name)
                 expected_index = (
                     expected_table.indexes.get(constraint_name)
@@ -989,25 +1083,8 @@ def _reflect_information_schema(connection, config: dict, expected: SchemaModel)
                     table.columns[column_name].primary_key = True
                     table.columns[column_name].nullable = False
 
-        if db_type == "mysql":
-            cursor.execute(
-                "SELECT table_name, index_name, non_unique, seq_in_index, column_name "
-                "FROM information_schema.statistics WHERE table_schema=DATABASE() "
-                "ORDER BY table_name,index_name,seq_in_index"
-            )
-        else:
-            cursor.execute(
-                "SELECT t.relname, i.relname, ix.indisunique, k.ord, a.attname "
-                "FROM pg_class t JOIN pg_namespace n ON n.oid=t.relnamespace "
-                "JOIN pg_index ix ON t.oid=ix.indrelid JOIN pg_class i ON i.oid=ix.indexrelid "
-                "JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS k(attnum,ord) ON TRUE "
-                "JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=k.attnum "
-                "WHERE n.nspname=" + placeholder + " AND t.relkind='r' "
-                "ORDER BY t.relname,i.relname,k.ord",
-                (schema,),
-            )
         indexes: dict[tuple[str, str], list[Any]] = {}
-        for row in cursor.fetchall():
+        for row in _execute_reflection_query(cursor, queries["indexes reflection"]):
             table_name = _identifier(row[0])
             if table_name in model.tables:
                 indexes.setdefault((table_name, _identifier(row[1])), []).append(row)
@@ -1020,7 +1097,9 @@ def _reflect_information_schema(connection, config: dict, expected: SchemaModel)
                 columns == unique for unique in model.tables[table_name].unique_constraints
             ):
                 model.tables[table_name].indexes[index_name] = IndexSpec(
-                    index_name, columns, bool(not rows[0][2]) if db_type == "mysql" else bool(rows[0][2])
+                    index_name,
+                    columns,
+                    bool(not rows[0][2]) if db_type == "mysql" else bool(rows[0][2]),
                 )
     finally:
         cursor.close()
