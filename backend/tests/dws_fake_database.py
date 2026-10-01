@@ -32,6 +32,7 @@ REVISION_ORDER = (
     "0008_indicator_semantic_contract",
     "0009_upstream_option_contract",
     "0010_field_mapping_identity",
+    "0011_push_job_freq_desc_capacity",
 )
 
 OPEN_MODULE_TABLES = (
@@ -566,6 +567,8 @@ class FakeDwsDatabase:
                 column.nullable = False
             elif re.match(r"SET DEFAULT ", action, re.I):
                 column.default = re.sub(r"SET DEFAULT ", "", action, flags=re.I).strip()
+            elif re.match(r"TYPE\s+", action, re.I):
+                column.type_name = re.sub(r"TYPE\s+", "", action, flags=re.I).strip()
             return True
         add_constraint = re.match(
             r"ALTER TABLE (?:[\w\"]+\.)?(?P<table>\w+) ADD CONSTRAINT "
@@ -827,3 +830,7 @@ def _reverse_revision(
                 ("upstream_system_id", "source_table_name"),
                 unique=True,
             )
+    elif revision == "0011_push_job_freq_desc_capacity":
+        table = database.tables.get("p_push_job")
+        if table is not None and "freq_desc" in table.columns:
+            table.columns["freq_desc"].type_name = "VARCHAR(200)"

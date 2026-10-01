@@ -25,6 +25,7 @@ keys because GaussDB/DWS does not support them.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -1173,6 +1174,80 @@ class FieldMappingIdentity(DwsRevisionAdapter):
 
 
 # ---------------------------------------------------------------------------
+# 0011_push_job_freq_desc_capacity
+# ---------------------------------------------------------------------------
+
+_BOUNDED_TEXT_RE = re.compile(
+    r"(?:CHARACTER\s+VARYING|VARCHAR)\s*\(\s*(\d+)\s*\)", re.I
+)
+_UNLIMITED_TEXT_TYPES = {"TEXT", "CHARACTER VARYING", "VARCHAR", "CLOB"}
+
+
+def _text_capacity(type_name: str) -> tuple[bool, int | None]:
+    """Return ``(recognized, length)`` for a text column type.
+
+    ``length is None`` means the type stores text without a fixed limit.
+    """
+    normalized = " ".join(str(type_name or "").upper().split())
+    match = _BOUNDED_TEXT_RE.fullmatch(normalized)
+    if match:
+        return True, int(match.group(1))
+    if normalized in _UNLIMITED_TEXT_TYPES:
+        return True, None
+    return False, None
+
+
+class PushJobFreqDescCapacity(DwsRevisionAdapter):
+    revision = "0011_push_job_freq_desc_capacity"
+    table = "p_push_job"
+    column = "freq_desc"
+    target_length = 1000
+
+    def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
+        table = ctx.table(self.table)
+        if table is None:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                f"{self.table} is missing from the target schema",
+            )
+        column = table.columns.get(self.column)
+        if column is None:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                f"{self.table}.{self.column} is missing from the target schema",
+            )
+        recognized, length = _text_capacity(column.type_name)
+        if not recognized:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                f"{self.table}.{self.column} has an unsupported type for this revision",
+                details=(f"observed type: {column.type_name}",),
+            )
+        if length is None or length >= self.target_length:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.APPLIED,
+                f"{self.table}.{self.column} already meets the {self.target_length} capacity",
+                details=(f"observed type: {column.type_name}",),
+            )
+        return RevisionInspection(
+            self.revision,
+            RevisionState.NOT_APPLIED,
+            f"{self.table}.{self.column} capacity {length} is below {self.target_length}",
+            details=(f"observed type: {column.type_name}",),
+        )
+
+    def apply(self, ctx: DwsRevisionContext) -> None:
+        ctx.execute(
+            f"ALTER TABLE {ctx.qualified(self.table)} "
+            f"ALTER COLUMN {self.column} TYPE VARCHAR({self.target_length})"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -1186,6 +1261,7 @@ ADAPTERS: tuple[DwsRevisionAdapter, ...] = (
     IndicatorSemanticContract(),
     UpstreamOptionContract(),
     FieldMappingIdentity(),
+    PushJobFreqDescCapacity(),
 )
 
 _ADAPTERS_BY_REVISION: dict[str, DwsRevisionAdapter] = {

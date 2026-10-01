@@ -277,7 +277,21 @@ class DwsLegacyUpgradeTests(unittest.TestCase):
         results = apply_revisions(database, CONFIG, "0001_baseline", repository_head())
 
         self.assertEqual([r for r in REVISION_ORDER], [r.revision for r in results])
-        self.assertTrue(all(result.action == "apply" for result in results))
+        actions = {result.revision: result.action for result in results}
+        # Every revision is applied on a truly old instance except 0011: the
+        # canonical 0003 adapter creates p_push_job with the current (already
+        # widened) column, so 0011 adopts it.
+        self.assertEqual(
+            {"adopt"},
+            {actions["0011_push_job_freq_desc_capacity"]},
+        )
+        self.assertTrue(
+            all(
+                action == "apply"
+                for revision, action in actions.items()
+                if revision != "0011_push_job_freq_desc_capacity"
+            )
+        )
         self.assertEqual(repository_head(), database.ledger)
 
         asset_columns = set(database.table("p_asset_table").columns)
@@ -415,6 +429,42 @@ class DwsLegacyUpgradeTests(unittest.TestCase):
             "UPSTREAM_DEPT",
             {row["category_code"] for row in database.table("p_code_category").rows},
         )
+
+
+class DwsPushJobCapacityTests(unittest.TestCase):
+    def test_0011_widens_legacy_freq_desc_and_verifies(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        downgrade_to_prefix(database, set(REVISION_ORDER[:9]))
+        self.assertEqual(
+            "VARCHAR(200)",
+            database.table("p_push_job").columns["freq_desc"].type_name,
+        )
+        database.ledger = "0010_field_mapping_identity"
+
+        results = apply_revisions(
+            database, CONFIG, "0010_field_mapping_identity", repository_head()
+        )
+
+        actions = {result.revision: result.action for result in results}
+        self.assertEqual("apply", actions["0011_push_job_freq_desc_capacity"])
+        self.assertEqual(
+            "VARCHAR(1000)",
+            database.table("p_push_job").columns["freq_desc"].type_name,
+        )
+        self.assertEqual(repository_head(), database.ledger)
+        self.assertEqual(repository_head(), verify_database(database, CONFIG, "dws"))
+
+    def test_0011_unknown_column_type_fails_closed(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        downgrade_to_prefix(database, set(REVISION_ORDER[:9]))
+        database.table("p_push_job").columns["freq_desc"].type_name = "BYTEA"
+        database.ledger = "0010_field_mapping_identity"
+
+        inspection = inspect_revision(
+            database, CONFIG, "0011_push_job_freq_desc_capacity"
+        )
+        self.assertIs(RevisionState.CONFLICT, inspection.state)
+        self.assertIn("unsupported type", inspection.summary)
 
 
 class DwsFailClosedTests(unittest.TestCase):

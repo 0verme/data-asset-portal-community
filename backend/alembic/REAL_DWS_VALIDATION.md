@@ -59,7 +59,7 @@ Record only profile names and results here; never add credentials, JDBC URLs, ho
 6. Run `status` and `verify`; require repository head and `verify=ok`.
 7. Recheck representative row counts, primary keys, backfilled `upstream_system_id`/`source_asset_id`/`result_field_id` values, new fields, indexes/constraints, RBAC and menus. Confirm business rows were preserved, `0009` did not duplicate or overwrite customized option rows, and no duplicate backfill rows appeared.
 8. Confirm the physical metadata that the runner relies on:
-   * columns: `p_asset_table` identity columns, `p_lineage_snapshot` ingestion columns, `p_indicator_item` semantic columns;
+   * columns: `p_asset_table` identity columns, `p_lineage_snapshot` ingestion columns, `p_indicator_item` semantic columns, `p_push_job.freq_desc` at `VARCHAR(1000)` (revision `0011`);
    * indexes: `idx_p_asset_table_filter`, `idx_p_indicator_semantic_ref`, `idx_p_field_mapping_table_identity`, and the absence of `idx_p_field_mapping_table_uk_01`;
    * constraints: `UNIQUE(source_key, asset_type, external_id)` on `p_asset_table`, no `UNIQUE(table_name)`, and the `status_code IN ('enabled','disabled')` check on `p_manual_code_table`;
    * logical relationships: `p_field_mapping_table.upstream_system_id` references an existing `p_upstream_system.system_pk` (no physical FK on DWS);
