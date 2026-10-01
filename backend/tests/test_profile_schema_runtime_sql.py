@@ -33,11 +33,7 @@ class RuntimeSqlProfileSchemaTests(unittest.TestCase):
             "sqlite_test": {"type": "sqlite", "database": ":memory:"},
             "postgres_test": {"type": "postgres", "schema": "dap"},
             "mysql_test": {"type": "mysql", "database": "dap_db"},
-            "gauss_test": {
-                "type": "gaussdb",
-                "schema": "dap",
-                "jdbc_url": "jdbc:gaussdb://localhost:5308/app?currentSchema=dap",
-            },
+            "gauss_test": {"type": "gaussdb", "schema": "dap"},
         }
         with patch(
             "backend.app.db.facade.get_db_profile",
