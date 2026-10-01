@@ -466,7 +466,7 @@ push_job = _table(
     Column("source_file_name", String(512)),
     Column("target_path", String(1000)),
     Column("target_file_name", String(512), nullable=False),
-    Column("freq_desc", String(200)),
+    Column("freq_desc", String(1000)),
     Column("freq_type", String(64)),
     Column("delimiter_code", String(32)),
     Column("encoding_type", String(64)),
