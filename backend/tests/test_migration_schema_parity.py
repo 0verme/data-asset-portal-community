@@ -200,6 +200,11 @@ class MigrationSchemaParityTests(unittest.TestCase):
             )
         ]
         self.assertEqual([], violations)
+        self.assertRegex(
+            _mask_sql_non_code(sql),
+            r"CREATE\s+INDEX\s+idx_p_asset_table_filter\s+ON\s+dwp\.p_asset_table\s*"
+            r"\(\s*layer_code\s*,\s*domain_code\s*\)",
+        )
 
     def test_dws_baseline_avoids_unsupported_813_identity_syntax(self):
         sql = baseline_path("dws").read_text(encoding="utf-8")

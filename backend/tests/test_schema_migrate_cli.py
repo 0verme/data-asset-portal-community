@@ -135,6 +135,120 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
             self.assertIn(("POSTGRESQL", "PostgreSQL"), upstream_db_type)
             self.assertIn(("SUPPLY_CHAIN", "供应链部"), upstream_dept)
 
+    def test_mismatched_existing_filter_index_fails_without_advancing_ledger(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "partial-filter-index.sqlite"
+            config = root / "database.yaml"
+            config.write_text(
+                "profiles:\n  partial:\n    type: sqlite\n"
+                f"    database: {database.as_posix()}\n",
+                encoding="utf-8",
+            )
+            initial = _run_cli(["apply", "--profile", "partial", "--config", str(config)])
+            self.assertEqual(0, initial.returncode, initial.stderr)
+
+            connection = sqlite3.connect(database)
+            try:
+                connection.execute(
+                    "UPDATE alembic_version SET version_num = '0001_baseline'"
+                )
+                connection.execute("DROP INDEX idx_p_asset_table_filter")
+                connection.execute(
+                    "CREATE INDEX idx_p_asset_table_filter "
+                    "ON p_asset_table(domain_code, layer_code)"
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            failed = _run_cli(["apply", "--profile", "partial", "--config", str(config)])
+            self.assertNotEqual(0, failed.returncode)
+            self.assertIn("exists with an unexpected definition", failed.stderr)
+
+            connection = sqlite3.connect(database)
+            try:
+                revision = connection.execute(
+                    "SELECT version_num FROM alembic_version"
+                ).fetchone()
+            finally:
+                connection.close()
+            self.assertEqual(("0001_baseline",), revision)
+
+    def test_unknown_ledger_revision_fails_closed_for_status_and_apply(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "unknown-revision.sqlite"
+            config = root / "database.yaml"
+            config.write_text(
+                "profiles:\n  unknown:\n    type: sqlite\n"
+                f"    database: {database.as_posix()}\n",
+                encoding="utf-8",
+            )
+            initial = _run_cli(["apply", "--profile", "unknown", "--config", str(config)])
+            self.assertEqual(0, initial.returncode, initial.stderr)
+
+            connection = sqlite3.connect(database)
+            try:
+                connection.execute(
+                    "UPDATE alembic_version SET version_num = 'legacy_unknown'"
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            for command in ("status", "apply"):
+                with self.subTest(command=command):
+                    result = _run_cli(
+                        [command, "--profile", "unknown", "--config", str(config)]
+                    )
+                    self.assertNotEqual(0, result.returncode)
+                    self.assertIn("not known to this repository", result.stderr)
+
+            connection = sqlite3.connect(database)
+            try:
+                self.assertEqual(
+                    ("legacy_unknown",),
+                    connection.execute("SELECT version_num FROM alembic_version").fetchone(),
+                )
+            finally:
+                connection.close()
+
+    def test_plan_lists_pending_revisions_in_upgrade_order(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "plan.sqlite"
+            config = root / "database.yaml"
+            config.write_text(
+                "profiles:\n  plan:\n    type: sqlite\n"
+                f"    database: {database.as_posix()}\n",
+                encoding="utf-8",
+            )
+            initial = _run_cli(["apply", "--profile", "plan", "--config", str(config)])
+            self.assertEqual(0, initial.returncode, initial.stderr)
+            connection = sqlite3.connect(database)
+            try:
+                connection.execute(
+                    "UPDATE alembic_version SET version_num = '0005_rbac_persistence'"
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            plan = _run_cli(["plan", "--profile", "plan", "--config", str(config)])
+            self.assertEqual(0, plan.returncode, plan.stderr)
+            revisions = plan.stdout.splitlines()
+            expected = [
+                "0006_field_mapping_upstream_id",
+                "0007_binary_status_contract",
+                "0008_indicator_semantic_contract",
+                "0009_upstream_option_contract",
+                "0010_field_mapping_identity",
+            ]
+            positions = [revisions.index(revision) for revision in expected]
+            self.assertEqual(sorted(positions), positions)
+            self.assertNotIn("0005_rbac_persistence", revisions)
+
     def test_apply_menu_seed_failure_exits_nonzero_without_success_revision_output(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -270,7 +384,6 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                     "(system_id, system_code, system_name, system_abbr, system_type, status_code) "
                     "VALUES (99, 'LEGACY', 'Legacy system', 'LEG', 'business', 'enabled')"
                 )
-                connection.execute("CREATE INDEX dwp.idx_p_asset_table_filter ON p_asset_table(layer_code, domain_code)")
                 for table in (
                     "p_lineage_edge", "p_lineage_node", "p_lineage_snapshot", "p_manual_code_table",
                     "p_report_asset", "p_push_change_log", "p_push_job_field", "p_push_job",
