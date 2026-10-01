@@ -361,7 +361,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_push_job (
     source_file_name VARCHAR(512),
     target_path VARCHAR(1000),
     target_file_name VARCHAR(512) NOT NULL,
-    freq_desc VARCHAR(200),
+    freq_desc VARCHAR(1000),
     freq_type VARCHAR(64),
     delimiter_code VARCHAR(32),
     encoding_type VARCHAR(64),
