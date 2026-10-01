@@ -305,7 +305,9 @@ class DwsSchemaSafetyTests(unittest.TestCase):
             or "pg_index" in sql
         ]
         self.assertTrue(scoped_reads)
-        self.assertTrue(all(params == ("dap",) for _, params in scoped_reads))
+        for sql, params in scoped_reads:
+            expected_params = ("dap", "dap") if "from pg_attribute a" in sql.lower() else ("dap",)
+            self.assertEqual(expected_params, params)
 
         verify_connection = RecordingConnection(revision="0001_baseline")
         with patch(

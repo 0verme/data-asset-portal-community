@@ -872,8 +872,8 @@ def _reflection_metadata_queries(config: dict) -> tuple[ReflectionQuery, ...]:
     """Build the exact catalog queries consumed by information-schema reflection.
 
     PostgreSQL and GaussDB(DWS) deliberately have separate catalog SQL. DWS
-    expands ordered catalog vectors with its documented generate_subscripts()
-    function rather than PostgreSQL's LATERAL unnest(... WITH ORDINALITY) path.
+    returns raw ordered catalog vectors and expands them in Python, avoiding
+    PostgreSQL 9.3+ LATERAL and correlated set-returning functions in FROM.
     """
     provider = get_provider(config["type"])
     db_type = provider.name
@@ -935,19 +935,29 @@ def _reflection_metadata_queries(config: dict) -> tuple[ReflectionQuery, ...]:
             "constraints reflection",
             "SELECT t.relname, CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' "
             "WHEN 'u' THEN 'UNIQUE' WHEN 'f' THEN 'FOREIGN KEY' END, c.conname, "
-            "a.attname, k.ord, rt.relname, ra.attname, "
+            "c.conkey, c.conrelid, rt.relname, c.confrelid, c.confkey, "
             "CASE c.confdeltype WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' "
             "WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END "
             "FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid "
             "JOIN pg_namespace n ON n.oid=t.relnamespace "
-            "CROSS JOIN generate_subscripts(c.conkey, 1) AS k(ord) "
-            "JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=c.conkey[k.ord] "
             "LEFT JOIN pg_class rt ON rt.oid=c.confrelid "
-            "LEFT JOIN pg_attribute ra ON ra.attrelid=c.confrelid "
-            "AND ra.attnum=c.confkey[k.ord] "
             "WHERE n.nspname=" + placeholder + " AND c.contype IN ('p','u','f') "
-            "ORDER BY t.relname,c.conname,k.ord",
+            "ORDER BY t.relname,c.conname",
             (schema,),
+        )
+        attributes = ReflectionQuery(
+            "attributes reflection",
+            "SELECT a.attrelid, a.attnum, a.attname FROM pg_attribute a "
+            "WHERE a.attnum > 0 AND NOT a.attisdropped AND a.attrelid IN ("
+            "SELECT t.oid FROM pg_class t JOIN pg_namespace n ON n.oid=t.relnamespace "
+            "WHERE n.nspname=" + placeholder + " "
+            "UNION "
+            "SELECT c.confrelid FROM pg_constraint c "
+            "JOIN pg_class t ON t.oid=c.conrelid "
+            "JOIN pg_namespace n ON n.oid=t.relnamespace "
+            "WHERE n.nspname=" + placeholder + " AND c.contype='f') "
+            "ORDER BY a.attrelid,a.attnum",
+            (schema, schema),
         )
     else:
         raise ValueError(f"schema reflection is not supported for provider: {db_type}")
@@ -983,28 +993,207 @@ def _reflection_metadata_queries(config: dict) -> tuple[ReflectionQuery, ...]:
                 "ORDER BY t.relname,i.relname,k.ord",
                 (schema,),
             )
-        else:
+        elif db_type == "gaussdb":
             indexes = ReflectionQuery(
                 "indexes reflection",
-                "SELECT t.relname, i.relname, ix.indisunique, k.ord, a.attname "
+                "SELECT t.relname, i.relname, ix.indisunique, ix.indkey, ix.indrelid "
                 "FROM pg_class t JOIN pg_namespace n ON n.oid=t.relnamespace "
                 "JOIN pg_index ix ON t.oid=ix.indrelid JOIN pg_class i ON i.oid=ix.indexrelid "
-                "CROSS JOIN generate_subscripts(ix.indkey, 1) AS k(ord) "
-                "JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=ix.indkey[k.ord] "
                 "WHERE n.nspname=" + placeholder + " AND t.relkind='r' "
-                "ORDER BY t.relname,i.relname,k.ord",
+                "ORDER BY t.relname,i.relname",
                 (schema,),
             )
+        else:
+            raise ValueError(f"schema reflection is not supported for provider: {db_type}")
 
+    if db_type == "gaussdb":
+        return (columns, attributes, constraints, referential_constraints, indexes)
     return (columns, constraints, referential_constraints, indexes)
 
 
-def _execute_reflection_query(cursor, query: ReflectionQuery) -> list[Any]:
-    if query.params:
-        cursor.execute(query.sql, query.params)
+def _normalize_gaussdb_catalog_vector(value: Any) -> tuple[int, ...]:
+    """Normalize common JDBC/Python renderings of a GaussDB attnum vector.
+
+    Supported values are PostgreSQL-style text (``{1,2}``), int2vector text
+    (``1 2``), Python list/tuple, and integer-indexable Java array objects.
+    Unknown or malformed representations fail explicitly instead of looking
+    like an empty catalog vector.
+    """
+    value_type = f"{type(value).__module__}.{type(value).__qualname__}"
+
+    def unsupported() -> ValueError:
+        return ValueError(
+            "unsupported GaussDB catalog vector representation: " + value_type
+        )
+
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith("{") or text.endswith("}"):
+            if not (text.startswith("{") and text.endswith("}")):
+                raise unsupported()
+            contents = text[1:-1].strip()
+            if not contents:
+                return ()
+            tokens = contents.split(",")
+        elif "{" in text or "}" in text:
+            raise unsupported()
+        elif "," in text:
+            tokens = text.split(",")
+        else:
+            tokens = text.split()
+        if not tokens:
+            raise unsupported()
+        raw_values = tokens
+    elif isinstance(value, (list, tuple)):
+        raw_values = value
+    elif isinstance(value, (bytes, bytearray, memoryview)):
+        raise unsupported()
     else:
-        cursor.execute(query.sql)
-    return cursor.fetchall()
+        # JPype Java arrays are indexable but are not Python list/tuple values.
+        try:
+            raw_values = tuple(value[index] for index in range(len(value)))
+        except Exception as exc:
+            raise unsupported() from exc
+
+    attnums: list[int] = []
+    for item in raw_values:
+        if isinstance(item, bool):
+            raise unsupported()
+        token = str(item).strip()
+        if not re.fullmatch(r"[+-]?\d+", token):
+            raise unsupported()
+        attnums.append(int(token))
+    return tuple(attnums)
+
+
+def _gaussdb_attribute_name(
+    attribute_names: dict[tuple[int, int], str], relation_id: Any, attnum: int
+) -> str:
+    try:
+        return attribute_names[(int(relation_id), attnum)]
+    except (KeyError, TypeError, ValueError) as exc:
+        raise RuntimeError(
+            "GaussDB catalog reflection could not resolve attnum "
+            f"{attnum} for relation {relation_id}"
+        ) from exc
+
+
+def _gaussdb_attribute_names(
+    cursor, query: ReflectionQuery
+) -> dict[tuple[int, int], str]:
+    names: dict[tuple[int, int], str] = {}
+    for relation_id, attnum, name in _execute_reflection_query(cursor, query):
+        key = (int(relation_id), int(attnum))
+        names[key] = _identifier(name)
+    return names
+
+
+def _gaussdb_constraint_rows(
+    cursor,
+    query: ReflectionQuery,
+    attribute_names: dict[tuple[int, int], str],
+) -> list[tuple[Any, ...]]:
+    """Expand raw DWS constraint vectors into the common ordered row contract."""
+    result: list[tuple[Any, ...]] = []
+    for row in _execute_reflection_query(cursor, query):
+        table_name, kind, constraint_name = row[:3]
+        try:
+            child_attnums = _normalize_gaussdb_catalog_vector(row[3])
+        except ValueError as exc:
+            raise ValueError(
+                f"GaussDB constraints reflection for {constraint_name}: {exc}"
+            ) from exc
+        child_relation_id = row[4]
+        referenced_table = row[5]
+        referenced_relation_id = row[6]
+        delete_action = row[8]
+        is_foreign_key = str(kind).upper() == "FOREIGN KEY"
+        if not child_attnums:
+            raise RuntimeError(
+                f"GaussDB catalog constraint {constraint_name} has an empty conkey"
+            )
+
+        parent_attnums: tuple[int, ...] = ()
+        if is_foreign_key:
+            try:
+                parent_attnums = _normalize_gaussdb_catalog_vector(row[7])
+            except ValueError as exc:
+                raise ValueError(
+                    f"GaussDB constraints reflection for {constraint_name}: {exc}"
+                ) from exc
+            if len(child_attnums) != len(parent_attnums):
+                raise RuntimeError(
+                    f"GaussDB catalog foreign key {constraint_name} has mismatched "
+                    "conkey/confkey lengths"
+                )
+            if referenced_table is None or referenced_relation_id is None:
+                raise RuntimeError(
+                    f"GaussDB catalog foreign key {constraint_name} is missing its parent relation"
+                )
+
+        for ordinal, child_attnum in enumerate(child_attnums, start=1):
+            column_name = _gaussdb_attribute_name(
+                attribute_names, child_relation_id, child_attnum
+            )
+            referenced_column = None
+            if is_foreign_key:
+                referenced_column = _gaussdb_attribute_name(
+                    attribute_names, referenced_relation_id, parent_attnums[ordinal - 1]
+                )
+            result.append(
+                (
+                    table_name,
+                    kind,
+                    constraint_name,
+                    column_name,
+                    ordinal,
+                    referenced_table,
+                    referenced_column,
+                    delete_action,
+                )
+            )
+    return result
+
+
+def _gaussdb_index_rows(
+    cursor,
+    query: ReflectionQuery,
+    attribute_names: dict[tuple[int, int], str],
+) -> list[tuple[Any, ...]]:
+    """Expand raw DWS index vectors, preserving each attnum's ordinal position."""
+    result: list[tuple[Any, ...]] = []
+    for table_name, index_name, is_unique, vector, relation_id in _execute_reflection_query(
+        cursor, query
+    ):
+        try:
+            attnums = _normalize_gaussdb_catalog_vector(vector)
+        except ValueError as exc:
+            raise ValueError(
+                f"GaussDB indexes reflection for {index_name}: {exc}"
+            ) from exc
+        if not attnums:
+            raise RuntimeError(f"GaussDB catalog index {index_name} has an empty indkey")
+        for ordinal, attnum in enumerate(attnums, start=1):
+            # Expression index entries use attnum 0; the existing catalog join
+            # also omitted them because they have no ordinary pg_attribute name.
+            if attnum == 0:
+                continue
+            column_name = _gaussdb_attribute_name(attribute_names, relation_id, attnum)
+            result.append((table_name, index_name, is_unique, ordinal, column_name))
+    return result
+
+
+def _execute_reflection_query(cursor, query: ReflectionQuery) -> list[Any]:
+    try:
+        if query.params:
+            cursor.execute(query.sql, query.params)
+        else:
+            cursor.execute(query.sql)
+        return cursor.fetchall()
+    except Exception as exc:
+        raise RuntimeError(
+            f"schema reflection query '{query.name}' failed: {exc}"
+        ) from exc
 
 
 def _reflect_information_schema(connection, config: dict, expected: SchemaModel) -> SchemaModel:
@@ -1041,8 +1230,21 @@ def _reflect_information_schema(connection, config: dict, expected: SchemaModel)
                 ),
             )
 
+        if db_type == "gaussdb":
+            attribute_names = _gaussdb_attribute_names(
+                cursor, queries["attributes reflection"]
+            )
+            constraint_rows = _gaussdb_constraint_rows(
+                cursor, queries["constraints reflection"], attribute_names
+            )
+        else:
+            attribute_names = {}
+            constraint_rows = _execute_reflection_query(
+                cursor, queries["constraints reflection"]
+            )
+
         grouped: dict[tuple[str, str, str], list[Any]] = {}
-        for row in _execute_reflection_query(cursor, queries["constraints reflection"]):
+        for row in constraint_rows:
             table_name = _identifier(row[0])
             if table_name in model.tables:
                 grouped.setdefault((table_name, str(row[1]).upper(), _identifier(row[2])), []).append(row)
@@ -1083,8 +1285,15 @@ def _reflect_information_schema(connection, config: dict, expected: SchemaModel)
                     table.columns[column_name].primary_key = True
                     table.columns[column_name].nullable = False
 
+        if db_type == "gaussdb":
+            index_rows = _gaussdb_index_rows(
+                cursor, queries["indexes reflection"], attribute_names
+            )
+        else:
+            index_rows = _execute_reflection_query(cursor, queries["indexes reflection"])
+
         indexes: dict[tuple[str, str], list[Any]] = {}
-        for row in _execute_reflection_query(cursor, queries["indexes reflection"]):
+        for row in index_rows:
             table_name = _identifier(row[0])
             if table_name in model.tables:
                 indexes.setdefault((table_name, _identifier(row[1])), []).append(row)
