@@ -26,7 +26,7 @@ from app.migrations.schema import (
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Execute the four read-only catalog queries used by DWS schema verify "
+            "Execute the read-only catalog queries used by DWS schema verify "
             "without changing the schema."
         )
     )
