@@ -194,7 +194,7 @@ backend/.venv/bin/uvicorn \
 
 ### 5.1 Fresh database
 
-`schema_migrate.py apply` 使用对应数据库 profile 的 canonical baseline，应用 Alembic head，并初始化仓库要求的 RBAC 数据。生产 PostgreSQL 示例：
+`schema_migrate.py apply` 使用对应数据库 profile 的 canonical baseline，应用 Alembic head，并依次初始化仓库要求的 RBAC 数据与 11 项默认系统菜单。生产 PostgreSQL 示例：
 
 ```bash
 cd /opt/data-asset-portal

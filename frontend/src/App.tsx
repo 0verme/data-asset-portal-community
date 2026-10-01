@@ -97,6 +97,9 @@ export default function App(): React.ReactElement {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [moreNavOpen, setMoreNavOpen] = useState(false);
+  const [compactHeader, setCompactHeader] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 1199px)").matches,
+  );
   const [lineageBootstrap, setLineageBootstrap] = useState<LineageBootstrap | null>(null);
   const [systemActionIntent, setSystemActionIntent] = useState("");
   const [navMenuSnapshot, setNavMenuSnapshot] = useState<{ authKey: string; menus: MenuItem[] }>({
@@ -298,14 +301,27 @@ export default function App(): React.ReactElement {
   }, [moreNavOpen]);
 
   useEffect(() => {
-    const desktopViewport = window.matchMedia("(min-width: 769px)");
-    const closeMobilePanels = (event: MediaQueryListEvent): void => {
-      if (!event.matches) return;
-      setSidebarOpen(false);
-      setMobileSearchOpen(false);
+    const compactViewport = window.matchMedia("(max-width: 1199px)");
+    const syncCompactHeader = (): void => setCompactHeader(compactViewport.matches);
+    compactViewport.addEventListener("change", syncCompactHeader);
+    return () => compactViewport.removeEventListener("change", syncCompactHeader);
+  }, []);
+
+  useEffect(() => {
+    const desktopSidebarViewport = window.matchMedia("(min-width: 960px)");
+    const desktopSearchViewport = window.matchMedia("(min-width: 769px)");
+    const closeSidebarOnDesktop = (event: MediaQueryListEvent): void => {
+      if (event.matches) setSidebarOpen(false);
     };
-    desktopViewport.addEventListener("change", closeMobilePanels);
-    return () => desktopViewport.removeEventListener("change", closeMobilePanels);
+    const closeSearchOnDesktop = (event: MediaQueryListEvent): void => {
+      if (event.matches) setMobileSearchOpen(false);
+    };
+    desktopSidebarViewport.addEventListener("change", closeSidebarOnDesktop);
+    desktopSearchViewport.addEventListener("change", closeSearchOnDesktop);
+    return () => {
+      desktopSidebarViewport.removeEventListener("change", closeSidebarOnDesktop);
+      desktopSearchViewport.removeEventListener("change", closeSearchOnDesktop);
+    };
   }, []);
 
   const visibleNavMenus = useMemo(
@@ -314,8 +330,8 @@ export default function App(): React.ReactElement {
   );
 
   const { primary: primaryNavMenus, more: moreNavMenus } = useMemo(
-    () => splitNavigationMenus(visibleNavMenus),
-    [visibleNavMenus],
+    () => splitNavigationMenus(visibleNavMenus, { maxPrimary: compactHeader ? 3 : 5 }),
+    [compactHeader, visibleNavMenus],
   );
   const moreNavActive = moreNavMenus.some((item) => item.code === module);
 
@@ -697,29 +713,31 @@ export default function App(): React.ReactElement {
   return (
     <AuthContext.Provider value={authContextValue}>
       <AppShell>
-        <header className="topbar">
-          {!isPortal ? (
-            <button
-              ref={hamburgerRef}
-              className="hamburger"
-              type="button"
-              onClick={() => {
-                setMobileSearchOpen(false);
-                setSidebarOpen((prev) => !prev);
-              }}
-              aria-controls="mobile-sidebar"
-              aria-expanded={sidebarOpen}
-              aria-label={sidebarOpen ? "关闭导航" : "打开导航"}
-            >
-              <Icon name="menu" size={18} />
-            </button>
-          ) : null}
+        <header className={`topbar${isPortal ? " portal-topbar" : ""}`}>
+          <div className="topbar-brand">
+            {!isPortal ? (
+              <button
+                ref={hamburgerRef}
+                className="hamburger"
+                type="button"
+                onClick={() => {
+                  setMobileSearchOpen(false);
+                  setSidebarOpen((prev) => !prev);
+                }}
+                aria-controls="mobile-sidebar"
+                aria-expanded={sidebarOpen}
+                aria-label={sidebarOpen ? "关闭导航" : "打开导航"}
+              >
+                <Icon name="menu" size={18} />
+              </button>
+            ) : null}
 
-          <div className="brand" onClick={() => switchModule("portal")}>
-            <div className="brand-mark">
-              <img src="/brand-icon.svg?v=20260609" alt="数据资产门户" />
+            <div className="brand" onClick={() => switchModule("portal")}>
+              <div className="brand-mark">
+                <img src="/brand-icon.svg?v=20260609" alt="数据资产门户" />
+              </div>
+              <div className="brand-name">数据资产门户<small>Data Asset Portal</small></div>
             </div>
-            <div className="brand-name">数据资产门户<small>Data Asset Portal</small></div>
           </div>
 
           <div className="mainnav">
@@ -770,62 +788,64 @@ export default function App(): React.ReactElement {
             ) : null}
           </div>
 
-          <div className="topbar-spacer"></div>
-          {!isPortal ? (
-            <button
-              ref={searchToggleRef}
-              className="mobile-search-toggle"
-              type="button"
-              onClick={() => {
-                setSidebarOpen(false);
-                setMobileSearchOpen((prev) => !prev);
-              }}
-              aria-controls="global-search"
-              aria-expanded={mobileSearchOpen}
-              aria-label={mobileSearchOpen ? "关闭搜索" : "打开搜索"}
-            >
-              <Icon name={mobileSearchOpen ? "close" : "search"} size={17} />
-            </button>
-          ) : null}
-          {!isPortal ? (
-            <div id="global-search" className={`search${query ? " has-val" : ""}${mobileSearchOpen ? " mobile-open" : ""}`}>
-              <span className="ico-search"><Icon name="search" size={16} /></span>
-              <input
-                ref={searchInputRef}
-                placeholder={searchPlaceholder}
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  if (!isPush && !isIndicator && !isReport && !isRoot && !isUpstream && !isMapping && route.page !== "home") assetBack();
-                  if (isIndicator && indicatorRoute.page !== "list") indicatorBack();
-                  if (isReport && reportRoute.page !== "list") reportBack();
-                  if (isPush && pushRoute.page !== "systems") pushGoList();
-                  if (isRoot && rootRoute.page !== "library") rootBack();
-                  if (isUpstream && upRoute.page !== "list") upBack();
+          <div className="topbar-actions">
+            {!isPortal ? (
+              <button
+                ref={searchToggleRef}
+                className="mobile-search-toggle"
+                type="button"
+                onClick={() => {
+                  setSidebarOpen(false);
+                  setMobileSearchOpen((prev) => !prev);
                 }}
-              />
-              <button className="clear" onClick={() => setQuery("")}><Icon name="close" size={13} /></button>
-            </div>
-          ) : null}
+                aria-controls="global-search"
+                aria-expanded={mobileSearchOpen}
+                aria-label={mobileSearchOpen ? "关闭搜索" : "打开搜索"}
+              >
+                <Icon name={mobileSearchOpen ? "close" : "search"} size={17} />
+              </button>
+            ) : null}
+            {!isPortal ? (
+              <div id="global-search" className={`search${query ? " has-val" : ""}${mobileSearchOpen ? " mobile-open" : ""}`}>
+                <span className="ico-search"><Icon name="search" size={16} /></span>
+                <input
+                  ref={searchInputRef}
+                  aria-label="全局搜索"
+                  placeholder={searchPlaceholder}
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    if (!isPush && !isIndicator && !isReport && !isRoot && !isUpstream && !isMapping && route.page !== "home") assetBack();
+                    if (isIndicator && indicatorRoute.page !== "list") indicatorBack();
+                    if (isReport && reportRoute.page !== "list") reportBack();
+                    if (isPush && pushRoute.page !== "systems") pushGoList();
+                    if (isRoot && rootRoute.page !== "library") rootBack();
+                    if (isUpstream && upRoute.page !== "list") upBack();
+                  }}
+                />
+                <button className="clear" onClick={() => setQuery("")}><Icon name="close" size={13} /></button>
+              </div>
+            ) : null}
 
-          <button
-            className="theme-toggle"
-            type="button"
-            onClick={toggleTheme}
-            aria-label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
-            title={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
-          >
-            <Icon name={theme === "dark" ? "sun" : "moon"} size={16} />
-          </button>
+            <button
+              className="theme-toggle"
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
+              title={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
+            >
+              <Icon name={theme === "dark" ? "sun" : "moon"} size={16} />
+            </button>
 
-          <AuthBar
-            auth={auth}
-            onLogin={() => {
-              setAuthError("");
-              setLoginOpen(true);
-            }}
-            onLogout={handleLogout}
-          />
+            <AuthBar
+              auth={auth}
+              onLogin={() => {
+                setAuthError("");
+                setLoginOpen(true);
+              }}
+              onLogout={handleLogout}
+            />
+          </div>
         </header>
 
         <div className="body">

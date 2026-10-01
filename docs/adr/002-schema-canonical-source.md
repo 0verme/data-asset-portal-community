@@ -22,10 +22,11 @@
 | `backend/alembic/versions/0001_baseline.py` | Ledger marker for the baseline; it does not create tables | Runtime migration ledger | Yes | No | Alembic ledger and `schema_migrate.py` | fresh apply/status tests |
 | `backend/alembic/versions/0002_*.py`–`0008_*.py` | Immutable forward revisions for existing databases and post-baseline changes | Runtime upgrade path | Yes | No | Alembic for SQLite/PostgreSQL/MySQL; DWS has no online Alembic path | migration lifecycle, CI integration and revision-head gates |
 | `backend/app/migrations/schema.py` | Baseline path resolution, lightweight SQL parsing, reflection and drift comparison | Runtime verification/build-time test helper | Yes | No | migration CLI and schema tests | parity, reflection and migration tests |
-| `backend/scripts/schema_migrate.py` | Orchestrates offline checks, baseline initialization, stamp, verify and Alembic head upgrade | Runtime/build-time CLI | Yes | No | operators, CI and release checks | CLI contract and offline checks |
+| `backend/scripts/schema_migrate.py` | Orchestrates offline checks, baseline initialization, stamp, verify, Alembic head upgrade, RBAC seed and default-menu seed | Runtime/build-time CLI | Yes | No | operators, CI and release checks | CLI contract and offline checks |
 | `backend/app/db/metadata.py` + `backend/app/db/tables.py` | Logical-schema namespace and runtime SQLAlchemy Core query declarations | Runtime query compilation | Yes | No | migrated services and provider adapters | Core dialect compilation and provider contracts |
+| `config/default-menus.json` | Canonical application-level defaults for the 11 system navigation entries; not schema DDL | Runtime seed input | Yes | No | backend menu persistence, frontend mock/default navigation, demo seed projection | menu seed, parity and icon registry tests |
 | `demo/seed_loader.py`, `demo/seed_sqlite.py`, `demo/seed_postgres.py` | DML seed plan and demo data consumers of the physical column contract | Runtime/deployment data initialization | Yes | SQL seed output only for PostgreSQL/DWS; not DDL generation | fresh Community/demo databases | seed volume, idempotency and public-data guard tests |
-| `docs/pg/*.sql`, `docs/dws/*.sql` | Supplementary module/vendor DDL and deployment reference; not the Community fresh-install entry point | Deployment reference | Yes | No | manual full/extension deployment | paired PG/DWS contract tests and document review |
+| `docs/pg/*.sql`, `docs/dws/*.sql` | Supplementary module/vendor deployment references; `menus-app-*` files are reference-only and are not runtime/canonical menu sources | Deployment reference | Yes | No | manual full/extension deployment | paired PG/DWS contract tests and document review |
 | `backend/tests/*schema*`, `*migration*`, `*provider*`, `*reflection*` | Contract and regression checks | Build/test-time | Yes | No | CI and local release checks | unittest suites and CI jobs |
 
 ### Four baseline consumers
@@ -33,7 +34,7 @@
 - `sqlite.sql`、`postgresql.sql`、`mysql.sql` 和 `dws.sql` 都由 `backend/app/migrations/schema.py` 的 `baseline_path()` 读取；`initialize()` 在空库中执行相应 SQL，随后写入 `0001_baseline`。
 - `schema_migrate.py verify/plan --offline` 读取 `backend/schema`，不连接数据库；`verify` 由共享 table parser 检查四方言 baseline 的 table inventory，`plan` 选择对应文件。
 - `test_migration_schema_parity.py`、`test_migrations.py`、`test_schema_migrate_cli.py` 和相关 CI job 直接或间接消费这些文件。
-- seed 脚本不读取 DDL 文本，但其列清单和表名直接依赖 baseline；`demo/seed_sqlite.py` 还调用 RBAC persistence 写入 baseline 中的 RBAC 表。
+- seed 脚本不读取 DDL 文本，但其列清单和表名直接依赖 baseline；`demo/seed_sqlite.py` 还调用 RBAC persistence 写入 baseline 中的 RBAC 表。系统菜单应用默认值统一来自 `config/default-menus.json`，由 backend seed、frontend mock/default menu adapter 和 demo seed projection 消费。
 
 ## Canonical Responsibility Map
 

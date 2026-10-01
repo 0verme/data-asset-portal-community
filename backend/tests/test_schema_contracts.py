@@ -1,8 +1,10 @@
 """Static schema contracts for PostgreSQL and DWS initialization DDL."""
 from __future__ import annotations
 
+import json
 import re
 import unittest
+from pathlib import Path
 
 from backend.tests.db_test_support import (
     DOCS_DWS,
@@ -10,6 +12,9 @@ from backend.tests.db_test_support import (
     assert_table_has_columns,
     read_sql,
 )
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class SchemaContractTests(unittest.TestCase):
@@ -70,29 +75,24 @@ class SchemaContractTests(unittest.TestCase):
             job_slice = sql[job_body_start : job_body_start + 1500]
             self.assertNotIn("owner_name", job_slice.lower())
 
-    def test_menu_seed_defines_current_navigation_layout(self):
-        expected = {
-            "upstream": "primary",
-            "dwm": "primary",
-            "mapping": "primary",
-            "lineage": "primary",
-            "indicator": "primary",
-            "codeTable": "more",
-        }
+    def test_menu_defaults_are_canonical_and_sql_artifacts_are_reference_only(self):
+        manifest = json.loads(
+            (REPO_ROOT / "config" / "default-menus.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(11, len(manifest))
+        expected_primary = {"upstream", "dwm", "mapping", "lineage", "indicator"}
+        self.assertEqual(
+            expected_primary,
+            {menu["code"] for menu in manifest if menu["navPlacement"] == "primary"},
+        )
+        self.assertTrue(next(menu for menu in manifest if menu["code"] == "system")["adminOnly"])
+        self.assertEqual("api", next(menu for menu in manifest if menu["code"] == "apiAsset")["icon"])
+
         for docs, suffix in ((DOCS_PG, "pg"), (DOCS_DWS, "dws")):
             sql = read_sql(docs / f"menus-app-{suffix}-ddl.sql")
-            for code, placement in expected.items():
-                self.assertRegex(
-                    sql,
-                    re.compile(
-                        rf"'{re.escape(code)}'[\s\S]{{0,200}}'{re.escape(placement)}'",
-                        re.I,
-                    ),
-                    f"{suffix} menu {code} should seed nav_placement={placement}",
-                )
-            # Defaults to more when nav_placement omitted in seed for some rows.
-            for code in ("root", "report", "apiAsset", "push", "system"):
-                self.assertIn(f"'{code}'", sql)
+            self.assertIn("Reference only", sql)
+            self.assertIn("config/default-menus.json", sql)
+            self.assertNotRegex(sql, re.compile(r"^\s*(?:CREATE|INSERT)\s", re.I | re.M))
 
     def test_auth_and_assets_core_tables_present(self):
         for docs, suffix in ((DOCS_PG, "pg"), (DOCS_DWS, "dws")):

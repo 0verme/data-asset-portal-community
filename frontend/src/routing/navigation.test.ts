@@ -21,6 +21,23 @@ test("desktop navigation groups menus by configured placement", () => {
   assert.deepEqual(more.map((item) => item.code), ["report", "system", "push"]);
 });
 
+test("compact header preserves menu order while moving overflow primary items into More", () => {
+  const menus = [
+    { code: "upstream", navPlacement: "primary" },
+    { code: "report", navPlacement: "more" },
+    { code: "dwm", navPlacement: "primary" },
+    { code: "system", navPlacement: "more" },
+    { code: "mapping", navPlacement: "primary" },
+    { code: "lineage", navPlacement: "primary" },
+    { code: "indicator", navPlacement: "primary" },
+  ];
+
+  const { primary, more } = splitNavigationMenus(menus, { maxPrimary: 3 });
+
+  assert.deepEqual(primary.map((item) => item.code), ["upstream", "dwm", "mapping"]);
+  assert.deepEqual(more.map((item) => item.code), ["lineage", "indicator", "report", "system"]);
+});
+
 test("portal push-job navigation clears the portal query while preserving the job route", () => {
   const portalQuery = "demo-portal-query";
   const navigation = getPortalPushNavigation({

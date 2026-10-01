@@ -39,16 +39,16 @@ REPO_ROOT = BACKEND.parent
 
 PYTHON = sys.executable
 MIGRATE = BACKEND / "scripts" / "schema_migrate.py"
+MENU_INIT = BACKEND / "scripts" / "init_menu_data.py"
 
 
-
-def _run_cli(args, env_extra=None):
+def _run_cli(args, env_extra=None, *, script=MIGRATE):
     env = dict(os.environ)
     env.setdefault("APP_SECRET_KEY", "test-only-migration-secret")
     if env_extra:
         env.update(env_extra)
     return subprocess.run(
-        [PYTHON, str(MIGRATE), *args],
+        [PYTHON, str(script), *args],
         cwd=REPO_ROOT,
         env=env,
         capture_output=True,
@@ -75,8 +75,22 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
             )
             apply = _run_cli(["apply", "--profile", "fresh", "--config", str(config)])
             self.assertEqual(0, apply.returncode, apply.stderr)
-            self.assertIn("applied=0001_baseline", apply.stdout)
             self.assertIn("rbac_seed=inserted:", apply.stdout)
+            self.assertIn("menu_seed=inserted:11 total:11", apply.stdout)
+            self.assertIn("applied=0001_baseline", apply.stdout)
+            self.assertLess(apply.stdout.index("rbac_seed="), apply.stdout.index("menu_seed="))
+            self.assertLess(apply.stdout.index("menu_seed="), apply.stdout.index("applied="))
+
+            repeat = _run_cli(["apply", "--profile", "fresh", "--config", str(config)])
+            self.assertEqual(0, repeat.returncode, repeat.stderr)
+            self.assertIn("menu_seed=inserted:0 total:11", repeat.stdout)
+
+            legacy_wrapper = _run_cli(
+                ["--profile", "fresh", "--config", str(config)],
+                script=MENU_INIT,
+            )
+            self.assertEqual(0, legacy_wrapper.returncode, legacy_wrapper.stderr)
+            self.assertIn("menu_seed=inserted:0 total:11", legacy_wrapper.stdout)
 
             status = _run_cli(["status", "--profile", "fresh", "--config", str(config)])
             self.assertEqual(0, status.returncode, status.stderr)
@@ -102,10 +116,14 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                     "SELECT item_code, item_value FROM p_code_item "
                     "WHERE category_code = 'UPSTREAM_DEPT' ORDER BY display_order"
                 ).fetchall()
+                menus = connection.execute(
+                    "SELECT menu_code FROM p_menu ORDER BY display_order"
+                ).fetchall()
             finally:
                 connection.close()
             self.assertEqual(("idx_p_asset_table_filter",), row)
             self.assertEqual(("idx_p_indicator_semantic_ref",), semantic_index)
+            self.assertEqual(11, len(menus))
             self.assertTrue(
                 {
                     "source_asset_id",
@@ -116,6 +134,52 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
             )
             self.assertIn(("POSTGRESQL", "PostgreSQL"), upstream_db_type)
             self.assertIn(("SUPPLY_CHAIN", "供应链部"), upstream_dept)
+
+    def test_apply_menu_seed_failure_exits_nonzero_without_success_revision_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "menu-seed-failure.sqlite"
+            config = root / "database.yaml"
+            config.write_text(
+                "profiles:\n  menu_failure:\n    type: sqlite\n"
+                f"    database: {database.as_posix()}\n",
+                encoding="utf-8",
+            )
+            initial = _run_cli(["apply", "--profile", "menu_failure", "--config", str(config)])
+            self.assertEqual(0, initial.returncode, initial.stderr)
+
+            connection = sqlite3.connect(database)
+            try:
+                connection.execute(
+                    "DELETE FROM p_menu WHERE menu_code IN ('report', 'apiAsset')"
+                )
+                connection.execute(
+                    "CREATE TRIGGER fail_menu_seed BEFORE INSERT ON p_menu "
+                    "WHEN NEW.menu_code = 'apiAsset' BEGIN "
+                    "SELECT RAISE(ABORT, 'injected menu seed failure'); END"
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            failed = _run_cli(
+                ["apply", "--profile", "menu_failure", "--config", str(config)]
+            )
+            self.assertNotEqual(0, failed.returncode)
+            self.assertIn("schema migration failed", failed.stderr)
+            self.assertNotIn("menu_seed=", failed.stdout)
+            self.assertNotIn("applied=", failed.stdout)
+
+            connection = sqlite3.connect(database)
+            try:
+                menu_codes = {
+                    row[0] for row in connection.execute("SELECT menu_code FROM p_menu")
+                }
+            finally:
+                connection.close()
+            self.assertEqual(9, len(menu_codes))
+            self.assertNotIn("report", menu_codes)
+            self.assertNotIn("apiAsset", menu_codes)
 
     def test_upstream_option_migration_preserves_legacy_items(self):
         with tempfile.TemporaryDirectory() as directory:

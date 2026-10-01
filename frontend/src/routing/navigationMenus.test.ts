@@ -4,6 +4,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { MENU_ITEMS } from "../data/menus.ts";
+import defaultMenus from "../../../config/default-menus.json" with { type: "json" };
+import { hasIcon, resolveIconName } from "../components/iconRegistry.ts";
 import type { AuthSession } from "../api/auth.ts";
 import {
   getNavigationAuthKey,
@@ -11,6 +13,36 @@ import {
   getVisibleNavigationMenus,
   loadNavigationMenus,
 } from "./navigationMenus.ts";
+
+test("frontend default navigation exactly projects the canonical menu manifest", () => {
+  const expected = defaultMenus.map((menu) => ({
+    id: String(menu.id),
+    code: menu.code,
+    name: menu.name,
+    icon: menu.icon,
+    path: menu.path,
+    order: menu.order,
+    status: menu.status,
+    adminOnly: menu.adminOnly,
+    desc: menu.desc,
+    navPlacement: menu.navPlacement,
+  }));
+  const actual = MENU_ITEMS.map(({ id, code, name, icon, path, order, status, adminOnly, desc, navPlacement }) => ({
+    id, code, name, icon, path, order, status, adminOnly, desc, navPlacement,
+  }));
+
+  assert.deepEqual(actual, expected);
+});
+
+test("every default menu icon has a renderer, including the API icon", () => {
+  assert.equal(MENU_ITEMS.length, 11);
+  assert.equal(MENU_ITEMS.every((menu) => hasIcon(menu.icon)), true);
+  assert.equal(hasIcon("api"), true);
+});
+
+test("unknown menu icons resolve to the grid renderer", () => {
+  assert.equal(resolveIconName("not-a-registered-icon"), "grid");
+});
 
 test("navigation auth keys change with identity, role, or effective permissions", () => {
   const guest: AuthSession = { user: null, name: null, role: "guest", permissions: ["asset:read"] };

@@ -170,6 +170,7 @@ def main(argv=None):
     if config["type"] != "gaussdb":
         _alembic_upgrade(args.profile)
     from app.authorization.persistence import seed_rbac_for_profile
+    from app.navigation.persistence import seed_menus_for_profile
 
     seeded = seed_rbac_for_profile(args.profile)
     print(
@@ -177,6 +178,8 @@ def main(argv=None):
         f"roles:{seeded.roles_inserted} permissions:{seeded.permissions_inserted} "
         f"mappings:{seeded.mappings_inserted}"
     )
+    menu_seed = seed_menus_for_profile(args.profile)
+    print(f"menu_seed=inserted:{menu_seed.inserted} total:{menu_seed.total}")
     print(f"applied={BASELINE_REVISION if created else '-'}")
     return 0
 

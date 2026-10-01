@@ -9,7 +9,7 @@
 
 当前 baseline 包含 shared/system、RBAC、dwm、mapping、root、indicator、apiAsset、upstream、push、report、codeTable 和 lineage storage 的 39 张表。`backend/app/db/tables.py` 是 runtime SQLAlchemy Core 查询子集，不是完整 physical schema；职责详见 [ADR-002](../../docs/adr/002-schema-canonical-source.md)。
 
-新库执行完整基线后会写入 Alembic revision `0001_baseline`。既有库只能在 `verify` 通过后执行 `baseline`（stamp），不会重放历史 DDL：
+新库执行完整基线后会写入 Alembic revision `0001_baseline`；`schema_migrate.py apply` 随后按顺序 seed RBAC 与 `config/default-menus.json` 中的默认系统菜单。菜单 seed 只补缺失项，不覆盖实例配置。既有库只能在 `verify` 通过后执行 `baseline`（stamp），不会重放历史 DDL：
 
 ```bash
 python backend/scripts/schema_migrate.py apply --profile <profile>
