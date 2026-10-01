@@ -143,6 +143,8 @@ CREATE TABLE IF NOT EXISTS dwp.p_asset_table (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (source_key, asset_type, external_id)
 );
+CREATE INDEX IF NOT EXISTS idx_p_asset_table_filter
+    ON dwp.p_asset_table (layer_code, domain_code);
 CREATE TABLE IF NOT EXISTS dwp.p_asset_field (
   field_id BIGINT PRIMARY KEY, asset_id BIGINT NOT NULL, field_name VARCHAR(256) NOT NULL,
   field_cn_name VARCHAR(256), data_type VARCHAR(128), field_order INTEGER NOT NULL DEFAULT 0,

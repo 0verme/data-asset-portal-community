@@ -46,7 +46,12 @@ class RecordingCursor:
         elif lowered.startswith("select version_num from"):
             self.result = (self.connection.revision,) if self.connection.revision else None
         elif "from information_schema.tables" in lowered:
-            self.result = None
+            self.result = (
+                (1,)
+                if "table_name = ?" in lowered
+                and self.connection.revision is not None
+                else None
+            )
         else:
             self.result = None
         return self
@@ -55,7 +60,7 @@ class RecordingCursor:
         return self.result
 
     def fetchall(self):
-        return []
+        return [self.result] if self.result is not None else []
 
     def close(self):
         pass
@@ -200,7 +205,13 @@ class DwsSchemaSafetyTests(unittest.TestCase):
 
     def test_fresh_apply_executes_profile_rendered_statements_and_stamps_same_schema(self):
         connection = RecordingConnection()
-        self.assertTrue(initialize(connection, self.config, "dws"))
+        # The baseline must verify before it is stamped; the recording cursor
+        # intentionally cannot answer the full catalog reflection.
+        with patch(
+            "backend.app.migrations.schema.verify_database",
+            return_value=None,
+        ):
+            self.assertTrue(initialize(connection, self.config, "dws"))
 
         baseline_statements = _split_sql_statements(
             render_baseline_for_profile(self.config, "dws")
@@ -237,8 +248,63 @@ class DwsSchemaSafetyTests(unittest.TestCase):
         empty_check = next(
             item for item in connection.executed
             if "information_schema.tables" in item[0]
+            and "table_name <> 'alembic_version'" in item[0]
         )
         self.assertEqual(("dap",), empty_check[1])
+
+    def test_dws_fresh_baseline_verifies_before_stamping_dynamic_head(self):
+        connection = RecordingConnection()
+        head = "0010_field_mapping_identity"
+
+        def verify_before_stamp(conn, config, dialect, root):
+            self.assertIs(conn, connection)
+            self.assertEqual("dws", dialect)
+            self.assertFalse(
+                any("CREATE TABLE IF NOT EXISTS dap.alembic_version" in sql for sql, _ in conn.executed)
+            )
+            return None
+
+        with patch(
+            "backend.app.migrations.schema.verify_database",
+            side_effect=verify_before_stamp,
+        ) as verify:
+            self.assertTrue(
+                initialize(
+                    connection,
+                    self.config,
+                    "dws",
+                    initial_revision=head,
+                )
+            )
+
+        verify.assert_called_once()
+        stamp = next(
+            (sql, params)
+            for sql, params in connection.executed
+            if sql.startswith("INSERT INTO dap.alembic_version")
+        )
+        self.assertEqual((head,), stamp[1])
+        self.assertEqual(1, connection.commits)
+
+    def test_dws_fresh_schema_verification_failure_does_not_stamp_head(self):
+        connection = RecordingConnection()
+        with patch(
+            "backend.app.migrations.schema.verify_database",
+            side_effect=RuntimeError("baseline schema drift"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "baseline schema drift"):
+                initialize(
+                    connection,
+                    self.config,
+                    "dws",
+                    initial_revision="0010_field_mapping_identity",
+                )
+
+        self.assertFalse(
+            any(sql.startswith("INSERT INTO dap.alembic_version") for sql, _ in connection.executed)
+        )
+        self.assertEqual(0, connection.commits)
+        self.assertEqual(1, connection.rollbacks)
 
     def test_missing_target_schema_fails_before_any_ddl(self):
         connection = RecordingConnection(schema_exists=False)

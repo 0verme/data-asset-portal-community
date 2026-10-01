@@ -38,16 +38,36 @@ def _parser():
     return parser
 
 
-def repository_alembic_head() -> str:
-    """Return the repository's configured Alembic head revision."""
+def _script_directory():
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
-    config = Config(str(BACKEND / "alembic.ini"))
-    head = ScriptDirectory.from_config(config).get_current_head()
+    return ScriptDirectory.from_config(Config(str(BACKEND / "alembic.ini")))
+
+
+def repository_alembic_head() -> str:
+    """Return the repository's configured Alembic head revision."""
+    head = _script_directory().get_current_head()
     if head is None:
         raise RuntimeError("repository has no Alembic migration head")
     return head
+
+
+def _validate_known_revision(revision: str | None) -> None:
+    if revision is None:
+        return
+    try:
+        known = _script_directory().get_revision(revision)
+    except Exception as exc:
+        raise RuntimeError(
+            f"database revision {revision!r} is not known to this repository; "
+            "refusing to guess or modify the database"
+        ) from exc
+    if known is None:
+        raise RuntimeError(
+            f"database revision {revision!r} is not known to this repository; "
+            "refusing to guess or modify the database"
+        )
 
 
 def _load_runtime():
@@ -129,6 +149,7 @@ def main(argv=None):
         stamp_existing,
         verify_database,
     )
+    from app.migrations.dws_runner import apply_revisions, plan_revisions, revision_chain
 
     config = get_db_profile(args.profile)
     try:
@@ -137,14 +158,46 @@ def main(argv=None):
         raise ValueError(f"unsupported database type for schema management: {config['type']}") from exc
 
     connection = connect_with_profile(args.profile)
+    applied_results = []
     try:
         revision = current_revision(connection, config)
+        _validate_known_revision(revision)
+        head = repository_alembic_head()
         if args.command == "status":
-            print(f"dialect={dialect} revision={revision or 'unmanaged'}")
+            if dialect == "dws":
+                print(
+                    f"dialect={dialect} revision={revision or 'unmanaged'} "
+                    f"head={head}"
+                )
+            else:
+                print(f"dialect={dialect} revision={revision or 'unmanaged'}")
             return 0
         if args.command == "plan":
+            if dialect == "dws":
+                if revision is None:
+                    print(f"{BASELINE_REVISION} dws.sql")
+                    for pending_revision in revision_chain(BASELINE_REVISION, head):
+                        print(f"{pending_revision} after-baseline")
+                    return 0
+                items = plan_revisions(
+                    connection, config, revision, head, root=args.root
+                )
+                if not items:
+                    print(f"up-to-date {head}")
+                for item in items:
+                    print(f"{item.revision} {item.action}")
+                return 0
             if revision is None:
                 print(f"{BASELINE_REVISION} {dialect}.sql")
+                lower = BASELINE_REVISION
+            else:
+                lower = revision
+            if lower != head:
+                pending = list(_script_directory().iterate_revisions(head, lower))
+                for migration in reversed(pending):
+                    print(migration.revision)
+            elif revision is not None:
+                print(f"up-to-date {head}")
             return 0
         if args.command == "verify":
             verified = verify_database(connection, config, dialect, args.root)
@@ -162,7 +215,19 @@ def main(argv=None):
             else:
                 print(f"baseline={stamp_existing(connection, config, dialect, args.root)}")
             return 0
+        start_revision = revision or BASELINE_REVISION
         created = initialize(connection, config, dialect, args.root)
+        if dialect == "dws":
+            applied_results = apply_revisions(
+                connection,
+                config,
+                start_revision,
+                head,
+                root=args.root,
+            )
+            # The whole physical schema must match the repository head contract
+            # after the last verified revision.
+            verify_database(connection, config, dialect, args.root)
     finally:
         if connection is not None:
             connection.close()
@@ -180,7 +245,11 @@ def main(argv=None):
     )
     menu_seed = seed_menus_for_profile(args.profile)
     print(f"menu_seed=inserted:{menu_seed.inserted} total:{menu_seed.total}")
-    print(f"applied={BASELINE_REVISION if created else '-'}")
+    if dialect == "dws":
+        applied_revision = applied_results[-1].revision if applied_results else ("-" if not created else BASELINE_REVISION)
+    else:
+        applied_revision = BASELINE_REVISION if created else "-"
+    print(f"applied={applied_revision}")
     return 0
 
 

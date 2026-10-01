@@ -17,6 +17,11 @@ from __future__ import annotations
 from alembic import op
 import sqlalchemy as sa
 
+from app.migrations.revision_logic import (
+    duplicate_mapping_keys,
+    plan_upstream_backfill,
+)
+
 revision = "0006_field_mapping_upstream_id"
 down_revision = "0005_rbac_persistence"
 branch_labels = None
@@ -43,24 +48,6 @@ def _table(name: str) -> sa.Table:
     )
 
 
-def _as_int(value, *, label: str) -> int | None:
-    if value is None or str(value).strip() == "":
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError) as error:
-        raise RuntimeError(f"字段映射迁移发现无效 {label}: {value!r}") from error
-
-
-def _describe_system(row) -> str:
-    return (
-        f"system_pk={row.get('system_pk')}, "
-        f"system_id={row.get('system_id')!r}, "
-        f"system_abbr={row.get('system_abbr')!r}, "
-        f"system_name={row.get('system_name')!r}"
-    )
-
-
 def _backfill_upstream_system_id() -> None:
     bind = op.get_bind()
     mapping = _table("p_field_mapping_table")
@@ -77,7 +64,7 @@ def _backfill_upstream_system_id() -> None:
     if not mapping_rows:
         return
 
-    systems = bind.execute(
+    system_rows = bind.execute(
         sa.select(
             upstream.c.system_pk,
             upstream.c.data_source_id,
@@ -86,91 +73,28 @@ def _backfill_upstream_system_id() -> None:
             upstream.c.system_name,
         ).order_by(upstream.c.system_pk)
     ).mappings().all()
-    systems_by_pk = {}
-    systems_by_data_source: dict[int, list] = {}
-    for row in systems:
-        system_pk = _as_int(row.get("system_pk"), label="system_pk")
-        if system_pk is None:
-            continue
-        systems_by_pk[system_pk] = row
-        data_source_id = _as_int(row.get("data_source_id"), label="data_source_id")
-        if data_source_id is not None:
-            systems_by_data_source.setdefault(data_source_id, []).append(row)
 
-    updates: list[tuple[int, int]] = []
-    errors: list[str] = []
-    for row in mapping_rows:
-        table_pk = row.get("table_pk")
-        source_table = row.get("source_table_name")
-        source_id = _as_int(row.get("data_source_id"), label="mapping.data_source_id")
-        current_id = _as_int(row.get("upstream_system_id"), label="mapping.upstream_system_id")
-
-        if current_id is not None:
-            system = systems_by_pk.get(current_id)
-            if system is None:
-                errors.append(
-                    f"table_pk={table_pk}, source_table={source_table!r}: "
-                    f"upstream_system_id={current_id} 不存在"
-                )
-                continue
-            system_source_id = _as_int(system.get("data_source_id"), label="upstream.data_source_id")
-            if source_id is not None and system_source_id is not None and source_id != system_source_id:
-                errors.append(
-                    f"table_pk={table_pk}, source_table={source_table!r}: "
-                    f"data_source_id={source_id} 与 {_describe_system(system)} 不一致"
-                )
-            continue
-
-        candidates = systems_by_data_source.get(source_id, []) if source_id is not None else []
-        if len(candidates) == 1:
-            updates.append((int(table_pk), int(candidates[0]["system_pk"])))
-            continue
-        if not candidates:
-            reason = "没有可唯一匹配的上游系统"
-        else:
-            reason = "存在多个候选上游系统：" + "; ".join(_describe_system(item) for item in candidates)
-        errors.append(
-            f"table_pk={table_pk}, source_table={source_table!r}, "
-            f"data_source_id={source_id}: {reason}"
-        )
-
-    if errors:
+    plan = plan_upstream_backfill(mapping_rows, system_rows)
+    if plan.errors:
         raise RuntimeError(
             "字段映射 upstream_system_id backfill 无法安全完成；"
             "请补充明确的上游系统关联后重试，未写入任何 backfill：\n"
-            + "\n".join(errors)
+            + "\n".join(plan.errors)
         )
 
-    for table_pk, system_pk in updates:
+    duplicates = duplicate_mapping_keys(mapping_rows, plan.updates)
+    if duplicates:
+        details = "; ".join(item.describe() for item in duplicates)
+        raise RuntimeError(
+            "字段映射存在重复的 upstream_system_id + source_table_name，"
+            f"无法建立唯一约束：{details}"
+        )
+
+    for table_pk, system_pk in plan.updates:
         bind.execute(
             sa.update(mapping)
             .where(mapping.c.table_pk == table_pk, mapping.c.upstream_system_id.is_(None))
             .values(upstream_system_id=system_pk)
-        )
-
-
-def _validate_mapping_keys() -> None:
-    bind = op.get_bind()
-    mapping = _table("p_field_mapping_table")
-    duplicates = bind.execute(
-        sa.select(
-            mapping.c.upstream_system_id,
-            mapping.c.source_table_name,
-            sa.func.count().label("mapping_count"),
-        )
-        .group_by(mapping.c.upstream_system_id, mapping.c.source_table_name)
-        .having(sa.func.count() > 1)
-        .order_by(mapping.c.upstream_system_id, mapping.c.source_table_name)
-    ).mappings().all()
-    if duplicates:
-        details = "; ".join(
-            f"upstream_system_id={row['upstream_system_id']}, "
-            f"source_table={row['source_table_name']!r}, count={row['mapping_count']}"
-            for row in duplicates
-        )
-        raise RuntimeError(
-            "字段映射存在重复的 upstream_system_id + source_table_name，"
-            f"无法建立唯一约束：{details}"
         )
 
 
@@ -295,7 +219,6 @@ def _ensure_relation_shape() -> None:
 
 def upgrade() -> None:
     _backfill_upstream_system_id()
-    _validate_mapping_keys()
     _ensure_relation_shape()
 
 

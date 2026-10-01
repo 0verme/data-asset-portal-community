@@ -55,6 +55,9 @@ class TableSpec:
     unique_constraints: set[tuple[str, ...]] = field(default_factory=set)
     foreign_keys: set[ForeignKeySpec] = field(default_factory=set)
     indexes: dict[str, IndexSpec] = field(default_factory=dict)
+    # Catalog constraint names are needed by the forward-only DWS adapter to
+    # drop a legacy UNIQUE without guessing an auto-generated name.
+    unique_constraint_names: dict[tuple[str, ...], str] = field(default_factory=dict)
 
 
 @dataclass
@@ -507,6 +510,36 @@ def baseline_columns(dialect: str, root: Path = SCHEMA_ROOT) -> dict[str, set[st
     return {name: set(table.columns) for name, table in baseline_schema(dialect, root).tables.items()}
 
 
+def baseline_table_statements(
+    dialect: str, tables: tuple[str, ...] | list[str] | set[str], root: Path = SCHEMA_ROOT
+) -> tuple[str, ...]:
+    """Return canonical baseline DDL for *tables* and their explicit indexes.
+
+    Only ``CREATE TABLE`` and ``CREATE INDEX`` statements are returned; schema
+    creation, ``ALTER TABLE`` and unrelated objects are intentionally excluded.
+    The DWS adapters use this to create missing module tables with the exact
+    distribution/constraint contract of the canonical baseline instead of
+    duplicating historical DDL.
+    """
+    wanted = {name.lower() for name in tables}
+    statements: list[str] = []
+    for statement in _split_sql_statements(baseline_path(dialect, root).read_text(encoding="utf-8")):
+        table_match = CREATE_TABLE_RE.search(statement)
+        if table_match:
+            if _identifier(table_match.group("table")) in wanted:
+                statements.append(statement)
+            continue
+        index_match = re.search(
+            r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+            r"[A-Za-z0-9_\"`.]+\s+ON\s+(?P<table>[A-Za-z0-9_\"`.]+)",
+            statement,
+            re.I,
+        )
+        if index_match and _table_name(index_match.group("table")) in wanted:
+            statements.append(statement)
+    return tuple(statements)
+
+
 def verify_baselines(root: Path = SCHEMA_ROOT) -> tuple[str, ...]:
     expected = None
     for dialect in SUPPORTED_DIALECTS:
@@ -681,18 +714,53 @@ def _execute(connection, sql: str, *, split: bool):
         cursor.close()
 
 
+def _ledger_exists(connection, config: dict) -> bool:
+    provider = get_provider(config["type"])
+    cursor = connection.cursor()
+    try:
+        if provider.name == "sqlite":
+            cursor.execute(
+                "SELECT 1 FROM dwp.sqlite_master "
+                "WHERE type = 'table' AND name = 'alembic_version'"
+            )
+        elif provider.name == "mysql":
+            cursor.execute(
+                "SELECT 1 FROM information_schema.tables "
+                f"WHERE table_schema = DATABASE() AND table_name = {provider.placeholder}",
+                ("alembic_version",),
+            )
+        else:
+            schema = provider.physical_schema(config)
+            if not schema:
+                raise ValueError("database profile requires a physical schema for migration checks")
+            cursor.execute(
+                "SELECT 1 FROM information_schema.tables "
+                f"WHERE table_schema = {provider.placeholder} "
+                f"AND table_name = {provider.placeholder}",
+                (schema, "alembic_version"),
+            )
+        return cursor.fetchone() is not None
+    finally:
+        cursor.close()
+
+
 def current_revision(connection, config: dict) -> str | None:
+    if not _ledger_exists(connection, config):
+        return None
+
     cursor = connection.cursor()
     try:
         cursor.execute(f"SELECT version_num FROM {_prefix(config)}alembic_version")
-        row = cursor.fetchone()
-        return str(row[0]) if row else None
-    except Exception:
-        try:
-            connection.rollback()
-        except Exception:
-            pass
-        return None
+        rows = cursor.fetchall()
+        if len(rows) != 1:
+            raise RuntimeError(
+                "alembic_version must contain exactly one revision; "
+                f"found {len(rows)} rows"
+            )
+        revision = rows[0][0]
+        if revision is None or not str(revision).strip():
+            raise RuntimeError("alembic_version contains an empty revision")
+        return str(revision)
     finally:
         cursor.close()
 
@@ -743,7 +811,12 @@ def _has_user_tables(connection, config: dict) -> bool:
         cursor.close()
 
 
-def _stamp(connection, config: dict):
+def stamp_revision(connection, config: dict, revision: str) -> None:
+    """Record *revision* as the last fully verified logical revision."""
+    _stamp(connection, config, revision)
+
+
+def _stamp(connection, config: dict, revision: str = BASELINE_REVISION):
     prefix = _prefix(config)
     _execute(
         connection,
@@ -756,13 +829,20 @@ def _stamp(connection, config: dict):
         cursor.execute(f"DELETE FROM {prefix}alembic_version")
         cursor.execute(
             f"INSERT INTO {prefix}alembic_version (version_num) VALUES ({get_provider(config['type']).placeholder})",
-            (BASELINE_REVISION,),
+            (revision,),
         )
     finally:
         cursor.close()
 
 
-def initialize(connection, config: dict, dialect: str, root: Path = SCHEMA_ROOT) -> bool:
+def initialize(
+    connection,
+    config: dict,
+    dialect: str,
+    root: Path = SCHEMA_ROOT,
+    *,
+    initial_revision: str = BASELINE_REVISION,
+) -> bool:
     if dialect == "dws":
         _assert_dws_schema_exists(connection, config)
     if current_revision(connection, config) is not None:
@@ -772,7 +852,11 @@ def initialize(connection, config: dict, dialect: str, root: Path = SCHEMA_ROOT)
     sql = render_baseline_for_profile(config, dialect, root)
     try:
         _execute(connection, sql, split=dialect in {"sqlite", "mysql", "dws"})
-        _stamp(connection, config)
+        if dialect == "dws":
+            # DWS's canonical baseline already represents repository head. The
+            # physical schema must verify before any logical revision is recorded.
+            verify_database(connection, config, dialect, root)
+        _stamp(connection, config, initial_revision)
         connection.commit()
         return True
     except Exception:
@@ -1277,6 +1361,7 @@ def _reflect_information_schema(connection, config: dict, expected: SchemaModel)
                 if expected_index is not None and expected_index.unique and expected_index.columns == columns:
                     continue
                 _add_actual_constraint(table, kind, constraint_name, columns)
+                table.unique_constraint_names.setdefault(columns, constraint_name)
             elif kind == "PRIMARY KEY":
                 _add_actual_constraint(table, kind, constraint_name, columns)
         for table in model.tables.values():
