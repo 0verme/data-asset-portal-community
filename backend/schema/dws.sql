@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_system (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_data_source (
     source_id BIGINT PRIMARY KEY, source_code VARCHAR(64) NOT NULL UNIQUE,
     source_name VARCHAR(256) NOT NULL, source_type VARCHAR(64) NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_data_source (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 
 CREATE TABLE IF NOT EXISTS dwp.p_api_asset (
   api_pk BIGINT PRIMARY KEY, api_code VARCHAR(64) NOT NULL UNIQUE,
@@ -31,25 +31,25 @@ CREATE TABLE IF NOT EXISTS dwp.p_api_asset (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_api_param (
   param_pk BIGINT PRIMARY KEY, api_code VARCHAR(64) NOT NULL, param_name VARCHAR(128) NOT NULL,
   param_in VARCHAR(16) NOT NULL, data_type VARCHAR(64) NOT NULL,
   required_flag CHAR(1) NOT NULL DEFAULT 'N', description_text VARCHAR(1000),
   example_value VARCHAR(1000), sort_no INTEGER NOT NULL DEFAULT 0,
   UNIQUE(api_code,param_name,param_in)
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_api_response_field (
   field_pk BIGINT PRIMARY KEY, api_code VARCHAR(64) NOT NULL, field_name VARCHAR(128) NOT NULL,
   data_type VARCHAR(64) NOT NULL, description_text VARCHAR(1000), example_value VARCHAR(1000),
   sort_no INTEGER NOT NULL DEFAULT 0, UNIQUE(api_code,field_name)
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_api_relation (
   relation_pk BIGINT PRIMARY KEY, api_code VARCHAR(64) NOT NULL,
   relation_type VARCHAR(16) NOT NULL, target_code VARCHAR(128) NOT NULL,
   target_name VARCHAR(256), sort_no INTEGER NOT NULL DEFAULT 0,
   UNIQUE(api_code,relation_type,target_code)
-);
+) DISTRIBUTE BY REPLICATION;
 ALTER TABLE dwp.p_api_asset ADD CONSTRAINT fk_p_api_asset_system
   FOREIGN KEY (system_id) REFERENCES dwp.p_system(system_id) ON DELETE RESTRICT;
 CREATE INDEX IF NOT EXISTS idx_p_api_asset_filter
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_field_mapping_table (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_field_mapping_field (
   field_pk BIGINT PRIMARY KEY, table_pk BIGINT NOT NULL,
   source_field_name VARCHAR(128) NOT NULL, source_field_type VARCHAR(128),
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_field_mapping_field (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 ALTER TABLE dwp.p_field_mapping_table ADD CONSTRAINT fk_p_field_mapping_data_source
   FOREIGN KEY (data_source_id) REFERENCES dwp.p_data_source(source_id) ON DELETE RESTRICT;
 ALTER TABLE dwp.p_field_mapping_field ADD CONSTRAINT fk_p_field_mapping_field_table
@@ -94,18 +94,18 @@ CREATE TABLE IF NOT EXISTS dwp.p_role (
   enabled CHAR(1) NOT NULL DEFAULT 'Y',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_permission (
   permission_code VARCHAR(128) PRIMARY KEY, resource VARCHAR(64) NOT NULL,
   action VARCHAR(32) NOT NULL, name VARCHAR(128) NOT NULL,
   description VARCHAR(2000)
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_role_permission (
   role_code VARCHAR(64) NOT NULL, permission_code VARCHAR(128) NOT NULL,
   PRIMARY KEY (role_code, permission_code),
   FOREIGN KEY (role_code) REFERENCES dwp.p_role(role_code) ON DELETE CASCADE,
   FOREIGN KEY (permission_code) REFERENCES dwp.p_permission(permission_code) ON DELETE CASCADE
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE INDEX IF NOT EXISTS idx_p_role_permission_permission
   ON dwp.p_role_permission(permission_code);
 
@@ -115,17 +115,17 @@ CREATE TABLE IF NOT EXISTS dwp.p_admin_user (
   role VARCHAR(16) NOT NULL DEFAULT 'admin', status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
   last_login_at TIMESTAMP, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_asset_domain (
   domain_code VARCHAR(64) PRIMARY KEY, domain_name VARCHAR(256) NOT NULL,
   display_order INTEGER NOT NULL DEFAULT 0, is_active CHAR(1) NOT NULL DEFAULT 'Y',
   is_deleted CHAR(1) NOT NULL DEFAULT 'N'
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_asset_layer (
   layer_code VARCHAR(32) PRIMARY KEY, layer_name VARCHAR(128) NOT NULL,
   display_order INTEGER NOT NULL DEFAULT 0, is_active CHAR(1) NOT NULL DEFAULT 'Y',
   is_deleted CHAR(1) NOT NULL DEFAULT 'N'
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_asset_table (
   asset_id BIGINT PRIMARY KEY, table_name VARCHAR(256) NOT NULL,
   table_cn_name VARCHAR(256), schema_name VARCHAR(128) NOT NULL DEFAULT 'dwp',
@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_asset_table (
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (source_key, asset_type, external_id)
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_asset_field (
   field_id BIGINT PRIMARY KEY, asset_id BIGINT NOT NULL, field_name VARCHAR(256) NOT NULL,
   field_cn_name VARCHAR(256), data_type VARCHAR(128), field_order INTEGER NOT NULL DEFAULT 0,
@@ -151,19 +151,19 @@ CREATE TABLE IF NOT EXISTS dwp.p_asset_field (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_asset_change_log (
   change_id BIGINT PRIMARY KEY, asset_id BIGINT, table_name VARCHAR(256) NOT NULL,
   change_type VARCHAR(64) NOT NULL, change_summary VARCHAR(1000),
   before_json TEXT, after_json TEXT, operator_name VARCHAR(64) NOT NULL DEFAULT 'system',
   change_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY HASH (change_id);
 CREATE TABLE IF NOT EXISTS dwp.p_root_category (
   category_id BIGINT PRIMARY KEY, category_name VARCHAR(64) NOT NULL UNIQUE,
   display_order INTEGER NOT NULL DEFAULT 0, is_deleted CHAR(1) NOT NULL DEFAULT 'N',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_root_item (
   root_id BIGINT PRIMARY KEY, root_abbr VARCHAR(64) NOT NULL UNIQUE,
   root_en_name VARCHAR(256), root_cn_name VARCHAR(256) NOT NULL,
@@ -172,7 +172,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_root_item (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_indicator_item (
   indicator_pk BIGINT PRIMARY KEY, indicator_id VARCHAR(64) NOT NULL UNIQUE,
   indicator_name VARCHAR(256) NOT NULL, meaning_desc VARCHAR(4000),
@@ -186,7 +186,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_indicator_item (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE INDEX idx_p_indicator_semantic_ref
   ON dwp.p_indicator_item (source_asset_id, result_field_id);
 CREATE TABLE IF NOT EXISTS dwp.p_indicator_path_config (
@@ -196,7 +196,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_indicator_path_config (
   sort_order INTEGER NOT NULL DEFAULT 0, status VARCHAR(32) NOT NULL DEFAULT 'enabled',
   remark VARCHAR(1000), created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_operation_log (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   user_id VARCHAR(64), user_name VARCHAR(128), dept_name VARCHAR(128),
@@ -206,7 +206,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_operation_log (
   result_status VARCHAR(16) NOT NULL DEFAULT 'success', error_message TEXT,
   ip_address VARCHAR(64), user_agent VARCHAR(512), cost_time_ms INTEGER NOT NULL DEFAULT 0,
   remark VARCHAR(512), created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY HASH (id);
 
 CREATE TABLE IF NOT EXISTS dwp.p_menu (
   menu_id BIGINT PRIMARY KEY, menu_code VARCHAR(64) NOT NULL UNIQUE,
@@ -219,7 +219,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_menu (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_code_category (
   category_id BIGINT PRIMARY KEY, category_code VARCHAR(64) NOT NULL UNIQUE,
   category_name VARCHAR(128) NOT NULL, category_desc VARCHAR(512),
@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_code_category (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_code_item (
   item_id BIGINT PRIMARY KEY, category_code VARCHAR(64) NOT NULL,
   item_code VARCHAR(64) NOT NULL, item_name VARCHAR(128) NOT NULL,
@@ -240,21 +240,21 @@ CREATE TABLE IF NOT EXISTS dwp.p_code_item (
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(category_code, item_code)
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE TABLE IF NOT EXISTS dwp.p_root_change_log (
   change_id BIGINT PRIMARY KEY, root_id BIGINT, root_abbr VARCHAR(64) NOT NULL,
   change_type VARCHAR(64) NOT NULL, change_summary VARCHAR(512),
   before_json TEXT, after_json TEXT,
   operator_name VARCHAR(64) NOT NULL DEFAULT 'system',
   change_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY HASH (change_id);
 CREATE TABLE IF NOT EXISTS dwp.p_indicator_change_log (
   change_id BIGINT PRIMARY KEY, indicator_pk BIGINT, indicator_id VARCHAR(64) NOT NULL,
   change_type VARCHAR(64) NOT NULL, change_summary VARCHAR(512),
   before_json TEXT, after_json TEXT,
   operator_name VARCHAR(64) NOT NULL DEFAULT 'system',
   change_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY HASH (change_id);
 
 -- Open repository modules: upstream, push, report, manual code tables, lineage.
 CREATE TABLE IF NOT EXISTS dwp.p_upstream_system (
@@ -443,7 +443,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_report_asset (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(64) NOT NULL DEFAULT 'system',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) DISTRIBUTE BY REPLICATION;
 CREATE INDEX idx_p_report_asset_ix_01 ON dwp.p_report_asset (status_code, report_type, domain_name);
 
 CREATE TABLE IF NOT EXISTS dwp.p_manual_code_table (

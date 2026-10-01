@@ -113,7 +113,7 @@ selected backend/schema/<dialect>.sql
 - MySQL InnoDB/charset/collation 和报表长文本 `TEXT`；
 - MySQL `p_indicator_path_config.full_path` 为 `VARCHAR(512)`，PostgreSQL/DWS 为 `VARCHAR(1000)`；这属于需要继续显式审查的 dialect-specific difference，不能由 generator 默认抹平；
 - MySQL 报表 JSON-like columns 没有 `DEFAULT '[]'`，该差异由 MySQL row-size/default compatibility 修复保留；
-- DWS baseline 的 11 个 `DISTRIBUTE BY` clauses。
+- 原静态盘点时 DWS baseline 有 11 个 `DISTRIBUTE BY` clauses；本次补全后当前为 39/39 张表显式声明（31 `REPLICATION`、8 `HASH`），由 `test_dws_distribution_contract.py` 强制覆盖。
 
 ### Git history
 
