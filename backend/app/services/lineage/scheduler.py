@@ -37,8 +37,6 @@ PROGRAM_TABLE_ENV = "LINEAGE_PROGRAM_TABLE"
 DEFAULT_JOB_TABLE = "p_job"
 DEFAULT_PROGRAM_TABLE = "p_program"
 
-SCHEMA = "dwp"
-
 # Strict identifier rule: schema-qualified names are not accepted here; callers
 # that need a different schema must extend the adapter, not bypass validation.
 IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -81,7 +79,7 @@ def job_sql(job_table: str) -> str:
     """Statement selecting job rows: (plan, job name, dependency text)."""
     return f"""
 SELECT a, c, ab
-FROM {SCHEMA}.{job_table}
+FROM {job_table}
 WHERE c IS NOT NULL
 """
 
@@ -90,7 +88,7 @@ def program_sql(job_table: str, program_table: str) -> str:
     """Statement selecting job-to-result-table rows."""
     return f"""
 SELECT DISTINCT substr(program.k, 5) AS table_name, job.c
-FROM {SCHEMA}.{job_table} job
-JOIN {SCHEMA}.{program_table} program ON job.e = program.b
+FROM {job_table} job
+JOIN {program_table} program ON job.e = program.b
 WHERE substr(program.k, 5) LIKE '%.%'
 """

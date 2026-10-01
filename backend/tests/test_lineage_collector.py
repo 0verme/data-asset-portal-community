@@ -89,8 +89,8 @@ class LineageCollectorUnitTests(unittest.TestCase):
             tx.return_value.__exit__.return_value = None
             publish_snapshot("lineage_test", snapshot)
 
-        self.assertTrue(any("LOCK TABLE dwp.p_lineage_snapshot" in sql for sql, _ in executed))
-        self.assertTrue(any("INSERT INTO dwp.p_lineage_snapshot" in sql for sql, _ in executed))
+        self.assertTrue(any("LOCK TABLE p_lineage_snapshot" in sql for sql, _ in executed))
+        self.assertTrue(any("INSERT INTO p_lineage_snapshot" in sql for sql, _ in executed))
 
 
 @skip_without_postgres_integration()

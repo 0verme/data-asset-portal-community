@@ -78,10 +78,11 @@ class SchedulerTableResolutionTests(unittest.TestCase):
 class SchedulerSqlTests(unittest.TestCase):
     def test_sql_uses_resolved_table_names(self):
         tables = resolve_scheduler_tables("p_job_custom", "p_program_custom")
-        self.assertIn("dwp.p_job_custom", job_sql(tables.job_table))
+        self.assertIn("FROM p_job_custom", job_sql(tables.job_table))
         job_stmt = program_sql(tables.job_table, tables.program_table)
-        self.assertIn("dwp.p_job_custom job", job_stmt)
-        self.assertIn("dwp.p_program_custom program", job_stmt)
+        self.assertIn("FROM p_job_custom job", job_stmt)
+        self.assertIn("JOIN p_program_custom program", job_stmt)
+        self.assertNotIn("dwp.", job_stmt)
         self.assertNotIn(";", job_stmt.splitlines()[0].strip().rstrip(","))
 
 
@@ -99,7 +100,7 @@ class SnapshotMetadataUsesSourceTablesTests(unittest.TestCase):
             program_table="p_program_custom",
         )
         self.assertEqual("p_job_custom+p_program_custom-collector", snapshot["generator"]["name"])
-        self.assertIn("dwp.p_job_custom", snapshot["nodes"][0]["attributes"]["source"])
+        self.assertEqual("p_job_custom", snapshot["nodes"][0]["attributes"]["source"])
         self.assertIn(
             "p_program_custom",
             snapshot["edges"][0]["evidence"]["sourceRecordId"],

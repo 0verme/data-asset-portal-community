@@ -20,7 +20,7 @@ from app.db.facade import (  # noqa: E402
 )
 from app.services.auth_service import build_password_hash  # noqa: E402
 
-TABLE_ADMIN_USER = "dwp.p_admin_user"
+TABLE_ADMIN_USER = "p_admin_user"
 
 
 def resolve_profile(explicit_profile: str | None = None) -> str:

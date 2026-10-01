@@ -445,7 +445,7 @@ SELECT
     system_pk,
     UPPER(COALESCE(system_abbr, '')) AS system_abbr,
     UPPER(COALESCE(system_id, '')) AS system_id
-FROM dwp.p_upstream_system
+FROM p_upstream_system
 WHERE is_deleted = 'N'
 """
     columns, rows = fetch_all(profile, sql)
@@ -469,7 +469,7 @@ def load_recv_dwf_map(profile: str) -> dict[str, RecvDwfMeta]:
     try:
         columns, rows = fetch_all(
             profile,
-            "SELECT recv_plan, data_source, table_name FROM dwp.p_recv_dwf",
+            "SELECT recv_plan, data_source, table_name FROM p_recv_dwf",
         )
     except Exception:
         return {}

@@ -175,7 +175,7 @@ def build_snapshot(job_rows, table_job_rows, *, snapshot_id=None, generated_at=N
             "namespace": "scheduler",
             "attributes": {
                 "plans": sorted(plans.get(job_name, set())),
-                "source": f"dwp.{job_table}",
+                "source": job_table,
                 "diagnostics": job_diagnostics.get(job_name, []),
             },
         })
@@ -191,7 +191,7 @@ def build_snapshot(job_rows, table_job_rows, *, snapshot_id=None, generated_at=N
             "attributes": {
                 "layer": namespace,
                 "dwfBoundary": is_dwf_table(table_name),
-                "source": f"dwp.{program_table}",
+                "source": program_table,
             },
         })
 
@@ -282,11 +282,11 @@ def publish_snapshot(profile, snapshot):
     with database_transaction():
         execute_sql(
             profile,
-            "LOCK TABLE dwp.p_lineage_snapshot IN EXCLUSIVE MODE",
+            "LOCK TABLE p_lineage_snapshot IN EXCLUSIVE MODE",
             autocommit=False,
         )
         execute_sql(profile, """
-INSERT INTO dwp.p_lineage_snapshot
+INSERT INTO p_lineage_snapshot
     (snapshot_id, generated_at, generator_name, generator_version, import_batch_id, status_code)
 VALUES (?, ?, ?, ?, ?, 'INACTIVE')
 """, autocommit=False, params=[
@@ -297,7 +297,7 @@ VALUES (?, ?, ?, ?, ?, 'INACTIVE')
             snapshot["snapshotId"],
         ])
         execute_many(profile, """
-INSERT INTO dwp.p_lineage_node
+INSERT INTO p_lineage_node
     (snapshot_id, node_id, kind_code, node_name, display_name, namespace_name, attributes_json)
 VALUES (?, ?, ?, ?, ?, ?, ?)
 """, [
@@ -309,7 +309,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?)
             for node in snapshot["nodes"]
         ], autocommit=False)
         execute_many(profile, """
-INSERT INTO dwp.p_lineage_edge
+INSERT INTO p_lineage_edge
     (snapshot_id, edge_id, source_node_id, target_node_id, kind_code, evidence_type,
      source_record_id, evidence_description, confidence_code, generated_at, diagnostics_json)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -324,12 +324,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ], autocommit=False)
         execute_sql(
             profile,
-            "UPDATE dwp.p_lineage_snapshot SET status_code = 'INACTIVE' WHERE status_code = 'ACTIVE'",
+            "UPDATE p_lineage_snapshot SET status_code = 'INACTIVE' WHERE status_code = 'ACTIVE'",
             autocommit=False,
         )
         execute_sql(
             profile,
-            "UPDATE dwp.p_lineage_snapshot SET status_code = 'ACTIVE' WHERE snapshot_id = ?",
+            "UPDATE p_lineage_snapshot SET status_code = 'ACTIVE' WHERE snapshot_id = ?",
             autocommit=False,
             params=[snapshot["snapshotId"]],
         )
