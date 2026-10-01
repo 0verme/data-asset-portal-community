@@ -11,6 +11,7 @@ from backend.app.migrations.schema import (
     _split_sql_statements,
     baseline_schema,
     baseline_tables,
+    _normalize_reflected_column_default,
 )
 from backend.tests.dws_relationship_contract import (
     DWS_LOGICAL_RELATIONSHIPS,
@@ -186,6 +187,70 @@ class MigrationSchemaParityTests(unittest.TestCase):
                         f"{relationship.child_table}.{child_column} -> "
                         f"{relationship.parent_table}.{parent_column} type mismatch",
                     )
+
+    def test_dws_baseline_avoids_unsupported_813_index_if_not_exists(self):
+        sql = baseline_path("dws").read_text(encoding="utf-8")
+        violations = [
+            statement
+            for statement in _split_sql_statements(sql)
+            if re.search(
+                r"\bCREATE\s+(?:UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\b",
+                _mask_sql_non_code(statement),
+                re.I,
+            )
+        ]
+        self.assertEqual([], violations)
+
+    def test_dws_baseline_avoids_unsupported_813_identity_syntax(self):
+        sql = baseline_path("dws").read_text(encoding="utf-8")
+        violations = [
+            statement
+            for statement in _split_sql_statements(sql)
+            if re.search(
+                r"\bGENERATED\s+BY\s+DEFAULT\s+AS\s+IDENTITY\b",
+                _mask_sql_non_code(statement),
+                re.I,
+            )
+        ]
+        self.assertEqual([], violations)
+
+        operation_log = next(
+            statement
+            for statement in _split_sql_statements(sql)
+            if re.search(r"\bp_operation_log\b", _mask_sql_non_code(statement), re.I)
+        )
+        self.assertRegex(
+            _mask_sql_non_code(operation_log),
+            r"\bid\s+BIGSERIAL\s+PRIMARY\s+KEY\b",
+        )
+
+    def test_dws_bigserial_reflects_as_logical_bigint_primary_key_without_default_drift(self):
+        operation_log_id = baseline_schema("dws").tables["p_operation_log"].columns["id"]
+        self.assertEqual("BIGINT", operation_log_id.type_name)
+        self.assertTrue(operation_log_id.primary_key)
+        self.assertFalse(operation_log_id.nullable)
+        self.assertIsNone(operation_log_id.default)
+        self.assertTrue(operation_log_id.generated_by_default)
+
+        reflected_sequence_default = "nextval('dap.p_operation_log_id_seq'::regclass)"
+        self.assertEqual(
+            operation_log_id.default,
+            _normalize_reflected_column_default(
+                reflected_sequence_default,
+                "BIGINT",
+                db_type="gaussdb",
+                expected_column=operation_log_id,
+            ),
+        )
+        self.assertNotEqual(
+            operation_log_id.default,
+            _normalize_reflected_column_default(
+                reflected_sequence_default,
+                "BIGINT",
+                db_type="postgres",
+                expected_column=operation_log_id,
+            ),
+        )
 
     def test_dws_baseline_contains_no_physical_foreign_keys(self):
         sql = baseline_path("dws").read_text(encoding="utf-8")
