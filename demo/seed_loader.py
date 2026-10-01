@@ -51,20 +51,18 @@ ADMIN_USER = {
     "status": "ACTIVE",
 }
 
-# Repository module menus (menu_id values match the existing full DDL).
-# portal has no menu row: it is the fixed landing page.
+# Compatibility projection consumed by the demo seed plan; canonical values live
+# in config/default-menus.json. portal has no menu row: it is the fixed landing page.
+_DEFAULT_MENU_MANIFEST = json.loads(
+    (Path(__file__).resolve().parents[1] / "config" / "default-menus.json").read_text(encoding="utf-8")
+)
 DEMO_MENUS = [
-    (1, "upstream", "上游卸数", "download", "/upstream", 10, "primary", "N", "Y", "上游卸数系统列表与维护"),
-    (2, "dwm", "数据仓库", "db", "/data-warehouse", 20, "primary", "N", "Y", "DWM 表资产、字段与 DDL"),
-    (3, "mapping", "字段映射", "link", "/field-mapping", 30, "primary", "N", "Y", "字段与表的映射关系查询"),
-    (10, "lineage", "血缘分析", "layers", "/lineage", 35, "primary", "N", "Y", "任务与数据表的上下游血缘排查"),
-    (4, "root", "词根管理", "book", "/root-management", 40, "more", "N", "Y", "词根、分类与批量导入"),
-    (5, "indicator", "指标维护", "hash", "/indicator-maintenance", 50, "primary", "N", "Y", "指标列表、详情与启停"),
-    (6, "report", "报表资产", "file", "/report-assets", 55, "more", "N", "Y", "报表元数据台账、归属信息与关联引用"),
-    (9, "apiAsset", "API 资产", "api", "/api-assets", 58, "more", "N", "Y", "API 元数据台账、参数、响应字段与关联资产维护"),
-    (7, "push", "下游推送", "upload", "/push", 60, "more", "N", "Y", "下游推送系统、作业与字段"),
-    (11, "codeTable", "码值表维护", "table", "/code-table-maintenance", 65, "more", "N", "Y", "湖仓手工码值表的表级元数据登记与维护"),
-    (8, "system", "系统管理", "shield", "/system-management", 70, "more", "Y", "Y", "用户、菜单、参数字典与操作日志（仅管理员可见）"),
+    (
+        item["id"], item["code"], item["name"], item["icon"], item["path"],
+        item["order"], item["navPlacement"], "Y" if item["adminOnly"] else "N",
+        "Y" if item["status"] == "enabled" else "N", item["desc"],
+    )
+    for item in _DEFAULT_MENU_MANIFEST
 ]
 
 

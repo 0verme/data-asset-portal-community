@@ -16,6 +16,7 @@
 import type { ReactNode, SVGProps } from "react";
 
 import { DOMAIN_HUE_MAP } from "../config/assets.ts";
+import { resolveIconName, type SupportedIconName } from "./iconRegistry.ts";
 
 // ---- 图标 (inline SVG, 1.6px stroke) ----
 export interface IconProps {
@@ -36,7 +37,7 @@ export function Icon({ name, size = 16, color = "currentColor", strokeWidth = 1.
     strokeLinecap: "round",
     strokeLinejoin: "round",
   };
-  const paths: Record<string, ReactNode> = {
+  const paths: Record<SupportedIconName, ReactNode> = {
     search: <><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></>,
     close: <><path d="M18 6 6 18M6 6l12 12" /></>,
     arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
@@ -79,8 +80,9 @@ export function Icon({ name, size = 16, color = "currentColor", strokeWidth = 1.
     login: <><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="m10 17 5-5-5-5" /><path d="M15 12H3" /></>,
     logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></>,
     shield: <><path d="M12 3 5 6v5c0 5 3.4 9.4 7 10 3.6-.6 7-5 7-10V6l-7-3Z" /></>,
+    api: <><circle cx="6" cy="12" r="3" /><circle cx="18" cy="6" r="3" /><circle cx="18" cy="18" r="3" /><path d="m8.7 10.7 6.6-3.4M8.7 13.3l6.6 3.4" /></>,
   };
-  return <svg {...svgProps}>{paths[name] || null}</svg>;
+  return <svg {...svgProps}>{paths[resolveIconName(name)]}</svg>;
 }
 
 // ---- 配色: 主题域 → oklch ----
