@@ -16,15 +16,40 @@ test("header auth actions omit persistent guest and role badges", () => {
   assert.doesNotMatch(authBar, /role-pill|roleLabel|未登录|业务维护员|系统管理员/);
 });
 
-test("shared header expands desktop search while retaining compact and mobile layouts", () => {
-  assert.match(appStyles, /\.search \{\s*position: relative;\s*width: clamp\(320px, 24vw, 460px\);[\s\S]*?flex: 0 1 clamp\(320px, 24vw, 460px\);/);
+test("shared header keeps brand, navigation, and actions in stable DOM and grid order", () => {
+  const headerGrid = appStyles.match(/\.topbar\s*\{[\s\S]*?\n\s{2}\}/)?.[0] || "";
+
+  assert.match(headerGrid, /grid-template-columns:\s*max-content\s+minmax\(0,\s*1fr\)\s+max-content/);
   assert.match(
-    appStyles,
-    /@media \(max-width: 1500px\) and \(min-width: 769px\)[\s\S]*?\.search \{\s*width: clamp\(150px, 24vw, 360px\);\s*max-width: 24vw;\s*flex-basis: clamp\(150px, 24vw, 360px\);/,
+    app,
+    /<div className="topbar-brand">[\s\S]*?<div className="mainnav">[\s\S]*?<div className="topbar-actions">/,
   );
-  assert.match(appStyles, /@media \(max-width: 1080px\) and \(min-width: 769px\)[\s\S]*?\.search \{\s*width: 36px;/);
+  assert.match(appStyles, /\.topbar-brand\s*\{[^}]*flex:\s*0 0 auto/);
+  assert.match(appStyles, /\.topbar-actions\s*\{[^}]*flex:\s*0 0 auto;[^}]*white-space:\s*nowrap/);
+  assert.doesNotMatch(appStyles, /\.topbar-spacer|\.mainnav\s*\{[^}]*\border\s*:/);
+});
+
+test("middle-width header compacts search and navigation before the mobile breakpoint", () => {
+  const compactHeader = appStyles.match(
+    /@media \(max-width: 1199px\) and \(min-width: 769px\) \{[\s\S]*?\n\s{2}\}/,
+  )?.[0] || "";
+  const tabletHeader = appStyles.match(
+    /@media \(max-width: 959px\) and \(min-width: 769px\) \{[\s\S]*?\n\s{2}\}/,
+  )?.[0] || "";
+
+  assert.match(appStyles, /\.search \{\s*position: relative;\s*width: clamp\(180px, 20vw, 360px\);/);
+  assert.match(compactHeader, /\.search \{\s*width: 36px;[\s\S]*?flex-basis: 36px;/);
+  assert.match(compactHeader, /\.search:focus-within,[\s\S]*?width: 196px;/);
+  assert.match(app, /matchMedia\("\(max-width: 1199px\)"\)/);
+  assert.match(app, /splitNavigationMenus\(visibleNavMenus, \{ maxPrimary: compactHeader \? 3 : 5 \}\)/);
+  assert.match(compactHeader, /\.search input \{\s*box-sizing: border-box;\s*padding: 0;/);
+  assert.match(appStyles, /\.search \.clear \{[^}]*pointer-events: none/);
+  assert.match(appStyles, /\.search\.has-val \.clear \{ opacity: 1; pointer-events: auto; \}/);
+  assert.match(tabletHeader, /\.hamburger \{ display: grid/);
+  assert.match(tabletHeader, /\.mainnav \{ display: none/);
   assert.match(appStyles, /@media \(max-width: 768px\)[\s\S]*?\.search\.mobile-open \{ display: block; \}/);
   assert.match(app, /id="global-search"/);
+  assert.match(app, /aria-label="全局搜索"/);
   assert.match(app, /value=\{query\}/);
   assert.match(app, /className="clear" onClick=\{\(\) => setQuery\(""\)\}/);
 });
