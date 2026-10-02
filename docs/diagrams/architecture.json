@@ -1,0 +1,375 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "数据资产门户 · 高层系统架构",
+    "subtitle": "代码基线 cf40c97 · 生产 remote 模式 · 主路径：资产目录查询 · 框内为逻辑组件，不代表独立服务",
+    "quality_profile": "showcase",
+    "visual_preset": "blueprint",
+    "animation": "none",
+    "repository": {
+      "url": "https://github.com/0verme/data-asset-portal-community",
+      "revision": "cf40c97b8b01836d0fcb68b660dd0f865b3ca69a"
+    }
+  },
+  "components": [
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "React Web 门户",
+      "sublabel": "浏览器 · remote API",
+      "pos": [
+        60,
+        330
+      ],
+      "size": [
+        195,
+        78
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/api/assets.ts"
+        },
+        {
+          "path": "frontend/src/api/http.ts"
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "cloud",
+      "label": "Nginx 入口",
+      "sublabel": "静态资源 + /api 反代",
+      "pos": [
+        365,
+        330
+      ],
+      "size": [
+        195,
+        78
+      ],
+      "sources": [
+        {
+          "path": "deploy/nginx/data-asset-portal.conf.example"
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI / Uvicorn",
+      "sublabel": "路由 · 契约校验 · 上下文",
+      "pos": [
+        670,
+        330
+      ],
+      "size": [
+        195,
+        78
+      ],
+      "sources": [
+        {
+          "path": "backend/asgi.py"
+        },
+        {
+          "path": "backend/app/fastapi/app.py"
+        },
+        {
+          "path": "backend/app/fastapi/routers/assets.py"
+        }
+      ]
+    },
+    {
+      "id": "domain",
+      "type": "backend",
+      "label": "目录业务服务",
+      "sublabel": "资产 · 搜索 · 血缘 · 台账",
+      "pos": [
+        975,
+        330
+      ],
+      "size": [
+        195,
+        78
+      ],
+      "sources": [
+        {
+          "path": "backend/app/services/assets_service.py"
+        },
+        {
+          "path": "backend/app/services/lineage_service.py"
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "type": "backend",
+      "label": "数据库访问层",
+      "sublabel": "CoreAccess · Provider",
+      "pos": [
+        1280,
+        330
+      ],
+      "size": [
+        195,
+        78
+      ],
+      "sources": [
+        {
+          "path": "backend/app/db/service.py"
+        },
+        {
+          "path": "backend/app/db/core.py"
+        },
+        {
+          "path": "backend/app/db/facade.py"
+        }
+      ]
+    },
+    {
+      "id": "database",
+      "type": "database",
+      "label": "元数据存储",
+      "sublabel": "关系数据库 · 按配置选择",
+      "pos": [
+        1585,
+        330
+      ],
+      "size": [
+        195,
+        78
+      ],
+      "sources": [
+        {
+          "path": "backend/app/db/tables.py"
+        },
+        {
+          "path": "docs/database-support.md"
+        }
+      ]
+    },
+    {
+      "id": "mobile",
+      "type": "frontend",
+      "label": "微信小程序",
+      "sublabel": "Taro · 只读目录客户端",
+      "pos": [
+        365,
+        100
+      ],
+      "size": [
+        195,
+        78
+      ],
+      "sources": [
+        {
+          "path": "miniapp/src/api/http.ts"
+        }
+      ]
+    },
+    {
+      "id": "identity",
+      "type": "security",
+      "label": "会话与 RBAC",
+      "sublabel": "签名 Cookie · 权限码",
+      "pos": [
+        670,
+        100
+      ],
+      "size": [
+        195,
+        78
+      ],
+      "sources": [
+        {
+          "path": "backend/app/fastapi/auth.py"
+        },
+        {
+          "path": "backend/app/fastapi/dependencies.py"
+        },
+        {
+          "path": "backend/app/authorization/core.py"
+        }
+      ]
+    },
+    {
+      "id": "collector",
+      "type": "external",
+      "label": "外部 Collector",
+      "sublabel": "采集 · 解析 · 调度 · 重试",
+      "pos": [
+        365,
+        560
+      ],
+      "size": [
+        195,
+        78
+      ],
+      "sources": [
+        {
+          "path": "docs/metadata-ingestion.md"
+        }
+      ]
+    },
+    {
+      "id": "ingestion",
+      "type": "backend",
+      "label": "元数据接入服务",
+      "sublabel": "校验 · 归一化 · 持久化",
+      "pos": [
+        670,
+        560
+      ],
+      "size": [
+        195,
+        78
+      ],
+      "sources": [
+        {
+          "path": "backend/app/fastapi/routers/metadata.py"
+        },
+        {
+          "path": "backend/app/services/metadata_ingestion_service.py"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "DAP 后端 · 同一 ASGI 进程 · loopback :15099",
+      "wraps": [
+        "api",
+        "identity",
+        "domain",
+        "storage",
+        "ingestion"
+      ],
+      "pad": 30
+    },
+    {
+      "kind": "region",
+      "label": "部署方数据边界",
+      "wraps": [
+        "database"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "外部团队所有",
+      "wraps": [
+        "collector"
+      ],
+      "pad": 20
+    }
+  ],
+  "connections": [
+    {
+      "from": "web",
+      "to": "gateway",
+      "label": "① /api",
+      "variant": "emphasis"
+    },
+    {
+      "from": "gateway",
+      "to": "api",
+      "label": "② 反代",
+      "variant": "emphasis"
+    },
+    {
+      "from": "api",
+      "to": "domain",
+      "label": "③ 查询",
+      "variant": "emphasis"
+    },
+    {
+      "from": "domain",
+      "to": "storage",
+      "label": "④ Core",
+      "variant": "emphasis"
+    },
+    {
+      "from": "storage",
+      "to": "database",
+      "label": "⑤ SQL",
+      "variant": "emphasis"
+    },
+    {
+      "from": "mobile",
+      "to": "gateway"
+    },
+    {
+      "from": "collector",
+      "to": "gateway",
+      "label": "Metadata API"
+    },
+    {
+      "from": "api",
+      "to": "identity",
+      "label": "按接口授权",
+      "variant": "security"
+    },
+    {
+      "from": "api",
+      "to": "ingestion"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "01 / 主路径：浏览资产目录",
+      "items": [
+        "Web → Nginx → FastAPI → AssetsService → CoreAccess → 数据库；JSON 响应原路返回，省略返回连线。",
+        "GET /api/assets/tables?summary=1 调用 get_asset_table_page；路由执行响应契约校验。",
+        "本图选择 VITE_API_MODE=remote。前端默认 mock 分支仅为演示，不在主链路中。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "02 / 信任边界与鉴权",
+      "items": [
+        "浏览器、小程序和外部采集器的输入均不可信；Nginx 是部署入口，后端按部署文档仅监听 127.0.0.1:15099。",
+        "匿名目录访问由 PUBLIC_CATALOG_PROFILE 控制：internal / strict 提供不同公开投影，disabled 要求登录；批量导出另受开关与权限控制。写操作按 permission code 授权。",
+        "元数据接入要求登录且具备 metadata:write；签名 Cookie 解析与数据库角色权限校验在应用内部完成。",
+        "入口还具有请求体大小限制、安全响应头、可配置 CORS；生产 HTTPS 由 Nginx 配置。"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "03 / 同进程业务能力",
+      "items": [
+        "目录服务框聚合资产、指标、字段映射、词根、码值、报表、API 台账、上下游、搜索与门户统计。",
+        "系统管理、权限仓库和操作日志复用数据库访问能力；为保持主图简洁，支持性数据库调用不重复连线。",
+        "血缘服务读取快照并遍历子图；持久化模式由 LINEAGE_DB_PROFILE 配置，受控 POC 仅限开发/测试条件。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "04 / 外部依赖与接入职责",
+      "items": [
+        "外部 Collector/Adapter 负责连接业务源、解析、调度与重试；这是接入角色，不是门户内置常驻服务。",
+        "POST /api/metadata/assets/ingestions 与 /lineage/ingestions 进入接入服务，再通过存储能力持久化、审计或发布；支持 dryRun。",
+        "上下游推送、报表与 API 资产主要管理元数据；主图不将被登记的业务系统画成实际执行依赖。"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "05 / 存储与部署选择",
+      "items": [
+        "SQLAlchemy Core 与 Provider 隔离 SQL 方言和连接差异；SQLite、PostgreSQL、MySQL 8、GaussDB/DWS 按配置选择，不要求同时部署。",
+        "数据库保存资产字段、权限、操作日志及配置启用的血缘快照；逻辑存储框允许按 profile 使用不同连接。",
+        "Web 静态产物由 Nginx 托管；Vite 是构建/开发工具。核心部署不要求独立消息队列、缓存或搜索服务。"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "06 / 证据与阅读范围",
+      "items": [
+        "依据代码基线 cf40c97b8b01836d0fcb68b660dd0f865b3ca69a 的入口、路由、业务服务、数据库层与部署模板分析。",
+        "点击组件可查看对应源码证据；图表达仓库支持的生产拓扑，不宣称当前机器已部署这些进程。",
+        "10 个核心组件、9 条关系；仅强调一条请求路径，其余依赖说明收进卡片。"
+      ]
+    }
+  ]
+}

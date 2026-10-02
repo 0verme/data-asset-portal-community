@@ -130,17 +130,10 @@ Apache Atlas 主要面向 Hadoop 生态的元数据与治理（Hive、HDFS 等�
 
 ## 🏗 架构概览
 
-```mermaid
-flowchart LR
-  U["用户浏览器"] --> R["React + Vite"]
-  R -->|"remote: /api"| A["ASGI Runtime / Uvicorn"]
-  A --> F["FastAPI routes"]
-  F --> S["Service Layer"]
-  S --> D["Database Provider"]
-  D --> DB[("SQLite / PostgreSQL / MySQL / GaussDB-DWS")]
-  R -.->|"mock"| M["受控演示数据"]
-  C["外部系统 / 自定义程序"] -->|"curated Metadata Contract"| A
-```
+![数据资产门户系统架构：客户端经 Nginx、FastAPI、业务服务和数据库访问层查询元数据；外部采集器通过受控 API 接入](./docs/images/system-architecture.svg)
+
+后端模块运行在同一 FastAPI 进程中；外部 Collector 负责采集，门户负责元数据接入与查询。
+归属边界、访问策略与组件源码见 [架构说明及交互图](./docs/architecture.md#高层系统架构)。
 
 | 部件 | 说明 |
 | --- | --- |
