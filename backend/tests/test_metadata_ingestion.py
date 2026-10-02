@@ -12,12 +12,18 @@ from backend.app.application import Identity  # type: ignore
 from backend.app.contracts.metadata_ingestion import (  # type: ignore
     AssetMetadataIngestionRequest,
     LineageMetadataIngestionRequest,
+    MAX_LINEAGE_EDGES,
+    MAX_LINEAGE_NODES,
 )
 from backend.app.db.sqlite_adapter import connect  # type: ignore
 from backend.app.fastapi_app import create_fastapi_app  # type: ignore
 from backend.app.migrations.schema import initialize  # type: ignore
 from backend.app.services.metadata_ingestion_service import (  # type: ignore
+    LINEAGE_INSERT_BATCH_SIZE,
+    MAX_CONFIGURED_LINEAGE_EDGES,
+    MAX_CONFIGURED_LINEAGE_NODES,
     MetadataIngestionService,
+    MetadataPayloadTooLargeError,
     MetadataValidationError,
 )
 
@@ -100,6 +106,29 @@ class MetadataContractTests(unittest.TestCase):
         normalized = self.service._preflight_lineage(request)
         self.assertEqual(2, len(normalized["nodes"]))
         self.assertEqual(1, len(normalized["edges"]))
+
+    def test_lineage_configurable_limits_reject_over_limit_before_persistence(self):
+        request = lineage_request()
+        with patch.dict(os.environ, {
+            "METADATA_MAX_LINEAGE_NODES": "1",
+            "METADATA_MAX_LINEAGE_EDGES": "10",
+        }):
+            with self.assertRaises(MetadataPayloadTooLargeError):
+                self.service._preflight_lineage(request)
+
+        with patch.dict(os.environ, {"METADATA_MAX_LINEAGE_NODES": "30000", "METADATA_MAX_LINEAGE_EDGES": "75000"}):
+            self.assertEqual(30_000, self.service._lineage_limit("METADATA_MAX_LINEAGE_NODES", 30_000, MAX_CONFIGURED_LINEAGE_NODES))
+        self.assertEqual(30_000, MAX_LINEAGE_NODES)
+        self.assertEqual(75_000, MAX_LINEAGE_EDGES)
+        self.assertGreaterEqual(MAX_LINEAGE_NODES, 17_514)
+        self.assertGreaterEqual(MAX_LINEAGE_EDGES, 45_407)
+        with patch.dict(os.environ, {"METADATA_MAX_LINEAGE_NODES": "999999999", "METADATA_MAX_LINEAGE_EDGES": "999999999"}):
+            self.assertEqual(MAX_CONFIGURED_LINEAGE_NODES, self.service._lineage_limit("METADATA_MAX_LINEAGE_NODES", 30_000, MAX_CONFIGURED_LINEAGE_NODES))
+            self.assertEqual(MAX_CONFIGURED_LINEAGE_EDGES, self.service._lineage_limit("METADATA_MAX_LINEAGE_EDGES", 75_000, MAX_CONFIGURED_LINEAGE_EDGES))
+        request.edges.append(request.edges[0].model_copy(update={"external_id": "edge-duplicate-id"}))
+        with patch.dict(os.environ, {"METADATA_MAX_LINEAGE_NODES": "30000", "METADATA_MAX_LINEAGE_EDGES": "1"}):
+            with self.assertRaises(MetadataPayloadTooLargeError):
+                self.service._preflight_lineage(request)
 
     def test_lineage_bad_reference_and_confidence_are_validation_errors(self):
         with self.assertRaises(MetadataValidationError):
@@ -209,6 +238,54 @@ class MetadataSqlitePersistenceTests(unittest.TestCase):
             self.service.ingest_lineage(lineage_request(import_id="run-new"))
         self.assertEqual(1, len(self._active_snapshot_rows()))
         self.assertEqual(1, self._snapshot_count())
+
+    def test_activation_failure_rolls_back_the_old_active_deactivation(self):
+        self.service.ingest_lineage(lineage_request(import_id="run-old"))
+        original_execute = self.service._db.execute
+        calls = 0
+
+        def fail_new_activation(statement):
+            nonlocal calls
+            calls += 1
+            if calls == 3:
+                raise RuntimeError("new ACTIVE update failed")
+            return original_execute(statement)
+
+        with patch.object(self.service._db, "execute", side_effect=fail_new_activation), self.assertRaises(RuntimeError):
+            self.service.ingest_lineage(lineage_request(import_id="run-new"))
+        self.assertEqual(1, len(self._active_snapshot_rows()))
+        self.assertEqual(1, self._snapshot_count())
+
+    def test_lineage_insert_batches_share_a_finite_chunk_size(self):
+        db = MagicMock()
+        service = MetadataIngestionService(db=db)
+        request = lineage_request()
+        nodes = [
+            {"id": f"node:{index}", "type": "table", "name": f"N{index}", "namespace": "", "attributes": {}}
+            for index in range(LINEAGE_INSERT_BATCH_SIZE + 1)
+        ]
+        edges = [
+            {
+                "id": f"edge:{index}", "sourceId": "node:0", "targetId": "node:1",
+                "type": "table_lineage", "evidence": {"type": "test", "sourceRecordId": "", "description": ""},
+                "confidence": "high", "diagnostics": [],
+            }
+            for index in range(LINEAGE_INSERT_BATCH_SIZE + 1)
+        ]
+        service._persist_lineage(
+            request,
+            {
+                "snapshot_id": "batch-test",
+                "import_batch_id": "batch-test-import",
+                "source_key": "source-test",
+                "content_hash": "content-test",
+                "generated_at": request.snapshot.generated_at,
+                "nodes": nodes,
+                "edges": edges,
+            },
+            "ingestion-test",
+        )
+        self.assertEqual([LINEAGE_INSERT_BATCH_SIZE, 1, LINEAGE_INSERT_BATCH_SIZE, 1], [len(call.args[1]) for call in db.execute_many.call_args_list])
 
 
 class MetadataApiTests(unittest.TestCase):

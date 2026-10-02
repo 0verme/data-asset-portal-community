@@ -8,7 +8,8 @@ operators who need them.
 
 The native runtime reads only `APP_SECRET_KEY`, `APP_ENV`, `APP_DEBUG`,
 `APP_CORS_ORIGINS`, and `APP_MAX_CONTENT_LENGTH_MB` for application security,
-session, CORS, and request-size settings. `APP_*` is the only supported
+session, CORS, and the finite global request-size setting. Metadata ingestion also
+uses the narrower `METADATA_MAX_BODY_MB` limit. `APP_*` is the only supported
 configuration namespace after Issue #145; the old names are ignored rather than
 silently falling back.
 
@@ -21,7 +22,7 @@ window. Migrate deployments before upgrading:
 | `FLASK_ENV` | `APP_ENV` | Removed; default is the secure production behavior |
 | `FLASK_DEBUG` | `APP_DEBUG` | Removed; default is disabled |
 | `FLASK_CORS_ORIGINS` | `APP_CORS_ORIGINS` | Removed; use the exact comma-separated allowlist |
-| `FLASK_MAX_CONTENT_LENGTH_MB` | `APP_MAX_CONTENT_LENGTH_MB` | Removed; default is 16 MiB |
+| `FLASK_MAX_CONTENT_LENGTH_MB` | `APP_MAX_CONTENT_LENGTH_MB` | Removed; default is 128 MiB |
 
 The secret is required and must come from a secret manager or equivalent secure
 store. Debug must remain disabled in production. An old `FLASK_*` value does not
@@ -110,6 +111,14 @@ Defaults are shown for orientation and are implemented by the runtime.
 | `ASSET_DB_TYPE` | provider type override | selected profile; provider-specific |
 | `ASSET_DB_JDBC_URL` | GaussDB JDBC URL override | selected profile; GaussDB only |
 | `ASSET_DB_JAR_PATH` | GaussDB JDBC driver path | profile/default; GaussDB only |
+| `METADATA_MAX_BODY_MB` | finite metadata-ingestion body cap; effective cap is the minimum of this and `APP_MAX_CONTENT_LENGTH_MB` | `96`; hard max `128` MiB |
+| `METADATA_MAX_LINEAGE_NODES` | maximum nodes in one complete replace snapshot | `30000`; hard max `200000` |
+| `METADATA_MAX_LINEAGE_EDGES` | maximum edges in one complete replace snapshot | `75000`; hard max `1000000` |
+
+For the large-lineage defaults, the example Nginx configuration uses
+`client_max_body_size 128m`; deployments with another reverse proxy must set its
+body limit at least as high as the effective metadata cap. The application does
+not control an external proxy or load balancer.
 
 `ASSET_DB_HOST`, `ASSET_DB_PORT`, `ASSET_DB_DATABASE`, and `ASSET_DB_USER` are
 also supported as provider/profile overrides. `ASSET_DB_PASSWORD` and DSNs/JDBC

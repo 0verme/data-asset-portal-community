@@ -9,7 +9,7 @@ server {
 
     root /opt/data-asset-portal/frontend/dist;
     index index.html;
-    client_max_body_size 16m;
+    client_max_body_size 128m;
 
     # React/Vite client-side routes must fall back to the SPA entry document.
     location / {
@@ -48,7 +48,7 @@ server {
 #
 #     root /opt/data-asset-portal/frontend/dist;
 #     index index.html;
-#     client_max_body_size 16m;
+#     client_max_body_size 128m;
 #
 #     location / {
 #         try_files $uri $uri/ /index.html;

@@ -93,7 +93,7 @@ POST /api/metadata/assets/ingestions?dryRun=false
 
 兼容 alias：`POST /api/metadata/assets:bulk-upsert`。
 
-写入权限复用当前 `maintainer` gate（`admin` 也属于可维护身份）；Contract 和 Service 不依赖具体 auth framework。请求是 bulk payload，不是逐字段 HTTP：默认最多 1000 assets、每个 asset 1000 fields、总计 10000 fields，request body 默认上限 8 MiB。可通过 `METADATA_MAX_*` 环境变量降低/调整数量限制。
+写入权限复用当前 `maintainer` gate（`admin` 也属于可维护身份）；Contract 和 Service 不依赖具体 auth framework。请求是 bulk payload，不是逐字段 HTTP：asset 默认最多 1000 条、每个 asset 1000 fields、总计 10000 fields；完整 lineage replace snapshot 默认最多 30000 nodes / 75000 edges。metadata body 默认上限 96 MiB，并同时受 `APP_MAX_CONTENT_LENGTH_MB`（默认 128 MiB）约束。可通过 `METADATA_MAX_*` 环境变量调整 lineage/body 限制；lineage nodes/edges 与 body 均有有限 hard ceiling。反向代理也必须允许至少该大小，见 `docs/configuration.md`。
 
 请求示例：
 
@@ -311,7 +311,13 @@ V1 只支持 `snapshot.mode=replace`。Snapshot 必须 self-contained：edge 的
 }
 ```
 
-Snapshot identity 是 `(source, importId/externalSnapshotId)`。相同 import 和相同 content hash 返回 `already_applied`；同一 import 使用不同内容返回 `409 conflict`。发布顺序为：validate → persist INACTIVE snapshot/nodes/edges → deactivate old ACTIVE → activate new → commit。失败时旧 ACTIVE 仍保持 ACTIVE。V1 不实现 append/merge。
+Snapshot identity 是 `(source, importId/externalSnapshotId)`。相同 import 和相同 content hash 返回 `already_applied`；同一 import 使用不同内容返回 `409 conflict`。发布顺序为：validate → persist INACTIVE snapshot/nodes/edges → deactivate old ACTIVE → activate new → commit。nodes/edges 使用有限批次写入，但都处于同一个事务和同一个 snapshot；失败时旧 ACTIVE 仍保持 ACTIVE。V1 不实现 append/merge 或多段 snapshot。
+
+## 大规模快照与 persistent 查询
+
+默认 lineage capacity 以已观测的约 17514 nodes / 45407 semantic edges 为基准，并分别设置 30000 nodes、75000 edges 与 96 MiB request body 的有限上限，为快照波动留出余量。`METADATA_MAX_LINEAGE_NODES` / `METADATA_MAX_LINEAGE_EDGES` 可在 hard ceiling 内按部署调节；`METADATA_MAX_BODY_MB` 最高 128，实际值还受 `APP_MAX_CONTENT_LENGTH_MB` 与反向代理限制。示例 Nginx 配置为 128m。超限在发布前返回 413，不会先停用现有 ACTIVE snapshot。
+
+persistent lineage bootstrap 从 ACTIVE snapshot 读取元数据、node/edge 计数和 deterministic root；search 在数据库侧限定 ACTIVE snapshot、table/task kind、名称和有限结果数；subgraph 使用 bounded frontier adjacency reads + application BFS，只 materialize 所选子图所需的节点和关系。表级视图只投影当前 frontier 触及的 task，并保留 `viaJobs` 与 DWF upstream boundary。development/test POC fixture 继续使用 in-memory 路径。
 
 ## Result and error model
 

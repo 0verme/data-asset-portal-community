@@ -94,6 +94,11 @@ class _ItemProblem(ValueError):
         self.field = field
 
 
+MAX_CONFIGURED_LINEAGE_NODES = 200_000
+MAX_CONFIGURED_LINEAGE_EDGES = 1_000_000
+LINEAGE_INSERT_BATCH_SIZE = 1_000
+
+
 class MetadataIngestionService(AuditActorMixin):
     """Normalize, compare, persist and audit metadata ingestion requests."""
 
@@ -121,6 +126,14 @@ class MetadataIngestionService(AuditActorMixin):
         except (TypeError, ValueError):
             value = default
         return max(1, value)
+
+    @staticmethod
+    def _lineage_limit(name: str, default: int, maximum: int) -> int:
+        try:
+            value = int(os.getenv(name, str(default)))
+        except (TypeError, ValueError, OverflowError):
+            value = default
+        return max(1, min(value, maximum))
 
     @staticmethod
     def _safe_int(value: Any, default: int = 0) -> int:
@@ -753,8 +766,12 @@ class MetadataIngestionService(AuditActorMixin):
         return normalized
 
     def _preflight_lineage(self, request: LineageMetadataIngestionRequest) -> dict[str, Any]:
-        node_limit = self._limit("METADATA_MAX_LINEAGE_NODES", MAX_LINEAGE_NODES)
-        edge_limit = self._limit("METADATA_MAX_LINEAGE_EDGES", MAX_LINEAGE_EDGES)
+        node_limit = self._lineage_limit(
+            "METADATA_MAX_LINEAGE_NODES", MAX_LINEAGE_NODES, MAX_CONFIGURED_LINEAGE_NODES
+        )
+        edge_limit = self._lineage_limit(
+            "METADATA_MAX_LINEAGE_EDGES", MAX_LINEAGE_EDGES, MAX_CONFIGURED_LINEAGE_EDGES
+        )
         if len(request.nodes) > node_limit or len(request.edges) > edge_limit:
             raise MetadataPayloadTooLargeError(f"lineage snapshot exceeds configured limits (nodes={node_limit}, edges={edge_limit})")
         mode = request.snapshot.mode.strip().casefold()
@@ -899,10 +916,18 @@ class MetadataIngestionService(AuditActorMixin):
             }
             for edge in normalized["edges"]
         ]
-        if node_rows:
-            self._db.execute_many(insert(lineage_node), node_rows)
-        if edge_rows:
-            self._db.execute_many(insert(lineage_edge), edge_rows)
+        node_insert = insert(lineage_node)
+        edge_insert = insert(lineage_edge)
+        for offset in range(0, len(node_rows), LINEAGE_INSERT_BATCH_SIZE):
+            self._db.execute_many(
+                node_insert,
+                node_rows[offset:offset + LINEAGE_INSERT_BATCH_SIZE],
+            )
+        for offset in range(0, len(edge_rows), LINEAGE_INSERT_BATCH_SIZE):
+            self._db.execute_many(
+                edge_insert,
+                edge_rows[offset:offset + LINEAGE_INSERT_BATCH_SIZE],
+            )
         self._db.execute(update(lineage_snapshot).where(lineage_snapshot.c.status_code == "ACTIVE").values(status_code="INACTIVE"))
         self._db.execute(update(lineage_snapshot).where(lineage_snapshot.c.snapshot_id == normalized["snapshot_id"]).values(status_code="ACTIVE"))
 

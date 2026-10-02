@@ -9,7 +9,7 @@ from typing import Any
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import JSONResponse
 
-from ..contracts.metadata_ingestion import MAX_METADATA_BODY_BYTES
+from ..settings import get_int_env
 
 
 METADATA_INGESTION_PATHS = frozenset(
@@ -61,12 +61,19 @@ def resolve_request_body_limit(
     method: str,
     global_limit: int,
     *,
-    metadata_limit: int = MAX_METADATA_BODY_BYTES,
+    metadata_limit: int | None = None,
 ) -> RequestBodyLimitPolicy:
     """Resolve the stricter global/metadata limit before body parsing starts."""
     effective_global = _coerce_limit(global_limit)
     if str(method or "").upper() == "POST" and path in METADATA_INGESTION_PATHS:
-        effective = min(effective_global, _coerce_limit(metadata_limit))
+        configured_metadata_limit = (
+            get_int_env("METADATA_MAX_BODY_MB", 96, minimum=1, maximum=128)
+            * 1024
+            * 1024
+            if metadata_limit is None
+            else _coerce_limit(metadata_limit)
+        )
+        effective = min(effective_global, configured_metadata_limit)
         return RequestBodyLimitPolicy(
             max_bytes=effective,
             code="METADATA_PAYLOAD_TOO_LARGE",
@@ -116,7 +123,7 @@ class RequestSizeLimitMiddleware:
         app: Callable[..., Awaitable[Any]],
         max_content_length: int,
         *,
-        metadata_body_limit: int = MAX_METADATA_BODY_BYTES,
+        metadata_body_limit: int | None = None,
     ):
         self.app = app
         self.max_content_length = max_content_length
