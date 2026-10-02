@@ -34,6 +34,10 @@ import type { MappingRoute } from "../routing/types.ts";
 import { ActionErrorBanner, EmptyState } from "./common/index.ts";
 import { FieldMappingFilters, FieldMappingStats } from "./fieldMapping/FieldMappingControls.tsx";
 import {
+  FieldMappingWideTable,
+  type HeaderMeasurement,
+} from "./fieldMapping/FieldMappingWideTable.tsx";
+import {
   DEFAULT_FILTERS,
   DIMENSION_TABS,
   LOAD_MODE_META,
@@ -65,11 +69,74 @@ interface MappingColumn {
   label: string;
   align?: "right" | undefined;
   sortable?: boolean | undefined;
+  width?: number | undefined;
 }
 
 interface DimensionTab {
   key: MappingTab;
   label: string;
+}
+
+interface MappingTableHeaderProps {
+  tab: MappingTab;
+  sourceColumns: readonly MappingColumn[];
+  targetColumns: readonly MappingColumn[];
+  orderedTableColumns: readonly MappingColumn[];
+  sort: FieldMappingSort;
+  onSort: (key: string) => void;
+}
+
+function MappingTableHeader({
+  tab,
+  sourceColumns,
+  targetColumns,
+  orderedTableColumns,
+  sort,
+  onSort,
+}: MappingTableHeaderProps) {
+  return (
+    <thead>
+      {tab === "field" ? (
+        <tr className="fm-group-head">
+          <th colSpan={sourceColumns.length} className="fm-group-source">源系统侧 / SOURCE</th>
+          <th rowSpan={2} className="fm-arrow-col" aria-label="映射方向"></th>
+          <th colSpan={targetColumns.length} className="fm-group-target">数据仓库 DWF 侧 / TARGET</th>
+        </tr>
+      ) : null}
+      <tr>
+        {tab === "field" ? (
+          <>
+            {sourceColumns.map((column) => (
+              <th key={column.key} onClick={() => onSort(column.key)}>
+                <span>{column.label}{sortMarker(sort, column.key)}</span>
+              </th>
+            ))}
+            {targetColumns.map((column) => (
+              <th key={column.key} onClick={() => onSort(column.key)}>
+                <span>{column.label}{sortMarker(sort, column.key)}</span>
+              </th>
+            ))}
+          </>
+        ) : orderedTableColumns.map((column) => (
+          <th
+            key={column.key}
+            className={column.align === "right" ? "is-right" : ""}
+            onClick={column.sortable === false ? undefined : () => onSort(column.key)}
+          >
+            <span>{column.label}{column.sortable === false ? "" : sortMarker(sort, column.key)}</span>
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
+}
+
+function MappingCellText({ value, className = "" }: { value: string; className?: string }) {
+  return (
+    <span className={`fm-cell-ellipsis ${className}`.trim()} title={value}>
+      {value}
+    </span>
+  );
 }
 
 const dimensionTabs = DIMENSION_TABS as readonly DimensionTab[];
@@ -270,30 +337,35 @@ export function FieldMappingPage({
   const tablePageRows = tab === "table" ? sortedTableRows : [];
 
   const sourceColumns: MappingColumn[] = [
-    { key: "srcSystem", label: "源系统" },
-    { key: "srcTable", label: "源系统表" },
-    { key: "srcField", label: "源字段" },
-    { key: "srcType", label: "字段类型" },
-    { key: "srcComment", label: "字段注释" },
+    { key: "srcSystem", label: "源系统", width: 260 },
+    { key: "srcTable", label: "源系统表", width: 240 },
+    { key: "srcField", label: "源字段", width: 180 },
+    { key: "srcType", label: "字段类型", width: 120 },
+    { key: "srcComment", label: "字段注释", width: 280 },
   ];
   const targetColumns: MappingColumn[] = [
-    { key: "targetLayer", label: "目标层" },
-    { key: "targetTable", label: "目标表名" },
-    { key: "loadMode", label: "入仓方式" },
-    { key: "targetField", label: "目标字段" },
-    { key: "mappingRule", label: "映射规则" },
+    { key: "targetLayer", label: "目标层", width: 90 },
+    { key: "targetTable", label: "目标表名", width: 280 },
+    { key: "loadMode", label: "入仓方式", width: 110 },
+    { key: "targetField", label: "目标字段", width: 180 },
+    { key: "mappingRule", label: "映射规则", width: 180 },
   ];
   const fieldColumns = [...sourceColumns, ...targetColumns];
+  const fieldLayoutColumns: MappingColumn[] = [
+    ...sourceColumns,
+    { key: "__arrow", label: "", sortable: false, width: 48 },
+    ...targetColumns,
+  ];
   const tableColumns: MappingColumn[] = [
-    { key: "srcSystem", label: "源系统" },
-    { key: "srcTable", label: "源系统表" },
-    { key: "srcTableCn", label: "表中文名" },
-    { key: "targetLayer", label: "目标层" },
-    { key: "targetTable", label: "目标表名" },
-    { key: "mappedCount", label: "已映射", align: "right" },
-    { key: "loadMode", label: "入仓方式" },
-    { key: "emptyCommentRate", label: "空注释率", align: "right" },
-    { key: "__actions", label: "操作", align: "right", sortable: false },
+    { key: "srcSystem", label: "源系统", width: 260 },
+    { key: "srcTable", label: "源系统表", width: 240 },
+    { key: "srcTableCn", label: "表中文名", width: 220 },
+    { key: "targetLayer", label: "目标层", width: 90 },
+    { key: "targetTable", label: "目标表名", width: 280 },
+    { key: "mappedCount", label: "已映射", align: "right", width: 100 },
+    { key: "loadMode", label: "入仓方式", width: 110 },
+    { key: "emptyCommentRate", label: "空注释率", align: "right", width: 140 },
+    { key: "__actions", label: "操作", align: "right", sortable: false, width: 150 },
   ];
   const orderedTableColumns = [
     "srcSystem",
@@ -362,11 +434,17 @@ export function FieldMappingPage({
 
   const renderTableCell = (row: FieldMappingTableSummary, column: MappingColumn) => {
     if (column.key === "srcSystem") {
-      return <span className="fm-system"><span className="fm-dot"></span>{formatSystemLabel(row)}</span>;
+      const systemLabel = formatSystemLabel(row);
+      return (
+        <span className="fm-system" title={systemLabel}>
+          <span className="fm-dot" aria-hidden="true"></span>
+          <span className="fm-cell-ellipsis">{systemLabel}</span>
+        </span>
+      );
     }
-    if (column.key === "srcTable") return row.srcTable;
-    if (column.key === "srcTableCn") return row.srcTableCn;
-    if (column.key === "targetTable") return row.targetTable;
+    if (column.key === "srcTable") return <MappingCellText value={row.srcTable} className="mono" />;
+    if (column.key === "srcTableCn") return <MappingCellText value={row.srcTableCn} />;
+    if (column.key === "targetTable") return <MappingCellText value={row.targetTable} className="mono" />;
     if (column.key === "loadMode") {
       const loadMode = LOAD_MODE_META[row.loadMode];
       return loadMode ? (
@@ -404,6 +482,37 @@ export function FieldMappingPage({
       return typeof loadMode === "string" ? LOAD_MODE_META[loadMode]?.label ?? "" : "";
     }
     return readMappingValue(row, column.key) ?? "";
+  };
+
+  const tableViewWidth = orderedTableColumns.reduce(
+    (width, column) => width + (column.width ?? 160),
+    0,
+  );
+  const fieldViewWidth = fieldLayoutColumns.reduce(
+    (width, column) => width + (column.width ?? 160),
+    0,
+  );
+  const tableClassName = tab === "table" ? "is-table-view" : "is-field-view";
+  const renderStickyHeader = ({ contentWidth, columnWidths }: HeaderMeasurement) => {
+    const measuredWidth = Math.max(contentWidth, columnWidths.reduce((width, value) => width + value, 0));
+    return (
+      <table
+        className={`fm-table ${tableClassName}`}
+        style={{ width: measuredWidth, tableLayout: "fixed" }}
+      >
+        <colgroup>
+          {columnWidths.map((width, index) => <col key={index} style={{ width, minWidth: width }} />)}
+        </colgroup>
+        <MappingTableHeader
+          tab={tab}
+          sourceColumns={sourceColumns}
+          targetColumns={targetColumns}
+          orderedTableColumns={orderedTableColumns}
+          sort={sort}
+          onSort={toggleSort}
+        />
+      </table>
+    );
   };
 
   const exportCurrentTab = async () => {
@@ -536,49 +645,44 @@ export function FieldMappingPage({
           <EmptyState title="暂无匹配记录" desc="可以调整查询条件，或者清空顶部搜索关键字后重试。" />
         ) : (
           <>
-            <div className="fm-table-wrap">
-              <table className="fm-table">
-                <thead>
-                  {tab === "field" ? (
-                    <tr className="fm-group-head">
-                      <th colSpan={sourceColumns.length} className="fm-group-source">源系统侧 / SOURCE</th>
-                      <th rowSpan={2} className="fm-arrow-col" aria-label="映射方向"></th>
-                      <th colSpan={targetColumns.length} className="fm-group-target">数据仓库 DWF 侧 / TARGET</th>
-                    </tr>
-                  ) : null}
-                  <tr>
-                    {tab === "field" ? (
-                      <>
-                        {sourceColumns.map((column) => (
-                          <th key={column.key} onClick={() => toggleSort(column.key)}>
-                            <span>{column.label}{sortMarker(sort, column.key)}</span>
-                          </th>
-                        ))}
-                        {targetColumns.map((column) => (
-                          <th key={column.key} onClick={() => toggleSort(column.key)}>
-                            <span>{column.label}{sortMarker(sort, column.key)}</span>
-                          </th>
-                        ))}
-                      </>
-                    ) : orderedTableColumns.map((column) => (
-                      <th
-                        key={column.key}
-                        className={column.align === "right" ? "is-right" : ""}
-                        onClick={column.sortable === false ? undefined : () => toggleSort(column.key)}
-                      >
-                        <span>{column.label}{column.sortable === false ? "" : sortMarker(sort, column.key)}</span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
+            <FieldMappingWideTable renderStickyHeader={renderStickyHeader}>
+              <table
+                id="field-mapping-results-table"
+                className={`fm-table ${tableClassName}`}
+                data-source-column-count={sourceColumns.length}
+                style={{
+                  width: tab === "table" ? tableViewWidth : fieldViewWidth,
+                  tableLayout: "fixed",
+                }}
+              >
+                <colgroup>
+                  {(tab === "table" ? orderedTableColumns : fieldLayoutColumns).map((column) => (
+                    <col key={column.key} style={{ width: column.width, minWidth: column.width }} />
+                  ))}
+                </colgroup>
+                <MappingTableHeader
+                  tab={tab}
+                  sourceColumns={sourceColumns}
+                  targetColumns={targetColumns}
+                  orderedTableColumns={orderedTableColumns}
+                  sort={sort}
+                  onSort={toggleSort}
+                />
                 <tbody>
                   {tab === "field" ? fieldPageRows.map((row) => (
                     <tr key={`${row.tablePk ?? fieldMappingTableIdentityKey(row)}-${row.srcField}-${row.targetField || ""}`}>
-                      <td><span className="fm-system"><span className="fm-dot"></span>{formatSystemLabel(row)}</span></td>
-                      <td className="mono">{row.srcTable}</td>
-                      <td className="mono">{row.srcField}</td>
-                      <td className="fm-muted mono">{row.srcType}</td>
-                      <td>{row.srcComment ? row.srcComment : <span className="fm-empty">未填写</span>}</td>
+                      <td>
+                        <span className="fm-system" title={formatSystemLabel(row)}>
+                          <span className="fm-dot" aria-hidden="true"></span>
+                          <span className="fm-cell-ellipsis">{formatSystemLabel(row)}</span>
+                        </span>
+                      </td>
+                      <td className="mono fm-cell-ellipsis-cell" title={row.srcTable}><MappingCellText value={String(row.srcTable || "")} className="mono" /></td>
+                      <td className="mono fm-cell-ellipsis-cell" title={row.srcField}><MappingCellText value={String(row.srcField || "")} className="mono" /></td>
+                      <td className="fm-muted mono fm-cell-ellipsis-cell" title={row.srcType}><MappingCellText value={String(row.srcType || "")} className="mono" /></td>
+                      <td className="fm-cell-ellipsis-cell" title={row.srcComment || "未填写"}>
+                        {row.srcComment ? <MappingCellText value={row.srcComment} /> : <span className="fm-empty">未填写</span>}
+                      </td>
                       <td className="fm-arrow-cell">
                         <span
                           className={isTransformRule(row.mappingRule || "") ? "fm-arrow is-transform" : "fm-arrow"}
@@ -587,9 +691,11 @@ export function FieldMappingPage({
                           →
                         </span>
                       </td>
-                      <td className="mono">{row.targetTable}</td>
-                      <td className="mono">{row.targetField || <span className="fm-empty">待补充</span>}</td>
-                      <td><span className={`tag ${RULE_TAGS[row.mappingRule || ""] || "tag-neutral"}`}>{row.mappingRule}</span></td>
+                      <td className="mono fm-cell-ellipsis-cell" title={row.targetTable}><MappingCellText value={String(row.targetTable || "")} className="mono" /></td>
+                      <td className="mono fm-cell-ellipsis-cell" title={row.targetField || "待补充"}>
+                        {row.targetField ? <MappingCellText value={row.targetField} className="mono" /> : <span className="fm-empty">待补充</span>}
+                      </td>
+                      <td><span className={`tag ${RULE_TAGS[row.mappingRule || ""] || "tag-neutral"}`} title={row.mappingRule}>{row.mappingRule}</span></td>
                     </tr>
                   )) : tablePageRows.map((row) => (
                     <tr key={row.tablePk ?? fieldMappingTableIdentityKey(row)}>
@@ -609,7 +715,7 @@ export function FieldMappingPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </FieldMappingWideTable>
 
             <div className="fm-pagination">
               <div>第 {totalRows ? ((currentPage - 1) * pageSize + 1) : 0}-{Math.min(currentPage * pageSize, totalRows)} 条 / 共 {totalRows} 条</div>

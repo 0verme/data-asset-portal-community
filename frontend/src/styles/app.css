@@ -657,6 +657,7 @@
   .side-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .main { flex: 1; min-width: 0; overflow-y: auto; }
+  .main.fm-has-wide-table-scrollbar { margin-bottom: 14px; }
   .main-inner { max-width: 1320px; margin: 0 auto; padding: 30px 36px 60px; }
 
   /* ===== Page header ===== */
@@ -2109,6 +2110,7 @@
   }
 
   .fm-table-wrap {
+    min-width: 0;
     overflow-x: auto;
   }
 
@@ -2116,6 +2118,72 @@
     width: 100%;
     min-width: 1180px;
     border-collapse: collapse;
+  }
+
+  .fm-table.is-table-view {
+    width: max-content;
+    min-width: 100%;
+    table-layout: fixed;
+  }
+
+  .fm-sticky-table-head {
+    position: fixed;
+    z-index: 30;
+    overflow: hidden;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .fm-sticky-table-head .fm-table {
+    margin: 0;
+  }
+
+  .fm-sticky-horizontal-scrollbar {
+    position: fixed;
+    z-index: 29;
+    height: 14px;
+    overflow: hidden;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .fm-scrollbar-track {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    left: 8px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--line);
+    transform: translateY(-50%);
+  }
+
+  .fm-scrollbar-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    border: 1px solid var(--surface-2);
+    border-radius: 999px;
+    background: var(--ink-3);
+    cursor: grab;
+  }
+
+  .fm-scrollbar-thumb:hover {
+    background: var(--ink-2);
+  }
+
+  .fm-sticky-horizontal-scrollbar:active .fm-scrollbar-thumb {
+    cursor: grabbing;
+  }
+
+  .fm-sticky-horizontal-scrollbar:focus-visible {
+    outline: 2px solid var(--accent-line);
+    outline-offset: 2px;
   }
 
   /* 字段维度：源/目标分区对照表头 */
@@ -2218,11 +2286,59 @@
     white-space: nowrap;
   }
 
+  .fm-table tbody td.fm-cell-ellipsis-cell {
+    max-width: 0;
+    overflow: hidden;
+  }
+
+  .fm-cell-ellipsis {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .fm-system {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
+    max-width: 100%;
     font-weight: 600;
+  }
+
+  .fm-system .fm-cell-ellipsis {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .fm-table tbody td:nth-child(-n+2) {
+    position: sticky;
+    z-index: 2;
+    background: var(--surface);
+  }
+
+  .fm-table tbody td:first-child,
+  .fm-table thead tr:last-child th:first-child {
+    left: 0;
+  }
+
+  .fm-table tbody td:nth-child(2),
+  .fm-table thead tr:last-child th:nth-child(2) {
+    left: var(--fm-sticky-first-column-width, 260px);
+    box-shadow: 5px 0 8px -7px rgba(15, 23, 42, 0.45);
+    border-right: 1px solid var(--line-strong);
+  }
+
+  .fm-table thead tr:last-child th:nth-child(-n+2) {
+    position: sticky;
+    z-index: 7;
+    background: var(--surface-2);
+  }
+
+  .fm-table tbody tr:hover > td {
+    background: var(--surface-2);
   }
 
   .fm-dot {
@@ -2678,6 +2794,18 @@
     .fm-table-wrap {
       position: relative;
       border-right: 16px solid var(--surface-2);
+    }
+
+    .fm-sticky-table-head,
+    .fm-sticky-horizontal-scrollbar {
+      display: none;
+    }
+
+    .fm-table tbody td:nth-child(-n+2),
+    .fm-table thead tr:last-child th:nth-child(-n+2) {
+      position: static;
+      left: auto;
+      box-shadow: none;
     }
 
     .fm-table-wrap::after {
