@@ -207,7 +207,12 @@
     top: calc(100% + 8px);
     right: 0;
     z-index: 40;
+    display: flex;
+    flex-direction: column;
+    width: max-content;
     min-width: 156px;
+    max-width: min(280px, calc(100vw - 32px));
+    white-space: normal;
     padding: 6px;
     background: var(--surface);
     border: 1px solid var(--line-strong);
@@ -223,6 +228,7 @@
     border-radius: var(--radius-sm);
     color: var(--ink-2);
     font-size: 13px;
+    white-space: nowrap;
   }
   .more-nav-menu button:hover,
   .more-nav-menu button.active { background: var(--surface-2); color: var(--ink); }
