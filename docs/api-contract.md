@@ -9,7 +9,7 @@ FastAPI Native adapter 复用 `backend/app/contracts/` 的框架中立 Contract�
 
 | 模块 | 前端 API | Base Path | Community 当前状态 | 说明 |
 | --- | --- | --- | --- | --- |
-| 门户 / Repository Module Contract / 搜索 | `api/portal.ts`、`api/search.ts` | `/api/portal`、`/api/capabilities`、`/api/search` | 已注册 | 门户统计、兼容的仓库模块 capability contract、统一搜索 |
+| 门户 / Repository Module Contract / 搜索 | `api/portal.ts`、`api/search.ts`、`api/hotKeywords.ts` | `/api/portal`、`/api/capabilities`、`/api/search`、`/api/search/hot-keywords` | 已注册 | 门户统计、兼容的仓库模块 capability contract、统一搜索 |
 | 认证 | `api/auth.ts` | `/api/auth` | 已注册 | 登录、登出、获取当前用户 |
 | 上游卸数 | `api/upstream.ts` | `/api/upstreams` | 已注册 | 管理上游源系统与卸数状态 |
 | 数据仓库 | `api/assets.ts` | `/api/assets` | 已注册 | 管理已配置层级的表资产、字段、DDL |
@@ -330,6 +330,13 @@ curl --get "http://127.0.0.1:15099/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D
 Base Path: `/api/search`
 
 当前统一搜索属于 Public Catalog read，匿名请求返回 `200`；已登录用户不需要额外的搜索 `*:read` 权限。搜索结果只返回目录展示字段，不返回连接凭据或管理审计数据。
+
+### 热门搜索词配置
+
+- `GET /api/search/hot-keywords` 是只读 Public Catalog 接口，返回 `{ "items": [...] }`；每项仅包含 `id`、`keyword`、`category`、`sortOrder`。
+- 数据由 `p_search_hot_keyword` 管理，服务仅返回 `enabled = 'Y'` 的非空词，并按 `sort_order, id` 稳定排序。`all`（以及未识别的自定义分类）作为全局词；已知分类可按资产、系统、字段、词根、指标、报表、API、血缘和码值表模块过滤。
+- 新库/升级的最小中性种子为“资产、系统、字段”，采用只补缺失项的策略，不覆盖已有分类、排序或启停状态。它们是推荐配置，不代表搜索热度或用户行为统计。
+- 空列表原样返回；前端仅在列表非空时显示“热门”。请求失败或列表为空时整段隐藏，不用本地 demo 词回退，也不影响常规搜索。
 
 ### 接口与查询参数
 

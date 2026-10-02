@@ -23,6 +23,7 @@ from ..services.push_service import push_service
 from ..services.report_service import report_service
 from ..services.root_service import root_service
 from ..services.search_provider import search_provider
+from ..services.search_hot_keyword_service import search_hot_keyword_service
 from ..services.system_management_service import system_management_service
 from ..services.upstream_service import upstream_service
 from ..security.login_protection import LoginAttemptLimiter
@@ -58,6 +59,7 @@ def create_fastapi_app(
     auth_service_instance: Any | None = None,
     portal_service_instance: Any | None = None,
     search_provider_instance: Any | None = None,
+    search_hot_keyword_service_instance: Any | None = None,
     indicator_service_instance: Any | None = None,
     assets_service_instance: Any | None = None,
     field_mapping_service_instance: Any | None = None,
@@ -118,6 +120,7 @@ def create_fastapi_app(
     app.state.login_protection = login_protection
     portal_stats = portal_service_instance or portal_service
     search = search_provider_instance or search_provider
+    hot_keywords = search_hot_keyword_service_instance or search_hot_keyword_service
     indicator = indicator_service_instance or indicator_service
     assets = assets_service_instance or assets_service
     field_mapping = field_mapping_service_instance or field_mapping_service
@@ -145,6 +148,7 @@ def create_fastapi_app(
         effective_capabilities,
         portal_stats,
         search,
+        hot_keywords,
     )
     # Every router shipped in this repository is part of the default runtime.
     # External dependencies report their own diagnostic errors at request time;

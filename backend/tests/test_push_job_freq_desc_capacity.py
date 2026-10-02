@@ -109,8 +109,8 @@ class PushJobFreqDescContractTests(unittest.TestCase):
             self.assertRegex(sql, re.compile(r"freq_desc\s+VARCHAR\(1000\)", re.I))
             self.assertRegex(sql, re.compile(r"row_count_desc\s+VARCHAR\(200\)", re.I))
 
-    def test_revision_chain_ends_with_capacity_revision(self):
-        self.assertEqual(CAPACITY_REVISION, repository_alembic_head())
+    def test_capacity_revision_precedes_search_hot_keyword_head(self):
+        self.assertEqual("0012_search_hot_keywords", repository_alembic_head())
         script = ScriptDirectory.from_config(Config(str(REPO_ROOT / "backend" / "alembic.ini")))
         revision = script.get_revision(CAPACITY_REVISION)
         self.assertIsNotNone(revision)

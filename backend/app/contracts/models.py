@@ -43,6 +43,21 @@ class ItemsResponse(ContractModel, Generic[T]):
     total: int | None = None
 
 
+class SearchHotKeyword(ContractModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    id: int
+    keyword: str
+    category: str
+    sortOrder: int
+
+
+class SearchHotKeywordsResponse(ContractModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    items: list[SearchHotKeyword]
+
+
 class DataEnvelope(ContractModel, Generic[T]):
     data: T
 

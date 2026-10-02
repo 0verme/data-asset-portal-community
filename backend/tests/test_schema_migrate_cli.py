@@ -501,7 +501,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("verify=ok", proc.stdout)
         self.assertIn("0001_baseline", proc.stdout)
-        self.assertIn("tables=39", proc.stdout)
+        self.assertIn("tables=40", proc.stdout)
 
     def test_offline_verify_includes_mysql_baseline(self):
         proc = _run_cli(["verify", "--offline", "--dialect", "mysql"])

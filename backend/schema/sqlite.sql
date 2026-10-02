@@ -142,6 +142,15 @@ CREATE TABLE IF NOT EXISTS dwp.p_admin_user (
   last_login_at TIMESTAMP, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS dwp.p_search_hot_keyword (
+  id INTEGER PRIMARY KEY, keyword TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'all', sort_order INTEGER NOT NULL DEFAULT 0,
+  enabled TEXT NOT NULL DEFAULT 'Y',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT ck_p_search_hot_keyword_keyword_nonempty CHECK (keyword <> ''),
+  CONSTRAINT uq_p_search_hot_keyword_category UNIQUE (keyword, category)
+);
 CREATE TABLE IF NOT EXISTS dwp.p_asset_domain (
   domain_code TEXT PRIMARY KEY, domain_name TEXT NOT NULL, display_order INTEGER NOT NULL DEFAULT 0,
   is_active TEXT NOT NULL DEFAULT 'Y', is_deleted TEXT NOT NULL DEFAULT 'N'

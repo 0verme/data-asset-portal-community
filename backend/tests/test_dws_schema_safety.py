@@ -415,7 +415,7 @@ class DwsSchemaSafetyTests(unittest.TestCase):
         self.assertEqual(1, connection.commits)
 
     def test_four_dialect_baseline_table_parity_remains_intact(self):
-        self.assertEqual(39, len(verify_baselines()))
+        self.assertEqual(40, len(verify_baselines()))
 
 
 if __name__ == "__main__":
