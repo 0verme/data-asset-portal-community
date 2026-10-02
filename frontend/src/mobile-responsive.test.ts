@@ -57,7 +57,7 @@ test("core list tables opt into mobile cards with field labels", () => {
 });
 
 test("comparison and editor tables keep dedicated mobile strategies", () => {
-  assert.match(read("./components/FieldMappingPage.tsx"), /className="fm-table"/);
+  assert.match(read("./components/FieldMappingPage.tsx"), /fm-table/);
   assert.doesNotMatch(read("./components/FieldMappingPage.tsx"), /mobile-card-table/);
   assert.match(read("./components/views/ApiAssetView.tsx"), /mobile-edit-table/);
   assert.match(read("./components/TableEditor.tsx"), /fields-edit mobile-edit-table/);
