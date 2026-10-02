@@ -53,3 +53,23 @@ test("middle-width header compacts search and navigation before the mobile break
   assert.match(app, /value=\{query\}/);
   assert.match(app, /className="clear" onClick=\{\(\) => setQuery\(""\)\}/);
 });
+
+test("more-navigation dropdown owns a bounded, single-column layout contract", () => {
+  const moreNav = appStyles.match(/\.more-nav\s*\{([^}]*)\}/)?.[1] || "";
+  const menu = appStyles.match(/\.more-nav-menu\s*\{([^}]*)\}/)?.[1] || "";
+  const menuButton = appStyles.match(/\.more-nav-menu button\s*\{([^}]*)\}/)?.[1] || "";
+
+  assert.match(moreNav, /position:\s*relative/);
+  assert.match(menu, /position:\s*absolute/);
+  assert.match(menu, /top:\s*calc\(100% \+ 8px\)/);
+  assert.match(menu, /right:\s*0/);
+  assert.match(menu, /display:\s*flex/);
+  assert.match(menu, /flex-direction:\s*column/);
+  assert.match(menu, /width:\s*max-content/);
+  assert.match(menu, /min-width:\s*156px/);
+  assert.match(menu, /max-width:\s*min\(280px,\s*calc\(100vw - 32px\)\)/);
+  assert.match(menu, /white-space:\s*normal/);
+  assert.match(menuButton, /width:\s*100%/);
+  assert.match(menuButton, /justify-content:\s*flex-start/);
+  assert.match(menuButton, /white-space:\s*nowrap/);
+});
