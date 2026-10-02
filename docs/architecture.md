@@ -3,6 +3,35 @@
 面向维护者与贡献者的技术实现说明。产品定位与能力边界见 [README](../README.md)，
 数据库验证等级见 [数据库支持矩阵](./database-support.md)。
 
+## 高层系统架构
+
+![数据资产门户高层架构及请求路径](./images/system-architecture.svg)
+
+[Archify 交互完整版](./diagrams/architecture.html) · [可编辑图源](./diagrams/architecture.json) · [维护与校验说明](./diagrams/README.md)
+
+GitHub 不直接运行仓库中的 HTML；下载交互完整版后用浏览器打开，可查看卡片、组件源码证据、搜索、缩放及导出。
+图描述仓库支持的生产 `remote` 拓扑，不代表本机已经部署了图中的进程。
+
+### 主请求路径
+
+`GET /api/assets/tables?summary=1` 从 Web 门户经 Nginx 进入 FastAPI，调用
+`AssetsService.get_asset_table_page`，通过 `CoreAccess`、SQLAlchemy Core 与 Provider 查询元数据。
+路由校验响应契约后返回 JSON；图中省略反向响应线。
+
+### 边界与支持性依赖
+
+| 组件 / 边界 | 职责与约束 |
+| --- | --- |
+| 浏览器、小程序与外部 Collector | 输入不可信；小程序为只读客户端，Collector 属于外部采集团队。 |
+| Nginx / 后端进程 | Nginx 托管静态产物并反代 `/api`；生产后端监听 loopback `127.0.0.1:15099`。Vite 属于构建/开发阶段。 |
+| 会话与 RBAC | 签名 Cookie 解析、数据库角色权限校验位于应用内；写入、管理与敏感读取按接口授权。匿名目录由 `PUBLIC_CATALOG_PROFILE` 的 `internal` / `strict` / `disabled` 策略控制；批量导出另有开关与权限限制。 |
+| 目录业务服务 | 聚合资产、指标、映射、词根、码值、上下游、报表、API 台账、门户统计与搜索；这些是同进程逻辑模块。 |
+| 元数据接入服务 | 接入要求登录及 `metadata:write`；负责校验、归一化、持久化、审计与快照发布，支持 `dryRun`。采集连接、解析、调度和重试由外部 Collector 负责。 |
+| 数据库访问与存储 | SQLAlchemy Core / Provider 隔离方言差异；各数据库为部署选项，不要求同时部署。权限、日志与接入服务也复用存储能力，图中不重复画线。 |
+| 血缘与外部系统 | 血缘展示已导入快照；`LINEAGE_DB_PROFILE` 选择持久化配置。被登记的上下游、报表与 API 系统不等于门户实际调用或执行的服务。 |
+
+组件卡片和源码证据位于交互版。README 的紧凑 SVG 是同一拓扑的静态排版，保留 10 个组件和一条主路径。
+
 ## 运行时
 
 当前后端是纯 FastAPI ASGI 运行时：
