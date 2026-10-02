@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Preflight the exact metadata SQL used by DWS schema verification."""
+"""Preflight DWS metadata SQL and semantic SchemaModel reflection."""
 
 from __future__ import annotations
 
@@ -20,14 +20,16 @@ from app.migrations.schema import (
     ReflectionQuery,
     _execute_reflection_query,
     _reflection_metadata_queries,
+    baseline_schema,
+    reflect_schema,
 )
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Execute the read-only catalog queries used by DWS schema verify "
-            "without changing the schema."
+            "Execute DWS schema verification catalog SQL and build a reflected "
+            "SchemaModel without changing the schema."
         )
     )
     parser.add_argument("--profile", required=True, help="Named GaussDB profile")
@@ -70,7 +72,7 @@ def run_preflight(
     output: TextIO | None = None,
     error_output: TextIO | None = None,
 ) -> int:
-    """Execute the formal DWS reflection queries and report all independent failures."""
+    """Run SQL and semantic reflection stages, reporting independent failures."""
     output = output or sys.stdout
     error_output = error_output or sys.stderr
     try:
@@ -108,6 +110,8 @@ def run_preflight(
     results: list[tuple[ReflectionQuery, str | None]] = []
     fatal_error: str | None = None
     rollback_error: str | None = None
+    semantic_status = "SKIPPED"
+    semantic_error: str | None = None
     try:
         for query in queries:
             try:
@@ -124,6 +128,19 @@ def run_preflight(
                     break
             else:
                 results.append((query, None))
+
+        if fatal_error is None and all(error is None for _, error in results):
+            try:
+                reflected = reflect_schema(connection, config, baseline_schema("dws"))
+                if not reflected.tables:
+                    raise RuntimeError(
+                        "GaussDB semantic reflection returned no application tables"
+                    )
+            except Exception as exc:
+                semantic_status = "FAIL"
+                semantic_error = redact_sensitive_text(exc, config)
+            else:
+                semantic_status = f"PASS (tables={len(reflected.tables)})"
     except Exception as exc:
         fatal_error = redact_sensitive_text(exc, config)
     finally:
@@ -147,17 +164,25 @@ def run_preflight(
 
     passed = sum(error is None for _, error in results)
     failed = sum(error is not None for _, error in results)
-    print("=== SUMMARY ===", file=output)
+    print("=== SQL SUMMARY ===", file=output)
     print(f"TOTAL : {len(queries)}", file=output)
     print(f"PASS  : {passed}", file=output)
     print(f"FAIL  : {failed}", file=output)
+    print("=== DWS SEMANTIC REFLECTION PREFLIGHT ===", file=output)
+    if semantic_status == "FAIL":
+        print("SchemaModel normalization  FAIL", file=output)
+        print("  ERROR: " + (semantic_error or "unknown reflection failure"), file=output)
+    elif semantic_status == "SKIPPED":
+        print("SchemaModel normalization  SKIPPED (metadata SQL did not fully pass)", file=output)
+    else:
+        print(f"SchemaModel normalization  {semantic_status}", file=output)
     if fatal_error is not None:
         print("DWS metadata preflight stopped: " + fatal_error, file=error_output)
     if rollback_error is not None:
         print("DWS metadata preflight final rollback failed: " + rollback_error, file=error_output)
     if fatal_error is not None or rollback_error is not None:
         return 2
-    return 0 if failed == 0 else 1
+    return 0 if failed == 0 and semantic_status.startswith("PASS") else 1
 
 
 def main(argv=None) -> int:
