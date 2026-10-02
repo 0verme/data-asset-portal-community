@@ -68,3 +68,23 @@ test("portal scope parsing is the shared whitelist parser", async () => {
   assert.match(source, /readPortalSearchParams/);
   assert.match(source, /useRef\(readPortalSearchParams\(validScopeKeys\)\)/);
 });
+
+test("recommendations load independently, hide when empty or failed, and reuse search clicks", async () => {
+  const source = await readFile(searchPagePath, "utf8");
+
+  assert.match(source, /getHotKeywords\(\)/);
+  assert.match(source, /\.catch\(\(\) => \{/);
+  assert.match(source, /setHotKeywords\(\[\]\)/);
+  assert.match(source, /hotTags\.length > 0 \?/);
+  assert.match(source, /onClick=\{\(\) => pickHot\(item\.keyword\)\}/);
+  assert.match(source, /runSearch\(term, scope\)/);
+  assert.doesNotMatch(source, /PORTAL_HOT_TAGS|订单|商品|会员|门店|库存|销售额/);
+});
+
+test("long recommendation chips wrap within their available width", async () => {
+  const styles = await readFile(searchStylesPath, "utf8");
+
+  assert.match(styles, /\.sp-hot-item[\s\S]*?max-width: 100%/);
+  assert.match(styles, /overflow-wrap: anywhere/);
+  assert.match(styles, /word-break: break-word/);
+});

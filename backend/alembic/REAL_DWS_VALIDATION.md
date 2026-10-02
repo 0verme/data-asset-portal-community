@@ -53,15 +53,15 @@ Record only profile names and results here; never add credentials, JDBC URLs, ho
 
 1. Use a restorable copy or a disposable schema created from a released legacy baseline. Do not use a production schema without an approved backup/recovery window.
 2. Capture `status` (likely `0001_baseline`) and the read-only DWS metadata preflight.
-3. Run `plan`; review every action. A nearly-head instance must show `adopt` for satisfied revisions, `apply` for `0002_portable_asset_filter`, and `apply` for `0009_upstream_option_contract` when the option rows are absent.
+3. Run `plan`; review every action. A nearly-head instance must show `adopt` for satisfied revisions, `apply` for `0002_portable_asset_filter`, and `apply` for `0009_upstream_option_contract` / `0012_search_hot_keywords` when their additive seed rows are absent.
 4. Capture representative business-row counts and stable primary keys for field mappings, indicators, assets/fields, manual code values, upstream systems and upstream options. Protect or anonymize data in retained evidence.
 5. Run `apply` once. Require each revision to be reflected in the ledger only after its post-condition is confirmed. On any error, stop; capture the failed revision/step and current ledger, and do not blindly rerun or repair the schema. A `CONFLICT` message lists the revision, observed state, why it is unsafe and the possible repairs.
 6. Run `status` and `verify`; require repository head and `verify=ok`.
-7. Recheck representative row counts, primary keys, backfilled `upstream_system_id`/`source_asset_id`/`result_field_id` values, new fields, indexes/constraints, RBAC and menus. Confirm business rows were preserved, `0009` did not duplicate or overwrite customized option rows, and no duplicate backfill rows appeared.
+7. Recheck representative row counts, primary keys, backfilled `upstream_system_id`/`source_asset_id`/`result_field_id` values, new fields, indexes/constraints, RBAC and menus. Confirm business rows were preserved, `0009` / `0012` did not duplicate or overwrite customized option/recommendation rows, and no duplicate backfill rows appeared.
 8. Confirm the physical metadata that the runner relies on:
-   * columns: `p_asset_table` identity columns, `p_lineage_snapshot` ingestion columns, `p_indicator_item` semantic columns, `p_push_job.freq_desc` at `VARCHAR(1000)` (revision `0011`);
+   * columns: `p_asset_table` identity columns, `p_lineage_snapshot` ingestion columns, `p_indicator_item` semantic columns, `p_push_job.freq_desc` at `VARCHAR(1000)` (revision `0011`), and `p_search_hot_keyword` with its category-scoped uniqueness (revision `0012`);
    * indexes: `idx_p_asset_table_filter`, `idx_p_indicator_semantic_ref`, `idx_p_field_mapping_table_identity`, and the absence of `idx_p_field_mapping_table_uk_01`;
-   * constraints: `UNIQUE(source_key, asset_type, external_id)` on `p_asset_table`, no `UNIQUE(table_name)`, and the `status_code IN ('enabled','disabled')` check on `p_manual_code_table`;
+   * constraints: `UNIQUE(source_key, asset_type, external_id)` on `p_asset_table`, no `UNIQUE(table_name)`, the `status_code IN ('enabled','disabled')` check on `p_manual_code_table`, and `UNIQUE(keyword, category)` on `p_search_hot_keyword`;
    * logical relationships: `p_field_mapping_table.upstream_system_id` references an existing `p_upstream_system.system_pk` (no physical FK on DWS);
    * ledger: exactly one row, equal to the repository head.
 9. Run `apply` a second time, then `status` and `verify`; require no revision changes and no duplicate data (Scenario 3).

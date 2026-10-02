@@ -39,6 +39,7 @@ from .revision_logic import (
     plan_indicator_reference_backfill,
     plan_upstream_backfill,
 )
+from .search_hot_keyword_seed import plan_search_hot_keyword_seed
 from .schema import (
     SCHEMA_ROOT,
     ColumnSpec,
@@ -46,6 +47,7 @@ from .schema import (
     SchemaModel,
     TableSpec,
     _render_schema_qualified_identifiers,
+    baseline_schema,
     baseline_table_statements,
 )
 
@@ -1248,6 +1250,115 @@ class PushJobFreqDescCapacity(DwsRevisionAdapter):
 
 
 # ---------------------------------------------------------------------------
+# 0012_search_hot_keywords
+# ---------------------------------------------------------------------------
+
+
+def _canonical_column_type(type_name: str) -> str:
+    normalized = " ".join(str(type_name or "").upper().split())
+    normalized = normalized.replace("CHARACTER VARYING", "VARCHAR")
+    normalized = normalized.replace("CHARACTER(", "CHAR(")
+    if normalized in {"INT", "INT4"}:
+        return "INTEGER"
+    if normalized == "TIMESTAMP WITHOUT TIME ZONE":
+        return "TIMESTAMP"
+    return normalized
+
+
+class SearchHotKeywords(DwsRevisionAdapter):
+    revision = "0012_search_hot_keywords"
+    table = "p_search_hot_keyword"
+
+    def _shape_conflicts(self, ctx: DwsRevisionContext) -> list[str]:
+        actual = ctx.table(self.table)
+        if actual is None:
+            return []
+        expected = baseline_schema("dws", ctx.root).tables.get(self.table)
+        if expected is None:
+            return ["canonical DWS baseline has no search-hot-keyword table"]
+        conflicts: list[str] = []
+        if actual.primary_key != expected.primary_key:
+            conflicts.append(
+                f"primary key expected={expected.primary_key!r} observed={actual.primary_key!r}"
+            )
+        if actual.unique_constraints != expected.unique_constraints:
+            conflicts.append(
+                "unique constraints differ from the canonical keyword/category contract"
+            )
+        if set(actual.columns) != set(expected.columns):
+            conflicts.append(
+                f"columns expected={sorted(expected.columns)!r} observed={sorted(actual.columns)!r}"
+            )
+            return conflicts
+        for name, expected_column in expected.columns.items():
+            actual_column = actual.columns[name]
+            if _canonical_column_type(actual_column.type_name) != _canonical_column_type(
+                expected_column.type_name
+            ):
+                conflicts.append(
+                    f"{name} type expected={expected_column.type_name!r} "
+                    f"observed={actual_column.type_name!r}"
+                )
+            if actual_column.nullable != expected_column.nullable:
+                conflicts.append(
+                    f"{name} nullable expected={expected_column.nullable!r} "
+                    f"observed={actual_column.nullable!r}"
+                )
+        return conflicts
+
+    def _existing_rows(self, ctx: DwsRevisionContext) -> list[dict[str, Any]]:
+        rows = ctx.fetchall(
+            f"SELECT id, keyword, category FROM {ctx.qualified(self.table)}"
+        )
+        return [
+            {"id": row[0], "keyword": row[1], "category": row[2]}
+            for row in rows
+        ]
+
+    def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
+        if not ctx.has_table(self.table):
+            return RevisionInspection(
+                self.revision,
+                RevisionState.NOT_APPLIED,
+                f"{self.table} is absent and must be created from the canonical DWS baseline",
+            )
+        conflicts = self._shape_conflicts(ctx)
+        if conflicts:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                f"{self.table} does not match the canonical recommendation schema",
+                details=tuple(conflicts),
+            )
+        missing = plan_search_hot_keyword_seed(self._existing_rows(ctx))
+        if missing:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.NOT_APPLIED,
+                "default search recommendations are missing",
+                details=(f"missing seed rows: {len(missing)}",),
+            )
+        return RevisionInspection(
+            self.revision,
+            RevisionState.APPLIED,
+            "search recommendation schema and default seed are present",
+        )
+
+    def apply(self, ctx: DwsRevisionContext) -> None:
+        if not ctx.has_table(self.table):
+            for statement in _baseline_statements(ctx, (self.table,)):
+                ctx.execute(statement)
+        for values in plan_search_hot_keyword_seed(self._existing_rows(ctx)):
+            columns = tuple(values)
+            placeholders = ", ".join("?" for _ in columns)
+            ctx.execute(
+                f"INSERT INTO {ctx.qualified(self.table)} "
+                f"({', '.join(columns)}) VALUES ({placeholders})",
+                tuple(values[column] for column in columns),
+            )
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -1262,6 +1373,7 @@ ADAPTERS: tuple[DwsRevisionAdapter, ...] = (
     UpstreamOptionContract(),
     FieldMappingIdentity(),
     PushJobFreqDescCapacity(),
+    SearchHotKeywords(),
 )
 
 _ADAPTERS_BY_REVISION: dict[str, DwsRevisionAdapter] = {

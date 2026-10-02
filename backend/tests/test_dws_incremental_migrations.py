@@ -183,7 +183,14 @@ class DwsFreshAndAdoptionTests(unittest.TestCase):
         actions = {result.revision: result.action for result in results}
         self.assertEqual(
             {
-                revision: ("apply" if revision == "0009_upstream_option_contract" else "adopt")
+                revision: (
+                    "apply"
+                    if revision in {
+                        "0009_upstream_option_contract",
+                        "0012_search_hot_keywords",
+                    }
+                    else "adopt"
+                )
                 for revision in REVISION_ORDER
             },
             actions,
@@ -206,15 +213,17 @@ class DwsFreshAndAdoptionTests(unittest.TestCase):
 
         actions = {result.revision: result.action for result in results}
         self.assertEqual("apply", actions["0002_portable_asset_filter"])
-        self.assertEqual(
-            "apply", actions["0009_upstream_option_contract"]
-        )
-        for revision in satisfied - {"0009_upstream_option_contract"}:
+        self.assertEqual("apply", actions["0009_upstream_option_contract"])
+        self.assertEqual("apply", actions["0012_search_hot_keywords"])
+        for revision in satisfied - {
+            "0009_upstream_option_contract",
+            "0012_search_hot_keywords",
+        }:
             self.assertEqual("adopt", actions[revision], revision)
         self.assertEqual(repository_head(), database.ledger)
 
-        # No structural replay: only the missing index and the missing option
-        # seed were written.  The option seed is additive by contract.
+        # No structural replay: only the missing index and additive option /
+        # recommendation seeds were written; configured values are preserved.
         structural_ddl = [
             sql
             for sql, _ in database.executed
@@ -280,7 +289,8 @@ class DwsLegacyUpgradeTests(unittest.TestCase):
         actions = {result.revision: result.action for result in results}
         # Every revision is applied on a truly old instance except 0011: the
         # canonical 0003 adapter creates p_push_job with the current (already
-        # widened) column, so 0011 adopts it.
+        # widened) column, so 0011 adopts it. Revision 0012 creates the new
+        # table from the canonical DWS baseline and applies only its defaults.
         self.assertEqual(
             {"adopt"},
             {actions["0011_push_job_freq_desc_capacity"]},
@@ -465,6 +475,63 @@ class DwsPushJobCapacityTests(unittest.TestCase):
         )
         self.assertIs(RevisionState.CONFLICT, inspection.state)
         self.assertIn("unsupported type", inspection.summary)
+
+
+class DwsSearchHotKeywordMigrationTests(unittest.TestCase):
+    def test_0012_seeds_only_missing_values_and_preserves_customized_rows(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.table("p_search_hot_keyword").add_row(
+            {
+                "id": 91,
+                "keyword": "资产",
+                "category": "all",
+                "sort_order": 5,
+                "enabled": "N",
+            }
+        )
+
+        results = apply_revisions(
+            database, CONFIG, "0011_push_job_freq_desc_capacity", repository_head()
+        )
+
+        self.assertEqual("apply", results[0].action)
+        rows = database.table("p_search_hot_keyword").rows
+        self.assertEqual(3, len(rows))
+        self.assertEqual("N", rows[0]["enabled"])
+        self.assertEqual(91, rows[0]["id"])
+        self.assertEqual(["系统", "字段"], [row["keyword"] for row in rows[1:]])
+        self.assertEqual(repository_head(), database.ledger)
+
+    def test_0012_creates_a_missing_table_from_canonical_dws_ddl(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.remove_table("p_search_hot_keyword")
+
+        apply_revisions(
+            database, CONFIG, "0011_push_job_freq_desc_capacity", repository_head()
+        )
+
+        self.assertTrue(database.has_table("p_search_hot_keyword"))
+        self.assertEqual(
+            ["资产", "系统", "字段"],
+            [row["keyword"] for row in database.table("p_search_hot_keyword").rows],
+        )
+        self.assertTrue(
+            any(
+                sql.startswith("CREATE TABLE IF NOT EXISTS dap.p_search_hot_keyword")
+                for sql, _ in database.executed
+            )
+        )
+
+    def test_0012_rejects_a_partially_created_table(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.remove_column("p_search_hot_keyword", "category")
+
+        inspection = inspect_revision(
+            database, CONFIG, "0012_search_hot_keywords"
+        )
+
+        self.assertIs(RevisionState.CONFLICT, inspection.state)
+        self.assertIn("does not match", inspection.summary)
 
 
 class DwsFailClosedTests(unittest.TestCase):

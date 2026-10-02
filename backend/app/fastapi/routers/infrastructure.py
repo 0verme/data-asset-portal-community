@@ -19,6 +19,8 @@ from fastapi.responses import JSONResponse  # pyright: ignore[reportMissingImpor
 from ...application import RequestContext
 from ...core.capabilities import capabilities_public_payload
 from ...services.search_provider import SCOPE_ALL, SearchDataSourceError
+from ...services.search_hot_keyword_service import SearchHotKeywordDataSourceError
+from ...contracts.models import SearchHotKeywordsResponse
 from ..dependencies import (
     get_authorization_service,
     get_request_context,
@@ -36,6 +38,7 @@ def _register_infrastructure_routes(
     capabilities: dict[str, Any],
     portal_service: Any,
     search_provider: Any,
+    search_hot_keyword_service: Any,
 ) -> None:
     # ``/api/capabilities`` is a compatibility endpoint for the open
     # repository-module contract. It does not perform dependency readiness,
@@ -85,6 +88,18 @@ def _register_infrastructure_routes(
         tags=["search-native"],
         dependencies=[Depends(require_public_catalog_access)],
     )
+
+    @search_router.get("/hot-keywords", response_model=SearchHotKeywordsResponse)
+    def get_search_hot_keywords(
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
+    ):
+        try:
+            items = search_hot_keyword_service.get_hot_keywords()
+        except SearchHotKeywordDataSourceError as error:
+            return _service_error_response(error, 500)
+        profile = profile_for_request(context, authorization)
+        return project_public_catalog_value({"items": items}, profile=profile)
 
     @search_router.get("", response_model=None)
     def unified_search(

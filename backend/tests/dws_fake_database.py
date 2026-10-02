@@ -33,6 +33,7 @@ REVISION_ORDER = (
     "0009_upstream_option_contract",
     "0010_field_mapping_identity",
     "0011_push_job_freq_desc_capacity",
+    "0012_search_hot_keywords",
 )
 
 OPEN_MODULE_TABLES = (
@@ -784,7 +785,9 @@ def downgrade_to_prefix(database: FakeDwsDatabase, satisfied: Iterable[str]) -> 
 def _reverse_revision(
     database: FakeDwsDatabase, revision: str, satisfied: set[str]
 ) -> None:
-    if revision == "0002_portable_asset_filter":
+    if revision == "0012_search_hot_keywords":
+        database.remove_table("p_search_hot_keyword")
+    elif revision == "0002_portable_asset_filter":
         database.remove_index("p_asset_table", "idx_p_asset_table_filter")
     elif revision == "0003_open_repository_modules":
         for table in OPEN_MODULE_TABLES:

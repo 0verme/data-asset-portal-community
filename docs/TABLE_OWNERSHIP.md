@@ -4,7 +4,7 @@
 
 ## Canonical baseline
 
-`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0011_push_job_freq_desc_capacity` 共同覆盖以下 39 张 canonical tables：
+`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0012_search_hot_keywords` 共同覆盖以下 40 张 canonical tables：
 
 | Owner | Tables |
 | --- | --- |
@@ -21,6 +21,7 @@
 | report | `p_report_asset` |
 | codeTable | `p_manual_code_table` |
 | lineage | `p_lineage_snapshot`, `p_lineage_node`, `p_lineage_edge` |
+| search | `p_search_hot_keyword` |
 
 四方言保持相同的 table/column/primary-key/unique/logical relationship/index contract；SQLite、PostgreSQL、MySQL 保持相同的 physical FK inventory，DWS 因目标版本不支持 FOREIGN KEY constraint 而仅保留 logical relationship。类型使用各数据库的等价表示。`p_asset_table` 的 source-scoped identity columns 与 `uq_p_asset_ingestion_identity` unique constraint 由 #114 contract mapping 使用，不能作为外部 Collector 的 wire shape。`p_push_system.master_system_id` 关联 shared `p_system`，用于复用现有 Push Service 的 master-system contract。
 
@@ -64,7 +65,7 @@
 
 `docs/pg/` 和 `docs/dws/` 保留为方言说明、历史迁移参考和部署 catalog。PostgreSQL supplementary DDL 保留 physical FK；DWS supplementary DDL 不创建 physical FK，并依赖 logical relationship contract 与 application-level delete behavior。它们不能再被解释为某个仓库模块的产品锁或 baseline 排除清单。
 
-`p_field_mapping_change_log` 的旧 DDL 目前没有对应 runtime service/SQLAlchemy declaration，也不在 canonical 39-table inventory；它作为 docs-only historical/reference artifact 保留，待实际 runtime 使用时再按正常 migration 流程纳入，不得作为当前 module availability 判据。
+`p_field_mapping_change_log` 的旧 DDL 目前没有对应 runtime service/SQLAlchemy declaration，也不在 canonical 40-table inventory；它作为 docs-only historical/reference artifact 保留，待实际 runtime 使用时再按正常 migration 流程纳入，不得作为当前 module availability 判据。
 
 ## Instance state versus module availability
 

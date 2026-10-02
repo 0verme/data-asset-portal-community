@@ -67,7 +67,7 @@ selected backend/schema/<dialect>.sql
 
 `metadata = MetaData(schema="__app__")` 和 `tables.py` 是 runtime query metadata，不是完整 physical schema。静态审计结果：
 
-- baseline 与 runtime metadata 当前均声明 39 张表、478 个列；metadata 仍是面向运行时查询的 SQLAlchemy Core 声明，不是 DDL generator；
+- baseline 与 runtime metadata 当前均声明 40 张表、485 个列；metadata 仍是面向运行时查询的 SQLAlchemy Core 声明，不是 DDL generator；
 - runtime metadata 的列名与 baseline 的公共列名保持对齐，包括 Phase 1 的指标语义列；
 - metadata 没有完整表达 physical baseline 的显式 index、foreign-key、unique/check constraint；`p_lineage_node`/`p_lineage_edge` 的复合主键也没有完整表达；
 - `__app__` 是 provider translation 的逻辑 schema，不等于 SQLite attached database、PostgreSQL/DWS `dwp` 或 MySQL database。
@@ -101,10 +101,10 @@ selected backend/schema/<dialect>.sql
 在 PR #302 merge 后的 baseline 上，parser inventory 为：
 
 ```text
-39 tables
-478 columns
+40 tables
+485 columns
 22 explicit indexes
-24 unique constraints
+25 unique constraints
 SQLite / PostgreSQL / MySQL: 13 physical foreign-key constraints each
 DWS: 0 physical foreign-key constraints; 13 explicit logical relationships
 ```
@@ -116,7 +116,7 @@ DWS: 0 physical foreign-key constraints; 13 explicit logical relationships
 - MySQL InnoDB/charset/collation 和报表长文本 `TEXT`；
 - MySQL `p_indicator_path_config.full_path` 为 `VARCHAR(512)`，PostgreSQL/DWS 为 `VARCHAR(1000)`；这属于需要继续显式审查的 dialect-specific difference，不能由 generator 默认抹平；
 - MySQL 报表 JSON-like columns 没有 `DEFAULT '[]'`，该差异由 MySQL row-size/default compatibility 修复保留；
-- 原静态盘点时 DWS baseline 有 11 个 `DISTRIBUTE BY` clauses；本次补全后当前为 39/39 张表显式声明（31 `REPLICATION`、8 `HASH`），由 `test_dws_distribution_contract.py` 强制覆盖。
+- 原静态盘点时 DWS baseline 有 11 个 `DISTRIBUTE BY` clauses；本次补全后当前为 40/40 张表显式声明（32 `REPLICATION`、8 `HASH`），由 `test_dws_distribution_contract.py` 强制覆盖。
 
 ### Git history
 
@@ -159,7 +159,7 @@ PostgreSQL 有 CI ephemeral migration/reflection/seed；MySQL 8 有独立 provid
 
 DWS provider 是 JDBC-only compatibility boundary，当前没有 SQLAlchemy engine 或 online Alembic。baseline 中的 `DISTRIBUTE BY`、identity、schema qualification 和 vendor syntax 必须保留。当前验证目标 GaussDB(DWS) 8.1.3 不支持 physical `FOREIGN KEY ... REFERENCES` constraint：DWS baseline / supplementary DDL 不创建 physical FK，测试层显式验证 13 条 logical relationship 的列、类型、parent candidate key 与 HASH distribution compatibility。关系上的 hard-delete 行为由 application service 显式实现或拒绝；DWS 直接 vendor execution evidence 不代表 PostgreSQL dialect 能完整生成 DWS。
 
-当前真实 fresh-baseline DDL compatibility 验证目标明确为 **GaussDB(DWS) 8.1.3**，不据此宣称所有 DWS 8.x 版本兼容。该 baseline 保持 39/39 张表显式 `DISTRIBUTE BY`；不使用 `CREATE INDEX IF NOT EXISTS`；`p_operation_log.id` 使用经 8.1.3 实测可用、支持自动生成与显式写入的 `BIGSERIAL PRIMARY KEY`，逻辑 schema model 规范化为 `BIGINT PRIMARY KEY`，并只对该 DWS generated column 规范化 reflection 中的 sequence default。真实 preflight runner 逐 statement 使用 savepoint，收集全部 DDL 错误并最终 rollback，不写 Alembic revision 或 seed 数据。
+当前真实 fresh-baseline DDL compatibility 验证目标明确为 **GaussDB(DWS) 8.1.3**，不据此宣称所有 DWS 8.x 版本兼容。该 baseline 保持 40/40 张表显式 `DISTRIBUTE BY`；不使用 `CREATE INDEX IF NOT EXISTS`；`p_operation_log.id` 使用经 8.1.3 实测可用、支持自动生成与显式写入的 `BIGSERIAL PRIMARY KEY`，逻辑 schema model 规范化为 `BIGINT PRIMARY KEY`，并只对该 DWS generated column 规范化 reflection 中的 sequence default。真实 preflight runner 逐 statement 使用 savepoint，收集全部 DDL 错误并最终 rollback，不写 Alembic revision 或 seed 数据。
 
 ### Alembic and existing databases
 
@@ -314,7 +314,7 @@ Re-open canonical-generation evaluation when one or more evidence thresholds is 
 
 - two independent releases contain a baseline omission or cross-dialect semantic drift incident;
 - a fifth supported dialect is added, or DWS/vendor extensions materially expand;
-- the metadata model covers all 39 current tables and the required defaults, constraints, indexes, composite keys and provider-specific extensions;
+- the metadata model covers all 40 current tables and the required defaults, constraints, indexes, composite keys and provider-specific extensions;
 - a deterministic renderer can execute cleanly offline and produce a clean diff for all four committed artifacts;
 - CI can execute the generated DWS artifact with an isolated vendor-compatible test environment, not only parse it;
 - manual baseline changes become a measured release bottleneck rather than an observed review cost.

@@ -28,13 +28,14 @@ p_admin_user.role  ── role_code ──> p_role
 that would reject an existing custom/unknown value before P2 can fail closed.
 
 The forward-only RBAC Alembic revision is
-`backend/alembic/versions/0005_rbac_persistence.py`; the current Alembic head also
-contains the additive field-mapping identity revision `0006_field_mapping_upstream_id.py`,
-the binary-status contract revision `0007_binary_status_contract.py`, and the
-indicator semantic contract revision `0008_indicator_semantic_contract.py`.
+`backend/alembic/versions/0005_rbac_persistence.py`; the forward chain subsequently added the field-mapping identity revision
+`0006_field_mapping_upstream_id.py`, the binary-status contract revision
+`0007_binary_status_contract.py`, and the indicator semantic contract revision
+`0008_indicator_semantic_contract.py`; later schema additions are documented in
+[the schema migration guide](../../backend/schema/README.md).
 Fresh baselines contain
 the same tables so `schema_migrate.py verify --offline` and fresh initialization
-see one identical 39-table contract. Existing SQLite/PostgreSQL/MySQL
+see one identical 40-table contract. Existing SQLite/PostgreSQL/MySQL
 installations at the previous RBAC head receive the tables through revision `0005`; field-mapping installations are then upgraded by revision `0006`.
 The GaussDB/DWS provider has no online Alembic path in the current repository;
 `seed_rbac` applies the same forward DDL when a pre-RBAC DWS database is

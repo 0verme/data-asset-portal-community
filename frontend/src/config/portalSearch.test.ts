@@ -3,7 +3,8 @@ import test from "node:test";
 
 import {
   DEFAULT_PORTAL_SCOPE,
-  filterPortalHotTagsByModules,
+  filterPortalHotKeywordsByModules,
+  isMonospaceHotKeyword,
   filterPortalScopesByModules,
   PORTAL_SCOPE_CONFIGS,
   readPortalSearchParams,
@@ -60,10 +61,18 @@ test("an unknown or hidden scope still falls back to all", () => {
   assert.equal(readPortalSearchParams(withoutDwm, "?scope=asset").scope, DEFAULT_PORTAL_SCOPE);
 });
 
-test("hot tags stay filtered by the visible modules", () => {
-  assert.ok(filterPortalHotTagsByModules(["dwm"]).some((item) => item.q === "订单"));
-  assert.equal(
-    filterPortalHotTagsByModules([]).some((item) => item.q === "DWS_TRADE_SALES_STAT_1D"),
-    false,
-  );
+test("API recommendations follow visible module categories and keep the first duplicate", () => {
+  const items = [
+    { id: 1, keyword: "资产", category: "all", sortOrder: 10 },
+    { id: 2, keyword: "DWS_TRADE_SALES_STAT_1D", category: "asset", sortOrder: 20 },
+    { id: 3, keyword: "资产", category: "field", sortOrder: 30 },
+  ];
+  assert.deepEqual(filterPortalHotKeywordsByModules(items, ["dwm"]), items.slice(0, 2));
+  assert.deepEqual(filterPortalHotKeywordsByModules(items, []), items.slice(0, 1));
+});
+
+test("code-like long keywords use monospace styling without embedding suggestions", () => {
+  assert.equal(isMonospaceHotKeyword("RISK_BLACKLIST_${yyyyMMdd}.txt"), true);
+  assert.equal(isMonospaceHotKeyword("/DWS/DWS"), true);
+  assert.equal(isMonospaceHotKeyword("监管报送"), false);
 });

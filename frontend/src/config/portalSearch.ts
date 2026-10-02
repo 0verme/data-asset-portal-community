@@ -42,22 +42,24 @@ export const PORTAL_SCOPE_CONFIGS: readonly PortalScopeConfig[] = [
  { key: "codeTable", label: "码值表", moduleKey: "codeTable" },
 ] as const;
 
-export interface PortalHotTag {
- q: string;
- mono?: boolean;
- moduleKeys?: readonly string[];
+export interface PortalHotKeyword {
+ id: number;
+ keyword: string;
+ category: string;
+ sortOrder: number;
 }
 
-export const PORTAL_HOT_TAGS: readonly PortalHotTag[] = [
- { q: "订单" },
- { q: "商品" },
- { q: "会员" },
- { q: "门店" },
- { q: "库存" },
- { q: "销售额", moduleKeys: ["indicator", "report"] },
- { q: "DWS_TRADE_SALES_STAT_1D", mono: true, moduleKeys: ["dwm"] },
- { q: "JOB_BI_01", mono: true, moduleKeys: ["push"] },
-] as const;
+const HOT_KEYWORD_CATEGORY_TO_MODULE: Readonly<Record<string, string>> = {
+ asset: "dwm",
+ system: "upstream",
+ field: "mapping",
+ root: "root",
+ metric: "indicator",
+ report: "report",
+ api: "apiAsset",
+ lineage: "lineage",
+ code_table: "codeTable",
+};
 
 /** Search entity type → repository module code used by menu filtering. */
 export const SEARCH_SCOPE_TO_MODULE: Record<string, string> = {
@@ -81,15 +83,24 @@ export function filterPortalScopesByModules(
  );
 }
 
-export function filterPortalHotTagsByModules(
+export function filterPortalHotKeywordsByModules(
+ items: readonly PortalHotKeyword[],
  moduleKeys: readonly string[] = [],
-): PortalHotTag[] {
+): PortalHotKeyword[] {
  const enabledModules = new Set(moduleKeys);
- return PORTAL_HOT_TAGS.filter((item) => {
-  if (!Array.isArray(item.moduleKeys) || item.moduleKeys.length === 0)
-   return true;
-  return item.moduleKeys.some((moduleKey) => enabledModules.has(moduleKey));
+ const seenKeywords = new Set<string>();
+ return items.filter((item) => {
+  const requiredModule = HOT_KEYWORD_CATEGORY_TO_MODULE[item.category];
+  if (requiredModule && !enabledModules.has(requiredModule)) return false;
+  const keyword = item.keyword.trim();
+  if (!keyword || seenKeywords.has(keyword)) return false;
+  seenKeywords.add(keyword);
+  return true;
  });
+}
+
+export function isMonospaceHotKeyword(keyword: string): boolean {
+ return /[A-Z]{2}/.test(keyword) && /[_/.$-]/.test(keyword);
 }
 
 export interface PortalSearchParams {

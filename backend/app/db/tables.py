@@ -1,6 +1,6 @@
 """Portable Core table declarations for migrated business queries."""
 
-from sqlalchemy import Column, DateTime, Integer, String, Table, Text
+from sqlalchemy import CheckConstraint, Column, DateTime, Integer, String, Table, Text, UniqueConstraint
 
 from .metadata import metadata
 
@@ -22,6 +22,19 @@ admin_user = _table(
     Column("last_login_at", DateTime),
     Column("created_at", DateTime),
     Column("updated_at", DateTime),
+)
+
+search_hot_keyword = _table(
+    "p_search_hot_keyword",
+    Column("id", Integer, primary_key=True),
+    Column("keyword", String(255), nullable=False),
+    Column("category", String(32), nullable=False),
+    Column("sort_order", Integer, nullable=False),
+    Column("enabled", String(1), nullable=False),
+    Column("created_at", DateTime, nullable=False),
+    Column("updated_at", DateTime, nullable=False),
+    CheckConstraint("keyword <> ''", name="ck_p_search_hot_keyword_keyword_nonempty"),
+    UniqueConstraint("keyword", "category", name="uq_p_search_hot_keyword_category"),
 )
 
 rbac_role = _table(

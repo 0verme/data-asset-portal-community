@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./ui.tsx";
 import { getPortalStats, type PortalStatItem } from "../api/portal.ts";
+import { getHotKeywords } from "../api/hotKeywords.ts";
 import {
   unifiedSearch,
   type SearchResult,
@@ -23,9 +24,11 @@ import {
 } from "../api/search.ts";
 import {
   DEFAULT_PORTAL_SCOPE,
-  filterPortalHotTagsByModules,
+  filterPortalHotKeywordsByModules,
   filterPortalScopesByModules,
+  isMonospaceHotKeyword,
   readPortalSearchParams,
+  type PortalHotKeyword,
 } from "../config/portalSearch.ts";
 
 type SearchNavigationTarget = SearchResultItem | SearchResultGroup;
@@ -57,10 +60,6 @@ export function SearchPortalPage({
     () => filterPortalScopesByModules(availableModules),
     [availableModules],
   );
-  const hotTags = useMemo(
-    () => filterPortalHotTagsByModules(availableModules),
-    [availableModules],
-  );
   const validScopeKeys = useMemo(
     () => new Set(scopeOptions.map((item) => item.key)),
     [scopeOptions],
@@ -68,6 +67,7 @@ export function SearchPortalPage({
   const initialSearchRef = useRef(readPortalSearchParams(validScopeKeys));
   const [query, setQuery] = useState(initialSearchRef.current.query);
   const [scope, setScope] = useState(initialSearchRef.current.scope);
+  const [hotKeywords, setHotKeywords] = useState<PortalHotKeyword[]>([]);
   const [stats, setStats] = useState<PortalStatItem[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState("");
@@ -75,6 +75,10 @@ export function SearchPortalPage({
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [searchedTerm, setSearchedTerm] = useState("");
+  const hotTags = useMemo(
+    () => filterPortalHotKeywordsByModules(hotKeywords, availableModules),
+    [hotKeywords, availableModules],
+  );
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const requestSeq = useRef(0);
@@ -200,6 +204,29 @@ export function SearchPortalPage({
   }, [availableModules, publicAccessReady]);
 
   useEffect(() => {
+    let cancelled = false;
+    if (!publicAccessReady) {
+      setHotKeywords([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    getHotKeywords()
+      .then((items) => {
+        if (!cancelled) setHotKeywords(items);
+      })
+      .catch(() => {
+        // Recommendations are optional: a failed request must not block search.
+        if (!cancelled) setHotKeywords([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [publicAccessReady]);
+
+  useEffect(() => {
     if (!publicAccessReady) return;
     const nextScope = validScopeKeys.has(scope) ? scope : DEFAULT_PORTAL_SCOPE;
     const activeQuery = String(searchedTerm || query || "").trim();
@@ -302,19 +329,23 @@ export function SearchPortalPage({
         ))}
       </div>
 
-      <div className="sp-hot">
-        <span className="sp-hot-label">热门</span>
-        {hotTags.map((item) => (
-          <button
-            type="button"
-            key={item.q}
-            className="sp-hot-item"
-            onClick={() => pickHot(item.q)}
-          >
-            <span className={item.mono ? "mono" : ""}>{item.q}</span>
-          </button>
-        ))}
-      </div>
+      {hotTags.length > 0 ? (
+        <div className="sp-hot">
+          <span className="sp-hot-label">热门</span>
+          {hotTags.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              className="sp-hot-item"
+              onClick={() => pickHot(item.keyword)}
+            >
+              <span className={isMonospaceHotKeyword(item.keyword) ? "mono" : ""}>
+                {item.keyword}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {searchedTerm ? (
         <div className="sp-results" aria-live="polite">
