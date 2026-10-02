@@ -1096,12 +1096,14 @@ def _reflection_metadata_queries(config: dict) -> tuple[ReflectionQuery, ...]:
 
 
 def _normalize_gaussdb_catalog_vector(value: Any) -> tuple[int, ...]:
-    """Normalize common JDBC/Python renderings of a GaussDB attnum vector.
+    """Normalize GaussDB catalog vectors through explicit public contracts.
 
-    Supported values are PostgreSQL-style text (``{1,2}``), int2vector text
-    (``1 2``), Python list/tuple, and integer-indexable Java array objects.
-    Unknown or malformed representations fail explicitly instead of looking
-    like an empty catalog vector.
+    JDBC ``Array`` values are consumed through ``getArray()``; typed vector
+    values are accepted only for the known ``int2vector`` contract and
+    read through ``getValue()``. Python sequences, Java arrays and the existing
+    PostgreSQL/vector text formats are also supported. Unknown objects and
+    malformed values fail closed rather than being stringified or treated as
+    empty vectors.
     """
     value_type = f"{type(value).__module__}.{type(value).__qualname__}"
 
@@ -1110,8 +1112,8 @@ def _normalize_gaussdb_catalog_vector(value: Any) -> tuple[int, ...]:
             "unsupported GaussDB catalog vector representation: " + value_type
         )
 
-    if isinstance(value, str):
-        text = value.strip()
+    def parse_text(text: str) -> tuple[int, ...]:
+        text = text.strip()
         if text.startswith("{") or text.endswith("}"):
             if not (text.startswith("{") and text.endswith("}")):
                 raise unsupported()
@@ -1127,27 +1129,109 @@ def _normalize_gaussdb_catalog_vector(value: Any) -> tuple[int, ...]:
             tokens = text.split()
         if not tokens:
             raise unsupported()
-        raw_values = tokens
-    elif isinstance(value, (list, tuple)):
-        raw_values = value
-    elif isinstance(value, (bytes, bytearray, memoryview)):
-        raise unsupported()
-    else:
-        # JPype Java arrays are indexable but are not Python list/tuple values.
+        return parse_items(tokens)
+
+    def parse_items(items) -> tuple[int, ...]:
+        attnums: list[int] = []
+        for item in items:
+            if isinstance(item, bool):
+                raise unsupported()
+            if isinstance(item, int):
+                attnums.append(item)
+                continue
+            if isinstance(item, str):
+                token = item.strip()
+                if not re.fullmatch(r"[+-]?\d+", token):
+                    raise unsupported()
+                attnums.append(int(token))
+                continue
+
+            # JPype may expose boxed Java numeric values. Accept their numeric
+            # protocols, not arbitrary object's string representation.
+            index_method = getattr(item, "__index__", None)
+            if callable(index_method):
+                try:
+                    number = index_method()
+                except Exception as exc:
+                    raise unsupported() from exc
+                if isinstance(number, bool) or not isinstance(number, int):
+                    raise unsupported()
+                attnums.append(number)
+                continue
+            int_value_method = getattr(item, "intValue", None)
+            if callable(int_value_method):
+                try:
+                    number = int_value_method()
+                except Exception as exc:
+                    raise unsupported() from exc
+                if isinstance(number, bool) or not isinstance(number, int):
+                    raise unsupported()
+                attnums.append(number)
+                continue
+            raise unsupported()
+        return tuple(attnums)
+
+    def array_items(array_value):
+        if array_value is None or isinstance(
+            array_value, (str, bytes, bytearray, memoryview, dict, set, frozenset)
+        ):
+            raise unsupported()
+        if isinstance(array_value, (list, tuple)):
+            return array_value
         try:
-            raw_values = tuple(value[index] for index in range(len(value)))
+            length = len(array_value)
+        except Exception:
+            length = None
+        if length is not None:
+            try:
+                return tuple(array_value[index] for index in range(length))
+            except Exception:
+                # Some JDBC implementations return ordered iterable wrappers
+                # whose elements are not integer-indexable.
+                pass
+        try:
+            return tuple(iter(array_value))
         except Exception as exc:
             raise unsupported() from exc
 
-    attnums: list[int] = []
-    for item in raw_values:
-        if isinstance(item, bool):
+    if value is None or isinstance(value, (bool, bytes, bytearray, memoryview)):
+        raise unsupported()
+    if isinstance(value, str):
+        return parse_text(value)
+    if isinstance(value, (list, tuple)):
+        return parse_items(value)
+
+    get_array = getattr(value, "getArray", None)
+    if callable(get_array):
+        try:
+            array_value = get_array()
+        except Exception as exc:
+            raise unsupported() from exc
+        return parse_items(array_items(array_value))
+
+    get_value = getattr(value, "getValue", None)
+    get_type = getattr(value, "getType", None)
+    if callable(get_value) or get_type is not None:
+        if not callable(get_value) or not callable(get_type):
             raise unsupported()
-        token = str(item).strip()
-        if not re.fullmatch(r"[+-]?\d+", token):
+        try:
+            vector_type = get_type()
+            text = get_value()
+        except Exception as exc:
+            raise unsupported() from exc
+        if not isinstance(vector_type, str) or vector_type.strip().lower() != "int2vector":
             raise unsupported()
-        attnums.append(int(token))
-    return tuple(attnums)
+        if not isinstance(text, str):
+            raise unsupported()
+        return parse_text(text)
+
+    # Java arrays and other ordered, integer-indexable array-like values.
+    try:
+        length = len(value)
+        raw_values = tuple(value[index] for index in range(length))
+    except Exception as exc:
+        raise unsupported() from exc
+    return parse_items(raw_values)
 
 
 def _gaussdb_attribute_name(

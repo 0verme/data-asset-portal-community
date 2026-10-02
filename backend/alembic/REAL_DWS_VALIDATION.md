@@ -8,11 +8,13 @@ Record only profile names and results here; never add credentials, JDBC URLs, ho
 
 - Confirm GaussDB/DWS version is 8.1.3 and the configured profile points to the intended physical schema.
 - Confirm maintenance window, application quiescence, backup/snapshot, restore procedure, available disk, and that no Agent is using this database.
-- Confirm schema metadata preflight passes:
+- Confirm schema metadata preflight passes both stages: all five metadata SQL queries execute/fetch, and semantic reflection normalizes catalog values and builds a non-empty `SchemaModel`:
 
   ```sh
   python backend/scripts/dws_verify_metadata_preflight.py --profile <profile>
   ```
+
+  A SQL-only PASS is insufficient. Before any write-capable migration command, capture the read-only `status` and `plan` output and stop for maintainer review of each revision action.
 
 - For an empty schema only, also run the DWS baseline preflight. It refuses non-empty schemas and rolls back its probes:
 
@@ -73,7 +75,7 @@ Record only profile names and results here; never add credentials, JDBC URLs, ho
 
 ## Scenario 4 — metadata and ledger confirmation
 
-1. Re-run the read-only metadata preflight; all queries must pass, including the `0007` check-constraint query above.
+1. Re-run the read-only metadata preflight; all five metadata SQL queries and semantic `SchemaModel` normalization must pass, including the `0007` check-constraint query above.
 2. Compare reflected columns/indexes/constraints against `schema_migrate.py verify`; require `verify=ok`.
 3. Confirm the `alembic_version` table contains exactly one row equal to the repository head.
 4. Record the DWS DDL/transaction observations: whether a failed `ALTER TABLE`/`CREATE INDEX` auto-committed, and whether the ledger stayed at the previous revision (the runner design assumes DDL may auto-commit).

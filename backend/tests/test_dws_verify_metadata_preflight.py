@@ -62,7 +62,7 @@ class ReflectionCursor:
 
 class ReflectionConnection:
     def __init__(self, results=None, *, fail_markers=(), failure_message="metadata SQL failure"):
-        self.results = results or {}
+        self.results = _preflight_reflection_results() if results is None else results
         self.fail_markers = set(fail_markers)
         self.failure_message = failure_message
         self.executed = []
@@ -107,6 +107,79 @@ class JavaArrayLike:
 
     def __getitem__(self, index):
         return self.values[index]
+
+
+class JavaShortFixture:
+    """Boxed Java Number surface returned by an object array."""
+
+    def __init__(self, value):
+        self.value = value
+
+    def intValue(self):
+        return self.value
+
+
+class StringifyingFixture:
+    def __str__(self):
+        return "1"
+
+
+class JdbcArrayFixture:
+    """JDBC Array surface; getArray returns an ordered Java-array-like value."""
+
+    def __init__(self, values):
+        self.values = tuple(values)
+
+    def getArray(self):
+        return JavaArrayLike(self.values)
+
+    def getBaseType(self):
+        return 5
+
+    def getBaseTypeName(self):
+        return "SMALLINT"
+
+
+class JdbcIterableFixture:
+    def __init__(self, values):
+        self.values = tuple(values)
+
+    def getArray(self):
+        return iter(self.values)
+
+
+class TypedVectorFixture:
+    """Typed vector value exposed through getType/getValue."""
+
+    def __init__(self, vector_type, value):
+        self.vector_type = vector_type
+        self.value = value
+
+    def getType(self):
+        return self.vector_type
+
+    def getValue(self):
+        return self.value
+
+
+def _preflight_reflection_results():
+    return {
+        "columns reflection": [_column_row("p_probe", "id", primary=True)],
+        "attributes reflection": [(505, 1, "id")],
+        "constraints reflection": [
+            (
+                "p_probe", "PRIMARY KEY", "p_probe_pkey",
+                JdbcArrayFixture([1]), 505, None, 0, None, None,
+            )
+        ],
+        "referential constraints": [],
+        "indexes reflection": [
+            (
+                "p_probe", "idx_probe", False,
+                TypedVectorFixture("int2vector", "1"), 505,
+            )
+        ],
+    }
 
 
 def _composite_contract():
@@ -175,13 +248,19 @@ def _composite_reflection_results():
             (202, 1, "parent_first"),
         ],
         "constraints reflection": [
-            ("p_pair", "PRIMARY KEY", "p_pair_pkey", "{1,3}", 101, None, 0, None, None),
+            (
+                "p_pair", "PRIMARY KEY", "p_pair_pkey",
+                JdbcArrayFixture([1, 3]), 101, None, 0, None, None,
+            ),
             ("p_pair", "UNIQUE", "p_pair_uq", (2, 4), 101, None, 0, None, None),
             ("p_pair", "FOREIGN KEY", "p_pair_fk", [5, 6], 101, "p_parent", 202, "2 1", "CASCADE"),
         ],
         "referential constraints": [("p_pair_fk", "CASCADE")],
         "indexes reflection": [
-            ("p_pair", "idx_pair", False, (7, 8), 101),
+            (
+                "p_pair", "idx_pair", False,
+                TypedVectorFixture("int2vector", "7 8"), 101,
+            ),
             ("p_pair", "idx_unique_pair", True, "9 10", 101),
         ],
     }
@@ -229,19 +308,42 @@ class DwsReflectionQueryTests(unittest.TestCase):
         supported = (
             ("{1,2}", (1, 2)),
             (" 1 3 ", (1, 3)),
+            ("1 2", (1, 2)),
+            ("1,2", (1, 2)),
             ([1, 2], (1, 2)),
             ((1, 3), (1, 3)),
             (JavaArrayLike([3, 1]), (3, 1)),
+            (JdbcArrayFixture([1, 2, 3]), (1, 2, 3)),
+            (JdbcArrayFixture([JavaShortFixture(1), JavaShortFixture(2)]), (1, 2)),
+            (JdbcIterableFixture([3, 2, 1]), (3, 2, 1)),
+            (TypedVectorFixture("int2vector", "10 4 7"), (10, 4, 7)),
+            (TypedVectorFixture("int2vector", "1"), (1,)),
         )
         for value, expected in supported:
             with self.subTest(value=value):
                 self.assertEqual(expected, _normalize_gaussdb_catalog_vector(value))
 
-    def test_unsupported_catalog_vector_representation_fails_explicitly(self):
-        with self.assertRaisesRegex(
-            ValueError, "unsupported GaussDB catalog vector representation"
-        ):
-            _normalize_gaussdb_catalog_vector({"not": "an attnum vector"})
+    def test_malformed_and_unknown_catalog_vectors_fail_closed(self):
+        malformed = (
+            "",
+            "1 x",
+            "{1,}",
+            True,
+            b"1",
+            None,
+            {"not": "an attnum vector"},
+            object(),
+            StringifyingFixture(),
+            TypedVectorFixture("text", "1"),
+            TypedVectorFixture("int2vector", b"1"),
+            JdbcArrayFixture([1, True]),
+        )
+        for value in malformed:
+            with self.subTest(value=type(value).__name__):
+                with self.assertRaisesRegex(
+                    ValueError, "unsupported GaussDB catalog vector representation"
+                ):
+                    _normalize_gaussdb_catalog_vector(value)
 
         connection = ReflectionConnection(
             {
@@ -391,7 +493,9 @@ class DwsVerifyMetadataPreflightTests(unittest.TestCase):
             self.assertIn(f"{label:<28} PASS", output)
         self.assertIn("TOTAL : 5", output)
         self.assertIn("FAIL  : 0", output)
-        self.assertEqual(5, len(connection.executed))
+        self.assertIn("DWS SEMANTIC REFLECTION PREFLIGHT", output)
+        self.assertIn("SchemaModel normalization  PASS (tables=1)", output)
+        self.assertEqual(10, len(connection.executed))
         self.assertTrue(all(sql.lstrip().upper().startswith("SELECT") for sql, _ in connection.executed))
         self.assertEqual(0, connection.commit_calls)
         self.assertEqual(1, connection.rollback_calls)
@@ -411,7 +515,26 @@ class DwsVerifyMetadataPreflightTests(unittest.TestCase):
             code = preflight_main(["--profile", "gauss_primary"])
         self.assertEqual(0, code, stderr.getvalue())
         self.assertIn("columns reflection", stdout.getvalue())
-        self.assertEqual(5, len(connection.executed))
+        self.assertIn("SchemaModel normalization  PASS", stdout.getvalue())
+        self.assertEqual(10, len(connection.executed))
+
+    def test_sql_success_does_not_hide_semantic_vector_normalization_failure(self):
+        results = _preflight_reflection_results()
+        results["constraints reflection"] = [
+            ("p_probe", "PRIMARY KEY", "p_probe_pkey", object(), 505, None, 0, None, None)
+        ]
+        connection = ReflectionConnection(results)
+        code, output, errors, _ = self._run(connection)
+
+        self.assertEqual(1, code)
+        self.assertEqual("", errors)
+        self.assertIn(f"{'constraints reflection':<28} PASS", output)
+        self.assertIn("TOTAL : 5", output)
+        self.assertIn("FAIL  : 0", output)
+        self.assertIn("SchemaModel normalization  FAIL", output)
+        self.assertIn("unsupported GaussDB catalog vector representation", output)
+        self.assertEqual(0, connection.commit_calls)
+        self.assertEqual(1, connection.close_calls)
 
     def test_independent_catalog_failures_are_reported_and_sensitive_text_redacted(self):
         connection = ReflectionConnection(
