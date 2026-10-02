@@ -6,9 +6,39 @@ from unittest.mock import MagicMock, patch
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
 from backend.app.services import lineage_service
+from backend.app.services.lineage_database_reader import LineageDatabaseReader
 
 
 class LineageCoreQueryTests(unittest.TestCase):
+    def test_bounded_reader_queries_compile_for_supported_core_dialects(self):
+        db = MagicMock()
+        db.fetch_rows.return_value = []
+        reader = LineageDatabaseReader(db)
+        reader.active_snapshot()
+        reader.counts("S1")
+        reader.default_root_id("S1")
+        reader.search_nodes("S1", "%table%", 100)
+        reader.node("S1", "table:one")
+        reader.adjacent("S1", ["table:one", "task:two"], "downstream", 101)
+        self.assertEqual(7, db.fetch_rows.call_count)
+
+        for call in db.fetch_rows.call_args_list:
+            statement = call.args[0]
+            for dialect in (sqlite.dialect(), postgresql.dialect(), mysql.dialect()):
+                compiled = statement.compile(dialect=dialect)
+                sql = str(compiled).lower()
+                self.assertIn("__app__.p_lineage_", sql)
+                self.assertNotIn("select *", sql)
+        search_sql = str(db.fetch_rows.call_args_list[4].args[0]).lower()
+        self.assertIn("kind_code", search_sql)
+        self.assertIn("node_name", search_sql)
+        self.assertIn("snapshot_id", search_sql)
+        self.assertIn("limit", search_sql)
+        adjacency_sql = str(db.fetch_rows.call_args_list[6].args[0]).lower()
+        self.assertIn("source_node_id", adjacency_sql)
+        self.assertIn("lineage_neighbor", adjacency_sql)
+        self.assertIn("limit", adjacency_sql)
+
     def test_database_snapshot_reads_use_bound_core_queries(self):
         db = MagicMock()
         db.fetch_rows.side_effect = [

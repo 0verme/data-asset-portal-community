@@ -24,13 +24,13 @@ class LineageBootstrapTestCase(unittest.TestCase):
 
     def test_bootstrap_reports_empty_snapshot_without_inventing_a_root(self):
         snapshot = {"snapshotId": "empty", "generatedAt": "2026-07-13T20:00:00Z", "generator": {"name": "test", "version": "1"}, "nodes": [], "edges": []}
-        with patch.object(lineage_service, "lineage_storage_status", return_value={"mode": "persistent"}), patch.object(lineage_service, "_current_snapshot", return_value=snapshot):
+        with patch.object(lineage_service, "lineage_storage_status", return_value={"mode": "poc"}), patch.object(lineage_service, "_current_snapshot", return_value=snapshot):
             bootstrap = lineage_service.get_bootstrap()
         self.assertEqual(bootstrap["status"], "empty_snapshot")
         self.assertIsNone(bootstrap["defaultRootId"])
 
     def test_bootstrap_reports_missing_active_snapshot(self):
-        with patch.object(lineage_service, "lineage_storage_status", return_value={"mode": "persistent"}), patch.object(lineage_service, "_current_snapshot", side_effect=lineage_service.LineageNoActiveSnapshotError("missing")):
+        with patch.object(lineage_service, "lineage_storage_status", return_value={"mode": "poc"}), patch.object(lineage_service, "_current_snapshot", side_effect=lineage_service.LineageNoActiveSnapshotError("missing")):
             bootstrap = lineage_service.get_bootstrap()
         self.assertEqual(bootstrap["status"], "no_active_snapshot")
         self.assertIsNone(bootstrap["defaultRootId"])
@@ -38,7 +38,7 @@ class LineageBootstrapTestCase(unittest.TestCase):
     def test_initial_view_builds_bootstrap_and_graph_from_one_snapshot(self):
         snapshot = lineage_service.SNAPSHOT
         with (
-            patch.object(lineage_service, "lineage_storage_status", return_value={"mode": "persistent"}),
+            patch.object(lineage_service, "lineage_storage_status", return_value={"mode": "poc"}),
             patch.object(lineage_service, "_current_snapshot", return_value=snapshot) as current_snapshot,
         ):
             initial = lineage_service.get_initial_view(depth=1, view="table")
@@ -50,7 +50,7 @@ class LineageBootstrapTestCase(unittest.TestCase):
 
     def test_initial_view_returns_no_graph_for_unavailable_snapshot(self):
         with (
-            patch.object(lineage_service, "lineage_storage_status", return_value={"mode": "persistent"}),
+            patch.object(lineage_service, "lineage_storage_status", return_value={"mode": "poc"}),
             patch.object(
                 lineage_service,
                 "_current_snapshot",

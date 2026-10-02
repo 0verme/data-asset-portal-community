@@ -1190,7 +1190,7 @@ Base Path: `/api/lineage`
 
 - `GET /api/lineage/bootstrap`：返回当前快照状态、默认根节点和节点/边数量。
 - `GET /api/lineage/initial-view`：一次读取当前快照并返回初始化状态与有限血缘子图，供页面首次进入、刷新和筛选使用。
-- `GET /api/lineage/assets?name=...`：按名称模糊搜索表或作业节点。
+- `GET /api/lineage/assets?name=...`：按名称模糊搜索表或作业节点；persistent 模式返回最多 100 条，不分页，以保持搜索读取有界。POC 模式仍返回全部匹配项。
 - `GET /api/lineage/subgraph`：返回有限血缘子图。
 
 `initial-view` 与 `subgraph` 参数：
@@ -1232,7 +1232,7 @@ Base Path: `/api/lineage`
 - 相同 source + importId + content 返回 `already_applied`；同一 import 使用不同内容返回 `409 conflict`。
 - `GET /api/metadata/ingestions/{ingestionId}`：查询正式 ingestion 的 audit summary；dry-run 不创建持久状态。
 
-写入复用当前 `maintainer` auth seam。默认 bulk limits 为 1000 assets、1000 fields/asset、10000 total fields、10000 nodes、20000 edges 和 8 MiB body。Collector responsibilities、error model、transaction/rollback、四方言 migration 和非目标见 [metadata-ingestion.md](./metadata-ingestion.md)。
+写入复用当前 `maintainer` auth seam。默认 bulk limits 为 1000 assets、1000 fields/asset、10000 total fields；lineage replace snapshot 为 30000 nodes / 75000 edges、96 MiB body（同时受 128 MiB 默认 global ASGI limit、部署配置及反向代理限制）。Collector responsibilities、bounded read path、error model、transaction/rollback、四方言 migration 和非目标见 [metadata-ingestion.md](./metadata-ingestion.md)。
 
 ## 14. 实施建议
 
