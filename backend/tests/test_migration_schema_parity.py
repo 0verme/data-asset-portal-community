@@ -405,6 +405,29 @@ class MigrationSchemaParityTests(unittest.TestCase):
             for fragment in required:
                 self.assertIn(fragment, normalized, f"{dialect}: {fragment}")
 
+    def test_lineage_read_paths_are_covered_by_existing_cross_dialect_keys_and_indexes(self):
+        for dialect in SUPPORTED_DIALECTS:
+            schema = baseline_schema(dialect)
+            node = schema.tables["p_lineage_node"]
+            edge = schema.tables["p_lineage_edge"]
+            snapshot = schema.tables["p_lineage_snapshot"]
+            with self.subTest(dialect=dialect):
+                self.assertEqual(("snapshot_id", "node_id"), node.primary_key)
+                self.assertEqual(("snapshot_id", "edge_id"), edge.primary_key)
+                self.assertEqual(
+                    ("snapshot_id", "kind_code", "node_name"),
+                    node.indexes["idx_p_lineage_node_lookup"].columns,
+                )
+                self.assertEqual(
+                    ("snapshot_id", "source_node_id"),
+                    edge.indexes["idx_p_lineage_edge_source"].columns,
+                )
+                self.assertEqual(
+                    ("snapshot_id", "target_node_id"),
+                    edge.indexes["idx_p_lineage_edge_target"].columns,
+                )
+                self.assertEqual(("snapshot_id",), snapshot.primary_key)
+
     def test_field_mapping_business_identity_has_a_non_unique_cross_dialect_index(self):
         expected_identity = (
             "upstream_system_id",

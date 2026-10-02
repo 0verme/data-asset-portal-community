@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from fastapi import Body, FastAPI
 from fastapi.responses import JSONResponse, Response
@@ -93,11 +94,28 @@ class RequestBodyPolicyTests(unittest.TestCase):
         policy = resolve_request_body_limit(
             "/api/metadata/assets/ingestions",
             "POST",
-            16 * 1024 * 1024,
+            128 * 1024 * 1024,
         )
         self.assertEqual(MAX_METADATA_BODY_BYTES, policy.max_bytes)
         self.assertEqual("METADATA_PAYLOAD_TOO_LARGE", policy.code)
         self.assertEqual(MAX_METADATA_BODY_BYTES, policy.details["maxBytes"])
+
+    def test_metadata_body_limit_is_configurable_but_finite(self):
+        with patch.dict(os.environ, {"METADATA_MAX_BODY_MB": "64"}):
+            policy = resolve_request_body_limit(
+                "/api/metadata/lineage/ingestions",
+                "POST",
+                128 * 1024 * 1024,
+            )
+        self.assertEqual(64 * 1024 * 1024, policy.max_bytes)
+
+        with patch.dict(os.environ, {"METADATA_MAX_BODY_MB": "129"}):
+            bounded = resolve_request_body_limit(
+                "/api/metadata/lineage/ingestions",
+                "POST",
+                128 * 1024 * 1024,
+            )
+        self.assertEqual(MAX_METADATA_BODY_BYTES, bounded.max_bytes)
 
     def test_global_limit_wins_when_it_is_stricter(self):
         policy = resolve_request_body_limit(

@@ -91,6 +91,12 @@ Windows 任务计划程序可将程序设置为 Python 解释器，参数设置�
 /opt/data-asset-portal/backend/scripts/collect_lineage_snapshot.py --profile prod
 ```
 
+## 容量与 persistent 查询
+
+lineage replace 默认上限为 30000 nodes、75000 edges、96 MiB body；通过 `METADATA_MAX_LINEAGE_NODES`、`METADATA_MAX_LINEAGE_EDGES`、`METADATA_MAX_BODY_MB` 在有限 hard ceiling 内调整。全局 ASGI body cap（`APP_MAX_CONTENT_LENGTH_MB`，默认 128 MiB）及部署反向代理也必须允许目标 body 大小。导入在单个原子事务中写入一个完整 snapshot；数据库批次仅是同一事务内的执行分批，不是 multipart/chunk snapshot。
+
+persistent 模式下 bootstrap/count、search 与 subgraph 均直接由数据库缩小读取范围。Subgraph 逐层批量读取当前 frontier 的 adjacency，再由应用执行有界 BFS；表级 projection 只处理当前 frontier 关联的 task，不会先下载并投影全图。请求最多读取有限的 adjacency rows；若触及该安全上限或 `maxNodes` 截断，响应 `truncated` 为 true。POC fixture 仍使用原 in-memory 路径。
+
 ## 查询语义
 
 - `view=table`：默认表级简图。

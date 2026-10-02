@@ -33,6 +33,8 @@
 | 18 | Asset mapping 只把 source metadata 映射到现有 asset/field service model；`layer_code`、`domain_code` 等 DAP governance classification 不强制由 Collector 提供。 | 防止 source metadata 与 DAP enrichment 混淆。 | V1 允许这些内部分类为空，维护 API 仍保留现有语义；#260 决策 21 把该原则固化为列级 merge 规则（ingestion update 永不写 portal-owned 列）。 |
 | 19 | Reference implementation 只包含 PostgreSQL catalog collector 与 JSON lineage producer，通过 HTTP Contract 调用 DAP。 | 证明边界可被第三方实现。 | 不做 scheduler、connector framework、parser、OpenLineage、DataHub/OpenMetadata compatibility。 |
 
+> **Capacity update（DAP Lineage Large Graph Phase 2 / #327）**：上表第 10 条保留 2026-08-22 的历史默认值。当前 lineage defaults 已由 #327 调整为 30000 nodes、75000 edges 和 96 MiB metadata body；有限 deployment limits、ASGI/proxy 边界、bounded persistent reads 与事务内批量写入见 [metadata-ingestion.md](../metadata-ingestion.md)。Asset limits 与 V1 单个完整 `replace` snapshot 语义不变。
+
 ## Ownership / Merge Policy（#260 补充决策，已实现）
 
 > 本节是 Epic #257 Child C（#260）在 ADR-001 之上补充并落地的列级 ownership / merge 决策，记录于 2026-09-20。决策 18 的“governance classification 不强制由 Collector 提供”由此进一步固化为可执行的列级规则；完整矩阵见 [metadata-ingestion.md](../metadata-ingestion.md)。

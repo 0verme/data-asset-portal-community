@@ -70,7 +70,7 @@ class NativeSecurityConfigTests(unittest.TestCase):
         config = get_runtime_config()
         self.assertTrue(config["SESSION_COOKIE_SECURE"])
         self.assertEqual([], config["CORS_ORIGINS"])
-        self.assertEqual(16 * 1024 * 1024, config["MAX_CONTENT_LENGTH"])
+        self.assertEqual(128 * 1024 * 1024, config["MAX_CONTENT_LENGTH"])
 
     def test_native_names_are_used_and_blank_values_use_native_defaults(self):
         os.environ["APP_SECRET_KEY"] = "native-secret"
@@ -97,7 +97,7 @@ class NativeSecurityConfigTests(unittest.TestCase):
         self.assertTrue(get_session_cookie_config()["SESSION_COOKIE_SECURE"])
         self.assertFalse(get_runtime_debug())
         self.assertEqual([], get_runtime_config()["CORS_ORIGINS"])
-        self.assertEqual(16 * 1024 * 1024, get_runtime_config()["MAX_CONTENT_LENGTH"])
+        self.assertEqual(128 * 1024 * 1024, get_runtime_config()["MAX_CONTENT_LENGTH"])
 
     def test_invalid_max_content_length_uses_safe_default(self):
         for value in ("abc", "0", "-1", "513"):

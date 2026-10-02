@@ -125,7 +125,7 @@ sudo chmod 600 backend/.env.local backend/configs/database.yaml
 - 同源 Nginx 部署不需要 `APP_CORS_ORIGINS`。只有前后端确实跨来源时，才配置精确的来源 allowlist，不要使用 `*` 配合 Cookie。
 - `ASSET_TRUST_PROXY_HEADERS=true` 只适用于后端保持 loopback、外部请求只能经过可信 Nginx 的拓扑；如果 `15099` 可被不可信客户端直接访问，应保持 `false`。
 - 应用只读取 `APP_*` 安全配置名称；旧 `FLASK_*` 名称不会作为 runtime 配置读取。升级既有部署时迁移变量名称，并保留原 `APP_SECRET_KEY`，避免已有 signed session 无法迁移。
-- `APP_MAX_CONTENT_LENGTH_MB` 默认限制为 16 MB；应用同时返回 `nosniff`、`SAMEORIGIN` 和严格来源策略等安全响应头。若调整请求体上限，应同时检查 Nginx 的 `client_max_body_size`。
+- `APP_MAX_CONTENT_LENGTH_MB` 默认限制为 128 MiB；metadata ingestion 另有默认 96 MiB 的 `METADATA_MAX_BODY_MB` 上限。若调整请求体上限，应同时检查 Nginx 的 `client_max_body_size`（示例配置为 128m）及任何外部网关。应用同时返回 `nosniff`、`SAMEORIGIN` 和严格来源策略等安全响应头。
 - `APP_ENV=production` 或未设置时不会注册 `/docs`、`/redoc`、`/openapi.json`；只有显式 `development` 才启用它们。关闭 HTTP interactive docs 不是业务 API 的 authentication/authorization 替代。
 
 ### 3.4 匿名目录公开策略

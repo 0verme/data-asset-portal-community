@@ -207,7 +207,7 @@ def get_runtime_config() -> dict[str, object]:
         )
 
     max_content_length = (
-        get_int_env("APP_MAX_CONTENT_LENGTH_MB", 16, minimum=1, maximum=512)
+        get_int_env("APP_MAX_CONTENT_LENGTH_MB", 128, minimum=1, maximum=512)
         * 1024
         * 1024
     )
