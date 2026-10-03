@@ -109,7 +109,9 @@ class _RecordingCursor:
         self.calls.append((sql, params))
 
     def executemany(self, sql, rows):
-        self.calls.append((sql, [tuple(row) for row in rows]))
+        rows = [tuple(row) for row in rows]
+        self.calls.append((sql, rows))
+        self.rowcount = len(rows)
 
     def fetchall(self):
         return []
@@ -289,9 +291,11 @@ class GaussdbCoreBindTests(_GaussdbAdapterTestCase):
             affected = execute_many_core("primary", insert(table), rows)
 
         self.assertEqual(2, affected)
-        self.assertEqual(2, len(self.cursor.calls))
-        self.assertEqual([EXPECTED_LITERAL], _timestamp_literals(self.cursor.calls[0][1]))
-        self.assertEqual([EXPECTED_LITERAL], _timestamp_literals(self.cursor.calls[1][1]))
+        self.assertEqual(1, len(self.cursor.calls))
+        _sql, rows = self.cursor.calls[0]
+        self.assertEqual(2, len(rows))
+        for row in rows:
+            self.assertEqual([EXPECTED_LITERAL], _timestamp_literals(row))
 
     def test_execute_statements_core_normalizes_datetime_bind(self):
         table = _temporal_table()
