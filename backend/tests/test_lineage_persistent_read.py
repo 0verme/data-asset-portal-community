@@ -159,6 +159,61 @@ class PersistentLineageReadTests(unittest.TestCase):
         self.assertNotIn("p_lineage_edge", search_sql)
         self.assertTrue(all("p_lineage_edge" not in sql for sql, _count in statements))
 
+    def test_search_treats_percent_underscore_and_escape_char_literally(self):
+        literals = [
+            ("table:escape:underscore", "F_ACCR_DAY_SUM_R"),
+            ("table:escape:percent", "ABC%DEF"),
+            ("table:escape:bang", "ABC!DEF"),
+            ("table:escape:combo", "A!B_C%D"),
+        ]
+        decoys = [
+            ("table:escape:wildcard-underscore", "FXACCRXDAYXSUMXR"),
+            ("table:escape:wildcard-percent", "ABCZZZDEF"),
+            ("table:escape:wildcard-bang", "ABCDEF"),
+            ("table:escape:wildcard-combo", "AXBXCZD"),
+        ]
+        connection = connect({"type": "sqlite", "database": str(self.database)})
+        try:
+            connection.executemany(
+                "INSERT INTO dwp.p_lineage_node "
+                "(snapshot_id, node_id, kind_code, node_name, display_name, namespace_name, attributes_json) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [
+                    ("active", node_id, "table", name, name, "ODS", "{}")
+                    for node_id, name in [*literals, *decoys]
+                ],
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        original_fetch_rows = CoreAccess.fetch_rows
+        statements = []
+
+        def track(db, statement):
+            rows = original_fetch_rows(db, statement)
+            statements.append(str(statement))
+            return rows
+
+        cases = {
+            "F_ACCR_DAY_SUM_R": "table:escape:underscore",
+            "ABC%DEF": "table:escape:percent",
+            "ABC!DEF": "table:escape:bang",
+            "A!B_C%D": "table:escape:combo",
+        }
+        with patch.object(CoreAccess, "fetch_rows", track):
+            for query, expected_id in cases.items():
+                with self.subTest(query=query):
+                    matches = lineage_service.search_nodes(query, limit=100)
+                    self.assertEqual([expected_id], [node["id"] for node in matches])
+
+        executed = [sql for sql in statements if "node_name" in sql]
+        self.assertEqual(len(cases), len(executed))
+        self.assertTrue(all("ESCAPE '!'" in sql for sql in executed))
+        self.assertTrue(all("ESCAPE '\\'" not in sql for sql in executed))
+        self.assertTrue(all("f!_accr" not in sql for sql in executed))
+        self.assertTrue(all("ABC%DEF" not in sql for sql in executed))
+
     def test_detail_bfs_supports_directions_depth_cycles_missing_root_and_node_limit(self):
         downstream = lineage_service.get_subgraph(
             "table:input_a", "downstream", 1, 20, "detail"

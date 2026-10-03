@@ -22,7 +22,7 @@ from ..db.registry import get_provider
 from ..db.service import CoreAccess
 from ..db.tables import lineage_edge, lineage_node, lineage_snapshot
 from ..settings import get_runtime_environment
-from .lineage_database_reader import LineageDatabaseReader
+from .lineage_database_reader import LineageDatabaseReader, escape_like_operand
 
 
 LOGGER = logging.getLogger(__name__)
@@ -414,7 +414,7 @@ def search_nodes(name, limit=None):
     result_limit = _search_limit(limit)
     status = lineage_storage_status()
     if status["mode"] == "persistent":
-        escaped = normalized_name.casefold().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        escaped = escape_like_operand(normalized_name.casefold())
         pattern = f"%{escaped}%"
 
         def search(reader, active):

@@ -8,9 +8,44 @@ snapshot identity.
 
 from __future__ import annotations
 
-from sqlalchemy import and_, case, exists, func, select
+from sqlalchemy import and_, case, func, select
 
 from ..db.tables import lineage_edge, lineage_node, lineage_snapshot
+
+
+# Portal search paths use "!" as a portable single-character ``LIKE`` escape
+# token (see ``services.search_provider.KeywordSearchProvider.LIKE_ESCAPE``).
+# GaussDB/DWS parses ``ESCAPE '\\'`` as an invalid escape string, so lineage
+# search reuses the same policy instead of a backslash literal.
+LINEAGE_LIKE_ESCAPE_CHAR = "!"
+
+
+def escape_like_operand(value: str, escape_char: str = LINEAGE_LIKE_ESCAPE_CHAR) -> str:
+    """Escape LIKE wildcards so user input is matched literally.
+
+    The escape token is escaped first; otherwise a user-supplied token could
+    change the meaning of a later wildcard escape (e.g. ``!_``).
+    """
+    return (
+        value.replace(escape_char, escape_char * 2)
+        .replace("%", f"{escape_char}%")
+        .replace("_", f"{escape_char}_")
+    )
+
+
+def _layer_rank_expression(node):
+    layer = func.upper(func.coalesce(node.c.namespace_name, ""))
+    return case(
+        (layer.in_(("DWF", "DWS_DWF")), 0),
+        (layer.in_(("DWM", "DWS_DWM")), 1),
+        (layer.in_(("DWP", "DWS_DWP")), 2),
+        (layer == "DIM", 3),
+        (layer == "ODS", 4),
+        (layer == "API", 5),
+        (layer == "REPORT", 6),
+        (layer == "PUSH", 7),
+        else_=8,
+    )
 
 
 _NODE_COLUMNS = (
@@ -77,46 +112,82 @@ class LineageDatabaseReader:
     def default_root_id(self, snapshot_id: str) -> str | None:
         """Choose a deterministic table-first root without loading the graph.
 
-        Connectivity and layer preference are evaluated by portable SQL
-        expressions. The historical Python ranking also used exact degree
-        counts and attributes_json.layer; avoiding those graph-wide values is
-        intentional. Namespace is the stable layer fallback for this bounded
-        root heuristic.
+        The historical ranking was one ``ORDER BY`` over every node with two
+        correlated ``EXISTS`` probes per node; GaussDB/DWS executed that shape
+        as ~17k nodes x 2 edge lookups and took ~67s on a 45k-edge snapshot.
+
+        Candidates are now evaluated by bounded portable SQL in the same
+        product priority order, short-circuiting on the first hit:
+
+        1. connected table (has incoming and outgoing edges)
+        2. any table
+        3. connected node
+        4. any node
+
+        Connectivity is derived once per candidate query as two ``DISTINCT``
+        edge-endpoint sets, so the snapshot's edges are scanned set-wise
+        instead of probing edges per node. Layer ranking and node_id ordering
+        are unchanged, and no query materializes the full snapshot.
         """
         node = lineage_node
-        has_incoming = exists(
-            select(lineage_edge.c.edge_id).where(
-                lineage_edge.c.snapshot_id == snapshot_id,
-                lineage_edge.c.target_node_id == node.c.node_id,
+        layer_rank = _layer_rank_expression(node)
+        incoming_ids = (
+            select(lineage_edge.c.target_node_id.label("node_id"))
+            .where(lineage_edge.c.snapshot_id == snapshot_id)
+            .distinct()
+            .subquery("lineage_incoming_ids")
+        )
+        outgoing_ids = (
+            select(lineage_edge.c.source_node_id.label("node_id"))
+            .where(lineage_edge.c.snapshot_id == snapshot_id)
+            .distinct()
+            .subquery("lineage_outgoing_ids")
+        )
+
+        def connected_candidates(kind: str | None):
+            statement = (
+                select(node.c.node_id)
+                .select_from(
+                    incoming_ids.join(
+                        outgoing_ids,
+                        outgoing_ids.c.node_id == incoming_ids.c.node_id,
+                    ).join(
+                        node,
+                        and_(
+                            node.c.snapshot_id == snapshot_id,
+                            node.c.node_id == incoming_ids.c.node_id,
+                        ),
+                    )
+                )
+                .order_by(layer_rank, node.c.node_id)
+                .limit(1)
             )
-        )
-        has_outgoing = exists(
-            select(lineage_edge.c.edge_id).where(
-                lineage_edge.c.snapshot_id == snapshot_id,
-                lineage_edge.c.source_node_id == node.c.node_id,
+            if kind is not None:
+                statement = statement.where(node.c.kind_code == kind)
+            return statement
+
+        def ranked_candidates(kind: str | None):
+            statement = (
+                select(node.c.node_id)
+                .where(node.c.snapshot_id == snapshot_id)
+                .order_by(layer_rank, node.c.node_id)
+                .limit(1)
             )
+            if kind is not None:
+                statement = statement.where(node.c.kind_code == kind)
+            return statement
+
+        candidates = (
+            connected_candidates("table"),
+            ranked_candidates("table"),
+            connected_candidates(None),
+            ranked_candidates(None),
         )
-        connected_rank = case((and_(has_incoming, has_outgoing), 0), else_=1)
-        kind_rank = case((node.c.kind_code == "table", 0), else_=1)
-        layer = func.upper(func.coalesce(node.c.namespace_name, ""))
-        layer_rank = case(
-            (layer.in_(("DWF", "DWS_DWF")), 0),
-            (layer.in_(("DWM", "DWS_DWM")), 1),
-            (layer.in_(("DWP", "DWS_DWP")), 2),
-            (layer == "DIM", 3),
-            (layer == "ODS", 4),
-            (layer == "API", 5),
-            (layer == "REPORT", 6),
-            (layer == "PUSH", 7),
-            else_=8,
-        )
-        rows = self._db.fetch_rows(
-            select(node.c.node_id)
-            .where(node.c.snapshot_id == snapshot_id)
-            .order_by(kind_rank, connected_rank, layer_rank, node.c.node_id)
-            .limit(1)
-        )
-        return rows[0]["node_id"] if rows else None
+        for statement in candidates:
+            rows = self._db.fetch_rows(statement)
+            if rows:
+                return rows[0]["node_id"]
+        return None
 
     def search_nodes(self, snapshot_id: str, name_pattern: str, limit: int) -> list[dict]:
         return self._db.fetch_rows(
@@ -124,7 +195,9 @@ class LineageDatabaseReader:
             .where(
                 lineage_node.c.snapshot_id == snapshot_id,
                 lineage_node.c.kind_code.in_(("table", "task")),
-                func.lower(lineage_node.c.node_name).like(name_pattern, escape="\\"),
+                func.lower(lineage_node.c.node_name).like(
+                    name_pattern, escape=LINEAGE_LIKE_ESCAPE_CHAR
+                ),
             )
             .order_by(lineage_node.c.node_id)
             .limit(limit)
@@ -179,4 +252,4 @@ class LineageDatabaseReader:
         return self._db.fetch_rows(statement)
 
 
-__all__ = ["LineageDatabaseReader"]
+__all__ = ["LINEAGE_LIKE_ESCAPE_CHAR", "LineageDatabaseReader", "escape_like_operand"]
