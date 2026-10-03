@@ -6,7 +6,11 @@ from unittest.mock import MagicMock, patch
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
 from backend.app.services import lineage_service
-from backend.app.services.lineage_database_reader import LineageDatabaseReader
+from backend.app.services.lineage_database_reader import (
+    LINEAGE_LIKE_ESCAPE_CHAR,
+    LineageDatabaseReader,
+    escape_like_operand,
+)
 
 
 class LineageCoreQueryTests(unittest.TestCase):
@@ -34,10 +38,38 @@ class LineageCoreQueryTests(unittest.TestCase):
         self.assertIn("node_name", search_sql)
         self.assertIn("snapshot_id", search_sql)
         self.assertIn("limit", search_sql)
+        self.assertIn("escape '!'", search_sql)
+        self.assertNotIn("escape '\\'", search_sql)
         adjacency_sql = str(db.fetch_rows.call_args_list[6].args[0]).lower()
         self.assertIn("source_node_id", adjacency_sql)
         self.assertIn("lineage_neighbor", adjacency_sql)
         self.assertIn("limit", adjacency_sql)
+
+    def test_like_escape_policy_escapes_escape_char_before_wildcards(self):
+        self.assertEqual("!", LINEAGE_LIKE_ESCAPE_CHAR)
+        self.assertEqual("abc", escape_like_operand("abc"))
+        self.assertEqual("f!_accr!_day!_sum!_r", escape_like_operand("f_accr_day_sum_r"))
+        self.assertEqual("abc!%def", escape_like_operand("abc%def"))
+        self.assertEqual("abc!!def", escape_like_operand("abc!def"))
+        self.assertEqual("a!!b!_c!%d", escape_like_operand("a!b_c%d"))
+        # The escape token is escaped first so user input cannot create a new
+        # wildcard escape for the following character.
+        self.assertEqual("a!!!%b", escape_like_operand("a!%b"))
+
+    def test_search_like_pattern_stays_bound_and_uses_single_character_escape(self):
+        db = MagicMock()
+        db.fetch_rows.return_value = []
+        reader = LineageDatabaseReader(db)
+        reader.search_nodes("S1", "%f!_accr!_day!_sum!_r%", 100)
+        statement = db.fetch_rows.call_args.args[0]
+        for dialect in (sqlite.dialect(), postgresql.dialect(), mysql.dialect()):
+            compiled = statement.compile(dialect=dialect)
+            sql = str(compiled)
+            self.assertIn("ESCAPE '!'", sql)
+            self.assertNotIn("ESCAPE '\\'", sql)
+            # The user pattern is bound, never inlined into the SQL text.
+            self.assertNotIn("f!_accr", sql)
+            self.assertEqual("%f!_accr!_day!_sum!_r%", compiled.params["lower_1"])
 
     def test_database_snapshot_reads_use_bound_core_queries(self):
         db = MagicMock()

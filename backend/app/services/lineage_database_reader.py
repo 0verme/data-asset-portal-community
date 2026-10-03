@@ -13,6 +13,26 @@ from sqlalchemy import and_, case, exists, func, select
 from ..db.tables import lineage_edge, lineage_node, lineage_snapshot
 
 
+# Portal search paths use "!" as a portable single-character ``LIKE`` escape
+# token (see ``services.search_provider.KeywordSearchProvider.LIKE_ESCAPE``).
+# GaussDB/DWS parses ``ESCAPE '\\'`` as an invalid escape string, so lineage
+# search reuses the same policy instead of a backslash literal.
+LINEAGE_LIKE_ESCAPE_CHAR = "!"
+
+
+def escape_like_operand(value: str, escape_char: str = LINEAGE_LIKE_ESCAPE_CHAR) -> str:
+    """Escape LIKE wildcards so user input is matched literally.
+
+    The escape token is escaped first; otherwise a user-supplied token could
+    change the meaning of a later wildcard escape (e.g. ``!_``).
+    """
+    return (
+        value.replace(escape_char, escape_char * 2)
+        .replace("%", f"{escape_char}%")
+        .replace("_", f"{escape_char}_")
+    )
+
+
 _NODE_COLUMNS = (
     lineage_node.c.node_id,
     lineage_node.c.kind_code,
@@ -124,7 +144,9 @@ class LineageDatabaseReader:
             .where(
                 lineage_node.c.snapshot_id == snapshot_id,
                 lineage_node.c.kind_code.in_(("table", "task")),
-                func.lower(lineage_node.c.node_name).like(name_pattern, escape="\\"),
+                func.lower(lineage_node.c.node_name).like(
+                    name_pattern, escape=LINEAGE_LIKE_ESCAPE_CHAR
+                ),
             )
             .order_by(lineage_node.c.node_id)
             .limit(limit)
@@ -179,4 +201,4 @@ class LineageDatabaseReader:
         return self._db.fetch_rows(statement)
 
 
-__all__ = ["LineageDatabaseReader"]
+__all__ = ["LINEAGE_LIKE_ESCAPE_CHAR", "LineageDatabaseReader", "escape_like_operand"]
