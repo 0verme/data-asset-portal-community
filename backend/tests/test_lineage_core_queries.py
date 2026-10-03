@@ -24,7 +24,7 @@ class LineageCoreQueryTests(unittest.TestCase):
         reader.search_nodes("S1", "%table%", 100)
         reader.node("S1", "table:one")
         reader.adjacent("S1", ["table:one", "task:two"], "downstream", 101)
-        self.assertEqual(7, db.fetch_rows.call_count)
+        self.assertEqual(10, db.fetch_rows.call_count)
 
         for call in db.fetch_rows.call_args_list:
             statement = call.args[0]
@@ -33,14 +33,26 @@ class LineageCoreQueryTests(unittest.TestCase):
                 sql = str(compiled).lower()
                 self.assertIn("__app__.p_lineage_", sql)
                 self.assertNotIn("select *", sql)
-        search_sql = str(db.fetch_rows.call_args_list[4].args[0]).lower()
+        root_candidates = [
+            str(call.args[0]).lower() for call in db.fetch_rows.call_args_list[3:7]
+        ]
+        self.assertEqual(4, len(root_candidates))
+        self.assertIn("distinct", root_candidates[0])
+        self.assertIn("target_node_id", root_candidates[0])
+        self.assertIn("source_node_id", root_candidates[0])
+        for root_sql in root_candidates:
+            self.assertIn("snapshot_id", root_sql)
+            self.assertIn("node_id", root_sql)
+            self.assertIn("limit", root_sql)
+            self.assertNotIn("exists", root_sql)
+        search_sql = str(db.fetch_rows.call_args_list[7].args[0]).lower()
         self.assertIn("kind_code", search_sql)
         self.assertIn("node_name", search_sql)
         self.assertIn("snapshot_id", search_sql)
         self.assertIn("limit", search_sql)
         self.assertIn("escape '!'", search_sql)
         self.assertNotIn("escape '\\'", search_sql)
-        adjacency_sql = str(db.fetch_rows.call_args_list[6].args[0]).lower()
+        adjacency_sql = str(db.fetch_rows.call_args_list[9].args[0]).lower()
         self.assertIn("source_node_id", adjacency_sql)
         self.assertIn("lineage_neighbor", adjacency_sql)
         self.assertIn("limit", adjacency_sql)
