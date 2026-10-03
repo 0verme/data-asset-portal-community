@@ -11,6 +11,7 @@ from sqlalchemy.sql.expression import ClauseElement
 
 from .facade import (
     _commit_if_needed,
+    _normalize_jdbc_bind_params,
     _rollback_if_needed,
     active_transaction_connection,
     connect_with_profile,
@@ -28,8 +29,12 @@ def _schema_translate_map(config: dict) -> dict:
     return {LOGICAL_SCHEMA: provider.physical_schema(config)}
 
 
-def _compile(profile: str, statement, dialect=None):
-    """Compile Core for a raw DB-API connection."""
+def _compile_for_jdbc(profile: str, statement, dialect=None):
+    """Compile Core for a raw DB-API connection and return its provider.
+
+    The provider is returned so raw cursor callers can apply provider-specific
+    bind normalization without loading the same profile a second time.
+    """
     config = get_db_profile(profile)
     provider = get_provider(config["type"])
     dialect = dialect or postgresql.dialect(paramstyle="qmark")
@@ -55,6 +60,12 @@ def _compile(profile: str, statement, dialect=None):
         params = tuple(compiled.params[name] for name in compiled.positiontup)
     else:
         params = compiled.params
+    return sql, params, provider
+
+
+def _compile(profile: str, statement, dialect=None):
+    """Compile Core for a raw DB-API connection."""
+    sql, params, _provider = _compile_for_jdbc(profile, statement, dialect)
     return sql, params
 
 
@@ -85,8 +96,10 @@ def fetch_all_core(profile: str, statement):
     owns_connection = shared is None
     cursor = connection.cursor()
     try:
-        sql, params = _compile(profile, statement, engine.dialect if engine is not None else None)
-        cursor.execute(sql, params)
+        sql, params, provider = _compile_for_jdbc(
+            profile, statement, engine.dialect if engine is not None else None
+        )
+        cursor.execute(sql, _normalize_jdbc_bind_params(provider, params))
         columns = [item[0] for item in cursor.description] if cursor.description else []
         return columns, cursor.fetchall()
     finally:
@@ -131,8 +144,10 @@ def execute_core(profile: str, statement) -> int:
             return int(result.rowcount or 0)
         cursor = connection.cursor()
         try:
-            sql, params = _compile(profile, statement, engine.dialect if engine is not None else None)
-            cursor.execute(sql, params)
+            sql, params, provider = _compile_for_jdbc(
+                profile, statement, engine.dialect if engine is not None else None
+            )
+            cursor.execute(sql, _normalize_jdbc_bind_params(provider, params))
             return int(cursor.rowcount or 0)
         finally:
             cursor.close()
@@ -150,8 +165,10 @@ def execute_core_on_cursor(profile: str, cursor, statement) -> int:
     statement = _normalize_core_statement(statement)
     config = get_db_profile(profile)
     engine = get_engine(profile, config=config)
-    sql, params = _compile(profile, statement, engine.dialect if engine is not None else None)
-    cursor.execute(sql, params)
+    sql, params, provider = _compile_for_jdbc(
+        profile, statement, engine.dialect if engine is not None else None
+    )
+    cursor.execute(sql, _normalize_jdbc_bind_params(provider, params))
     return int(getattr(cursor, "rowcount", 0) or 0)
 
 
@@ -183,8 +200,8 @@ def execute_many_core(profile: str, statement, rows) -> int:
             compile_dialect = engine.dialect if engine is not None else None
             for row in payloads:
                 bound = statement.values(**row) if hasattr(statement, "values") else statement
-                sql, params = _compile(profile, bound, compile_dialect)
-                cursor.execute(sql, params)
+                sql, params, provider = _compile_for_jdbc(profile, bound, compile_dialect)
+                cursor.execute(sql, _normalize_jdbc_bind_params(provider, params))
                 affected += int(cursor.rowcount or 0)
             return affected
         finally:
@@ -212,8 +229,8 @@ def execute_statements_core(profile: str, statements) -> int:
             affected = 0
             compile_dialect = engine.dialect if engine is not None else None
             for statement in items:
-                sql, params = _compile(profile, statement, compile_dialect)
-                cursor.execute(sql, params)
+                sql, params, provider = _compile_for_jdbc(profile, statement, compile_dialect)
+                cursor.execute(sql, _normalize_jdbc_bind_params(provider, params))
                 affected += int(cursor.rowcount or 0)
             return affected
         finally:

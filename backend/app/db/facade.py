@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import datetime
 import os
 import re
 import logging
@@ -290,6 +291,30 @@ def _rollback_if_needed(conn):
     conn.rollback()
 
 
+def _normalize_jdbc_bind_params(provider, params):
+    """Convert Python temporal binds for the GaussDB/JDBC raw cursor path.
+
+    GaussDB is the only provider whose raw JDBC driver cannot accept Python
+    ``datetime`` bind values.  The adapter is imported lazily, and skipped
+    entirely when no temporal value is present, so SQLite/PostgreSQL/MySQL
+    deployments never require JayDeBeApi/JPype.
+    """
+    if params is None or provider.name != "gaussdb" or not _has_temporal_bind(params):
+        return params
+    from .gaussdb_adapter import normalize_bind_params
+
+    return normalize_bind_params(params)
+
+
+def _has_temporal_bind(params) -> bool:
+    if isinstance(params, dict):
+        params = params.values()
+    return any(
+        isinstance(value, (datetime.datetime, datetime.date, datetime.time))
+        for value in params
+    )
+
+
 def _prepare_execute_args(profile: str, sql: str, params=None):
     config = get_db_profile(profile)
     provider = get_provider(config["type"])
@@ -298,7 +323,7 @@ def _prepare_execute_args(profile: str, sql: str, params=None):
         return normalized_sql, None
     if provider.placeholder != "?":
         normalized_sql = normalized_sql.replace("?", provider.placeholder)
-    return normalized_sql, tuple(params)
+    return normalized_sql, _normalize_jdbc_bind_params(provider, tuple(params))
 
 
 def fetch_all(profile: str, sql: str, params=None):
@@ -371,7 +396,12 @@ def execute_many(profile: str, sql: str, rows, autocommit: bool = True):
         conn = shared_connection or connect_with_profile(profile)
         curs = conn.cursor()
         normalized_sql, _ = _prepare_execute_args(profile, sql, params=[None])
-        curs.executemany(normalized_sql, [tuple(row) for row in rows])
+        config = get_db_profile(profile)
+        provider = get_provider(config["type"])
+        normalized_rows = [
+            _normalize_jdbc_bind_params(provider, tuple(row)) for row in rows
+        ]
+        curs.executemany(normalized_sql, normalized_rows)
         if autocommit and shared_connection is None:
             _commit_if_needed(conn)
         return True

@@ -62,6 +62,19 @@ backend/.venv/bin/python -m pip show JPype1
 
 `pip show` 的 `Version` 字段用于核对已安装发行包；不要依赖 `jaydebeapi.__version__`。这些命令只检查 Java 命令和 Python 包信息，不等于 JVM startup、JDBC driver loading 或真实 GaussDB/DWS 连接验证。
 
+### Python temporal bind 语义（GaussDB/JDBC）
+
+JayDeBeApi 将绑定值原样交给 vendor JDBC driver；GaussDB driver 没有 `setObject(int, datetime)` overload，因此 raw JDBC cursor 的 temporal 参数必须先转换为 JDBC 对象：
+
+| Python 值 | JDBC 对象 | 转换规则 |
+| --- | --- | --- |
+| aware `datetime` | `java.sql.Timestamp` | 先转 UTC，再移除 tzinfo，保留 microseconds |
+| naive `datetime` | `java.sql.Timestamp` | 保持 wall-clock，不附加任何时区 |
+| `date` | `java.sql.Date` | 保持日期 |
+| `time` | `java.sql.Time` | 秒级精度；aware 值先转 UTC |
+
+DAP DWS physical schema 使用 `TIMESTAMP WITHOUT TIME ZONE`，aware 值明确按 **UTC wall-clock** 写入，不依赖 JVM / 操作系统本地时区。非 temporal 参数（`None`、`str`、`int`、`float`、`bool` 等）原样透传；SQLite / PostgreSQL / MySQL provider 不经过该转换。
+
 ## 启动
 
 从仓库根目录以前台方式启动默认 runtime：
