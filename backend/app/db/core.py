@@ -29,11 +29,12 @@ def _schema_translate_map(config: dict) -> dict:
     return {LOGICAL_SCHEMA: provider.physical_schema(config)}
 
 
-def _compile_for_jdbc(profile: str, statement, dialect=None):
-    """Compile Core for a raw DB-API connection and return its provider.
+def _compile_statement(profile: str, statement, dialect=None):
+    """Compile Core for a raw DB-API connection and keep the compiled object.
 
-    The provider is returned so raw cursor callers can apply provider-specific
-    bind normalization without loading the same profile a second time.
+    The compiled object is returned so callers can rely on SQLAlchemy's own
+    positional bind metadata (``positiontup``) instead of guessing parameter
+    order from Python mappings.
     """
     config = get_db_profile(profile)
     provider = get_provider(config["type"])
@@ -56,6 +57,16 @@ def _compile_for_jdbc(profile: str, statement, dialect=None):
     else:
         sql = re.sub(_SCHEMA_TOKEN_RE.pattern + r"\.", "", sql)
         sql = sql.replace(f"{LOGICAL_SCHEMA}.", "")
+    return sql, compiled, provider
+
+
+def _compile_for_jdbc(profile: str, statement, dialect=None):
+    """Compile Core for a raw DB-API connection and return its provider.
+
+    The provider is returned so raw cursor callers can apply provider-specific
+    bind normalization without loading the same profile a second time.
+    """
+    sql, compiled, provider = _compile_statement(profile, statement, dialect)
     if compiled.positiontup:
         params = tuple(compiled.params[name] for name in compiled.positiontup)
     else:
@@ -181,6 +192,62 @@ def execute_core_on_connection(profile: str, connection, statement) -> int:
         cursor.close()
 
 
+def _execute_many_jdbc_batch(profile, cursor, statement, payloads, compile_dialect):
+    """Execute one homogeneous payload through the JDBC driver's batch API.
+
+    The statement is compiled once from the first row; every later row only
+    produces a bind-parameter tuple in the compiled statement's positional
+    order, and JayDeBeApi turns the whole sequence into one
+    ``prepareStatement`` + ``addBatch`` + ``executeBatch`` cycle.
+
+    ``None`` is returned when the payload cannot use this fast path so the
+    caller can fall back to per-row execution *before* anything has been sent
+    to the database: non-insert statements, heterogeneous mappings, and
+    statements whose compiled bind parameters do not match the row keys (for
+    example an extra WHERE bind or a Python-side default).
+    """
+    if not hasattr(statement, "values"):
+        return None
+    if not callable(getattr(cursor, "executemany", None)):
+        return None
+    first = payloads[0]
+    sql, compiled, provider = _compile_statement(
+        profile, statement.values(**first), compile_dialect
+    )
+    positiontup = tuple(compiled.positiontup or ())
+    if not positiontup or set(positiontup) != set(first):
+        return None
+    parameter_rows = []
+    for payload in payloads:
+        if payload.keys() != first.keys():
+            return None
+        parameter_rows.append(tuple(payload[name] for name in positiontup))
+    cursor.executemany(
+        sql,
+        [_normalize_jdbc_bind_params(provider, row) for row in parameter_rows],
+    )
+    return _jdbc_batch_rowcount(cursor, len(parameter_rows))
+
+
+def _jdbc_batch_rowcount(cursor, attempted: int) -> int:
+    """Interpret ``cursor.rowcount`` after a JDBC ``executeBatch()``.
+
+    JayDeBeApi stores ``sum(executeBatch())`` in ``cursor.rowcount``.  JDBC
+    drivers may report ``SUCCESS_NO_INFO`` for batched statements, which makes
+    that sum unusable, so a successful batch with a negative total is reported
+    as the number of attempted rows instead of a bogus value.  A failed batch
+    raises before this helper is reached and must never be retried here.
+    """
+    rowcount = getattr(cursor, "rowcount", None)
+    if rowcount is None:
+        return attempted
+    try:
+        rowcount = int(rowcount)
+    except (TypeError, ValueError):
+        return attempted
+    return rowcount if rowcount >= 0 else attempted
+
+
 def execute_many_core(profile: str, statement, rows) -> int:
     """Execute one Core statement for each parameter mapping on a single connection."""
     statement = _normalize_core_statement(statement)
@@ -196,8 +263,14 @@ def execute_many_core(profile: str, statement, rows) -> int:
             return int(result.rowcount or 0)
         cursor = connection.cursor()
         try:
-            affected = 0
             compile_dialect = engine.dialect if engine is not None else None
+            if get_provider(config["type"]).name == "gaussdb":
+                affected = _execute_many_jdbc_batch(
+                    profile, cursor, statement, payloads, compile_dialect
+                )
+                if affected is not None:
+                    return affected
+            affected = 0
             for row in payloads:
                 bound = statement.values(**row) if hasattr(statement, "values") else statement
                 sql, params, provider = _compile_for_jdbc(profile, bound, compile_dialect)
