@@ -329,7 +329,7 @@ curl --get "http://127.0.0.1:15099/api/assets/tables/DWM_MEMBER_ACTIVITY_STAT_1D
 
 Base Path: `/api/search`
 
-当前统一搜索属于 Public Catalog read，匿名请求返回 `200`；已登录用户不需要额外的搜索 `*:read` 权限。搜索结果只返回目录展示字段，不返回连接凭据或管理审计数据。
+当前统一搜索属于 Public Catalog read，匿名请求返回 `200`；已登录用户不需要额外的搜索 `*:read` 权限。搜索结果只返回当前 `PUBLIC_CATALOG_PROFILE` 可展示的字段，不返回连接凭据或管理审计数据。可搜索字段与可展示字段共用同一 profile 策略：`internal` 可搜索 host / db / schema 等安全连接定位元数据，`strict` 下这些字段既不展示也不参与匹配，`matchedFields` 不会返回被隐藏字段的值；`disabled` 拒绝匿名搜索。
 
 ### 热门搜索词配置
 
@@ -890,7 +890,7 @@ Base Path: `/api/upstreams`
 
 `GET /api/upstreams/systems`
 
-- `keyword`：模糊匹配 `id`、`abbr`、`name`、负责人、部门和说明；连接信息不属于公开搜索字段
+- `keyword`：按 `PUBLIC_CATALOG_PROFILE` 过滤后模糊匹配。`internal` 匹配 `id`、`abbr`、`name`、负责人、部门、说明、卸数时间，以及 host、db、schema 等连接定位元数据；`strict` 排除连接定位元数据与人员身份字段，因此这些字段不会命中。可搜索字段始终是可展示字段的子集。
 - `status`：如 `enabled` / `disabled`
 - `dbType`：如 `Oracle`、`MySQL`、`PostgreSQL`
 

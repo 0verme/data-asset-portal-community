@@ -268,9 +268,9 @@ V1 血缘只支持 self-contained `replace` snapshot：新快照先以 `INACTIVE
 
 ### API 安全边界
 
-- **Public Catalog**：普通业务目录、搜索、字段/DDL、映射、血缘、菜单、报表、API 资产、码值表、上/下游目录和门户统计支持匿名只读浏览；公开响应按需脱敏，不是全部 GET 无脑公开。
+- **Public Catalog**：普通业务目录、搜索、字段/DDL、映射、血缘、菜单、报表、API 资产、码值表、上/下游目录和门户统计支持匿名只读浏览；公开响应按需脱敏，不是全部 GET 无脑公开。`PUBLIC_CATALOG_PROFILE`（`internal`/`strict`/`disabled`）同时决定可展示字段与可搜索字段：`internal` 允许匿名查看和搜索安全的连接定位元数据（host、port、database、schema、去除凭据的 JDBC endpoint），`strict` 隐藏这些字段且不允许通过搜索命中，`disabled` 关闭匿名目录与匿名搜索。
 - **Authenticated Management**：写操作、管理操作和敏感读取继续由 permission-based RBAC 控制。
-- **Protected data**：系统用户/角色/参数、操作日志、Metadata ingestion、上/下游 `admin-detail`、连接信息、凭据和认证信息继续要求认证/权限。
+- **Protected data**：系统用户/角色/参数、操作日志、Metadata ingestion、上/下游 `admin-detail`、账号/密码/token/secret/credential 等凭据、认证信息、内部路径与诊断信息继续要求认证/权限。
 
 完整 route 分类见 [Public Catalog + Authenticated Management](./docs/rbac/authenticated-read-model.md)。
 

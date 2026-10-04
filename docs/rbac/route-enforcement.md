@@ -41,6 +41,11 @@ The following ordinary read routes explicitly accept anonymous requests:
 - `GET /api/system/menus`.
 
 These routes return public catalog data with the necessary response projection.
+`PUBLIC_CATALOG_PROFILE` selects the projection: `internal` keeps safe
+connection locator metadata and business contacts, `strict` removes
+connection locators and person identity. The same policy also filters
+`/api/search` matchers, `/api/upstreams/systems?keyword=` matching, and
+`matchedFields`, so a hidden field cannot be used as a search side channel.
 The upstream/push `admin-detail` routes, metadata-ingestion lookup, operation
 logs, system users/roles/parameters, and all mutations remain protected.
 

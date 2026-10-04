@@ -139,13 +139,15 @@ PUBLIC_CATALOG_EXPORT_ENABLED=false
 
 | Profile | 匿名访问策略 | 推荐场景 |
 | --- | --- | --- |
-| `internal`（默认） | 可浏览业务目录，允许负责人、维护人和业务联系人姓名；仍隐藏凭据、账号和连接/内部诊断信息 | 企业内网部署 |
-| `strict` | 在 internal 基础上隐藏负责人、维护人、联系人和审计人员身份；保留部门、团队、数据域等组织信息 | 公网 Demo 或较高安全场景 |
-| `disabled` | 后端拒绝匿名业务目录 API，匿名菜单为空；登录和健康检查不受影响 | 完全禁止匿名目录访问 |
+| `internal`（默认） | 可浏览并搜索业务目录与安全连接定位元数据（host、port、database、schema、去除凭据的 JDBC endpoint），允许负责人、维护人和业务联系人姓名；仍隐藏账号、密码、token、secret、credential 等凭据 | 企业内网部署 |
+| `strict` | 隐藏连接定位元数据以及负责人、维护人、联系人和审计人员身份；保留部门、团队、数据域等组织信息；隐藏字段同时不参与匿名搜索与 `matchedFields` | 公网 Demo 或较高安全场景 |
+| `disabled` | 后端拒绝匿名业务目录 API 与匿名搜索，匿名菜单为空；登录和健康检查不受影响 | 完全禁止匿名目录访问 |
 
 建议：内网使用 `PUBLIC_CATALOG_PROFILE=internal`，公网 Demo 使用 `strict`，完全关闭匿名目录使用 `disabled`。非法 profile 会阻止应用启动，不会默默回退到更宽松策略。
 
-匿名批量导出默认关闭（`PUBLIC_CATALOG_EXPORT_ENABLED=false`）。开启后手工码值表与字段映射 CSV endpoint 均在后端执行该开关，并复用页面相同的 public projection；`disabled` profile 仍禁止匿名业务读取与导出。永久敏感字段（password、token、secret、credential、数据库账号及连接信息、内部路径/诊断等）不会因 profile 或导出开关而公开。受保护的 `admin-detail`、写操作、系统管理和操作日志边界不随该配置放宽。
+Public Catalog 的“可搜索字段”和“可展示字段”采用同一 profile 策略：`/api/search`、`/api/upstreams/systems?keyword=` 与 `matchedFields` 都先按 profile 过滤字段再执行匹配，避免“字段不可见但可被搜索命中”的搜索侧信道。JDBC/连接串会去除 `user`、`password`、`token`、`secret` 等凭据类 query 参数。
+
+匿名批量导出默认关闭（`PUBLIC_CATALOG_EXPORT_ENABLED=false`）。开启后手工码值表与字段映射 CSV endpoint 均在后端执行该开关，并复用页面相同的 public projection；`disabled` profile 仍禁止匿名业务读取与导出。永久敏感字段（password、token、secret、credential、数据库账号、内部路径/诊断等）不会因 profile 或导出开关而公开。受保护的 `admin-detail`、写操作、系统管理和操作日志边界不随该配置放宽。
 
 ### 3.5 API authentication boundary
 

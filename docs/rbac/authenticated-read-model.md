@@ -78,16 +78,30 @@ The following routes intentionally accept anonymous requests:
 | `GET /api/api-assets/*` | `200`; API catalog metadata without examples/credentials/audit actors |
 | `GET /api/manual-code-tables` and `GET /api/manual-code-tables/{table_id}` | `200`; table-level code metadata without audit actors |
 | `GET /api/manual-code-tables/export` | `401` for guests by default; `PUBLIC_CATALOG_EXPORT_ENABLED=true` opts into profile-projected anonymous CSV export |
-| `GET /api/upstreams/systems` and `GET /api/upstreams/systems/{system_id}` | `200`; public system metadata; connection fields remain excluded |
+| `GET /api/upstreams/systems` and `GET /api/upstreams/systems/{system_id}` | `200`; public system metadata; safe connection locator metadata (host/db/schema) and business contacts under `internal`, hidden under `strict` |
 | `GET /api/push/systems` and `GET /api/push/systems/{system_id}` | `200`; public system/job metadata; connection fields are always excluded; people fields depend on profile |
 | `POST /api/auth/login` | Authentication lifecycle; no existing session required |
 | `GET /api/auth/me` | `401` without a valid identity; never returns business data |
 | `POST /api/auth/logout` | Idempotent authentication lifecycle cleanup |
 
 Set `PUBLIC_CATALOG_PROFILE` to `internal` (default), `strict`, or `disabled`.
-In `internal`, business owner/contact names remain visible; `strict` hides
-person-identity fields while preserving organization metadata; `disabled`
-returns `401` for anonymous business reads and returns no anonymous menus.
+
+- `internal` is the enterprise intranet catalog: anonymous visitors may read
+  and search safe connection locator metadata (host, port, database, schema,
+  sanitized JDBC endpoint) and business owner/contact names.
+- `strict` hides connection locator metadata and person identity from display
+  *and* from anonymous search: a hidden field is excluded from `/api/search`,
+  `/api/upstreams/systems?keyword=`, and `matchedFields`, so it cannot be used
+  as a search side channel.
+- `disabled` returns `401` for anonymous business reads (including anonymous
+  search) and returns no anonymous menus.
+
+Display fields and searchable fields use the same profile policy. Credentials
+(account, username, password, token, secret, credential, private key, access
+key, cookie, authorization/authentication) are permanently hidden in every
+profile, and JDBC/connection strings are sanitized so credential query
+parameters never leak even in `internal`.
+
 Authentication, health checks, and the non-secret `/api/public-catalog/config`
 policy endpoint remain available. Invalid profile values fail application
 startup. The `admin-detail` upstream/push routes are not part of the public
