@@ -78,7 +78,7 @@ class PublicCatalogProjectionTests(unittest.TestCase):
                 item = project({"name": "public", "createdBy": "admin", "updatedBy": "admin"})
                 self.assertEqual({"name": "public"}, item)
 
-    def test_upstream_projection_hides_connection_values_in_every_profile(self):
+    def test_upstream_projection_exposes_locators_only_in_internal_profile(self):
         source = {
             "id": "WAREHOUSE",
             "dbType": "PostgreSQL",
@@ -97,16 +97,22 @@ class PublicCatalogProjectionTests(unittest.TestCase):
 
         self.assertEqual("PostgreSQL", internal["dbType"])
         self.assertEqual("Alice", internal["owner"])
+        self.assertEqual("198.51.100.4", internal["host"])
+        self.assertEqual(5432, internal["port"])
+        self.assertEqual("catalog", internal["db"])
+        self.assertEqual("private_schema", internal["schema"])
         self.assertEqual("Data Office", strict["ownerDepartment"])
-        self.assertNotIn("warehouse", internal["description"])
+        self.assertIn("database=warehouse", internal["description"])
         self.assertNotIn("svc_reader", internal["description"])
         self.assertNotIn("/internal/config", internal["description"])
-        for key in ("host", "port", "db", "schema", "account", "password"):
+        self.assertNotIn("warehouse", strict["description"])
+        for key in ("account", "password"):
             self.assertNotIn(key, internal)
             self.assertNotIn(key, strict)
-        self.assertNotIn("owner", strict)
+        for key in ("host", "port", "db", "schema", "owner"):
+            self.assertNotIn(key, strict)
 
-    def test_internal_profile_keeps_business_contacts_but_hides_sensitive_fields(self):
+    def test_internal_profile_keeps_business_contacts_and_locators_but_hides_sensitive_fields(self):
         item = redact_public_push_system({
             "owner": "Alice",
             "downstreamContact": "Bob",
@@ -114,6 +120,7 @@ class PublicCatalogProjectionTests(unittest.TestCase):
             "ownerPhone": "owner-phone",
             "ownerDepartment": "Data Office",
             "host": "198.51.100.9",
+            "port": 22,
             "databaseUser": "svc_reader",
             "password": "not-public",
             "diagnostics": {"lastError": "trace"},
@@ -124,7 +131,9 @@ class PublicCatalogProjectionTests(unittest.TestCase):
         self.assertEqual("alice@demo.invalid", item["ownerEmail"])
         self.assertEqual("owner-phone", item["ownerPhone"])
         self.assertEqual("Data Office", item["ownerDepartment"])
-        for key in ("host", "databaseUser", "password", "diagnostics"):
+        self.assertEqual("198.51.100.9", item["host"])
+        self.assertEqual(22, item["port"])
+        for key in ("databaseUser", "password", "diagnostics"):
             self.assertNotIn(key, item)
 
     def test_strict_profile_hides_person_identity_but_keeps_organization_metadata(self):
@@ -169,11 +178,24 @@ class PublicCatalogProjectionTests(unittest.TestCase):
                 },
                 "diagnostics": [{"host": "198.51.100.2"}],
             }],
-        })
-        self.assertEqual({"layer": "DWM", "owner": "catalog"}, item["nodes"][0]["attributes"])
+        }, profile="strict")
+        self.assertEqual({"layer": "DWM"}, item["nodes"][0]["attributes"])
         self.assertNotIn("sourceRecordId", item["edges"][0]["evidence"])
         self.assertNotIn("diagnostics", item["edges"][0])
         self.assertEqual("[已隐藏]", item["edges"][0]["evidence"]["description"])
+
+    def test_internal_lineage_keeps_safe_endpoint_and_removes_credentials(self):
+        item = redact_public_lineage({
+            "nodes": [{
+                "attributes": {
+                    "jdbcUrl": "jdbc:postgresql://host.demo.invalid:5432/db?user=x&password=y&sslmode=require",
+                },
+            }],
+        }, profile="internal")
+        self.assertEqual(
+            "jdbc:postgresql://host.demo.invalid:5432/db?sslmode=require",
+            item["nodes"][0]["attributes"]["jdbcUrl"],
+        )
 
 
 if __name__ == "__main__":
