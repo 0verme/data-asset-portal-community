@@ -63,14 +63,21 @@ visibility is configurable independently from route registration:
 
 | Setting | Default | Values / behavior |
 |---|---|---|
-| `PUBLIC_CATALOG_PROFILE` | `internal` | `internal` retains business contact names; `strict` hides person identity while keeping organization metadata; `disabled` rejects anonymous business reads and hides guest menus. Invalid values fail startup. |
+| `PUBLIC_CATALOG_PROFILE` | `internal` | `internal` publishes and searches safe connection locator metadata (host, port, database, schema, sanitized JDBC endpoint) plus business contacts; `strict` hides connection locators and person identity, and excludes them from anonymous search; `disabled` rejects anonymous business reads and hides guest menus. Invalid values fail startup. |
 | `PUBLIC_CATALOG_EXPORT_ENABLED` | `false` | Enables anonymous batch export only; an enabled export still uses the selected public projection, and `disabled` always blocks guest export. |
 
-Credentials, database accounts and connection details, internal paths, and
-diagnostics are always removed from ordinary catalog responses in every
-profile. Health checks, authentication, and the non-secret catalog policy
-endpoint remain available. Mutations, administration, sensitive reads, and
-audit data continue to use their existing backend authentication/RBAC rules.
+Public Catalog display fields and searchable fields use the same profile
+policy, so a field hidden from a profile is also excluded from anonymous
+search, upstream keyword matching, and `matchedFields` — avoiding a search
+side channel. Credentials, database accounts, authentication material,
+internal paths, and diagnostics are always removed from ordinary catalog
+responses in every profile. Connection strings and JDBC endpoints are
+sanitized so credential query parameters (`user`, `password`, `token`, ...)
+never leak even in `internal`. Health checks, authentication, and the
+non-secret catalog policy endpoint remain available. Mutations,
+administration, sensitive reads, and audit data continue to use their
+existing backend authentication/RBAC rules.
+
 See the [deployment guide](../DEPLOYMENT.md) and [Public Catalog contract](./rbac/authenticated-read-model.md).
 
 ## OpenAPI and interactive docs exposure

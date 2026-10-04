@@ -26,8 +26,12 @@ Only ordinary business/catalog reads are public. In particular:
 
 - `GET /api/system/menus` returns enabled, non-management menu entries for an
   anonymous request;
-- upstream/push public reads exclude connection, credential, internal-path, and
-  contact details;
+- upstream public reads follow `PUBLIC_CATALOG_PROFILE`: `internal` publishes
+  safe connection locator metadata (host/db/schema) and business contacts,
+  `strict` excludes them; credentials and internal paths are excluded in every
+  profile;
+- push public reads exclude credential, internal-path, and connection
+  configuration details; people fields depend on the profile;
 - API public reads omit arbitrary examples, credential-like parameters, and
   audit actors;
 - report/code-table public reads omit audit actors;
@@ -55,8 +59,10 @@ Authentication and authorization failures use the existing minimal error
 contract: `UNAUTHORIZED`/`请先登录。` for missing identity and
 `FORBIDDEN`/`无权限执行此操作。` for a missing permission. Protected error
 responses do not include permission names, roles, database/schema identifiers,
-or stack traces. Public projections additionally remove known connection,
-credential, contact, audit, and arbitrary-example data.
+or stack traces. Public projections additionally remove known credential,
+audit, internal-path, and arbitrary-example data. Connection locators and
+person identity follow the active `PUBLIC_CATALOG_PROFILE`; when hidden they
+are also excluded from anonymous search and `matchedFields`.
 
 ## Verification evidence
 

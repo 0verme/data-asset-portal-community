@@ -160,9 +160,9 @@ register_search_entity({
         {"expr": "t.table_cn_name", "label": "资产中文名"},
         {"expr": "d.domain_name", "label": "主题域"},
         {"expr": "t.domain_code", "label": "主题域编码"},
-        {"expr": "t.schema_name", "label": "Schema"},
+        {"expr": "t.schema_name", "label": "Schema", "class": "connection"},
         {"expr": "t.layer_code", "label": "分层"},
-        {"expr": "t.owner_name", "label": "负责人"},
+        {"expr": "t.owner_name", "label": "负责人", "class": "person"},
         {"expr": "t.grain_desc", "label": "粒度"},
         {"expr": "t.cycle_desc", "label": "周期"},
         {"expr": "t.table_desc", "label": "描述"},
@@ -206,9 +206,17 @@ register_search_entity({
         {"expr": "system_abbr", "label": "系统简称"},
         {"expr": "system_name", "label": "系统名称"},
         {"expr": "system_id", "label": "系统编码"},
-        {"expr": "owner_name", "label": "负责人"},
+        {"expr": "owner_name", "label": "负责人", "class": "person"},
+        {"expr": "dept_name", "label": "归属部门"},
+        {"expr": "system_desc", "label": "系统描述"},
+        {"expr": "host_name", "label": "主机", "class": "connection"},
+        {"expr": "db_name", "label": "数据库", "class": "connection"},
+        {"expr": "schema_name", "label": "Schema", "class": "connection"},
     ],
-    "select": "system_id, system_abbr, system_name, owner_name",
+    "select": (
+        "system_id, system_abbr, system_name, owner_name, dept_name, "
+        "system_desc, host_name, db_name, schema_name"
+    ),
     "order": "system_abbr",
     "build_item": _build_system,
 })
@@ -273,7 +281,7 @@ register_search_entity({
         {"expr": "result_field_name", "label": "结果字段"},
         {"expr": "caliber_desc", "label": "口径"},
         {"expr": "path_desc", "label": "路径"},
-        {"expr": "registrar_name", "label": "维护人"},
+        {"expr": "registrar_name", "label": "维护人", "class": "person"},
     ],
     "select": (
         "indicator_id, "
@@ -336,8 +344,8 @@ register_search_entity({
         {"expr": "domain_name", "label": "主题域"},
         {"expr": "purpose_desc", "label": "用途"},
         {"expr": "owner_dept_name", "label": "归属部门"},
-        {"expr": "owner_name", "label": "负责人"},
-        {"expr": "maintainer_name", "label": "维护人"},
+        {"expr": "owner_name", "label": "负责人", "class": "person"},
+        {"expr": "maintainer_name", "label": "维护人", "class": "person"},
     ],
     "select": (
         "report_code, "
@@ -365,8 +373,8 @@ register_search_entity({
         {"expr": "method_code", "label": "方法"},
         {"expr": "description_text", "label": "描述"},
         {"expr": "owner_dept_name", "label": "归属部门"},
-        {"expr": "owner_name", "label": "负责人"},
-        {"expr": "maintainer_name", "label": "维护人"},
+        {"expr": "owner_name", "label": "负责人", "class": "person"},
+        {"expr": "maintainer_name", "label": "维护人", "class": "person"},
     ],
     "select": (
         "api_code, "
@@ -389,7 +397,7 @@ register_search_entity({
         {"expr": "table_code", "label": "表编码"},
         {"expr": "table_name", "label": "表名称"},
         {"expr": "table_style", "label": "样式"},
-        {"expr": "owner_name", "label": "负责人"},
+        {"expr": "owner_name", "label": "负责人", "class": "person"},
         {"expr": "remark", "label": "说明"},
     ],
     "select": "table_code, table_name, table_style, owner_name, remark",

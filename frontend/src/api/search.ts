@@ -181,6 +181,7 @@ const ASSET_TABLE_FIELDS: readonly EntityField<MockDwmTable>[] = [
   { label: '资产表', getValue: (row) => row.name },
   { label: '资产中文名', getValue: (row) => row.cn },
   { label: '主题域', getValue: (row) => row.domain },
+  { label: 'Schema', getValue: (row) => `DWS_${row.layer}` },
   { label: '分层', getValue: (row) => row.layer },
   { label: '负责人', getValue: (row) => row.owner },
   { label: '描述', getValue: (row) => row.desc },
@@ -255,10 +256,13 @@ const MOCK_ENTITIES: readonly SearchEntity[] = [
     [
       { label: '系统简称', getValue: (row) => row.abbr },
       { label: '系统名称', getValue: (row) => row.name },
-      { label: '主机', getValue: (row) => row.host },
-      { label: '数据库', getValue: (row) => row.db },
       { label: '系统编码', getValue: (row) => row.id },
       { label: '负责人', getValue: (row) => row.owner },
+      { label: '归属部门', getValue: (row) => row.dept },
+      { label: '系统描述', getValue: (row) => row.desc },
+      { label: '主机', getValue: (row) => row.host },
+      { label: '数据库', getValue: (row) => row.db },
+      { label: 'Schema', getValue: (row) => row.schema },
     ],
     (row, matchedFields) =>
       makeItem(
@@ -268,7 +272,7 @@ const MOCK_ENTITIES: readonly SearchEntity[] = [
         row.id,
         row.abbr || row.name || '',
         row.name || '',
-        row.host || '',
+        row.owner || '',
         row.id,
         matchedFields,
       ),

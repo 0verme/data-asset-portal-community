@@ -1,200 +1,24 @@
-"""Public catalog response boundaries and anonymous navigation helpers."""
+"""Public catalog response boundaries and anonymous navigation helpers.
+
+Field exposure is centralized in :mod:`backend.app.security.public_field_policy`.
+This module only wires the policy into HTTP response projection and anonymous
+navigation, so display, search, and matchedFields always share one source.
+"""
 
 from __future__ import annotations
 
 import re
-from copy import deepcopy
 from typing import Any
 
 from ..application import RequestContext
 from ..authorization.core import AuthorizationService
+from ..security.public_field_policy import (
+    normalized_key,
+    project_public_value,
+)
 from ..settings import PublicCatalogProfile, get_public_catalog_profile
 
 _PUBLIC_MENU_EXCLUDED_CODES = {"system", "system-management"}
-
-# These fields are never included in ordinary catalog projections, regardless
-# of profile or caller identity. Privileged connection details remain available
-# only through the protected admin-detail routes.
-_PUBLIC_ALWAYS_HIDDEN_KEYS = frozenset(
-    {
-        "account",
-        "accountname",
-        "accountusername",
-        "databaseaccount",
-        "dbaccount",
-        "serviceaccount",
-        "accesskey",
-        "authentication",
-        "authtype",
-        "authmode",
-        "apikey",
-        "auth",
-        "authorization",
-        "connection",
-        "connectionconfig",
-        "connectiondetails",
-        "connectionoptions",
-        "connectionstring",
-        "connectionuser",
-        "connectionusername",
-        "connectionaccount",
-        "connectionaccountname",
-        "connectionurl",
-        "connectionuri",
-        "connectiondsn",
-        "cookie",
-        "credential",
-        "createdby",
-        "createdbyid",
-        "createdbyname",
-        "createby",
-        "createbyname",
-        "createduser",
-        "createdusername",
-        "creator",
-        "creatorname",
-        "delimiter",
-        "encoding",
-        "rowcnt",
-        "fieldcount",
-        "database",
-        "databaseconnection",
-        "databaseconfig",
-        "databasehost",
-        "databasename",
-        "databaseusername",
-        "databasepassword",
-        "databaseport",
-        "databaseurl",
-        "databaseuser",
-        "dbconfig",
-        "dbhost",
-        "dbname",
-        "dbusername",
-        "dbpassword",
-        "dbport",
-        "dbuser",
-        "diagnostics",
-        "dsn",
-        "endpoint",
-        "filepath",
-        "confpath",
-        "configpath",
-        "host",
-        "hostname",
-        "ip",
-        "ipaddress",
-        "server",
-        "serveraddress",
-        "serverip",
-        "serverhost",
-        "hostaddress",
-        "serverport",
-        "portnumber",
-        "jdbcurl",
-        "lastmodifiedby",
-        "lastupdatedby",
-        "lastupdatedbyname",
-        "logpath",
-        "modifiedby",
-        "modifiedbyname",
-        "operator",
-        "operatorid",
-        "operatorname",
-        "password",
-        "port",
-        "portno",
-        "privatekey",
-        "registeredby",
-        "reviewer",
-        "reviewerid",
-        "reviewername",
-        "auditedby",
-        "audituser",
-        "approvedby",
-        "session",
-        "sourcerecordid",
-        "sourcepath",
-        "sourcefilepath",
-        "targetpath",
-        "updatedby",
-        "updateby",
-        "updatebyname",
-        "updatedbyid",
-        "updatedbyname",
-        "updateduser",
-        "updatedusername",
-        "updater",
-        "updatername",
-        "targetfilepath",
-        "token",
-        "uri",
-        "url",
-        "user",
-        "userid",
-        "useridentifier",
-        "username",
-        "workdir",
-        "workingdirectory",
-    }
-)
-
-# Exact normalized keys only: ownerDepartment, ownerTeam and ownershipType are
-# ordinary business metadata and must not be removed by matching "owner".
-_PUBLIC_PERSON_IDENTITY_KEYS = frozenset(
-    {
-        "owner",
-        "ownername",
-        "ownerid",
-        "owneruserid",
-        "ownerusername",
-        "owneremail",
-        "ownerphone",
-        "maintainer",
-        "maintainername",
-        "maintainerid",
-        "maintaineruserid",
-        "maintainerusername",
-        "maintaineremail",
-        "maintainerphone",
-        "contact",
-        "contactname",
-        "contactperson",
-        "contactid",
-        "contactemail",
-        "contactphone",
-        "contactmobile",
-        "downstreamcontact",
-        "downstreamcontactname",
-        "downstreamcontactid",
-        "downstreamcontactemail",
-        "downstreamcontactphone",
-        "datadevelopercontact",
-        "datadevelopercontactname",
-        "datadevelopercontactid",
-        "datadevelopercontactemail",
-        "datadevelopercontactphone",
-        "registrar",
-        "registrarname",
-        "responsible",
-        "responsiblename",
-        "responsibleperson",
-        "responsiblepersonname",
-        "dutyowner",
-        "dutyownername",
-        "employee",
-        "employeename",
-        "staff",
-        "staffname",
-        "person",
-        "personname",
-        "registrarid",
-        "email",
-        "phone",
-        "mobile",
-        "telephone",
-    }
-)
 
 _PUBLIC_API_SAMPLE_KEYS = frozenset(
     {
@@ -209,17 +33,6 @@ _PUBLIC_API_SAMPLE_KEYS = frozenset(
     }
 )
 
-_CREDENTIAL_KEY_PARTS = (
-    "password",
-    "secret",
-    "token",
-    "credential",
-    "authorization",
-    "cookie",
-    "privatekey",
-    "accesskey",
-    "apikey",
-)
 _SENSITIVE_PARAMETER_NAME = re.compile(
     r"(?:authorization|authentication|auth[-_]?type|cookie|password|secret|token|"
     r"credential|signature|api[-_]?key|access[-_]?key|private[-_]?key|"
@@ -227,42 +40,6 @@ _SENSITIVE_PARAMETER_NAME = re.compile(
     r"db[-_]?user|database[-_]?user)",
     re.IGNORECASE,
 )
-_CONNECTION_VALUE = re.compile(
-    r"(?:jdbc:[^\s]+|(?:https?|ftp)://[^\s]+|"
-    r"(?:postgres(?:ql)?|mysql)://[^\s]+)",
-    re.IGNORECASE,
-)
-_SENSITIVE_TEXT_VALUE = re.compile(
-    r"(?:authorization|authentication|cookie|password|passphrase|secret|token|"
-    r"credential|signature|api[-_]?key|access[-_]?key|private[-_]?key|"
-    r"account(?:name)?|user(?:name)?|database(?:user|name)?|db(?:user|name)?|"
-    r"schema|host|hostname|port|url|uri|dsn|"
-    r"path|directory|(?:file|source|target|config|log|work)[-_]?"
-    r"(?:path|dir|directory))"
-    r"\s*[:=]\s*[^\s,;]+",
-    re.IGNORECASE,
-)
-
-
-def _normalized_key(key: Any) -> str:
-    return str(key).replace("_", "").replace("-", "").lower()
-
-
-def _is_always_hidden_key(key: Any) -> bool:
-    normalized = _normalized_key(key)
-    if normalized in _PUBLIC_ALWAYS_HIDDEN_KEYS:
-        return True
-    return any(part in normalized for part in _CREDENTIAL_KEY_PARTS) or "diagnostic" in normalized
-
-
-def _is_person_identity_key(key: Any) -> bool:
-    return _normalized_key(key) in _PUBLIC_PERSON_IDENTITY_KEYS
-
-
-def _redact_text(value: str) -> str:
-    return _SENSITIVE_TEXT_VALUE.sub(
-        "[已隐藏]", _CONNECTION_VALUE.sub("[已隐藏]", value)
-    )
 
 
 def project_public_catalog_value(
@@ -272,35 +49,11 @@ def project_public_catalog_value(
     hide_person_identity: bool | None = None,
 ) -> Any:
     """Project nested catalog data using the centralized field policy."""
-    selected_profile = profile or get_public_catalog_profile()
-    hide_people = (
-        selected_profile == "strict"
-        if hide_person_identity is None
-        else hide_person_identity
+    return project_public_value(
+        value,
+        profile=profile,
+        hide_person_identity=hide_person_identity,
     )
-    if isinstance(value, dict):
-        return {
-            key: project_public_catalog_value(
-                child,
-                profile=selected_profile,
-                hide_person_identity=hide_people,
-            )
-            for key, child in value.items()
-            if not _is_always_hidden_key(key)
-            and not (hide_people and _is_person_identity_key(key))
-        }
-    if isinstance(value, list):
-        return [
-            project_public_catalog_value(
-                child,
-                profile=selected_profile,
-                hide_person_identity=hide_people,
-            )
-            for child in value
-        ]
-    if isinstance(value, str):
-        return _redact_text(value)
-    return deepcopy(value)
 
 
 def profile_for_request(
@@ -376,7 +129,7 @@ def redact_public_api_asset(
             return {
                 key: remove_examples(child)
                 for key, child in value.items()
-                if _normalized_key(key) not in _PUBLIC_API_SAMPLE_KEYS
+                if normalized_key(key) not in _PUBLIC_API_SAMPLE_KEYS
             }
         if isinstance(value, list):
             return [remove_examples(child) for child in value]
@@ -399,21 +152,12 @@ def redact_public_api_asset(
 def redact_public_upstream_system(
     item: Any, *, profile: PublicCatalogProfile | None = None
 ) -> Any:
-    """Hide source connection names in addition to shared sensitive fields."""
-    projected = project_public_catalog_value(item, profile=profile)
+    """Project an upstream system through the shared profile policy.
 
-    def remove_connection_schema(value: Any) -> Any:
-        if isinstance(value, dict):
-            return {
-                key: remove_connection_schema(child)
-                for key, child in value.items()
-                if _normalized_key(key) not in {"db", "database", "schema", "schemaname"}
-            }
-        if isinstance(value, list):
-            return [remove_connection_schema(child) for child in value]
-        return value
-
-    return remove_connection_schema(projected)
+    ``internal`` keeps safe connection locator metadata (host / db / schema);
+    ``strict`` removes it. Credentials stay permanently hidden.
+    """
+    return project_public_catalog_value(item, profile=profile)
 
 
 def redact_public_push_system(

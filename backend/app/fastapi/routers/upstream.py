@@ -66,10 +66,8 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
     def get_service() -> Any:
         return service
 
-    def project_for_request(value: Any, context: RequestContext, authorization: Any) -> Any:
-        return redact_public_upstream_system(
-            value, profile=profile_for_request(context, authorization)
-        )
+    def project_for_request(value: Any, profile: Any) -> Any:
+        return redact_public_upstream_system(value, profile=profile)
 
     @router.get("/systems", response_model=None)
     def get_systems(
@@ -84,16 +82,18 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
         authorization: Any = Depends(get_authorization_service),
     ):
         try:
+            profile = profile_for_request(context, authorization)
             items = current_service.get_systems(
                 keyword=keyword,
                 status=status,
                 db_type=db_type,
                 page=page,
                 page_size=page_size or limit,
+                profile=profile,
             )
         except UpstreamDataSourceError as error:
             return _upstream_error_response(error)
-        items = project_for_request(items, context, authorization)
+        items = project_for_request(items, profile)
         return JSONResponse(
             content=validate_contract({"items": items}, UpstreamListResponse)
         )
@@ -106,10 +106,11 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
         authorization: Any = Depends(get_authorization_service),
     ):
         try:
-            data = current_service.get_system_detail(system_id)
+            profile = profile_for_request(context, authorization)
+            data = current_service.get_system_detail(system_id, profile=profile)
         except (UpstreamSystemNotFoundError, UpstreamDataSourceError) as error:
             return _upstream_error_response(error)
-        data = project_for_request(data, context, authorization)
+        data = project_for_request(data, profile)
         return JSONResponse(
             content=validate_contract({"data": data}, UpstreamDataResponse)
         )

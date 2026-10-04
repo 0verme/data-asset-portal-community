@@ -61,7 +61,7 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
         self.assertEqual(200, search.status_code)
         self.assertEqual(self.search_provider.search.return_value, search.json())
         self.search_provider.search.assert_called_once_with(
-            "ORDER", scope="indicator", limit="7"
+            "ORDER", scope="indicator", limit="7", profile="internal"
         )
 
     def test_hot_keyword_route_returns_only_the_public_schema_and_is_documented(self):

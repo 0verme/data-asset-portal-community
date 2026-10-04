@@ -205,8 +205,11 @@ class PublicCatalogApiTests(unittest.TestCase):
             self.client.get("/api/push/systems/PUSH_1"),
         ):
             self.assertEqual(200, response.status_code, response.text)
-            for value in ("198.51.100.8", "service-account", "/private"):
+            for value in ("service-account", "/private", "secret"):
                 self.assertNotIn(value, response.text)
+            # internal is the enterprise intranet profile: connection locators
+            # and ordinary contacts are public, credentials are not.
+            self.assertIn("198.51.100.8", response.text)
             self.assertIn("Alice", response.text)
             self.assertIn("Bob", response.text)
 
@@ -230,8 +233,11 @@ class PublicCatalogApiTests(unittest.TestCase):
         }
         lineage = self.client.get("/api/lineage/subgraph")
         self.assertEqual(200, lineage.status_code)
-        for value in ("jdbcUrl", "private-record", "198.51.100.2"):
+        for value in ("private-record", "198.51.100.2"):
             self.assertNotIn(value, lineage.text)
+        # internal keeps safe connection locators; internal paths and
+        # diagnostics stay hidden.
+        self.assertIn("jdbcUrl", lineage.text)
 
     def test_authenticated_user_keeps_existing_catalog_access(self):
         self.current_identity = Identity("catalog-reader", "normal", "Normal")

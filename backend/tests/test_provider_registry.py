@@ -42,7 +42,7 @@ class ProviderRegistryTestCase(unittest.TestCase):
         ), patch.object(provider, "_connection", return_value=nullcontext(object())), patch.object(
             provider,
             "_search_one_safe",
-            side_effect=lambda conn, config, query, limit: {
+            side_effect=lambda conn, config, query, limit, profile=None: {
                 "type": config["type"],
                 "label": config["label"],
                 "module": config["module"],

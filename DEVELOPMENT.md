@@ -188,7 +188,7 @@ Remote API 的普通业务目录 GET 支持匿名浏览：资产、字段/DDL、
 
 `/api/auth/me` 未登录仍返回 `401`，这是正常的身份探测结果。前端将其转换为 anonymous 状态，然后继续加载公开菜单、统计、搜索和业务模块，而不是停止应用数据加载。完整清单见 [Public Catalog + Authenticated Management](./docs/rbac/authenticated-read-model.md)。
 
-匿名目录策略由后端统一配置：`PUBLIC_CATALOG_PROFILE=internal`（默认）允许业务负责人/维护人姓名；`strict` 隐藏人员身份但保留组织元数据；`disabled` 由后端拒绝匿名业务目录 API 并隐藏匿名菜单。`PUBLIC_CATALOG_EXPORT_ENABLED=false` 默认关闭匿名批量导出。永久敏感字段（凭据、数据库账号、连接信息、内部路径和诊断信息等）不会因为 profile 改变而公开。非法 profile 会明确阻止应用启动。
+匿名目录策略由后端统一配置：`PUBLIC_CATALOG_PROFILE=internal`（默认）面向企业内网，允许匿名查看和搜索安全的连接定位元数据（host、port、database、schema 及去除凭据后的 JDBC endpoint）与业务负责人/维护人姓名；`strict` 适合公网 Demo，隐藏连接定位元数据与人员身份，且这些字段不参与匿名搜索；`disabled` 由后端拒绝匿名业务目录 API 与匿名搜索并隐藏匿名菜单。可展示字段与可搜索字段（含 `/api/search`、`/api/upstreams/systems?keyword=` 和 `matchedFields`）共用同一 profile 策略，避免搜索侧信道。`PUBLIC_CATALOG_EXPORT_ENABLED=false` 默认关闭匿名批量导出。永久敏感字段（凭据、数据库账号、token/secret/credential、内部路径和诊断信息等）不会因为 profile 改变而公开。非法 profile 会明确阻止应用启动。
 
 ### FastAPI 开发文档
 

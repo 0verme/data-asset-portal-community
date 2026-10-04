@@ -123,3 +123,17 @@ test("upstream save failures use one summary, inline field errors, and first-err
   assert.doesNotMatch(source, /title="请先修正以下问题"/);
   assert.match(source, /saving=\{saving\}/);
 });
+
+test("upstream cards render connection metadata only when the profile returns it", async () => {
+  const [listSource, styles] = await Promise.all([
+    readFile(upstreamListPath, "utf8"),
+    readFile(upstreamStylesPath, "utf8"),
+  ]);
+
+  assert.match(listSource, /function UpstreamConnectionMeta/);
+  assert.match(listSource, /if \(system\.schema\) items\.push\(\["Schema", system\.schema\]\)/);
+  assert.match(listSource, /if \(system\.host\) items\.push\(\["连接", system\.host\]\)/);
+  assert.match(listSource, /if \(!items\.length\) return null/);
+  assert.match(listSource, /<UpstreamConnectionMeta system=\{item\} \/>/);
+  assert.match(styles, /\.upstream-connection/);
+});

@@ -112,15 +112,16 @@ def _register_infrastructure_routes(
         authorization: Any = Depends(get_authorization_service),
     ):
         effective_scope = scope or search_type or module or SCOPE_ALL
+        profile = profile_for_request(context, authorization)
         try:
             result = search_provider.search(
                 query,
                 scope=effective_scope,
                 limit=limit,
+                profile=profile,
             )
         except SearchDataSourceError as error:
             return _service_error_response(error, 500)
-        profile = profile_for_request(context, authorization)
         return JSONResponse(content=project_public_catalog_value(result, profile=profile))
 
     app.include_router(public_catalog_router)

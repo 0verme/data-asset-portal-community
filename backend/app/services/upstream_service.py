@@ -38,6 +38,11 @@ from ..db.tables import (
     upstream_system,
     upstream_unload_time,
 )
+from ..security.public_field_policy import (
+    FIELD_CLASS_CONNECTION,
+    FIELD_CLASS_PERSON,
+    public_field_class_visible,
+)
 from ..settings import get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
 from .operation_log_service import (
@@ -301,7 +306,7 @@ class UpstreamService(AuditActorMixin):
         normalized_page_size = max(1, min(max_page_size, normalized_page_size))
         return normalized_page, normalized_page_size
 
-    def _build_system_where(self, keyword=None, status=None, db_type=None):
+    def _build_system_where(self, keyword=None, status=None, db_type=None, profile=None):
         clauses = [upstream_system.c.is_deleted == "N"]
         if status:
             clauses.append(upstream_system.c.status_code == str(status).strip())
@@ -310,13 +315,29 @@ class UpstreamService(AuditActorMixin):
         normalized_keyword = str(keyword or "").strip().lower()
         if normalized_keyword:
             pattern = f"%{normalized_keyword}%"
+            columns = [
+                upstream_system.c.system_id,
+                upstream_system.c.system_abbr,
+                upstream_system.c.system_name,
+                upstream_system.c.dept_name,
+                upstream_system.c.system_desc,
+            ]
+            # Person identity and connection locators follow the same public
+            # catalog profile as response projection, so a hidden field cannot
+            # be used as a keyword search side channel.
+            if public_field_class_visible(FIELD_CLASS_PERSON, profile):
+                columns.append(upstream_system.c.owner_name)
+            if public_field_class_visible(FIELD_CLASS_CONNECTION, profile):
+                columns.extend([
+                    upstream_system.c.host_name,
+                    upstream_system.c.db_name,
+                    upstream_system.c.schema_name,
+                ])
             clauses.append(or_(
-                func.lower(func.coalesce(upstream_system.c.system_id, "")).like(pattern),
-                func.lower(func.coalesce(upstream_system.c.system_abbr, "")).like(pattern),
-                func.lower(func.coalesce(upstream_system.c.system_name, "")).like(pattern),
-                func.lower(func.coalesce(upstream_system.c.owner_name, "")).like(pattern),
-                func.lower(func.coalesce(upstream_system.c.dept_name, "")).like(pattern),
-                func.lower(func.coalesce(upstream_system.c.system_desc, "")).like(pattern),
+                *[
+                    func.lower(func.coalesce(column, "")).like(pattern)
+                    for column in columns
+                ],
                 select(1).where(
                     upstream_unload_time.c.system_pk == upstream_system.c.system_pk,
                     upstream_unload_time.c.is_deleted == "N",
@@ -348,7 +369,7 @@ class UpstreamService(AuditActorMixin):
             ).append(row["unload_time"])
         return grouped
 
-    def _row_to_system(self, row, unload_times=None, include_connection=False):
+    def _row_to_system(self, row, unload_times=None, include_connection=False, include_person=True):
         system = {
             "upstreamSystemId": self._coerce_db_integer(row["system_pk"], "system_pk"),
             "id": row["system_id"],
@@ -357,10 +378,11 @@ class UpstreamService(AuditActorMixin):
             "dbType": self._display_option_value("UPSTREAM_DB_TYPE", row["db_type"]),
             "unloadTimes": list(unload_times or []),
             "status": row["status_code"],
-            "owner": row.get("owner_name") or "",
             "dept": self._display_option_value("UPSTREAM_DEPT", row.get("dept_name")),
             "desc": row.get("system_desc") or "",
         }
+        if include_person:
+            system["owner"] = row.get("owner_name") or ""
         if include_connection:
             system.update({
                 "host": row["host_name"],
@@ -386,13 +408,15 @@ class UpstreamService(AuditActorMixin):
         ])
         return columns
 
-    def _db_systems(self, keyword=None, status=None, db_type=None, page=None, page_size=None):
+    def _db_systems(self, keyword=None, status=None, db_type=None, page=None, page_size=None, profile=None):
+        include_connection = public_field_class_visible(FIELD_CLASS_CONNECTION, profile)
+        include_person = public_field_class_visible(FIELD_CLASS_PERSON, profile)
         paginate = page is not None or page_size is not None
         page, page_size = self._resolve_paging(page=page, page_size=page_size)
         offset = (page - 1) * page_size
         statement = (
-            select(*self._system_select())
-            .where(*self._build_system_where(keyword=keyword, status=status, db_type=db_type))
+            select(*self._system_select(include_connection=include_connection))
+            .where(*self._build_system_where(keyword=keyword, status=status, db_type=db_type, profile=profile))
             .order_by(upstream_system.c.system_abbr, upstream_system.c.system_id)
         )
         if paginate:
@@ -416,6 +440,8 @@ class UpstreamService(AuditActorMixin):
                 unload_times_by_pk.get(
                     self._coerce_db_integer(row["system_pk"], "system_pk"), []
                 ),
+                include_connection=include_connection,
+                include_person=include_person,
             )
             for row in rows
         ]
@@ -431,11 +457,11 @@ class UpstreamService(AuditActorMixin):
             raise UpstreamSystemNotFoundError(system_id)
         return rows[0]
 
-    def get_systems(self, keyword=None, status=None, db_type=None, page=None, page_size=None):
+    def get_systems(self, keyword=None, status=None, db_type=None, page=None, page_size=None, profile=None):
         with database_transaction():
-            return self._db_systems(keyword=keyword, status=status, db_type=db_type, page=page, page_size=page_size)
+            return self._db_systems(keyword=keyword, status=status, db_type=db_type, page=page, page_size=page_size, profile=profile)
 
-    def _load_system_detail(self, system_id, *, include_connection=False, purpose="upstream detail unload times", method="get_system_detail"):
+    def _load_system_detail(self, system_id, *, include_connection=False, include_person=True, purpose="upstream detail unload times", method="get_system_detail"):
         """Load one system using the current shared transaction (if any)."""
         row = self._get_system_row(system_id, include_connection=include_connection)
         unload_times = self._load_unload_times(
@@ -450,14 +476,16 @@ class UpstreamService(AuditActorMixin):
                     self._coerce_db_integer(row["system_pk"], "system_pk"), []
                 ),
                 include_connection=include_connection,
+                include_person=include_person,
             )
         )
 
-    def get_system_detail(self, system_id):
+    def get_system_detail(self, system_id, profile=None):
         with database_transaction():
             return self._load_system_detail(
                 system_id,
-                include_connection=False,
+                include_connection=public_field_class_visible(FIELD_CLASS_CONNECTION, profile),
+                include_person=public_field_class_visible(FIELD_CLASS_PERSON, profile),
                 purpose="upstream detail unload times",
                 method="get_system_detail",
             )

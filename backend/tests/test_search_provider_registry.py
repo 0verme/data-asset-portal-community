@@ -28,7 +28,7 @@ class SearchProviderRegistryTestCase(unittest.TestCase):
         with patch.object(self.provider, "_connection", return_value=nullcontext(object())), patch.object(
             self.provider,
             "_search_one_safe",
-            side_effect=lambda conn, config, query, limit: self._group(config),
+            side_effect=lambda conn, config, query, limit, profile=None: self._group(config),
         ) as mock_search_one:
             result = self.provider.search("首贷", scope="all", limit=5)
 
@@ -41,7 +41,7 @@ class SearchProviderRegistryTestCase(unittest.TestCase):
         with patch.object(self.provider, "_connection", return_value=nullcontext(object())), patch.object(
             self.provider,
             "_search_one_safe",
-            side_effect=lambda conn, config, query, limit: self._group(config),
+            side_effect=lambda conn, config, query, limit, profile=None: self._group(config),
         ) as mock_search_one:
             result = self.provider.search("推送", scope="push", limit=5)
 

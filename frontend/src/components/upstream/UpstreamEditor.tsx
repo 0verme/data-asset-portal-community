@@ -14,6 +14,7 @@
 
 import React from "react";
 import { Icon } from "../ui.tsx";
+import type { PublicUpstreamSystem } from "../../api/upstream.ts";
 import type { MockUpstreamSystem } from "../../data/upstreamSystems.ts";
 import {
   normalizeBinaryStatusOptions,
@@ -50,6 +51,7 @@ import {
 export type UpstreamEditorMode = "new" | "edit";
 export type UpstreamEditorInitial =
   | Partial<MockUpstreamSystem>
+  | PublicUpstreamSystem
   | null
   | undefined;
 

@@ -159,3 +159,27 @@ test("mock non-asset entities keep their existing contract", () => {
     ]);
   }
 });
+
+test("mock system search mirrors the remote internal locator fields", () => {
+  for (const keyword of ["FUL", "up_fulfillment", "ful.demo.invalid", "DEMO_FUL_OWNER"]) {
+    const result = buildMockSearchResult(keyword, "system", 5, ALL_MODULES);
+    const group = result.groups[0];
+    assert.ok(group, `system group is expected for ${keyword}`);
+    assert.ok(group.count >= 1, `keyword ${keyword} must hit the system group`);
+    const item = group.items.find((entry) => entry.id === "up_fulfillment");
+    assert.ok(item, `keyword ${keyword} must recall up_fulfillment`);
+    assert.equal(item.meta, "演示数据维护组");
+  }
+});
+
+test("mock asset search recalls an asset by its derived schema", () => {
+  const result = buildMockSearchResult("DWS_DWM", "asset", 5, ALL_MODULES);
+  const group = assetGroup(result);
+
+  assert.ok(group.count > 0);
+  assert.ok(
+    group.items.some((item) =>
+      item.matchedFields.some((match) => match.label === "Schema" && match.value === "DWS_DWM"),
+    ),
+  );
+});
