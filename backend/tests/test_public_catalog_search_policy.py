@@ -98,9 +98,9 @@ class PublicFieldPolicyUnitTests(unittest.TestCase):
 
     def test_sanitize_connection_uri_keeps_safe_endpoint(self):
         self.assertEqual(
-            "jdbc:postgresql://host.demo.invalid:5432/db?sslmode=require",
+            "jdbc:postgresql://demo.invalid:5432/db?sslmode=require",
             sanitize_connection_uri(
-                "jdbc:postgresql://user:pass@host.demo.invalid:5432/db?user=x&password=y&sslmode=require"
+                "jdbc:postgresql://user:pass@demo.invalid:5432/db?user=x&password=y&sslmode=require"
             ),
         )
 
