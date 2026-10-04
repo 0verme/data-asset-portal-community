@@ -24,12 +24,17 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
 from ..db.facade import _prepare_execute_args, connect_with_profile, fetch_all, resolve_db_profile_name
-from ..settings import get_int_env
+from ..security.public_field_policy import (
+    project_public_value,
+    public_field_class_visible,
+)
+from ..settings import get_int_env, get_public_catalog_profile
 from .asset_field_match import asset_field_match_value
 from .providers import entity_module_codes, list_search_entities, module_scope_aliases
 from .system_management_service import system_management_service
@@ -55,7 +60,14 @@ class SearchDataSourceError(Exception):
 
 class SearchProvider(ABC):
     @abstractmethod
-    def search(self, query: str, scope: str = SCOPE_ALL, limit: int = 5) -> dict:
+    def search(
+        self,
+        query: str,
+        scope: str = SCOPE_ALL,
+        limit: int = 5,
+        *,
+        profile: str | None = None,
+    ) -> dict:
         raise NotImplementedError
 
 
@@ -151,6 +163,39 @@ class KeywordSearchProvider(SearchProvider):
     def _text_expr(self, expr):
         return f"COALESCE(CAST({expr} AS TEXT), '')"
 
+    @staticmethod
+    def _matcher_column(expr):
+        """Map a matcher expression to the row column it reads, if plain."""
+        text = str(expr or "").strip()
+        if not text:
+            return ""
+        token = text.split(".")[-1].strip().strip('"').strip("'").strip("`")
+        return token if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", token) else ""
+
+    def _matchers_for(self, config, profile):
+        """Return matchers visible under the active public catalog profile.
+
+        Filtering here (before SQL is built) keeps searchable fields a subset
+        of publicly visible fields, so a hidden field cannot be used as a
+        search side channel or leak through matchedFields.
+        """
+        return [
+            matcher
+            for matcher in config["matchers"]
+            if public_field_class_visible(matcher.get("class"), profile)
+        ]
+
+    def _hidden_columns_for(self, config, profile):
+        """Row columns backing matchers that the profile hides."""
+        hidden = set()
+        for matcher in config["matchers"]:
+            if public_field_class_visible(matcher.get("class"), profile):
+                continue
+            column = self._matcher_column(matcher.get("expr"))
+            if column:
+                hidden.add(column)
+        return hidden
+
     def _matcher_condition(self, matcher):
         return f"LOWER({self._text_expr(matcher['expr'])}) LIKE ? ESCAPE ?"
 
@@ -168,8 +213,11 @@ class KeywordSearchProvider(SearchProvider):
             f"WHERE {spec['asset_ref']} AND {spec['active_where']} AND {inner})"
         )
 
-    def _build_where(self, config):
-        conditions = [self._matcher_condition(matcher) for matcher in config["matchers"]]
+    def _build_where(self, config, profile):
+        conditions = [
+            self._matcher_condition(matcher)
+            for matcher in self._matchers_for(config, profile)
+        ]
         field_match = self._field_match_spec(config)
         if field_match:
             conditions.append(self._field_match_condition(field_match))
@@ -178,10 +226,10 @@ class KeywordSearchProvider(SearchProvider):
             clause = f"{config['base_where']} AND {clause}"
         return clause
 
-    def _build_match_select(self, config):
+    def _build_match_select(self, config, profile):
         label_cases = []
         value_cases = []
-        for matcher in config["matchers"]:
+        for matcher in self._matchers_for(config, profile):
             condition = self._matcher_condition(matcher)
             label = matcher["label"].replace("'", "''")
             label_cases.append(f"WHEN {condition} THEN '{label}'")
@@ -196,15 +244,15 @@ class KeywordSearchProvider(SearchProvider):
             + " ELSE '' END AS matched_field_value"
         )
 
-    def _build_match_params(self, config, pattern):
+    def _build_match_params(self, config, pattern, profile):
         params = []
-        for _matcher in config["matchers"]:
+        for _matcher in self._matchers_for(config, profile):
             params.extend([pattern, self.LIKE_ESCAPE])
         return params
 
-    def _build_where_params(self, config, pattern):
+    def _build_where_params(self, config, pattern, profile):
         """Parameters for ``_build_where`` in clause order (entity, then fields)."""
-        params = self._build_match_params(config, pattern)
+        params = self._build_match_params(config, pattern, profile)
         field_match = self._field_match_spec(config)
         if field_match:
             for _matcher in field_match["matchers"]:
@@ -272,12 +320,20 @@ class KeywordSearchProvider(SearchProvider):
             return []
         return [{"label": label, "value": value}]
 
-    def _map_item(self, config, row, extra_matched_fields=None):
+    def _map_item(self, config, row, extra_matched_fields=None, profile=None):
         matched_fields = self._matched_fields(row)
         if extra_matched_fields:
             matched_fields = [*matched_fields, *extra_matched_fields]
+        # Hidden columns are removed before item building so composite display
+        # strings (meta / subtitle) cannot leak a hidden person or locator value.
+        hidden_columns = self._hidden_columns_for(config, profile)
+        visible_row = (
+            {key: value for key, value in row.items() if key not in hidden_columns}
+            if hidden_columns
+            else row
+        )
         build_item = config["build_item"]
-        payload = build_item(row, matched_fields) or {}
+        payload = build_item(visible_row, matched_fields) or {}
         entity_type = config["type"]
         module = config["module"]
         item = {
@@ -295,7 +351,9 @@ class KeywordSearchProvider(SearchProvider):
         # a canonical asset identity, so existing item shapes stay unchanged.
         if payload.get("assetId") is not None:
             item["assetId"] = payload["assetId"]
-        return item
+        # Defense in depth: the same policy that filtered matchers also
+        # projects the assembled item and sanitizes matchedFields strings.
+        return project_public_value(item, profile=profile)
 
     def _empty_group(self, config):
         return {
@@ -307,9 +365,9 @@ class KeywordSearchProvider(SearchProvider):
             "items": [],
         }
 
-    def _search_one_safe(self, conn, config, query, limit):
+    def _search_one_safe(self, conn, config, query, limit, profile=None):
         try:
-            return self._search_one(conn, config, query, limit)
+            return self._search_one(conn, config, query, limit, profile)
         except SearchDataSourceError as error:
             LOGGER.warning("search degraded for type=%s: %s", config["type"], error.message)
             return self._empty_group(config)
@@ -317,20 +375,23 @@ class KeywordSearchProvider(SearchProvider):
             LOGGER.exception("search unexpected failure for type=%s", config["type"])
             return self._empty_group(config)
 
-    def _count_matches(self, conn, config, query):
+    def _count_matches(self, conn, config, query, profile):
         """Exact matched total for one entity (single COUNT, never per-row)."""
         pattern = self._like_pattern(query)
-        count_sql = f"SELECT COUNT(*) AS matched_total FROM {config['from']} WHERE {self._build_where(config)}"
+        count_sql = (
+            f"SELECT COUNT(*) AS matched_total FROM {config['from']} "
+            f"WHERE {self._build_where(config, profile)}"
+        )
         rows = self._fetch_rows_with_conn(
             conn,
             count_sql,
-            params=self._build_where_params(config, pattern),
+            params=self._build_where_params(config, pattern, profile),
         )
         if not rows:
             return 0
         return int(rows[0].get("matched_total") or 0)
 
-    def _load_field_matches(self, conn, config, rows, pattern):
+    def _load_field_matches(self, conn, config, rows, pattern, profile=None):
         """Batch matched child fields for the current page (one query, no N+1)."""
         field_match = self._field_match_spec(config)
         if not field_match or not rows:
@@ -357,7 +418,7 @@ class KeywordSearchProvider(SearchProvider):
             f"AND {inner} "
             f"ORDER BY {field_match['order']}"
         )
-        params = list(keys) + self._build_match_params(field_match, pattern)
+        params = list(keys) + self._build_match_params(field_match, pattern, profile)
         matches = {}
         max_fields = int(field_match.get("max_fields") or 1)
         for row in self._fetch_rows_with_conn(conn, sql, params=params):
@@ -371,13 +432,13 @@ class KeywordSearchProvider(SearchProvider):
             bucket.append({"label": field_match["label"], "value": value})
         return matches
 
-    def _search_one(self, conn, config, query, limit):
+    def _search_one(self, conn, config, query, limit, profile=None):
         started_at = time.perf_counter()
         pattern = self._like_pattern(query)
-        where = self._build_where(config)
-        where_params = self._build_where_params(config, pattern)
-        match_select = self._build_match_select(config)
-        match_params = self._build_match_params(config, pattern)
+        where = self._build_where(config, profile)
+        where_params = self._build_where_params(config, pattern, profile)
+        match_select = self._build_match_select(config, profile)
+        match_params = self._build_match_params(config, pattern, profile)
         list_sql = (
             "SELECT * FROM ("
             f"SELECT {config['select']}, {match_select} "
@@ -392,12 +453,17 @@ class KeywordSearchProvider(SearchProvider):
         page_limit = min(max_limit, max(1, int(limit or default_module_limit)))
         list_params = match_params + match_params + where_params + [page_limit]
         rows = self._fetch_rows_with_conn(conn, list_sql, params=list_params)
-        total_matches = self._count_matches(conn, config, query)
+        total_matches = self._count_matches(conn, config, query, profile)
         field_match = self._field_match_spec(config)
-        field_matches = self._load_field_matches(conn, config, rows, pattern)
+        field_matches = self._load_field_matches(conn, config, rows, pattern, profile)
         row_key = field_match["row_key"] if field_match else None
         items = [
-            self._map_item(config, row, field_matches.get(row.get(row_key)) if row_key else None)
+            self._map_item(
+                config,
+                row,
+                field_matches.get(row.get(row_key)) if row_key else None,
+                profile=profile,
+            )
             for row in rows
         ]
         # ``count`` is the matched total, so ``hasMore`` only reports whether the
@@ -423,7 +489,15 @@ class KeywordSearchProvider(SearchProvider):
             "items": items,
         }
 
-    def search(self, query: str, scope: str = SCOPE_ALL, limit: int = 5) -> dict:
+    def search(
+        self,
+        query: str,
+        scope: str = SCOPE_ALL,
+        limit: int = 5,
+        *,
+        profile: str | None = None,
+    ) -> dict:
+        selected_profile = profile or get_public_catalog_profile()
         normalized_scope = self._normalize_scope(scope)
         normalized_limit = self._normalize_limit(limit)
         keyword = (query or "").strip()
@@ -435,7 +509,12 @@ class KeywordSearchProvider(SearchProvider):
         if not configs:
             return {"query": keyword, "scope": normalized_scope, "groups": [], "total": 0}
         with self._connection() as conn:
-            groups = [self._search_one_safe(conn, config, keyword, normalized_limit) for config in configs]
+            groups = [
+                self._search_one_safe(
+                    conn, config, keyword, normalized_limit, selected_profile
+                )
+                for config in configs
+            ]
         if normalized_scope == SCOPE_ALL:
             groups = [group for group in groups if group["count"] > 0]
         matched_total = sum(group["count"] for group in groups)

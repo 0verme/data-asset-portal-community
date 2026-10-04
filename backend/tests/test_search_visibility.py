@@ -50,7 +50,7 @@ class SearchVisibilityTestCase(unittest.TestCase):
             patch.object(
                 self.provider,
                 "_search_one_safe",
-                side_effect=lambda conn, current_config, query, limit: self._group(
+                side_effect=lambda conn, current_config, query, limit, profile=None: self._group(
                     current_config
                 ),
             ) as mock_search_one,
@@ -115,7 +115,7 @@ class SearchVisibilityTestCase(unittest.TestCase):
             patch.object(
                 self.provider,
                 "_search_one_safe",
-                side_effect=lambda conn, current_config, keyword, limit: self._group(
+                side_effect=lambda conn, current_config, keyword, limit, profile=None: self._group(
                     current_config
                 ),
             ) as mock_search_one,
@@ -147,7 +147,7 @@ class SearchVisibilityTestCase(unittest.TestCase):
             patch.object(
                 self.provider,
                 "_search_one_safe",
-                side_effect=lambda conn, config, query, limit: self._group(config),
+                side_effect=lambda conn, config, query, limit, profile=None: self._group(config),
             ) as mock_search_one,
         ):
             result = self.provider.search("首贷", scope="all", limit=5)
@@ -192,7 +192,7 @@ class SearchVisibilityTestCase(unittest.TestCase):
             patch.object(
                 self.provider,
                 "_search_one_safe",
-                side_effect=lambda conn, config, query, limit: self._group(config),
+                side_effect=lambda conn, config, query, limit, profile=None: self._group(config),
             ) as mock_search_one,
         ):
             result = self.provider.search("推送", scope="push", limit=5)
@@ -225,7 +225,9 @@ class SearchRouteAliasTestCase(unittest.TestCase):
         response = self.client.get("/api/search?q=首贷&module=indicator")
 
         self.assertEqual(200, response.status_code)
-        mock_search.assert_called_once_with("首贷", scope="indicator", limit="5")
+        mock_search.assert_called_once_with(
+            "首贷", scope="indicator", limit="5", profile="internal"
+        )
 
 
 class PortalVisibilityTestCase(unittest.TestCase):
