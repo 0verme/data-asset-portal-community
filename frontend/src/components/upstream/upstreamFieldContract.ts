@@ -14,10 +14,13 @@
 
 /**
  * The upstream system field contract is the shared vocabulary for the edit
- * surface and the detail surface. Connection metadata remains admin-only;
- * ordinary business metadata must have a readable detail location.
+ * surface and the detail surface. Business metadata is always readable in the
+ * public detail. Connection locator metadata (host/db/schema) is
+ * profile-dependent: `internal` returns it and it renders under metadata;
+ * `strict` omits it and the detail simply does not render the field.
  */
 type DetailLocation = "metadata" | "hero" | "schedule";
+type UpstreamFieldVisibility = "business" | "connection";
 type UpstreamFieldKey =
  | "id"
  | "abbr"
@@ -38,7 +41,7 @@ export interface UpstreamFieldDefinition {
  editable: boolean;
  detailLocations: readonly DetailLocation[];
  mono?: boolean | undefined;
- sensitive?: boolean | undefined;
+ visibility?: UpstreamFieldVisibility | undefined;
 }
 
 const fieldDefinitions = [
@@ -81,24 +84,24 @@ const fieldDefinitions = [
   key: "host",
   label: "JDBC 地址",
   editable: true,
-  detailLocations: [],
-  sensitive: true,
+  detailLocations: ["metadata"],
+  visibility: "connection",
   mono: true,
  },
  {
   key: "db",
   label: "数据库",
   editable: false,
-  detailLocations: [],
-  sensitive: true,
+  detailLocations: ["metadata"],
+  visibility: "connection",
   mono: true,
  },
  {
   key: "schema",
   label: "Schema",
   editable: true,
-  detailLocations: [],
-  sensitive: true,
+  detailLocations: ["metadata"],
+  visibility: "connection",
   mono: true,
  },
  {
@@ -122,8 +125,8 @@ export const UPSTREAM_SYSTEM_FIELD_CONTRACT = Object.freeze(fieldContract);
 
 export const UPSTREAM_EDITABLE_BUSINESS_FIELDS = Object.freeze(
  UPSTREAM_SYSTEM_FIELD_CONTRACT.filter(
-  ({ editable, sensitive, key }) =>
-   editable && !sensitive && key !== "unloadTimes",
+  ({ editable, visibility, key }) =>
+   editable && visibility !== "connection" && key !== "unloadTimes",
  ),
 );
 
@@ -166,7 +169,13 @@ export function getUpstreamDetailMetadata(
  system: unknown,
 ): Array<UpstreamFieldDefinition & { value: string }> {
  const source = isRecord(system) ? system : {};
- return UPSTREAM_DETAIL_METADATA_FIELDS.map((definition) => ({
+ return UPSTREAM_DETAIL_METADATA_FIELDS.filter((definition) => {
+  // Connection metadata is profile-dependent: strict responses omit the
+  // field entirely, so the detail must not render an empty placeholder.
+  if (definition.visibility !== "connection") return true;
+  const raw = source[definition.key];
+  return raw !== null && raw !== undefined && String(raw).trim() !== "";
+ }).map((definition) => ({
   ...definition,
   value: displayUpstreamValue(source[definition.key]),
  }));

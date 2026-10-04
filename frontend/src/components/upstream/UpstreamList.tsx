@@ -19,6 +19,29 @@ import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 import { Icon } from "../ui.tsx";
 import { DbBadge } from "./UpstreamParts.tsx";
 
+/**
+ * Lightweight connection locator line for the card view. The remote API only
+ * returns these fields under the `internal` profile; under `strict` they are
+ * absent and the line is not rendered.
+ */
+function UpstreamConnectionMeta({ system }: { system: PublicUpstreamSystem }) {
+  const items: Array<[string, string]> = [];
+  if (system.schema) items.push(["Schema", system.schema]);
+  if (system.host) items.push(["连接", system.host]);
+  else if (system.db) items.push(["数据库", system.db]);
+  if (!items.length) return null;
+  return (
+    <div className="upstream-connection">
+      {items.map(([label, value]) => (
+        <span key={label} className="uc-item">
+          <span className="uc-label">{label}</span>
+          <span className="uc-value mono">{value}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export interface UpstreamListProps {
   systems: readonly PublicUpstreamSystem[];
   pendingIds?: readonly string[] | undefined;
@@ -76,7 +99,12 @@ export function UpstreamList({
           )}
           renderTitle={(item) => item.name}
           renderSubtitle={(item) => `${item.abbr} / ${item.id}`}
-          renderDesc={(item) => item.desc}
+          renderDesc={(item) => (
+            <>
+              {item.desc}
+              <UpstreamConnectionMeta system={item} />
+            </>
+          )}
           renderFootLeft={(item) => (
             <div className="time-chips">
               {item.unloadTimes.map((time) => <span key={time} className="time-chip">{time}</span>)}

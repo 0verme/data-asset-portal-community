@@ -53,11 +53,18 @@ function normalizeDetail<T>(payload: unknown): T {
   throw new Error('Invalid upstream payload');
 }
 
-export type PublicUpstreamSystem = Omit<MockUpstreamSystem, 'host' | 'db' | 'schema'>;
+/**
+ * Connection locator metadata is profile-dependent: `internal` returns it for
+ * anonymous catalog reads, `strict` omits it. Render only when present.
+ */
+export type PublicUpstreamSystem = Omit<MockUpstreamSystem, 'host' | 'db' | 'schema'> & {
+  host?: string | undefined;
+  db?: string | undefined;
+  schema?: string | undefined;
+};
 
 function toPublicSystem(system: MockUpstreamSystem): PublicUpstreamSystem {
-  const { host: _host, db: _db, schema: _schema, ...summary } = system;
-  return summary;
+  return { ...system };
 }
 
 export interface UpstreamQueryParams {
@@ -81,9 +88,20 @@ export async function getUpstreamSystems(params: UpstreamQueryParams = {}): Prom
       if (params.status && item.status !== params.status) return false;
       if (params.dbType && item.dbType !== params.dbType) return false;
       if (!q) return true;
-      return [item.id, item.abbr, item.name, item.owner, item.dept, item.desc].some((value) =>
-        String(value || '').toLowerCase().includes(q),
-      );
+      // Same keyword contract as the remote upstream list for the internal
+      // profile: business metadata plus connection locators and unload times.
+      return [
+        item.id,
+        item.abbr,
+        item.name,
+        item.host,
+        item.db,
+        item.schema,
+        item.owner,
+        item.dept,
+        item.desc,
+        ...(item.unloadTimes || []),
+      ].some((value) => String(value || '').toLowerCase().includes(q));
     })
     .map(toPublicSystem);
 }

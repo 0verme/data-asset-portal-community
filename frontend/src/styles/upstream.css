@@ -482,3 +482,29 @@
   .upstream-time-control .upstream-field-error {
     margin-top: 0;
   }
+
+/* Profile-dependent connection locator line on upstream cards. */
+.upstream-connection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 6px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.upstream-connection .uc-item {
+  display: inline-flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.upstream-connection .uc-label {
+  color: var(--ink-3);
+}
+
+.upstream-connection .uc-value {
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}

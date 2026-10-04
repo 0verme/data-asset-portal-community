@@ -375,7 +375,20 @@ export function useUpstreamModule({
       if (upFilter.status && item.status !== upFilter.status) return false;
       if (upFilter.dbType && item.dbType !== upFilter.dbType) return false;
       if (!normalizedQuery) return true;
-      return [item.id, item.abbr, item.name, item.owner, item.dept, item.desc].some((value) =>
+      // Mirrors the remote upstream keyword contract for the active profile:
+      // connection locators and owner are simply absent under strict.
+      return [
+        item.id,
+        item.abbr,
+        item.name,
+        item.host,
+        item.db,
+        item.schema,
+        item.owner,
+        item.dept,
+        item.desc,
+        ...(item.unloadTimes || []),
+      ].some((value) =>
         String(value || '').toLowerCase().includes(normalizedQuery),
       );
     });
