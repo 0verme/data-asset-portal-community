@@ -15,6 +15,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
+import "@cloudflare/kumo/styles/standalone";
 import "./styles/app.css";
 import "./styles/push.css";
 import "./styles/report.css";
@@ -28,8 +29,25 @@ if (!rootElement) {
   throw new Error("Unable to mount the application: #root is missing.");
 }
 
-ReactDOM.createRoot(rootElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+const root = ReactDOM.createRoot(rootElement);
+const isKumoSpike = import.meta.env.DEV && window.location.pathname === "/__kumo-spike";
+
+if (isKumoSpike) {
+  const storedTheme = window.localStorage.getItem("dap-theme");
+  const theme = storedTheme === "dark" ? "dark" : "light";
+  document.documentElement.dataset["theme"] = theme;
+  document.documentElement.dataset["mode"] = theme === "dark" ? "dark" : "light";
+  void import("./kumo-spike/KumoCompatibilityFixture.tsx").then(({ default: Fixture }) => {
+    root.render(
+      <React.StrictMode>
+        <Fixture />
+      </React.StrictMode>,
+    );
+  });
+} else {
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+}
