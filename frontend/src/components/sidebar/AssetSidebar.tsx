@@ -14,7 +14,7 @@
 
 import type { UseAssetModuleResult } from "../../hooks/useAssetModule.ts";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.tsx";
-import { SidebarFilterGroup } from "./common/SidebarFilterGroup.tsx";
+import { AssetSidebarFilterGroup } from "./asset/AssetSidebarFilterGroup.tsx";
 import { buildSidebarFacetItems } from "./common/buildSidebarFacetItems.ts";
 
 export interface AssetSidebarProps {
@@ -38,7 +38,7 @@ export function AssetSidebar({ asset, canEdit = false }: AssetSidebarProps) {
 
   return (
     <>
-      <SidebarFilterGroup
+      <AssetSidebarFilterGroup
         title="数据分层"
         allOption={{
           key: "all-layers",
@@ -74,7 +74,7 @@ export function AssetSidebar({ asset, canEdit = false }: AssetSidebarProps) {
         ]}
       />
 
-      <SidebarFilterGroup
+      <AssetSidebarFilterGroup
         title="主题域"
         allOption={{
           key: "all-domains",
