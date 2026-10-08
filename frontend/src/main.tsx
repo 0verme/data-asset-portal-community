@@ -31,14 +31,19 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
-const isKumoSpike = import.meta.env.DEV && window.location.pathname === "/__kumo-spike";
+const fixturePath = import.meta.env.DEV ? window.location.pathname : "";
+const isKumoSpike = fixturePath === "/__kumo-spike";
+const isKumoAdapterFixture = fixturePath === "/__kumo-adapters";
 
-if (isKumoSpike) {
+if (isKumoSpike || isKumoAdapterFixture) {
   const storedTheme = window.localStorage.getItem("dap-theme");
   const theme = storedTheme === "dark" ? "dark" : "light";
   document.documentElement.dataset["theme"] = theme;
   document.documentElement.dataset["mode"] = theme === "dark" ? "dark" : "light";
-  void import("./kumo-spike/KumoCompatibilityFixture.tsx").then(({ default: Fixture }) => {
+  const loadFixture = isKumoSpike
+    ? import("./kumo-spike/KumoCompatibilityFixture.tsx")
+    : import("./kumo-adapters/KumoPrimitiveFixture.tsx");
+  void loadFixture.then(({ default: Fixture }) => {
     root.render(
       <React.StrictMode>
         <Fixture />

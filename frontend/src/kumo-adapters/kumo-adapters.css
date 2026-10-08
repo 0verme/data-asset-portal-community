@@ -1,0 +1,51 @@
+.kumo-adapter-fixture {
+  display: grid;
+  gap: 20px;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px;
+  color: var(--dap-color-text);
+  font-family: var(--dap-font-sans);
+}
+
+.kumo-adapter-header,
+.kumo-adapter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.kumo-adapter-header h1,
+.kumo-adapter-section h2,
+.kumo-adapter-section h3 {
+  margin: 0;
+}
+
+.kumo-adapter-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--dap-color-border);
+  border-radius: 12px;
+  background: var(--dap-color-surface);
+}
+
+.kumo-adapter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .kumo-adapter-fixture {
+    padding: 16px;
+  }
+
+  .kumo-adapter-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
