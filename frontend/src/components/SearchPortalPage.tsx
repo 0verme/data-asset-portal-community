@@ -14,6 +14,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./ui.tsx";
+import { Button, EmptyState, ErrorState, Input, LoadingState } from "../ui/index.ts";
 import { getPortalStats, type PortalStatItem } from "../api/portal.ts";
 import { getHotKeywords } from "../api/hotKeywords.ts";
 import {
@@ -296,7 +297,7 @@ export function SearchPortalPage({
           <span className="sp-ico">
             <Icon name="search" size={20} />
           </span>
-          <input
+          <Input
             ref={inputRef}
             type="text"
             value={query}
@@ -308,24 +309,25 @@ export function SearchPortalPage({
             aria-label="搜索数据资产"
             autoFocus
           />
-          <button type="button" className="sp-search-btn" onClick={doSearch}>
+          <Button variant="primary" type="button" className="sp-search-btn" onClick={doSearch}>
             <Icon name="search" size={17} />
             <span className="sp-btn-text">搜索</span>
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="sp-scopes" role="group" aria-label="搜索范围">
         {scopeOptions.map((item) => (
-          <button
+          <Button
             key={item.key}
+            variant="tertiary"
             type="button"
             className={`sp-scope-chip${scope === item.key ? " active" : ""}`}
             aria-pressed={scope === item.key}
             onClick={() => pickScope(item.key)}
           >
             {item.label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -333,16 +335,17 @@ export function SearchPortalPage({
         <div className="sp-hot">
           <span className="sp-hot-label">热门</span>
           {hotTags.map((item) => (
-            <button
+            <Button
               type="button"
               key={item.id}
+              variant="tertiary"
               className="sp-hot-item"
               onClick={() => pickHot(item.keyword)}
             >
               <span className={isMonospaceHotKeyword(item.keyword) ? "mono" : ""}>
                 {item.keyword}
               </span>
-            </button>
+            </Button>
           ))}
         </div>
       ) : null}
@@ -350,27 +353,33 @@ export function SearchPortalPage({
       {searchedTerm ? (
         <div className="sp-results" aria-live="polite">
           {searchLoading ? (
-            <div className="sp-result-hint">正在搜索 “{searchedTerm}”...</div>
+            <LoadingState
+              title={`正在搜索 “${searchedTerm}”...`}
+              desc=""
+              label="正在搜索"
+              className="sp-result-loading"
+            />
           ) : searchError ? (
-            <div className="sp-result-hint sp-result-error">{searchError}</div>
+            <ErrorState title={searchError} desc="" className="sp-result-error" />
           ) : groups.length === 0 ? (
             <div className="sp-empty">
               <div className="sp-empty-ic">
                 <Icon name="inbox" size={26} />
               </div>
-              <h4>没有找到匹配的资产</h4>
-              <p>
-                没有与 “{searchedTerm}”
-                相关的资产、系统、字段、词根、指标、报表、API、码值表或下游推送。
-              </p>
-              <button
-                className="btn primary sp-empty-action"
+              <EmptyState
+                title="没有找到匹配的资产"
+                desc={`没有与 “${searchedTerm}” 相关的资产、系统、字段、词根、指标、报表、API、码值表或下游推送。`}
+                className="sp-empty-adapter"
+              />
+              <Button
+                variant="primary"
+                className="sp-empty-action"
                 type="button"
                 aria-label="清空搜索"
                 onClick={() => clearSearch(scope)}
               >
                 清空搜索
-              </button>
+              </Button>
             </div>
           ) : (
             <>
@@ -389,7 +398,8 @@ export function SearchPortalPage({
                   </div>
                   <div className="sp-group-list">
                     {group.items.map((item) => (
-                      <button
+                      <Button
+                        variant="tertiary"
                         type="button"
                         key={item.id}
                         className="sp-hit"
@@ -415,11 +425,12 @@ export function SearchPortalPage({
                         <span className="sp-hit-go">
                           <Icon name="arrow" size={14} />
                         </span>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                   {group.hasMore === true ? (
-                    <button
+                    <Button
+                      variant="tertiary"
                       type="button"
                       className="sp-group-more"
                       aria-label={`查看全部${group.label}结果`}
@@ -427,7 +438,7 @@ export function SearchPortalPage({
                     >
                       查看全部 {group.count} 条
                       <Icon name="arrow" size={13} />
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               ))}
@@ -437,11 +448,21 @@ export function SearchPortalPage({
       ) : (
         <div className="sp-stats">
           {!publicAccessReady ? (
-            <div className="sp-stats-hint">正在准备公开资产目录...</div>
+            <LoadingState
+              title="正在准备公开资产目录..."
+              desc=""
+              label="正在准备公开资产目录"
+              className="sp-stats-hint"
+            />
           ) : statsLoading ? (
-            <div className="sp-stats-hint">正在加载资产统计...</div>
+            <LoadingState
+              title="正在加载资产统计..."
+              desc=""
+              label="正在加载资产统计"
+              className="sp-stats-hint"
+            />
           ) : statsError ? (
-            <div className="sp-stats-hint sp-stats-error">{statsError}</div>
+            <ErrorState title={statsError} desc="" className="sp-stats-hint sp-stats-error" />
           ) : (
             <div className="sp-stats-grid">
               {stats.map((item) => (

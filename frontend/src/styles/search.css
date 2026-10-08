@@ -26,7 +26,7 @@
 .sp-searchbox:focus-within .sp-ico { color: var(--accent); }
 .sp-searchbox input {
   flex: 1; min-width: 0; height: 100%;
-  border: none; outline: none; background: transparent;
+  border: none; outline: none; background: transparent; box-shadow: none;
   font-family: var(--sans); font-size: 16px; color: var(--ink);
 }
 .sp-searchbox input::placeholder { color: var(--ink-3); }
@@ -86,11 +86,16 @@
 }
 .sp-stat-label { margin-top: 5px; font-size: 12.5px; color: var(--ink-3); }
 .sp-stats-hint { text-align: center; color: var(--ink-3); font-size: 13px; padding: 16px 0; }
+.sp-stats-hint h3 { margin: 0; font-size: 13px; font-weight: 400; color: var(--ink-3); }
+.sp-stats-hint p:empty { display: none; }
 .sp-stats-error { color: var(--danger); }
+.sp-stats-error :is(h2, h3, p, span) { color: var(--danger); }
 
 /* ===== 检索结果（分组展示）===== */
 .sp-results { width: 100%; max-width: 760px; margin-top: 4px; }
-.sp-result-hint { text-align: center; color: var(--ink-3); font-size: 13px; padding: 20px 0; }
+.sp-result-loading { width: 100%; max-width: 760px; margin-top: 4px; text-align: center; color: var(--ink-3); font-size: 13px; padding: 20px 0; }
+.sp-result-loading h3 { margin: 0; font-size: 13px; font-weight: 400; color: var(--ink-3); }
+.sp-result-loading p:empty { display: none; }
 .sp-result-error { color: var(--danger); }
 .sp-result-summary { font-size: 13px; color: var(--ink-2); margin-bottom: 16px; }
 .sp-result-summary b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -155,9 +160,11 @@
   display: grid; place-items: center;
   background: var(--surface-2); color: var(--ink-3);
 }
-.sp-empty h4 { font-size: 15px; font-weight: 600; color: var(--ink); }
-.sp-empty p { margin-top: 8px; font-size: 13px; color: var(--ink-3); line-height: 1.6; }
-.sp-empty-action { margin-top: 16px; }
+.sp-empty-adapter { width: 100%; padding: 0; gap: 0; border: 0; border-radius: 0; background: transparent; color: var(--ink); }
+.sp-empty-adapter > div { gap: 0; }
+.sp-empty-adapter h2 { font-family: var(--sans); font-size: 15px; font-weight: 600; color: var(--ink); }
+.sp-empty-adapter p { margin-top: 8px; font-size: 13px; color: var(--ink-3); line-height: 1.6; }
+.sp-empty-action { margin: 16px auto 0; }
 
 @media (max-width: 860px) {
   .sp-stats-grid { grid-template-columns: repeat(3, 1fr); }
