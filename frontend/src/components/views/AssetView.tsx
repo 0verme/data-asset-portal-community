@@ -18,13 +18,14 @@ import { DOMAIN_ORDER } from "../../config/assets.ts";
 import { DetailPage } from "../DetailPage.tsx";
 import { HomePage } from "../HomePage.tsx";
 import { TableEditor } from "../TableEditor.tsx";
-import { Icon } from "../ui.tsx";
 import {
-  EmptyState,
-  ErrorState,
-  LoadingState,
-  ViewModeSwitcher,
-} from "../common/index.ts";
+  Button,
+  ErrorState as AdapterErrorState,
+  LoadingState as AdapterLoadingState,
+} from "../../ui/index.ts";
+import { Icon } from "../ui.tsx";
+import { EmptyState, ErrorState, LoadingState } from "../common/index.ts";
+import { AssetViewModeSwitcher } from "./AssetViewModeSwitcher.tsx";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 
 export interface AssetViewProps {
@@ -88,15 +89,16 @@ export function AssetView({
   if (route.page === "home") {
     if (homeLoading) {
       return (
-        <LoadingState
+        <AdapterLoadingState
           title="加载资产元数据"
           desc="正在准备表清单、主题域和分层信息。"
+          label="正在加载资产元数据"
         />
       );
     }
     if (homeError) {
       return (
-        <ErrorState
+        <AdapterErrorState
           title="资产列表加载失败"
           desc={homeError}
           onRetry={loadHomeData}
@@ -126,7 +128,7 @@ export function AssetView({
             </div>
           </div>
           <div className="head-actions">
-            <ViewModeSwitcher value={layout as ViewMode} onChange={setLayout} />
+            <AssetViewModeSwitcher value={layout as ViewMode} onChange={setLayout} />
             {canEdit ? (
               <button
                 className="btn primary"
@@ -147,27 +149,29 @@ export function AssetView({
         />
         {pageCount > 1 ? (
           <div className="oplog-pager">
-            <button
+            <Button
               className="btn"
+              variant="secondary"
               type="button"
               disabled={page <= 1}
               onClick={() => setPage(page - 1)}
             >
               <Icon name="chevron" size={14} />
               上一页
-            </button>
+            </Button>
             <span className="oplog-pager-info">
               第 {page} / {pageCount} 页
             </span>
-            <button
+            <Button
               className="btn"
+              variant="secondary"
               type="button"
               disabled={page >= pageCount}
               onClick={() => setPage(page + 1)}
             >
               下一页
               <Icon name="chevron" size={14} />
-            </button>
+            </Button>
           </div>
         ) : null}
       </div>

@@ -84,6 +84,9 @@ test("Tooltip, Popover, and Dropdown expose keyboard and accessible popup behavi
   await expect(menuItem).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(menuItem).toBeHidden();
+
+  await page.getByRole("button", { name: "重新加载" }).click();
+  await expect(page.getByRole("region", { name: "Notifications" })).toContainText("正在重试");
   expect(pageErrors).toEqual([]);
 });
 

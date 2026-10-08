@@ -13,7 +13,8 @@
 // limitations under the License.
 
 import type { AssetTableItem } from "../api/assets.ts";
-import { CardGridView, EmptyState, GroupView } from "./common/index.ts";
+import { EmptyState } from "../ui/index.ts";
+import { CardGridView, GroupView } from "./common/index.ts";
 import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.tsx";
 
 function fieldCount(table: AssetTableItem): number {
