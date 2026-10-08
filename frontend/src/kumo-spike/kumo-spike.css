@@ -1,0 +1,214 @@
+.kumo-spike {
+  min-height: 100vh;
+  padding: 28px clamp(16px, 3vw, 48px) 20px;
+  color: var(--ink, #142133);
+  background: var(--bg, #f3f7fb);
+  font-family: var(--font, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif);
+}
+
+.kumo-spike-header,
+.kumo-spike-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.kumo-spike-header {
+  max-width: 1440px;
+  margin: 0 auto 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line, #dce4ed);
+}
+
+.kumo-spike-header h1 {
+  margin: 6px 0 4px;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.kumo-spike-header p,
+.kumo-spike-section-heading p {
+  margin: 0;
+  color: var(--ink-2, #415268);
+  line-height: 1.6;
+}
+
+.kumo-spike-eyebrow {
+  color: var(--ink-3, #65758a);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.kumo-spike-main {
+  display: grid;
+  max-width: 1440px;
+  margin: 0 auto;
+  gap: 20px;
+}
+
+.kumo-spike-section {
+  min-width: 0;
+  padding: clamp(16px, 2vw, 24px);
+  border: 1px solid var(--line, #dce4ed);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  box-shadow: 0 1px 3px rgb(16 32 48 / 5%);
+}
+
+.kumo-spike-section-heading {
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.kumo-spike-section-heading h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.kumo-spike-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 20px;
+}
+
+.kumo-spike-field {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.kumo-spike-label {
+  color: var(--ink, #142133);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.kumo-spike-choice-field {
+  align-content: start;
+  gap: 14px;
+}
+
+.kumo-spike-row,
+.kumo-spike-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.kumo-spike-status-row {
+  margin-bottom: 18px;
+}
+
+.kumo-spike-surface {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 16px;
+}
+
+.kumo-spike-surface-title,
+.kumo-spike-inline-loader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kumo-spike-surface-title {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.kumo-spike-surface-copy {
+  color: var(--ink-2, #415268);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.kumo-spike-inline-loader {
+  color: var(--ink-3, #65758a);
+  font-size: 12px;
+}
+
+.kumo-spike-table-frame {
+  max-width: 100%;
+  margin: 14px 0;
+  overflow: auto;
+  border: 1px solid var(--line, #dce4ed);
+  border-radius: 8px;
+}
+
+.kumo-spike-table-frame table {
+  min-width: 760px;
+}
+
+.kumo-spike-table-frame code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.kumo-spike-dialog {
+  display: grid;
+  gap: 16px;
+  max-width: calc(100vw - 32px);
+}
+
+.kumo-spike-popover {
+  max-width: min(320px, calc(100vw - 24px));
+}
+
+.kumo-spike-fixed-probe {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 12;
+  max-width: min(300px, calc(100vw - 24px));
+  padding: 8px 12px;
+  border: 1px solid var(--line, #dce4ed);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  color: var(--ink-2, #415268);
+  font-size: 11px;
+  box-shadow: 0 2px 8px rgb(16 32 48 / 12%);
+}
+
+.kumo-spike-overlay-actions [data-testid="open-kumo-popover"] {
+  margin-left: auto;
+}
+
+/* DAP layer bridge for the spike: Kumo Toasty defaults to z-index: 1. */
+html[data-theme] [role="region"][aria-label="Notifications"] {
+  z-index: 220;
+}
+
+.kumo-spike-footer {
+  max-width: 1440px;
+  margin: 18px auto 0;
+  color: var(--ink-3, #65758a);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .kumo-spike {
+    padding-top: 16px;
+  }
+
+  .kumo-spike-header,
+  .kumo-spike-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .kumo-spike-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kumo-spike-section-heading > :last-child {
+    align-self: flex-start;
+  }
+}

@@ -1014,6 +1014,10 @@
   .lineage-detail-content { display: flex; flex: 1; flex-direction: column; min-height: 0; }
   .lineage-detail h2, .lineage-detail-content > p, .lineage-detail h3, .lineage-detail dl { margin: 16px; }
   .lineage-detail h2 { font-family: var(--mono); font-size: 16px; }
+  /* Restore the DAP detail headings normalized by Kumo's global Preflight. */
+  .lineage-detail h2,
+  .lineage-detail h3 { font-weight: 700; line-height: normal; }
+  .lineage-detail h3 { font-size: 1.17em; }
   .lineage-detail-content > p { color: var(--ink-2); }
   .lineage-detail dl { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; font-size: 13px; }
   .lineage-detail dt { color: var(--ink-3); }
