@@ -20,11 +20,12 @@ import { HomePage } from "../HomePage.tsx";
 import { TableEditor } from "../TableEditor.tsx";
 import {
   Button,
+  EmptyState as AdapterEmptyState,
   ErrorState as AdapterErrorState,
   LoadingState as AdapterLoadingState,
 } from "../../ui/index.ts";
 import { Icon } from "../ui.tsx";
-import { EmptyState, ErrorState, LoadingState } from "../common/index.ts";
+import { EmptyState } from "../common/index.ts";
 import { AssetViewModeSwitcher } from "./AssetViewModeSwitcher.tsx";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 
@@ -181,15 +182,16 @@ export function AssetView({
   if (route.page === "detail") {
     if (detailLoading) {
       return (
-        <LoadingState
+        <AdapterLoadingState
           title="加载表详情"
           desc={`正在准备 ${routeTable} 的字段与 DDL。`}
+          label="正在加载表详情"
         />
       );
     }
     if (detailError) {
       return (
-        <ErrorState
+        <AdapterErrorState
           title="表详情加载失败"
           desc={detailError}
           onRetry={() => loadDetailData({ assetId: route.assetId, tableName: routeTable })}
@@ -197,7 +199,7 @@ export function AssetView({
       );
     }
     if (!detailAsset) {
-      return <EmptyState title="表不存在" />;
+      return <AdapterEmptyState title="表不存在" />;
     }
     return (
       <DetailPage
@@ -217,15 +219,16 @@ export function AssetView({
   if (route.page === "edit") {
     if (detailLoading && !editingAsset) {
       return (
-        <LoadingState
+        <AdapterLoadingState
           title="加载编辑页"
           desc={`正在准备 ${routeTable} 的元数据和字段信息。`}
+          label="正在加载编辑页"
         />
       );
     }
     if (detailError && !editingAsset) {
       return (
-        <ErrorState
+        <AdapterErrorState
           title="编辑页加载失败"
           desc={detailError}
           onRetry={() => loadDetailData({ assetId: route.assetId, tableName: routeTable })}
@@ -233,7 +236,7 @@ export function AssetView({
       );
     }
     if (!editingAsset) {
-      return <EmptyState title="表不存在" />;
+      return <AdapterEmptyState title="表不存在" />;
     }
     return (
       <TableEditor
