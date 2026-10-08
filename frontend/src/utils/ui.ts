@@ -18,6 +18,14 @@ export { THEME_STORAGE_KEY };
 
 export type ThemeMode = 'light' | 'dark';
 
+export function applyThemeAttributes(
+  theme: ThemeMode,
+  root: Pick<HTMLElement, 'dataset'>,
+): void {
+  root.dataset['theme'] = theme;
+  root.dataset['mode'] = theme;
+}
+
 export function getInitialTheme(): ThemeMode {
   if (typeof window === 'undefined') return 'light';
   const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);

@@ -3,7 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 const outputDir = process.env["DAP_KUMO_TEST_OUTPUT"] || process.env["RUNNER_TEMP"];
 if (!outputDir) throw new Error("Set DAP_KUMO_TEST_OUTPUT to an issue-specific test output directory.");
 
-const baseURL = "http://127.0.0.1:4178";
+const baseURL = process.env["DAP_KUMO_BASE_URL"] || "http://127.0.0.1:4178";
+const serverPort = new URL(baseURL).port || "4178";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -32,7 +33,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev -- --host 127.0.0.1 --port 4178 --strictPort",
+    command: `npm run dev -- --host 127.0.0.1 --port ${serverPort} --strictPort`,
     url: `${baseURL}/__kumo-spike`,
     reuseExistingServer: !process.env["CI"],
     timeout: 60_000,

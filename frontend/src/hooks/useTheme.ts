@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { useEffect, useState } from 'react';
-import { getInitialTheme, THEME_STORAGE_KEY, type ThemeMode } from '../utils/ui.ts';
+import { applyThemeAttributes, getInitialTheme, THEME_STORAGE_KEY, type ThemeMode } from '../utils/ui.ts';
 
 export interface UseThemeResult {
   theme: ThemeMode;
@@ -24,7 +24,7 @@ export function useTheme(): UseThemeResult {
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
 
   useEffect(() => {
-    document.documentElement.dataset['theme'] = theme;
+    applyThemeAttributes(theme, document.documentElement);
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 

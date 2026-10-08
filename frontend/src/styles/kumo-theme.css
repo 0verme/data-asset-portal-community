@@ -1,0 +1,62 @@
+/*
+ * DAP-to-Kumo theme bridge.
+ * Import after Kumo standalone and all legacy DAP styles so the bridge aliases
+ * tokens only; it does not rename or replace legacy selectors.
+ */
+:root {
+  --dap-color-canvas: var(--bg);
+  --dap-color-surface: var(--surface);
+  --dap-color-surface-raised: var(--surface-2);
+  --dap-color-surface-hover: var(--surface-3);
+  --dap-color-surface-inset: var(--panel);
+  --dap-color-text: var(--ink);
+  --dap-color-text-muted: var(--ink-2);
+  --dap-color-text-disabled: var(--ink-3);
+  --dap-color-border: var(--line);
+  --dap-color-border-strong: var(--line-strong);
+  --dap-color-brand: var(--accent);
+  --dap-color-brand-strong: var(--accent-strong);
+  --dap-font-sans: var(--sans);
+  --dap-font-mono: var(--mono);
+  --dap-font-size-xs: 12px;
+  --dap-font-size-sm: 13px;
+  --dap-font-size-base: 14px;
+  --dap-font-size-lg: 16px;
+
+  --color-kumo-canvas: var(--dap-color-canvas);
+  --color-kumo-elevated: var(--dap-color-surface-raised);
+  --color-kumo-recessed: var(--dap-color-surface-inset);
+  --color-kumo-base: var(--dap-color-surface);
+  --color-kumo-tint: var(--dap-color-surface-raised);
+  --color-kumo-control: var(--dap-color-surface);
+  --color-kumo-fill: var(--dap-color-surface-raised);
+  --color-kumo-fill-hover: var(--dap-color-surface-hover);
+  --color-kumo-brand: var(--dap-color-brand);
+  --color-kumo-brand-hover: var(--dap-color-brand-strong);
+  --color-kumo-line: var(--dap-color-border-strong);
+  --color-kumo-hairline: var(--dap-color-border);
+  --text-color-kumo-default: var(--dap-color-text);
+  --text-color-kumo-strong: var(--dap-color-text);
+  --text-color-kumo-subtle: var(--dap-color-text-muted);
+  --text-color-kumo-inactive: var(--dap-color-text-disabled);
+  --text-color-kumo-placeholder: var(--dap-color-text-disabled);
+  --text-color-kumo-brand: var(--dap-color-brand);
+  --font-sans: var(--dap-font-sans);
+  --font-mono: var(--dap-font-mono);
+  --text-xs: var(--dap-font-size-xs);
+  --text-xs--line-height: 1.5;
+  --text-sm: var(--dap-font-size-sm);
+  --text-sm--line-height: 1.5;
+  --text-base: var(--dap-font-size-base);
+  --text-base--line-height: 1.5;
+  --text-lg: var(--dap-font-size-lg);
+  --text-lg--line-height: 1.5;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}

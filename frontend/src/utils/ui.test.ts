@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getErrorMessage, optionLabel } from "./ui.ts";
+import { applyThemeAttributes, getErrorMessage, optionLabel } from "./ui.ts";
 
 interface TestErrorDetail {
   field: string;
@@ -16,6 +16,16 @@ class TestApiError extends Error {
     this.payload = { error: { details } };
   }
 }
+
+test("applyThemeAttributes synchronizes DAP theme and Kumo mode", () => {
+  const root = { dataset: {} } as Pick<HTMLElement, "dataset">;
+
+  applyThemeAttributes("dark", root);
+  assert.deepEqual(root.dataset, { theme: "dark", mode: "dark" });
+
+  applyThemeAttributes("light", root);
+  assert.deepEqual(root.dataset, { theme: "light", mode: "light" });
+});
 
 test("optionLabel supports string and dictionary options", () => {
   assert.equal(optionLabel("PostgreSQL"), "PostgreSQL");

@@ -23,6 +23,7 @@ import "./styles/upstream.css";
 import "./styles/indicator.css";
 import "./styles/system.css";
 import "./styles/search.css";
+import "./styles/kumo-theme.css";
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {

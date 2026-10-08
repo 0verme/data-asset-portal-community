@@ -1,7 +1,15 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light" data-mode="light">
 <head>
 <meta charset="UTF-8" />
+<script>
+  (() => {
+    const savedTheme = window.localStorage.getItem("dap-theme");
+    const theme = savedTheme === "dark" ? "dark" : "light";
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.mode = theme;
+  })();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>数据资产管理与血缘分析平台</title>
 <link rel="icon" type="image/x-icon" href="/favicon.ico" />

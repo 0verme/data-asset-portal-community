@@ -226,6 +226,50 @@ test("DAP light/dark theme bridge persists and is present before fixture render"
   await expect(page.getByTestId("kumo-spike")).toBeVisible();
 });
 
+test("DAP application theme maps persisted DAP tokens to Kumo mode and tokens", async ({ page }) => {
+  await page.addInitScript(() => {
+    const initializedKey = "dap-kumo-theme-test-initialized";
+    if (!sessionStorage.getItem(initializedKey)) {
+      localStorage.setItem("dap-theme", "dark");
+      sessionStorage.setItem(initializedKey, "true");
+    }
+  });
+  await page.goto("/");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-theme", "dark");
+  await expect(html).toHaveAttribute("data-mode", "dark");
+  await expect(page.getByRole("button", { name: "切换到浅色主题" })).toBeVisible();
+
+  const readTokens = () => page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement);
+    return {
+      brand: style.getPropertyValue("--color-kumo-brand").trim(),
+      dapBrand: style.getPropertyValue("--dap-color-brand").trim(),
+      canvas: style.getPropertyValue("--color-kumo-canvas").trim(),
+      dapCanvas: style.getPropertyValue("--dap-color-canvas").trim(),
+      font: style.getPropertyValue("--font-sans").trim(),
+    };
+  });
+  const darkTokens = await readTokens();
+  expect(darkTokens.brand).toBe(darkTokens.dapBrand);
+  expect(darkTokens.canvas).toBe(darkTokens.dapCanvas);
+  expect(darkTokens.font).toContain("Segoe UI");
+
+  await page.getByRole("button", { name: "切换到浅色主题" }).click();
+  await expect(html).toHaveAttribute("data-theme", "light");
+  await expect(html).toHaveAttribute("data-mode", "light");
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("dap-theme"))).toBe("light");
+  const lightTokens = await readTokens();
+  expect(lightTokens.brand).toBe(lightTokens.dapBrand);
+  expect(lightTokens.brand).not.toBe(darkTokens.brand);
+
+  await page.reload();
+  await expect(html).toHaveAttribute("data-theme", "light");
+  await expect(html).toHaveAttribute("data-mode", "light");
+  await expect(page.getByRole("button", { name: "切换到深色主题" })).toBeVisible();
+});
+
 test("existing DAP Portal, assets, dense table, form, admin, and Lineage render with Kumo CSS loaded", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
