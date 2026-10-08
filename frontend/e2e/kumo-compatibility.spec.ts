@@ -12,7 +12,7 @@ const existingRoutes = [
 
 async function openFixture(page: import("@playwright/test").Page) {
   await page.goto(fixturePath);
-  await expect(page.getByTestId("kumo-spike")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kumo × 数据资产审批" })).toBeVisible({ timeout: 15_000 });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -223,7 +223,7 @@ test("DAP light/dark theme bridge persists and is present before fixture render"
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(page.locator("html")).toHaveAttribute("data-mode", "dark");
-  await expect(page.getByTestId("kumo-spike")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kumo × 数据资产审批" })).toBeVisible({ timeout: 15_000 });
 });
 
 test("DAP application theme maps persisted DAP tokens to Kumo mode and tokens", async ({ page }) => {
