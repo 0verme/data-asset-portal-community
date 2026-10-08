@@ -31,13 +31,9 @@ import {
   ASSET_NAME_RULE_MESSAGE,
   isValidAssetName,
 } from "../utils/assetName.ts";
-import {
-  ActionErrorBanner,
-  confirmDeleteAction,
-  DangerZone,
-  FormActionBar,
-  PageHeader,
-} from "./common/index.ts";
+import { ActionErrorBanner, PageHeader } from "./common/index.ts";
+import { Button, IconButton, Input, Select, Textarea } from "../ui/index.ts";
+import { AssetDeleteZone, AssetEditorActionBar } from "./views/asset/AssetEditorActions.tsx";
 import { Icon } from "./ui.tsx";
 
 interface EditorField {
@@ -391,7 +387,8 @@ export function TableEditor({
         <div className="form-grid">
           <div className="fl">
             <label>表名（英文）</label>
-            <input
+            <Input
+              aria-label="表名（英文）"
               className={`inp mono${touched && (!form.name.trim() || !isValidAssetName(form.name.trim())) ? " invalid" : ""}`}
               placeholder="例如：dwm_xxx_detail_di"
               value={form.name}
@@ -400,7 +397,8 @@ export function TableEditor({
           </div>
           <div className="fl">
             <label>表中文名 / 业务含义</label>
-            <input
+            <Input
+              aria-label="表中文名 / 业务含义"
               className={`inp${touched && !form.cn.trim() ? " invalid" : ""}`}
               placeholder="例如：支付交易明细中间表"
               value={form.cn}
@@ -409,41 +407,38 @@ export function TableEditor({
           </div>
           <div className="fl">
             <label>主题域</label>
-            <select
+            <Select<string>
+              aria-label="主题域"
               className="sel"
-              value={form.domain}
-              onChange={(event) => setValue("domain", event.target.value)}
+              placeholder="请选择主题域"
+              value={form.domain || null}
+              onValueChange={(value) => setValue("domain", value || "")}
             >
-              <option value="">请选择主题域</option>
-              {domains.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
+              <Select.Option value="">请选择主题域</Select.Option>
+              {domains.map((name) => <Select.Option key={name} value={name}>{name}</Select.Option>)}
+            </Select>
           </div>
           <div className="fl">
             <label>数据层级</label>
-            <select
+            <Select<string>
+              aria-label="数据层级"
               className="sel"
-              value={form.layer}
-              onChange={(event) => setValue("layer", event.target.value)}
+              placeholder="请选择数据层级"
+              value={form.layer || null}
+              onValueChange={(value) => setValue("layer", value || "")}
             >
-              <option value="">请选择数据层级</option>
+              <Select.Option value="">请选择数据层级</Select.Option>
               {layers.map((item) => {
                 const code = item.code;
                 const label = `${item.code} · ${item.cn || item.code}`;
-                return (
-                  <option key={code} value={code}>
-                    {label}
-                  </option>
-                );
+                return <Select.Option key={code} value={code}>{label}</Select.Option>;
               })}
-            </select>
+            </Select>
           </div>
           <div className="fl">
             <label>负责人</label>
-            <input
+            <Input
+              aria-label="负责人"
               className="inp"
               placeholder="例如：何嘉佳"
               value={form.owner}
@@ -452,7 +447,8 @@ export function TableEditor({
           </div>
           <div className="fl">
             <label>数据粒度</label>
-            <input
+            <Input
+              aria-label="数据粒度"
               className="inp"
               placeholder="例如：一笔支付交易"
               value={form.grain}
@@ -461,7 +457,8 @@ export function TableEditor({
           </div>
           <div className="fl">
             <label>更新周期</label>
-            <input
+            <Input
+              aria-label="更新周期"
               className="inp"
               placeholder="例如：每日增量 T+1"
               value={form.cycle}
@@ -470,7 +467,8 @@ export function TableEditor({
           </div>
           <div className="fl full">
             <label>表说明</label>
-            <textarea
+            <Textarea
+              aria-label="表说明"
               className="ta"
               placeholder="描述表来源、加工逻辑和下游用途。"
               value={form.desc}
@@ -493,8 +491,8 @@ export function TableEditor({
             <thead>
               <tr>
                 <th style={{ width: 40 }}>#</th>
-                <th style={{ minWidth: 180 }}>字段名</th>
-                <th style={{ minWidth: 160 }}>中文注释</th>
+                <th style={{ minWidth: 160 }}>字段名</th>
+                <th style={{ minWidth: 140 }}>中文注释</th>
                 <th style={{ width: 160 }}>数据类型</th>
                 <th className="ctr" style={{ width: 64 }}>
                   主键
@@ -505,7 +503,7 @@ export function TableEditor({
                 <th className="ctr" style={{ width: 64 }}>
                   可空
                 </th>
-                <th style={{ minWidth: 220 }}>枚举 / 取值说明</th>
+                <th style={{ minWidth: 180 }}>枚举 / 取值说明</th>
                 <th style={{ width: 110 }}></th>
               </tr>
             </thead>
@@ -520,7 +518,8 @@ export function TableEditor({
                       {index + 1}
                     </td>
                     <td data-label="字段名">
-                      <input
+                      <Input
+                        aria-label={`字段${index + 1}字段名`}
                         className={`cell-inp mono${rowErrors.name ? " invalid" : ""}`}
                         placeholder="field_name"
                         value={field.name}
@@ -530,7 +529,8 @@ export function TableEditor({
                       />
                     </td>
                     <td data-label="中文注释">
-                      <input
+                      <Input
+                        aria-label={`字段${index + 1}中文注释`}
                         className={`cell-inp${rowErrors.cn ? " invalid" : ""}`}
                         placeholder="字段含义"
                         value={field.cn}
@@ -541,11 +541,14 @@ export function TableEditor({
                     </td>
                     <td data-label="数据类型">
                       <div style={{ display: "grid", gap: 6 }}>
-                        <select
+                        <Select<string>
+                          aria-label={`字段${index + 1}数据类型`}
                           className={`cell-inp mono${rowErrors.type ? " invalid" : ""}`}
+                          collisionAvoidance={{ side: "flip", align: "shift" }}
+                          side="top"
                           value={field.typeBase}
-                          onChange={(event) => {
-                            const nextBaseType = event.target.value;
+                          onValueChange={(value) => {
+                            const nextBaseType = value || "";
                             const nextPatch: Partial<EditorField> = {
                               typeBase: nextBaseType,
                             };
@@ -565,18 +568,19 @@ export function TableEditor({
                           }}
                         >
                           {!isDataTypeBase(field.typeBase) ? (
-                            <option value={field.typeBase}>
+                            <Select.Option value={field.typeBase}>
                               {field.typeBase}
-                            </option>
+                            </Select.Option>
                           ) : null}
                           {DATA_TYPE_BASE_OPTIONS.map((type) => (
-                            <option key={type} value={type}>
+                            <Select.Option key={type} value={type}>
                               {type}
-                            </option>
+                            </Select.Option>
                           ))}
-                        </select>
+                        </Select>
                         {field.typeBase === "VARCHAR" ? (
-                          <input
+                          <Input
+                            aria-label={`字段${index + 1}类型长度`}
                             className={`cell-inp mono${rowErrors.type ? " invalid" : ""}`}
                             inputMode="numeric"
                             placeholder={`长度，默认 ${DEFAULT_VARCHAR_LENGTH}`}
@@ -599,7 +603,8 @@ export function TableEditor({
                               gap: 6,
                             }}
                           >
-                            <input
+                            <Input
+                              aria-label={`字段${index + 1}精度`}
                               className={`cell-inp mono${rowErrors.type ? " invalid" : ""}`}
                               inputMode="numeric"
                               placeholder={`precision，默认 ${DEFAULT_NUMERIC_PRECISION}`}
@@ -613,7 +618,8 @@ export function TableEditor({
                                 })
                               }
                             />
-                            <input
+                            <Input
+                              aria-label={`字段${index + 1}小数位`}
                               className={`cell-inp mono${rowErrors.type ? " invalid" : ""}`}
                               inputMode="numeric"
                               placeholder={`scale，默认 ${DEFAULT_NUMERIC_SCALE}`}
@@ -637,39 +643,52 @@ export function TableEditor({
                       </div>
                     </td>
                     <td data-label="主键" className="ctr">
-                      <button
+                      <Button
+                        aria-label={`${field.pk ? "取消" : "设为"}主键 ${field.name || `字段${index + 1}`}`}
+                        aria-pressed={field.pk}
                         className={`cbtn amber${field.pk ? " on" : ""}`}
                         onClick={() => setField(field._key, { pk: !field.pk })}
+                        size="sm"
                         type="button"
+                        variant="tertiary"
                       >
                         <Icon name="key" size={13} />
-                      </button>
+                      </Button>
                     </td>
                     <td data-label="分区" className="ctr">
-                      <button
+                      <Button
+                        aria-label={`${field.part ? "取消" : "设为"}分区字段 ${field.name || `字段${index + 1}`}`}
+                        aria-pressed={field.part}
                         className={`cbtn cyan${field.part ? " on" : ""}`}
                         onClick={() =>
                           setField(field._key, { part: !field.part })
                         }
+                        size="sm"
                         type="button"
+                        variant="tertiary"
                       >
                         <Icon name="hash" size={13} />
-                      </button>
+                      </Button>
                     </td>
                     <td data-label="可空" className="ctr">
-                      <button
+                      <Button
+                        aria-label={`${field.nullable ? "禁止" : "允许"}字段可空 ${field.name || `字段${index + 1}`}`}
+                        aria-pressed={field.nullable}
                         className={`cbtn${field.nullable ? " on" : ""}`}
                         onClick={() =>
                           setField(field._key, { nullable: !field.nullable })
                         }
                         disabled={field.pk}
+                        size="sm"
                         type="button"
+                        variant="tertiary"
                       >
                         <Icon name="check" size={13} />
-                      </button>
+                      </Button>
                     </td>
                     <td data-label="枚举 / 取值说明">
-                      <input
+                      <Input
+                        aria-label={`字段${index + 1}枚举 / 取值说明`}
                         className="cell-inp"
                         placeholder="例如：SUCCESS-成功 / FAIL-失败"
                         value={field.enum}
@@ -680,30 +699,36 @@ export function TableEditor({
                     </td>
                     <td data-label="">
                       <div className="row-tools">
-                        <button
+                        <IconButton
+                          aria-label={`上移字段 ${field.name || index + 1}`}
                           className="icon-btn"
                           disabled={index === 0}
+                          icon={<Icon name="up" size={14} />}
                           onClick={() => moveField(index, -1)}
+                          size="sm"
                           type="button"
-                        >
-                          <Icon name="up" size={14} />
-                        </button>
-                        <button
+                          variant="tertiary"
+                        />
+                        <IconButton
+                          aria-label={`下移字段 ${field.name || index + 1}`}
                           className="icon-btn"
                           disabled={index === form.fields.length - 1}
+                          icon={<Icon name="down" size={14} />}
                           onClick={() => moveField(index, 1)}
+                          size="sm"
                           type="button"
-                        >
-                          <Icon name="down" size={14} />
-                        </button>
-                        <button
+                          variant="tertiary"
+                        />
+                        <IconButton
+                          aria-label={`删除字段 ${field.name || index + 1}`}
                           className="icon-btn danger"
                           disabled={form.fields.length === 1}
+                          icon={<Icon name="trash" size={14} />}
                           onClick={() => deleteField(field._key)}
+                          size="sm"
                           type="button"
-                        >
-                          <Icon name="trash" size={14} />
-                        </button>
+                          variant="danger"
+                        />
                       </div>
                     </td>
                   </tr>
@@ -712,13 +737,13 @@ export function TableEditor({
             </tbody>
           </table>
         </div>
-        <button className="add-field" onClick={addField} type="button">
+        <Button className="add-field" onClick={addField} size="sm" type="button" variant="tertiary">
           <Icon name="plus" size={14} />
           新增字段
-        </button>
+        </Button>
       </div>
 
-      <FormActionBar
+      <AssetEditorActionBar
         note={
           isEdit
             ? "保存后会更新表元数据、字段列表和 DDL 展示。"
@@ -729,36 +754,7 @@ export function TableEditor({
         saving={saving}
         isDirty={isDirty}
       />
-      {deleteInitial ? (
-        <DangerZone
-          description="删除资产表会影响字段清单、DDL 展示和历史元数据追溯，请谨慎操作。"
-          actions={[
-            {
-              key: "delete-table",
-              label: "删除表",
-              icon: "trash",
-              danger: true,
-              onClick: async () => {
-                if (
-                  await confirmDeleteAction({
-                    name: oldName,
-                    typeLabel: "资产表",
-                    impact:
-                      "该表删除后，可能影响字段清单、DDL 展示、资产检索和历史追溯。请确认没有下游依赖。",
-                    consequences: [
-                      "删除前应以后端校验为准。",
-                      "若后端返回不可删除原因，页面会直接展示原因。",
-                    ],
-                    confirmKeyword: oldName,
-                    confirmKeywordLabel: "请输入表名二次确认",
-                  })
-                )
-                  await onDelete?.(oldName);
-              },
-            },
-          ]}
-        />
-      ) : null}
+      {deleteInitial ? <AssetDeleteZone name={oldName} onDelete={onDelete} /> : null}
     </div>
   );
 }

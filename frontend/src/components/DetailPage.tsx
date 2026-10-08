@@ -16,6 +16,7 @@ import React, { type ReactNode } from "react";
 
 import type { AssetTableField, AssetTableItem } from "../api/assets.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
+import { Button, Input, Tabs } from "../ui/index.ts";
 import { AssetRisksPanel } from "./AssetRisksPanel.tsx";
 import { MetaItem, PageHeader } from "./common/index.ts";
 import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.tsx";
@@ -132,9 +133,9 @@ function DDLView({ asset, ddl, ddlDialectLabel }: DDLViewProps) {
     <div className="ddl-wrap">
       <div className="ddl-bar">
         <span className="ddl-lang"><span className="d"></span>{ddlDialectLabel} · 建表语句</span>
-        <button className={`btn${copied ? " copied" : ""}`} type="button" onClick={() => void copy()} style={{ height: 30 }}>
+        <Button className={`btn${copied ? " copied" : ""}`} size="sm" type="button" variant="secondary" onClick={() => void copy()} style={{ height: 30 }}>
           <Icon name={copied ? "check" : "copy"} size={14} />{copied ? "已复制" : "复制 DDL"}
-        </button>
+        </Button>
       </div>
       <pre className="ddl" aria-label={`${asset.name} DDL`}>
         <code className="ddl-code">{renderDDL(ddl)}</code>
@@ -176,7 +177,8 @@ function FieldsView({ fields }: FieldsViewProps) {
       <div className="field-toolbar">
         <div className="ft-search">
           <span className="ico-search"><Icon name="search" size={14} /></span>
-          <input
+          <Input
+            aria-label="在当前表内筛选字段"
             placeholder="在当前表内筛选字段"
             value={fieldQuery}
             onChange={(event) => setFieldQuery(event.target.value)}
@@ -281,15 +283,15 @@ export function DetailPage({
             <div className="dh-desc">{asset.desc}</div>
           </div>
           <div className="dh-actions">
-            {onEdit ? <button className="btn" type="button" onClick={onEdit}>
+            {onEdit ? <Button className="btn" type="button" variant="secondary" onClick={onEdit}>
               <Icon name="edit" size={15} />编辑表
-            </button> : null}
-            <button className={`btn${copied ? " copied" : ""}`} type="button" onClick={() => void copyName()}>
+            </Button> : null}
+            <Button className={`btn${copied ? " copied" : ""}`} type="button" variant="secondary" onClick={() => void copyName()}>
               <Icon name={copied ? "check" : "copy"} size={15} />{copied ? "已复制" : "复制表名"}
-            </button>
-            <button className="btn primary" type="button" onClick={() => onTabChange("ddl")}>
+            </Button>
+            <Button className="btn primary" type="button" variant="primary" onClick={() => onTabChange("ddl")}>
               <Icon name="code" size={15} />查看 DDL
-            </button>
+            </Button>
           </div>
         </div>
         <div className="dh-meta">
@@ -303,14 +305,18 @@ export function DetailPage({
 
       <AssetRisksPanel assetRisks={Array.isArray(assetRisks) ? assetRisks : []} />
 
-      <div className="tabs">
-        <div className={`tab${tab === "fields" ? " active" : ""}`} onClick={() => onTabChange("fields")}>
-          <Icon name="columns" size={15} />字段信息 <span className="tab-n">{fields.length}</span>
-        </div>
-        <div className={`tab${tab === "ddl" ? " active" : ""}`} onClick={() => onTabChange("ddl")}>
-          <Icon name="code" size={15} />建表语句
-        </div>
-      </div>
+      <Tabs
+        aria-label="数据表详情内容"
+        appearance="line"
+        className="asset-detail-tabs"
+        size="sm"
+        value={tab}
+        onValueChange={onTabChange}
+        tabs={[
+          { value: "fields", label: `字段信息 (${fields.length})` },
+          { value: "ddl", label: "建表语句" },
+        ]}
+      />
       <div className="panel">
         {tab === "fields" ? <FieldsView fields={fields} /> : <DDLView asset={asset} ddl={ddl} ddlDialectLabel={ddlDialectLabel} />}
       </div>

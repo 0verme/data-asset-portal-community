@@ -26,6 +26,32 @@ test("asset read controls use DAP adapters and preserve pressed-button semantics
   assert.match(home, /import \{ EmptyState \} from "\.\.\/ui\/index\.ts"/);
 });
 
+test("asset detail and editor compose controls only from DAP adapters", async () => {
+  const [detail, editor, actions, view] = await Promise.all([
+    read("../DetailPage.tsx"),
+    read("../TableEditor.tsx"),
+    read("./asset/AssetEditorActions.tsx"),
+    read("./AssetView.tsx"),
+  ]);
+
+  assert.match(detail, /import \{ Button, Input, Tabs \} from "\.\.\/ui\/index\.ts"/);
+  assert.match(detail, /<Tabs[\s\S]*?value=\{tab\}[\s\S]*?onValueChange=\{onTabChange\}/);
+  assert.match(detail, /<Input[\s\S]*?aria-label="在当前表内筛选字段"/);
+  assert.doesNotMatch(detail, /<(?:button|input|select|textarea)\b/);
+
+  assert.match(editor, /import \{ Button, IconButton, Input, Select, Textarea \} from "\.\.\/ui\/index\.ts"/);
+  assert.match(editor, /collisionAvoidance=\{\{ side: "flip", align: "shift" \}\}[\s\S]*?side="top"/);
+  assert.match(editor, /<AssetEditorActionBar[\s\S]*?<AssetDeleteZone/);
+  assert.doesNotMatch(editor, /<(?:button|input|select|textarea)\b/);
+
+  assert.ok(actions.includes('import { Button } from "../../../ui/index.ts";'));
+  assert.match(actions, /confirmDeleteAction\(\{/);
+  assert.match(actions, /confirmKeyword: name/);
+  assert.doesNotMatch(`${detail}\n${editor}\n${actions}`, /@cloudflare\/kumo/);
+  assert.match(view, /<AdapterLoadingState[\s\S]*?title="加载表详情"/);
+  assert.match(view, /<AdapterErrorState[\s\S]*?title="表详情加载失败"/);
+});
+
 test("asset filters use scoped adapters without changing shared module sidebars", async () => {
   const [assetSidebar, assetFilter, sharedFilter] = await Promise.all([
     read("../sidebar/AssetSidebar.tsx"),
