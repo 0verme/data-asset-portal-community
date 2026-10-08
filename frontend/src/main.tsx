@@ -34,15 +34,21 @@ const root = ReactDOM.createRoot(rootElement);
 const fixturePath = import.meta.env.DEV ? window.location.pathname : "";
 const isKumoSpike = fixturePath === "/__kumo-spike";
 const isKumoAdapterFixture = fixturePath === "/__kumo-adapters";
+const isKumoOverlayFixture = fixturePath === "/__kumo-overlays";
+const isKumoToastFallbackFixture = fixturePath === "/__kumo-toast-fallback";
 
-if (isKumoSpike || isKumoAdapterFixture) {
+if (isKumoSpike || isKumoAdapterFixture || isKumoOverlayFixture || isKumoToastFallbackFixture) {
   const storedTheme = window.localStorage.getItem("dap-theme");
   const theme = storedTheme === "dark" ? "dark" : "light";
   document.documentElement.dataset["theme"] = theme;
   document.documentElement.dataset["mode"] = theme === "dark" ? "dark" : "light";
   const loadFixture = isKumoSpike
     ? import("./kumo-spike/KumoCompatibilityFixture.tsx")
-    : import("./kumo-adapters/KumoPrimitiveFixture.tsx");
+    : isKumoAdapterFixture
+      ? import("./kumo-adapters/KumoPrimitiveFixture.tsx")
+      : isKumoOverlayFixture
+        ? import("./kumo-overlays/KumoOverlayFixture.tsx")
+        : import("./kumo-overlays/KumoToastFallbackFixture.tsx");
   void loadFixture.then(({ default: Fixture }) => {
     root.render(
       <React.StrictMode>
