@@ -13,8 +13,8 @@ test("empty search results expose a clear action that preserves scope and focus"
   ]);
 
   assert.match(source, /groups\.length === 0 \?/);
-  assert.match(source, /<h4>没有找到匹配的资产<\/h4>/);
-  assert.match(source, /className="btn primary sp-empty-action"/);
+  assert.match(source, /<EmptyState[\s\S]*?title="没有找到匹配的资产"/);
+  assert.match(source, /className="sp-empty-action"/);
   assert.match(source, /aria-label="清空搜索"/);
   assert.match(source, /onClick=\{\(\) => clearSearch\(scope\)\}/);
   assert.match(source, /const clearSearch = \(nextScope = scope\) => \{/);
@@ -24,7 +24,19 @@ test("empty search results expose a clear action that preserves scope and focus"
   assert.match(source, /searchParams\.set\("scope", nextScope\);/);
   assert.match(source, /syncSearchUrl\("", preservedScope\);/);
   assert.match(source, /inputRef\.current\?\.focus\(\);/);
-  assert.match(styles, /\.sp-empty-action \{ margin-top: 16px; \}/);
+  assert.match(styles, /\.sp-empty-action \{ margin: 16px auto 0; \}/);
+});
+
+test("Portal Search uses only DAP UI adapters for controls and feedback", async () => {
+  const source = await readFile(searchPagePath, "utf8");
+
+  assert.match(source, /from "\.\.\/ui\/index\.ts"/);
+  assert.doesNotMatch(source, /@cloudflare\/kumo/);
+  assert.match(source, /<Input[\s>]/);
+  assert.match(source, /<Button[\s>]/);
+  assert.match(source, /<LoadingState[\s>]/);
+  assert.match(source, /<ErrorState[\s>]/);
+  assert.match(source, /<EmptyState[\s>]/);
 });
 
 test("empty recovery remains separate from loading, error, and result branches", async () => {
