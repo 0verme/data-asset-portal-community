@@ -1,0 +1,46 @@
+#dap-ui-overlay-root [role="region"][aria-label="Notifications"] {
+  z-index: 220 !important;
+  max-width: min(420px, calc(100vw - 24px));
+}
+
+.dap-ui-banner,
+.dap-ui-error-state {
+  font-family: var(--dap-font-sans, inherit);
+}
+
+.dap-ui-loading-state {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--dap-color-text-muted);
+  text-align: center;
+}
+
+.dap-ui-loading-state h3,
+.dap-ui-loading-state p {
+  margin: 0;
+}
+
+.dap-ui-loading-state h3 {
+  color: var(--dap-color-text);
+  font-size: var(--dap-font-size-base);
+  font-weight: 600;
+}
+
+.dap-ui-loading-state p {
+  font-size: var(--dap-font-size-sm);
+}
+
+.dap-ui-empty-state {
+  font-family: var(--dap-font-sans, inherit);
+}
+
+@media (max-width: 480px) {
+  #dap-ui-overlay-root [role="region"][aria-label="Notifications"] {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    max-width: none;
+  }
+}

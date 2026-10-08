@@ -1,0 +1,84 @@
+.kumo-overlays-fixture {
+  display: grid;
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  color: var(--dap-color-text);
+  font-family: var(--dap-font-sans);
+}
+
+.kumo-overlays-header,
+.kumo-overlays-section {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--dap-color-border);
+  border-radius: 12px;
+  background: var(--dap-color-surface);
+}
+
+.kumo-overlays-header h1,
+.kumo-overlays-section h2,
+.kumo-overlays-header p {
+  margin: 0;
+}
+
+.kumo-overlays-header h1 {
+  font-size: 22px;
+}
+
+.kumo-overlays-header p,
+.kumo-overlays-section > p {
+  color: var(--dap-color-text-muted);
+  font-size: var(--dap-font-size-sm);
+}
+
+.kumo-overlays-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.kumo-overlays-state-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kumo-overlays-dialog-body {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.kumo-overlays-dialog-body p {
+  margin: 0;
+}
+
+.kumo-overlays-form-field {
+  display: grid;
+  gap: 6px;
+  font-size: var(--dap-font-size-sm);
+}
+
+.kumo-overlays-form-field input {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--dap-color-border);
+  border-radius: 6px;
+  background: var(--dap-color-surface);
+  color: var(--dap-color-text);
+  font: inherit;
+}
+
+@media (max-width: 760px) {
+  .kumo-overlays-fixture {
+    padding: 12px;
+  }
+
+  .kumo-overlays-state-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
