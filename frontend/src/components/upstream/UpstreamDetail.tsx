@@ -22,6 +22,7 @@ import {
 } from "../../utils/optionUtils.ts";
 import { MetaItem, PageHeader, StatusBadge } from "../common/index.ts";
 import { Icon } from "../ui.tsx";
+import { Button } from "../../ui/index.ts";
 import { nextUnload, ScheduleStepper } from "./UpstreamParts.tsx";
 import {
   displayUpstreamValue,
@@ -80,7 +81,7 @@ export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], o
             ) : null}
           </div>
           {onEdit ? <div className="dh-actions">
-            <button className="btn" type="button" onClick={onEdit}><Icon name="edit" size={15} />编辑</button>
+            <Button className="btn" variant="secondary" type="button" onClick={onEdit}><Icon name="edit" size={15} />编辑</Button>
           </div> : null}
         </div>
         <div className="dh-meta upstream-detail-meta" data-field-contract="upstream-system">

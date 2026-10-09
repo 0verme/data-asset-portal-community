@@ -14,6 +14,7 @@
 
 import React from "react";
 import { Icon } from "../ui.tsx";
+import { Button, IconButton, Input, Select, Textarea } from "../../ui/index.ts";
 import type { PublicUpstreamSystem } from "../../api/upstream.ts";
 import type { MockUpstreamSystem } from "../../data/upstreamSystems.ts";
 import {
@@ -280,7 +281,8 @@ export function UpstreamEditor({
         <div className="form-grid">
           <div className="fl upstream-field" data-form-field="id">
             <label>{getUpstreamFieldLabel("id")}</label>
-            <input
+            <Input
+              aria-label={getUpstreamFieldLabel("id")}
               className={`inp mono${getFieldError("id") ? " invalid" : ""}`}
               value={form.id}
               onChange={(event) => setValue("id", event.target.value)}
@@ -293,7 +295,8 @@ export function UpstreamEditor({
           </div>
           <div className="fl upstream-field" data-form-field="abbr">
             <label>{getUpstreamFieldLabel("abbr")}</label>
-            <input
+            <Input
+              aria-label={getUpstreamFieldLabel("abbr")}
               className={`inp mono${getFieldError("abbr") ? " invalid" : ""}`}
               value={form.abbr}
               onChange={(event) => setValue("abbr", event.target.value)}
@@ -306,7 +309,8 @@ export function UpstreamEditor({
           </div>
           <div className="fl upstream-field" data-form-field="name">
             <label>{getUpstreamFieldLabel("name")}</label>
-            <input
+            <Input
+              aria-label={getUpstreamFieldLabel("name")}
               className={`inp${getFieldError("name") ? " invalid" : ""}`}
               value={form.name}
               onChange={(event) => setValue("name", event.target.value)}
@@ -319,21 +323,22 @@ export function UpstreamEditor({
           </div>
           <div className="fl upstream-field" data-form-field="dbType">
             <label>{getUpstreamFieldLabel("dbType")}</label>
-            <select
+            <Select<string>
+              aria-label={getUpstreamFieldLabel("dbType")}
               className={`sel${getFieldError("dbType") ? " invalid" : ""}`}
-              value={form.dbType}
-              onChange={(event) => setValue("dbType", event.target.value)}
+              value={form.dbType || null}
+              onValueChange={(value) => setValue("dbType", value || "")}
               data-form-control
               aria-invalid={Boolean(getFieldError("dbType")) || undefined}
               aria-describedby={getFieldError("dbType") ? fieldErrorId("dbType") : undefined}
             >
-              <option value="">请选择数据库类型</option>
+              <Select.Option value="">请选择数据库类型</Select.Option>
               {dbTypeSelectOptions.map((item) => (
-                <option key={item.value} value={item.value}>
+                <Select.Option key={item.value} value={item.value}>
                   {optionLabel(item)}
-                </option>
+                </Select.Option>
               ))}
-            </select>
+            </Select>
             {dbTypeLegacy && !getFieldError("dbType") ? (
               <div
                 className="editor-sub"
@@ -346,7 +351,8 @@ export function UpstreamEditor({
           </div>
           <div className="fl">
             <label>{getUpstreamFieldLabel("owner")}</label>
-            <input
+            <Input
+              aria-label={getUpstreamFieldLabel("owner")}
               className="inp"
               value={form.owner}
               onChange={(event) => setValue("owner", event.target.value)}
@@ -355,21 +361,22 @@ export function UpstreamEditor({
           </div>
           <div className="fl upstream-field" data-form-field="dept">
             <label>{getUpstreamFieldLabel("dept")}</label>
-            <select
+            <Select<string>
+              aria-label={getUpstreamFieldLabel("dept")}
               className={`sel${getFieldError("dept") ? " invalid" : ""}`}
-              value={form.dept}
-              onChange={(event) => setValue("dept", event.target.value)}
+              value={form.dept || null}
+              onValueChange={(value) => setValue("dept", value || "")}
               data-form-control
               aria-invalid={Boolean(getFieldError("dept")) || undefined}
               aria-describedby={getFieldError("dept") ? fieldErrorId("dept") : undefined}
             >
-              <option value="">请选择业务部门</option>
+              <Select.Option value="">请选择业务部门</Select.Option>
               {deptSelectOptions.map((item) => (
-                <option key={item.value} value={item.value}>
+                <Select.Option key={item.value} value={item.value}>
                   {optionLabel(item)}
-                </option>
+                </Select.Option>
               ))}
-            </select>
+            </Select>
             {deptLegacy && !getFieldError("dept") ? (
               <div
                 className="editor-sub"
@@ -403,7 +410,8 @@ export function UpstreamEditor({
           </div>
           <div className="fl full">
             <label>{getUpstreamFieldLabel("desc")}</label>
-            <textarea
+            <Textarea
+              aria-label={getUpstreamFieldLabel("desc")}
               className="ta"
               value={form.desc}
               onChange={(event) => setValue("desc", event.target.value)}
@@ -421,7 +429,8 @@ export function UpstreamEditor({
         <div className="form-grid">
           <div className="fl upstream-field" data-form-field="host">
             <label>{getUpstreamFieldLabel("host")}</label>
-            <input
+            <Input
+              aria-label={getUpstreamFieldLabel("host")}
               className={`inp mono${getFieldError("host") ? " invalid" : ""}`}
               value={form.host}
               onChange={(event) => setValue("host", event.target.value)}
@@ -434,7 +443,8 @@ export function UpstreamEditor({
           </div>
           <div className="fl">
             <label>{getUpstreamFieldLabel("schema")}</label>
-            <input
+            <Input
+              aria-label={getUpstreamFieldLabel("schema")}
               className="inp mono"
               value={form.schema}
               onChange={(event) => setValue("schema", event.target.value)}
@@ -478,10 +488,11 @@ export function UpstreamEditor({
                   />
                   {renderFieldError(`unloadTimes[${index}]`)}
                 </div>
-                <button
+                <IconButton
+                  aria-label={`删除时间点 ${index + 1}`}
                   className="icon-btn danger"
-                  type="button"
                   disabled={unloadTimes.length === 1}
+                  icon={<Icon name="trash" size={14} />}
                   onClick={() => {
                     onClearSaveError?.("unloadTimes");
                     setForm((previous) => ({
@@ -491,16 +502,19 @@ export function UpstreamEditor({
                       ),
                     }));
                   }}
-                >
-                  <Icon name="trash" size={14} />
-                </button>
+                  size="sm"
+                  type="button"
+                  variant="danger"
+                />
               </div>
             );
           })}
         </div>
-        <button
+        <Button
           className="add-field"
+          size="sm"
           type="button"
+          variant="tertiary"
           onClick={() => {
             onClearSaveError?.("unloadTimes");
             setForm((previous) => ({
@@ -511,7 +525,7 @@ export function UpstreamEditor({
         >
           <Icon name="plus" size={14} />
           新增时间点
-        </button>
+        </Button>
         {renderFieldError("unloadTimes")}
       </div>
 

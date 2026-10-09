@@ -137,3 +137,28 @@ test("upstream cards render connection metadata only when the profile returns it
   assert.match(listSource, /<UpstreamConnectionMeta system=\{item\} \/>/);
   assert.match(styles, /\.upstream-connection/);
 });
+
+test("upstream views consume the frozen DAP adapters without changing legacy classes", async () => {
+  const [listSource, detailSource, editorSource] = await Promise.all([
+    readFile(upstreamListPath, "utf8"),
+    readFile(upstreamDetailPath, "utf8"),
+    readFile(upstreamEditorPath, "utf8"),
+  ]);
+
+  assert.match(listSource, /import \{ Button \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.match(listSource, /<Button className="btn primary" variant="primary" type="button" onClick=\{onNew\}>/);
+  assert.match(detailSource, /import \{ Button \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.match(detailSource, /<Button className="btn" variant="secondary" type="button" onClick=\{onEdit\}>/);
+  assert.match(editorSource, /import \{ Button, IconButton, Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.equal((editorSource.match(/<Input/g) ?? []).length, 6);
+  assert.equal((editorSource.match(/<Select<string>/g) ?? []).length, 2);
+  assert.equal((editorSource.match(/<Select\.Option/g) ?? []).length, 4);
+  assert.equal((editorSource.match(/<Textarea/g) ?? []).length, 1);
+  assert.equal((editorSource.match(/<IconButton/g) ?? []).length, 1);
+  assert.match(editorSource, /<IconButton[\s\S]*?className="icon-btn danger"/);
+  assert.match(editorSource, /<Button[\s\S]*?className="add-field"/);
+  assert.doesNotMatch(editorSource, /<input|<select|<textarea/);
+  [listSource, detailSource, editorSource].forEach((source) => {
+    assert.doesNotMatch(source, /from "@cloudflare\/kumo\//);
+  });
+});

@@ -17,6 +17,7 @@ import type { MappingRoute } from "../../routing/types.ts";
 import { CardGridView, EmptyState, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.ts";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 import { Icon } from "../ui.tsx";
+import { Button } from "../../ui/index.ts";
 import { DbBadge } from "./UpstreamParts.tsx";
 
 /**
@@ -80,7 +81,7 @@ export function UpstreamList({
         </div>
         <div className="head-actions">
           <ViewModeSwitcher value={view} onChange={onChangeView} modes={["card", "list"] as const} />
-          {canEdit && onNew ? <button className="btn primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增系统</button> : null}
+          {canEdit && onNew ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增系统</Button> : null}
         </div>
       </div>
 
