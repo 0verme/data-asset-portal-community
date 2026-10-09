@@ -18,6 +18,7 @@ import {
   confirmDeleteAction,
 } from "./common/index.ts";
 import { Highlight, Icon } from "./ui.tsx";
+import { Button, Input, Select, Textarea } from "../ui/index.ts";
 
 const STYLE_LABELS: Record<string, string> = Object.fromEntries(MANUAL_CODE_TABLE_STYLES.map((item) => [item.value, item.label]));
 
@@ -35,32 +36,27 @@ function CodeTableForm({ module }: CodeTableFormProps) {
         <div className="form-grid">
           <div className="fl">
             <label>表编码</label>
-            <input className={`inp mono${hasError("tableCode") ? " invalid" : ""}`} value={form.tableCode} onChange={(event) => setForm((current) => ({ ...current, tableCode: event.target.value.toUpperCase() }))} placeholder="例如：DIM_GENDER" maxLength={64} />
+            <Input aria-label="表编码" className={`inp mono${hasError("tableCode") ? " invalid" : ""}`} value={form.tableCode} onChange={(event) => setForm((current) => ({ ...current, tableCode: event.target.value.toUpperCase() }))} placeholder="例如：DIM_GENDER" maxLength={64} />
           </div>
           <div className="fl">
             <label>表名称</label>
-            <input className={`inp${hasError("tableName") ? " invalid" : ""}`} value={form.tableName} onChange={(event) => setForm((current) => ({ ...current, tableName: event.target.value }))} placeholder="例如：性别字典" maxLength={128} />
+            <Input aria-label="表名称" className={`inp${hasError("tableName") ? " invalid" : ""}`} value={form.tableName} onChange={(event) => setForm((current) => ({ ...current, tableName: event.target.value }))} placeholder="例如：性别字典" maxLength={128} />
           </div>
           <div className="fl">
             <label>表样式</label>
-            <select className={`inp${hasError("style") ? " invalid" : ""}`} value={form.style} onChange={(event) => setForm((current) => ({ ...current, style: event.target.value }))}>
-              <option value="">请选择表样式</option>
-              {MANUAL_CODE_TABLE_STYLES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-            </select>
+            <Select<string> aria-label="表样式" className={`inp${hasError("style") ? " invalid" : ""}`} items={[{ label: "请选择表样式", value: "" }, ...MANUAL_CODE_TABLE_STYLES.map((item) => ({ label: item.label, value: item.value }))]} value={form.style || null} onValueChange={(value) => setForm((current) => ({ ...current, style: value || "" }))} />
           </div>
           <div className="fl">
             <label>负责人</label>
-            <input className="inp" value={form.owner} onChange={(event) => setForm((current) => ({ ...current, owner: event.target.value }))} placeholder="例如：张敏" maxLength={64} />
+            <Input aria-label="负责人" className="inp" value={form.owner} onChange={(event) => setForm((current) => ({ ...current, owner: event.target.value }))} placeholder="例如：张敏" maxLength={64} />
           </div>
           <div className="fl full">
             <label>状态</label>
-            <select className="inp" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
-              <option value="enabled">启用</option><option value="disabled">禁用</option>
-            </select>
+            <Select<string> aria-label="状态" className="inp" items={[{ label: "启用", value: "enabled" }, { label: "禁用", value: "disabled" }]} value={form.status || null} onValueChange={(value) => setForm((current) => ({ ...current, status: value || current.status }))} />
           </div>
           <div className="fl full">
             <label>说明</label>
-            <textarea className="ta" value={form.remark} onChange={(event) => setForm((current) => ({ ...current, remark: event.target.value }))} placeholder="补充用途、引用场景或值结构约定" maxLength={1000} />
+            <Textarea aria-label="说明" className="ta" value={form.remark} onChange={(event) => setForm((current) => ({ ...current, remark: event.target.value }))} placeholder="补充用途、引用场景或值结构约定" maxLength={1000} />
           </div>
         </div>
       </FormSection>
@@ -138,8 +134,8 @@ export function ManualCodeTablePage({ module, query, canEdit, canExport }: Manua
           <div className="page-sub">注册并维护湖仓手工码值表的表级元数据，不维护表内码值条目。</div>
         </div>
         <div className="head-actions">
-          {canExport ? <button className="btn" type="button" onClick={module.exportCsv}><Icon name="download" size={15} />导出</button> : null}
-          {canEdit ? <button className="btn primary" type="button" onClick={module.openNew}><Icon name="plus" size={15} />新增码值表</button> : null}
+          {canExport ? <Button className="btn" variant="secondary" type="button" onClick={module.exportCsv}><Icon name="download" size={15} />导出</Button> : null}
+          {canEdit ? <Button className="btn primary" variant="primary" type="button" onClick={module.openNew}><Icon name="plus" size={15} />新增码值表</Button> : null}
         </div>
       </div>
 
@@ -147,9 +143,7 @@ export function ManualCodeTablePage({ module, query, canEdit, canExport }: Manua
 
       <div className="tbl-wrap code-table-list">
         <div className="field-toolbar">
-          <select className="inp code-table-status-filter" value={module.statusFilter} onChange={(event) => module.setStatusFilter(event.target.value)} aria-label="状态筛选">
-            <option value="">全部状态</option><option value="enabled">启用</option><option value="disabled">禁用</option>
-          </select>
+          <Select<string> aria-label="状态筛选" className="inp code-table-status-filter" items={[{ label: "全部状态", value: "" }, { label: "启用", value: "enabled" }, { label: "禁用", value: "disabled" }]} value={module.statusFilter || null} onValueChange={(value) => module.setStatusFilter(value || "")} />
           <div className="ft-info">共 {module.filteredItems.length} 张码表{query ? `，匹配“${query}”` : ""}</div>
         </div>
         {!module.filteredItems.length ? (

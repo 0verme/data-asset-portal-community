@@ -19,6 +19,7 @@ import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { ROOT_ABBR_RULE_MESSAGE, isValidRootAbbr } from "../utils/rootValidation.ts";
 import { ActionErrorBanner, confirmDeleteAction, DangerZone, EmptyState, FormActionBar, PageHeader, RowActions } from "./common/index.ts";
 import { Highlight, Icon } from "./ui.tsx";
+import { Button, Input, Select, Textarea } from "../ui/index.ts";
 
 interface CatBadgeProps {
   cat: string;
@@ -71,8 +72,8 @@ export function RootLibrary({
           </div>
         </div>
         <div className="head-actions">
-          {canEdit ? <button className="btn" type="button" onClick={onImport}><Icon name="upload" size={15} />批量导入</button> : null}
-          {canEdit ? <button className="btn primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增词根</button> : null}
+          {canEdit ? <Button className="btn" variant="secondary" type="button" onClick={onImport}><Icon name="upload" size={15} />批量导入</Button> : null}
+          {canEdit ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增词根</Button> : null}
         </div>
       </div>
 
@@ -246,25 +247,25 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
         <div className="form-grid">
           <div className="fl">
             <label>词根缩写</label>
-            <input className={`inp mono${touched && !isValidRootAbbr(form.abbr) ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setForm((prev) => ({ ...prev, abbr: event.target.value }))} placeholder="例如：trans" />
+            <Input aria-label="词根缩写" className={`inp mono${touched && !isValidRootAbbr(form.abbr) ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setForm((prev) => ({ ...prev, abbr: event.target.value }))} placeholder="例如：trans" />
           </div>
           <div className="fl">
             <label>英文全称</label>
-            <input className="inp mono" value={form.en} onChange={(event) => setForm((prev) => ({ ...prev, en: event.target.value }))} placeholder="例如：transaction" />
+            <Input aria-label="英文全称" className="inp mono" value={form.en} onChange={(event) => setForm((prev) => ({ ...prev, en: event.target.value }))} placeholder="例如：transaction" />
           </div>
           <div className="fl">
             <label>中文名</label>
-            <input className={`inp${touched && !form.cn.trim() ? " invalid" : ""}`} value={form.cn} onChange={(event) => setForm((prev) => ({ ...prev, cn: event.target.value }))} placeholder="例如：交易流水" />
+            <Input aria-label="中文名" className={`inp${touched && !form.cn.trim() ? " invalid" : ""}`} value={form.cn} onChange={(event) => setForm((prev) => ({ ...prev, cn: event.target.value }))} placeholder="例如：交易流水" />
           </div>
           <div className="fl">
             <label>分类</label>
-            <select className="sel" value={form.cat} onChange={(event) => setForm((prev) => ({ ...prev, cat: event.target.value }))}>
-              {categoryNames.map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
+            <Select<string> aria-label="分类" className="sel" value={form.cat || null} onValueChange={(value) => setForm((prev) => ({ ...prev, cat: value || prev.cat }))}>
+              {categoryNames.map((item) => <Select.Option key={item} value={item}>{item}</Select.Option>)}
+            </Select>
           </div>
           <div className="fl full">
             <label>说明 / 示例</label>
-            <textarea className="ta" value={form.desc} onChange={(event) => setForm((prev) => ({ ...prev, desc: event.target.value }))} placeholder="例如：trans_id 交易流水号 / trans_status 交易状态" />
+            <Textarea aria-label="说明 / 示例" className="ta" value={form.desc} onChange={(event) => setForm((prev) => ({ ...prev, desc: event.target.value }))} placeholder="例如：trans_id 交易流水号 / trans_status 交易状态" />
           </div>
         </div>
       </div>
@@ -443,7 +444,7 @@ export function RootImport({ roots, categories, onBack, onCommit }: RootImportPr
           <div className="editor-sub">支持 Excel 粘贴、CSV / TSV 文件导入，预览后执行 upsert。</div>
         </div>
         <div className="editor-actions">
-          <button className="btn" type="button" onClick={onBack}><Icon name="close" size={14} />返回</button>
+          <Button className="btn" variant="secondary" type="button" onClick={onBack}><Icon name="close" size={14} />返回</Button>
         </div>
       </div>
 
@@ -471,7 +472,8 @@ export function RootImport({ roots, categories, onBack, onCommit }: RootImportPr
           />
         </div>
 
-        <textarea
+        <Textarea
+          aria-label="批量导入内容"
           className="paste-ta"
           value={text}
           onChange={(event) => {
@@ -531,10 +533,10 @@ export function RootImport({ roots, categories, onBack, onCommit }: RootImportPr
             <div className="ed-foot">
               <span className="ef-note">仅会提交新增与更新项，错误项会被跳过。</span>
               <div className="ed-foot-actions">
-                <button className="btn" type="button" onClick={() => { setText(""); setPreview(null); }}>清空</button>
-                <button className="btn primary" type="button" disabled={!summary.new && !summary.update} onClick={commit}>
+                <Button className="btn" variant="secondary" type="button" onClick={() => { setText(""); setPreview(null); }}>清空</Button>
+                <Button className="btn primary" variant="primary" type="button" disabled={!summary.new && !summary.update} onClick={commit}>
                   <Icon name="check" size={14} />确认导入
-                </button>
+                </Button>
               </div>
             </div>
           </>
