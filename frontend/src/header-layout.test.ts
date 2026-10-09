@@ -91,3 +91,19 @@ test("primary navigation actions use the frozen DAP Button adapter", () => {
   assert.match(app, /splitNavigationMenus\(visibleNavMenus, \{ maxPrimary: compactHeader \? 3 : 5 \}\)/);
   assert.doesNotMatch(app, /from "@cloudflare\/kumo\//);
 });
+
+test("more-menu trigger and entries use DAP Buttons without changing menu behavior", () => {
+  const moreNavStart = app.indexOf('<div className="more-nav" ref={moreNavRef}>');
+  const actionsStart = app.indexOf('<div className="topbar-actions">', moreNavStart);
+  const moreNav = app.slice(moreNavStart, actionsStart);
+
+  assert.equal((moreNav.match(/<Button/g) ?? []).length, 2);
+  assert.doesNotMatch(moreNav, /<button/);
+  assert.equal((moreNav.match(/variant="tertiary"/g) ?? []).length, 2);
+  assert.ok(moreNav.includes("className={`more-nav-trigger"));
+  assert.ok(moreNav.includes("aria-expanded={moreNavOpen}"));
+  assert.ok(moreNav.includes('role="menuitem"'));
+  assert.ok(moreNav.includes("setMoreNavOpen(false)"));
+  assert.ok(moreNav.includes("switchModuleFromMenu(item.code)"));
+  assert.ok(moreNav.includes('aria-controls="more-nav-menu"'));
+});

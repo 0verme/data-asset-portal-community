@@ -6,7 +6,7 @@ test("primary navigation adapters preserve the five/three menu split and browser
   await page.goto("/data-warehouse?layout=list");
 
   const navigation = page.locator(".topbar .mainnav");
-  const primaryButtons = navigation.locator("button.dap-ui-button");
+  const primaryButtons = navigation.locator("button.dap-ui-button:not(.more-nav-trigger)");
   await expect(primaryButtons).toHaveCount(5);
   await expect(navigation.getByRole("button", { name: "数据仓库" })).toHaveClass(/active/);
   await expect(navigation.getByRole("button", { name: "上游卸数" })).toHaveClass(/dap-ui-button/);
@@ -22,4 +22,27 @@ test("primary navigation adapters preserve the five/three menu split and browser
   await page.goBack();
   await expect(page).toHaveURL(/\/data-warehouse$/);
   await expect(navigation.getByRole("button", { name: "数据仓库" })).toHaveClass(/active/);
+});
+
+test("more-menu DAP Buttons preserve expand, select, and close behavior", async ({ page }) => {
+  await page.addInitScript(() => localStorage.removeItem("dap_auth"));
+  await page.setViewportSize({ width: 1199, height: 900 });
+  await page.goto("/data-warehouse");
+
+  const navigation = page.locator(".topbar .mainnav");
+  const trigger = navigation.getByRole("button", { name: "更多" });
+  await expect(trigger).toHaveClass(/dap-ui-button/);
+  await trigger.click();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+  const menu = navigation.getByRole("menu");
+  await expect(menu).toBeVisible();
+  const firstItem = menu.getByRole("menuitem").first();
+  await expect(firstItem).toHaveClass(/dap-ui-button/);
+  const previousUrl = page.url();
+  await firstItem.click();
+
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await expect(menu).toBeHidden();
+  await expect(page).not.toHaveURL(previousUrl);
 });

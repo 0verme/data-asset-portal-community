@@ -768,7 +768,9 @@ export default function App(): React.ReactElement {
             ))}
             {moreNavMenus.length ? (
               <div className="more-nav" ref={moreNavRef}>
-                <button
+                <Button
+                  variant="tertiary"
+                  size="sm"
                   className={`more-nav-trigger${moreNavActive ? " active" : ""}`}
                   type="button"
                   aria-expanded={moreNavOpen}
@@ -776,12 +778,14 @@ export default function App(): React.ReactElement {
                   onClick={() => setMoreNavOpen((prev) => !prev)}
                 >
                   更多<Icon name="chevron" size={13} />
-                </button>
+                </Button>
                 {moreNavOpen ? (
                   <div id="more-nav-menu" className="more-nav-menu" role="menu">
                     {moreNavMenus.map((item) => (
-                      <button
+                      <Button
                         key={item.code}
+                        variant="tertiary"
+                        size="sm"
                         className={module === item.code ? "active" : ""}
                         type="button"
                         role="menuitem"
@@ -791,7 +795,7 @@ export default function App(): React.ReactElement {
                         }}
                       >
                         <Icon name={item.icon} size={15} />{item.name}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 ) : null}
