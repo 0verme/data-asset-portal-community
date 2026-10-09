@@ -73,3 +73,21 @@ test("more-navigation dropdown owns a bounded, single-column layout contract", (
   assert.match(menuButton, /justify-content:\s*flex-start/);
   assert.match(menuButton, /white-space:\s*nowrap/);
 });
+
+test("primary navigation actions use the frozen DAP Button adapter", () => {
+  assert.match(app, /import \{ Button \} from "\.\/ui\/index\.ts"/);
+  assert.match(
+    app,
+    /currentNavMenuStatus === "loading" \? \([\s\S]*?<Button type="button" variant="tertiary" size="sm" disabled>/,
+  );
+  assert.match(
+    app,
+    /currentNavMenuStatus === "error" \? \([\s\S]*?<Button[\s\S]*?onClick=\{\(\) => void loadMenus\(navigationAuthKey\)\}/,
+  );
+  assert.match(
+    app,
+    /primaryNavMenus\.map\(\(item\) => \([\s\S]*?<Button[\s\S]*?variant="tertiary"[\s\S]*?className=\{module === item\.code \? "active" : ""\}[\s\S]*?onClick=\{\(\) => switchModuleFromMenu\(item\.code\)\}/,
+  );
+  assert.match(app, /splitNavigationMenus\(visibleNavMenus, \{ maxPrimary: compactHeader \? 3 : 5 \}\)/);
+  assert.doesNotMatch(app, /from "@cloudflare\/kumo\//);
+});

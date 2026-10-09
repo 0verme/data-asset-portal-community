@@ -25,6 +25,7 @@ import { ModuleSidebar } from "./components/app/ModuleSidebar.tsx";
 import type { AppModuleContext } from "./components/app/appTypes.ts";
 import { ConfirmDialogHost, ModuleErrorBoundary, ToastHost } from "./components/common/index.ts";
 import { Icon } from "./components/ui.tsx";
+import { Button } from "./ui/index.ts";
 import {
   APP_VERSION,
   DEFAULT_ASSET_ROUTE,
@@ -742,18 +743,28 @@ export default function App(): React.ReactElement {
 
           <div className="mainnav">
             {currentNavMenuStatus === "loading" ? (
-              <button type="button" disabled>菜单加载中…</button>
+              <Button type="button" variant="tertiary" size="sm" disabled>菜单加载中…</Button>
             ) : currentNavMenuStatus === "error" ? (
-              <button type="button" onClick={() => void loadMenus(navigationAuthKey)}>菜单加载失败，点击重试</button>
+              <Button
+                type="button"
+                variant="tertiary"
+                size="sm"
+                onClick={() => void loadMenus(navigationAuthKey)}
+              >
+                菜单加载失败，点击重试
+              </Button>
             ) : null}
             {primaryNavMenus.map((item) => (
-              <button
+              <Button
                 key={item.code}
+                type="button"
+                variant="tertiary"
+                size="sm"
                 className={module === item.code ? "active" : ""}
                 onClick={() => switchModuleFromMenu(item.code)}
               >
                 <Icon name={item.icon} size={15} />{item.name}
-              </button>
+              </Button>
             ))}
             {moreNavMenus.length ? (
               <div className="more-nav" ref={moreNavRef}>
