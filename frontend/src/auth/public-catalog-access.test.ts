@@ -37,7 +37,7 @@ test("anonymous UI exposes catalog actions only and keeps write controls permiss
   ]);
 
   for (const source of sources) assert.match(source, /canEdit/);
-  const gatedButton = /canEdit\s*\?\s*\(?\s*<button/;
+  const gatedButton = /canEdit\s*\?\s*\(?\s*<(?:button|Button)/;
   assert.match(sources[0], gatedButton);
   assert.match(sources[1], gatedButton);
   assert.match(sources[2], gatedButton);
@@ -60,8 +60,8 @@ test("anonymous CSV export stays hidden unless the server explicitly enables it"
   ]);
 
   assert.match(moduleContent, /catalogExportEnabled/);
-  assert.match(codeTables, /canExport \? <button/);
-  assert.match(mappings, /canExport \? <button/);
+  assert.match(codeTables, /canExport \? <(?:button|Button)/);
+  assert.match(mappings, /canExport \? <(?:button|Button)/);
   assert.match(codeSidebar, /canExport\s*\?/);
   assert.match(mappingSidebar, /canExport\s*\?/);
   assert.match(mappingApi, /field-mappings\/export/);
