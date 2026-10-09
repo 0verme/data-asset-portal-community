@@ -10,10 +10,14 @@ const authBar = authControls.match(/export function AuthBar\([\s\S]*$/)?.[0] || 
 
 test("header auth actions omit persistent guest and role badges", () => {
   assert.ok(authBar, "AuthBar should remain the shared header auth entry");
-  assert.match(authBar, /if \(!auth\.user\)[\s\S]*?className="login-cta"/);
+  assert.match(authControls, /import \{ Button, IconButton \} from "\.\.\/ui\/index\.ts"/);
+  assert.match(authBar, /if \(!auth\.user\)[\s\S]*?<Button[\s\S]*?className="login-cta"[\s\S]*?onClick=\{onLogin\}/);
   assert.match(authBar, /className="user-chip"/);
-  assert.match(authBar, /className="logout-btn"/);
-  assert.doesNotMatch(authBar, /role-pill|roleLabel|未登录|业务维护员|系统管理员/);
+  assert.match(
+    authBar,
+    /<IconButton[\s\S]*?className="logout-btn"[\s\S]*?aria-label="退出登录"[\s\S]*?onClick=\{\(\) => void onLogout\(\)\}/,
+  );
+  assert.doesNotMatch(authBar, /<button|role-pill|roleLabel|未登录|业务维护员|系统管理员/);
 });
 
 test("shared header keeps brand, navigation, and actions in stable DOM and grid order", () => {

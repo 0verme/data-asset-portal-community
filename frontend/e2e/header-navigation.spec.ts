@@ -50,6 +50,35 @@ test("global-search adapters preserve value, clear, and mobile focus behavior", 
   await expect(input).toHaveValue("");
 });
 
+test("guest AuthBar DAP Button preserves login modal behavior", async ({ page }) => {
+  await page.addInitScript(() => localStorage.removeItem("dap_auth"));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/data-warehouse");
+
+  const login = page.getByRole("button", { name: "登录", exact: true });
+  await expect(login).toHaveClass(/dap-ui-button/);
+  await login.click();
+  const loginDialog = page.getByRole("dialog");
+  await expect(loginDialog.getByRole("heading", { name: "管理员登录" })).toBeVisible();
+  await loginDialog.getByRole("button", { name: "暂不登录" }).click();
+  await expect(loginDialog).toHaveCount(0);
+});
+
+test("authenticated AuthBar DAP IconButton preserves logout behavior", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("dap_auth", JSON.stringify({ role: "admin", user: "admin", name: "管理员" }));
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/data-warehouse");
+
+  const logout = page.getByRole("button", { name: "退出登录" });
+  await expect(logout).toHaveClass(/dap-ui-icon-button/);
+  await expect(page.locator(".user-chip")).toContainText("admin");
+  await logout.click();
+  await expect(page.getByRole("button", { name: "登录", exact: true })).toBeVisible();
+  await expect(page.locator(".user-chip")).toHaveCount(0);
+});
+
 test("more-menu DAP Buttons preserve expand, select, and close behavior", async ({ page }) => {
   await page.addInitScript(() => localStorage.removeItem("dap_auth"));
   await page.setViewportSize({ width: 1199, height: 900 });
