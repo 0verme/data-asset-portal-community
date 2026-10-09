@@ -43,7 +43,13 @@ test("admin indicator editor uses adapter controls and keeps the DAP cascader", 
   const semantic = page.getByRole("combobox", { name: "语义生命周期" });
   await expect(semantic).toHaveClass(/inp/);
   await expect(page.getByRole("combobox", { name: "来源资产（稳定引用）" })).toHaveText("未绑定稳定资产（保留兼容快照）");
-  await expect(page.getByRole("combobox", { name: "聚合方式" })).toHaveText("未指定（兼容历史指标）");
+  await expect(aggregation).toHaveText("未指定（兼容历史指标）");
+  await aggregation.click();
+  await page.getByRole("option", { name: "SUM", exact: true }).click();
+  await expect(aggregation).toHaveText("SUM");
+  await aggregation.click();
+  await page.getByRole("option", { name: "未指定（兼容历史指标）" }).click();
+  await expect(aggregation).toHaveText("未指定（兼容历史指标）");
   await semantic.click();
   await page.getByRole("option", { name: "已认证" }).click();
   await expect(semantic).toHaveText("已认证");
