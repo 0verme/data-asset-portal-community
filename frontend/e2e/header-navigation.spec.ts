@@ -79,6 +79,48 @@ test("authenticated AuthBar DAP IconButton preserves logout behavior", async ({ 
   await expect(page.locator(".user-chip")).toHaveCount(0);
 });
 
+test("theme trigger DAP IconButton preserves labels, persistence, and mobile sizing", async ({ page }) => {
+  await page.addInitScript(() => localStorage.removeItem("dap_auth"));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/data-warehouse");
+
+  const root = page.locator("html");
+  const wrapper = page.locator(".theme-toggle-wrapper");
+  const lightToggle = page.getByRole("button", { name: "切换到深色主题" });
+  await expect(lightToggle).toHaveClass(/dap-ui-icon-button/);
+  await expect(lightToggle).toHaveClass(/theme-toggle/);
+  await expect(wrapper).toHaveAttribute("title", "切换到深色主题");
+  await expect(root).toHaveAttribute("data-theme", "light");
+  await expect(root).toHaveAttribute("data-mode", "light");
+  const desktopBounds = await lightToggle.boundingBox();
+  expect(desktopBounds?.width).toBe(36);
+  expect(desktopBounds?.height).toBe(36);
+
+  await lightToggle.click();
+  const darkToggle = page.getByRole("button", { name: "切换到浅色主题" });
+  await expect(darkToggle).toBeVisible();
+  await expect(wrapper).toHaveAttribute("title", "切换到浅色主题");
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await expect(root).toHaveAttribute("data-mode", "dark");
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("dap-theme"))).toBe("dark");
+
+  await page.reload();
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await expect(root).toHaveAttribute("data-mode", "dark");
+  const persistedDarkToggle = page.getByRole("button", { name: "切换到浅色主题" });
+  await expect(persistedDarkToggle).toBeVisible();
+  await expect(wrapper).toHaveAttribute("title", "切换到浅色主题");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileBounds = await persistedDarkToggle.boundingBox();
+  expect(mobileBounds?.width).toBeGreaterThanOrEqual(44);
+  expect(mobileBounds?.height).toBeGreaterThanOrEqual(44);
+  await persistedDarkToggle.click();
+  await expect(root).toHaveAttribute("data-theme", "light");
+  await expect(root).toHaveAttribute("data-mode", "light");
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("dap-theme"))).toBe("light");
+});
+
 test("more-menu DAP Buttons preserve expand, select, and close behavior", async ({ page }) => {
   await page.addInitScript(() => localStorage.removeItem("dap_auth"));
   await page.setViewportSize({ width: 1199, height: 900 });

@@ -82,7 +82,7 @@ test("more-navigation dropdown owns a bounded, single-column layout contract", (
 });
 
 test("primary navigation actions use the frozen DAP Button adapter", () => {
-  assert.match(app, /import \{ Button, Input \} from "\.\/ui\/index\.ts"/);
+  assert.match(app, /import \{ Button, IconButton, Input \} from "\.\/ui\/index\.ts"/);
   assert.match(
     app,
     /currentNavMenuStatus === "loading" \? \([\s\S]*?<Button type="button" variant="tertiary" size="sm" disabled>/,
@@ -113,4 +113,15 @@ test("more-menu trigger and entries use DAP Buttons without changing menu behavi
   assert.ok(moreNav.includes("setMoreNavOpen(false)"));
   assert.ok(moreNav.includes("switchModuleFromMenu(item.code)"));
   assert.ok(moreNav.includes('aria-controls="more-nav-menu"'));
+});
+
+test("theme trigger uses a DAP IconButton and preserves its dynamic label and title", () => {
+  assert.ok(app.includes('const themeToggleLabel = theme === "dark" ? "切换到浅色主题" : "切换到深色主题";'));
+  assert.ok(app.includes('<span className="theme-toggle-wrapper" title={themeToggleLabel}>'));
+  assert.match(app, /<IconButton[\s\S]*?type="button"[\s\S]*?variant="secondary"[\s\S]*?size="sm"[\s\S]*?className="theme-toggle"/);
+  assert.ok(app.includes("onClick={toggleTheme}"));
+  assert.ok(app.includes("aria-label={themeToggleLabel}"));
+  assert.ok(app.includes('icon={<Icon name={theme === "dark" ? "sun" : "moon"} size={16} />}'));
+  assert.match(appStyles, /\.theme-toggle-wrapper\s*\{\s*display:\s*inline-flex;\s*flex:\s*0 0 auto;\s*\}/);
+  assert.doesNotMatch(app, /<button\s+className="theme-toggle"/);
 });

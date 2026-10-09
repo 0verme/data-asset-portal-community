@@ -25,7 +25,7 @@ import { ModuleSidebar } from "./components/app/ModuleSidebar.tsx";
 import type { AppModuleContext } from "./components/app/appTypes.ts";
 import { ConfirmDialogHost, ModuleErrorBoundary, ToastHost } from "./components/common/index.ts";
 import { Icon } from "./components/ui.tsx";
-import { Button, Input } from "./ui/index.ts";
+import { Button, IconButton, Input } from "./ui/index.ts";
 import {
   APP_VERSION,
   DEFAULT_ASSET_ROUTE,
@@ -162,6 +162,7 @@ export default function App(): React.ReactElement {
   } = navigation;
 
   const { theme, toggleTheme } = useTheme();
+  const themeToggleLabel = theme === "dark" ? "切换到浅色主题" : "切换到深色主题";
   const { statusOptions: rawStatusOptions } = useStatusOptions();
   const statusOptions = useMemo<DictOption[]>(
     () => rawStatusOptions.map((item) => ({ code: item.value, ...item })),
@@ -852,15 +853,17 @@ export default function App(): React.ReactElement {
               </div>
             ) : null}
 
-            <button
-              className="theme-toggle"
-              type="button"
-              onClick={toggleTheme}
-              aria-label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
-              title={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
-            >
-              <Icon name={theme === "dark" ? "sun" : "moon"} size={16} />
-            </button>
+            <span className="theme-toggle-wrapper" title={themeToggleLabel}>
+              <IconButton
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="theme-toggle"
+                onClick={toggleTheme}
+                aria-label={themeToggleLabel}
+                icon={<Icon name={theme === "dark" ? "sun" : "moon"} size={16} />}
+              />
+            </span>
 
             <AuthBar
               auth={auth}
