@@ -23,6 +23,9 @@ test("indicator editor fields use frozen DAP adapters", () => {
   assert.equal((editor.match(/<Textarea/g) ?? []).length, 1);
   assert.doesNotMatch(editor, /<input|<select|<textarea/);
   assert.match(editor, /<Select<string \| number>/);
+  assert.match(editor, /value=\{form\.sourceAssetId \|\| ""\}/);
+  assert.match(editor, /value=\{form\.resultFieldId \|\| ""\}/);
+  assert.match(editor, /placeholder="未指定（兼容历史指标）"/);
   assert.match(editor, /aria-label="语义生命周期"[\s\S]*?items=\{SEMANTIC_STATE_OPTIONS/);
   assert.doesNotMatch(editor, /from "@cloudflare\/kumo\//);
 });

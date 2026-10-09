@@ -405,7 +405,8 @@ export function IndicatorEditor({
                   return assetId === null ? [] : [{ label: assetLabel(asset), value: assetId }];
                 }),
               ]}
-              value={form.sourceAssetId || null}
+              value={form.sourceAssetId || ""}
+              placeholder="未绑定稳定资产（保留兼容快照）"
               onValueChange={(value) => handleAssetChange(value === null ? "" : String(value))}
             />
             {assetError ? <div className="match-hint" style={{ color: "var(--danger)" }}>{assetError}</div> : null}
@@ -427,7 +428,8 @@ export function IndicatorEditor({
                   return fieldId === null ? [] : [{ label: fieldLabel(field), value: fieldId }];
                 }),
               ]}
-              value={form.resultFieldId || null}
+              value={form.resultFieldId || ""}
+              placeholder="未绑定稳定字段（保留兼容快照）"
               onValueChange={(value) => handleFieldChange(value === null ? "" : String(value))}
             />
             {fieldError ? <div className="match-hint" style={{ color: "var(--danger)" }}>{fieldError}</div> : null}
@@ -456,7 +458,7 @@ export function IndicatorEditor({
           </div>
           <div className="fl">
             <label>聚合方式</label>
-            <Select<string> aria-label="聚合方式" className="inp mono" items={[{ label: "未指定（兼容历史指标）", value: "" }, ...AGGREGATION_OPTIONS.map((value) => ({ label: value, value }))]} value={form.aggregation || null} onValueChange={(value) => setValue("aggregation", value || "")} />
+            <Select<string> aria-label="聚合方式" className="inp mono" placeholder="未指定（兼容历史指标）" items={[{ label: "未指定（兼容历史指标）", value: "" }, ...AGGREGATION_OPTIONS.map((value) => ({ label: value, value }))]} value={form.aggregation || ""} onValueChange={(value) => setValue("aggregation", value || "")} />
           </div>
           <div className="fl">
             <label>语义生命周期</label>
