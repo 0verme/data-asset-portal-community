@@ -22,6 +22,13 @@ test("primary navigation adapters preserve the five/three menu split and browser
   await page.goBack();
   await expect(page).toHaveURL(/\/data-warehouse$/);
   await expect(navigation.getByRole("button", { name: "数据仓库" })).toHaveClass(/active/);
+
+  await page.goForward();
+  await expect(page).toHaveURL(/\/upstream(?:\?|$)/);
+  await expect(navigation.getByRole("button", { name: "上游卸数" })).toHaveClass(/active/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/data-warehouse$/);
+  await expect(navigation.getByRole("button", { name: "数据仓库" })).toHaveClass(/active/);
 });
 
 test("global-search adapters preserve value, clear, and mobile focus behavior", async ({ page }) => {
@@ -112,6 +119,7 @@ test("theme trigger DAP IconButton preserves labels, persistence, and mobile siz
   await expect(wrapper).toHaveAttribute("title", "切换到浅色主题");
 
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(async () => (await persistedDarkToggle.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
   const mobileBounds = await persistedDarkToggle.boundingBox();
   expect(mobileBounds?.width).toBeGreaterThanOrEqual(44);
   expect(mobileBounds?.height).toBeGreaterThanOrEqual(44);
