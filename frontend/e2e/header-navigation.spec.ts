@@ -44,17 +44,31 @@ test("global-search adapters preserve value, clear, and mobile focus behavior", 
   await clear.click();
   await expect(input).toHaveValue("");
 
-  await page.setViewportSize({ width: 390, height: 844 });
   const toggle = page.locator(".mobile-search-toggle");
-  await expect(toggle).toBeVisible();
-  await expect(input).toBeHidden();
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-expanded", "true");
-  await expect(input).toBeVisible();
-  await expect(input).toBeFocused();
-  await input.fill("mobile query");
-  await clear.click();
-  await expect(input).toHaveValue("");
+  for (const width of [960, 768, 480, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    if (width > 768) {
+      await expect(toggle).toBeHidden();
+      await expect(input).toBeVisible();
+      await input.fill(`desktop query ${width}`);
+      await clear.click();
+      await expect(input).toHaveValue("");
+      continue;
+    }
+
+    await expect(toggle).toBeVisible();
+    await expect(input).toBeHidden();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(input).toBeVisible();
+    await expect(input).toBeFocused();
+    await input.fill(`mobile query ${width}`);
+    await clear.click();
+    await expect(input).toHaveValue("");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(input).toBeHidden();
+  }
 });
 
 test("guest AuthBar DAP Button preserves login modal behavior", async ({ page }) => {
