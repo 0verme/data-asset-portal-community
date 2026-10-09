@@ -24,6 +24,32 @@ test("primary navigation adapters preserve the five/three menu split and browser
   await expect(navigation.getByRole("button", { name: "数据仓库" })).toHaveClass(/active/);
 });
 
+test("global-search adapters preserve value, clear, and mobile focus behavior", async ({ page }) => {
+  await page.addInitScript(() => localStorage.removeItem("dap_auth"));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/data-warehouse");
+
+  const input = page.getByRole("textbox", { name: "全局搜索" });
+  const clear = page.getByRole("button", { name: "清除全局搜索" });
+  await expect(input).toBeVisible();
+  await expect(input).toHaveClass(/dap-ui-input/);
+  await input.fill("warehouse");
+  await clear.click();
+  await expect(input).toHaveValue("");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const toggle = page.locator(".mobile-search-toggle");
+  await expect(toggle).toBeVisible();
+  await expect(input).toBeHidden();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(input).toBeVisible();
+  await expect(input).toBeFocused();
+  await input.fill("mobile query");
+  await clear.click();
+  await expect(input).toHaveValue("");
+});
+
 test("more-menu DAP Buttons preserve expand, select, and close behavior", async ({ page }) => {
   await page.addInitScript(() => localStorage.removeItem("dap_auth"));
   await page.setViewportSize({ width: 1199, height: 900 });

@@ -25,7 +25,7 @@ import { ModuleSidebar } from "./components/app/ModuleSidebar.tsx";
 import type { AppModuleContext } from "./components/app/appTypes.ts";
 import { ConfirmDialogHost, ModuleErrorBoundary, ToastHost } from "./components/common/index.ts";
 import { Icon } from "./components/ui.tsx";
-import { Button } from "./ui/index.ts";
+import { Button, Input } from "./ui/index.ts";
 import {
   APP_VERSION,
   DEFAULT_ASSET_ROUTE,
@@ -823,9 +823,10 @@ export default function App(): React.ReactElement {
             {!isPortal ? (
               <div id="global-search" className={`search${query ? " has-val" : ""}${mobileSearchOpen ? " mobile-open" : ""}`}>
                 <span className="ico-search"><Icon name="search" size={16} /></span>
-                <input
+                <Input
                   ref={searchInputRef}
                   aria-label="全局搜索"
+                  className="search-input"
                   placeholder={searchPlaceholder}
                   value={query}
                   onChange={(event) => {
@@ -838,7 +839,16 @@ export default function App(): React.ReactElement {
                     if (isUpstream && upRoute.page !== "list") upBack();
                   }}
                 />
-                <button className="clear" onClick={() => setQuery("")}><Icon name="close" size={13} /></button>
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  size="sm"
+                  className="clear"
+                  aria-label="清除全局搜索"
+                  onClick={() => setQuery("")}
+                >
+                  <Icon name="close" size={13} />
+                </Button>
               </div>
             ) : null}
 

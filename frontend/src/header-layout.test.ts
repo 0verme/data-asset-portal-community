@@ -50,8 +50,11 @@ test("middle-width header compacts search and navigation before the mobile break
   assert.match(appStyles, /@media \(max-width: 768px\)[\s\S]*?\.search\.mobile-open \{ display: block; \}/);
   assert.match(app, /id="global-search"/);
   assert.match(app, /aria-label="全局搜索"/);
-  assert.match(app, /value=\{query\}/);
-  assert.match(app, /className="clear" onClick=\{\(\) => setQuery\(""\)\}/);
+  assert.match(app, /<Input[\s\S]*?className="search-input"[\s\S]*?value=\{query\}/);
+  assert.match(
+    app,
+    /<Button[\s\S]*?className="clear"[\s\S]*?aria-label="清除全局搜索"[\s\S]*?onClick=\{\(\) => setQuery\(""\)\}/,
+  );
 });
 
 test("more-navigation dropdown owns a bounded, single-column layout contract", () => {
@@ -75,7 +78,7 @@ test("more-navigation dropdown owns a bounded, single-column layout contract", (
 });
 
 test("primary navigation actions use the frozen DAP Button adapter", () => {
-  assert.match(app, /import \{ Button \} from "\.\/ui\/index\.ts"/);
+  assert.match(app, /import \{ Button, Input \} from "\.\/ui\/index\.ts"/);
   assert.match(
     app,
     /currentNavMenuStatus === "loading" \? \([\s\S]*?<Button type="button" variant="tertiary" size="sm" disabled>/,
