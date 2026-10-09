@@ -25,6 +25,7 @@ import { ModuleSidebar } from "./components/app/ModuleSidebar.tsx";
 import type { AppModuleContext } from "./components/app/appTypes.ts";
 import { ConfirmDialogHost, ModuleErrorBoundary, ToastHost } from "./components/common/index.ts";
 import { Icon } from "./components/ui.tsx";
+import { Button, IconButton, Input } from "./ui/index.ts";
 import {
   APP_VERSION,
   DEFAULT_ASSET_ROUTE,
@@ -161,6 +162,7 @@ export default function App(): React.ReactElement {
   } = navigation;
 
   const { theme, toggleTheme } = useTheme();
+  const themeToggleLabel = theme === "dark" ? "切换到浅色主题" : "切换到深色主题";
   const { statusOptions: rawStatusOptions } = useStatusOptions();
   const statusOptions = useMemo<DictOption[]>(
     () => rawStatusOptions.map((item) => ({ code: item.value, ...item })),
@@ -742,22 +744,34 @@ export default function App(): React.ReactElement {
 
           <div className="mainnav">
             {currentNavMenuStatus === "loading" ? (
-              <button type="button" disabled>菜单加载中…</button>
+              <Button type="button" variant="tertiary" size="sm" disabled>菜单加载中…</Button>
             ) : currentNavMenuStatus === "error" ? (
-              <button type="button" onClick={() => void loadMenus(navigationAuthKey)}>菜单加载失败，点击重试</button>
+              <Button
+                type="button"
+                variant="tertiary"
+                size="sm"
+                onClick={() => void loadMenus(navigationAuthKey)}
+              >
+                菜单加载失败，点击重试
+              </Button>
             ) : null}
             {primaryNavMenus.map((item) => (
-              <button
+              <Button
                 key={item.code}
+                type="button"
+                variant="tertiary"
+                size="sm"
                 className={module === item.code ? "active" : ""}
                 onClick={() => switchModuleFromMenu(item.code)}
               >
                 <Icon name={item.icon} size={15} />{item.name}
-              </button>
+              </Button>
             ))}
             {moreNavMenus.length ? (
               <div className="more-nav" ref={moreNavRef}>
-                <button
+                <Button
+                  variant="tertiary"
+                  size="sm"
                   className={`more-nav-trigger${moreNavActive ? " active" : ""}`}
                   type="button"
                   aria-expanded={moreNavOpen}
@@ -765,12 +779,14 @@ export default function App(): React.ReactElement {
                   onClick={() => setMoreNavOpen((prev) => !prev)}
                 >
                   更多<Icon name="chevron" size={13} />
-                </button>
+                </Button>
                 {moreNavOpen ? (
                   <div id="more-nav-menu" className="more-nav-menu" role="menu">
                     {moreNavMenus.map((item) => (
-                      <button
+                      <Button
                         key={item.code}
+                        variant="tertiary"
+                        size="sm"
                         className={module === item.code ? "active" : ""}
                         type="button"
                         role="menuitem"
@@ -780,7 +796,7 @@ export default function App(): React.ReactElement {
                         }}
                       >
                         <Icon name={item.icon} size={15} />{item.name}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 ) : null}
@@ -808,9 +824,10 @@ export default function App(): React.ReactElement {
             {!isPortal ? (
               <div id="global-search" className={`search${query ? " has-val" : ""}${mobileSearchOpen ? " mobile-open" : ""}`}>
                 <span className="ico-search"><Icon name="search" size={16} /></span>
-                <input
+                <Input
                   ref={searchInputRef}
                   aria-label="全局搜索"
+                  className="search-input"
                   placeholder={searchPlaceholder}
                   value={query}
                   onChange={(event) => {
@@ -823,19 +840,30 @@ export default function App(): React.ReactElement {
                     if (isUpstream && upRoute.page !== "list") upBack();
                   }}
                 />
-                <button className="clear" onClick={() => setQuery("")}><Icon name="close" size={13} /></button>
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  size="sm"
+                  className="clear"
+                  aria-label="清除全局搜索"
+                  onClick={() => setQuery("")}
+                >
+                  <Icon name="close" size={13} />
+                </Button>
               </div>
             ) : null}
 
-            <button
-              className="theme-toggle"
-              type="button"
-              onClick={toggleTheme}
-              aria-label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
-              title={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
-            >
-              <Icon name={theme === "dark" ? "sun" : "moon"} size={16} />
-            </button>
+            <span className="theme-toggle-wrapper" title={themeToggleLabel}>
+              <IconButton
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="theme-toggle"
+                onClick={toggleTheme}
+                aria-label={themeToggleLabel}
+                icon={<Icon name={theme === "dark" ? "sun" : "moon"} size={16} />}
+              />
+            </span>
 
             <AuthBar
               auth={auth}

@@ -23,6 +23,7 @@ import {
   type LoginOptions,
 } from "../auth.ts";
 import { Icon, initial } from "./ui.tsx";
+import { Button, IconButton } from "../ui/index.ts";
 
 function getSafeDisplayName(auth: AuthSession): string {
   const user = String(auth.user || "").trim();
@@ -235,10 +236,16 @@ export function AuthBar({ auth, onLogin, onLogout }: AuthBarProps) {
   if (!auth.user) {
     return (
       <div className="authbar">
-        <button className="login-cta" onClick={onLogin}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="login-cta"
+          onClick={onLogin}
+        >
           <Icon name="login" size={15} />
           登录
-        </button>
+        </Button>
       </div>
     );
   }
@@ -249,13 +256,15 @@ export function AuthBar({ auth, onLogin, onLogout }: AuthBarProps) {
         <span className="uc-av">{initial(displayName)}</span>
         <span className="uc-name">{displayName}</span>
       </div>
-      <button
+      <IconButton
+        type="button"
+        variant="tertiary"
+        size="sm"
         className="logout-btn"
+        aria-label="退出登录"
+        icon={<Icon name="logout" size={15} />}
         onClick={() => void onLogout()}
-        title="退出登录"
-      >
-        <Icon name="logout" size={15} />
-      </button>
+      />
     </div>
   );
 }

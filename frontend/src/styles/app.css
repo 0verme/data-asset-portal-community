@@ -326,6 +326,10 @@
     display: inline-grid;
     place-items: center;
   }
+  .theme-toggle-wrapper {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
   .theme-toggle {
     width: 36px;
     height: 36px;

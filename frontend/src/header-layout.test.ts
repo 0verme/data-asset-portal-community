@@ -10,10 +10,14 @@ const authBar = authControls.match(/export function AuthBar\([\s\S]*$/)?.[0] || 
 
 test("header auth actions omit persistent guest and role badges", () => {
   assert.ok(authBar, "AuthBar should remain the shared header auth entry");
-  assert.match(authBar, /if \(!auth\.user\)[\s\S]*?className="login-cta"/);
+  assert.match(authControls, /import \{ Button, IconButton \} from "\.\.\/ui\/index\.ts"/);
+  assert.match(authBar, /if \(!auth\.user\)[\s\S]*?<Button[\s\S]*?className="login-cta"[\s\S]*?onClick=\{onLogin\}/);
   assert.match(authBar, /className="user-chip"/);
-  assert.match(authBar, /className="logout-btn"/);
-  assert.doesNotMatch(authBar, /role-pill|roleLabel|未登录|业务维护员|系统管理员/);
+  assert.match(
+    authBar,
+    /<IconButton[\s\S]*?className="logout-btn"[\s\S]*?aria-label="退出登录"[\s\S]*?onClick=\{\(\) => void onLogout\(\)\}/,
+  );
+  assert.doesNotMatch(authBar, /<button|role-pill|roleLabel|未登录|业务维护员|系统管理员/);
 });
 
 test("shared header keeps brand, navigation, and actions in stable DOM and grid order", () => {
@@ -50,8 +54,11 @@ test("middle-width header compacts search and navigation before the mobile break
   assert.match(appStyles, /@media \(max-width: 768px\)[\s\S]*?\.search\.mobile-open \{ display: block; \}/);
   assert.match(app, /id="global-search"/);
   assert.match(app, /aria-label="全局搜索"/);
-  assert.match(app, /value=\{query\}/);
-  assert.match(app, /className="clear" onClick=\{\(\) => setQuery\(""\)\}/);
+  assert.match(app, /<Input[\s\S]*?className="search-input"[\s\S]*?value=\{query\}/);
+  assert.match(
+    app,
+    /<Button[\s\S]*?className="clear"[\s\S]*?aria-label="清除全局搜索"[\s\S]*?onClick=\{\(\) => setQuery\(""\)\}/,
+  );
 });
 
 test("more-navigation dropdown owns a bounded, single-column layout contract", () => {
@@ -72,4 +79,49 @@ test("more-navigation dropdown owns a bounded, single-column layout contract", (
   assert.match(menuButton, /width:\s*100%/);
   assert.match(menuButton, /justify-content:\s*flex-start/);
   assert.match(menuButton, /white-space:\s*nowrap/);
+});
+
+test("primary navigation actions use the frozen DAP Button adapter", () => {
+  assert.match(app, /import \{ Button, IconButton, Input \} from "\.\/ui\/index\.ts"/);
+  assert.match(
+    app,
+    /currentNavMenuStatus === "loading" \? \([\s\S]*?<Button type="button" variant="tertiary" size="sm" disabled>/,
+  );
+  assert.match(
+    app,
+    /currentNavMenuStatus === "error" \? \([\s\S]*?<Button[\s\S]*?onClick=\{\(\) => void loadMenus\(navigationAuthKey\)\}/,
+  );
+  assert.match(
+    app,
+    /primaryNavMenus\.map\(\(item\) => \([\s\S]*?<Button[\s\S]*?variant="tertiary"[\s\S]*?className=\{module === item\.code \? "active" : ""\}[\s\S]*?onClick=\{\(\) => switchModuleFromMenu\(item\.code\)\}/,
+  );
+  assert.match(app, /splitNavigationMenus\(visibleNavMenus, \{ maxPrimary: compactHeader \? 3 : 5 \}\)/);
+  assert.doesNotMatch(app, /from "@cloudflare\/kumo\//);
+});
+
+test("more-menu trigger and entries use DAP Buttons without changing menu behavior", () => {
+  const moreNavStart = app.indexOf('<div className="more-nav" ref={moreNavRef}>');
+  const actionsStart = app.indexOf('<div className="topbar-actions">', moreNavStart);
+  const moreNav = app.slice(moreNavStart, actionsStart);
+
+  assert.equal((moreNav.match(/<Button/g) ?? []).length, 2);
+  assert.doesNotMatch(moreNav, /<button/);
+  assert.equal((moreNav.match(/variant="tertiary"/g) ?? []).length, 2);
+  assert.ok(moreNav.includes("className={`more-nav-trigger"));
+  assert.ok(moreNav.includes("aria-expanded={moreNavOpen}"));
+  assert.ok(moreNav.includes('role="menuitem"'));
+  assert.ok(moreNav.includes("setMoreNavOpen(false)"));
+  assert.ok(moreNav.includes("switchModuleFromMenu(item.code)"));
+  assert.ok(moreNav.includes('aria-controls="more-nav-menu"'));
+});
+
+test("theme trigger uses a DAP IconButton and preserves its dynamic label and title", () => {
+  assert.ok(app.includes('const themeToggleLabel = theme === "dark" ? "切换到浅色主题" : "切换到深色主题";'));
+  assert.ok(app.includes('<span className="theme-toggle-wrapper" title={themeToggleLabel}>'));
+  assert.match(app, /<IconButton[\s\S]*?type="button"[\s\S]*?variant="secondary"[\s\S]*?size="sm"[\s\S]*?className="theme-toggle"/);
+  assert.ok(app.includes("onClick={toggleTheme}"));
+  assert.ok(app.includes("aria-label={themeToggleLabel}"));
+  assert.ok(app.includes('icon={<Icon name={theme === "dark" ? "sun" : "moon"} size={16} />}'));
+  assert.match(appStyles, /\.theme-toggle-wrapper\s*\{\s*display:\s*inline-flex;\s*flex:\s*0 0 auto;\s*\}/);
+  assert.doesNotMatch(app, /<button\s+className="theme-toggle"/);
 });
