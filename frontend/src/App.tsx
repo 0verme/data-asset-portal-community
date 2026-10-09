@@ -718,10 +718,12 @@ export default function App(): React.ReactElement {
         <header className={`topbar${isPortal ? " portal-topbar" : ""}`}>
           <div className="topbar-brand">
             {!isPortal ? (
-              <button
+              <IconButton
                 ref={hamburgerRef}
                 className="hamburger"
                 type="button"
+                variant="tertiary"
+                size="sm"
                 onClick={() => {
                   setMobileSearchOpen(false);
                   setSidebarOpen((prev) => !prev);
@@ -729,9 +731,8 @@ export default function App(): React.ReactElement {
                 aria-controls="mobile-sidebar"
                 aria-expanded={sidebarOpen}
                 aria-label={sidebarOpen ? "关闭导航" : "打开导航"}
-              >
-                <Icon name="menu" size={18} />
-              </button>
+                icon={<Icon name="menu" size={18} />}
+              />
             ) : null}
 
             <div className="brand" onClick={() => switchModule("portal")}>
@@ -902,21 +903,23 @@ export default function App(): React.ReactElement {
                 <nav className="mobile-module-nav" aria-label="模块导航">
                   <div className="side-title">模块导航</div>
                   {currentNavMenuStatus === "loading" ? (
-                    <button className="mobile-module-link" type="button" disabled>菜单加载中…</button>
+                    <Button className="mobile-module-link" type="button" variant="tertiary" size="sm" disabled>菜单加载中…</Button>
                   ) : currentNavMenuStatus === "error" ? (
-                    <button className="mobile-module-link" type="button" onClick={() => void loadMenus(navigationAuthKey)}>
+                    <Button className="mobile-module-link" type="button" variant="tertiary" size="sm" onClick={() => void loadMenus(navigationAuthKey)}>
                       菜单加载失败，点击重试
-                    </button>
+                    </Button>
                   ) : null}
                   {visibleNavMenus.map((item) => (
-                    <button
+                    <Button
                       key={item.code}
                       className={`mobile-module-link${module === item.code ? " active" : ""}`}
                       type="button"
+                      variant="tertiary"
+                      size="sm"
                       onClick={() => switchModuleFromMenu(item.code)}
                     >
                       <Icon name={item.icon} size={16} />{item.name}
-                    </button>
+                    </Button>
                   ))}
                 </nav>
                 <ModuleErrorBoundary
