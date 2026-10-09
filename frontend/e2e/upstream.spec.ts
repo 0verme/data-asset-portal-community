@@ -71,3 +71,21 @@ test("upstream editor validation keeps inline field errors on the adapter contro
   await expect(page.locator('[data-form-field="id"] .upstream-field-error')).toContainText("系统标识不能为空");
   await expect(page.getByText("保存失败").first()).toBeVisible();
 });
+
+test("upstream new-system selects keep their empty-state labels", async ({ page }) => {
+  await setMockAuth(page, "admin");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/upstream/new");
+  await expect(page.getByRole("heading", { name: "新增上游卸数系统" })).toBeVisible({ timeout: 20_000 });
+
+  const dept = page.getByRole("combobox", { name: "业务部门" });
+  await expect(dept).toHaveText("请选择业务部门");
+
+  const dbType = page.getByRole("combobox", { name: "数据库类型" });
+  await dbType.click();
+  await page.getByRole("option", { name: "请选择数据库类型" }).click();
+  await expect(dbType).toHaveText("请选择数据库类型");
+  await dbType.click();
+  await page.getByRole("option", { name: "PostgreSQL", exact: true }).click();
+  await expect(dbType).toHaveText("PostgreSQL");
+});

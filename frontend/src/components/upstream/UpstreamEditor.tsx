@@ -326,6 +326,7 @@ export function UpstreamEditor({
             <Select<string>
               aria-label={getUpstreamFieldLabel("dbType")}
               className={`sel${getFieldError("dbType") ? " invalid" : ""}`}
+              placeholder="请选择数据库类型"
               value={form.dbType || null}
               onValueChange={(value) => setValue("dbType", value || "")}
               data-form-control
@@ -364,6 +365,7 @@ export function UpstreamEditor({
             <Select<string>
               aria-label={getUpstreamFieldLabel("dept")}
               className={`sel${getFieldError("dept") ? " invalid" : ""}`}
+              placeholder="请选择业务部门"
               value={form.dept || null}
               onValueChange={(value) => setValue("dept", value || "")}
               data-form-control

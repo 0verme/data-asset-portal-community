@@ -44,7 +44,7 @@ function CodeTableForm({ module }: CodeTableFormProps) {
           </div>
           <div className="fl">
             <label>表样式</label>
-            <Select<string> aria-label="表样式" className={`inp${hasError("style") ? " invalid" : ""}`} items={[{ label: "请选择表样式", value: "" }, ...MANUAL_CODE_TABLE_STYLES.map((item) => ({ label: item.label, value: item.value }))]} value={form.style || null} onValueChange={(value) => setForm((current) => ({ ...current, style: value || "" }))} />
+            <Select<string> aria-label="表样式" placeholder="请选择表样式" className={`inp${hasError("style") ? " invalid" : ""}`} items={[{ label: "请选择表样式", value: "" }, ...MANUAL_CODE_TABLE_STYLES.map((item) => ({ label: item.label, value: item.value }))]} value={form.style || null} onValueChange={(value) => setForm((current) => ({ ...current, style: value || "" }))} />
           </div>
           <div className="fl">
             <label>负责人</label>
@@ -143,7 +143,7 @@ export function ManualCodeTablePage({ module, query, canEdit, canExport }: Manua
 
       <div className="tbl-wrap code-table-list">
         <div className="field-toolbar">
-          <Select<string> aria-label="状态筛选" className="inp code-table-status-filter" items={[{ label: "全部状态", value: "" }, { label: "启用", value: "enabled" }, { label: "禁用", value: "disabled" }]} value={module.statusFilter || null} onValueChange={(value) => module.setStatusFilter(value || "")} />
+          <Select<string> aria-label="状态筛选" placeholder="全部状态" className="inp code-table-status-filter" items={[{ label: "全部状态", value: "" }, { label: "启用", value: "enabled" }, { label: "禁用", value: "disabled" }]} value={module.statusFilter || null} onValueChange={(value) => module.setStatusFilter(value || "")} />
           <div className="ft-info">共 {module.filteredItems.length} 张码表{query ? `，匹配“${query}”` : ""}</div>
         </div>
         {!module.filteredItems.length ? (
