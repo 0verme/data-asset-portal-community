@@ -196,15 +196,6 @@
     min-width: 0;
   }
 
-  .push-job-path {
-    display: block;
-    max-width: 100%;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   .job-row-name {
     display: flex;
     flex-direction: column;
