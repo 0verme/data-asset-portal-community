@@ -3,6 +3,7 @@ import { formatFreq, formatRenameHint, isRenameJob, type PushJobLike } from "./p
 import { FREQ_PARAM_CONFIG } from "./pushConstants.ts";
 import { StatusBadge } from "../common/index.ts";
 import { Icon } from "../ui.tsx";
+import { Button } from "../../ui/index.ts";
 
 interface PushJobDisplay extends PushJobLike {
   id: string;
@@ -52,7 +53,7 @@ export function PushJobDetail({ system, job, showDetails = false, onBackSystems,
   return (
     <div>
       <div className="crumb"><button type="button" className="crumb-link" onClick={onBackSystems}>系统列表</button><span className="sep"><Icon name="chevron" size={13} /></span><button type="button" className="crumb-link" onClick={onBackJobs}>{system.id}</button><span className="sep"><Icon name="chevron" size={13} /></span><span className="cur">{job.id}</span></div>
-      <div className="detail-head"><div className="dh-top"><div><div className="dh-title"><Icon name="file" size={21} color="var(--ink-2)" /><span className="push-title">{job.cn}</span><StatusBadge on={job.enabled} /></div><div className="dh-cn mono">{job.targetFileName}</div></div>{onEdit ? <div className="dh-actions"><button className="btn primary" type="button" onClick={onEdit}><Icon name="edit" size={15} />编辑接口</button></div> : null}</div></div>
+      <div className="detail-head"><div className="dh-top"><div><div className="dh-title"><Icon name="file" size={21} color="var(--ink-2)" /><span className="push-title">{job.cn}</span><StatusBadge on={job.enabled} /></div><div className="dh-cn mono">{job.targetFileName}</div></div>{onEdit ? <div className="dh-actions"><Button className="btn primary" variant="primary" type="button" onClick={onEdit}><Icon name="edit" size={15} />编辑接口</Button></div> : null}</div></div>
       <div className="file-head-card"><h3 className="file-head-title"><Icon name="info" size={14} />作业摘要</h3><div className="fh-grid"><div className="fh-item"><div className="k">推送频率</div><div className="v">{job.freqType}{FREQ_PARAM_CONFIG[job.freqType] ? ` / ${formatFreq(job)}` : ""}</div></div><div className="fh-item fh-full"><div className="k">业务逻辑说明</div><div className="v file-desc">{job.desc}</div></div></div></div>
       {showDetails && isDetailedJob(job) ? <PushJobDetails system={system} job={job} /> : null}
     </div>

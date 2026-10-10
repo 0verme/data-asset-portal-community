@@ -13,6 +13,7 @@ import {
 } from "./pushConstants.ts";
 import { validateSystem, type PushSystemForm } from "./pushUtils.ts";
 import { Icon } from "../ui.tsx";
+import { Input, Select, Textarea } from "../../ui/index.ts";
 
 type SystemFormData = PushSystemForm & {
   desc: string;
@@ -177,35 +178,37 @@ export function SystemEditor({
         <div className="form-grid">
           <div className="fl">
             <label>系统名称</label>
-            <input className={`inp${touched && !form.name.trim() ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：零售经营看板" />
+            <Input aria-label="系统名称" className={`inp${touched && !form.name.trim() ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：零售经营看板" />
           </div>
           <div className="fl">
             <label>系统编号</label>
-            <input className={`inp mono${touched && (!form.id.trim() || !SYSTEM_ID_RE.test(form.id.trim())) ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder="例如：SYS_XXX" />
+            <Input aria-label="系统编号" className={`inp mono${touched && (!form.id.trim() || !SYSTEM_ID_RE.test(form.id.trim())) ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder="例如：SYS_XXX" />
           </div>
           <div className="fl">
             <label>系统缩写</label>
-            <input className={`inp mono${touched && !form.abbr.trim() ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setValue("abbr", event.target.value)} placeholder="例如：CBS" />
+            <Input aria-label="系统缩写" className={`inp mono${touched && !form.abbr.trim() ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setValue("abbr", event.target.value)} placeholder="例如：CBS" />
           </div>
           <div className="fl">
             <label>归属部门</label>
-            <select className="sel" value={form.dept} onChange={(event) => setValue("dept", event.target.value)}>
-              <option value="">请选择归属部门</option>
-              {deptSelectOptions.map((dept) => <option key={dept.value} value={dept.value}>{optionLabel(dept)}</option>)}
-            </select>
+            <Select<string>
+              aria-label="归属部门"
+              className="sel"
+              placeholder="请选择归属部门"
+              items={[{ label: "请选择归属部门", value: "" }, ...deptSelectOptions.map((dept) => ({ label: optionLabel(dept), value: dept.value }))]}
+              value={form.dept || ""}
+              onValueChange={(value) => setValue("dept", value || "")}
+            />
             {deptLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>业务部门当前值未在码值中维护，请补充码值或重新选择。</div> : null}
           </div>
           <div className="fl">
             <label>重要程度</label>
-            <select
-              className="sel"
-              value={form.importanceLevel}
-              onChange={(event) => setImportanceLevel(event.target.value)}
+            <Select<string>
               aria-label="重要程度"
-            >
-              <option value="normal">普通</option>
-              <option value="important">重要</option>
-            </select>
+              className="sel"
+              items={[{ label: "普通", value: "normal" }, { label: "重要", value: "important" }]}
+              value={form.importanceLevel}
+              onValueChange={(value) => setImportanceLevel(value || "normal")}
+            />
           </div>
           <div className="fl">
             <label>最晚出数时间</label>
@@ -224,7 +227,7 @@ export function SystemEditor({
           </div>
           <div className="fl full">
             <label>系统说明</label>
-            <textarea className="ta" value={form.desc} onChange={(event) => setValue("desc", event.target.value)} placeholder="描述系统用途，以及它消费哪些数据文件。" />
+            <Textarea aria-label="系统说明" className="ta" value={form.desc} onChange={(event) => setValue("desc", event.target.value)} placeholder="描述系统用途，以及它消费哪些数据文件。" />
           </div>
         </div>
       </div>
@@ -234,37 +237,45 @@ export function SystemEditor({
         <div className="form-grid">
           <div className="fl">
             <label>连接协议</label>
-            <select className="sel" value={form.protocol} onChange={(event) => setValue("protocol", event.target.value)}>
-              {protocolSelectOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item)}</option>)}
-            </select>
+            <Select<string>
+              aria-label="连接协议"
+              className="sel"
+              items={protocolSelectOptions.map((item) => ({ label: optionLabel(item), value: item.value }))}
+              value={form.protocol || null}
+              onValueChange={(value) => setValue("protocol", value || "")}
+            />
             {protocolLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>连接协议当前值未在码值中维护，请补充码值或重新选择。</div> : null}
           </div>
           <div className="fl">
             <label>认证方式</label>
-            <select className="sel" value={form.auth} onChange={(event) => setValue("auth", event.target.value)}>
-              {authSelectOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item)}</option>)}
-            </select>
+            <Select<string>
+              aria-label="认证方式"
+              className="sel"
+              items={authSelectOptions.map((item) => ({ label: optionLabel(item), value: item.value }))}
+              value={form.auth || null}
+              onValueChange={(value) => setValue("auth", value || "")}
+            />
             {authLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>认证方式当前值未在码值中维护，请补充码值或重新选择。</div> : null}
           </div>
           <div className="fl">
             <label>服务器地址</label>
-            <input className={`inp mono${touched && !form.host.trim() ? " invalid" : ""}`} value={form.host} onChange={(event) => setValue("host", event.target.value)} placeholder="例如：bi.consumer.demo.invalid" />
+            <Input aria-label="服务器地址" className={`inp mono${touched && !form.host.trim() ? " invalid" : ""}`} value={form.host} onChange={(event) => setValue("host", event.target.value)} placeholder="例如：bi.consumer.demo.invalid" />
           </div>
           <div className="fl">
             <label>端口</label>
-            <input className={`inp mono${touched && (!String(form.port).trim() || Number.isNaN(Number(form.port))) ? " invalid" : ""}`} value={form.port} onChange={(event) => setValue("port", event.target.value)} placeholder="例如：22" />
+            <Input aria-label="端口" className={`inp mono${touched && (!String(form.port).trim() || Number.isNaN(Number(form.port))) ? " invalid" : ""}`} value={form.port} onChange={(event) => setValue("port", event.target.value)} placeholder="例如：22" />
           </div>
           <div className="fl">
             <label>登录账号</label>
-            <input className="inp mono" value={form.account} onChange={(event) => setValue("account", event.target.value)} placeholder="例如：dw_push_xxx" />
+            <Input aria-label="登录账号" className="inp mono" value={form.account} onChange={(event) => setValue("account", event.target.value)} placeholder="例如：dw_push_xxx" />
           </div>
           <div className="fl">
             <label>下游对接人</label>
-            <input className="inp" value={form.downstreamContact} onChange={(event) => setValue("downstreamContact", event.target.value)} placeholder="例如：何嘉佳" />
+            <Input aria-label="下游对接人" className="inp" value={form.downstreamContact} onChange={(event) => setValue("downstreamContact", event.target.value)} placeholder="例如：何嘉佳" />
           </div>
           <div className="fl">
             <label>数据开发对接人</label>
-            <input className="inp" value={form.dataDeveloperContact} onChange={(event) => setValue("dataDeveloperContact", event.target.value)} placeholder="例如：何嘉佳" />
+            <Input aria-label="数据开发对接人" className="inp" value={form.dataDeveloperContact} onChange={(event) => setValue("dataDeveloperContact", event.target.value)} placeholder="例如：何嘉佳" />
           </div>
           <div className="fl">
             <label>启用状态</label>
