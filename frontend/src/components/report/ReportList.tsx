@@ -2,6 +2,7 @@ import type { EnrichedReportItem } from "../../hooks/useReportModule.ts";
 import { CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.ts";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 import { Highlight, Icon } from "../ui.tsx";
+import { Button } from "../../ui/index.ts";
 
 interface ReportCardLayoutProps {
   reports: readonly EnrichedReportItem[];
@@ -66,7 +67,7 @@ export function ReportList({ reports, query, view, onChangeView, onView, onEdit,
             共 <b>{reports.length}</b> 个报表资产{query ? <>，匹配 “{query}”</> : null}
           </div>
         </div>
-        <div className="head-actions"><ViewModeSwitcher value={view} onChange={onChangeView} />{canEdit ? <button className="btn primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增报表</button> : null}</div>
+        <div className="head-actions"><ViewModeSwitcher value={view} onChange={onChangeView} />{canEdit ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增报表</Button> : null}</div>
       </div>
 
       {!reports.length ? <EmptyState title={query ? "未找到符合条件的报表资产" : "暂无报表资产"} /> : view === "list" ? <div className="tbl-wrap indicator-tbl">

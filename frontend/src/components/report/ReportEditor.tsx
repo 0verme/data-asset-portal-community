@@ -9,6 +9,7 @@ import { buildReportOptionSets, type ReportOptionSets } from "../../config/repor
 import { getLegacyAwareOptions, normalizeDictOptions, type OptionInputItem } from "../../utils/optionUtils.ts";
 import { ActionErrorBanner, AssetReferencePicker, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader } from "../common/index.ts";
 import { Icon } from "../ui.tsx";
+import { Checkbox, Input, Select, Textarea } from "../../ui/index.ts";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -134,7 +135,7 @@ interface DictInputProps {
 function DictInput({ value, onChange, options, listId, placeholder, invalid = false }: DictInputProps) {
   const selectOptions = getLegacyAwareOptions(normalizeDictOptions(options), value);
   return <>
-    <input className={`inp${invalid ? " invalid" : ""}`} list={listId} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+    <Input aria-label={placeholder} className={`inp${invalid ? " invalid" : ""}`} list={listId} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
     <datalist id={listId}>{selectOptions.map((item) => <option key={item.value} value={item.value}>{item.name}</option>)}</datalist>
   </>;
 }
@@ -378,22 +379,26 @@ export function ReportEditor({
         <div className="form-grid">
           <div className="fl">
             <label>报表编码</label>
-            <input className={`inp mono${touched && !form.code.trim() ? " invalid" : ""}`} value={form.code} onChange={(event) => setValue("code", event.target.value)} placeholder="例如：RPT_PAY_DAILY" />
+            <Input aria-label="报表编码" className={`inp mono${touched && !form.code.trim() ? " invalid" : ""}`} value={form.code} onChange={(event) => setValue("code", event.target.value)} placeholder="例如：RPT_PAY_DAILY" />
           </div>
           <div className="fl">
             <label>报表名称</label>
-            <input className={`inp${touched && !form.name.trim() ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：支付交易日报" />
+            <Input aria-label="报表名称" className={`inp${touched && !form.name.trim() ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：支付交易日报" />
           </div>
           <div className="fl">
             <label>报表别名</label>
-            <input className="inp" value={form.alias} onChange={(event) => setValue("alias", event.target.value)} placeholder="例如：支付日结报表" />
+            <Input aria-label="报表别名" className="inp" value={form.alias} onChange={(event) => setValue("alias", event.target.value)} placeholder="例如：支付日结报表" />
           </div>
           <div className="fl">
             <label>报表类型</label>
-            <select className={`sel${touched && !form.type.trim() ? " invalid" : ""}`} value={form.type} onChange={(event) => setValue("type", event.target.value)}>
-              <option value="">请选择报表类型</option>
-              {getLegacyAwareOptions(normalizeDictOptions(reportTypeOptions), form.type).map((item) => <option key={item.value} value={item.value}>{item.name}</option>)}
-            </select>
+            <Select<string>
+              aria-label="报表类型"
+              className={`sel${touched && !form.type.trim() ? " invalid" : ""}`}
+              placeholder="请选择报表类型"
+              items={[{ label: "请选择报表类型", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(reportTypeOptions), form.type).map((item) => ({ label: item.name, value: item.value }))]}
+              value={form.type || ""}
+              onValueChange={(value) => setValue("type", value || "")}
+            />
           </div>
           <div className="fl">
             <label>状态</label>
@@ -407,22 +412,37 @@ export function ReportEditor({
         <div className="form-grid">
           <div className="fl">
             <label>主题域</label>
-            <select className={`sel${touched && !form.domain.trim() ? " invalid" : ""}`} value={form.domain} onChange={(event) => setValue("domain", event.target.value)}>
-              <option value="">请选择主题域</option>
-              {[...new Set([...domains, ...(form.domain ? [form.domain] : [])])].map((name) => <option key={name} value={name}>{name}</option>)}
-            </select>
+            <Select<string>
+              aria-label="主题域"
+              className={`sel${touched && !form.domain.trim() ? " invalid" : ""}`}
+              placeholder="请选择主题域"
+              items={[{ label: "请选择主题域", value: "" }, ...[...new Set([...domains, ...(form.domain ? [form.domain] : [])])].map((name) => ({ label: name, value: name }))]}
+              value={form.domain || ""}
+              onValueChange={(value) => setValue("domain", value || "")}
+            />
           </div>
           <div className="fl">
             <label>归属部门</label>
-            <select className={`sel${touched && !form.ownerDept.trim() ? " invalid" : ""}`} value={form.ownerDept} onChange={(event) => setValue("ownerDept", event.target.value)}><option value="">请选择归属部门</option>{getLegacyAwareOptions(normalizeDictOptions(departmentOptions), form.ownerDept).map((item) => <option key={item.value} value={item.value}>{item.name}</option>)}</select>
+            <Select<string>
+              aria-label="归属部门"
+              className={`sel${touched && !form.ownerDept.trim() ? " invalid" : ""}`}
+              placeholder="请选择归属部门"
+              items={[{ label: "请选择归属部门", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(departmentOptions), form.ownerDept).map((item) => ({ label: item.name, value: item.value }))]}
+              value={form.ownerDept || ""}
+              onValueChange={(value) => setValue("ownerDept", value || "")}
+            />
           </div>
           <div className="fl">
             <label>负责人</label>
-            <input className={`inp${touched && !form.ownerName.trim() ? " invalid" : ""}`} list="report-person-options" value={form.ownerName} onChange={(event) => setValues({ ownerName: event.target.value, ...(form.maintainerSameAsOwner ? { maintainerName: event.target.value } : {}) })} placeholder="搜索已有负责人" />
+            <Input aria-label="负责人" className={`inp${touched && !form.ownerName.trim() ? " invalid" : ""}`} list="report-person-options" value={form.ownerName} onChange={(event) => setValues({ ownerName: event.target.value, ...(form.maintainerSameAsOwner ? { maintainerName: event.target.value } : {}) })} placeholder="搜索已有负责人" />
           </div>
           <div className="fl">
-            <label><input type="checkbox" checked={!form.maintainerSameAsOwner} onChange={(event) => setValues({ maintainerSameAsOwner: !event.target.checked, maintainerName: event.target.checked ? form.maintainerName : form.ownerName })} /> 维护人不同</label>
-            {!form.maintainerSameAsOwner ? <input className="inp" list="report-person-options" value={form.maintainerName} onChange={(event) => setValue("maintainerName", event.target.value)} placeholder="搜索已有维护人" /> : <div className="match-hint">维护人同负责人</div>}
+            <Checkbox
+              label="维护人不同"
+              checked={!form.maintainerSameAsOwner}
+              onCheckedChange={(checked) => setValues({ maintainerSameAsOwner: !checked, maintainerName: checked ? form.maintainerName : form.ownerName })}
+            />
+            {!form.maintainerSameAsOwner ? <Input aria-label="维护人" className="inp" list="report-person-options" value={form.maintainerName} onChange={(event) => setValue("maintainerName", event.target.value)} placeholder="搜索已有维护人" /> : <div className="match-hint">维护人同负责人</div>}
           </div>
         </div>
       </div>
@@ -432,11 +452,18 @@ export function ReportEditor({
         <div className="form-grid">
           <div className="fl">
             <label>统计对象</label>
-            <input className="inp" value={form.statObject} onChange={(event) => setValue("statObject", event.target.value)} placeholder="例如：全行支付交易" />
+            <Input aria-label="统计对象" className="inp" value={form.statObject} onChange={(event) => setValue("statObject", event.target.value)} placeholder="例如：全行支付交易" />
           </div>
           <div className="fl">
             <label>统计周期</label>
-            <select className={`sel${touched && !form.statPeriod ? " invalid" : ""}`} value={form.statPeriod} onChange={(event) => setValue("statPeriod", event.target.value)}><option value="">请选择统计周期</option>{getLegacyAwareOptions(normalizeDictOptions(periodOptions), form.statPeriod).map((item) => <option key={item.value} value={item.value}>{item.name}</option>)}</select>
+            <Select<string>
+              aria-label="统计周期"
+              className={`sel${touched && !form.statPeriod ? " invalid" : ""}`}
+              placeholder="请选择统计周期"
+              items={[{ label: "请选择统计周期", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(periodOptions), form.statPeriod).map((item) => ({ label: item.name, value: item.value }))]}
+              value={form.statPeriod || ""}
+              onValueChange={(value) => setValue("statPeriod", value || "")}
+            />
           </div>
           <div className="fl full">
             <label>统计口径</label>
@@ -446,7 +473,7 @@ export function ReportEditor({
             <summary>更多设置（数据延迟、业务范围标签）</summary>
             <div className="form-grid" style={{ marginTop: 12 }}>
               <div className="fl"><label>数据延迟（选填）</label><DictInput value={form.dataDelay} onChange={(value) => setValue("dataDelay", value)} options={dataDelayOptions} listId="report-data-delay-options" placeholder="请选择或输入数据延迟" /></div>
-              <div className="fl full"><label>业务范围标签（选填）</label><input className="inp" value={form.businessScopeTags} onChange={(event) => setValue("businessScopeTags", event.target.value)} placeholder="例如：微信、支付宝、银联渠道" /></div>
+              <div className="fl full"><label>业务范围标签（选填）</label><Input aria-label="业务范围标签（选填）" className="inp" value={form.businessScopeTags} onChange={(event) => setValue("businessScopeTags", event.target.value)} placeholder="例如：微信、支付宝、银联渠道" /></div>
             </div>
           </details>
         </div>
@@ -455,18 +482,18 @@ export function ReportEditor({
       <div className="form-card">
         <h3><Icon name="info" size={14} />补充信息</h3>
         <div className="form-grid">
-          <div className="fl full"><label>报表说明</label><textarea className="ta" value={form.purpose} onChange={(event) => setValue("purpose", event.target.value)} placeholder="描述报表的业务用途和使用对象。" /></div>
-          <div className="fl full"><label>过滤条件</label><textarea className="ta" value={form.filterCondition} onChange={(event) => setValue("filterCondition", event.target.value)} placeholder="补充取数过滤条件。" /></div>
-          <div className="fl full"><label>特殊规则</label><textarea className="ta" value={form.specialRule} onChange={(event) => setValue("specialRule", event.target.value)} placeholder="补充特殊业务规则或统计说明。" /></div>
-          <div className="fl full"><label>备注</label><textarea className="ta" value={form.remark} onChange={(event) => setValue("remark", event.target.value)} placeholder="补充维护备注。" /></div>
+          <div className="fl full"><label>报表说明</label><Textarea aria-label="报表说明" className="ta" value={form.purpose} onChange={(event) => setValue("purpose", event.target.value)} placeholder="描述报表的业务用途和使用对象。" /></div>
+          <div className="fl full"><label>过滤条件</label><Textarea aria-label="过滤条件" className="ta" value={form.filterCondition} onChange={(event) => setValue("filterCondition", event.target.value)} placeholder="补充取数过滤条件。" /></div>
+          <div className="fl full"><label>特殊规则</label><Textarea aria-label="特殊规则" className="ta" value={form.specialRule} onChange={(event) => setValue("specialRule", event.target.value)} placeholder="补充特殊业务规则或统计说明。" /></div>
+          <div className="fl full"><label>备注</label><Textarea aria-label="备注" className="ta" value={form.remark} onChange={(event) => setValue("remark", event.target.value)} placeholder="补充维护备注。" /></div>
         </div>
       </div>
 
       <details className="form-card">
         <summary><Icon name="calendar" size={14} />更多设置 / 生命周期</summary>
         <div className="form-grid" style={{ marginTop: 16 }}>
-          <div className="fl"><label>生效日期（选填）</label><input type="date" className={`inp mono${touched && form.effectiveDate.trim() && !DATE_RE.test(form.effectiveDate.trim()) ? " invalid" : ""}`} value={form.effectiveDate} onChange={(event) => setValue("effectiveDate", event.target.value)} /></div>
-          <div className="fl"><label>失效日期（选填）</label><input type="date" className={`inp mono${touched && form.expireDate.trim() && !DATE_RE.test(form.expireDate.trim()) ? " invalid" : ""}`} value={form.expireDate} min={form.effectiveDate || undefined} onChange={(event) => setValue("expireDate", event.target.value)} /></div>
+          <div className="fl"><label>生效日期（选填）</label><Input aria-label="生效日期（选填）" type="date" className={`inp mono${touched && form.effectiveDate.trim() && !DATE_RE.test(form.effectiveDate.trim()) ? " invalid" : ""}`} value={form.effectiveDate} onChange={(event) => setValue("effectiveDate", event.target.value)} /></div>
+          <div className="fl"><label>失效日期（选填）</label><Input aria-label="失效日期（选填）" type="date" className={`inp mono${touched && form.expireDate.trim() && !DATE_RE.test(form.expireDate.trim()) ? " invalid" : ""}`} value={form.expireDate} min={form.effectiveDate || undefined} onChange={(event) => setValue("expireDate", event.target.value)} /></div>
         </div>
       </details>
 
