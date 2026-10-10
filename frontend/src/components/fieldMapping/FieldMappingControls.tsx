@@ -2,6 +2,7 @@ import type { ChangeEventHandler, ReactNode } from "react";
 
 import type { FieldMappingSourceSystemOption, FieldMappingStats } from "../../api/fieldMapping.ts";
 import { Icon } from "../ui.tsx";
+import { Button, Input } from "../../ui/index.ts";
 import {
   formatSystemLabel,
   getSourceSystemId,
@@ -128,7 +129,8 @@ export function FieldMappingFilters({
             </label>
             <label className="fm-field">
               <span>源系统表名</span>
-              <input
+              <Input
+                aria-label="源系统表名"
                 className="inp mono"
                 value={draftFilters.srcTable}
                 onChange={onChange("srcTable")}
@@ -137,7 +139,8 @@ export function FieldMappingFilters({
             </label>
             <label className="fm-field">
               <span>源字段名</span>
-              <input
+              <Input
+                aria-label="源字段名"
                 className="inp mono"
                 value={draftFilters.srcField}
                 onChange={onChange("srcField")}
@@ -158,7 +161,8 @@ export function FieldMappingFilters({
             </label>
             <label className="fm-field">
               <span>DWF 表名</span>
-              <input
+              <Input
+                aria-label="DWF 表名"
                 className="inp mono"
                 value={draftFilters.targetTable}
                 onChange={onChange("targetTable")}
@@ -167,7 +171,8 @@ export function FieldMappingFilters({
             </label>
             <label className="fm-field">
               <span>DWF 字段名</span>
-              <input
+              <Input
+                aria-label="DWF 字段名"
                 className="inp mono"
                 value={draftFilters.targetField}
                 onChange={onChange("targetField")}
@@ -176,13 +181,13 @@ export function FieldMappingFilters({
             </label>
           </div>
           <div className="fm-actions">
-            <button className="btn" type="button" onClick={onReset}>
+            <Button className="btn" variant="secondary" type="button" onClick={onReset}>
               重置
-            </button>
-            <button className="btn primary" type="button" onClick={onApply}>
+            </Button>
+            <Button className="btn primary" variant="primary" type="button" onClick={onApply}>
               <Icon name="search" size={15} color="#fff" />
               查询
-            </button>
+            </Button>
           </div>
         </>
       ) : null}

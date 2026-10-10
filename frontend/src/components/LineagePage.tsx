@@ -12,6 +12,7 @@ import { formatDateTime } from "../utils/date.ts";
 import { ActionErrorBanner, ErrorState, LoadingState } from "./common/index.ts";
 import { LineageCanvas } from "./lineage/LineageCanvas.tsx";
 import { Icon } from "./ui.tsx";
+import { Button, Input, Select } from "../ui/index.ts";
 
 const MAX_NODES = 100;
 type LineageDirection = LineageRoute["direction"];
@@ -229,17 +230,17 @@ export function LineagePage({ route, onRouteChange, onBootstrap }: LineagePagePr
           <div className="page-sub">表级漫游与作业排障 · 当前快照 {graph.snapshot.snapshotId}</div>
         </div>
         <div className="lineage-actions">
-          <label>视图<select value={pendingFilters.view} onChange={(event) => setPendingFilters((current) => ({ ...current, view: normalizeView(event.target.value) }))} disabled={loading || querying} aria-label="血缘视图"><option value="table">表级简图</option><option value="detail">作业详图</option></select></label>
-          <label>方向<select value={pendingFilters.direction} onChange={(event) => setPendingFilters((current) => ({ ...current, direction: normalizeDirection(event.target.value) }))} disabled={loading || querying} aria-label="血缘方向"><option value="both">上下游</option><option value="upstream">仅上游</option><option value="downstream">仅下游</option></select></label>
-          <label>表层级<select value={pendingFilters.depth} onChange={(event) => setPendingFilters((current) => ({ ...current, depth: Number(event.target.value) }))} disabled={loading || querying} aria-label="血缘层级">{[1, 2, 3, 4, 5].map((value) => <option value={value} key={value}>{value} 层</option>)}</select></label>
-          <button className="btn" type="button" onClick={() => void loadGraph({ ...route, ...pendingFilters })} disabled={loading}><Icon name="refresh" size={15} />{loading ? "加载中…" : "刷新"}</button>
+          <label>视图<Select<string> aria-label="血缘视图" className="sel" disabled={loading || querying} items={[{ label: "表级简图", value: "table" }, { label: "作业详图", value: "detail" }]} value={pendingFilters.view || null} onValueChange={(value) => setPendingFilters((current) => ({ ...current, view: normalizeView(value || "table") }))} /></label>
+          <label>方向<Select<string> aria-label="血缘方向" className="sel" disabled={loading || querying} items={[{ label: "上下游", value: "both" }, { label: "仅上游", value: "upstream" }, { label: "仅下游", value: "downstream" }]} value={pendingFilters.direction || null} onValueChange={(value) => setPendingFilters((current) => ({ ...current, direction: normalizeDirection(value || "both") }))} /></label>
+          <label>表层级<Select<string> aria-label="血缘层级" className="sel" disabled={loading || querying} items={[1, 2, 3, 4, 5].map((value) => ({ label: `${value} 层`, value: String(value) }))} value={String(pendingFilters.depth)} onValueChange={(value) => setPendingFilters((current) => ({ ...current, depth: Number(value || 1) }))} /></label>
+          <Button className="btn" variant="secondary" type="button" onClick={() => void loadGraph({ ...route, ...pendingFilters })} disabled={loading}><Icon name="refresh" size={15} />{loading ? "加载中…" : "刷新"}</Button>
         </div>
       </div>
       <form className="lineage-query" onSubmit={(event) => void submitQuery(event)}>
         <label htmlFor="lineage-node-name">表或作业名称查询</label>
-        <input id="lineage-node-name" value={query} onChange={(event) => { setQuery(event.target.value); setQueryError(""); setCandidates([]); }} placeholder="例如：DWS_TRADE_SALES_STAT_1D 或 JOB_AGGREGATE_DAILY_SALES" disabled={querying} aria-describedby="lineage-query-status" />
-        <button className="btn primary" type="submit" disabled={querying}>{querying ? "查询中…" : "查询"}</button>
-        <button className="btn" type="button" onClick={() => { setQuery(""); setQueryError(""); setCandidates([]); }} disabled={!query || querying}>清空</button>
+        <Input id="lineage-node-name" aria-label="血缘节点名称" value={query} onChange={(event) => { setQuery(event.target.value); setQueryError(""); setCandidates([]); }} placeholder="例如：DWS_TRADE_SALES_STAT_1D 或 JOB_AGGREGATE_DAILY_SALES" disabled={querying} aria-describedby="lineage-query-status" />
+        <Button className="btn primary" variant="primary" type="submit" disabled={querying}>{querying ? "查询中…" : "查询"}</Button>
+        <Button className="btn" variant="secondary" type="button" onClick={() => { setQuery(""); setQueryError(""); setCandidates([]); }} disabled={!query || querying}>清空</Button>
         <span id="lineage-query-status" className="lineage-query-status" role={queryError ? "alert" : "status"} aria-live="polite">{queryError}</span>
       </form>
       {candidates.length ? <div className="lineage-candidates" role="list" aria-label="血缘节点候选项">{candidates.map((candidate) => <button className="lineage-candidate" type="button" role="listitem" key={candidate.id} onClick={() => selectCandidate(candidate)}><b>{candidate.name}</b><span>{candidate.namespace}</span><small>{candidate.displayName}</small></button>)}</div> : null}
