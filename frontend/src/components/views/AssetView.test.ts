@@ -60,9 +60,10 @@ test("asset filters use scoped adapters without changing shared module sidebars"
   ]);
 
   assert.match(assetSidebar, /AssetSidebarFilterGroup/);
-  assert.match(assetFilter, /import \{ Button \} from "\.\.\/\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.match(assetFilter, /import \{ Button, Tooltip \} from "\.\.\/\.\.\/\.\.\/ui\/index\.ts"/);
   assert.match(assetFilter, /aria-pressed=\{typeof item\.active === "boolean" \? item\.active : undefined\}/);
   assert.match(assetFilter, /disabled=\{item\.disabled\}/);
+  assert.match(assetFilter, /<Tooltip trigger=\{button\} content=\{item\.tooltip\}/);
   assert.doesNotMatch(assetFilter, /@cloudflare\/kumo/);
   assert.match(sharedFilter, /<button/);
   assert.doesNotMatch(sharedFilter, /ui\/index\.ts/);

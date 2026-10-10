@@ -63,7 +63,7 @@ test("guest and read-only users can browse assets but do not get asset-write con
 
 test("admin retains create controls while list/search uses the existing asset query contract", async ({ page }) => {
   await openAssetList(page, "admin");
-  await expect(page.getByRole("button", { name: "新增表" })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "新增表" })).toHaveCount(1);
 
   const search = page.getByRole("textbox", { name: "全局搜索" });
   await search.fill("订单商品");
