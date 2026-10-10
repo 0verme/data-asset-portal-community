@@ -126,6 +126,7 @@
     z-index: 20;
   }
   .topbar-brand { display: flex; align-items: center; gap: 12px; min-width: max-content; flex: 0 0 auto; }
+  .topbar-nav-slot { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; width: 100%; }
   .topbar-actions { display: flex; align-items: center; justify-self: end; gap: 8px; min-width: max-content; flex: 0 0 auto; white-space: nowrap; }
   .brand { display: flex; align-items: center; gap: 11px; min-width: max-content; flex: 0 0 auto; cursor: pointer; user-select: none; }
   .brand-mark {
@@ -141,7 +142,9 @@
     display: flex;
     align-items: center;
     min-width: 0;
-    width: 100%;
+    width: max-content;
+    max-width: 100%;
+    flex: 0 1 auto;
     flex-wrap: nowrap;
     gap: 6px;
     white-space: nowrap;
@@ -150,6 +153,18 @@
     border: 1px solid var(--line);
     border-radius: 11px;
     overflow: visible;
+  }
+
+  .mainnav-measure {
+    position: absolute;
+    top: -10000px;
+    left: 0;
+    width: max-content;
+    max-width: none;
+    flex: none;
+    visibility: hidden;
+    pointer-events: none;
+    z-index: -1;
   }
 
   .mainnav button {
@@ -203,25 +218,15 @@
   .more-nav-trigger svg { transform: rotate(90deg); }
   .more-nav-trigger.active { box-shadow: inset 0 -2px 0 var(--accent); font-weight: 600; }
   .more-nav-menu {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    z-index: 40;
-    display: flex;
-    flex-direction: column;
     width: max-content;
     min-width: 156px;
     max-width: min(280px, calc(100vw - 32px));
     white-space: normal;
     padding: 6px;
-    background: var(--surface);
-    border: 1px solid var(--line-strong);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-md);
   }
-  .more-nav-menu button {
+  .more-nav-menu-item {
     width: 100%;
-    height: 36px;
+    min-height: 36px;
     padding: 0 10px;
     justify-content: flex-start;
     gap: 8px;
@@ -230,8 +235,7 @@
     font-size: 13px;
     white-space: nowrap;
   }
-  .more-nav-menu button:hover,
-  .more-nav-menu button.active { background: var(--surface-2); color: var(--ink); }
+  .more-nav-menu-item[aria-current="page"] { background: var(--surface-2); color: var(--ink); font-weight: 600; }
 
   .search {
     position: relative;
@@ -2488,7 +2492,7 @@
     }
     .topbar-actions { margin-left: auto; gap: 8px; }
 
-    .topbar > .mainnav {
+    .topbar-nav-slot {
       display: none;
     }
 

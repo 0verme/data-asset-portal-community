@@ -17,7 +17,7 @@ test("mobile shell behavior is scoped to the 768px breakpoint", () => {
   const mobileSection = styles.match(/\/\* ===== Mobile ≤ 768px ===== \*\/[\s\S]*?\/\* ===== Small phone ≤ 480px ===== \*\//)?.[0] || "";
 
   assert.match(mobileSection, /@media \(max-width: 768px\)/);
-  assert.match(mobileSection, /\.topbar > \.mainnav \{\s*display: none;/);
+  assert.match(mobileSection, /\.topbar-nav-slot \{\s*display: none;/);
   assert.match(mobileSection, /\.search\.mobile-open \{ display: block; \}/);
   assert.match(mobileSection, /table\.mobile-card-table/);
   assert.match(mobileSection, /height: 100dvh;/);

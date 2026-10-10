@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { getPortalPushNavigation, resolvePortalNavigationQuery } from "./portalNavigation.ts";
 import { getModuleDetailRoute, getModuleEditRoute } from "./navigation.ts";
-import { splitNavigationMenus } from "./navigationMenuGrouping.ts";
+import { getNavigationPrimaryLimit, splitNavigationMenus } from "./navigationMenuGrouping.ts";
 
 test("desktop navigation groups menus by configured placement", () => {
   const menus = [
@@ -21,7 +21,7 @@ test("desktop navigation groups menus by configured placement", () => {
   assert.deepEqual(more.map((item) => item.code), ["report", "system", "push"]);
 });
 
-test("compact header preserves menu order while moving overflow primary items into More", () => {
+test("fixed primary limits preserve configured order when a caller explicitly requests a count", () => {
   const menus = [
     { code: "upstream", navPlacement: "primary" },
     { code: "report", navPlacement: "more" },
@@ -36,6 +36,47 @@ test("compact header preserves menu order while moving overflow primary items in
 
   assert.deepEqual(primary.map((item) => item.code), ["upstream", "dwm", "mapping"]);
   assert.deepEqual(more.map((item) => item.code), ["lineage", "indicator", "report", "system"]);
+});
+
+test("available-width navigation fits the largest primary prefix and reserves More", () => {
+  const menus = [
+    { code: "upstream", navPlacement: "primary" },
+    { code: "report", navPlacement: "more" },
+    { code: "dwm", navPlacement: "primary" },
+    { code: "mapping", navPlacement: "primary" },
+    { code: "lineage", navPlacement: "primary" },
+  ];
+  const metrics = {
+    availableWidth: 176,
+    menuWidths: [50, 60, 40, 45],
+    moreTriggerWidth: 40,
+    chromeWidth: 10,
+    gap: 6,
+  };
+
+  const maxPrimary = getNavigationPrimaryLimit(menus, metrics);
+  const { primary, more } = splitNavigationMenus(menus, { maxPrimary });
+
+  assert.equal(maxPrimary, 2);
+  assert.deepEqual(primary.map((item) => item.code), ["upstream", "dwm"]);
+  assert.deepEqual(more.map((item) => item.code), ["mapping", "lineage", "report"]);
+  assert.ok(10 + 50 + 60 + 40 + 2 * 6 <= metrics.availableWidth);
+  assert.ok(10 + 50 + 60 + 40 + 40 + 3 * 6 > metrics.availableWidth);
+});
+
+test("available-width navigation falls back safely until every primary width is measured", () => {
+  const menus = [
+    { code: "upstream", navPlacement: "primary" },
+    { code: "dwm", navPlacement: "primary" },
+  ];
+
+  assert.equal(getNavigationPrimaryLimit(menus, {
+    availableWidth: 60,
+    menuWidths: [50],
+    moreTriggerWidth: 40,
+    chromeWidth: 10,
+    gap: 6,
+  }), 2);
 });
 
 test("portal push-job navigation clears the portal query while preserving the job route", () => {

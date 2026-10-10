@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { LineageBootstrap } from "./api/lineage.ts";
 import { getMenus, MENUS_CHANGED_EVENT } from "./api/menus.ts";
@@ -25,7 +25,7 @@ import { ModuleSidebar } from "./components/app/ModuleSidebar.tsx";
 import type { AppModuleContext } from "./components/app/appTypes.ts";
 import { ConfirmDialogHost, ModuleErrorBoundary, ToastHost } from "./components/common/index.ts";
 import { Icon } from "./components/ui.tsx";
-import { Button, IconButton, Input } from "./ui/index.ts";
+import { Button, DropdownMenu, IconButton, Input } from "./ui/index.ts";
 import {
   APP_VERSION,
   DEFAULT_ASSET_ROUTE,
@@ -55,7 +55,7 @@ import {
   getVisibleNavigationMenus,
   loadNavigationMenus,
 } from "./routing/navigationMenus.ts";
-import { splitNavigationMenus } from "./routing/navigationMenuGrouping.ts";
+import { getNavigationPrimaryLimit, splitNavigationMenus, type NavigationMenuFitMetrics } from "./routing/navigationMenuGrouping.ts";
 import { useLocationSynchronization } from "./hooks/useLocationSynchronization.ts";
 import {
   useNavigationController,
@@ -88,19 +88,20 @@ type NavigationTarget = Parameters<NavigationActions["goToModuleWithQuery"]>[0];
 
 type NavigationMenuStatus = "loading" | "ready" | "error";
 
+type NavigationFitSnapshot = NavigationMenuFitMetrics & { menuKey: string };
+
 export default function App(): React.ReactElement {
   const hamburgerRef = React.useRef<HTMLButtonElement | null>(null);
   const sidebarRef = React.useRef<HTMLElement | null>(null);
   const searchToggleRef = React.useRef<HTMLButtonElement | null>(null);
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
-  const moreNavRef = useRef<HTMLDivElement | null>(null);
+  const navSlotRef = useRef<HTMLDivElement | null>(null);
+  const navMeasureRef = useRef<HTMLElement | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [moreNavOpen, setMoreNavOpen] = useState(false);
-  const [compactHeader, setCompactHeader] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(max-width: 1199px)").matches,
-  );
+  const [navigationFitSnapshot, setNavigationFitSnapshot] = useState<NavigationFitSnapshot | null>(null);
   const [lineageBootstrap, setLineageBootstrap] = useState<LineageBootstrap | null>(null);
   const [systemActionIntent, setSystemActionIntent] = useState("");
   const [navMenuSnapshot, setNavMenuSnapshot] = useState<{ authKey: string; menus: MenuItem[] }>({
@@ -284,32 +285,6 @@ export default function App(): React.ReactElement {
   }, [mobileSearchOpen]);
 
   useEffect(() => {
-    if (!moreNavOpen) return undefined;
-    const closeOnEscape = (event: KeyboardEvent): void => {
-      if (event.key !== "Escape") return;
-      setMoreNavOpen(false);
-    };
-    const closeOnOutsideClick = (event: PointerEvent): void => {
-      if (!(event.target instanceof Node) || !moreNavRef.current?.contains(event.target)) {
-        setMoreNavOpen(false);
-      }
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    document.addEventListener("pointerdown", closeOnOutsideClick);
-    return () => {
-      window.removeEventListener("keydown", closeOnEscape);
-      document.removeEventListener("pointerdown", closeOnOutsideClick);
-    };
-  }, [moreNavOpen]);
-
-  useEffect(() => {
-    const compactViewport = window.matchMedia("(max-width: 1199px)");
-    const syncCompactHeader = (): void => setCompactHeader(compactViewport.matches);
-    compactViewport.addEventListener("change", syncCompactHeader);
-    return () => compactViewport.removeEventListener("change", syncCompactHeader);
-  }, []);
-
-  useEffect(() => {
     const desktopSidebarViewport = window.matchMedia("(min-width: 960px)");
     const desktopSearchViewport = window.matchMedia("(min-width: 769px)");
     const closeSidebarOnDesktop = (event: MediaQueryListEvent): void => {
@@ -330,10 +305,74 @@ export default function App(): React.ReactElement {
     () => getVisibleNavigationMenus(navMenus, { canManageSystem, canViewOperationLog }),
     [canManageSystem, canViewOperationLog, navMenus],
   );
+  const navigationPrimaryMenus = visibleNavMenus.filter((item) => item.navPlacement === "primary");
+  const navigationPrimaryMenuCount = navigationPrimaryMenus.length;
+  const navigationMenuKey = JSON.stringify(navigationPrimaryMenus.map(({ code, name, icon }) => [code, name, icon]));
 
+  useLayoutEffect(() => {
+    const measureNavigation = (): void => {
+      const slot = navSlotRef.current;
+      const measure = navMeasureRef.current;
+      if (!slot || !measure || getComputedStyle(measure).display === "none") return;
+      const availableWidth = slot.getBoundingClientRect().width;
+      if (availableWidth <= 0) return;
+
+      const measuredMenuButtons = [...measure.querySelectorAll<HTMLElement>("[data-nav-measure-item]")];
+      const measuredMoreTrigger = measure.querySelector<HTMLElement>("[data-nav-measure-more]");
+      if (measuredMenuButtons.length !== navigationPrimaryMenuCount || !measuredMoreTrigger) return;
+
+      const style = getComputedStyle(measure);
+      const cssPixels = (value: string): number => Number.parseFloat(value) || 0;
+      const next: NavigationFitSnapshot = {
+        menuKey: navigationMenuKey,
+        availableWidth,
+        menuWidths: measuredMenuButtons.map((button) => button.getBoundingClientRect().width),
+        moreTriggerWidth: measuredMoreTrigger.getBoundingClientRect().width,
+        chromeWidth: cssPixels(style.paddingLeft) + cssPixels(style.paddingRight)
+          + cssPixels(style.borderLeftWidth) + cssPixels(style.borderRightWidth),
+        gap: cssPixels(style.columnGap),
+      };
+
+      setNavigationFitSnapshot((current) => {
+        const sameWidths = current?.menuWidths.length === next.menuWidths.length
+          && current.menuWidths.every((width, index) => {
+            const nextWidth = next.menuWidths[index];
+            return nextWidth !== undefined && Math.abs(width - nextWidth) < 0.5;
+          });
+        if (
+          current?.menuKey === next.menuKey
+          && Math.abs(current.availableWidth - next.availableWidth) < 0.5
+          && sameWidths
+          && Math.abs(current.moreTriggerWidth - next.moreTriggerWidth) < 0.5
+          && Math.abs(current.chromeWidth - next.chromeWidth) < 0.5
+          && Math.abs(current.gap - next.gap) < 0.5
+        ) {
+          return current;
+        }
+        return next;
+      });
+    };
+
+    measureNavigation();
+    const observer = new ResizeObserver(measureNavigation);
+    if (navSlotRef.current) observer.observe(navSlotRef.current);
+    if (navMeasureRef.current) observer.observe(navMeasureRef.current);
+    window.addEventListener("resize", measureNavigation);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measureNavigation);
+    };
+  }, [module, navigationMenuKey, navigationPrimaryMenuCount]);
+
+  const navigationFitMetrics = navigationFitSnapshot?.menuKey === navigationMenuKey
+    ? navigationFitSnapshot
+    : null;
+  const maxPrimaryMenus = navigationFitMetrics
+    ? getNavigationPrimaryLimit(visibleNavMenus, navigationFitMetrics)
+    : navigationPrimaryMenus.length;
   const { primary: primaryNavMenus, more: moreNavMenus } = useMemo(
-    () => splitNavigationMenus(visibleNavMenus, { maxPrimary: compactHeader ? 3 : 5 }),
-    [compactHeader, visibleNavMenus],
+    () => splitNavigationMenus(visibleNavMenus, { maxPrimary: maxPrimaryMenus }),
+    [maxPrimaryMenus, visibleNavMenus],
   );
   const moreNavActive = moreNavMenus.some((item) => item.code === module);
 
@@ -588,6 +627,16 @@ export default function App(): React.ReactElement {
   const isCodeTable = module === "codeTable";
   const isPortal = module === "portal";
 
+  useEffect(() => {
+    const hiddenNavigation = window.matchMedia(isPortal ? "(max-width: 768px)" : "(max-width: 959px)");
+    const closeWhenHidden = (): void => {
+      if (hiddenNavigation.matches) setMoreNavOpen(false);
+    };
+    closeWhenHidden();
+    hiddenNavigation.addEventListener("change", closeWhenHidden);
+    return () => hiddenNavigation.removeEventListener("change", closeWhenHidden);
+  }, [isPortal]);
+
   const searchPlaceholder = isPush
     ? "搜索系统、作业、文件名或说明"
     : isCodeTable
@@ -743,66 +792,96 @@ export default function App(): React.ReactElement {
             </div>
           </div>
 
-          <div className="mainnav">
-            {currentNavMenuStatus === "loading" ? (
-              <Button type="button" variant="tertiary" size="sm" disabled>菜单加载中…</Button>
-            ) : currentNavMenuStatus === "error" ? (
-              <Button
-                type="button"
-                variant="tertiary"
-                size="sm"
-                onClick={() => void loadMenus(navigationAuthKey)}
-              >
-                菜单加载失败，点击重试
-              </Button>
-            ) : null}
-            {primaryNavMenus.map((item) => (
-              <Button
-                key={item.code}
-                type="button"
-                variant="tertiary"
-                size="sm"
-                className={module === item.code ? "active" : ""}
-                onClick={() => switchModuleFromMenu(item.code)}
-              >
-                <Icon name={item.icon} size={15} />{item.name}
-              </Button>
-            ))}
-            {moreNavMenus.length ? (
-              <div className="more-nav" ref={moreNavRef}>
+          <div className="topbar-nav-slot" ref={navSlotRef}>
+            <nav className="mainnav" aria-label="主导航">
+              {currentNavMenuStatus === "loading" ? (
+                <Button type="button" variant="tertiary" size="sm" disabled>菜单加载中…</Button>
+              ) : currentNavMenuStatus === "error" ? (
                 <Button
+                  type="button"
                   variant="tertiary"
                   size="sm"
-                  className={`more-nav-trigger${moreNavActive ? " active" : ""}`}
+                  onClick={() => void loadMenus(navigationAuthKey)}
+                >
+                  菜单加载失败，点击重试
+                </Button>
+              ) : null}
+              {primaryNavMenus.map((item) => (
+                <Button
+                  key={item.code}
                   type="button"
-                  aria-expanded={moreNavOpen}
-                  aria-controls="more-nav-menu"
-                  onClick={() => setMoreNavOpen((prev) => !prev)}
+                  variant="tertiary"
+                  size="sm"
+                  className={module === item.code ? "active" : ""}
+                  onClick={() => switchModuleFromMenu(item.code)}
+                >
+                  <Icon name={item.icon} size={15} />{item.name}
+                </Button>
+              ))}
+              {moreNavMenus.length ? (
+                <div className="more-nav">
+                  <DropdownMenu open={moreNavOpen} onOpenChange={(open) => setMoreNavOpen(open)}>
+                    <DropdownMenu.Trigger
+                      render={(
+                        <Button
+                          variant="tertiary"
+                          size="sm"
+                          className={`more-nav-trigger${moreNavActive ? " active" : ""}${moreNavOpen ? " open" : ""}`}
+                          type="button"
+                          aria-expanded={moreNavOpen}
+                          aria-controls="more-nav-menu"
+                        />
+                      )}
+                    >
+                      更多<Icon name="chevron" size={13} />
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Content id="more-nav-menu" className="more-nav-menu" align="end" side="bottom">
+                      {moreNavMenus.map((item) => (
+                        <DropdownMenu.Item
+                          key={item.code}
+                          className="more-nav-menu-item"
+                          icon={<Icon name={item.icon} size={15} />}
+                          selected={module === item.code}
+                          aria-current={module === item.code ? "page" : undefined}
+                          onClick={() => {
+                            setMoreNavOpen(false);
+                            switchModuleFromMenu(item.code);
+                          }}
+                        >
+                          {item.name}
+                        </DropdownMenu.Item>
+                      ))}
+                    </DropdownMenu.Content>
+                  </DropdownMenu>
+                </div>
+              ) : null}
+            </nav>
+
+            <nav ref={navMeasureRef} className="mainnav mainnav-measure" aria-hidden="true" inert>
+              {navigationPrimaryMenus.map((item) => (
+                <Button
+                  key={item.code}
+                  type="button"
+                  variant="tertiary"
+                  size="sm"
+                  className={module === item.code ? "active" : ""}
+                  data-nav-measure-item={item.code}
+                >
+                  <Icon name={item.icon} size={15} />{item.name}
+                </Button>
+              ))}
+              <div className="more-nav">
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  size="sm"
+                  className="more-nav-trigger active"
+                  data-nav-measure-more=""
                 >
                   更多<Icon name="chevron" size={13} />
                 </Button>
-                {moreNavOpen ? (
-                  <div id="more-nav-menu" className="more-nav-menu" role="menu">
-                    {moreNavMenus.map((item) => (
-                      <Button
-                        key={item.code}
-                        variant="tertiary"
-                        size="sm"
-                        className={module === item.code ? "active" : ""}
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setMoreNavOpen(false);
-                          switchModuleFromMenu(item.code);
-                        }}
-                      >
-                        <Icon name={item.icon} size={15} />{item.name}
-                      </Button>
-                    ))}
-                  </div>
-                ) : null}
               </div>
-            ) : null}
+            </nav>
           </div>
 
           <div className="topbar-actions">

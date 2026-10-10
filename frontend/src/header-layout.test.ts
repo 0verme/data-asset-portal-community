@@ -26,14 +26,17 @@ test("shared header keeps brand, navigation, and actions in stable DOM and grid 
   assert.match(headerGrid, /grid-template-columns:\s*max-content\s+minmax\(0,\s*1fr\)\s+max-content/);
   assert.match(
     app,
-    /<div className="topbar-brand">[\s\S]*?<div className="mainnav">[\s\S]*?<div className="topbar-actions">/,
+    /<div className="topbar-brand">[\s\S]*?<div className="topbar-nav-slot"[\s\S]*?<nav className="mainnav"[\s\S]*?<div className="topbar-actions">/,
   );
   assert.match(appStyles, /\.topbar-brand\s*\{[^}]*flex:\s*0 0 auto/);
+  assert.match(appStyles, /\.topbar-nav-slot\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%/);
   assert.match(appStyles, /\.topbar-actions\s*\{[^}]*flex:\s*0 0 auto;[^}]*white-space:\s*nowrap/);
-  assert.doesNotMatch(appStyles, /\.topbar-spacer|\.mainnav\s*\{[^}]*\border\s*:/);
+  assert.match(appStyles, /\.mainnav\s*\{[^}]*width:\s*max-content;[^}]*max-width:\s*100%/);
+  assert.match(app, /className="mainnav mainnav-measure" aria-hidden="true" inert/);
+  assert.doesNotMatch(appStyles, /\.topbar-spacer/);
 });
 
-test("middle-width header compacts search and navigation before the mobile breakpoint", () => {
+test("middle-width navigation derives its visible prefix from measured available space", () => {
   const compactHeader = appStyles.match(
     /@media \(max-width: 1199px\) and \(min-width: 769px\) \{[\s\S]*?\n\s{2}\}/,
   )?.[0] || "";
@@ -44,13 +47,16 @@ test("middle-width header compacts search and navigation before the mobile break
   assert.match(appStyles, /\.search \{\s*position: relative;\s*width: clamp\(180px, 20vw, 360px\);/);
   assert.match(compactHeader, /\.search \{\s*width: 36px;[\s\S]*?flex-basis: 36px;/);
   assert.match(compactHeader, /\.search:focus-within,[\s\S]*?width: 196px;/);
-  assert.match(app, /matchMedia\("\(max-width: 1199px\)"\)/);
-  assert.match(app, /splitNavigationMenus\(visibleNavMenus, \{ maxPrimary: compactHeader \? 3 : 5 \}\)/);
+  assert.match(app, /new ResizeObserver\(measureNavigation\)/);
+  assert.match(app, /getNavigationPrimaryLimit\(visibleNavMenus, navigationFitMetrics\)/);
+  assert.match(app, /data-nav-measure-item=\{item\.code\}/);
+  assert.doesNotMatch(app, /maxPrimary:\s*compactHeader\s*\?/);
   assert.match(compactHeader, /\.search input \{\s*box-sizing: border-box;\s*padding: 0;/);
   assert.match(appStyles, /\.search \.clear \{[^}]*pointer-events: none/);
   assert.match(appStyles, /\.search\.has-val \.clear \{ opacity: 1; pointer-events: auto; \}/);
   assert.match(tabletHeader, /\.hamburger \{ display: grid/);
   assert.match(tabletHeader, /\.mainnav \{ display: none/);
+  assert.match(appStyles, /@media \(max-width: 768px\)[\s\S]*?\.topbar-nav-slot \{\s*display: none;\s*\}/);
   assert.match(appStyles, /@media \(max-width: 768px\)[\s\S]*?\.search\.mobile-open \{ display: block; \}/);
   assert.match(app, /id="global-search"/);
   assert.match(app, /aria-label="全局搜索"/);
@@ -61,28 +67,27 @@ test("middle-width header compacts search and navigation before the mobile break
   );
 });
 
-test("more-navigation dropdown owns a bounded, single-column layout contract", () => {
-  const moreNav = appStyles.match(/\.more-nav\s*\{([^}]*)\}/)?.[1] || "";
+test("More navigation uses the DAP DropdownMenu adapter with bounded Kumo content", () => {
   const menu = appStyles.match(/\.more-nav-menu\s*\{([^}]*)\}/)?.[1] || "";
-  const menuButton = appStyles.match(/\.more-nav-menu button\s*\{([^}]*)\}/)?.[1] || "";
+  const menuItem = appStyles.match(/\.more-nav-menu-item\s*\{([^}]*)\}/)?.[1] || "";
 
-  assert.match(moreNav, /position:\s*relative/);
-  assert.match(menu, /position:\s*absolute/);
-  assert.match(menu, /top:\s*calc\(100% \+ 8px\)/);
-  assert.match(menu, /right:\s*0/);
-  assert.match(menu, /display:\s*flex/);
-  assert.match(menu, /flex-direction:\s*column/);
+  assert.match(app, /import \{ Button, DropdownMenu, IconButton, Input \} from "\.\/ui\/index\.ts"/);
+  assert.match(app, /<DropdownMenu\.Trigger[\s\S]*?render=\{[\s\S]*?<Button/);
+  assert.match(app, /<DropdownMenu\.Content id="more-nav-menu" className="more-nav-menu" align="end" side="bottom">/);
+  assert.match(app, /<DropdownMenu\.Item[\s\S]*?selected=\{module === item\.code\}[\s\S]*?aria-current=\{module === item\.code \? "page" : undefined\}/);
   assert.match(menu, /width:\s*max-content/);
   assert.match(menu, /min-width:\s*156px/);
   assert.match(menu, /max-width:\s*min\(280px,\s*calc\(100vw - 32px\)\)/);
   assert.match(menu, /white-space:\s*normal/);
-  assert.match(menuButton, /width:\s*100%/);
-  assert.match(menuButton, /justify-content:\s*flex-start/);
-  assert.match(menuButton, /white-space:\s*nowrap/);
+  assert.doesNotMatch(menu, /position:\s*absolute|top:|right:/);
+  assert.match(menuItem, /width:\s*100%/);
+  assert.match(menuItem, /justify-content:\s*flex-start/);
+  assert.match(menuItem, /white-space:\s*nowrap/);
+  assert.doesNotMatch(app, /from "@cloudflare\/kumo\//);
 });
 
 test("primary navigation actions use the frozen DAP Button adapter", () => {
-  assert.match(app, /import \{ Button, IconButton, Input \} from "\.\/ui\/index\.ts"/);
+  assert.match(app, /import \{ Button, DropdownMenu, IconButton, Input \} from "\.\/ui\/index\.ts"/);
   assert.match(
     app,
     /currentNavMenuStatus === "loading" \? \([\s\S]*?<Button type="button" variant="tertiary" size="sm" disabled>/,
@@ -95,24 +100,23 @@ test("primary navigation actions use the frozen DAP Button adapter", () => {
     app,
     /primaryNavMenus\.map\(\(item\) => \([\s\S]*?<Button[\s\S]*?variant="tertiary"[\s\S]*?className=\{module === item\.code \? "active" : ""\}[\s\S]*?onClick=\{\(\) => switchModuleFromMenu\(item\.code\)\}/,
   );
-  assert.match(app, /splitNavigationMenus\(visibleNavMenus, \{ maxPrimary: compactHeader \? 3 : 5 \}\)/);
+  assert.match(app, /getNavigationPrimaryLimit\(visibleNavMenus, navigationFitMetrics\)/);
   assert.doesNotMatch(app, /from "@cloudflare\/kumo\//);
 });
 
-test("more-menu trigger and entries use DAP Buttons without changing menu behavior", () => {
-  const moreNavStart = app.indexOf('<div className="more-nav" ref={moreNavRef}>');
+test("More menu items keep selection and navigation inside the DAP DropdownMenu boundary", () => {
+  const moreNavStart = app.indexOf('<div className="more-nav">');
   const actionsStart = app.indexOf('<div className="topbar-actions">', moreNavStart);
   const moreNav = app.slice(moreNavStart, actionsStart);
 
-  assert.equal((moreNav.match(/<Button/g) ?? []).length, 2);
-  assert.doesNotMatch(moreNav, /<button/);
-  assert.equal((moreNav.match(/variant="tertiary"/g) ?? []).length, 2);
+  assert.ok(moreNav.includes("<DropdownMenu open={moreNavOpen}"));
   assert.ok(moreNav.includes("className={`more-nav-trigger"));
-  assert.ok(moreNav.includes("aria-expanded={moreNavOpen}"));
-  assert.ok(moreNav.includes('role="menuitem"'));
+  assert.ok(moreNav.includes("aria-controls=\"more-nav-menu\""));
+  assert.ok(moreNav.includes("selected={module === item.code}"));
+  assert.ok(moreNav.includes('aria-current={module === item.code ? "page" : undefined}'));
   assert.ok(moreNav.includes("setMoreNavOpen(false)"));
   assert.ok(moreNav.includes("switchModuleFromMenu(item.code)"));
-  assert.ok(moreNav.includes('aria-controls="more-nav-menu"'));
+  assert.doesNotMatch(moreNav, /role="menuitem"|<button/);
 });
 
 test("theme trigger uses a DAP IconButton and preserves its dynamic label and title", () => {
