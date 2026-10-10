@@ -6,7 +6,7 @@ const read = (relativePath: string) => readFileSync(new URL(relativePath, import
 const app = read("./App.tsx");
 
 test("sidebar shell trigger uses the frozen DAP IconButton adapter", () => {
-  assert.match(app, /import \{ Button, IconButton, Input \} from "\.\/ui\/index\.ts"/);
+  assert.match(app, /import \{ Button, DropdownMenu, IconButton, Input \} from "\.\/ui\/index\.ts"/);
   assert.match(
     app,
     /<IconButton[\s\S]*?ref=\{hamburgerRef\}[\s\S]*?className="hamburger"[\s\S]*?variant="tertiary"[\s\S]*?size="sm"[\s\S]*?aria-controls="mobile-sidebar"[\s\S]*?aria-expanded=\{sidebarOpen\}[\s\S]*?aria-label=\{sidebarOpen \? "关闭导航" : "打开导航"\}[\s\S]*?icon=\{<Icon name="menu" size=\{18\} \/>\}/,
