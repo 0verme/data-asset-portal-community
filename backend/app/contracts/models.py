@@ -175,6 +175,19 @@ class IndicatorItem(ContractModel):
     registeredAt: str = ""
 
 
+class IndicatorPathTreeNode(ContractModel):
+    label: str
+    value: str
+    pathLabel: str
+    pathCode: str
+    pathName: str
+    dimensionCode: str
+    pathLevel: int
+    fullPath: str
+    remark: str | None = None
+    children: list["IndicatorPathTreeNode"] | None = None
+
+
 class IndicatorRequest(ContractModel):
     id: str | None = None
     name: str | None = None

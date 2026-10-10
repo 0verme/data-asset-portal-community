@@ -75,7 +75,7 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
             response.json(),
         )
 
-    def test_native_runtime_route_surface_has_no_wait_db_or_private_paths(self):
+    def test_native_runtime_route_surface_includes_indicator_paths_but_no_residual_routes(self):
         app = create_fastapi_app(
             capabilities=self.capabilities,
             identity_resolver=lambda _request: None,
@@ -93,7 +93,7 @@ class NativeFastApiRuntimeTests(unittest.TestCase):
                 "/api/assets/tables",
             }.issubset(paths)
         )
-        self.assertNotIn("/api/indicator-path/tree", paths)
+        self.assertIn("/api/indicator-path/tree", paths)
         self.assertNotIn("/api/common-codes/categories", paths)
         self.assertIn("/api/push/systems", paths)
 
