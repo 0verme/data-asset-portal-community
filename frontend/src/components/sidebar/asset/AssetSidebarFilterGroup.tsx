@@ -1,15 +1,20 @@
-import type { ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 
-import { Button } from "../../../ui/index.ts";
+import { Button, Tooltip } from "../../../ui/index.ts";
+import { Icon } from "../../ui.tsx";
 import type { SidebarFilterItem } from "../common/SidebarFilterGroup.tsx";
+
+export interface AssetSidebarFilterItem extends SidebarFilterItem {
+  tooltip?: ReactNode | undefined;
+}
 
 export interface AssetSidebarFilterGroupProps {
   title: ReactNode;
-  items?: readonly SidebarFilterItem[] | undefined;
-  allOption?: SidebarFilterItem | undefined;
+  items?: readonly AssetSidebarFilterItem[] | undefined;
+  allOption?: AssetSidebarFilterItem | undefined;
 }
 
-function AssetSidebarFilterButton({ item }: { item: SidebarFilterItem }) {
+function AssetSidebarFilterButton({ item }: { item: AssetSidebarFilterItem }) {
   const className = [
     "side-item",
     item.active ? "active" : "",
@@ -18,20 +23,22 @@ function AssetSidebarFilterButton({ item }: { item: SidebarFilterItem }) {
     .filter(Boolean)
     .join(" ");
 
-  return (
+  const button = (
     <Button
       type="button"
       variant="tertiary"
       size="sm"
-      className={className}
+      className={`${className} asset-sidebar-filter-option`}
       onClick={item.disabled ? undefined : item.onClick}
       disabled={item.disabled}
       aria-pressed={typeof item.active === "boolean" ? item.active : undefined}
     >
       {item.content || (
         <>
-          {item.leading}
-          {item.label}
+          <span className="asset-sidebar-filter-label">
+            {item.leading}
+            {item.label}
+          </span>
           {item.count !== undefined && item.count !== null ? (
             <span className="count">{item.count}</span>
           ) : null}
@@ -39,6 +46,10 @@ function AssetSidebarFilterButton({ item }: { item: SidebarFilterItem }) {
       )}
     </Button>
   );
+
+  return item.tooltip ? (
+    <Tooltip trigger={button} content={item.tooltip} side="right" align="start" />
+  ) : button;
 }
 
 export function AssetSidebarFilterGroup({
@@ -47,11 +58,36 @@ export function AssetSidebarFilterGroup({
   allOption,
 }: AssetSidebarFilterGroupProps) {
   const renderedItems = allOption ? [allOption, ...items] : items;
+  const headingId = useId();
+  const contentId = useId();
+  const [expanded, setExpanded] = useState(true);
 
   return (
     <div className="side-group asset-sidebar-filter-group">
-      <div className="side-title">{title}</div>
-      {renderedItems.map((item) => <AssetSidebarFilterButton key={item.key} item={item} />)}
+      <Button
+        id={headingId}
+        type="button"
+        variant="tertiary"
+        size="sm"
+        className="asset-sidebar-filter-heading"
+        aria-expanded={expanded}
+        aria-controls={contentId}
+        onClick={() => setExpanded((current) => !current)}
+      >
+        <span>{title}</span>
+        <span className="asset-sidebar-filter-chevron" aria-hidden="true">
+          <Icon name="chevron" size={14} />
+        </span>
+      </Button>
+      <div
+        id={contentId}
+        className="asset-sidebar-filter-items"
+        role="group"
+        aria-labelledby={headingId}
+        hidden={!expanded}
+      >
+        {renderedItems.map((item) => <AssetSidebarFilterButton key={item.key} item={item} />)}
+      </div>
     </div>
   );
 }

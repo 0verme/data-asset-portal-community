@@ -185,5 +185,5 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
       </div>
     );
   }
-  return <AssetSidebar asset={asset} canEdit={canPermission("asset:write")} />;
+  return <AssetSidebar asset={asset} route={context.route} canEdit={canPermission("asset:write")} />;
 }
