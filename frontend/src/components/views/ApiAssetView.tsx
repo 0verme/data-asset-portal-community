@@ -28,6 +28,7 @@ import {
   StatusBadge,
   ViewModeSwitcher,
 } from "../common/index.ts";
+import { Button, Input, Select, Textarea } from "../../ui/index.ts";
 
 interface NormalizedRelations {
   tables: TableReference[];
@@ -160,7 +161,8 @@ function Rows<T extends RowItem>({
             {items.map((row, index) => (
               <tr key={index}>
                 <td data-label="名称">
-                  <input
+                  <Input
+                    aria-label="名称"
                     className="inp mono"
                     value={row.name}
                     onChange={(event) =>
@@ -170,21 +172,18 @@ function Rows<T extends RowItem>({
                 </td>
                 {kind === "params" ? (
                   <td data-label="位置">
-                    <select
+                    <Select<string>
+                      aria-label="位置"
                       className="sel"
+                      items={["query", "path", "header", "body"].map((value) => ({ label: value, value }))}
                       value={(row as ApiAssetParam).in}
-                      onChange={(event) =>
-                        update(index, { in: event.target.value })
-                      }
-                    >
-                      {["query", "path", "header", "body"].map((value) => (
-                        <option key={value}>{value}</option>
-                      ))}
-                    </select>
+                      onValueChange={(value) => update(index, { in: value || "query" })}
+                    />
                   </td>
                 ) : null}
                 <td data-label="类型">
-                  <input
+                  <Input
+                    aria-label="类型"
                     className="inp"
                     value={row.dataType}
                     onChange={(event) =>
@@ -193,7 +192,8 @@ function Rows<T extends RowItem>({
                   />
                 </td>
                 <td data-label="说明">
-                  <input
+                  <Input
+                    aria-label="说明"
                     className="inp"
                     value={row.description || ""}
                     onChange={(event) =>
@@ -202,24 +202,25 @@ function Rows<T extends RowItem>({
                   />
                 </td>
                 <td data-label="">
-                  <button
+                  <Button
                     className="btn ghost-danger"
+                    variant="danger"
                     type="button"
                     onClick={() =>
                       onChange(items.filter((_, current) => current !== index))
                     }
                   >
                     删除
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <button className="btn" type="button" onClick={add}>
+      <Button className="btn" variant="secondary" type="button" onClick={add}>
         + 添加
-      </button>
+      </Button>
     </div>
   );
 }
@@ -243,12 +244,14 @@ function SystemPicker({ systems, value, onChange }: SystemPickerProps) {
   );
   return (
     <div className="system-picker">
-      <input
+      <Input
+        aria-label="搜索系统名称或简称"
         className="inp"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="搜索系统名称或简称"
       />
+      {/* System <select> intentionally remains native: per-option disabled semantics are not expressible in the frozen DAP Select items API. */}
       <select
         className="sel"
         value={value || ""}
@@ -350,7 +353,8 @@ function Editor({ item, systems, onSave, onCancel, error }: EditorProps) {
           {API_TEXT_FIELDS.map(([key, label]) => (
             <div className="fl" key={key}>
               <label>{label}</label>
-              <input
+              <Input
+                aria-label={label}
                 className={`inp${key === "code" || key === "path" ? " mono" : ""}`}
                 value={form[key]}
                 disabled={Boolean(item) && key === "code"}
@@ -371,15 +375,13 @@ function Editor({ item, systems, onSave, onCancel, error }: EditorProps) {
           </div>
           <div className="fl">
             <label>请求方式</label>
-            <select
+            <Select<string>
+              aria-label="请求方式"
               className="sel"
+              items={["GET", "POST", "PUT", "PATCH", "DELETE"].map((value) => ({ label: value, value }))}
               value={form.method}
-              onChange={(event) => set("method", event.target.value)}
-            >
-              {["GET", "POST", "PUT", "PATCH", "DELETE"].map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
+              onValueChange={(value) => set("method", value || "GET")}
+            />
           </div>
           <div className="fl">
             <label>状态</label>
@@ -401,7 +403,8 @@ function Editor({ item, systems, onSave, onCancel, error }: EditorProps) {
           </div>
           <div className="fl full">
             <label>说明</label>
-            <textarea
+            <Textarea
+              aria-label="说明"
               className="ta"
               value={form.description}
               onChange={(event) => set("description", event.target.value)}
@@ -409,7 +412,8 @@ function Editor({ item, systems, onSave, onCancel, error }: EditorProps) {
           </div>
           <div className="fl full">
             <label>备注</label>
-            <textarea
+            <Textarea
+              aria-label="备注"
               className="ta"
               value={form.remark}
               onChange={(event) => set("remark", event.target.value)}
@@ -439,17 +443,18 @@ function Editor({ item, systems, onSave, onCancel, error }: EditorProps) {
         />
       </div>
       <div className="form-actions">
-        <button className="btn" type="button" onClick={onCancel}>
+        <Button className="btn" variant="secondary" type="button" onClick={onCancel}>
           取消
-        </button>
-        <button
+        </Button>
+        <Button
           className="btn primary"
+          variant="primary"
           type="button"
           onClick={submit}
           disabled={!form.downstreamSystemId}
         >
           保存
-        </button>
+        </Button>
       </div>
     </>
   );
@@ -613,13 +618,14 @@ function ApiList({
         <div className="head-actions">
           <ViewModeSwitcher value={view} onChange={onChangeView} />
           {canEdit ? (
-            <button
+            <Button
               className="btn primary"
+              variant="primary"
               type="button"
               onClick={apiAsset.create}
             >
               新增 API
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -804,13 +810,14 @@ export function ApiAssetView({
           />
         </div>
         {canEdit ? (
-          <button
+          <Button
             className="btn"
+            variant="secondary"
             type="button"
             onClick={() => apiAsset.edit(item.code)}
           >
             编辑
-          </button>
+          </Button>
         ) : null}
       </>
     );
