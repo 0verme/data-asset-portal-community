@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { Select as KumoSelect } from "@cloudflare/kumo/components/select";
 
+import { joinClassNames } from "./classNames.ts";
 import { CONTROL_SIZE_MAP, type ControlSize } from "./variants.ts";
 
 type KumoSelectProps = ComponentProps<typeof KumoSelect>;
@@ -24,7 +25,17 @@ type DapSelectComponent = {
   Separator: typeof KumoSelect.Separator;
 };
 
+// `.sel` belongs to native <select> styling and adds CSS arrow gradients; Kumo renders its own caret.
+function normalizeKumoSelectClassName(className?: string): string {
+  const compatibleClassName = className
+    ?.split(/\s+/)
+    .filter((name) => name && name !== "sel")
+    .join(" ");
+  return joinClassNames("dap-ui-select", compatibleClassName);
+}
+
 function DapSelect<Value = string>({
+  className,
   defaultValue,
   items,
   onValueChange,
@@ -34,6 +45,7 @@ function DapSelect<Value = string>({
 }: SelectProps<Value>) {
   const selectProps = {
     ...props,
+    className: normalizeKumoSelectClassName(className),
     size: CONTROL_SIZE_MAP[size],
     ...(defaultValue !== undefined ? { defaultValue } : {}),
     ...(items !== undefined ? { items } : {}),
