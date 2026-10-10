@@ -77,12 +77,18 @@ async function captureViewport(page: Page, testInfo: TestInfo, auth: AuthMode, w
   await page.screenshot({ path: testInfo.outputPath(`${auth}-list-${width}.png`), fullPage: true });
 }
 
-test("asset sidebar and primary create action remain usable at all required responsive widths", async ({ page }, testInfo) => {
+test("asset sidebar and primary create action remain usable at all required responsive widths", async ({ browser }, testInfo) => {
   test.setTimeout(90_000);
   for (const auth of ["guest", "admin"] as const) {
-    await openAssetList(page, auth);
-    for (const width of VIEWPORTS) {
-      await captureViewport(page, testInfo, auth, width);
+    const context = await browser.newContext();
+    try {
+      const page = await context.newPage();
+      await openAssetList(page, auth);
+      for (const width of VIEWPORTS) {
+        await captureViewport(page, testInfo, auth, width);
+      }
+    } finally {
+      await context.close();
     }
   }
 });

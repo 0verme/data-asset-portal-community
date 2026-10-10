@@ -24,3 +24,10 @@ test("asset facet tooltips retain full layer labels and only expand long domain 
   assert.match(sidebar, /tooltip: layer \? `\$\{layer\.code\} \$\{layer\.cn\}` : undefined/);
   assert.match(sidebar, /tooltip: item\.key\.length > 6 \? item\.key : undefined/);
 });
+
+test("admins keep sidebar create access when the home list cannot show its primary action", async () => {
+  const sidebar = await sidebarSource();
+
+  assert.match(sidebar, /const showCreateInSidebar = canEdit && \(\s*route\.page !== "home" \|\| homeLoading \|\| Boolean\(homeError\)\s*\)/);
+  assert.match(sidebar, /actions=\{\s*showCreateInSidebar\s*\?/);
+});

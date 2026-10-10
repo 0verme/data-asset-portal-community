@@ -27,6 +27,8 @@ export interface AssetSidebarProps {
 export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProps) {
   const {
     domain,
+    homeLoading,
+    homeError,
     setDomain,
     selectedLayer,
     setSelectedLayer,
@@ -76,6 +78,10 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
     tooltip: item.key.length > 6 ? item.key : undefined,
   }));
 
+  const showCreateInSidebar = canEdit && (
+    route.page !== "home" || homeLoading || Boolean(homeError)
+  );
+
   return (
     <>
       <AssetSidebarFilterGroup
@@ -116,7 +122,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
 
       <SidebarActionGroup
         actions={
-          canEdit && route.page !== "home"
+          showCreateInSidebar
             ? [
                 {
                   key: "create-asset",

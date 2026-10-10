@@ -47,18 +47,24 @@ async function captureViewport(page: Page, testInfo: TestInfo, width: number, na
   await page.screenshot({ path: testInfo.outputPath(`${name}-${width}.png`), fullPage: true });
 }
 
-test("guest and read-only users can browse assets but do not get asset-write controls", async ({ page }) => {
-  await openAssetList(page, "guest");
-  await expect(page.locator(".asset-page table.dt tbody tr").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "新增表" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /上一页/ })).toBeDisabled();
-  await page.getByRole("button", { name: /下一页/ }).click();
-  await expect(page.locator(".oplog-pager-info")).toHaveText("第 2 / 12 页");
-  await expect(page.getByRole("button", { name: /上一页/ })).toBeEnabled();
-
-  await openAssetList(page, "readonly");
-  await expect(page.locator(".asset-page table.dt tbody tr").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "新增表" })).toHaveCount(0);
+test("guest and read-only users can browse assets but do not get asset-write controls", async ({ browser }) => {
+  for (const auth of ["guest", "readonly"] as const) {
+    const context = await browser.newContext();
+    try {
+      const page = await context.newPage();
+      await openAssetList(page, auth);
+      await expect(page.locator(".asset-page table.dt tbody tr").first()).toBeVisible();
+      await expect(page.getByRole("button", { name: "新增表" })).toHaveCount(0);
+      if (auth === "guest") {
+        await expect(page.getByRole("button", { name: /上一页/ })).toBeDisabled();
+        await page.getByRole("button", { name: /下一页/ }).click();
+        await expect(page.locator(".oplog-pager-info")).toHaveText("第 2 / 12 页");
+        await expect(page.getByRole("button", { name: /上一页/ })).toBeEnabled();
+      }
+    } finally {
+      await context.close();
+    }
+  }
 });
 
 test("admin retains create controls while list/search uses the existing asset query contract", async ({ page }) => {
