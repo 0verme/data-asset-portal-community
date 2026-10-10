@@ -255,7 +255,6 @@
   .search.has-val .clear { opacity: 1; pointer-events: auto; }
   .search .clear:hover { background: var(--line-strong); }
 
-  .top-user { display: flex; align-items: center; gap: 10px; }
   .avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(16, 185, 129, 0.16); color: var(--accent-soft-color); display: grid; place-items: center; font-weight: 600; font-size: 13px; }
   .authbar { display: inline-flex; align-items: center; gap: 10px; flex: 0 0 auto; flex-wrap: nowrap; white-space: nowrap; }
   .user-chip,
@@ -1749,8 +1748,6 @@
   .root-tbl table.dt tbody tr:last-child { border-bottom: none; }
   .root-tbl table.dt tbody tr:hover { background: var(--surface-2); }
 
-  .cat-badge,
-  .db-badge,
   .time-chip {
     display: inline-flex;
     align-items: center;
@@ -1759,13 +1756,6 @@
     padding: 3px 9px;
     font-size: 12px;
     white-space: nowrap;
-  }
-
-  .cat-badge .dot,
-  .db-badge .dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
   }
 
   .time-chips {
@@ -1815,8 +1805,7 @@
     margin-bottom: 6px;
   }
 
-  .drop-area p,
-  .paste-hint {
+  .drop-area p {
     color: var(--ink-3);
     font-size: 12.5px;
   }
@@ -1862,58 +1851,6 @@
   .imp-chip.upd { color: var(--info); }
   .imp-chip.same { color: var(--ink-2); }
   .imp-chip.err { color: var(--danger); }
-
-  .switch-wrap {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .switch {
-    width: 42px;
-    height: 24px;
-    border: none;
-    border-radius: 999px;
-    background: var(--line-strong);
-    padding: 2px;
-    cursor: pointer;
-    transition: 0.14s;
-    position: relative;
-  }
-
-  .switch:disabled {
-    cursor: wait;
-    opacity: 0.88;
-  }
-
-  .switch.on {
-    background: var(--accent);
-  }
-
-  .switch .knob {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #fff;
-    display: block;
-    transition: 0.14s;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  }
-
-  .switch.on .knob {
-    transform: translateX(18px);
-  }
-
-  .switch-label {
-    font-size: 12.5px;
-    font-weight: 600;
-  }
-
-  .switch-label.on { color: var(--accent-soft-color); }
-  .switch-label.off { color: var(--ink-3); }
-  .switch-wrap.pending .switch-label {
-    color: var(--ink-2);
-  }
 
   .fm-page {
     display: flex;

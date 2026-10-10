@@ -60,10 +60,6 @@
     color: var(--ink-2);
     font-size: 12.5px;
   }
-  .indicator-btn-disabled:disabled {
-    opacity: 0.62;
-    cursor: not-allowed;
-  }
   .indicator-dim-code {
     font-family: var(--mono);
     font-size: 10.5px;
