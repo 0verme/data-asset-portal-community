@@ -5,6 +5,7 @@ import { formatDate, formatDateTime } from "../utils/date.ts";
 import { ActionErrorBanner, CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "./common/index.ts";
 import type { ViewMode } from "./common/ViewModeSwitcher.tsx";
 import { Highlight, Icon, initial } from "./ui.tsx";
+import { Button } from "../ui/index.ts";
 
 const DIMENSION_ORDER = ["prd", "mem", "ord", "str", "inv", "mkt", "ful", "svc"] as const;
 
@@ -139,9 +140,9 @@ export function MetricDetailDrawer({ indicator, open, onClose }: MetricDetailDra
             </div>
             <div className="editor-sub">查看该指标的完整登记信息</div>
           </div>
-          <button className="btn" type="button" onClick={onClose} aria-label="关闭指标详情">
+          <Button className="btn" variant="secondary" type="button" onClick={onClose} aria-label="关闭指标详情">
             <Icon name="close" size={14} />关闭
-          </button>
+          </Button>
         </div>
 
         <div className="indicator-detail-body">
@@ -201,9 +202,9 @@ export function MetricDetailDrawer({ indicator, open, onClose }: MetricDetailDra
         </div>
 
         <div className="indicator-detail-foot">
-          <button className="btn" type="button" onClick={onClose}>
+          <Button className="btn" variant="secondary" type="button" onClick={onClose}>
             <Icon name="close" size={14} />关闭
-          </button>
+          </Button>
         </div>
       </aside>
     </div>
@@ -465,9 +466,9 @@ export function IndicatorPage({
         </div>
         <div className="head-actions">
           <ViewModeSwitcher value={view} onChange={onChangeView} />
-          {canEdit ? <button className="btn primary" type="button" onClick={onNew}>
+          {canEdit ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}>
             <Icon name="plus" size={15} />新增指标
-          </button> : null}
+          </Button> : null}
         </div>
       </div>
 

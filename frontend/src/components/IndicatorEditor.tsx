@@ -13,6 +13,7 @@ import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader } from "./common/index.ts";
 import IndicatorPathCascader, { type IndicatorPathChangeMeta } from "./IndicatorPathCascader.tsx";
 import { Icon } from "./ui.tsx";
+import { Input, Select, Textarea } from "../ui/index.ts";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const AGGREGATION_OPTIONS = ["SUM", "COUNT", "COUNT_DISTINCT", "AVG", "MIN", "MAX", "NONE"] as const;
@@ -288,8 +289,8 @@ export function IndicatorEditor({
     });
   };
 
-  const handleAssetChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const sourceAssetId = normalizeOptionalId(event.target.value);
+  const handleAssetChange = (value: string) => {
+    const sourceAssetId = normalizeOptionalId(value);
     const selectedAsset = assetOptions.find((item) => getAssetOptionId(item) === sourceAssetId);
     setValues({
       sourceAssetId,
@@ -300,8 +301,8 @@ export function IndicatorEditor({
     });
   };
 
-  const handleFieldChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const resultFieldId = normalizeOptionalId(event.target.value);
+  const handleFieldChange = (value: string) => {
+    const resultFieldId = normalizeOptionalId(value);
     const selectedField = fieldOptions.find((item) => getFieldOptionId(item) === resultFieldId);
     setValues({
       resultFieldId,
@@ -360,19 +361,19 @@ export function IndicatorEditor({
         <div className="form-grid">
           <div className="fl">
             <label>指标 ID</label>
-            <input className={`inp mono${touched && !form.id.trim() ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder="例如：CUST00001" />
+            <Input aria-label="指标 ID" className={`inp mono${touched && !form.id.trim() ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder="例如：CUST00001" />
           </div>
           <div className="fl">
             <label>指标中文名</label>
-            <input className={`inp${touched && !form.name.trim() ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：会员复购率" />
+            <Input aria-label="指标中文名" className={`inp${touched && !form.name.trim() ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：会员复购率" />
           </div>
           <div className="fl">
             <label>登记人</label>
-            <input className={`inp${touched && !form.registrar.trim() ? " invalid" : ""}`} value={form.registrar} onChange={(event) => setValue("registrar", event.target.value)} placeholder="例如：何嘉佳" />
+            <Input aria-label="登记人" className={`inp${touched && !form.registrar.trim() ? " invalid" : ""}`} value={form.registrar} onChange={(event) => setValue("registrar", event.target.value)} placeholder="例如：何嘉佳" />
           </div>
           <div className="fl">
             <label>登记日期</label>
-            <input className={`inp mono${touched && !DATE_RE.test(form.registeredAt.trim()) ? " invalid" : ""}`} value={form.registeredAt} onChange={(event) => setValue("registeredAt", event.target.value)} placeholder="例如：2025-06-17" />
+            <Input aria-label="登记日期" className={`inp mono${touched && !DATE_RE.test(form.registeredAt.trim()) ? " invalid" : ""}`} value={form.registeredAt} onChange={(event) => setValue("registeredAt", event.target.value)} placeholder="例如：2025-06-17" />
           </div>
           <div className="fl">
             <label>状态</label>
@@ -386,40 +387,57 @@ export function IndicatorEditor({
         <div className="form-grid">
           <div className="fl full">
             <label>指标含义</label>
-            <textarea className="ta" value={form.meaning} onChange={(event) => setValue("meaning", event.target.value)} placeholder="描述该指标的业务含义、取值逻辑和使用范围。" />
+            <Textarea aria-label="指标含义" className="ta" value={form.meaning} onChange={(event) => setValue("meaning", event.target.value)} placeholder="描述该指标的业务含义、取值逻辑和使用范围。" />
           </div>
           <div className="fl">
             <label>来源资产（稳定引用）</label>
-            <select className="inp" value={form.sourceAssetId || ""} onChange={handleAssetChange} disabled={assetLoading}>
-              <option value="">未绑定稳定资产（保留兼容快照）</option>
-              {form.sourceAssetId && !assetOptions.some((item) => getAssetOptionId(item) === form.sourceAssetId) ? (
-                <option value={form.sourceAssetId}>{form.sourceAssetName || form.resultTableName || "当前来源资产"}</option>
-              ) : null}
-              {assetOptions.map((asset) => {
-                const assetId = getAssetOptionId(asset);
-                return assetId === null ? null : <option key={assetId} value={assetId}>{assetLabel(asset)}</option>;
-              })}
-            </select>
+            <Select<string | number>
+              aria-label="来源资产（稳定引用）"
+              className="inp"
+              disabled={assetLoading}
+              items={[
+                { label: "未绑定稳定资产（保留兼容快照）", value: "" },
+                ...(form.sourceAssetId && !assetOptions.some((item) => getAssetOptionId(item) === form.sourceAssetId)
+                  ? [{ label: form.sourceAssetName || form.resultTableName || "当前来源资产", value: form.sourceAssetId }]
+                  : []),
+                ...assetOptions.flatMap((asset) => {
+                  const assetId = getAssetOptionId(asset);
+                  return assetId === null ? [] : [{ label: assetLabel(asset), value: assetId }];
+                }),
+              ]}
+              value={form.sourceAssetId || ""}
+              placeholder="未绑定稳定资产（保留兼容快照）"
+              onValueChange={(value) => handleAssetChange(value === null ? "" : String(value))}
+            />
             {assetError ? <div className="match-hint" style={{ color: "var(--danger)" }}>{assetError}</div> : null}
             {!assetLoading && !assetError && !assetOptions.length ? <div className="match-hint">当前数据源未提供稳定资产 ID，保留兼容文本录入。</div> : null}
           </div>
           <div className="fl">
             <label>结果字段（稳定引用）</label>
-            <select className="inp" value={form.resultFieldId || ""} onChange={handleFieldChange} disabled={!form.sourceAssetId || fieldLoading}>
-              <option value="">未绑定稳定字段（保留兼容快照）</option>
-              {form.resultFieldId && !fieldOptions.some((item) => getFieldOptionId(item) === form.resultFieldId) ? (
-                <option value={form.resultFieldId}>{form.resultFieldName || "当前结果字段"}</option>
-              ) : null}
-              {fieldOptions.map((field) => {
-                const fieldId = getFieldOptionId(field);
-                return fieldId === null ? null : <option key={fieldId} value={fieldId}>{fieldLabel(field)}</option>;
-              })}
-            </select>
+            <Select<string | number>
+              aria-label="结果字段（稳定引用）"
+              className="inp"
+              disabled={!form.sourceAssetId || fieldLoading}
+              items={[
+                { label: "未绑定稳定字段（保留兼容快照）", value: "" },
+                ...(form.resultFieldId && !fieldOptions.some((item) => getFieldOptionId(item) === form.resultFieldId)
+                  ? [{ label: form.resultFieldName || "当前结果字段", value: form.resultFieldId }]
+                  : []),
+                ...fieldOptions.flatMap((field) => {
+                  const fieldId = getFieldOptionId(field);
+                  return fieldId === null ? [] : [{ label: fieldLabel(field), value: fieldId }];
+                }),
+              ]}
+              value={form.resultFieldId || ""}
+              placeholder="未绑定稳定字段（保留兼容快照）"
+              onValueChange={(value) => handleFieldChange(value === null ? "" : String(value))}
+            />
             {fieldError ? <div className="match-hint" style={{ color: "var(--danger)" }}>{fieldError}</div> : null}
           </div>
           <div className="fl">
             <label>结果表兼容快照</label>
-            <input
+            <Input
+              aria-label="结果表兼容快照"
               className="inp mono"
               value={form.resultTableName}
               readOnly={Boolean(form.sourceAssetId)}
@@ -429,7 +447,8 @@ export function IndicatorEditor({
           </div>
           <div className="fl">
             <label>结果字段兼容快照</label>
-            <input
+            <Input
+              aria-label="结果字段兼容快照"
               className="inp mono"
               value={form.resultFieldName}
               readOnly={Boolean(form.resultFieldId)}
@@ -439,20 +458,15 @@ export function IndicatorEditor({
           </div>
           <div className="fl">
             <label>聚合方式</label>
-            <select className="inp mono" value={form.aggregation} onChange={(event) => setValue("aggregation", event.target.value)}>
-              <option value="">未指定（兼容历史指标）</option>
-              {AGGREGATION_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-            </select>
+            <Select<string> aria-label="聚合方式" className="inp mono" placeholder="未指定（兼容历史指标）" items={[{ label: "未指定（兼容历史指标）", value: "" }, ...AGGREGATION_OPTIONS.map((value) => ({ label: value, value }))]} value={form.aggregation || ""} onValueChange={(value) => setValue("aggregation", value || "")} />
           </div>
           <div className="fl">
             <label>语义生命周期</label>
-            <select className="inp" value={form.semanticState} onChange={(event) => setValue("semanticState", event.target.value)}>
-              {SEMANTIC_STATE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
+            <Select<string> aria-label="语义生命周期" className="inp" items={SEMANTIC_STATE_OPTIONS.map((option) => ({ label: option.label, value: option.value }))} value={form.semanticState || null} onValueChange={(value) => setValue("semanticState", value || form.semanticState)} />
           </div>
           <div className="fl">
             <label>指标口径</label>
-            <input className="inp" value={form.caliber} onChange={(event) => setValue("caliber", event.target.value)} placeholder="例如：一表通口径" />
+            <Input aria-label="指标口径" className="inp" value={form.caliber} onChange={(event) => setValue("caliber", event.target.value)} placeholder="例如：一表通口径" />
           </div>
           <div className="fl">
             <label>指标路径</label>
