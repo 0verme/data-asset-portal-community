@@ -157,6 +157,8 @@ test("upstream views consume the frozen DAP adapters without changing legacy cla
   assert.equal((editorSource.match(/<IconButton/g) ?? []).length, 1);
   assert.match(editorSource, /<IconButton[\s\S]*?className="icon-btn danger"/);
   assert.match(editorSource, /<Button[\s\S]*?className="add-field"/);
+  assert.match(editorSource, /placeholder="请选择数据库类型"/);
+  assert.match(editorSource, /placeholder="请选择业务部门"/);
   assert.doesNotMatch(editorSource, /<input|<select|<textarea/);
   [listSource, detailSource, editorSource].forEach((source) => {
     assert.doesNotMatch(source, /from "@cloudflare\/kumo\//);

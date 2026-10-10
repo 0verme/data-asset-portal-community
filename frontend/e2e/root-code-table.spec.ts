@@ -61,6 +61,7 @@ test("admin code-table filter and form use adapter controls", async ({ page }) =
 
   const filter = page.getByRole("combobox", { name: "状态筛选" });
   await expect(filter).toHaveClass(/code-table-status-filter/);
+  await expect(filter).toHaveText("全部状态");
   await filter.click();
   await page.getByRole("option", { name: "启用" }).click();
   await expect(filter).toHaveText("启用");
@@ -70,6 +71,7 @@ test("admin code-table filter and form use adapter controls", async ({ page }) =
   await expect(codeInput).toHaveClass(/dap-ui-input/);
   const styleSelect = page.getByRole("combobox", { name: "表样式" });
   await expect(styleSelect).toHaveClass(/inp/);
+  await expect(styleSelect).toHaveText("请选择表样式");
   const remark = page.getByLabel("说明");
   await expect(remark).toHaveClass(/dap-ui-textarea/);
   await expect(remark).toHaveClass(/ta/);
