@@ -48,6 +48,7 @@ from ..db.facade import (
 )
 from ..db.service import CoreAccess
 from ..db.tables import data_source, mapping_field, mapping_table, upstream_system
+from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
 from ..settings import get_int_env, get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
 from .operation_log_service import (
@@ -193,9 +194,11 @@ class FieldMappingService(AuditActorMixin):
     def _append_like(clauses, column, value):
         text = str(value or "").strip().lower()
         if text:
-            escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            escaped = escape_like_keyword(text)
             clauses.append(
-                func.lower(func.coalesce(column, "")).like(f"%{escaped}%", escape="\\")
+                func.lower(func.coalesce(column, "")).like(
+                    f"%{escaped}%", escape=LIKE_ESCAPE_CHAR
+                )
             )
 
     def _build_where(self, params=None):
@@ -257,17 +260,17 @@ class FieldMappingService(AuditActorMixin):
         )
 
         empty_comment = str(params.get("emptyComment") or "").strip()
-        comment = func.trim(func.coalesce(mapping_field.c.source_field_comment, ""))
+        comment_length = func.coalesce(
+            func.length(func.trim(mapping_field.c.source_field_comment)), 0
+        )
         if empty_comment == "yes":
-            clauses.append(comment == "")
+            clauses.append(comment_length == 0)
         elif empty_comment == "no":
-            clauses.append(comment != "")
+            clauses.append(comment_length > 0)
 
         keyword = str(params.get("keyword") or "").strip().lower()
         if keyword:
-            escaped = (
-                keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            )
+            escaped = escape_like_keyword(keyword)
             pattern = f"%{escaped}%"
             searchable = (
                 upstream_system.c.system_name,
@@ -287,7 +290,9 @@ class FieldMappingService(AuditActorMixin):
             clauses.append(
                 or_(
                     *(
-                        func.lower(func.coalesce(column, "")).like(pattern, escape="\\")
+                        func.lower(func.coalesce(column, "")).like(
+                            pattern, escape=LIKE_ESCAPE_CHAR
+                        )
                         for column in searchable
                     )
                 )
@@ -1087,7 +1092,7 @@ class FieldMappingService(AuditActorMixin):
     @staticmethod
     def _null_last_text_order_terms(column, direction="ASC"):
         normalized_direction = "DESC" if str(direction).upper() == "DESC" else "ASC"
-        empty = or_(column.is_(None), func.trim(column) == "")
+        empty = func.coalesce(func.length(func.trim(column)), 0) == 0
         value = column.desc() if normalized_direction == "DESC" else column.asc()
         return [case((empty, 1), else_=0).asc(), value]
 
@@ -1240,10 +1245,11 @@ class FieldMappingService(AuditActorMixin):
                     distinct(
                         case(
                             (
-                                func.trim(
-                                    func.coalesce(mapping_field.c.target_field_name, "")
+                                func.coalesce(
+                                    func.length(func.trim(mapping_field.c.target_field_name)),
+                                    0,
                                 )
-                                != "",
+                                > 0,
                                 mapping_field.c.field_pk,
                             ),
                             else_=None,
@@ -1254,12 +1260,13 @@ class FieldMappingService(AuditActorMixin):
                     distinct(
                         case(
                             (
-                                func.trim(
-                                    func.coalesce(
-                                        mapping_field.c.source_field_comment, ""
-                                    )
+                                func.coalesce(
+                                    func.length(
+                                        func.trim(mapping_field.c.source_field_comment)
+                                    ),
+                                    0,
                                 )
-                                == "",
+                                == 0,
                                 mapping_field.c.field_pk,
                             ),
                             else_=None,
@@ -1410,10 +1417,11 @@ class FieldMappingService(AuditActorMixin):
                 func.sum(
                     case(
                         (
-                            func.trim(
-                                func.coalesce(mapping_field.c.target_field_name, "")
+                            func.coalesce(
+                                func.length(func.trim(mapping_field.c.target_field_name)),
+                                0,
                             )
-                            != "",
+                            > 0,
                             1,
                         ),
                         else_=0,
@@ -1422,10 +1430,13 @@ class FieldMappingService(AuditActorMixin):
                 func.sum(
                     case(
                         (
-                            func.trim(
-                                func.coalesce(mapping_field.c.source_field_comment, "")
+                            func.coalesce(
+                                func.length(
+                                    func.trim(mapping_field.c.source_field_comment)
+                                ),
+                                0,
                             )
-                            == "",
+                            == 0,
                             1,
                         ),
                         else_=0,

@@ -313,6 +313,101 @@ class FieldMappingSortingTests(unittest.TestCase):
                     all(not item["srcComment"].strip() for item in items[3:])
                 )
 
+    def test_null_empty_and_whitespace_values_keep_mapping_stats_and_filters_correct(self):
+        self._insert_extra_mapping(
+            source_id=20,
+            system_id=120,
+            table_pk=220,
+            system_name="Boundary System",
+            system_abbr="BOUNDARY",
+            source_table="boundary_table",
+            target_table="boundary_target",
+            fields=[
+                {
+                    "field_pk": 401,
+                    "source_field": "null_comment",
+                    "source_type": "text",
+                    "source_comment": None,
+                    "target_field": None,
+                    "mapping_rule": "direct",
+                    "field_order": 1,
+                },
+                {
+                    "field_pk": 402,
+                    "source_field": "empty_comment",
+                    "source_type": "text",
+                    "source_comment": "",
+                    "target_field": "",
+                    "mapping_rule": "direct",
+                    "field_order": 2,
+                },
+                {
+                    "field_pk": 403,
+                    "source_field": "space_comment",
+                    "source_type": "text",
+                    "source_comment": "   ",
+                    "target_field": "   ",
+                    "mapping_rule": "direct",
+                    "field_order": 3,
+                },
+                {
+                    "field_pk": 404,
+                    "source_field": "normal_comment",
+                    "source_type": "text",
+                    "source_comment": "ordinary comment",
+                    "target_field": "mapped_target",
+                    "mapping_rule": "direct",
+                    "field_order": 4,
+                },
+            ],
+        )
+
+        params = {"sourceSystemId": "120"}
+        stats_empty = self.service.get_stats({**params, "emptyComment": "yes"})
+        self.assertEqual(3, stats_empty["fieldCount"])
+        self.assertEqual(0, stats_empty["mappedFieldCount"])
+        self.assertEqual(3, stats_empty["emptyCommentCount"])
+        self.assertEqual(0, stats_empty["coverage"])
+
+        stats_nonempty = self.service.get_stats({**params, "emptyComment": "no"})
+        self.assertEqual(1, stats_nonempty["fieldCount"])
+        self.assertEqual(1, stats_nonempty["mappedFieldCount"])
+        self.assertEqual(0, stats_nonempty["emptyCommentCount"])
+        self.assertEqual(100, stats_nonempty["coverage"])
+
+        table_summary = self.service._get_table_mappings(params)["items"][0]
+        self.assertEqual(4, table_summary["fieldCount"])
+        self.assertEqual(1, table_summary["mappedCount"])
+        self.assertEqual(3, table_summary["emptyCommentCount"])
+        self.assertEqual(75, table_summary["emptyCommentRate"])
+
+        empty_page_one_response = self.client.get(
+            "/api/field-mappings/fields",
+            params={**params, "emptyComment": "yes", "page": 1, "pageSize": 2},
+        )
+        empty_page_two_response = self.client.get(
+            "/api/field-mappings/fields",
+            params={**params, "emptyComment": "yes", "page": 2, "pageSize": 2},
+        )
+        self.assertEqual(200, empty_page_one_response.status_code)
+        self.assertEqual(200, empty_page_two_response.status_code)
+        empty_page_one = empty_page_one_response.json()
+        empty_page_two = empty_page_two_response.json()
+        self.assertEqual(3, empty_page_one["total"])
+        self.assertEqual(2, len(empty_page_one["items"]))
+        self.assertEqual(1, len(empty_page_two["items"]))
+        empty_items = empty_page_one["items"] + empty_page_two["items"]
+        self.assertTrue(all(not item["srcComment"].strip() for item in empty_items))
+        nonempty = self.client.get(
+            "/api/field-mappings/fields",
+            params={**params, "emptyComment": "no"},
+        )
+        self.assertEqual(200, nonempty.status_code, nonempty.text)
+        self.assertEqual(
+            ["normal_comment"],
+            [item["srcField"] for item in nonempty.json()["items"]],
+        )
+
     def test_equal_sort_values_have_stable_default_ties_across_pages(self):
         self._insert_extra_mapping(
             source_id=10,

@@ -35,6 +35,7 @@ from ..db.facade import (
 )
 from ..db.service import CoreAccess
 from ..db.tables import operation_log
+from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
 from ..settings import get_page_size_limits
 
 logger = logging.getLogger(__name__)
@@ -142,7 +143,7 @@ class OperationLogService:
         start_time = str(filters.get("startTime") or "").strip()
         end_time = str(filters.get("endTime") or "").strip()
         if keyword:
-            escaped = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            escaped = escape_like_keyword(keyword)
             pattern = f"%{escaped}%"
             searchable = (
                 operation_log.c.user_name,
@@ -153,7 +154,9 @@ class OperationLogService:
             clauses.append(
                 or_(
                     *(
-                        func.lower(func.coalesce(column, "")).like(pattern, escape="\\")
+                        func.lower(func.coalesce(column, "")).like(
+                            pattern, escape=LIKE_ESCAPE_CHAR
+                        )
                         for column in searchable
                     )
                 )

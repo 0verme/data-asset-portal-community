@@ -17,6 +17,7 @@ from ..db.tables import (
     api_response_field,
     system_table,
 )
+from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
     OPERATION_TYPE_DELETE,
@@ -383,8 +384,7 @@ class ApiAssetService(AuditActorMixin):
         if downstream_system_id:
             clauses.append(api_asset.c.system_id == downstream_system_id)
         if keyword:
-            escaped = str(keyword).strip().lower().replace("\\", "\\\\")
-            escaped = escaped.replace("%", "\\%").replace("_", "\\_")
+            escaped = escape_like_keyword(str(keyword).strip().lower())
             pattern = f"%{escaped}%"
             searchable = (
                 api_asset.c.api_code,
@@ -399,7 +399,9 @@ class ApiAssetService(AuditActorMixin):
             clauses.append(
                 or_(
                     *(
-                        func.lower(func.coalesce(column, "")).like(pattern, escape="\\")
+                        func.lower(func.coalesce(column, "")).like(
+                            pattern, escape=LIKE_ESCAPE_CHAR
+                        )
                         for column in searchable
                     )
                 )
@@ -423,12 +425,16 @@ class ApiAssetService(AuditActorMixin):
         clauses = [system_table.c.is_deleted == "N"]
         query = str(keyword or "").strip().lower()
         if query:
-            escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            escaped = escape_like_keyword(query)
             pattern = f"%{escaped}%"
             clauses.append(
                 or_(
-                    func.lower(system_table.c.system_name).like(pattern, escape="\\"),
-                    func.lower(system_table.c.system_abbr).like(pattern, escape="\\"),
+                    func.lower(system_table.c.system_name).like(
+                        pattern, escape=LIKE_ESCAPE_CHAR
+                    ),
+                    func.lower(system_table.c.system_abbr).like(
+                        pattern, escape=LIKE_ESCAPE_CHAR
+                    ),
                 )
             )
         statement = (

@@ -29,6 +29,7 @@ from ..application import AuditActorMixin, actor_aware
 
 from ..db.service import CoreAccess
 from ..db.tables import asset_domain, asset_table, indicator_item, report_asset
+from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
@@ -399,7 +400,7 @@ class ReportService(AuditActorMixin):
             clauses.append(report_asset.c.owner_dept_name == owner_dept)
         if keyword:
             query = str(keyword).strip().lower()
-            escaped_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            escaped_query = escape_like_keyword(query)
             pattern = f"%{escaped_query}%"
             searchable = (
                 report_asset.c.report_code,
@@ -411,7 +412,9 @@ class ReportService(AuditActorMixin):
                 report_asset.c.purpose_desc,
             )
             clauses.append(or_(*(
-                func.lower(func.coalesce(column, "")).like(pattern, escape="\\")
+                func.lower(func.coalesce(column, "")).like(
+                    pattern, escape=LIKE_ESCAPE_CHAR
+                )
                 for column in searchable
             )))
         return clauses

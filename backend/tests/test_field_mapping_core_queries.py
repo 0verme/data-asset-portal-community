@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock
 
+from sqlalchemy import select
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
 from backend.app.services.field_mapping_service import FieldMappingService
@@ -47,7 +48,12 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
         }
 
     def _assert_portable(self, statement):
-        for dialect in (sqlite.dialect(), postgresql.dialect(), mysql.dialect()):
+        for dialect in (
+            sqlite.dialect(),
+            postgresql.dialect(),
+            mysql.dialect(),
+            postgresql.dialect(paramstyle="qmark"),
+        ):
             with self.subTest(dialect=dialect.name):
                 compiled = statement.compile(dialect=dialect)
                 self.assertIn("p_field_mapping", str(compiled))
@@ -97,6 +103,10 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
         stats_statement = self.service._db.fetch_rows.call_args.args[0]
         self._assert_portable(stats_statement)
         self.assertEqual(stats["coverage"], 50)
+        self.assertIn(
+            "coalesce(length(trim(",
+            str(stats_statement.compile(dialect=sqlite.dialect())).lower(),
+        )
 
         self.service._stats_cache.clear()
         self.service._db.fetch_rows = MagicMock(side_effect=[[{"total": 1}], [self.table_row]])
@@ -106,6 +116,30 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
             self._assert_portable(statement)
         self.assertEqual(result["items"][0]["fieldCount"], 2)
         self.assertEqual(result["items"][0]["tablePk"], 301)
+        self.assertIn(
+            "coalesce(length(trim(",
+            str(statements[1].compile(dialect=sqlite.dialect())).lower(),
+        )
+
+    def test_empty_comment_filters_use_null_safe_numeric_comparisons(self):
+        for empty_comment in ("yes", "no"):
+            statement = select(1).where(
+                *self.service._build_where({"emptyComment": empty_comment})
+            )
+            for dialect in (
+                sqlite.dialect(),
+                postgresql.dialect(),
+                mysql.dialect(),
+                postgresql.dialect(paramstyle="qmark"),
+            ):
+                compiled = statement.compile(dialect=dialect)
+                sql = str(compiled).lower()
+                with self.subTest(empty_comment=empty_comment, dialect=dialect.name):
+                    self.assertIn("coalesce(length(trim(", sql)
+                    self.assertNotIn("= ''", sql)
+                    self.assertNotIn("!= ''", sql)
+                    self.assertNotIn("<>", sql)
+                    self.assertIn(0, compiled.params.values())
 
 
 if __name__ == "__main__":

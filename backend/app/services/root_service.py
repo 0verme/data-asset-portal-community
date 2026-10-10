@@ -25,6 +25,7 @@ from sqlalchemy import and_, func, insert, or_, select, update
 from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
 from ..db.tables import root_category, root_change_log, root_item
+from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
     OPERATION_TYPE_DELETE,
@@ -124,8 +125,7 @@ class RootService(AuditActorMixin):
         if cat:
             clauses.append(root_item.c.category_name == str(cat).strip())
         if keyword:
-            escaped = str(keyword).strip().lower().replace("\\", "\\\\")
-            escaped = escaped.replace("%", "\\%").replace("_", "\\_")
+            escaped = escape_like_keyword(str(keyword).strip().lower())
             pattern = f"%{escaped}%"
             searchable = (
                 root_item.c.root_abbr,
@@ -136,7 +136,9 @@ class RootService(AuditActorMixin):
             clauses.append(
                 or_(
                     *(
-                        func.lower(func.coalesce(column, "")).like(pattern, escape="\\")
+                        func.lower(func.coalesce(column, "")).like(
+                            pattern, escape=LIKE_ESCAPE_CHAR
+                        )
                         for column in searchable
                     )
                 )

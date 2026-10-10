@@ -25,6 +25,7 @@ from sqlalchemy import and_, func, insert, or_, select, update
 from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
 from ..db.tables import asset_field, asset_table, indicator_change_log, indicator_item
+from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
@@ -295,7 +296,7 @@ class IndicatorService(AuditActorMixin):
             clauses.append(indicator_item.c.status_code == status)
         if keyword:
             query = str(keyword).strip().lower()
-            escaped_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            escaped_query = escape_like_keyword(query)
             pattern = f"%{escaped_query}%"
             searchable = (
                 indicator_item.c.indicator_id,
@@ -308,7 +309,9 @@ class IndicatorService(AuditActorMixin):
                 indicator_item.c.registrar_name,
             )
             clauses.append(or_(*(
-                func.lower(func.coalesce(column, "")).like(pattern, escape="\\")
+                func.lower(func.coalesce(column, "")).like(
+                    pattern, escape=LIKE_ESCAPE_CHAR
+                )
                 for column in searchable
             )))
         return clauses

@@ -13,6 +13,7 @@ from sqlalchemy import delete, func, insert, or_, select, update
 from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
 from ..db.tables import manual_code_table
+from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
     OPERATION_TYPE_DELETE,
@@ -171,8 +172,7 @@ class ManualCodeTableService(AuditActorMixin):
         if status:
             clauses.append(manual_code_table.c.status_code == status)
         if keyword:
-            escaped = str(keyword).strip().lower().replace("\\", "\\\\")
-            escaped = escaped.replace("%", "\\%").replace("_", "\\_")
+            escaped = escape_like_keyword(str(keyword).strip().lower())
             pattern = f"%{escaped}%"
             searchable = (
                 manual_code_table.c.table_code,
@@ -184,7 +184,7 @@ class ManualCodeTableService(AuditActorMixin):
                 or_(
                     *(
                         func.lower(func.coalesce(column, "")).like(
-                            pattern, escape="\\"
+                            pattern, escape=LIKE_ESCAPE_CHAR
                         )
                         for column in searchable
                     )
