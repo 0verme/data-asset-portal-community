@@ -40,6 +40,32 @@ async function chooseOption(page: Page, control: Locator, label: string) {
   }
   await control.click();
   await page.getByRole("option", { name: label, exact: true }).click();
+  await page.keyboard.press("Escape");
+}
+
+async function expectSingleKumoSelectCaret(select: Locator) {
+  await expect(select).toHaveClass(/dap-ui-select/);
+  await expect(select).not.toHaveClass(/\bsel\b/);
+  const arrow = await select.evaluate((element) => {
+    const visibleSvgs = Array.from(element.querySelectorAll("svg")).filter((svg) => {
+      const rect = svg.getBoundingClientRect();
+      const style = getComputedStyle(svg);
+      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden";
+    });
+    const caretRect = visibleSvgs[0]?.getBoundingClientRect();
+    return {
+      backgroundImage: getComputedStyle(element).backgroundImage,
+      paddingRight: getComputedStyle(element).paddingRight,
+      visibleSvgCount: visibleSvgs.length,
+      caretWidth: caretRect?.width ?? 0,
+      caretHeight: caretRect?.height ?? 0,
+    };
+  });
+  expect(arrow.backgroundImage).toBe("none");
+  expect(arrow.paddingRight).not.toBe("36px");
+  expect(arrow.visibleSvgCount).toBe(1);
+  expect(arrow.caretWidth).toBeGreaterThan(0);
+  expect(arrow.caretHeight).toBeGreaterThan(0);
 }
 
 async function closeMobileSidebar(page: Page) {
@@ -154,10 +180,14 @@ test("asset detail tabs preserve URL state across reload and browser history", a
   await expect(page).toHaveURL(/[?&]tab=ddl(?:&|$)/);
 });
 
-test("admin can edit details and choose to keep or discard dirty changes", async ({ page }) => {
+test("admin can edit details and choose to keep or discard dirty changes", async ({ page }, testInfo: TestInfo) => {
   await openAssetDetail(page, "admin");
   await page.getByRole("button", { name: "编辑表" }).click();
   await expect(page.getByRole("heading", { name: "编辑数据表" })).toBeVisible();
+
+  const tableSelects = [page.getByRole("combobox", { name: "主题域" }), page.getByRole("combobox", { name: "数据层级" })];
+  for (const select of tableSelects) await expectSingleKumoSelectCaret(select);
+  await page.screenshot({ path: testInfo.outputPath("table-editor-select-arrows.png"), fullPage: true });
 
   const tableName = page.getByLabel("表名（英文）");
   await tableName.fill("dwm_pr6_unsaved_359");
@@ -247,8 +277,12 @@ test("admin can create, validate, edit fields, and delete an asset with keyword 
 
     const domainField = page.locator(".form-grid .fl").filter({ hasText: "主题域" });
     const domainControl = domainField.getByRole("combobox");
+    const layerControl = page.getByRole("combobox", { name: "数据层级" });
+    await expect(domainControl).toHaveText("请选择主题域");
+    await expect(layerControl).toHaveText("DWM");
     await chooseOption(page, domainControl, "交易");
     await chooseOption(page, domainControl, "请选择主题域");
+    await expect(domainControl).toHaveText("请选择主题域");
     await save.click();
     await expect(page.locator(".err-banner")).toContainText("请选择主题域。");
     await chooseOption(page, domainControl, "交易");
@@ -318,6 +352,8 @@ test("admin can create, validate, edit fields, and delete an asset with keyword 
       for (const width of [960, 768, 480, 390]) {
         await page.setViewportSize({ width, height: 844 });
         if (width <= 768) await closeMobileSidebar(page);
+        await expectSingleKumoSelectCaret(domainControl);
+        await expectSingleKumoSelectCaret(layerControl);
         const metrics = await page.evaluate(() => ({
           viewport: window.innerWidth,
           document: document.documentElement.scrollWidth,

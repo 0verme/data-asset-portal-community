@@ -1256,6 +1256,11 @@
     transition: border-color 0.15s, box-shadow 0.15s;
   }
 
+  .dap-ui-select {
+    width: 100%;
+    min-width: 0;
+  }
+
   .inp,
   .sel {
     height: 38px;
@@ -2739,6 +2744,7 @@
     .mobile-edit-table tbody td[data-label=""]::before { display: none; }
     .mobile-edit-table .inp,
     .mobile-edit-table .sel,
+    .mobile-edit-table .dap-ui-select,
     .mobile-edit-table .cell-inp,
     .mobile-edit-table .btn {
       width: 100%;
