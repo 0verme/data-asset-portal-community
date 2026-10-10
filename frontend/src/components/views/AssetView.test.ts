@@ -34,7 +34,7 @@ test("asset detail and editor compose controls only from DAP adapters", async ()
     read("./AssetView.tsx"),
   ]);
 
-  assert.match(detail, /import \{ Button, Input, Tabs \} from "\.\.\/ui\/index\.ts"/);
+  assert.match(detail, /import \{ Badge, Button, Input, Tabs \} from "\.\.\/ui\/index\.ts"/);
   assert.match(detail, /<Tabs[\s\S]*?value=\{tab\}[\s\S]*?onValueChange=\{onTabChange\}/);
   assert.match(detail, /<Input[\s\S]*?aria-label="在当前表内筛选字段"/);
   assert.doesNotMatch(detail, /<(?:button|input|select|textarea)\b/);

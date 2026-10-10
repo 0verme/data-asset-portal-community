@@ -16,7 +16,7 @@ import React, { type ReactNode } from "react";
 
 import type { AssetTableField, AssetTableItem } from "../api/assets.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
-import { Button, Input, Tabs } from "../ui/index.ts";
+import { Badge, Button, Input, Tabs } from "../ui/index.ts";
 import { AssetRisksPanel } from "./AssetRisksPanel.tsx";
 import { MetaItem, PageHeader } from "./common/index.ts";
 import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.tsx";
@@ -307,17 +307,39 @@ export function DetailPage({
 
       <Tabs
         aria-label="数据表详情内容"
-        appearance="line"
+        appearance="segmented"
         className="asset-detail-tabs"
-        size="sm"
+        size="md"
         value={tab}
         onValueChange={onTabChange}
         tabs={[
-          { value: "fields", label: `字段信息 (${fields.length})` },
-          { value: "ddl", label: "建表语句" },
+          {
+            value: "fields",
+            label: (
+              <span className="asset-detail-tab-label">
+                <Icon name="table" size={14} />
+                <span>字段信息</span>
+                <Badge
+                  className={`asset-detail-tab-count${tab === "fields" ? " is-active" : ""}`}
+                  tone={tab === "fields" ? "brand" : "neutral"}
+                >
+                  {fields.length}
+                </Badge>
+              </span>
+            ),
+          },
+          {
+            value: "ddl",
+            label: (
+              <span className="asset-detail-tab-label">
+                <Icon name="code" size={14} />
+                <span>建表语句</span>
+              </span>
+            ),
+          },
         ]}
       />
-      <div className="panel">
+      <div className="panel asset-detail-panel">
         {tab === "fields" ? <FieldsView fields={fields} /> : <DDLView asset={asset} ddl={ddl} ddlDialectLabel={ddlDialectLabel} />}
       </div>
     </div>

@@ -79,6 +79,9 @@ test("guest and read-only users can inspect fields and DDL but cannot edit asset
     const fieldTab = page.getByRole("tab", { name: /字段信息/ });
     const ddlTab = page.getByRole("tab", { name: "建表语句" });
     await expect(fieldTab).toHaveAttribute("aria-selected", "true");
+    await expect(fieldTab.locator("svg")).toHaveCount(1);
+    await expect(fieldTab.locator(".asset-detail-tab-count")).toHaveText("11");
+    await expect(ddlTab.locator("svg")).toHaveCount(1);
     if (auth === "guest") {
       await page.locator(".main-inner").evaluate((element) => element.scrollTo(0, 0));
       await page.screenshot({ path: testInfo.outputPath("asset-detail-fields-1280.png"), fullPage: true });
@@ -117,6 +120,38 @@ test("guest and read-only users can inspect fields and DDL but cannot edit asset
   expect(widths.fieldsOverflow).toBe("auto");
   expect(widths.fieldsScroll).toBeGreaterThanOrEqual(widths.fieldsClient);
   await page.screenshot({ path: testInfo.outputPath("asset-detail-fields-390.png"), fullPage: true });
+  const tabs = page.locator(".asset-detail-tabs");
+  await tabs.scrollIntoViewIfNeeded();
+  await tabs.screenshot({ path: testInfo.outputPath("asset-detail-tabs-390.png") });
+});
+
+test("asset detail tabs preserve URL state across reload and browser history", async ({ page }) => {
+  await setMockAuth(page, "guest");
+  await page.goto(`${ASSET_PATH}?layout=list`);
+  const assetRow = page.locator(".asset-page table.dt tbody tr").filter({ hasText: EXISTING_ASSET });
+  await expect(assetRow).toBeVisible({ timeout: 20_000 });
+  await assetRow.click();
+  await expect(page.locator(".dh-en")).toHaveText(EXISTING_ASSET);
+
+  const fieldTab = page.getByRole("tab", { name: /字段信息/ });
+  const ddlTab = page.getByRole("tab", { name: "建表语句" });
+  await fieldTab.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(ddlTab).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(ddlTab).toHaveAttribute("aria-selected", "true");
+  await expect(page).toHaveURL(/[?&]tab=ddl(?:&|$)/);
+
+  await page.reload();
+  await expect(page.getByRole("tab", { name: "建表语句" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".ddl")).toBeVisible();
+
+  await page.goBack();
+  await expect(page.locator(".asset-page table.dt tbody tr").filter({ hasText: EXISTING_ASSET })).toBeVisible();
+  await expect(page).not.toHaveURL(/tab=ddl/);
+  await page.goForward();
+  await expect(page.getByRole("tab", { name: "建表语句" })).toHaveAttribute("aria-selected", "true");
+  await expect(page).toHaveURL(/[?&]tab=ddl(?:&|$)/);
 });
 
 test("admin can edit details and choose to keep or discard dirty changes", async ({ page }) => {
@@ -158,6 +193,10 @@ test("admin detail stays usable across light/dark and desktop-to-phone viewports
       await page.getByRole("button", { name: currentMode === "dark" ? "切换到浅色主题" : "切换到深色主题" }).click();
     }
     await expect(mode).toHaveAttribute("data-mode", theme);
+    await expect(page.getByRole("tab", { name: /字段信息/ })).toHaveCSS(
+      "color",
+      theme === "light" ? "rgb(15, 159, 120)" : "rgb(16, 185, 129)",
+    );
 
     for (const width of [960, 768, 480, 390]) {
       await page.setViewportSize({ width, height: 844 });
