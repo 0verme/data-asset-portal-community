@@ -80,3 +80,51 @@ test("admin operation log filters, pager and detail use adapters", async ({ page
     await expect(detail).toHaveCount(0);
   }
 });
+
+test("menu sort IconButtons keep visible icons and preserve reorder boundaries", async ({ page }, testInfo) => {
+  await setMockAuth(page, "admin");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/system-management/menus");
+
+  const rows = page.locator("table.menu-mobile-table tbody tr");
+  await expect(rows.first()).toBeVisible({ timeout: 20_000 });
+  const firstRow = rows.first();
+  const lastRow = rows.last();
+  const firstUp = firstRow.getByRole("button", { name: "上移" });
+  const firstDown = firstRow.getByRole("button", { name: "下移" });
+  await expect(firstUp).toBeDisabled();
+  await expect(firstDown).toBeEnabled();
+  await expect(lastRow.getByRole("button", { name: "下移" })).toBeDisabled();
+
+  for (const button of [firstUp, firstDown]) {
+    await expect(button).toHaveClass(/dap-ui-icon-button/);
+    await expect(button).not.toHaveClass(/\bbtn\b/);
+    const svg = button.locator("svg");
+    await expect(svg).toBeVisible();
+    const bounds = await svg.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return { width: box.width, height: box.height };
+    });
+    expect(bounds.width).toBeGreaterThan(0);
+    expect(bounds.height).toBeGreaterThan(0);
+  }
+
+  await page.screenshot({ path: testInfo.outputPath("menu-sort-icons-desktop-after.png"), fullPage: true });
+  const firstCode = await firstRow.locator('td[data-label="编码"]').innerText();
+  await firstDown.click();
+  await expect.poll(async () => rows.first().locator('td[data-label="编码"]').innerText()).not.toBe(firstCode);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(rows.first()).toBeVisible();
+  const mobileUp = rows.first().getByRole("button", { name: "上移" });
+  const mobileDown = rows.first().getByRole("button", { name: "下移" });
+  await expect(mobileUp).toBeDisabled();
+  await expect(mobileDown).toBeEnabled();
+  const mobileIconBounds = await mobileDown.locator("svg").evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return { width: box.width, height: box.height };
+  });
+  expect(mobileIconBounds.width).toBeGreaterThan(0);
+  expect(mobileIconBounds.height).toBeGreaterThan(0);
+  await page.screenshot({ path: testInfo.outputPath("menu-sort-icons-mobile-after.png"), fullPage: true });
+});

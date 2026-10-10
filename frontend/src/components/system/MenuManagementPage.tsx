@@ -93,7 +93,6 @@ export function MenuManagementPage({
                       <span className="mono">{item.order}</span>
                       <IconButton
                         aria-label="上移"
-                        className="btn"
                         disabled={!!query || index === 0}
                         icon={<Icon name="up" size={14} />}
                         onClick={() => onMove(item, "up")}
@@ -103,7 +102,6 @@ export function MenuManagementPage({
                       />
                       <IconButton
                         aria-label="下移"
-                        className="btn"
                         disabled={!!query || index === filteredMenus.length - 1}
                         icon={<Icon name="down" size={14} />}
                         onClick={() => onMove(item, "down")}
