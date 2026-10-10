@@ -18,6 +18,7 @@ import type { MockOperationLogItem } from "../../data/operationLogs.ts";
 import { formatDateTime } from "../../utils/date.ts";
 import { ActionErrorBanner, StatusBadge } from "../common/index.ts";
 import { Icon } from "../ui.tsx";
+import { Button } from "../../ui/index.ts";
 import { formatCost } from "./OperationLogTable.tsx";
 
 interface RowProps {
@@ -84,10 +85,10 @@ export function OperationLogDetail({
             {log ? <div className="editor-sub">日志编号 #{log.id}</div> : null}
           </div>
           <div className="editor-actions">
-            <button className="btn" type="button" onClick={onClose}>
+            <Button className="btn" variant="secondary" type="button" onClick={onClose}>
               <Icon name="close" size={14} />
               关闭
-            </button>
+            </Button>
           </div>
         </div>
 

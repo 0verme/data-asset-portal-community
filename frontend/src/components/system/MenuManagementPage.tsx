@@ -15,6 +15,7 @@
 import type { MenuItem } from "../../data/menus.ts";
 import { EmptyState, RowActions, StatusBadge } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
+import { Button, IconButton } from "../../ui/index.ts";
 import { MENU_STATUS_META } from "./constants.ts";
 
 export interface MenuManagementPageProps {
@@ -55,9 +56,9 @@ export function MenuManagementPage({
           </div>
         </div>
         <div className="head-actions">
-          <button className="btn primary" type="button" onClick={onNew}>
+          <Button className="btn primary" variant="primary" type="button" onClick={onNew}>
             <Icon name="plus" size={15} />新增菜单
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -90,24 +91,26 @@ export function MenuManagementPage({
                   <td data-label="排序">
                     <div className="system-cell-inline">
                       <span className="mono">{item.order}</span>
-                      <button
+                      <IconButton
+                        aria-label="上移"
                         className="btn"
-                        type="button"
                         disabled={!!query || index === 0}
-                        title="上移"
+                        icon={<Icon name="up" size={14} />}
                         onClick={() => onMove(item, "up")}
-                      >
-                        <Icon name="up" size={14} />
-                      </button>
-                      <button
-                        className="btn"
+                        size="sm"
                         type="button"
+                        variant="secondary"
+                      />
+                      <IconButton
+                        aria-label="下移"
+                        className="btn"
                         disabled={!!query || index === filteredMenus.length - 1}
-                        title="下移"
+                        icon={<Icon name="down" size={14} />}
                         onClick={() => onMove(item, "down")}
-                      >
-                        <Icon name="down" size={14} />
-                      </button>
+                        size="sm"
+                        type="button"
+                        variant="secondary"
+                      />
                     </div>
                   </td>
                   <td data-label="">

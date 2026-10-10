@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ChangeEvent } from "react";
-
 import {
   OPERATION_MODULES,
   OPERATION_RESULTS,
@@ -21,6 +19,7 @@ import {
 } from "../../data/operationLogs.ts";
 import type { OperationLogFilter as OperationLogFilterState } from "./operationLogQuery.ts";
 import { Icon } from "../ui.tsx";
+import { Button, Input, Select } from "../../ui/index.ts";
 
 /**
  * 操作日志查询筛选组件。
@@ -61,10 +60,6 @@ export function OperationLogFilter({
       filter.endTime,
   );
 
-  const handleChange = (
-    event: ChangeEvent<HTMLSelectElement | HTMLInputElement>,
-  ) => event;
-
   return (
     <div className="oplog-filter">
       <div className="oplog-filter-field">
@@ -72,20 +67,14 @@ export function OperationLogFilter({
           <Icon name="layers" size={13} />
           模块
         </label>
-        <select
+        <Select<string>
+          aria-label="模块"
           className="inp"
+          placeholder="全部模块"
+          items={[{ label: "全部模块", value: "" }, ...OPERATION_MODULES.map((item) => ({ label: item, value: item }))]}
           value={filter.module || ""}
-          onChange={(event) =>
-            update({ module: handleChange(event).target.value })
-          }
-        >
-          <option value="">全部模块</option>
-          {OPERATION_MODULES.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+          onValueChange={(value) => update({ module: value || "" })}
+        />
       </div>
 
       <div className="oplog-filter-field">
@@ -93,20 +82,14 @@ export function OperationLogFilter({
           <Icon name="filter" size={13} />
           操作类型
         </label>
-        <select
+        <Select<string>
+          aria-label="操作类型"
           className="inp"
+          placeholder="全部类型"
+          items={[{ label: "全部类型", value: "" }, ...OPERATION_TYPES.map((item) => ({ label: item, value: item }))]}
           value={filter.operationType || ""}
-          onChange={(event) =>
-            update({ operationType: handleChange(event).target.value })
-          }
-        >
-          <option value="">全部类型</option>
-          {OPERATION_TYPES.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+          onValueChange={(value) => update({ operationType: value || "" })}
+        />
       </div>
 
       <div className="oplog-filter-field">
@@ -114,20 +97,14 @@ export function OperationLogFilter({
           <Icon name="check" size={13} />
           操作结果
         </label>
-        <select
+        <Select<string>
+          aria-label="操作结果"
           className="inp"
+          placeholder="全部"
+          items={[{ label: "全部", value: "all" }, ...OPERATION_RESULTS.map((item) => ({ label: item.name, value: item.value }))]}
           value={filter.result || "all"}
-          onChange={(event) =>
-            update({ result: handleChange(event).target.value })
-          }
-        >
-          <option value="all">全部</option>
-          {OPERATION_RESULTS.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.name}
-            </option>
-          ))}
-        </select>
+          onValueChange={(value) => update({ result: value || "all" })}
+        />
       </div>
 
       <div className="oplog-filter-field">
@@ -135,7 +112,8 @@ export function OperationLogFilter({
           <Icon name="clock" size={13} />
           开始时间
         </label>
-        <input
+        <Input
+          aria-label="开始时间"
           className="inp"
           type="datetime-local"
           value={toLocalInput(filter.startTime)}
@@ -150,7 +128,8 @@ export function OperationLogFilter({
           <Icon name="clock" size={13} />
           结束时间
         </label>
-        <input
+        <Input
+          aria-label="结束时间"
           className="inp"
           type="datetime-local"
           value={toLocalInput(filter.endTime)}
@@ -161,14 +140,15 @@ export function OperationLogFilter({
       </div>
 
       {hasFilter ? (
-        <button
+        <Button
           className="btn oplog-filter-reset"
+          variant="secondary"
           type="button"
           onClick={onReset}
         >
           <Icon name="refresh" size={14} />
           重置筛选
-        </button>
+        </Button>
       ) : null}
     </div>
   );

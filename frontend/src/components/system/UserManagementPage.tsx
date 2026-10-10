@@ -17,6 +17,7 @@ import type { MockSystemUser } from "../../data/systemUsers.ts";
 import { formatDateTime } from "../../utils/date.ts";
 import { EmptyState, RowActions, StatusBadge } from "../common/index.ts";
 import { Highlight, Icon, initial } from "../ui.tsx";
+import { Button } from "../../ui/index.ts";
 import { USER_ROLE_META, USER_STATUS_META } from "./constants.ts";
 
 // 用户账号状态统一为启用/禁用，重置密码和状态切换作为业务动作展示。
@@ -90,9 +91,9 @@ export function UserManagementPage({
           </div>
         </div>
         <div className="head-actions">
-          <button className="btn primary" type="button" onClick={onNew}>
+          <Button className="btn primary" variant="primary" type="button" onClick={onNew}>
             <Icon name="plus" size={15} />新增用户
-          </button>
+          </Button>
         </div>
       </div>
 

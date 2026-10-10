@@ -20,6 +20,7 @@ import {
 } from "../../api/operationLogs.ts";
 import type { MockOperationLogItem } from "../../data/operationLogs.ts";
 import { Icon } from "../ui.tsx";
+import { Button } from "../../ui/index.ts";
 import { OperationLogDetail } from "./OperationLogDetail.tsx";
 import { OperationLogFilter } from "./OperationLogFilter.tsx";
 import { OperationLogTable } from "./OperationLogTable.tsx";
@@ -175,13 +176,14 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
           </div>
           <h4>操作日志加载失败</h4>
           <p>{error}</p>
-          <button
+          <Button
             className="btn state-btn"
+            variant="secondary"
             type="button"
             onClick={() => void load()}
           >
             重新加载
-          </button>
+          </Button>
         </div>
       ) : !logs.length ? (
         <div className="empty">
@@ -196,8 +198,9 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
           <OperationLogTable logs={logs} query={query} onView={openDetail} />
           {totalPages > 1 ? (
             <div className="oplog-pager">
-              <button
+              <Button
                 className="btn"
+                variant="secondary"
                 type="button"
                 disabled={page <= 1}
                 onClick={() =>
@@ -209,12 +212,13 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
               >
                 <Icon name="chevron" size={14} />
                 上一页
-              </button>
+              </Button>
               <span className="oplog-pager-info">
                 第 {page} / {totalPages} 页
               </span>
-              <button
+              <Button
                 className="btn"
+                variant="secondary"
                 type="button"
                 disabled={page >= totalPages}
                 onClick={() =>
@@ -226,7 +230,7 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
               >
                 下一页
                 <Icon name="chevron" size={14} />
-              </button>
+              </Button>
             </div>
           ) : null}
         </>
