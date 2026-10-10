@@ -15,6 +15,7 @@ import {
   DangerZone,
   FormSection,
 } from "../common/index.ts";
+import { Input, Select, Textarea } from "../../ui/index.ts";
 
 function normalizeStatus(value: string | boolean): string {
   return typeof value === "boolean" ? (value ? "enabled" : "disabled") : value;
@@ -54,27 +55,24 @@ export function ParamForm({
         <div className="form-grid">
           <div className="fl">
             <label>参数分类</label>
-            <select
+            <Select<string>
+              aria-label="参数分类"
               className={`inp${hasError("categoryCode") ? " invalid" : ""}`}
-              value={form.categoryCode}
-              onChange={(event) =>
+              placeholder="请选择分类"
+              items={[{ label: "请选择分类", value: "" }, ...categories.map((item) => ({ label: item.name, value: item.code }))]}
+              value={form.categoryCode || ""}
+              onValueChange={(value) =>
                 setForm((prev) => ({
                   ...prev,
-                  categoryCode: event.target.value,
+                  categoryCode: value || "",
                 }))
               }
-            >
-              <option value="">请选择分类</option>
-              {categories.map((item) => (
-                <option key={item.code} value={item.code}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <div className="fl">
             <label>参数编码</label>
-            <input
+            <Input
+              aria-label="参数编码"
               className={`inp mono${hasError("code") ? " invalid" : ""}`}
               value={form.code}
               readOnly={isEdit}
@@ -86,7 +84,8 @@ export function ParamForm({
           </div>
           <div className="fl">
             <label>参数名称</label>
-            <input
+            <Input
+              aria-label="参数名称"
               className={`inp${hasError("name") ? " invalid" : ""}`}
               value={form.name}
               onChange={(event) =>
@@ -97,7 +96,8 @@ export function ParamForm({
           </div>
           <div className="fl">
             <label>参数值</label>
-            <input
+            <Input
+              aria-label="参数值"
               className={`inp mono${hasError("value") ? " invalid" : ""}`}
               value={form.value}
               onChange={(event) =>
@@ -119,7 +119,8 @@ export function ParamForm({
           </div>
           <div className="fl full">
             <label>说明</label>
-            <textarea
+            <Textarea
+              aria-label="说明"
               className="ta"
               value={form.desc}
               onChange={(event) =>

@@ -34,6 +34,7 @@ import {
   BinaryStatusToggle,
 } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
+import { Button, Input, Textarea } from "../../ui/index.ts";
 
 const ROLE_STATUS_META = {
   enabled: { label: "启用", className: "st-on" },
@@ -122,7 +123,8 @@ export function RoleForm({
         <div className="form-grid">
           <div className="fl">
             <label>角色编码</label>
-            <input
+            <Input
+              aria-label="角色编码"
               className={`inp mono${hasError("roleCode") ? " invalid" : ""}`}
               value={form.roleCode}
               disabled={isEdit}
@@ -143,7 +145,8 @@ export function RoleForm({
           </div>
           <div className="fl">
             <label>角色名称</label>
-            <input
+            <Input
+              aria-label="角色名称"
               className={`inp${hasError("name") ? " invalid" : ""}`}
               value={form.name}
               disabled={Boolean(initial?.builtin)}
@@ -174,7 +177,8 @@ export function RoleForm({
           </div>
           <div className="fl full">
             <label>角色说明</label>
-            <textarea
+            <Textarea
+              aria-label="角色说明"
               className="ta"
               value={form.description}
               disabled={Boolean(initial?.builtin)}
@@ -280,10 +284,10 @@ export function RoleManagementPage({
         </div>
         {canEdit ? (
           <div className="head-actions">
-            <button className="btn primary" type="button" onClick={onNew}>
+            <Button className="btn primary" variant="primary" type="button" onClick={onNew}>
               <Icon name="plus" size={15} />
               新增角色
-            </button>
+            </Button>
           </div>
         ) : null}
       </div>

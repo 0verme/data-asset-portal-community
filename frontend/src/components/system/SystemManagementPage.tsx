@@ -2,6 +2,7 @@ import type { SystemRoute } from "../../routing/types.ts";
 import type { UseRoleModuleResult } from "../../hooks/useRoleModule.ts";
 import type { UseSystemModuleResult } from "../../hooks/useSystemModule.ts";
 import { Icon } from "../ui.tsx";
+import { Button } from "../../ui/index.ts";
 import { FormModal } from "../common/index.ts";
 import { useRoleModule } from "../../hooks/useRoleModule.ts";
 import { useSystemModule } from "../../hooks/useSystemModule.ts";
@@ -97,7 +98,7 @@ export function SystemManagementPage({
         <div className="ec"><Icon name="inbox" size={24} /></div>
         <h4>系统管理加载失败</h4>
         <p>{error || roleModule.error}</p>
-        <button className="btn state-btn" type="button" onClick={route.page === "roles" ? () => void roleModule.load() : () => void loadAll()}>重新加载</button>
+        <Button className="btn state-btn" variant="secondary" type="button" onClick={route.page === "roles" ? () => void roleModule.load() : () => void loadAll()}>重新加载</Button>
       </div>
     );
   }

@@ -4,6 +4,7 @@ import type { MockSystemUser } from "../../data/systemUsers.ts";
 import type { RoleFormData } from "../../hooks/useRoleModule.ts";
 import type { UserFormData, SystemFormFieldError } from "../../hooks/useSystemModule.ts";
 import { ActionErrorBanner, BinaryStatusToggle, confirmDeleteAction, DangerZone, FormSection } from "../common/index.ts";
+import { Input, Select, Textarea } from "../../ui/index.ts";
 
 function normalizeStatus(value: string | boolean): string {
   return typeof value === "boolean" ? (value ? "enabled" : "disabled") : value;
@@ -45,7 +46,8 @@ export function UserForm({
         <div className="form-grid">
           <div className="fl">
             <label>用户名</label>
-            <input
+            <Input
+              aria-label="用户名"
               className={`inp mono${hasError("username") ? " invalid" : ""}`}
               value={form.username}
               maxLength={64}
@@ -56,7 +58,8 @@ export function UserForm({
           </div>
           <div className="fl">
             <label>显示名</label>
-            <input
+            <Input
+              aria-label="显示名"
               className={`inp${hasError("displayName") ? " invalid" : ""}`}
               value={form.displayName}
               onChange={(event) => setForm((prev) => ({ ...prev, displayName: event.target.value }))}
@@ -65,7 +68,8 @@ export function UserForm({
           </div>
           <div className="fl">
             <label>邮箱</label>
-            <input
+            <Input
+              aria-label="邮箱"
               className="inp"
               value={form.email}
               onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
@@ -78,15 +82,18 @@ export function UserForm({
           </div>
           <div className="fl">
             <label>账号角色</label>
-            <select className="sel" value={form.role} onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value }))}>
-              {roleOptions.filter((role) => role.enabled !== "disabled").map((role) => (
-                <option value={role.roleCode} key={role.roleCode}>{role.name || role.roleCode}</option>
-              ))}
-            </select>
+            <Select<string>
+              aria-label="账号角色"
+              className="sel"
+              items={roleOptions.filter((role) => role.enabled !== "disabled").map((role) => ({ label: role.name || role.roleCode, value: role.roleCode }))}
+              value={form.role || null}
+              onValueChange={(value) => setForm((prev) => ({ ...prev, role: value || "" }))}
+            />
           </div>
           <div className="fl full">
             <label>备注</label>
-            <textarea
+            <Textarea
+              aria-label="备注"
               className="ta"
               value={form.remark}
               onChange={(event) => setForm((prev) => ({ ...prev, remark: event.target.value }))}
