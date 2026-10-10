@@ -30,6 +30,7 @@ import {
   SystemEditor,
 } from "../PushPages.tsx";
 import { Icon } from "../ui.tsx";
+import { Button } from "../../ui/index.ts";
 
 type RequireLogin = (action?: () => void, permission?: string) => boolean;
 
@@ -128,8 +129,9 @@ export function PushView({
               modes={["card", "list"] as const}
             />
             {canEdit ? (
-              <button
+              <Button
                 className="btn primary"
+                variant="primary"
                 type="button"
                 onClick={() =>
                   requireLogin(() => pushGoSystemEdit(null), "push:write")
@@ -137,7 +139,7 @@ export function PushView({
               >
                 <Icon name="plus" size={15} />
                 新增系统
-              </button>
+              </Button>
             ) : null}
           </div>
         </div>

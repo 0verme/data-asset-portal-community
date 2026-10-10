@@ -24,6 +24,7 @@ import {
   type PushJobForm,
 } from "./pushUtils.ts";
 import { Icon } from "../ui.tsx";
+import { Button, IconButton, Input, Select, Textarea } from "../../ui/index.ts";
 
 interface JobFormData extends PushJobForm {
   id: string;
@@ -222,74 +223,84 @@ export function JobEditor({
         <div className="form-grid">
           <div className="fl">
             <label>作业名称</label>
-            <input className={`inp${touched && !form.cn.trim() ? " invalid" : ""}`} value={form.cn} onChange={(event) => setValue("cn", event.target.value)} placeholder="例如：会员画像日终快照推送" />
+            <Input aria-label="作业名称" className={`inp${touched && !form.cn.trim() ? " invalid" : ""}`} value={form.cn} onChange={(event) => setValue("cn", event.target.value)} placeholder="例如：会员画像日终快照推送" />
           </div>
           <div className="fl">
             <label>湖仓来源路径</label>
-            <input className="inp mono" value={form.sourcePath} onChange={(event) => setValue("sourcePath", event.target.value)} placeholder="例如：/dw/dwm/xxx/dt=${yyyy-MM-dd}" />
+            <Input aria-label="湖仓来源路径" className="inp mono" value={form.sourcePath} onChange={(event) => setValue("sourcePath", event.target.value)} placeholder="例如：/dw/dwm/xxx/dt=${yyyy-MM-dd}" />
           </div>
           <div className="fl">
             <label>湖仓来源文件名</label>
-            <input className={`inp mono${touched && !form.sourceFileName.trim() ? " invalid" : ""}`} value={form.sourceFileName} onChange={(event) => setSourceFileName(event.target.value)} placeholder="例如：ACCT_BAL_${yyyyMMdd}.dat" />
+            <Input aria-label="湖仓来源文件名" className={`inp mono${touched && !form.sourceFileName.trim() ? " invalid" : ""}`} value={form.sourceFileName} onChange={(event) => setSourceFileName(event.target.value)} placeholder="例如：ACCT_BAL_${yyyyMMdd}.dat" />
           </div>
           <div className="fl">
             <label>目标推送路径</label>
-            <input className="inp mono" value={form.targetPath} onChange={(event) => setValue("targetPath", event.target.value)} placeholder="例如：/incoming/xxx/" />
+            <Input aria-label="目标推送路径" className="inp mono" value={form.targetPath} onChange={(event) => setValue("targetPath", event.target.value)} placeholder="例如：/incoming/xxx/" />
           </div>
           <div className="fl">
             <label>目标推送文件名</label>
-            <input className={`inp mono${touched && !form.targetFileName.trim() && !form.sourceFileName.trim() ? " invalid" : ""}`} value={form.targetFileName} onChange={(event) => setValue("targetFileName", event.target.value)} placeholder="默认同湖仓来源文件名" />
+            <Input aria-label="目标推送文件名" className={`inp mono${touched && !form.targetFileName.trim() && !form.sourceFileName.trim() ? " invalid" : ""}`} value={form.targetFileName} onChange={(event) => setValue("targetFileName", event.target.value)} placeholder="默认同湖仓来源文件名" />
           </div>
           {isRenameJob(form) ? <div className="fl full"><div className="editor-sub mono">推送时重命名：{formatRenameHint(form)}</div></div> : null}
           <div className="fl">
             <label>字段分隔符</label>
-            <select className="sel mono" value={form.delimiter} onChange={(event) => setValue("delimiter", event.target.value)}>
-              {delimiterSelectOptions.map((item) => (
-                <option key={item.value} value={item.value}>{optionLabel(item)}</option>
-              ))}
-            </select>
+            <Select<string>
+              aria-label="字段分隔符"
+              className="sel mono"
+              items={delimiterSelectOptions.map((item) => ({ label: optionLabel(item), value: item.value }))}
+              value={form.delimiter || null}
+              onValueChange={(value) => setValue("delimiter", value || "")}
+            />
             {delimiterLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>字段分隔符当前值未在码值中维护，请补充码值或重新选择。</div> : null}
           </div>
           <div className="fl">
             <label>文件编码</label>
-            <select className="sel mono" value={form.encoding} onChange={(event) => setValue("encoding", event.target.value)}>
-              {encodingSelectOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item)}</option>)}
-            </select>
+            <Select<string>
+              aria-label="文件编码"
+              className="sel mono"
+              items={encodingSelectOptions.map((item) => ({ label: optionLabel(item), value: item.value }))}
+              value={form.encoding || null}
+              onValueChange={(value) => setValue("encoding", value || "")}
+            />
             {encodingLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>文件编码当前值未在码值中维护，请补充码值或重新选择。</div> : null}
           </div>
           <div className="fl">
             <label>推送频率</label>
-            <select className="sel" value={form.freqType} onChange={(event) => setFreqType(event.target.value)}>
-              {freqTypeSelectOptions.map((item) => <option key={item.value} value={item.value}>{optionLabel(item)}</option>)}
-            </select>
+            <Select<string>
+              aria-label="推送频率"
+              className="sel"
+              items={freqTypeSelectOptions.map((item) => ({ label: optionLabel(item), value: item.value }))}
+              value={form.freqType || null}
+              onValueChange={(value) => setFreqType(value || "")}
+            />
             {freqTypeLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>推送频率当前值未在码值中维护，请补充码值或重新选择。</div> : null}
           </div>
           <div className="fl">
             {freqParamConfig ? (
               <>
                 <label>{freqParamConfig.label}</label>
-                <select
+                <Select<string>
+                  aria-label={freqParamConfig.label}
                   className={`sel${touched && !form.freq ? " invalid" : ""}`}
-                  value={form.freq}
-                  onChange={(event) => setValue("freq", event.target.value)}
-                >
-                  {freqParamConfig.options.map((item) => <option key={item.value} value={item.value}>{item.name}</option>)}
-                </select>
+                  items={freqParamConfig.options.map((item) => ({ label: item.name, value: item.value }))}
+                  value={form.freq || null}
+                  onValueChange={(value) => setValue("freq", value || "")}
+                />
               </>
             ) : (
               <>
                 <label>频率明细</label>
-                <input className="inp" value="无需配置（出数时间取决于上游）" disabled readOnly />
+                <Input aria-label="频率明细" className="inp" value="无需配置（出数时间取决于上游）" disabled readOnly />
               </>
             )}
           </div>
           <div className="fl">
             <label>预估行数</label>
-            <input className="inp" value={form.rowCnt} onChange={(event) => setValue("rowCnt", event.target.value)} placeholder="例如：约 12 万行" />
+            <Input aria-label="预估行数" className="inp" value={form.rowCnt} onChange={(event) => setValue("rowCnt", event.target.value)} placeholder="例如：约 12 万行" />
           </div>
           <div className="fl full">
             <label>业务逻辑说明</label>
-            <textarea className="ta" value={form.desc} onChange={(event) => setValue("desc", event.target.value)} placeholder="描述推送内容、加工逻辑和注意事项。" />
+            <Textarea aria-label="业务逻辑说明" className="ta" value={form.desc} onChange={(event) => setValue("desc", event.target.value)} placeholder="描述推送内容、加工逻辑和注意事项。" />
           </div>
           <div className="fl">
             <label>启用状态</label>
@@ -324,27 +335,31 @@ export function JobEditor({
                   <tr key={field._key}>
                     <td data-label="字段序号" className="idx-cell">{index + 1}</td>
                     <td data-label="字段名">
-                      <input className={`cell-inp mono${rowErrors.name ? " invalid" : ""}`} value={field.name} onChange={(event) => setField(field._key, { name: event.target.value })} placeholder="field_name" />
+                      <Input aria-label="字段名" className={`cell-inp mono${rowErrors.name ? " invalid" : ""}`} value={field.name} onChange={(event) => setField(field._key, { name: event.target.value })} placeholder="field_name" />
                     </td>
                     <td data-label="中文名">
-                      <input className={`cell-inp${rowErrors.cn ? " invalid" : ""}`} value={field.cn} onChange={(event) => setField(field._key, { cn: event.target.value })} placeholder="中文名" />
+                      <Input aria-label="中文名" className={`cell-inp${rowErrors.cn ? " invalid" : ""}`} value={field.cn} onChange={(event) => setField(field._key, { cn: event.target.value })} placeholder="中文名" />
                     </td>
                     <td data-label="含义">
-                      <input className="cell-inp" value={field.meaning} onChange={(event) => setField(field._key, { meaning: event.target.value })} placeholder="字段含义说明" />
+                      <Input aria-label="含义" className="cell-inp" value={field.meaning} onChange={(event) => setField(field._key, { meaning: event.target.value })} placeholder="字段含义说明" />
                     </td>
                     <td data-label="来源系统">
-                      <input className="cell-inp" value={field.src} onChange={(event) => setField(field._key, { src: event.target.value })} placeholder="来源系统" />
+                      <Input aria-label="来源系统" className="cell-inp" value={field.src} onChange={(event) => setField(field._key, { src: event.target.value })} placeholder="来源系统" />
                     </td>
                     <td data-label="数据类型">
-                      <select className="cell-inp mono" value={field.type} onChange={(event) => setField(field._key, { type: event.target.value })}>
-                        {FIELD_TYPE_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
-                      </select>
+                      <Select<string>
+                        aria-label="数据类型"
+                        className="cell-inp mono"
+                        items={FIELD_TYPE_OPTIONS.map((item) => ({ label: item, value: item }))}
+                        value={field.type || null}
+                        onValueChange={(value) => setField(field._key, { type: value || "" })}
+                      />
                     </td>
                     <td data-label="">
                       <div className="row-tools">
-                        <button className="icon-btn" disabled={index === 0} onClick={() => moveField(index, -1)} type="button"><Icon name="up" size={14} /></button>
-                        <button className="icon-btn" disabled={index === fields.length - 1} onClick={() => moveField(index, 1)} type="button"><Icon name="down" size={14} /></button>
-                        <button className="icon-btn danger" disabled={fields.length === 1} onClick={() => deleteField(field._key)} type="button"><Icon name="trash" size={14} /></button>
+                        <IconButton aria-label={`上移字段 ${field.name || index + 1}`} className="icon-btn" disabled={index === 0} icon={<Icon name="up" size={14} />} onClick={() => moveField(index, -1)} size="sm" type="button" variant="tertiary" />
+                        <IconButton aria-label={`下移字段 ${field.name || index + 1}`} className="icon-btn" disabled={index === fields.length - 1} icon={<Icon name="down" size={14} />} onClick={() => moveField(index, 1)} size="sm" type="button" variant="tertiary" />
+                        <IconButton aria-label={`删除字段 ${field.name || index + 1}`} className="icon-btn danger" disabled={fields.length === 1} icon={<Icon name="trash" size={14} />} onClick={() => deleteField(field._key)} size="sm" type="button" variant="danger" />
                       </div>
                     </td>
                   </tr>
@@ -353,7 +368,7 @@ export function JobEditor({
             </tbody>
           </table>
         </div>
-        <button className="add-field" onClick={addField} type="button"><Icon name="plus" size={14} />新增字段</button>
+        <Button className="add-field" size="sm" type="button" variant="tertiary" onClick={addField}><Icon name="plus" size={14} />新增字段</Button>
       </div>
 
       <FormActionBar

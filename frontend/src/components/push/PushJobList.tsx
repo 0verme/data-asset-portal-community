@@ -4,6 +4,7 @@ import type { PublicPushJob, PublicPushSystem } from "../../api/push.ts";
 import { getSystemBadgeText } from "../../utils/push.ts";
 import { EmptyState, MetaItem, RowActions, StatusBadge } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
+import { Button } from "../../ui/index.ts";
 import { ProtocolTag } from "./PushSystemList.tsx";
 import { PUSH_JOB_TABLE_COLUMNS, type PushJobTableColumn, type PushJobTableColumnKey, type PushJobTableValues, getPushJobTableValues } from "./pushJobTable.ts";
 import { isRenameJob } from "./pushUtils.ts";
@@ -105,7 +106,7 @@ export function PushJobList({
             </div>
           </div>
           <div className="dh-actions">
-            {canEdit && onEditSystem ? <button className="btn" type="button" onClick={onEditSystem}><Icon name="edit" size={15} />编辑系统</button> : null}
+            {canEdit && onEditSystem ? <Button className="btn" variant="secondary" type="button" onClick={onEditSystem}><Icon name="edit" size={15} />编辑系统</Button> : null}
           </div>
         </div>
         <div className="dh-meta">
@@ -122,7 +123,7 @@ export function PushJobList({
           推送作业清单
           <span className="sub-count">{jobs.length} 个</span>
         </div>
-        {canEdit && onNewJob ? <button className="btn primary" type="button" onClick={onNewJob}><Icon name="plus" size={15} />新增接口</button> : null}
+        {canEdit && onNewJob ? <Button className="btn primary" variant="primary" type="button" onClick={onNewJob}><Icon name="plus" size={15} />新增接口</Button> : null}
       </div>
 
       {!jobs.length ? (
