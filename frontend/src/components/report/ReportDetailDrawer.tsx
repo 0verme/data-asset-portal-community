@@ -4,6 +4,7 @@ import type { MockReportItem, RelatedIndicatorSummary, RelatedTableSummary } fro
 import { formatDate, formatDateTime } from "../../utils/date.ts";
 import { RowActions, StatusBadge } from "../common/index.ts";
 import { Icon } from "../ui.tsx";
+import { Button } from "../../ui/index.ts";
 
 interface MetaItemProps {
   label: string;
@@ -99,9 +100,9 @@ export function ReportDetailDrawer({ report, open, onClose, onEdit, onDelete, ca
             </div>
             <div className="editor-sub">{report.code}</div>
           </div>
-          <button className="btn" type="button" onClick={onClose}>
+          <Button className="btn" variant="secondary" type="button" onClick={onClose}>
             <Icon name="close" size={14} />关闭
-          </button>
+          </Button>
         </div>
 
         <div className="indicator-detail-body">
@@ -170,9 +171,9 @@ export function ReportDetailDrawer({ report, open, onClose, onEdit, onDelete, ca
 
         {canEdit ? <div className="indicator-detail-foot">
           <RowActions onEdit={() => onEdit(report.code)} />
-          <button className="btn ghost-danger" type="button" onClick={() => void onDelete(report.code)}>
+          <Button className="btn ghost-danger" variant="danger" type="button" onClick={() => void onDelete(report.code)}>
             <Icon name="trash" size={14} />删除
-          </button>
+          </Button>
         </div> : null}
       </aside>
     </div>
