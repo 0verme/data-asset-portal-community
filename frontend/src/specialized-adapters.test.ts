@@ -17,7 +17,7 @@ test("field mapping controls use DAP Select and retain the unrelated native empt
   assert.equal((controls.match(/<button/g) ?? []).length, 1, "fm-toggle stays native");
   assert.match(controls, /onSourceSystemChange: \(value: string \| null\) => void/);
   assert.match(controls, /value=\{selectedSourceSystemId \|\| null\}/);
-  assert.match(controls, /selectedSourceSystemLabel\.length > 24/);
+  assert.match(controls, /trigger=\{<div>\{sourceSystemSelect\}<\/div>\}/);
   assert.match(controls, /content=\{selectedSourceSystemLabel\}/);
   assert.match(controls, /value: String\(getSourceSystemId\(item\)\)/);
   assert.match(controls, /label: formatSystemLabel\(item\)/);

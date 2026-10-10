@@ -115,14 +115,14 @@ export function FieldMappingFilters({
       onValueChange={onSourceSystemChange}
     />
   );
-  // Kumo truncates the trigger value; keep long labels available in a DAP tooltip.
-  const sourceSystemControl = selectedSourceSystemLabel.length > 24
-    ? <Tooltip
-        trigger={<div>{sourceSystemSelect}</div>}
-        content={selectedSourceSystemLabel}
-        delay={250}
-      />
-    : sourceSystemSelect;
+  // Keep the tooltip/trigger tree stable so selecting a long label never remounts Select.
+  const sourceSystemControl = (
+    <Tooltip
+      trigger={<div>{sourceSystemSelect}</div>}
+      content={selectedSourceSystemLabel}
+      delay={500}
+    />
+  );
 
   return (
     <section className="fm-card">

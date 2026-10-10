@@ -146,6 +146,7 @@ test("field-mapping source-system Select preserves ids and long labels across th
   });
   await selectedOption.click();
   await expect(sourceSystemSelect).toContainText(selectedSystemLabel);
+  await expect(sourceSystemSelect).toBeFocused();
   if (remoteFixturesEnabled) {
     await sourceSystemSelect.hover();
     await expect(page.getByRole("tooltip")).toHaveText(selectedSystemLabel);
