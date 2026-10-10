@@ -58,6 +58,7 @@ import {
   type FieldMappingSort,
 } from "./fieldMapping/fieldMappingUtils.ts";
 import { Icon } from "./ui.tsx";
+import { Button, Select } from "../ui/index.ts";
 
 type MappingTab = "table" | "field";
 
@@ -457,10 +458,10 @@ export function FieldMappingPage({
     }
     if (column.key === "__actions") {
       return (
-        <button className="btn" type="button" onClick={() => handleViewFieldMapping(row)}>
+        <Button className="btn" variant="secondary" type="button" onClick={() => handleViewFieldMapping(row)}>
           <Icon name="link" size={14} />
           查看字段映射
-        </button>
+        </Button>
       );
     }
     if (column.key === "mappedCount") return row.mappedCount;
@@ -578,14 +579,14 @@ export function FieldMappingPage({
             </div>
           </div>
           <div className="fm-context-actions">
-            <button className="btn" type="button" onClick={onBackToUpstream}>
+            <Button className="btn" variant="secondary" type="button" onClick={onBackToUpstream}>
               <Icon name="chevron" size={14} />
               返回上游卸数
-            </button>
-            <button className="btn" type="button" onClick={handleClearLinkedFilters}>
+            </Button>
+            <Button className="btn" variant="secondary" type="button" onClick={handleClearLinkedFilters}>
               <Icon name="close" size={14} />
               清除筛选
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}
@@ -622,10 +623,10 @@ export function FieldMappingPage({
           </div>
           <div className="fm-result-tools">
             <span>共 <b>{totalRows}</b> 条</span>
-            {canExport ? <button className="btn" type="button" onClick={exportCurrentTab}>
+            {canExport ? <Button className="btn" variant="secondary" type="button" onClick={exportCurrentTab}>
               <Icon name="download" size={15} />
               导出 CSV
-            </button> : null}
+            </Button> : null}
           </div>
         </div>
 
@@ -722,27 +723,25 @@ export function FieldMappingPage({
               <div className="fm-pagination-tools">
                 <label>
                   每页
-                  <select
+                  <Select<string>
+                    aria-label="每页条数"
                     className="sel fm-page-size"
-                    value={pageSize}
-                    onChange={(event) => {
+                    items={FIELD_MAPPING_PAGE_SIZE_OPTIONS.map((item) => ({ label: String(item), value: String(item) }))}
+                    value={String(pageSize)}
+                    onValueChange={(value) => {
                       setPage(1);
-                      setPageSize(Number(event.target.value));
+                      setPageSize(Number(value));
                     }}
-                  >
-                    {FIELD_MAPPING_PAGE_SIZE_OPTIONS.map((item) => (
-                      <option key={item} value={item}>{item}</option>
-                    ))}
-                  </select>
+                  />
                   条
                 </label>
-                <button className="btn" type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={currentPage <= 1}>
+                <Button className="btn" variant="secondary" type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={currentPage <= 1}>
                   上一页
-                </button>
+                </Button>
                 <span className="mono">{currentPage} / {pageCount}</span>
-                <button className="btn" type="button" onClick={() => setPage((current) => Math.min(pageCount, current + 1))} disabled={currentPage >= pageCount}>
+                <Button className="btn" variant="secondary" type="button" onClick={() => setPage((current) => Math.min(pageCount, current + 1))} disabled={currentPage >= pageCount}>
                   下一页
-                </button>
+                </Button>
               </div>
             </div>
           </>

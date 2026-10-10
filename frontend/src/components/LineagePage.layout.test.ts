@@ -109,9 +109,9 @@ test("lineage filters wait for an explicit query", async () => {
     page,
     /const \[pendingFilters, setPendingFilters\] = React\.useState/,
   );
-  assert.match(page, /value=\{pendingFilters\.view\}/);
-  assert.match(page, /value=\{pendingFilters\.direction\}/);
-  assert.match(page, /value=\{pendingFilters\.depth\}/);
+  assert.match(page, /value=\{pendingFilters\.view \|\| null\}/);
+  assert.match(page, /value=\{pendingFilters\.direction \|\| null\}/);
+  assert.match(page, /value=\{String\(pendingFilters\.depth\)\}/);
   assert.match(page, /setPendingFilters\(\(current\) =>/);
   assert.doesNotMatch(page, /const changeRoute =/);
   assert.doesNotMatch(page, /onChange=\{\(event\) => changeRoute/);
@@ -141,8 +141,8 @@ test("lineage page supports table and detail views with snapshot diagnostics", a
     readFile(stylesPath, "utf8"),
   ]);
 
-  assert.match(page, /<option value="table">表级简图<\/option>/);
-  assert.match(page, /<option value="detail">作业详图<\/option>/);
+  assert.match(page, /\{ label: "表级简图", value: "table" \}/);
+  assert.match(page, /\{ label: "作业详图", value: "detail" \}/);
   assert.match(page, /view: nextRoute\.view/);
   assert.match(page, /快照诊断/);
   assert.match(styles, /\.lineage-diagnostics \{[^}]*var\(--warn-line\)/);
