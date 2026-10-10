@@ -160,6 +160,7 @@ test("push job table keeps public business columns without connection paths", as
 
 test("push system importance defaults and latest output time rules are explicit", async () => {
   const source = await readSources(systemListPath, systemEditorPath);
+  const systemEditorSource = await readFile(systemEditorPath, "utf8");
   const timeInputSource = await readFile(timeInputPath, "utf8");
 
   assert.equal(
@@ -181,8 +182,10 @@ test("push system importance defaults and latest output time rules are explicit"
     source.includes('className={`sys-card${isImportant ? " important" : ""}`}'),
   );
   assert.match(source, /最晚出数时间/);
-  assert.match(source, /<TimeInput/);
-  assert.match(source, /disabled=\{form\.importanceLevel !== "important"\}/);
+  assert.match(systemEditorSource, /className="push-system-editor"/);
+  assert.match(systemEditorSource, /<Input\s+type="time"\s+step=\{60\}/);
+  assert.doesNotMatch(systemEditorSource, /<TimeInput/);
+  assert.match(systemEditorSource, /disabled=\{form\.importanceLevel !== "important"\}/);
   assert.match(timeInputSource, /type="time"/);
   assert.match(timeInputSource, /step=\{step\}/);
 });

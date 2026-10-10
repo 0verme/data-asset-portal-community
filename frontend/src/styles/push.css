@@ -296,6 +296,10 @@
   .sys-grid {
     grid-template-columns: 1fr;
   }
+
+  .push-system-editor .form-action-bar {
+    position: static;
+  }
 }
 
 @media (max-width: 480px) {
