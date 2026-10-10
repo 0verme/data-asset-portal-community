@@ -1351,7 +1351,7 @@ class FieldMappingService(AuditActorMixin):
             else "ASC"
         )
         sort_column = FIELD_SORT_COLUMNS.get(sort_key)
-        if not sort_column:
+        if sort_column is None:
             return self._field_default_order_terms()
         return (
             self._null_last_text_order_terms(sort_column, sort_direction)
