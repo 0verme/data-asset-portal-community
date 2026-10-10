@@ -8,7 +8,7 @@ async function setMockAuth(page: Page, mode: "guest" | "admin"): Promise<void> {
   }, mode);
 }
 
-test("field mapping filters and pagination use adapter controls", async ({ page }) => {
+test("field mapping filters and pagination use adapter controls", async ({ page }, testInfo) => {
   await setMockAuth(page, "admin");
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/field-mapping");
@@ -24,8 +24,24 @@ test("field mapping filters and pagination use adapter controls", async ({ page 
   await expect(page.getByRole("button", { name: "查询" })).toHaveClass(/dap-ui-button/);
   await expect(page.getByRole("button", { name: "重置" })).toHaveClass(/dap-ui-button/);
 
+  const sourceSystemSelect = page.getByRole("combobox", { name: "源系统" });
+  await expect(sourceSystemSelect).toBeVisible();
+  await expect(sourceSystemSelect).toHaveClass(/dap-ui-select/);
+  await expect(sourceSystemSelect).not.toHaveClass(/\bsel\b/);
+  await page.screenshot({ path: testInfo.outputPath("field-mapping-source-system-kumo-light.png"), fullPage: true });
+  const sourceArrow = await sourceSystemSelect.evaluate((element) => ({
+    backgroundImage: getComputedStyle(element).backgroundImage,
+    visibleSvgCount: Array.from(element.querySelectorAll("svg")).filter((svg) => {
+      const rect = svg.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }).length,
+  }));
+  expect(sourceArrow.backgroundImage).toBe("none");
+  expect(sourceArrow.visibleSvgCount).toBe(1);
+
   const nativeSelect = page.locator("select.sel").first();
   await expect(nativeSelect).toBeVisible();
+  await expect(page.locator("select.sel")).toHaveCount(1);
   const nativeArrow = await nativeSelect.evaluate((element) => ({
     tagName: element.tagName,
     backgroundImage: getComputedStyle(element).backgroundImage,
@@ -34,6 +50,24 @@ test("field mapping filters and pagination use adapter controls", async ({ page 
   expect(nativeArrow.tagName).toBe("SELECT");
   expect(nativeArrow.backgroundImage).toContain("linear-gradient");
   expect(nativeArrow.svgCount).toBe(0);
+
+  await expect(page.locator(".fm-system")).toHaveCount(12);
+  await sourceSystemSelect.click();
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(9);
+  await page.getByRole("option", { name: "商品中心 · PIM", exact: true }).click();
+  await expect(sourceSystemSelect).toContainText("商品中心 · PIM");
+  await page.getByRole("button", { name: "查询" }).click();
+  await expect(page.locator(".fm-system")).toHaveCount(2);
+  await expect(page.locator(".fm-system").first()).toContainText("商品中心 · PIM");
+  await sourceSystemSelect.click();
+  await page.getByRole("listbox").getByRole("option", { name: "全部", exact: true }).click();
+  await expect(sourceSystemSelect).toContainText("全部");
+  await page.getByRole("button", { name: "查询" }).click();
+  await expect(page.locator(".fm-system")).toHaveCount(12);
+  await page.getByRole("button", { name: "重置" }).click();
+  await expect(sourceSystemSelect).toContainText("全部");
+  await page.getByRole("button", { name: "查询" }).click();
+  await expect(page.locator(".fm-system")).toHaveCount(12);
 
   const pageSize = page.getByRole("combobox", { name: "每页条数" });
   if (await pageSize.count()) {
