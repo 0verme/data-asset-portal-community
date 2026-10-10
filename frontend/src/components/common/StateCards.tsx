@@ -14,12 +14,12 @@
 
 import type { MouseEventHandler, ReactNode } from "react";
 
+import { Status as DAPStatus } from "../../ui/index.ts";
 import { Icon } from "../ui.tsx";
-import {
-  getBinaryStatusValue,
-  normalizeBinaryStatusLabel,
-  normalizeBinaryStatusValue,
-} from "./status.ts";
+import { resolveStatusBadgePresentation } from "./statusBadge.ts";
+import type { StatusMeta } from "./statusBadge.ts";
+
+export type { StatusMeta } from "./statusBadge.ts";
 
 export interface LoadingStateProps {
   title: ReactNode;
@@ -75,35 +75,6 @@ export function EmptyState({ title, desc, actionText, onAction }: EmptyStateProp
   );
 }
 
-type StatusTone = "st-on" | "st-warn" | "st-off";
-
-interface StatusTag {
-  tag: string;
-  mark: string;
-}
-
-const STATUS_TAG: Record<StatusTone, StatusTag> = {
-  "st-on": { tag: "tag-ok", mark: "●" },
-  "st-warn": { tag: "tag-warn", mark: "●" },
-  "st-off": { tag: "tag-danger", mark: "○" },
-};
-
-function isStatusTone(value: string | undefined): value is StatusTone {
-  return value === "st-on" || value === "st-warn" || value === "st-off";
-}
-
-// 默认状态映射：仅 enabled/disabled 两态（启用/禁用）。
-const DEFAULT_STATUS_META: Record<string, StatusMeta> = {
-  enabled: { label: "启用", className: "st-on" },
-  disabled: { label: "禁用", className: "st-off" },
-};
-
-export interface StatusMeta {
-  label?: string | undefined;
-  className?: string | undefined;
-  [key: string]: unknown;
-}
-
 export interface StatusBadgeProps {
   status?: unknown;
   metaMap?: Record<string, StatusMeta> | undefined;
@@ -115,31 +86,9 @@ export interface StatusBadgeProps {
  * 全站唯一的只读状态 pill。支持两种调用方式：
  *   1) status + 可选 metaMap：按映射取文案与色调（系统管理、指标等）。
  *      不传 metaMap 时回退到 enabled/disabled → 启用/禁用。
- *   2) on(布尔) + 可选 label：二态开关型，统一显示 启用/禁用。
+ *   2) on(布尔) + 可选 label：二态启停或操作结果，label 用于保留成功/失败等语义。
  */
 export function StatusBadge({ status, metaMap, on, label }: StatusBadgeProps) {
-  let tone: StatusTag;
-  let text: string;
-  if (status !== undefined) {
-    const statusMap = metaMap || DEFAULT_STATUS_META;
-    const normalizedStatus = normalizeBinaryStatusValue(status);
-    const sourceMeta = normalizedStatus
-      ? statusMap[normalizedStatus]
-      : typeof status === "string"
-        ? statusMap[status]
-        : undefined;
-    const meta = sourceMeta || { label: label || (typeof status === "string" ? status : "-"), className: "st-off" };
-    tone = isStatusTone(meta.className) ? STATUS_TAG[meta.className] : STATUS_TAG["st-off"];
-    text = normalizeBinaryStatusLabel(status, meta.label);
-  } else {
-    const binaryStatus = getBinaryStatusValue(on);
-    tone = binaryStatus === "enabled" ? STATUS_TAG["st-on"] : STATUS_TAG["st-off"];
-    text = normalizeBinaryStatusLabel(binaryStatus, label);
-  }
-  return (
-    <span className={`tag ${tone.tag}`}>
-      {tone.mark}
-      {text}
-    </span>
-  );
+  const presentation = resolveStatusBadgePresentation({ status, metaMap, on, label });
+  return <DAPStatus tone={presentation.tone}>{presentation.label}</DAPStatus>;
 }
