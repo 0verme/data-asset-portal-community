@@ -2,7 +2,7 @@ import type { ChangeEventHandler, ReactNode } from "react";
 
 import type { FieldMappingSourceSystemOption, FieldMappingStats } from "../../api/fieldMapping.ts";
 import { Icon } from "../ui.tsx";
-import { Button, Input } from "../../ui/index.ts";
+import { Button, Input, Select, Tooltip } from "../../ui/index.ts";
 import {
   formatSystemLabel,
   getSourceSystemId,
@@ -77,6 +77,7 @@ export interface FieldMappingFiltersProps {
   sourceSystems: readonly FieldMappingSourceSystemOption[];
   onToggle: () => void;
   onChange: (key: FieldMappingFilterField) => FieldMappingChangeHandler;
+  onSourceSystemChange: (value: string | null) => void;
   onReset: () => void;
   onApply: () => void;
 }
@@ -87,9 +88,42 @@ export function FieldMappingFilters({
   sourceSystems,
   onToggle,
   onChange,
+  onSourceSystemChange,
   onReset,
   onApply,
 }: FieldMappingFiltersProps) {
+  const selectedSourceSystemId = String(draftFilters.sourceSystemId ?? "");
+  const selectedSourceSystem = sourceSystems.find(
+    (item) => String(getSourceSystemId(item)) === selectedSourceSystemId,
+  );
+  const selectedSourceSystemLabel = selectedSourceSystem
+    ? formatSystemLabel(selectedSourceSystem)
+    : selectedSourceSystemId || "全部";
+  const sourceSystemSelect = (
+    <Select<string>
+      aria-label="源系统"
+      className="sel"
+      placeholder="全部"
+      items={[
+        { label: "全部", value: "" },
+        ...sourceSystems.map((item) => ({
+          label: formatSystemLabel(item),
+          value: String(getSourceSystemId(item)),
+        })),
+      ]}
+      value={selectedSourceSystemId || null}
+      onValueChange={onSourceSystemChange}
+    />
+  );
+  // Keep the tooltip/trigger tree stable so selecting a long label never remounts Select.
+  const sourceSystemControl = (
+    <Tooltip
+      trigger={<div>{sourceSystemSelect}</div>}
+      content={selectedSourceSystemLabel}
+      delay={500}
+    />
+  );
+
   return (
     <section className="fm-card">
       <div className="fm-card-head">
@@ -106,27 +140,10 @@ export function FieldMappingFilters({
       {open ? (
         <>
           <div className="fm-filter-grid">
-            <label className="fm-field">
+            <div className="fm-field">
               <span>源系统</span>
-              <select
-                className="sel"
-                value={draftFilters.sourceSystemId}
-                onChange={onChange("sourceSystemId")}
-              >
-                <option value="">全部</option>
-                {sourceSystems.map((item) => {
-                  const sourceSystemId = getSourceSystemId(item);
-                  return (
-                    <option
-                      key={String(sourceSystemId)}
-                      value={String(sourceSystemId)}
-                    >
-                      {formatSystemLabel(item)}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
+              {sourceSystemControl}
+            </div>
             <label className="fm-field">
               <span>源系统表名</span>
               <Input

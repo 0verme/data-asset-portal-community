@@ -8,12 +8,20 @@ const page = read("./components/FieldMappingPage.tsx");
 const lineage = read("./components/LineagePage.tsx");
 const wideTable = read("./components/fieldMapping/FieldMappingWideTable.tsx");
 
-test("field mapping controls use the frozen DAP adapters with documented native exceptions", () => {
-  assert.match(controls, /import \{ Button, Input \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+test("field mapping controls use DAP Select and retain the unrelated native empty-comment filter", () => {
+  assert.match(controls, /import \{ Button, Input, Select, Tooltip \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((controls.match(/<Input/g) ?? []).length, 4);
   assert.equal((controls.match(/<Button/g) ?? []).length, 2);
+  assert.equal((controls.match(/<Select<string>/g) ?? []).length, 1);
+  assert.equal((controls.match(/<select/g) ?? []).length, 1, "only emptyComment remains native");
   assert.equal((controls.match(/<button/g) ?? []).length, 1, "fm-toggle stays native");
-  assert.equal((controls.match(/<select/g) ?? []).length, 2, "filter selects stay native under the ChangeEventHandler contract");
+  assert.match(controls, /onSourceSystemChange: \(value: string \| null\) => void/);
+  assert.match(controls, /value=\{selectedSourceSystemId \|\| null\}/);
+  assert.match(controls, /trigger=\{<div>\{sourceSystemSelect\}<\/div>\}/);
+  assert.match(controls, /content=\{selectedSourceSystemLabel\}/);
+  assert.match(controls, /value: String\(getSourceSystemId\(item\)\)/);
+  assert.match(controls, /label: formatSystemLabel\(item\)/);
+  assert.match(page, /const setDraftSourceSystem = \(value: string \| null\) =>/);
 });
 
 test("field mapping page uses adapters for actions and pagination", () => {

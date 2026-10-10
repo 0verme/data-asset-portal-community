@@ -6,6 +6,7 @@ import {
   buildFieldMappingRequestFilters,
   buildLinkedFilters,
   formatSystemLabel,
+  getSourceSystemId,
   compareValues,
   isLinkedRoute,
   isTransformRule,
@@ -55,7 +56,13 @@ test("field mapping comparison and sort markers preserve direction", () => {
   assert.equal(sortMarker({ key: "srcTable", direction: "asc" }, "targetTable"), "");
 });
 
-test("system labels use name and code without exposing the primary key", () => {
-  assert.equal(formatSystemLabel({ id: 101, name: "会员档案数据源", systemCode: "MEM" }), "会员档案数据源 · MEM");
-  assert.doesNotMatch(formatSystemLabel({ id: 101, name: "会员档案数据源", systemCode: "MEM" }), /101|#/);
+test("source system labels use names and codes without exposing primary keys or truncating long values", () => {
+  const system = { id: 101, sourceSystemId: 101, name: "会员档案数据源", systemCode: "MEM" };
+  assert.equal(getSourceSystemId(system), 101);
+  assert.equal(formatSystemLabel(system), "会员档案数据源 · MEM");
+  assert.doesNotMatch(formatSystemLabel(system), /101|#/);
+
+  const longName = "客户关系管理平台".repeat(12);
+  const longCode = `CRM-${"LONG-CODE-".repeat(8)}`;
+  assert.equal(formatSystemLabel({ id: 202, name: longName, systemCode: longCode }), `${longName} · ${longCode}`);
 });

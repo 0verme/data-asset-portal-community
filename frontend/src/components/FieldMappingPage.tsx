@@ -388,6 +388,10 @@ export function FieldMappingPage({
     setDraftFilters((current) => ({ ...current, [key]: value }));
   };
 
+  const setDraftSourceSystem = (value: string | null) => {
+    setDraftFilters((current) => ({ ...current, sourceSystemId: value ?? "" }));
+  };
+
   const toggleSort = (key: string) => {
     setPage(1);
     setSort((current) => {
@@ -599,6 +603,7 @@ export function FieldMappingPage({
         sourceSystems={sourceSystems}
         onToggle={() => setFilterOpen((current) => !current)}
         onChange={setDraftValue}
+        onSourceSystemChange={setDraftSourceSystem}
         onReset={handleResetFilters}
         onApply={() => {
           setPage(1);
