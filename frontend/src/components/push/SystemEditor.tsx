@@ -4,7 +4,7 @@ import type { PushSystemItem } from "../../data/pushSystems.ts";
 import { getLegacyAwareOptions, isLegacyDictValue, normalizeDictOptions, type OptionInputItem, type DictOption } from "../../utils/optionUtils.ts";
 import { isValidLatestOutputTime, normalizeLatestOutputTime } from "../../utils/push.ts";
 import { optionLabel } from "../../utils/ui.ts";
-import { ActionErrorBanner, BinaryStatusToggle, confirmDeleteAction, DangerZone, FormActionBar, PageHeader, TimeInput } from "../common/index.ts";
+import { ActionErrorBanner, BinaryStatusToggle, confirmDeleteAction, DangerZone, FormActionBar, PageHeader } from "../common/index.ts";
 import {
   DEFAULT_AUTH_OPTIONS,
   DEFAULT_PROTOCOL_OPTIONS,
@@ -158,7 +158,7 @@ export function SystemEditor({
   };
 
   return (
-    <div>
+    <div className="push-system-editor">
       <PageHeader
         back={{ onClick: onCancel, text: isEdit ? "返回上一层" : "返回下游推送" }}
         breadcrumbs={[
@@ -212,11 +212,13 @@ export function SystemEditor({
           </div>
           <div className="fl">
             <label>最晚出数时间</label>
-            <TimeInput
-              className="inp mono"
+            <Input
+              type="time"
+              step={60}
+              className={`inp mono${touched && !isValidLatestOutputTime(form.importanceLevel, form.latestOutputTime) ? " invalid" : ""}`}
               value={form.latestOutputTime}
               onChange={(event) => setValue("latestOutputTime", event.target.value)}
-              invalid={touched && !isValidLatestOutputTime(form.importanceLevel, form.latestOutputTime)}
+              aria-invalid={touched && !isValidLatestOutputTime(form.importanceLevel, form.latestOutputTime) || undefined}
               disabled={form.importanceLevel !== "important"}
               aria-label="最晚出数时间"
               aria-describedby="latest-output-time-hint"

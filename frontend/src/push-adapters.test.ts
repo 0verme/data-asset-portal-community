@@ -13,7 +13,8 @@ test("push views use the frozen DAP adapters", () => {
   assert.match(view, /import \{ Button \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.match(view, /<Button[\s\S]*?className="btn primary"[\s\S]*?variant="primary"/);
   assert.match(systemEditor, /import \{ Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
-  assert.equal((systemEditor.match(/<Input/g) ?? []).length, 8);
+  assert.equal((systemEditor.match(/<Input/g) ?? []).length, 9);
+  assert.match(systemEditor, /<Input\s+type="time"\s+step=\{60\}/);
   assert.equal((systemEditor.match(/<Select<string>/g) ?? []).length, 4);
   assert.equal((systemEditor.match(/<Textarea/g) ?? []).length, 1);
   assert.match(systemEditor, /placeholder="请选择归属部门"/);
