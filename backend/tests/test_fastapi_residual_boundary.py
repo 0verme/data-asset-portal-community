@@ -41,13 +41,13 @@ class FastApiRepositoryBoundaryTests(unittest.TestCase):
         ):
             self.assertIn(path, paths)
 
-    def test_unrelated_wait_db_routes_remain_unregistered(self):
+    def test_indicator_path_route_is_migrated_without_restoring_common_codes(self):
         app = create_fastapi_app(
             capabilities=self.capabilities,
             identity_resolver=lambda _request: None,
         )
         paths = set(app.openapi()["paths"])
-        self.assertNotIn("/api/indicator-path/tree", paths)
+        self.assertIn("/api/indicator-path/tree", paths)
         self.assertNotIn("/api/common-codes/categories", paths)
 
 

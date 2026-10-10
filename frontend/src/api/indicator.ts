@@ -163,12 +163,30 @@ function writeStore(items: MockIndicatorItem[]): void {
   mockIndicators = clone(items);
 }
 
-function normalizePathTree(payload: unknown): unknown[] {
-  if (Array.isArray(payload)) return clone(payload);
-  const record = payload as Record<string, unknown> | null | undefined;
-  if (record && Array.isArray(record['items'])) return clone(record['items']);
-  if (record?.['data'] && Array.isArray(record['data'])) return clone(record['data']);
-  return [];
+function normalizeIndicatorPathNode(item: unknown): unknown {
+  if (item === null || typeof item !== 'object' || Array.isArray(item)) return item;
+  const record = clone(item as Record<string, unknown>);
+  const dimension = firstPresent(record, ['dimension', 'dimensionCode', 'dimension_code']);
+  const children = Array.isArray(record['children'])
+    ? record['children'].map(normalizeIndicatorPathNode)
+    : undefined;
+  return {
+    ...record,
+    ...(dimension ? { dimension } : {}),
+    ...(children ? { children } : {}),
+  };
+}
+
+export function normalizeIndicatorPathTree(payload: unknown): unknown[] {
+  let items: unknown[];
+  if (Array.isArray(payload)) items = payload;
+  else {
+    const record = payload as Record<string, unknown> | null | undefined;
+    if (record && Array.isArray(record['items'])) items = record['items'];
+    else if (record && Array.isArray(record['data'])) items = record['data'];
+    else return [];
+  }
+  return clone(items).map(normalizeIndicatorPathNode);
 }
 
 export async function getIndicatorList(params: IndicatorQueryParams = {}): Promise<MockIndicatorItem[]> {
@@ -192,7 +210,7 @@ export async function getIndicatorDetail(indicatorId: string): Promise<MockIndic
 export async function getIndicatorPathTree(params: Record<string, unknown> = {}): Promise<unknown[]> {
   if (API_MODE === 'remote') {
     const payload = await requestRemote('/indicator-path/tree', { params });
-    return normalizePathTree(payload);
+    return normalizeIndicatorPathTree(payload);
   }
   return clone(INDICATOR_PATH_OPTIONS) as unknown[];
 }

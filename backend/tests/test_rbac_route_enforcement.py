@@ -47,6 +47,7 @@ class RoutePermissionInventoryTests(unittest.TestCase):
         "/api/roots/{abbr}",
         "/api/indicators",
         "/api/indicators/{indicator_id}",
+        "/api/indicator-path/tree",
         "/api/reports",
         "/api/reports/{report_code}",
         "/api/api-assets",

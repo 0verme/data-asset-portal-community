@@ -29,12 +29,16 @@ class IndicatorPathService:
         return self._db.fetch_rows(statement)
 
     def get_path_tree(self, dimension_code=None):
+        """Return enabled path nodes, optionally narrowed to one dimension code.
+
+        A dimension filter matches node codes case-insensitively and keeps the
+        path's ancestors plus the matched node's full subtree so the response
+        remains a navigable tree at every hierarchy level.
+        """
+        normalized_dimension = str(dimension_code or "").strip().casefold()
         where = [
             indicator_path_config.c.status.in_(("enabled", "ENABLED", "启用")),
         ]
-        if dimension_code:
-            normalized = str(dimension_code).strip().upper()
-            where.append(indicator_path_config.c.dimension_code == normalized)
         statement = (
             select(
                 indicator_path_config.c.id,
@@ -92,7 +96,33 @@ class IndicatorPathService:
                 node["children"] = [build_tree(child_id) for child_id in child_ids]
             return node
 
-        return [build_tree(node_id) for node_id in root_ids]
+        tree = [build_tree(node_id) for node_id in root_ids]
+        if not normalized_dimension:
+            return tree
+
+        def retain_matching_branches(node):
+            node_dimension = str(node.get("dimensionCode") or "").strip().casefold()
+            if node_dimension == normalized_dimension:
+                return node
+
+            filtered_children = []
+            for child in node.get("children", []):
+                filtered_child = retain_matching_branches(child)
+                if filtered_child is not None:
+                    filtered_children.append(filtered_child)
+            if not filtered_children:
+                return None
+
+            filtered_node = {key: value for key, value in node.items() if key != "children"}
+            filtered_node["children"] = filtered_children
+            return filtered_node
+
+        filtered_tree = []
+        for root in tree:
+            filtered_root = retain_matching_branches(root)
+            if filtered_root is not None:
+                filtered_tree.append(filtered_root)
+        return filtered_tree
 
 
 indicator_path_service = IndicatorPathService()

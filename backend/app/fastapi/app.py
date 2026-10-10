@@ -13,6 +13,7 @@ from ..services.assets_service import assets_service
 from ..services.auth_service import auth_service
 from ..services.field_mapping_service import field_mapping_service
 from ..services.indicator_service import indicator_service
+from ..services.indicator_path_service import indicator_path_service
 from ..services.manual_code_table_service import manual_code_table_service
 from ..services.metadata_ingestion_service import (
     metadata_ingestion_service,  # type: ignore
@@ -40,6 +41,7 @@ from .routers.assets import _register_asset_routes
 from .routers.auth import _register_auth_routes  # pyright: ignore[reportMissingImports]
 from .routers.field_mappings import _register_field_mapping_routes
 from .routers.indicators import _register_indicator_routes
+from .routers.indicator_path import _register_indicator_path_routes
 from .routers.infrastructure import _register_infrastructure_routes
 from .routers.lineage import _register_lineage_routes, lineage_service
 from .routers.manual_code_tables import _register_manual_code_table_routes
@@ -61,6 +63,7 @@ def create_fastapi_app(
     search_provider_instance: Any | None = None,
     search_hot_keyword_service_instance: Any | None = None,
     indicator_service_instance: Any | None = None,
+    indicator_path_service_instance: Any | None = None,
     assets_service_instance: Any | None = None,
     field_mapping_service_instance: Any | None = None,
     root_service_instance: Any | None = None,
@@ -122,6 +125,7 @@ def create_fastapi_app(
     search = search_provider_instance or search_provider
     hot_keywords = search_hot_keyword_service_instance or search_hot_keyword_service
     indicator = indicator_service_instance or indicator_service
+    indicator_paths = indicator_path_service_instance or indicator_path_service
     assets = assets_service_instance or assets_service
     field_mapping = field_mapping_service_instance or field_mapping_service
     root = root_service_instance or root_service
@@ -154,6 +158,7 @@ def create_fastapi_app(
     # External dependencies report their own diagnostic errors at request time;
     # they do not turn an existing source module into a 404.
     _register_indicator_routes(app, indicator)
+    _register_indicator_path_routes(app, indicator_paths)
     _register_asset_routes(app, assets)
     _register_field_mapping_routes(app, field_mapping)
     _register_root_routes(app, root)

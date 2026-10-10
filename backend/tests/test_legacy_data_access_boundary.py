@@ -149,7 +149,11 @@ class ParameterBindingRegressionTests(unittest.TestCase):
         indicator._db.fetch_rows = MagicMock(return_value=[])
         indicator.get_path_tree(malicious)
         indicator_statement = indicator._db.fetch_rows.call_args.args[0]
-        self.assert_bound(indicator_statement, malicious.upper())
+        for dialect in DIALECTS:
+            with self.subTest(dialect=dialect.name):
+                compiled = indicator_statement.compile(dialect=dialect)
+                self.assertNotIn(malicious, str(compiled))
+                self.assertNotIn(malicious.upper(), str(compiled))
 
         audit = OperationLogService()
         audit_statement = audit._build_audit_insert_statement(
