@@ -617,14 +617,27 @@ class CommunityDemoSeedTests(unittest.TestCase):
                     with redirect_stdout(output):
                         render_demo_seed_sql()
                 sql = output.getvalue()
-                path_start = sql.index("INSERT INTO dwp.p_indicator_path_config ")
+                path_guard_start = sql.index(
+                    "INSERT INTO dwp.p_indicator_path_config (id)"
+                )
+                indicator_guard_start = sql.index(
+                    "INSERT INTO dwp.p_indicator_item (indicator_pk)"
+                )
+                path_start = sql.rindex("INSERT INTO dwp.p_indicator_path_config ")
                 path_end = sql.index(";", path_start)
                 path_insert = sql[path_start:path_end]
-                indicator_start = sql.index("INSERT INTO dwp.p_indicator_item ")
+                indicator_start = sql.rindex("INSERT INTO dwp.p_indicator_item ")
                 indicator_end = sql.index(";", indicator_start)
                 indicator_insert = sql[indicator_start:indicator_end]
 
-                self.assertIn("-- Existing indicator path/indicator rows are insert-only", sql)
+                self.assertIn(
+                    "-- Preflight rejects conflicting existing indicator path/indicator rows",
+                    sql,
+                )
+                self.assertIn("existing.path_code = 'PRD'", sql)
+                self.assertIn("existing.path_desc", sql)
+                self.assertLess(path_guard_start, sql.index("-- p_admin_user is not seeded"))
+                self.assertLess(indicator_guard_start, sql.index("-- p_admin_user is not seeded"))
                 self.assertIn("ON CONFLICT (id) DO NOTHING", path_insert)
                 self.assertIn("ON CONFLICT (indicator_pk) DO NOTHING", indicator_insert)
                 self.assertFalse(any(f"'{code}'" not in path_insert for code in path_codes))
