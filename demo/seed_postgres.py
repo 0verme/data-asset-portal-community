@@ -55,12 +55,12 @@ def values(items):
 def conflict_guard_sql(table, spec, primary_key, natural_keys=()):
     """Render an insert-only guard that aborts on conflicting seeded rows.
 
-    The deliberate duplicate-primary-key INSERT has no matching rows when the
-    existing Demo data is canonical. A mismatching row with the same primary or
-    natural key makes the enclosing transaction fail before any seed writes.
+    Each SELECT returns the existing primary key plus valid canonical row
+    values. It has no result for matching Demo data; a mismatch deliberately
+    violates the primary key before any seed writes.
     """
     columns = spec["columns"]
-    guard_conditions = []
+    branches = []
     for row in spec["rows"]:
         identity_conditions = []
         for key in (primary_key, *natural_keys):
@@ -78,23 +78,31 @@ def conflict_guard_sql(table, spec, primary_key, natural_keys=()):
                 mismatch_conditions.append(
                     f"(existing.{column} IS NULL OR existing.{column} <> {literal(value)})"
                 )
-        guard_conditions.append(
-            "((" + " OR ".join(identity_conditions) + ") AND ("
+        selected_values = ", ".join(
+            f"existing.{column}"
+            if column == primary_key
+            else literal(value)
+            for column, value in zip(columns, row)
+        )
+        branches.append(
+            f"SELECT {selected_values}\n"
+            f"FROM dwp.{table} AS existing\n"
+            "WHERE ("
+            + " OR ".join(identity_conditions)
+            + ") AND ("
             + " OR ".join(mismatch_conditions)
-            + "))"
+            + ")"
         )
 
-    if not guard_conditions:
+    if not branches:
         return ""
     return (
         "-- Fail fast before seed writes if an existing row matches a canonical "
         "ID/natural key but differs from the Demo contract.\n"
-        "-- A conflict intentionally triggers a duplicate-primary-key error.\n"
-        f"INSERT INTO dwp.{table} ({primary_key})\n"
-        f"SELECT existing.{primary_key}\n"
-        f"FROM dwp.{table} AS existing\n"
-        "WHERE\n  "
-        + "\n  OR ".join(guard_conditions)
+        "-- Canonical values satisfy row constraints; the deliberate duplicate "
+        "primary key aborts the transaction.\n"
+        f"INSERT INTO dwp.{table} ({', '.join(columns)})\n"
+        + "\nUNION ALL\n".join(branches)
         + ";\n"
     )
 

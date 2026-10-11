@@ -618,10 +618,10 @@ class CommunityDemoSeedTests(unittest.TestCase):
                         render_demo_seed_sql()
                 sql = output.getvalue()
                 path_guard_start = sql.index(
-                    "INSERT INTO dwp.p_indicator_path_config (id)"
+                    "INSERT INTO dwp.p_indicator_path_config ("
                 )
                 indicator_guard_start = sql.index(
-                    "INSERT INTO dwp.p_indicator_item (indicator_pk)"
+                    "INSERT INTO dwp.p_indicator_item ("
                 )
                 path_start = sql.rindex("INSERT INTO dwp.p_indicator_path_config ")
                 path_end = sql.index(";", path_start)
