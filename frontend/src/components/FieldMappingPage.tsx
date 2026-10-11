@@ -57,6 +57,7 @@ import {
   type FieldMappingFilters as FieldMappingFilterState,
   type FieldMappingSort,
 } from "./fieldMapping/fieldMappingUtils.ts";
+import type { FieldMappingStatsStatus } from "./fieldMapping/fieldMappingStatsState.ts";
 import { Icon } from "./ui.tsx";
 import { Button, Select } from "../ui/index.ts";
 
@@ -241,6 +242,7 @@ export function FieldMappingPage({
     async function loadData(): Promise<void> {
       setLoading(true);
       setError("");
+      setStats(null);
       try {
         const baseParams: FieldMappingQueryParams = {
           ...requestFilters,
@@ -321,6 +323,13 @@ export function FieldMappingPage({
   };
   const linkedView = isLinkedRoute(route);
   const currentSourceLabel = resolveSourceSystemLabel(route, sourceSystems);
+  const statsStatus: FieldMappingStatsStatus = error
+    ? "error"
+    : loading
+      ? "loading"
+      : stats
+        ? "ready"
+        : "unknown";
 
   const sortedFieldRows = useMemo(
     () => sortMappingRows(fieldRows, sort),
@@ -595,7 +604,7 @@ export function FieldMappingPage({
         </section>
       ) : null}
 
-      <FieldMappingStats stats={stats} />
+      <FieldMappingStats stats={stats} status={statsStatus} />
 
       <FieldMappingFilters
         open={filterOpen}

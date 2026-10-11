@@ -313,6 +313,21 @@ class FieldMappingSortingTests(unittest.TestCase):
                     all(not item["srcComment"].strip() for item in items[3:])
                 )
 
+    def test_stats_endpoint_field_count_matches_filtered_field_page_total(self):
+        with patch.dict(os.environ, {"PUBLIC_CATALOG_PROFILE": "internal"}):
+            for params in (
+                {"sourceSystemId": "101"},
+                {"srcTable": "no_matching_table"},
+            ):
+                with self.subTest(params=params):
+                    stats = self.client.get("/api/field-mappings/stats", params=params)
+                    fields = self.client.get("/api/field-mappings/fields", params=params)
+                    self.assertEqual(200, stats.status_code, stats.text)
+                    self.assertEqual(200, fields.status_code, fields.text)
+                    self.assertEqual(
+                        fields.json()["total"], stats.json()["data"]["fieldCount"]
+                    )
+
     def test_null_empty_and_whitespace_values_keep_mapping_stats_and_filters_correct(self):
         self._insert_extra_mapping(
             source_id=20,

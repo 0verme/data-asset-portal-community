@@ -8,6 +8,11 @@ import {
   getSourceSystemId,
   type FieldMappingFilters,
 } from "./fieldMappingUtils.ts";
+import {
+  fieldMappingStatDisplayValue,
+  fieldMappingStatsDisplayHint,
+  type FieldMappingStatsStatus,
+} from "./fieldMappingStatsState.ts";
 
 interface StatCardProps {
   label: string;
@@ -27,40 +32,49 @@ function StatCard({ label, value, hint }: StatCardProps) {
 
 export interface FieldMappingStatsProps {
   stats?: FieldMappingStats | null | undefined;
+  status?: FieldMappingStatsStatus | undefined;
 }
 
-export function FieldMappingStats({ stats }: FieldMappingStatsProps) {
+export function FieldMappingStats({
+  stats,
+  status = stats ? "ready" : "unknown",
+}: FieldMappingStatsProps) {
+  const value = (count: number | undefined) =>
+    fieldMappingStatDisplayValue(count, status);
+  const hint = (readyHint: string) =>
+    fieldMappingStatsDisplayHint(status, readyHint);
+
   return (
     <div className="fm-stats">
       <StatCard
         label="源系统"
-        value={stats?.sourceSystemCount ?? "-"}
-        hint="已纳管映射来源"
+        value={value(stats?.sourceSystemCount)}
+        hint={hint("已纳管映射来源")}
       />
       <StatCard
         label="表维度"
-        value={stats?.sourceTableCount ?? "-"}
-        hint="参与映射的全量表数"
+        value={value(stats?.sourceTableCount)}
+        hint={hint("参与映射的全量表数")}
       />
       <StatCard
         label="字段维度"
-        value={stats?.fieldCount ?? "-"}
-        hint="字段映射明细总数"
+        value={value(stats?.fieldCount)}
+        hint={hint("字段映射明细总数")}
       />
       <StatCard
         label="已映射"
-        value={stats?.mappedFieldCount ?? "-"}
-        hint={`覆盖率 ${stats?.coverage ?? 0}%`}
+        value={value(stats?.mappedFieldCount)}
+        hint={stats ? `覆盖率 ${stats.coverage}%` : hint("")}
       />
       <StatCard
         label="待补充"
-        value={stats?.unmappedFieldCount ?? "-"}
-        hint="目标字段尚未落位"
+        value={value(stats?.unmappedFieldCount)}
+        hint={hint("目标字段尚未落位")}
       />
       <StatCard
         label="空注释"
-        value={stats?.emptyCommentCount ?? "-"}
-        hint="源字段注释缺失"
+        value={value(stats?.emptyCommentCount)}
+        hint={hint("源字段注释缺失")}
       />
     </div>
   );

@@ -337,7 +337,7 @@ class FieldMappingTableItem(ContractModel):
 class MappingStats(ContractModel):
     sourceSystemCount: int = 0
     sourceTableCount: int = 0
-    fieldCount: int = 0
+    fieldCount: int = Field(ge=0)
     mappedFieldCount: int = 0
     unmappedFieldCount: int = 0
     emptyCommentCount: int = 0
