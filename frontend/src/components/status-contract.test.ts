@@ -18,6 +18,12 @@ const manualHookPath = fileURLToPath(
 const manualPagePath = fileURLToPath(
   new URL("./ManualCodeTablePage.tsx", import.meta.url),
 );
+const manualSidebarPath = fileURLToPath(
+  new URL("./sidebar/ManualCodeTableSidebar.tsx", import.meta.url),
+);
+const moduleSidebarPath = fileURLToPath(
+  new URL("./app/ModuleSidebar.tsx", import.meta.url),
+);
 const manualApiPath = fileURLToPath(
   new URL("../api/manualCodeTables.ts", import.meta.url),
 );
@@ -59,6 +65,24 @@ test("legacy binary values are read as canonical values without becoming options
       { value: "disabled", name: "禁用" },
     ],
   );
+});
+
+test("manual code-table status remains a filter separate from row mutations and exports", async () => {
+  const [hook, page, sidebar, moduleSidebar] = await Promise.all([
+    read(manualHookPath),
+    read(manualPagePath),
+    read(manualSidebarPath),
+    read(moduleSidebarPath),
+  ]);
+
+  assert.match(sidebar, /<StatusFilterGroup[\s\S]*?value=\{module\.statusFilter\}[\s\S]*?onChange=\{\(status\) => module\.setStatusFilter\(status \|\| ""\)\}/);
+  assert.match(sidebar, /getManualCodeTableFacetCounts/);
+  assert.doesNotMatch(sidebar, /module\.changeStatus/);
+  assert.match(moduleSidebar, /query=\{context\.query\}/);
+  assert.doesNotMatch(page, /aria-label="状态筛选"|code-table-status-filter/);
+  assert.match(page, /code-table-active-filters/);
+  assert.match(page, /module\.changeStatus/);
+  assert.match(hook, /keyword: query \|\| '',[\s\S]*?style: styleFilter,[\s\S]*?status: statusFilter/);
 });
 
 test("manual code table surfaces only expose the binary status contract", async () => {

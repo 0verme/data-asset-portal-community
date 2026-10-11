@@ -44,7 +44,7 @@ export const MANUAL_CODE_TABLES: readonly MockManualCodeTable[] = [
     id: "4",
     tableCode: "MAP_PRODUCT_CATEGORY",
     tableName: "商品类目映射表",
-    style: "mapping",
+    style: "map",
     owner: "演示数据维护组",
     status: "enabled",
     remark: "统一各渠道商品类目。",
