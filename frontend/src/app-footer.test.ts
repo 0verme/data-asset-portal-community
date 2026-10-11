@@ -12,7 +12,11 @@ test("application footer keeps the version and exposes the project GitHub link",
     app,
     /<a\s+className="app-footer-link"\s+href="https:\/\/github\.com\/0verme\/data-asset-portal-community"\s+target="_blank"\s+rel="noopener noreferrer"[\s\S]*?GitHub ↗/
   );
-  assert.match(styles, /\.app-footer \{[\s\S]*?flex-wrap: wrap;[\s\S]*?gap: 0 8px;/);
-  assert.match(styles, /\.app-footer-link \{[\s\S]*?color: var\(--ink-3\);[\s\S]*?white-space: nowrap;/);
-  assert.match(styles, /\.app-footer-link:hover \{[\s\S]*?color: var\(--ink-2\);/);
+  assert.match(styles, /\.app-footer-shell \{[\s\S]*?border-top: 1px solid var\(--line\);[\s\S]*?background: transparent;/);
+  assert.match(
+    styles,
+    /\.app-footer \{[\s\S]*?flex-wrap: wrap;[\s\S]*?gap: 0 8px;[\s\S]*?padding: 0;[\s\S]*?border: 0;[\s\S]*?border-radius: 0;[\s\S]*?background: transparent;[\s\S]*?box-shadow: none;[\s\S]*?color: var\(--ink-2\);/
+  );
+  assert.match(styles, /\.app-footer-link \{[\s\S]*?color: var\(--ink-2\);[\s\S]*?white-space: nowrap;/);
+  assert.match(styles, /\.app-footer-link:hover \{[\s\S]*?color: var\(--ink\);/);
 });

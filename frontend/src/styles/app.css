@@ -594,25 +594,26 @@
     flex: 0 0 auto;
     display: flex;
     justify-content: center;
-    padding: 10px 24px 14px;
-    border-top: 0.5px solid var(--line);
-    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    padding: 8px 24px;
+    border-top: 1px solid var(--line);
+    background: transparent;
   }
   .app-footer {
-    min-height: 34px;
+    min-height: 20px;
     max-width: min(100%, 920px);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
     gap: 0 8px;
-    padding: 7px 18px;
-    border: 0.5px solid var(--line-strong);
-    border-radius: 999px;
-    background: var(--surface);
-    box-shadow: var(--shadow-sm);
-    color: var(--ink-3);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ink-2);
     font-size: 12px;
+    line-height: 1.4;
     text-align: center;
   }
   .app-footer-copy {
@@ -623,14 +624,14 @@
     color: var(--line-strong);
   }
   .app-footer-link {
-    color: var(--ink-3);
+    color: var(--ink-2);
     font-weight: 500;
     white-space: nowrap;
     text-decoration: none;
     transition: color 0.15s ease;
   }
   .app-footer-link:hover {
-    color: var(--ink-2);
+    color: var(--ink);
   }
   .app-footer-link:focus-visible {
     outline: 2px solid var(--accent-line);
@@ -2608,11 +2609,7 @@
     }
 
     .app-footer-shell {
-      padding: 10px 16px 14px;
-    }
-
-    .app-footer {
-      padding: 7px 16px;
+      padding: 8px 16px;
     }
 
     .tbl-wrap {
@@ -2854,11 +2851,7 @@
     }
 
     .app-footer-shell {
-      padding: 10px 12px 14px;
-    }
-
-    .app-footer {
-      padding: 7px 14px;
+      padding: 8px 12px;
     }
 
     .page-title {
