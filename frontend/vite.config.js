@@ -48,6 +48,7 @@ export default defineConfig(({ mode }) => {
         allow: [
           searchForWorkspaceRoot(process.cwd()),
           fileURLToPath(new URL("../config", import.meta.url)),
+          fileURLToPath(new URL("../demo", import.meta.url)),
         ],
       },
       proxy: apiMode === "remote" ? {

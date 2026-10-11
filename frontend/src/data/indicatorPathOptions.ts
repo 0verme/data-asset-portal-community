@@ -1,93 +1,16 @@
+import demoIndicatorPathTree from "../../../demo/datasets/indicator_paths.json" with {
+  type: "json",
+};
+
 export const INDICATOR_PATH_SEPARATOR = " > ";
 
-type TopicGroup = [string, readonly string[]];
-type DimensionSpec = [string, string, string, readonly TopicGroup[]];
-
-const DIMENSIONS: readonly DimensionSpec[] = [
-  [
-    "prd",
-    "PRD",
-    "商品维度",
-    [
-      ["商品运营", ["规模", "动销"]],
-      ["价格分析", ["价格", "变更"]],
-    ],
-  ],
-  [
-    "mem",
-    "MEM",
-    "会员维度",
-    [
-      ["会员增长", ["新增"]],
-      ["会员活跃", ["活跃", "互动"]],
-      ["会员价值", ["复购", "分层"]],
-    ],
-  ],
-  [
-    "ord",
-    "ORD",
-    "交易维度",
-    [
-      ["销售分析", ["规模", "订单", "效率"]],
-      ["商品分析", ["件单"]],
-    ],
-  ],
-  [
-    "str",
-    "STR",
-    "门店维度",
-    [
-      ["门店经营", ["销售", "目标"]],
-      ["客流分析", ["客流", "转化"]],
-    ],
-  ],
-  [
-    "inv",
-    "INV",
-    "库存维度",
-    [
-      ["库存健康", ["库存", "缺货", "在途"]],
-      ["库存效率", ["周转"]],
-      ["补货管理", ["建议"]],
-    ],
-  ],
-  [
-    "mkt",
-    "MKT",
-    "营销维度",
-    [
-      ["活动效果", ["曝光", "互动", "转化"]],
-      ["优惠分析", ["用券"]],
-    ],
-  ],
-  [
-    "ful",
-    "FUL",
-    "履约维度",
-    [
-      ["配送效率", ["规模", "时效"]],
-      ["履约质量", ["异常"]],
-    ],
-  ],
-  [
-    "svc",
-    "SVC",
-    "售后维度",
-    [
-      ["退换货", ["申请", "质量"]],
-      ["退款处理", ["金额"]],
-      ["客户服务", ["效率"]],
-      ["客户声音", ["评价"]],
-    ],
-  ],
-] as const;
-
-export const INDICATOR_DIMENSION_CODE_MAP: Record<string, string> =
-  Object.fromEntries(DIMENSIONS.map(([value, code]) => [value, code]));
-export const INDICATOR_DIMENSION_VALUE_MAP: Record<string, string> =
-  Object.fromEntries(DIMENSIONS.map(([value, code]) => [code, value]));
-export const INDICATOR_DIMENSION_LABEL_MAP: Record<string, string> =
-  Object.fromEntries(DIMENSIONS.map(([value, , label]) => [label, value]));
+type PathCatalogNode = {
+  pathCode: string;
+  pathName: string;
+  dimensionCode?: string;
+  sortOrder: number;
+  children?: readonly PathCatalogNode[];
+};
 
 export interface IndicatorPathOptionNode {
   label: string;
@@ -97,18 +20,52 @@ export interface IndicatorPathOptionNode {
   children?: IndicatorPathOptionNode[];
 }
 
-export const INDICATOR_PATH_OPTIONS: IndicatorPathOptionNode[] = DIMENSIONS.map(
-  ([dimension, code, label, groups]) => ({
-    label: `${code} ${label}`,
-    value: code,
-    pathLabel: code,
+const PATH_CATALOG = demoIndicatorPathTree as unknown as readonly PathCatalogNode[];
+
+function orderedChildren(node: PathCatalogNode): readonly PathCatalogNode[] {
+  return [...(node.children || [])].sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+function toPathOption(
+  node: PathCatalogNode,
+  dimension: string,
+  isRoot = false,
+): IndicatorPathOptionNode {
+  const pathLabel = isRoot ? node.pathCode : node.pathName;
+  const children = orderedChildren(node).map((child) =>
+    toPathOption(child, dimension),
+  );
+  return {
+    label: isRoot ? `${node.pathCode} ${node.pathName}` : node.pathName,
+    value: pathLabel,
+    pathLabel,
     dimension,
-    children: groups.map(([group, topics]) => ({
-      label: group,
-      value: group,
-      children: topics.map((topic) => ({ label: topic, value: topic })),
-    })),
-  }),
+    ...(children.length ? { children } : {}),
+  };
+}
+
+const ROOTS = [...PATH_CATALOG].sort(
+  (left, right) => left.sortOrder - right.sortOrder,
+);
+
+export const INDICATOR_DIMENSION_CODE_MAP: Record<string, string> =
+  Object.fromEntries(
+    ROOTS.map((root) => [root.dimensionCode || "", root.pathCode]),
+  );
+export const INDICATOR_DIMENSION_VALUE_MAP: Record<string, string> =
+  Object.fromEntries(
+    ROOTS.map((root) => [root.pathCode.toUpperCase(), root.dimensionCode || ""]),
+  );
+export const INDICATOR_DIMENSION_LABEL_MAP: Record<string, string> =
+  Object.fromEntries(
+    ROOTS.flatMap((root) => [
+      [root.pathName, root.dimensionCode || ""],
+      [`${root.pathCode} ${root.pathName}`, root.dimensionCode || ""],
+    ]),
+  );
+
+export const INDICATOR_PATH_OPTIONS: IndicatorPathOptionNode[] = ROOTS.map(
+  (root) => toPathOption(root, root.dimensionCode || "", true),
 );
 
 export function splitIndicatorPath(path?: unknown): string[] {

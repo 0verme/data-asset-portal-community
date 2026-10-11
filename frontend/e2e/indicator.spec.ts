@@ -57,6 +57,12 @@ test("admin indicator editor uses adapter controls and keeps the DAP cascader", 
   const meaning = page.getByLabel("指标含义");
   await expect(meaning).toHaveClass(/dap-ui-textarea/);
   await expect(page.locator(".indicator-path-cascader")).toBeVisible();
+  const pathTrigger = page.locator(".indicator-path-trigger");
+  await pathTrigger.click();
+  await page.locator(".indicator-path-option").filter({ hasText: "PRD 商品维度" }).click();
+  await page.locator(".indicator-path-option").filter({ hasText: "商品运营" }).click();
+  await page.locator(".indicator-path-option").filter({ hasText: "规模" }).click();
+  await expect(pathTrigger).toContainText("PRD > 商品运营 > 规模");
 
   await page.getByRole("button", { name: "取消", exact: true }).click();
   await page.getByRole("button", { name: "放弃修改" }).click();

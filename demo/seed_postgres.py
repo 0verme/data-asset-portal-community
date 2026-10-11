@@ -56,7 +56,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dialect", choices=("postgres", "dws"), default="postgres")
     args = parser.parse_args()
+    seed_plan = {**rbac_seed_plan(), **community_seed_plan()}
     print(f"-- full-channel retail demo seed: {args.dialect}")
+    print("-- Existing indicator path/indicator rows are insert-only; review legacy conflicts before applying to a previously seeded database.")
     print("BEGIN;")
     print(
         "-- p_admin_user is not seeded here: create the first admin with"
@@ -64,7 +66,6 @@ def main():
     print(
         "-- backend/scripts/reset_all_user_passwords.py after first startup."
     )
-    seed_plan = {**rbac_seed_plan(), **community_seed_plan()}
     for table, spec in seed_plan.items():
         if not spec["rows"]:
             continue
