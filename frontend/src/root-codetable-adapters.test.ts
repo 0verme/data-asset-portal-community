@@ -29,13 +29,16 @@ test("root pages keep the documented native exceptions only", () => {
 });
 
 test("code-table page uses frozen DAP adapters without raw controls", () => {
-  assert.match(codeTablePage, /import \{ Button, Input, Select, Textarea \} from "\.\.\/ui\/index\.ts"/);
+  assert.match(codeTablePage, /import \{ Button, IconButton, Input, Select, Textarea \} from "\.\.\/ui\/index\.ts"/);
   assert.equal((codeTablePage.match(/<Input/g) ?? []).length, 3);
-  assert.equal((codeTablePage.match(/<Select<string>/g) ?? []).length, 3);
+  assert.equal((codeTablePage.match(/<Select<string>/g) ?? []).length, 2);
   assert.equal((codeTablePage.match(/<Textarea/g) ?? []).length, 1);
   assert.equal((codeTablePage.match(/<Button/g) ?? []).length, 2);
-  assert.match(codeTablePage, /<Select<string> aria-label="状态筛选" placeholder="全部状态" className="inp code-table-status-filter"/);
+  assert.doesNotMatch(codeTablePage, /aria-label="状态筛选"|code-table-status-filter/);
   assert.match(codeTablePage, /<Select<string> aria-label="表样式" placeholder="请选择表样式" className=\{`inp\$\{hasError\("style"\)/);
+  assert.doesNotMatch(codeTablePage, /<input|<select|<textarea/);
   assert.doesNotMatch(codeTablePage, /<input|<select|<textarea|<button/);
+  assert.equal((codeTablePage.match(/<IconButton\b/g) ?? []).length, 2);
+  assert.match(codeTablePage, /className="code-table-filter-clear"/);
   assert.doesNotMatch(codeTablePage, /from "@cloudflare\/kumo\//);
 });

@@ -18,7 +18,7 @@ import {
   confirmDeleteAction,
 } from "./common/index.ts";
 import { Highlight, Icon } from "./ui.tsx";
-import { Button, Input, Select, Textarea } from "../ui/index.ts";
+import { Button, IconButton, Input, Select, Textarea } from "../ui/index.ts";
 
 const STYLE_LABELS: Record<string, string> = Object.fromEntries(MANUAL_CODE_TABLE_STYLES.map((item) => [item.value, item.label]));
 
@@ -125,6 +125,12 @@ export function ManualCodeTablePage({ module, query, canEdit, canExport }: Manua
     ["禁用", module.items.filter((item) => item.status === "disabled").length],
     ["样式种类", new Set(module.items.map((item) => item.style)).size],
   ];
+  const activeStyleLabel = MANUAL_CODE_TABLE_STYLES.find(
+    (style) => style.value === module.styleFilter,
+  )?.label;
+  const activeStatusLabel = module.statusFilter
+    ? MANUAL_CODE_TABLE_STATUS_META[module.statusFilter]?.label
+    : null;
 
   return (
     <div className="asset-page code-table-page">
@@ -143,7 +149,38 @@ export function ManualCodeTablePage({ module, query, canEdit, canExport }: Manua
 
       <div className="tbl-wrap code-table-list">
         <div className="field-toolbar">
-          <Select<string> aria-label="状态筛选" placeholder="全部状态" className="inp code-table-status-filter" items={[{ label: "全部状态", value: "" }, { label: "启用", value: "enabled" }, { label: "禁用", value: "disabled" }]} value={module.statusFilter || null} onValueChange={(value) => module.setStatusFilter(value || "")} />
+          {activeStyleLabel || activeStatusLabel ? (
+            <div className="code-table-active-filters" aria-live="polite">
+              {activeStyleLabel ? (
+                <span className="chip-active">
+                  样式：{activeStyleLabel}
+                  <IconButton
+                    type="button"
+                    className="code-table-filter-clear"
+                    size="sm"
+                    variant="tertiary"
+                    aria-label={`清除样式筛选：${activeStyleLabel}`}
+                    icon={<Icon name="close" size={12} />}
+                    onClick={() => module.setStyleFilter("")}
+                  />
+                </span>
+              ) : null}
+              {activeStatusLabel ? (
+                <span className="chip-active">
+                  状态：{activeStatusLabel}
+                  <IconButton
+                    type="button"
+                    className="code-table-filter-clear"
+                    size="sm"
+                    variant="tertiary"
+                    aria-label={`清除状态筛选：${activeStatusLabel}`}
+                    icon={<Icon name="close" size={12} />}
+                    onClick={() => module.setStatusFilter("")}
+                  />
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <div className="ft-info">共 {module.filteredItems.length} 张码表{query ? `，匹配“${query}”` : ""}</div>
         </div>
         {!module.filteredItems.length ? (

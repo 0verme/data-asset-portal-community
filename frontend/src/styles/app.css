@@ -2440,10 +2440,8 @@
     background: var(--accent-soft);
   }
 
-  .code-table-status-filter {
-    width: 132px;
-    min-height: 34px;
-  }
+  .code-table-page .field-toolbar .code-table-active-filters { display: flex; align-self: flex-start; flex-wrap: wrap; gap: 8px; }
+  .code-table-page .code-table-filter-clear:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; }
 
   .code-table-list table.dt tbody tr {
     cursor: default;
