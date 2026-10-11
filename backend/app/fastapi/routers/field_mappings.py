@@ -50,6 +50,20 @@ def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
             value, profile=profile_for_request(context, authorization)
         )
 
+    def project_mapping_stats_for_request(
+        value: Any, context: RequestContext, authorization: Any
+    ) -> Any:
+        projected = project_for_request(value, context, authorization)
+        # Owner-approved endpoint-scoped contract: keep fieldCount globally hidden,
+        # but return this aggregate on the existing field-mapping stats endpoint.
+        if (
+            isinstance(value, dict)
+            and "fieldCount" in value
+            and isinstance(projected, dict)
+        ):
+            projected["fieldCount"] = value["fieldCount"]
+        return projected
+
     def build_params(
         keyword: str | None,
         data_source_id: str | None,
@@ -166,7 +180,7 @@ def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
             data = current_service.get_stats(params)
         except FieldMappingDataSourceError as error:
             return _service_error_response(error, 500)
-        data = project_for_request(data, context, authorization)
+        data = project_mapping_stats_for_request(data, context, authorization)
         return JSONResponse(
             content=validate_contract({"data": data}, DataEnvelope[MappingStats])
         )

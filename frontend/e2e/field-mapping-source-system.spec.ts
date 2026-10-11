@@ -123,6 +123,11 @@ test("field-mapping source-system Select preserves ids and long labels across th
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/field-mapping");
 
+  if (remoteFixturesEnabled) {
+    const fieldCountCard = page.locator(".fm-stat-card").filter({ hasText: "字段维度" });
+    await expect(fieldCountCard.locator(".fm-stat-value")).toHaveText("0");
+  }
+
   const sourceSystemSelect = page.getByRole("combobox", { name: "源系统" });
   await expect(sourceSystemSelect).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   filterFieldMappingRows,
   getFieldMappingSourceSystems,
+  normalizeFieldMappingStats,
   summarizeTables,
 } from "./fieldMapping.ts";
 import { formatSystemLabel } from "../components/fieldMapping/fieldMappingUtils.ts";
@@ -79,6 +80,20 @@ test("table summaries keep mappings separate by complete business identity", () 
     tables.filter((row) => row.targetTable === "DWF.F_AGT_EXTR_FINANCE_BOOK").length,
     2,
   );
+});
+
+test("field mapping stats preserve a true zero count from the data envelope", () => {
+  const stats = normalizeFieldMappingStats({ data: { fieldCount: 0 } });
+  assert.equal(stats.fieldCount, 0);
+});
+
+test("field mapping stats reject missing or invalid fieldCount instead of defaulting to zero", () => {
+  for (const fieldCount of [undefined, null, -1, 1.5, "0"]) {
+    assert.throws(
+      () => normalizeFieldMappingStats({ data: { fieldCount } }),
+      /有效的字段计数/,
+    );
+  }
 });
 
 test("source-system options retain duplicate names and expose name/code labels", async () => {

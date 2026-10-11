@@ -324,6 +324,27 @@ export interface FieldMappingStats {
   coverage: number;
 }
 
+export function normalizeFieldMappingStats(payload: unknown): FieldMappingStats {
+  const detail = normalizeDetail(payload);
+  const fieldCount = detail['fieldCount'];
+  if (
+    typeof fieldCount !== 'number' ||
+    !Number.isInteger(fieldCount) ||
+    fieldCount < 0
+  ) {
+    throw new Error('字段映射统计接口缺少有效的字段计数');
+  }
+  return {
+    sourceSystemCount: Number(detail['sourceSystemCount'] || 0),
+    sourceTableCount: Number(detail['sourceTableCount'] || 0),
+    fieldCount,
+    mappedFieldCount: Number(detail['mappedFieldCount'] || 0),
+    unmappedFieldCount: Number(detail['unmappedFieldCount'] || 0),
+    emptyCommentCount: Number(detail['emptyCommentCount'] || 0),
+    coverage: Number(detail['coverage'] || 0),
+  };
+}
+
 function buildStats(rows: readonly EnrichedFieldMappingRow[]): FieldMappingStats {
   const tables = summarizeTables(rows);
   const mappedFields = rows.filter((row) => row.targetField).length;
@@ -405,16 +426,7 @@ export async function getFieldMappingStats(params: FieldMappingQueryParams = {})
       params,
       timeout: LONG_REQUEST_TIMEOUT,
     });
-    const detail = normalizeDetail(payload);
-    return {
-      sourceSystemCount: Number(detail['sourceSystemCount'] || 0),
-      sourceTableCount: Number(detail['sourceTableCount'] || 0),
-      fieldCount: Number(detail['fieldCount'] || 0),
-      mappedFieldCount: Number(detail['mappedFieldCount'] || 0),
-      unmappedFieldCount: Number(detail['unmappedFieldCount'] || 0),
-      emptyCommentCount: Number(detail['emptyCommentCount'] || 0),
-      coverage: Number(detail['coverage'] || 0),
-    };
+    return normalizeFieldMappingStats(payload);
   }
   return buildStats(getMockRows(params));
 }
