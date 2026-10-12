@@ -38,9 +38,10 @@
 
 @media (max-width: 480px) {
   #dap-ui-overlay-root [role="region"][aria-label="Notifications"] {
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
+    right: max(12px, env(safe-area-inset-right, 0px));
+    bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    left: max(12px, env(safe-area-inset-left, 0px));
+    width: auto;
     max-width: none;
   }
 }

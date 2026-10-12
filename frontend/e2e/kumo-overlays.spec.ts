@@ -39,6 +39,7 @@ test("DAP Dialog shares the overlay portal, traps focus in WebKit, and restores 
 
   await page.getByTestId("dialog-toast").click();
   const notificationRegion = page.getByRole("region", { name: "Notifications" });
+  await expect(notificationRegion).toHaveAttribute("aria-live", "polite");
   await expect(notificationRegion).toContainText("Dialog 内的通知");
   expect(await notificationRegion.evaluate((element) => element.closest("#dap-ui-overlay-root") !== null)).toBe(true);
   expect(await notificationRegion.evaluate((element) => element.closest("#root") !== null)).toBe(false);
@@ -48,6 +49,82 @@ test("DAP Dialog shares the overlay portal, traps focus in WebKit, and restores 
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
   await expect(page.locator("#root")).not.toHaveAttribute("aria-hidden", "true");
+  expect(pageErrors).toEqual([]);
+});
+
+test("DAP toast facade deduplicates identical notices and survives child route changes", async ({ page }) => {
+  await openFixture(page);
+
+  const notifications = page.getByRole("region", { name: "Notifications" });
+  await page.getByTestId("show-toast-duplicate").click();
+  const duplicate = notifications.getByText("重复的诊断提醒", { exact: true });
+  await expect(duplicate).toBeVisible();
+  await expect(duplicate).toHaveCount(1);
+
+  await page.getByTestId("change-fixture-route").click();
+  await expect(page.getByTestId("fixture-route-content")).toHaveText("当前模拟模块：字段映射");
+  await expect(duplicate).toBeVisible();
+  await expect(notifications).toHaveAttribute("aria-live", "polite");
+  await expect(page.getByRole("region", { name: "Notifications" })).toHaveCount(1);
+});
+
+test("390px notification viewport stays inside mobile safe-area margins", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openFixture(page);
+  await expect(page.locator('meta[name="viewport"]')).toHaveAttribute("content", /viewport-fit=cover/);
+
+  await page.getByTestId("show-toast").click();
+  const notifications = page.getByRole("region", { name: "Notifications" });
+  await expect(notifications).toContainText("字段映射保存成功");
+  const bounds = await notifications.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      left: rect.left,
+      right: rect.right,
+      bottom: rect.bottom,
+      width: rect.width,
+      position: style.position,
+    };
+  });
+
+  expect(bounds.position).toBe("fixed");
+  expect(bounds.left).toBeGreaterThanOrEqual(11);
+  expect(bounds.right).toBeLessThanOrEqual(379);
+  expect(bounds.bottom).toBeLessThanOrEqual(832);
+  expect(bounds.width).toBeLessThanOrEqual(366);
+});
+
+test("shared Kumo-backed toast host preserves queue, close, timeout, and live-region behavior", async ({ page }) => {
+  test.setTimeout(60_000);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await openFixture(page);
+
+  const notifications = page.getByRole("region", { name: "Notifications" });
+  await expect(notifications).toHaveAttribute("aria-live", "polite");
+  await page.getByTestId("show-toast-queue").click();
+  const queuedSuccess = notifications.getByText("队列消息一", { exact: true });
+  const queuedError = notifications.getByText("队列消息二", { exact: true });
+  await expect(queuedSuccess).toBeAttached();
+  await expect(queuedError).toBeVisible();
+  await queuedError.hover();
+  await expect(queuedSuccess).toBeVisible();
+
+  const errorToast = queuedError.locator("xpath=ancestor::div[contains(@class, 'ring-kumo-danger')][1]");
+  const closeError = errorToast.locator('[data-kumo-part="close"]');
+  await expect(closeError).toBeVisible();
+  await closeError.click();
+  await expect(queuedError).toBeHidden();
+  await expect(queuedSuccess).toBeVisible();
+  const successToast = queuedSuccess.locator("xpath=ancestor::div[contains(@class, 'ring-kumo-success')][1]");
+  await successToast.locator('[data-kumo-part="close"]').click();
+  await expect(queuedSuccess).toBeHidden();
+
+  await page.getByTestId("show-toast-timeout").click();
+  const timedToast = notifications.getByText("短时通知已到达", { exact: true });
+  await expect(timedToast).toBeVisible();
+  await expect(timedToast).toBeHidden({ timeout: 5_000 });
   expect(pageErrors).toEqual([]);
 });
 

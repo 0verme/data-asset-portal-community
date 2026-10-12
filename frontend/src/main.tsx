@@ -15,6 +15,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
+import { ToastHost } from "./ui/index.ts";
 import "@cloudflare/kumo/styles/standalone";
 import "./styles/app.css";
 import "./styles/push.css";
@@ -59,7 +60,9 @@ if (isKumoSpike || isKumoAdapterFixture || isKumoOverlayFixture || isKumoToastFa
 } else {
   root.render(
     <React.StrictMode>
-      <App />
+      <ToastHost>
+        <App />
+      </ToastHost>
     </React.StrictMode>,
   );
 }
