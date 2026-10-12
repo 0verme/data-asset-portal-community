@@ -23,7 +23,7 @@ import { AppShell } from "./components/app/AppShell.tsx";
 import { ModuleContent } from "./components/app/ModuleContent.tsx";
 import { ModuleSidebar } from "./components/app/ModuleSidebar.tsx";
 import type { AppModuleContext } from "./components/app/appTypes.ts";
-import { ConfirmDialogHost, ModuleErrorBoundary, ToastHost } from "./components/common/index.ts";
+import { ConfirmDialogHost, ModuleErrorBoundary } from "./components/common/index.ts";
 import { Icon } from "./components/ui.tsx";
 import { Button, DropdownMenu, IconButton, Input } from "./ui/index.ts";
 import {
@@ -1055,7 +1055,6 @@ export default function App(): React.ReactElement {
         />
 
         <ConfirmDialogHost />
-        <ToastHost />
       </AppShell>
     </AuthContext.Provider>
   );

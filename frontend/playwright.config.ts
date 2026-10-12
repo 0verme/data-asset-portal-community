@@ -34,6 +34,7 @@ export default defineConfig({
   ],
   webServer: {
     command: `npm run dev -- --host 127.0.0.1 --port ${serverPort} --strictPort`,
+    env: { NODE_ENV: "development" },
     url: `${baseURL}/__kumo-spike`,
     // Never silently attach to another worktree's dev server on the default port.
     reuseExistingServer: false,

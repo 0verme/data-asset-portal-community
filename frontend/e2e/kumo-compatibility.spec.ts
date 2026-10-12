@@ -21,6 +21,25 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("production App mounts one Kumo notification host in the shared portal", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.removeItem("dap_auth");
+    localStorage.setItem("dap-theme", "light");
+  });
+  await page.route("**/api/search/hot-keywords", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ items: [] }),
+  }));
+  await page.goto("/");
+  await expect(page.locator("footer.app-footer-shell")).toBeVisible();
+
+  const notifications = page.getByRole("region", { name: "Notifications" });
+  await expect(notifications).toHaveCount(1);
+  await expect(notifications).toHaveAttribute("aria-live", "polite");
+  expect(await notifications.evaluate((element) => element.closest("#dap-ui-overlay-root") !== null)).toBe(true);
+});
+
 test("fixture renders pinned Kumo primitives with DAP content and no runtime errors", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -174,16 +193,16 @@ test("Kumo and DAP toast/modal portals render alongside each other", async ({ pa
   await expect(dapDialog).toBeHidden();
 
   await page.getByTestId("open-dap-toast").click();
-  const dapToastRegion = page.getByRole("region", { name: "消息提示" });
+  const dapToastRegion = page.getByRole("region", { name: "Notifications" });
   await expect(dapToastRegion.getByText("DAP legacy toast：保存成功")).toBeVisible();
   await page.getByTestId("kumo-toast-success").click();
-  await expect(notificationRegion.getByText("保存成功")).toBeVisible();
+  await expect(notificationRegion.getByText("保存成功", { exact: true })).toBeVisible();
   const layerOrder = await page.evaluate(() => ({
+    notificationCount: document.querySelectorAll('[role="region"][aria-label="Notifications"]').length,
     kumoToast: Number(getComputedStyle(document.querySelector('[role="region"][aria-label="Notifications"]')!).zIndex),
-    dapToast: Number(getComputedStyle(document.querySelector(".toast-stack")!).zIndex),
     fixedProbe: Number(getComputedStyle(document.querySelector("[data-testid='fixed-ui-probe']")!).zIndex),
   }));
-  expect(layerOrder.kumoToast).toBeGreaterThan(layerOrder.dapToast);
+  expect(layerOrder.notificationCount).toBe(1);
   expect(layerOrder.kumoToast).toBeGreaterThan(layerOrder.fixedProbe);
 });
 

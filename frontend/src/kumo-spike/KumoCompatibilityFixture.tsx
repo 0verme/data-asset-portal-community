@@ -21,7 +21,7 @@ import { Surface } from "@cloudflare/kumo/components/surface";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { Table } from "@cloudflare/kumo/components/table";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
-import { Toasty, useKumoToastManager } from "@cloudflare/kumo/components/toast";
+import { useKumoToastManager } from "@cloudflare/kumo/components/toast";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { ConfirmDialog, ToastHost, toast } from "../components/common/index.ts";
 import "./kumo-spike.css";
@@ -268,7 +268,6 @@ function FixtureBody({ theme, onThemeChange }: { theme: Theme; onThemeChange: ()
             onConfirm={() => { setLegacyDialogOpen(false); toast.success("Legacy dialog confirmed"); }}
             onCancel={() => setLegacyDialogOpen(false)}
           />
-          <ToastHost />
         </section>
       </main>
       <footer className="kumo-spike-footer">Spike only · no business routes, backend data, or navigation entry.</footer>
@@ -294,8 +293,8 @@ export default function KumoCompatibilityFixture() {
   };
 
   return (
-    <Toasty>
+    <ToastHost>
       <FixtureBody theme={theme} onThemeChange={toggleTheme} />
-    </Toasty>
+    </ToastHost>
   );
 }

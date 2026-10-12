@@ -6,7 +6,7 @@ import { Toasty, createKumoToastManager } from "@cloudflare/kumo/components/toas
 import type { ComponentProps } from "react";
 import { Button } from "./Button.tsx";
 import { joinClassNames } from "./classNames.ts";
-import { DEFAULT_TOAST_DURATION, resolveToastDuration } from "./toastConfig.ts";
+import { createToastId, DEFAULT_TOAST_DURATION, resolveToastDuration } from "./toastConfig.ts";
 import {
   ensureOverlayRoot,
   useOverlayPortalRoot,
@@ -32,6 +32,7 @@ function emitToast(message: unknown, tone: ToastTone, options: ToastOptions = {}
   }
 
   toastManager.add({
+    id: createToastId(text, tone),
     title: text,
     variant: tone,
     timeout: resolveToastDuration(options.duration),
@@ -62,12 +63,13 @@ export function ToastHost({ children }: ToastHostProps) {
     };
   }, []);
 
-  if (!portalRoot) return <>{children}</>;
   return (
-    <>
-      <Toasty container={portalRoot} toastManager={toastManager}>{null}</Toasty>
+    <Toasty
+      {...(portalRoot ? { container: portalRoot } : {})}
+      toastManager={toastManager}
+    >
       {children}
-    </>
+    </Toasty>
   );
 }
 

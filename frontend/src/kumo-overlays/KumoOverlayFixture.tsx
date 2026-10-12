@@ -27,6 +27,7 @@ export default function KumoOverlayFixture() {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmResult, setConfirmResult] = useState("尚未确认");
   const [serviceConfirmResult, setServiceConfirmResult] = useState("pending");
+  const [activeRoute, setActiveRoute] = useState<"assets" | "mapping">("assets");
 
   const submitForm = () => {
     setFormBusy(true);
@@ -76,6 +77,23 @@ export default function KumoOverlayFixture() {
               显示 Toast 队列
             </Button>
             <Button
+              data-testid="show-toast-duplicate"
+              variant="tertiary"
+              onClick={() => {
+                toast.warning("重复的诊断提醒", { duration: 0 });
+                toast.warning("重复的诊断提醒", { duration: 0 });
+              }}
+            >
+              重复提示
+            </Button>
+            <Button
+              data-testid="change-fixture-route"
+              variant="tertiary"
+              onClick={() => setActiveRoute((current) => current === "assets" ? "mapping" : "assets")}
+            >
+              切换模拟路由
+            </Button>
+            <Button
               data-testid="open-service-confirm"
               variant="secondary"
               onClick={() => {
@@ -90,6 +108,11 @@ export default function KumoOverlayFixture() {
               打开 Promise 确认
             </Button>
           </div>
+          {activeRoute === "assets" ? (
+            <p key="assets" data-testid="fixture-route-content">当前模拟模块：数据资产</p>
+          ) : (
+            <p key="mapping" data-testid="fixture-route-content">当前模拟模块：字段映射</p>
+          )}
           <p data-testid="confirm-result">{confirmResult}</p>
           <p data-testid="service-confirm-result">{serviceConfirmResult}</p>
         </section>
