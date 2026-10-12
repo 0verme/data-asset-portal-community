@@ -16,7 +16,13 @@ test("report list and detail drawer use the frozen DAP Button adapter", () => {
 });
 
 test("report editor fields use frozen DAP adapters without raw controls", () => {
-  assert.match(editor, /import \{ Checkbox, Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.match(editor, /FormErrorSummary,[\s\S]*?FormField,[\s\S]*?Input,[\s\S]*?type FormFieldErrors,[\s\S]*?from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.match(editor, /import \{ validateReportForm \} from "\.\/reportFormErrors\.ts"/);
+  assert.match(editor, /focusFirstFormError\(formRef\.current, errors, "auto"\)/);
+  assert.match(editor, /const nextErrors = validateReportForm\(form\);[\s\S]*?Object\.keys\(nextErrors\)\.length/);
+  assert.match(editor, /name="expireDate" label="失效日期（选填）" error=\{errors\["expireDate"\]\}/);
+  assert.match(editor, /onBeforeFocus=\{\(field\) => \{[\s\S]*?field === "effectiveDate" \|\| field === "expireDate"[\s\S]*?lifecycleDetailsRef\.current\.open = true/);
+  assert.match(editor, /lifecycleDetailsRef\.current\.open = true/);
   assert.equal((editor.match(/<Input/g) ?? []).length, 10);
   assert.equal((editor.match(/<Select<string>/g) ?? []).length, 4);
   assert.equal((editor.match(/<Textarea/g) ?? []).length, 4);
