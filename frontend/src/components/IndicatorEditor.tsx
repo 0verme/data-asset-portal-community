@@ -13,9 +13,26 @@ import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader } from "./common/index.ts";
 import IndicatorPathCascader, { type IndicatorPathChangeMeta } from "./IndicatorPathCascader.tsx";
 import { Icon } from "./ui.tsx";
-import { Input, Select, Textarea } from "../ui/index.ts";
+import {
+  FormErrorSummary,
+  FormField,
+  focusFirstFormError,
+  formFieldElementId,
+  Input,
+  Select,
+  Textarea,
+  type FormFieldErrors,
+} from "../ui/index.ts";
+import { validateIndicatorForm } from "./indicatorFormErrors.ts";
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const INDICATOR_FORM_ID = "indicator-editor-form";
+const INDICATOR_FIELD_LABELS: Readonly<Record<string, string>> = {
+  id: "指标 ID",
+  name: "指标中文名",
+  registrar: "登记人",
+  registeredAt: "登记日期",
+  path: "指标路径",
+};
 const AGGREGATION_OPTIONS = ["SUM", "COUNT", "COUNT_DISTINCT", "AVG", "MIN", "MAX", "NONE"] as const;
 const SEMANTIC_STATE_OPTIONS = [
   { value: "candidate", label: "候选" },
@@ -160,6 +177,9 @@ export function IndicatorEditor({
   const isEdit = mode === "edit";
   const [form, setForm] = React.useState<IndicatorFormData>(() => createFormState(initial));
   const [touched, setTouched] = React.useState(false);
+  const formRef = React.useRef<HTMLDivElement>(null);
+  const [validationFocusRequest, setValidationFocusRequest] = React.useState(0);
+  const handledFocusRequestRef = React.useRef(0);
   const [pathOptions, setPathOptions] = React.useState<IndicatorPathOptionNode[]>([]);
   const [pathLoading, setPathLoading] = React.useState(false);
   const [pathError, setPathError] = React.useState("");
@@ -264,14 +284,16 @@ export function IndicatorEditor({
     };
   }, []);
 
-  const errors: string[] = [];
-  if (touched) {
-    if (!form.id.trim()) errors.push("指标 ID 不能为空");
-    if (!form.name.trim()) errors.push("指标中文名不能为空");
-    if (!form.path.trim()) errors.push("指标路径不能为空");
-    if (!form.registrar.trim()) errors.push("登记人不能为空");
-    if (!DATE_RE.test(form.registeredAt.trim())) errors.push("登记日期必须使用 yyyy-mm-dd");
-  }
+  const errors: FormFieldErrors = React.useMemo(
+    () => touched ? validateIndicatorForm(form) : {},
+    [form, touched],
+  );
+
+  React.useLayoutEffect(() => {
+    if (!validationFocusRequest || handledFocusRequestRef.current === validationFocusRequest) return;
+    handledFocusRequestRef.current = validationFocusRequest;
+    focusFirstFormError(formRef.current, errors, "auto");
+  }, [errors, validationFocusRequest]);
 
   const setValues = (nextValues: Partial<IndicatorFormData>) => {
     if (saveError) onClearSaveError();
@@ -310,9 +332,22 @@ export function IndicatorEditor({
     });
   };
 
+  const pathFieldMarkerId = formFieldElementId(INDICATOR_FORM_ID, "path");
+  const pathValidationErrorId = `${pathFieldMarkerId}-error`;
+  const pathConfigErrorId = `${pathFieldMarkerId}-config-error`;
+  const pathDescribedBy = [
+    errors["path"] ? pathValidationErrorId : "",
+    pathError ? pathConfigErrorId : "",
+  ].filter(Boolean).join(" ") || undefined;
+
   const submit = () => {
+    const nextErrors = validateIndicatorForm(form);
     setTouched(true);
-    if (errors.length || saveBusy) return;
+    if (saveBusy) return;
+    if (Object.keys(nextErrors).length) {
+      setValidationFocusRequest((request) => request + 1);
+      return;
+    }
 
     const normalizedPath = form.path.trim();
     const derivedDimension = getIndicatorDimensionFromPath(normalizedPath) || normalizeIndicatorDimension(form.dimension);
@@ -342,7 +377,7 @@ export function IndicatorEditor({
   };
 
   return (
-    <div>
+    <div id={INDICATOR_FORM_ID} ref={formRef}>
       <PageHeader
         back={{ onClick: onCancel, text: isEdit ? "返回上一层" : "返回指标列表" }}
         breadcrumbs={buildModuleBreadcrumbs("indicator", [
@@ -354,27 +389,27 @@ export function IndicatorEditor({
       />
 
       <ActionErrorBanner title="保存失败" message={saveError} />
-      <ActionErrorBanner title="请先修正以下问题" messages={errors} />
+      <FormErrorSummary
+        formId={INDICATOR_FORM_ID}
+        errors={errors}
+        getFieldLabel={(field) => INDICATOR_FIELD_LABELS[field] || "表单字段"}
+      />
 
       <div className="form-card">
         <h3><Icon name="hash" size={14} />基本信息</h3>
         <div className="form-grid">
-          <div className="fl">
-            <label>指标 ID</label>
-            <Input aria-label="指标 ID" className={`inp mono${touched && !form.id.trim() ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder="例如：CUST00001" />
-          </div>
-          <div className="fl">
-            <label>指标中文名</label>
-            <Input aria-label="指标中文名" className={`inp${touched && !form.name.trim() ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：会员复购率" />
-          </div>
-          <div className="fl">
-            <label>登记人</label>
-            <Input aria-label="登记人" className={`inp${touched && !form.registrar.trim() ? " invalid" : ""}`} value={form.registrar} onChange={(event) => setValue("registrar", event.target.value)} placeholder="例如：何嘉佳" />
-          </div>
-          <div className="fl">
-            <label>登记日期</label>
-            <Input aria-label="登记日期" className={`inp mono${touched && !DATE_RE.test(form.registeredAt.trim()) ? " invalid" : ""}`} value={form.registeredAt} onChange={(event) => setValue("registeredAt", event.target.value)} placeholder="例如：2025-06-17" />
-          </div>
+          <FormField className="fl" formId={INDICATOR_FORM_ID} name="id" label="指标 ID" error={errors["id"]}>
+            <Input aria-label="指标 ID" className={`inp mono${errors["id"] ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder="例如：CUST00001" />
+          </FormField>
+          <FormField className="fl" formId={INDICATOR_FORM_ID} name="name" label="指标中文名" error={errors["name"]}>
+            <Input aria-label="指标中文名" className={`inp${errors["name"] ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：会员复购率" />
+          </FormField>
+          <FormField className="fl" formId={INDICATOR_FORM_ID} name="registrar" label="登记人" error={errors["registrar"]}>
+            <Input aria-label="登记人" className={`inp${errors["registrar"] ? " invalid" : ""}`} value={form.registrar} onChange={(event) => setValue("registrar", event.target.value)} placeholder="例如：何嘉佳" />
+          </FormField>
+          <FormField className="fl" formId={INDICATOR_FORM_ID} name="registeredAt" label="登记日期" error={errors["registeredAt"]}>
+            <Input aria-label="登记日期" className={`inp mono${errors["registeredAt"] ? " invalid" : ""}`} value={form.registeredAt} onChange={(event) => setValue("registeredAt", event.target.value)} placeholder="例如：2025-06-17" />
+          </FormField>
           <div className="fl">
             <label>状态</label>
             <BinaryStatusToggle mode="status" value={form.status} onChange={(value) => setValue("status", normalizeStatus(value))} />
@@ -468,17 +503,32 @@ export function IndicatorEditor({
             <label>指标口径</label>
             <Input aria-label="指标口径" className="inp" value={form.caliber} onChange={(event) => setValue("caliber", event.target.value)} placeholder="例如：一表通口径" />
           </div>
-          <div className="fl">
-            <label>指标路径</label>
+          <div
+            id={pathFieldMarkerId}
+            className="fl"
+            data-form-field="path"
+            tabIndex={-1}
+          >
+            <label id={`${pathFieldMarkerId}-label`}>指标路径</label>
             <IndicatorPathCascader
               value={form.path}
               options={pathOptions}
               loading={pathLoading}
               error={pathError}
               onChange={handlePathChange}
-              invalid={touched && !form.path.trim()}
+              invalid={Boolean(errors["path"])}
+              aria-invalid={errors["path"] ? "true" : undefined}
+              aria-describedby={pathDescribedBy}
+              aria-labelledby={`${pathFieldMarkerId}-label`}
             />
-            {pathError ? <div className="match-hint" style={{ color: "var(--danger)" }}>{pathError}</div> : null}
+            {errors["path"] ? (
+              <div id={pathValidationErrorId} className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
+                {errors["path"]}
+              </div>
+            ) : null}
+            {pathError ? (
+              <div id={pathConfigErrorId} className="match-hint" style={{ color: "var(--danger)" }}>{pathError}</div>
+            ) : null}
             {!pathLoading && !pathError && form.path.trim() && !getIndicatorDimensionFromPath(form.path) ? (
               <div className="match-hint">
                 当前保留原始路径文本，未匹配到级联配置；可直接保存，或重新选择规范路径。

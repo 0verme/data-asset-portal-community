@@ -68,3 +68,58 @@ test("admin indicator editor uses adapter controls and keeps the DAP cascader", 
   await page.getByRole("button", { name: "放弃修改" }).click();
   await expect(page.locator(".indicator-page .page-title")).toContainText("指标管理");
 });
+
+test("form error presenter blocks invalid indicator saves and focuses fields after commit", async ({ page }) => {
+  await setMockAuth(page, "admin");
+
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/indicator-maintenance/new");
+    await expect(page.getByRole("heading", { name: "新增指标" })).toBeVisible({ timeout: 20_000 });
+
+    const idInput = page.getByLabel("指标 ID");
+    const nameInput = page.getByLabel("指标中文名");
+    const registrarInput = page.getByLabel("登记人");
+    const dateInput = page.getByLabel("登记日期");
+    const pathTrigger = page.locator(".indicator-path-trigger");
+    const summary = page.locator("#indicator-editor-form [role='alert']").first();
+
+    await page.getByRole("button", { name: "创建指标" }).click();
+    await expect(page.getByRole("heading", { name: "新增指标" })).toBeVisible();
+    await expect(idInput).toBeFocused();
+    await expect(idInput).toHaveAttribute("aria-invalid", "true");
+    const idErrorDescription = await idInput.getAttribute("aria-describedby");
+    expect(idErrorDescription).toBeTruthy();
+    await expect(page.locator(`#${idErrorDescription!.split(/\s+/)[0]}`)).toContainText("指标 ID 不能为空");
+    await expect(summary).toContainText("指标 ID：指标 ID 不能为空");
+
+    await idInput.fill("KPI_FORM_ERROR");
+    await expect(idInput).not.toHaveAttribute("aria-invalid", "true");
+    await expect(summary).not.toContainText("指标 ID：指标 ID 不能为空");
+    await nameInput.fill("表单错误反馈回归指标");
+    await registrarInput.fill("E2E 测试用户");
+    await dateInput.fill("2025-06-17");
+    await expect(pathTrigger).toHaveAttribute("aria-invalid", "true");
+
+    await page.getByRole("button", { name: "创建指标" }).click();
+    await expect(page.getByRole("heading", { name: "新增指标" })).toBeVisible();
+    await expect(pathTrigger).toBeFocused();
+    await expect(pathTrigger).toBeInViewport();
+    await expect(pathTrigger).toHaveAccessibleName("指标路径");
+    await expect(pathTrigger).toHaveAttribute("aria-invalid", "true");
+    const describedBy = await pathTrigger.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    await expect(page.locator(`#${describedBy!.split(/\s+/)[0]}`)).toContainText("指标路径不能为空");
+    await expect(summary).toContainText("指标路径：指标路径不能为空");
+    await expect(idInput).toHaveValue("KPI_FORM_ERROR");
+    await expect(nameInput).toHaveValue("表单错误反馈回归指标");
+    await expect(registrarInput).toHaveValue("E2E 测试用户");
+
+    await pathTrigger.click();
+    await page.locator(".indicator-path-option").filter({ hasText: "PRD 商品维度" }).click();
+    await page.locator(".indicator-path-option").filter({ hasText: "商品运营" }).click();
+    await page.locator(".indicator-path-option").filter({ hasText: "规模" }).click();
+    await expect(pathTrigger).not.toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#indicator-editor-form [role='alert']")).toHaveCount(0);
+  }
+});
