@@ -40,6 +40,16 @@ export { Button, IconButton, type ButtonProps, type IconButtonProps } from "./Bu
 export { Combobox, type ComboboxProps } from "./Combobox.tsx";
 export { Checkbox, Switch, type CheckboxProps, type SwitchProps } from "./choices.tsx";
 export { Field, Input, Textarea, type FieldProps, type InputProps, type TextareaProps } from "./controls.tsx";
+export { FormErrorSummary, FormField, type FormErrorSummaryProps, type FormFieldProps } from "./FormErrors.tsx";
+export {
+  clearFormFieldErrors,
+  focusFirstFormError,
+  focusFormField,
+  formErrorSummaryId,
+  formFieldElementId,
+  mergeFormFieldErrors,
+  type FormFieldErrors,
+} from "./formErrors.ts";
 export { Breadcrumbs, Grid, GridItem, Surface, type BreadcrumbItem, type BreadcrumbsProps, type GridProps, type SurfaceProps } from "./layout.tsx";
 export { Select, type SelectProps } from "./Select.tsx";
 export { Tabs, type TabsProps } from "./Tabs.tsx";

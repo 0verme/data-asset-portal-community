@@ -606,6 +606,12 @@ jobs:
           VITE_API_MODE: remote
         run: npm run test:browser -- --grep "API asset validation"
 
+      - name: Form error presenter browser regression (Chromium and WebKit)
+        if: matrix.node == '22'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/form-error-presenter-playwright
+        run: npm run test:browser -- --grep "form error presenter"
+
       - name: Frontend production build
         run: npm run build:frontend
 

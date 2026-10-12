@@ -21,6 +21,8 @@ Kumo remains pinned at `@cloudflare/kumo@2.14.0`. Adapters consume the DAP theme
 | `IconButton` | Same variants/sizes; `icon` and `aria-label` or `aria-labelledby` required; square by default | Kumo Button icon-only shape |
 | `Input`, `Textarea` | `intent="default" | "error"`; size `sm` / `md` (default `md`); native input props/events | `default` → Kumo default, `error` → Kumo error; `md` → `base` |
 | `Field` | DAP label/description/required/controlFirst; one control child; `error` marks it invalid and exposes the message as its accessible description | Kumo Field; `labelTooltip` omitted |
+| `FormField`, `FormErrorSummary` | Stable field-path marker + Kumo inline error; persistent alert summary with actions to focus fields | Caller supplies safe field labels/messages and a matching form id; no form state or values are owned |
+| `mergeFormFieldErrors`, `clearFormFieldErrors`, `focusFirstFormError` | Merge local/server field maps (later source wins), clear one path/group, and focus/scroll the first invalid field | Focus scrolls the nearest vertical overflow container, falling back to the document viewport only when no such container exists |
 | `Select` | Single-value control; `value`/`onValueChange` or `defaultValue`; compound Option/Group/GroupLabel/Separator; size `sm` / `md` | `md` → `base`; no Tooltip labels |
 | `Combobox` | Typed items/value callback with Kumo compound Content/TriggerInput/List/Item/Empty parts; supports optional multi-value mode | `md` → `base`; Chinese labels default for clear/show-options actions |
 | `Checkbox` | Controlled `checked`; `onCheckedChange` always reports boolean (`indeterminate` normalizes to `false`); `intent` default/error | Kumo Checkbox |
@@ -33,6 +35,29 @@ Kumo remains pinned at `@cloudflare/kumo@2.14.0`. Adapters consume the DAP theme
 | `Breadcrumbs` | Accessible Chinese-labeled nav; callback or href items; last item is current page | DAP-owned markup preserves DAP callback navigation semantics that Kumo Breadcrumbs does not express |
 
 `Field`, `Select`, and `Combobox` deliberately do not expose `labelTooltip`. The first UI adapter consumer must still validate its workflow-specific accessibility and responsive behavior; this contract does not imply a page migration.
+
+## Shared form error presenter (Phase 3)
+
+`FormField` composes the existing DAP `Field` adapter, adds a stable `data-form-field` marker, and uses Kumo's field association for `aria-invalid` and inline error description. `FormErrorSummary` renders a persistent `role="alert"` with caller-provided, known field labels and buttons that focus the matching control. Keep form values in the caller's controlled state; validation helpers only transform error maps and never reset inputs.
+
+```tsx
+const errors = mergeFormFieldErrors(serverErrors, localErrors); // later sources win
+const formRef = useRef<HTMLFormElement>(null);
+
+<form id="asset-form" ref={formRef} onSubmit={handleSubmit}>
+  <FormErrorSummary formId="asset-form" errors={errors} getFieldLabel={fieldLabel} />
+  <FormField formId="asset-form" name="email" label="邮箱" error={errors["email"]}>
+    <Input aria-label="邮箱" value={values.email} onChange={handleEmailChange} />
+  </FormField>
+</form>
+
+// After a failed submit:
+focusFirstFormError(formRef.current, errors);
+// On edit, clear only this path (and nested paths such as params.0.name):
+setServerErrors((current) => clearFormFieldErrors(current, "email"));
+```
+
+Use the same canonical field path for server/local errors and `FormField.name`. Error messages and labels passed to the presenter must already be safe/user-facing; do not display raw server details. Prefix clearing treats dot and numeric-bracket array paths equivalently and preserves siblings. Focus uses `preventScroll` and scrolls only the nearest vertical scroll container; it does not issue an unconditional `scrollTo(0, 0)`. This helper does not add a form library, manage submission state, or migrate business pages.
 
 ## Overlay and feedback adapters (PR #4)
 

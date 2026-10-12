@@ -1,0 +1,21 @@
+.dap-ui-form-field {
+  min-width: 0;
+}
+
+.dap-ui-form-error-summary__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  margin: 0;
+  padding-inline-start: 1.125rem;
+}
+
+.dap-ui-form-error-summary__item {
+  min-width: 0;
+}
+
+.dap-ui-form-error-summary__button {
+  max-width: 100%;
+  text-align: start;
+  white-space: normal;
+}
