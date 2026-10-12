@@ -9,9 +9,31 @@ import { buildReportOptionSets, type ReportOptionSets } from "../../config/repor
 import { getLegacyAwareOptions, normalizeDictOptions, type OptionInputItem } from "../../utils/optionUtils.ts";
 import { ActionErrorBanner, AssetReferencePicker, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader } from "../common/index.ts";
 import { Icon } from "../ui.tsx";
-import { Checkbox, Input, Select, Textarea } from "../../ui/index.ts";
+import {
+  Checkbox,
+  FormErrorSummary,
+  FormField,
+  focusFirstFormError,
+  Input,
+  Select,
+  Textarea,
+  type FormFieldErrors,
+} from "../../ui/index.ts";
+import { validateReportForm } from "./reportFormErrors.ts";
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const REPORT_FORM_ID = "report-editor-form";
+const REPORT_FIELD_LABELS: Readonly<Record<string, string>> = {
+  code: "报表编码",
+  name: "报表名称",
+  type: "报表类型",
+  domain: "主题域",
+  ownerDept: "归属部门",
+  ownerName: "负责人",
+  statPeriod: "统计周期",
+  statCaliber: "统计口径",
+  effectiveDate: "生效日期",
+  expireDate: "失效日期",
+};
 
 interface ReportFormData {
   code: string;
@@ -102,27 +124,6 @@ function createFormState(initial: MockReportItem | null | undefined): ReportForm
   };
 }
 
-function validateForm(form: ReportFormData): string[] {
-  const errors: string[] = [];
-  if (!form.code.trim()) errors.push("报表编码不能为空");
-  if (!/^[A-Z][A-Z0-9_-]{2,63}$/.test(form.code.trim().toUpperCase())) {
-    errors.push("报表编码仅允许大写字母、数字、下划线和中划线，且需以字母开头");
-  }
-  if (!form.name.trim()) errors.push("报表名称不能为空");
-  if (!form.type.trim()) errors.push("报表类型不能为空");
-  if (!form.domain.trim()) errors.push("请选择主题域");
-  if (!form.statPeriod.trim()) errors.push("请选择统计周期");
-  if (!form.statCaliber.trim()) errors.push("请选择或输入统计口径");
-  if (!form.ownerDept.trim()) errors.push("归属部门不能为空");
-  if (!form.ownerName.trim()) errors.push("负责人不能为空");
-  if (form.effectiveDate.trim() && !DATE_RE.test(form.effectiveDate.trim())) errors.push("生效日期必须使用 yyyy-mm-dd");
-  if (form.expireDate.trim() && !DATE_RE.test(form.expireDate.trim())) errors.push("失效日期必须使用 yyyy-mm-dd");
-  if (form.effectiveDate.trim() && form.expireDate.trim() && form.expireDate.trim() < form.effectiveDate.trim()) {
-    errors.push("失效日期不能早于生效日期");
-  }
-  return [...new Set(errors)];
-}
-
 interface DictInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -130,12 +131,13 @@ interface DictInputProps {
   listId: string;
   placeholder: string;
   invalid?: boolean | undefined;
+  "aria-invalid"?: boolean | "false" | "true" | undefined;
 }
 
-function DictInput({ value, onChange, options, listId, placeholder, invalid = false }: DictInputProps) {
+function DictInput({ value, onChange, options, listId, placeholder, invalid = false, "aria-invalid": ariaInvalid }: DictInputProps) {
   const selectOptions = getLegacyAwareOptions(normalizeDictOptions(options), value);
   return <>
-    <Input aria-label={placeholder} className={`inp${invalid ? " invalid" : ""}`} list={listId} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+    <Input aria-label={placeholder} aria-invalid={ariaInvalid} className={`inp${invalid ? " invalid" : ""}`} list={listId} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
     <datalist id={listId}>{selectOptions.map((item) => <option key={item.value} value={item.value}>{item.name}</option>)}</datalist>
   </>;
 }
@@ -205,6 +207,10 @@ export function ReportEditor({
   const isEdit = mode === "edit";
   const [form, setForm] = React.useState<ReportFormData>(() => createFormState(initial));
   const [touched, setTouched] = React.useState(false);
+  const formRef = React.useRef<HTMLDivElement>(null);
+  const lifecycleDetailsRef = React.useRef<HTMLDetailsElement>(null);
+  const [validationFocusRequest, setValidationFocusRequest] = React.useState(0);
+  const handledFocusRequestRef = React.useRef(0);
   const [tableSearch, setTableSearch] = React.useState("");
   const [indicatorSearch, setIndicatorSearch] = React.useState("");
   const [tableCandidates, setTableCandidates] = React.useState<RelatedTableSummary[]>([]);
@@ -265,7 +271,29 @@ export function ReportEditor({
     };
   }, []);
 
-  const errors = touched ? validateForm(form) : [];
+  const errors: FormFieldErrors = React.useMemo(
+    () => touched ? validateReportForm(form) : {},
+    [form, touched],
+  );
+  const hasLifecycleErrors = Boolean(errors["effectiveDate"] || errors["expireDate"]);
+
+  React.useLayoutEffect(() => {
+    if (!validationFocusRequest || handledFocusRequestRef.current === validationFocusRequest) return;
+    handledFocusRequestRef.current = validationFocusRequest;
+
+    let firstInvalidField = "";
+    for (const marker of formRef.current?.querySelectorAll<HTMLElement>("[data-form-field]") ?? []) {
+      const field = marker.getAttribute("data-form-field");
+      if (field && errors[field]) {
+        firstInvalidField = field;
+        break;
+      }
+    }
+    if (firstInvalidField === "effectiveDate" || firstInvalidField === "expireDate") {
+      if (lifecycleDetailsRef.current) lifecycleDetailsRef.current.open = true;
+    }
+    focusFirstFormError(formRef.current, errors, "auto");
+  }, [errors, validationFocusRequest]);
 
   const setValues = (nextValues: Partial<ReportFormData>) => {
     if (saveError) onClearSaveError?.();
@@ -320,9 +348,13 @@ export function ReportEditor({
   };
 
   const submit = () => {
+    const nextErrors = validateReportForm(form);
     setTouched(true);
-    const nextErrors = validateForm(form);
-    if (nextErrors.length || saveBusy) return;
+    if (saveBusy) return;
+    if (Object.keys(nextErrors).length) {
+      setValidationFocusRequest((request) => request + 1);
+      return;
+    }
 
     void onSave({
       code: form.code.trim().toUpperCase(),
@@ -360,7 +392,7 @@ export function ReportEditor({
   };
 
   return (
-    <div>
+    <div id={REPORT_FORM_ID} ref={formRef}>
       <PageHeader
         breadcrumbs={[
           { label: "报表资产", onClick: onCancel },
@@ -372,34 +404,35 @@ export function ReportEditor({
       />
 
       <ActionErrorBanner title="保存失败" message={saveError} />
-      <ActionErrorBanner title="请先修正以下问题" messages={errors} />
+      <FormErrorSummary
+        formId={REPORT_FORM_ID}
+        errors={errors}
+        getFieldLabel={(field) => REPORT_FIELD_LABELS[field] || "表单字段"}
+      />
 
       <div className="form-card">
         <h3><Icon name="hash" size={14} />基本信息</h3>
         <div className="form-grid">
-          <div className="fl">
-            <label>报表编码</label>
-            <Input aria-label="报表编码" className={`inp mono${touched && !form.code.trim() ? " invalid" : ""}`} value={form.code} onChange={(event) => setValue("code", event.target.value)} placeholder="例如：RPT_PAY_DAILY" />
-          </div>
-          <div className="fl">
-            <label>报表名称</label>
-            <Input aria-label="报表名称" className={`inp${touched && !form.name.trim() ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：支付交易日报" />
-          </div>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="code" label="报表编码" error={errors["code"]}>
+            <Input aria-label="报表编码" className={`inp mono${errors["code"] ? " invalid" : ""}`} value={form.code} onChange={(event) => setValue("code", event.target.value)} placeholder="例如：RPT_PAY_DAILY" />
+          </FormField>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="name" label="报表名称" error={errors["name"]}>
+            <Input aria-label="报表名称" className={`inp${errors["name"] ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：支付交易日报" />
+          </FormField>
           <div className="fl">
             <label>报表别名</label>
             <Input aria-label="报表别名" className="inp" value={form.alias} onChange={(event) => setValue("alias", event.target.value)} placeholder="例如：支付日结报表" />
           </div>
-          <div className="fl">
-            <label>报表类型</label>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="type" label="报表类型" error={errors["type"]}>
             <Select<string>
               aria-label="报表类型"
-              className={`sel${touched && !form.type.trim() ? " invalid" : ""}`}
+              className={`sel${errors["type"] ? " invalid" : ""}`}
               placeholder="请选择报表类型"
               items={[{ label: "请选择报表类型", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(reportTypeOptions), form.type).map((item) => ({ label: item.name, value: item.value }))]}
               value={form.type || ""}
               onValueChange={(value) => setValue("type", value || "")}
             />
-          </div>
+          </FormField>
           <div className="fl">
             <label>状态</label>
             <BinaryStatusToggle mode="status" value={form.status} onChange={(value) => setValue("status", normalizeStatus(value))} />
@@ -410,32 +443,29 @@ export function ReportEditor({
       <div className="form-card">
         <h3><Icon name="user" size={14} />业务归属</h3>
         <div className="form-grid">
-          <div className="fl">
-            <label>主题域</label>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="domain" label="主题域" error={errors["domain"]}>
             <Select<string>
               aria-label="主题域"
-              className={`sel${touched && !form.domain.trim() ? " invalid" : ""}`}
+              className={`sel${errors["domain"] ? " invalid" : ""}`}
               placeholder="请选择主题域"
               items={[{ label: "请选择主题域", value: "" }, ...[...new Set([...domains, ...(form.domain ? [form.domain] : [])])].map((name) => ({ label: name, value: name }))]}
               value={form.domain || ""}
               onValueChange={(value) => setValue("domain", value || "")}
             />
-          </div>
-          <div className="fl">
-            <label>归属部门</label>
+          </FormField>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="ownerDept" label="归属部门" error={errors["ownerDept"]}>
             <Select<string>
               aria-label="归属部门"
-              className={`sel${touched && !form.ownerDept.trim() ? " invalid" : ""}`}
+              className={`sel${errors["ownerDept"] ? " invalid" : ""}`}
               placeholder="请选择归属部门"
               items={[{ label: "请选择归属部门", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(departmentOptions), form.ownerDept).map((item) => ({ label: item.name, value: item.value }))]}
               value={form.ownerDept || ""}
               onValueChange={(value) => setValue("ownerDept", value || "")}
             />
-          </div>
-          <div className="fl">
-            <label>负责人</label>
-            <Input aria-label="负责人" className={`inp${touched && !form.ownerName.trim() ? " invalid" : ""}`} list="report-person-options" value={form.ownerName} onChange={(event) => setValues({ ownerName: event.target.value, ...(form.maintainerSameAsOwner ? { maintainerName: event.target.value } : {}) })} placeholder="搜索已有负责人" />
-          </div>
+          </FormField>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="ownerName" label="负责人" error={errors["ownerName"]}>
+            <Input aria-label="负责人" className={`inp${errors["ownerName"] ? " invalid" : ""}`} list="report-person-options" value={form.ownerName} onChange={(event) => setValues({ ownerName: event.target.value, ...(form.maintainerSameAsOwner ? { maintainerName: event.target.value } : {}) })} placeholder="搜索已有负责人" />
+          </FormField>
           <div className="fl">
             <Checkbox
               label="维护人不同"
@@ -454,21 +484,19 @@ export function ReportEditor({
             <label>统计对象</label>
             <Input aria-label="统计对象" className="inp" value={form.statObject} onChange={(event) => setValue("statObject", event.target.value)} placeholder="例如：全行支付交易" />
           </div>
-          <div className="fl">
-            <label>统计周期</label>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="statPeriod" label="统计周期" error={errors["statPeriod"]}>
             <Select<string>
               aria-label="统计周期"
-              className={`sel${touched && !form.statPeriod ? " invalid" : ""}`}
+              className={`sel${errors["statPeriod"] ? " invalid" : ""}`}
               placeholder="请选择统计周期"
               items={[{ label: "请选择统计周期", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(periodOptions), form.statPeriod).map((item) => ({ label: item.name, value: item.value }))]}
               value={form.statPeriod || ""}
               onValueChange={(value) => setValue("statPeriod", value || "")}
             />
-          </div>
-          <div className="fl full">
-            <label>统计口径</label>
-            <DictInput value={form.statCaliber} onChange={(value) => setValue("statCaliber", value)} options={statCaliberOptions} listId="report-stat-caliber-options" invalid={touched && !form.statCaliber.trim()} placeholder="请选择或输入统计口径" />
-          </div>
+          </FormField>
+          <FormField className="fl full" formId={REPORT_FORM_ID} name="statCaliber" label="统计口径" error={errors["statCaliber"]}>
+            <DictInput value={form.statCaliber} onChange={(value) => setValue("statCaliber", value)} options={statCaliberOptions} listId="report-stat-caliber-options" invalid={Boolean(errors["statCaliber"])} placeholder="请选择或输入统计口径" />
+          </FormField>
           <details className="fl full">
             <summary>更多设置（数据延迟、业务范围标签）</summary>
             <div className="form-grid" style={{ marginTop: 12 }}>
@@ -489,11 +517,21 @@ export function ReportEditor({
         </div>
       </div>
 
-      <details className="form-card">
+      <details
+        ref={lifecycleDetailsRef}
+        className="form-card"
+        onToggle={(event) => {
+          if (hasLifecycleErrors && !event.currentTarget.open) event.currentTarget.open = true;
+        }}
+      >
         <summary><Icon name="calendar" size={14} />更多设置 / 生命周期</summary>
         <div className="form-grid" style={{ marginTop: 16 }}>
-          <div className="fl"><label>生效日期（选填）</label><Input aria-label="生效日期（选填）" type="date" className={`inp mono${touched && form.effectiveDate.trim() && !DATE_RE.test(form.effectiveDate.trim()) ? " invalid" : ""}`} value={form.effectiveDate} onChange={(event) => setValue("effectiveDate", event.target.value)} /></div>
-          <div className="fl"><label>失效日期（选填）</label><Input aria-label="失效日期（选填）" type="date" className={`inp mono${touched && form.expireDate.trim() && !DATE_RE.test(form.expireDate.trim()) ? " invalid" : ""}`} value={form.expireDate} min={form.effectiveDate || undefined} onChange={(event) => setValue("expireDate", event.target.value)} /></div>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="effectiveDate" label="生效日期（选填）" error={errors["effectiveDate"]}>
+            <Input aria-label="生效日期（选填）" type="date" className={`inp mono${errors["effectiveDate"] ? " invalid" : ""}`} value={form.effectiveDate} onChange={(event) => setValue("effectiveDate", event.target.value)} />
+          </FormField>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="expireDate" label="失效日期（选填）" error={errors["expireDate"]}>
+            <Input aria-label="失效日期（选填）" type="date" className={`inp mono${errors["expireDate"] ? " invalid" : ""}`} value={form.expireDate} min={form.effectiveDate || undefined} onChange={(event) => setValue("expireDate", event.target.value)} />
+          </FormField>
         </div>
       </details>
 
