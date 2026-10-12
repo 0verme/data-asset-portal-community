@@ -14,7 +14,7 @@ import {
   PUSH_JOB_TABLE_COLUMNS,
   getPushJobTableValues,
 } from "./push/pushJobTable.ts";
-import { formatFreq, validateJob, validateSystem } from "./push/pushUtils.ts";
+import { formatFreq, getJobFormFieldLabel, validateJob, validateSystem } from "./push/pushUtils.ts";
 
 const defaultsPath = fileURLToPath(
   new URL("../config/defaults.ts", import.meta.url),
@@ -320,9 +320,36 @@ test("push utilities preserve frequency formatting and validation", () => {
   assert.deepEqual(validateJob(validJob, [validField]), {
     errors: [],
     fieldErrors: {},
+    formFields: {},
   });
   assert.equal(
     validateJob(validJob, [{ ...validField, cn: "" }]).errors.length,
     1,
   );
+});
+
+test("push job validation exposes safe keyed errors and caller-owned labels", () => {
+  const fields = [
+    { _key: "job-row-1", name: "customer_id", cn: "", meaning: "", src: "DWM", type: "string" },
+    { _key: "job-row-2", name: "customer_id", cn: "客户编号", meaning: "", src: "DWM", type: "string" },
+  ];
+  const validation = validateJob(
+    { cn: " ", sourceFileName: " ", freqType: "每周", freq: "" },
+    fields,
+  );
+
+  assert.deepEqual(validation.formFields, {
+    cn: "作业名称不能为空。",
+    sourceFileName: "湖仓来源文件名不能为空。",
+    freq: "请选择「星期几」。",
+    "fields.job-row-1.cn": "请输入字段中文名。",
+    "fields.job-row-2.name": "字段名重复，请保持唯一。",
+  });
+  assert.deepEqual(validation.fieldErrors, {
+    "job-row-1": { cn: true },
+    "job-row-2": { name: true },
+  });
+  assert.equal(getJobFormFieldLabel("freq", fields, "每周"), "星期几");
+  assert.equal(getJobFormFieldLabel("fields.job-row-2.name", fields, "每周"), "字段2字段名");
+  assert.equal(getJobFormFieldLabel("fields.unknown.name", fields, "每周"), "表单字段");
 });

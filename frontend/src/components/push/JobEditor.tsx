@@ -2,7 +2,7 @@ import React from "react";
 
 import type { PushJobItem, PushSystemItem } from "../../data/pushSystems.ts";
 import { getLegacyAwareOptions, isLegacyDictValue, normalizeDictOptions, type DictOption, type OptionInputItem } from "../../utils/optionUtils.ts";
-import { ActionErrorBanner, BinaryStatusToggle, confirmDeleteAction, DangerZone, FormActionBar, PageHeader } from "../common/index.ts";
+import { BinaryStatusToggle, confirmDeleteAction, DangerZone, FormActionBar, PageHeader } from "../common/index.ts";
 import { optionLabel } from "../../utils/ui.ts";
 import {
   DEFAULT_DELIMITER_OPTIONS,
@@ -15,6 +15,7 @@ import {
   createPushField,
   defaultFreqParam,
   formatRenameHint,
+  getJobFormFieldLabel,
   isRenameJob,
   normalizePushFields,
   validateJob,
@@ -24,7 +25,16 @@ import {
   type PushJobForm,
 } from "./pushUtils.ts";
 import { Icon } from "../ui.tsx";
-import { Button, IconButton, Input, Select, Textarea } from "../../ui/index.ts";
+import {
+  Button,
+  FormErrorSummary,
+  FormField,
+  focusFirstFormError,
+  IconButton,
+  Input,
+  Select,
+  Textarea,
+} from "../../ui/index.ts";
 
 interface JobFormData extends PushJobForm {
   id: string;
@@ -37,6 +47,13 @@ interface JobFormData extends PushJobForm {
   enabled: boolean;
   desc: string;
 }
+
+const JOB_FORM_ID = "push-job-editor-form";
+const EMPTY_JOB_VALIDATION: JobValidationResult = {
+  errors: [],
+  fieldErrors: {},
+  formFields: {},
+};
 
 function normalizeEnabled(value: string | boolean): boolean {
   return typeof value === "boolean" ? value : value === "enabled";
@@ -110,6 +127,9 @@ export function JobEditor({
   ));
   const [touched, setTouched] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [validationFocusRequest, setValidationFocusRequest] = React.useState(0);
+  const formRef = React.useRef<HTMLDivElement>(null);
+  const handledValidationFocusRequestRef = React.useRef(0);
   const initialSnapshotRef = React.useRef(JSON.stringify({ form, fields }));
   const isDirty = initialSnapshotRef.current !== JSON.stringify({ form, fields });
   const oldId = initial?.id || "";
@@ -125,7 +145,13 @@ export function JobEditor({
     initialSnapshotRef.current = JSON.stringify({ form: nextForm, fields: nextFields });
   }, [initial, defaultDelimiter, defaultEncoding, defaultFreqType]);
 
-  const validation: JobValidationResult = touched ? validateJob(form, fields) : { errors: [], fieldErrors: {} };
+  const validation = touched ? validateJob(form, fields) : EMPTY_JOB_VALIDATION;
+  React.useLayoutEffect(() => {
+    if (validationFocusRequest <= handledValidationFocusRequestRef.current) return;
+    handledValidationFocusRequestRef.current = validationFocusRequest;
+    focusFirstFormError(formRef.current, validation.formFields, "auto");
+  }, [validation.formFields, validationFocusRequest]);
+
   const delimiterSelectOptions = normalizeSelectOptions(delimiterOptions, form.delimiter);
   const encodingSelectOptions = normalizeSelectOptions(encodingOptions, form.encoding);
   const freqTypeSelectOptions = normalizeSelectOptions(freqTypeOptions, form.freqType);
@@ -169,7 +195,12 @@ export function JobEditor({
   const save = async (): Promise<void> => {
     setTouched(true);
     const nextValidation = validateJob(form, fields);
-    if (nextValidation.errors.length || saving) return;
+    if (nextValidation.errors.length || saving) {
+      if (nextValidation.errors.length) {
+        setValidationFocusRequest((request) => request + 1);
+      }
+      return;
+    }
 
     const generatedId = oldId || `JOB_${system.abbr}_${Date.now().toString(36).toUpperCase()}`;
     setSaving(true);
@@ -202,7 +233,7 @@ export function JobEditor({
   };
 
   return (
-    <div>
+    <div id={JOB_FORM_ID} ref={formRef}>
       <PageHeader
         back={{ onClick: onCancel, text: isEdit ? "返回上一层" : "返回系统详情" }}
         breadcrumbs={[
@@ -216,30 +247,45 @@ export function JobEditor({
         subtitle={`${system.name} / ${system.id}`}
       />
 
-      <ActionErrorBanner title="请先修正以下问题" messages={validation.errors} />
+      <FormErrorSummary
+        formId={JOB_FORM_ID}
+        errors={validation.formFields}
+        getFieldLabel={(field) => getJobFormFieldLabel(field, fields, form.freqType)}
+        title="请先修正以下问题"
+      />
 
       <div className="form-card">
         <h3><Icon name="file" size={14} />文件头信息</h3>
         <div className="form-grid">
-          <div className="fl">
-            <label>作业名称</label>
-            <Input aria-label="作业名称" className={`inp${touched && !form.cn.trim() ? " invalid" : ""}`} value={form.cn} onChange={(event) => setValue("cn", event.target.value)} placeholder="例如：会员画像日终快照推送" />
-          </div>
+          <FormField
+            className="fl"
+            formId={JOB_FORM_ID}
+            name="cn"
+            label="作业名称"
+            error={validation.formFields["cn"]}
+          >
+            <Input aria-label="作业名称" className={`inp${validation.formFields["cn"] ? " invalid" : ""}`} value={form.cn} onChange={(event) => setValue("cn", event.target.value)} placeholder="例如：会员画像日终快照推送" />
+          </FormField>
           <div className="fl">
             <label>湖仓来源路径</label>
             <Input aria-label="湖仓来源路径" className="inp mono" value={form.sourcePath} onChange={(event) => setValue("sourcePath", event.target.value)} placeholder="例如：/dw/dwm/xxx/dt=${yyyy-MM-dd}" />
           </div>
-          <div className="fl">
-            <label>湖仓来源文件名</label>
-            <Input aria-label="湖仓来源文件名" className={`inp mono${touched && !form.sourceFileName.trim() ? " invalid" : ""}`} value={form.sourceFileName} onChange={(event) => setSourceFileName(event.target.value)} placeholder="例如：ACCT_BAL_${yyyyMMdd}.dat" />
-          </div>
+          <FormField
+            className="fl"
+            formId={JOB_FORM_ID}
+            name="sourceFileName"
+            label="湖仓来源文件名"
+            error={validation.formFields["sourceFileName"]}
+          >
+            <Input aria-label="湖仓来源文件名" className={`inp mono${validation.formFields["sourceFileName"] ? " invalid" : ""}`} value={form.sourceFileName} onChange={(event) => setSourceFileName(event.target.value)} placeholder="例如：ACCT_BAL_${yyyyMMdd}.dat" />
+          </FormField>
           <div className="fl">
             <label>目标推送路径</label>
             <Input aria-label="目标推送路径" className="inp mono" value={form.targetPath} onChange={(event) => setValue("targetPath", event.target.value)} placeholder="例如：/incoming/xxx/" />
           </div>
           <div className="fl">
             <label>目标推送文件名</label>
-            <Input aria-label="目标推送文件名" className={`inp mono${touched && !form.targetFileName.trim() && !form.sourceFileName.trim() ? " invalid" : ""}`} value={form.targetFileName} onChange={(event) => setValue("targetFileName", event.target.value)} placeholder="默认同湖仓来源文件名" />
+            <Input aria-label="目标推送文件名" className="inp mono" value={form.targetFileName} onChange={(event) => setValue("targetFileName", event.target.value)} placeholder="默认同湖仓来源文件名" />
           </div>
           {isRenameJob(form) ? <div className="fl full"><div className="editor-sub mono">推送时重命名：{formatRenameHint(form)}</div></div> : null}
           <div className="fl">
@@ -275,25 +321,28 @@ export function JobEditor({
             />
             {freqTypeLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>推送频率当前值未在码值中维护，请补充码值或重新选择。</div> : null}
           </div>
-          <div className="fl">
-            {freqParamConfig ? (
-              <>
-                <label>{freqParamConfig.label}</label>
-                <Select<string>
-                  aria-label={freqParamConfig.label}
-                  className={`sel${touched && !form.freq ? " invalid" : ""}`}
-                  items={freqParamConfig.options.map((item) => ({ label: item.name, value: item.value }))}
-                  value={form.freq || null}
-                  onValueChange={(value) => setValue("freq", value || "")}
-                />
-              </>
-            ) : (
-              <>
-                <label>频率明细</label>
-                <Input aria-label="频率明细" className="inp" value="无需配置（出数时间取决于上游）" disabled readOnly />
-              </>
-            )}
-          </div>
+          {freqParamConfig ? (
+            <FormField
+              className="fl"
+              formId={JOB_FORM_ID}
+              name="freq"
+              label={freqParamConfig.label}
+              error={validation.formFields["freq"]}
+            >
+              <Select<string>
+                aria-label={freqParamConfig.label}
+                className={`sel${validation.formFields["freq"] ? " invalid" : ""}`}
+                items={freqParamConfig.options.map((item) => ({ label: item.name, value: item.value }))}
+                value={form.freq || null}
+                onValueChange={(value) => setValue("freq", value || "")}
+              />
+            </FormField>
+          ) : (
+            <div className="fl">
+              <label>频率明细</label>
+              <Input aria-label="频率明细" className="inp" value="无需配置（出数时间取决于上游）" disabled readOnly />
+            </div>
+          )}
           <div className="fl">
             <label>预估行数</label>
             <Input aria-label="预估行数" className="inp" value={form.rowCnt} onChange={(event) => setValue("rowCnt", event.target.value)} placeholder="例如：约 12 万行" />
@@ -335,10 +384,26 @@ export function JobEditor({
                   <tr key={field._key}>
                     <td data-label="字段序号" className="idx-cell">{index + 1}</td>
                     <td data-label="字段名">
-                      <Input aria-label="字段名" className={`cell-inp mono${rowErrors.name ? " invalid" : ""}`} value={field.name} onChange={(event) => setField(field._key, { name: event.target.value })} placeholder="field_name" />
+                      <FormField
+                        formId={JOB_FORM_ID}
+                        name={`fields.${field._key}.name`}
+                        label={`字段${index + 1}字段名`}
+                        hideLabel
+                        error={validation.formFields[`fields.${field._key}.name`]}
+                      >
+                        <Input aria-label={`字段${index + 1}字段名`} className={`cell-inp mono${rowErrors.name ? " invalid" : ""}`} value={field.name} onChange={(event) => setField(field._key, { name: event.target.value })} placeholder="field_name" />
+                      </FormField>
                     </td>
                     <td data-label="中文名">
-                      <Input aria-label="中文名" className={`cell-inp${rowErrors.cn ? " invalid" : ""}`} value={field.cn} onChange={(event) => setField(field._key, { cn: event.target.value })} placeholder="中文名" />
+                      <FormField
+                        formId={JOB_FORM_ID}
+                        name={`fields.${field._key}.cn`}
+                        label={`字段${index + 1}中文名`}
+                        hideLabel
+                        error={validation.formFields[`fields.${field._key}.cn`]}
+                      >
+                        <Input aria-label={`字段${index + 1}中文名`} className={`cell-inp${rowErrors.cn ? " invalid" : ""}`} value={field.cn} onChange={(event) => setField(field._key, { cn: event.target.value })} placeholder="中文名" />
+                      </FormField>
                     </td>
                     <td data-label="含义">
                       <Input aria-label="含义" className="cell-inp" value={field.meaning} onChange={(event) => setField(field._key, { meaning: event.target.value })} placeholder="字段含义说明" />
@@ -368,7 +433,15 @@ export function JobEditor({
             </tbody>
           </table>
         </div>
-        <Button className="add-field" size="sm" type="button" variant="tertiary" onClick={addField}><Icon name="plus" size={14} />新增字段</Button>
+        <FormField
+          formId={JOB_FORM_ID}
+          name="fields"
+          label="字段清单"
+          hideLabel
+          error={validation.formFields["fields"]}
+        >
+          <Button className="add-field" size="sm" type="button" variant="tertiary" onClick={addField}><Icon name="plus" size={14} />新增字段</Button>
+        </FormField>
       </div>
 
       <FormActionBar
