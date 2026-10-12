@@ -361,6 +361,77 @@ jobs:
       - name: Backend tests with PostgreSQL integration enabled (0 skipped)
         run: python -m unittest discover -s backend/tests
 
+      - name: Community Demo seed is idempotent and rejects conflicting legacy rows
+        run: |
+          python demo/seed_postgres.py --dialect postgres > /tmp/pg-seed-repeat.sql
+          python - <<'EOF'
+          import psycopg
+          from demo.seed_loader import community_seed_plan
+
+          seed_sql = open("/tmp/pg-seed-repeat.sql", encoding="utf-8").read()
+          plan = community_seed_plan()
+          conn = psycopg.connect(host="127.0.0.1", port=5432, dbname="test",
+                                 user="postgres", password="postgres")
+          conn.autocommit = True
+          conn.execute(seed_sql)
+
+          for table in ("p_indicator_path_config", "p_indicator_item"):
+              columns = plan[table]["columns"]
+              selected = ", ".join(columns)
+              actual = conn.execute(
+                  f"SELECT {selected} FROM dwp.{table} ORDER BY {columns[0]}"
+              ).fetchall()
+              expected = sorted(
+                  [tuple(row) for row in plan[table]["rows"]], key=lambda row: row[0]
+              )
+              if actual != expected:
+                  raise SystemExit(f"repeat seed mismatch for {table}")
+
+          def assert_seed_rejected(description):
+              try:
+                  conn.execute(seed_sql)
+              except psycopg.errors.UniqueViolation:
+                  conn.rollback()
+              else:
+                  raise SystemExit(f"seed did not reject conflicting {description}")
+
+          legacy_description = "PRD 商品维度 > 商品运营 > 规模"
+          canonical_description = plan["p_indicator_item"]["rows"][0][
+              plan["p_indicator_item"]["columns"].index("path_desc")
+          ]
+          conn.execute(
+              "UPDATE dwp.p_indicator_item SET path_desc=%s WHERE indicator_pk=1",
+              (legacy_description,),
+          )
+          assert_seed_rejected("indicator pathDesc")
+          indicator_path = conn.execute(
+              "SELECT path_desc FROM dwp.p_indicator_item WHERE indicator_pk=1"
+          ).fetchone()[0]
+          if indicator_path != legacy_description:
+              raise SystemExit("seed changed a conflicting existing indicator pathDesc")
+          conn.execute(
+              "UPDATE dwp.p_indicator_item SET path_desc=%s WHERE indicator_pk=1",
+              (canonical_description,),
+          )
+
+          legacy_path = ("RETL", "零售经营分析", "retail", 1, "RETL")
+          conn.execute(
+              "UPDATE dwp.p_indicator_path_config "
+              "SET path_code='RETL', path_name='零售经营分析', "
+              "dimension_code='retail', path_level=1, full_path='RETL' "
+              "WHERE id=1"
+          )
+          assert_seed_rejected("indicator path tree")
+          path_row = conn.execute(
+              "SELECT path_code, path_name, dimension_code, path_level, full_path "
+              "FROM dwp.p_indicator_path_config WHERE id=1"
+          ).fetchone()
+          if path_row != legacy_path:
+              raise SystemExit("seed changed a conflicting existing indicator path row")
+          print("repeat seed is stable; conflicting legacy rows abort without overwrites")
+          conn.close()
+          EOF
+
   mysql:
     name: MySQL 8 Integration
     runs-on: ubuntu-latest

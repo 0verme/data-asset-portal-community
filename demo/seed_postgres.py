@@ -52,19 +52,88 @@ def values(items):
     return ",\n".join("(" + ",".join(literal(value) for value in row) + ")" for row in items)
 
 
+def conflict_guard_sql(table, spec, primary_key, natural_keys=()):
+    """Render an insert-only guard that aborts on conflicting seeded rows.
+
+    Each SELECT returns the existing primary key plus valid canonical row
+    values. It has no result for matching Demo data; a mismatch deliberately
+    violates the primary key before any seed writes.
+    """
+    columns = spec["columns"]
+    branches = []
+    for row in spec["rows"]:
+        identity_conditions = []
+        for key in (primary_key, *natural_keys):
+            value = row[columns.index(key)]
+            if value is not None:
+                identity_conditions.append(f"existing.{key} = {literal(value)}")
+        if not identity_conditions:
+            continue
+
+        mismatch_conditions = []
+        for column, value in zip(columns, row):
+            if value is None:
+                mismatch_conditions.append(f"existing.{column} IS NOT NULL")
+            else:
+                mismatch_conditions.append(
+                    f"(existing.{column} IS NULL OR existing.{column} <> {literal(value)})"
+                )
+        selected_values = ", ".join(
+            f"existing.{column}"
+            if column == primary_key
+            else literal(value)
+            for column, value in zip(columns, row)
+        )
+        branches.append(
+            f"SELECT {selected_values}\n"
+            f"FROM dwp.{table} AS existing\n"
+            "WHERE ("
+            + " OR ".join(identity_conditions)
+            + ") AND ("
+            + " OR ".join(mismatch_conditions)
+            + ")"
+        )
+
+    if not branches:
+        return ""
+    return (
+        "-- Fail fast before seed writes if an existing row matches a canonical "
+        "ID/natural key but differs from the Demo contract.\n"
+        "-- Canonical values satisfy row constraints; the deliberate duplicate "
+        "primary key aborts the transaction.\n"
+        f"INSERT INTO dwp.{table} ({', '.join(columns)})\n"
+        + "\nUNION ALL\n".join(branches)
+        + ";\n"
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dialect", choices=("postgres", "dws"), default="postgres")
     args = parser.parse_args()
+    seed_plan = {**rbac_seed_plan(), **community_seed_plan()}
     print(f"-- full-channel retail demo seed: {args.dialect}")
+    print("-- Preflight rejects conflicting existing indicator path/indicator rows; matching rows remain insert-only.")
     print("BEGIN;")
+    for table, primary_key, natural_keys in (
+        ("p_indicator_path_config", "id", ("path_code", "full_path")),
+        ("p_indicator_item", "indicator_pk", ("indicator_id",)),
+    ):
+        print(
+            conflict_guard_sql(
+                table,
+                seed_plan[table],
+                primary_key,
+                natural_keys,
+            ),
+            end="",
+        )
     print(
         "-- p_admin_user is not seeded here: create the first admin with"
     )
     print(
         "-- backend/scripts/reset_all_user_passwords.py after first startup."
     )
-    seed_plan = {**rbac_seed_plan(), **community_seed_plan()}
     for table, spec in seed_plan.items():
         if not spec["rows"]:
             continue

@@ -15,6 +15,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+try:
+    from .indicator_path_contract import (
+        flatten_indicator_path_tree,
+        validate_indicator_path_contract,
+    )
+except ImportError:  # imported as a top-level script from demo/
+    from indicator_path_contract import (
+        flatten_indicator_path_tree,
+        validate_indicator_path_contract,
+    )
+
 DATASETS_DIR = Path(__file__).resolve().parent / "datasets"
 
 # Keep code-table seed IDs outside the small IDs used by the forward migration.
@@ -71,6 +82,14 @@ def load_dataset(name: str) -> list[dict]:
     return __import__("json").loads(path.read_text(encoding="utf-8"))
 
 
+def validate_demo_indicator_path_contract() -> list[dict]:
+    """Reject mismatched Demo paths before a seed plan can be applied."""
+    path_tree = load_dataset("indicator_paths.json")
+    indicators = load_dataset("indicators.json")
+    validate_indicator_path_contract(path_tree, indicators)
+    return path_tree
+
+
 def demo_push_system_codes() -> tuple[str, ...]:
     """Return the exact push-system codes owned by the Community demo."""
     return tuple(item["code"] for item in load_dataset("push_systems.json"))
@@ -83,6 +102,8 @@ def community_seed_plan() -> dict[str, dict]:
     ordered exactly like columns so dialect seeders can emit parameterized or
     literal SQL without their own business mapping.
     """
+
+    validate_demo_indicator_path_contract()
 
     def spec(columns, rows):
         return {"columns": list(columns), "rows": [list(row) for row in rows]}
@@ -222,15 +243,15 @@ def community_seed_plan() -> dict[str, dict]:
             )
             code_item_id += 1
 
-    indicator_paths = load_dataset("indicator_paths.json")
     indicator_path_rows = [
         (
-            path["id"], path.get("parentId"), path["pathCode"], path["pathName"],
+            path["id"], path["parentId"], path["pathCode"], path["pathName"],
             path["dimensionCode"], path["pathLevel"], path["fullPath"],
-            path.get("sortOrder", 0), path.get("status", "enabled"),
-            path.get("remark"),
+            path["sortOrder"], path["status"], path["remark"],
         )
-        for path in indicator_paths
+        for path in flatten_indicator_path_tree(
+            load_dataset("indicator_paths.json")
+        )
     ]
 
     root_items = [

@@ -7,6 +7,8 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from contextlib import redirect_stdout
+from io import StringIO
 import tempfile
 import unittest
 from pathlib import Path
@@ -24,7 +26,17 @@ from backend.app.services.upstream_service import (
     UpstreamService,
     UpstreamValidationError,
 )
-from demo.seed_loader import ADMIN_USER, DEMO_PUSH_AUTH_TYPE, LEGACY_DEMO_PUSH_AUTH_TYPE
+from demo.indicator_path_contract import (
+    flatten_indicator_path_tree,
+    indicator_path_contract_errors,
+)
+from demo.seed_loader import (
+    ADMIN_USER,
+    DEMO_PUSH_AUTH_TYPE,
+    LEGACY_DEMO_PUSH_AUTH_TYPE,
+    load_dataset,
+)
+from demo.seed_postgres import main as render_demo_seed_sql
 from werkzeug.security import check_password_hash, generate_password_hash
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,7 +49,7 @@ EXPECTED_COUNTS = {
     "p_asset_field": 251,
     "p_code_category": 11,
     "p_code_item": 49,
-    "p_indicator_path_config": 10,
+    "p_indicator_path_config": 62,
     "p_root_item": 40,
     "p_indicator_item": 16,
     "p_system": 8,
@@ -483,16 +495,207 @@ class CommunityDemoSeedTests(unittest.TestCase):
                 "SELECT category_code, item_code FROM p_code_item"
             ).fetchall()
             paths = connection.execute(
-                "SELECT path_code, parent_id, path_level, full_path FROM p_indicator_path_config"
+                "SELECT id, path_code, parent_id, path_level, full_path, dimension_code "
+                "FROM p_indicator_path_config ORDER BY id"
             ).fetchall()
         finally:
             connection.close()
         self.assertEqual(len({(c, i) for c, i in item_codes}), len(item_codes))
-        self.assertEqual(len({p[0] for p in paths}), len(paths))
-        roots = [p for p in paths if p[1] is None]
-        self.assertEqual(len(roots), 1)
+        self.assertEqual(len({p[1] for p in paths}), len(paths))
+        self.assertEqual(62, len(paths))
+        roots = [path for path in paths if path[2] is None]
+        self.assertEqual(8, len(roots))
+        root_dimensions = {path[5] for path in roots}
+        self.assertEqual(
+            {"prd", "mem", "ord", "str", "inv", "mkt", "ful", "svc"},
+            root_dimensions,
+        )
+        by_id = {path[0]: path for path in paths}
         for path in paths:
-            self.assertEqual(path[3].split("/")[-1], path[0], f"full_path tail for {path[0]}")
+            self.assertEqual(path[4].split("/")[-1], path[1], f"full_path tail for {path[1]}")
+            self.assertEqual(len(path[4].split("/")), path[3], f"path_level for {path[1]}")
+            self.assertIn(path[5], root_dimensions)
+            if path[2] is not None:
+                parent = by_id[path[2]]
+                self.assertEqual(path[3], parent[3] + 1, path[1])
+                self.assertEqual(path[4], f"{parent[4]}/{path[1]}", path[1])
+                self.assertEqual(path[5], parent[5], path[1])
+
+    def test_demo_indicator_paths_match_seed_tree_and_dimension_codes(self):
+        path_tree = _load_dataset("indicator_paths.json")
+        indicators = _load_dataset("indicators.json")
+        self.assertEqual([], indicator_path_contract_errors(path_tree, indicators))
+        self.assertEqual(16, len(indicators))
+
+        self._seed()
+        connection = sqlite3.connect(self.database)
+        try:
+            seeded = connection.execute(
+                "SELECT indicator_id, dimension_code, path_desc "
+                "FROM p_indicator_item ORDER BY indicator_pk"
+            ).fetchall()
+        finally:
+            connection.close()
+        expected = [
+            (item["code"], item["code"][:3].lower(), item["pathDesc"])
+            for item in indicators
+        ]
+        self.assertEqual(expected, seeded)
+
+    def test_path_contract_reports_indicator_and_missing_node(self):
+        path_tree = _load_dataset("indicator_paths.json")
+        indicators = _load_dataset("indicators.json")
+        indicators[0]["pathDesc"] = "PRD > Missing Group > 规模"
+
+        errors = indicator_path_contract_errors(path_tree, indicators)
+
+        self.assertEqual(1, len(errors))
+        self.assertIn("PRD00001", errors[0])
+        self.assertIn("Missing Group", errors[0])
+
+    def test_seed_rejects_unmatched_indicator_path_before_writes(self):
+        original_load = load_dataset
+
+        def load_with_invalid_indicator_path(name):
+            data = original_load(name)
+            if name == "indicators.json":
+                data[0]["pathDesc"] = "PRD > Missing Group > 规模"
+            return data
+
+        with patch("demo.seed_loader.load_dataset", side_effect=load_with_invalid_indicator_path):
+            with self.assertRaisesRegex(ValueError, "indicator PRD00001: missing path node"):
+                self._seed()
+
+        connection = sqlite3.connect(self.database)
+        try:
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM p_system").fetchone()[0])
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM p_indicator_path_config").fetchone()[0])
+        finally:
+            connection.close()
+
+    def test_seed_rejects_legacy_indicator_path_description_without_overwrite(self):
+        self._seed()
+        legacy_path_desc = "PRD 商品维度 > 商品运营 > 规模"
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute(
+                "UPDATE p_indicator_item SET path_desc = ? WHERE indicator_pk = 1",
+                (legacy_path_desc,),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        with self.assertRaisesRegex(
+            ValueError, r"p_indicator_item row \(indicator_pk=1\) conflicts"
+        ):
+            self._seed()
+
+        connection = sqlite3.connect(self.database)
+        try:
+            self.assertEqual(
+                legacy_path_desc,
+                connection.execute(
+                    "SELECT path_desc FROM p_indicator_item WHERE indicator_pk = 1"
+                ).fetchone()[0],
+            )
+            self.assertEqual(8, connection.execute("SELECT COUNT(*) FROM p_system").fetchone()[0])
+        finally:
+            connection.close()
+
+    def test_postgres_and_dws_seed_sql_share_the_canonical_path_contract(self):
+        path_tree = _load_dataset("indicator_paths.json")
+        indicators = _load_dataset("indicators.json")
+        path_codes = [
+            row["pathCode"] for row in flatten_indicator_path_tree(path_tree)
+        ]
+
+        for dialect in ("postgres", "dws"):
+            with self.subTest(dialect=dialect):
+                output = StringIO()
+                with patch("sys.argv", ["seed_postgres.py", "--dialect", dialect]):
+                    with redirect_stdout(output):
+                        render_demo_seed_sql()
+                sql = output.getvalue()
+                path_guard_start = sql.index(
+                    "INSERT INTO dwp.p_indicator_path_config ("
+                )
+                indicator_guard_start = sql.index(
+                    "INSERT INTO dwp.p_indicator_item ("
+                )
+                path_start = sql.rindex("INSERT INTO dwp.p_indicator_path_config ")
+                path_end = sql.index(";", path_start)
+                path_insert = sql[path_start:path_end]
+                indicator_start = sql.rindex("INSERT INTO dwp.p_indicator_item ")
+                indicator_end = sql.index(";", indicator_start)
+                indicator_insert = sql[indicator_start:indicator_end]
+
+                self.assertIn(
+                    "-- Preflight rejects conflicting existing indicator path/indicator rows",
+                    sql,
+                )
+                self.assertIn("existing.path_code = 'PRD'", sql)
+                self.assertIn("existing.path_desc", sql)
+                self.assertLess(path_guard_start, sql.index("-- p_admin_user is not seeded"))
+                self.assertLess(indicator_guard_start, sql.index("-- p_admin_user is not seeded"))
+                self.assertIn("ON CONFLICT (id) DO NOTHING", path_insert)
+                self.assertIn("ON CONFLICT (indicator_pk) DO NOTHING", indicator_insert)
+                self.assertFalse(any(f"'{code}'" not in path_insert for code in path_codes))
+                self.assertFalse(
+                    any(item["pathDesc"] not in indicator_insert for item in indicators)
+                )
+                self.assertNotIn("UPDATE", path_insert.upper())
+                self.assertNotIn("DELETE", path_insert.upper())
+
+    def test_postgres_seed_rejects_unmatched_paths_before_emitting_sql(self):
+        original_load = load_dataset
+
+        def load_with_invalid_indicator_path(name):
+            data = original_load(name)
+            if name == "indicators.json":
+                data[0]["pathDesc"] = "PRD > Missing Group > 规模"
+            return data
+
+        output = StringIO()
+        with patch("demo.seed_loader.load_dataset", side_effect=load_with_invalid_indicator_path):
+            with patch("sys.argv", ["seed_postgres.py", "--dialect", "postgres"]):
+                with redirect_stdout(output):
+                    with self.assertRaisesRegex(
+                        ValueError, "indicator PRD00001: missing path node"
+                    ):
+                        render_demo_seed_sql()
+        self.assertEqual("", output.getvalue())
+
+    def test_seed_preserves_and_rejects_legacy_path_rows_before_writes(self):
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute(
+                "INSERT INTO p_indicator_path_config "
+                "(id, parent_id, path_code, path_name, dimension_code, path_level, "
+                "full_path, sort_order, status, remark) "
+                "VALUES (1, NULL, 'RETL', '零售经营分析', 'retail', 1, 'RETL', 1, 'enabled', 'legacy demo row')"
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        with self.assertRaisesRegex(
+            ValueError, r"p_indicator_path_config row \(id=1\) conflicts"
+        ):
+            self._seed()
+
+        connection = sqlite3.connect(self.database)
+        try:
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM p_system").fetchone()[0])
+            self.assertEqual(
+                [("RETL",)],
+                connection.execute(
+                    "SELECT path_code FROM p_indicator_path_config WHERE id = 1"
+                ).fetchall(),
+            )
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM p_indicator_item").fetchone()[0])
+        finally:
+            connection.close()
 
     def test_fresh_demo_push_auth_matches_contract_and_edit_succeeds(self):
         self._seed()

@@ -1,12 +1,240 @@
 [
-  {"id":1,"parentId":null,"pathCode":"RETL","pathName":"零售经营分析","dimensionCode":"retail","pathLevel":1,"fullPath":"RETL","sortOrder":1,"status":"enabled","remark":"零售全渠道经营分析根路径"},
-  {"id":2,"parentId":1,"pathCode":"RETL_SALES","pathName":"销售分析","dimensionCode":"sales","pathLevel":2,"fullPath":"RETL/RETL_SALES","sortOrder":1,"status":"enabled","remark":"销售达成与结构分析"},
-  {"id":3,"parentId":1,"pathCode":"RETL_MEMBER","pathName":"会员分析","dimensionCode":"member","pathLevel":2,"fullPath":"RETL/RETL_MEMBER","sortOrder":2,"status":"enabled","remark":"会员规模与价值分析"},
-  {"id":4,"parentId":1,"pathCode":"RETL_PRODUCT","pathName":"商品分析","dimensionCode":"product","pathLevel":2,"fullPath":"RETL/RETL_PRODUCT","sortOrder":3,"status":"enabled","remark":"商品动销与毛利分析"},
-  {"id":5,"parentId":1,"pathCode":"RETL_STORE","pathName":"门店分析","dimensionCode":"store","pathLevel":2,"fullPath":"RETL/RETL_STORE","sortOrder":4,"status":"enabled","remark":"门店经营与目标达成分析"},
-  {"id":6,"parentId":1,"pathCode":"RETL_FULFILLMENT","pathName":"履约分析","dimensionCode":"fulfillment","pathLevel":2,"fullPath":"RETL/RETL_FULFILLMENT","sortOrder":5,"status":"enabled","remark":"物流时效与履约质量分析"},
-  {"id":7,"parentId":1,"pathCode":"RETL_MARKETING","pathName":"营销分析","dimensionCode":"marketing","pathLevel":2,"fullPath":"RETL/RETL_MARKETING","sortOrder":6,"status":"enabled","remark":"营销活动效果分析"},
-  {"id":8,"parentId":2,"pathCode":"RETL_SALES_DAILY","pathName":"日销售分析","dimensionCode":"sales_daily","pathLevel":3,"fullPath":"RETL/RETL_SALES/RETL_SALES_DAILY","sortOrder":1,"status":"enabled","remark":"全渠道日销售趋势"},
-  {"id":9,"parentId":3,"pathCode":"RETL_MEMBER_VALUE","pathName":"会员价值分析","dimensionCode":"member_value","pathLevel":3,"fullPath":"RETL/RETL_MEMBER/RETL_MEMBER_VALUE","sortOrder":1,"status":"enabled","remark":"会员分层与复购价值"},
-  {"id":10,"parentId":4,"pathCode":"RETL_PRODUCT_SALES","pathName":"商品销售分析","dimensionCode":"product_sales","pathLevel":3,"fullPath":"RETL/RETL_PRODUCT/RETL_PRODUCT_SALES","sortOrder":1,"status":"enabled","remark":"商品销售与毛利排名"}
+  {
+    "pathCode": "PRD",
+    "pathName": "商品维度",
+    "dimensionCode": "prd",
+    "sortOrder": 1,
+    "children": [
+      {
+        "pathCode": "PRD_G01",
+        "pathName": "商品运营",
+        "sortOrder": 1,
+        "children": [
+          { "pathCode": "PRD_G01_T01", "pathName": "规模", "sortOrder": 1 },
+          { "pathCode": "PRD_G01_T02", "pathName": "动销", "sortOrder": 2 }
+        ]
+      },
+      {
+        "pathCode": "PRD_G02",
+        "pathName": "价格分析",
+        "sortOrder": 2,
+        "children": [
+          { "pathCode": "PRD_G02_T01", "pathName": "价格", "sortOrder": 1 },
+          { "pathCode": "PRD_G02_T02", "pathName": "变更", "sortOrder": 2 }
+        ]
+      }
+    ]
+  },
+  {
+    "pathCode": "MEM",
+    "pathName": "会员维度",
+    "dimensionCode": "mem",
+    "sortOrder": 2,
+    "children": [
+      {
+        "pathCode": "MEM_G01",
+        "pathName": "会员增长",
+        "sortOrder": 1,
+        "children": [
+          { "pathCode": "MEM_G01_T01", "pathName": "新增", "sortOrder": 1 }
+        ]
+      },
+      {
+        "pathCode": "MEM_G02",
+        "pathName": "会员活跃",
+        "sortOrder": 2,
+        "children": [
+          { "pathCode": "MEM_G02_T01", "pathName": "活跃", "sortOrder": 1 },
+          { "pathCode": "MEM_G02_T02", "pathName": "互动", "sortOrder": 2 }
+        ]
+      },
+      {
+        "pathCode": "MEM_G03",
+        "pathName": "会员价值",
+        "sortOrder": 3,
+        "children": [
+          { "pathCode": "MEM_G03_T01", "pathName": "复购", "sortOrder": 1 },
+          { "pathCode": "MEM_G03_T02", "pathName": "分层", "sortOrder": 2 }
+        ]
+      }
+    ]
+  },
+  {
+    "pathCode": "ORD",
+    "pathName": "交易维度",
+    "dimensionCode": "ord",
+    "sortOrder": 3,
+    "children": [
+      {
+        "pathCode": "ORD_G01",
+        "pathName": "销售分析",
+        "sortOrder": 1,
+        "children": [
+          { "pathCode": "ORD_G01_T01", "pathName": "规模", "sortOrder": 1 },
+          { "pathCode": "ORD_G01_T02", "pathName": "订单", "sortOrder": 2 },
+          { "pathCode": "ORD_G01_T03", "pathName": "效率", "sortOrder": 3 }
+        ]
+      },
+      {
+        "pathCode": "ORD_G02",
+        "pathName": "商品分析",
+        "sortOrder": 2,
+        "children": [
+          { "pathCode": "ORD_G02_T01", "pathName": "件单", "sortOrder": 1 }
+        ]
+      }
+    ]
+  },
+  {
+    "pathCode": "STR",
+    "pathName": "门店维度",
+    "dimensionCode": "str",
+    "sortOrder": 4,
+    "children": [
+      {
+        "pathCode": "STR_G01",
+        "pathName": "门店经营",
+        "sortOrder": 1,
+        "children": [
+          { "pathCode": "STR_G01_T01", "pathName": "销售", "sortOrder": 1 },
+          { "pathCode": "STR_G01_T02", "pathName": "目标", "sortOrder": 2 }
+        ]
+      },
+      {
+        "pathCode": "STR_G02",
+        "pathName": "客流分析",
+        "sortOrder": 2,
+        "children": [
+          { "pathCode": "STR_G02_T01", "pathName": "客流", "sortOrder": 1 },
+          { "pathCode": "STR_G02_T02", "pathName": "转化", "sortOrder": 2 }
+        ]
+      }
+    ]
+  },
+  {
+    "pathCode": "INV",
+    "pathName": "库存维度",
+    "dimensionCode": "inv",
+    "sortOrder": 5,
+    "children": [
+      {
+        "pathCode": "INV_G01",
+        "pathName": "库存健康",
+        "sortOrder": 1,
+        "children": [
+          { "pathCode": "INV_G01_T01", "pathName": "库存", "sortOrder": 1 },
+          { "pathCode": "INV_G01_T02", "pathName": "缺货", "sortOrder": 2 },
+          { "pathCode": "INV_G01_T03", "pathName": "在途", "sortOrder": 3 }
+        ]
+      },
+      {
+        "pathCode": "INV_G02",
+        "pathName": "库存效率",
+        "sortOrder": 2,
+        "children": [
+          { "pathCode": "INV_G02_T01", "pathName": "周转", "sortOrder": 1 }
+        ]
+      },
+      {
+        "pathCode": "INV_G03",
+        "pathName": "补货管理",
+        "sortOrder": 3,
+        "children": [
+          { "pathCode": "INV_G03_T01", "pathName": "建议", "sortOrder": 1 }
+        ]
+      }
+    ]
+  },
+  {
+    "pathCode": "MKT",
+    "pathName": "营销维度",
+    "dimensionCode": "mkt",
+    "sortOrder": 6,
+    "children": [
+      {
+        "pathCode": "MKT_G01",
+        "pathName": "活动效果",
+        "sortOrder": 1,
+        "children": [
+          { "pathCode": "MKT_G01_T01", "pathName": "曝光", "sortOrder": 1 },
+          { "pathCode": "MKT_G01_T02", "pathName": "互动", "sortOrder": 2 },
+          { "pathCode": "MKT_G01_T03", "pathName": "转化", "sortOrder": 3 }
+        ]
+      },
+      {
+        "pathCode": "MKT_G02",
+        "pathName": "优惠分析",
+        "sortOrder": 2,
+        "children": [
+          { "pathCode": "MKT_G02_T01", "pathName": "用券", "sortOrder": 1 }
+        ]
+      }
+    ]
+  },
+  {
+    "pathCode": "FUL",
+    "pathName": "履约维度",
+    "dimensionCode": "ful",
+    "sortOrder": 7,
+    "children": [
+      {
+        "pathCode": "FUL_G01",
+        "pathName": "配送效率",
+        "sortOrder": 1,
+        "children": [
+          { "pathCode": "FUL_G01_T01", "pathName": "规模", "sortOrder": 1 },
+          { "pathCode": "FUL_G01_T02", "pathName": "时效", "sortOrder": 2 }
+        ]
+      },
+      {
+        "pathCode": "FUL_G02",
+        "pathName": "履约质量",
+        "sortOrder": 2,
+        "children": [
+          { "pathCode": "FUL_G02_T01", "pathName": "异常", "sortOrder": 1 }
+        ]
+      }
+    ]
+  },
+  {
+    "pathCode": "SVC",
+    "pathName": "售后维度",
+    "dimensionCode": "svc",
+    "sortOrder": 8,
+    "children": [
+      {
+        "pathCode": "SVC_G01",
+        "pathName": "退换货",
+        "sortOrder": 1,
+        "children": [
+          { "pathCode": "SVC_G01_T01", "pathName": "申请", "sortOrder": 1 },
+          { "pathCode": "SVC_G01_T02", "pathName": "质量", "sortOrder": 2 }
+        ]
+      },
+      {
+        "pathCode": "SVC_G02",
+        "pathName": "退款处理",
+        "sortOrder": 2,
+        "children": [
+          { "pathCode": "SVC_G02_T01", "pathName": "金额", "sortOrder": 1 }
+        ]
+      },
+      {
+        "pathCode": "SVC_G03",
+        "pathName": "客户服务",
+        "sortOrder": 3,
+        "children": [
+          { "pathCode": "SVC_G03_T01", "pathName": "效率", "sortOrder": 1 }
+        ]
+      },
+      {
+        "pathCode": "SVC_G04",
+        "pathName": "客户声音",
+        "sortOrder": 4,
+        "children": [
+          { "pathCode": "SVC_G04_T01", "pathName": "评价", "sortOrder": 1 }
+        ]
+      }
+    ]
+  }
 ]

@@ -23,6 +23,11 @@ from pathlib import Path
 
 from safety_scan import GUARD_DIRS, GUARD_FILES, scan_file
 
+try:
+    from .indicator_path_contract import indicator_path_contract_errors
+except ImportError:  # invoked as `python demo/validate_demo_data.py`
+    from indicator_path_contract import indicator_path_contract_errors
+
 ROOT = Path(__file__).resolve().parent
 REPO_ROOT = ROOT.parent
 PRIVATE_IPV4 = None  # kept for compatibility; real checks live in safety_scan
@@ -151,20 +156,10 @@ def validate_demo_surfaces():
                 f"common_codes.json: duplicate item code in {category.get('categoryCode')}"
             )
 
-    # Indicator paths must form a single root with stable full paths.
     paths = datasets.get("indicator_paths.json", [])
-    root_ids = [p.get("id") for p in paths if p.get("parentId") is None]
-    if len(root_ids) != 1:
-        risks.append(f"indicator_paths.json: expected exactly one root, got {len(root_ids)}")
-    path_codes = [p.get("pathCode") for p in paths]
-    if len(path_codes) != len(set(path_codes)):
-        risks.append("indicator_paths.json: duplicate pathCode")
-    for path in paths:
-        expected = path.get("fullPath", "").split("/")[-1]
-        if expected != path.get("pathCode"):
-            risks.append(
-                f"indicator_paths.json: fullPath tail {expected!r} != pathCode {path.get('pathCode')!r}"
-            )
+    risks.extend(
+        indicator_path_contract_errors(paths, datasets.get("indicators.json", []))
+    )
 
     dataset_files = [ROOT / relative for relative in manifest["datasets"]]
     seed_files = [ROOT / "seed_postgres.py", ROOT / "seed_sqlite.py"]

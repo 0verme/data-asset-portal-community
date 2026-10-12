@@ -59,12 +59,50 @@ def repair_legacy_demo_push_auth(connection):
     )
 
 
+def _assert_existing_indicator_seed_rows_compatible(connection, seed_plan):
+    """Refuse legacy/conflicting seed IDs rather than mixing or overwriting rows."""
+    for table in ("p_indicator_path_config", "p_indicator_item"):
+        spec = seed_plan[table]
+        columns = spec["columns"]
+        selected = ", ".join(f'"{column}"' for column in columns)
+        table_exists = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (table,),
+        ).fetchone()
+        if not table_exists:
+            continue
+
+        expected_by_id = {row[0]: tuple(row) for row in spec["rows"]}
+        natural_index = 2 if table == "p_indicator_path_config" else 1
+        expected_by_natural_key = {
+            row[natural_index]: tuple(row) for row in spec["rows"]
+        }
+        existing_rows = connection.execute(
+            f"SELECT {selected} FROM \"{table}\""
+        ).fetchall()
+        for existing in existing_rows:
+            existing = tuple(existing)
+            expected = expected_by_id.get(existing[0])
+            conflict_key = f"{columns[0]}={existing[0]}"
+            if expected is None:
+                expected = expected_by_natural_key.get(existing[natural_index])
+                conflict_key = f"{columns[natural_index]}={existing[natural_index]!r}"
+            if expected is not None and existing != expected:
+                raise ValueError(
+                    f"Demo seed aborted: existing {table} row ({conflict_key}) "
+                    "conflicts with the canonical indicator path seed. Existing rows "
+                    "were not changed; review or use a fresh disposable Demo database."
+                )
+
+
 def seed(database: Path):
     if not database.is_absolute():
         raise ValueError("--database must be an absolute path")
+    seed_plan = community_seed_plan()
     connection = sqlite3.connect(database)
     connection.execute("PRAGMA foreign_keys = ON")
     try:
+        _assert_existing_indicator_seed_rows_compatible(connection, seed_plan)
         seed_rbac(
             connection,
             {"type": "sqlite", "database": str(database)},
@@ -82,7 +120,7 @@ def seed(database: Path):
                 ADMIN_USER["status"],
             ),
         )
-        for table, spec in community_seed_plan().items():
+        for table, spec in seed_plan.items():
             columns = ", ".join(spec["columns"])
             placeholders = ", ".join("?" for _ in spec["columns"])
             statement = (
