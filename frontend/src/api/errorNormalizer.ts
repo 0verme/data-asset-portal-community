@@ -174,13 +174,12 @@ function isTimeout(error: UnknownRecord | null, message: string | undefined): bo
     || /(?:timeout|timed\s*out|请求超时|接口请求超时)/i.test(message || '');
 }
 
-function isNetworkError(error: unknown, record: UnknownRecord | null, message: string | undefined): boolean {
-  return error instanceof TypeError
-    || record?.['name'] === 'NetworkError'
-    || /(?:failed to fetch|network error|network request failed|load failed|网络连接失败|网络错误)/i.test(message || '');
+function isNetworkError(record: UnknownRecord | null, message: string | undefined): boolean {
+  return record?.['name'] === 'NetworkError'
+    || /(?:failed to fetch|fetch failed|network error|network request failed|load failed|网络连接失败|网络错误)/i.test(message || '');
 }
 
-function classifyError(status: number | undefined, error: unknown, record: UnknownRecord | null, message: string | undefined): NormalizedApiErrorKind {
+function classifyError(status: number | undefined, record: UnknownRecord | null, message: string | undefined): NormalizedApiErrorKind {
   if (status === 401) return 'unauthorized';
   if (status === 403) return 'forbidden';
   if (status === 409) return 'conflict';
@@ -188,7 +187,7 @@ function classifyError(status: number | undefined, error: unknown, record: Unkno
   if (status !== undefined && status >= 500) return 'server';
   if (status !== undefined) return 'http';
   if (isTimeout(record, message)) return 'timeout';
-  if (isNetworkError(error, record, message)) return 'network';
+  if (isNetworkError(record, message)) return 'network';
   return 'unknown';
 }
 
@@ -237,8 +236,14 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
     typeof record?.['message'] === 'string' ? record['message'] : undefined,
     typeof error === 'string' ? error : undefined,
   );
-  const details = readDetails(envelope, payload) ?? (Array.isArray(payloadValue) ? payloadValue : undefined);
-  const kind = classifyError(status, error, record, message);
+  const hasDetails = hasOwn(envelope, 'details') || hasOwn(payload, 'details') || hasOwn(payload, 'detail');
+  let details: unknown;
+  if (hasDetails) {
+    details = readDetails(envelope, payload);
+  } else if (Array.isArray(payloadValue)) {
+    details = payloadValue;
+  }
+  const kind = classifyError(status, record, message);
 
   return {
     kind,

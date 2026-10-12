@@ -43,6 +43,11 @@ test('normalizer preserves the ErrorEnvelope and extracts known structured field
     { field: 'responseFields', index: 0, label: '响应字段' },
     { field: 'path', index: null, label: '请求路径' },
   ]);
+
+  const explicitNullDetails = normalizeApiError(httpError(422, {
+    error: { code: 'VALIDATION_ERROR', details: null },
+  }));
+  assert.equal(explicitNullDetails.details, null);
 });
 
 test('normalizer classifies common HTTP failure statuses with safe messages', () => {
@@ -101,6 +106,13 @@ test('normalizer distinguishes network failures and timeouts', () => {
   const network = normalizeApiError(new TypeError('Failed to fetch'));
   assert.equal(network.kind, 'network');
   assert.equal(network.safeMessage, '网络连接失败，请检查网络后重试。');
+
+  const nodeFetchFailure = normalizeApiError(new TypeError('fetch failed'));
+  assert.equal(nodeFetchFailure.kind, 'network');
+
+  const unrelatedTypeError = normalizeApiError(new TypeError('Cannot read properties of undefined'));
+  assert.equal(unrelatedTypeError.kind, 'unknown');
+  assert.equal(unrelatedTypeError.safeMessage, '操作失败，请稍后重试。');
 
   const timeout = normalizeApiError(new Error('接口请求超时（60秒），请稍后重试。'));
   assert.equal(timeout.kind, 'timeout');
