@@ -23,16 +23,21 @@ import {
   DEFAULT_VARCHAR_LENGTH,
   buildColumnType,
   parseColumnType,
-  validateColumnType,
 } from "../constants/dataTypes.ts";
 import { LAYER_OPTIONS, type LayerOption } from "../config/assets.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
+import { PageHeader } from "./common/index.ts";
 import {
-  ASSET_NAME_RULE_MESSAGE,
-  isValidAssetName,
-} from "../utils/assetName.ts";
-import { ActionErrorBanner, PageHeader } from "./common/index.ts";
-import { Button, IconButton, Input, Select, Textarea } from "../ui/index.ts";
+  Button,
+  FormErrorSummary,
+  FormField,
+  focusFirstFormError,
+  IconButton,
+  Input,
+  Select,
+  Textarea,
+} from "../ui/index.ts";
+import { getTableFieldLabel, validateTableForm, type TableRowErrors, type TableValidation } from "./tableFormErrors.ts";
 import { AssetDeleteZone, AssetEditorActionBar } from "./views/asset/AssetEditorActions.tsx";
 import { Icon } from "./ui.tsx";
 
@@ -63,23 +68,14 @@ interface TableFormData {
   fields: EditorField[];
 }
 
-interface FieldErrors {
-  name?: string | undefined;
-  cn?: string | undefined;
-  nullable?: string | undefined;
-  type?: string | undefined;
-}
-
 type DataTypeBase = (typeof DATA_TYPE_BASE_OPTIONS)[number];
 
 function isDataTypeBase(value: string): value is DataTypeBase {
   return (DATA_TYPE_BASE_OPTIONS as readonly string[]).includes(value);
 }
 
-interface TableValidation {
-  list: string[];
-  fields: Record<string, FieldErrors>;
-}
+const TABLE_FORM_ID = "table-editor-form";
+const EMPTY_TABLE_VALIDATION: TableValidation = { list: [], fields: {}, formFields: {} };
 
 function createField(): EditorField {
   const typeParts = parseColumnType(DEFAULT_DATA_TYPE);
@@ -155,76 +151,6 @@ function normalizeInitial(
   };
 }
 
-function validateForm(
-  form: TableFormData,
-  existingNames: readonly string[],
-  oldName: string,
-): TableValidation {
-  const errors: string[] = [];
-  const fieldErrors: Record<string, FieldErrors> = {};
-  const normalizedName = form.name.trim();
-
-  if (!normalizedName) {
-    errors.push("请输入表英文名。");
-  } else if (!isValidAssetName(normalizedName)) {
-    errors.push(`表英文名${ASSET_NAME_RULE_MESSAGE}`);
-  }
-
-  const duplicateTable = existingNames.some(
-    (name) => name === normalizedName && name !== oldName,
-  );
-  if (normalizedName && duplicateTable) {
-    errors.push(`表名 ${normalizedName} 已存在。`);
-  }
-
-  if (!form.cn.trim()) errors.push("请输入表中文名或业务含义。");
-  if (!form.domain) errors.push("请选择主题域。");
-  if (!form.layer) errors.push("请选择数据层级。");
-  if (!form.fields.length) errors.push("至少需要一个字段。");
-
-  const usedFieldNames = new Set<string>();
-  form.fields.forEach((field) => {
-    const rowErrors: FieldErrors = {};
-    const fieldName = field.name.trim();
-
-    if (!fieldName) {
-      rowErrors.name = "请输入字段名";
-      errors.push("存在未填写字段名的字段。");
-    } else if (!isValidAssetName(fieldName)) {
-      rowErrors.name = "字段名格式不正确";
-      errors.push(`字段 ${fieldName} 格式不正确。`);
-    } else if (usedFieldNames.has(fieldName)) {
-      rowErrors.name = "字段名重复";
-      errors.push(`字段 ${fieldName} 重复。`);
-    } else {
-      usedFieldNames.add(fieldName);
-    }
-
-    if (!field.cn.trim()) {
-      rowErrors.cn = "请输入字段中文注释";
-      errors.push(`字段 ${fieldName || "未命名字段"} 缺少中文注释。`);
-    }
-
-    if (field.pk && field.nullable) {
-      rowErrors.nullable = "主键字段不能可空";
-      errors.push(`字段 ${fieldName || "未命名字段"} 不能同时为主键和可空。`);
-    }
-
-    const typeError = validateColumnType(field);
-    if (typeError) {
-      rowErrors.type = typeError;
-      errors.push(`字段 ${fieldName || "未命名字段"} ${typeError}`);
-    }
-
-    if (Object.keys(rowErrors).length) fieldErrors[field._key] = rowErrors;
-  });
-
-  return {
-    list: [...new Set(errors)],
-    fields: fieldErrors,
-  };
-}
-
 export interface TableEditorProps {
   mode: "new" | "edit";
   initial?: AssetTableItem | null | undefined;
@@ -259,6 +185,9 @@ export function TableEditor({
   );
   const [touched, setTouched] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [validationFocusRequest, setValidationFocusRequest] = React.useState(0);
+  const formRef = React.useRef<HTMLDivElement>(null);
+  const handledValidationFocusRequestRef = React.useRef(0);
   const initialSnapshotRef = React.useRef(JSON.stringify(form));
   const isDirty = initialSnapshotRef.current !== JSON.stringify(form);
   const deleteInitial = isEdit ? initial : null;
@@ -270,9 +199,16 @@ export function TableEditor({
     initialSnapshotRef.current = JSON.stringify(nextForm);
   }, [defaultLayer, initial]);
 
-  const validation: TableValidation = touched
-    ? validateForm(form, existingNames, oldName)
-    : { list: [], fields: {} };
+  const validation = React.useMemo(
+    () => touched ? validateTableForm(form, existingNames, oldName) : EMPTY_TABLE_VALIDATION,
+    [existingNames, form, oldName, touched],
+  );
+
+  React.useLayoutEffect(() => {
+    if (validationFocusRequest <= handledValidationFocusRequestRef.current) return;
+    handledValidationFocusRequestRef.current = validationFocusRequest;
+    focusFirstFormError(formRef.current, validation.formFields, "auto");
+  }, [validation.formFields, validationFocusRequest]);
 
   const setValue = <K extends keyof TableFormData>(
     key: K,
@@ -320,9 +256,13 @@ export function TableEditor({
   };
 
   const save = async (): Promise<void> => {
+    const nextValidation = validateTableForm(form, existingNames, oldName);
+    const hasErrors = Object.keys(nextValidation.formFields).length > 0;
     setTouched(true);
-    const nextValidation = validateForm(form, existingNames, oldName);
-    if (nextValidation.list.length || saving) return;
+    if (hasErrors || saving) {
+      if (hasErrors) setValidationFocusRequest((request) => request + 1);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -357,7 +297,7 @@ export function TableEditor({
   };
 
   return (
-    <div>
+    <div id={TABLE_FORM_ID} ref={formRef}>
       <PageHeader
         back={{ onClick: onCancel, text: isEdit ? "返回上一层" : "返回列表" }}
         breadcrumbs={buildModuleBreadcrumbs(
@@ -377,7 +317,12 @@ export function TableEditor({
         }
       />
 
-      <ActionErrorBanner title="请先修正以下问题" messages={validation.list} />
+      <FormErrorSummary
+        formId={TABLE_FORM_ID}
+        errors={validation.formFields}
+        getFieldLabel={(field) => getTableFieldLabel(field, form.fields)}
+        title="请先修正以下问题"
+      />
 
       <div className="form-card">
         <h3>
@@ -385,31 +330,46 @@ export function TableEditor({
           基本信息
         </h3>
         <div className="form-grid">
-          <div className="fl">
-            <label>表名（英文）</label>
+          <FormField
+            className="fl"
+            formId={TABLE_FORM_ID}
+            name="name"
+            label="表名（英文）"
+            error={validation.formFields["name"]}
+          >
             <Input
               aria-label="表名（英文）"
-              className={`inp mono${touched && (!form.name.trim() || !isValidAssetName(form.name.trim())) ? " invalid" : ""}`}
+              className={`inp mono${validation.formFields["name"] ? " invalid" : ""}`}
               placeholder="例如：dwm_xxx_detail_di"
               value={form.name}
               onChange={(event) => setValue("name", event.target.value)}
             />
-          </div>
-          <div className="fl">
-            <label>表中文名 / 业务含义</label>
+          </FormField>
+          <FormField
+            className="fl"
+            formId={TABLE_FORM_ID}
+            name="cn"
+            label="表中文名 / 业务含义"
+            error={validation.formFields["cn"]}
+          >
             <Input
               aria-label="表中文名 / 业务含义"
-              className={`inp${touched && !form.cn.trim() ? " invalid" : ""}`}
+              className={`inp${validation.formFields["cn"] ? " invalid" : ""}`}
               placeholder="例如：支付交易明细中间表"
               value={form.cn}
               onChange={(event) => setValue("cn", event.target.value)}
             />
-          </div>
-          <div className="fl">
-            <label>主题域</label>
+          </FormField>
+          <FormField
+            className="fl"
+            formId={TABLE_FORM_ID}
+            name="domain"
+            label="主题域"
+            error={validation.formFields["domain"]}
+          >
             <Select<string>
               aria-label="主题域"
-              className="sel"
+              className={`sel${validation.formFields["domain"] ? " invalid" : ""}`}
               placeholder="请选择主题域"
               value={form.domain || null}
               onValueChange={(value) => setValue("domain", value || "")}
@@ -417,12 +377,17 @@ export function TableEditor({
               <Select.Option value="">请选择主题域</Select.Option>
               {domains.map((name) => <Select.Option key={name} value={name}>{name}</Select.Option>)}
             </Select>
-          </div>
-          <div className="fl">
-            <label>数据层级</label>
+          </FormField>
+          <FormField
+            className="fl"
+            formId={TABLE_FORM_ID}
+            name="layer"
+            label="数据层级"
+            error={validation.formFields["layer"]}
+          >
             <Select<string>
               aria-label="数据层级"
-              className="sel"
+              className={`sel${validation.formFields["layer"] ? " invalid" : ""}`}
               placeholder="请选择数据层级"
               value={form.layer || null}
               onValueChange={(value) => setValue("layer", value || "")}
@@ -434,7 +399,7 @@ export function TableEditor({
                 return <Select.Option key={code} value={code}>{label}</Select.Option>;
               })}
             </Select>
-          </div>
+          </FormField>
           <div className="fl">
             <label>负责人</label>
             <Input
@@ -509,7 +474,7 @@ export function TableEditor({
             </thead>
             <tbody>
               {form.fields.map((field, index) => {
-                const rowErrors: FieldErrors =
+                const rowErrors: TableRowErrors =
                   validation.fields[field._key] || {};
 
                 return (
@@ -518,82 +483,114 @@ export function TableEditor({
                       {index + 1}
                     </td>
                     <td data-label="字段名">
-                      <Input
-                        aria-label={`字段${index + 1}字段名`}
-                        className={`cell-inp mono${rowErrors.name ? " invalid" : ""}`}
-                        placeholder="field_name"
-                        value={field.name}
-                        onChange={(event) =>
-                          setField(field._key, { name: event.target.value })
-                        }
-                      />
+                      <FormField
+                        formId={TABLE_FORM_ID}
+                        name={`fields.${field._key}.name`}
+                        label={`字段${index + 1}字段名`}
+                        hideLabel
+                        error={rowErrors.name}
+                      >
+                        <Input
+                          aria-label={`字段${index + 1}字段名`}
+                          className={`cell-inp mono${rowErrors.name ? " invalid" : ""}`}
+                          placeholder="field_name"
+                          value={field.name}
+                          onChange={(event) =>
+                            setField(field._key, { name: event.target.value })
+                          }
+                        />
+                      </FormField>
                     </td>
                     <td data-label="中文注释">
-                      <Input
-                        aria-label={`字段${index + 1}中文注释`}
-                        className={`cell-inp${rowErrors.cn ? " invalid" : ""}`}
-                        placeholder="字段含义"
-                        value={field.cn}
-                        onChange={(event) =>
-                          setField(field._key, { cn: event.target.value })
-                        }
-                      />
+                      <FormField
+                        formId={TABLE_FORM_ID}
+                        name={`fields.${field._key}.cn`}
+                        label={`字段${index + 1}中文注释`}
+                        hideLabel
+                        error={rowErrors.cn}
+                      >
+                        <Input
+                          aria-label={`字段${index + 1}中文注释`}
+                          className={`cell-inp${rowErrors.cn ? " invalid" : ""}`}
+                          placeholder="字段含义"
+                          value={field.cn}
+                          onChange={(event) =>
+                            setField(field._key, { cn: event.target.value })
+                          }
+                        />
+                      </FormField>
                     </td>
                     <td data-label="数据类型">
                       <div style={{ display: "grid", gap: 6 }}>
-                        <Select<string>
-                          aria-label={`字段${index + 1}数据类型`}
-                          className={`cell-inp mono${rowErrors.type ? " invalid" : ""}`}
-                          collisionAvoidance={{ side: "flip", align: "shift" }}
-                          side="top"
-                          value={field.typeBase}
-                          onValueChange={(value) => {
-                            const nextBaseType = value || "";
-                            const nextPatch: Partial<EditorField> = {
-                              typeBase: nextBaseType,
-                            };
-                            if (nextBaseType === "VARCHAR")
-                              nextPatch.typeLength =
-                                field.typeLength ||
-                                String(DEFAULT_VARCHAR_LENGTH);
-                            if (nextBaseType === "NUMERIC") {
-                              nextPatch.typePrecision =
-                                field.typePrecision ||
-                                String(DEFAULT_NUMERIC_PRECISION);
-                              nextPatch.typeScale =
-                                field.typeScale ||
-                                String(DEFAULT_NUMERIC_SCALE);
-                            }
-                            setField(field._key, nextPatch);
-                          }}
+                        <FormField
+                          formId={TABLE_FORM_ID}
+                          name={`fields.${field._key}.typeBase`}
+                          label={`字段${index + 1}数据类型`}
+                          hideLabel
+                          error={rowErrors.typeField === "typeBase" ? rowErrors.type : undefined}
                         >
-                          {!isDataTypeBase(field.typeBase) ? (
-                            <Select.Option value={field.typeBase}>
-                              {field.typeBase}
-                            </Select.Option>
-                          ) : null}
-                          {DATA_TYPE_BASE_OPTIONS.map((type) => (
-                            <Select.Option key={type} value={type}>
-                              {type}
-                            </Select.Option>
-                          ))}
-                        </Select>
+                          <Select<string>
+                            aria-label={`字段${index + 1}数据类型`}
+                            className={`cell-inp mono${rowErrors.typeField === "typeBase" ? " invalid" : ""}`}
+                            collisionAvoidance={{ side: "flip", align: "shift" }}
+                            side="top"
+                            value={field.typeBase}
+                            onValueChange={(value) => {
+                              const nextBaseType = value || "";
+                              const nextPatch: Partial<EditorField> = {
+                                typeBase: nextBaseType,
+                              };
+                              if (nextBaseType === "VARCHAR")
+                                nextPatch.typeLength =
+                                  field.typeLength ||
+                                  String(DEFAULT_VARCHAR_LENGTH);
+                              if (nextBaseType === "NUMERIC") {
+                                nextPatch.typePrecision =
+                                  field.typePrecision ||
+                                  String(DEFAULT_NUMERIC_PRECISION);
+                                nextPatch.typeScale =
+                                  field.typeScale ||
+                                  String(DEFAULT_NUMERIC_SCALE);
+                              }
+                              setField(field._key, nextPatch);
+                            }}
+                          >
+                            {!isDataTypeBase(field.typeBase) ? (
+                              <Select.Option value={field.typeBase}>
+                                {field.typeBase}
+                              </Select.Option>
+                            ) : null}
+                            {DATA_TYPE_BASE_OPTIONS.map((type) => (
+                              <Select.Option key={type} value={type}>
+                                {type}
+                              </Select.Option>
+                            ))}
+                          </Select>
+                        </FormField>
                         {field.typeBase === "VARCHAR" ? (
-                          <Input
-                            aria-label={`字段${index + 1}类型长度`}
-                            className={`cell-inp mono${rowErrors.type ? " invalid" : ""}`}
-                            inputMode="numeric"
-                            placeholder={`长度，默认 ${DEFAULT_VARCHAR_LENGTH}`}
-                            value={field.typeLength}
-                            onChange={(event) =>
-                              setField(field._key, {
-                                typeLength: event.target.value.replace(
-                                  /[^\d]/g,
-                                  "",
-                                ),
-                              })
-                            }
-                          />
+                          <FormField
+                            formId={TABLE_FORM_ID}
+                            name={`fields.${field._key}.typeLength`}
+                            label={`字段${index + 1}类型长度`}
+                            hideLabel
+                            error={rowErrors.typeField === "typeLength" ? rowErrors.type : undefined}
+                          >
+                            <Input
+                              aria-label={`字段${index + 1}类型长度`}
+                              className={`cell-inp mono${rowErrors.typeField === "typeLength" ? " invalid" : ""}`}
+                              inputMode="numeric"
+                              placeholder={`长度，默认 ${DEFAULT_VARCHAR_LENGTH}`}
+                              value={field.typeLength}
+                              onChange={(event) =>
+                                setField(field._key, {
+                                  typeLength: event.target.value.replace(
+                                    /[^\d]/g,
+                                    "",
+                                  ),
+                                })
+                              }
+                            />
+                          </FormField>
                         ) : null}
                         {field.typeBase === "NUMERIC" ? (
                           <div
@@ -603,57 +600,76 @@ export function TableEditor({
                               gap: 6,
                             }}
                           >
-                            <Input
-                              aria-label={`字段${index + 1}精度`}
-                              className={`cell-inp mono${rowErrors.type ? " invalid" : ""}`}
-                              inputMode="numeric"
-                              placeholder={`precision，默认 ${DEFAULT_NUMERIC_PRECISION}`}
-                              value={field.typePrecision}
-                              onChange={(event) =>
-                                setField(field._key, {
-                                  typePrecision: event.target.value.replace(
-                                    /[^\d]/g,
-                                    "",
-                                  ),
-                                })
-                              }
-                            />
-                            <Input
-                              aria-label={`字段${index + 1}小数位`}
-                              className={`cell-inp mono${rowErrors.type ? " invalid" : ""}`}
-                              inputMode="numeric"
-                              placeholder={`scale，默认 ${DEFAULT_NUMERIC_SCALE}`}
-                              value={field.typeScale}
-                              onChange={(event) =>
-                                setField(field._key, {
-                                  typeScale: event.target.value.replace(
-                                    /[^\d]/g,
-                                    "",
-                                  ),
-                                })
-                              }
-                            />
-                          </div>
-                        ) : null}
-                        {rowErrors.type ? (
-                          <div style={{ color: "#f87171", fontSize: 12 }}>
-                            {rowErrors.type}
+                            <FormField
+                              formId={TABLE_FORM_ID}
+                              name={`fields.${field._key}.typePrecision`}
+                              label={`字段${index + 1}精度`}
+                              hideLabel
+                              error={rowErrors.typeField === "typePrecision" ? rowErrors.type : undefined}
+                            >
+                              <Input
+                                aria-label={`字段${index + 1}精度`}
+                                className={`cell-inp mono${rowErrors.typeField === "typePrecision" ? " invalid" : ""}`}
+                                inputMode="numeric"
+                                placeholder={`precision，默认 ${DEFAULT_NUMERIC_PRECISION}`}
+                                value={field.typePrecision}
+                                onChange={(event) =>
+                                  setField(field._key, {
+                                    typePrecision: event.target.value.replace(
+                                      /[^\d]/g,
+                                      "",
+                                    ),
+                                  })
+                                }
+                              />
+                            </FormField>
+                            <FormField
+                              formId={TABLE_FORM_ID}
+                              name={`fields.${field._key}.typeScale`}
+                              label={`字段${index + 1}小数位`}
+                              hideLabel
+                              error={rowErrors.typeField === "typeScale" ? rowErrors.type : undefined}
+                            >
+                              <Input
+                                aria-label={`字段${index + 1}小数位`}
+                                className={`cell-inp mono${rowErrors.typeField === "typeScale" ? " invalid" : ""}`}
+                                inputMode="numeric"
+                                placeholder={`scale，默认 ${DEFAULT_NUMERIC_SCALE}`}
+                                value={field.typeScale}
+                                onChange={(event) =>
+                                  setField(field._key, {
+                                    typeScale: event.target.value.replace(
+                                      /[^\d]/g,
+                                      "",
+                                    ),
+                                  })
+                                }
+                              />
+                            </FormField>
                           </div>
                         ) : null}
                       </div>
                     </td>
                     <td data-label="主键" className="ctr">
-                      <Button
-                        aria-label={`${field.pk ? "取消" : "设为"}主键 ${field.name || `字段${index + 1}`}`}
-                        aria-pressed={field.pk}
-                        className={`cbtn amber${field.pk ? " on" : ""}`}
-                        onClick={() => setField(field._key, { pk: !field.pk })}
-                        size="sm"
-                        type="button"
-                        variant="tertiary"
+                      <FormField
+                        formId={TABLE_FORM_ID}
+                        name={`fields.${field._key}.pk`}
+                        label={`字段${index + 1}主键设置`}
+                        hideLabel
+                        error={rowErrors.nullable}
                       >
-                        <Icon name="key" size={13} />
-                      </Button>
+                        <Button
+                          aria-label={`${field.pk ? "取消" : "设为"}主键 ${field.name || `字段${index + 1}`}`}
+                          aria-pressed={field.pk}
+                          className={`cbtn amber${field.pk ? " on" : ""}${rowErrors.nullable ? " invalid" : ""}`}
+                          onClick={() => setField(field._key, { pk: !field.pk })}
+                          size="sm"
+                          type="button"
+                          variant="tertiary"
+                        >
+                          <Icon name="key" size={13} />
+                        </Button>
+                      </FormField>
                     </td>
                     <td data-label="分区" className="ctr">
                       <Button
@@ -737,10 +753,18 @@ export function TableEditor({
             </tbody>
           </table>
         </div>
-        <Button className="add-field" onClick={addField} size="sm" type="button" variant="tertiary">
-          <Icon name="plus" size={14} />
-          新增字段
-        </Button>
+        <FormField
+          formId={TABLE_FORM_ID}
+          name="fields"
+          label="字段信息"
+          hideLabel
+          error={validation.formFields["fields"]}
+        >
+          <Button className="add-field" onClick={addField} size="sm" type="button" variant="tertiary">
+            <Icon name="plus" size={14} />
+            新增字段
+          </Button>
+        </FormField>
       </div>
 
       <AssetEditorActionBar

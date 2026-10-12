@@ -39,7 +39,9 @@ test("asset detail and editor compose controls only from DAP adapters", async ()
   assert.match(detail, /<Input[\s\S]*?aria-label="在当前表内筛选字段"/);
   assert.doesNotMatch(detail, /<(?:button|input|select|textarea)\b/);
 
-  assert.match(editor, /import \{ Button, IconButton, Input, Select, Textarea \} from "\.\.\/ui\/index\.ts"/);
+  assert.match(editor, /import \{[\s\S]*FormErrorSummary,[\s\S]*FormField,[\s\S]*focusFirstFormError,[\s\S]*IconButton,[\s\S]*Input,[\s\S]*Select,[\s\S]*Textarea,[\s\S]*\} from "\.\.\/ui\/index\.ts"/);
+  assert.match(editor, /<FormErrorSummary[\s\S]*?errors=\{validation\.formFields\}/);
+  assert.match(editor, /name=\{`fields\.\$\{field\._key\}\.name`\}/);
   assert.match(editor, /collisionAvoidance=\{\{ side: "flip", align: "shift" \}\}[\s\S]*?side="top"/);
   assert.match(editor, /<AssetEditorActionBar[\s\S]*?<AssetDeleteZone/);
   assert.doesNotMatch(editor, /<(?:button|input|select|textarea)\b/);

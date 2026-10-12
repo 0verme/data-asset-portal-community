@@ -43,6 +43,16 @@ async function chooseOption(page: Page, control: Locator, label: string) {
   await page.keyboard.press("Escape");
 }
 
+async function expectFieldError(control: Locator, message: string) {
+  await expect(control).toHaveAttribute("aria-invalid", "true");
+  await expect(control).toHaveAttribute("aria-describedby", /\S/);
+  const describedByError = await control.evaluate((element, expectedMessage) => {
+    const ids = element.getAttribute("aria-describedby")?.split(/\s+/) || [];
+    return ids.some((id) => document.getElementById(id)?.textContent?.includes(expectedMessage));
+  }, message);
+  expect(describedByError).toBe(true);
+}
+
 async function expectSingleKumoSelectCaret(select: Locator) {
   await expect(select).toHaveClass(/dap-ui-select/);
   await expect(select).not.toHaveClass(/\bsel\b/);
@@ -253,6 +263,49 @@ test("admin detail stays usable across light/dark and desktop-to-phone viewports
   }
 });
 
+test("TableEditor form error presenter focuses, associates, and clears keyed errors", async ({ page }) => {
+  await setMockAuth(page, "admin");
+
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(`${ASSET_PATH}?layout=list`);
+    await expect(page.locator(".asset-page table.dt tbody tr").first()).toBeVisible({ timeout: 20_000 });
+    if (width <= 768) await closeMobileSidebar(page);
+    await page.getByRole("button", { name: "新增表" }).first().click();
+    await expect(page.getByRole("heading", { name: "新增数据表" })).toBeVisible();
+
+    const form = page.locator("#table-editor-form");
+    const save = page.locator(".form-action-bar").getByRole("button", { name: "保存" });
+    const summary = form.locator("[role='alert']").first();
+    const tableName = page.getByLabel("表名（英文）");
+    await save.click();
+    await expect(tableName).toBeFocused();
+    await expectFieldError(tableName, "请输入表英文名。");
+    await expect(summary).toContainText("字段1字段名：请输入字段名");
+
+    const firstRow = page.locator(".fields-edit tbody tr").first();
+    const fieldName = firstRow.getByLabel("字段1字段名");
+    await summary.getByRole("button", { name: /字段1字段名/ }).click();
+    await expect(fieldName).toBeFocused();
+    await expectFieldError(fieldName, "请输入字段名");
+
+    await tableName.fill(`dwm_form_feedback_${width}`);
+    await page.getByLabel("表中文名 / 业务含义").fill("表单错误反馈测试");
+    const domain = page.getByRole("combobox", { name: "主题域" });
+    await save.click();
+    await expect(domain).toBeFocused();
+    await expectFieldError(domain, "请选择主题域。");
+    await chooseOption(page, domain, "交易");
+    await expect(summary).toContainText("字段1字段名：请输入字段名");
+    await fieldName.fill("order_id");
+    await expect(fieldName).not.toHaveAttribute("aria-invalid", "true");
+    await expect(summary).not.toContainText("字段1字段名");
+    await expect(summary).toContainText("字段1中文注释：请输入字段中文注释");
+    await firstRow.getByLabel("字段1中文注释").fill("订单编号");
+    await expect(form.locator("[role='alert']")).toHaveCount(0);
+  }
+});
+
 test("admin can create, validate, edit fields, and delete an asset with keyword confirmation", async ({ page }, testInfo: TestInfo) => {
   await setMockAuth(page, "admin");
   await page.goto(`${ASSET_PATH}?layout=list`);
@@ -261,10 +314,13 @@ test("admin can create, validate, edit fields, and delete an asset with keyword 
   await expect(page.getByRole("heading", { name: "新增数据表" })).toBeVisible();
 
   const save = page.locator(".form-action-bar").getByRole("button", { name: "保存" });
+  const tableNameInput = page.getByLabel("表名（英文）");
+  const errorSummary = page.locator("#table-editor-form [role='alert']").first();
   await save.click();
-  await expect(page.locator(".err-banner")).toContainText("请输入表英文名");
-  await expect(page.locator(".err-banner")).toContainText("请选择主题域。");
-  await expect(page.locator(".err-banner")).toContainText("存在未填写字段名的字段。");
+  await expect(tableNameInput).toBeFocused();
+  await expect(errorSummary).toContainText("请输入表英文名");
+  await expect(errorSummary).toContainText("请选择主题域。");
+  await expect(errorSummary).toContainText("字段1字段名：请输入字段名");
 
   const suffix = `${Date.now()}`.slice(-8);
   const tableName = `dwm_pr6_adapter_${suffix}`;
@@ -284,7 +340,7 @@ test("admin can create, validate, edit fields, and delete an asset with keyword 
     await chooseOption(page, domainControl, "请选择主题域");
     await expect(domainControl).toHaveText("请选择主题域");
     await save.click();
-    await expect(page.locator(".err-banner")).toContainText("请选择主题域。");
+    await expect(errorSummary).toContainText("请选择主题域。");
     await chooseOption(page, domainControl, "交易");
 
     let rows = page.locator(".fields-edit tbody tr");
@@ -299,7 +355,9 @@ test("admin can create, validate, edit fields, and delete an asset with keyword 
     await expect(firstRow.getByRole("button", { name: "允许字段可空 id" })).toBeDisabled();
     await firstRow.getByLabel("字段1小数位").fill("13");
     await save.click();
-    await expect(page.locator(".err-banner")).toContainText("NUMERIC scale 不能大于 precision");
+    await expect(errorSummary).toContainText("NUMERIC scale 不能大于 precision");
+    await expect(firstRow.getByLabel("字段1小数位")).toBeFocused();
+    await expectFieldError(firstRow.getByLabel("字段1小数位"), "NUMERIC scale 不能大于 precision");
     await firstRow.getByLabel("字段1小数位").fill("2");
 
     await page.getByRole("button", { name: "新增字段" }).click();
@@ -309,21 +367,20 @@ test("admin can create, validate, edit fields, and delete an asset with keyword 
     await secondRow.getByLabel("字段2字段名").fill("id");
     await secondRow.getByLabel("字段2中文注释").fill("重复字段");
     await save.click();
-    await expect(page.locator(".err-banner")).toContainText("字段 id 重复。");
+    await expect(errorSummary).toContainText("字段2字段名：字段名重复");
     await secondRow.getByLabel("字段2字段名").fill("created_at");
     await secondRow.getByLabel("字段2中文注释").fill("创建时间");
     await secondRow.getByLabel("字段2字段名").fill("bad-name");
     await save.click();
-    await expect(page.locator(".err-banner")).toContainText("字段 bad-name 格式不正确。");
+    await expect(errorSummary).toContainText("字段2字段名：字段名格式不正确");
     await secondRow.getByLabel("字段2字段名").fill("created_at");
 
-    const tableNameInput = page.getByLabel("表名（英文）");
     await tableNameInput.fill(EXISTING_ASSET);
     await save.click();
-    await expect(page.locator(".err-banner")).toContainText(`表名 ${EXISTING_ASSET} 已存在。`);
+    await expect(errorSummary).toContainText(`表名 ${EXISTING_ASSET} 已存在。`);
     await tableNameInput.fill("dwm-invalid-name");
     await save.click();
-    await expect(page.locator(".err-banner")).toContainText("表英文名只允许字母、数字和下划线，且必须以字母开头。");
+    await expect(errorSummary).toContainText("表英文名只允许字母、数字和下划线，且必须以字母开头。");
     await tableNameInput.fill(tableName);
 
     await secondRow.getByRole("button", { name: "上移字段 created_at" }).click();
