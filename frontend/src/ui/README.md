@@ -57,7 +57,7 @@ focusFirstFormError(formRef.current, errors);
 setServerErrors((current) => clearFormFieldErrors(current, "email"));
 ```
 
-Use the same canonical field path for server/local errors and `FormField.name`. Error messages and labels passed to the presenter must already be safe/user-facing; do not display raw server details. Prefix clearing treats dot and numeric-bracket array paths equivalently and preserves siblings. Focus uses `preventScroll` and scrolls only the nearest vertical scroll container; it does not issue an unconditional `scrollTo(0, 0)`. This helper does not add a form library, manage submission state, or migrate business pages.
+Use the same canonical field path for server/local errors and `FormField.name`. Error messages and labels passed to the presenter must already be safe/user-facing; do not display raw server details. Prefix clearing treats dot and numeric-bracket array paths equivalently and preserves siblings. `focusFirstFormError` scans rendered `data-form-field` markers in DOM order and continues past errors with no usable field marker. After submitting, invoke focus only after the merged errors have committed to the DOM (for example, from a `useLayoutEffect` keyed by a submit-failure revision); do not call it synchronously immediately after `setState`. Focus uses `preventScroll` and scrolls only the nearest vertical scroll container; it does not issue an unconditional `scrollTo(0, 0)`. This helper does not add a form library, manage submission state, or migrate business pages.
 
 ## Overlay and feedback adapters (PR #4)
 

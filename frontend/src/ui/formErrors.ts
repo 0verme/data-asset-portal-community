@@ -109,18 +109,7 @@ function scrollFieldToCenter(target: HTMLElement, behavior: ScrollBehavior): voi
   }
 }
 
-/** Focus a named field and scroll only its nearest vertical scroll container. */
-export function focusFormField(
-  form: HTMLElement | null,
-  field: string,
-  behavior: ScrollBehavior = "smooth",
-): boolean {
-  if (!form || !field || typeof document === "undefined" || typeof window === "undefined") return false;
-
-  const marker = Array.from(form.querySelectorAll<HTMLElement>("[data-form-field]"))
-    .find((element) => element.getAttribute("data-form-field") === field);
-  if (!marker) return false;
-
+function focusFormFieldMarker(marker: HTMLElement, behavior: ScrollBehavior): boolean {
   const descendants = Array.from(marker.querySelectorAll<HTMLElement>(FOCUSABLE_FIELD_SELECTOR));
   const target = descendants.find(isFocusable)
     || (marker.matches(FOCUSABLE_FIELD_SELECTOR) && isFocusable(marker) ? marker : null)
@@ -136,11 +125,34 @@ export function focusFormField(
   return true;
 }
 
+/** Focus a named field and scroll only its nearest vertical scroll container. */
+export function focusFormField(
+  form: HTMLElement | null,
+  field: string,
+  behavior: ScrollBehavior = "smooth",
+): boolean {
+  if (!form || !field || typeof document === "undefined" || typeof window === "undefined") return false;
+
+  const marker = Array.from(form.querySelectorAll<HTMLElement>("[data-form-field]"))
+    .find((element) => element.getAttribute("data-form-field") === field);
+  return marker ? focusFormFieldMarker(marker, behavior) : false;
+}
+
 export function focusFirstFormError(
   form: HTMLElement | null,
   errors: FormFieldErrors,
   behavior: ScrollBehavior = "smooth",
 ): boolean {
-  const firstField = Object.entries(errors).find(([, message]) => typeof message === "string" && message.trim())?.[0];
-  return firstField ? focusFormField(form, firstField, behavior) : false;
+  if (!form || typeof document === "undefined" || typeof window === "undefined") return false;
+  const invalidFields = new Set(
+    Object.entries(errors)
+      .filter(([, message]) => typeof message === "string" && message.trim())
+      .map(([field]) => field),
+  );
+
+  for (const marker of form.querySelectorAll<HTMLElement>("[data-form-field]")) {
+    const field = marker.getAttribute("data-form-field");
+    if (field && invalidFields.has(field) && focusFormFieldMarker(marker, behavior)) return true;
+  }
+  return false;
 }

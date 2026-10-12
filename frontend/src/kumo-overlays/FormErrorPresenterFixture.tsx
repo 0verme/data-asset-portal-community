@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import {
   Button,
@@ -21,6 +21,7 @@ interface FormValues {
 
 export default function FormErrorPresenterFixture() {
   const formRef = useRef<HTMLFormElement>(null);
+  const focusAfterCommitRef = useRef(false);
   const [values, setValues] = useState<FormValues>({
     owner: "初始负责人",
     email: "invalid-address",
@@ -28,7 +29,16 @@ export default function FormErrorPresenterFixture() {
   });
   const [serverErrors, setServerErrors] = useState<FormFieldErrors>({});
   const [localErrors, setLocalErrors] = useState<FormFieldErrors>({});
-  const errors = mergeFormFieldErrors(serverErrors, localErrors);
+  const errors = useMemo(
+    () => mergeFormFieldErrors(serverErrors, localErrors),
+    [serverErrors, localErrors],
+  );
+
+  useLayoutEffect(() => {
+    if (!focusAfterCommitRef.current) return;
+    focusAfterCommitRef.current = false;
+    focusFirstFormError(formRef.current, errors, "auto");
+  }, [errors]);
 
   const updateField = (field: keyof FormValues, errorPath: string, value: string): void => {
     setValues((current) => ({ ...current, [field]: value }));
@@ -42,13 +52,13 @@ export default function FormErrorPresenterFixture() {
       ? {}
       : { email: "请输入有效的邮箱地址。" };
     const nextServerErrors: FormFieldErrors = {
-      owner: "服务器校验要求确认负责人。",
+      form: "服务器拒绝了当前提交内容。",
       "params.12.name": "第 13 行参数名称需要调整。",
+      owner: "服务器校验要求确认负责人。",
     };
-    const nextErrors = mergeFormFieldErrors(nextServerErrors, nextLocalErrors);
+    focusAfterCommitRef.current = true;
     setLocalErrors(nextLocalErrors);
     setServerErrors(nextServerErrors);
-    focusFirstFormError(formRef.current, nextErrors, "auto");
   };
 
   return (

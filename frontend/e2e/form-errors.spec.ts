@@ -28,6 +28,7 @@ for (const viewport of [
     await page.getByRole("button", { name: "提交表单" }).click();
 
     const summary = page.getByRole("alert");
+    await expect(summary).toContainText("服务器拒绝了当前提交内容。");
     await expect(summary).toContainText("服务器校验要求确认负责人。");
     await expect(summary).toContainText("请输入有效的邮箱地址。");
     await expect(summary).toContainText("第 13 行参数名称需要调整。");
@@ -65,6 +66,9 @@ for (const viewport of [
     await email.fill("owner@example.test");
     await expect(email).not.toHaveAttribute("aria-invalid", "true");
     await expect(summary).not.toContainText("请输入有效的邮箱地址。");
+    await parameterName.fill("已修正的第 13 行参数名");
+    await expect(parameterName).not.toHaveAttribute("aria-invalid", "true");
+    await expect(summary).not.toContainText("第 13 行参数名称需要调整。");
     await expect(owner).toHaveValue("已修正负责人");
     expect(pageErrors).toEqual([]);
   });
