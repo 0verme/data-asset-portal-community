@@ -17,7 +17,12 @@ test("indicator page buttons use the frozen DAP Button adapter", () => {
 });
 
 test("indicator editor fields use frozen DAP adapters", () => {
-  assert.match(editor, /import \{ Input, Select, Textarea \} from "\.\.\/ui\/index\.ts"/);
+  assert.match(editor, /FormErrorSummary,[\s\S]*?FormField,[\s\S]*?Input,[\s\S]*?type FormFieldErrors,[\s\S]*?from "\.\.\/ui\/index\.ts"/);
+  assert.match(editor, /import \{ validateIndicatorForm \} from "\.\/indicatorFormErrors\.ts"/);
+  assert.match(editor, /focusFirstFormError\(formRef\.current, errors, "auto"\)/);
+  assert.match(editor, /const nextErrors = validateIndicatorForm\(form\);[\s\S]*?Object\.keys\(nextErrors\)\.length/);
+  assert.match(cascader, /aria-describedby=\{ariaDescribedBy\}/);
+  assert.match(cascader, /aria-labelledby=\{ariaLabelledBy\}/);
   assert.equal((editor.match(/<Input/g) ?? []).length, 7);
   assert.equal((editor.match(/<Select/g) ?? []).length, 4);
   assert.equal((editor.match(/<Textarea/g) ?? []).length, 1);

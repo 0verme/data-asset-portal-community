@@ -44,6 +44,9 @@ export interface IndicatorPathCascaderProps {
   placeholder?: string | undefined;
   disabled?: boolean | undefined;
   invalid?: boolean | undefined;
+  "aria-invalid"?: boolean | "false" | "true" | undefined;
+  "aria-describedby"?: string | undefined;
+  "aria-labelledby"?: string | undefined;
   loading?: boolean | undefined;
   error?: string | undefined;
   emptyText?: string | undefined;
@@ -58,6 +61,9 @@ export function IndicatorPathCascader({
   placeholder = "请选择指标路径",
   disabled = false,
   invalid = false,
+  "aria-invalid": ariaInvalid,
+  "aria-describedby": ariaDescribedBy,
+  "aria-labelledby": ariaLabelledBy,
   loading = false,
   error = "",
   emptyText = "暂无可选路径",
@@ -144,6 +150,9 @@ export function IndicatorPathCascader({
         onClick={() => !disabled && setOpen((prev) => !prev)}
         disabled={disabled}
         aria-expanded={open}
+        aria-invalid={ariaInvalid ?? (invalid ? "true" : undefined)}
+        aria-describedby={ariaDescribedBy}
+        aria-labelledby={ariaLabelledBy}
       >
         <span
           className={`indicator-path-trigger-text${displayValue ? "" : " placeholder"} mono`}
