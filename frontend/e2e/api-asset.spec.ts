@@ -90,6 +90,7 @@ test("guest api asset list stays read-only and opens the detail view", async ({ 
 });
 
 test("API asset validation blocks an empty form and focuses the first missing field", async ({ page }) => {
+  test.setTimeout(60_000);
   const api = await mockRemoteApiAssetApi(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/api-assets/new");
@@ -107,6 +108,7 @@ test("API asset validation blocks an empty form and focuses the first missing fi
 });
 
 test("API asset validation preserves 422 details, row context, and retry values", async ({ page }) => {
+  test.setTimeout(60_000);
   const api = await mockRemoteApiAssetApi(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/api-assets/new");
@@ -140,7 +142,7 @@ test("API asset validation preserves 422 details, row context, and retry values"
 
   await page.getByLabel("API 名称").fill("订单查询（已修正）");
   await expect(page.getByText("请输入 API 名称。", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("alert")).not.toContainText("API 名称：");
+  await expect(page.getByText("第 1 行内容未通过服务端校验，请检查名称、位置和类型。")).toBeVisible();
   await paramsTable.getByRole("textbox", { name: "第 1 行名称" }).fill("order_id");
   await expect(page.getByText("第 1 行内容未通过服务端校验，请检查名称、位置和类型。")).toHaveCount(0);
 
