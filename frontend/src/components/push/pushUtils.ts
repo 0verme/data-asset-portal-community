@@ -50,6 +50,8 @@ export interface FieldValidationErrors {
 export interface JobValidationResult {
   errors: string[];
   fieldErrors: Record<string, FieldValidationErrors>;
+  /** Safe local messages keyed by the controls that can correct each error. */
+  formFields: Record<string, string>;
 }
 
 export function defaultFreqParam(freqType: string): string {
@@ -143,32 +145,76 @@ export function validateJob(
 ): JobValidationResult {
   const errors: string[] = [];
   const fieldErrors: Record<string, FieldValidationErrors> = {};
+  const formFields: Record<string, string> = {};
 
-  if (!form.cn.trim()) errors.push("作业名称不能为空。");
-  if (!form.sourceFileName.trim()) errors.push("湖仓来源文件名不能为空。");
-  if (FREQ_PARAM_CONFIG[form.freqType] && !form.freq) {
-    errors.push(`请选择「${FREQ_PARAM_CONFIG[form.freqType]?.label}」。`);
+  if (!form.cn.trim()) {
+    const message = "作业名称不能为空。";
+    errors.push(message);
+    formFields["cn"] = message;
   }
-  if (!fields.length) errors.push("至少需要一个字段。");
+  if (!form.sourceFileName.trim()) {
+    const message = "湖仓来源文件名不能为空。";
+    errors.push(message);
+    formFields["sourceFileName"] = message;
+  }
+  const freqConfig = FREQ_PARAM_CONFIG[form.freqType];
+  if (freqConfig && !form.freq) {
+    const message = `请选择「${freqConfig.label}」。`;
+    errors.push(message);
+    formFields["freq"] = message;
+  }
+  if (!fields.length) {
+    const message = "至少需要一个字段。";
+    errors.push(message);
+    formFields["fields"] = message;
+  }
 
   const fieldNames = new Set<string>();
   fields.forEach((field) => {
     const rowErrors: FieldValidationErrors = {};
     const normalizedName = field.name.trim();
-    if (
-      !normalizedName ||
-      !ID_RE.test(normalizedName) ||
-      fieldNames.has(normalizedName)
-    ) {
+    const namePath = `fields.${field._key}.name`;
+    if (!normalizedName) {
       rowErrors.name = true;
+      formFields[namePath] = "请输入字段名。";
+    } else if (!ID_RE.test(normalizedName)) {
+      rowErrors.name = true;
+      formFields[namePath] = "字段名格式不正确，请使用字母、数字和下划线，且以字母或下划线开头。";
+    } else if (fieldNames.has(normalizedName)) {
+      rowErrors.name = true;
+      formFields[namePath] = "字段名重复，请保持唯一。";
     } else {
       fieldNames.add(normalizedName);
     }
-    if (!field.cn.trim()) rowErrors.cn = true;
+    if (!field.cn.trim()) {
+      rowErrors.cn = true;
+      formFields[`fields.${field._key}.cn`] = "请输入字段中文名。";
+    }
     if (Object.keys(rowErrors).length) fieldErrors[field._key] = rowErrors;
   });
   if (Object.keys(fieldErrors).length) {
     errors.push("字段名或中文名存在空值、格式错误或重复，请按红框修正。");
   }
-  return { errors, fieldErrors };
+  return { errors, fieldErrors, formFields };
+}
+
+export function getJobFormFieldLabel(
+  fieldPath: string,
+  fields: readonly Pick<PushField, "_key">[],
+  freqType: string,
+): string {
+  if (fieldPath === "cn") return "作业名称";
+  if (fieldPath === "sourceFileName") return "湖仓来源文件名";
+  if (fieldPath === "freq") return FREQ_PARAM_CONFIG[freqType]?.label || "推送频率明细";
+  if (fieldPath === "fields") return "字段清单";
+
+  for (const [index, field] of fields.entries()) {
+    const prefix = `fields.${field._key}.`;
+    if (!fieldPath.startsWith(prefix)) continue;
+    const rowField = fieldPath.slice(prefix.length);
+    if (rowField === "name") return `字段${index + 1}字段名`;
+    if (rowField === "cn") return `字段${index + 1}中文名`;
+    return "字段信息";
+  }
+  return "表单字段";
 }

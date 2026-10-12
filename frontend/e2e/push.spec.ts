@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 async function setMockAuth(page: Page, mode: "guest" | "admin"): Promise<void> {
   await page.addInitScript((authMode) => {
@@ -6,6 +6,16 @@ async function setMockAuth(page: Page, mode: "guest" | "admin"): Promise<void> {
     if (authMode === "guest") return;
     localStorage.setItem("dap_auth", JSON.stringify({ role: "admin", user: "admin", name: "管理员" }));
   }, mode);
+}
+
+async function expectFieldError(control: Locator, message: string): Promise<void> {
+  await expect(control).toHaveAttribute("aria-invalid", "true");
+  await expect(control).toHaveAttribute("aria-describedby", /\S/);
+  const hasAssociatedMessage = await control.evaluate((element, expectedMessage) => {
+    const ids = element.getAttribute("aria-describedby")?.split(/\s+/) || [];
+    return ids.some((id) => document.getElementById(id)?.textContent?.includes(expectedMessage));
+  }, message);
+  expect(hasAssociatedMessage).toBe(true);
 }
 
 test("guest push systems list stays read-only", async ({ page }) => {
@@ -174,4 +184,77 @@ test("admin push job editor uses adapters and field row tools", async ({ page })
   await expect(lastRow.getByRole("button", { name: /删除字段/ })).toBeVisible();
   await lastRow.getByRole("button", { name: /删除字段/ }).click();
   await expect(rows).toHaveCount(initial);
+});
+
+test("form error presenter keeps push job context, focuses keyed fields, and clears corrections", async ({ page }) => {
+  await setMockAuth(page, "admin");
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/push?view=list");
+
+  const firstSystem = page.locator("table.dt tbody tr").first();
+  await expect(firstSystem).toBeVisible({ timeout: 20_000 });
+  await firstSystem.click();
+  await expect(page).toHaveURL(/\/push\/DEMO_[A-Z]+$/);
+  await page.getByRole("button", { name: "新增接口" }).click();
+  await expect(page.getByRole("heading", { name: "新增推送接口" })).toBeVisible({ timeout: 20_000 });
+
+  const form = page.locator("#push-job-editor-form");
+  const summary = form.getByRole("alert");
+  const save = page.getByRole("button", { name: "保存", exact: true });
+  const jobName = page.getByLabel("作业名称");
+  const sourceFileName = page.getByLabel("湖仓来源文件名");
+  const targetFileName = page.getByLabel("目标推送文件名");
+  const rows = form.locator("table.fields-edit tbody tr");
+  const firstRow = rows.nth(0);
+  const firstFieldName = firstRow.getByLabel("字段1字段名");
+  const firstFieldCn = firstRow.getByLabel("字段1中文名");
+
+  await save.click();
+  await expect(jobName).toBeFocused();
+  await expect(summary).toContainText("作业名称：作业名称不能为空。");
+  await expect(summary).toContainText("湖仓来源文件名：湖仓来源文件名不能为空。");
+  await expect(summary).toContainText("字段1字段名：请输入字段名。");
+  await expect(summary).toContainText("字段1中文名：请输入字段中文名。");
+  await expectFieldError(jobName, "作业名称不能为空。");
+  await expectFieldError(sourceFileName, "湖仓来源文件名不能为空。");
+  await expectFieldError(firstFieldName, "请输入字段名。");
+  await expectFieldError(firstFieldCn, "请输入字段中文名。");
+  await expect(page.getByRole("heading", { name: "新增推送接口" })).toBeVisible();
+
+  await summary.getByRole("button", { name: /字段1字段名：请输入字段名/ }).click();
+  await expect(firstFieldName).toBeFocused();
+  await jobName.fill("E2E 客户推送作业");
+  await sourceFileName.fill("customer.csv");
+  await expect(targetFileName).toHaveValue("customer.csv");
+  await firstFieldName.fill("customer_id");
+  await firstFieldCn.fill("客户编号");
+  await expect(summary).toHaveCount(0);
+  await expect(jobName).toHaveValue("E2E 客户推送作业");
+  await expect(sourceFileName).toHaveValue("customer.csv");
+
+  await page.getByRole("button", { name: "新增字段" }).click();
+  await expect(rows).toHaveCount(2);
+  const secondRow = rows.nth(1);
+  const secondFieldName = secondRow.getByLabel("字段2字段名");
+  await secondFieldName.fill("customer_id");
+  await secondRow.getByLabel("字段2中文名").fill("重复字段");
+  await save.click();
+  await expect(secondFieldName).toBeFocused();
+  await expect(summary).toContainText("字段2字段名：字段名重复，请保持唯一。");
+  await expectFieldError(secondFieldName, "字段名重复，请保持唯一。");
+  await expect(jobName).toHaveValue("E2E 客户推送作业");
+  await expect(sourceFileName).toHaveValue("customer.csv");
+  await expect(firstFieldName).toHaveValue("customer_id");
+  await expect(firstFieldCn).toHaveValue("客户编号");
+  await expect(secondFieldName).toHaveValue("customer_id");
+  await secondFieldName.fill("account_id");
+  await expect(summary).toHaveCount(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await firstFieldName.fill("");
+  await save.click();
+  await expect(firstFieldName).toBeFocused();
+  await expect(summary).toContainText("字段1字段名：请输入字段名。");
+  await firstFieldName.fill("customer_id");
+  await expect(summary).toHaveCount(0);
 });

@@ -18,7 +18,7 @@ test("push views use the frozen DAP adapters", () => {
   assert.equal((systemEditor.match(/<Select<string>/g) ?? []).length, 4);
   assert.equal((systemEditor.match(/<Textarea/g) ?? []).length, 1);
   assert.match(systemEditor, /placeholder="请选择归属部门"/);
-  assert.match(jobEditor, /import \{ Button, IconButton, Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.match(jobEditor, /import \{[\s\S]*?FormErrorSummary[\s\S]*?FormField[\s\S]*?focusFirstFormError[\s\S]*?IconButton[\s\S]*?Input[\s\S]*?Select[\s\S]*?Textarea[\s\S]*?\} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((jobEditor.match(/<Input/g) ?? []).length, 11);
   assert.equal((jobEditor.match(/<Select<string>/g) ?? []).length, 5);
   assert.equal((jobEditor.match(/<IconButton/g) ?? []).length, 3);
