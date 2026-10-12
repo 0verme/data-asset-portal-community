@@ -1,4 +1,11 @@
-import type { ComponentProps, ReactElement, ReactNode } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  type AriaAttributes,
+  type ComponentProps,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { Select as KumoSelect } from "@cloudflare/kumo/components/select";
 
 import { joinClassNames } from "./classNames.ts";
@@ -8,8 +15,9 @@ type KumoSelectProps = ComponentProps<typeof KumoSelect>;
 
 export type SelectProps<Value = string> = Omit<
   KumoSelectProps,
-  "defaultValue" | "items" | "labelTooltip" | "multiple" | "onValueChange" | "size" | "value"
+  "aria-invalid" | "defaultValue" | "items" | "labelTooltip" | "multiple" | "onValueChange" | "size" | "value"
 > & {
+  "aria-invalid"?: AriaAttributes["aria-invalid"];
   defaultValue?: Value | null;
   items?: ReadonlyArray<{ label: ReactNode; value: Value }>;
   onValueChange?: (value: Value | null) => void;
@@ -34,11 +42,40 @@ function normalizeKumoSelectClassName(className?: string): string {
   return joinClassNames("dap-ui-select", compatibleClassName);
 }
 
+/** Kumo Select needs invalid state on its trigger, not only on the root. */
+function setTriggerAriaInvalid(
+  trigger: ReactElement,
+  ariaInvalid: AriaAttributes["aria-invalid"],
+): ReactElement {
+  return cloneElement(
+    trigger as ReactElement<{ "aria-invalid"?: AriaAttributes["aria-invalid"] }>,
+    { "aria-invalid": ariaInvalid },
+  );
+}
+
+function withAriaInvalid(
+  render: KumoSelectProps["render"],
+  ariaInvalid: AriaAttributes["aria-invalid"],
+): KumoSelectProps["render"] {
+  if (ariaInvalid === undefined) return render;
+  if (typeof render === "function") {
+    return (props, state) => {
+      const element = render(props, state);
+      return isValidElement(element)
+        ? setTriggerAriaInvalid(element, ariaInvalid)
+        : element;
+    };
+  }
+  return setTriggerAriaInvalid(render ?? <button />, ariaInvalid);
+}
+
 function DapSelect<Value = string>({
+  "aria-invalid": ariaInvalid,
   className,
   defaultValue,
   items,
   onValueChange,
+  render,
   size = "md",
   value,
   ...props
@@ -46,6 +83,7 @@ function DapSelect<Value = string>({
   const selectProps = {
     ...props,
     className: normalizeKumoSelectClassName(className),
+    render: withAriaInvalid(render, ariaInvalid),
     size: CONTROL_SIZE_MAP[size],
     ...(defaultValue !== undefined ? { defaultValue } : {}),
     ...(items !== undefined ? { items } : {}),
