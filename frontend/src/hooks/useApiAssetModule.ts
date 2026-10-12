@@ -7,6 +7,10 @@ import {
   setApiAssetStatus,
 } from '../api/apiAssets.ts';
 import type { MockApiAsset } from '../data/apiAssets.ts';
+import {
+  normalizeApiAssetSaveFailure,
+  type ApiAssetFieldErrors,
+} from '../api/apiAssetValidation.ts';
 import type { MockSystem } from '../data/systems.ts';
 import { DEFAULT_API_ASSET_ROUTE } from '../config/defaults.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
@@ -42,7 +46,9 @@ export interface UseApiAssetModuleResult {
   facets: ApiAssetFacets;
   current: MockApiAsset | null;
   saveError: string;
-  setSaveError: React.Dispatch<React.SetStateAction<string>>;
+  saveFieldErrors: ApiAssetFieldErrors;
+  saveFailureRevision: number;
+  clearSaveErrors: (fieldPrefix?: string) => void;
   pendingIds: string[];
   create: () => void;
   edit: (code: string) => void;
@@ -70,6 +76,20 @@ export function useApiAssetModule({
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [saveFieldErrors, setSaveFieldErrors] = useState<ApiAssetFieldErrors>({});
+  const [saveFailureRevision, setSaveFailureRevision] = useState(0);
+  const clearSaveErrors = (fieldPrefix?: string): void => {
+    setSaveError('');
+    setSaveFailureRevision(0);
+    setSaveFieldErrors((current) => {
+      if (!fieldPrefix) return {};
+      return Object.fromEntries(
+        Object.entries(current).filter(
+          ([field]) => field !== fieldPrefix && !field.startsWith(`${fieldPrefix}.`),
+        ),
+      );
+    });
+  };
   const [pendingIds, setPendingIds] = useState<string[]>([]);
   const pendingRef = useRef(new Set<string>());
 
@@ -148,13 +168,18 @@ export function useApiAssetModule({
       setLoginOpen(true);
       return;
     }
+    clearSaveErrors();
     try {
       await saveApiAsset(route.page === 'edit' ? route.code : null, payload);
       await load();
+      clearSaveErrors();
       setRoute(DEFAULT_API_ASSET_ROUTE);
       scrollMainToTop();
     } catch (e: unknown) {
-      setSaveError(e instanceof Error && e.message ? e.message : '保存失败');
+      const failure = normalizeApiAssetSaveFailure(e, payload);
+      setSaveError(failure.summary);
+      setSaveFieldErrors(failure.fieldErrors);
+      setSaveFailureRevision((revision) => revision + 1);
     }
   };
 
@@ -192,12 +217,21 @@ export function useApiAssetModule({
     facets,
     current,
     saveError,
-    setSaveError,
+    saveFieldErrors,
+    saveFailureRevision,
+    clearSaveErrors,
     pendingIds,
-    create: () => guard(() => setRoute({ page: 'new', code: null })),
-    edit: (code: string) => guard(() => setRoute({ page: 'edit', code })),
+    create: () => guard(() => {
+      clearSaveErrors();
+      setRoute({ page: 'new', code: null });
+    }),
+    edit: (code: string) => guard(() => {
+      clearSaveErrors();
+      setRoute({ page: 'edit', code });
+    }),
     view: (code: string) => setRoute({ page: 'view', code }),
     back: () => {
+      clearSaveErrors();
       setRoute(DEFAULT_API_ASSET_ROUTE);
       scrollMainToTop();
     },

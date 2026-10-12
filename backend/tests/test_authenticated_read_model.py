@@ -11,6 +11,7 @@ from backend.app.application import Identity
 from backend.app.authorization.core import AuthorizationService, AuthorizationSubject
 from backend.app.authorization.permissions import BUILTIN_ROLE_PERMISSION_CODES
 from backend.app.fastapi_app import create_fastapi_app
+from backend.app.services.api_asset_service import ApiAssetValidationError
 
 
 PUBLIC_READS = (
@@ -325,6 +326,49 @@ class PublicCatalogApiTests(unittest.TestCase):
         self.assertEqual(403, mutation.status_code)
         self.assertEqual("FORBIDDEN", mutation.json()["error"]["code"])
         self.indicators.create_indicator.assert_not_called()
+
+    def test_api_asset_validation_details_keep_error_envelope_and_write_permission(self):
+        payload = {
+            "code": "ORDER_QUERY",
+            "name": "订单查询",
+            "method": "GET",
+            "path": "/orders",
+            "version": "v1",
+            "systemId": 3,
+            "type": "query",
+            "status": "enabled",
+            "ownerDept": "数据平台",
+            "ownerName": "维护人",
+            "maintainerName": "维护人",
+            "description": "",
+            "remark": "",
+            "params": [],
+            "responseFields": [],
+            "relations": [],
+        }
+        self.current_identity = Identity("catalog-reader", "no-permission", "No permission")
+        denied = self.client.post("/api/api-assets", json=payload)
+        self.assertEqual(403, denied.status_code, denied.text)
+        self.assertEqual("FORBIDDEN", denied.json()["error"]["code"])
+        self.api_asset.create.assert_not_called()
+
+        details = [{"field": "name", "message": "name is required"}]
+        self.api_asset.create.side_effect = ApiAssetValidationError(
+            "API asset validation failed", details
+        )
+        self.current_identity = Identity("admin", "admin", "Admin")
+        response = self.client.post("/api/api-assets", json=payload)
+
+        self.assertEqual(422, response.status_code, response.text)
+        self.assertEqual(
+            {
+                "code": "API_ASSET_VALIDATION_FAILED",
+                "message": "API asset validation failed",
+                "details": details,
+            },
+            response.json()["error"],
+        )
+        self.api_asset.create.assert_called_once()
 
     def test_admin_can_read_sensitive_data_and_mutate_where_permitted(self):
         self.current_identity = Identity("admin", "admin", "Admin")

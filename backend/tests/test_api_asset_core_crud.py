@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
-from backend.app.services.api_asset_service import ApiAssetService
+from backend.app.services.api_asset_service import ApiAssetService, ApiAssetValidationError
 
 
 class ApiAssetCoreCrudTests(unittest.TestCase):
@@ -57,6 +57,42 @@ class ApiAssetCoreCrudTests(unittest.TestCase):
                 self.assertIn("p_api_", str(compiled))
                 self.assertIn("__app__", str(compiled))
                 self.assertNotIn("dwp.", str(compiled))
+
+    def test_create_validation_returns_structured_field_details(self):
+        payload = {
+            **self.item,
+            "code": "",
+            "name": "",
+            "method": "INVALID",
+            "path": "orders",
+            "status": "unknown",
+            "ownerDept": "",
+            "ownerName": "",
+            "systemId": None,
+        }
+
+        with self.assertRaises(ApiAssetValidationError) as raised:
+            self.service._validate_asset(payload)
+
+        error = raised.exception
+        self.assertEqual(422, error.status)
+        self.assertEqual("API_ASSET_VALIDATION_FAILED", error.code)
+        self.assertEqual(
+            ["code", "name", "method", "path", "status", "ownerDept", "ownerName", "systemId"],
+            [detail["field"] for detail in error.details],
+        )
+        self.assertEqual(error.details, error.to_dict()["details"])
+
+    def test_child_validation_preserves_array_row_index(self):
+        with self.assertRaises(ApiAssetValidationError) as raised:
+            self.service._validate_rows(
+                [{"name": "", "in": "unknown", "dataType": ""}], "params"
+            )
+
+        self.assertEqual(
+            [{"field": "params[0]", "message": "required fields are invalid"}],
+            raised.exception.details,
+        )
 
     def test_list_and_child_relations_use_core_selects(self):
         self.service._db.fetch_rows = MagicMock(side_effect=[[self.row], [], [], []])

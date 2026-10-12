@@ -51,10 +51,10 @@ test("API asset create and edit keep enabled/disabled payload values", async () 
   ]);
 
   assert.match(apiAssetView, /status: "enabled"/);
-  assert.match(
-    apiAssetView,
-    /const submit = \(\): void => \{\s*onSave\(\{\s*\.\.\.form,/,
-  );
+  assert.match(apiAssetView, /validateApiAssetForm\(/);
+  assert.match(apiAssetView, /focusApiAssetField\(validationErrors\)/);
+  assert.match(apiAssetView, /data-api-asset-field=\{key\}/);
+  assert.doesNotMatch(apiAssetView, /disabled=\{!form\.downstreamSystemId\}/);
   assert.match(apiClient, /body:\s*payload/);
   assert.match(apiClient, /body:\s*\{\s*status\s*\}/);
 });
