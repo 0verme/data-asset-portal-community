@@ -1355,6 +1355,23 @@
     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
   }
 
+  [data-api-asset-field] {
+    scroll-margin-block: 120px;
+  }
+
+  .api-asset-field-error {
+    display: block;
+    margin-top: 4px;
+    color: var(--danger);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .api-asset-error-row td {
+    border-top: 0;
+    padding-block: 4px 10px;
+  }
+
   .err-banner {
     display: flex;
     align-items: flex-start;

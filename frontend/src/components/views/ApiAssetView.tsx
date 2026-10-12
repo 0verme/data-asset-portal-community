@@ -15,6 +15,11 @@ import type {
 } from "../common/AssetReferenceSelector.tsx";
 import type { UseApiAssetModuleResult } from "../../hooks/useApiAssetModule.ts";
 import {
+  apiAssetFieldLabel,
+  validateApiAssetForm,
+  type ApiAssetFieldErrors,
+} from "../../api/apiAssetValidation.ts";
+import {
   ActionErrorBanner,
   AssetReferenceSelector,
   BinaryStatusToggle,
@@ -109,11 +114,44 @@ function relationRows(
 type RowKind = "params" | "responseFields";
 type RowItem = ApiAssetParam | ApiAssetResponseField;
 
+function apiAssetErrorId(field: string): string {
+  return `api-asset-error-${field.replace(/[^a-z0-9_-]/gi, "-")}`;
+}
+
+function focusApiAssetField(fieldErrors: ApiAssetFieldErrors): void {
+  const firstField = Object.keys(fieldErrors)[0];
+  if (!firstField) return;
+  const marker = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-api-asset-field]"),
+  ).find((element) => element.dataset["apiAssetField"] === firstField);
+  if (!marker) return;
+  const focusableSelector = "input, select, textarea, button, [tabindex]";
+  const target = marker.matches(focusableSelector)
+    ? marker
+    : marker.querySelector<HTMLElement>(focusableSelector) || marker;
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+  target.focus({ preventScroll: true });
+}
+
+function clearFieldErrors(
+  current: ApiAssetFieldErrors,
+  fieldPrefix?: string,
+): ApiAssetFieldErrors {
+  if (!fieldPrefix) return {};
+  return Object.fromEntries(
+    Object.entries(current).filter(
+      ([field]) => field !== fieldPrefix && !field.startsWith(`${fieldPrefix}.`),
+    ),
+  );
+}
+
 interface RowsProps<T extends RowItem> {
   title: string;
   items: T[];
   onChange: (items: T[]) => void;
   kind: RowKind;
+  fieldErrors: ApiAssetFieldErrors;
+  clearErrors: (fieldPrefix?: string) => void;
 }
 
 function Rows<T extends RowItem>({
@@ -121,6 +159,8 @@ function Rows<T extends RowItem>({
   items,
   onChange,
   kind,
+  fieldErrors,
+  clearErrors,
 }: RowsProps<T>) {
   const add = (): void => {
     const row: RowItem =
@@ -134,9 +174,11 @@ function Rows<T extends RowItem>({
             example: "",
           }
         : { name: "", dataType: "string", description: "", example: "" };
+    clearErrors(kind);
     onChange([...items, row as T]);
   };
   const update = (index: number, patch: Partial<RowItem>): void => {
+    clearErrors(`${kind}.${index}`);
     onChange(
       items.map((item, current) =>
         current === index ? ({ ...item, ...patch } as T) : item,
@@ -158,63 +200,97 @@ function Rows<T extends RowItem>({
             </tr>
           </thead>
           <tbody>
-            {items.map((row, index) => (
-              <tr key={index}>
-                <td data-label="名称">
-                  <Input
-                    aria-label="名称"
-                    className="inp mono"
-                    value={row.name}
-                    onChange={(event) =>
-                      update(index, { name: event.target.value })
-                    }
-                  />
-                </td>
-                {kind === "params" ? (
-                  <td data-label="位置">
-                    <Select<string>
-                      aria-label="位置"
-                      className="sel"
-                      items={["query", "path", "header", "body"].map((value) => ({ label: value, value }))}
-                      value={(row as ApiAssetParam).in}
-                      onValueChange={(value) => update(index, { in: value || "query" })}
-                    />
-                  </td>
-                ) : null}
-                <td data-label="类型">
-                  <Input
-                    aria-label="类型"
-                    className="inp"
-                    value={row.dataType}
-                    onChange={(event) =>
-                      update(index, { dataType: event.target.value })
-                    }
-                  />
-                </td>
-                <td data-label="说明">
-                  <Input
-                    aria-label="说明"
-                    className="inp"
-                    value={row.description || ""}
-                    onChange={(event) =>
-                      update(index, { description: event.target.value })
-                    }
-                  />
-                </td>
-                <td data-label="">
-                  <Button
-                    className="btn ghost-danger"
-                    variant="danger"
-                    type="button"
-                    onClick={() =>
-                      onChange(items.filter((_, current) => current !== index))
-                    }
-                  >
-                    删除
-                  </Button>
-                </td>
-              </tr>
-            ))}
+            {items.map((row, index) => {
+              const prefix = `${kind}.${index}`;
+              const nameField = `${prefix}.name`;
+              const locationField = `${prefix}.in`;
+              const typeField = `${prefix}.dataType`;
+              const nameError = fieldErrors[nameField];
+              const locationError = fieldErrors[locationField];
+              const typeError = fieldErrors[typeField];
+              const rowError = fieldErrors[prefix];
+              return (
+                <React.Fragment key={index}>
+                  <tr>
+                    <td data-label="名称">
+                      <Input
+                        aria-label={`第 ${index + 1} 行名称`}
+                        aria-invalid={Boolean(nameError || rowError) || undefined}
+                        aria-describedby={[
+                          nameError ? apiAssetErrorId(nameField) : "",
+                          rowError ? apiAssetErrorId(prefix) : "",
+                        ].filter(Boolean).join(" ") || undefined}
+                        data-api-asset-field={rowError && !nameError ? prefix : nameField}
+                        className={`inp mono${nameError || rowError ? " invalid" : ""}`}
+                        value={row.name}
+                        onChange={(event) => update(index, { name: event.target.value })}
+                      />
+                      {nameError ? <small id={apiAssetErrorId(nameField)} className="api-asset-field-error">{nameError}</small> : null}
+                    </td>
+                    {kind === "params" ? (
+                      <td data-label="位置">
+                        <Select<string>
+                          aria-label={`第 ${index + 1} 行位置`}
+                          aria-invalid={Boolean(locationError) || undefined}
+                          aria-describedby={locationError ? apiAssetErrorId(locationField) : undefined}
+                          data-api-asset-field={locationField}
+                          className={`sel${locationError ? " invalid" : ""}`}
+                          items={["query", "path", "header", "body"].map((value) => ({ label: value, value }))}
+                          value={(row as ApiAssetParam).in}
+                          onValueChange={(value) => update(index, { in: value || "query" })}
+                        />
+                        {locationError ? <small id={apiAssetErrorId(locationField)} className="api-asset-field-error">{locationError}</small> : null}
+                      </td>
+                    ) : null}
+                    <td data-label="类型">
+                      <Input
+                        aria-label={`第 ${index + 1} 行类型`}
+                        aria-invalid={Boolean(typeError) || undefined}
+                        aria-describedby={typeError ? apiAssetErrorId(typeField) : undefined}
+                        data-api-asset-field={typeField}
+                        className={`inp${typeError ? " invalid" : ""}`}
+                        value={row.dataType}
+                        onChange={(event) => update(index, { dataType: event.target.value })}
+                      />
+                      {typeError ? <small id={apiAssetErrorId(typeField)} className="api-asset-field-error">{typeError}</small> : null}
+                    </td>
+                    <td data-label="说明">
+                      <Input
+                        aria-label={`第 ${index + 1} 行说明`}
+                        className="inp"
+                        value={row.description || ""}
+                        onChange={(event) => update(index, { description: event.target.value })}
+                      />
+                    </td>
+                    <td data-label="">
+                      <Button
+                        className="btn ghost-danger"
+                        variant="danger"
+                        type="button"
+                        onClick={() => {
+                          clearErrors(kind);
+                          onChange(items.filter((_, current) => current !== index));
+                        }}
+                      >
+                        删除
+                      </Button>
+                    </td>
+                  </tr>
+                  {rowError ? (
+                    <tr className="api-asset-error-row">
+                      <td colSpan={kind === "params" ? 5 : 4}>
+                        <div
+                          id={apiAssetErrorId(prefix)}
+                          className="api-asset-field-error"
+                        >
+                          {rowError}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -228,10 +304,11 @@ function Rows<T extends RowItem>({
 interface SystemPickerProps {
   systems: readonly MockSystem[];
   value: string;
+  error?: string | undefined;
   onChange: (value: string) => void;
 }
 
-function SystemPicker({ systems, value, onChange }: SystemPickerProps) {
+function SystemPicker({ systems, value, error, onChange }: SystemPickerProps) {
   const [query, setQuery] = React.useState("");
   const options = systems.filter(
     (system) =>
@@ -253,7 +330,11 @@ function SystemPicker({ systems, value, onChange }: SystemPickerProps) {
       />
       {/* System <select> intentionally remains native: per-option disabled semantics are not expressible in the frozen DAP Select items API. */}
       <select
-        className="sel"
+        aria-label="下游调用系统"
+        aria-invalid={Boolean(error) || undefined}
+        aria-describedby={error ? apiAssetErrorId("systemId") : undefined}
+        data-api-asset-field="systemId"
+        className={`sel${error ? " invalid" : ""}`}
         value={value || ""}
         onChange={(event) => onChange(event.target.value)}
         required
@@ -308,9 +389,21 @@ interface EditorProps {
   onSave: (payload: MockApiAsset) => void | Promise<unknown>;
   onCancel: () => void;
   error: string;
+  fieldErrors: ApiAssetFieldErrors;
+  saveFailureRevision: number;
+  clearSaveErrors: (fieldPrefix?: string) => void;
 }
 
-function Editor({ item, systems, onSave, onCancel, error }: EditorProps) {
+function Editor({
+  item,
+  systems,
+  onSave,
+  onCancel,
+  error,
+  fieldErrors: serverFieldErrors,
+  saveFailureRevision,
+  clearSaveErrors: clearServerErrors,
+}: EditorProps) {
   const [form, setForm] = React.useState<ApiAssetFormData>(() =>
     toFormData(item),
   );
@@ -322,19 +415,53 @@ function Editor({ item, systems, onSave, onCancel, error }: EditorProps) {
   const [indicators, setIndicators] = React.useState<IndicatorReference[]>(
     initial.indicators,
   );
+  const [localFieldErrors, setLocalFieldErrors] = React.useState<ApiAssetFieldErrors>({});
+  const fieldErrors = { ...serverFieldErrors, ...localFieldErrors };
+  const clearErrors = (fieldPrefix?: string): void => {
+    clearServerErrors(fieldPrefix);
+    setLocalFieldErrors((current) => clearFieldErrors(current, fieldPrefix));
+  };
   const set = <K extends keyof ApiAssetFormData>(
     key: K,
     value: ApiAssetFormData[K],
-  ): void => setForm((current) => ({ ...current, [key]: value }));
+  ): void => {
+    clearErrors(key === "downstreamSystemId" ? "systemId" : String(key));
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+  React.useEffect(() => {
+    if (saveFailureRevision > 0) focusApiAssetField(serverFieldErrors);
+  }, [saveFailureRevision, serverFieldErrors]);
   const submit = (): void => {
-    onSave({
+    clearErrors();
+    const payload: MockApiAsset = {
       ...form,
       systemId: form.systemId || Number(form.downstreamSystemId),
       downstreamSystemId: Number(form.downstreamSystemId),
       code: form.code.trim().toUpperCase(),
       relations: relationRows(tables, indicators, initial.others),
-    });
+    };
+    const validationErrors = validateApiAssetForm(
+      { ...payload, downstreamSystemId: form.downstreamSystemId },
+      systems,
+    );
+    setLocalFieldErrors(validationErrors);
+    if (Object.keys(validationErrors).length) {
+      focusApiAssetField(validationErrors);
+      return;
+    }
+    void onSave(payload);
   };
+  const relationErrors = Object.entries(fieldErrors).filter(([field]) =>
+    /^relations\.\d+$/.test(field),
+  );
+  const firstRelationError = relationErrors[0];
+  const fieldSummary = Object.keys(fieldErrors).length
+    ? `请检查以下字段：${Object.keys(fieldErrors).map(apiAssetFieldLabel).join("、")}`
+    : "";
+  const bannerMessages = [
+    ...(error ? [error] : []),
+    ...(fieldSummary ? [fieldSummary] : []),
+  ];
   return (
     <>
       <PageHeader
@@ -346,60 +473,84 @@ function Editor({ item, systems, onSave, onCancel, error }: EditorProps) {
         title={item ? "编辑 API" : "新增 API"}
         subtitle="维护 API 元数据、请求参数、响应字段与资产关联。"
       />
-      <ActionErrorBanner message={error} />
+      <ActionErrorBanner
+        title={error ? "API 资产保存失败" : "请检查 API 资产表单"}
+        messages={bannerMessages}
+      />
       <div className="form-card">
         <h3>基本信息</h3>
         <div className="form-grid">
-          {API_TEXT_FIELDS.map(([key, label]) => (
-            <div className="fl" key={key}>
-              <label>{label}</label>
-              <Input
-                aria-label={label}
-                className={`inp${key === "code" || key === "path" ? " mono" : ""}`}
-                value={form[key]}
-                disabled={Boolean(item) && key === "code"}
-                onChange={(event) => set(key, event.target.value)}
-              />
-            </div>
-          ))}
+          {API_TEXT_FIELDS.map(([key, label]) => {
+            const fieldError = fieldErrors[key];
+            return (
+              <div className="fl" key={key}>
+                <label>{label}</label>
+                <Input
+                  aria-label={label}
+                  aria-invalid={Boolean(fieldError) || undefined}
+                  aria-describedby={fieldError ? apiAssetErrorId(key) : undefined}
+                  data-api-asset-field={key}
+                  className={`inp${key === "code" || key === "path" ? " mono" : ""}${fieldError ? " invalid" : ""}`}
+                  value={form[key]}
+                  disabled={Boolean(item) && key === "code"}
+                  onChange={(event) => set(key, event.target.value)}
+                />
+                {fieldError ? <small id={apiAssetErrorId(key)} className="api-asset-field-error">{fieldError}</small> : null}
+              </div>
+            );
+          })}
           <div className="fl">
             <label>下游调用系统</label>
             <SystemPicker
               systems={systems}
               value={form.downstreamSystemId}
+              error={fieldErrors["systemId"]}
               onChange={(value) => set("downstreamSystemId", value)}
             />
-            <small className="field-error">
-              {!form.downstreamSystemId ? "请选择下游调用系统" : ""}
-            </small>
+            {fieldErrors["systemId"] ? <small id={apiAssetErrorId("systemId")} className="api-asset-field-error">{fieldErrors["systemId"]}</small> : null}
           </div>
           <div className="fl">
             <label>请求方式</label>
             <Select<string>
               aria-label="请求方式"
-              className="sel"
+              aria-invalid={Boolean(fieldErrors["method"]) || undefined}
+              aria-describedby={fieldErrors["method"] ? apiAssetErrorId("method") : undefined}
+              data-api-asset-field="method"
+              className={`sel${fieldErrors["method"] ? " invalid" : ""}`}
               items={["GET", "POST", "PUT", "PATCH", "DELETE"].map((value) => ({ label: value, value }))}
               value={form.method}
               onValueChange={(value) => set("method", value || "GET")}
             />
+            {fieldErrors["method"] ? <small id={apiAssetErrorId("method")} className="api-asset-field-error">{fieldErrors["method"]}</small> : null}
           </div>
           <div className="fl">
             <label>状态</label>
-            <BinaryStatusToggle
-              mode="status"
-              name="status"
-              value={form.status}
-              onChange={(value) =>
-                set(
-                  "status",
-                  typeof value === "boolean"
-                    ? value
-                      ? "enabled"
-                      : "disabled"
-                    : value,
-                )
-              }
-            />
+            <div
+              role="group"
+              aria-label="状态"
+              aria-invalid={Boolean(fieldErrors["status"]) || undefined}
+              data-api-asset-field="status"
+              tabIndex={fieldErrors["status"] ? -1 : undefined}
+              aria-describedby={fieldErrors["status"] ? apiAssetErrorId("status") : undefined}
+            >
+              <BinaryStatusToggle
+                mode="status"
+                name="status"
+                value={form.status}
+                className={fieldErrors["status"] ? "invalid" : ""}
+                onChange={(value) =>
+                  set(
+                    "status",
+                    typeof value === "boolean"
+                      ? value
+                        ? "enabled"
+                        : "disabled"
+                      : value,
+                  )
+                }
+              />
+            </div>
+            {fieldErrors["status"] ? <small id={apiAssetErrorId("status")} className="api-asset-field-error">{fieldErrors["status"]}</small> : null}
           </div>
           <div className="fl full">
             <label>说明</label>
@@ -426,21 +577,45 @@ function Editor({ item, systems, onSave, onCancel, error }: EditorProps) {
         items={form.params}
         onChange={(value) => set("params", value)}
         kind="params"
+        fieldErrors={fieldErrors}
+        clearErrors={clearErrors}
       />
       <Rows<ApiAssetResponseField>
         title="响应字段"
         items={form.responseFields}
         onChange={(value) => set("responseFields", value)}
         kind="responseFields"
+        fieldErrors={fieldErrors}
+        clearErrors={clearErrors}
       />
       <div className="form-card">
         <h3>关联资产</h3>
-        <AssetReferenceSelector
-          selectedTables={tables}
-          selectedIndicators={indicators}
-          onTablesChange={setTables}
-          onIndicatorsChange={setIndicators}
-        />
+        <div
+          role="group"
+          aria-label="关联资产"
+          aria-invalid={relationErrors.length ? true : undefined}
+          aria-describedby={firstRelationError ? apiAssetErrorId(firstRelationError[0]) : undefined}
+          data-api-asset-field={firstRelationError?.[0]}
+          tabIndex={firstRelationError ? -1 : undefined}
+        >
+          <AssetReferenceSelector
+            selectedTables={tables}
+            selectedIndicators={indicators}
+            onTablesChange={(value) => {
+              clearErrors("relations");
+              setTables(value);
+            }}
+            onIndicatorsChange={(value) => {
+              clearErrors("relations");
+              setIndicators(value);
+            }}
+          />
+        </div>
+        {relationErrors.map(([field, message]) => (
+          <small key={field} id={apiAssetErrorId(field)} className="api-asset-field-error">
+            {message}
+          </small>
+        ))}
       </div>
       <div className="form-actions">
         <Button className="btn" variant="secondary" type="button" onClick={onCancel}>
@@ -451,7 +626,6 @@ function Editor({ item, systems, onSave, onCancel, error }: EditorProps) {
           variant="primary"
           type="button"
           onClick={submit}
-          disabled={!form.downstreamSystemId}
         >
           保存
         </Button>
@@ -748,6 +922,9 @@ export function ApiAssetView({
         onSave={apiAsset.save}
         onCancel={apiAsset.back}
         error={apiAsset.saveError}
+        fieldErrors={apiAsset.saveFieldErrors}
+        saveFailureRevision={apiAsset.saveFailureRevision}
+        clearSaveErrors={apiAsset.clearSaveErrors}
       />
     );
   if (route.page === "view" && apiAsset.current) {

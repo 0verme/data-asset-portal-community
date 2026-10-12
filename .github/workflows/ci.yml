@@ -595,6 +595,17 @@ jobs:
       - name: Frontend tests
         run: npm test
 
+      - name: Install Playwright browsers for API asset validation
+        if: matrix.node == '22'
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: API asset validation browser regression (Chromium and WebKit)
+        if: matrix.node == '22'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/api-asset-validation-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- --grep "API asset validation"
+
       - name: Frontend production build
         run: npm run build:frontend
 
