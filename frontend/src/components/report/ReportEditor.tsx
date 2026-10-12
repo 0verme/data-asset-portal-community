@@ -408,6 +408,11 @@ export function ReportEditor({
         formId={REPORT_FORM_ID}
         errors={errors}
         getFieldLabel={(field) => REPORT_FIELD_LABELS[field] || "表单字段"}
+        onBeforeFocus={(field) => {
+          if (field === "effectiveDate" || field === "expireDate") {
+            if (lifecycleDetailsRef.current) lifecycleDetailsRef.current.open = true;
+          }
+        }}
       />
 
       <div className="form-card">

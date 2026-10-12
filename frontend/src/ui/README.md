@@ -21,7 +21,7 @@ Kumo remains pinned at `@cloudflare/kumo@2.14.0`. Adapters consume the DAP theme
 | `IconButton` | Same variants/sizes; `icon` and `aria-label` or `aria-labelledby` required; square by default | Kumo Button icon-only shape |
 | `Input`, `Textarea` | `intent="default" | "error"`; size `sm` / `md` (default `md`); native input props/events | `default` → Kumo default, `error` → Kumo error; `md` → `base` |
 | `Field` | DAP label/description/required/controlFirst; one control child; `error` marks it invalid and exposes the message as its accessible description | Kumo Field; `labelTooltip` omitted |
-| `FormField`, `FormErrorSummary` | Stable field-path marker + Kumo inline error; persistent alert summary with actions to focus fields | Caller supplies safe field labels/messages and a matching form id; no form state or values are owned |
+| `FormField`, `FormErrorSummary` | Stable field-path marker + Kumo inline error; persistent alert summary with actions to focus fields | Caller supplies safe field labels/messages and a matching form id; optional `onBeforeFocus` reveals collapsed field regions; no form state or values are owned |
 | `mergeFormFieldErrors`, `clearFormFieldErrors`, `focusFirstFormError` | Merge local/server field maps (later source wins), clear one path/group, and focus/scroll the first invalid field | Focus scrolls the nearest vertical overflow container, falling back to the document viewport only when no such container exists |
 | `Select` | Single-value control; `value`/`onValueChange` or `defaultValue`; compound Option/Group/GroupLabel/Separator; size `sm` / `md` | `md` → `base`; no Tooltip labels |
 | `Combobox` | Typed items/value callback with Kumo compound Content/TriggerInput/List/Item/Empty parts; supports optional multi-value mode | `md` → `base`; Chinese labels default for clear/show-options actions |
@@ -38,7 +38,7 @@ Kumo remains pinned at `@cloudflare/kumo@2.14.0`. Adapters consume the DAP theme
 
 ## Shared form error presenter (Phase 3)
 
-`FormField` composes the existing DAP `Field` adapter, adds a stable `data-form-field` marker, and uses Kumo's field association for `aria-invalid` and inline error description. `FormErrorSummary` renders a persistent `role="alert"` with caller-provided, known field labels and buttons that focus the matching control. Keep form values in the caller's controlled state; validation helpers only transform error maps and never reset inputs.
+`FormField` composes the existing DAP `Field` adapter, adds a stable `data-form-field` marker, and uses Kumo's field association for `aria-invalid` and inline error description. `FormErrorSummary` renders a persistent `role="alert"` with caller-provided, known field labels and buttons that focus the matching control. When a field is inside a collapsed region, callers may pass `onBeforeFocus(field)` to reveal it before the summary moves focus. Keep form values in the caller's controlled state; validation helpers only transform error maps and never reset inputs.
 
 ```tsx
 const errors = mergeFormFieldErrors(serverErrors, localErrors); // later sources win

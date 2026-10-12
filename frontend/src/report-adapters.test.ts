@@ -21,6 +21,7 @@ test("report editor fields use frozen DAP adapters without raw controls", () => 
   assert.match(editor, /focusFirstFormError\(formRef\.current, errors, "auto"\)/);
   assert.match(editor, /const nextErrors = validateReportForm\(form\);[\s\S]*?Object\.keys\(nextErrors\)\.length/);
   assert.match(editor, /name="expireDate" label="失效日期（选填）" error=\{errors\["expireDate"\]\}/);
+  assert.match(editor, /onBeforeFocus=\{\(field\) => \{[\s\S]*?field === "effectiveDate" \|\| field === "expireDate"[\s\S]*?lifecycleDetailsRef\.current\.open = true/);
   assert.match(editor, /lifecycleDetailsRef\.current\.open = true/);
   assert.equal((editor.match(/<Input/g) ?? []).length, 10);
   assert.equal((editor.match(/<Select<string>/g) ?? []).length, 4);

@@ -116,6 +116,40 @@ test("form error presenter expands lifecycle details to focus a reversed expiry 
   }
 });
 
+test("form error presenter summary links reveal collapsed lifecycle fields before focus", async ({ page }) => {
+  await setMockAuth(page, "admin");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/report-assets/new");
+  await expect(page.getByRole("heading", { name: "新增报表" })).toBeVisible({ timeout: 20_000 });
+
+  await page.getByLabel("报表名称").fill("E2E 日期摘要跳转日报");
+  await selectFirstNonPlaceholder(page, "报表类型", "请选择报表类型");
+  await selectFirstNonPlaceholder(page, "主题域", "请选择主题域");
+  await selectFirstNonPlaceholder(page, "归属部门", "请选择归属部门");
+  await page.getByLabel("负责人").fill("E2E 测试用户");
+  await selectFirstNonPlaceholder(page, "统计周期", "请选择统计周期");
+  await page.getByRole("combobox", { name: "统计口径" }).fill("按日统计");
+
+  const lifecycle = page.locator("details.form-card").filter({ hasText: "更多设置 / 生命周期" });
+  const lifecycleSummary = lifecycle.locator("summary");
+  await lifecycleSummary.click();
+  await page.getByLabel("生效日期（选填）").fill("2026-06-01");
+  const expireDate = page.getByLabel("失效日期（选填）");
+  await expireDate.fill("2026-05-01");
+  await lifecycleSummary.click();
+  await expect(lifecycle).not.toHaveAttribute("open", "");
+
+  const codeInput = page.getByLabel("报表编码");
+  await page.getByRole("button", { name: "创建报表" }).click();
+  await expect(codeInput).toBeFocused();
+  await expect(lifecycle).not.toHaveAttribute("open", "");
+
+  const expiryError = page.getByRole("button", { name: "失效日期：失效日期不能早于生效日期" });
+  await expiryError.click();
+  await expect(lifecycle).toHaveAttribute("open", "");
+  await expect(expireDate).toBeFocused();
+});
+
 test("admin report editor uses adapter controls with stable labels and dirty cancel", async ({ page }) => {
   await setMockAuth(page, "admin");
   await page.setViewportSize({ width: 1440, height: 900 });

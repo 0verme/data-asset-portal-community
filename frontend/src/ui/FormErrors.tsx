@@ -43,6 +43,8 @@ export interface FormErrorSummaryProps {
   errors: FormFieldErrors;
   /** Labels come from the caller's known field contract, never raw server paths. */
   getFieldLabel: (field: string) => string;
+  /** Reveal a field in a collapsed region before moving focus to its control. */
+  onBeforeFocus?: (field: string) => void;
   title?: string;
 }
 
@@ -51,6 +53,7 @@ export function FormErrorSummary({
   formId,
   errors,
   getFieldLabel,
+  onBeforeFocus,
   title = "请检查表单",
 }: FormErrorSummaryProps): ReactElement | null {
   const entries = Object.entries(errors).filter(([, message]) => typeof message === "string" && message.trim());
@@ -58,6 +61,7 @@ export function FormErrorSummary({
 
   const focus = (field: string): void => {
     if (typeof document === "undefined") return;
+    onBeforeFocus?.(field);
     focusFormField(document.getElementById(formId), field);
   };
 
