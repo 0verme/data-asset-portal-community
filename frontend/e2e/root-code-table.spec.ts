@@ -150,6 +150,40 @@ test("code-table facet counts combine search, style, and status and clear indepe
   await expect(page.getByRole("button", { name: "清除状态筛选：禁用" })).toHaveCount(0);
 });
 
+test("form error presenter blocks invalid root saves, focuses, and clears corrections", async ({ page }) => {
+  await setMockAuth(page, "admin");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/root-management");
+  await expect(page.locator(".root-page .page-title")).toContainText("词根库", { timeout: 20_000 });
+
+  await page.getByRole("main").getByRole("button", { name: "新增词根" }).click();
+  const abbrInput = page.getByLabel("词根缩写");
+  const chineseNameInput = page.getByLabel("中文名");
+  const summary = page.locator(".dap-ui-form-error-summary");
+
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(summary).toContainText("词根缩写不能为空");
+  await expect(summary).toContainText("中文名不能为空");
+  await expect(abbrInput).toHaveAttribute("aria-invalid", "true");
+  await expect(abbrInput).toBeFocused();
+  expect(await abbrInput.getAttribute("aria-describedby")).toBeTruthy();
+  await expect(page.getByRole("button", { name: "保存", exact: true })).toBeVisible();
+
+  await abbrInput.fill("sku");
+  await chineseNameInput.fill("临时词根");
+  await expect(summary).toContainText("词根 sku 已存在");
+  await expect(abbrInput).toHaveAttribute("aria-invalid", "true");
+
+  await abbrInput.fill("newroot");
+  await expect(summary).toHaveCount(0);
+  await expect(abbrInput).not.toHaveAttribute("aria-invalid", "true");
+  await expect(chineseNameInput).toHaveValue("临时词根");
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+
+  await expect(page.locator(".root-page .page-title")).toContainText("词根库");
+  await expect(page.locator(".root-page table.dt tbody tr").filter({ hasText: "newroot" })).toContainText("临时词根");
+});
+
 test("mobile status drawer leaves a keyboard-accessible summary and clear action", async ({ page }, testInfo) => {
   await setMockAuth(page, "admin");
 

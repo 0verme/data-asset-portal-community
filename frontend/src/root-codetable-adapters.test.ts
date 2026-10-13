@@ -7,7 +7,7 @@ const rootPages = read("./components/RootPages.tsx");
 const codeTablePage = read("./components/ManualCodeTablePage.tsx");
 
 test("root pages use frozen DAP adapters and keep legacy classes", () => {
-  assert.match(rootPages, /import \{ Button, Input, Select, Textarea \} from "\.\.\/ui\/index\.ts"/);
+  assert.match(rootPages, /import \{[\s\S]*?\bButton,[\s\S]*?\bFormErrorSummary,[\s\S]*?\bFormField,[\s\S]*?\bfocusFirstFormError,[\s\S]*?\bInput,[\s\S]*?\bSelect,[\s\S]*?\bTextarea,[\s\S]*?\} from "\.\.\/ui\/index\.ts"/);
   assert.match(rootPages, /<Button className="btn" variant="secondary" type="button" onClick=\{onImport\}>/);
   assert.match(rootPages, /<Button className="btn primary" variant="primary" type="button" onClick=\{onNew\}>/);
   assert.match(rootPages, /<Button className="btn" variant="secondary" type="button" onClick=\{onBack\}>/);
