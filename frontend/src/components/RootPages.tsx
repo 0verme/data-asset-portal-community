@@ -19,7 +19,17 @@ import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { ROOT_ABBR_RULE_MESSAGE, isValidRootAbbr } from "../utils/rootValidation.ts";
 import { ActionErrorBanner, confirmDeleteAction, DangerZone, EmptyState, FormActionBar, PageHeader, RowActions } from "./common/index.ts";
 import { Highlight, Icon } from "./ui.tsx";
-import { Button, Input, Select, Textarea } from "../ui/index.ts";
+import {
+  Button,
+  FormErrorSummary,
+  FormField,
+  focusFirstFormError,
+  Input,
+  Select,
+  Textarea,
+  type FormFieldErrors,
+} from "../ui/index.ts";
+import { validateRootForm } from "./rootFormErrors.ts";
 
 interface CatBadgeProps {
   cat: string;
@@ -150,6 +160,11 @@ export function RootLibrary({
 
 type RootFormData = Pick<SanitizedWordRoot, "abbr" | "en" | "cn" | "cat" | "desc">;
 
+const ROOT_FIELD_LABELS: Readonly<Record<string, string>> = {
+  abbr: "词根缩写",
+  cn: "中文名",
+};
+
 export interface RootEditorProps {
   mode: "new" | "edit";
   initial?: SanitizedWordRoot | null | undefined;
@@ -179,6 +194,10 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
   } : defaultForm);
   const [touched, setTouched] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const formId = React.useId();
+  const formRef = React.useRef<HTMLDivElement>(null);
+  const [validationFocusRequest, setValidationFocusRequest] = React.useState(0);
+  const handledFocusRequestRef = React.useRef(0);
   const initialSnapshotRef = React.useRef(JSON.stringify(form));
   const isDirty = initialSnapshotRef.current !== JSON.stringify(form);
 
@@ -199,21 +218,24 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
   }, [initial, categories]);
 
   const categoryNames = categories.map((item) => item.name);
-  const errors: string[] = [];
-  if (touched) {
-    if (!form.abbr.trim()) {
-      errors.push("词根缩写不能为空");
-    } else if (!isValidRootAbbr(form.abbr)) {
-      errors.push(ROOT_ABBR_RULE_MESSAGE);
-    } else if (existingAbbrs.some((item) => item === form.abbr.trim() && item !== oldAbbr)) {
-      errors.push(`词根 ${form.abbr.trim()} 已存在`);
-    }
-    if (!form.cn.trim()) errors.push("中文名不能为空");
-  }
+  const errors: FormFieldErrors = touched
+    ? validateRootForm(form, existingAbbrs, oldAbbr)
+    : {};
+
+  React.useLayoutEffect(() => {
+    if (!validationFocusRequest || handledFocusRequestRef.current === validationFocusRequest) return;
+    handledFocusRequestRef.current = validationFocusRequest;
+    focusFirstFormError(formRef.current, errors, "auto");
+  }, [errors, validationFocusRequest]);
 
   const save = async (): Promise<void> => {
+    const nextErrors = validateRootForm(form, existingAbbrs, oldAbbr);
     setTouched(true);
-    if (errors.length || saving) return;
+    if (saving) return;
+    if (Object.keys(nextErrors).length) {
+      setValidationFocusRequest((request) => request + 1);
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
@@ -229,7 +251,7 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
   };
 
   return (
-    <div>
+    <div id={formId} ref={formRef}>
       <PageHeader
         back={{ onClick: onCancel, text: isEdit ? "返回上一层" : "返回词根列表" }}
         breadcrumbs={buildModuleBreadcrumbs("root", [
@@ -240,23 +262,25 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
         subtitle={isEdit ? oldAbbr : "添加一个命名词根"}
       />
 
-      <ActionErrorBanner title="请先修正以下问题" messages={errors} />
+      <FormErrorSummary
+        formId={formId}
+        errors={errors}
+        getFieldLabel={(field) => ROOT_FIELD_LABELS[field] || "表单字段"}
+      />
 
       <div className="form-card">
         <h3><Icon name="book" size={14} />词根信息</h3>
         <div className="form-grid">
-          <div className="fl">
-            <label>词根缩写</label>
-            <Input aria-label="词根缩写" className={`inp mono${touched && !isValidRootAbbr(form.abbr) ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setForm((prev) => ({ ...prev, abbr: event.target.value }))} placeholder="例如：trans" />
-          </div>
+          <FormField className="fl" formId={formId} name="abbr" label="词根缩写" error={errors["abbr"]}>
+            <Input aria-label="词根缩写" className={`inp mono${errors["abbr"] ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setForm((prev) => ({ ...prev, abbr: event.target.value }))} placeholder="例如：trans" />
+          </FormField>
           <div className="fl">
             <label>英文全称</label>
             <Input aria-label="英文全称" className="inp mono" value={form.en} onChange={(event) => setForm((prev) => ({ ...prev, en: event.target.value }))} placeholder="例如：transaction" />
           </div>
-          <div className="fl">
-            <label>中文名</label>
-            <Input aria-label="中文名" className={`inp${touched && !form.cn.trim() ? " invalid" : ""}`} value={form.cn} onChange={(event) => setForm((prev) => ({ ...prev, cn: event.target.value }))} placeholder="例如：交易流水" />
-          </div>
+          <FormField className="fl" formId={formId} name="cn" label="中文名" error={errors["cn"]}>
+            <Input aria-label="中文名" className={`inp${errors["cn"] ? " invalid" : ""}`} value={form.cn} onChange={(event) => setForm((prev) => ({ ...prev, cn: event.target.value }))} placeholder="例如：交易流水" />
+          </FormField>
           <div className="fl">
             <label>分类</label>
             <Select<string> aria-label="分类" className="sel" value={form.cat || null} onValueChange={(value) => setForm((prev) => ({ ...prev, cat: value || prev.cat }))}>
