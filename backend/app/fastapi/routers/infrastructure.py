@@ -76,8 +76,11 @@ def _register_infrastructure_routes(
         try:
             items = portal_service.get_stats()
         except Exception:
-            LOGGER.exception("portal stats fatal; returning zero-filled fallback")
-            items = portal_service.zero_stats()
+            LOGGER.exception("portal stats unavailable")
+            return JSONResponse(status_code=503, content={"error": {
+                "code": "PORTAL_STATS_UNAVAILABLE",
+                "message": "统计暂时不可用，请稍后重试。",
+            }})
         profile = profile_for_request(context, authorization)
         return JSONResponse(
             content=project_public_catalog_value({"items": items}, profile=profile)
