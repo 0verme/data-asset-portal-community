@@ -5,6 +5,11 @@ import type {
 } from '../data/apiAssets.ts';
 
 export interface ApiAssetFormValues {
+  version?: string;
+  type?: string;
+  maintainerName?: string;
+  description?: string;
+  remark?: string;
   code: string;
   name: string;
   method: string;
@@ -34,6 +39,7 @@ const API_CODE_PATTERN = /^[A-Z][A-Z0-9_-]{2,63}$/;
 const API_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 const PARAM_LOCATIONS = new Set(['query', 'path', 'header', 'body']);
 const RELATION_TYPES = new Set(['table', 'indicator', 'system']);
+const TEXT_LIMITS = { name: 256, path: 512, version: 64, type: 64, ownerDept: 128, ownerName: 64, maintainerName: 64, description: 2000, remark: 2000 } as const;
 
 export function validateApiAssetForm(
   form: ApiAssetFormValues,
@@ -54,6 +60,12 @@ export function validateApiAssetForm(
   }
   if (!form.ownerDept.trim()) errors['ownerDept'] = '请输入归属部门。';
   if (!form.ownerName.trim()) errors['ownerName'] = '请输入负责人。';
+  for (const [field, limit] of Object.entries(TEXT_LIMITS)) {
+    const value = form[field as keyof typeof TEXT_LIMITS];
+    if (value && Array.from(value.trim()).length > limit) {
+      errors[field] = `${apiAssetFieldLabel(field)}不能超过 ${limit} 个字符。`;
+    }
+  }
 
   const systemId = Number(form.downstreamSystemId);
   if (
@@ -170,6 +182,10 @@ function validationFieldErrors(
       fieldErrors['form'] = '表单中有字段未通过校验，请检查后重试。';
       continue;
     }
+    if (isRecord(detail) && detail['code'] === 'max_length' && Object.hasOwn(TEXT_LIMITS, field)) {
+      fieldErrors[field] = `${apiAssetFieldLabel(field)}不能超过 ${TEXT_LIMITS[field as keyof typeof TEXT_LIMITS]} 个字符。`;
+      continue;
+    }
     const rowErrors = rowFieldErrors(field, form);
     if (rowErrors) {
       Object.assign(fieldErrors, rowErrors);
@@ -257,6 +273,11 @@ export function apiAssetFieldLabel(field: string): string {
     status: '状态',
     ownerDept: '归属部门',
     ownerName: '负责人',
+    version: '版本',
+    type: 'API 类型',
+    maintainerName: '维护人',
+    description: '说明',
+    remark: '备注',
     systemId: '下游调用系统',
     body: '表单',
     form: '表单',

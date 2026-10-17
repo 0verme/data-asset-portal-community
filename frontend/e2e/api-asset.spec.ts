@@ -107,6 +107,26 @@ test("API asset validation blocks an empty form and focuses the first missing fi
   await expect(codeInput).toBeFocused();
 });
 
+test("API asset validation locates overlong text without sending or clearing it", async ({ page }) => {
+  const api = await mockRemoteApiAssetApi(page);
+  await page.goto("/api-assets/new");
+  await page.getByLabel("API 编码").fill("LENGTH_API");
+  await page.getByLabel("API 名称").fill("长度测试");
+  await page.getByLabel("请求路径").fill("/items");
+  await page.getByLabel("归属部门").fill("原部门");
+  await page.getByLabel("负责人").fill("原负责人");
+  await page.locator(".system-picker select").selectOption("3");
+  const description = page.getByLabel("说明", { exact: true });
+  const value = "字".repeat(2001);
+  await description.fill(value);
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(description).toBeFocused();
+  await expect(description).toHaveAttribute("aria-invalid", "true");
+  await expect(description).toHaveAccessibleDescription("说明不能超过 2000 个字符。");
+  await expect(description).toHaveValue(value);
+  expect(api.postCount()).toBe(0);
+});
+
 test("API asset validation edit saves the selected system and child options on reopening", async ({ page }) => {
   await setMockAuth(page, "admin");
   let item = {

@@ -108,6 +108,15 @@ class ApiAssetCoreCrudTests(unittest.TestCase):
         row = {"name": "id", "in": "path", "dataType": "custom-type", "required": True, "example": "A-1", "description": "标识"}
         self.assertEqual([row], self.service._validate_rows([row], "params"))
 
+    def test_scalar_lengths_follow_existing_storage_contract(self):
+        self.service._rows = MagicMock(return_value=[{"system_id": 3}])
+        self.assertEqual("x" * 256, self.service._validate_asset({**self.item, "name": "x" * 256})["name"])
+        for field, length in (("name", 256), ("path", 512), ("version", 64), ("type", 64), ("ownerDept", 128), ("ownerName", 64), ("maintainerName", 64), ("description", 2000), ("remark", 2000)):
+            value = ("/" if field == "path" else "x") + "x" * length
+            with self.subTest(field=field), self.assertRaises(ApiAssetValidationError) as raised:
+                self.service._validate_asset({**self.item, field: value})
+            self.assertIn({"field": field, "code": "max_length", "maxLength": length, "message": "field exceeds maximum length"}, raised.exception.details)
+
     def test_list_and_child_relations_use_core_selects(self):
         self.service._db.fetch_rows = MagicMock(side_effect=[[self.row], [], [], []])
 

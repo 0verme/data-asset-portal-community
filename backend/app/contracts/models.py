@@ -426,6 +426,7 @@ class ApiAssetItem(ContractModel):
 
 
 class ApiAssetRequest(ContractModel):
+    type: str | None = None
     code: str | None = None
     name: str | None = None
     method: str | None = None

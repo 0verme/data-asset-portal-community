@@ -598,19 +598,27 @@ function Editor({
             <label>说明</label>
             <Textarea
               aria-label="说明"
+              data-api-asset-field="description"
+              aria-invalid={Boolean(fieldErrors["description"]) || undefined}
+              aria-describedby={fieldErrors["description"] ? apiAssetErrorId("description") : undefined}
               className="ta"
               value={form.description}
               onChange={(event) => set("description", event.target.value)}
             />
+            {fieldErrors["description"] ? <small id={apiAssetErrorId("description")} className="api-asset-field-error">{fieldErrors["description"]}</small> : null}
           </div>
           <div className="fl full">
             <label>备注</label>
             <Textarea
               aria-label="备注"
+              data-api-asset-field="remark"
+              aria-invalid={Boolean(fieldErrors["remark"]) || undefined}
+              aria-describedby={fieldErrors["remark"] ? apiAssetErrorId("remark") : undefined}
               className="ta"
               value={form.remark}
               onChange={(event) => set("remark", event.target.value)}
             />
+            {fieldErrors["remark"] ? <small id={apiAssetErrorId("remark")} className="api-asset-field-error">{fieldErrors["remark"]}</small> : null}
           </div>
         </div>
       </div>

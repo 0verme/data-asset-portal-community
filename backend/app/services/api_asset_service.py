@@ -105,6 +105,16 @@ class ApiAssetService(AuditActorMixin):
             "remark": str(payload.get("remark") or "").strip(),
         }
         errors = []
+        text_columns = {
+            "name": "api_name", "path": "path_text", "version": "version_text",
+            "type": "api_type", "ownerDept": "owner_dept_name", "ownerName": "owner_name",
+            "maintainerName": "maintainer_name", "description": "description_text", "remark": "remark_desc",
+        }
+        for field, column in text_columns.items():
+            limit = api_asset.c[column].type.length
+            if len(item[field]) > limit:
+                errors.append({"field": field, "code": "max_length", "maxLength": limit,
+                               "message": "field exceeds maximum length"})
         if include_code and not CODE_RE.fullmatch(item["code"]):
             errors.append({"field": "code", "message": "code format is invalid"})
         if not item["name"]:
