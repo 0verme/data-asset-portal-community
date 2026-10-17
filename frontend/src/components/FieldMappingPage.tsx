@@ -195,6 +195,8 @@ export function FieldMappingPage({
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<FieldMappingSort>({ key: "", direction: "asc" });
   const [sourceSystems, setSourceSystems] = useState<FieldMappingSourceSystemOption[]>([]);
+  const [sourceSystemsError, setSourceSystemsError] = useState("");
+  const [sourceSystemsRetry, setSourceSystemsRetry] = useState(0);
   const [stats, setStats] = useState<FieldMappingStatsData | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState("");
@@ -237,13 +239,15 @@ export function FieldMappingPage({
     let cancelled = false;
 
     async function loadOptions(): Promise<void> {
+      setSourceSystemsError("");
       try {
         const mappingSystems = await getFieldMappingSourceSystems();
         if (cancelled) return;
         setSourceSystems(mappingSystems);
-      } catch {
+      } catch (error: unknown) {
         if (cancelled) return;
         setSourceSystems([]);
+        setSourceSystemsError(error instanceof Error ? error.message : "来源系统加载失败");
       }
     }
 
@@ -251,7 +255,7 @@ export function FieldMappingPage({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sourceSystemsRetry]);
 
   useEffect(() => {
     const nextFilters = isLinkedRoute(routeFilters)
@@ -641,6 +645,14 @@ export function FieldMappingPage({
         ) : null}
       </div>
 
+      {sourceSystemsError ? (
+        <div>
+          <ActionErrorBanner title="来源系统加载失败" message={sourceSystemsError} />
+          <Button variant="secondary" type="button" onClick={() => setSourceSystemsRetry((value) => value + 1)}>
+            重试来源系统
+          </Button>
+        </div>
+      ) : null}
       <FieldMappingFilters
         open={filterOpen}
         draftFilters={draftFilters}

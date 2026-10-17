@@ -37,12 +37,12 @@ function clone<T>(value: T): T {
   }
 }
 
-function normalizeCollection(payload: unknown, fallbackKey?: string): unknown[] {
+export function normalizeCollection(payload: unknown, fallbackKey?: string): unknown[] {
   if (Array.isArray(payload)) return payload;
   const record = payload as Record<string, unknown> | null | undefined;
   if (record && Array.isArray(record['items'])) return record['items'];
   if (record && fallbackKey && Array.isArray(record[fallbackKey])) return record[fallbackKey] as unknown[];
-  return [];
+  throw new Error('指标列表接口返回格式无效');
 }
 
 function normalizeDetail(payload: unknown): MockIndicatorItem {
