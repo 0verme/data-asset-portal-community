@@ -599,12 +599,12 @@ jobs:
         if: matrix.node == '22'
         run: npx playwright install --with-deps chromium webkit
 
-      - name: API asset validation browser regression (Chromium and WebKit)
+      - name: Remote API validation and data trust browser regression (Chromium and WebKit)
         if: matrix.node == '22'
         env:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/api-asset-validation-playwright
           VITE_API_MODE: remote
-        run: npm run test:browser -- --grep "API asset validation"
+        run: npm run test:browser -- --grep "API asset validation|Remote data trust"
 
       - name: Form error presenter browser regression (Chromium and WebKit)
         if: matrix.node == '22'

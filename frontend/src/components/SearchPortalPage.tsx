@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./ui.tsx";
 import { Button, EmptyState, ErrorState, Input, LoadingState } from "../ui/index.ts";
+import { ActionErrorBanner } from "./common/ActionErrorBanner.tsx";
 import { getPortalStats, type PortalStatItem } from "../api/portal.ts";
 import { getHotKeywords } from "../api/hotKeywords.ts";
 import {
@@ -352,6 +353,9 @@ export function SearchPortalPage({
 
       {searchedTerm ? (
         <div className="sp-results" aria-live="polite">
+          {!searchLoading && !searchError && result?.partial ? (
+            <ActionErrorBanner title="搜索结果不完整" message="部分模块暂时不可用，以下仅展示已成功查询的结果，请重新搜索。" />
+          ) : null}
           {searchLoading ? (
             <LoadingState
               title={`正在搜索 “${searchedTerm}”...`}
@@ -367,8 +371,8 @@ export function SearchPortalPage({
                 <Icon name="inbox" size={26} />
               </div>
               <EmptyState
-                title="没有找到匹配的资产"
-                desc={`没有与 “${searchedTerm}” 相关的资产、系统、字段、词根、指标、报表、API、码值表或下游推送。`}
+                title={result?.partial ? "已查询模块暂无匹配" : "没有找到匹配的资产"}
+                desc={result?.partial ? "部分模块加载失败，当前无法确认完整搜索结果。" : `没有与 “${searchedTerm}” 相关的资产、系统、字段、词根、指标、报表、API、码值表或下游推送。`}
                 className="sp-empty-adapter"
               />
               <Button
@@ -384,7 +388,7 @@ export function SearchPortalPage({
           ) : (
             <>
               <div className="sp-result-summary">
-                共 <b>{result?.total}</b> 条结果，匹配 “{searchedTerm}”
+                {result?.partial ? "已加载" : "共"} <b>{result?.total}</b> 条结果，匹配 “{searchedTerm}”
               </div>
               {groups.map((group) => (
                 <div key={group.type} className="sp-group">

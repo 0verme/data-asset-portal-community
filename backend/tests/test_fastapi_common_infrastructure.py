@@ -139,6 +139,16 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
             response.json()["error"],
         )
 
+    def test_search_partial_failure_survives_public_projection(self):
+        self.search_provider.search.return_value = {
+            "query": "asset", "scope": "all", "groups": [], "total": 0,
+            "partial": True, "failedGroups": ["asset"],
+        }
+        response = TestClient(self.app()).get("/api/search?q=asset")
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.json()["partial"])
+        self.assertEqual(["asset"], response.json()["failedGroups"])
+
     def test_common_code_remains_wait_db_and_is_not_native_route(self):
         response = TestClient(self.app()).get("/api/common-codes/categories")
         self.assertEqual(404, response.status_code)

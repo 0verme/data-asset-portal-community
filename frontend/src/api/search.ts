@@ -72,6 +72,8 @@ export interface SearchResultGroup {
 }
 
 export interface SearchResult {
+  partial?: boolean;
+  failedGroups?: string[];
   query: string;
   scope: string;
   groups: SearchResultGroup[];

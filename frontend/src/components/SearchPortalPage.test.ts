@@ -13,7 +13,7 @@ test("empty search results expose a clear action that preserves scope and focus"
   ]);
 
   assert.match(source, /groups\.length === 0 \?/);
-  assert.match(source, /<EmptyState[\s\S]*?title="没有找到匹配的资产"/);
+  assert.match(source, /<EmptyState[\s\S]*?title=\{result\?\.partial \? "已查询模块暂无匹配" : "没有找到匹配的资产"\}/);
   assert.match(source, /className="sp-empty-action"/);
   assert.match(source, /aria-label="清空搜索"/);
   assert.match(source, /onClick=\{\(\) => clearSearch\(scope\)\}/);

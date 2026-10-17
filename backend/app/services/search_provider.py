@@ -370,10 +370,10 @@ class KeywordSearchProvider(SearchProvider):
             return self._search_one(conn, config, query, limit, profile)
         except SearchDataSourceError as error:
             LOGGER.warning("search degraded for type=%s: %s", config["type"], error.message)
-            return self._empty_group(config)
+            raise SearchDataSourceError("部分搜索模块暂时不可用，请重试。") from error
         except Exception:  # pragma: no cover
             LOGGER.exception("search unexpected failure for type=%s", config["type"])
-            return self._empty_group(config)
+            raise SearchDataSourceError("部分搜索模块暂时不可用，请重试。")
 
     def _count_matches(self, conn, config, query, profile):
         """Exact matched total for one entity (single COUNT, never per-row)."""
@@ -508,13 +508,15 @@ class KeywordSearchProvider(SearchProvider):
         configs = self._visible_configs(normalized_scope)
         if not configs:
             return {"query": keyword, "scope": normalized_scope, "groups": [], "total": 0}
+        groups, failed_groups = [], []
         with self._connection() as conn:
-            groups = [
-                self._search_one_safe(
-                    conn, config, keyword, normalized_limit, selected_profile
-                )
-                for config in configs
-            ]
+            for config in configs:
+                try:
+                    groups.append(self._search_one_safe(conn, config, keyword, normalized_limit, selected_profile))
+                except SearchDataSourceError:
+                    failed_groups.append(config["type"])
+        if not groups and failed_groups:
+            raise SearchDataSourceError("搜索模块暂时不可用，请稍后重试。")
         if normalized_scope == SCOPE_ALL:
             groups = [group for group in groups if group["count"] > 0]
         matched_total = sum(group["count"] for group in groups)
@@ -529,6 +531,7 @@ class KeywordSearchProvider(SearchProvider):
             "total": matched_total,
             "estimatedTotal": matched_total,
             "hasMore": has_more,
+            **({"partial": True, "failedGroups": failed_groups} if failed_groups else {}),
         }
 
 
