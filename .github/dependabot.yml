@@ -27,6 +27,9 @@ updates:
 
   - package-ecosystem: "pip"
     directory: "/backend"
+    # Java 8 compatibility pins require manual review; see backend/README.md.
+    exclude-paths:
+      - "requirements-gaussdb-java8.txt"
     schedule:
       interval: "weekly"
       day: "monday"
