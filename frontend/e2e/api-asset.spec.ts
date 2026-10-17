@@ -107,6 +107,55 @@ test("API asset validation blocks an empty form and focuses the first missing fi
   await expect(codeInput).toBeFocused();
 });
 
+test("API asset validation edit saves the selected system and child options on reopening", async ({ page }) => {
+  await setMockAuth(page, "admin");
+  let item = {
+    code: "REBIND_API", name: "关联测试", method: "HEAD", path: "/items", version: "legacy-v",
+    systemId: 8, downstreamSystemId: 8, downstreamSystemName: "停用系统", downstreamSystemShortName: "旧",
+    type: "legacy-custom", status: "enabled", ownerDept: "原部门", ownerName: "原负责人",
+    maintainerName: "", description: "", remark: "", relations: [],
+    params: [{ name: "id", in: "query", dataType: "custom", required: false, description: "", example: "old" }],
+    responseFields: [{ name: "result", dataType: "custom", description: "", example: "old-response" }],
+  };
+  let saved = false;
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (!path.startsWith("/api/")) return route.continue();
+    if (path === "/api/auth/me") return route.fulfill({ json: { data: { role: "admin", user: "tester", permissions: ["api_asset:read", "api_asset:write"] } } });
+    if (path === "/api/public-catalog/config") return route.fulfill({ json: { profile: "internal", exportEnabled: false } });
+    if (path === "/api/api-assets/systems") return route.fulfill({ json: { items: [
+      { id: 8, name: "停用系统", short_name: "旧", status: "disabled" },
+      { id: 3, name: "订单中心", short_name: "订单", status: "enabled" },
+    ] } });
+    if (route.request().method() === "PUT") {
+      item = route.request().postDataJSON();
+      saved = true;
+      return route.fulfill({ json: { data: item } });
+    }
+    return route.fulfill({ json: { items: path === "/api/api-assets" ? [item] : [] } });
+  });
+  await page.goto("/api-assets/REBIND_API/edit");
+  await expect(page.getByLabel("请求方式")).toHaveText("HEAD");
+  await expect(page.locator(".system-picker select")).toHaveValue("8");
+  await page.getByLabel("搜索系统名称或简称").fill("订单");
+  await expect(page.locator('.system-picker option[value="8"]')).toHaveCount(1);
+  await page.locator(".system-picker select").selectOption("3");
+  const params = page.locator("table.mobile-edit-table").first();
+  await params.getByRole("checkbox", { name: "第 1 行必填" }).check();
+  await params.getByLabel("第 1 行示例").fill("new-param");
+  await page.locator("table.mobile-edit-table").nth(1).getByLabel("第 1 行示例").fill("new-response");
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect.poll(() => saved).toBe(true);
+  expect(item).toMatchObject({ systemId: 3, downstreamSystemId: 3, type: "legacy-custom", method: "HEAD",
+    params: [{ required: true, example: "new-param", dataType: "custom" }],
+    responseFields: [{ example: "new-response" }],
+  });
+  await page.goto("/api-assets/REBIND_API/edit");
+  await expect(page.locator(".system-picker select")).toHaveValue("3");
+  await expect(params.getByRole("checkbox", { name: "第 1 行必填" })).toBeChecked();
+  await expect(params.getByLabel("第 1 行示例")).toHaveValue("new-param");
+});
+
 test("API asset validation preserves 422 details, row context, and retry values", async ({ page }) => {
   test.setTimeout(60_000);
   const api = await mockRemoteApiAssetApi(page);

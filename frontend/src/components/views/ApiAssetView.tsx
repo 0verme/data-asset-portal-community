@@ -33,7 +33,7 @@ import {
   StatusBadge,
   ViewModeSwitcher,
 } from "../common/index.ts";
-import { Button, Input, Select, Textarea } from "../../ui/index.ts";
+import { Button, Checkbox, Input, Select, Textarea } from "../../ui/index.ts";
 
 interface NormalizedRelations {
   tables: TableReference[];
@@ -196,6 +196,8 @@ function Rows<T extends RowItem>({
               {kind === "params" ? <th>位置</th> : null}
               <th>类型</th>
               <th>说明</th>
+              {kind === "params" ? <th>必填</th> : null}
+              <th>示例</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -262,6 +264,22 @@ function Rows<T extends RowItem>({
                         onChange={(event) => update(index, { description: event.target.value })}
                       />
                     </td>
+                    {kind === "params" ? (
+                      <td data-label="必填">
+                        <Checkbox
+                          aria-label={`第 ${index + 1} 行必填`}
+                          checked={(row as ApiAssetParam).required}
+                          onCheckedChange={(required) => update(index, { required })}
+                        />
+                      </td>
+                    ) : null}
+                    <td data-label="示例">
+                      <Input
+                        aria-label={`第 ${index + 1} 行示例`}
+                        value={row.example || ""}
+                        onChange={(event) => update(index, { example: event.target.value })}
+                      />
+                    </td>
                     <td data-label="">
                       <Button
                         className="btn ghost-danger"
@@ -278,7 +296,7 @@ function Rows<T extends RowItem>({
                   </tr>
                   {rowError ? (
                     <tr className="api-asset-error-row">
-                      <td colSpan={kind === "params" ? 5 : 4}>
+                      <td colSpan={kind === "params" ? 7 : 5}>
                         <div
                           id={apiAssetErrorId(prefix)}
                           className="api-asset-field-error"
@@ -312,7 +330,7 @@ function SystemPicker({ systems, value, error, onChange }: SystemPickerProps) {
   const [query, setQuery] = React.useState("");
   const options = systems.filter(
     (system) =>
-      !query ||
+      String(system.id) === value || !query ||
       [system.name, system.short_name].some((item) =>
         String(item || "")
           .toLowerCase()
@@ -380,7 +398,7 @@ const API_TEXT_FIELDS: readonly [ApiTextFieldKey, string][] = [
 
 function toFormData(item: MockApiAsset | null | undefined): ApiAssetFormData {
   if (!item) return { ...blank, params: [], responseFields: [], relations: [] };
-  return { ...item, downstreamSystemId: String(item.downstreamSystemId || "") };
+  return { ...item, downstreamSystemId: String(item.systemId || item.downstreamSystemId || "") };
 }
 
 interface EditorProps {
@@ -435,7 +453,7 @@ function Editor({
     clearErrors();
     const payload: MockApiAsset = {
       ...form,
-      systemId: form.systemId || Number(form.downstreamSystemId),
+      systemId: Number(form.downstreamSystemId),
       downstreamSystemId: Number(form.downstreamSystemId),
       code: form.code.trim().toUpperCase(),
       relations: relationRows(tables, indicators, initial.others),
@@ -517,7 +535,7 @@ function Editor({
               aria-describedby={fieldErrors["method"] ? apiAssetErrorId("method") : undefined}
               data-api-asset-field="method"
               className={`sel${fieldErrors["method"] ? " invalid" : ""}`}
-              items={["GET", "POST", "PUT", "PATCH", "DELETE"].map((value) => ({ label: value, value }))}
+              items={["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"].map((value) => ({ label: value, value }))}
               value={form.method}
               onValueChange={(value) => set("method", value || "GET")}
             />

@@ -94,6 +94,20 @@ class ApiAssetCoreCrudTests(unittest.TestCase):
             raised.exception.details,
         )
 
+    def test_duplicate_children_fail_instead_of_silently_disappearing(self):
+        for kind, row in (
+            ("params", {"name": "id", "in": "path", "dataType": "string"}),
+            ("responseFields", {"name": "id", "dataType": "custom-type"}),
+            ("relations", {"type": "system", "targetCode": "SYS"}),
+        ):
+            with self.subTest(kind=kind), self.assertRaises(ApiAssetValidationError) as raised:
+                self.service._validate_rows([row, row], kind)
+            self.assertEqual(f"{kind}[1]", raised.exception.details[0]["field"])
+
+    def test_child_options_round_trip_without_changing_unknown_types(self):
+        row = {"name": "id", "in": "path", "dataType": "custom-type", "required": True, "example": "A-1", "description": "标识"}
+        self.assertEqual([row], self.service._validate_rows([row], "params"))
+
     def test_list_and_child_relations_use_core_selects(self):
         self.service._db.fetch_rows = MagicMock(side_effect=[[self.row], [], [], []])
 

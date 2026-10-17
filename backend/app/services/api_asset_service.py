@@ -182,7 +182,9 @@ class ApiAssetService(AuditActorMixin):
                 }
             if not valid:
                 errors.append({"field": f"{kind}[{index}]", "message": "required fields are invalid"})
-            elif key not in seen:
+            elif key in seen:
+                errors.append({"field": f"{kind}[{index}]", "message": "duplicate row"})
+            else:
                 seen.add(key)
                 normalized.append(value)
         if errors:

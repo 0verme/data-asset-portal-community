@@ -64,6 +64,7 @@ export function validateApiAssetForm(
     errors['systemId'] = '请选择有效且已启用的下游调用系统。';
   }
 
+  const paramKeys = new Set<string>();
   form.params.forEach((row, index) => {
     const prefix = `params.${index}`;
     if (!row.name.trim()) errors[`${prefix}.name`] = `请输入第 ${index + 1} 行参数名称。`;
@@ -71,12 +72,18 @@ export function validateApiAssetForm(
       errors[`${prefix}.in`] = `请选择第 ${index + 1} 行参数位置。`;
     }
     if (!row.dataType.trim()) errors[`${prefix}.dataType`] = `请输入第 ${index + 1} 行参数类型。`;
+    const key = JSON.stringify([row.name.trim(), row.in.trim()]);
+    if (paramKeys.has(key)) errors[prefix] = `第 ${index + 1} 行参数名称与位置重复。`;
+    paramKeys.add(key);
   });
 
+  const responseNames = new Set<string>();
   form.responseFields.forEach((row, index) => {
     const prefix = `responseFields.${index}`;
     if (!row.name.trim()) errors[`${prefix}.name`] = `请输入第 ${index + 1} 行响应字段名称。`;
     if (!row.dataType.trim()) errors[`${prefix}.dataType`] = `请输入第 ${index + 1} 行响应字段类型。`;
+    if (responseNames.has(row.name.trim())) errors[prefix] = `第 ${index + 1} 行响应字段名称重复。`;
+    responseNames.add(row.name.trim());
   });
 
   form.relations.forEach((row, index) => {
