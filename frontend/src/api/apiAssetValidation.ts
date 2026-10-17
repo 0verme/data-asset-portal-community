@@ -5,6 +5,11 @@ import type {
 } from '../data/apiAssets.ts';
 
 export interface ApiAssetFormValues {
+  version?: string;
+  type?: string;
+  maintainerName?: string;
+  description?: string;
+  remark?: string;
   code: string;
   name: string;
   method: string;
@@ -34,6 +39,7 @@ const API_CODE_PATTERN = /^[A-Z][A-Z0-9_-]{2,63}$/;
 const API_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 const PARAM_LOCATIONS = new Set(['query', 'path', 'header', 'body']);
 const RELATION_TYPES = new Set(['table', 'indicator', 'system']);
+const TEXT_LIMITS = { name: 256, path: 512, version: 64, type: 64, ownerDept: 128, ownerName: 64, maintainerName: 64, description: 2000, remark: 2000 } as const;
 
 export function validateApiAssetForm(
   form: ApiAssetFormValues,
@@ -54,6 +60,12 @@ export function validateApiAssetForm(
   }
   if (!form.ownerDept.trim()) errors['ownerDept'] = '请输入归属部门。';
   if (!form.ownerName.trim()) errors['ownerName'] = '请输入负责人。';
+  for (const [field, limit] of Object.entries(TEXT_LIMITS)) {
+    const value = form[field as keyof typeof TEXT_LIMITS];
+    if (value && Array.from(value.trim()).length > limit) {
+      errors[field] = `${apiAssetFieldLabel(field)}不能超过 ${limit} 个字符。`;
+    }
+  }
 
   const systemId = Number(form.downstreamSystemId);
   if (
@@ -64,6 +76,7 @@ export function validateApiAssetForm(
     errors['systemId'] = '请选择有效且已启用的下游调用系统。';
   }
 
+  const paramKeys = new Set<string>();
   form.params.forEach((row, index) => {
     const prefix = `params.${index}`;
     if (!row.name.trim()) errors[`${prefix}.name`] = `请输入第 ${index + 1} 行参数名称。`;
@@ -71,12 +84,18 @@ export function validateApiAssetForm(
       errors[`${prefix}.in`] = `请选择第 ${index + 1} 行参数位置。`;
     }
     if (!row.dataType.trim()) errors[`${prefix}.dataType`] = `请输入第 ${index + 1} 行参数类型。`;
+    const key = JSON.stringify([row.name.trim(), row.in.trim()]);
+    if (paramKeys.has(key)) errors[prefix] = `第 ${index + 1} 行参数名称与位置重复。`;
+    paramKeys.add(key);
   });
 
+  const responseNames = new Set<string>();
   form.responseFields.forEach((row, index) => {
     const prefix = `responseFields.${index}`;
     if (!row.name.trim()) errors[`${prefix}.name`] = `请输入第 ${index + 1} 行响应字段名称。`;
     if (!row.dataType.trim()) errors[`${prefix}.dataType`] = `请输入第 ${index + 1} 行响应字段类型。`;
+    if (responseNames.has(row.name.trim())) errors[prefix] = `第 ${index + 1} 行响应字段名称重复。`;
+    responseNames.add(row.name.trim());
   });
 
   form.relations.forEach((row, index) => {
@@ -161,6 +180,10 @@ function validationFieldErrors(
         : '';
     if (!field) {
       fieldErrors['form'] = '表单中有字段未通过校验，请检查后重试。';
+      continue;
+    }
+    if (isRecord(detail) && detail['code'] === 'max_length' && Object.hasOwn(TEXT_LIMITS, field)) {
+      fieldErrors[field] = `${apiAssetFieldLabel(field)}不能超过 ${TEXT_LIMITS[field as keyof typeof TEXT_LIMITS]} 个字符。`;
       continue;
     }
     const rowErrors = rowFieldErrors(field, form);
@@ -250,6 +273,11 @@ export function apiAssetFieldLabel(field: string): string {
     status: '状态',
     ownerDept: '归属部门',
     ownerName: '负责人',
+    version: '版本',
+    type: 'API 类型',
+    maintainerName: '维护人',
+    description: '说明',
+    remark: '备注',
     systemId: '下游调用系统',
     body: '表单',
     form: '表单',

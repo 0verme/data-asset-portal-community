@@ -33,7 +33,7 @@ import {
   StatusBadge,
   ViewModeSwitcher,
 } from "../common/index.ts";
-import { Button, Input, Select, Textarea } from "../../ui/index.ts";
+import { Button, Checkbox, Input, Select, Textarea } from "../../ui/index.ts";
 
 interface NormalizedRelations {
   tables: TableReference[];
@@ -196,6 +196,8 @@ function Rows<T extends RowItem>({
               {kind === "params" ? <th>位置</th> : null}
               <th>类型</th>
               <th>说明</th>
+              {kind === "params" ? <th>必填</th> : null}
+              <th>示例</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -262,6 +264,22 @@ function Rows<T extends RowItem>({
                         onChange={(event) => update(index, { description: event.target.value })}
                       />
                     </td>
+                    {kind === "params" ? (
+                      <td data-label="必填">
+                        <Checkbox
+                          aria-label={`第 ${index + 1} 行必填`}
+                          checked={(row as ApiAssetParam).required}
+                          onCheckedChange={(required) => update(index, { required })}
+                        />
+                      </td>
+                    ) : null}
+                    <td data-label="示例">
+                      <Input
+                        aria-label={`第 ${index + 1} 行示例`}
+                        value={row.example || ""}
+                        onChange={(event) => update(index, { example: event.target.value })}
+                      />
+                    </td>
                     <td data-label="">
                       <Button
                         className="btn ghost-danger"
@@ -278,7 +296,7 @@ function Rows<T extends RowItem>({
                   </tr>
                   {rowError ? (
                     <tr className="api-asset-error-row">
-                      <td colSpan={kind === "params" ? 5 : 4}>
+                      <td colSpan={kind === "params" ? 7 : 5}>
                         <div
                           id={apiAssetErrorId(prefix)}
                           className="api-asset-field-error"
@@ -312,7 +330,7 @@ function SystemPicker({ systems, value, error, onChange }: SystemPickerProps) {
   const [query, setQuery] = React.useState("");
   const options = systems.filter(
     (system) =>
-      !query ||
+      String(system.id) === value || !query ||
       [system.name, system.short_name].some((item) =>
         String(item || "")
           .toLowerCase()
@@ -380,7 +398,7 @@ const API_TEXT_FIELDS: readonly [ApiTextFieldKey, string][] = [
 
 function toFormData(item: MockApiAsset | null | undefined): ApiAssetFormData {
   if (!item) return { ...blank, params: [], responseFields: [], relations: [] };
-  return { ...item, downstreamSystemId: String(item.downstreamSystemId || "") };
+  return { ...item, downstreamSystemId: String(item.systemId || item.downstreamSystemId || "") };
 }
 
 interface EditorProps {
@@ -416,6 +434,8 @@ function Editor({
     initial.indicators,
   );
   const [localFieldErrors, setLocalFieldErrors] = React.useState<ApiAssetFieldErrors>({});
+  const [saving, setSaving] = React.useState(false);
+  const savingRef = React.useRef(false);
   const fieldErrors = { ...serverFieldErrors, ...localFieldErrors };
   const clearErrors = (fieldPrefix?: string): void => {
     clearServerErrors(fieldPrefix);
@@ -431,11 +451,12 @@ function Editor({
   React.useEffect(() => {
     if (saveFailureRevision > 0) focusApiAssetField(serverFieldErrors);
   }, [saveFailureRevision, serverFieldErrors]);
-  const submit = (): void => {
+  const submit = async (): Promise<void> => {
+    if (savingRef.current) return;
     clearErrors();
     const payload: MockApiAsset = {
       ...form,
-      systemId: form.systemId || Number(form.downstreamSystemId),
+      systemId: Number(form.downstreamSystemId),
       downstreamSystemId: Number(form.downstreamSystemId),
       code: form.code.trim().toUpperCase(),
       relations: relationRows(tables, indicators, initial.others),
@@ -449,7 +470,14 @@ function Editor({
       focusApiAssetField(validationErrors);
       return;
     }
-    void onSave(payload);
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await onSave(payload);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
   const relationErrors = Object.entries(fieldErrors).filter(([field]) =>
     /^relations\.\d+$/.test(field),
@@ -517,7 +545,7 @@ function Editor({
               aria-describedby={fieldErrors["method"] ? apiAssetErrorId("method") : undefined}
               data-api-asset-field="method"
               className={`sel${fieldErrors["method"] ? " invalid" : ""}`}
-              items={["GET", "POST", "PUT", "PATCH", "DELETE"].map((value) => ({ label: value, value }))}
+              items={["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"].map((value) => ({ label: value, value }))}
               value={form.method}
               onValueChange={(value) => set("method", value || "GET")}
             />
@@ -533,7 +561,21 @@ function Editor({
               tabIndex={fieldErrors["status"] ? -1 : undefined}
               aria-describedby={fieldErrors["status"] ? apiAssetErrorId("status") : undefined}
             >
-              <BinaryStatusToggle
+              {!["enabled", "disabled"].includes(form.status) ? (
+                <>
+                  <p role="status">未知历史状态：{form.status || "空值"}，请选择启用或禁用。</p>
+                  <Select<string>
+                    aria-label="选择有效的 API 状态"
+                    value={form.status}
+                    items={[
+                      { value: form.status, label: `未知状态：${form.status || "空值"}` },
+                      { value: "enabled", label: "启用" },
+                      { value: "disabled", label: "禁用" },
+                    ]}
+                    onValueChange={(value) => { if (value) set("status", value); }}
+                  />
+                </>
+              ) : <BinaryStatusToggle
                 mode="status"
                 name="status"
                 value={form.status}
@@ -548,7 +590,7 @@ function Editor({
                       : value,
                   )
                 }
-              />
+              />}
             </div>
             {fieldErrors["status"] ? <small id={apiAssetErrorId("status")} className="api-asset-field-error">{fieldErrors["status"]}</small> : null}
           </div>
@@ -556,19 +598,27 @@ function Editor({
             <label>说明</label>
             <Textarea
               aria-label="说明"
+              data-api-asset-field="description"
+              aria-invalid={Boolean(fieldErrors["description"]) || undefined}
+              aria-describedby={fieldErrors["description"] ? apiAssetErrorId("description") : undefined}
               className="ta"
               value={form.description}
               onChange={(event) => set("description", event.target.value)}
             />
+            {fieldErrors["description"] ? <small id={apiAssetErrorId("description")} className="api-asset-field-error">{fieldErrors["description"]}</small> : null}
           </div>
           <div className="fl full">
             <label>备注</label>
             <Textarea
               aria-label="备注"
+              data-api-asset-field="remark"
+              aria-invalid={Boolean(fieldErrors["remark"]) || undefined}
+              aria-describedby={fieldErrors["remark"] ? apiAssetErrorId("remark") : undefined}
               className="ta"
               value={form.remark}
               onChange={(event) => set("remark", event.target.value)}
             />
+            {fieldErrors["remark"] ? <small id={apiAssetErrorId("remark")} className="api-asset-field-error">{fieldErrors["remark"]}</small> : null}
           </div>
         </div>
       </div>
@@ -618,7 +668,7 @@ function Editor({
         ))}
       </div>
       <div className="form-actions">
-        <Button className="btn" variant="secondary" type="button" onClick={onCancel}>
+        <Button className="btn" variant="secondary" type="button" onClick={onCancel} disabled={saving}>
           取消
         </Button>
         <Button
@@ -626,8 +676,9 @@ function Editor({
           variant="primary"
           type="button"
           onClick={submit}
+          disabled={saving}
         >
-          保存
+          {saving ? "保存中..." : "保存"}
         </Button>
       </div>
     </>

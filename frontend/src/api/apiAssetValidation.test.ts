@@ -23,6 +23,24 @@ const validForm: ApiAssetFormValues = {
 };
 const enabledSystems = [{ id: 3, status: 'enabled' }];
 
+test('storage lengths are validated locally and structured server limits use safe field labels', () => {
+  assert.deepEqual(validateApiAssetForm({ ...validForm, name: 'x'.repeat(256) }, enabledSystems), {});
+  assert.match(validateApiAssetForm({ ...validForm, name: 'x'.repeat(257) }, enabledSystems)['name']!, /256/);
+  const failure = normalizeApiAssetSaveFailure(httpError(422, 'API_ASSET_VALIDATION_FAILED', [
+    { field: 'version', code: 'max_length', maxLength: 64, message: 'private server text' },
+  ]), validForm);
+  assert.equal(failure.fieldErrors['version'], '版本不能超过 64 个字符。');
+});
+
+test('duplicate parameter identities and response names locate the second row', () => {
+  const errors = validateApiAssetForm({
+    ...validForm,
+    params: [validForm.params[0]!, { ...validForm.params[0]!, name: ' orderId ' }],
+    responseFields: [validForm.responseFields[0]!, validForm.responseFields[0]!],
+  }, enabledSystems);
+  assert.deepEqual(Object.keys(errors), ['params.1', 'responseFields.1']);
+});
+
 function httpError(status: number, code: string, details?: unknown): Error & { status: number; payload: unknown } {
   return Object.assign(new Error('English server message'), {
     status,

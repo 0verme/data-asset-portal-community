@@ -599,20 +599,30 @@ jobs:
         if: matrix.node == '22'
         run: npx playwright install --with-deps chromium webkit
 
-      - name: API asset validation browser regression (Chromium and WebKit)
+      - name: Remote API validation and data trust browser regression (Chromium and WebKit)
         if: matrix.node == '22'
         env:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/api-asset-validation-playwright
           VITE_API_MODE: remote
-        run: npm run test:browser -- --grep "API asset validation"
+        run: npm run test:browser -- --grep "API asset validation|Remote data trust|source options failure"
 
       - name: Form error presenter browser regression (Chromium and WebKit)
         if: matrix.node == '22'
         env:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/form-error-presenter-playwright
+          VITE_API_MODE: mock
         run: npm run test:browser -- --grep "form error presenter"
 
+      - name: Overlay focus and feedback browser regression (Chromium and WebKit)
+        if: matrix.node == '22'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/overlay-feedback-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- e2e/kumo-overlays.spec.ts --workers=2
+
       - name: Frontend production build
+        env:
+          VITE_API_MODE: remote
         run: npm run build:frontend
 
       - name: Dependency audit gate (Critical/High must be 0)

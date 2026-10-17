@@ -94,6 +94,29 @@ class ApiAssetCoreCrudTests(unittest.TestCase):
             raised.exception.details,
         )
 
+    def test_duplicate_children_fail_instead_of_silently_disappearing(self):
+        for kind, row in (
+            ("params", {"name": "id", "in": "path", "dataType": "string"}),
+            ("responseFields", {"name": "id", "dataType": "custom-type"}),
+            ("relations", {"type": "system", "targetCode": "SYS"}),
+        ):
+            with self.subTest(kind=kind), self.assertRaises(ApiAssetValidationError) as raised:
+                self.service._validate_rows([row, row], kind)
+            self.assertEqual(f"{kind}[1]", raised.exception.details[0]["field"])
+
+    def test_child_options_round_trip_without_changing_unknown_types(self):
+        row = {"name": "id", "in": "path", "dataType": "custom-type", "required": True, "example": "A-1", "description": "标识"}
+        self.assertEqual([row], self.service._validate_rows([row], "params"))
+
+    def test_scalar_lengths_follow_existing_storage_contract(self):
+        self.service._rows = MagicMock(return_value=[{"system_id": 3}])
+        self.assertEqual("x" * 256, self.service._validate_asset({**self.item, "name": "x" * 256})["name"])
+        for field, length in (("name", 256), ("path", 512), ("version", 64), ("type", 64), ("ownerDept", 128), ("ownerName", 64), ("maintainerName", 64), ("description", 2000), ("remark", 2000)):
+            value = ("/" if field == "path" else "x") + "x" * length
+            with self.subTest(field=field), self.assertRaises(ApiAssetValidationError) as raised:
+                self.service._validate_asset({**self.item, field: value})
+            self.assertIn({"field": field, "code": "max_length", "maxLength": length, "message": "field exceeds maximum length"}, raised.exception.details)
+
     def test_list_and_child_relations_use_core_selects(self):
         self.service._db.fetch_rows = MagicMock(side_effect=[[self.row], [], [], []])
 

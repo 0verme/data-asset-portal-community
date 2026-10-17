@@ -17,9 +17,15 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv, searchForWorkspaceRoot } from "vite";
 import react from "@vitejs/plugin-react";
 
-function resolveFrontendApiMode(env) {
-  const mode = env.VITE_API_MODE?.trim().toLowerCase() || "mock";
-  return mode === "remote" ? "remote" : "mock";
+export function resolveFrontendApiMode(env, command) {
+  const mode = env.VITE_API_MODE?.trim().toLowerCase();
+  if (mode && !["remote", "mock"].includes(mode)) {
+    throw new Error("VITE_API_MODE must be remote or mock");
+  }
+  if (command === "build" && mode !== "remote") {
+    throw new Error("Production builds require explicit VITE_API_MODE=remote; use the dev server for Mock");
+  }
+  return mode || "mock";
 }
 
 function resolveFrontendApiBaseUrl(env) {
@@ -35,9 +41,9 @@ function buildApiProxyKey(apiBaseUrl) {
   return `^${escapedBaseUrl}(?:/|$)`;
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const apiMode = resolveFrontendApiMode(env);
+  const apiMode = resolveFrontendApiMode(env, command);
   const apiBaseUrl = resolveFrontendApiBaseUrl(env);
   const backendTarget = resolveBackendTarget(env);
 

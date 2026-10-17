@@ -121,13 +121,14 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
             response.json()["error"],
         )
 
-    def test_portal_fatal_error_keeps_zero_filled_200_fallback(self):
-        fallback = [{"key": "dwm", "label": "数据仓库", "value": 0}]
+    def test_portal_fatal_error_reports_unavailable_without_fake_zero(self):
         self.portal_service.get_stats.side_effect = RuntimeError("temporary failure")
-        self.portal_service.zero_stats.return_value = fallback
         response = TestClient(self.app()).get("/api/portal/stats")
-        self.assertEqual(200, response.status_code)
-        self.assertEqual({"items": fallback}, response.json())
+        self.assertEqual(503, response.status_code)
+        self.assertEqual("PORTAL_STATS_UNAVAILABLE", response.json()["error"]["code"])
+        self.assertNotIn("items", response.json())
+        self.assertNotIn("temporary failure", response.text)
+        self.portal_service.zero_stats.assert_not_called()
 
     def test_search_data_source_error_keeps_error_envelope(self):
         self.search_provider.search.side_effect = SearchDataSourceError("search down")
@@ -137,6 +138,16 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
             {"code": "SEARCH_DATA_SOURCE_ERROR", "message": "search down"},
             response.json()["error"],
         )
+
+    def test_search_partial_failure_survives_public_projection(self):
+        self.search_provider.search.return_value = {
+            "query": "asset", "scope": "all", "groups": [], "total": 0,
+            "partial": True, "failedGroups": ["asset"],
+        }
+        response = TestClient(self.app()).get("/api/search?q=asset")
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.json()["partial"])
+        self.assertEqual(["asset"], response.json()["failedGroups"])
 
     def test_common_code_remains_wait_db_and_is_not_native_route(self):
         response = TestClient(self.app()).get("/api/common-codes/categories")

@@ -163,6 +163,22 @@ function statCard(page: Page, label: string) {
   return page.locator(".fm-stat-card").filter({ hasText: label }).locator(".fm-stat-value");
 }
 
+test("source options failure stays visible and can be retried independently", async ({ page }) => {
+  await installApiFixtures(page);
+  let attempts = 0;
+  await page.route("**/api/field-mappings/source-systems", async (route) => {
+    attempts += 1;
+    await route.fulfill(attempts === 1
+      ? { status: 503, json: { error: { message: "选项暂时不可用" } } }
+      : { json: { items: [] } });
+  });
+  await page.goto("/field-mapping");
+  await expect(page.getByRole("alert").filter({ hasText: "来源系统加载失败" })).toBeVisible();
+  await page.getByRole("button", { name: "重试来源系统" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "来源系统加载失败" })).toHaveCount(0);
+  expect(attempts).toBe(2);
+});
+
 test("default table results render independently of slow stats and field details are on demand", async ({ page }) => {
   let markStatsStarted!: () => void;
   let releaseStats!: () => void;

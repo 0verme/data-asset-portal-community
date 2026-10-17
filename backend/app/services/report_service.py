@@ -168,13 +168,16 @@ class ReportService(AuditActorMixin):
     def _normalize_json_array(value):
         if isinstance(value, list):
             return value
+        if value is None or value == "":
+            return []
         if isinstance(value, str) and value.strip():
             try:
                 payload = json.loads(value)
-            except JSONDecodeError:
-                return []
-            return payload if isinstance(payload, list) else []
-        return []
+            except JSONDecodeError as error:
+                raise ReportDataSourceError("报表关联数据格式无效，请联系管理员核查。") from error
+            if isinstance(payload, list):
+                return payload
+        raise ReportDataSourceError("报表关联数据格式无效，请联系管理员核查。")
 
     def _asset_lookup(self):
         """Return ``(by_asset_id, by_table_name)`` indexes for related tables.

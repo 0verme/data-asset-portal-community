@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -18,8 +18,8 @@ function sourceFiles(directory: string): string[] {
 
 test("Kumo component deep imports stay within DAP adapters and the Phase 1 raw probe", () => {
   const violations = sourceFiles(sourceRoot).flatMap((filePath) => {
-    const isAdapter = filePath === adapterRoot || filePath.startsWith(`${adapterRoot}/`);
-    const isRawProbe = filePath === spikeRoot || filePath.startsWith(`${spikeRoot}/`);
+    const isAdapter = filePath === adapterRoot || filePath.startsWith(`${adapterRoot}${sep}`);
+    const isRawProbe = filePath === spikeRoot || filePath.startsWith(`${spikeRoot}${sep}`);
     if (isAdapter || isRawProbe) return [];
     const source = readFileSync(filePath, "utf8");
     return /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)["']@cloudflare\/kumo\/components\//.test(source)

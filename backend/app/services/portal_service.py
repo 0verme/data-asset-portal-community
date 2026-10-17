@@ -104,7 +104,7 @@ class PortalService:
             return self._count(config)
         except Exception:
             LOGGER.exception("portal stat degraded for key=%s (from=%s)", config["key"], config["from"])
-            return 0
+            raise
 
     def get_stats(self):
         with database_transaction():
@@ -141,10 +141,6 @@ class PortalService:
             return items
         except Exception:
             LOGGER.exception("portal stats batch query failed; falling back to per-stat counts")
-            if self._stats_cache and self._stats_cache_signature == signature:
-                LOGGER.warning("portal stats returning stale cache after batch failure")
-                return self._clone_items(self._stats_cache)
-
             items = [
                 {"key": config["key"], "label": config["label"], "value": self._count_safe(config)}
                 for config in configs

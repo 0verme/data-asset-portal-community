@@ -6,10 +6,11 @@ const read = (relativePath: string) => readFileSync(new URL(relativePath, import
 const view = read("./components/views/ApiAssetView.tsx");
 
 test("api asset view uses the frozen DAP adapters", () => {
-  assert.match(view, /import \{ Button, Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
-  assert.equal((view.match(/<Input/g) ?? []).length, 5);
+  assert.match(view, /import \{ Button, Checkbox, Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.equal((view.match(/<Input/g) ?? []).length, 6);
+  assert.equal((view.match(/<Checkbox/g) ?? []).length, 1);
   assert.equal((view.match(/<Button/g) ?? []).length, 6);
-  assert.equal((view.match(/<Select<string>/g) ?? []).length, 2);
+  assert.equal((view.match(/<Select<string>/g) ?? []).length, 3);
   assert.equal((view.match(/<Textarea/g) ?? []).length, 2);
   assert.doesNotMatch(view, /from "@cloudflare\/kumo\//);
 });
