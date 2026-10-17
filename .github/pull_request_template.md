@@ -22,7 +22,7 @@ Closes #
 <!-- List commands run and their results. Mark irrelevant checks as N/A and
      explain why; do not check a test that was not run. For example:
      python -m unittest discover -s backend/tests
-     cd frontend && npm test && npm run build
+     cd frontend && npm test && VITE_API_MODE=remote npm run build
 -->
 
 - [ ] Backend tests pass

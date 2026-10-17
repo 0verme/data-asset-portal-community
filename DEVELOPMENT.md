@@ -38,9 +38,13 @@ cd frontend
 npm run build:lineage       # lineage-viewer -> domain-adapter -> react
 npm run typecheck:lineage
 npm test
-npm run build              # build:lineage + root frontend production build
+VITE_API_MODE=remote npm run build  # build:lineage + root frontend production build
 npm run verify:lineage-packages
 ```
+
+发布构建必须显式设置 `VITE_API_MODE=remote`；漏设、`mock` 或未知值会停止构建。
+PowerShell 对应执行 `$env:VITE_API_MODE='remote'; npm run build`。
+本地演示继续使用 `VITE_API_MODE=mock` 的开发服务器，不生成 Mock 发布包。
 
 | Artifact | Repository policy | Producer / consumer |
 |---|---|---|

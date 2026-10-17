@@ -507,7 +507,7 @@ HTTPS Production 将上述 `http://` 替换为 `https://`。最终至少确认�
 3. 创建 `backend/.venv` 并安装 `backend/requirements.txt`；MySQL 按需安装可选依赖，GaussDB/DWS 按运行时 Java 版本选择对应 JDBC requirements（见[兼容矩阵](./backend/README.md#gaussdbdws-jdbc-compatibility-by-java-version)），并由部署方提供 JDBC 驱动。
 4. 执行 `schema_migrate.py apply`，再执行 `status`/`verify`。
 5. 执行 `create_admin.py` 创建管理员。
-6. 通过服务器或构建机执行 `cd frontend && npm ci && npm run build`，确认 `frontend/dist/index.html`；或部署已验证的 `frontend/dist` artifact。
+6. 通过服务器或构建机执行 `cd frontend && npm ci && VITE_API_MODE=remote npm run build`，确认 `frontend/dist/index.html`；或部署已验证的 `frontend/dist` artifact。
 7. 安装并启用 systemd unit，确认 backend 监听 `127.0.0.1:15099`。
 8. 安装 Nginx HTTP Demo 或 HTTPS Production 配置，执行 `nginx -t` 并 reload。
 9. 按[验收命令](#10-verification)检查 systemd、`/healthz`、Nginx、首页、`/api` 和 SPA refresh。
