@@ -38,6 +38,8 @@ class MeasurementTests(unittest.TestCase):
             thread.join()
             server.server_close()
         self.assertTrue(result["field_stats_consistent"])
+        self.assertTrue(result["stable_counts"])
+        self.assertNotIn("stable_snapshot", result)
         self.assertEqual(6, len(requests))
         self.assertTrue(all(parse_qs(urlsplit(path).query)["sourceSystemId"] == ["approved-test-id"] for path in requests))
         self.assertNotIn("approved-test-id", json.dumps(result))

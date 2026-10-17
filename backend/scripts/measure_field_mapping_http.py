@@ -12,7 +12,7 @@ import os
 import statistics
 import time
 from urllib.parse import urlencode, urlsplit
-from urllib.request import Request, build_opener, HTTPRedirectHandler
+from urllib.request import Request, build_opener, HTTPRedirectHandler, ProxyHandler
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -28,7 +28,7 @@ def measure(base_url, filters, samples):
     token = os.environ.get("DAP_MEASURE_TOKEN")
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    opener = build_opener(NoRedirect)
+    opener = build_opener(ProxyHandler({}), NoRedirect)
     measurements = {}
     totals = {}
     for endpoint in ("tables", "fields", "stats"):
@@ -50,7 +50,7 @@ def measure(base_url, filters, samples):
         measurements[endpoint] = {"first_ms": durations[0], "median_ms": statistics.median(durations), "p95_ms": sorted(durations)[math.ceil(.95 * samples) - 1], "samples_ms": durations}
     stable = all(len(set(values)) == 1 for values in totals.values())
     return {"environment": "NON_PRODUCTION_LOOPBACK", "cache_state": "UNKNOWN", "http": measurements,
-            "counts": totals, "stable_snapshot": stable,
+            "counts": totals, "stable_counts": stable,
             "field_stats_consistent": stable and totals["fields"][0] == totals["stats"][0]}
 
 
