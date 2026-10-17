@@ -290,10 +290,15 @@ def _missing_snapshot_bootstrap(storage_mode):
 
 
 def _decode_json(value, fallback):
-    try:
-        return json.loads(value) if value else fallback
-    except (TypeError, json.JSONDecodeError):
+    if value is None or value == "":
         return fallback
+    try:
+        parsed = json.loads(value)
+    except (TypeError, json.JSONDecodeError) as error:
+        raise LineageDataSourceError("血缘持久化数据格式无效，请联系管理员核查。") from error
+    if not isinstance(parsed, type(fallback)):
+        raise LineageDataSourceError("血缘持久化数据格式无效，请联系管理员核查。")
+    return parsed
 
 
 def _database_node(row, *, joined=False):
