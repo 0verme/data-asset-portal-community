@@ -613,6 +613,8 @@ jobs:
         run: npm run test:browser -- --grep "form error presenter"
 
       - name: Frontend production build
+        env:
+          VITE_API_MODE: remote
         run: npm run build:frontend
 
       - name: Dependency audit gate (Critical/High must be 0)
