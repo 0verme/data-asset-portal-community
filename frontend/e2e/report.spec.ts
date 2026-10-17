@@ -78,10 +78,9 @@ test("form error presenter blocks invalid report saves and refocuses after field
   }
 });
 
-test("form error presenter expands lifecycle details to focus a reversed expiry date", async ({ page }) => {
-  await setMockAuth(page, "admin");
-
-  for (const width of [1440, 390]) {
+for (const width of [1440, 390]) {
+  test(`form error presenter expands lifecycle details to focus a reversed expiry date (${width}px)`, async ({ page }) => {
+    await setMockAuth(page, "admin");
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/report-assets/new");
     await expect(page.getByRole("heading", { name: "新增报表" })).toBeVisible({ timeout: 20_000 });
@@ -113,8 +112,8 @@ test("form error presenter expands lifecycle details to focus a reversed expiry 
     await expect(page.locator(`#${expireDescription!.split(/\s+/)[0]}`)).toContainText("失效日期不能早于生效日期");
     await expect(page.locator("#report-editor-form [role='alert']").first()).toContainText("失效日期：失效日期不能早于生效日期");
     await expect(page.getByRole("heading", { name: "新增报表" })).toBeVisible();
-  }
-});
+  });
+}
 
 test("form error presenter summary links reveal collapsed lifecycle fields before focus", async ({ page }) => {
   await setMockAuth(page, "admin");
