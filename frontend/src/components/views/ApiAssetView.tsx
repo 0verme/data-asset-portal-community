@@ -434,6 +434,8 @@ function Editor({
     initial.indicators,
   );
   const [localFieldErrors, setLocalFieldErrors] = React.useState<ApiAssetFieldErrors>({});
+  const [saving, setSaving] = React.useState(false);
+  const savingRef = React.useRef(false);
   const fieldErrors = { ...serverFieldErrors, ...localFieldErrors };
   const clearErrors = (fieldPrefix?: string): void => {
     clearServerErrors(fieldPrefix);
@@ -449,7 +451,8 @@ function Editor({
   React.useEffect(() => {
     if (saveFailureRevision > 0) focusApiAssetField(serverFieldErrors);
   }, [saveFailureRevision, serverFieldErrors]);
-  const submit = (): void => {
+  const submit = async (): Promise<void> => {
+    if (savingRef.current) return;
     clearErrors();
     const payload: MockApiAsset = {
       ...form,
@@ -467,7 +470,14 @@ function Editor({
       focusApiAssetField(validationErrors);
       return;
     }
-    void onSave(payload);
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await onSave(payload);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
   const relationErrors = Object.entries(fieldErrors).filter(([field]) =>
     /^relations\.\d+$/.test(field),
@@ -551,7 +561,21 @@ function Editor({
               tabIndex={fieldErrors["status"] ? -1 : undefined}
               aria-describedby={fieldErrors["status"] ? apiAssetErrorId("status") : undefined}
             >
-              <BinaryStatusToggle
+              {!["enabled", "disabled"].includes(form.status) ? (
+                <>
+                  <p role="status">未知历史状态：{form.status || "空值"}，请选择启用或禁用。</p>
+                  <Select<string>
+                    aria-label="选择有效的 API 状态"
+                    value={form.status}
+                    items={[
+                      { value: form.status, label: `未知状态：${form.status || "空值"}` },
+                      { value: "enabled", label: "启用" },
+                      { value: "disabled", label: "禁用" },
+                    ]}
+                    onValueChange={(value) => { if (value) set("status", value); }}
+                  />
+                </>
+              ) : <BinaryStatusToggle
                 mode="status"
                 name="status"
                 value={form.status}
@@ -566,7 +590,7 @@ function Editor({
                       : value,
                   )
                 }
-              />
+              />}
             </div>
             {fieldErrors["status"] ? <small id={apiAssetErrorId("status")} className="api-asset-field-error">{fieldErrors["status"]}</small> : null}
           </div>
@@ -636,7 +660,7 @@ function Editor({
         ))}
       </div>
       <div className="form-actions">
-        <Button className="btn" variant="secondary" type="button" onClick={onCancel}>
+        <Button className="btn" variant="secondary" type="button" onClick={onCancel} disabled={saving}>
           取消
         </Button>
         <Button
@@ -644,8 +668,9 @@ function Editor({
           variant="primary"
           type="button"
           onClick={submit}
+          disabled={saving}
         >
-          保存
+          {saving ? "保存中..." : "保存"}
         </Button>
       </div>
     </>

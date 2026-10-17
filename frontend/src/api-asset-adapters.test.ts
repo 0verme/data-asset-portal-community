@@ -10,7 +10,7 @@ test("api asset view uses the frozen DAP adapters", () => {
   assert.equal((view.match(/<Input/g) ?? []).length, 6);
   assert.equal((view.match(/<Checkbox/g) ?? []).length, 1);
   assert.equal((view.match(/<Button/g) ?? []).length, 6);
-  assert.equal((view.match(/<Select<string>/g) ?? []).length, 2);
+  assert.equal((view.match(/<Select<string>/g) ?? []).length, 3);
   assert.equal((view.match(/<Textarea/g) ?? []).length, 2);
   assert.doesNotMatch(view, /from "@cloudflare\/kumo\//);
 });
