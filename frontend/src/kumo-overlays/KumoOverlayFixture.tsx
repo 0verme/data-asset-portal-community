@@ -21,6 +21,7 @@ import "./kumo-overlays.css";
 
 export default function KumoOverlayFixture() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [nestedOpen, setNestedOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [formBusy, setFormBusy] = useState(false);
@@ -29,23 +30,28 @@ export default function KumoOverlayFixture() {
   const [serviceConfirmResult, setServiceConfirmResult] = useState("pending");
   const [activeRoute, setActiveRoute] = useState<"assets" | "mapping">("assets");
 
+  const waitForOperation = () => new Promise<void>((resolve) => {
+    if (new URLSearchParams(window.location.search).has("controlled")) {
+      window.addEventListener("dap-fixture-complete", () => resolve(), { once: true });
+    } else {
+      window.setTimeout(resolve, 900);
+    }
+  });
+
   const submitForm = () => {
     setFormBusy(true);
-    window.setTimeout(() => {
+    void waitForOperation().then(() => {
       setFormBusy(false);
       setFormOpen(false);
-    }, 900);
+    });
   };
 
   const confirmDelete = () => {
     setConfirmBusy(true);
-    return new Promise<void>((resolve) => {
-      window.setTimeout(() => {
-        setConfirmBusy(false);
-        setConfirmOpen(false);
-        setConfirmResult("确认已完成");
-        resolve();
-      }, 900);
+    return waitForOperation().then(() => {
+      setConfirmBusy(false);
+      setConfirmOpen(false);
+      setConfirmResult("确认已完成");
     });
   };
 
@@ -101,7 +107,7 @@ export default function KumoOverlayFixture() {
                   title: "Promise-based confirmation",
                   content: "服务确认结果应返回 Promise<boolean>。",
                   confirmText: "执行确认",
-                  onConfirm: () => new Promise<void>((resolve) => window.setTimeout(resolve, 300)),
+                  onConfirm: waitForOperation,
                 }).then((result) => setServiceConfirmResult(String(result)));
               }}
             >
@@ -162,6 +168,10 @@ export default function KumoOverlayFixture() {
             <Button data-testid="dialog-toast" variant="secondary" onClick={() => toast.info("Dialog 内的通知", { duration: 0 })}>Dialog 内触发 Toast</Button>
             <Button data-testid="dialog-first" variant="secondary">第一个焦点项</Button>
             <Button data-testid="dialog-last" variant="secondary">最后一个焦点项</Button>
+            <Button data-testid="open-nested-dialog" onClick={() => setNestedOpen(true)}>嵌套 Dialog</Button>
+            <Dialog open={nestedOpen} onOpenChange={setNestedOpen} title="嵌套 Dialog">
+              <Button data-testid="close-nested-dialog" onClick={() => setNestedOpen(false)}>关闭嵌套 Dialog</Button>
+            </Dialog>
             <Button data-testid="close-dialog" onClick={() => setDialogOpen(false)}>关闭 Dialog</Button>
           </div>
         </Dialog>

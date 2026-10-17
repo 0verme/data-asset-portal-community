@@ -2,6 +2,7 @@ import {
   cloneElement,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ComponentProps,
@@ -83,8 +84,32 @@ export function Dialog({
 }: DialogProps) {
   const portalContainer = useOverlayContainer(container);
   const popupRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const openRef = useRef(open);
   openRef.current = open;
+
+  useLayoutEffect(() => {
+    if (open) {
+      const active = document.activeElement;
+      if (!returnFocusRef.current && active instanceof HTMLElement && active !== document.body && !popupRef.current?.contains(active)) {
+        returnFocusRef.current = active;
+      }
+      return undefined;
+    }
+    // WebKit does not focus buttons on pointer activation. Remember the opener
+    // before its click opens the controlled Root (which has no primitive Trigger).
+    const rememberOpener = (event: Event) => {
+      if (!(event.target instanceof Element)) return;
+      const target = event.target.closest<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (target && !popupRef.current?.contains(target)) returnFocusRef.current = target;
+    };
+    document.addEventListener("pointerdown", rememberOpener, true);
+    document.addEventListener("focusin", rememberOpener, true);
+    return () => {
+      document.removeEventListener("pointerdown", rememberOpener, true);
+      document.removeEventListener("focusin", rememberOpener, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     const popup = popupRef.current;
@@ -145,6 +170,7 @@ export function Dialog({
             <KumoDialogPrimitive.Popup
               role={role}
               aria-modal="true"
+              finalFocus={() => returnFocusRef.current?.isConnected ? returnFocusRef.current : false}
               aria-label={title == null ? ariaLabel : undefined}
               onKeyDownCapture={handleTabKey}
             />

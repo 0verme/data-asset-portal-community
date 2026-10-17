@@ -1,11 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-async function openFixture(page: import("@playwright/test").Page) {
-  await page.goto("/__kumo-overlays");
+async function openFixture(page: import("@playwright/test").Page, controlled = false) {
+  await page.goto(`/__kumo-overlays${controlled ? "?controlled=1" : ""}`);
   await expect(page.getByRole("heading", { name: "Kumo Overlay Adapter Fixture" })).toBeVisible({ timeout: 15_000 });
 }
 
 test("DAP Dialog shares the overlay portal, traps focus in WebKit, and restores focus", async ({ page }) => {
+  // Windows WebKit measured up to 32.2s with two workers; keep the global 30s default.
+  test.setTimeout(60_000);
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await openFixture(page);
@@ -66,6 +68,33 @@ test("DAP toast facade deduplicates identical notices and survives child route c
   await expect(duplicate).toBeVisible();
   await expect(notifications).toHaveAttribute("aria-live", "polite");
   await expect(page.getByRole("region", { name: "Notifications" })).toHaveCount(1);
+});
+
+test("controlled Dialog restores pointer and keyboard openers through nested overlays", async ({ page }) => {
+  // Full nested pointer/keyboard flow measured 30.8s on Windows WebKit.
+  test.setTimeout(60_000);
+  await openFixture(page);
+  const trigger = page.getByTestId("open-dialog");
+  await trigger.click();
+  const nestedTrigger = page.getByTestId("open-nested-dialog");
+  await nestedTrigger.click();
+  const nested = page.getByRole("dialog", { name: "嵌套 Dialog", exact: true });
+  await expect(nested).toBeVisible();
+  await page.getByTestId("close-nested-dialog").focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("close-nested-dialog")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(nested).toBeHidden();
+  await expect(nestedTrigger).toBeFocused();
+  await expect(page.getByRole("dialog", { name: "DAP Dialog", exact: true })).toBeVisible();
+  await page.getByTestId("close-dialog").click();
+  await expect(trigger).toBeFocused();
+  await trigger.press("Enter");
+  await expect(page.getByRole("dialog", { name: "DAP Dialog", exact: true })).toBeVisible();
+  await page.getByTestId("dialog-last").focus();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "DAP Dialog", exact: true })).toBeHidden();
+  await expect(trigger).toBeFocused();
 });
 
 test("390px notification viewport stays inside mobile safe-area margins", async ({ page }) => {
@@ -167,10 +196,10 @@ test("Tooltip, Popover, and Dropdown expose keyboard and accessible popup behavi
   expect(pageErrors).toEqual([]);
 });
 
-test("Confirm and FormModal preserve busy, keyword, Escape, outside-click, and toast contracts", async ({ page }) => {
+test("Confirm preserves busy, keyword, Escape and outside-click contracts", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
-  await openFixture(page);
+  await openFixture(page, true);
 
   await page.getByTestId("open-confirm").click();
   const confirmation = page.getByRole("alertdialog", { name: "确认删除字段映射？" });
@@ -187,6 +216,9 @@ test("Confirm and FormModal preserve busy, keyword, Escape, outside-click, and t
   await expect(confirmation.getByRole("button", { name: "处理中..." })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(confirmation).toBeVisible();
+  await page.mouse.click(8, 8);
+  await expect(confirmation).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("dap-fixture-complete")));
   await expect(page.getByTestId("confirm-result")).toHaveText("确认已完成");
   await expect(confirmation).toBeHidden();
 
@@ -195,11 +227,20 @@ test("Confirm and FormModal preserve busy, keyword, Escape, outside-click, and t
   await page.mouse.click(8, 8);
   await expect(page.getByRole("alertdialog", { name: "确认删除字段映射？" })).toBeHidden();
 
+  expect(pageErrors).toEqual([]);
+});
+
+test("service Confirm resolves success and cancellation after the pending operation", async ({ page }) => {
+  await openFixture(page, true);
+
   await page.getByTestId("open-service-confirm").click();
   const serviceDialog = page.getByRole("alertdialog", { name: "Promise-based confirmation" });
   await expect(serviceDialog).toBeVisible();
   await serviceDialog.getByRole("button", { name: "执行确认" }).click();
   await expect(serviceDialog.getByRole("button", { name: "处理中..." })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(serviceDialog).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("dap-fixture-complete")));
   await expect(page.getByTestId("service-confirm-result")).toHaveText("true");
   await expect(serviceDialog).toBeHidden();
   await page.getByTestId("open-service-confirm").click();
@@ -208,6 +249,11 @@ test("Confirm and FormModal preserve busy, keyword, Escape, outside-click, and t
   await cancelledServiceDialog.getByRole("button", { name: "取消" }).click();
   await expect(page.getByTestId("service-confirm-result")).toHaveText("false");
   await expect(cancelledServiceDialog).toBeHidden();
+
+});
+
+test("FormModal preserves Escape and busy state until the pending save completes", async ({ page }) => {
+  await openFixture(page, true);
 
   await page.getByTestId("open-form-modal").click();
   let formDialog = page.getByRole("dialog", { name: "编辑资产字段" });
@@ -221,7 +267,15 @@ test("Confirm and FormModal preserve busy, keyword, Escape, outside-click, and t
   await expect(formDialog.getByRole("button", { name: "保存中..." })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(formDialog).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("dap-fixture-complete")));
   await expect(formDialog).toBeHidden({ timeout: 3_000 });
+
+});
+
+test("overlay feedback preserves toast close, timeout and queue contracts", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await openFixture(page);
 
   const region = page.getByRole("region", { name: "Notifications" });
   await page.getByTestId("show-toast").click();
