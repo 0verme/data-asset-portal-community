@@ -33,12 +33,12 @@
     "@lineage-viewer/react": "1.1.0",
     "@phosphor-icons/react": "2.1.10",
     "lineage-viewer": "1.1.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@playwright/test": "1.64.0",
+    "@playwright/test": "1.64.1",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
