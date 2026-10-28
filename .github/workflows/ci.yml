@@ -604,7 +604,14 @@ jobs:
         env:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/api-asset-validation-playwright
           VITE_API_MODE: remote
-        run: npm run test:browser -- --grep "API asset validation|Remote data trust|source options failure"
+        run: npm run test:browser -- --grep "API asset validation|Remote data trust|source options failure|field-mapping column contract"
+
+      - name: Field-mapping mock CSV column regression (Chromium and WebKit)
+        if: matrix.node == '22'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/field-mapping-mock-csv-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- --grep "field-mapping mock CSV contract"
 
       - name: Form error presenter browser regression (Chromium and WebKit)
         if: matrix.node == '22'
