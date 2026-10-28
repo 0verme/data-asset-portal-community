@@ -136,7 +136,7 @@ export default function KumoOverlayFixture() {
             </Popover>
             <DropdownMenu>
               <DropdownMenu.Trigger render={<Button data-testid="dropdown-trigger" variant="secondary" />}>打开菜单</DropdownMenu.Trigger>
-              <DropdownMenu.Content align="end">
+              <DropdownMenu.Content align="end" className="dap-ui-dropdown-content">
                 <DropdownMenu.Item data-testid="dropdown-item">查看字段映射</DropdownMenu.Item>
                 <DropdownMenu.Item variant="danger">删除（危险操作）</DropdownMenu.Item>
               </DropdownMenu.Content>

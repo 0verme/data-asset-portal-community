@@ -184,6 +184,7 @@ test("Tooltip, Popover, and Dropdown expose keyboard and accessible popup behavi
   await expect(popover).toBeHidden();
 
   await page.getByTestId("dropdown-trigger").click();
+  await expect(page.getByRole("menu")).toHaveClass(/dap-ui-dropdown-content/);
   const menuItem = page.getByRole("menuitem", { name: "查看字段映射" });
   await expect(menuItem).toBeVisible();
   await page.keyboard.press("ArrowDown");
