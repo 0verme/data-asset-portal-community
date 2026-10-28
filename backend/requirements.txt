@@ -1,10 +1,10 @@
 Werkzeug==3.1.9
 itsdangerous==2.2.0
-SQLAlchemy==2.1.4
+SQLAlchemy==2.1.6
 psycopg[binary]==3.3.6
 PyYAML==6.0.3
-pydantic==2.14.0
-fastapi==0.143.0
+pydantic==2.14.1
+fastapi==0.161.1
 uvicorn==0.54.0
 httpx==0.28.1
-alembic==1.20.0
+alembic==1.20.1
