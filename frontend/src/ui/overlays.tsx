@@ -495,7 +495,9 @@ function DapPopoverRoot(props: ComponentProps<typeof KumoPopover>) {
 
 export const Popover = Object.assign(DapPopoverRoot, { ...KumoPopover, Content: DapPopoverContent });
 
-type DropdownContentProps = ComponentPropsWithoutRef<typeof KumoDropdownMenu.Content>;
+type DropdownContentProps = Omit<ComponentPropsWithoutRef<typeof KumoDropdownMenu.Content>, "className"> & {
+  className?: string | undefined;
+};
 
 const DapDropdownContent = forwardRef<HTMLDivElement, DropdownContentProps>(function DapDropdownContent(
   { className, container, ...props },
@@ -507,7 +509,7 @@ const DapDropdownContent = forwardRef<HTMLDivElement, DropdownContentProps>(func
       {...props}
       ref={ref}
       container={portalContainer}
-      className={className}
+      className={className ?? ""}
       data-dap-ui-layer="dropdown"
     />
   );
