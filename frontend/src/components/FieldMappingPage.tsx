@@ -739,35 +739,48 @@ export function FieldMappingPage({
                   onSort={toggleSort}
                 />
                 <tbody>
-                  {tab === "field" ? fieldPageRows.map((row) => (
-                    <tr key={`${row.tablePk ?? fieldMappingTableIdentityKey(row)}-${row.srcField}-${row.targetField || ""}`}>
-                      <td>
-                        <span className="fm-system" title={formatSystemLabel(row)}>
-                          <span className="fm-dot" aria-hidden="true"></span>
-                          <span className="fm-cell-ellipsis">{formatSystemLabel(row)}</span>
-                        </span>
-                      </td>
-                      <td className="mono fm-cell-ellipsis-cell" title={row.srcTable}><MappingCellText value={String(row.srcTable || "")} className="mono" /></td>
-                      <td className="mono fm-cell-ellipsis-cell" title={row.srcField}><MappingCellText value={String(row.srcField || "")} className="mono" /></td>
-                      <td className="fm-muted mono fm-cell-ellipsis-cell" title={row.srcType}><MappingCellText value={String(row.srcType || "")} className="mono" /></td>
-                      <td className="fm-cell-ellipsis-cell" title={row.srcComment || "未填写"}>
-                        {row.srcComment ? <MappingCellText value={row.srcComment} /> : <span className="fm-empty">未填写</span>}
-                      </td>
-                      <td className="fm-arrow-cell">
-                        <span
-                          className={isTransformRule(row.mappingRule || "") ? "fm-arrow is-transform" : "fm-arrow"}
-                          title={isTransformRule(row.mappingRule || "") ? `需要转换：${row.mappingRule}` : "直接映射"}
-                        >
-                          →
-                        </span>
-                      </td>
-                      <td className="mono fm-cell-ellipsis-cell" title={row.targetTable}><MappingCellText value={String(row.targetTable || "")} className="mono" /></td>
-                      <td className="mono fm-cell-ellipsis-cell" title={row.targetField || "待补充"}>
-                        {row.targetField ? <MappingCellText value={row.targetField} className="mono" /> : <span className="fm-empty">待补充</span>}
-                      </td>
-                      <td><span className={`tag ${RULE_TAGS[row.mappingRule || ""] || "tag-neutral"}`} title={row.mappingRule}>{row.mappingRule}</span></td>
-                    </tr>
-                  )) : tablePageRows.map((row) => (
+                  {tab === "field" ? fieldPageRows.map((row) => {
+                    const loadMode = LOAD_MODE_META[row.loadMode || ""];
+                    return (
+                      <tr key={`${row.tablePk ?? fieldMappingTableIdentityKey(row)}-${row.srcField}-${row.targetField || ""}`}>
+                        <td>
+                          <span className="fm-system" title={formatSystemLabel(row)}>
+                            <span className="fm-dot" aria-hidden="true"></span>
+                            <span className="fm-cell-ellipsis">{formatSystemLabel(row)}</span>
+                          </span>
+                        </td>
+                        <td className="mono fm-cell-ellipsis-cell" title={row.srcTable}><MappingCellText value={String(row.srcTable || "")} className="mono" /></td>
+                        <td className="mono fm-cell-ellipsis-cell" title={row.srcField}><MappingCellText value={String(row.srcField || "")} className="mono" /></td>
+                        <td className="fm-muted mono fm-cell-ellipsis-cell" title={row.srcType}><MappingCellText value={String(row.srcType || "")} className="mono" /></td>
+                        <td className="fm-cell-ellipsis-cell" title={row.srcComment || "未填写"}>
+                          {row.srcComment ? <MappingCellText value={row.srcComment} /> : <span className="fm-empty">未填写</span>}
+                        </td>
+                        <td className="fm-arrow-cell">
+                          <span
+                            className={isTransformRule(row.mappingRule || "") ? "fm-arrow is-transform" : "fm-arrow"}
+                            title={isTransformRule(row.mappingRule || "") ? `需要转换：${row.mappingRule}` : "直接映射"}
+                          >
+                            →
+                          </span>
+                        </td>
+                        <td className="mono fm-cell-ellipsis-cell" title={row.targetLayer || "-"}>
+                          <MappingCellText value={String(row.targetLayer || "-")} className="mono" />
+                        </td>
+                        <td className="mono fm-cell-ellipsis-cell" title={row.targetTable}><MappingCellText value={String(row.targetTable || "")} className="mono" /></td>
+                        <td>
+                          {loadMode ? (
+                            <span className={`tag ${loadMode.tone}`}>{loadMode.label}</span>
+                          ) : (
+                            <span className="fm-empty">未设置</span>
+                          )}
+                        </td>
+                        <td className="mono fm-cell-ellipsis-cell" title={row.targetField || "待补充"}>
+                          {row.targetField ? <MappingCellText value={row.targetField} className="mono" /> : <span className="fm-empty">待补充</span>}
+                        </td>
+                        <td><span className={`tag ${RULE_TAGS[row.mappingRule || ""] || "tag-neutral"}`} title={row.mappingRule}>{row.mappingRule}</span></td>
+                      </tr>
+                    );
+                  }) : tablePageRows.map((row) => (
                     <tr key={row.tablePk ?? fieldMappingTableIdentityKey(row)}>
                       {orderedTableColumns.map((column) => (
                         <td
