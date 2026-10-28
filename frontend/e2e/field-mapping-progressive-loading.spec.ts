@@ -1,4 +1,9 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { expect, test, type Download, type Locator, type Page, type Route, type TestInfo } from "@playwright/test";
+
+const remoteFixturesEnabled = String(process.env["VITE_API_MODE"] || "")
+  .trim()
+  .toLowerCase() === "remote";
 
 interface RequestLog {
   stats: URL[];
@@ -11,6 +16,7 @@ interface MappingFixtureOptions {
   onStats?: (route: Route, url: URL) => Promise<void>;
   onTables?: (route: Route, url: URL) => Promise<void>;
   onFields?: (route: Route, url: URL) => Promise<void>;
+  onExport?: (route: Route, url: URL) => Promise<void>;
 }
 
 const tableRow = (srcTable: string) => ({
@@ -150,7 +156,11 @@ async function installApiFixtures(
     }
     if (path === "/api/field-mappings/export") {
       requests.exports.push(url);
-      await route.fulfill({ contentType: "text/csv; charset=utf-8", body: "source,target\nFIELD_ID,FIELD_ID\n" });
+      if (options.onExport) {
+        await options.onExport(route, url);
+      } else {
+        await route.fulfill({ contentType: "text/csv; charset=utf-8", body: "source,target\nFIELD_ID,FIELD_ID\n" });
+      }
       return;
     }
 
@@ -161,6 +171,81 @@ async function installApiFixtures(
 
 function statCard(page: Page, label: string) {
   return page.locator(".fm-stat-card").filter({ hasText: label }).locator(".fm-stat-value");
+}
+
+async function downloadText(download: Download, testInfo: TestInfo, fileName: string): Promise<string> {
+  const path = testInfo.outputPath(fileName);
+  await download.saveAs(path);
+  return (await readFile(path, "utf8")).replace(/^\uFEFF/, "");
+}
+
+function parseCsv(content: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < content.length; index += 1) {
+    const character = content[index];
+    if (character === '"') {
+      if (quoted && content[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (character === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if (character === "\n" && !quoted) {
+      row.push(cell.replace(/\r$/, ""));
+      if (row.some((value) => value !== "")) rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += character;
+    }
+  }
+  if (cell || row.length) {
+    row.push(cell.replace(/\r$/, ""));
+    if (row.some((value) => value !== "")) rows.push(row);
+  }
+  return rows;
+}
+
+async function exportAndAssertColumns(
+  page: Page,
+  testInfo: TestInfo,
+  view: "field" | "table",
+  expectedHeaders: string[],
+): Promise<void> {
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "导出 CSV" }).click();
+  const download = await downloadPromise;
+  expect(await download.failure()).toBeNull();
+  const rows = parseCsv(await downloadText(download, testInfo, `${view}-view.csv`));
+  expect(rows).toHaveLength(2);
+  for (const row of rows) expect(row).toHaveLength(expectedHeaders.length);
+  expect(rows[0]).toEqual(expectedHeaders);
+}
+
+async function countEffectiveHeaderColumns(table: Locator): Promise<number[]> {
+  return table.locator("thead").evaluate((thead) => {
+    const occupiedUntil = new Map<number, number>();
+    const rowWidths: number[] = [];
+    Array.from(thead.rows).forEach((row, rowIndex) => {
+      let column = 0;
+      Array.from(row.cells).forEach((cell) => {
+        while ((occupiedUntil.get(column) ?? 0) > rowIndex) column += 1;
+        const end = column + cell.colSpan;
+        for (let position = column; position < end; position += 1) {
+          occupiedUntil.set(position, Math.max(occupiedUntil.get(position) ?? 0, rowIndex + cell.rowSpan));
+        }
+        column = end;
+      });
+      rowWidths.push(column);
+    });
+    return rowWidths;
+  });
 }
 
 test("source options failure stays visible and can be retried independently", async ({ page }) => {
@@ -396,4 +481,183 @@ test("direct linked field URL loads only field details with its route filters", 
     expect(request?.searchParams.get("tablePk")).toBe("pk-linked");
   }
   await expect(page).toHaveURL(/tab=field/);
+});
+
+test("field-mapping column contract aligns field/table cells and preserves CSV columns", async ({ page }, testInfo) => {
+  const rows = [
+    {
+      ...fieldRow,
+      tablePk: "pk-populated",
+      srcField: "AMOUNT",
+      srcComment: "销售金额",
+      targetLayer: "DWF",
+      targetTable: "DWF_SALES",
+      loadMode: "incr",
+      targetField: "AMOUNT_VALUE",
+      mappingRule: "日期格式化",
+    },
+    {
+      ...fieldRow,
+      tablePk: "pk-empty",
+      srcField: "EMPTY_LAYER",
+      srcComment: "空目标层及未知入仓方式",
+      targetLayer: "",
+      targetTable: "DWF_EMPTY_LAYER",
+      loadMode: "future_mode",
+      targetField: "EMPTY_LAYER_VALUE",
+    },
+    {
+      ...fieldRow,
+      tablePk: "pk-missing",
+      srcField: "MISSING_METADATA",
+      srcComment: "缺少目标层及入仓方式",
+      targetLayer: undefined,
+      targetTable: "DWF_MISSING_METADATA",
+      loadMode: undefined,
+      targetField: "MISSING_METADATA_VALUE",
+    },
+  ];
+  const fieldCsv = [
+    "源系统,源系统表,源字段,字段类型,字段注释,目标层,目标表名,入仓方式,目标字段,映射规则",
+    "测试源系统,SRC_SALES,AMOUNT,DECIMAL,销售金额,DWF,DWF_SALES,增量,AMOUNT_VALUE,日期格式化",
+  ].join("\r\n");
+  const tableCsv = [
+    "源系统,源系统表,表中文名,目标层,目标表名,入仓方式,已映射,空注释率",
+    "测试源系统,SRC_SALES,销售表,DWF,DWF_SALES,增量,3,0%",
+  ].join("\r\n");
+  const requests = await installApiFixtures(page, {
+    onFields: async (route, url) => {
+      const pageSize = Number(url.searchParams.get("pageSize") || 50);
+      const pageNumber = Number(url.searchParams.get("page") || 1);
+      const start = (pageNumber - 1) * pageSize;
+      await route.fulfill({ json: { items: rows.slice(start, start + pageSize), total: rows.length, page: pageNumber, pageSize } });
+    },
+    onExport: async (route, url) => {
+      await route.fulfill({
+        contentType: "text/csv; charset=utf-8",
+        body: url.searchParams.get("view") === "field" ? fieldCsv : tableCsv,
+      });
+    },
+  });
+  await page.goto("/field-mapping");
+
+  const table = page.locator("#field-mapping-results-table");
+  await expect(table.locator("tbody tr")).toHaveCount(1);
+  await expect(table.locator("thead th")).toHaveCount(9);
+  await expect(table.locator("colgroup col")).toHaveCount(9);
+  await expect(table.locator("tbody tr").first().locator("td")).toHaveCount(9);
+  await exportAndAssertColumns(page, testInfo, "table", [
+    "源系统", "源系统表", "表中文名", "目标层", "目标表名", "入仓方式", "已映射", "空注释率",
+  ]);
+  expect(requests.exports.at(-1)?.searchParams.get("view")).toBe("table");
+
+  await page.getByRole("button", { name: /字段维度/ }).click();
+  await expect(table.locator("tbody tr")).toHaveCount(3);
+  await expect(table.locator("colgroup col")).toHaveCount(11);
+  expect(await countEffectiveHeaderColumns(table)).toEqual([11, 11]);
+  const targetHeaders = await table.locator("thead tr").last().locator("th").allInnerTexts();
+  expect(targetHeaders.slice(5).map((label) => label.trim())).toEqual([
+    "目标层", "目标表名", "入仓方式", "目标字段", "映射规则",
+  ]);
+  await expect(table.locator("thead .fm-arrow-col")).toHaveAttribute("rowspan", "2");
+
+  const fieldRows = await table.locator("tbody tr").all();
+  for (const row of fieldRows) await expect(row.locator("td")).toHaveCount(11);
+  expect((await fieldRows[0]!.locator("td").allInnerTexts()).slice(6).map((value) => value.trim())).toEqual([
+    "DWF", "DWF_SALES", "增量", "AMOUNT_VALUE", "日期格式化",
+  ]);
+  await expect(fieldRows[0]!.locator("td").nth(8).locator(".tag")).toHaveClass(/tag-ok/);
+  for (const rowIndex of [1, 2]) {
+    const targetCells = (await fieldRows[rowIndex]!.locator("td").allInnerTexts()).slice(6).map((value) => value.trim());
+    expect(targetCells[0]).toBe("-");
+    expect(targetCells[2]).toBe("未设置");
+    await expect(fieldRows[rowIndex]!.locator("td").nth(8).locator(".fm-empty")).toHaveText("未设置");
+  }
+
+  await exportAndAssertColumns(page, testInfo, "field", [
+    "源系统", "源系统表", "源字段", "字段类型", "字段注释",
+    "目标层", "目标表名", "入仓方式", "目标字段", "映射规则",
+  ]);
+  expect(requests.exports.at(-1)?.searchParams.get("view")).toBe("field");
+
+  await page.getByRole("button", { name: /表维度/ }).click();
+  await expect(table.locator("tbody tr")).toHaveCount(1);
+  await expect(table.locator("colgroup col")).toHaveCount(9);
+  await expect(table.locator("thead th")).toHaveCount(9);
+  await expect(table.locator("tbody tr").first().locator("td")).toHaveCount(9);
+  expect(requests.tables.length).toBeGreaterThan(1);
+});
+
+test("field-mapping column contract preserves wide scrolling and the fixed header", async ({ page }) => {
+  const rows = Array.from({ length: 60 }, (_, index) => ({
+    ...fieldRow,
+    tablePk: `pk-wide-${index}`,
+    srcField: `SOURCE_FIELD_${index}`,
+    targetField: `TARGET_FIELD_${index}`,
+  }));
+  await installApiFixtures(page, {
+    onFields: async (route, url) => {
+      const pageSize = Number(url.searchParams.get("pageSize") || 50);
+      const pageNumber = Number(url.searchParams.get("page") || 1);
+      const start = (pageNumber - 1) * pageSize;
+      await route.fulfill({ json: { items: rows.slice(start, start + pageSize), total: rows.length, page: pageNumber, pageSize } });
+    },
+  });
+  await page.goto("/field-mapping?tab=field");
+
+  const table = page.locator("#field-mapping-results-table");
+  const bodyRows = table.locator("tbody tr");
+  await expect(bodyRows).toHaveCount(50);
+  for (const row of await bodyRows.all()) await expect(row.locator("td")).toHaveCount(11);
+
+  const main = page.locator(".main");
+  const wrapper = page.locator(".fm-table-wrap");
+  await expect.poll(() => wrapper.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+  await main.evaluate((element) => {
+    const tableWrapper = element.querySelector<HTMLElement>(".fm-table-wrap");
+    if (!tableWrapper) throw new Error("field mapping table wrapper missing");
+    const distance = tableWrapper.getBoundingClientRect().top - element.getBoundingClientRect().top + 120;
+    element.scrollTop += distance;
+  });
+
+  const stickyHeader = page.locator(".fm-sticky-table-head");
+  await expect(stickyHeader).toBeVisible();
+  await expect.poll(() => stickyHeader.evaluate((element) => getComputedStyle(element).position)).toBe("fixed");
+  await expect(stickyHeader.locator("colgroup col")).toHaveCount(11);
+  const horizontalScrollbar = page.getByRole("scrollbar", { name: "字段映射表格横向滚动" });
+  await expect(horizontalScrollbar).toBeVisible();
+  await horizontalScrollbar.focus();
+  await horizontalScrollbar.press("End");
+  await expect.poll(() => wrapper.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  await expect.poll(async () => {
+    const [tableScrollLeft, stickyScrollLeft] = await Promise.all([
+      wrapper.evaluate((element) => element.scrollLeft),
+      stickyHeader.evaluate((element) => element.scrollLeft),
+    ]);
+    return Math.abs(tableScrollLeft - stickyScrollLeft);
+  }).toBeLessThanOrEqual(1);
+});
+
+test("field-mapping mock CSV contract keeps ten business fields and excludes the arrow", async ({ page }, testInfo) => {
+  test.skip(remoteFixturesEnabled, "Client-generated CSV is exercised in the VITE_API_MODE=mock run.");
+  await page.addInitScript(() => {
+    localStorage.setItem("dap_auth", JSON.stringify({ role: "admin", user: "field-mapping-e2e", name: "字段映射 E2E" }));
+    localStorage.setItem("dap-theme", "light");
+  });
+  await page.goto("/field-mapping?tab=field");
+  const table = page.locator("#field-mapping-results-table");
+  await expect(table.locator("tbody tr").first()).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "导出 CSV" }).click();
+  const download = await downloadPromise;
+  expect(await download.failure()).toBeNull();
+  const csvRows = parseCsv(await downloadText(download, testInfo, "mock-field-view.csv"));
+  expect(csvRows[0]).toEqual([
+    "源系统", "源系统表", "源字段", "字段类型", "字段注释",
+    "目标层", "目标表名", "入仓方式", "目标字段", "映射规则",
+  ]);
+  expect(csvRows.length).toBeGreaterThan(1);
+  for (const row of csvRows) expect(row).toHaveLength(10);
+  expect(csvRows[0]).not.toContain("映射方向");
 });
