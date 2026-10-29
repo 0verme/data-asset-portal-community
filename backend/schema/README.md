@@ -9,6 +9,8 @@
 
 当前 baseline 包含 shared/system、RBAC、dwm、mapping、root、indicator、apiAsset、upstream、push、report、codeTable、lineage 和 search 的 40 张表。`p_search_hot_keyword` 由 search 模块拥有，保存只读公开的推荐词配置；新库和迁移以“资产、系统、字段”作为可覆盖的最小中性种子。`backend/app/db/tables.py` 是 runtime SQLAlchemy Core 查询子集，不是完整 physical schema；职责详见 [ADR-002](../../docs/adr/002-schema-canonical-source.md)。
 
+PostgreSQL fresh initialization 要求显式 Profile `schema`。canonical `postgresql.sql` 保留逻辑 `dwp`；受控 renderer 将 schema identifier tokens（包括 `CREATE SCHEMA IF NOT EXISTS` 的目标）映射到 Profile schema，保留当前 `CREATE SCHEMA IF NOT EXISTS` 行为。ledger lookup/stamp、user-table preflight、reflection 与 DDL 使用同一目标，缺失 schema 时在查询/DDL 前拒绝。该变化不改 canonical SQL 文件或历史 Alembic revisions；非 `dwp` 部署仍需独立真实环境验收。
+
 新库执行完整基线后会写入 Alembic revision `0001_baseline`；`schema_migrate.py apply` 随后按顺序 seed RBAC 与 `config/default-menus.json` 中的默认系统菜单。菜单 seed 只补缺失项，不覆盖实例配置。既有库只能在 `verify` 通过后执行 `baseline`（stamp），不会重放历史 DDL：
 
 ```bash

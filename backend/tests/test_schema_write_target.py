@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -25,7 +26,14 @@ from backend.app.db.write_target import (
     validate_connection_target,
     validate_write_sql,
 )
-from backend.app.migrations.schema import initialize
+from backend.app.migrations.schema import (
+    _prefix,
+    _reflection_metadata_queries,
+    _schema_for_reflection,
+    baseline_path,
+    initialize,
+    render_baseline_for_profile,
+)
 
 
 class RecordingCursor:
@@ -478,18 +486,83 @@ class SchemaWriteTargetContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "currentSchema must match"):
                 GaussDBProvider().validate("gauss_test", profile, config_path=Path("database.yaml"))
 
-    def test_postgres_fresh_baseline_mismatch_fails_before_ddl(self):
-        connection = RecordingConnection(schema="dap")
-        with self.assertRaisesRegex(RuntimeError, "canonical baseline currently targets dwp"):
-            initialize(connection, {"type": "postgres", "schema": "dap"}, "postgresql")
-        self.assertFalse(
-            any(
-                sql.lstrip().upper().startswith(
-                    ("CREATE", "ALTER", "DROP", "TRUNCATE", "INSERT", "UPDATE", "DELETE")
-                )
-                for sql, _params in connection.calls
+    def test_postgres_baseline_renders_only_schema_identifiers_for_profile(self):
+        with tempfile.TemporaryDirectory(prefix="postgres-profile-baseline-") as directory:
+            root = Path(directory)
+            (root / "postgresql.sql").write_text(
+                "-- Keep dwp.p_comment in this reference comment\n"
+                "CREATE SCHEMA IF NOT EXISTS dwp;\n"
+                "CREATE SCHEMA IF NOT EXISTS \"dwp\";\n"
+                "CREATE TABLE IF NOT EXISTS dwp.p_system ("
+                "schema_name TEXT DEFAULT 'dwp', note TEXT DEFAULT '__app__.p_report_asset');\n"
+                "CREATE TABLE IF NOT EXISTS \"dwp\".quoted_table (id INTEGER);\n",
+                encoding="utf-8",
             )
+            rendered = render_baseline_for_profile(
+                {"type": "postgres", "schema": "Dap"}, "postgresql", root
+            )
+
+        self.assertIn("-- Keep dwp.p_comment in this reference comment", rendered)
+        self.assertEqual(2, rendered.count("CREATE SCHEMA IF NOT EXISTS dap;"))
+        self.assertIn("CREATE TABLE IF NOT EXISTS dap.p_system", rendered)
+        self.assertIn("DEFAULT 'dwp'", rendered)
+        self.assertIn("DEFAULT '__app__.p_report_asset'", rendered)
+        self.assertIn("CREATE TABLE IF NOT EXISTS dap.quoted_table", rendered)
+        self.assertNotIn('CREATE TABLE IF NOT EXISTS "dwp".quoted_table', rendered)
+
+    def test_postgres_dwp_target_preserves_canonical_baseline(self):
+        canonical = baseline_path("postgresql").read_text(encoding="utf-8")
+        rendered = render_baseline_for_profile(
+            {"type": "postgres", "schema": "dwp"}, "postgresql"
         )
+        self.assertEqual(canonical, rendered)
+
+    def test_postgres_profile_target_is_shared_by_baseline_ledger_and_reflection(self):
+        config = {"type": "postgres", "schema": "Dap"}
+        self.assertEqual("dap.", _prefix(config))
+        self.assertEqual("dap", _schema_for_reflection(config))
+        reflection_queries = _reflection_metadata_queries(config)
+        self.assertTrue(reflection_queries)
+        for query in reflection_queries:
+            with self.subTest(query=query.name):
+                self.assertEqual(("dap",) * len(query.params), query.params)
+
+        connection = RecordingConnection(schema="dap")
+        self.assertTrue(initialize(connection, config, "postgresql"))
+        statements = [sql for sql, _params in connection.calls]
+        metadata_params = [
+            params
+            for sql, params in connection.calls
+            if "information_schema.tables" in sql
+        ]
+        self.assertEqual([("dap", "alembic_version"), ("dap",)], metadata_params)
+        self.assertTrue(
+            any("CREATE SCHEMA IF NOT EXISTS dap" in sql for sql in statements)
+        )
+        self.assertTrue(
+            any("CREATE TABLE IF NOT EXISTS dap.p_system" in sql for sql in statements)
+        )
+        self.assertIn(
+            "CREATE TABLE IF NOT EXISTS dap.alembic_version "
+            "(version_num VARCHAR(32) NOT NULL PRIMARY KEY)",
+            statements,
+        )
+        self.assertIn("DELETE FROM dap.alembic_version", statements)
+        self.assertTrue(
+            any(sql.startswith("INSERT INTO dap.alembic_version") for sql in statements)
+        )
+        self.assertEqual(1, connection.commits)
+        self.assertEqual(0, connection.rollbacks)
+
+    def test_postgres_missing_schema_fails_before_migration_query_or_ddl(self):
+        connection = RecordingConnection(schema="dwp")
+        with self.assertRaisesRegex(WriteTargetError, "explicit Profile schema"):
+            initialize(connection, {"type": "postgres"}, "postgresql")
+        with self.assertRaisesRegex(WriteTargetError, "explicit Profile schema"):
+            render_baseline_for_profile({"type": "postgres"}, "postgresql")
+        self.assertEqual([], connection.calls)
+        self.assertEqual(0, connection.commits)
+        self.assertEqual(0, connection.rollbacks)
 
     def test_execute_many_rejects_wrong_database_before_connect(self):
         config = {"type": "mysql", "database": "asset_db"}

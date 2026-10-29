@@ -1,6 +1,6 @@
 # ADR-003：Profile 应用写目标与 Schema 解析契约
 
-- Status: **#454 实施契约；真实部署兼容仍待验证**
+- Status: **Phase 1 已合并；PostgreSQL baseline target consistency 已实现待评审；真实部署兼容仍未验证**
 - Scope: Issue #454，SC-01..SC-07
 - Baseline: `f4cc555c8773d83736e1c3f8d6de5264baf1c2e7`
 - Boundary: 不改变 #414 的 profile 覆盖优先级，不接管 #313/#314 migration 与部署验收。
@@ -30,9 +30,9 @@
 
 ## 3. Baseline 与既有迁移边界
 
-- PostgreSQL canonical `backend/schema/postgresql.sql` 当前使用 `dwp`。在 baseline 的渲染与 ledger/reflection 同目标方案完成前，非 `dwp` Profile 的 fresh initialization 必须在第一条 DDL 前 fail closed；不得先运行固定 baseline 再 stamp 到另一个 schema。
-- PostgreSQL 后续实现须只渲染受控 schema 标识符，确保 DDL、ledger、reflection 一致；业务默认值、字符串、注释及引用值保持原文。
-- DWS 继续使用既有 profile-aware baseline、schema existence guard、逐语句失败与相同 schema ledger/reflection；#313 已合并实现和未完成的真实 DWS 8.1.3 验收均不由本 ADR 重做或代替。不得改写历史 Alembic revision。
+- PostgreSQL canonical `backend/schema/postgresql.sql` 保留逻辑 `dwp`；fresh initialization 只消费显式、已校验的 Profile schema。profile renderer 仅改写 schema identifier token（包括 `CREATE SCHEMA IF NOT EXISTS dwp` 的目标），将 DDL 指向该 schema，并保留 canonical baseline 当前的 `CREATE SCHEMA IF NOT EXISTS` 行为。
+- PostgreSQL migration 的 ledger lookup/stamp、user-table preflight、reflection 与 baseline DDL 都使用同一规范化 Profile schema；目标缺失时在查询/DDL 前 fail closed，不使用 `physical_schema()` 的 `dwp` fallback。非 `dwp` 目标由 Recording/offline regression 覆盖；真实部署兼容仍 NOT VERIFIED。renderer 不改写业务默认值、字符串、注释、引用值，也不修改 canonical SQL 或已发布 Alembic revisions.
+- DWS 继续使用既有 profile-aware baseline、schema existence guard、逐语句失败与相同 schema ledger/reflection，仍要求部署方预先创建目标 schema；#313 已合并实现和未完成的真实 DWS 8.1.3 验收均不由本 ADR 重做或代替。不得改写历史 Alembic revision。
 
 ## 4. 必须保留的合法 Schema 值
 

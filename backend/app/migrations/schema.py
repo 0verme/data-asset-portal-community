@@ -561,20 +561,35 @@ def _dws_schema(config: dict) -> str:
     return provider.physical_schema(config)
 
 
+def _profile_schema(config: dict) -> str:
+    """Resolve the schema used by migration DDL, ledger, and reflection."""
+    provider = get_provider(config["type"])
+    if provider.name == "postgres":
+        normalized = dict(config)
+        normalized["type"] = "postgres"
+        return resolve_write_target(normalized).schema or ""
+    return provider.physical_schema(config)
+
+
 def _prefix(config: dict) -> str:
     provider = get_provider(config["type"])
-    schema = provider.physical_schema(config)
+    schema = _profile_schema(config)
     if provider.name == "gaussdb":
         schema = gaussdb_schema_sql_identifier(schema)
     return f"{schema}." if schema else ""
 
 
 def _render_schema_qualified_identifiers(
-    sql: str, canonical_schema: str, target_schema: str
+    sql: str,
+    canonical_schema: str,
+    target_schema: str,
+    *,
+    rewrite_schema_declaration: bool = False,
 ) -> str:
-    """Map only SQL schema identifiers, leaving literals and comments intact."""
+    """Map schema identifier tokens, leaving literals and comments intact."""
     rendered: list[str] = []
     target = gaussdb_schema_sql_identifier(target_schema)
+    previous_words: list[str] = []
     index = 0
     while index < len(sql):
         pair = sql[index:index + 2]
@@ -611,6 +626,7 @@ def _render_schema_qualified_identifiers(
                 close = sql.find(delimiter, index + len(delimiter))
                 end = len(sql) if close < 0 else close + len(delimiter)
                 rendered.append(sql[index:end])
+                previous_words.clear()
                 index = end
                 continue
         if character == "'":
@@ -627,6 +643,7 @@ def _render_schema_qualified_identifiers(
                 else:
                     end += 1
             rendered.append(sql[index:end])
+            previous_words.clear()
             index = end
             continue
         if character == '"':
@@ -646,15 +663,26 @@ def _render_schema_qualified_identifiers(
             after = end
             while after < len(sql) and sql[after].isspace():
                 after += 1
-            if (
-                "".join(identifier) == canonical_schema
+            quoted_value = "".join(identifier)
+            is_schema_declaration = rewrite_schema_declaration and (
+                previous_words[-2:] == ["CREATE", "SCHEMA"]
+                or previous_words[-5:] == ["CREATE", "SCHEMA", "IF", "NOT", "EXISTS"]
+            )
+            if is_schema_declaration and quoted_value == canonical_schema:
+                rendered.append(target)
+                previous_words.clear()
+                index = end
+            elif (
+                quoted_value == canonical_schema
                 and after < len(sql)
                 and sql[after] == "."
             ):
                 rendered.append(target + sql[end:after + 1])
+                previous_words.clear()
                 index = after + 1
             else:
                 rendered.append(sql[index:end])
+                previous_words.clear()
                 index = end
             continue
         if character == "`":
@@ -669,7 +697,13 @@ def _render_schema_qualified_identifiers(
                 else:
                     end += 1
             rendered.append(sql[index:end])
+            previous_words.clear()
             index = end
+            continue
+
+        if character.isspace():
+            rendered.append(character)
+            index += 1
             continue
 
         match = re.match(r"[A-Za-z_][A-Za-z0-9_$]*", sql[index:])
@@ -680,15 +714,28 @@ def _render_schema_qualified_identifiers(
             while after < len(sql) and sql[after].isspace():
                 after += 1
             is_schema = token.lower() == canonical_schema.lower()
+            is_schema_declaration = rewrite_schema_declaration and (
+                previous_words[-2:] == ["CREATE", "SCHEMA"]
+                or previous_words[-5:] == ["CREATE", "SCHEMA", "IF", "NOT", "EXISTS"]
+            )
             if is_schema and after < len(sql) and sql[after] == ".":
                 rendered.append(target + sql[end:after + 1])
+                previous_words.clear()
                 index = after + 1
+            elif is_schema and is_schema_declaration:
+                rendered.append(target)
+                previous_words.clear()
+                index = end
             else:
                 rendered.append(token)
+                previous_words.append(token.upper())
+                if len(previous_words) > 5:
+                    previous_words.pop(0)
                 index = end
             continue
 
         rendered.append(character)
+        previous_words.clear()
         index += 1
     return "".join(rendered)
 
@@ -698,10 +745,18 @@ def render_baseline_for_profile(
 ) -> str:
     """Render a canonical baseline for a profile without rewriting SQL values."""
     sql = baseline_path(dialect, root).read_text(encoding="utf-8")
-    if dialect != "dws":
-        return sql
-    schema = _dws_schema(config)
-    return _render_schema_qualified_identifiers(sql, "dwp", schema)
+    if dialect == "dws":
+        schema = _dws_schema(config)
+        return _render_schema_qualified_identifiers(sql, "dwp", schema)
+    if dialect == "postgresql":
+        provider = get_provider(config["type"])
+        if provider.name != "postgres":
+            raise ValueError("PostgreSQL baseline requires a PostgreSQL profile")
+        schema = _profile_schema(config)
+        return _render_schema_qualified_identifiers(
+            sql, "dwp", schema, rewrite_schema_declaration=True
+        )
+    return sql
 
 
 def _execute(connection, sql: str, *, split: bool):
@@ -717,6 +772,11 @@ def _execute(connection, sql: str, *, split: bool):
 
 def _ledger_exists(connection, config: dict) -> bool:
     provider = get_provider(config["type"])
+    schema = (
+        _profile_schema(config)
+        if provider.name not in {"sqlite", "mysql"}
+        else ""
+    )
     cursor = connection.cursor()
     try:
         if provider.name == "sqlite":
@@ -731,7 +791,6 @@ def _ledger_exists(connection, config: dict) -> bool:
                 ("alembic_version",),
             )
         else:
-            schema = provider.physical_schema(config)
             if not schema:
                 raise ValueError("database profile requires a physical schema for migration checks")
             cursor.execute(
@@ -785,6 +844,12 @@ def _assert_dws_schema_exists(connection, config: dict):
 
 def _has_user_tables(connection, config: dict) -> bool:
     db_type = config["type"]
+    provider = get_provider(db_type)
+    schema = (
+        _profile_schema(config)
+        if provider.name not in {"sqlite", "mysql"}
+        else ""
+    )
     cursor = connection.cursor()
     try:
         if db_type == "sqlite":
@@ -798,10 +863,9 @@ def _has_user_tables(connection, config: dict) -> bool:
                 "AND table_name <> 'alembic_version' LIMIT 1"
             )
         else:
-            schema = get_provider(db_type).physical_schema(config)
             if not schema:
                 raise ValueError("database profile requires a physical schema for migration checks")
-            placeholder = get_provider(db_type).placeholder
+            placeholder = provider.placeholder
             cursor.execute(
                 "SELECT 1 FROM information_schema.tables WHERE table_schema = " + placeholder
                 + " AND table_name <> 'alembic_version' LIMIT 1",
@@ -836,15 +900,6 @@ def _stamp(connection, config: dict, revision: str = BASELINE_REVISION):
         cursor.close()
 
 
-def _assert_postgres_fresh_baseline_target(config: dict) -> None:
-    target = resolve_write_target(config)
-    if target.provider != "postgres" or target.schema != "dwp":
-        raise RuntimeError(
-            "PostgreSQL canonical baseline currently targets dwp; refusing fresh DDL "
-            "for a different Profile schema until profile-aware baseline rendering is available"
-        )
-
-
 def initialize(
     connection,
     config: dict,
@@ -857,8 +912,6 @@ def initialize(
         _assert_dws_schema_exists(connection, config)
     if current_revision(connection, config) is not None:
         return False
-    if dialect == "postgresql":
-        _assert_postgres_fresh_baseline_target(config)
     if _has_user_tables(connection, config):
         raise RuntimeError("database already contains user tables; verify it and use baseline/stamp")
     sql = render_baseline_for_profile(config, dialect, root)
@@ -952,7 +1005,7 @@ def _reflect_sqlite(connection, expected: SchemaModel) -> SchemaModel:
 
 
 def _schema_for_reflection(config: dict) -> str:
-    return get_provider(config["type"]).physical_schema(config)
+    return _profile_schema(config)
 
 
 def _column_type(data_type: Any, length: Any, precision: Any, scale: Any) -> str:
@@ -974,7 +1027,7 @@ def _reflection_metadata_queries(config: dict) -> tuple[ReflectionQuery, ...]:
     provider = get_provider(config["type"])
     db_type = provider.name
     placeholder = provider.placeholder
-    schema = provider.physical_schema(config)
+    schema = _profile_schema(config)
 
     if db_type == "mysql":
         columns = ReflectionQuery(
