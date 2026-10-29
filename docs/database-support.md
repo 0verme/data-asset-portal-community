@@ -80,6 +80,10 @@ GaussDB / DWS 的准确边界是：
 
 因此它只能被描述为 **Compatible**，不能被描述为「已验证支持」或与 PostgreSQL / MySQL 同级。
 
+### SQL snapshot export and replay
+
+`backend/scripts/db_to_init_sql.py` treats `--profile` as the read-only source Profile and requires an explicit `--target-schema` for generated replay DML. Source SELECTs are schema/database-qualified; generated DELETE/INSERT statements are qualified with the caller-supplied final effective destination Profile schema. The exporter does not connect to or verify the replay destination database/session, permissions, or data state. The artifact deletes all rows from its listed tables before replay; review it and independently verify/authorize the isolated target before any execution. Exporting is not deployment validation.
+
 ### Cloudflare D1 — Not supported
 
 仓库中没有 D1 adapter、没有 baseline、也没有验证路径。当前没有支持计划。

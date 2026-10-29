@@ -29,7 +29,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from app.db.facade import fetch_all, get_db_profile, resolve_db_profile_name
-from app.db.registry import get_provider
+from app.db.write_target import EffectiveWriteTarget, WriteTargetError, resolve_write_target
 from app.settings import load_runtime_env
 
 
@@ -75,10 +75,43 @@ def fetch_rows(profile: str, sql: str, params=None) -> list[dict]:
     return [dict(zip(columns, row)) for row in rows]
 
 
-def profile_schema(profile: str) -> str:
+def profile_target(profile: str) -> EffectiveWriteTarget:
+    """Resolve the source Profile explicitly; never fall back to legacy physical schema."""
     config = get_db_profile(profile)
-    provider = get_provider(config["type"])
-    return str(provider.physical_schema(config) or config.get("database") or "")
+    target = resolve_write_target(config)
+    if target.provider not in {"postgres", "gaussdb", "mysql"}:
+        raise WriteTargetError(
+            "SQL snapshot export requires a PostgreSQL, GaussDB/DWS, or MySQL source Profile"
+        )
+    return target
+
+
+def profile_schema(profile: str) -> str:
+    target = profile_target(profile)
+    return str(target.schema or target.database or "")
+
+
+def _quote_identifier(identifier: str, provider: str) -> str:
+    if provider == "mysql":
+        return "`" + identifier.replace("`", "``") + "`"
+    return '"' + identifier.replace('"', '""') + '"'
+
+
+def _qualified_table(target: EffectiveWriteTarget, table_name: str) -> str:
+    if target.provider == "mysql":
+        schema = _quote_identifier(target.database or "", target.provider)
+    else:
+        schema = target.rendered_schema()
+    if not schema:
+        raise WriteTargetError("SQL snapshot source Profile has no explicit schema/database")
+    return f"{schema}.{_quote_identifier(table_name, target.provider)}"
+
+
+def resolve_output_target(dialect: str, schema: str) -> EffectiveWriteTarget:
+    provider = {"pg": "postgres", "dws": "gaussdb"}.get(dialect)
+    if provider is None:
+        raise ValueError(f"Unsupported output dialect: {dialect}")
+    return resolve_write_target({"type": provider, "schema": schema})
 
 
 def sql_literal(value) -> str:
@@ -114,51 +147,93 @@ ORDER BY ordinal_position
     return [row["column_name"] for row in rows]
 
 
-def load_table_rows(profile: str, table_name: str, columns: list[str]) -> list[dict]:
+def load_table_rows(
+    profile: str,
+    table_name: str,
+    columns: list[str],
+    source_target: EffectiveWriteTarget,
+) -> list[dict]:
     if not columns:
         return []
-    order_by = ", ".join(columns[:3])
-    sql = f"SELECT {', '.join(columns)} FROM {table_name}"
+    quoted_columns = [_quote_identifier(column, source_target.provider) for column in columns]
+    order_by = ", ".join(quoted_columns[:3])
+    sql = (
+        f"SELECT {', '.join(quoted_columns)} "
+        f"FROM {_qualified_table(source_target, table_name)}"
+    )
     if order_by:
         sql += f" ORDER BY {order_by}"
     return fetch_rows(profile, sql)
 
 
-def resolve_output_paths(profile: str, dialect: str, allow_repository_output: bool) -> list[Path]:
+def resolve_output_dialects(profile: str, dialect: str) -> list[str]:
     normalized = (dialect or "auto").strip().lower()
-    mapping = REPO_DIALECT_TO_OUTPUT if allow_repository_output else DIALECT_TO_OUTPUT
     if normalized == "auto":
-        config = get_db_profile(profile)
-        normalized = "pg" if config["type"] == "postgres" else "dws"
+        provider = str(get_db_profile(profile).get("type") or "").strip().lower()
+        if provider == "postgres":
+            normalized = "pg"
+        elif provider in {"gaussdb", "dws"}:
+            normalized = "dws"
+        else:
+            raise ValueError(
+                "--dialect auto requires a PostgreSQL or GaussDB/DWS source Profile; "
+                "select --dialect pg or --dialect dws explicitly"
+            )
     if normalized == "both":
-        return [mapping["pg"], mapping["dws"]]
-    if normalized not in mapping:
+        return ["pg", "dws"]
+    if normalized not in {"pg", "dws"}:
         raise ValueError(f"Unsupported dialect: {dialect}")
-    return [mapping[normalized]]
+    return [normalized]
 
 
-def build_delete_block() -> list[str]:
+def resolve_output_paths(
+    profile: str, dialect: str, allow_repository_output: bool
+) -> list[Path]:
+    mapping = REPO_DIALECT_TO_OUTPUT if allow_repository_output else DIALECT_TO_OUTPUT
+    return [mapping[item] for item in resolve_output_dialects(profile, dialect)]
+
+
+def load_profile_snapshot(
+    profile: str,
+) -> tuple[EffectiveWriteTarget, list[tuple[str, list[str], list[dict]]]]:
+    source_target = profile_target(profile)
+    schema_name = source_target.schema or source_target.database or ""
+    if not schema_name:
+        raise WriteTargetError("SQL snapshot source Profile has no explicit schema/database")
+
+    tables = []
+    for table_name in TABLES:
+        columns = load_table_columns(profile, schema_name, table_name)
+        rows = load_table_rows(profile, table_name, columns, source_target)
+        tables.append((table_name, columns, rows))
+    return source_target, tables
+
+
+def build_delete_block(target: EffectiveWriteTarget) -> list[str]:
     lines = ["-- Clear current data before replaying inserts"]
     for table_name in reversed(TABLES):
-        lines.append(f"DELETE FROM {table_name};")
+        lines.append(f"DELETE FROM {_qualified_table(target, table_name)};")
     return lines
 
 
-def build_insert_block(profile: str) -> list[str]:
+def build_insert_block(
+    snapshot: list[tuple[str, list[str], list[dict]]],
+    target: EffectiveWriteTarget,
+) -> list[str]:
     lines = ["-- Replay current database snapshot"]
-    schema_name = profile_schema(profile)
-    for table_name in TABLES:
-        columns = load_table_columns(profile, schema_name, table_name)
-        rows = load_table_rows(profile, table_name, columns)
+    for table_name, columns, rows in snapshot:
+        qualified_table = _qualified_table(target, table_name)
         if not rows:
             lines.append(f"-- {table_name}: 0 rows")
             continue
 
-        col_sql = ", ".join(columns)
+        col_sql = ", ".join(
+            _quote_identifier(column, target.provider) for column in columns
+        )
         lines.append(f"-- {table_name}: {len(rows)} rows")
         for row in rows:
             values_sql = ", ".join(sql_literal(row[column]) for column in columns)
-            lines.append(f"INSERT INTO {table_name} ({col_sql}) VALUES ({values_sql});")
+            lines.append(f"INSERT INTO {qualified_table} ({col_sql}) VALUES ({values_sql});")
     return lines
 
 
@@ -182,9 +257,22 @@ def main():
     load_runtime_env()
 
     parser = argparse.ArgumentParser(description="Export current database data to replayable SQL.")
-    parser.add_argument("--profile", help="Database profile name")
-    parser.add_argument("--dialect", choices=["auto", "pg", "dws", "both"], default="both", help="Output SQL dialect target")
-    parser.add_argument("--output", help="Target SQL file path")
+    parser.add_argument("--profile", help="Source database profile name")
+    parser.add_argument(
+        "--dialect",
+        choices=["auto", "pg", "dws", "both"],
+        default="both",
+        help="Output SQL dialect target",
+    )
+    parser.add_argument(
+        "--target-schema",
+        required=True,
+        help=(
+            "Required final effective Profile schema of the replay destination; "
+            "independently verify its database/session"
+        ),
+    )
+    parser.add_argument("--output", help="Target SQL file path; requires a single output dialect")
     parser.add_argument(
         "--allow-repository-output",
         action="store_true",
@@ -194,11 +282,18 @@ def main():
     args = parser.parse_args()
 
     profile = (args.profile or "").strip() or resolve_db_profile_name()
+    output_dialects = resolve_output_dialects(profile, args.dialect)
+    if args.output and len(output_dialects) != 1:
+        parser.error("--output requires --dialect pg, --dialect dws, or a single-dialect auto result")
     output_paths = (
         [Path(args.output).resolve()]
         if args.output
         else resolve_output_paths(profile, args.dialect, args.allow_repository_output)
     )
+    output_targets = [
+        resolve_output_target(item, args.target_schema) for item in output_dialects
+    ]
+    source_target, snapshot = load_profile_snapshot(profile)
 
     if args.allow_repository_output:
         print("⚠️  --allow-repository-output：将写入仓库 docs/ 路径。")
@@ -207,17 +302,24 @@ def main():
         print(f"默认输出到 git-ignored 目录：{EXPORT_ROOT.relative_to(ROOT_DIR)}")
         print("如需写入仓库 docs/，请显式加 --allow-repository-output。")
 
-    lines = [
-        "-- Generated by backend/scripts/db_to_init_sql.py",
-        f"-- Profile: {profile}",
-        "BEGIN;",
-        *build_delete_block(),
-        "",
-        *build_insert_block(profile),
-        "COMMIT;",
-        "",
-    ]
-    for output_path in output_paths:
+    if len(output_targets) != len(output_paths):
+        parser.error("Output dialect/path resolution mismatch")
+    for output_path, output_dialect, output_target in zip(
+        output_paths, output_dialects, output_targets
+    ):
+        lines = [
+            "-- Generated by backend/scripts/db_to_init_sql.py",
+            f"-- Source Profile: {profile} ({source_target.provider})",
+            f"-- Output dialect: {output_dialect}",
+            f"-- Replay target schema: {output_target.schema}",
+            "-- Destination database/session is not verified by this exporter; review and verify it before replay.",
+            "BEGIN;",
+            *build_delete_block(output_target),
+            "",
+            *build_insert_block(snapshot, output_target),
+            "COMMIT;",
+            "",
+        ]
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text("\n".join(lines), encoding="utf-8")
 

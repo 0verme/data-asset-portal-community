@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -73,31 +74,87 @@ class RuntimeSqlProfileSchemaTests(unittest.TestCase):
                         ),
                     )
 
-    def test_database_export_uses_profile_schema_and_unqualified_replay_sql(self):
+    def test_database_export_qualifies_profile_reads_and_explicit_replay_targets(self):
         config = {"type": "gaussdb", "schema": "dap"}
         with patch("backend.scripts.db_to_init_sql.get_db_profile", return_value=config):
             self.assertEqual("dap", db_to_init_sql.profile_schema("gauss_test"))
+            source_target = db_to_init_sql.profile_target("gauss_test")
 
-        self.assertTrue(
-            all("dwp." not in table.lower() for table in db_to_init_sql.TABLES)
-        )
-        self.assertFalse(
-            any(
-                "dwp." in statement.lower()
-                for statement in db_to_init_sql.build_delete_block()
-            )
-        )
         with patch(
             "backend.scripts.db_to_init_sql.fetch_rows",
-            return_value=[{"column_name": "asset_id"}],
+            return_value=[{"asset_id": 42}],
         ) as rows:
             self.assertEqual(
-                ["asset_id"],
-                db_to_init_sql.load_table_columns("gauss_test", "dap", "p_asset_table"),
+                [{"asset_id": 42}],
+                db_to_init_sql.load_table_rows(
+                    "gauss_test", "p_asset_table", ["asset_id"], source_target
+                ),
             )
-        query, params = rows.call_args.args[1], rows.call_args.kwargs["params"]
-        self.assertNotIn("dwp.", query.lower())
-        self.assertEqual(["dap", "p_asset_table"], params)
+        source_query = rows.call_args.args[1]
+        self.assertEqual(
+            'SELECT "asset_id" FROM dap."p_asset_table" ORDER BY "asset_id"',
+            source_query,
+        )
+
+        pg_target = db_to_init_sql.resolve_output_target("pg", "Dap")
+        self.assertEqual("dap", pg_target.schema)
+        dws_target = db_to_init_sql.resolve_output_target("dws", "Dap")
+        self.assertEqual('"Dap"', dws_target.rendered_schema())
+        self.assertIn(
+            'DELETE FROM dap."p_admin_user";',
+            db_to_init_sql.build_delete_block(pg_target),
+        )
+        inserts = db_to_init_sql.build_insert_block(
+            [("p_asset_table", ["asset_id"], [{"asset_id": 42}])], dws_target
+        )
+        self.assertIn(
+            'INSERT INTO "Dap"."p_asset_table" ("asset_id") VALUES (42);',
+            inserts,
+        )
+
+    def test_mysql_snapshot_source_is_explicitly_qualified(self):
+        target = db_to_init_sql.resolve_write_target(
+            {"type": "mysql", "database": "asset_db"}
+        )
+        with patch(
+            "backend.scripts.db_to_init_sql.fetch_rows", return_value=[]
+        ) as rows:
+            db_to_init_sql.load_table_rows("mysql_source", "p_asset_table", ["id"], target)
+        self.assertIn(
+            "FROM `asset_db`.`p_asset_table`", rows.call_args.args[1]
+        )
+
+    def test_database_export_fails_closed_without_profile_schema(self):
+        with patch(
+            "backend.scripts.db_to_init_sql.get_db_profile",
+            return_value={"type": "postgres"},
+        ):
+            with self.assertRaisesRegex(ValueError, "explicit Profile schema"):
+                db_to_init_sql.profile_schema("postgres_test")
+
+        with self.assertRaises(ValueError):
+            db_to_init_sql.resolve_output_target("pg", "dap; DROP SCHEMA public")
+
+    def test_database_export_output_dialect_requires_explicit_choice_for_mysql(self):
+        with patch(
+            "backend.scripts.db_to_init_sql.get_db_profile",
+            return_value={"type": "mysql", "database": "asset_db"},
+        ):
+            with self.assertRaisesRegex(ValueError, "--dialect auto requires"):
+                db_to_init_sql.resolve_output_dialects("mysql_source", "auto")
+            self.assertEqual(
+                ["pg", "dws"],
+                db_to_init_sql.resolve_output_dialects("mysql_source", "both"),
+            )
+
+    def test_database_export_requires_explicit_target_schema_argument(self):
+        with (
+            patch.object(sys, "argv", ["db_to_init_sql.py"]),
+            patch("backend.scripts.db_to_init_sql.load_runtime_env"),
+            self.assertRaises(SystemExit) as error,
+        ):
+            db_to_init_sql.main()
+        self.assertEqual(2, error.exception.code)
 
     def test_portal_stats_and_search_resolve_sqlite_attached_schema(self):
         with tempfile.TemporaryDirectory(prefix="profile-schema-runtime-") as temp_dir:

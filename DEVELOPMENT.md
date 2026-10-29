@@ -320,7 +320,15 @@ PostgreSQL integration 测试（16 个）通过 `TEST_DATABASE_PROFILE` + `TEST_
 | `frontend/scripts/dev-frontend.ps1` | 前端后台运行并写日志 |
 | `backend/scripts/dev-backend.ps1` | 后端后台运行并写日志（Windows，启动前清理 15099 端口） |
 | `backend/scripts/dev-backend.sh` | 后端后台运行并写日志（Mac/Linux，启动前清理 15099 端口） |
-| `backend/scripts/db_to_init_sql.py` | 从数据库导出整库快照 SQL（默认输出到 git-ignored `tmp/db-init-sql/`，写仓库需显式 `--allow-repository-output`） |
+| `backend/scripts/db_to_init_sql.py` | 从 PostgreSQL / GaussDB(DWS) / MySQL Profile 导出整库快照 SQL；必须提供 `--target-schema <最终有效目标 schema>`；默认输出到 git-ignored `tmp/db-init-sql/`，写仓库需显式 `--allow-repository-output` |
+
+该脚本的 `--profile` 只选择**只读导出源**；`--target-schema` 必须由调用者按现有配置优先级提供回放目标的最终有效 Profile schema，例如：
+
+```bash
+python backend/scripts/db_to_init_sql.py --profile <source-profile> --dialect pg --target-schema <effective-target-schema>
+```
+
+导出器按源 Profile 明确限定 SELECT，并按 `--target-schema` 限定每条 DELETE/INSERT；`--dialect both` 将同一 schema 名按 PG/DWS 方言规则分别渲染（需两个目标配置不同则分开生成）。它不连接或验证回放目标的数据库、会话、权限或数据状态。生成文件会先 DELETE 当前清单中各表的全部行，再 INSERT 导出数据；执行前必须独立核对目标数据库和会话、审阅文件，并只在获授权的隔离目标执行。不要把导出成功当作部署验收。
 
 ## 代码组织约定
 
