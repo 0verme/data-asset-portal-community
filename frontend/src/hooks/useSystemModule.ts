@@ -42,7 +42,8 @@ import {
   type MenuPayload,
 } from '../api/menus.ts';
 import type { MenuItem } from '../data/menus.ts';
-import { getErrorMessage, type ErrorWithPayload } from '../utils/ui.ts';
+import { getErrorMessage } from '../utils/ui.ts';
+import { clearFormFieldErrorEntry, mapApiFormFieldErrors } from '../utils/formFieldErrorMapping.ts';
 import { toast } from '../components/common/index.ts';
 import { DEFAULT_MENU_FORM, DEFAULT_PARAM_FORM, DEFAULT_USER_FORM } from '../components/system/constants.ts';
 
@@ -81,15 +82,8 @@ export interface SystemFormFieldError {
   message: string;
 }
 
-function getFieldErrors(error: unknown, fallback: string): SystemFormFieldError[] {
-  const errWithPayload = error as ErrorWithPayload | undefined;
-  const details = errWithPayload?.payload?.error?.details;
-  if (Array.isArray(details) && details.length) {
-    return details.map((item) =>
-      typeof item === 'string' ? { field: 'form', message: item } : { field: item.field || 'form', message: item.message || '' },
-    );
-  }
-  return [{ field: 'form', message: getErrorMessage(error, fallback) }];
+function getFieldErrors(error: unknown, fields: readonly string[]): SystemFormFieldError[] {
+  return mapApiFormFieldErrors(error, fields);
 }
 
 export interface SystemModalState<T> {
@@ -130,6 +124,12 @@ export interface UseSystemModuleResult {
   userErrors: SystemFormFieldError[];
   paramErrors: SystemFormFieldError[];
   menuErrors: SystemFormFieldError[];
+  userErrorFocusRevision: number;
+  paramErrorFocusRevision: number;
+  menuErrorFocusRevision: number;
+  clearUserFieldError: (field: string) => void;
+  clearParamFieldError: (field: string) => void;
+  clearMenuFieldError: (field: string) => void;
   loadAll: () => Promise<void>;
   openNewUser: () => void;
   openEditUser: (user: MockSystemUser) => void;
@@ -189,6 +189,21 @@ export function useSystemModule({
   const [userErrors, setUserErrors] = React.useState<SystemFormFieldError[]>([]);
   const [paramErrors, setParamErrors] = React.useState<SystemFormFieldError[]>([]);
   const [menuErrors, setMenuErrors] = React.useState<SystemFormFieldError[]>([]);
+  const [userErrorFocusRevision, setUserErrorFocusRevision] = React.useState(0);
+  const [paramErrorFocusRevision, setParamErrorFocusRevision] = React.useState(0);
+  const [menuErrorFocusRevision, setMenuErrorFocusRevision] = React.useState(0);
+  const userSubmitInFlight = React.useRef(false);
+  const paramSubmitInFlight = React.useRef(false);
+  const menuSubmitInFlight = React.useRef(false);
+  const clearUserFieldError = React.useCallback((field: string) => {
+    setUserErrors((current) => clearFormFieldErrorEntry(current, field));
+  }, []);
+  const clearParamFieldError = React.useCallback((field: string) => {
+    setParamErrors((current) => clearFormFieldErrorEntry(current, field));
+  }, []);
+  const clearMenuFieldError = React.useCallback((field: string) => {
+    setMenuErrors((current) => clearFormFieldErrorEntry(current, field));
+  }, []);
   const itemsRequestSeq = React.useRef(0);
   const loadedItemsCategoryRef = React.useRef('');
   const pageRequestSeq = React.useRef(0);
@@ -388,6 +403,7 @@ export function useSystemModule({
     }
     if (!userForm.displayName.trim()) errors.push({ field: 'displayName', message: '显示名不能为空' });
     setUserErrors(errors);
+    if (errors.length) setUserErrorFocusRevision((revision) => revision + 1);
     return !errors.length;
   };
 
@@ -398,6 +414,7 @@ export function useSystemModule({
     if (!paramForm.name.trim()) errors.push({ field: 'name', message: '参数名称不能为空' });
     if (!paramForm.value.trim()) errors.push({ field: 'value', message: '参数值不能为空' });
     setParamErrors(errors);
+    if (errors.length) setParamErrorFocusRevision((revision) => revision + 1);
     return !errors.length;
   };
 
@@ -412,11 +429,14 @@ export function useSystemModule({
       errors.push({ field: 'order', message: '排序号需为非负整数' });
     }
     setMenuErrors(errors);
+    if (errors.length) setMenuErrorFocusRevision((revision) => revision + 1);
     return !errors.length;
   };
 
   const handleSubmitUser = async (): Promise<void> => {
+    if (userSubmitInFlight.current || userModal.busy) return;
     if (!validateUserForm()) return;
+    userSubmitInFlight.current = true;
     setUserModal((prev) => ({ ...prev, busy: true }));
     try {
       const payload = {
@@ -436,13 +456,18 @@ export function useSystemModule({
       setUserModal({ open: false, mode: 'new', initial: null, busy: false });
       setUserForm(DEFAULT_USER_FORM);
     } catch (nextError: unknown) {
-      setUserErrors(getFieldErrors(nextError, '保存用户失败。'));
+      setUserErrors(getFieldErrors(nextError, ['username', 'displayName', 'status', 'role', 'email', 'remark']));
+      setUserErrorFocusRevision((revision) => revision + 1);
       setUserModal((prev) => ({ ...prev, busy: false }));
+    } finally {
+      userSubmitInFlight.current = false;
     }
   };
 
   const handleSubmitParam = async (): Promise<void> => {
+    if (paramSubmitInFlight.current || paramModal.busy) return;
     if (!validateParamForm()) return;
+    paramSubmitInFlight.current = true;
     setParamModal((prev) => ({ ...prev, busy: true }));
     try {
       const payload = {
@@ -467,13 +492,18 @@ export function useSystemModule({
       setParamModal({ open: false, mode: 'new', initial: null, busy: false });
       setParamForm(DEFAULT_PARAM_FORM);
     } catch (nextError: unknown) {
-      setParamErrors([{ field: 'form', message: getErrorMessage(nextError, '保存参数失败。') }]);
+      setParamErrors(getFieldErrors(nextError, ['categoryCode', 'code', 'name', 'value', 'status', 'desc']));
+      setParamErrorFocusRevision((revision) => revision + 1);
       setParamModal((prev) => ({ ...prev, busy: false }));
+    } finally {
+      paramSubmitInFlight.current = false;
     }
   };
 
   const handleSubmitMenu = async (): Promise<void> => {
+    if (menuSubmitInFlight.current || menuModal.busy) return;
     if (!validateMenuForm()) return;
+    menuSubmitInFlight.current = true;
     setMenuModal((prev) => ({ ...prev, busy: true }));
     try {
       const payload: MenuPayload = {
@@ -496,8 +526,11 @@ export function useSystemModule({
       setMenuModal({ open: false, mode: 'new', initial: null, busy: false });
       setMenuForm(DEFAULT_MENU_FORM);
     } catch (nextError: unknown) {
-      setMenuErrors([{ field: 'form', message: getErrorMessage(nextError, '保存菜单失败。') }]);
+      setMenuErrors(getFieldErrors(nextError, ['code', 'name', 'icon', 'path', 'order', 'navPlacement', 'adminOnly', 'status', 'desc']));
+      setMenuErrorFocusRevision((revision) => revision + 1);
       setMenuModal((prev) => ({ ...prev, busy: false }));
+    } finally {
+      menuSubmitInFlight.current = false;
     }
   };
 
@@ -608,6 +641,12 @@ export function useSystemModule({
     userErrors,
     paramErrors,
     menuErrors,
+    userErrorFocusRevision,
+    paramErrorFocusRevision,
+    menuErrorFocusRevision,
+    clearUserFieldError,
+    clearParamFieldError,
+    clearMenuFieldError,
     loadAll,
     openNewUser,
     openEditUser,

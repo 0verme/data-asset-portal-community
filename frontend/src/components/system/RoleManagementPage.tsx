@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Dispatch, SetStateAction } from "react";
+import { useLayoutEffect, useMemo, useRef, type Dispatch, type SetStateAction } from "react";
 
 import { isPublicPermission } from "../../auth/permissions.ts";
 import type {
@@ -30,11 +30,20 @@ import {
   FormSection,
   RowActions,
   StatusBadge,
-  ActionErrorBanner,
   BinaryStatusToggle,
 } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
-import { Button, Input, Textarea } from "../../ui/index.ts";
+import { Button, FormErrorSummary, FormField, focusFirstFormError, Input, Textarea } from "../../ui/index.ts";
+import { formFieldErrorEntries } from "../../utils/formFieldErrorMapping.ts";
+
+const ROLE_FORM_ID = "system-role-form";
+const ROLE_FIELD_LABELS: Readonly<Record<string, string>> = {
+  roleCode: "角色编码",
+  name: "角色名称",
+  enabled: "角色状态",
+  description: "角色说明",
+  permissionCodes: "附加权限",
+};
 
 const ROLE_STATUS_META = {
   enabled: { label: "启用", className: "st-on" },
@@ -74,6 +83,8 @@ export interface RoleFormProps {
   setForm: Dispatch<SetStateAction<RoleFormData>>;
   permissions: readonly SystemPermissionItem[];
   errors?: readonly RoleFormFieldError[] | undefined;
+  focusRevision?: number | undefined;
+  onFieldChange?: ((field: string) => void) | undefined;
   mode?: "new" | "edit" | undefined;
   initial?: SystemRoleItem | null | undefined;
   onDelete?: ((role: SystemRoleItem) => void | Promise<unknown>) | undefined;
@@ -84,13 +95,22 @@ export function RoleForm({
   setForm,
   permissions,
   errors = [],
+  focusRevision = 0,
+  onFieldChange,
   mode = "new",
   initial = null,
   onDelete,
 }: RoleFormProps) {
   const isEdit = mode === "edit";
-  const hasError = (field: string) =>
-    errors.some((item) => item.field === field);
+  const fieldErrors = useMemo(() => formFieldErrorEntries(errors), [errors]);
+  const formRef = useRef<HTMLDivElement>(null);
+  const previousFocusRevision = useRef(focusRevision);
+  useLayoutEffect(() => {
+    if (previousFocusRevision.current === focusRevision) return;
+    previousFocusRevision.current = focusRevision;
+    focusFirstFormError(formRef.current, fieldErrors, "auto");
+  }, [fieldErrors, focusRevision]);
+  const clearField = (field: string) => onFieldChange?.(field);
   const assignablePermissions = permissions.filter(
     (permission) => !isPublicPermission(permission.code),
   );
@@ -101,6 +121,7 @@ export function RoleForm({
     (form.permissionCodes || []).filter((code) => assignableCodes.has(code)),
   );
   const togglePermission = (code: string) => {
+    clearField("permissionCodes");
     setForm((previous) => {
       const current = new Set(
         (previous.permissionCodes || []).filter(
@@ -114,84 +135,77 @@ export function RoleForm({
   };
 
   return (
-    <>
-      <ActionErrorBanner
-        title="请先修正以下问题"
-        messages={errors.map((item) => item.message)}
+    <div id={ROLE_FORM_ID} ref={formRef}>
+      <FormErrorSummary
+        formId={ROLE_FORM_ID}
+        errors={fieldErrors}
+        getFieldLabel={(field) => ROLE_FIELD_LABELS[field] || "表单内容"}
       />
       <FormSection title="角色信息">
         <div className="form-grid">
-          <div className="fl">
-            <label>角色编码</label>
+          <FormField
+            className="fl"
+            formId={ROLE_FORM_ID}
+            name="roleCode"
+            label="角色编码"
+            error={fieldErrors["roleCode"]}
+            description={!isEdit ? "仅允许小写字母、数字、短横线和下划线，创建后不可修改。" : undefined}
+          >
             <Input
               aria-label="角色编码"
-              className={`inp mono${hasError("roleCode") ? " invalid" : ""}`}
+              className={`inp mono${fieldErrors["roleCode"] ? " invalid" : ""}`}
               value={form.roleCode}
               disabled={isEdit}
               maxLength={64}
-              onChange={(event) =>
-                setForm((previous) => ({
-                  ...previous,
-                  roleCode: event.target.value,
-                }))
-              }
+              onChange={(event) => {
+                clearField("roleCode");
+                setForm((previous) => ({ ...previous, roleCode: event.target.value }));
+              }}
               placeholder="例如：indicator-maintainer"
             />
-            {!isEdit ? (
-              <div className="form-hint">
-                仅允许小写字母、数字、短横线和下划线，创建后不可修改。
-              </div>
-            ) : null}
-          </div>
-          <div className="fl">
-            <label>角色名称</label>
+          </FormField>
+          <FormField className="fl" formId={ROLE_FORM_ID} name="name" label="角色名称" error={fieldErrors["name"]}>
             <Input
               aria-label="角色名称"
-              className={`inp${hasError("name") ? " invalid" : ""}`}
+              className={`inp${fieldErrors["name"] ? " invalid" : ""}`}
               value={form.name}
               disabled={Boolean(initial?.builtin)}
               maxLength={128}
-              onChange={(event) =>
-                setForm((previous) => ({
-                  ...previous,
-                  name: event.target.value,
-                }))
-              }
+              onChange={(event) => {
+                clearField("name");
+                setForm((previous) => ({ ...previous, name: event.target.value }));
+              }}
               placeholder="例如：指标维护员"
             />
-          </div>
-          <div className="fl">
-            <label>角色状态</label>
-            <BinaryStatusToggle
-              mode="status"
-              value={form.enabled}
-              disabled={Boolean(initial?.builtin)}
-              className="system-status-seg"
-              onChange={(value) =>
-                setForm((previous) => ({
-                  ...previous,
-                  enabled: normalizeStatus(value),
-                }))
-              }
-            />
-          </div>
-          <div className="fl full">
-            <label>角色说明</label>
+          </FormField>
+          <FormField className="fl" formId={ROLE_FORM_ID} name="enabled" label="角色状态" error={fieldErrors["enabled"]}>
+            <div role="group" aria-label="角色状态">
+              <BinaryStatusToggle
+                mode="status"
+                value={form.enabled}
+                disabled={Boolean(initial?.builtin)}
+                className="system-status-seg"
+                onChange={(value) => {
+                  clearField("enabled");
+                  setForm((previous) => ({ ...previous, enabled: normalizeStatus(value) }));
+                }}
+              />
+            </div>
+          </FormField>
+          <FormField className="fl full" formId={ROLE_FORM_ID} name="description" label="角色说明" error={fieldErrors["description"]}>
             <Textarea
               aria-label="角色说明"
               className="ta"
               value={form.description}
               disabled={Boolean(initial?.builtin)}
               maxLength={2000}
-              onChange={(event) =>
-                setForm((previous) => ({
-                  ...previous,
-                  description: event.target.value,
-                }))
-              }
+              onChange={(event) => {
+                clearField("description");
+                setForm((previous) => ({ ...previous, description: event.target.value }));
+              }}
               placeholder="说明该角色的职责范围"
             />
-          </div>
+          </FormField>
         </div>
       </FormSection>
 
@@ -199,22 +213,24 @@ export function RoleForm({
         <p className="form-hint">
           公共只读权限已默认开放，无需在角色中重复配置；此处仅配置角色的额外权限。
         </p>
-        <div className="role-permission-grid">
-          {assignablePermissions.map((permission) => (
-            <label className="role-permission-option" key={permission.code}>
-              <input
-                type="checkbox"
-                checked={selected.has(permission.code)}
-                disabled={Boolean(initial?.builtin)}
-                onChange={() => togglePermission(permission.code)}
-              />
-              <span>
-                <b>{permissionName(permission)}</b>
-                <small className="mono">{permission.code}</small>
-              </span>
-            </label>
-          ))}
-        </div>
+        <FormField className="fl full" formId={ROLE_FORM_ID} name="permissionCodes" label="附加权限" error={fieldErrors["permissionCodes"]}>
+          <div className="role-permission-grid" role="group" aria-label="附加权限">
+            {assignablePermissions.map((permission) => (
+              <label className="role-permission-option" key={permission.code}>
+                <input
+                  type="checkbox"
+                  checked={selected.has(permission.code)}
+                  disabled={Boolean(initial?.builtin)}
+                  onChange={() => togglePermission(permission.code)}
+                />
+                <span>
+                  <b>{permissionName(permission)}</b>
+                  <small className="mono">{permission.code}</small>
+                </span>
+              </label>
+            ))}
+          </div>
+        </FormField>
       </FormSection>
 
       {isEdit && initial && !initial.builtin ? (
@@ -232,7 +248,7 @@ export function RoleForm({
           ]}
         />
       ) : null}
-    </>
+    </div>
   );
 }
 

@@ -56,6 +56,12 @@ export function SystemManagementPage({
     userErrors,
     paramErrors,
     menuErrors,
+    userErrorFocusRevision,
+    paramErrorFocusRevision,
+    menuErrorFocusRevision,
+    clearUserFieldError,
+    clearParamFieldError,
+    clearMenuFieldError,
     loadAll,
     openNewUser,
     openEditUser,
@@ -134,7 +140,7 @@ export function SystemManagementPage({
         submitText={userModal.mode === "edit" ? "保存修改" : "创建"}
         busy={userModal.busy}
       >
-        <UserForm form={userForm} setForm={setUserForm} roles={roleModule.roles} errors={userErrors} mode={userModal.mode} initial={userModal.initial} onDelete={handleDeleteUser} />
+        <UserForm form={userForm} setForm={setUserForm} roles={roleModule.roles} errors={userErrors} focusRevision={userErrorFocusRevision} onFieldChange={clearUserFieldError} mode={userModal.mode} initial={userModal.initial} onDelete={handleDeleteUser} />
       </FormModal>
 
       <FormModal
@@ -147,7 +153,7 @@ export function SystemManagementPage({
         submitText={roleModule.modal.mode === "edit" ? "保存修改" : "创建"}
         busy={roleModule.modal.busy}
       >
-        <RoleForm form={roleModule.form} setForm={roleModule.setForm} permissions={roleModule.permissions} errors={roleModule.errors} mode={roleModule.modal.mode} initial={roleModule.modal.initial} onDelete={roleModule.remove} />
+        <RoleForm form={roleModule.form} setForm={roleModule.setForm} permissions={roleModule.permissions} errors={roleModule.errors} focusRevision={roleModule.errorFocusRevision} onFieldChange={roleModule.clearFieldError} mode={roleModule.modal.mode} initial={roleModule.modal.initial} onDelete={roleModule.remove} />
       </FormModal>
 
       <FormModal
@@ -160,7 +166,7 @@ export function SystemManagementPage({
         submitText={paramModal.mode === "edit" ? "保存修改" : "创建"}
         busy={paramModal.busy}
       >
-        <ParamForm form={paramForm} categories={categories} setForm={setParamForm} errors={paramErrors} mode={paramModal.mode} initial={paramModal.initial} onDelete={handleDeleteParam} />
+        <ParamForm form={paramForm} categories={categories} setForm={setParamForm} errors={paramErrors} focusRevision={paramErrorFocusRevision} onFieldChange={clearParamFieldError} mode={paramModal.mode} initial={paramModal.initial} onDelete={handleDeleteParam} />
       </FormModal>
 
       <FormModal
@@ -173,7 +179,7 @@ export function SystemManagementPage({
         submitText={menuModal.mode === "edit" ? "保存修改" : "创建"}
         busy={menuModal.busy}
       >
-        <MenuForm form={menuForm} setForm={setMenuForm} errors={menuErrors} mode={menuModal.mode} initial={menuModal.initial} onDelete={handleDeleteMenu} />
+        <MenuForm form={menuForm} setForm={setMenuForm} errors={menuErrors} focusRevision={menuErrorFocusRevision} onFieldChange={clearMenuFieldError} mode={menuModal.mode} initial={menuModal.initial} onDelete={handleDeleteMenu} />
       </FormModal>
     </>
   );

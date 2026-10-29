@@ -23,7 +23,8 @@ import {
   type SystemRoleItem,
 } from '../api/systemRoles.ts';
 import { toast } from '../components/common/index.ts';
-import { getErrorMessage, type ErrorWithPayload } from '../utils/ui.ts';
+import { getErrorMessage } from '../utils/ui.ts';
+import { clearFormFieldErrorEntry, mapApiFormFieldErrors } from '../utils/formFieldErrorMapping.ts';
 import { normalizeRolePermissionCodes } from '../auth/permissions.ts';
 
 export interface RoleFormData {
@@ -47,16 +48,8 @@ export interface RoleFormFieldError {
   message: string;
 }
 
-function getFieldErrors(error: unknown, fallback: string): RoleFormFieldError[] {
-  const errWithPayload = error as ErrorWithPayload | undefined;
-  const details = errWithPayload?.payload?.error?.details;
-  if (Array.isArray(details) && details.length) {
-    return details.map((item) => {
-      if (typeof item === 'string') return { field: 'form', message: item };
-      return { field: item.field || 'form', message: item.message || '' };
-    });
-  }
-  return [{ field: 'form', message: getErrorMessage(error, fallback) }];
+function getFieldErrors(error: unknown, fields: readonly string[]): RoleFormFieldError[] {
+  return mapApiFormFieldErrors(error, fields);
 }
 
 export interface RoleModalState {
@@ -83,6 +76,8 @@ export interface UseRoleModuleResult {
   form: RoleFormData;
   setForm: React.Dispatch<React.SetStateAction<RoleFormData>>;
   errors: RoleFormFieldError[];
+  errorFocusRevision: number;
+  clearFieldError: (field: string) => void;
   deletingRoleCode: string;
   load: () => Promise<void>;
   openNew: () => void;
@@ -109,6 +104,11 @@ export function useRoleModule({
   });
   const [form, setForm] = React.useState<RoleFormData>(DEFAULT_FORM);
   const [errors, setErrors] = React.useState<RoleFormFieldError[]>([]);
+  const [errorFocusRevision, setErrorFocusRevision] = React.useState(0);
+  const submitInFlight = React.useRef(false);
+  const clearFieldError = React.useCallback((field: string) => {
+    setErrors((current) => clearFormFieldErrorEntry(current, field));
+  }, []);
   const [deletingRoleCode, setDeletingRoleCode] = React.useState('');
   const requestSeq = React.useRef(0);
   const deletingRoleCodes = React.useRef(new Set<string>());
@@ -180,11 +180,14 @@ export function useRoleModule({
     }
     if (!form.name.trim()) nextErrors.push({ field: 'name', message: '角色名称不能为空' });
     setErrors(nextErrors);
+    if (nextErrors.length) setErrorFocusRevision((revision) => revision + 1);
     return !nextErrors.length;
   }, [form]);
 
   const submit = React.useCallback(async (): Promise<void> => {
+    if (submitInFlight.current || modal.busy) return;
     if (!validate()) return;
+    submitInFlight.current = true;
     setModal((previous) => ({ ...previous, busy: true }));
     try {
       const payload = {
@@ -203,8 +206,11 @@ export function useRoleModule({
       setModal({ open: false, mode: 'new', initial: null, busy: false });
       setForm(DEFAULT_FORM);
     } catch (nextError: unknown) {
-      setErrors(getFieldErrors(nextError, '保存角色失败。'));
+      setErrors(getFieldErrors(nextError, ['roleCode', 'name', 'description', 'enabled', 'permissionCodes']));
+      setErrorFocusRevision((revision) => revision + 1);
       setModal((previous) => ({ ...previous, busy: false }));
+    } finally {
+      submitInFlight.current = false;
     }
   }, [form, load, modal, validate]);
 
@@ -244,6 +250,8 @@ export function useRoleModule({
     form,
     setForm,
     errors,
+    errorFocusRevision,
+    clearFieldError,
     deletingRoleCode,
     load,
     openNew,
