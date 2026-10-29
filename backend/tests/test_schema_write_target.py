@@ -3,9 +3,11 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from sqlalchemy import Column, Integer, MetaData, Table, insert, text
+from sqlalchemy.dialects import mysql
 
 from backend.app.db.core import (
     _compile_statement,
@@ -265,6 +267,82 @@ class SchemaWriteTargetContractTests(unittest.TestCase):
             )
         )
 
+    def test_mysql_current_database_maps_logical_schema_across_raw_and_core_paths(self):
+        config = {"type": "mysql", "database": "asset_db"}
+        raw_connection = RecordingConnection(database="asset_db")
+        with (
+            patch("backend.app.db.facade.get_db_profile", return_value=config),
+            patch(
+                "backend.app.db.facade.connect_with_profile",
+                return_value=raw_connection,
+            ),
+        ):
+            execute_many(
+                "primary",
+                "INSERT INTO __app__.p_asset_table (id) VALUES (?)",
+                [(1,)],
+            )
+
+        self.assertEqual(
+            [
+                ("SELECT DATABASE()", None),
+                ("INSERT INTO p_asset_table (id) VALUES (%s)", [(1,)]),
+            ],
+            raw_connection.calls,
+        )
+        self.assertEqual(1, raw_connection.commits)
+
+        core_connection = RecordingConnection(database="asset_db")
+        table = Table(
+            "p_asset_table",
+            MetaData(schema="__app__"),
+            Column("id", Integer, primary_key=True),
+        )
+        mysql_engine = SimpleNamespace(dialect=mysql.dialect())
+        with (
+            patch("backend.app.db.core.get_db_profile", return_value=config),
+            patch("backend.app.db.core.get_engine", return_value=mysql_engine),
+            patch(
+                "backend.app.db.core.active_transaction_connection",
+                return_value=core_connection,
+            ),
+        ):
+            execute_core("primary", insert(table).values(id=1))
+
+        self.assertEqual("SELECT DATABASE()", core_connection.calls[0][0])
+        self.assertEqual(
+            ("INSERT INTO p_asset_table (id) VALUES (%s)", (1,)),
+            core_connection.calls[1],
+        )
+        self.assertEqual(0, core_connection.commits)
+
+    def test_mysql_explicit_dwp_sql_is_never_rewritten_to_another_database(self):
+        sql = "DELETE FROM dwp.p_report_asset WHERE id = 1"
+        wrong_target = {"type": "mysql", "database": "asset_db"}
+        with (
+            patch("backend.app.db.facade.get_db_profile", return_value=wrong_target),
+            patch("backend.app.db.facade.connect_with_profile") as connect,
+        ):
+            with self.assertRaisesRegex(WriteTargetError, "does not match"):
+                execute_sql("primary", sql)
+        connect.assert_not_called()
+
+        dwp_target = {"type": "mysql", "database": "dwp"}
+        connection = RecordingConnection(database="dwp")
+        with (
+            patch("backend.app.db.facade.get_db_profile", return_value=dwp_target),
+            patch(
+                "backend.app.db.facade.connect_with_profile",
+                return_value=connection,
+            ),
+        ):
+            execute_sql("primary", sql)
+        self.assertEqual(
+            [("SELECT DATABASE()", None), (sql, None)],
+            connection.calls,
+        )
+        self.assertEqual(1, connection.commits)
+
     def test_escape_strings_and_mysql_executable_comments_fail_closed(self):
         target = resolve_write_target({"type": "postgres", "schema": "dap"})
         source = r"UPDATE __app__.p_asset_table SET note = E'escaped \' __app__.literal'"
@@ -463,15 +541,24 @@ class SchemaWriteTargetContractTests(unittest.TestCase):
         connect.assert_not_called()
 
     def test_textclause_write_is_rejected_before_connect(self):
-        config = {"type": "gaussdb", "schema": "dap"}
-        with (
-            patch("backend.app.db.core.get_db_profile", return_value=config),
-            patch("backend.app.db.core.get_engine", return_value=None),
-            patch("backend.app.db.core.connect_with_profile") as connect,
-        ):
-            with self.assertRaisesRegex(WriteTargetError, "TextClause DML/DDL"):
-                execute_core("primary", text("UPDATE dwp.p_asset_table SET id = 1"))
-        connect.assert_not_called()
+        profiles = (
+            {"type": "gaussdb", "schema": "dap"},
+            {"type": "mysql", "database": "asset_db"},
+        )
+        for config in profiles:
+            with self.subTest(provider=config["type"]):
+                with (
+                    patch("backend.app.db.core.get_db_profile", return_value=config),
+                    patch("backend.app.db.core.get_engine", return_value=None),
+                    patch("backend.app.db.core.connect_with_profile") as connect,
+                ):
+                    with self.assertRaisesRegex(
+                        WriteTargetError, "TextClause DML/DDL"
+                    ):
+                        execute_core(
+                            "primary", text("UPDATE dwp.p_asset_table SET id = 1")
+                        )
+                connect.assert_not_called()
 
     def test_gaussdb_provider_rejects_jdbc_current_schema_mismatch(self):
         profile = {
