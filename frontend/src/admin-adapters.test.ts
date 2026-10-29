@@ -21,13 +21,13 @@ test("system forms use the frozen DAP adapters", () => {
   assert.equal((userForm.match(/<Select<string>/g) ?? []).length, 1);
   assert.equal((userForm.match(/<Textarea/g) ?? []).length, 1);
 
-  assert.match(menuForm, /import \{ Checkbox, Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.match(menuForm, /import \{ Checkbox, FormErrorSummary, FormField, focusFirstFormError, Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((menuForm.match(/<Input/g) ?? []).length, 4);
   assert.equal((menuForm.match(/<Select<string>/g) ?? []).length, 2);
   assert.equal((menuForm.match(/<Checkbox/g) ?? []).length, 1);
   assert.equal((menuForm.match(/<Textarea/g) ?? []).length, 1);
 
-  assert.match(paramForm, /import \{ Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.match(paramForm, /import \{ FormErrorSummary, FormField, focusFirstFormError, Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((paramForm.match(/<Input/g) ?? []).length, 3);
   assert.equal((paramForm.match(/<Select<string>/g) ?? []).length, 1);
   assert.match(paramForm, /placeholder="请选择分类"/);
@@ -41,7 +41,7 @@ test("system pages use the frozen DAP adapters with documented native exceptions
   assert.match(paramPage, /<Button className="btn primary" variant="primary"/);
   assert.equal((paramPage.match(/<button/g) ?? []).length, 1, "category list item stays native");
   assert.match(systemPage, /<Button className="btn state-btn" variant="secondary"/);
-  assert.match(rolePage, /import \{ Button, Input, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.match(rolePage, /import \{ Button, FormErrorSummary, FormField, focusFirstFormError, Input, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((rolePage.match(/<Input/g) ?? []).length, 2);
   assert.equal((rolePage.match(/<Textarea/g) ?? []).length, 1);
   assert.equal((rolePage.match(/<input/g) ?? []).length, 1, "permission matrix checkbox stays native");
