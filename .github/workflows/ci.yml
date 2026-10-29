@@ -627,6 +627,13 @@ jobs:
           VITE_API_MODE: remote
         run: npm run test:browser -- e2e/admin-form-errors.spec.ts --workers=2
 
+      - name: Manual code table form feedback browser regression (Chromium and WebKit)
+        if: matrix.node == '22'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/manual-code-table-form-feedback-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/manual-code-table-form-errors.spec.ts --workers=2
+
       - name: Overlay focus and feedback browser regression (Chromium and WebKit)
         if: matrix.node == '22'
         env:
