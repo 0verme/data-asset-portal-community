@@ -13,6 +13,10 @@
 表级简图和表—作业详图使用同一份快照，不新增表级物化表。表级关系由后端根据
 `表 → 作业 → 表` 路径投影，确保每条表级边都能回到实际作业证据。
 
+> 本指南中的 `dwp.p_lineage_*` 是应用存储的历史示例物理 schema；应用 runtime 使用最终有效 Profile schema。
+> `dwp.p_job` / `p_program` 表示部署方调度源表，其外部 source schema 由部署环境决定，不是应用写目标。
+> `docs/dws/lineage-snapshot-rollback.sql` 固定写入 DWS `dwp`，不支持其他 Profile schema。
+
 > 调度元数据表（下方泛化为 `p_job` / `p_program`）是部署环境的数据库契约：
 > 表名与列名由各环境的数据仓库调度平台决定，本仓库不维护其 DDL，
 > 采集器按部署环境的实际表结构读取。
@@ -70,9 +74,10 @@ WHERE snapshot_id = '<new_snapshot_id>'
 GROUP BY kind_code;
 ```
 
-需要回退时使用 `docs/dws/lineage-snapshot-rollback.sql`，将其中
-`__SNAPSHOT_ID__` 替换为目标历史快照。历史 INACTIVE 快照应按本地保留策略清理，
-不要在采集事务中删除当前 ACTIVE 快照。
+手工回退 SQL `docs/dws/lineage-snapshot-rollback.sql` 仅适用于最终有效 Profile schema 为 `dwp`
+且执行会话 `current_schema()` 等于 `dwp` 的 GaussDB/DWS 目标。脚本在锁表和应用表 DML 前检查会话 schema；不匹配会因 NOT NULL guard 失败。**非 `dwp` Profile 不得执行此文件**；它没有通用 schema 替换参数，也不是动态 Profile renderer。
+
+执行前须从目标数据库确认并审阅实际历史 `snapshot_id`，再将文件中的 `__SNAPSHOT_ID__` 替换为该值；还要独立确认隔离/授权目标和执行会话。此文档 SQL 未在真实 DWS 部署实例验证；运行 Recording/Fake 或静态检查不能替代部署验收。历史 INACTIVE 快照应按本地保留策略清理，不要在采集事务中删除当前 ACTIVE 快照。
 
 ## 定时执行
 
