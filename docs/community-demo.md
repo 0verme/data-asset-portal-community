@@ -225,10 +225,10 @@ PostgreSQL 不是 one-command local Demo 的目标。Community PostgreSQL 初始
 
 ```bash
 python backend/scripts/schema_migrate.py apply --profile community_postgres
-python demo/seed_postgres.py --dialect postgres
+python demo/seed_postgres.py --dialect postgres --schema dwp
 ```
 
-请先审阅生成的 SQL，再导入专用数据库。不要把生产连接串、密码或真实数据粘贴到命令、Issue、日志或文档中。
+`--schema` 是必填应用目标，必须与现有配置优先级解析后的最终有效 Profile `schema` 一致；示例使用默认 Community profile 的 `dwp`，有覆盖或自定义 Profile 时请传入最终实际 schema。生成器不会读取 DSN、search_path 或权限来推断目标，也不会验证执行连接；使用者必须确认目标数据库属于同一隔离 Profile。请先审阅生成的 SQL，再导入专用数据库。不要把生产连接串、密码或真实数据粘贴到命令、Issue、日志或文档中。
 
 ## 模块与部署能力边界
 

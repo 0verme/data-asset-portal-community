@@ -236,7 +236,7 @@ backend/.venv/bin/python demo/seed_sqlite.py --database /opt/data-asset-portal/i
 
 # 或使用隔离的 Community PostgreSQL 数据库
 backend/.venv/bin/python backend/scripts/schema_migrate.py apply --profile community_postgres
-backend/.venv/bin/python demo/seed_postgres.py --dialect postgres
+backend/.venv/bin/python demo/seed_postgres.py --dialect postgres --schema dwp
 ```
 
 `docs/pg/`、`docs/dws/` 中的方言 SQL 和 external integration 说明是补充参考，不是 `backend/schema` + Alembic 的替代。需要 vendor-specific DDL 时先确认目标 profile、依赖和对象归属，不要无条件执行全部 SQL。

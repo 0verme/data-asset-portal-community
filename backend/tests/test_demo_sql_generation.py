@@ -75,7 +75,14 @@ class DemoSqlManifestCoverageTests(unittest.TestCase):
         for dialect in ("postgres", "dws"):
             with self.subTest(dialect=dialect):
                 result = subprocess.run(
-                    [sys.executable, str(POSTGRES_SEED), "--dialect", dialect],
+                    [
+                        sys.executable,
+                        str(POSTGRES_SEED),
+                        "--dialect",
+                        dialect,
+                        "--schema",
+                        "demo_target",
+                    ],
                     cwd=PROJECT_ROOT,
                     capture_output=True,
                     text=True,
@@ -84,11 +91,12 @@ class DemoSqlManifestCoverageTests(unittest.TestCase):
                 )
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertIn(
-                    "UPDATE dwp.p_push_system SET auth_type = '密钥认证'",
+                    "UPDATE demo_target.p_push_system SET auth_type = '密钥认证'",
                     result.stdout,
                 )
                 self.assertIn("auth_type = '演示占位配置'", result.stdout)
                 self.assertIn("AND created_by = 'demo';", result.stdout)
+                self.assertNotIn("dwp.", result.stdout)
                 self.assertIn("ON CONFLICT (category_code) DO NOTHING", result.stdout)
                 self.assertIn("ON CONFLICT (category_code,item_code) DO NOTHING", result.stdout)
 

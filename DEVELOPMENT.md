@@ -242,7 +242,7 @@ python demo/seed_sqlite.py --database <absolute-local-path>/community.db
 
 # PostgreSQL Community 部署
 python backend/scripts/schema_migrate.py apply --profile community_postgres
-python demo/seed_postgres.py --dialect postgres
+python demo/seed_postgres.py --dialect postgres --schema dwp
 ```
 
 MySQL 8.0 先执行 `pip install -r backend/requirements-mysql.txt`，再使用 `community_mysql` profile 执行 `schema_migrate.py apply`；真实 CRUD、分页、唯一约束、中文/emoji、NULL 和 rollback 由 CI MySQL 8 integration job 验证。既有数据库先 `verify`，只有与 baseline 契约一致时才允许 `baseline` stamp；后续结构变更只走 Alembic forward revision。

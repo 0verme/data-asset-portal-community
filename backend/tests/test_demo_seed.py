@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 import tempfile
 import unittest
@@ -612,21 +612,30 @@ class CommunityDemoSeedTests(unittest.TestCase):
 
         for dialect in ("postgres", "dws"):
             with self.subTest(dialect=dialect):
+                schema = "SeedTarget"
+                rendered_schema = '"SeedTarget"' if dialect == "dws" else "seedtarget"
                 output = StringIO()
-                with patch("sys.argv", ["seed_postgres.py", "--dialect", dialect]):
+                with patch(
+                    "sys.argv",
+                    ["seed_postgres.py", "--dialect", dialect, "--schema", schema],
+                ):
                     with redirect_stdout(output):
                         render_demo_seed_sql()
                 sql = output.getvalue()
                 path_guard_start = sql.index(
-                    "INSERT INTO dwp.p_indicator_path_config ("
+                    f"INSERT INTO {rendered_schema}.p_indicator_path_config ("
                 )
                 indicator_guard_start = sql.index(
-                    "INSERT INTO dwp.p_indicator_item ("
+                    f"INSERT INTO {rendered_schema}.p_indicator_item ("
                 )
-                path_start = sql.rindex("INSERT INTO dwp.p_indicator_path_config ")
+                path_start = sql.rindex(
+                    f"INSERT INTO {rendered_schema}.p_indicator_path_config "
+                )
                 path_end = sql.index(";", path_start)
                 path_insert = sql[path_start:path_end]
-                indicator_start = sql.rindex("INSERT INTO dwp.p_indicator_item ")
+                indicator_start = sql.rindex(
+                    f"INSERT INTO {rendered_schema}.p_indicator_item "
+                )
                 indicator_end = sql.index(";", indicator_start)
                 indicator_insert = sql[indicator_start:indicator_end]
 
@@ -640,6 +649,42 @@ class CommunityDemoSeedTests(unittest.TestCase):
                 self.assertLess(indicator_guard_start, sql.index("-- p_admin_user is not seeded"))
                 self.assertIn("ON CONFLICT (id) DO NOTHING", path_insert)
                 self.assertIn("ON CONFLICT (indicator_pk) DO NOTHING", indicator_insert)
+                self.assertIn(
+                    f"FROM {rendered_schema}.p_indicator_path_config AS existing",
+                    sql,
+                )
+                self.assertIn(
+                    f"-- explicit application schema target: {rendered_schema}",
+                    sql,
+                )
+                self.assertNotIn("dwp.", sql)
+                write_statements = [
+                    line.strip()
+                    for line in sql.splitlines()
+                    if line.strip().startswith(("INSERT INTO ", "UPDATE "))
+                ]
+                self.assertTrue(write_statements)
+                expected_write_targets = (
+                    f"INSERT INTO {rendered_schema}.",
+                    f"UPDATE {rendered_schema}.",
+                )
+                for statement in write_statements:
+                    self.assertTrue(
+                        statement.startswith(expected_write_targets), statement
+                    )
+                guarded_sources = [
+                    line.strip()
+                    for line in sql.splitlines()
+                    if line.strip().startswith("FROM ")
+                ]
+                self.assertTrue(guarded_sources)
+                expected_from_target = f"FROM {rendered_schema}."
+                self.assertTrue(
+                    all(
+                        line.startswith(expected_from_target)
+                        for line in guarded_sources
+                    )
+                )
                 self.assertFalse(any(f"'{code}'" not in path_insert for code in path_codes))
                 self.assertFalse(
                     any(item["pathDesc"] not in indicator_insert for item in indicators)
@@ -658,13 +703,38 @@ class CommunityDemoSeedTests(unittest.TestCase):
 
         output = StringIO()
         with patch("demo.seed_loader.load_dataset", side_effect=load_with_invalid_indicator_path):
-            with patch("sys.argv", ["seed_postgres.py", "--dialect", "postgres"]):
+            with patch(
+                "sys.argv",
+                ["seed_postgres.py", "--dialect", "postgres", "--schema", "dwp"],
+            ):
                 with redirect_stdout(output):
                     with self.assertRaisesRegex(
                         ValueError, "indicator PRD00001: missing path node"
                     ):
                         render_demo_seed_sql()
         self.assertEqual("", output.getvalue())
+
+    def test_postgres_seed_requires_explicit_safe_schema_before_output(self):
+        invalid_invocations = (
+            ["seed_postgres.py", "--dialect", "postgres"],
+            [
+                "seed_postgres.py",
+                "--dialect",
+                "postgres",
+                "--schema",
+                "safe; DROP SCHEMA public",
+            ],
+        )
+        for argv in invalid_invocations:
+            with self.subTest(argv=argv):
+                output = StringIO()
+                error = StringIO()
+                with patch("sys.argv", argv):
+                    with redirect_stdout(output), redirect_stderr(error):
+                        with self.assertRaises(SystemExit) as raised:
+                            render_demo_seed_sql()
+                self.assertEqual(2, raised.exception.code)
+                self.assertEqual("", output.getvalue())
 
     def test_seed_preserves_and_rejects_legacy_path_rows_before_writes(self):
         connection = sqlite3.connect(self.database)
