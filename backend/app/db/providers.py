@@ -16,6 +16,16 @@ from .base import BackendCapabilities
 LOGICAL_SCHEMA = "__app__"
 DEFAULT_GAUSS_DRIVER = "com.huawei.gauss200.jdbc.Driver"
 GAUSSDB_SCHEMA_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+POSTGRES_SCHEMA_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+
+
+def _postgres_schema(config: dict) -> str:
+    schema = config.get("schema")
+    if not isinstance(schema, str) or not POSTGRES_SCHEMA_IDENTIFIER.fullmatch(schema.strip()):
+        raise ValueError(
+            "PostgreSQL Profile schema must be a safe SQL identifier"
+        )
+    return schema.strip().lower()
 
 
 def _gaussdb_schema(config: dict, profile: str | None = None) -> str:
@@ -144,13 +154,15 @@ class PostgreSQLProvider:
             required = [key for key in ("user", "password") if not config.get(key)]
             if required:
                 raise ValueError(f"postgres profile '{profile}' requires {', '.join(required)}")
+        if config.get("schema") not in (None, ""):
+            config["schema"] = _postgres_schema(config)
         return config
 
     @staticmethod
     def _options(config: dict):
         options = []
         if config.get("schema"):
-            options.append(f"-c search_path={config['schema']}")
+            options.append(f"-c search_path={_postgres_schema(config)}")
         if config.get("statement_timeout_ms") is not None:
             options.append(f"-c statement_timeout={int(config['statement_timeout_ms'])}")
         return " ".join(options) or None
@@ -172,7 +184,8 @@ class PostgreSQLProvider:
         return self.create_engine(config).raw_connection()
 
     def physical_schema(self, config: dict):
-        return str(config.get("schema") or "dwp")
+        schema = config.get("schema")
+        return "dwp" if schema is None or schema == "" else _postgres_schema(config)
 
 
 @dataclass(frozen=True)
@@ -250,6 +263,22 @@ class GaussDBProvider:
         required = [key for key in ("jdbc_url", "user", "password") if not config.get(key)]
         if required:
             raise ValueError(f"gaussdb profile '{profile}' requires {', '.join(required)}")
+        current_schema_values = [
+            value
+            for key, value in parse_qsl(
+                urlsplit(str(config["jdbc_url"]).replace("jdbc:", "", 1)).query,
+                keep_blank_values=True,
+            )
+            if key.casefold() == "currentschema"
+        ]
+        if len(current_schema_values) > 1:
+            raise ValueError(
+                f"gaussdb profile '{profile}' jdbc_url must not contain duplicate currentSchema parameters"
+            )
+        if current_schema_values and current_schema_values[0] != config["schema"]:
+            raise ValueError(
+                f"gaussdb profile '{profile}' currentSchema must match profile schema"
+            )
         config["jar_path"] = str(jar_path)
         config["jdbc_url"] = with_jdbc_timeouts(
             config["jdbc_url"],
