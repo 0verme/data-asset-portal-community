@@ -332,6 +332,30 @@ def _check_target_at(tokens: list[_Token], index: int, target: EffectiveWriteTar
     return after
 
 
+def _check_table_target_list(
+    tokens: list[_Token],
+    index: int,
+    target: EffectiveWriteTarget,
+    *,
+    allow_only: bool = False,
+    allow_inheritance: bool = False,
+) -> int:
+    """Validate each table in TRUNCATE/LOCK lists, including per-item modifiers."""
+    while True:
+        if index < len(tokens) and tokens[index].value.upper() == "ONLY":
+            if not allow_only:
+                raise WriteTargetError("ONLY table targets are unsupported for this provider")
+            index += 1
+        index = _check_target_at(tokens, index, target)
+        if index < len(tokens) and tokens[index].value == "*":
+            if not allow_inheritance:
+                raise WriteTargetError("Inherited table targets are unsupported for this provider")
+            index += 1
+        if index >= len(tokens) or tokens[index].value != ",":
+            return index
+        index += 1
+
+
 def _next_keyword(tokens: list[_Token], index: int, stop: set[str]) -> int | None:
     for position in range(index, len(tokens)):
         value = tokens[position].value.upper()
@@ -445,7 +469,7 @@ def validate_write_sql(sql: str, target: EffectiveWriteTarget) -> bool:
             writes = True
             continue
 
-        if keyword in {"CREATE", "ALTER", "DROP"}:
+        if keyword in {"CREATE", "ALTER", "DROP"} and (index == 0 or previous == ";"):
             if (
                 keyword == "CREATE"
                 and index + 1 < len(tokens)
@@ -500,6 +524,28 @@ def validate_write_sql(sql: str, target: EffectiveWriteTarget) -> bool:
                             raise WriteTargetError(
                                 "Cross-schema table movement/partition DDL is not allowed"
                             )
+                        if target.provider == "mysql" and pair in {
+                            ("RENAME", "TO"), ("RENAME", "AS")
+                        }:
+                            destination = position + 2
+                            schema, _table, _after = _qualified_name_at(
+                                tokens, destination
+                            )
+                            schema_token = tokens[destination] if schema is not None else None
+                            _check_qualified_name(schema, schema_token, target)
+                        if target.provider == "mysql" and pair == (
+                            "EXCHANGE", "PARTITION"
+                        ):
+                            with_pos = _next_keyword(tokens, position + 2, {"WITH", ";"})
+                            if (
+                                with_pos is None
+                                or with_pos + 1 >= len(tokens)
+                                or tokens[with_pos + 1].value.upper() != "TABLE"
+                            ):
+                                raise WriteTargetError(
+                                    "Cannot determine MySQL EXCHANGE PARTITION table target"
+                                )
+                            _check_target_at(tokens, with_pos + 2, target)
                 if keyword == "DROP":
                     while index < len(tokens) and tokens[index].value == ",":
                         index = _check_target_at(tokens, index + 1, target)
@@ -529,18 +575,24 @@ def validate_write_sql(sql: str, target: EffectiveWriteTarget) -> bool:
                 # DROP INDEX targets the index object; CREATE INDEX targets
                 # both its optional schema and the table after ON.
                 name_schema, _name, after_name = _qualified_name_at(tokens, index_name_pos)
-                if name_schema is not None:
-                    _check_qualified_name(name_schema, tokens[index_name_pos], target)
                 if keyword == "DROP":
+                    _check_qualified_name(
+                        name_schema,
+                        tokens[index_name_pos] if name_schema is not None else None,
+                        target,
+                    )
                     while after_name < len(tokens) and tokens[after_name].value == ",":
                         next_start = after_name + 1
                         next_schema, _name, after_name = _qualified_name_at(
                             tokens, next_start
                         )
-                        if next_schema is not None:
-                            _check_qualified_name(
-                                next_schema, tokens[next_start], target
-                            )
+                        _check_qualified_name(
+                            next_schema,
+                            tokens[next_start] if next_schema is not None else None,
+                            target,
+                        )
+                elif name_schema is not None:
+                    _check_qualified_name(name_schema, tokens[index_name_pos], target)
                 if keyword == "CREATE":
                     on_pos = _next_keyword(tokens, after_name, {"ON", ";"})
                     if on_pos is None or tokens[on_pos].value.upper() != "ON":
@@ -575,21 +627,31 @@ def validate_write_sql(sql: str, target: EffectiveWriteTarget) -> bool:
         if keyword in {"TRUNCATE", "COPY", "LOCK"}:
             target_index = index + 1
             if keyword in {"TRUNCATE", "LOCK"}:
-                while (
-                    target_index < len(tokens)
-                    and tokens[target_index].value.upper() in {"TABLE", "ONLY"}
-                ):
+                if target_index < len(tokens) and tokens[target_index].value.upper() == "TABLE":
                     target_index += 1
+                if (
+                    keyword == "LOCK"
+                    and target.provider != "mysql"
+                    and target_index < len(tokens)
+                    and tokens[target_index].value.upper() == "TABLES"
+                ):
+                    raise WriteTargetError("MySQL LOCK TABLES syntax is unsupported for this provider")
             if (
                 keyword == "COPY"
                 and target_index < len(tokens)
                 and tokens[target_index].value.upper() == "BINARY"
             ):
                 target_index += 1
-            index = _check_target_at(tokens, target_index, target)
             if keyword in {"LOCK", "TRUNCATE"}:
-                while index < len(tokens) and tokens[index].value == ",":
-                    index = _check_target_at(tokens, index + 1, target)
+                index = _check_table_target_list(
+                    tokens,
+                    target_index,
+                    target,
+                    allow_only=target.provider in {"postgres", "gaussdb"},
+                    allow_inheritance=target.provider in {"postgres", "gaussdb"},
+                )
+            else:
+                index = _check_target_at(tokens, target_index, target)
             writes = True
             continue
 

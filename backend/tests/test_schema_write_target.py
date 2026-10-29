@@ -166,7 +166,10 @@ class SchemaWriteTargetContractTests(unittest.TestCase):
             "DROP INDEX dap.first_index, dwp.second_index",
             "TRUNCATE TABLE dap.first_table, dwp.second_table",
             "TRUNCATE TABLE ONLY dap.first_table, dwp.second_table",
+            "TRUNCATE TABLE dap.first_table, ONLY dwp.second_table",
+            "TRUNCATE TABLE dap.first_table *, dwp.second_table",
             "LOCK TABLE ONLY dap.first_table, dwp.second_table IN ACCESS EXCLUSIVE MODE",
+            "LOCK TABLE dap.first_table *, ONLY dwp.second_table IN ACCESS EXCLUSIVE MODE",
         )
         for sql in statements:
             with self.subTest(sql=sql), self.assertRaisesRegex(
@@ -183,10 +186,41 @@ class SchemaWriteTargetContractTests(unittest.TestCase):
             "DELETE FROM asset_db.first_table, dwp.second_table WHERE id = 1",
             "LOCK TABLES asset_db.first_table WRITE, dwp.second_table READ",
             "DROP INDEX idx ON dwp.p_asset_table",
+            "ALTER TABLE asset_db.first_table RENAME TO other_db.second_table",
+            "ALTER TABLE asset_db.partitioned EXCHANGE PARTITION p0 WITH TABLE other_db.shadow",
         )
         for sql in statements:
             with self.subTest(sql=sql), self.assertRaises(WriteTargetError):
                 validate_write_sql(sql, target)
+
+    def test_mysql_table_rename_validates_source_and_destination_database(self):
+        target = resolve_write_target({"type": "mysql", "database": "asset_db"})
+        self.assertTrue(
+            validate_write_sql(
+                "ALTER TABLE asset_db.old_name RENAME TO asset_db.new_name", target
+            )
+        )
+        self.assertTrue(
+            validate_write_sql("ALTER TABLE old_name RENAME TO new_name", target)
+        )
+        with self.assertRaisesRegex(WriteTargetError, "does not match"):
+            validate_write_sql(
+                "ALTER TABLE asset_db.old_name RENAME AS other_db.new_name", target
+            )
+
+    def test_alter_column_action_is_not_parsed_as_a_second_ddl_statement(self):
+        target = resolve_write_target({"type": "postgres", "schema": "dwp"})
+        self.assertTrue(
+            validate_write_sql(
+                "ALTER TABLE dwp.p_push_job ALTER COLUMN freq_desc TYPE VARCHAR(200)",
+                target,
+            )
+        )
+        with self.assertRaisesRegex(WriteTargetError, "does not match"):
+            validate_write_sql(
+                "ALTER TABLE public.p_push_job ALTER COLUMN freq_desc TYPE VARCHAR(200)",
+                target,
+            )
 
     def test_schema_moving_and_temporary_table_ddl_fail_closed(self):
         target = resolve_write_target({"type": "postgres", "schema": "dap"})
@@ -252,6 +286,11 @@ class SchemaWriteTargetContractTests(unittest.TestCase):
         self.assertTrue(validate_write_sql("INSERT INTO dwp.p_asset_table (id) VALUES (1)", target))
         with self.assertRaisesRegex(WriteTargetError, "must explicitly target"):
             validate_write_sql("INSERT INTO p_asset_table (id) VALUES (1)", target)
+        with self.assertRaisesRegex(WriteTargetError, "must explicitly target"):
+            validate_write_sql("DROP INDEX outside_idx", target)
+        with self.assertRaisesRegex(WriteTargetError, "does not match"):
+            validate_write_sql("DROP INDEX main.outside_idx", target)
+        self.assertTrue(validate_write_sql("DROP INDEX dwp.internal_idx", target))
 
         connection = connect_sqlite(config)
         try:
