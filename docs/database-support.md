@@ -50,7 +50,8 @@ DAP 用标签而不是笼统的「支持」来描述数据库状态，避免把�
   5. repeat `apply` 必须为 no-op
   6. canonical repository schema 物理边界检查
   7. 启用集成测试后的**全量后端测试**（集成测试不 skip）
-- **边界**：CI 使用隔离的一次性 schema（`dwp`），不连接任何生产库。
+- **Profile target**：fresh baseline 要求显式 Profile `schema`；仅将 canonical baseline 中受控的 `dwp` schema identifier tokens（含 `CREATE SCHEMA IF NOT EXISTS dwp`）渲染到该目标，并保持 `CREATE SCHEMA IF NOT EXISTS` 行为。ledger lookup/stamp、user-table preflight、reflection 与 DDL 使用同一 Profile schema；缺失目标在 catalog query/DDL 前拒绝。
+- **边界**：CI 使用隔离的一次性 schema（`dwp`），不连接任何生产库。当前 CI 在线服务覆盖 `dwp`；非 `dwp` rendering/ledger/reflection 由 Recording/offline tests 覆盖，未在部署数据库验证。
 
 ### MySQL 8.0 — Verified
 
