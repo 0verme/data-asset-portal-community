@@ -36,6 +36,8 @@ def _jaydebeapi_connect_patch(conn):
     return stack
 
 
+GAUSS_PROFILE = {"type": "gaussdb", "schema": "dap"}
+
 GAUSS_CONFIG = {
     "driver": "com.huawei.gauss200.jdbc.Driver",
     "jdbc_url": "jdbc:gaussdb://db.example.test:25308/asset_portal",
@@ -84,8 +86,13 @@ class DatabaseTransactionTests(unittest.TestCase):
     def test_success_commits_once_after_all_shared_statements(self):
         conn = MagicMock()
         conn.jconn.getAutoCommit.return_value = False
+        conn.exec_driver_sql = None
 
-        with patch("backend.app.db.facade.connect_with_profile", return_value=conn):
+        conn.cursor.return_value.fetchone.return_value = ("dap",)
+        with (
+            patch("backend.app.db.facade.connect_with_profile", return_value=conn),
+            patch("backend.app.db.facade.get_db_profile", return_value=GAUSS_PROFILE),
+        ):
             with database_transaction():
                 execute_statements("primary", ["UPDATE first", "UPDATE second"])
                 conn.commit.assert_not_called()
@@ -125,12 +132,14 @@ class DatabaseTransactionTests(unittest.TestCase):
         conn = MagicMock()
         cursor = conn.cursor.return_value
         conn.jconn.getAutoCommit.return_value = False
+        conn.exec_driver_sql = None
+        cursor.fetchone.return_value = ("dap",)
 
         with (
             patch("backend.app.db.facade.connect_with_profile", return_value=conn),
             patch(
                 "backend.app.db.facade.get_db_profile",
-                return_value={"type": "gaussdb", "schema": "dap"},
+                return_value=GAUSS_PROFILE,
             ),
         ):
             execute_statements(
@@ -150,7 +159,11 @@ class DatabaseTransactionTests(unittest.TestCase):
                     ("值", 7),
                 ),
             ],
-            cursor.execute.call_args_list,
+            [
+                call
+                for call in cursor.execute.call_args_list
+                if call.args[0] != "SELECT current_schema()"
+            ],
         )
         conn.commit.assert_called_once_with()
         conn.rollback.assert_not_called()
@@ -159,13 +172,19 @@ class DatabaseTransactionTests(unittest.TestCase):
         conn = MagicMock()
         cursor = conn.cursor.return_value
         conn.jconn.getAutoCommit.return_value = False
-        cursor.execute.side_effect = [None, RuntimeError("write failed")]
+        conn.exec_driver_sql = None
+        cursor.fetchone.return_value = ("dap",)
+        cursor.execute.side_effect = [
+            None,
+            None,
+            RuntimeError("write failed"),
+        ]
 
         with (
             patch("backend.app.db.facade.connect_with_profile", return_value=conn),
             patch(
                 "backend.app.db.facade.get_db_profile",
-                return_value={"type": "gaussdb", "schema": "dap"},
+                return_value=GAUSS_PROFILE,
             ),
         ):
             with self.assertRaisesRegex(RuntimeError, "write failed"):
@@ -215,7 +234,8 @@ class DatabaseTransactionTests(unittest.TestCase):
             with self.assertRaisesRegex(TypeError, "statement must be SQL text"):
                 execute_statements("primary", [("UPDATE sample", [], "extra")])
 
-        conn.rollback.assert_called_once_with()
+        conn.cursor.assert_not_called()
+        conn.rollback.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from typing import Any
 
 from ..db.providers import gaussdb_schema_sql_identifier
 from ..db.registry import get_provider
+from ..db.write_target import resolve_write_target
 
 BASELINE_REVISION = "0001_baseline"
 SUPPORTED_DIALECTS = ("sqlite", "postgresql", "mysql", "dws")
@@ -835,6 +836,15 @@ def _stamp(connection, config: dict, revision: str = BASELINE_REVISION):
         cursor.close()
 
 
+def _assert_postgres_fresh_baseline_target(config: dict) -> None:
+    target = resolve_write_target(config)
+    if target.provider != "postgres" or target.schema != "dwp":
+        raise RuntimeError(
+            "PostgreSQL canonical baseline currently targets dwp; refusing fresh DDL "
+            "for a different Profile schema until profile-aware baseline rendering is available"
+        )
+
+
 def initialize(
     connection,
     config: dict,
@@ -847,6 +857,8 @@ def initialize(
         _assert_dws_schema_exists(connection, config)
     if current_revision(connection, config) is not None:
         return False
+    if dialect == "postgresql":
+        _assert_postgres_fresh_baseline_target(config)
     if _has_user_tables(connection, config):
         raise RuntimeError("database already contains user tables; verify it and use baseline/stamp")
     sql = render_baseline_for_profile(config, dialect, root)

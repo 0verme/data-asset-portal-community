@@ -50,6 +50,29 @@ class RuntimeSqlProfileSchemaTests(unittest.TestCase):
         self.assertEqual("", MySQLProvider().physical_schema(profiles["mysql_test"]))
         self.assertEqual("dap", GaussDBProvider().physical_schema(profiles["gauss_test"]))
 
+    def test_explicit_dwp_and_external_schema_are_never_rewritten(self):
+        sql = "UPDATE dwp.p_report_asset SET name = 'dwp.example' -- dwp.note"
+        profiles = {
+            "postgres_test": {"type": "postgres", "schema": "dap"},
+            "mysql_test": {"type": "mysql", "database": "asset_db"},
+            "gauss_test": {"type": "gaussdb", "schema": "dap"},
+        }
+        with patch(
+            "backend.app.db.facade.get_db_profile",
+            side_effect=profiles.__getitem__,
+        ):
+            for profile in profiles:
+                with self.subTest(profile=profile):
+                    self.assertEqual(sql, normalize_sql_for_profile(profile, sql))
+                    self.assertEqual(
+                        "UPDATE upstream_catalog.p_report_asset SET name = 'dwp.example'",
+                        normalize_sql_for_profile(
+                            profile,
+                            "UPDATE upstream_catalog.p_report_asset "
+                            "SET name = 'dwp.example'",
+                        ),
+                    )
+
     def test_database_export_uses_profile_schema_and_unqualified_replay_sql(self):
         config = {"type": "gaussdb", "schema": "dap"}
         with patch("backend.scripts.db_to_init_sql.get_db_profile", return_value=config):
