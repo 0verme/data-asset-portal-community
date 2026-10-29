@@ -217,7 +217,7 @@ async function exportAndAssertColumns(
   testInfo: TestInfo,
   view: "field" | "table",
   expectedHeaders: string[],
-): Promise<void> {
+): Promise<string[][]> {
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出 CSV" }).click();
   const download = await downloadPromise;
@@ -226,6 +226,7 @@ async function exportAndAssertColumns(
   expect(rows).toHaveLength(2);
   for (const row of rows) expect(row).toHaveLength(expectedHeaders.length);
   expect(rows[0]).toEqual(expectedHeaders);
+  return rows;
 }
 
 async function countEffectiveHeaderColumns(table: Locator): Promise<number[]> {
@@ -519,11 +520,11 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
   ];
   const fieldCsv = [
     "源系统,源系统表,源字段,字段类型,字段注释,目标层,目标表名,入仓方式,目标字段,映射规则",
-    "测试源系统,SRC_SALES,AMOUNT,DECIMAL,销售金额,DWF,DWF_SALES,增量,AMOUNT_VALUE,日期格式化",
+    "测试源系统 · SYS-1,SRC_SALES,AMOUNT,DECIMAL,销售金额,DWF,DWF_SALES,incr,AMOUNT_VALUE,日期格式化",
   ].join("\r\n");
   const tableCsv = [
     "源系统,源系统表,表中文名,目标层,目标表名,入仓方式,已映射,空注释率",
-    "测试源系统,SRC_SALES,销售表,DWF,DWF_SALES,增量,3,0%",
+    "测试源系统 · SYS-1,SRC_SALES,销售表,DWF,DWF_SALES,增量,3,0",
   ].join("\r\n");
   const requests = await installApiFixtures(page, {
     onFields: async (route, url) => {
@@ -546,8 +547,11 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
   await expect(table.locator("thead th")).toHaveCount(9);
   await expect(table.locator("colgroup col")).toHaveCount(9);
   await expect(table.locator("tbody tr").first().locator("td")).toHaveCount(9);
-  await exportAndAssertColumns(page, testInfo, "table", [
+  const tableCsvRows = await exportAndAssertColumns(page, testInfo, "table", [
     "源系统", "源系统表", "表中文名", "目标层", "目标表名", "入仓方式", "已映射", "空注释率",
+  ]);
+  expect(tableCsvRows[1]).toEqual([
+    "测试源系统 · SYS-1", "SRC_SALES", "销售表", "DWF", "DWF_SALES", "增量", "3", "0",
   ]);
   expect(requests.exports.at(-1)?.searchParams.get("view")).toBe("table");
 
@@ -555,17 +559,36 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
   await expect(table.locator("tbody tr")).toHaveCount(3);
   await expect(table.locator("colgroup col")).toHaveCount(11);
   expect(await countEffectiveHeaderColumns(table)).toEqual([11, 11]);
-  const targetHeaders = await table.locator("thead tr").last().locator("th").allInnerTexts();
-  expect(targetHeaders.slice(5).map((label) => label.trim())).toEqual([
+  const fieldHeaders = (await table.locator("thead tr").last().locator("th").allInnerTexts())
+    .map((label) => label.trim());
+  expect(fieldHeaders).toEqual([
+    "源系统", "源系统表", "源字段", "字段类型", "字段注释",
     "目标层", "目标表名", "入仓方式", "目标字段", "映射规则",
   ]);
   await expect(table.locator("thead .fm-arrow-col")).toHaveAttribute("rowspan", "2");
 
   const fieldRows = await table.locator("tbody tr").all();
   for (const row of fieldRows) await expect(row.locator("td")).toHaveCount(11);
-  expect((await fieldRows[0]!.locator("td").allInnerTexts()).slice(6).map((value) => value.trim())).toEqual([
+  const populatedCells = (await fieldRows[0]!.locator("td").allInnerTexts())
+    .map((value) => value.trim());
+  expect(populatedCells).toEqual([
+    "测试源系统", "FIELD_ON_DEMAND", "AMOUNT", "VARCHAR", "销售金额", "→",
     "DWF", "DWF_SALES", "增量", "AMOUNT_VALUE", "日期格式化",
   ]);
+  expect(Object.fromEntries(fieldHeaders.slice(0, 5).map((header, index) => [header, populatedCells[index]]))).toEqual({
+    "源系统": "测试源系统",
+    "源系统表": "FIELD_ON_DEMAND",
+    "源字段": "AMOUNT",
+    "字段类型": "VARCHAR",
+    "字段注释": "销售金额",
+  });
+  expect(Object.fromEntries(fieldHeaders.slice(5).map((header, index) => [header, populatedCells[index + 6]]))).toEqual({
+    "目标层": "DWF",
+    "目标表名": "DWF_SALES",
+    "入仓方式": "增量",
+    "目标字段": "AMOUNT_VALUE",
+    "映射规则": "日期格式化",
+  });
   await expect(fieldRows[0]!.locator("td").nth(8).locator(".tag")).toHaveClass(/tag-ok/);
   for (const rowIndex of [1, 2]) {
     const targetCells = (await fieldRows[rowIndex]!.locator("td").allInnerTexts()).slice(6).map((value) => value.trim());
@@ -574,9 +597,13 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
     await expect(fieldRows[rowIndex]!.locator("td").nth(8).locator(".fm-empty")).toHaveText("未设置");
   }
 
-  await exportAndAssertColumns(page, testInfo, "field", [
+  const fieldCsvRows = await exportAndAssertColumns(page, testInfo, "field", [
     "源系统", "源系统表", "源字段", "字段类型", "字段注释",
     "目标层", "目标表名", "入仓方式", "目标字段", "映射规则",
+  ]);
+  expect(fieldCsvRows[1]).toEqual([
+    "测试源系统 · SYS-1", "SRC_SALES", "AMOUNT", "DECIMAL", "销售金额",
+    "DWF", "DWF_SALES", "incr", "AMOUNT_VALUE", "日期格式化",
   ]);
   expect(requests.exports.at(-1)?.searchParams.get("view")).toBe("field");
 
