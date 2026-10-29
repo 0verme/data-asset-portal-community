@@ -11,6 +11,7 @@ from backend.app.db.base import (
     BackendCapability,
     CrossProfileTransactionError,
     DatabaseConnectionError,
+    DatabaseTransactionError,
     validate_provider_contract,
 )
 from backend.app.db.facade import (
@@ -78,6 +79,39 @@ class ProviderContractTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(ValueError, "requires database"):
             SQLiteProvider().validate("missing-database", {"type": "sqlite"}, config_path=Path("database.yaml"))
+
+    def test_postgres_schema_is_safe_and_uses_unquoted_identifier_case(self):
+        provider = PostgreSQLProvider()
+        config = provider.validate(
+            "postgres_test",
+            {
+                "type": "postgres",
+                "database": "asset",
+                "user": "test-user",
+                "password": "test-password",
+                "schema": "Dap",
+            },
+            config_path=Path("database.yaml"),
+        )
+        self.assertEqual("dap", config["schema"])
+        self.assertEqual("dap", provider.physical_schema(config))
+        self.assertIn("-c search_path=dap", provider._options(config))
+
+        for schema in ("dap;DROP", "foo.bar", " "):
+            with self.subTest(schema=schema), self.assertRaisesRegex(
+                ValueError, "safe SQL identifier"
+            ):
+                provider.validate(
+                    "postgres_test",
+                    {
+                        "type": "postgres",
+                        "database": "asset",
+                        "user": "test-user",
+                        "password": "test-password",
+                        "schema": schema,
+                    },
+                    config_path=Path("database.yaml"),
+                )
 
     def test_dws_validation_requires_jdbc_credentials_and_driver_file(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -239,6 +273,28 @@ class TransactionContractTests(unittest.TestCase):
                     self.assertIs(first, second)
                     active_transaction_connection("profile-b")
         connect.assert_called_once_with("profile-a")
+        connection.rollback.assert_called_once_with()
+        connection.close.assert_called_once_with()
+
+    def test_transaction_fixes_one_effective_profile_configuration(self):
+        config = {"type": "gaussdb", "schema": "dap"}
+        connection = MagicMock()
+        connection.jconn.getAutoCommit.return_value = False
+        with patch(
+            "backend.app.db.facade.connect_with_profile", return_value=connection
+        ) as connect:
+            with self.assertRaisesRegex(
+                DatabaseTransactionError, "cannot change its effective profile"
+            ):
+                with database_transaction():
+                    self.assertIs(
+                        connection,
+                        active_transaction_connection("profile", config=config),
+                    )
+                    active_transaction_connection(
+                        "profile", config={"type": "gaussdb", "schema": "dwp"}
+                    )
+        connect.assert_called_once_with("profile", config=config)
         connection.rollback.assert_called_once_with()
         connection.close.assert_called_once_with()
 

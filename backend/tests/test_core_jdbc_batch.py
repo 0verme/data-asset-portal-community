@@ -121,8 +121,18 @@ class _BatchCursor:
         self.closed = False
         self._batch_error = batch_error
         self._batch_rowcount = batch_rowcount
+        self._result = None
+        self.probe_calls = []
 
     def execute(self, sql, params=None):
+        if sql == "SELECT current_schema()":
+            self.probe_calls.append((sql, params))
+            self._result = ("dap",)
+            return
+        if sql == "SELECT current_schema(), current_schemas(false)":
+            self.probe_calls.append((sql, params))
+            self._result = ("dwp", ["dwp"])
+            return
         self.calls.append(("execute", sql, params))
         self.rowcount = 1
 
@@ -132,6 +142,9 @@ class _BatchCursor:
         if self._batch_error is not None:
             raise self._batch_error
         self.rowcount = len(rows) if self._batch_rowcount is None else self._batch_rowcount
+
+    def fetchone(self):
+        return self._result
 
     def fetchall(self):
         return []

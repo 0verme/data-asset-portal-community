@@ -99,19 +99,36 @@ def _import_gaussdb_adapter(stack: ExitStack):
 
 
 class _RecordingCursor:
-    def __init__(self):
+    def __init__(self, connection=None):
         self.calls = []
+        self.probes = []
+        self.all_calls = []
+        self.connection = connection
+        self.result = None
         self.rowcount = 1
         self.description = None
         self.closed = False
 
     def execute(self, sql, params=None):
+        self.all_calls.append((sql, params))
+        if sql.startswith("SELECT current_schema"):
+            self.probes.append((sql, params))
+            if "current_schemas(false)" in sql:
+                self.result = (self.connection.current_schema, [self.connection.current_schema])
+            else:
+                self.result = (self.connection.current_schema,)
+            return
         self.calls.append((sql, params))
+        self.result = None
 
     def executemany(self, sql, rows):
         rows = [tuple(row) for row in rows]
+        self.all_calls.append((sql, rows))
         self.calls.append((sql, rows))
         self.rowcount = len(rows)
+
+    def fetchone(self):
+        return self.result
 
     def fetchall(self):
         return []
@@ -121,8 +138,10 @@ class _RecordingCursor:
 
 
 class _RecordingConnection:
-    def __init__(self, cursor):
+    def __init__(self, cursor, *, current_schema="dap"):
         self._cursor = cursor
+        self.current_schema = current_schema
+        cursor.connection = self
         self.jconn = types.SimpleNamespace(getAutoCommit=lambda: False)
         self.closed = False
         self.committed = 0
@@ -263,7 +282,7 @@ class GaussdbCoreBindTests(_GaussdbAdapterTestCase):
 
     def test_execute_core_on_cursor_normalizes_datetime_bind(self):
         table = _temporal_table()
-        cursor = _RecordingCursor()
+        cursor = _RecordingCursor(self.connection)
 
         with (
             patch("backend.app.db.core.get_db_profile", return_value=dict(GAUSSDB_PROFILE)),
@@ -408,7 +427,7 @@ class NonGaussdbBindIsolationTests(unittest.TestCase):
     def test_postgres_core_path_keeps_python_datetime(self):
         table = _temporal_table()
         cursor = _RecordingCursor()
-        connection = _RecordingConnection(cursor)
+        connection = _RecordingConnection(cursor, current_schema="dwp")
 
         with (
             patch("backend.app.db.core.get_db_profile", return_value={"type": "postgres", "schema": "dwp"}),

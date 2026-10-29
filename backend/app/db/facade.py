@@ -31,12 +31,16 @@ from .base import (
     DatabaseTransactionError,
     redact_sensitive_text,
 )
-from .providers import (
-    DEFAULT_GAUSS_DRIVER,
-    LOGICAL_SCHEMA,
-    gaussdb_schema_sql_identifier,
-)
+from .providers import DEFAULT_GAUSS_DRIVER
 from .registry import get_provider
+from .write_target import (
+    EffectiveWriteTarget,
+    resolve_write_target,
+    rewrite_logical_schema,
+    sql_has_write_keyword,
+    validate_connection_target,
+    validate_write_sql,
+)
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
@@ -60,14 +64,27 @@ class _DatabaseTransaction:
     def __init__(self):
         self.profile = None
         self.connection = None
+        self.config_fingerprint = None
 
-    def connection_for(self, profile: str):
+    def connection_for(self, profile: str, config: dict | None = None):
         if self.connection is None:
             self.profile = profile
-            self.connection = connect_with_profile(profile)
+            if config is not None:
+                self.config_fingerprint = _config_fingerprint(config)
+                self.connection = connect_with_profile(profile, config=config)
+            else:
+                self.connection = connect_with_profile(profile)
         elif self.profile != profile:
             raise CrossProfileTransactionError(
                 f"A database transaction cannot span multiple profiles: {self.profile} and {profile}"
+            )
+        elif (
+            config is not None
+            and self.config_fingerprint is not None
+            and self.config_fingerprint != _config_fingerprint(config)
+        ):
+            raise DatabaseTransactionError(
+                "A database transaction cannot change its effective profile configuration"
             )
         return self.connection
 
@@ -103,10 +120,14 @@ def database_transaction():
                 LOGGER.exception("Failed to close database transaction")
 
 
-def active_transaction_connection(profile: str):
+def active_transaction_connection(profile: str, *, config: dict | None = None):
     """Return the shared connection for *profile*, if an operation owns one."""
     transaction = _ACTIVE_TRANSACTION.get()
-    return transaction.connection_for(profile) if transaction is not None else None
+    return (
+        transaction.connection_for(profile, config=config)
+        if transaction is not None
+        else None
+    )
 
 
 def _resolve_config_path() -> Path:
@@ -202,8 +223,8 @@ def _connect_sqlite(config: dict):
     return connect(config)
 
 
-def connect_with_profile(profile: str):
-    config = get_db_profile(profile)
+def connect_with_profile(profile: str, *, config: dict | None = None):
+    config = get_db_profile(profile) if config is None else config
     provider = get_provider(config["type"])
     try:
         engine = get_engine(profile, config=config)
@@ -221,11 +242,15 @@ def connect_with_profile(profile: str):
         raise DatabaseConnectionError(profile, provider.name, safe_reason) from None
 
 
+def _config_fingerprint(config: dict) -> tuple:
+    return tuple(sorted((key, repr(value)) for key, value in config.items()))
+
+
 def get_engine(profile: str, *, config: dict | None = None):
     """Return the cached SQLAlchemy Engine for an engine-backed profile."""
-    config = config or get_db_profile(profile)
+    config = get_db_profile(profile) if config is None else config
     provider = get_provider(config["type"])
-    fingerprint = tuple(sorted((key, repr(value)) for key, value in config.items()))
+    fingerprint = _config_fingerprint(config)
     cached = _ENGINE_CACHE.get(profile)
     if cached and cached[0] == fingerprint:
         return cached[1]
@@ -315,10 +340,25 @@ def _has_temporal_bind(params) -> bool:
     )
 
 
-def _prepare_execute_args(profile: str, sql: str, params=None):
-    config = get_db_profile(profile)
+def _normalize_sql_for_config(config: dict, sql_text: str) -> str:
     provider = get_provider(config["type"])
-    normalized_sql = normalize_sql_for_profile(profile, sql)
+    physical_schema = provider.physical_schema(config)
+    target = EffectiveWriteTarget(
+        provider=provider.name,
+        database=config.get("database"),
+        schema=physical_schema or None,
+    )
+    sql_text = rewrite_logical_schema(sql_text, target)
+    if config["type"] == "gaussdb":
+        return sql_text
+    # Only gaussdb/DWS understands DISTRIBUTE BY HASH(...); strip it for postgres.
+    return POSTGRES_DISTRIBUTE_RE.sub(");", sql_text)
+
+
+def _prepare_execute_args(profile: str, sql: str, params=None, *, config=None):
+    config = get_db_profile(profile) if config is None else config
+    provider = get_provider(config["type"])
+    normalized_sql = _normalize_sql_for_config(config, sql)
     if not params:
         return normalized_sql, None
     if provider.placeholder != "?":
@@ -327,13 +367,16 @@ def _prepare_execute_args(profile: str, sql: str, params=None):
 
 
 def fetch_all(profile: str, sql: str, params=None):
+    config = get_db_profile(profile)
     conn = None
     curs = None
-    shared_connection = active_transaction_connection(profile)
+    shared_connection = active_transaction_connection(profile, config=config)
     try:
-        conn = shared_connection or connect_with_profile(profile)
+        conn = shared_connection or connect_with_profile(profile, config=config)
         curs = conn.cursor()
-        normalized_sql, normalized_params = _prepare_execute_args(profile, sql, params=params)
+        normalized_sql, normalized_params = _prepare_execute_args(
+            profile, sql, params=params, config=config
+        )
         if normalized_params is None:
             curs.execute(normalized_sql)
         else:
@@ -358,13 +401,23 @@ def fetch_all(profile: str, sql: str, params=None):
 
 
 def execute_sql(profile: str, sql: str, autocommit: bool = True, params=None):
+    config = get_db_profile(profile)
+    normalized_sql, normalized_params = _prepare_execute_args(
+        profile, sql, params=params, config=config
+    )
+    provider = get_provider(config["type"]).name
+    is_write = sql_has_write_keyword(normalized_sql, provider)
+    target = resolve_write_target(config) if is_write else None
+    if is_write:
+        validate_write_sql(normalized_sql, target)
     conn = None
     curs = None
-    shared_connection = active_transaction_connection(profile)
+    shared_connection = active_transaction_connection(profile, config=config)
     try:
-        conn = shared_connection or connect_with_profile(profile)
+        conn = shared_connection or connect_with_profile(profile, config=config)
+        if is_write:
+            validate_connection_target(conn, config, target)
         curs = conn.cursor()
-        normalized_sql, normalized_params = _prepare_execute_args(profile, sql, params=params)
         if normalized_params is None:
             curs.execute(normalized_sql)
         else:
@@ -373,6 +426,11 @@ def execute_sql(profile: str, sql: str, autocommit: bool = True, params=None):
             _commit_if_needed(conn)
         return True
     except Exception:
+        try:
+            if conn is not None and shared_connection is None:
+                _rollback_if_needed(conn)
+        except Exception:
+            LOGGER.exception("Failed to roll back execute_sql for profile=%s", profile)
         LOGGER.exception("execute_sql failed for profile=%s", profile)
         raise
     finally:
@@ -389,14 +447,23 @@ def execute_sql(profile: str, sql: str, autocommit: bool = True, params=None):
 
 
 def execute_many(profile: str, sql: str, rows, autocommit: bool = True):
+    config = get_db_profile(profile)
+    normalized_sql, _ = _prepare_execute_args(
+        profile, sql, params=[None], config=config
+    )
+    provider = get_provider(config["type"]).name
+    is_write = sql_has_write_keyword(normalized_sql, provider)
+    target = resolve_write_target(config) if is_write else None
+    if is_write:
+        validate_write_sql(normalized_sql, target)
     conn = None
     curs = None
-    shared_connection = active_transaction_connection(profile)
+    shared_connection = active_transaction_connection(profile, config=config)
     try:
-        conn = shared_connection or connect_with_profile(profile)
+        conn = shared_connection or connect_with_profile(profile, config=config)
+        if is_write:
+            validate_connection_target(conn, config, target)
         curs = conn.cursor()
-        normalized_sql, _ = _prepare_execute_args(profile, sql, params=[None])
-        config = get_db_profile(profile)
         provider = get_provider(config["type"])
         normalized_rows = [
             _normalize_jdbc_bind_params(provider, tuple(row)) for row in rows
@@ -406,6 +473,11 @@ def execute_many(profile: str, sql: str, rows, autocommit: bool = True):
             _commit_if_needed(conn)
         return True
     except Exception:
+        try:
+            if conn is not None and shared_connection is None:
+                _rollback_if_needed(conn)
+        except Exception:
+            LOGGER.exception("Failed to roll back execute_many for profile=%s", profile)
         LOGGER.exception("execute_many failed for profile=%s", profile)
         raise
     finally:
@@ -421,27 +493,58 @@ def execute_many(profile: str, sql: str, rows, autocommit: bool = True):
             pass
 
 
-def _prepare_statement(profile: str, statement):
+def _prepare_statement(profile: str, statement, *, config=None):
     if isinstance(statement, str):
-        return statement, None
+        return _prepare_execute_args(profile, statement, config=config)
     if (
         isinstance(statement, (tuple, list))
         and len(statement) == 2
         and isinstance(statement[0], str)
     ):
-        return _prepare_execute_args(profile, statement[0], params=statement[1])
+        return _prepare_execute_args(
+            profile, statement[0], params=statement[1], config=config
+        )
     raise TypeError("statement must be SQL text or a (sql, params) pair")
 
 
 def execute_statements(profile: str, statements, autocommit: bool = True):
+    statements = list(statements)
+    for statement in statements:
+        if not (
+            isinstance(statement, str)
+            or (
+                isinstance(statement, (tuple, list))
+                and len(statement) == 2
+                and isinstance(statement[0], str)
+            )
+        ):
+            raise TypeError("statement must be SQL text or a (sql, params) pair")
+    config = get_db_profile(profile)
+    prepared = []
+    target = None
+    has_writes = False
+    for statement in statements:
+        normalized_sql, normalized_params = _prepare_statement(
+            profile, statement, config=config
+        )
+        if normalized_sql.strip() and sql_has_write_keyword(
+            normalized_sql, get_provider(config["type"]).name
+        ):
+            current_target = resolve_write_target(config)
+            validate_write_sql(normalized_sql, current_target)
+            target = current_target
+            has_writes = True
+        prepared.append((normalized_sql, normalized_params))
+
     conn = None
     curs = None
-    shared_connection = active_transaction_connection(profile)
+    shared_connection = active_transaction_connection(profile, config=config)
     try:
-        conn = shared_connection or connect_with_profile(profile)
+        conn = shared_connection or connect_with_profile(profile, config=config)
+        if has_writes:
+            validate_connection_target(conn, config, target)
         curs = conn.cursor()
-        for statement in statements:
-            normalized_sql, normalized_params = _prepare_statement(profile, statement)
+        for normalized_sql, normalized_params in prepared:
             if not normalized_sql.strip():
                 continue
             if normalized_params is None:
@@ -477,18 +580,4 @@ POSTGRES_DISTRIBUTE_RE = re.compile(r"\)\s*DISTRIBUTE\s+BY\s+HASH\s*\([^)]+\)\s*
 
 def normalize_sql_for_profile(profile: str, sql_text: str) -> str:
     config = get_db_profile(profile)
-    provider = get_provider(config["type"])
-    physical_schema = provider.physical_schema(config)
-    schema_identifier = (
-        gaussdb_schema_sql_identifier(physical_schema)
-        if provider.name == "gaussdb"
-        else physical_schema
-    )
-    schema_prefix = f"{schema_identifier}." if schema_identifier else ""
-    sql_text = sql_text.replace(f"{LOGICAL_SCHEMA}.", schema_prefix)
-    if physical_schema is None:
-        sql_text = sql_text.replace("dwp.", "")
-    # Only gaussdb/DWS understands DISTRIBUTE BY HASH(...); strip it for postgres.
-    if config["type"] == "gaussdb":
-        return sql_text
-    return POSTGRES_DISTRIBUTE_RE.sub(");", sql_text)
+    return _normalize_sql_for_config(config, sql_text)
