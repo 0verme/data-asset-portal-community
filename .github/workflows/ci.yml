@@ -305,7 +305,7 @@ jobs:
 
       - name: Seed Community demo data (PostgreSQL)
         run: |
-          python demo/seed_postgres.py --dialect postgres > /tmp/pg-seed.sql
+          python demo/seed_postgres.py --dialect postgres --schema dwp > /tmp/pg-seed.sql
           python - <<'EOF'
           import psycopg
           conn = psycopg.connect(host="127.0.0.1", port=5432, dbname="test",
@@ -363,7 +363,7 @@ jobs:
 
       - name: Community Demo seed is idempotent and rejects conflicting legacy rows
         run: |
-          python demo/seed_postgres.py --dialect postgres > /tmp/pg-seed-repeat.sql
+          python demo/seed_postgres.py --dialect postgres --schema dwp > /tmp/pg-seed-repeat.sql
           python - <<'EOF'
           import psycopg
           from demo.seed_loader import community_seed_plan

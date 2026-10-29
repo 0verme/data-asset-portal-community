@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Render an idempotent PostgreSQL/DWS-compatible repository seed.
 
+The CLI requires an explicit schema from the final effective Profile. This
+script only renders SQL; it does not connect to or validate the execution DB.
 The canonical column set comes from ``demo/seed_loader.py`` and
 ``backend/schema``; all rows are fictional demo metadata.
 """
@@ -16,6 +18,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+from backend.app.db.write_target import WriteTargetError, resolve_write_target  # noqa: E402
 
 # The generated SQL contains CJK demo text; force UTF-8 stdout so piping the
 # seed into a database works identically on Windows and POSIX terminals.
@@ -52,13 +56,14 @@ def values(items):
     return ",\n".join("(" + ",".join(literal(value) for value in row) + ")" for row in items)
 
 
-def conflict_guard_sql(table, spec, primary_key, natural_keys=()):
+def conflict_guard_sql(schema, table, spec, primary_key, natural_keys=()):
     """Render an insert-only guard that aborts on conflicting seeded rows.
 
     Each SELECT returns the existing primary key plus valid canonical row
     values. It has no result for matching Demo data; a mismatch deliberately
     violates the primary key before any seed writes.
     """
+    qualified_table = f"{schema}.{table}"
     columns = spec["columns"]
     branches = []
     for row in spec["rows"]:
@@ -86,7 +91,7 @@ def conflict_guard_sql(table, spec, primary_key, natural_keys=()):
         )
         branches.append(
             f"SELECT {selected_values}\n"
-            f"FROM dwp.{table} AS existing\n"
+            f"FROM {qualified_table} AS existing\n"
             "WHERE ("
             + " OR ".join(identity_conditions)
             + ") AND ("
@@ -101,7 +106,7 @@ def conflict_guard_sql(table, spec, primary_key, natural_keys=()):
         "ID/natural key but differs from the Demo contract.\n"
         "-- Canonical values satisfy row constraints; the deliberate duplicate "
         "primary key aborts the transaction.\n"
-        f"INSERT INTO dwp.{table} ({', '.join(columns)})\n"
+        f"INSERT INTO {qualified_table} ({', '.join(columns)})\n"
         + "\nUNION ALL\n".join(branches)
         + ";\n"
     )
@@ -110,9 +115,22 @@ def conflict_guard_sql(table, spec, primary_key, natural_keys=()):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dialect", choices=("postgres", "dws"), default="postgres")
+    parser.add_argument(
+        "--schema",
+        required=True,
+        help="final effective Profile schema after existing overrides (never inferred)",
+    )
     args = parser.parse_args()
+    provider = "postgres" if args.dialect == "postgres" else "gaussdb"
+    try:
+        schema = resolve_write_target(
+            {"type": provider, "schema": args.schema}
+        ).rendered_schema()
+    except WriteTargetError as error:
+        parser.error(f"invalid --schema: {error}")
     seed_plan = {**rbac_seed_plan(), **community_seed_plan()}
     print(f"-- full-channel retail demo seed: {args.dialect}")
+    print(f"-- explicit application schema target: {schema}")
     print("-- Preflight rejects conflicting existing indicator path/indicator rows; matching rows remain insert-only.")
     print("BEGIN;")
     for table, primary_key, natural_keys in (
@@ -121,6 +139,7 @@ def main():
     ):
         print(
             conflict_guard_sql(
+                schema,
                 table,
                 seed_plan[table],
                 primary_key,
@@ -150,14 +169,14 @@ def main():
             "p_role_permission": "role_code,permission_code",
         }.get(table, spec["columns"][0])
         print(
-            f"INSERT INTO dwp.{table} ({columns}) VALUES\n"
+            f"INSERT INTO {schema}.{table} ({columns}) VALUES\n"
             + values(spec["rows"])
             + f"\nON CONFLICT ({key_column}) DO NOTHING;"
         )
     system_codes = ", ".join(literal(code) for code in demo_push_system_codes())
     # pi-lens-ignore: python-sql-injection
     print(
-        "UPDATE dwp.p_push_system "
+        f"UPDATE {schema}.p_push_system "
         f"SET auth_type = {literal(DEMO_PUSH_AUTH_TYPE)} "
         f"WHERE system_code IN ({system_codes}) "
         f"AND auth_type = {literal(LEGACY_DEMO_PUSH_AUTH_TYPE)} "

@@ -76,6 +76,7 @@ GaussDB / DWS 的准确边界是：
 - 商业 JDBC 驱动（如 `gaussdb200.jar`）不包含在仓库中，由部署方自行提供。
 - 在线 `apply` 必须在 GaussDB profile 中显式配置安全的 `schema`，并由部署方预先创建该 schema；migration 会先检查它存在，不会创建 schema，也不会回退到 `dwp`。
 - DWS canonical baseline 使用 `dwp` 作为逻辑 schema；运行时只将 schema-qualified identifiers 映射到 profile 的物理 schema。在线 GaussDB 仍需部署方自行验收。
+- `demo/seed_postgres.py --dialect dws` 也必须显式提供 `--schema`；它只生成 SQL，须由调用者传入最终有效 Profile schema 并核对执行会话。没有在线 DWS seed CI，SQL 生成不代表 DWS 部署验证。
 
 因此它只能被描述为 **Compatible**，不能被描述为「已验证支持」或与 PostgreSQL / MySQL 同级。
 
@@ -98,7 +99,7 @@ python demo/seed_sqlite.py --database <absolute-local-path>/community.db
 
 # PostgreSQL Community 初始化（需要隔离的一次性数据库）
 python backend/scripts/schema_migrate.py apply --profile community_postgres
-python demo/seed_postgres.py --dialect postgres
+python demo/seed_postgres.py --dialect postgres --schema dwp
 
 # MySQL 8.0（先安装可选驱动）
 pip install -r backend/requirements-mysql.txt

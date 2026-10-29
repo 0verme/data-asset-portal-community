@@ -232,7 +232,7 @@ Full/module-specific/external-dependency 部署可手动逐个执行模块 DDL�
 
 本 checklist 针对 Community 的 `backend/scripts/schema_migrate.py`、Alembic baseline 和 `demo/seed_postgres.py`。CLI 的 `apply` 已包含 baseline 初始化以及 Alembic `head` upgrade；仓库没有另一个独立的 `upgrade` 子命令。所有验证都必须使用一次性、可丢弃的 PostgreSQL 数据库或专用测试库，不要使用生产库。
 
-以下命令中的 `DAP38_PG_CONFIG`、`DAP38_PG_PROFILE` 和 `DAP38_PG_DSN` 只代表本地未跟踪配置 / secret-store 变量，不能把真实密码、Token 或完整连接串写入仓库、Issue、PR 或日志。
+以下命令中的 `DAP38_PG_CONFIG`、`DAP38_PG_PROFILE`、`DAP38_PG_DSN` 和 `DAP38_PG_SCHEMA` 只代表本地未跟踪配置 / secret-store 变量；不能把真实密码、Token 或完整连接串写入仓库、Issue、PR 或日志。`DAP38_PG_SCHEMA` 是非敏感标识符，必须手工设为按现有 Profile/config/env 优先级解析后的最终 `schema`（PostgreSQL 未引用标识符按规则折为小写）。seed 不从 DSN、search_path 或数据库权限推断目标，也不验证下游 psql 连接；执行者须确认 DSN 属于同一隔离 Profile。
 
 ### 1. 准备隔离环境
 
@@ -275,7 +275,7 @@ python backend/scripts/schema_migrate.py verify \
 - `schema_migrate.py` 不负责写入演示数据。按当前 seed 脚本生成 SQL，并通过隔离库的 `psql` 执行：
 
 ```bash
-python demo/seed_postgres.py --dialect postgres \
+python demo/seed_postgres.py --dialect postgres --schema "$DAP38_PG_SCHEMA" \
   | psql --dbname "$DAP38_PG_DSN" --set=ON_ERROR_STOP=1
 ```
 
