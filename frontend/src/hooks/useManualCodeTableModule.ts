@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createManualCodeTable,
   deleteManualCodeTable,
@@ -10,7 +10,8 @@ import {
 import type { MockManualCodeTable } from '../data/manualCodeTables.ts';
 import { getBinaryStatusValue, toast } from '../components/common/index.ts';
 import { downloadCsvRows, downloadCsvContent } from '../utils/csv.ts';
-import { getErrorMessage, type ErrorWithPayload } from '../utils/ui.ts';
+import { getErrorMessage } from '../utils/ui.ts';
+import { clearFormFieldErrorEntry, mapApiFormFieldErrors } from '../utils/formFieldErrorMapping.ts';
 
 export interface ManualCodeTableStyleOption {
   value: string;
@@ -86,6 +87,8 @@ export interface UseManualCodeTableModuleResult {
   form: ManualCodeTableFormData;
   setForm: React.Dispatch<React.SetStateAction<ManualCodeTableFormData>>;
   formErrors: ManualCodeTableFormFieldError[];
+  errorFocusRevision: number;
+  clearFieldError: (field: string) => void;
   openNew: () => void;
   openEdit: (item: MockManualCodeTable) => void;
   closeForm: () => void;
@@ -116,6 +119,11 @@ export function useManualCodeTableModule({
   const [detailItem, setDetailItem] = useState<MockManualCodeTable | null>(null);
   const [form, setForm] = useState<ManualCodeTableFormData>(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState<ManualCodeTableFormFieldError[]>([]);
+  const [errorFocusRevision, setErrorFocusRevision] = useState(0);
+  const submitInFlight = useRef(false);
+  const clearFieldError = useCallback((field: string) => {
+    setFormErrors((current) => clearFormFieldErrorEntry(current, field));
+  }, []);
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -177,6 +185,7 @@ export function useManualCodeTableModule({
   };
 
   const submit = async (): Promise<void> => {
+    if (submitInFlight.current || formModal.busy) return;
     const payload = {
       tableCode: form.tableCode.trim().toUpperCase(),
       tableName: form.tableName.trim(),
@@ -196,8 +205,10 @@ export function useManualCodeTableModule({
     if (!payload.style) errors.push({ field: 'style', message: '请选择表样式' });
     if (errors.length) {
       setFormErrors(errors);
+      setErrorFocusRevision((revision) => revision + 1);
       return;
     }
+    submitInFlight.current = true;
     setFormModal((current) => ({ ...current, busy: true }));
     try {
       if (formModal.mode === 'edit' && formModal.initial) {
@@ -209,18 +220,11 @@ export function useManualCodeTableModule({
       setFormModal({ open: false, mode: 'new', initial: null, busy: false });
       toast.success(formModal.mode === 'edit' ? '码值表已更新' : '码值表已新增');
     } catch (nextError: unknown) {
-      const errWithPayload = nextError as ErrorWithPayload | undefined;
-      const details = errWithPayload?.payload?.error?.details;
-      if (Array.isArray(details) && details.length) {
-        setFormErrors(
-          details.map((item) =>
-            typeof item === 'string' ? { field: 'form', message: item } : { field: item.field || 'form', message: item.message || '' },
-          ),
-        );
-      } else {
-        setFormErrors([{ field: 'form', message: getErrorMessage(nextError, '保存码值表失败。') }]);
-      }
+      setFormErrors(mapApiFormFieldErrors(nextError, ['tableCode', 'tableName', 'style', 'owner', 'status', 'remark']));
+      setErrorFocusRevision((revision) => revision + 1);
       setFormModal((current) => ({ ...current, busy: false }));
+    } finally {
+      submitInFlight.current = false;
     }
   };
 
@@ -297,6 +301,8 @@ export function useManualCodeTableModule({
     form,
     setForm,
     formErrors,
+    errorFocusRevision,
+    clearFieldError,
     openNew,
     openEdit,
     closeForm,

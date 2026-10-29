@@ -1,3 +1,5 @@
+import { useLayoutEffect, useMemo, useRef } from "react";
+
 import type { MockManualCodeTable } from "../data/manualCodeTables.ts";
 import type { UseManualCodeTableModuleResult } from "../hooks/useManualCodeTableModule.ts";
 import {
@@ -5,8 +7,8 @@ import {
   MANUAL_CODE_TABLE_STYLES,
 } from "../hooks/useManualCodeTableModule.ts";
 import { formatDateTime } from "../utils/date.ts";
+import { formFieldErrorEntries } from "../utils/formFieldErrorMapping.ts";
 import {
-  ActionErrorBanner,
   DangerZone,
   EmptyState,
   ErrorState,
@@ -19,45 +21,80 @@ import {
 } from "./common/index.ts";
 import { Highlight, Icon } from "./ui.tsx";
 import { Button, IconButton, Input, Select, Textarea } from "../ui/index.ts";
+import { FormErrorSummary, FormField } from "../ui/FormErrors.tsx";
+import { focusFirstFormError } from "../ui/formErrors.ts";
 
 const STYLE_LABELS: Record<string, string> = Object.fromEntries(MANUAL_CODE_TABLE_STYLES.map((item) => [item.value, item.label]));
+const MANUAL_CODE_TABLE_FORM_ID = "manual-code-table-form";
+const MANUAL_CODE_TABLE_FIELD_LABELS: Readonly<Record<string, string>> = {
+  tableCode: "表编码",
+  tableName: "表名称",
+  style: "表样式",
+  owner: "负责人",
+  status: "状态",
+  remark: "说明",
+};
 
 interface CodeTableFormProps {
   module: UseManualCodeTableModuleResult;
 }
 
 function CodeTableForm({ module }: CodeTableFormProps) {
-  const { form, setForm, formErrors, formModal } = module;
-  const hasError = (field: string) => formErrors.some((item) => item.field === field);
+  const { form, setForm, formErrors, formModal, errorFocusRevision, clearFieldError } = module;
+  const fieldErrors = useMemo(() => formFieldErrorEntries(formErrors), [formErrors]);
+  const formRef = useRef<HTMLDivElement>(null);
+  const previousFocusRevision = useRef(errorFocusRevision);
+  useLayoutEffect(() => {
+    if (previousFocusRevision.current === errorFocusRevision) return;
+    previousFocusRevision.current = errorFocusRevision;
+    focusFirstFormError(formRef.current, fieldErrors, "auto");
+  }, [errorFocusRevision, fieldErrors]);
+
   return (
-    <>
-      <ActionErrorBanner title="请先修正以下问题" messages={formErrors.map((item) => item.message)} />
+    <div id={MANUAL_CODE_TABLE_FORM_ID} ref={formRef}>
+      <FormErrorSummary
+        formId={MANUAL_CODE_TABLE_FORM_ID}
+        errors={fieldErrors}
+        getFieldLabel={(field) => MANUAL_CODE_TABLE_FIELD_LABELS[field] || "表单内容"}
+      />
       <FormSection title="码表信息">
         <div className="form-grid">
-          <div className="fl">
-            <label>表编码</label>
-            <Input aria-label="表编码" className={`inp mono${hasError("tableCode") ? " invalid" : ""}`} value={form.tableCode} onChange={(event) => setForm((current) => ({ ...current, tableCode: event.target.value.toUpperCase() }))} placeholder="例如：DIM_GENDER" maxLength={64} />
-          </div>
-          <div className="fl">
-            <label>表名称</label>
-            <Input aria-label="表名称" className={`inp${hasError("tableName") ? " invalid" : ""}`} value={form.tableName} onChange={(event) => setForm((current) => ({ ...current, tableName: event.target.value }))} placeholder="例如：性别字典" maxLength={128} />
-          </div>
-          <div className="fl">
-            <label>表样式</label>
-            <Select<string> aria-label="表样式" placeholder="请选择表样式" className={`inp${hasError("style") ? " invalid" : ""}`} items={[{ label: "请选择表样式", value: "" }, ...MANUAL_CODE_TABLE_STYLES.map((item) => ({ label: item.label, value: item.value }))]} value={form.style || null} onValueChange={(value) => setForm((current) => ({ ...current, style: value || "" }))} />
-          </div>
-          <div className="fl">
-            <label>负责人</label>
-            <Input aria-label="负责人" className="inp" value={form.owner} onChange={(event) => setForm((current) => ({ ...current, owner: event.target.value }))} placeholder="例如：张敏" maxLength={64} />
-          </div>
-          <div className="fl full">
-            <label>状态</label>
-            <Select<string> aria-label="状态" className="inp" items={[{ label: "启用", value: "enabled" }, { label: "禁用", value: "disabled" }]} value={form.status || null} onValueChange={(value) => setForm((current) => ({ ...current, status: value || current.status }))} />
-          </div>
-          <div className="fl full">
-            <label>说明</label>
-            <Textarea aria-label="说明" className="ta" value={form.remark} onChange={(event) => setForm((current) => ({ ...current, remark: event.target.value }))} placeholder="补充用途、引用场景或值结构约定" maxLength={1000} />
-          </div>
+          <FormField className="fl" formId={MANUAL_CODE_TABLE_FORM_ID} name="tableCode" label="表编码" error={fieldErrors["tableCode"]}>
+            <Input aria-label="表编码" className={`inp mono${fieldErrors["tableCode"] ? " invalid" : ""}`} value={form.tableCode} onChange={(event) => {
+              clearFieldError("tableCode");
+              setForm((current) => ({ ...current, tableCode: event.target.value.toUpperCase() }));
+            }} placeholder="例如：DIM_GENDER" maxLength={64} />
+          </FormField>
+          <FormField className="fl" formId={MANUAL_CODE_TABLE_FORM_ID} name="tableName" label="表名称" error={fieldErrors["tableName"]}>
+            <Input aria-label="表名称" className={`inp${fieldErrors["tableName"] ? " invalid" : ""}`} value={form.tableName} onChange={(event) => {
+              clearFieldError("tableName");
+              setForm((current) => ({ ...current, tableName: event.target.value }));
+            }} placeholder="例如：性别字典" maxLength={128} />
+          </FormField>
+          <FormField className="fl" formId={MANUAL_CODE_TABLE_FORM_ID} name="style" label="表样式" error={fieldErrors["style"]}>
+            <Select<string> aria-label="表样式" placeholder="请选择表样式" className={`inp${fieldErrors["style"] ? " invalid" : ""}`} items={[{ label: "请选择表样式", value: "" }, ...MANUAL_CODE_TABLE_STYLES.map((item) => ({ label: item.label, value: item.value }))]} value={form.style || null} onValueChange={(value) => {
+              clearFieldError("style");
+              setForm((current) => ({ ...current, style: value || "" }));
+            }} />
+          </FormField>
+          <FormField className="fl" formId={MANUAL_CODE_TABLE_FORM_ID} name="owner" label="负责人" error={fieldErrors["owner"]}>
+            <Input aria-label="负责人" className={`inp${fieldErrors["owner"] ? " invalid" : ""}`} value={form.owner} onChange={(event) => {
+              clearFieldError("owner");
+              setForm((current) => ({ ...current, owner: event.target.value }));
+            }} placeholder="例如：张敏" maxLength={64} />
+          </FormField>
+          <FormField className="fl full" formId={MANUAL_CODE_TABLE_FORM_ID} name="status" label="状态" error={fieldErrors["status"]}>
+            <Select<string> aria-label="状态" className={`inp${fieldErrors["status"] ? " invalid" : ""}`} items={[{ label: "启用", value: "enabled" }, { label: "禁用", value: "disabled" }]} value={form.status || null} onValueChange={(value) => {
+              clearFieldError("status");
+              setForm((current) => ({ ...current, status: value || current.status }));
+            }} />
+          </FormField>
+          <FormField className="fl full" formId={MANUAL_CODE_TABLE_FORM_ID} name="remark" label="说明" error={fieldErrors["remark"]}>
+            <Textarea aria-label="说明" className={`ta${fieldErrors["remark"] ? " invalid" : ""}`} value={form.remark} onChange={(event) => {
+              clearFieldError("remark");
+              setForm((current) => ({ ...current, remark: event.target.value }));
+            }} placeholder="补充用途、引用场景或值结构约定" maxLength={1000} />
+          </FormField>
         </div>
       </FormSection>
       {formModal.mode === "edit" && formModal.initial ? (
@@ -79,7 +116,7 @@ function CodeTableForm({ module }: CodeTableFormProps) {
           }]}
         />
       ) : null}
-    </>
+    </div>
   );
 }
 
