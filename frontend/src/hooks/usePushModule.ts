@@ -200,7 +200,7 @@ export function usePushModule({
         ...DEFAULT_FREQ_TYPE_OPTIONS,
         ...result.options.freqTypes,
       ]);
-      const deptItems = fallbackOptions(import.meta.env.VITE_API_MODE === 'mock' ? [...UPSTREAM_DEPT_OPTIONS, ...result.options.depts] : result.options.depts);
+      const deptItems = fallbackOptions(import.meta.env?.VITE_API_MODE === 'mock' ? [...UPSTREAM_DEPT_OPTIONS, ...result.options.depts] : result.options.depts);
       setPushPageData(result);
       setPushSystems(result.items);
       setPushProtocolOptions(protocolItems);
