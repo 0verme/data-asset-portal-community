@@ -196,6 +196,8 @@ Community Demo 初始化完成后，可以使用：
 
 详细说明见 [Community Demo 指南](./docs/community-demo.md)。
 
+> Windows 内网使用 Nexus npm 镜像更新前端：参见 [Windows 内网构建与部署流程](./DEPLOYMENT.md#73-windows-内网-npm-镜像构建与部署issue-468)，不要直接套用 Linux/systemd 命令。
+
 ### 只看前端（mock mode）
 
 只需 Node.js 22.13+ 和 npm 10+。mock mode 只读取前端受控数据，不需要数据库或后端服务。
