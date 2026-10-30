@@ -147,6 +147,24 @@ not control an external proxy or load balancer.
 also supported as provider/profile overrides. `ASSET_DB_PASSWORD` and DSNs/JDBC
 URLs are sensitive and should not be placed in committed files.
 
+## Lineage storage mode (#414)
+
+`LINEAGE_STORAGE_MODE` supports `auto` (default, backward compatible),
+`persistent` and `poc`. In `persistent` mode, `LINEAGE_DB_PROFILE`
+is required; missing configuration fails closed. In `poc` mode, the
+lineage graph is synthetic and permitted **only** for development/dev/test
+when `LINEAGE_DB_PROFILE` is unset. Production never serves POC data.
+Conflicting or unknown modes fail closed.
+
+In legacy `auto` mode an explicitly configured `LINEAGE_DB_PROFILE`
+selects persistent storage; otherwise development/dev/test retains the
+existing labeled in-memory POC, and production fails closed. To prevent
+an accidentally missing profile from appearing as a demo graph in a
+development-like deployed environment, explicitly set
+`LINEAGE_STORAGE_MODE=persistent`. This setting does not change
+`ASSET_DB_*` override precedence; profile override isolation remains
+a separate #414 decision.
+
 ## Database files and precedence
 
 The repository does not include `backend/configs/database.yaml`. For a normal
