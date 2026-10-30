@@ -80,6 +80,14 @@ def _register_report_routes(app: FastAPI, service: Any) -> None:
             content=validate_contract({"items": items}, ReportListResponse)
         )
 
+    @router.get("/options", response_model=None)
+    def get_report_options(current_service: Any = Depends(get_service)):
+        try:
+            options = current_service.get_report_options()
+        except ReportDataSourceError as error:
+            return error_response(error, 503)
+        return JSONResponse(content={"options": options})
+
     @router.get("/{report_code}", response_model=None)
     def get_report_detail(
         report_code: str,
