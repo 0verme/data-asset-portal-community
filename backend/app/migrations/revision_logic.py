@@ -20,6 +20,8 @@ from typing import Any, Iterable, Mapping, Sequence
 
 __all__ = [
     "OPTION_CATEGORY_SPECS",
+    "PLATFORM_OPTION_CATEGORY_SPECS",
+    "DEMO_OPTION_CATEGORY_SPECS",
     "UpstreamBackfillPlan",
     "DuplicateMappingKey",
     "IndicatorReferenceUpdate",
@@ -281,7 +283,7 @@ def plan_indicator_reference_backfill(
 # 0009_upstream_option_contract
 # ---------------------------------------------------------------------------
 
-OPTION_CATEGORY_SPECS = (
+PLATFORM_OPTION_CATEGORY_SPECS = (
     {
         "code": "UPSTREAM_DB_TYPE",
         "name": "上游数据库类型",
@@ -298,6 +300,11 @@ OPTION_CATEGORY_SPECS = (
             ("OTHER", "其他", "其他", "其他数据库类型", 80),
         ),
     },
+)
+
+# Retail department values are Demo data: only explicit Community Demo seeders
+# use these specs; ordinary profile migrations use platform specs only.
+DEMO_OPTION_CATEGORY_SPECS = (
     {
         "code": "UPSTREAM_DEPT",
         "name": "零售业务部门",
@@ -316,10 +323,13 @@ OPTION_CATEGORY_SPECS = (
     },
 )
 
+# Preserve the complete catalog for callers that explicitly need its inventory.
+OPTION_CATEGORY_SPECS = PLATFORM_OPTION_CATEGORY_SPECS + DEMO_OPTION_CATEGORY_SPECS
+
 
 @dataclass(frozen=True)
 class CodeSeedPlan:
-    """Missing option rows that ``0009`` should add, with concrete values."""
+    """Missing platform option rows that ``0009`` should add, with concrete values."""
 
     categories: tuple[Mapping[str, Any], ...] = ()
     items: tuple[Mapping[str, Any], ...] = ()
@@ -332,13 +342,14 @@ class CodeSeedPlan:
 def plan_code_option_seed(
     category_rows: Iterable[Mapping[str, Any]],
     item_rows: Iterable[Mapping[str, Any]],
-    specs: Sequence[Mapping[str, Any]] = OPTION_CATEGORY_SPECS,
+    specs: Sequence[Mapping[str, Any]] = PLATFORM_OPTION_CATEGORY_SPECS,
 ) -> CodeSeedPlan:
-    """Plan missing option categories/items without touching existing rows.
+    """Plan missing platform option rows without touching existing data.
 
-    Existing categories and items are matched by their stable code; a
-    customized row (same code, different display value) is never overwritten
-    and is never re-inserted.
+    Explicit Demo seeders own retail department values; migrations use the
+    platform-only default specs. Existing categories and items are matched by
+    stable code; a customized row (same code, different display value) is never
+    overwritten or re-inserted.
     """
     existing_categories = {
         _text(row.get("category_code")) for row in category_rows

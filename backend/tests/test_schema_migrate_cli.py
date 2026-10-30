@@ -133,7 +133,34 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 } <= indicator_columns
             )
             self.assertIn(("POSTGRESQL", "PostgreSQL"), upstream_db_type)
-            self.assertIn(("SUPPLY_CHAIN", "供应链部"), upstream_dept)
+            self.assertEqual([], upstream_dept)
+
+            # Retail department options remain available through the explicit
+            # Community Demo seed, not through ordinary profile migration.
+            from demo.seed_sqlite import seed as seed_community_demo
+
+            seed_community_demo(database.resolve())
+            connection = sqlite3.connect(database)
+            try:
+                demo_departments = connection.execute(
+                    "SELECT item_code, item_value FROM p_code_item "
+                    "WHERE category_code = 'UPSTREAM_DEPT' ORDER BY display_order"
+                ).fetchall()
+            finally:
+                connection.close()
+            self.assertEqual(
+                [
+                    ("PRODUCT_OPERATIONS", "商品运营部"),
+                    ("MEMBER_OPERATIONS", "会员运营部"),
+                    ("TRADE_OPERATIONS", "交易运营部"),
+                    ("STORE_OPERATIONS", "门店运营部"),
+                    ("SUPPLY_CHAIN", "供应链部"),
+                    ("MARKETING", "市场营销部"),
+                    ("FULFILLMENT", "履约运营部"),
+                    ("CUSTOMER_SERVICE", "客户服务部"),
+                ],
+                demo_departments,
+            )
 
     def test_mismatched_existing_filter_index_fails_without_advancing_ledger(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -361,8 +388,10 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
             self.assertEqual((repository_alembic_head(),), revision)
             self.assertIn(("DB2", "Legacy DB2", "legacy-db2"), db_items)
             self.assertIn(("POSTGRESQL", "PostgreSQL", "PostgreSQL"), db_items)
-            self.assertIn(("CUSTOMER_OPS", "Legacy customer ops", "legacy-customer-ops"), dept_items)
-            self.assertIn(("SUPPLY_CHAIN", "供应链部", "供应链部"), dept_items)
+            self.assertEqual(
+                [("CUSTOMER_OPS", "Legacy customer ops", "legacy-customer-ops")],
+                dept_items,
+            )
             self.assertEqual(len({item[0] for item in db_items}), len(db_items))
             self.assertEqual(len({item[0] for item in dept_items}), len(dept_items))
 

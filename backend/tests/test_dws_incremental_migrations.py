@@ -197,8 +197,8 @@ class DwsFreshAndAdoptionTests(unittest.TestCase):
         )
         self.assertEqual(repository_head(), database.ledger)
         categories = {row["category_code"] for row in database.table("p_code_category").rows}
-        self.assertEqual({"UPSTREAM_DB_TYPE", "UPSTREAM_DEPT"}, categories)
-        self.assertEqual(16, len(database.table("p_code_item").rows))
+        self.assertEqual({"UPSTREAM_DB_TYPE"}, categories)
+        self.assertEqual(8, len(database.table("p_code_item").rows))
 
     def test_nearly_head_legacy_only_applies_missing_revision_and_seed(self):
         database = FakeDwsDatabase().seed_from_baseline()
@@ -412,6 +412,18 @@ class DwsLegacyUpgradeTests(unittest.TestCase):
                 "item_value": "自定义 PostgreSQL",
             }
         )
+        database.table("p_code_category").add_row(
+            {"category_id": 8, "category_code": "UPSTREAM_DEPT", "category_name": "历史部门"}
+        )
+        database.table("p_code_item").add_row(
+            {
+                "item_id": 10,
+                "category_code": "UPSTREAM_DEPT",
+                "item_code": "LEGACY_DEPT",
+                "item_name": "历史部门项",
+                "item_value": "历史部门项",
+            }
+        )
 
         apply_revisions(database, CONFIG, "0001_baseline", repository_head())
 
@@ -435,9 +447,19 @@ class DwsLegacyUpgradeTests(unittest.TestCase):
             if row["category_code"] == "UPSTREAM_DB_TYPE"
         )
         self.assertEqual("自定义", category["category_name"])
-        self.assertIn(
-            "UPSTREAM_DEPT",
-            {row["category_code"] for row in database.table("p_code_category").rows},
+        department_items = [
+            (row["item_code"], row["item_value"])
+            for row in database.table("p_code_item").rows
+            if row["category_code"] == "UPSTREAM_DEPT"
+        ]
+        self.assertEqual([("LEGACY_DEPT", "历史部门项")], department_items)
+        self.assertEqual(
+            "历史部门",
+            next(
+                row["category_name"]
+                for row in database.table("p_code_category").rows
+                if row["category_code"] == "UPSTREAM_DEPT"
+            ),
         )
 
 

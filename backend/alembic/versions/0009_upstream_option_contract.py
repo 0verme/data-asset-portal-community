@@ -1,10 +1,10 @@
-"""Backfill the option contract used by upstream and push system forms.
+"""Seed platform upstream database-type options for the system forms.
 
-The application stores the existing display values (for example,
-``PostgreSQL`` and ``供应链部``), while the code item remains the stable
-identifier.  Older installations may have no upstream categories or may have
-an older subset, so this migration only adds missing categories/items and never
-rewrites existing dictionary or system rows.
+The application stores display values such as ``PostgreSQL`` while the code
+item remains the stable identifier. This ordinary profile migration adds only
+the platform ``UPSTREAM_DB_TYPE`` category/items; retail ``UPSTREAM_DEPT``
+values belong to the explicit Community Demo seed or to a separately configured
+business directory. Existing dictionary and system rows are never rewritten.
 """
 
 # pyright: reportMissingImports=false
@@ -15,7 +15,10 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-from app.migrations.revision_logic import plan_code_option_seed
+from app.migrations.revision_logic import (
+    PLATFORM_OPTION_CATEGORY_SPECS,
+    plan_code_option_seed,
+)
 
 revision = "0009_upstream_option_contract"
 down_revision = "0008_indicator_semantic_contract"
@@ -49,6 +52,7 @@ def upgrade() -> None:
     plan = plan_code_option_seed(
         _column_rows(bind, category_table),
         _column_rows(bind, item_table),
+        specs=PLATFORM_OPTION_CATEGORY_SPECS,
     )
 
     for values in plan.categories:

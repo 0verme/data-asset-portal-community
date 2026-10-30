@@ -34,6 +34,7 @@ from typing import Any, Sequence
 from ..db.providers import gaussdb_schema_sql_identifier
 from ..db.registry import get_provider
 from .revision_logic import (
+    PLATFORM_OPTION_CATEGORY_SPECS,
     duplicate_mapping_keys,
     plan_code_option_seed,
     plan_indicator_reference_backfill,
@@ -1018,7 +1019,9 @@ class UpstreamOptionContract(DwsRevisionAdapter):
             {"item_id": row[0], "category_code": row[1], "item_code": row[2]}
             for row in item_rows
         ]
-        return plan_code_option_seed(categories, items)
+        return plan_code_option_seed(
+            categories, items, specs=PLATFORM_OPTION_CATEGORY_SPECS
+        )
 
     def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
         if not (ctx.has_table("p_code_category") and ctx.has_table("p_code_item")):
@@ -1032,12 +1035,12 @@ class UpstreamOptionContract(DwsRevisionAdapter):
             return RevisionInspection(
                 self.revision,
                 RevisionState.APPLIED,
-                "all required upstream option categories and items already exist",
+                "all required platform UPSTREAM_DB_TYPE categories and items already exist",
             )
         return RevisionInspection(
             self.revision,
             RevisionState.NOT_APPLIED,
-            "upstream option seed rows are missing",
+            "platform UPSTREAM_DB_TYPE seed rows are missing",
             details=(
                 f"missing categories: {len(plan.categories)}",
                 f"missing items: {len(plan.items)}",
