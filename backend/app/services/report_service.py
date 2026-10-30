@@ -139,6 +139,24 @@ class ReportService(AuditActorMixin):
         except CommonCodeCategoryNotFoundError:
             return set(fallback)
 
+    def get_report_options(self):
+        """Non-sensitive, full-domain options; never substitute demo values."""
+        categories = {
+            "reportTypes": REPORT_TYPE_CATEGORY,
+            "periods": REPORT_PERIOD_CATEGORY,
+            "statCalibers": REPORT_DATE_CALIBER_CATEGORY,
+            "dataDelays": REPORT_TIMELINESS_CATEGORY,
+            "departments": DEPARTMENT_CATEGORY,
+        }
+        options = {
+            key: sorted(self._allowed_code_values(category, set()))
+            for key, category in categories.items()
+        }
+        options["reportTypes"] = sorted(set(options["reportTypes"]) | self._legacy_values("report_type"))
+        options["periods"] = sorted(set(options["periods"]) | self._legacy_values("freq_code"))
+        options["departments"] = sorted(set(options["departments"]) | self._legacy_values("owner_dept_name"))
+        return options
+
     def _domain_names(self):
         rows = self._fetch_rows(
             select(asset_domain.c.domain_name)
