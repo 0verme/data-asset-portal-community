@@ -218,7 +218,7 @@ export function useUpstreamModule({
       setUpstreamPageData(result);
       setUpstreamSystems(result.items);
       setUpstreamDbTypes(fallbackOptions([...UPSTREAM_DB_TYPE_OPTIONS, ...result.options.dbTypes]));
-      setUpstreamDeptOptions(fallbackOptions([...UPSTREAM_DEPT_OPTIONS, ...result.options.depts]));
+      setUpstreamDeptOptions(fallbackOptions(import.meta.env.VITE_API_MODE === 'mock' ? [...UPSTREAM_DEPT_OPTIONS, ...result.options.depts] : result.options.depts));
       setUpstreamLoaded(true);
     } catch (error: unknown) {
       if (sequence === upstreamListSequence.current && latestListKey.current === listKey) {
