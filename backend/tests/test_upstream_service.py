@@ -12,7 +12,8 @@ from backend.app.migrations.schema import initialize
 from backend.app.services.common_code_service import CommonCodeCategoryNotFoundError
 from backend.app.services.upstream_service import (
     UpstreamService,
-    UpstreamSystemReferencedError,\n    UpstreamValidationError,
+    UpstreamSystemReferencedError,
+    UpstreamValidationError,
 )
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
