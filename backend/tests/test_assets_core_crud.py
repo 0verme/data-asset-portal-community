@@ -86,6 +86,20 @@ class AssetsCoreCrudTests(unittest.TestCase):
         self.assertNotIn("orders", str(compiled_change))
         self.assertNotIn("owner", str(compiled_change))
 
+    def test_read_description_preserves_presence_independently_of_cn(self):
+        base = {
+            "asset_id": 7, "field_id": 8, "field_name": "amount", "field_cn_name": "中文名称",
+            "data_type": "DECIMAL", "nullable_flag": "Y", "pk_flag": "N", "partition_flag": "N",
+            "enum_desc": None,
+        }
+        for extra in ({}, {"field_desc": None}, {"field_desc": ""}, {"field_desc": "source description"}):
+            with self.subTest(extra=extra), patch.object(self.service, "_fetch_rows", return_value=[{**base, **extra}]):
+                field = self.service._load_field_rows([7])[7][0]
+                self.assertEqual("中文名称", field["cn"])
+                self.assertEqual("field_desc" in extra, "description" in field)
+                if "field_desc" in extra:
+                    self.assertEqual(extra["field_desc"], field["description"])
+
     def test_queries_compile_for_supported_sqlalchemy_dialects(self):
         statement = select(asset_table).where(asset_table.c.table_name == "orders").limit(10)
 

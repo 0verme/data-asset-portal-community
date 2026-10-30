@@ -44,7 +44,10 @@ def _asset_payload(payload: AssetTableRequest | None) -> dict[str, Any] | None:
     return payload.model_dump(by_alias=True, exclude_unset=True)
 
 
-def _register_asset_routes(app: FastAPI, service: Any) -> None:
+def _register_asset_routes(app: FastAPI, service: Any, *, snapshot_service: Any = None) -> None:
+    from .catalog_snapshots import _register_catalog_snapshot_routes
+
+    _register_catalog_snapshot_routes(app, snapshot_service)
     router = APIRouter(
         prefix="/api/assets",
         tags=["assets-migration"],

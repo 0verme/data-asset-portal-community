@@ -28,6 +28,22 @@ The secret is required and must come from a secret manager or equivalent secure
 store. Debug must remain disabled in production. An old `FLASK_*` value does not
 satisfy a missing `APP_*` setting and is never logged or echoed by the runtime.
 
+## Optional catalog snapshot composition
+
+The authorized read-only catalog snapshot exporter is **not enabled by default**.
+It introduces no environment variable, required secret, startup probe, database
+change, or model dependency. A trusted DAP composition may explicitly inject
+`catalog_snapshot_service_instance` into `create_fastapi_app`; issuance is a
+trusted Python operation, not an HTTP mint endpoint. Its short-lived workload
+proof is generated independently of `APP_SECRET_KEY` and browser cookies.
+
+Only file-backed SQLite capture is currently supported. Other providers fail
+closed; no live PostgreSQL/MySQL/GaussDB-DWS snapshot support is implied by
+existing CRUD CI. Deployment TLS, secret delivery and worker affinity require
+separate verification. Limits, expiry, authorization rechecks, disabled behavior,
+rollback and remaining integration gates are documented in
+[the catalog snapshot contract](./catalog-snapshot.md).
+
 ## Signed-session contract
 
 The application now writes an application-owned signed `session` cookie using

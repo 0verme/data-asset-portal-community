@@ -169,6 +169,7 @@ Base Path: `/api/assets`
   "assetId": 101,
   "name": "trans_status",
   "cn": "交易状态",
+  "description": "源系统字段说明（独立于中文名称）",
   "type": "string",
   "nullable": false,
   "pk": false,
@@ -176,6 +177,9 @@ Base Path: `/api/assets`
   "enum": "INIT-初始化 / SUCCESS-成功 / FAIL-失败"
 }
 ```
+
+`description` 是 additive 只读字段，直接映射当前 `field_desc`；旧 `cn` 显示 fallback 不变。
+缺失 key 表示未暴露/未知，显式 null 表示当前存储为空，空串/实际文字保持原值；不能用 cn 代替 description。
 
 #### AssetTable
 
@@ -195,6 +199,15 @@ Base Path: `/api/assets`
 ```
 
 ### 2.2 接口
+
+可选工作负载只读快照（默认 exporter 不启用，无 HTTP mint）：
+
+- `GET /api/assets/snapshots/{catalogId}/{scopeId}/{snapshotId}`
+- `GET /api/assets/snapshots/{catalogId}/{scopeId}/{snapshotId}/manifest`
+
+该资源仅接受独立短期 grant + HTTPS，不复用浏览器 Cookie，不改变下面的列表/详情契约。
+授权、SQLite 一致 capture、版本/分页/完整性、支持矩阵与回滚见
+[授权元数据快照契约](./catalog-snapshot.md)。
 
 Canonical（以 `assetId` 定位资产）：
 
