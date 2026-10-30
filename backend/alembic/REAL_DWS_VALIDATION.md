@@ -45,10 +45,10 @@ Record only profile names and results here; never add credentials, JDBC URLs, ho
 1. Confirm the target schema exists and contains no application tables; capture the preflight report.
 2. Run `schema_migrate.py status --profile <profile>` and confirm the result is unmanaged (and prints the repository head).
 3. Run `schema_migrate.py plan --profile <profile>` and review the baseline + `after-baseline` actions.
-4. Run `schema_migrate.py apply --profile <profile>`. The CLI executes the canonical baseline, verifies it, records `0001_baseline`, then adopts every structural revision and applies the `0009` option seed until the ledger reaches head.
+4. Run `schema_migrate.py apply --profile <profile>`. The CLI executes the canonical baseline, verifies it, records `0001_baseline`, then adopts every structural revision and applies the platform-only `UPSTREAM_DB_TYPE` seed in `0009` until the ledger reaches head. Retail `UPSTREAM_DEPT` values are excluded from ordinary migration and require the separate explicit Community Demo seed.
 5. Run `schema_migrate.py status --profile <profile>` and confirm it reports the repository's current logical head, not `0001_baseline`.
 6. Run `schema_migrate.py verify --profile <profile>`; require `verify=ok`.
-7. Confirm the migration CLI initialized RBAC and default menus, and that `p_code_category`/`p_code_item` contain the `UPSTREAM_DB_TYPE`/`UPSTREAM_DEPT` options; repeat `apply` and verify it is a no-op for schema revisions and inserts no duplicate seed rows.
+7. Confirm ordinary migration initialized RBAC/default menus and the platform `UPSTREAM_DB_TYPE` options; a fresh schema migration must not create retail `UPSTREAM_DEPT` Demo rows. If validating Community Demo, apply its separate explicit seed as an opt-in and verify the complete fictional retail department set. Repeat ordinary `apply` and verify it is a no-op for the ledger and adds no duplicate technical seed rows.
 8. Record DWS version (not host/user), profile schema name only if approved for internal notes, repository SHA, command exit status, logical revision, and row/table-count evidence.
 
 ## Scenario 2 — existing legacy `0001_baseline` upgrade (controlled snapshot)
@@ -59,7 +59,7 @@ Record only profile names and results here; never add credentials, JDBC URLs, ho
 4. Capture representative business-row counts and stable primary keys for field mappings, indicators, assets/fields, manual code values, upstream systems and upstream options. Protect or anonymize data in retained evidence.
 5. Run `apply` once. Require each revision to be reflected in the ledger only after its post-condition is confirmed. On any error, stop; capture the failed revision/step and current ledger, and do not blindly rerun or repair the schema. A `CONFLICT` message lists the revision, observed state, why it is unsafe and the possible repairs.
 6. Run `status` and `verify`; require repository head and `verify=ok`.
-7. Recheck representative row counts, primary keys, backfilled `upstream_system_id`/`source_asset_id`/`result_field_id` values, new fields, indexes/constraints, RBAC and menus. Confirm business rows were preserved, `0009` / `0012` did not duplicate or overwrite customized option/recommendation rows, and no duplicate backfill rows appeared.
+7. Recheck representative row counts, primary keys, backfilled `upstream_system_id`/`source_asset_id`/`result_field_id` values, new fields, indexes/constraints, RBAC and menus. Confirm business rows and existing historical `UPSTREAM_DEPT` values were preserved; `0009` adds only missing platform `UPSTREAM_DB_TYPE` values, and `0012` does not duplicate or overwrite customized recommendation rows. No historical department rows may be deleted as part of this audit fix.
 8. Confirm the physical metadata that the runner relies on:
    * columns: `p_asset_table` identity columns, `p_lineage_snapshot` ingestion columns, `p_indicator_item` semantic columns, `p_push_job.freq_desc` at `VARCHAR(1000)` (revision `0011`), and `p_search_hot_keyword` with its category-scoped uniqueness (revision `0012`);
    * indexes: `idx_p_asset_table_filter`, `idx_p_indicator_semantic_ref`, `idx_p_field_mapping_table_identity`, and the absence of `idx_p_field_mapping_table_uk_01`;
