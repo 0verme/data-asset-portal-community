@@ -65,6 +65,7 @@ def create_fastapi_app(
     indicator_service_instance: Any | None = None,
     indicator_path_service_instance: Any | None = None,
     assets_service_instance: Any | None = None,
+    catalog_snapshot_service_instance: Any | None = None,
     field_mapping_service_instance: Any | None = None,
     root_service_instance: Any | None = None,
     manual_code_table_service_instance: Any | None = None,
@@ -159,7 +160,7 @@ def create_fastapi_app(
     # they do not turn an existing source module into a 404.
     _register_indicator_routes(app, indicator)
     _register_indicator_path_routes(app, indicator_paths)
-    _register_asset_routes(app, assets)
+    _register_asset_routes(app, assets, snapshot_service=catalog_snapshot_service_instance)
     _register_field_mapping_routes(app, field_mapping)
     _register_root_routes(app, root)
     _register_manual_code_table_routes(app, manual_code_table)

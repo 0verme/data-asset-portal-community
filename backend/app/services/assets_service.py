@@ -538,6 +538,7 @@ class AssetsService(AuditActorMixin):
                     "assetId": int(row["asset_id"]),
                     "name": row["field_name"],
                     "cn": row["field_cn_name"] or row["field_desc"] or row["field_name"],
+                    **({"description": row["field_desc"]} if "field_desc" in row else {}),
                     "type": self._normalize_field_type(row.get("data_type")),
                     "nullable": str(row["nullable_flag"]).upper() == "Y",
                     "pk": str(row["pk_flag"]).upper() == "Y",
@@ -546,6 +547,75 @@ class AssetsService(AuditActorMixin):
                 }
             )
         return grouped
+
+    def capture_catalog_rows(self, *, max_documents, max_text_length, max_bytes, timeout_seconds):
+        """Read the authoritative active catalog once, under a proved read view.
+
+        Unlike legacy summary/detail formatting this preserves SQL NULL and
+        selects no connection, person, audit or administrative information.
+        Length sentinels allow the exporter to reject, never truncate, text.
+        """
+        from sqlalchemy import LargeBinary, cast
+
+        from ..db.catalog_capture import CatalogCaptureLimit, catalog_read_transaction
+
+        def bounded(column, label=None):
+            return func.substr(column, 1, max_text_length + 1).label(label or column.name)
+
+        with catalog_read_transaction(self._db.profile(), timeout_seconds=timeout_seconds):
+            table_query = (
+                select(
+                    asset_table.c.asset_id,
+                    bounded(asset_table.c.table_name),
+                    bounded(asset_table.c.table_cn_name),
+                    bounded(asset_table.c.table_desc),
+                    bounded(func.coalesce(asset_domain.c.domain_name, asset_table.c.domain_code), "domain_name"),
+                    bounded(asset_table.c.layer_code),
+                    bounded(asset_layer.c.layer_name),
+                    bounded(asset_table.c.grain_desc),
+                    bounded(asset_table.c.cycle_desc),
+                )
+                .select_from(
+                    asset_table.outerjoin(asset_domain, asset_domain.c.domain_code == asset_table.c.domain_code)
+                    .outerjoin(asset_layer, asset_layer.c.layer_code == asset_table.c.layer_code)
+                )
+                .where(asset_table.c.is_deleted == "N")
+                .order_by(asset_table.c.asset_id)
+                .limit(max_documents + 1)
+            )
+            field_query = (
+                select(
+                    asset_field.c.asset_id,
+                    asset_field.c.field_id,
+                    *(bounded(asset_field.c[key]) for key in (
+                        "field_name", "field_cn_name", "field_desc", "data_type",
+                        "enum_desc", "nullable_flag", "pk_flag", "partition_flag",
+                    )),
+                )
+                .select_from(asset_field.join(asset_table, asset_table.c.asset_id == asset_field.c.asset_id))
+                .where(asset_table.c.is_deleted == "N", asset_field.c.is_deleted == "N")
+                .order_by(asset_field.c.asset_id, asset_field.c.field_id)
+                .limit(max_documents + 1)
+            )
+            # Preflight inside the SAME read view, before transferring payloads.
+            # SQL subqueries are row/text bounded; no unbounded Python fetchall
+            # can exhaust memory before the exporter applies its byte budget.
+            count = byte_count = 0
+            for query in (table_query, field_query):
+                bounded_rows = query.subquery()
+                row_bytes = sum(func.coalesce(func.length(cast(column, LargeBinary)), 0)
+                                for column in bounded_rows.c)
+                budget = self._db.fetch_rows(select(
+                    func.count().label("documents"),
+                    func.coalesce(func.sum(row_bytes), 0).label("bytes"),
+                ).select_from(bounded_rows))[0]
+                count += int(budget["documents"])
+                byte_count += int(budget["bytes"])
+                if count > max_documents or byte_count > max_bytes:
+                    raise CatalogCaptureLimit("CATALOG_CAPTURE_LIMIT")
+            tables = self._fetch_rows(table_query)
+            fields = self._fetch_rows(field_query)
+        return tables, fields
 
     def _load_active_field_rows(self, asset_id):
         """Load raw active field rows (with order) for identity matching."""

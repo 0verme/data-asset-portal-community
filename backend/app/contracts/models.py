@@ -237,6 +237,7 @@ class AssetField(ContractModel):
     assetId: int | None = None
     name: str
     cn: str
+    description: str | None = None
     type: str
     nullable: bool
     pk: bool
