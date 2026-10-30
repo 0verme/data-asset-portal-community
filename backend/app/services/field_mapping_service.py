@@ -69,6 +69,7 @@ FIELD_SORT_COLUMNS = {
     "targetField": mapping_field.c.target_field_name,
     "mappingRule": mapping_field.c.mapping_rule,
 }
+FIELD_MAPPING_EXPORT_BATCH_SIZE = 200
 
 
 class FieldMappingDataSourceError(Exception):
@@ -1308,25 +1309,27 @@ class FieldMappingService(AuditActorMixin):
         with database_transaction():
             return self._get_field_mappings(params)
 
-    def _get_field_mappings(self, params=None):
+    def _get_field_mappings(self, params=None, *, include_total=True):
         page, page_size = self._resolve_paging(params)
         offset = (page - 1) * page_size
         where = self._build_where(params)
 
-        total_statement = (
-            select(func.count().label("total"))
-            .select_from(self._base_from())
-            .where(*where)
-        )
-        total_rows = self._fetch_rows_logged(
-            total_statement,
-            purpose="mapping field total",
-            method="get_field_mappings",
-            page=page,
-            page_size=page_size,
-            keyword=(params or {}).get("keyword"),
-        )
-        total = self._safe_int(total_rows[0].get("total")) if total_rows else 0
+        total = None
+        if include_total:
+            total_statement = (
+                select(func.count().label("total"))
+                .select_from(self._base_from())
+                .where(*where)
+            )
+            total_rows = self._fetch_rows_logged(
+                total_statement,
+                purpose="mapping field total",
+                method="get_field_mappings",
+                page=page,
+                page_size=page_size,
+                keyword=(params or {}).get("keyword"),
+            )
+            total = self._safe_int(total_rows[0].get("total")) if total_rows else 0
 
         statement = (
             select(*self._field_select())
@@ -1349,6 +1352,33 @@ class FieldMappingService(AuditActorMixin):
         ]
         return {"items": items, "total": total, "page": page, "pageSize": page_size}
 
+    def iter_field_mapping_export_batches(self, params=None):
+        export_params = {
+            key: value
+            for key, value in (params or {}).items()
+            if key not in {"page", "pageSize", "limit"}
+        }
+        page_size = self._resolve_paging(
+            {"pageSize": FIELD_MAPPING_EXPORT_BATCH_SIZE}
+        )[1]
+        page = 1
+        with database_transaction():
+            while True:
+                page_params = {
+                    **export_params,
+                    "page": page,
+                    "pageSize": page_size,
+                }
+                batch = self._get_field_mappings(
+                    page_params, include_total=False
+                )["items"]
+                if not batch:
+                    break
+                yield batch
+                if len(batch) < page_size:
+                    break
+                page += 1
+
     def _resolve_field_order(self, params=None):
         params = params or {}
         sort_key = str(params.get("sortKey") or "").strip()
@@ -1365,36 +1395,95 @@ class FieldMappingService(AuditActorMixin):
             + self._field_default_order_terms()
         )
 
+    def _resolve_table_export_order(self, params=None, sort_columns=None):
+        params = params or {}
+        sort_column = (sort_columns or {}).get(
+            str(params.get("sortKey") or "").strip()
+        )
+        if sort_column is None:
+            return self._table_default_order_terms()
+        direction = str(params.get("sortDirection") or "").strip().lower()
+        sort_term = sort_column.desc() if direction == "desc" else sort_column.asc()
+        return [sort_term, *self._table_default_order_terms()]
+
     def get_table_mappings(self, params=None):
         with database_transaction():
             return self._get_table_mappings(params)
 
-    def _get_table_mappings(self, params=None):
+    def _get_table_mappings(
+        self, params=None, *, include_total=True, export_sort=False
+    ):
         page, page_size = self._resolve_paging(params)
         offset = (page - 1) * page_size
         where = self._build_where(params)
 
-        counted = (
-            select(mapping_table.c.table_pk)
-            .select_from(self._base_from())
-            .where(*where)
-            .group_by(mapping_table.c.table_pk)
-            .subquery("counted")
-        )
-        count_statement = select(func.count().label("total")).select_from(counted)
-        total_rows = self._fetch_rows_logged(
-            count_statement,
-            purpose="mapping table total",
-            method="get_table_mappings",
-            page=page,
-            page_size=page_size,
-            keyword=(params or {}).get("keyword"),
-        )
-        total = self._safe_int(total_rows[0].get("total")) if total_rows else 0
+        total = None
+        if include_total:
+            counted = (
+                select(mapping_table.c.table_pk)
+                .select_from(self._base_from())
+                .where(*where)
+                .group_by(mapping_table.c.table_pk)
+                .subquery("counted")
+            )
+            count_statement = select(func.count().label("total")).select_from(counted)
+            total_rows = self._fetch_rows_logged(
+                count_statement,
+                purpose="mapping table total",
+                method="get_table_mappings",
+                page=page,
+                page_size=page_size,
+                keyword=(params or {}).get("keyword"),
+            )
+            total = self._safe_int(total_rows[0].get("total")) if total_rows else 0
 
         source_table_cn = func.coalesce(
             mapping_table.c.source_table_cn, mapping_table.c.source_table_name
         ).label("source_table_cn")
+        field_count_expression = func.count()
+        mapped_count_expression = func.sum(
+            case(
+                (
+                    func.coalesce(
+                        func.length(func.trim(mapping_field.c.target_field_name)), 0
+                    )
+                    > 0,
+                    1,
+                ),
+                else_=0,
+            )
+        )
+        empty_comment_count_expression = func.sum(
+            case(
+                (
+                    func.coalesce(
+                        func.length(func.trim(mapping_field.c.source_field_comment)), 0
+                    )
+                    == 0,
+                    1,
+                ),
+                else_=0,
+            )
+        )
+        empty_comment_rate_expression = func.round(
+            empty_comment_count_expression * 100.0
+            / func.nullif(field_count_expression, 0)
+        )
+        table_sort_columns = {
+            "srcSystem": func.coalesce(upstream_system.c.system_name, ""),
+            "srcTable": func.coalesce(mapping_table.c.source_table_name, ""),
+            "srcTableCn": source_table_cn,
+            "targetLayer": func.coalesce(mapping_table.c.target_layer_code, "DWF"),
+            "targetTable": func.coalesce(mapping_table.c.target_table_name, ""),
+            "loadMode": func.coalesce(mapping_table.c.load_mode, ""),
+            "mappedCount": mapped_count_expression,
+            "emptyCommentRate": empty_comment_rate_expression,
+        }
+        order_terms = (
+            self._resolve_table_export_order(params, table_sort_columns)
+            if export_sort
+            else self._table_default_order_terms()
+        )
         statement = (
             select(
                 mapping_table.c.table_pk.label("table_pk"),
@@ -1413,35 +1502,9 @@ class FieldMappingService(AuditActorMixin):
                     "target_table_name"
                 ),
                 func.coalesce(mapping_table.c.load_mode, "").label("load_mode"),
-                func.count().label("field_count"),
-                func.sum(
-                    case(
-                        (
-                            func.coalesce(
-                                func.length(func.trim(mapping_field.c.target_field_name)),
-                                0,
-                            )
-                            > 0,
-                            1,
-                        ),
-                        else_=0,
-                    )
-                ).label("mapped_count"),
-                func.sum(
-                    case(
-                        (
-                            func.coalesce(
-                                func.length(
-                                    func.trim(mapping_field.c.source_field_comment)
-                                ),
-                                0,
-                            )
-                            == 0,
-                            1,
-                        ),
-                        else_=0,
-                    )
-                ).label("empty_comment_count"),
+                field_count_expression.label("field_count"),
+                mapped_count_expression.label("mapped_count"),
+                empty_comment_count_expression.label("empty_comment_count"),
                 func.max(
                     func.coalesce(
                         mapping_field.c.updated_at,
@@ -1465,7 +1528,7 @@ class FieldMappingService(AuditActorMixin):
                 mapping_table.c.target_table_name,
                 mapping_table.c.load_mode,
             )
-            .order_by(*self._table_default_order_terms())
+            .order_by(*order_terms)
             .limit(page_size)
             .offset(offset)
         )
@@ -1511,6 +1574,33 @@ class FieldMappingService(AuditActorMixin):
                 }
             )
         return {"items": items, "total": total, "page": page, "pageSize": page_size}
+
+    def iter_table_mapping_export_batches(self, params=None):
+        export_params = {
+            key: value
+            for key, value in (params or {}).items()
+            if key not in {"page", "pageSize", "limit"}
+        }
+        page_size = self._resolve_paging(
+            {"pageSize": FIELD_MAPPING_EXPORT_BATCH_SIZE}
+        )[1]
+        page = 1
+        with database_transaction():
+            while True:
+                page_params = {
+                    **export_params,
+                    "page": page,
+                    "pageSize": page_size,
+                }
+                batch = self._get_table_mappings(
+                    page_params, include_total=False, export_sort=True
+                )["items"]
+                if not batch:
+                    break
+                yield batch
+                if len(batch) < page_size:
+                    break
+                page += 1
 
 
 field_mapping_service = FieldMappingService()

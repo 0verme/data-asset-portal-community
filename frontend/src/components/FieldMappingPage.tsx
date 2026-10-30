@@ -21,6 +21,7 @@ import {
   getFieldMappingStats,
   getFieldMappings,
   exportFieldMappingCsv,
+  getFieldMappingMockExportRows,
   getFieldMappingTables,
   fieldMappingTableIdentityKey,
   type EnrichedFieldMappingRow,
@@ -662,14 +663,20 @@ export function FieldMappingPage({
   const exportCurrentTab = async () => {
     setExportError("");
     try {
-      const csv = await exportFieldMappingCsv(tab, {
+      const exportSortKey = tab === "field"
+        ? sort.key
+        : orderedTableColumns.some(
+          (column) => column.sortable !== false && column.key === sort.key,
+        )
+          ? sort.key
+          : "";
+      const exportParams = {
         ...baseParams,
-        page: requestPage,
-        pageSize,
-        ...(tab === "field" && sort.key
-          ? { sortKey: sort.key, sortDirection: sort.direction }
+        ...(exportSortKey
+          ? { sortKey: exportSortKey, sortDirection: sort.direction }
           : {}),
-      });
+      };
+      const csv = await exportFieldMappingCsv(tab, exportParams);
       if (csv !== null) {
         downloadCsvContent(
           tab === "field" ? "字段映射_字段视图.csv" : "字段映射_表视图.csv",
@@ -677,16 +684,20 @@ export function FieldMappingPage({
         );
         return;
       }
+      const exportRows = sortMappingRows(
+        getFieldMappingMockExportRows(tab, exportParams),
+        sort,
+      );
       if (tab === "field") {
         downloadCsv("字段映射_字段视图.csv", [
           FIELD_CSV_COLUMNS.map((item) => item.label),
-          ...fieldPageRows.map((row) => FIELD_CSV_COLUMNS.map((item) => displayCellValue(row, item))),
+          ...exportRows.map((row) => FIELD_CSV_COLUMNS.map((item) => displayCellValue(row, item))),
         ]);
         return;
       }
       downloadCsv("字段映射_表视图.csv", [
         orderedTableColumns.filter((item) => item.key !== "__actions").map((item) => item.label),
-        ...tablePageRows.map((row) => orderedTableColumns
+        ...exportRows.map((row) => orderedTableColumns
           .filter((item) => item.key !== "__actions")
           .map((item) => displayCellValue(row, item))),
       ]);

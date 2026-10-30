@@ -378,6 +378,27 @@ function getMockRows(params: FieldMappingQueryParams = {}): EnrichedFieldMapping
   return rows;
 }
 
+export function getFieldMappingMockExportRows(
+  view: 'field',
+  params?: FieldMappingQueryParams,
+): EnrichedFieldMappingRow[];
+export function getFieldMappingMockExportRows(
+  view: 'table',
+  params?: FieldMappingQueryParams,
+): FieldMappingTableSummary[];
+export function getFieldMappingMockExportRows(
+  view: 'field' | 'table',
+  params?: FieldMappingQueryParams,
+): Array<EnrichedFieldMappingRow | FieldMappingTableSummary>;
+export function getFieldMappingMockExportRows(
+  view: 'field' | 'table',
+  params: FieldMappingQueryParams = {},
+): Array<EnrichedFieldMappingRow | FieldMappingTableSummary> {
+  if (API_MODE === 'remote') return [];
+  const rows = getMockRows(params);
+  return view === 'field' ? rows : summarizeTables(rows);
+}
+
 export interface FieldMappingSourceSystemOption {
   id: string | number;
   sourceSystemId: string | number;
