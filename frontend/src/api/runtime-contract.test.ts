@@ -33,7 +33,8 @@ test("runtime option loaders do not call the retired common-codes API", async ()
 
   assert.doesNotMatch(source, /common-codes/);
   assert.doesNotMatch(source, /useDictOptions|getDictOptions|getCodeItems/);
-  assert.match(reportSource, /buildReportOptionSets\(reportItems\)/);
+  assert.match(reportSource, /buildReportOptionSets\(reportItems, remoteOptions\)/);
+  assert.match(reportSource, /getReportOptions\(\)/);
   assert.match(reportSidebarSource, /Object\.keys\(reportFacets\.type\)/);
   assert.match(statusSource, /BINARY_STATUS_OPTIONS/);
   assert.doesNotMatch(pushSource, /getDictOptionsBatch/);
