@@ -49,6 +49,16 @@ export function buildReportOptionSets(
   reports: unknown[] = [],
 ): ReportOptionSets {
   const reportTypeValues = reportValues(reports, "type");
+  const isMock = import.meta.env?.VITE_API_MODE === "mock";
+  if (!isMock) {
+    return {
+      reportTypes: optionsFromValues(reportTypeValues),
+      periods: optionsFromValues([...reportValues(reports, "statPeriod"), ...reportValues(reports, "freq")]),
+      statCalibers: optionsFromValues([...reportValues(reports, "statCaliber"), ...reportValues(reports, "dateCaliber")]),
+      dataDelays: optionsFromValues([...reportValues(reports, "dataDelay"), ...reportValues(reports, "dataTimeliness")]),
+      departments: optionsFromValues(reportValues(reports, "ownerDept")),
+    };
+  }
   return {
     // Report type is a report-asset domain value. Prefer the values returned by
     // /api/reports; the local list is only the existing mock-mode seed fallback.
