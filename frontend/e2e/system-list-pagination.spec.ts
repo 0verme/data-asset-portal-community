@@ -117,6 +117,11 @@ async function fixture(page: Page, kind: Kind, options: FixtureOptions = {}) {
       else await route.fulfill({ json: payload });
       return;
     }
+    if (path === endpoint && request.method() === 'POST') {
+      writes.push('POST');
+      await route.fulfill({ status: 201, json: { data: request.postDataJSON() } });
+      return;
+    }
     if (path.startsWith(`${endpoint}/`)) {
       const id = decodeURIComponent(path.slice(endpoint.length + 1).split('/')[0]!);
       if (request.method() === 'DELETE') {
@@ -323,6 +328,21 @@ test('system list pagination upstream: refreshing global options must not discar
   } finally {
     release();
   }
+});
+
+test('system list pagination upstream: restoring pristine inputs retains validation', async ({ page }) => {
+  test.skip(!remote, 'Explicit remote HTTP fixture contract');
+  const api = await fixture(page, 'upstream');
+  await page.goto('/upstream/new');
+  const name = page.getByLabel('系统名称', { exact: true });
+  await expect(name).toHaveValue('', { timeout: 20_000 });
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(name).toHaveAttribute('aria-invalid', 'true');
+  await name.fill('Temporary name');
+  await expect(name).not.toHaveAttribute('aria-invalid', 'true');
+  await name.fill('');
+  await expect(name).toHaveAttribute('aria-invalid', 'true');
+  expect(api.writes).toEqual([]);
 });
 
 test('system list pagination push: cross-page job fields and editing keep complete detail', async ({ page }) => {

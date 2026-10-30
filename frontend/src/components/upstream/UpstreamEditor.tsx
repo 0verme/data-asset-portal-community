@@ -145,12 +145,16 @@ export function UpstreamEditor({
   const isDirty = initialSnapshotRef.current !== JSON.stringify(form);
   const sourceIdentity = `${mode}:${initial?.id || ''}`;
   const previousSourceIdentityRef = React.useRef(sourceIdentity);
+  const previousInitialFormRef = React.useRef(initialForm);
   const unloadTimes = Array.isArray(form.unloadTimes) ? form.unloadTimes : [];
 
   React.useEffect(() => {
     // A list metadata response may add global options after detail has loaded.
-    // Re-normalize pristine forms, but never overwrite edits to the same item.
-    if (previousSourceIdentityRef.current === sourceIdentity && isDirty) return;
+    // A dirty/pristine transition alone must not reset validation or the form.
+    const sameSource = previousSourceIdentityRef.current === sourceIdentity;
+    if (sameSource && previousInitialFormRef.current === initialForm) return;
+    previousInitialFormRef.current = initialForm;
+    if (sameSource && isDirty) return;
     previousSourceIdentityRef.current = sourceIdentity;
     setForm(initialForm);
     setTouched(false);
