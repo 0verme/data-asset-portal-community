@@ -80,11 +80,13 @@ class RoutePermissionInventoryTests(unittest.TestCase):
             "/api/upstreams/systems/{system_id}/admin-detail",
         ): "upstream:read",
         ("POST", "/api/upstreams/systems"): "upstream:write",
+        ("GET", "/api/upstreams/options"): "upstream:write",
         (
             "GET",
             "/api/push/systems/{system_id}/admin-detail",
         ): "push:read",
         ("POST", "/api/push/systems"): "push:write",
+        ("GET", "/api/push/options"): "push:write",
         ("POST", "/api/manual-code-tables"): "code_table:write",
         ("POST", "/api/field-mappings/import"): "field_mapping:write",
         (

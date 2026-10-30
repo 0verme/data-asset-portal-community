@@ -19,6 +19,8 @@ from ...contracts import (
     UpstreamSystemRequest,
     validate_contract,
 )
+from ...services.business_option_catalog import get_business_option_catalog
+from ...services.common_code_service import CommonCodeDataSourceError
 from ...services.upstream_service import (
     UpstreamDataSourceError,
     UpstreamSystemAlreadyExistsError,
@@ -68,6 +70,16 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
 
     def project_for_request(value: Any, profile: Any) -> Any:
         return redact_public_upstream_system(value, profile=profile)
+
+    @router.get("/options", response_model=None)
+    def get_system_options(
+        _context: RequestContext = Depends(require_permission("upstream:write")),
+    ):
+        try:
+            catalog = get_business_option_catalog(["UPSTREAM_DB_TYPE", "UPSTREAM_DEPT"])
+        except CommonCodeDataSourceError as error:
+            return _service_error_response(error, 503)
+        return JSONResponse(content=catalog)
 
     @router.get("/systems", response_model=None)
     def get_systems(

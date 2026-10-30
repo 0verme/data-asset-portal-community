@@ -31,6 +31,8 @@ from fastapi import (  # pyright: ignore[reportAttributeAccessIssue, reportMissi
 from fastapi.responses import JSONResponse  # pyright: ignore[reportMissingImports]
 
 from ...application import RequestContext
+from ...services.business_option_catalog import get_business_option_catalog
+from ...services.common_code_service import CommonCodeDataSourceError
 from ...services.push_service import (
     PushDataSourceError,
     PushJobAlreadyExistsError,
@@ -76,6 +78,25 @@ def _register_push_routes(app: FastAPI, service: Any) -> None:
 
     def get_service() -> Any:
         return service
+
+    @router.get("/options", response_model=None)
+    def get_system_options(
+        _context: RequestContext = Depends(require_permission("push:write")),
+    ):
+        try:
+            catalog = get_business_option_catalog(
+                [
+                    "PUSH_PROTOCOL",
+                    "PUSH_AUTH_TYPE",
+                    "UPSTREAM_DEPT",
+                    "PUSH_DELIMITER",
+                    "FILE_ENCODING",
+                    "FREQ_TYPE",
+                ]
+            )
+        except CommonCodeDataSourceError as error:
+            return _service_error_response(error, 503)
+        return JSONResponse(content=catalog)
 
     @router.get("/systems", response_model=None)
     def get_systems(

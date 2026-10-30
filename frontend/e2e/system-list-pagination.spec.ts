@@ -39,6 +39,7 @@ function text(item: CatalogItem, key: string): string {
 
 interface FixtureOptions {
   failLists?: boolean;
+  failOptionsFirst?: boolean;
   maxPageSize?: number;
   onList?: (route: Route, url: URL, payload: unknown) => Promise<void>;
 }
@@ -48,6 +49,7 @@ async function fixture(page: Page, kind: Kind, options: FixtureOptions = {}) {
   const lists: URL[] = [];
   const details: string[] = [];
   const writes: string[] = [];
+  const optionRequests: string[] = [];
   const endpoint = kind === 'upstream' ? '/api/upstreams/systems' : '/api/push/systems';
   await page.addInitScript(() => {
     localStorage.setItem('dap_auth', JSON.stringify({ role: 'admin', user: 'pagination-fixture', name: 'Pagination fixture' }));
@@ -64,6 +66,29 @@ async function fixture(page: Page, kind: Kind, options: FixtureOptions = {}) {
     }
     if (path === '/api/public-catalog/config') {
       await route.fulfill({ json: { profile: 'internal', exportEnabled: false } });
+      return;
+    }
+    const optionEndpoint = kind === 'upstream' ? '/api/upstreams/options' : '/api/push/options';
+    if (path === optionEndpoint && request.method() === 'GET') {
+      optionRequests.push(path);
+      if (options.failOptionsFirst && optionRequests.length === 1) {
+        await route.fulfill({ status: 503, json: { error: { message: 'Synthetic dictionary unavailable' } } });
+        return;
+      }
+      const categories = kind === 'upstream'
+        ? {
+            UPSTREAM_DB_TYPE: [{ code: 'CUSTOM_DB', name: '制造数据库', value: '制造数据库' }],
+            UPSTREAM_DEPT: [{ code: 'EQUIPMENT', name: '设备管理部', value: '设备管理部' }],
+          }
+        : {
+            PUSH_PROTOCOL: [{ code: 'CUSTOM_PROTOCOL', name: 'Custom HTTPS', value: 'CUSTOM_HTTPS' }],
+            PUSH_AUTH_TYPE: [{ code: 'OIDC', name: 'OIDC', value: 'OIDC workload identity' }],
+            UPSTREAM_DEPT: [{ code: 'EQUIPMENT', name: '设备管理部', value: '设备管理部' }],
+            PUSH_DELIMITER: [{ code: 'CARET', name: 'Caret', value: '^' }],
+            FILE_ENCODING: [{ code: 'UTF16LE', name: 'UTF-16LE', value: 'UTF-16LE' }],
+            FREQ_TYPE: [{ code: 'EVERY_QUARTER', name: 'Every quarter', value: 'EVERY_QUARTER' }],
+          };
+      await route.fulfill({ json: { categories, missingCategories: [] } });
       return;
     }
     if (path === endpoint && request.method() === 'GET') {
@@ -144,7 +169,7 @@ async function fixture(page: Page, kind: Kind, options: FixtureOptions = {}) {
     }
     await route.fulfill({ json: { items: [] } });
   });
-  return { lists, details, writes };
+  return { lists, details, writes, optionRequests };
 }
 
 async function choose(page: Page, label: string, option: string) {
@@ -258,6 +283,8 @@ for (const kind of ['upstream', 'push'] as const) {
     await page.goto(`/${kind}/${lastId}/edit`);
     const name = page.getByLabel('系统名称', { exact: true });
     await expect(name).toHaveValue(lastName, { timeout: 20_000 });
+    const legacyOptionLabel = kind === 'upstream' ? '数据库类型' : '连接协议';
+    await expect(page.getByRole('combobox', { name: legacyOptionLabel, exact: true })).toContainText(tail);
     await name.fill(`Edited ${lastName}`);
     await page.getByRole('button', { name: '保存', exact: true }).click();
     const detailTitle = page.locator(kind === 'upstream' ? '.upstream-detail-title' : '.push-title');
@@ -356,4 +383,60 @@ test('system list pagination push: cross-page job fields and editing keep comple
   await expect(page.getByLabel('作业名称', { exact: true })).toHaveValue('Remote job 21');
   await expect(page.getByLabel('字段1字段名', { exact: true })).toHaveValue('fixture_id');
   await expect(page.getByRole('combobox', { name: '推送频率', exact: true })).toContainText('only-last');
+});
+
+test('configured upstream options show a visible retry and never substitute Demo candidates', async ({ page }) => {
+  test.skip(!remote, 'Explicit remote HTTP fixture contract');
+  const api = await fixture(page, 'upstream', { failOptionsFirst: true });
+  await page.goto('/upstream/new');
+  await expect(page.getByRole('heading', { name: '上游业务候选加载失败' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Synthetic dictionary unavailable')).toBeVisible();
+  await page.getByRole('button', { name: '重新加载' }).click();
+  await expect(page.getByRole('heading', { name: '新增上游卸数系统' })).toBeVisible();
+  expect(api.optionRequests).toHaveLength(2);
+  const dbType = page.getByRole('combobox', { name: '数据库类型' });
+  await expect(dbType).toContainText('制造数据库');
+  await dbType.click();
+  await expect(page.getByRole('option', { name: '制造数据库', exact: true })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'PostgreSQL', exact: true })).toHaveCount(0);
+});
+
+test('configured push options accept cross-industry protocol, delimiter, encoding and frequency values', async ({ page }) => {
+  test.skip(!remote, 'Explicit remote HTTP fixture contract');
+  const api = await fixture(page, 'push', { failOptionsFirst: true });
+  await page.goto('/push/new');
+  await expect(page.getByRole('heading', { name: '下游推送业务候选加载失败' })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: '重新加载' }).click();
+  await expect(page.getByRole('heading', { name: '新增下游系统' })).toBeVisible();
+  expect(api.optionRequests).toHaveLength(2);
+  await expect(page.getByRole('combobox', { name: '连接协议', exact: true })).toContainText('Custom HTTPS');
+  await expect(page.getByRole('combobox', { name: '认证方式', exact: true })).toContainText('OIDC');
+  for (const [label, candidate] of [
+    ['连接协议', 'Custom HTTPS'],
+    ['认证方式', 'OIDC'],
+    ['归属部门', '设备管理部'],
+  ]) {
+    await page.getByRole('combobox', { name: label, exact: true }).click();
+    await expect(page.getByRole('option', { name: candidate, exact: true })).toBeVisible();
+    if (label === '连接协议') await expect(page.getByRole('option', { name: 'SFTP', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+  }
+  await page.goto('/push/PUSH_01/new');
+  await expect(page.getByRole('heading', { name: '新增推送接口' })).toBeVisible();
+  expect(api.optionRequests).toHaveLength(3);
+  await expect(page.getByRole('combobox', { name: '字段分隔符', exact: true })).toContainText('Caret');
+  await expect(page.getByRole('combobox', { name: '文件编码', exact: true })).toContainText('UTF-16LE');
+  await expect(page.getByRole('combobox', { name: '推送频率', exact: true })).toContainText('Every quarter');
+  for (const [label, candidate] of [
+    ['字段分隔符', 'Caret'],
+    ['文件编码', 'UTF-16LE'],
+    ['推送频率', 'Every quarter'],
+  ]) {
+    await page.getByRole('combobox', { name: label, exact: true }).click();
+    await expect(page.getByRole('option', { name: candidate, exact: true })).toBeVisible();
+    if (label === '字段分隔符') await expect(page.getByRole('option', { name: '|', exact: true })).toHaveCount(0);
+    if (label === '文件编码') await expect(page.getByRole('option', { name: 'UTF-8', exact: true })).toHaveCount(0);
+    if (label === '推送频率') await expect(page.getByRole('option', { name: 'T+1', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+  }
 });

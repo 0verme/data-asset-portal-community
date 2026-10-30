@@ -345,11 +345,17 @@ class PushService(AuditActorMixin):
         auth_error = None
         if not isinstance(protocol, str) or not protocol.strip():
             protocol_error = {"field": "protocol", "message": "protocol 不能为空"}
-        elif protocol.strip() not in allowed_protocols:
+        elif (
+            protocol.strip() not in allowed_protocols
+            and protocol.strip() != str((current_system or {}).get("protocol") or "").strip()
+        ):
             protocol_error = {"field": "protocol", "message": f"protocol 不在允许范围内: {protocol.strip()}"}
         if not isinstance(auth_type, str) or not auth_type.strip():
             auth_error = {"field": "auth", "message": "auth 不能为空"}
-        elif auth_type.strip() not in allowed_auth_types:
+        elif (
+            auth_type.strip() not in allowed_auth_types
+            and auth_type.strip() != str((current_system or {}).get("auth") or "").strip()
+        ):
             auth_error = {"field": "auth", "message": f"auth 不在允许范围内: {auth_type.strip()}"}
 
         if not isinstance(name, str) or not name.strip():
