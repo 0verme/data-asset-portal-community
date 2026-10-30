@@ -27,6 +27,8 @@ from .lineage_database_reader import LineageDatabaseReader, escape_like_operand
 
 LOGGER = logging.getLogger(__name__)
 LINEAGE_PROFILE_ENV = "LINEAGE_DB_PROFILE"
+LINEAGE_MODE_ENV = "LINEAGE_STORAGE_MODE"
+LINEAGE_SUPPORTED_MODES = frozenset({"auto", "persistent", "poc"})
 POC_ENVIRONMENTS = {"development", "dev", "test"}
 LINEAGE_SEARCH_DEFAULT_LIMIT = 100
 LINEAGE_SEARCH_MAX_LIMIT = 300
@@ -92,13 +94,31 @@ class LineageConfigurationError(LineageDataSourceError):
 def lineage_storage_status():
     """Return the safe, explicit storage mode selected for this process."""
     profile = os.getenv(LINEAGE_PROFILE_ENV, "").strip()
+    mode = os.getenv(LINEAGE_MODE_ENV, "auto").strip().lower() or "auto"
+    if mode not in LINEAGE_SUPPORTED_MODES:
+        raise LineageConfigurationError(
+            "invalid LINEAGE_STORAGE_MODE; expected auto, persistent, or poc"
+        )
+    environment = get_runtime_environment()
+    if mode == "poc":
+        if profile:
+            raise LineageConfigurationError(
+                "LINEAGE_STORAGE_MODE=poc conflicts with LINEAGE_DB_PROFILE"
+            )
+        if environment not in POC_ENVIRONMENTS:
+            raise LineageConfigurationError(
+                "LINEAGE_STORAGE_MODE=poc is restricted to development/test"
+            )
+        return {"mode": "poc", "profile": None, "schema": None}
     if profile:
         config = get_db_profile(profile)
         provider = get_provider(config["type"])
         schema = provider.physical_schema(config) or config.get("database")
         return {"mode": "persistent", "profile": profile, "schema": schema}
-
-    environment = get_runtime_environment()
+    if mode == "persistent":
+        raise LineageConfigurationError(
+            "LINEAGE_STORAGE_MODE=persistent requires LINEAGE_DB_PROFILE"
+        )
     if environment in POC_ENVIRONMENTS:
         return {"mode": "poc", "profile": None, "schema": None}
     raise LineageConfigurationError(
