@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
   filterFieldMappingRows,
+  getFieldMappingMockExportRows,
   getFieldMappingSourceSystems,
+  getFieldMappings,
   normalizeFieldMappingStats,
   summarizeTables,
 } from "./fieldMapping.ts";
@@ -80,6 +82,29 @@ test("table summaries keep mappings separate by complete business identity", () 
     tables.filter((row) => row.targetTable === "DWF.F_AGT_EXTR_FINANCE_BOOK").length,
     2,
   );
+});
+
+test("mock field export includes every filtered row regardless of current page and keeps sort order", async () => {
+  const sourceSystem = (await getFieldMappingSourceSystems()).find((item) => item.count > 1);
+  assert.ok(sourceSystem, "mock catalog should contain a source system with multiple fields");
+  const params = {
+    sourceSystemId: sourceSystem.sourceSystemId,
+    page: 2,
+    pageSize: 1,
+    sortKey: "srcField",
+    sortDirection: "asc",
+  };
+  const currentPage = await getFieldMappings(params);
+  const exportedRows = getFieldMappingMockExportRows("field", params);
+  assert.equal(currentPage.items.length, 1);
+  assert.equal(exportedRows.length, sourceSystem.count);
+  assert.ok(exportedRows.length > currentPage.items.length);
+  const fieldNames = exportedRows.map((row) => row.srcField);
+  for (let index = 1; index < fieldNames.length; index += 1) {
+    const previousField = fieldNames[index - 1] ?? "";
+    const currentField = fieldNames[index] ?? "";
+    assert.ok(previousField.localeCompare(currentField) <= 0);
+  }
 });
 
 test("field mapping stats preserve a true zero count from the data envelope", () => {

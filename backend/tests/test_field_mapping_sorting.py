@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import os
 import tempfile
 import unittest
@@ -212,6 +214,29 @@ class FieldMappingSortingTests(unittest.TestCase):
             self._insert_mapping(connection, **kwargs)
         finally:
             connection.close()
+
+    def _seed_export_mapping(self):
+        self._insert_extra_mapping(
+            source_id=4,
+            system_id=104,
+            table_pk=204,
+            system_name="System-D",
+            system_abbr="SYS_D",
+            source_table="table-D",
+            target_table="target-D",
+            fields=[
+                {
+                    "field_pk": 401 + index,
+                    "source_field": f"field-{letter}",
+                    "source_type": "text",
+                    "source_comment": "export fixture",
+                    "target_field": f"target-{letter}",
+                    "mapping_rule": "=CMD()" if letter == "C" else "direct",
+                    "field_order": index,
+                }
+                for index, letter in enumerate("ABCDE", start=1)
+            ],
+        )
 
     def _get_fields(self, params=None):
         response = self.client.get("/api/field-mappings/fields", params=params or {})
@@ -486,6 +511,133 @@ class FieldMappingSortingTests(unittest.TestCase):
         expected = ["alpha", "zeta", "beta"]
         self.assertEqual(expected, read_pages())
         self.assertEqual(expected, read_pages())
+
+
+    def test_field_export_ignores_current_page_and_keeps_filter_order_bom_and_formula_safety(self):
+        self._seed_export_mapping()
+        with patch("backend.app.services.field_mapping_service.FIELD_MAPPING_EXPORT_BATCH_SIZE", 2):
+            with patch.dict(
+                os.environ,
+                {"PUBLIC_CATALOG_PROFILE": "internal", "PUBLIC_CATALOG_EXPORT_ENABLED": "true"},
+                clear=False,
+            ):
+                response = self.client.get(
+                    "/api/field-mappings/export",
+                    params={
+                        "view": "field",
+                        "sourceSystemId": "104",
+                        "srcTable": "table-D",
+                        "page": 3,
+                        "pageSize": 1,
+                        "sortKey": "srcField",
+                        "sortDirection": "asc",
+                    },
+                )
+
+        self.assertEqual(200, response.status_code, response.text)
+        self.assertTrue(response.content.startswith(bytes.fromhex("efbbbf")))
+        self.assertEqual("text/csv; charset=utf-8", response.headers["content-type"])
+        self.assertEqual(
+            'attachment; filename="field-mappings-field.csv"',
+            response.headers["content-disposition"],
+        )
+        self.assertEqual(6, response.content.count(bytes((13, 10))))
+        rows = list(
+            csv.reader(io.StringIO(response.content.decode("utf-8-sig"), newline=""))
+        )
+        field_index = rows[0].index("源字段")
+        formula_index = rows[0].index("映射规则")
+        self.assertEqual(
+            [f"field-{letter}" for letter in "ABCDE"],
+            [row[field_index] for row in rows[1:]],
+        )
+        self.assertEqual("'=CMD()", rows[3][formula_index])
+
+    def test_table_export_streams_all_filtered_tables_in_stable_order_across_batches(self):
+        self._seed_export_mapping()
+        with patch("backend.app.services.field_mapping_service.FIELD_MAPPING_EXPORT_BATCH_SIZE", 2):
+            with patch.dict(
+                os.environ,
+                {"PUBLIC_CATALOG_PROFILE": "internal", "PUBLIC_CATALOG_EXPORT_ENABLED": "true"},
+                clear=False,
+            ):
+                responses = [
+                    self.client.get(
+                        "/api/field-mappings/export",
+                        params={
+                            "view": "table",
+                            "srcTable": "table",
+                            "page": 2,
+                            "pageSize": 1,
+                        },
+                    )
+                    for _ in range(2)
+                ]
+                sorted_response = self.client.get(
+                    "/api/field-mappings/export",
+                    params={
+                        "view": "table",
+                        "srcTable": "table",
+                        "page": 2,
+                        "pageSize": 1,
+                        "sortKey": "srcTable",
+                        "sortDirection": "desc",
+                    },
+                )
+
+        for response in responses:
+            self.assertEqual(200, response.status_code, response.text)
+            rows = list(csv.reader(io.StringIO(response.content.decode("utf-8-sig"), newline="")))
+            self.assertEqual(4, len(rows) - 1)
+            self.assertEqual(
+                ["table-C", "table-D", "table-A", "table-B"],
+                [row[1] for row in rows[1:]],
+            )
+        self.assertEqual(responses[0].content, responses[1].content)
+        self.assertEqual(200, sorted_response.status_code, sorted_response.text)
+        sorted_rows = list(
+            csv.reader(
+                io.StringIO(sorted_response.content.decode("utf-8-sig"), newline="")
+            )
+        )
+        self.assertEqual(
+            ["table-D", "table-C", "table-B", "table-A"],
+            [row[1] for row in sorted_rows[1:]],
+        )
+        with patch.dict(
+            os.environ,
+            {"PUBLIC_CATALOG_PROFILE": "internal", "PUBLIC_CATALOG_EXPORT_ENABLED": "true"},
+            clear=False,
+        ):
+            for sort_key in (
+                "srcSystem",
+                "srcTable",
+                "srcTableCn",
+                "targetLayer",
+                "targetTable",
+                "loadMode",
+                "mappedCount",
+                "emptyCommentRate",
+            ):
+                with self.subTest(sort_key=sort_key):
+                    sorted_response = self.client.get(
+                        "/api/field-mappings/export",
+                        params={
+                            "view": "table",
+                            "srcTable": "table",
+                            "sortKey": sort_key,
+                            "sortDirection": "asc",
+                        },
+                    )
+                    self.assertEqual(200, sorted_response.status_code, sorted_response.text)
+                    rows = list(
+                        csv.reader(
+                            io.StringIO(
+                                sorted_response.content.decode("utf-8-sig"), newline=""
+                            )
+                        )
+                    )
+                    self.assertEqual(4, len(rows) - 1)
 
 
 if __name__ == "__main__":

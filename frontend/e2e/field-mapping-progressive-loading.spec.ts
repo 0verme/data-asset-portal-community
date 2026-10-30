@@ -331,7 +331,8 @@ test("default table results render independently of slow stats and field details
   await expect(page.locator("html")).toHaveAttribute("data-csv-download-name", "字段映射_字段视图.csv");
   expect(requests.exports).toHaveLength(1);
   expect(requests.exports[0]?.searchParams.get("view")).toBe("field");
-  expect(requests.exports[0]?.searchParams.get("pageSize")).toBe("100");
+  expect(requests.exports[0]?.searchParams.get("page")).toBeNull();
+  expect(requests.exports[0]?.searchParams.get("pageSize")).toBeNull();
   expect(requests.exports[0]?.searchParams.get("sortKey")).toBe("srcField");
   expect(requests.exports[0]?.searchParams.get("sortDirection")).toBe("asc");
   expect(requests.stats).toHaveLength(1);
@@ -340,6 +341,107 @@ test("default table results render independently of slow stats and field details
   await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBeNull();
   await expect(page.getByText("TABLE_READY", { exact: true })).toBeVisible();
   expect(requests.fields).toHaveLength(2);
+});
+
+test("complete field-mapping export ignores the current page and preserves filter and sort", async ({ page }, testInfo) => {
+  const requests = await installApiFixtures(page, {
+    onFields: async (route, url) => {
+      await route.fulfill({
+        json: {
+          items: [fieldRow],
+          total: 120,
+          page: Number(url.searchParams.get("page") || 1),
+          pageSize: Number(url.searchParams.get("pageSize") || 50),
+        },
+      });
+    },
+    onExport: async (route) => {
+      const rows = Array.from({ length: 120 }, (_, index) => `SYS-1,FILTERED_TABLE,FIELD_${index + 1}`);
+      const lineEnding = String.fromCharCode(13, 10);
+      await route.fulfill({
+        contentType: "text/csv; charset=utf-8",
+        body: `${String.fromCharCode(0xfeff)}源系统,源系统表,源字段${lineEnding}${rows.join(lineEnding)}${lineEnding}`,
+      });
+    },
+  });
+
+  await page.goto("/field-mapping");
+  await expect(page.getByText("TABLE_READY", { exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "源系统表名" }).fill("FILTERED_TABLE");
+  await page.getByRole("button", { name: "查询", exact: true }).click();
+  await expect.poll(() => requests.tables.at(-1)?.searchParams.get("srcTable")).toBe("FILTERED_TABLE");
+
+  await page.getByRole("button", { name: /字段维度/ }).click();
+  await expect.poll(() => requests.fields.at(-1)?.searchParams.get("srcTable")).toBe("FILTERED_TABLE");
+  await expect(page.getByText("FIELD_ON_DEMAND", { exact: true })).toBeVisible();
+  await page.locator("#field-mapping-results-table").getByRole("columnheader", { name: /源字段/ }).click();
+  await expect.poll(() => requests.fields.at(-1)?.searchParams.get("sortKey")).toBe("srcField");
+  await page.getByRole("button", { name: "下一页" }).click();
+  await expect.poll(() => requests.fields.at(-1)?.searchParams.get("page")).toBe("2");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "导出 CSV" }).click();
+  const download = await downloadPromise;
+  expect(await download.failure()).toBeNull();
+  const csvRows = parseCsv(await downloadText(download, testInfo, "complete-field-export.csv"));
+  expect(csvRows).toHaveLength(121);
+
+  expect(requests.exports).toHaveLength(1);
+  const exportParams = requests.exports[0]?.searchParams;
+  expect(exportParams?.get("view")).toBe("field");
+  expect(exportParams?.get("srcTable")).toBe("FILTERED_TABLE");
+  expect(exportParams?.get("sortKey")).toBe("srcField");
+  expect(exportParams?.get("sortDirection")).toBe("asc");
+  expect(exportParams?.get("page")).toBeNull();
+  expect(exportParams?.get("pageSize")).toBeNull();
+});
+
+test("complete field-mapping export preserves table sort across the current page boundary", async ({ page }, testInfo) => {
+  const requests = await installApiFixtures(page, {
+    onTables: async (route, url) => {
+      await route.fulfill({
+        json: {
+          items: [tableRow("FILTERED_TABLE")],
+          total: 120,
+          page: Number(url.searchParams.get("page") || 1),
+          pageSize: Number(url.searchParams.get("pageSize") || 50),
+        },
+      });
+    },
+    onExport: async (route) => {
+      const rows = Array.from({ length: 120 }, (_, index) => `SYS-1,FILTERED_TABLE_${index + 1}`);
+      const lineEnding = String.fromCharCode(13, 10);
+      await route.fulfill({
+        contentType: "text/csv; charset=utf-8",
+        body: `${String.fromCharCode(0xfeff)}源系统,源系统表${lineEnding}${rows.join(lineEnding)}${lineEnding}`,
+      });
+    },
+  });
+
+  await page.goto("/field-mapping");
+  await expect(page.getByText("FILTERED_TABLE", { exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "源系统表名" }).fill("FILTERED_TABLE");
+  await page.getByRole("button", { name: "查询", exact: true }).click();
+  await expect.poll(() => requests.tables.at(-1)?.searchParams.get("srcTable")).toBe("FILTERED_TABLE");
+  await page.locator("#field-mapping-results-table").getByRole("columnheader", { name: /源系统表/ }).click();
+  await page.getByRole("button", { name: "下一页" }).click();
+  await expect.poll(() => requests.tables.at(-1)?.searchParams.get("page")).toBe("2");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "导出 CSV" }).click();
+  const download = await downloadPromise;
+  expect(await download.failure()).toBeNull();
+  const csvRows = parseCsv(await downloadText(download, testInfo, "complete-table-export.csv"));
+  expect(csvRows).toHaveLength(121);
+
+  const exportParams = requests.exports[0]?.searchParams;
+  expect(requests.exports).toHaveLength(1);
+  expect(exportParams?.get("view")).toBe("table");
+  expect(exportParams?.get("srcTable")).toBe("FILTERED_TABLE");
+  expect(exportParams?.get("sortKey")).toBe("srcTable");
+  expect(exportParams?.get("sortDirection")).toBe("asc");
+  expect(exportParams?.get("page")).toBeNull();
+  expect(exportParams?.get("pageSize")).toBeNull();
 });
 
 test("stats failure and retry do not clear or refetch the active table list", async ({ page }) => {

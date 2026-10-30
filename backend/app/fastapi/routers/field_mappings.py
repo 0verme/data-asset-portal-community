@@ -6,11 +6,12 @@
 from __future__ import annotations
 
 import csv
-import io
+import tempfile
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, FastAPI, Query
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
+from starlette.background import BackgroundTask
 
 from ...application import RequestContext
 from ...contracts import (
@@ -33,6 +34,21 @@ from ..dependencies import (
 )
 from ..public_catalog import profile_for_request, project_public_catalog_value
 from ..errors import _service_error_response
+
+
+CSV_EXPORT_SPOOL_MAX_MEMORY = 1024 * 1024
+CSV_EXPORT_CHUNK_SIZE = 64 * 1024
+
+
+def _iter_spooled_csv(spool):
+    try:
+        while True:
+            chunk = spool.read(CSV_EXPORT_CHUNK_SIZE)
+            if not chunk:
+                break
+            yield chunk
+    finally:
+        spool.close()
 
 
 def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
@@ -201,17 +217,17 @@ def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
                 status_code=400,
                 content={"error": {"code": "invalid_export_view", "message": "view must be field or table"}},
             )
-        try:
-            data = (
-                current_service.get_field_mappings(params)
-                if view == "field"
-                else current_service.get_table_mappings(params)
-            )
-        except FieldMappingDataSourceError as error:
-            return _service_error_response(error, 500)
-        data = project_for_request(data, context, authorization)
+        export_params = {
+            key: value
+            for key, value in params.items()
+            if key not in {"page", "pageSize", "limit"}
+        }
+        batch_iterator = (
+            current_service.iter_field_mapping_export_batches(export_params)
+            if view == "field"
+            else current_service.iter_table_mapping_export_batches(export_params)
+        )
         contract = FieldMappingListResponse if view == "field" else FieldMappingTableListResponse
-        validate_contract(data, contract)
 
         field_columns = (
             ("源系统", "srcSystem"),
@@ -242,28 +258,55 @@ def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
             "incr_zip": "增量拉链",
             "full_zip": "全量拉链",
         }
-        output = io.StringIO(newline="")
-        writer = csv.writer(output, lineterminator="\r\n")
-        writer.writerow([label for label, _key in columns])
-        for item in data.get("items", []):
-            name = str(item.get("systemName") or item.get("srcSystem") or "").strip()
-            code = str(item.get("systemCode") or item.get("systemAbbr") or "").strip()
-            item_values = {**item, "srcSystem": f"{name} · {code}" if name and code else name or code}
-            if view == "table":
-                item_values["loadMode"] = load_mode_labels.get(item_values.get("loadMode"), "")
-            cells = []
-            for _label, key in columns:
-                value = item_values.get(key, "")
-                text = "" if value is None else str(value)
-                if text.lstrip(" \t\r\n").startswith(("=", "+", "-", "@")):
-                    text = "'" + text
-                cells.append(text)
-            writer.writerow(cells)
+        spool = tempfile.SpooledTemporaryFile(
+            max_size=CSV_EXPORT_SPOOL_MAX_MEMORY,
+            mode="w+",
+            encoding="utf-8",
+            newline="",
+        )
+        try:
+            spool.write("\ufeff")
+            writer = csv.writer(spool, lineterminator="\r\n")
+            writer.writerow([label for label, _key in columns])
+            for batch in batch_iterator:
+                data = project_for_request({"items": batch}, context, authorization)
+                validate_contract(data, contract)
+                for item in data.get("items", []):
+                    name = str(item.get("systemName") or item.get("srcSystem") or "").strip()
+                    code = str(item.get("systemCode") or item.get("systemAbbr") or "").strip()
+                    item_values = {
+                        **item,
+                        "srcSystem": f"{name} · {code}" if name and code else name or code,
+                    }
+                    if view == "table":
+                        item_values["loadMode"] = load_mode_labels.get(item_values.get("loadMode"), "")
+                    cells = []
+                    for _label, key in columns:
+                        value = item_values.get(key, "")
+                        text = "" if value is None else str(value)
+                        if text.lstrip(" \t\r\n").startswith(("=", "+", "-", "@")):
+                            text = "'" + text
+                        cells.append(text)
+                    writer.writerow(cells)
+            spool.flush()
+            spool.seek(0)
+        except FieldMappingDataSourceError as error:
+            spool.close()
+            return _service_error_response(error, 500)
+        except Exception:
+            spool.close()
+            raise
+        finally:
+            close_iterator = getattr(batch_iterator, "close", None)
+            if callable(close_iterator):
+                close_iterator()
+
         file_name = f"field-mappings-{view}.csv"
-        return Response(
-            content="\ufeff" + output.getvalue(),
+        return StreamingResponse(
+            _iter_spooled_csv(spool),
             media_type="text/csv; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+            background=BackgroundTask(spool.close),
         )
 
     @router.get("/fields", response_model=None)

@@ -139,6 +139,9 @@ class PublicCatalogProfileSettingsTests(unittest.TestCase):
                     "page": 1,
                     "pageSize": 50,
                 }
+                service.iter_field_mapping_export_batches.return_value = iter(
+                    [service.get_field_mappings.return_value["items"]]
+                )
                 with patch.dict(
                     os.environ,
                     {
@@ -158,14 +161,28 @@ class PublicCatalogProfileSettingsTests(unittest.TestCase):
 
                 if profile == "disabled" or export_enabled == "false":
                     self.assertEqual(401, response.status_code, response.text)
-                    service.get_field_mappings.assert_not_called()
+                    service.iter_field_mapping_export_batches.assert_not_called()
                 else:
                     self.assertEqual(200, response.status_code, response.text)
                     self.assertTrue(response.headers["content-type"].startswith("text/csv"))
                     self.assertIn("源系统", response.text)
                     self.assertIn("订单源 · ORD", response.text)
                     self.assertNotIn("should-never-export", response.text)
-                    service.get_field_mappings.assert_called_once()
+                    service.iter_field_mapping_export_batches.assert_called_once_with({
+                        "keyword": None,
+                        "sourceSystemId": None,
+                        "upstreamSystemId": None,
+                        "dataSourceId": None,
+                        "srcSystem": None,
+                        "srcTable": None,
+                        "srcField": None,
+                        "emptyComment": None,
+                        "targetTable": None,
+                        "targetField": None,
+                        "tablePk": None,
+                        "sortKey": None,
+                        "sortDirection": None,
+                    })
 
     def test_field_mapping_table_export_formats_labels_and_neutralizes_formulas(self):
         service = MagicMock()
@@ -187,6 +204,9 @@ class PublicCatalogProfileSettingsTests(unittest.TestCase):
             "page": 1,
             "pageSize": 50,
         }
+        service.iter_table_mapping_export_batches.return_value = iter(
+            [service.get_table_mappings.return_value["items"]]
+        )
         with patch.dict(
             os.environ,
             {"PUBLIC_CATALOG_PROFILE": "internal", "PUBLIC_CATALOG_EXPORT_ENABLED": "true"},
@@ -205,7 +225,7 @@ class PublicCatalogProfileSettingsTests(unittest.TestCase):
         self.assertIn("订单源 · ORD", response.text)
         self.assertIn("'=CMD()", response.text)
         self.assertIn("全量", response.text)
-        service.get_table_mappings.assert_called_once()
+        service.iter_table_mapping_export_batches.assert_called_once()
 
     def test_anonymous_export_is_independently_gated_and_uses_profile_projection(self):
         for profile, export_enabled, expected_owner in (
