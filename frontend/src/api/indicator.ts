@@ -14,6 +14,7 @@
 // limitations under the License.
 
 import { requestRemote } from './http.ts';
+import { parseCollectionResponse } from './collectionResponse.ts';
 import {
   INDICATOR_DIMENSIONS,
   INDICATORS,
@@ -41,12 +42,8 @@ function clone<T>(value: T): T {
   }
 }
 
-export function normalizeCollection(payload: unknown, fallbackKey?: string): unknown[] {
-  if (Array.isArray(payload)) return payload;
-  const record = payload as Record<string, unknown> | null | undefined;
-  if (record && Array.isArray(record['items'])) return record['items'];
-  if (record && fallbackKey && Array.isArray(record[fallbackKey])) return record[fallbackKey] as unknown[];
-  throw new Error('指标列表接口返回格式无效');
+export function normalizeCollection(payload: unknown): unknown[] {
+  return parseCollectionResponse<unknown>(payload, '指标集合');
 }
 
 function normalizeDetail(payload: unknown): MockIndicatorItem {
@@ -181,27 +178,20 @@ function normalizeIndicatorPathNode(item: unknown): unknown {
 }
 
 export function normalizeIndicatorPathTree(payload: unknown): unknown[] {
-  let items: unknown[];
-  if (Array.isArray(payload)) items = payload;
-  else {
-    const record = payload as Record<string, unknown> | null | undefined;
-    if (record && Array.isArray(record['items'])) items = record['items'];
-    else if (record && Array.isArray(record['data'])) items = record['data'];
-    else return [];
-  }
+  const items = parseCollectionResponse<unknown>(payload, '指标路径树');
   return clone(items).map(normalizeIndicatorPathNode);
 }
 
 export async function getIndicatorList(params: IndicatorQueryParams = {}): Promise<MockIndicatorItem[]> {
   if (API_MODE === 'remote') {
     const payload = await requestRemote('/indicators', { params });
-    return normalizeCollection(payload, 'items').map(normalizeIndicator);
+    return normalizeCollection(payload).map(normalizeIndicator);
   }
   return filterIndicators(readStore().map(normalizeIndicator), params);
 }
 
 function normalizeDimensionCatalog(payload: unknown): IndicatorDimensionCatalogEntry[] {
-  return normalizeCollection(payload, 'items').map((item) => {
+  return normalizeCollection(payload).map((item) => {
     const record = (item ?? {}) as Record<string, unknown>;
     const code = String(
       record['code'] ?? record['dimension'] ?? record['dimensionCode'] ?? record['dimension_code'] ?? '',

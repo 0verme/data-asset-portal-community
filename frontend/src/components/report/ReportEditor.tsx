@@ -217,6 +217,7 @@ export function ReportEditor({
   const [indicatorCandidates, setIndicatorCandidates] = React.useState<RelatedIndicatorSummary[]>([]);
   const [refLoading, setRefLoading] = React.useState(false);
   const [refError, setRefError] = React.useState("");
+  const [referenceRetryRevision, setReferenceRetryRevision] = React.useState(0);
   const [domains, setDomains] = React.useState<string[]>([]);
   const [people, setPeople] = React.useState<string[]>([]);
   const [reportOptionSets, setReportOptionSets] = React.useState<ReportOptionSets>(() => buildReportOptionSets());
@@ -257,8 +258,6 @@ export function ReportEditor({
         setPeople([...new Set(peopleValues)].sort((a, b) => a.localeCompare(b, "zh-CN")));
       } catch (error: unknown) {
         if (cancelled) return;
-        setTableCandidates([]);
-        setIndicatorCandidates([]);
         setRefError(error instanceof Error ? error.message : "关联资产加载失败。");
       } finally {
         if (!cancelled) setRefLoading(false);
@@ -269,7 +268,7 @@ export function ReportEditor({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [referenceRetryRevision]);
 
   const errors: FormFieldErrors = React.useMemo(
     () => touched ? validateReportForm(form) : {},
@@ -544,7 +543,12 @@ export function ReportEditor({
 
       <div className="form-card">
         <h3><Icon name="link" size={14} />关联引用</h3>
-        {refError ? <div className="match-hint" style={{ color: "var(--danger)" }}>{refError}</div> : null}
+        {refError ? (
+          <div className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
+            {refError}{" "}
+            <button className="btn" type="button" onClick={() => setReferenceRetryRevision((revision) => revision + 1)}>重试加载关联数据</button>
+          </div>
+        ) : null}
         {refLoading ? <div className="match-hint">正在加载可关联资产…</div> : null}
         <div className="report-picker-grid">
           <AssetReferencePicker

@@ -14,6 +14,7 @@
 // limitations under the License.
 
 import { requestRemote } from './http.ts';
+import { parseCollectionResponse } from './collectionResponse.ts';
 import { LONG_REQUEST_TIMEOUT } from '../config/request.ts';
 import { assertValidRootAbbr } from '../utils/rootValidation.ts';
 import { ROOT_CATEGORIES, WORD_ROOTS } from '../data/roots.ts';
@@ -73,12 +74,8 @@ function writeStore(items: SanitizedWordRoot[]): void {
   mockRoots = clone(items);
 }
 
-function normalizeCollection<T>(payload: unknown, fallbackKey?: string): T[] {
-  if (Array.isArray(payload)) return payload as T[];
-  const record = payload as Record<string, unknown> | null | undefined;
-  if (record && Array.isArray(record['items'])) return record['items'] as T[];
-  if (record && fallbackKey && Array.isArray(record[fallbackKey])) return record[fallbackKey] as T[];
-  return [];
+export function normalizeCollection<T>(payload: unknown): T[] {
+  return parseCollectionResponse<T>(payload, '词根列表');
 }
 
 function normalizeDetail<T>(payload: unknown): T {
@@ -118,7 +115,7 @@ function deriveCategoryNames(items: readonly SanitizedWordRoot[]): string[] {
 export async function getRoots(params: RootQueryParams = {}): Promise<SanitizedWordRoot[]> {
   if (API_MODE === 'remote') {
     const payload = await requestRemote('/roots', { params });
-    return sanitizeRoots(normalizeCollection(payload, 'roots'));
+    return sanitizeRoots(normalizeCollection(payload));
   }
   const items = sanitizeRoots(readStore());
   return items.filter((item) => {
@@ -134,7 +131,7 @@ export async function getRoots(params: RootQueryParams = {}): Promise<SanitizedW
 export async function getRootCategories(): Promise<RootCategoryItem[]> {
   if (API_MODE === 'remote') {
     const payload = await requestRemote('/roots/categories');
-    const categories = normalizeCollection<unknown>(payload, 'categories')
+    const categories = normalizeCollection<unknown>(payload)
       .map((item) => {
         if (typeof item === 'string') return { name: item, count: 0 };
         if (item && typeof item === 'object') {

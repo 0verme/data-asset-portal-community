@@ -112,10 +112,10 @@ export function useReportModule({
   }, []);
 
   useEffect(() => {
-    if (active && !reportLoaded && !reportLoading) {
+    if (active && !reportLoaded && !reportLoading && !reportError) {
       loadReportData();
     }
-  }, [active, reportLoaded, reportLoading, loadReportData]);
+  }, [active, reportLoaded, reportLoading, reportError, loadReportData]);
 
   const reportBack = (): void => {
     setReportRoute(DEFAULT_REPORT_ROUTE);

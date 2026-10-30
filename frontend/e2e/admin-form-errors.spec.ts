@@ -69,7 +69,7 @@ async function mockAdminApi(page: Page, onSave: SaveHandler) {
       return;
     }
     if (path === "/system/param-dicts/categories") {
-      await route.fulfill({ json: { categories: [{ code: "SYSTEM_STATUS", name: "系统状态", count: 0 }] } });
+      await route.fulfill({ json: { items: [{ code: "SYSTEM_STATUS", name: "系统状态", count: 0 }] } });
       return;
     }
     if (path === "/system/param-dicts") {

@@ -190,6 +190,9 @@ export function IndicatorEditor({
   const [fieldOptions, setFieldOptions] = React.useState<AssetTableField[]>([]);
   const [fieldLoading, setFieldLoading] = React.useState(false);
   const [fieldError, setFieldError] = React.useState("");
+  const [assetRetryRevision, setAssetRetryRevision] = React.useState(0);
+  const [fieldRetryRevision, setFieldRetryRevision] = React.useState(0);
+  const [pathRetryRevision, setPathRetryRevision] = React.useState(0);
   const initialSnapshotRef = React.useRef(JSON.stringify(form));
   const isDirty = initialSnapshotRef.current !== JSON.stringify(form);
 
@@ -213,7 +216,6 @@ export function IndicatorEditor({
         }
       } catch (error: unknown) {
         if (!cancelled) {
-          setAssetOptions([]);
           setAssetError(error instanceof Error ? error.message : "来源资产加载失败。");
         }
       } finally {
@@ -225,7 +227,7 @@ export function IndicatorEditor({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [assetRetryRevision]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -246,7 +248,6 @@ export function IndicatorEditor({
         if (!cancelled) setFieldOptions(Array.isArray(items) ? items : []);
       } catch (error: unknown) {
         if (!cancelled) {
-          setFieldOptions([]);
           setFieldError(error instanceof Error ? error.message : "来源资产字段加载失败。");
         }
       } finally {
@@ -258,7 +259,7 @@ export function IndicatorEditor({
     return () => {
       cancelled = true;
     };
-  }, [assetOptions, form.sourceAssetId]);
+  }, [assetOptions, form.sourceAssetId, fieldRetryRevision]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -271,7 +272,6 @@ export function IndicatorEditor({
         if (!cancelled) setPathOptions(parseIndicatorPathOptions(items));
       } catch (error: unknown) {
         if (!cancelled) {
-          setPathOptions([]);
           setPathError(error instanceof Error ? error.message : "指标路径配置加载失败。");
         }
       } finally {
@@ -283,7 +283,7 @@ export function IndicatorEditor({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [pathRetryRevision]);
 
   const errors: FormFieldErrors = React.useMemo(
     () => touched ? validateIndicatorForm(form) : {},
@@ -445,7 +445,12 @@ export function IndicatorEditor({
               placeholder="未绑定稳定资产（保留兼容快照）"
               onValueChange={(value) => handleAssetChange(value === null ? "" : String(value))}
             />
-            {assetError ? <div className="match-hint" style={{ color: "var(--danger)" }}>{assetError}</div> : null}
+            {assetError ? (
+              <div className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
+                {assetError}{" "}
+                <button className="btn" type="button" onClick={() => setAssetRetryRevision((revision) => revision + 1)}>重试加载资产</button>
+              </div>
+            ) : null}
             {!assetLoading && !assetError && !assetOptions.length ? <div className="match-hint">当前数据源未提供稳定资产 ID，保留兼容文本录入。</div> : null}
           </div>
           <div className="fl">
@@ -468,7 +473,12 @@ export function IndicatorEditor({
               placeholder="未绑定稳定字段（保留兼容快照）"
               onValueChange={(value) => handleFieldChange(value === null ? "" : String(value))}
             />
-            {fieldError ? <div className="match-hint" style={{ color: "var(--danger)" }}>{fieldError}</div> : null}
+            {fieldError ? (
+              <div className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
+                {fieldError}{" "}
+                <button className="btn" type="button" onClick={() => setFieldRetryRevision((revision) => revision + 1)}>重试加载字段</button>
+              </div>
+            ) : null}
           </div>
           <div className="fl">
             <label>结果表兼容快照</label>
@@ -528,7 +538,10 @@ export function IndicatorEditor({
               </div>
             ) : null}
             {pathError ? (
-              <div id={pathConfigErrorId} className="match-hint" style={{ color: "var(--danger)" }}>{pathError}</div>
+              <div id={pathConfigErrorId} className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
+                {pathError}{" "}
+                <button className="btn" type="button" onClick={() => setPathRetryRevision((revision) => revision + 1)}>重试加载路径</button>
+              </div>
             ) : null}
             {!pathLoading && !pathError && form.path.trim() && !getIndicatorDimensionFromPath(form.path) ? (
               <div className="match-hint">
