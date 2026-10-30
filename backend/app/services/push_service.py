@@ -202,7 +202,9 @@ class PushService(AuditActorMixin):
     def _get_allowed_values(self, category_code, fallback):
         try:
             return {value for value in common_code_service.get_item_values(category_code) if value}
-        except (CommonCodeCategoryNotFoundError, CommonCodeDataSourceError):
+        except CommonCodeDataSourceError as error:
+            raise PushDataSourceError("业务码表数据源不可用，请稍后重试") from error
+        except CommonCodeCategoryNotFoundError:
             return set(fallback)
 
     def _normalize_job_fields(self, fields, details):
@@ -259,7 +261,7 @@ class PushService(AuditActorMixin):
         freq_type = (payload.get("freqType") or "").strip() if isinstance(payload.get("freqType"), str) else ""
         allowed_delimiters = self._get_allowed_values("PUSH_DELIMITER", DEFAULT_PUSH_DELIMITERS)
         allowed_encodings = self._get_allowed_values("FILE_ENCODING", DEFAULT_PUSH_ENCODINGS)
-        allowed_freq_types = self._get_allowed_values("FREQ_TYPE", DEFAULT_PUSH_FREQ_TYPES)
+        allowed_freq_types = self._get_allowed_values("FREQ_TYPE", set())
         if not isinstance(cn, str) or not cn.strip():
             details.append({"field": "cn", "message": "作业名称不能为空"})
         if not isinstance(source_file_name, str) or not source_file_name.strip():
@@ -345,11 +347,17 @@ class PushService(AuditActorMixin):
         auth_error = None
         if not isinstance(protocol, str) or not protocol.strip():
             protocol_error = {"field": "protocol", "message": "protocol 不能为空"}
-        elif protocol.strip() not in allowed_protocols:
+        elif (
+            protocol.strip() not in allowed_protocols
+            and protocol.strip() != str((current_system or {}).get("protocol") or "").strip()
+        ):
             protocol_error = {"field": "protocol", "message": f"protocol 不在允许范围内: {protocol.strip()}"}
         if not isinstance(auth_type, str) or not auth_type.strip():
             auth_error = {"field": "auth", "message": "auth 不能为空"}
-        elif auth_type.strip() not in allowed_auth_types:
+        elif (
+            auth_type.strip() not in allowed_auth_types
+            and auth_type.strip() != str((current_system or {}).get("auth") or "").strip()
+        ):
             auth_error = {"field": "auth", "message": f"auth 不在允许范围内: {auth_type.strip()}"}
 
         if not isinstance(name, str) or not name.strip():

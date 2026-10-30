@@ -14,6 +14,7 @@
 // limitations under the License.
 
 import { requestRemote } from './http.ts';
+import { parseCollectionResponse } from './collectionResponse.ts';
 import { LONG_REQUEST_TIMEOUT } from '../config/request.ts';
 import { UPSTREAM_SYSTEMS, type MockUpstreamSystem } from '../data/upstreamSystems.ts';
 
@@ -37,12 +38,8 @@ function writeStore(items: MockUpstreamSystem[]): void {
   mockUpstreamSystems = clone(items);
 }
 
-function normalizeCollection<T>(payload: unknown, fallbackKey?: string): T[] {
-  if (Array.isArray(payload)) return payload as T[];
-  const record = payload as Record<string, unknown> | null | undefined;
-  if (record && Array.isArray(record['items'])) return record['items'] as T[];
-  if (record && fallbackKey && Array.isArray(record[fallbackKey])) return record[fallbackKey] as T[];
-  return [];
+export function normalizeCollection<T>(payload: unknown): T[] {
+  return parseCollectionResponse<T>(payload, '上游系统列表');
 }
 
 function normalizeDetail<T>(payload: unknown): T {
@@ -84,7 +81,7 @@ export async function getUpstreamSystems(params: UpstreamQueryParams = {}): Prom
       params,
       timeout: LONG_REQUEST_TIMEOUT,
     });
-    return normalizeCollection<PublicUpstreamSystem>(payload, 'systems');
+    return normalizeCollection<PublicUpstreamSystem>(payload);
   }
   const q = params.keyword?.trim().toLowerCase();
   return readStore()

@@ -14,6 +14,7 @@
 // limitations under the License.
 
 import { requestRemote } from './http.ts';
+import { parseCollectionResponse } from './collectionResponse.ts';
 import { SYSTEM_USERS, type MockSystemUser } from '../data/systemUsers.ts';
 
 const API_MODE = (
@@ -40,12 +41,8 @@ function writeStore(users: MockSystemUser[]): void {
   mockUsers = clone(users);
 }
 
-function normalizeCollection<T>(payload: unknown, fallbackKey?: string): T[] {
-  if (Array.isArray(payload)) return payload as T[];
-  const record = payload as Record<string, unknown> | null | undefined;
-  if (record && Array.isArray(record['items'])) return record['items'] as T[];
-  if (record && fallbackKey && Array.isArray(record[fallbackKey])) return record[fallbackKey] as T[];
-  return [];
+export function normalizeCollection<T>(payload: unknown): T[] {
+  return parseCollectionResponse<T>(payload, '系统用户列表');
 }
 
 function normalizeDetail<T>(payload: unknown): T {
@@ -90,7 +87,7 @@ export interface PasswordResetResult {
 export async function getUsers(): Promise<MockSystemUser[]> {
   if (API_MODE === 'remote') {
     const payload = await requestRemote('/system/users');
-    return normalizeCollection<MockSystemUser>(payload, 'items');
+    return normalizeCollection<MockSystemUser>(payload);
   }
   return readStore();
 }

@@ -107,7 +107,7 @@ export function useIndicatorModule({
       // derived from the indicator list below so both share one footing.
       const [items, dimensionCatalog] = await Promise.all([
         getIndicatorList(),
-        getIndicatorDimensions().catch(() => [] as IndicatorDimensionCatalogEntry[]),
+        getIndicatorDimensions(),
       ]);
       setIndicators(items);
       setIndicatorDimensionCatalog(dimensionCatalog);
@@ -120,10 +120,10 @@ export function useIndicatorModule({
   }, []);
 
   useEffect(() => {
-    if (active && !indicatorLoaded && !indicatorLoading) {
+    if (active && !indicatorLoaded && !indicatorLoading && !indicatorError) {
       loadIndicatorData();
     }
-  }, [active, indicatorLoaded, indicatorLoading, loadIndicatorData]);
+  }, [active, indicatorLoaded, indicatorLoading, indicatorError, loadIndicatorData]);
 
   const indicatorBack = (): void => {
     setIndicatorRoute(DEFAULT_INDICATOR_ROUTE);

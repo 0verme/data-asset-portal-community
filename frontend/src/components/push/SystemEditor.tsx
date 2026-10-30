@@ -88,8 +88,9 @@ export function SystemEditor({
   const normalizedProtocolOptions = normalizeDictOptions(protocolOptions);
   const normalizedAuthOptions = normalizeDictOptions(authOptions);
   const normalizedStatusOptions = normalizeDictOptions(statusOptions);
-  const defaultProtocol = normalizedProtocolOptions[0]?.value || DEFAULT_PROTOCOL_OPTIONS[0] || "HTTP";
-  const defaultAuth = normalizedAuthOptions[0]?.value || DEFAULT_AUTH_OPTIONS[0] || "密钥认证";
+  const remoteApi = import.meta.env?.["VITE_API_MODE"] === "remote";
+  const defaultProtocol = normalizedProtocolOptions[0]?.value || (remoteApi ? "" : DEFAULT_PROTOCOL_OPTIONS[0] || "HTTP");
+  const defaultAuth = normalizedAuthOptions[0]?.value || (remoteApi ? "" : DEFAULT_AUTH_OPTIONS[0] || "密钥认证");
   const defaultStatus = normalizedStatusOptions[0]?.value || "enabled";
   const defaults = { protocol: defaultProtocol, auth: defaultAuth, status: defaultStatus };
   const [form, setForm] = React.useState<SystemFormData>(() => createForm(initial, defaults));
@@ -146,7 +147,7 @@ export function SystemEditor({
           account: form.account.trim() || `dw_push_${form.abbr.trim().toLowerCase() || "sys"}`,
           downstreamContact: form.downstreamContact.trim(),
           dataDeveloperContact: form.dataDeveloperContact.trim(),
-          dept: form.dept.trim() || "未分配",
+          dept: form.dept.trim(),
           latestOutputTime: normalizeLatestOutputTime(form.importanceLevel, form.latestOutputTime),
           jobs: initial?.jobs || [],
         },

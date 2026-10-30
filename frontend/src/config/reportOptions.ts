@@ -3,6 +3,7 @@
 
 import mockCommonCodes, { type CommonCodeItem } from "../data/commonCodes.ts";
 import { REPORTS, type MockReportItem } from "../data/reports.ts";
+import type { RemoteReportOptions } from "../api/report.ts";
 import { optionsFromValues } from "../utils/optionUtils.ts";
 
 function localCategoryValues(categoryCode: string): CommonCodeItem[] {
@@ -47,8 +48,19 @@ export interface ReportOptionSets {
 
 export function buildReportOptionSets(
   reports: unknown[] = [],
+  remoteOptions?: RemoteReportOptions,
 ): ReportOptionSets {
   const reportTypeValues = reportValues(reports, "type");
+  const isMock = import.meta.env?.['VITE_API_MODE'] === "mock";
+  if (!isMock) {
+    return {
+      reportTypes: optionsFromValues([...(remoteOptions?.reportTypes || []), ...reportTypeValues]),
+      periods: optionsFromValues([...(remoteOptions?.periods || []), ...reportValues(reports, "statPeriod"), ...reportValues(reports, "freq")]),
+      statCalibers: optionsFromValues([...(remoteOptions?.statCalibers || []), ...reportValues(reports, "statCaliber"), ...reportValues(reports, "dateCaliber")]),
+      dataDelays: optionsFromValues([...(remoteOptions?.dataDelays || []), ...reportValues(reports, "dataDelay"), ...reportValues(reports, "dataTimeliness")]),
+      departments: optionsFromValues([...(remoteOptions?.departments || []), ...reportValues(reports, "ownerDept")]),
+    };
+  }
   return {
     // Report type is a report-asset domain value. Prefer the values returned by
     // /api/reports; the local list is only the existing mock-mode seed fallback.

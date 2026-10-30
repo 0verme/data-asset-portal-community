@@ -74,17 +74,20 @@ class RoutePermissionInventoryTests(unittest.TestCase):
         ("POST", "/api/roots"): "root:write",
         ("POST", "/api/indicators"): "indicator:write",
         ("POST", "/api/reports"): "report:write",
+        ("GET", "/api/reports/options"): "report:write",
         ("POST", "/api/api-assets"): "api_asset:write",
         (
             "GET",
             "/api/upstreams/systems/{system_id}/admin-detail",
         ): "upstream:read",
         ("POST", "/api/upstreams/systems"): "upstream:write",
+        ("GET", "/api/upstreams/options"): "upstream:write",
         (
             "GET",
             "/api/push/systems/{system_id}/admin-detail",
         ): "push:read",
         ("POST", "/api/push/systems"): "push:write",
+        ("GET", "/api/push/options"): "push:write",
         ("POST", "/api/manual-code-tables"): "code_table:write",
         ("POST", "/api/field-mappings/import"): "field_mapping:write",
         (

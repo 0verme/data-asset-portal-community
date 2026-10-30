@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { getPushBusinessOptions } from "../../api/businessOptions.ts";
 import type { UsePushModuleResult } from "../../hooks/usePushModule.ts";
+import { useBusinessOptionCatalog } from "../../hooks/useBusinessOptionCatalog.ts";
 import type { PushRoute } from "../../routing/types.ts";
 import type { OptionInputItem } from "../../utils/optionUtils.ts";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
@@ -90,6 +92,54 @@ export function PushView({
     pushIds,
     pushDepts,
   } = push;
+  const needsBusinessOptions = ["sysNew", "sysEdit", "jobNew", "jobEdit"].includes(pushRoute.page);
+  const optionLoad = useBusinessOptionCatalog(
+    needsBusinessOptions,
+    getPushBusinessOptions,
+    pushRoute.page,
+    "下游推送业务候选加载失败。",
+  );
+  const configuredOptions = optionLoad.catalog;
+  const editorCategories = configuredOptions?.categories;
+  const editorDepts = editorCategories?.["UPSTREAM_DEPT"] ?? pushDepts;
+  const editorProtocols = editorCategories?.["PUSH_PROTOCOL"] ?? pushProtocolOptions;
+  const editorAuthTypes = editorCategories?.["PUSH_AUTH_TYPE"] ?? pushAuthOptions;
+  const editorDelimiters = editorCategories?.["PUSH_DELIMITER"] ?? pushDelimiterOptions;
+  const editorEncodings = editorCategories?.["FILE_ENCODING"] ?? pushEncodingOptions;
+  const editorFrequencies = editorCategories?.["FREQ_TYPE"] ?? pushFreqTypeOptions;
+  const requiredOptionCategories = pushRoute.page === "sysNew"
+    ? ["PUSH_PROTOCOL", "PUSH_AUTH_TYPE"]
+    : pushRoute.page === "jobNew"
+      ? ["PUSH_DELIMITER", "FILE_ENCODING", "FREQ_TYPE"]
+      : [];
+  const emptyRequiredCategories = configuredOptions
+    ? requiredOptionCategories.filter((code) => configuredOptions.categories[code]?.length === 0)
+    : [];
+  const optionConfigMessage = emptyRequiredCategories.map((code) => (
+    configuredOptions?.missingCategories.includes(code) ? `${code} 分类不存在或未启用` : `${code} 没有启用项`
+  )).join("；");
+
+  if (needsBusinessOptions && (optionLoad.loading || (!configuredOptions && !optionLoad.error))) {
+    return <LoadingState title="加载下游业务候选" desc="正在读取已配置的协议、部门和作业选项。" />;
+  }
+  if (needsBusinessOptions && optionLoad.error) {
+    return (
+      <ErrorState
+        title="下游推送业务候选加载失败"
+        desc={optionLoad.error}
+        onRetry={() => { void optionLoad.reload(); }}
+      />
+    );
+  }
+  if (requiredOptionCategories.length && emptyRequiredCategories.length) {
+    return (
+      <ErrorState
+        title="下游推送选项尚未配置"
+        desc={`${optionConfigMessage}；请先维护真实码值后重试，不会回退到 Demo 候选。`}
+        onRetry={() => { void optionLoad.reload(); }}
+      />
+    );
+  }
 
   if ((pushLoading && !pushLoaded && ['systems', 'sysNew'].includes(pushRoute.page)) || pushDetailLoading) {
     return (
@@ -252,9 +302,9 @@ export function PushView({
       <SystemEditor
         mode="new"
         existingIds={pushIds}
-        depts={pushDepts}
-        protocolOptions={pushProtocolOptions}
-        authOptions={pushAuthOptions}
+        depts={editorDepts}
+        protocolOptions={editorProtocols}
+        authOptions={editorAuthTypes}
         statusOptions={statusOptions}
         onSave={handleSavePushSystem}
         onCancel={pushGoList}
@@ -280,9 +330,9 @@ export function PushView({
         mode="edit"
         initial={pushAdminDetail}
         existingIds={pushIds}
-        depts={pushDepts}
-        protocolOptions={pushProtocolOptions}
-        authOptions={pushAuthOptions}
+        depts={editorDepts}
+        protocolOptions={editorProtocols}
+        authOptions={editorAuthTypes}
         statusOptions={statusOptions}
         onSave={handleSavePushSystem}
         onCancel={() => pushGoSystem(currentSystem.id)}
@@ -297,9 +347,9 @@ export function PushView({
       <JobEditor
         mode="new"
         system={currentSystem}
-        delimiterOptions={pushDelimiterOptions}
-        encodingOptions={pushEncodingOptions}
-        freqTypeOptions={pushFreqTypeOptions}
+        delimiterOptions={editorDelimiters}
+        encodingOptions={editorEncodings}
+        freqTypeOptions={editorFrequencies}
         onSave={handleSavePushJob}
         onCancel={() => pushGoSystem(currentSystem.id)}
         onBackToList={pushGoList}
@@ -336,9 +386,9 @@ export function PushView({
         mode="edit"
         system={pushAdminDetail}
         initial={adminJob}
-        delimiterOptions={pushDelimiterOptions}
-        encodingOptions={pushEncodingOptions}
-        freqTypeOptions={pushFreqTypeOptions}
+        delimiterOptions={editorDelimiters}
+        encodingOptions={editorEncodings}
+        freqTypeOptions={editorFrequencies}
         onSave={handleSavePushJob}
         onCancel={() => pushGoJob(currentSystem.id, currentJob.id)}
         onBackToList={pushGoList}

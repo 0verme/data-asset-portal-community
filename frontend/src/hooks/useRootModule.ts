@@ -107,10 +107,10 @@ export function useRootModule({
   }, []);
 
   useEffect(() => {
-    if (active && !rootLoaded && !rootLoading) {
+    if (active && !rootLoaded && !rootLoading && !rootError) {
       loadRootData();
     }
-  }, [active, rootLoaded, rootLoading, loadRootData]);
+  }, [active, rootLoaded, rootLoading, rootError, loadRootData]);
 
   const rootBack = useSmartBack<RootNavigationSnapshot>({
     moduleKey: 'root',

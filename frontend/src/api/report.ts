@@ -14,6 +14,7 @@
 // limitations under the License.
 
 import { requestRemote } from './http.ts';
+import { parseCollectionResponse } from './collectionResponse.ts';
 import { REPORTS, type MockReportItem } from '../data/reports.ts';
 
 const API_MODE = (
@@ -28,12 +29,8 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function normalizeCollection(payload: unknown, fallbackKey?: string): MockReportItem[] {
-  if (Array.isArray(payload)) return payload as MockReportItem[];
-  const record = payload as Record<string, unknown> | null | undefined;
-  if (record && Array.isArray(record['items'])) return record['items'] as MockReportItem[];
-  if (record && fallbackKey && Array.isArray(record[fallbackKey])) return record[fallbackKey] as MockReportItem[];
-  return [];
+export function normalizeCollection(payload: unknown): MockReportItem[] {
+  return parseCollectionResponse<MockReportItem>(payload, '报表列表');
 }
 
 function normalizeDetail(payload: unknown): MockReportItem {
@@ -85,7 +82,7 @@ function filterReports(items: readonly MockReportItem[], params: ReportQueryPara
 export async function getReportList(params: ReportQueryParams = {}): Promise<MockReportItem[]> {
   if (API_MODE === 'remote') {
     const payload = await requestRemote('/reports', { params });
-    return normalizeCollection(payload, 'items');
+    return normalizeCollection(payload);
   }
   return filterReports(readStore(), params);
 }
@@ -148,3 +145,24 @@ export async function deleteReport(reportCode: string): Promise<void> {
   }
   writeStore(readStore().filter((item) => item.code !== reportCode));
 }
+
+export interface RemoteReportOptions {
+  reportTypes: string[];
+  periods: string[];
+  statCalibers: string[];
+  dataDelays: string[];
+  departments: string[];
+}
+
+export async function getReportOptions(): Promise<RemoteReportOptions> {
+  const response = await requestRemote<{ options: RemoteReportOptions }>('/reports/options');
+  if (!response || !response.options) throw new Error('报表字典响应无效');
+  const options = response.options;
+  for (const key of ['reportTypes', 'periods', 'statCalibers', 'dataDelays', 'departments'] as const) {
+    if (!Array.isArray(options[key]) || !options[key].every((value) => typeof value === 'string')) {
+      throw new Error('报表字典响应无效');
+    }
+  }
+  return options;
+}
+

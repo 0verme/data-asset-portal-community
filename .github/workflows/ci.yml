@@ -606,7 +606,7 @@ jobs:
         env:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/api-asset-validation-playwright
           VITE_API_MODE: remote
-        run: npm run test:browser -- --grep "API asset validation|Remote data trust|source options failure|field-mapping column contract|complete field-mapping export"
+        run: npm run test:browser -- --grep "API asset validation|Remote data trust|strict collection response|indicator path malformed envelope|source options failure|field-mapping column contract"
 
       - name: Upstream and push remote pagination regression (Chromium and WebKit)
         if: matrix.node == '22'
@@ -649,6 +649,13 @@ jobs:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/manual-code-table-form-feedback-playwright
           VITE_API_MODE: remote
         run: npm run test:browser -- e2e/manual-code-table-form-errors.spec.ts --workers=2
+
+      - name: Root CSV/TSV import parser browser regression (Chromium and WebKit)
+        if: matrix.node == '22'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/root-csv-tsv-import-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/root-import-parser.spec.ts --workers=2
 
       - name: Overlay focus and feedback browser regression (Chromium and WebKit)
         if: matrix.node == '22'

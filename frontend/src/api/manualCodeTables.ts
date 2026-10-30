@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { requestRemote } from './http.ts';
+import { parseCollectionResponse } from './collectionResponse.ts';
 import { MANUAL_CODE_TABLES, type MockManualCodeTable } from '../data/manualCodeTables.ts';
 
 const API_MODE = (
@@ -48,8 +49,8 @@ export interface ManualCodeTableFilterParams {
   [key: string]: unknown;
 }
 
-interface ManualCodeTableListEnvelope {
-  items?: MockManualCodeTable[] | undefined;
+export function normalizeCollection(payload: unknown): MockManualCodeTable[] {
+  return parseCollectionResponse<MockManualCodeTable>(payload, '码值表列表');
 }
 
 export async function exportManualCodeTablesCsv(
@@ -63,8 +64,8 @@ export async function exportManualCodeTablesCsv(
 
 export async function getManualCodeTables(filters: ManualCodeTableFilterParams = {}): Promise<MockManualCodeTable[]> {
   if (API_MODE === 'remote') {
-    const payload = await requestRemote<ManualCodeTableListEnvelope>('/manual-code-tables', { params: filters });
-    return Array.isArray(payload?.items) ? payload.items : [];
+    const payload = await requestRemote<unknown>('/manual-code-tables', { params: filters });
+    return normalizeCollection(payload);
   }
   const keyword = String(filters.keyword || '').trim().toLowerCase();
   return clone(
