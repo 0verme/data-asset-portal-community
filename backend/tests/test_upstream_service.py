@@ -37,10 +37,10 @@ class UpstreamOptionContractTestCase(unittest.TestCase):
                     "backend.app.services.upstream_service.common_code_service.get_items",
                     side_effect=CommonCodeCategoryNotFoundError("missing"),
                 ):
-            normalized = service._normalize_payload(payload)
+            with self.assertRaises(UpstreamValidationError) as caught:
+                service._normalize_payload(payload)
 
-        self.assertEqual("PostgreSQL", normalized["dbType"])
-        self.assertEqual("供应链部", normalized["dept"])
+        self.assertTrue(any(item["field"] == "dept" for item in caught.exception.details))
 
 
 class UpstreamDeleteRelationshipTests(unittest.TestCase):
