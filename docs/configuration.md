@@ -182,6 +182,14 @@ Resolution is:
 1. `ASSET_DB_PROFILE` (and optional `ASSET_AUTH_DB_PROFILE`) selects profiles.
 2. YAML `defaults` are merged with the selected profile.
 3. Non-empty `ASSET_DB_*` environment overrides replace YAML/profile values.
+   This is **global to every selected named profile**, including an explicit
+   `LINEAGE_DB_PROFILE` and `ASSET_AUTH_DB_PROFILE`; choosing a distinct profile
+   name does not bypass these overrides. When a dedicated lineage database
+   must retain its own host/credentials, do not set conflicting global
+   `ASSET_DB_HOST`/`ASSET_DB_DATABASE`/`ASSET_DB_USER`/`ASSET_DB_PASSWORD`
+   variables: instead put the connection fields in the per-profile YAML and
+   protect the config file appropriately. Do not assume that a profile switch
+   provides connection isolation.
 4. `ASSET_DB_JAR_PATH` overrides a GaussDB `jar_path`.
 5. A relative GaussDB `jar_path` is resolved against `backend/` (the parent of
    `configs/`); with the default `backend/configs/database.yaml`,
