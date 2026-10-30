@@ -3,6 +3,7 @@
 
 import mockCommonCodes, { type CommonCodeItem } from "../data/commonCodes.ts";
 import { REPORTS, type MockReportItem } from "../data/reports.ts";
+import type { RemoteReportOptions } from "../api/report.ts";
 import { optionsFromValues } from "../utils/optionUtils.ts";
 
 function localCategoryValues(categoryCode: string): CommonCodeItem[] {
@@ -47,16 +48,17 @@ export interface ReportOptionSets {
 
 export function buildReportOptionSets(
   reports: unknown[] = [],
+  remoteOptions?: RemoteReportOptions,
 ): ReportOptionSets {
   const reportTypeValues = reportValues(reports, "type");
   const isMock = import.meta.env?.VITE_API_MODE === "mock";
   if (!isMock) {
     return {
-      reportTypes: optionsFromValues(reportTypeValues),
-      periods: optionsFromValues([...reportValues(reports, "statPeriod"), ...reportValues(reports, "freq")]),
-      statCalibers: optionsFromValues([...reportValues(reports, "statCaliber"), ...reportValues(reports, "dateCaliber")]),
-      dataDelays: optionsFromValues([...reportValues(reports, "dataDelay"), ...reportValues(reports, "dataTimeliness")]),
-      departments: optionsFromValues(reportValues(reports, "ownerDept")),
+      reportTypes: optionsFromValues([...(remoteOptions?.reportTypes || []), ...reportTypeValues]),
+      periods: optionsFromValues([...(remoteOptions?.periods || []), ...reportValues(reports, "statPeriod"), ...reportValues(reports, "freq")]),
+      statCalibers: optionsFromValues([...(remoteOptions?.statCalibers || []), ...reportValues(reports, "statCaliber"), ...reportValues(reports, "dateCaliber")]),
+      dataDelays: optionsFromValues([...(remoteOptions?.dataDelays || []), ...reportValues(reports, "dataDelay"), ...reportValues(reports, "dataTimeliness")]),
+      departments: optionsFromValues([...(remoteOptions?.departments || []), ...reportValues(reports, "ownerDept")]),
     };
   }
   return {
