@@ -21,7 +21,7 @@ import re
 from copy import deepcopy
 from time import perf_counter
 
-from sqlalchemy import delete, func, insert, or_, select, update
+from sqlalchemy import case, delete, func, insert, or_, select, update
 
 from ..application import AuditActorMixin, actor_aware
 from .common_code_service import (
@@ -40,6 +40,7 @@ from ..db.tables import (
 )
 from ..settings import get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
+from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
     OPERATION_TYPE_DELETE,
@@ -477,8 +478,17 @@ class PushService(AuditActorMixin):
         normalized_page_size = max(1, min(max_page_size, normalized_page_size))
         return normalized_page, normalized_page_size
 
-    def _build_system_where(self, status=None, protocol=None, dept=None, keyword=None):
+    @staticmethod
+    def _importance_value():
+        return func.coalesce(func.nullif(push_system.c.importance_level_code, ""), "normal")
+
+    def _build_system_where(self, status=None, protocol=None, dept=None, keyword=None,
+                            importance_level=None, system_code=None, literal_keyword=False):
         where = [push_system.c.is_deleted == "N"]
+        if importance_level:
+            where.append(self._importance_value() == importance_level)
+        if system_code is not None:
+            where.append(push_system.c.system_code == system_code)
         if status:
             where.append(push_system.c.status_code == status)
         if protocol:
@@ -487,7 +497,8 @@ class PushService(AuditActorMixin):
             where.append(push_system.c.dept_name == dept)
         normalized_keyword = str(keyword or "").strip().lower()
         if normalized_keyword:
-            like = f"%{normalized_keyword}%"
+            like = f"%{escape_like_keyword(normalized_keyword) if literal_keyword else normalized_keyword}%"
+            escape = LIKE_ESCAPE_CHAR if literal_keyword else None
             system_searchable = (
                 push_system.c.system_code,
                 push_system.c.system_name,
@@ -505,11 +516,11 @@ class PushService(AuditActorMixin):
             job_match = select(1).select_from(push_job).where(
                 push_job.c.system_id == push_system.c.system_id,
                 push_job.c.is_deleted == "N",
-                or_(*(func.lower(func.coalesce(column, "")).like(like) for column in job_searchable)),
+                or_(*(func.lower(func.coalesce(column, "")).like(like, escape=escape) for column in job_searchable)),
             ).exists()
             where.append(
                 or_(
-                    *(func.lower(func.coalesce(column, "")).like(like) for column in system_searchable),
+                    *(func.lower(func.coalesce(column, "")).like(like, escape=escape) for column in system_searchable),
                     job_match,
                 )
             )
@@ -738,27 +749,27 @@ class PushService(AuditActorMixin):
             grouped.setdefault(int(row["system_id"]), []).append(job)
         return grouped
 
-    def _load_public_system_rows(self, status=None, protocol=None, dept=None, keyword=None, page=None, page_size=None):
+    @staticmethod
+    def _public_system_columns():
+        return (
+            push_system.c.system_id, push_system.c.system_code, push_system.c.system_name,
+            push_system.c.system_abbr, push_system.c.protocol_type, push_system.c.contact_name,
+            push_system.c.data_developer_contact_name, push_system.c.dept_name, push_system.c.system_desc,
+            push_system.c.status_code, push_system.c.importance_level_code, push_system.c.latest_output_time,
+        )
+
+    def _load_public_system_rows(self, status=None, protocol=None, dept=None, keyword=None, page=None, page_size=None,
+                                 importance_level=None, system_code=None):
         paginate = page is not None or page_size is not None
         page, page_size = self._resolve_paging(page=page, page_size=page_size)
         offset = (page - 1) * page_size
         statement = (
-            select(
-                push_system.c.system_id,
-                push_system.c.system_code,
-                push_system.c.system_name,
-                push_system.c.system_abbr,
-                push_system.c.protocol_type,
-                push_system.c.contact_name,
-                push_system.c.data_developer_contact_name,
-                push_system.c.dept_name,
-                push_system.c.system_desc,
-                push_system.c.status_code,
-                push_system.c.importance_level_code,
-                push_system.c.latest_output_time,
-            )
-            .where(*self._build_system_where(status=status, protocol=protocol, dept=dept, keyword=keyword))
-            .order_by(push_system.c.system_code)
+            select(*self._public_system_columns())
+            .where(*self._build_system_where(
+                status=status, protocol=protocol, dept=dept, keyword=keyword,
+                importance_level=importance_level, system_code=system_code,
+            ))
+            .order_by(push_system.c.system_code, push_system.c.system_id)
         )
         if paginate:
             statement = statement.limit(page_size).offset(offset)
@@ -846,7 +857,7 @@ class PushService(AuditActorMixin):
         return self._to_system(row, jobs)
 
     def _get_public_system_detail(self, system_code):
-        systems = self._load_public_systems(keyword=None)
+        systems = self._load_public_systems(system_code=system_code)
         system = next((item for item in systems if item["id"] == system_code), None)
         if not system:
             raise PushSystemNotFoundError(system_code)
@@ -1000,7 +1011,84 @@ class PushService(AuditActorMixin):
             delete(push_job).where(push_job.c.system_id == int(system_id)),
         ]
 
-    def get_push_systems(self, status=None, protocol=None, dept=None, keyword=None, page=None, page_size=None):
+    def _system_page_order(self, sort_key=None, sort_direction=None):
+        column = {
+            "id": push_system.c.system_code,
+            "name": push_system.c.system_name,
+            "protocol": push_system.c.protocol_type,
+            "dept": push_system.c.dept_name,
+            "importanceLevel": case((self._importance_value() == "important", 0), else_=1),
+        }.get(sort_key, case((self._importance_value() == "important", 0), else_=1))
+        primary = column.desc() if sort_direction == "desc" else column.asc()
+        return primary, push_system.c.system_code.asc(), push_system.c.system_id.asc()
+
+    def get_push_system_page(self, status=None, protocol=None, dept=None, keyword=None, page=None, page_size=None,
+                             importance_level=None, sort_key=None, sort_direction=None):
+        """Lightweight explicit page; legacy unpaged consumers keep jobs/fields."""
+        page, page_size = self._resolve_paging(page, page_size)
+        with database_transaction():
+            filters = self._build_system_where(
+                status=status, protocol=protocol, dept=dept, keyword=keyword,
+                importance_level=importance_level, literal_keyword=True,
+            )
+            count_rows = self._fetch_rows_logged(
+                select(func.count().label("total")).select_from(push_system).where(*filters),
+                purpose="push filtered count", method="get_push_system_page",
+            )
+            job_count = select(func.count()).select_from(push_job).where(
+                push_job.c.system_id == push_system.c.system_id, push_job.c.is_deleted == "N",
+            ).scalar_subquery()
+            rows = self._fetch_rows_logged(
+                select(*self._public_system_columns(), job_count.label("live_job_count"))
+                .where(*filters).order_by(*self._system_page_order(sort_key, sort_direction))
+                .limit(page_size).offset((page - 1) * page_size),
+                purpose="push system page", method="get_push_system_page", page=page, page_size=page_size,
+            )
+            items = [dict(self._to_public_system(row, []), jobCount=int(row["live_job_count"])) for row in rows]
+            columns = (push_system.c.status_code, push_system.c.protocol_type,
+                       push_system.c.dept_name, self._importance_value().label("importance_level"))
+            buckets = self._fetch_rows_logged(
+                select(*columns, func.count().label("total"))
+                .where(push_system.c.is_deleted == "N").group_by(*columns),
+                purpose="push global facets", method="get_push_system_page",
+            )
+            facets = {"status": {}, "protocol": {}, "dept": {}, "importanceLevel": {}}
+            system_count = 0
+            for row in buckets:
+                count = int(row["total"])
+                system_count += count
+                for key, field in (("status", "status_code"), ("protocol", "protocol_type"),
+                                   ("dept", "dept_name"), ("importanceLevel", "importance_level")):
+                    value = row.get(field) or ""
+                    if value:
+                        facets[key][value] = facets[key].get(value, 0) + count
+            # Keep complete narrow candidates (not full system/job projections)
+            # for the existing duplicate-id and frequency option consumers.
+            ids = self._fetch_rows_logged(
+                select(push_system.c.system_code).where(push_system.c.is_deleted == "N")
+                .order_by(push_system.c.system_code, push_system.c.system_id),
+                purpose="push complete system id options", method="get_push_system_page",
+            )
+            frequencies = self._fetch_rows_logged(
+                select(push_job.c.freq_type, func.count().label("total"))
+                .select_from(push_job.join(push_system, push_job.c.system_id == push_system.c.system_id))
+                .where(push_job.c.is_deleted == "N", push_system.c.is_deleted == "N")
+                .group_by(push_job.c.freq_type),
+                purpose="push global frequency options and job count", method="get_push_system_page",
+            )
+            return {
+                "items": items, "total": int(count_rows[0]["total"]), "page": page, "pageSize": page_size,
+                "facets": facets,
+                "options": {
+                    "systemIds": [row["system_code"] for row in ids],
+                    "protocols": sorted(facets["protocol"]), "depts": sorted(facets["dept"]),
+                    "freqTypes": sorted({row["freq_type"] for row in frequencies if row.get("freq_type")}),
+                },
+                "stats": {"systemCount": system_count, "jobCount": sum(int(row["total"]) for row in frequencies)},
+            }
+
+    def get_push_systems(self, status=None, protocol=None, dept=None, keyword=None, page=None, page_size=None,
+                         importance_level=None):
         with database_transaction():
             return self._load_public_systems(
                 status=status,
@@ -1009,6 +1097,7 @@ class PushService(AuditActorMixin):
                 keyword=keyword,
                 page=page,
                 page_size=page_size,
+                importance_level=importance_level,
             )
 
     def get_push_system_detail(self, system_id):

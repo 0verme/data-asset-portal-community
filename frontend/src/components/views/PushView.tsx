@@ -30,7 +30,7 @@ import {
   SystemEditor,
 } from "../PushPages.tsx";
 import { Icon } from "../ui.tsx";
-import { Button } from "../../ui/index.ts";
+import { Button, Select } from "../../ui/index.ts";
 
 type RequireLogin = (action?: () => void, permission?: string) => boolean;
 
@@ -53,6 +53,16 @@ export function PushView({
 }: PushViewProps) {
   const {
     pushProtocolOptions,
+    pushPage,
+    pushPageSize,
+    pushTotal,
+    pushSort,
+    setPushPage,
+    setPushPageSize,
+    setPushSort,
+    pushLoaded,
+    pushDetailLoading,
+    loadPushDetail,
     pushAuthOptions,
     pushDelimiterOptions,
     pushEncodingOptions,
@@ -81,7 +91,7 @@ export function PushView({
     pushDepts,
   } = push;
 
-  if (pushLoading) {
+  if ((pushLoading && !pushLoaded && ['systems', 'sysNew'].includes(pushRoute.page)) || pushDetailLoading) {
     return (
       <LoadingState
         title="加载下游推送配置"
@@ -94,7 +104,7 @@ export function PushView({
       <ErrorState
         title="下游推送加载失败"
         desc={pushError}
-        onRetry={loadPushData}
+        onRetry={() => { void loadPushData(); void loadPushDetail(); }}
       />
     );
   }
@@ -110,8 +120,9 @@ export function PushView({
     );
   }
   if (pushRoute.page === "systems") {
+    const pageCount = Math.max(1, Math.ceil(pushTotal / pushPageSize));
     return (
-      <>
+      <div aria-busy={pushLoading}>
         <div className="page-head">
           <div>
             <div className="page-title">
@@ -119,7 +130,7 @@ export function PushView({
               下游系统推送
             </div>
             <div className="page-sub">
-              共 <b>{filteredPushSystems.length}</b> 个系统
+              共 <b>{pushTotal}</b> 个系统
             </div>
           </div>
           <div className="head-actions">
@@ -149,7 +160,22 @@ export function PushView({
           view={pushView}
           onOpen={pushOpenSystem}
         />
-      </>
+        <div className="fm-pagination" aria-label="下游系统分页">
+          <div aria-live="polite">{pushLoading ? '正在加载…' : `共 ${pushTotal} 条`}</div>
+          <div className="fm-pagination-tools">
+            <Select<string> aria-label="下游系统排序" value={pushSort} onValueChange={(value) => setPushSort(value || 'importanceLevel:asc')}
+              items={[{ label: '重要优先', value: 'importanceLevel:asc' }, { label: '名称升序', value: 'name:asc' }, { label: '标识升序', value: 'id:asc' }, { label: '标识降序', value: 'id:desc' }]} />
+            <label>每页 <Select<string> aria-label="每页条数" value={String(pushPageSize)}
+              items={[...new Set([10, 20, 50, 100, pushPageSize])].sort((a, b) => a - b).map((size) => ({ label: String(size), value: String(size) }))}
+              onValueChange={(value) => { if (value) { setPushPage(1); setPushPageSize(Number(value)); } }} /> 条</label>
+            <Button variant="secondary" type="button" disabled={pushPage <= 1}
+              onClick={() => setPushPage((page) => Math.max(1, page - 1))}>上一页</Button>
+            <span className="mono">{pushPage} / {pageCount}</span>
+            <Button variant="secondary" type="button" disabled={pushPage >= pageCount}
+              onClick={() => setPushPage((page) => Math.min(pageCount, page + 1))}>下一页</Button>
+          </div>
+        </div>
+      </div>
     );
   }
   if (pushRoute.page === "jobs" && currentSystem) {

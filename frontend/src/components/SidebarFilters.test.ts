@@ -124,7 +124,7 @@ test("sidebar all entries clear only their own dimension while preserving peer f
 	assert.match(push, /active: !pushFilter\.importanceLevel/);
 });
 
-test("all entries retain the existing facet count sources", async () => {
+test("all entries retain global facet counts rather than current-page lengths", async () => {
 	const source = await readSources(
 		assetSidebarPath,
 		upstreamSidebarPath,
@@ -135,8 +135,10 @@ test("all entries retain the existing facet count sources", async () => {
 
 	assert.match(source, /count: Object\.values\(layerCounts\)\.reduce/);
 	assert.match(source, /count: Object\.values\(domainCounts\)\.reduce/);
-	assert.match(source, /count: upstreamSystems\.length/);
+	assert.match(source, /count: upstreamSystemCount/);
+	assert.doesNotMatch(source, /count: upstreamSystems\.length/);
 	assert.match(source, /count: reports\.length/);
 	assert.match(source, /count: apiAsset\.items\.length/);
-	assert.match(source, /count: pushSystems\.length/);
+	assert.match(source, /count: pushSystemCount/);
+	assert.doesNotMatch(source, /count: pushSystems\.length/);
 });

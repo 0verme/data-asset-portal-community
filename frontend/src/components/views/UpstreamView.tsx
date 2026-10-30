@@ -33,6 +33,7 @@ import {
   UpstreamList,
 } from "../UpstreamPages.tsx";
 import { Icon } from "../ui.tsx";
+import { Button, Select } from "../../ui/index.ts";
 
 type RequireLogin = (action?: () => void, permission?: string) => boolean;
 type UpstreamSystem = PublicUpstreamSystem | MockUpstreamSystem;
@@ -86,6 +87,14 @@ export function UpstreamView({
   const {
     upstreamDbTypes,
     upstreamDeptOptions,
+    upstreamPage,
+    upstreamPageSize,
+    upstreamTotal,
+    upstreamSort,
+    setUpstreamPage,
+    setUpstreamPageSize,
+    setUpstreamSort,
+    upstreamLoaded,
     currentUpstream,
     upstreamPendingIds,
     upstreamLoading,
@@ -111,7 +120,7 @@ export function UpstreamView({
   } = upstream;
   const normalizedStatusOptions = normalizeDictOptions(statusOptions);
 
-  if (upstreamLoading) {
+  if (upstreamLoading && !upstreamLoaded && !['detail', 'edit'].includes(upRoute.page)) {
     return (
       <LoadingState
         title="加载上游卸数配置"
@@ -137,9 +146,12 @@ export function UpstreamView({
     );
   }
   if (upRoute.page === "list") {
+    const pageCount = Math.max(1, Math.ceil(upstreamTotal / upstreamPageSize));
     return (
+      <div aria-busy={upstreamLoading}>
       <UpstreamList
         systems={filteredUpstreamSystems}
+        total={upstreamTotal}
         pendingIds={upstreamPendingIds}
         query={query}
         view={upstreamView as ViewMode}
@@ -163,6 +175,22 @@ export function UpstreamView({
         onToggle={handleToggleUpstream}
         onViewTables={onViewTables}
       />
+      <div className="fm-pagination" aria-label="上游系统分页">
+        <div aria-live="polite">{upstreamLoading ? '正在加载…' : `共 ${upstreamTotal} 条`}</div>
+        <div className="fm-pagination-tools">
+          <Select<string> aria-label="上游系统排序" value={upstreamSort} onValueChange={(value) => setUpstreamSort(value || 'abbr:asc')}
+            items={[{ label: '缩写升序', value: 'abbr:asc' }, { label: '名称升序', value: 'name:asc' }, { label: '标识升序', value: 'id:asc' }, { label: '标识降序', value: 'id:desc' }]} />
+          <label>每页 <Select<string> aria-label="每页条数" value={String(upstreamPageSize)}
+            items={[...new Set([10, 20, 50, 100, upstreamPageSize])].sort((a, b) => a - b).map((size) => ({ label: String(size), value: String(size) }))}
+            onValueChange={(value) => { if (value) { setUpstreamPage(1); setUpstreamPageSize(Number(value)); } }} /> 条</label>
+          <Button variant="secondary" type="button" disabled={upstreamPage <= 1}
+            onClick={() => setUpstreamPage((page) => Math.max(1, page - 1))}>上一页</Button>
+          <span className="mono">{upstreamPage} / {pageCount}</span>
+          <Button variant="secondary" type="button" disabled={upstreamPage >= pageCount}
+            onClick={() => setUpstreamPage((page) => Math.min(pageCount, page + 1))}>下一页</Button>
+        </div>
+      </div>
+      </div>
     );
   }
   if (upRoute.page === "detail") {

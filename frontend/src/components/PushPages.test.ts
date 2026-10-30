@@ -231,7 +231,7 @@ test("push sidebar filters systems by importance with counts and a clearable sel
   assert.match(source, /pushFacets\.importanceLevel\[item\.value\] \|\| 0/);
   assert.match(
     source,
-    /system\.importanceLevel !== pushFilter\.importanceLevel/,
+    /importanceLevel: pushFilter\.importanceLevel \|\| undefined/,
   );
   assert.match(
     source,

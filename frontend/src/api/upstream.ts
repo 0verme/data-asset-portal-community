@@ -71,6 +71,10 @@ export interface UpstreamQueryParams {
   keyword?: string | undefined;
   status?: string | undefined;
   dbType?: string | undefined;
+  page?: number | undefined;
+  pageSize?: number | undefined;
+  sortKey?: string | undefined;
+  sortDirection?: string | undefined;
   [key: string]: unknown;
 }
 
@@ -104,6 +108,49 @@ export async function getUpstreamSystems(params: UpstreamQueryParams = {}): Prom
       ].some((value) => String(value || '').toLowerCase().includes(q));
     })
     .map(toPublicSystem);
+}
+
+export interface UpstreamSystemPage {
+  items: PublicUpstreamSystem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  facets: { status: Record<string, number>; dbType: Record<string, number>; dept: Record<string, number> };
+  options: { dbTypes: string[]; depts: string[] };
+  stats: { systemCount: number };
+}
+
+export async function getUpstreamSystemPage(params: UpstreamQueryParams = {}): Promise<UpstreamSystemPage> {
+  const page = Math.max(1, params.page || 1);
+  const pageSize = Math.max(1, params.pageSize || 20);
+  if (API_MODE === 'remote') {
+    // Deliberately separate from the full collection/options API above.
+    const payload = await requestRemote('/upstreams/systems', {
+      params: { ...params, page, pageSize }, timeout: LONG_REQUEST_TIMEOUT,
+    }) as UpstreamSystemPage;
+    if (!payload || !Array.isArray(payload.items) || !Number.isFinite(payload.total) || !payload.facets || !payload.options || !payload.stats) {
+      throw new Error('Invalid upstream page payload');
+    }
+    return payload;
+  }
+  const all = readStore();
+  const matches = await getUpstreamSystems(params);
+  const columns: Record<string, keyof PublicUpstreamSystem> = { id: 'id', abbr: 'abbr', name: 'name', dbType: 'dbType', status: 'status' };
+  const key = columns[params.sortKey || ''] || 'abbr';
+  const direction = params.sortDirection === 'desc' ? -1 : 1;
+  matches.sort((left, right) => String(left[key] || '').localeCompare(String(right[key] || '')) * direction || left.id.localeCompare(right.id));
+  const facets: UpstreamSystemPage['facets'] = { status: {}, dbType: {}, dept: {} };
+  for (const item of all) {
+    for (const field of ['status', 'dbType', 'dept'] as const) {
+      const value = item[field];
+      if (value) facets[field][value] = (facets[field][value] || 0) + 1;
+    }
+  }
+  return {
+    items: matches.slice((page - 1) * pageSize, page * pageSize), total: matches.length, page, pageSize, facets,
+    options: { dbTypes: Object.keys(facets.dbType).sort(), depts: Object.keys(facets.dept).sort() },
+    stats: { systemCount: all.length },
+  };
 }
 
 export async function getUpstreamSystem(systemId: string): Promise<PublicUpstreamSystem> {

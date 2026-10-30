@@ -496,7 +496,9 @@ jobs:
             --config /tmp/mysql-ci-config.yaml
 
       - name: MySQL CRUD, pagination, uniqueness and rollback contracts
-        run: python -m unittest backend.tests.test_mysql_integration
+        run: |
+          python -m unittest backend.tests.test_mysql_integration
+          python -m unittest backend.tests.test_system_list_pagination_integration.MySQLSystemPaginationIntegrationTests
 
       - name: Repeat migration apply must be a no-op
         run: |
@@ -605,6 +607,13 @@ jobs:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/api-asset-validation-playwright
           VITE_API_MODE: remote
         run: npm run test:browser -- --grep "API asset validation|Remote data trust|source options failure|field-mapping column contract"
+
+      - name: Upstream and push remote pagination regression (Chromium and WebKit)
+        if: matrix.node == '22'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/system-list-pagination-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/system-list-pagination.spec.ts
 
       - name: Field-mapping mock CSV column regression (Chromium and WebKit)
         if: matrix.node == '22'

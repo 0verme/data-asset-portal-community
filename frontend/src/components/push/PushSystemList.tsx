@@ -75,7 +75,7 @@ export function PushSystemList({ systems, query, view, onOpen }: PushSystemListP
                     <td data-label="下游对接人" style={{ color: "var(--ink-2)" }}>{downstreamContact || "未指定"}</td>
                     <td data-label="数据开发对接人" style={{ color: "var(--ink-2)" }}>{dataDeveloperContact || "未指定"}</td>
                   </> : null}
-                  <td data-label="作业数" style={{ textAlign: "center" }}><span className="t-num">{system.jobs.length}</span></td>
+                  <td data-label="作业数" style={{ textAlign: "center" }}><span className="t-num">{system.jobCount ?? system.jobs.length}</span></td>
                   <td data-label="状态"><StatusBadge status={system.status} /></td>
                 </tr>
               );
@@ -128,7 +128,7 @@ export function PushSystemList({ systems, query, view, onOpen }: PushSystemListP
               <span className="cv">{dataDeveloperContact}</span>
             </div> : null}
             <div className="sys-card-foot">
-              <span className="jobs-n"><Icon name="push" size={14} color="var(--ink-3)" /><b>{system.jobs.length}</b> 个推送作业</span>
+              <span className="jobs-n"><Icon name="push" size={14} color="var(--ink-3)" /><b>{system.jobCount ?? system.jobs.length}</b> 个推送作业</span>
               <span className="enter-link">进入 <Icon name="arrow" size={14} /></span>
             </div>
           </div>

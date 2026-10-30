@@ -45,6 +45,7 @@ function UpstreamConnectionMeta({ system }: { system: PublicUpstreamSystem }) {
 
 export interface UpstreamListProps {
   systems: readonly PublicUpstreamSystem[];
+  total?: number | undefined;
   pendingIds?: readonly string[] | undefined;
   query: string;
   view: ViewMode;
@@ -59,6 +60,7 @@ export interface UpstreamListProps {
 
 export function UpstreamList({
   systems,
+  total = systems.length,
   pendingIds = [],
   query,
   view,
@@ -76,7 +78,7 @@ export function UpstreamList({
         <div>
           <div className="page-title"><Icon name="download" size={21} color="var(--ink-2)" />上游卸数系统</div>
           <div className="page-sub">
-            上游业务系统按计划将数据卸载至数据湖，共 <b>{systems.length}</b> 个{query ? <>，匹配“{query}”</> : null}
+            上游业务系统按计划将数据卸载至数据湖，共 <b>{total}</b> 个{query ? <>，匹配“{query}”</> : null}
           </div>
         </div>
         <div className="head-actions">

@@ -21,7 +21,7 @@ export function PushSidebar({
   pushRoute,
 }: PushSidebarProps) {
   const {
-    pushSystems,
+    pushSystemCount,
     pushProtocolOptions,
     pushFilter,
     setPushFilter,
@@ -44,7 +44,7 @@ export function PushSidebar({
         allOption={{
           key: "all-protocols",
           label: "全部协议",
-          count: pushSystems.length,
+          count: pushSystemCount,
           active: !pushFilter.protocol,
           onClick: () => setPushFilter((prev) => ({ ...prev, protocol: null })),
         }}
@@ -68,7 +68,7 @@ export function PushSidebar({
         allValue={DEFAULT_PUSH_FILTER.status}
         enabledValue={enabledValue}
         disabledValue={disabledValue}
-        totalCount={pushSystems.length}
+        totalCount={pushSystemCount}
         enabledCount={pushFacets.status[enabledValue] || 0}
         disabledCount={pushFacets.status[disabledValue] || 0}
         onChange={(status) => setPushFilter((prev) => ({ ...prev, status }))}
@@ -79,7 +79,7 @@ export function PushSidebar({
         allOption={{
           key: "all-importance-levels",
           label: "全部重要程度",
-          count: pushSystems.length,
+          count: pushSystemCount,
           active: !pushFilter.importanceLevel,
           onClick: () =>
             setPushFilter((prev) => ({ ...prev, importanceLevel: null })),

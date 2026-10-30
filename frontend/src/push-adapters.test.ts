@@ -10,7 +10,10 @@ const jobList = read("./components/push/PushJobList.tsx");
 const jobDetail = read("./components/push/PushJobDetail.tsx");
 
 test("push views use the frozen DAP adapters", () => {
-  assert.match(view, /import \{ Button \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.match(view, /import \{ Button, Select \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.equal((view.match(/<Select<string>/g) ?? []).length, 2);
+  assert.match(view, /aria-label="每页条数"/);
+  assert.match(view, /aria-label="下游系统排序"/);
   assert.match(view, /<Button[\s\S]*?className="btn primary"[\s\S]*?variant="primary"/);
   assert.match(systemEditor, /import \{ Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((systemEditor.match(/<Input/g) ?? []).length, 9);

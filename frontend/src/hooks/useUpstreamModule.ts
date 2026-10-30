@@ -17,7 +17,8 @@ import {
   deleteUpstreamSystem,
   getUpstreamSystem,
   getUpstreamSystemAdminDetail,
-  getUpstreamSystems,
+  getUpstreamSystemPage,
+  type UpstreamSystemPage,
   patchUpstreamStatus,
   saveUpstreamSystem,
   type PublicUpstreamSystem,
@@ -88,6 +89,15 @@ export interface UseUpstreamModuleProps {
 
 export interface UseUpstreamModuleResult {
   upstreamSystems: PublicUpstreamSystem[];
+  upstreamPage: number;
+  upstreamPageSize: number;
+  upstreamTotal: number;
+  upstreamSystemCount: number;
+  upstreamFacets: UpstreamSystemPage['facets'];
+  upstreamSort: string;
+  setUpstreamPage: React.Dispatch<React.SetStateAction<number>>;
+  setUpstreamPageSize: React.Dispatch<React.SetStateAction<number>>;
+  setUpstreamSort: React.Dispatch<React.SetStateAction<string>>;
   upstreamDbTypes: DictOption[];
   upstreamDeptOptions: DictOption[];
   currentUpstream: PublicUpstreamSystem | MockUpstreamSystem | null;
@@ -139,7 +149,9 @@ export function useUpstreamModule({
   const [upstreamPendingIds, setUpstreamPendingIds] = useState<string[]>([]);
   const [upstreamLoading, setUpstreamLoading] = useState(false);
   const [upstreamDetailLoading, setUpstreamDetailLoading] = useState(false);
+  const [upstreamDetailPage, setUpstreamDetailPage] = useState<string | null>(null);
   const [upstreamError, setUpstreamError] = useState('');
+  const [upstreamListError, setUpstreamListError] = useState('');
   const [upstreamSaveError, setUpstreamSaveError] = useState('');
   const [upstreamSaveFieldErrors, setUpstreamSaveFieldErrors] = useState<UpstreamFormError[]>([]);
   const upstreamSaveRawErrorRef = useRef('');
@@ -154,6 +166,15 @@ export function useUpstreamModule({
   const [upstreamLoaded, setUpstreamLoaded] = useState(false);
   const [upstreamView, setUpstreamView] = useState(initialView);
   const [upFilter, setUpFilter] = useState(initialFilter);
+  const [upstreamPage, setUpstreamPage] = useState(1);
+  const [upstreamPageSize, setUpstreamPageSize] = useState(20);
+  const [upstreamSort, setUpstreamSort] = useState('abbr:asc');
+  const [upstreamPageData, setUpstreamPageData] = useState<UpstreamSystemPage | null>(null);
+  const upstreamListSequence = useRef(0);
+  const upstreamDetailSequence = useRef(0);
+  const listKey = JSON.stringify([query, upFilter.status, upFilter.dbType, upstreamPage, upstreamPageSize, upstreamSort, canEdit]);
+  const latestListKey = useRef(listKey);
+  latestListKey.current = listKey;
 
   const buildNavigationSnapshot = useCallback(
     (): UpstreamNavigationSnapshot => ({
@@ -178,50 +199,73 @@ export function useUpstreamModule({
   );
 
   const loadUpstreamData = useCallback(async (): Promise<void> => {
+    const sequence = ++upstreamListSequence.current;
     setUpstreamLoading(true);
-    setUpstreamError('');
+    setUpstreamListError('');
     try {
-      const systems = await getUpstreamSystems();
-      setUpstreamSystems(systems);
-      setUpstreamDbTypes(fallbackOptions([...UPSTREAM_DB_TYPE_OPTIONS, ...systems.map((item) => item.dbType)]));
-      setUpstreamDeptOptions(fallbackOptions([...UPSTREAM_DEPT_OPTIONS, ...systems.map((item) => item.dept)]));
+      const result = await getUpstreamSystemPage({
+        keyword: query, status: upFilter.status || undefined, dbType: upFilter.dbType || undefined,
+        page: upstreamPage, pageSize: upstreamPageSize,
+        sortKey: upstreamSort.split(':')[0], sortDirection: upstreamSort.split(':')[1],
+      });
+      if (sequence !== upstreamListSequence.current || latestListKey.current !== listKey) return;
+      if (result.pageSize !== upstreamPageSize) setUpstreamPageSize(result.pageSize);
+      const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
+      if (upstreamPage > lastPage) {
+        setUpstreamPage(lastPage);
+        return;
+      }
+      setUpstreamPageData(result);
+      setUpstreamSystems(result.items);
+      setUpstreamDbTypes(fallbackOptions([...UPSTREAM_DB_TYPE_OPTIONS, ...result.options.dbTypes]));
+      setUpstreamDeptOptions(fallbackOptions([...UPSTREAM_DEPT_OPTIONS, ...result.options.depts]));
       setUpstreamLoaded(true);
     } catch (error: unknown) {
-      setUpstreamError(getErrorMessage(error, '上游卸数系统加载失败。'));
+      if (sequence === upstreamListSequence.current && latestListKey.current === listKey) {
+        setUpstreamListError(getErrorMessage(error, '上游卸数系统加载失败。'));
+      }
     } finally {
-      setUpstreamLoading(false);
+      if (sequence === upstreamListSequence.current && latestListKey.current === listKey) setUpstreamLoading(false);
     }
-  }, []);
+  }, [query, upFilter.status, upFilter.dbType, upstreamPage, upstreamPageSize, upstreamSort, listKey]);
+  const upstreamReloadRef = useRef(loadUpstreamData);
+  upstreamReloadRef.current = loadUpstreamData;
 
   const loadUpstreamDetail = useCallback(
     async (systemId: string): Promise<void> => {
+      const sequence = ++upstreamDetailSequence.current;
+      setCurrentUpstream(null);
+      setUpstreamDetailPage(null);
       setUpstreamDetailLoading(true);
       setUpstreamError('');
       try {
-        setCurrentUpstream(
-          await (upRoute.page === 'edit'
-            ? getUpstreamSystemAdminDetail(systemId)
-            : getUpstreamSystem(systemId)),
-        );
+        const detail = await (upRoute.page === 'edit'
+          ? getUpstreamSystemAdminDetail(systemId)
+          : getUpstreamSystem(systemId));
+        if (sequence === upstreamDetailSequence.current) {
+          setCurrentUpstream(detail);
+          setUpstreamDetailPage(upRoute.page);
+        }
       } catch (error: unknown) {
-        setCurrentUpstream(null);
-        setUpstreamError(getErrorMessage(error, '上游卸数系统详情加载失败。'));
+        if (sequence === upstreamDetailSequence.current) {
+          setCurrentUpstream(null);
+          setUpstreamError(getErrorMessage(error, '上游卸数系统详情加载失败。'));
+        }
       } finally {
-        setUpstreamDetailLoading(false);
+        if (sequence === upstreamDetailSequence.current) setUpstreamDetailLoading(false);
       }
     },
     [upRoute.page],
   );
 
   useEffect(() => {
-    if (active && !upstreamLoaded && !upstreamLoading) {
-      loadUpstreamData();
-    }
-  }, [active, upstreamLoaded, upstreamLoading, loadUpstreamData]);
+    if (active) void loadUpstreamData();
+    return () => { upstreamListSequence.current += 1; };
+  }, [active, loadUpstreamData]);
 
   useEffect(() => {
-    setUpstreamLoaded(false);
-  }, [canEdit]);
+    setUpstreamPage(1);
+  }, [query, upFilter.status, upFilter.dbType, upstreamPageSize, upstreamSort]);
 
   useEffect(() => {
     setUpstreamView(initialView || DEFAULT_UP_VIEW);
@@ -238,7 +282,8 @@ export function useUpstreamModule({
       setCurrentUpstream(null);
       setUpstreamDetailLoading(false);
     }
-  }, [active, upRoute, loadUpstreamDetail]);
+    return () => { upstreamDetailSequence.current += 1; };
+  }, [active, upRoute, loadUpstreamDetail, canEdit]);
 
   const upBack = useSmartBack<UpstreamNavigationSnapshot>({
     moduleKey: 'upstream',
@@ -302,7 +347,7 @@ export function useUpstreamModule({
     clearUpstreamSaveError();
     try {
       await saveUpstreamSystem(system, oldId);
-      await loadUpstreamData();
+      await upstreamReloadRef.current();
       clearModuleNavigationState('upstream');
       setUpRoute(getModuleDetailRoute('upstream', system.id) as UpstreamRoute);
       await loadUpstreamDetail(system.id);
@@ -326,10 +371,8 @@ export function useUpstreamModule({
     await runProtectedMutation(
       async () => {
         await deleteUpstreamSystem(systemId);
-        await loadUpstreamData();
+        await upstreamReloadRef.current();
         clearModuleNavigationState('upstream');
-        setQuery('');
-        setUpFilter(DEFAULT_UP_FILTER);
         clearUpstreamSaveError();
         setUpRoute(getModuleListRoute('upstream') as UpstreamRoute);
         scrollMainToTop();
@@ -345,7 +388,8 @@ export function useUpstreamModule({
       setLoginOpen(true);
       return;
     }
-    const previousSystem = upstreamSystems.find((item) => item.id === systemId);
+    const previousSystem = upstreamSystems.find((item) => item.id === systemId)
+      || (currentUpstream?.id === systemId ? currentUpstream : null);
     if (!previousSystem) return;
 
     setUpstreamPendingIds((prev) => (prev.includes(systemId) ? prev : [...prev, systemId]));
@@ -366,48 +410,36 @@ export function useUpstreamModule({
       setCurrentUpstream((prev) => (prev?.id === systemId ? previousSystem : prev));
     } finally {
       setUpstreamPendingIds((prev) => prev.filter((id) => id !== systemId));
+      await upstreamReloadRef.current();
     }
   };
 
-  const filteredUpstreamSystems = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return upstreamSystems.filter((item) => {
-      if (upFilter.status && item.status !== upFilter.status) return false;
-      if (upFilter.dbType && item.dbType !== upFilter.dbType) return false;
-      if (!normalizedQuery) return true;
-      // Mirrors the remote upstream keyword contract for the active profile:
-      // connection locators and owner are simply absent under strict.
-      return [
-        item.id,
-        item.abbr,
-        item.name,
-        item.host,
-        item.db,
-        item.schema,
-        item.owner,
-        item.dept,
-        item.desc,
-        ...(item.unloadTimes || []),
-      ].some((value) =>
-        String(value || '').toLowerCase().includes(normalizedQuery),
-      );
-    });
-  }, [upstreamSystems, query, upFilter]);
+  // Filtering and ordering are performed before COUNT/LIMIT by the API.
+  const filteredUpstreamSystems = upstreamSystems;
 
   const currentUpstreamEdit = useMemo(() => {
     if (upRoute.page !== 'edit' || !upRoute.id) return null;
-    return currentUpstream || upstreamSystems.find((item) => item.id === upRoute.id);
-  }, [upRoute, upstreamSystems, currentUpstream]);
+    return upstreamDetailPage === 'edit' && currentUpstream?.id === upRoute.id ? currentUpstream : null;
+  }, [upRoute, upstreamDetailPage, currentUpstream]);
 
   return {
     upstreamSystems,
+    upstreamPage,
+    upstreamPageSize,
+    upstreamTotal: upstreamPageData?.total ?? 0,
+    upstreamSystemCount: upstreamPageData?.stats.systemCount ?? 0,
+    upstreamFacets: upstreamPageData?.facets ?? { status: {}, dbType: {}, dept: {} },
+    upstreamSort,
+    setUpstreamPage,
+    setUpstreamPageSize,
+    setUpstreamSort,
     upstreamDbTypes,
     upstreamDeptOptions,
     currentUpstream,
     upstreamPendingIds,
     upstreamLoading,
     upstreamDetailLoading,
-    upstreamError,
+    upstreamError: ['detail', 'edit'].includes(upRoute.page) ? upstreamError : upstreamListError,
     upstreamSaveError,
     upstreamSaveFieldErrors,
     clearUpstreamSaveError,
