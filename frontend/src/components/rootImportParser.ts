@@ -23,6 +23,7 @@ type FieldState = "start" | "unquoted" | "quoted" | "afterQuote";
 function detectDelimiter(text: string): Delimiter {
   const counts: Record<Delimiter, number> = { "\t": 0, ",": 0, "|": 0 };
   let quoted = false;
+  let recordStarted = false;
 
   for (let index = 0; index < text.length; index += 1) {
     const character = text[index];
@@ -32,19 +33,26 @@ function detectDelimiter(text: string): Delimiter {
       } else {
         quoted = !quoted;
       }
+      recordStarted = true;
       continue;
     }
     if (quoted) continue;
-    if (character === "\r" || character === "\n") break;
+    if (character === "\r" || character === "\n") {
+      if (recordStarted || Object.values(counts).some((count) => count > 0)) break;
+      continue;
+    }
     if (character === "\t" || character === "," || character === "|") {
       counts[character] += 1;
+      continue;
     }
+    if (!/\s/.test(character ?? "")) recordStarted = true;
   }
 
-  const candidates: Delimiter[] = ["\t", ",", "|"];
-  candidates.sort((left, right) => counts[right] - counts[left]);
-  const best = candidates[0] ?? ",";
-  return counts[best] > 0 ? best : ",";
+  // Keep the legacy spreadsheet-import preference so commas inside a TSV
+  // description (or pipes inside a delimited row) cannot win by sheer count.
+  if (counts["\t"] > 0) return "\t";
+  if (counts["|"] > 0) return "|";
+  return ",";
 }
 
 /** Parse RFC-4180-style quoted records while retaining their physical source line. */

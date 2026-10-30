@@ -44,6 +44,36 @@ test("quoted fields preserve inner whitespace while unquoted cells are trimmed",
   ]);
 });
 
+test("delimiter detection skips leading blank records and preserves physical source rows", () => {
+  const result = parseRootImport("\r\nabbr\ten\tcn\r\nSKU\tStock\t库存单位\r\n");
+
+  assert.deepEqual(result.items, [
+    {
+      abbr: "SKU",
+      en: "Stock",
+      cn: "库存单位",
+      cat: "",
+      desc: "",
+      _line: 3,
+    },
+  ]);
+});
+
+test("TSV detection wins over commas in unquoted headerless descriptions", () => {
+  const result = parseRootImport("SKU\tStock keeping unit\t库存单位\t业务对象\tOne, two, three, four, five, six");
+
+  assert.deepEqual(result.items, [
+    {
+      abbr: "SKU",
+      en: "Stock keeping unit",
+      cn: "库存单位",
+      cat: "业务对象",
+      desc: "One, two, three, four, five, six",
+      _line: 1,
+    },
+  ]);
+});
+
 test("TSV import permits quoted tabs and multiline cells while preserving source line numbers", () => {
   const result = parseRootImport(
     'abbr\ten\tcn\tcat\tdesc\r\nTABROOT\t"English\tlabel"\t中文\t公共词根\t"first line\r\nsecond line"\r\n',
