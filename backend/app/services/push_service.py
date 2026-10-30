@@ -261,7 +261,7 @@ class PushService(AuditActorMixin):
         freq_type = (payload.get("freqType") or "").strip() if isinstance(payload.get("freqType"), str) else ""
         allowed_delimiters = self._get_allowed_values("PUSH_DELIMITER", DEFAULT_PUSH_DELIMITERS)
         allowed_encodings = self._get_allowed_values("FILE_ENCODING", DEFAULT_PUSH_ENCODINGS)
-        allowed_freq_types = self._get_allowed_values("FREQ_TYPE", DEFAULT_PUSH_FREQ_TYPES)
+        allowed_freq_types = self._get_allowed_values("FREQ_TYPE", set())
         if not isinstance(cn, str) or not cn.strip():
             details.append({"field": "cn", "message": "作业名称不能为空"})
         if not isinstance(source_file_name, str) or not source_file_name.strip():
