@@ -699,6 +699,19 @@ class CatalogSnapshotTests(unittest.TestCase):
             self._error("SNAPSHOT_LIMIT", self._lease)
         self.assertEqual({}, self.service._snapshots)
 
+    def test_embedded_nul_in_table_or_field_text_is_rejected_before_truncation(self):
+        cases = (
+            ("UPDATE dwp.p_asset_table SET table_desc=?", "Visible\x00table suffix", "Source table description"),
+            ("UPDATE dwp.p_asset_field SET field_desc=? WHERE field_name='amount'", "Visible\x00field suffix", "Source field description"),
+        )
+        for statement, invalid_text, original_text in cases:
+            with self.subTest(statement=statement):
+                self._sql(statement, (invalid_text,))
+                with patch.object(self.assets, "_fetch_rows", side_effect=AssertionError("truncated payload must not transfer")):
+                    self._error("SNAPSHOT_CONTENT_REJECTED", self._lease)
+                self.assertEqual({}, self.service._snapshots)
+                self._sql(statement, (original_text,))
+
     def test_parent_context_amplification_is_bounded_during_projection(self):
         self.service = self._service(max_bytes=10240)
         tables = [{"asset_id": 1, "table_name": "one", "table_desc": "x" * 3000}]

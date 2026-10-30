@@ -25,6 +25,10 @@ class CatalogCaptureLimit(RuntimeError):
     pass
 
 
+class CatalogCaptureInvalidText(RuntimeError):
+    pass
+
+
 @contextmanager
 def catalog_read_transaction(profile: str, *, timeout_seconds: float):
     deadline = monotonic() + timeout_seconds

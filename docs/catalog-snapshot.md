@@ -159,7 +159,8 @@ WAL 测试在两条 SELECT 之间真实 commit 增删改，结果仍为同一旧
 默认上限：10000 documents、所有 retained documents 合计 32 MiB、4 个快照、
 单次 issuance 并发 1、DB capture 10 秒、TTL 最多 300 秒、单字符串 16384 字符。
 受信构造参数只能在代码允许的硬上限内设置。SQL 对行数和文本使用 limit+1 哨兵，
-在同一 read view 内先作行数/原始字节预算检查，再传输 payload；投影时逐文档计费，
+在同一 read view 内先作行数/原始字节预算检查和嵌入 NUL 检测，再传输 payload；避免 SQLite
+`substr`/`length` 对 NUL 后缀的静默截断。投影时逐文档计费，
 父上下文扩散也不能先生成超量清单再检查。预算查询不是一致性推断算法。
 命中上限失败，不静默截断。SQLite progress handler/busy timeout 限制数据库工作，
 有界投影完成后也检查总预算；不是已测的吞吐/P95 或硬实时调度保证。

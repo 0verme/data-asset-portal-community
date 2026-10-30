@@ -557,23 +557,39 @@ class AssetsService(AuditActorMixin):
         """
         from sqlalchemy import LargeBinary, cast
 
-        from ..db.catalog_capture import CatalogCaptureLimit, catalog_read_transaction
+        from ..db.catalog_capture import (
+            CatalogCaptureInvalidText, CatalogCaptureLimit, catalog_read_transaction,
+        )
 
         def bounded(column, label=None):
             return func.substr(column, 1, max_text_length + 1).label(label or column.name)
 
+        def nul_marker(column, label):
+            return func.coalesce(func.instr(column, func.char(0)), 0).label(f"_snapshot_nul_{label}")
+
+        table_text = (
+            ("table_name", asset_table.c.table_name),
+            ("table_cn_name", asset_table.c.table_cn_name),
+            ("table_desc", asset_table.c.table_desc),
+            ("domain_name", func.coalesce(asset_domain.c.domain_name, asset_table.c.domain_code)),
+            ("layer_code", asset_table.c.layer_code),
+            ("layer_name", asset_layer.c.layer_name),
+            ("grain_desc", asset_table.c.grain_desc),
+            ("cycle_desc", asset_table.c.cycle_desc),
+        )
+        field_text = tuple((key, asset_field.c[key]) for key in (
+            "field_name", "field_cn_name", "field_desc", "data_type",
+            "enum_desc", "nullable_flag", "pk_flag", "partition_flag",
+        ))
+        marker_names = {
+            f"_snapshot_nul_{label}" for label, _ in (*table_text, *field_text)
+        }
         with catalog_read_transaction(self._db.profile(), timeout_seconds=timeout_seconds):
             table_query = (
                 select(
                     asset_table.c.asset_id,
-                    bounded(asset_table.c.table_name),
-                    bounded(asset_table.c.table_cn_name),
-                    bounded(asset_table.c.table_desc),
-                    bounded(func.coalesce(asset_domain.c.domain_name, asset_table.c.domain_code), "domain_name"),
-                    bounded(asset_table.c.layer_code),
-                    bounded(asset_layer.c.layer_name),
-                    bounded(asset_table.c.grain_desc),
-                    bounded(asset_table.c.cycle_desc),
+                    *(bounded(column, label) for label, column in table_text),
+                    *(nul_marker(column, label) for label, column in table_text),
                 )
                 .select_from(
                     asset_table.outerjoin(asset_domain, asset_domain.c.domain_code == asset_table.c.domain_code)
@@ -587,10 +603,8 @@ class AssetsService(AuditActorMixin):
                 select(
                     asset_field.c.asset_id,
                     asset_field.c.field_id,
-                    *(bounded(asset_field.c[key]) for key in (
-                        "field_name", "field_cn_name", "field_desc", "data_type",
-                        "enum_desc", "nullable_flag", "pk_flag", "partition_flag",
-                    )),
+                    *(bounded(column, label) for label, column in field_text),
+                    *(nul_marker(column, label) for label, column in field_text),
                 )
                 .select_from(asset_field.join(asset_table, asset_table.c.asset_id == asset_field.c.asset_id))
                 .where(asset_table.c.is_deleted == "N", asset_field.c.is_deleted == "N")
@@ -603,18 +617,29 @@ class AssetsService(AuditActorMixin):
             count = byte_count = 0
             for query in (table_query, field_query):
                 bounded_rows = query.subquery()
+                payload_columns = [column for column in bounded_rows.c if column.name not in marker_names]
                 row_bytes = sum(func.coalesce(func.length(cast(column, LargeBinary)), 0)
-                                for column in bounded_rows.c)
+                                for column in payload_columns)
+                nul_count = sum(
+                    func.coalesce(func.sum(bounded_rows.c[name]), 0)
+                    for name in marker_names if name in bounded_rows.c
+                )
                 budget = self._db.fetch_rows(select(
                     func.count().label("documents"),
                     func.coalesce(func.sum(row_bytes), 0).label("bytes"),
+                    nul_count.label("embedded_nuls"),
                 ).select_from(bounded_rows))[0]
+                if int(budget["embedded_nuls"]):
+                    raise CatalogCaptureInvalidText("CATALOG_CAPTURE_INVALID_TEXT")
                 count += int(budget["documents"])
                 byte_count += int(budget["bytes"])
                 if count > max_documents or byte_count > max_bytes:
                     raise CatalogCaptureLimit("CATALOG_CAPTURE_LIMIT")
             tables = self._fetch_rows(table_query)
             fields = self._fetch_rows(field_query)
+            for row in (*tables, *fields):
+                for name in marker_names:
+                    row.pop(name, None)
         return tables, fields
 
     def _load_active_field_rows(self, asset_id):

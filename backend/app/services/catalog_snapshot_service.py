@@ -24,7 +24,9 @@ from ..contracts.catalog_snapshot import (
     canonical_bytes, content_hash, identity_order, manifest_hash, projection_hash,
     validate_documents,
 )
-from ..db.catalog_capture import CatalogCaptureLimit, CatalogCaptureTimeout, CatalogCaptureUnsupported
+from ..db.catalog_capture import (
+    CatalogCaptureInvalidText, CatalogCaptureLimit, CatalogCaptureTimeout, CatalogCaptureUnsupported,
+)
 from ..db.facade import get_db_profile
 from ..security import public_field_policy as policy
 from ..settings import get_public_catalog_export_enabled, get_public_catalog_profile
@@ -331,6 +333,8 @@ class CatalogSnapshotService:
             raise SnapshotError("CAPTURE_UNSUPPORTED") from None
         except CatalogCaptureTimeout:
             raise SnapshotError("CAPTURE_TIMEOUT") from None
+        except CatalogCaptureInvalidText:
+            raise SnapshotError("SNAPSHOT_CONTENT_REJECTED") from None
         except CatalogCaptureLimit:
             raise SnapshotError("SNAPSHOT_LIMIT") from None
         except Exception:
