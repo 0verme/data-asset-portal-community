@@ -86,6 +86,7 @@ export interface PublicPushSystem {
   status: string;
   importanceLevel: string;
   latestOutputTime: string;
+  jobCount?: number | undefined;
   jobs: PublicPushJob[];
 }
 
@@ -120,6 +121,13 @@ function toPublicSystem(system: PushSystemItem & { systemId?: number | undefined
 export interface PushQueryParams {
   importanceLevel?: string | undefined;
   keyword?: string | undefined;
+  status?: string | undefined;
+  protocol?: string | undefined;
+  dept?: string | undefined;
+  page?: number | undefined;
+  pageSize?: number | undefined;
+  sortKey?: string | undefined;
+  sortDirection?: string | undefined;
   [key: string]: unknown;
 }
 
@@ -132,6 +140,76 @@ export async function getPushSystems(params: PushQueryParams = {}): Promise<Publ
     return normalizeCollection<PublicPushSystem>(payload, 'systems');
   }
   return readStore().map((system, index) => toPublicSystem({ ...system, systemId: index + 1 }));
+}
+
+export interface PushSystemPage {
+  items: PublicPushSystem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  facets: { status: Record<string, number>; protocol: Record<string, number>; dept: Record<string, number>; importanceLevel: Record<string, number> };
+  options: { systemIds: string[]; protocols: string[]; depts: string[]; freqTypes: string[] };
+  stats: { systemCount: number; jobCount: number };
+}
+
+export async function getPushSystemPage(params: PushQueryParams = {}): Promise<PushSystemPage> {
+  const page = Math.max(1, params.page || 1);
+  const pageSize = Math.max(1, params.pageSize || 20);
+  if (API_MODE === 'remote') {
+    const payload = await requestRemote('/push/systems', {
+      params: { ...params, page, pageSize }, timeout: LONG_REQUEST_TIMEOUT,
+    }) as PushSystemPage;
+    if (!payload || !Array.isArray(payload.items) || !Number.isFinite(payload.total) || !payload.facets || !payload.options || !payload.stats) {
+      throw new Error('Invalid push page payload');
+    }
+    return payload;
+  }
+  const all = readStore().map((system, index) => toPublicSystem({ ...system, systemId: index + 1 }));
+  const keyword = params.keyword?.trim().toLowerCase();
+  const matches = all.filter((item) => {
+    if (params.status && item.status !== params.status) return false;
+    if (params.protocol && item.protocol !== params.protocol) return false;
+    if (params.dept && item.dept !== params.dept) return false;
+    if (params.importanceLevel && item.importanceLevel !== params.importanceLevel) return false;
+    return !keyword || [item.id, item.name, item.abbr, item.dept, item.desc,
+      ...item.jobs.flatMap((job) => [job.id, job.cn, job.sourceFileName, job.targetFileName, job.desc]),
+    ].some((value) => value.toLowerCase().includes(keyword));
+  });
+  const columns: Record<string, keyof PublicPushSystem> = { id: 'id', name: 'name', protocol: 'protocol', dept: 'dept' };
+  const key = columns[params.sortKey || ''];
+  const direction = params.sortDirection === 'desc' ? -1 : 1;
+  matches.sort((left, right) => {
+    const primary = key ? String(left[key]).localeCompare(String(right[key]))
+      : Number(left.importanceLevel !== 'important') - Number(right.importanceLevel !== 'important');
+    return primary * direction || left.id.localeCompare(right.id);
+  });
+  const facets: PushSystemPage['facets'] = { status: {}, protocol: {}, dept: {}, importanceLevel: {} };
+  for (const item of all) {
+    for (const field of ['status', 'protocol', 'dept', 'importanceLevel'] as const) {
+      const value = item[field];
+      if (value) facets[field][value] = (facets[field][value] || 0) + 1;
+    }
+  }
+  return {
+    items: matches.slice((page - 1) * pageSize, page * pageSize).map((item) => ({ ...item, jobCount: item.jobs.length, jobs: [] })),
+    total: matches.length, page, pageSize, facets,
+    options: {
+      systemIds: all.map((item) => item.id).sort(), protocols: Object.keys(facets.protocol).sort(), depts: Object.keys(facets.dept).sort(),
+      freqTypes: [...new Set(all.flatMap((item) => item.jobs.map((job) => job.freqType)).filter(Boolean))].sort(),
+    },
+    stats: { systemCount: all.length, jobCount: all.reduce((sum, item) => sum + item.jobs.length, 0) },
+  };
+}
+
+export async function getPushSystem(systemId: string): Promise<PublicPushSystem> {
+  if (API_MODE === 'remote') {
+    return normalizeDetail<PublicPushSystem>(await requestRemote(`/push/systems/${encodeURIComponent(systemId)}`));
+  }
+  const systems = readStore();
+  const index = systems.findIndex((system) => system.id === systemId);
+  const item = systems[index];
+  if (!item) throw new Error(`System not found: ${systemId}`);
+  return toPublicSystem({ ...item, systemId: index + 1 });
 }
 
 export async function getPushSystemAdminDetail(systemId: string): Promise<PushSystemItem> {

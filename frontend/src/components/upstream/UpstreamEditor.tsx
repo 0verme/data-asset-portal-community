@@ -143,15 +143,21 @@ export function UpstreamEditor({
   const initialSnapshotRef = React.useRef(JSON.stringify(form));
   const previousSaveErrorCountRef = React.useRef(saveFieldErrors.length);
   const isDirty = initialSnapshotRef.current !== JSON.stringify(form);
+  const sourceIdentity = `${mode}:${initial?.id || ''}`;
+  const previousSourceIdentityRef = React.useRef(sourceIdentity);
   const unloadTimes = Array.isArray(form.unloadTimes) ? form.unloadTimes : [];
 
   React.useEffect(() => {
+    // A list metadata response may add global options after detail has loaded.
+    // Re-normalize pristine forms, but never overwrite edits to the same item.
+    if (previousSourceIdentityRef.current === sourceIdentity && isDirty) return;
+    previousSourceIdentityRef.current = sourceIdentity;
     setForm(initialForm);
     setTouched(false);
     saveLockRef.current = false;
     setSaving(false);
     initialSnapshotRef.current = JSON.stringify(initialForm);
-  }, [initialForm]);
+  }, [initialForm, sourceIdentity, isDirty]);
 
   const clientErrors = touched ? validateUpstreamForm(form) : [];
   const fieldErrors = mergeUpstreamFieldErrors(clientErrors, saveFieldErrors);

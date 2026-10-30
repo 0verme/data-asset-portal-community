@@ -45,6 +45,7 @@ from ..security.public_field_policy import (
 )
 from ..settings import get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
+from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
     OPERATION_TYPE_DELETE,
@@ -220,8 +221,9 @@ class UpstreamService(AuditActorMixin):
         normalized = str(value or "").strip()
         return aliases.get(normalized.casefold(), normalized)
 
-    def _display_option_value(self, category_code, value):
-        _values, aliases = self._get_option_contract(category_code, set())
+    def _display_option_value(self, category_code, value, aliases=None):
+        if aliases is None:
+            _values, aliases = self._get_option_contract(category_code, set())
         return self._normalize_option_value(value, aliases)
 
     def _normalize_payload(self, payload, current=None):
@@ -306,15 +308,22 @@ class UpstreamService(AuditActorMixin):
         normalized_page_size = max(1, min(max_page_size, normalized_page_size))
         return normalized_page, normalized_page_size
 
-    def _build_system_where(self, keyword=None, status=None, db_type=None, profile=None):
+    def _build_system_where(self, keyword=None, status=None, db_type=None, profile=None, literal_keyword=False):
         clauses = [upstream_system.c.is_deleted == "N"]
         if status:
             clauses.append(upstream_system.c.status_code == str(status).strip())
         if db_type:
-            clauses.append(upstream_system.c.db_type == str(db_type).strip())
+            # Older rows may store a dictionary code, while the UI receives its
+            # display value. Filter both forms before COUNT and LIMIT.
+            _values, aliases = self._get_option_contract("UPSTREAM_DB_TYPE", DEFAULT_UPSTREAM_DB_TYPES)
+            value = self._normalize_option_value(db_type, aliases)
+            candidates = {str(db_type).strip().casefold(), value.casefold()}
+            candidates.update(alias for alias, target in aliases.items() if target == value)
+            clauses.append(func.lower(upstream_system.c.db_type).in_(sorted(candidates)))
         normalized_keyword = str(keyword or "").strip().lower()
         if normalized_keyword:
-            pattern = f"%{normalized_keyword}%"
+            pattern = f"%{escape_like_keyword(normalized_keyword) if literal_keyword else normalized_keyword}%"
+            escape = LIKE_ESCAPE_CHAR if literal_keyword else None
             columns = [
                 upstream_system.c.system_id,
                 upstream_system.c.system_abbr,
@@ -335,13 +344,13 @@ class UpstreamService(AuditActorMixin):
                 ])
             clauses.append(or_(
                 *[
-                    func.lower(func.coalesce(column, "")).like(pattern)
+                    func.lower(func.coalesce(column, "")).like(pattern, escape=escape)
                     for column in columns
                 ],
                 select(1).where(
                     upstream_unload_time.c.system_pk == upstream_system.c.system_pk,
                     upstream_unload_time.c.is_deleted == "N",
-                    func.lower(func.coalesce(upstream_unload_time.c.unload_time, "")).like(pattern),
+                    func.lower(func.coalesce(upstream_unload_time.c.unload_time, "")).like(pattern, escape=escape),
                 ).exists(),
             ))
         return clauses
@@ -369,16 +378,17 @@ class UpstreamService(AuditActorMixin):
             ).append(row["unload_time"])
         return grouped
 
-    def _row_to_system(self, row, unload_times=None, include_connection=False, include_person=True):
+    def _row_to_system(self, row, unload_times=None, include_connection=False, include_person=True, option_aliases=None):
+        option_aliases = option_aliases or {}
         system = {
             "upstreamSystemId": self._coerce_db_integer(row["system_pk"], "system_pk"),
             "id": row["system_id"],
             "abbr": row["system_abbr"],
             "name": row["system_name"],
-            "dbType": self._display_option_value("UPSTREAM_DB_TYPE", row["db_type"]),
+            "dbType": self._display_option_value("UPSTREAM_DB_TYPE", row["db_type"], option_aliases.get("dbType")),
             "unloadTimes": list(unload_times or []),
             "status": row["status_code"],
-            "dept": self._display_option_value("UPSTREAM_DEPT", row.get("dept_name")),
+            "dept": self._display_option_value("UPSTREAM_DEPT", row.get("dept_name"), option_aliases.get("dept")),
             "desc": row.get("system_desc") or "",
         }
         if include_person:
@@ -408,7 +418,20 @@ class UpstreamService(AuditActorMixin):
         ])
         return columns
 
-    def _db_systems(self, keyword=None, status=None, db_type=None, page=None, page_size=None, profile=None):
+    @staticmethod
+    def _system_order(sort_key=None, sort_direction=None):
+        column = {
+            "id": upstream_system.c.system_id,
+            "abbr": upstream_system.c.system_abbr,
+            "name": upstream_system.c.system_name,
+            "dbType": upstream_system.c.db_type,
+            "status": upstream_system.c.status_code,
+        }.get(sort_key, upstream_system.c.system_abbr)
+        primary = column.desc() if sort_direction == "desc" else column.asc()
+        return primary, upstream_system.c.system_id.asc(), upstream_system.c.system_pk.asc()
+
+    def _db_systems(self, keyword=None, status=None, db_type=None, page=None, page_size=None, profile=None,
+                    sort_key=None, sort_direction=None, literal_keyword=False):
         include_connection = public_field_class_visible(FIELD_CLASS_CONNECTION, profile)
         include_person = public_field_class_visible(FIELD_CLASS_PERSON, profile)
         paginate = page is not None or page_size is not None
@@ -416,8 +439,10 @@ class UpstreamService(AuditActorMixin):
         offset = (page - 1) * page_size
         statement = (
             select(*self._system_select(include_connection=include_connection))
-            .where(*self._build_system_where(keyword=keyword, status=status, db_type=db_type, profile=profile))
-            .order_by(upstream_system.c.system_abbr, upstream_system.c.system_id)
+            .where(*self._build_system_where(
+                keyword=keyword, status=status, db_type=db_type, profile=profile, literal_keyword=literal_keyword,
+            ))
+            .order_by(*self._system_order(sort_key, sort_direction))
         )
         if paginate:
             statement = statement.limit(page_size).offset(offset)
@@ -434,6 +459,11 @@ class UpstreamService(AuditActorMixin):
             purpose="upstream system unload times",
             method="_db_systems",
         )
+        # Resolve dictionaries once for the page, not once per returned row.
+        option_aliases = {
+            "dbType": self._get_option_contract("UPSTREAM_DB_TYPE", set())[1],
+            "dept": self._get_option_contract("UPSTREAM_DEPT", set())[1],
+        } if rows else {}
         return [
             self._row_to_system(
                 row,
@@ -442,6 +472,7 @@ class UpstreamService(AuditActorMixin):
                 ),
                 include_connection=include_connection,
                 include_person=include_person,
+                option_aliases=option_aliases,
             )
             for row in rows
         ]
@@ -460,6 +491,51 @@ class UpstreamService(AuditActorMixin):
     def get_systems(self, keyword=None, status=None, db_type=None, page=None, page_size=None, profile=None):
         with database_transaction():
             return self._db_systems(keyword=keyword, status=status, db_type=db_type, page=page, page_size=page_size, profile=profile)
+
+    def get_system_page(self, keyword=None, status=None, db_type=None, page=None, page_size=None,
+                        profile=None, sort_key=None, sort_direction=None):
+        """Explicit list contract; the unpaged API remains a full collection."""
+        page, page_size = self._resolve_paging(page, page_size)
+        with database_transaction():
+            filters = self._build_system_where(
+                keyword=keyword, status=status, db_type=db_type, profile=profile, literal_keyword=True,
+            )
+            count_rows = self._fetch_rows_logged(
+                select(func.count().label("total")).select_from(upstream_system).where(*filters),
+                purpose="upstream filtered count", method="get_system_page",
+            )
+            items = self._db_systems(
+                keyword=keyword, status=status, db_type=db_type, page=page, page_size=page_size,
+                profile=profile, sort_key=sort_key, sort_direction=sort_direction, literal_keyword=True,
+            )
+            # These are global catalog facets/options, never counts of a page.
+            columns = (upstream_system.c.status_code, upstream_system.c.db_type, upstream_system.c.dept_name)
+            buckets = self._fetch_rows_logged(
+                select(*columns, func.count().label("total"))
+                .where(upstream_system.c.is_deleted == "N").group_by(*columns),
+                purpose="upstream global facets", method="get_system_page",
+            )
+            facets = {"status": {}, "dbType": {}, "dept": {}}
+            _values, db_aliases = self._get_option_contract("UPSTREAM_DB_TYPE", set())
+            _values, dept_aliases = self._get_option_contract("UPSTREAM_DEPT", set())
+            system_count = 0
+            for row in buckets:
+                count = int(row["total"])
+                system_count += count
+                values = {
+                    "status": row.get("status_code") or "",
+                    "dbType": self._normalize_option_value(row.get("db_type"), db_aliases),
+                    "dept": self._normalize_option_value(row.get("dept_name"), dept_aliases),
+                }
+                for key, value in values.items():
+                    if value:
+                        facets[key][value] = facets[key].get(value, 0) + count
+            return {
+                "items": items, "total": int(count_rows[0]["total"]), "page": page, "pageSize": page_size,
+                "facets": facets,
+                "options": {"dbTypes": sorted(facets["dbType"]), "depts": sorted(facets["dept"])},
+                "stats": {"systemCount": system_count},
+            }
 
     def _load_system_detail(self, system_id, *, include_connection=False, include_person=True, purpose="upstream detail unload times", method="get_system_detail"):
         """Load one system using the current shared transaction (if any)."""

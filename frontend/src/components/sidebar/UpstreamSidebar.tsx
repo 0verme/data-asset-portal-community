@@ -15,26 +15,15 @@ export interface UpstreamSidebarProps {
 }
 
 export function UpstreamSidebar({ upstream, statusOptions, requireLogin, canEdit = false, setUpRoute }: UpstreamSidebarProps) {
-  const { upstreamSystems, upstreamDbTypes, upFilter, setUpFilter } = upstream;
-
-  const dbTypeCounts = upstreamSystems.reduce<Record<string, number>>((acc, item) => {
-    acc[item.dbType] = (acc[item.dbType] || 0) + 1;
-    return acc;
-  }, {});
+  const { upstreamSystemCount, upstreamFacets, upstreamDbTypes, upFilter, setUpFilter } = upstream;
+  const dbTypeCounts = upstreamFacets.dbType;
 
   const enabledValue = statusOptions.find((item) => item.value !== "disabled")?.value || "enabled";
   const disabledValue = statusOptions.find((item) => item.value !== enabledValue)?.value || "disabled";
-  const statusCounts = upstreamSystems.reduce(
-    (acc, item) => {
-      if (item.status === enabledValue) {
-        acc.enabled += 1;
-      } else if (item.status === disabledValue) {
-        acc.disabled += 1;
-      }
-      return acc;
-    },
-    { enabled: 0, disabled: 0 },
-  );
+  const statusCounts = {
+    enabled: upstreamFacets.status[enabledValue] || 0,
+    disabled: upstreamFacets.status[disabledValue] || 0,
+  };
 
   return (
     <>
@@ -43,7 +32,7 @@ export function UpstreamSidebar({ upstream, statusOptions, requireLogin, canEdit
         allOption={{
           key: "all-db-types",
           label: "全部类型",
-          count: upstreamSystems.length,
+          count: upstreamSystemCount,
           active: !upFilter.dbType,
           onClick: () => setUpFilter((prev) => ({ ...prev, dbType: null })),
         }}
@@ -66,7 +55,7 @@ export function UpstreamSidebar({ upstream, statusOptions, requireLogin, canEdit
         allValue={DEFAULT_UP_FILTER.status}
         enabledValue={enabledValue}
         disabledValue={disabledValue}
-        totalCount={upstreamSystems.length}
+        totalCount={upstreamSystemCount}
         enabledCount={statusCounts.enabled}
         disabledCount={statusCounts.disabled}
         onChange={(status) => setUpFilter((prev: UpstreamFilter) => ({ ...prev, status }))}
