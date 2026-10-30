@@ -248,7 +248,7 @@ class UpstreamService(AuditActorMixin):
             "UPSTREAM_DB_TYPE", DEFAULT_UPSTREAM_DB_TYPES
         )
         allowed_depts, dept_aliases = self._get_option_contract(
-            "UPSTREAM_DEPT", DEFAULT_UPSTREAM_DEPTS
+            "UPSTREAM_DEPT", set()
         )
         db_type = self._normalize_option_value(db_type, db_type_aliases)
         dept = self._normalize_option_value(dept, dept_aliases)
