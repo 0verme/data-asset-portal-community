@@ -16,11 +16,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createIndicator,
   deleteIndicator,
+  getIndicatorDimensions,
   getIndicatorList,
   updateIndicator,
   updateIndicatorStatus,
 } from '../api/indicator.ts';
-import type { MockIndicatorItem } from '../data/indicators.ts';
+import type { IndicatorDimensionOption, MockIndicatorItem } from '../data/indicators.ts';
+import {
+  buildIndicatorDimensionOptions,
+  type IndicatorDimensionCatalogEntry,
+} from '../data/indicatorDimensions.ts';
 import { isUnauthorizedError } from '../api/http.ts';
 import { DEFAULT_INDICATOR_ROUTE } from '../config/defaults.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
@@ -64,6 +69,7 @@ export interface UseIndicatorModuleResult {
   handleDeleteIndicator: (indicatorId?: string) => Promise<void>;
   handleToggleIndicatorStatus: (indicator: MockIndicatorItem) => Promise<void>;
   indicatorFacets: IndicatorFacets;
+  indicatorDimensions: IndicatorDimensionOption[];
   filteredIndicators: MockIndicatorItem[];
   currentIndicatorEdit: MockIndicatorItem | null;
   currentIndicatorDetail: MockIndicatorItem | null;
@@ -82,6 +88,9 @@ export function useIndicatorModule({
   setLoginOpen,
 }: UseIndicatorModuleProps): UseIndicatorModuleResult {
   const [indicators, setIndicators] = useState<MockIndicatorItem[]>([]);
+  const [indicatorDimensionCatalog, setIndicatorDimensionCatalog] = useState<
+    IndicatorDimensionCatalogEntry[]
+  >([]);
   const [indicatorLoading, setIndicatorLoading] = useState(false);
   const [indicatorError, setIndicatorError] = useState('');
   const [indicatorLoaded, setIndicatorLoaded] = useState(false);
@@ -94,7 +103,14 @@ export function useIndicatorModule({
     setIndicatorLoading(true);
     setIndicatorError('');
     try {
-      setIndicators(await getIndicatorList());
+      // The dimension directory only supplies labels and ordering; counts are
+      // derived from the indicator list below so both share one footing.
+      const [items, dimensionCatalog] = await Promise.all([
+        getIndicatorList(),
+        getIndicatorDimensions().catch(() => [] as IndicatorDimensionCatalogEntry[]),
+      ]);
+      setIndicators(items);
+      setIndicatorDimensionCatalog(dimensionCatalog);
       setIndicatorLoaded(true);
     } catch (error: unknown) {
       setIndicatorError(getErrorMessage(error, '指标数据加载失败。'));
@@ -215,9 +231,9 @@ export function useIndicatorModule({
     () =>
       indicators.reduce<IndicatorFacets>(
         (acc, item) => {
-          if (item.dimension) {
-            acc.dimension[item.dimension] = (acc.dimension[item.dimension] || 0) + 1;
-          }
+          // Empty codes are a real bucket here: the dimension total must stay
+          // equal to the "全部指标" total even when a row has no dimension.
+          acc.dimension[item.dimension] = (acc.dimension[item.dimension] || 0) + 1;
           if (item.status) {
             acc.status[item.status] = (acc.status[item.status] || 0) + 1;
           }
@@ -226,6 +242,11 @@ export function useIndicatorModule({
         { dimension: {}, status: {} },
       ),
     [indicators],
+  );
+
+  const indicatorDimensions = useMemo(
+    () => buildIndicatorDimensionOptions(indicatorDimensionCatalog, indicatorFacets.dimension),
+    [indicatorDimensionCatalog, indicatorFacets],
   );
 
   const filteredIndicators = useMemo(() => {
@@ -277,6 +298,7 @@ export function useIndicatorModule({
     handleDeleteIndicator,
     handleToggleIndicatorStatus,
     indicatorFacets,
+    indicatorDimensions,
     filteredIndicators,
     currentIndicatorEdit,
     currentIndicatorDetail,

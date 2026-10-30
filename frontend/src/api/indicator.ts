@@ -14,12 +14,16 @@
 // limitations under the License.
 
 import { requestRemote } from './http.ts';
-import { INDICATORS, type MockIndicatorItem } from '../data/indicators.ts';
 import {
-  getIndicatorDimensionFromPath,
-  INDICATOR_PATH_OPTIONS,
-  normalizeIndicatorDimension,
-} from '../data/indicatorPathOptions.ts';
+  INDICATOR_DIMENSIONS,
+  INDICATORS,
+  type MockIndicatorItem,
+} from '../data/indicators.ts';
+import {
+  type IndicatorDimensionCatalogEntry,
+  resolveIndicatorDimension,
+} from '../data/indicatorDimensions.ts';
+import { INDICATOR_PATH_OPTIONS } from '../data/indicatorPathOptions.ts';
 
 const API_MODE = (
   typeof import.meta !== 'undefined' && import.meta.env?.['VITE_API_MODE']
@@ -90,9 +94,8 @@ function normalizeIndicator(item: unknown): MockIndicatorItem {
   }
   const record = item as Record<string, unknown>;
   const path = firstPresent(record, ['path', 'path_desc', 'indicator_path', 'metric_path', 'path_name'], '');
-  const dimension =
-    getIndicatorDimensionFromPath(path) ||
-    normalizeIndicatorDimension(firstPresent(record, ['dimension', 'dimension_code', 'dimensionCode'], ''));
+  const rawDimension = firstPresent(record, ['dimension', 'dimension_code', 'dimensionCode'], '');
+  const dimension = resolveIndicatorDimension(path, rawDimension);
   const resultTableName = firstPresent(
     record,
     ['resultTableName', 'result_table_name', 'resultTable', 'result_table'],
@@ -195,6 +198,43 @@ export async function getIndicatorList(params: IndicatorQueryParams = {}): Promi
     return normalizeCollection(payload, 'items').map(normalizeIndicator);
   }
   return filterIndicators(readStore().map(normalizeIndicator), params);
+}
+
+function normalizeDimensionCatalog(payload: unknown): IndicatorDimensionCatalogEntry[] {
+  return normalizeCollection(payload, 'items').map((item) => {
+    const record = (item ?? {}) as Record<string, unknown>;
+    const code = String(
+      record['code'] ?? record['dimension'] ?? record['dimensionCode'] ?? record['dimension_code'] ?? '',
+    )
+      .trim()
+      .toLowerCase();
+    return {
+      code,
+      label: firstPresent(record, ['label', 'name', 'title'], ''),
+      count: Number(record['count'] ?? record['total'] ?? 0) || 0,
+    };
+  });
+}
+
+/**
+ * Read the configured indicator dimension directory.
+ *
+ * The backend derives it from the real indicator data (same soft-delete and
+ * permission footing as the list API) and labels it from the parameter
+ * dictionary / indicator path configuration. Mock mode keeps the retail demo
+ * dimensions so the Community Demo shows its original eight dimensions.
+ */
+export async function getIndicatorDimensions(): Promise<IndicatorDimensionCatalogEntry[]> {
+  if (API_MODE === 'remote') {
+    const payload = await requestRemote('/indicators/dimensions');
+    return normalizeDimensionCatalog(payload);
+  }
+  const items = readStore().map(normalizeIndicator);
+  return INDICATOR_DIMENSIONS.filter((item) => item.value !== 'all').map((item) => ({
+    code: item.value,
+    label: item.label,
+    count: items.filter((indicator) => indicator.dimension === item.value).length,
+  }));
 }
 
 export async function getIndicatorDetail(indicatorId: string): Promise<MockIndicatorItem> {

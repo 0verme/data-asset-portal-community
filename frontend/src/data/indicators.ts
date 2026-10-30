@@ -449,6 +449,3 @@ export const INDICATORS: MockIndicatorItem[] = SPECS.map(
     status: index === 35 ? "disabled" : "enabled",
   }),
 );
-
-export const INDICATOR_DIMENSION_OPTIONS: readonly IndicatorDimensionOption[] =
-  INDICATOR_DIMENSIONS.filter((item) => item.value !== "all");

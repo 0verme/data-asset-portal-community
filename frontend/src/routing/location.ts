@@ -37,7 +37,7 @@ import {
   INDICATOR_VIEW_OPTIONS,
   ASSET_VIEW_OPTIONS,
 } from "../config/defaults.ts";
-import { INDICATOR_DIMENSION_OPTIONS } from "../data/indicators.ts";
+import { normalizeIndicatorDimensionCode } from "../data/indicatorDimensions.ts";
 import { LAYER_OPTIONS } from "../config/assets.ts";
 import { getActiveModuleRoute } from "./navigation.ts";
 import type {
@@ -96,6 +96,19 @@ function readEnum<T extends string>(
   return allowed.includes(value as T) ? (value as T) : fallback;
 }
 
+/**
+ * Read the indicator dimension filter from the URL.
+ *
+ * Any real dimension code is accepted so deep links keep working for business
+ * dimensions the frontend has no static list for (CUS/EMP/DUE/...). An explicit
+ * empty value addresses the "未标注维度" bucket.
+ */
+function readIndicatorDimension(value: string | null): string {
+  if (value === null) return DEFAULT_INDICATOR_FILTER.dimension;
+  if (value === "" || value === DEFAULT_INDICATOR_FILTER.dimension) return value;
+  return normalizeIndicatorDimensionCode(value) || DEFAULT_INDICATOR_FILTER.dimension;
+}
+
 export function parseInitialLocation(): LocationSnapshot {
   if (typeof window === "undefined") {
     return {
@@ -139,10 +152,7 @@ export function parseInitialLocation(): LocationSnapshot {
     DEFAULT_INDICATOR_VIEW,
   );
   const indicatorFilter: IndicatorFilter = {
-    dimension: indicatorDimension !== null
-      && INDICATOR_DIMENSION_OPTIONS.some((item) => item.value === indicatorDimension)
-      ? indicatorDimension
-      : DEFAULT_INDICATOR_FILTER.dimension,
+    dimension: readIndicatorDimension(indicatorDimension),
     status: readAllowedString(
       searchParams.get("status"),
       ["all", "enabled", "disabled"],

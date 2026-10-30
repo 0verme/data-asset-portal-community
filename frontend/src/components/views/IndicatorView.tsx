@@ -55,6 +55,7 @@ export function IndicatorView({
     handleDeleteIndicator,
     handleToggleIndicatorStatus,
     filteredIndicators,
+    indicatorDimensions,
     currentIndicatorEdit,
     currentIndicatorDetail,
     canEdit,
@@ -149,6 +150,7 @@ export function IndicatorView({
       filter={indicatorFilter}
       view={indicatorView}
       pendingIds={indicatorPendingIds}
+      dimensionOptions={indicatorDimensions}
       canEdit={canEdit}
       detailIndicator={currentIndicatorDetail}
       onChangeView={setIndicatorView}

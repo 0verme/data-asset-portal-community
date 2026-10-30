@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from ...application import RequestContext
 from ...contracts import (
     DataEnvelope,
+    IndicatorDimensionListResponse,
     IndicatorItem,
     IndicatorListResponse,
     IndicatorRequest,
@@ -76,6 +77,30 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
         items = project_for_request(items, context, authorization)
         return JSONResponse(
             content=validate_contract({"items": items}, IndicatorListResponse)
+        )
+
+    @router.get(
+        "/dimensions",
+        response_model=None,
+        summary="查询指标维度目录",
+        description=(
+            "返回由指标数据自动发现的维度目录（code / label / count）。"
+            "统计口径与 GET /api/indicators 完全一致（同样的删除标记、权限与筛选条件），"
+            "因此各维度 count 之和等于未筛选的指标总数；label 来自参数字典与指标路径配置，"
+            "未登记的维度码回退为码值本身，不会被静默过滤。"
+        ),
+    )
+    def get_indicator_dimensions(
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            items = current_service.get_dimension_catalog()
+        except IndicatorDataSourceError as error:
+            return _service_error_response(error, 500)
+        return JSONResponse(
+            content=validate_contract(
+                {"items": items}, IndicatorDimensionListResponse
+            )
         )
 
     @router.get("/{indicator_id}", response_model=None)

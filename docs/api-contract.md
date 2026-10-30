@@ -669,6 +669,7 @@ Base Path: `/api/indicators`
 ### 4.2 接口
 
 - `GET /api/indicators`
+- `GET /api/indicators/dimensions`（维度目录）
 - `GET /api/indicators/{indicatorId}`
 - `POST /api/indicators`
 - `PUT /api/indicators/{indicatorId}`
@@ -680,12 +681,34 @@ Base Path: `/api/indicators`
 `GET /api/indicators`
 
 - `keyword`：模糊匹配 `id`、`name`、`meaning`、`caliber`、`path`、`registrar`
-- `dimension`：`cus` / `con` / `due` / `emp` / `org`
+- `dimension`：维度码，大小写不敏感（例如 `cus` / `emp` / `ord` / `ful` / `due` / `con` / `org`；零售 Demo 为 `prd` / `mem` / `ord` / `str` / `inv` / `mkt` / `ful` / `svc`）。取值不限于固定清单，任何真实维度码都可过滤，未知码不会再被归一成空串
 - `status`：`enabled` / `disabled`
 
 `sourceAssetId` 与 `resultFieldId` 是稳定的机器引用；`resultTableName` / `resultFieldName` 保留为展示和兼容快照。两者同时存在时，服务会校验字段属于来源资产；只提交 `resultFieldId` 时会 deterministic 推导来源资产。历史指标无法唯一精确匹配时这些 ID 可以为 `null`，不会按名称猜测。`aggregation` 只接受 `SUM`、`COUNT`、`COUNT_DISTINCT`、`AVG`、`MIN`、`MAX`、`NONE` 或 `null`；`semanticState` 与 `status` 分离，取 `candidate`、`certified`、`deprecated`，而 `status` 继续只表示 `enabled` / `disabled`。
 
-### 4.4 状态变更
+### 4.4 维度目录
+
+`GET /api/indicators/dimensions`
+
+返回配置驱动的维度目录，由真实指标数据自动发现（不依赖前端静态清单）：
+
+```json
+{
+  "items": [
+    { "code": "cus", "label": "客户维度", "count": 1230 },
+    { "code": "emp", "label": "员工维度", "count": 365 },
+    { "code": "org", "label": "机构维度", "count": 2 }
+  ]
+}
+```
+
+- `count` 与 `GET /api/indicators` 使用完全相同的删除标记（`is_deleted = 'N'`）、权限投影与筛选条件，因此各维度 `count` 之和恒等于未筛选的指标总数。
+- `label` 解析顺序：参数字典 `INDICATOR_DIMENSION` 分类 → `p_indicator_path_config` 一级路径名称 → 模块内置存量维度映射 → 维度码本身。未登记维度直接回退为码值，不会被过滤。
+- 数据中出现的任意新维度码都会自动出现在目录里，并在前端侧边栏与分组视图中生效，无需改代码。
+- `dimension_code` 为空串的指标会归入 `code = ""` 的桶（前端显示为「未标注维度」），保证计数一致。
+- 聚合只使用标准 `lower()` + `GROUP BY`，SQLite / PostgreSQL / MySQL / GaussDB(DWS) 通用。
+
+### 4.5 状态变更
 
 `PATCH /api/indicators/{indicatorId}/status`
 

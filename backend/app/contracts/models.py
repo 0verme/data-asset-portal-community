@@ -232,6 +232,18 @@ class IndicatorListResponse(ItemsResponse[IndicatorItem]):
     pass
 
 
+class IndicatorDimensionItem(ContractModel):
+    """One row of the configured indicator dimension directory."""
+
+    code: str
+    label: str = ""
+    count: int = 0
+
+
+class IndicatorDimensionListResponse(ItemsResponse[IndicatorDimensionItem]):
+    pass
+
+
 class AssetField(ContractModel):
     fieldId: int | None = None
     assetId: int | None = None
