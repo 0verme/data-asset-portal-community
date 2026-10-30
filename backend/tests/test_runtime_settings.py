@@ -66,6 +66,23 @@ class RuntimeSettingsTestCase(unittest.TestCase):
             self.assertEqual("env-user", profile["user"])
             self.assertEqual("env-password", profile["password"])
 
+    def test_global_db_overrides_apply_to_every_selected_profile(self):
+        """Current precedence: profile selection does not isolate ASSET_DB_*."""
+        with tempfile.TemporaryDirectory() as directory:
+            config_path = Path(directory) / "database.yaml"
+            config_path.write_text(
+                "profiles:\n  primary:\n    type: postgres\n    host: primary-host\n"
+                "    database: assetdb\n    user: sample\n    password: placeholder\n"
+                "  lineage:\n    type: postgres\n    host: lineage-host\n"
+                "    database: lineagedb\n    user: sample\n    password: placeholder\n",
+                encoding="utf-8",
+            )
+            os.environ["ASSET_DB_CONFIG_PATH"] = str(config_path)
+            self.assertEqual("lineage-host", get_db_profile("lineage")["host"])
+            os.environ["ASSET_DB_HOST"] = "explicit-global-host"
+            self.assertEqual("explicit-global-host", get_db_profile("primary")["host"])
+            self.assertEqual("explicit-global-host", get_db_profile("lineage")["host"])
+
     def test_system_management_sql_uses_explicit_configured_system_actor(self):
         os.environ["ASSET_OPERATOR"] = "batch-agent"
         service = SystemManagementService()

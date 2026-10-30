@@ -125,15 +125,37 @@ class ReportService(AuditActorMixin):
     def _allowed_status_values(self):
         try:
             return {value for value in common_code_service.get_item_values("SYSTEM_STATUS") if value}
-        except (CommonCodeCategoryNotFoundError, CommonCodeDataSourceError):
+        except CommonCodeDataSourceError as error:
+            raise ReportDataSourceError("业务码表数据源不可用，请稍后重试") from error
+        except CommonCodeCategoryNotFoundError:
             return set(DEFAULT_STATUS)
 
     def _allowed_code_values(self, category, fallback):
         try:
             values = {value for value in common_code_service.get_item_values(category) if value}
             return values or set(fallback)
-        except (CommonCodeCategoryNotFoundError, CommonCodeDataSourceError):
+        except CommonCodeDataSourceError as error:
+            raise ReportDataSourceError("业务码表数据源不可用，请稍后重试") from error
+        except CommonCodeCategoryNotFoundError:
             return set(fallback)
+
+    def get_report_options(self):
+        """Non-sensitive, full-domain options; never substitute demo values."""
+        categories = {
+            "reportTypes": REPORT_TYPE_CATEGORY,
+            "periods": REPORT_PERIOD_CATEGORY,
+            "statCalibers": REPORT_DATE_CALIBER_CATEGORY,
+            "dataDelays": REPORT_TIMELINESS_CATEGORY,
+            "departments": DEPARTMENT_CATEGORY,
+        }
+        options = {
+            key: sorted(self._allowed_code_values(category, set()))
+            for key, category in categories.items()
+        }
+        options["reportTypes"] = sorted(set(options["reportTypes"]) | self._legacy_values("report_type"))
+        options["periods"] = sorted(set(options["periods"]) | self._legacy_values("freq_code"))
+        options["departments"] = sorted(set(options["departments"]) | self._legacy_values("owner_dept_name"))
+        return options
 
     def _domain_names(self):
         rows = self._fetch_rows(
@@ -270,11 +292,11 @@ class ReportService(AuditActorMixin):
             details.append({"field": "name", "message": "name is required"})
         if not report_type:
             details.append({"field": "type", "message": "type is required"})
-        elif report_type not in self._allowed_code_values(REPORT_TYPE_CATEGORY, DEFAULT_REPORT_TYPES) | self._legacy_values("report_type"):
+        elif report_type not in self._allowed_code_values(REPORT_TYPE_CATEGORY, set()) | self._legacy_values("report_type"):
             details.append({"field": "type", "message": f"type is not allowed: {report_type}"})
         if domain and domain not in self._domain_names() | self._legacy_values("domain_name"):
             details.append({"field": "domain", "message": f"domain does not exist: {domain}"})
-        if stat_period not in self._allowed_code_values(REPORT_PERIOD_CATEGORY, DEFAULT_REPORT_PERIODS) | self._legacy_values("freq_code"):
+        if stat_period not in self._allowed_code_values(REPORT_PERIOD_CATEGORY, set()) | self._legacy_values("freq_code"):
             details.append({"field": "statPeriod", "message": f"statPeriod is not allowed: {stat_period}"})
         if not date_caliber:
             details.append({"field": "statCaliber", "message": "statCaliber is required"})

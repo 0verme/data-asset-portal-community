@@ -74,6 +74,7 @@ class RoutePermissionInventoryTests(unittest.TestCase):
         ("POST", "/api/roots"): "root:write",
         ("POST", "/api/indicators"): "indicator:write",
         ("POST", "/api/reports"): "report:write",
+        ("GET", "/api/reports/options"): "report:write",
         ("POST", "/api/api-assets"): "api_asset:write",
         (
             "GET",

@@ -148,3 +148,24 @@ export async function deleteReport(reportCode: string): Promise<void> {
   }
   writeStore(readStore().filter((item) => item.code !== reportCode));
 }
+
+export interface RemoteReportOptions {
+  reportTypes: string[];
+  periods: string[];
+  statCalibers: string[];
+  dataDelays: string[];
+  departments: string[];
+}
+
+export async function getReportOptions(): Promise<RemoteReportOptions> {
+  const response = await requestRemote<{ options: RemoteReportOptions }>('/reports/options');
+  if (!response || !response.options) throw new Error('报表字典响应无效');
+  const options = response.options;
+  for (const key of ['reportTypes', 'periods', 'statCalibers', 'dataDelays', 'departments'] as const) {
+    if (!Array.isArray(options[key]) || !options[key].every((value) => typeof value === 'string')) {
+      throw new Error('报表字典响应无效');
+    }
+  }
+  return options;
+}
+

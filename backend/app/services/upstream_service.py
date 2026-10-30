@@ -177,13 +177,17 @@ class UpstreamService(AuditActorMixin):
     def _get_allowed_status_values(self):
         try:
             return {value for value in common_code_service.get_item_values("SYSTEM_STATUS") if value}
-        except (CommonCodeCategoryNotFoundError, CommonCodeDataSourceError):
+        except CommonCodeDataSourceError as error:
+            raise UpstreamDataSourceError("业务码表数据源不可用，请稍后重试") from error
+        except CommonCodeCategoryNotFoundError:
             return set(DEFAULT_UPSTREAM_STATUS)
 
     def _get_option_contract(self, category_code, fallback):
         try:
             items = common_code_service.get_items(category_code)
-        except (CommonCodeCategoryNotFoundError, CommonCodeDataSourceError):
+        except CommonCodeDataSourceError as error:
+            raise UpstreamDataSourceError("业务码表数据源不可用，请稍后重试") from error
+        except CommonCodeCategoryNotFoundError:
             if isinstance(fallback, dict):
                 items = [
                     {"code": str(code), "name": str(value), "value": str(value)}
@@ -244,7 +248,7 @@ class UpstreamService(AuditActorMixin):
             "UPSTREAM_DB_TYPE", DEFAULT_UPSTREAM_DB_TYPES
         )
         allowed_depts, dept_aliases = self._get_option_contract(
-            "UPSTREAM_DEPT", DEFAULT_UPSTREAM_DEPTS
+            "UPSTREAM_DEPT", set()
         )
         db_type = self._normalize_option_value(db_type, db_type_aliases)
         dept = self._normalize_option_value(dept, dept_aliases)

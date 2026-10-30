@@ -2,7 +2,7 @@ import React from "react";
 
 import { getAssetTables, getDomains, type AssetTableItem } from "../../api/assets.ts";
 import { getIndicatorList } from "../../api/indicator.ts";
-import { getReportList } from "../../api/report.ts";
+import { getReportList, getReportOptions } from "../../api/report.ts";
 import type { MockIndicatorItem } from "../../data/indicators.ts";
 import type { MockReportItem, RelatedIndicatorSummary, RelatedTableSummary } from "../../data/reports.ts";
 import { buildReportOptionSets, type ReportOptionSets } from "../../config/reportOptions.ts";
@@ -244,12 +244,12 @@ export function ReportEditor({
       setRefLoading(true);
       setRefError("");
       try {
-        const [tables, indicators, domainItems, reportItems] = await Promise.all([getAssetTables(), getIndicatorList(), getDomains(), getReportList()]);
+        const [tables, indicators, domainItems, reportItems, remoteOptions] = await Promise.all([getAssetTables(), getIndicatorList(), getDomains(), getReportList(), import.meta.env?.['VITE_API_MODE'] === "remote" ? getReportOptions() : Promise.resolve(undefined)]);
         if (cancelled) return;
         setTableCandidates((Array.isArray(tables) ? tables : []).map(normalizeTableCandidate));
         setIndicatorCandidates((Array.isArray(indicators) ? indicators : []).map(normalizeIndicatorCandidate));
         setDomains((Array.isArray(domainItems) ? domainItems : []).map((item) => item.name).filter(Boolean));
-        setReportOptionSets(buildReportOptionSets(reportItems));
+        setReportOptionSets(buildReportOptionSets(reportItems, remoteOptions));
         const peopleValues = [
           ...(Array.isArray(reportItems) ? reportItems : []).flatMap((item) => [item.ownerName, item.maintainerName]),
           ...(Array.isArray(tables) ? tables : []).map((item) => item.owner),
