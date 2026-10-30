@@ -695,8 +695,8 @@ Base Path: `/api/indicators`
 ```json
 {
   "items": [
-    { "code": "cus", "label": "客户维度", "count": 1230 },
-    { "code": "emp", "label": "员工维度", "count": 365 },
+    { "code": "cus", "label": "客户维度", "count": 61 },
+    { "code": "emp", "label": "员工维度", "count": 24 },
     { "code": "org", "label": "机构维度", "count": 2 }
   ]
 }

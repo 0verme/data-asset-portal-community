@@ -297,7 +297,7 @@ python -m unittest discover -s backend/tests
 
 `.github/workflows/ci.yml` 在 `pull_request` 与 `main` 推送时运行：
 
-1. **Repository Guard** —— `python demo/validate_demo_data.py --strict`（BLOCKER / SUSPICIOUS 必须为 0）、二进制 / dump / 环境文件检查、workflow YAML 自检；
+1. **Repository Guard** —— `python demo/validate_demo_data.py --strict`（BLOCKER / SUSPICIOUS 必须为 0；INFO 是通用行业词汇提示，不阻断）、二进制 / dump / 环境文件检查、workflow YAML 自检；
 2. **Backend / Python 3.11 + 3.13** —— `python -m unittest discover -s backend/tests` + baseline offline verify（sqlite / postgresql / mysql / dws）+ packaging contract tests；
 3. **PostgreSQL Integration（PG 16 service）** —— fresh migration → seed → integration tests（16 个不再 skip）→ repeat apply no-op → 当前 Community 表物理边界检查；
 4. **MySQL 8 Integration** —— fresh baseline → verify → SQLAlchemy Core CRUD / pagination / uniqueness / Unicode / NULL / rollback → repeat apply no-op；

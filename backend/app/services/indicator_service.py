@@ -166,7 +166,7 @@ class IndicatorService(AuditActorMixin):
         Unknown-but-well-formed codes are kept verbatim (lowercased) instead of
         being collapsed into an empty string: real business dimensions such as
         CUS/EMP/DUE/CON/ORG are discovered from data, and silently dropping them
-        made 1789 indicators look dimension-less in the portal.
+        made every unregistered dimension look dimension-less in the portal.
         """
         raw = str(value or "").strip()
         if not raw:

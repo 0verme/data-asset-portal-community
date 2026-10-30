@@ -13,26 +13,27 @@ import {
 } from "./indicatorDimensions.ts";
 import { INDICATOR_DIMENSIONS, INDICATORS } from "./indicators.ts";
 
-// Read-only intranet audit snapshot: 2301 indicators over seven real codes.
-const BANK_CATALOG: IndicatorDimensionCatalogEntry[] = [
-  { code: "cus", label: "客户维度", count: 1230 },
-  { code: "emp", label: "员工维度", count: 365 },
-  { code: "ord", label: "交易维度", count: 331 },
-  { code: "ful", label: "履约维度", count: 181 },
-  { code: "due", label: "借据维度", count: 108 },
-  { code: "con", label: "合同维度", count: 84 },
-  { code: "org", label: "机构维度", count: 2 },
+// Synthetic seven-code fixture: labels must come from the catalog, so the
+// exact wording and counts only need to be self-consistent.
+const SEVEN_CODE_CATALOG: IndicatorDimensionCatalogEntry[] = [
+  { code: "cus", label: "客户维度", count: 61 },
+  { code: "emp", label: "员工维度", count: 24 },
+  { code: "ord", label: "交易维度", count: 19 },
+  { code: "ful", label: "履约维度", count: 11 },
+  { code: "due", label: "借据维度", count: 7 },
+  { code: "con", label: "合同维度", count: 5 },
+  { code: "org", label: "机构维度", count: 1 },
 ];
 
 const countsOf = (options: ReturnType<typeof buildIndicatorDimensionOptions>) =>
   Object.fromEntries(options.map((item) => [item.value, item.code]));
 
-test("seven-dimension bank data renders every real dimension with its label", () => {
+test("seven-dimension data renders every dimension with its catalog label", () => {
   const counts = Object.fromEntries(
-    BANK_CATALOG.map((entry) => [entry.code, entry.count ?? 0]),
+    SEVEN_CODE_CATALOG.map((entry) => [entry.code, entry.count ?? 0]),
   );
 
-  const options = buildIndicatorDimensionOptions(BANK_CATALOG, counts);
+  const options = buildIndicatorDimensionOptions(SEVEN_CODE_CATALOG, counts);
 
   assert.deepEqual(
     options.map((item) => item.value),
@@ -52,7 +53,7 @@ test("seven-dimension bank data renders every real dimension with its label", ()
     ["客户维度", "员工维度", "交易维度", "履约维度", "借据维度", "合同维度", "机构维度"],
   );
   const total = options.reduce((sum, item) => sum + (counts[item.value] || 0), 0);
-  assert.equal(total, 2301);
+  assert.equal(total, 128);
 });
 
 test("eight-dimension Community Demo keeps its retail dimensions and order", () => {
@@ -132,7 +133,7 @@ test("a newly added dimension needs no frontend change", () => {
 test("empty dimension codes keep the bucket total equal to the list total", () => {
   const counts = { cus: 10, "": 4 };
 
-  const options = buildIndicatorDimensionOptions(BANK_CATALOG.slice(0, 1), counts);
+  const options = buildIndicatorDimensionOptions(SEVEN_CODE_CATALOG.slice(0, 1), counts);
 
   assert.deepEqual(
     options.map((item) => item.value),

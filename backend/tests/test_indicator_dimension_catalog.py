@@ -24,16 +24,16 @@ from backend.app.services.indicator_service import (
 
 # pyright: reportMissingImports=false
 
-# Read-only audit snapshot from the intranet GaussDB instance: 2301 indicators,
-# 2300 enabled + 1 disabled, spread over seven real business dimension codes.
+# Synthetic seven-code distribution: the catalogue contract only needs the
+# codes and their relative totals, so these counts are invented for the test.
 BANK_DIMENSION_DISTRIBUTION = {
-    "CUS": 1230,
-    "EMP": 365,
-    "ORD": 331,
-    "FUL": 181,
-    "DUE": 108,
-    "CON": 84,
-    "ORG": 2,
+    "CUS": 61,
+    "EMP": 24,
+    "ORD": 19,
+    "FUL": 11,
+    "DUE": 7,
+    "CON": 5,
+    "ORG": 1,
 }
 BANK_DIMENSION_ORDER = ["cus", "emp", "ord", "ful", "due", "con", "org"]
 
@@ -148,7 +148,7 @@ class IndicatorDimensionCatalogSqliteTests(unittest.TestCase):
         rows.append(indicator_row(index, "CUS", is_deleted="Y"))
         return rows
 
-    def test_bank_data_exposes_seven_real_dimensions_with_matching_totals(self):
+    def test_seven_dimension_data_exposes_matching_totals(self):
         service = self.build_service(self.bank_rows())
 
         catalog = service.get_dimension_catalog()
@@ -162,7 +162,7 @@ class IndicatorDimensionCatalogSqliteTests(unittest.TestCase):
             {item["code"]: item["count"] for item in catalog},
         )
         # The catalogue must share the list API soft-delete footing.
-        self.assertEqual(2301, len(listing))
+        self.assertEqual(128, len(listing))
         self.assertEqual(len(listing), sum(item["count"] for item in catalog))
 
     def test_bank_dimension_codes_survive_row_projection(self):
@@ -340,7 +340,7 @@ class IndicatorDimensionApiTests(unittest.TestCase):
 
     def test_dimension_directory_is_served_before_the_detail_route(self):
         self.indicators.get_dimension_catalog.return_value = [
-            {"code": "cus", "label": "客户维度", "count": 1230},
+            {"code": "cus", "label": "客户维度", "count": 61},
             {"code": "org", "label": "机构维度", "count": 2},
         ]
         self.indicators.get_indicator_detail.return_value = {"id": "dimensions"}
@@ -350,7 +350,7 @@ class IndicatorDimensionApiTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         self.assertEqual(
             [
-                {"code": "cus", "label": "客户维度", "count": 1230},
+                {"code": "cus", "label": "客户维度", "count": 61},
                 {"code": "org", "label": "机构维度", "count": 2},
             ],
             response.json()["items"],

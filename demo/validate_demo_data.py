@@ -6,7 +6,9 @@ Two layers:
   2. Repository Public Data Guard: scans docs / configs / scripts / demo /
      frontend data for private IPs, internal domains, secrets, local paths
      and business-sensitive residue. Findings are classified
-     SAFE / EXPECTED / SUSPICIOUS / BLOCKER; BLOCKER must be zero.
+     INFO / SAFE / EXPECTED / SUSPICIOUS / BLOCKER; BLOCKER must be zero and
+     --strict additionally fails on SUSPICIOUS. INFO (generic industry
+     vocabulary) is reported for review but never fails the gate.
 
 Usage:
   python demo/validate_demo_data.py            # whole guard
@@ -19,7 +21,6 @@ import argparse
 import json
 import subprocess
 from pathlib import Path
-
 
 from safety_scan import GUARD_DIRS, GUARD_FILES, scan_file
 
@@ -229,7 +230,7 @@ def main():
     parser.add_argument(
         "--strict",
         action="store_true",
-        help="Fail on any SUSPICIOUS finding too (CI gate), not only BLOCKER.",
+        help="Fail on any SUSPICIOUS finding too (CI gate), not only BLOCKER. INFO findings never fail.",
     )
     args = parser.parse_args()
 
@@ -247,12 +248,14 @@ def main():
     blockers = [f for f in findings if f["severity"] == "BLOCKER"]
     suspicious = [f for f in findings if f["severity"] == "SUSPICIOUS"]
     expected = [f for f in findings if f["severity"] == "EXPECTED"]
+    infos = [f for f in findings if f["severity"] == "INFO"]
     safe = [f for f in findings if f["severity"] == "SAFE"]
 
     print(f"扫描文件数：{file_count}")
     print(f"BLOCKER    : {len(blockers)}")
     print(f"SUSPICIOUS : {len(suspicious)}")
     print(f"EXPECTED   : {len(expected)}")
+    print(f"INFO       : {len(infos)}")
     print(f"SAFE       : {len(safe)}")
     if suspicious:
         print("\n-- SUSPICIOUS --")
@@ -261,6 +264,10 @@ def main():
     if blockers:
         print("\n-- BLOCKER --")
         for f in blockers[:50]:
+            print(f"  [{f['severity']}] {f['label']} [{f['category']}]: {_mask_detail(f['detail'])}")
+    if infos:
+        print("\n-- INFO（仅提示，不阻断） --")
+        for f in infos[:50]:
             print(f"  [{f['severity']}] {f['label']} [{f['category']}]: {_mask_detail(f['detail'])}")
 
     print(f"\nRepository Public Data Guard: 高置信风险(BLOCKER) = {len(blockers)}")
