@@ -517,7 +517,7 @@ jobs:
           esac
 
   frontend:
-    name: Frontend / Node ${{ matrix.node }}
+    name: ${{ matrix.node == '22' && 'Frontend Core / Node 22' || 'Frontend / Node 24' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -597,70 +597,6 @@ jobs:
       - name: Frontend tests
         run: npm test
 
-      # Preserve every existing Chromium/WebKit test selection and the required
-      # "Frontend / Node 22" check. Each lane gets an isolated Vite port and
-      # Playwright output directory; both failures are propagated explicitly.
-      - name: Install Playwright browsers for API asset validation
-        if: matrix.node == '22'
-        run: npx playwright install --with-deps chromium webkit
-
-      - name: Parallel Playwright browser regressions (Chromium and WebKit)
-        if: matrix.node == '22'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/dap-browser-logs"
-
-          (
-            set -euo pipefail
-            export DAP_KUMO_BASE_URL=http://127.0.0.1:4178
-            export VITE_API_MODE=remote
-            export DAP_KUMO_TEST_OUTPUT="$RUNNER_TEMP/api-asset-validation-playwright"
-            npm run test:browser -- --grep "API asset validation|Remote data trust|strict collection response|indicator path malformed envelope|source options failure|field-mapping column contract"
-            export DAP_KUMO_TEST_OUTPUT="$RUNNER_TEMP/system-list-pagination-playwright"
-            npm run test:browser -- e2e/system-list-pagination.spec.ts
-            export VITE_API_MODE=mock
-            export DAP_KUMO_TEST_OUTPUT="$RUNNER_TEMP/field-mapping-mock-csv-playwright"
-            npm run test:browser -- --grep "field-mapping mock CSV contract"
-            export VITE_API_MODE=remote
-            export DAP_KUMO_TEST_OUTPUT="$RUNNER_TEMP/root-csv-tsv-import-playwright"
-            npm run test:browser -- e2e/root-import-parser.spec.ts --workers=2
-          ) > "$RUNNER_TEMP/dap-browser-logs/lane-a.log" 2>&1 &
-          lane_a=$!
-
-          (
-            set -euo pipefail
-            export DAP_KUMO_BASE_URL=http://127.0.0.1:4179
-            export VITE_API_MODE=mock
-            export DAP_KUMO_TEST_OUTPUT="$RUNNER_TEMP/form-error-presenter-playwright"
-            npm run test:browser -- --grep "form error presenter"
-            export DAP_KUMO_TEST_OUTPUT="$RUNNER_TEMP/portal-search-layout-playwright"
-            npm run test:browser -- e2e/portal-search.spec.ts --workers=2
-            export VITE_API_MODE=remote
-            export DAP_KUMO_TEST_OUTPUT="$RUNNER_TEMP/system-form-feedback-playwright"
-            npm run test:browser -- e2e/admin-form-errors.spec.ts --workers=2
-            export DAP_KUMO_TEST_OUTPUT="$RUNNER_TEMP/manual-code-table-form-feedback-playwright"
-            npm run test:browser -- e2e/manual-code-table-form-errors.spec.ts --workers=2
-            export VITE_API_MODE=mock
-            export DAP_KUMO_TEST_OUTPUT="$RUNNER_TEMP/overlay-feedback-playwright"
-            npm run test:browser -- e2e/kumo-overlays.spec.ts --workers=2
-          ) > "$RUNNER_TEMP/dap-browser-logs/lane-b.log" 2>&1 &
-          lane_b=$!
-
-          lane_a_status=0
-          lane_b_status=0
-          wait "$lane_a" || lane_a_status=$?
-          wait "$lane_b" || lane_b_status=$?
-          for lane in a b; do
-            echo "::group::Playwright lane $lane"
-            cat "$RUNNER_TEMP/dap-browser-logs/lane-$lane.log"
-            echo "::endgroup::"
-          done
-          echo "Playwright lane A exit: $lane_a_status; lane B exit: $lane_b_status"
-          if [[ "$lane_a_status" -ne 0 || "$lane_b_status" -ne 0 ]]; then
-            exit 1
-          fi
-
       - name: Frontend production build
         env:
           VITE_API_MODE: remote
@@ -668,6 +604,115 @@ jobs:
 
       - name: Dependency audit gate (Critical/High must be 0)
         run: npm audit --audit-level=high
+
+  frontend-browser:
+    name: Frontend Browser / Lane ${{ matrix.lane }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [a, b]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: npm ci (clean install from lockfile)
+        run: npm ci
+      - name: Build Lineage workspace packages from source
+        run: npm run build:lineage
+      - name: Install Playwright browsers for API asset validation
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Remote API validation and data trust browser regression (Chromium and WebKit)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/api-asset-validation-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- --grep "API asset validation|Remote data trust|strict collection response|indicator path malformed envelope|source options failure|field-mapping column contract"
+
+      - name: Upstream and push remote pagination regression (Chromium and WebKit)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/system-list-pagination-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/system-list-pagination.spec.ts
+
+      - name: Field-mapping mock CSV column regression (Chromium and WebKit)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/field-mapping-mock-csv-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- --grep "field-mapping mock CSV contract"
+
+      - name: Form error presenter browser regression (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/form-error-presenter-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- --grep "form error presenter"
+
+      - name: Portal search result layout regression (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/portal-search-layout-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- e2e/portal-search.spec.ts --workers=2
+
+      - name: System management form feedback browser regression (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/system-form-feedback-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/admin-form-errors.spec.ts --workers=2
+
+      - name: Manual code table form feedback browser regression (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/manual-code-table-form-feedback-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/manual-code-table-form-errors.spec.ts --workers=2
+
+      - name: Root CSV/TSV import parser browser regression (Chromium and WebKit)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/root-csv-tsv-import-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/root-import-parser.spec.ts --workers=2
+
+      - name: Overlay focus and feedback browser regression (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/overlay-feedback-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- e2e/kumo-overlays.spec.ts --workers=2
+
+
+
+  frontend-gate:
+    # Keep the original required check context. It must fail if EITHER
+    # browser shard or ANY frontend core matrix entry fails, skips or cancels.
+    name: Frontend / Node 22
+    runs-on: ubuntu-latest
+    needs: [frontend, frontend-browser]
+    if: always()
+    timeout-minutes: 2
+    steps:
+      - name: Require frontend core and all browser shards
+        env:
+          CORE_RESULT: ${{ needs.frontend.result }}
+          BROWSER_RESULT: ${{ needs.frontend-browser.result }}
+        run: |
+          echo "Frontend core: $CORE_RESULT; browser shards: $BROWSER_RESULT"
+          test "$CORE_RESULT" = success
+          test "$BROWSER_RESULT" = success
 
   migration-community:
     name: Community Migration (SQLite)
