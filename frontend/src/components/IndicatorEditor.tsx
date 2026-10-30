@@ -188,6 +188,7 @@ export function IndicatorEditor({
   const [assetLoading, setAssetLoading] = React.useState(false);
   const [assetError, setAssetError] = React.useState("");
   const [fieldOptions, setFieldOptions] = React.useState<AssetTableField[]>([]);
+  const [fieldOptionsAssetId, setFieldOptionsAssetId] = React.useState<number | null>(null);
   const [fieldLoading, setFieldLoading] = React.useState(false);
   const [fieldError, setFieldError] = React.useState("");
   const [assetRetryRevision, setAssetRetryRevision] = React.useState(0);
@@ -195,6 +196,7 @@ export function IndicatorEditor({
   const [pathRetryRevision, setPathRetryRevision] = React.useState(0);
   const initialSnapshotRef = React.useRef(JSON.stringify(form));
   const isDirty = initialSnapshotRef.current !== JSON.stringify(form);
+  const currentFieldOptions = fieldOptionsAssetId === form.sourceAssetId ? fieldOptions : [];
 
   React.useEffect(() => {
     const nextForm = createFormState(initial);
@@ -235,6 +237,7 @@ export function IndicatorEditor({
     const selectedAssetName = selectedAsset?.name || "";
     if (!selectedAssetName && !selectedAsset?.assetId) {
       setFieldOptions([]);
+      setFieldOptionsAssetId(null);
       setFieldError("");
       setFieldLoading(false);
       return undefined;
@@ -245,7 +248,10 @@ export function IndicatorEditor({
       setFieldError("");
       try {
         const items = await getAssetFields({ assetId: selectedAsset?.assetId, tableName: selectedAssetName });
-        if (!cancelled) setFieldOptions(Array.isArray(items) ? items : []);
+        if (!cancelled) {
+          setFieldOptions(Array.isArray(items) ? items : []);
+          setFieldOptionsAssetId(form.sourceAssetId);
+        }
       } catch (error: unknown) {
         if (!cancelled) {
           setFieldError(error instanceof Error ? error.message : "来源资产字段加载失败。");
@@ -326,7 +332,7 @@ export function IndicatorEditor({
 
   const handleFieldChange = (value: string) => {
     const resultFieldId = normalizeOptionalId(value);
-    const selectedField = fieldOptions.find((item) => getFieldOptionId(item) === resultFieldId);
+    const selectedField = currentFieldOptions.find((item) => getFieldOptionId(item) === resultFieldId);
     setValues({
       resultFieldId,
       resultFieldName: selectedField?.name || form.resultFieldName,
@@ -461,10 +467,10 @@ export function IndicatorEditor({
               disabled={!form.sourceAssetId || fieldLoading}
               items={[
                 { label: "未绑定稳定字段（保留兼容快照）", value: "" },
-                ...(form.resultFieldId && !fieldOptions.some((item) => getFieldOptionId(item) === form.resultFieldId)
+                ...(form.resultFieldId && !currentFieldOptions.some((item) => getFieldOptionId(item) === form.resultFieldId)
                   ? [{ label: form.resultFieldName || "当前结果字段", value: form.resultFieldId }]
                   : []),
-                ...fieldOptions.flatMap((field) => {
+                ...currentFieldOptions.flatMap((field) => {
                   const fieldId = getFieldOptionId(field);
                   return fieldId === null ? [] : [{ label: fieldLabel(field), value: fieldId }];
                 }),

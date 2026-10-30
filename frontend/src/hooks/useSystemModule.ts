@@ -206,6 +206,7 @@ export function useSystemModule({
     setMenuErrors((current) => clearFormFieldErrorEntry(current, field));
   }, []);
   const itemsRequestSeq = React.useRef(0);
+  const itemsLoadingCategoryRef = React.useRef('');
   const loadedItemsCategoryRef = React.useRef('');
   const pageRequestSeq = React.useRef(0);
   const loadedPagesRef = React.useRef(new Set<string>());
@@ -243,13 +244,19 @@ export function useSystemModule({
     const requestSeq = ++itemsRequestSeq.current;
     if (!categoryCode) {
       setItems([]);
+      itemsLoadingCategoryRef.current = '';
       loadedItemsCategoryRef.current = '';
       return;
     }
-    loadedItemsCategoryRef.current = categoryCode;
-    const nextItems = await getParamDicts(categoryCode);
-    if (requestSeq !== itemsRequestSeq.current) return;
-    setItems(nextItems);
+    itemsLoadingCategoryRef.current = categoryCode;
+    try {
+      const nextItems = await getParamDicts(categoryCode);
+      if (requestSeq !== itemsRequestSeq.current) return;
+      setItems(nextItems);
+      loadedItemsCategoryRef.current = categoryCode;
+    } finally {
+      if (requestSeq === itemsRequestSeq.current) itemsLoadingCategoryRef.current = '';
+    }
   }, []);
 
   const reloadCurrentItems = React.useCallback(async (): Promise<void> => {
@@ -304,8 +311,11 @@ export function useSystemModule({
   React.useEffect(() => {
     if (currentPage !== "param-dicts" || !selectedCategoryCode) return;
     if (loadedItemsCategoryRef.current === selectedCategoryCode) return;
+    if (itemsLoadingCategoryRef.current === selectedCategoryCode) return;
     loadItems(selectedCategoryCode).catch((nextError: unknown) => {
-      setError(getErrorMessage(nextError, '加载参数字典失败。'));
+      if (selectedCategoryCodeRef.current === selectedCategoryCode) {
+        setError(getErrorMessage(nextError, '加载参数字典失败。'));
+      }
     });
   }, [currentPage, loadItems, selectedCategoryCode]);
 
