@@ -12,6 +12,7 @@ import {
   UNASSIGNED_DIMENSION_LABEL,
 } from "./indicatorDimensions.ts";
 import { INDICATOR_DIMENSIONS, INDICATORS } from "./indicators.ts";
+import { normalizeIndicatorDimension } from "./indicatorPathOptions.ts";
 
 // Synthetic seven-code fixture: labels must come from the catalog, so the
 // exact wording and counts only need to be self-consistent.
@@ -147,7 +148,7 @@ test("empty dimension codes keep the bucket total equal to the list total", () =
   );
 });
 
-test("bank dimension codes survive remote row projection", () => {
+test("dimension codes survive remote row projection without a static list", () => {
   assert.equal(resolveIndicatorDimension("", "CUS"), "cus");
   assert.equal(resolveIndicatorDimension("CUS > 客户基础 > 涉农标签", "CUS"), "cus");
   assert.equal(resolveIndicatorDimension("", "  emp "), "emp");
@@ -155,7 +156,35 @@ test("bank dimension codes survive remote row projection", () => {
   assert.equal(resolveIndicatorDimension("PRD > 商品运营 > 规模", ""), "prd");
   // Nothing to resolve stays unresolved instead of inventing a dimension.
   assert.equal(resolveIndicatorDimension("", ""), "");
-  assert.equal(resolveIndicatorDimension("CUS > 客户基础", ""), "");
+  // A path root that is itself a code resolves even for data we never saw.
+  assert.equal(resolveIndicatorDimension("REGION_APAC > 区域", ""), "region_apac");
+  // A label-only root is not translated into a code.
+  assert.equal(resolveIndicatorDimension("客户维度 > 子节点", ""), "");
+});
+
+test("any well-formed code works without touching the code base", () => {
+  const cases = [
+    ["MFG > 产线 > 产量", "mfg"],
+    ["region_apac > 区域 > 规模", "region_apac"],
+    ["ZZ9 > 自定义 > 指标", "zz9"],
+    ["x1_2 > 任意 > 指标", "x1_2"],
+  ] as const;
+
+  for (const [path, expected] of cases) {
+    assert.equal(resolveIndicatorDimension(path, ""), expected);
+    assert.equal(resolveIndicatorDimension("", expected), expected);
+  }
+  assert.equal(resolveIndicatorDimension("1BAD > x", ""), "");
+  assert.equal(resolveIndicatorDimension("bad code! > x", ""), "");
+});
+
+test("dimension normalization never translates industry wording", () => {
+  for (const label of ["商品维度", "客户维度", "借据维度", "制造维度"]) {
+    assert.equal(normalizeIndicatorDimension(label), "");
+    assert.equal(normalizeIndicatorDimensionCode(label), "");
+  }
+  assert.equal(normalizeIndicatorDimension("MFG"), "mfg");
+  assert.equal(normalizeIndicatorDimension(" REGION_APAC "), "region_apac");
 });
 
 test("dimension code normalization accepts codes only", () => {

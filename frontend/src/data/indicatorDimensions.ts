@@ -2,10 +2,7 @@
 // Licensed under the Apache License, Version 2.0.
 
 import type { IndicatorDimensionOption } from "./indicators.ts";
-import {
-  getIndicatorDimensionFromPath,
-  normalizeIndicatorDimension,
-} from "./indicatorPathOptions.ts";
+import { getIndicatorDimensionFromPath } from "./indicatorPathOptions.ts";
 
 /**
  * A dimension code as reported by the backend dimension directory.
@@ -29,9 +26,10 @@ export const UNASSIGNED_DIMENSION_LABEL = "未标注维度";
 /**
  * Keep a real dimension code instead of collapsing it to an empty string.
  *
- * Labels/paths are normalized by `normalizeIndicatorDimension`; this helper is
- * the fallback for codes the frontend has no label for yet, so a newly imported
- * business dimension is displayed with its own code rather than being dropped.
+ * A dimension is user data, so only the generic storage format is validated.
+ * This helper is the fallback for codes the frontend has no label for yet, so a
+ * newly written business dimension is displayed with its own code rather than
+ * being dropped.
  */
 export function normalizeIndicatorDimensionCode(value: unknown): string {
   const raw = String(value ?? "").trim();
@@ -42,9 +40,10 @@ export function normalizeIndicatorDimensionCode(value: unknown): string {
 /**
  * Resolve the dimension of one indicator record.
  *
- * Demo path labels win so seeded rows keep their retail wording; anything else
- * keeps its real code (CUS/EMP/DUE/CON/ORG, Excel-imported codes) instead of
- * being silently collapsed into an empty dimension.
+ * The demo-style path root wins so seeded rows keep their retail wording;
+ * anything else keeps its real code (whatever the data uses, including codes
+ * the frontend has never seen) instead of being collapsed into an empty
+ * dimension. No industry vocabulary is assumed.
  */
 export function resolveIndicatorDimension(
   path: unknown,
@@ -52,7 +51,6 @@ export function resolveIndicatorDimension(
 ): string {
   return (
     getIndicatorDimensionFromPath(path) ||
-    normalizeIndicatorDimension(dimension) ||
     normalizeIndicatorDimensionCode(dimension)
   );
 }

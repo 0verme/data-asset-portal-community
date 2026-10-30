@@ -20,22 +20,29 @@ from backend.app.fastapi_app import create_fastapi_app
 from backend.app.services.indicator_service import (
     IndicatorDataSourceError,
     IndicatorService,
+    IndicatorValidationError,
 )
 
 # pyright: reportMissingImports=false
 
-# Synthetic seven-code distribution: the catalogue contract only needs the
-# codes and their relative totals, so these counts are invented for the test.
-BANK_DIMENSION_DISTRIBUTION = {
-    "CUS": 61,
-    "EMP": 24,
-    "ORD": 19,
-    "FUL": 11,
-    "DUE": 7,
-    "CON": 5,
-    "ORG": 1,
+# Cross-industry fixtures: dimensions are user data, so the contract is not
+# allowed to depend on which industry a code comes from.
+MIXED_DIMENSION_DISTRIBUTION = {
+    "CUS": 3,  # finance / corporate
+    "PRD": 2,  # retail demo vocabulary
+    "MFG": 2,  # manufacturing
+    "PLNT": 1,  # manufacturing, multi-letter code
+    "REGION_APAC": 1,  # custom organisation code with an underscore
+    "ZZ9": 1,  # never referenced anywhere in the code base
 }
-BANK_DIMENSION_ORDER = ["cus", "emp", "ord", "ful", "due", "con", "org"]
+MIXED_DIMENSION_ORDER = [
+    "cus",
+    "mfg",
+    "prd",
+    "plnt",
+    "region_apac",
+    "zz9",
+]
 
 DEMO_DIMENSION_DISTRIBUTION = {
     "PRD": 4,
@@ -134,10 +141,10 @@ class IndicatorDimensionCatalogSqliteTests(unittest.TestCase):
         service._dimension_code_items = MagicMock(return_value=[])
         return service
 
-    def bank_rows(self):
+    def mixed_rows(self):
         rows = []
         index = 0
-        for code, total in BANK_DIMENSION_DISTRIBUTION.items():
+        for code, total in MIXED_DIMENSION_DISTRIBUTION.items():
             for _ in range(total):
                 index += 1
                 rows.append(indicator_row(index, code))
@@ -148,30 +155,31 @@ class IndicatorDimensionCatalogSqliteTests(unittest.TestCase):
         rows.append(indicator_row(index, "CUS", is_deleted="Y"))
         return rows
 
-    def test_seven_dimension_data_exposes_matching_totals(self):
-        service = self.build_service(self.bank_rows())
+    def test_mixed_industry_data_exposes_matching_totals(self):
+        service = self.build_service(self.mixed_rows())
 
         catalog = service.get_dimension_catalog()
         listing = service.get_indicators()
 
+        self.assertEqual(MIXED_DIMENSION_ORDER, [item["code"] for item in catalog])
         self.assertEqual(
-            BANK_DIMENSION_ORDER, [item["code"] for item in catalog]
-        )
-        self.assertEqual(
-            {code.lower(): total for code, total in BANK_DIMENSION_DISTRIBUTION.items()},
+            {
+                code.lower(): total
+                for code, total in MIXED_DIMENSION_DISTRIBUTION.items()
+            },
             {item["code"]: item["count"] for item in catalog},
         )
         # The catalogue must share the list API soft-delete footing.
-        self.assertEqual(128, len(listing))
+        self.assertEqual(10, len(listing))
         self.assertEqual(len(listing), sum(item["count"] for item in catalog))
 
-    def test_bank_dimension_codes_survive_row_projection(self):
-        service = self.build_service(self.bank_rows())
+    def test_mixed_dimension_codes_survive_row_projection(self):
+        service = self.build_service(self.mixed_rows())
 
         items = service.get_indicators()
         dimensions = {item["dimension"] for item in items}
 
-        self.assertEqual(set(BANK_DIMENSION_ORDER), dimensions)
+        self.assertEqual(set(MIXED_DIMENSION_ORDER), dimensions)
         self.assertNotIn("", dimensions)
 
     def test_demo_data_keeps_the_eight_retail_dimensions_and_labels(self):
@@ -289,18 +297,29 @@ class IndicatorDimensionCatalogSqliteTests(unittest.TestCase):
         self.assertEqual("员工主数据维度", labels["emp"])
         self.assertEqual("CHANNEL", labels["channel"])
 
-    def test_configured_path_roots_extend_the_writable_dimension_set(self):
+    def test_a_brand_new_code_needs_no_configuration_at_all(self):
         service = self.build_service(
-            [], [path_row(1, "RETL", "零售维度", "retl", 1)]
+            [indicator_row(1, "zz9"), indicator_row(2, "zz9")]
         )
 
-        self.assertTrue(service._is_allowed_dimension("cus"))
-        self.assertTrue(service._is_allowed_dimension("retl"))
-        self.assertFalse(service._is_allowed_dimension("bogus"))
-        self.assertFalse(service._is_allowed_dimension(""))
+        catalog = service.get_dimension_catalog()
+
+        self.assertEqual([("zz9", 2)], [(item["code"], item["count"]) for item in catalog])
+        # No configured name: the code itself is the display name.
+        self.assertEqual("ZZ9", catalog[0]["label"])
+        self.assertEqual(2, len(service.get_indicators(dimension="ZZ9")))
+        self.assertEqual(2, len(service.get_indicators(dimension="zz9")))
+
+    def test_malformed_dimension_filter_matches_nothing(self):
+        service = self.build_service([indicator_row(1, "cus"), indicator_row(2, "")])
+
+        # A malformed filter must not collapse onto the "unassigned" bucket.
+        self.assertEqual([], service.get_indicators(dimension="bad code!"))
+        self.assertEqual([], service.get_indicators(dimension="--"))
+        self.assertEqual(1, len(service.get_indicators(dimension="cus")))
 
     def test_dimension_aggregate_is_portable_across_supported_dialects(self):
-        service = self.build_service(self.bank_rows())
+        service = self.build_service(self.mixed_rows())
         service._fetch_rows = MagicMock(return_value=[])
         service.get_dimension_catalog()
 
@@ -312,6 +331,117 @@ class IndicatorDimensionCatalogSqliteTests(unittest.TestCase):
                 self.assertIn("GROUP BY lower(", compiled)
                 self.assertIn("count(*)", compiled)
                 self.assertIn("p_indicator_item.is_deleted = ", compiled)
+
+
+class IndicatorDimensionWriteBoundaryTests(unittest.TestCase):
+    """The write boundary validates the code format, never a business list."""
+
+    def setUp(self):
+        self.service = IndicatorService()
+        self.service._allowed_status_values = MagicMock(
+            return_value={"enabled", "disabled"}
+        )
+        self.service._resolve_semantic_asset = MagicMock(return_value=None)
+        self.service._resolve_semantic_field = MagicMock(return_value=None)
+
+    def payload(self, **overrides):
+        base = {
+            "id": "IND_NEW",
+            "name": "跨行业新指标",
+            "dimension": "zz9",
+            "path": "ZZ9 > 根节点 > 叶子",
+            "status": "enabled",
+            "registrar": "tester",
+            "registeredAt": "2026-07-01",
+        }
+        base.update(overrides)
+        return base
+
+    def test_any_well_formed_code_is_accepted_without_configuration(self):
+        for code in ("zz9", "MFG", "region_apac", "A1", "x" * 16):
+            with self.subTest(code=code):
+                item = self.service._normalize_payload(self.payload(dimension=code))
+                self.assertEqual(code.lower(), item["dimension"])
+
+    def test_only_generic_format_and_length_are_enforced(self):
+        for code in ("-bad", "bad code", "1abc", "a" * 17, "维"):
+            with self.subTest(code=code):
+                with self.assertRaises(IndicatorValidationError) as ctx:
+                    self.service._normalize_payload(self.payload(dimension=code))
+                self.assertIn(
+                    "dimension", {item["field"] for item in ctx.exception.details}
+                )
+
+    def test_chinese_dimension_label_is_not_translated_into_a_code(self):
+        # The service owns no industry wording: a label is not a dimension code.
+        with self.assertRaises(IndicatorValidationError) as ctx:
+            self.service._normalize_payload(self.payload(dimension="客户维度"))
+        self.assertIn(
+            "dimension", {item["field"] for item in ctx.exception.details}
+        )
+
+    def test_dimension_is_required_when_the_path_has_no_code_root(self):
+        for payload in (
+            self.payload(dimension="", path="客户基础 > 叶子"),
+            self.payload(dimension="", path=""),
+        ):
+            with self.assertRaises(IndicatorValidationError) as ctx:
+                self.service._normalize_payload(payload)
+            self.assertIn(
+                "dimension", {item["field"] for item in ctx.exception.details}
+            )
+
+    def test_dimension_can_be_derived_from_the_path_root(self):
+        item = self.service._normalize_payload(
+            self.payload(dimension="", path="PLNT > 产线 > 产量")
+        )
+        self.assertEqual("plnt", item["dimension"])
+
+    def test_create_keeps_a_brand_new_code_verbatim(self):
+        self.service._db.fetch_rows = MagicMock(return_value=[])
+        self.service._db.next_pk = MagicMock(side_effect=[1, 2])
+        self.service._db.execute_statements = MagicMock()
+
+        created = self.service._create_indicator(self.payload(dimension="zz9"))
+
+        self.assertEqual("zz9", created["dimension"])
+        statements = self.service._db.execute_statements.call_args.args[0]
+        self.assertEqual(2, len(statements))
+        self.assertEqual("zz9", statements[0].compile().params["dimension_code"])
+
+    def test_update_keeps_a_brand_new_code(self):
+        self.service._db.fetch_rows = MagicMock(
+            side_effect=[
+                [{"indicator_pk": 1}],
+                [
+                    {
+                        "indicator_pk": 1,
+                        "indicator_id": "IND_NEW",
+                        "indicator_name": "跨行业新指标",
+                        "meaning_desc": "",
+                        "result_table_name": "",
+                        "result_field_name": "",
+                        "dimension_code": "zz9",
+                        "caliber_desc": "",
+                        "path_desc": "ZZ9 > 根节点 > 叶子",
+                        "status_code": "enabled",
+                        "registrar_name": "tester",
+                        "registered_date": "2026-07-01",
+                    }
+                ],
+            ]
+        )
+        self.service._db.next_pk = MagicMock(return_value=2)
+        self.service._db.execute_statements = MagicMock()
+
+        _, updated = self.service._update_indicator(
+            "IND_NEW", self.payload(dimension="zz9", name="改名后的指标")
+        )
+
+        self.assertEqual("改名后的指标", updated["name"])
+        self.assertEqual("zz9", updated["dimension"])
+        statements = self.service._db.execute_statements.call_args.args[0]
+        self.assertEqual("zz9", statements[0].compile().params["dimension_code"])
 
 
 class IndicatorDimensionApiTests(unittest.TestCase):

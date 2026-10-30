@@ -681,7 +681,7 @@ Base Path: `/api/indicators`
 `GET /api/indicators`
 
 - `keyword`：模糊匹配 `id`、`name`、`meaning`、`caliber`、`path`、`registrar`
-- `dimension`：维度码，大小写不敏感（例如 `cus` / `emp` / `ord` / `ful` / `due` / `con` / `org`；零售 Demo 为 `prd` / `mem` / `ord` / `str` / `inv` / `mkt` / `ful` / `svc`）。取值不限于固定清单，任何真实维度码都可过滤，未知码不会再被归一成空串
+- `dimension`：维度码，大小写不敏感。取值完全由数据决定 —— 系统不内置任何合法业务维度清单，任何符合存储格式的码（`^[A-Za-z][A-Za-z0-9_]{0,15}$`）都可直接筛选；格式非法的值不命中任何行（不会回退成「未标注」桶）
 - `status`：`enabled` / `disabled`
 
 `sourceAssetId` 与 `resultFieldId` 是稳定的机器引用；`resultTableName` / `resultFieldName` 保留为展示和兼容快照。两者同时存在时，服务会校验字段属于来源资产；只提交 `resultFieldId` 时会 deterministic 推导来源资产。历史指标无法唯一精确匹配时这些 ID 可以为 `null`，不会按名称猜测。`aggregation` 只接受 `SUM`、`COUNT`、`COUNT_DISTINCT`、`AVG`、`MIN`、`MAX`、`NONE` 或 `null`；`semanticState` 与 `status` 分离，取 `candidate`、`certified`、`deprecated`，而 `status` 继续只表示 `enabled` / `disabled`。
@@ -703,8 +703,9 @@ Base Path: `/api/indicators`
 ```
 
 - `count` 与 `GET /api/indicators` 使用完全相同的删除标记（`is_deleted = 'N'`）、权限投影与筛选条件，因此各维度 `count` 之和恒等于未筛选的指标总数。
-- `label` 解析顺序：参数字典 `INDICATOR_DIMENSION` 分类 → `p_indicator_path_config` 一级路径名称 → 模块内置存量维度映射 → 维度码本身。未登记维度直接回退为码值，不会被过滤。
+- `label` 解析顺序：参数字典 `INDICATOR_DIMENSION` 分类 → `p_indicator_path_config` 一级路径名称 → 维度码本身（大写展示）。系统不内置任何行业维度中文名，未配置名称时直接展示原始编码。
 - 数据中出现的任意新维度码都会自动出现在目录里，并在前端侧边栏与分组视图中生效，无需改代码。
+- 写入侧只校验通用格式、长度与必要性（`dimension` 必填，或可从路径首段推导）：维度是用户数据，不是程序枚举，写入不依赖该码是否已存在于 `p_indicator_path_config` 或其他任何清单。
 - `dimension_code` 为空串的指标会归入 `code = ""` 的桶（前端显示为「未标注维度」），保证计数一致。
 - 聚合只使用标准 `lower()` + `GROUP BY`，SQLite / PostgreSQL / MySQL / GaussDB(DWS) 通用。
 
