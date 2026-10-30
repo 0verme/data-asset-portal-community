@@ -9,8 +9,9 @@ Refs #467 / #465 / #444。`contractVersion=1.0`，
 Ingestion、增量 feed、RAG 服务或索引发布器。原有列表、详情、CRUD、
 `/api/search`、RBAC、Public Data Guard 和游客政策保持原义。
 
-**默认不注入 exporter，专用读取返回 503/SNAPSHOT_DISABLED。** 不新增环境变量、
-启动前提、模型/网络探测、依赖、Migration 或 Seed。路由注册不代表实例启用。
+**默认不注入 exporter。** 新资源保留现有登录门禁；匿名访问先返回 401，已认证读取返回
+503/SNAPSHOT_DISABLED。显式启用后才由独立 HTTPS workload grant 鉴权，浏览器 Cookie
+不是其 fallback。不新增环境变量、启动前提、模型/网络探测、依赖、Migration 或 Seed。路由注册不代表实例启用。
 本 PR 不提供 HTTP grant 签发端点、外部真实读取 client、Adapter、AI 查询或 UI。
 
 ## 受信签发与身份

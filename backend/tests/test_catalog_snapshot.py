@@ -380,8 +380,12 @@ class CatalogSnapshotTests(unittest.TestCase):
             response = getattr(anonymous, method)(path, headers=self._headers(lease))
             self.assertEqual(405, response.status_code)
         response = self._client(service=False).get(path, headers=self._headers(lease))
-        self.assertEqual(503, response.status_code)
-        self.assertEqual("SNAPSHOT_DISABLED", response.json()["error"]["code"])
+        self.assertEqual(401, response.status_code)
+        disabled_authenticated = self._client(service=False, authenticated=True).get(
+            path, headers=self._headers(lease),
+        )
+        self.assertEqual(503, disabled_authenticated.status_code)
+        self.assertEqual("SNAPSHOT_DISABLED", disabled_authenticated.json()["error"]["code"])
 
     def test_final_online_confirmation_cannot_use_revoked_authority(self):
         lease = self._lease()

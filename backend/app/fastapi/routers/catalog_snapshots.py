@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from ...services.catalog_snapshot_service import SnapshotError
+from ..dependencies import require_authenticated
 
 _NO_STORE = {"Cache-Control": "no-store", "Vary": "Authorization, X-DAP-Workload"}
 
@@ -13,7 +14,11 @@ _NO_STORE = {"Cache-Control": "no-store", "Vary": "Authorization, X-DAP-Workload
 def _register_catalog_snapshot_routes(app, service):
     # Deliberately separate from the ordinary browser catalog dependency:
     # a workload grant is its own narrowly scoped proof, never a browser login.
-    router = APIRouter(prefix="/api/assets/snapshots", tags=["asset-snapshots"])
+    router = APIRouter(
+        prefix="/api/assets/snapshots",
+        tags=["asset-snapshots"],
+        dependencies=[Depends(require_authenticated)] if service is None else [],
+    )
 
     def read(request, catalog_id, scope_id, snapshot_id, *, manifest=False):
         try:
