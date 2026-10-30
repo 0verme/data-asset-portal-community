@@ -418,12 +418,16 @@ export function SearchPortalPage({
                             {item.category ? ` · ${item.category}` : ""}
                           </span>
                         </span>
-                        {item.meta ? (
-                          <span className="sp-hit-meta">{item.meta}</span>
-                        ) : null}
-                        {formatMatchedField(item) ? (
-                          <span className="sp-hit-match">
-                            {formatMatchedField(item)}
+                        {item.meta || formatMatchedField(item) ? (
+                          <span className="sp-hit-facts">
+                            {item.meta ? (
+                              <span className="sp-hit-meta">{item.meta}</span>
+                            ) : null}
+                            {formatMatchedField(item) ? (
+                              <span className="sp-hit-match">
+                                {formatMatchedField(item)}
+                              </span>
+                            ) : null}
                           </span>
                         ) : null}
                         <span className="sp-hit-go">

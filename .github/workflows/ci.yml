@@ -629,6 +629,13 @@ jobs:
           VITE_API_MODE: mock
         run: npm run test:browser -- --grep "form error presenter"
 
+      - name: Portal search result layout regression (Chromium and WebKit)
+        if: matrix.node == '22'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/portal-search-layout-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- e2e/portal-search.spec.ts --workers=2
+
       - name: System management form feedback browser regression (Chromium and WebKit)
         if: matrix.node == '22'
         env:
