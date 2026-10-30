@@ -125,14 +125,18 @@ class ReportService(AuditActorMixin):
     def _allowed_status_values(self):
         try:
             return {value for value in common_code_service.get_item_values("SYSTEM_STATUS") if value}
-        except (CommonCodeCategoryNotFoundError, CommonCodeDataSourceError):
+        except CommonCodeDataSourceError as error:
+            raise ReportDataSourceError("业务码表数据源不可用，请稍后重试") from error
+        except CommonCodeCategoryNotFoundError:
             return set(DEFAULT_STATUS)
 
     def _allowed_code_values(self, category, fallback):
         try:
             values = {value for value in common_code_service.get_item_values(category) if value}
             return values or set(fallback)
-        except (CommonCodeCategoryNotFoundError, CommonCodeDataSourceError):
+        except CommonCodeDataSourceError as error:
+            raise ReportDataSourceError("业务码表数据源不可用，请稍后重试") from error
+        except CommonCodeCategoryNotFoundError:
             return set(fallback)
 
     def _domain_names(self):
