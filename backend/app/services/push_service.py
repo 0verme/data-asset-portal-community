@@ -202,7 +202,9 @@ class PushService(AuditActorMixin):
     def _get_allowed_values(self, category_code, fallback):
         try:
             return {value for value in common_code_service.get_item_values(category_code) if value}
-        except (CommonCodeCategoryNotFoundError, CommonCodeDataSourceError):
+        except CommonCodeDataSourceError as error:
+            raise PushDataSourceError("业务码表数据源不可用，请稍后重试") from error
+        except CommonCodeCategoryNotFoundError:
             return set(fallback)
 
     def _normalize_job_fields(self, fields, details):
