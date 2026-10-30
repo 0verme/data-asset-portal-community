@@ -244,7 +244,7 @@ export function ReportEditor({
       setRefLoading(true);
       setRefError("");
       try {
-        const [tables, indicators, domainItems, reportItems, remoteOptions] = await Promise.all([getAssetTables(), getIndicatorList(), getDomains(), getReportList(), import.meta.env?.VITE_API_MODE === "remote" ? getReportOptions() : Promise.resolve(undefined)]);
+        const [tables, indicators, domainItems, reportItems, remoteOptions] = await Promise.all([getAssetTables(), getIndicatorList(), getDomains(), getReportList(), import.meta.env?.['VITE_API_MODE'] === "remote" ? getReportOptions() : Promise.resolve(undefined)]);
         if (cancelled) return;
         setTableCandidates((Array.isArray(tables) ? tables : []).map(normalizeTableCandidate));
         setIndicatorCandidates((Array.isArray(indicators) ? indicators : []).map(normalizeIndicatorCandidate));
