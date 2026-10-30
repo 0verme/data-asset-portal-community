@@ -81,7 +81,7 @@ def _register_report_routes(app: FastAPI, service: Any) -> None:
         )
 
     @router.get("/options", response_model=None)
-    def get_report_options(current_service: Any = Depends(get_service)):
+    def get_report_options(\n        _context: RequestContext = Depends(require_permission("report:write")),\n        current_service: Any = Depends(get_service),\n    ):
         try:
             options = current_service.get_report_options()
         except ReportDataSourceError as error:
