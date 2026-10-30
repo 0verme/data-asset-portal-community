@@ -862,8 +862,7 @@ Base Path: `/api/upstreams`
 }
 ```
 
-`host`、`db`、`schema` 只在受 `upstream:read` 保护的
-`GET /api/upstreams/systems/{systemId}/admin-detail` 响应中返回。
+公开目录遵循 `PUBLIC_CATALOG_PROFILE`：`internal` 可返回安全的 `host`、`db`、`schema` 与人员展示字段，`strict` 删除这些字段，凭据始终隐藏。受 `upstream:read` 保护的 `GET /api/upstreams/systems/{systemId}/admin-detail` 用于维护详情；分页不改变这些投影或权限。
 
 ### 7.2 新增 / 编辑字段契约
 
@@ -905,7 +904,15 @@ Base Path: `/api/upstreams`
 
 - `keyword`：按 `PUBLIC_CATALOG_PROFILE` 过滤后模糊匹配。`internal` 匹配 `id`、`abbr`、`name`、负责人、部门、说明、卸数时间，以及 host、db、schema 等连接定位元数据；`strict` 排除连接定位元数据与人员身份字段，因此这些字段不会命中。可搜索字段始终是可展示字段的子集。
 - `status`：如 `enabled` / `disabled`
-- `dbType`：如 `Oracle`、`MySQL`、`PostgreSQL`
+- `dbType`：如 `Oracle`、`MySQL`、`PostgreSQL`，兼容目录 code 与展示 value。
+- `page`、`pageSize` / 旧 `limit`：只有显式传入任一分页参数才启用数据库分页；缺省页码为 1、页大小为 20，使用现有配置上限。`pageSize` 存在时优先于 `limit`；非法输入按既有规范归一化，非正整数钳制为 1。
+- `sortKey`：分页时支持 `abbr`（默认）、`id`、`name`、`dbType`、`status`；`sortDirection` 为 `asc`（默认）/ `desc`，随后以唯一系统标识和主键确定同值次序。
+
+**显式分页响应：** `items,total,page,pageSize,facets,options,stats`。所有筛选先在数据库执行，COUNT 与取页使用同一筛选规则；越界页返回空 `items` 并保留实际 `total`。分页搜索将 `%` / `_` 等当作字面字符，与页面原有包含匹配一致。
+
+- `facets.status/dbType/dept` 是未软删系统的**全局**计数，不随当前页或当前筛选缩小；字典有无两种情况下都与行的展示值保持一致。
+- `options.dbTypes/depts` 是全局完整候选；`stats.systemCount` 为全局系统数。
+- **兼容性：** 不传分页参数仍返回原 `{items}` 全量响应，保持原关键词通配符行为，不能把分页页内数据用于完整选项消费者。单系统详情仍按唯一标识直接查询。
 
 ### 7.5 状态变更
 
@@ -936,8 +943,7 @@ Base Path: `/api/push`
 }
 ```
 
-`host`、`port`、`account`、`auth` 和联系人字段只在受
-`push:read` 保护的 `admin-detail` 响应中使用。
+`host`、`port`、`account`、`auth` 等连接维护配置只在受 `push:read` 保护的 `admin-detail` 中使用。公开响应的安全联系人展示字段遵循公共目录投影（`strict` 隐藏）；分页不扩大公开字段集合。
 
 #### PushJob（公开目录响应）
 
@@ -953,8 +959,7 @@ Base Path: `/api/push`
 }
 ```
 
-来源/目标路径、分隔符、编码、行数和字段清单属于受保护的维护详情，
-不随匿名目录响应返回。
+来源/目标路径、分隔符、编码和行数等维护配置只由受保护详情返回。无分页旧接口与单系统公共详情继续提供原有作业及安全字段元数据；显式分页系统列表不加载整批作业/字段对象，详情不依赖列表当前页。
 
 > **推送频率（`freqType` + `freq`）**：`freqType` 为类型，`freq` 为对应参数（落库分别对应 `freq_type` / `freq_desc`）。
 >
@@ -978,11 +983,21 @@ Base Path: `/api/push`
 
 `GET /api/push/systems`
 
-- `keyword`：模糊匹配系统标识和名称
+- `keyword`：匹配系统标识、名称、缩写、部门、说明，或作业标识、名称、来源/目标文件名、说明；作业匹配采用 EXISTS，不因多个作业命中放大系统 COUNT。分页搜索按字面包含匹配，无分页旧通配符行为不变。
 - `status`：如 `enabled` / `disabled`
 - `protocol`：如 `SFTP` / `FTP` / `HTTP`
 - `dept`：按归属部门过滤
-- 匿名返回项只包含目录级协议和作业摘要，不包含下游服务器地址、端口、账号、认证方式、内部路径或联系人；维护详情仍受 `push:read` 保护。
+- `importanceLevel`：`important` / `normal`，在数据库筛选后 COUNT/取页。
+- `page`、`pageSize` / 旧 `limit`：与上游模块相同的显式分页、默认值、上限、归一化和优先级。
+- `sortKey`：分页支持 `importanceLevel`（默认重要优先）、`id`、`name`、`protocol`、`dept`；`sortDirection` 为 `asc`（默认）/ `desc`，同值以 `system_code,system_id` 稳定排序。
+
+**显式分页响应：** `items,total,page,pageSize,facets,options,stats`。`items` 中每个系统包含真实未软删作业数 `jobCount`，`jobs` 为空数组（不是零作业），页面必须使用 `jobCount`；不加载完整 jobs/fields。COUNT 与取页的筛选集合相同，越界保留 `total` 并返回空页。
+
+- `facets.status/protocol/dept/importanceLevel` 是全局未软删系统计数，不从当前页推导。
+- `options.systemIds/protocols/depts/freqTypes` 保持完整候选；系统标识仅查询窄列，频率来自未软删系统的未软删作业聚合。
+- `stats.systemCount/jobCount` 为全局系统/作业数，不以可能陈旧的存储计数或当前页作业推算。
+- 不传分页参数仍返回原全量 `{items}`，包含原有嵌套 jobs/fields；单系统公共详情直接按唯一 code 查询并加载该系统的完整公共作业/字段，管理员详情及所有写权限不变。
+- 匿名列表不包含下游服务器地址、端口、账号、认证方式或内部路径，其他业务字段仍按公共目录投影。无需 Schema、Seed 或 Migration 变更。
 
 ## 9. 系统管理模块 `system`
 

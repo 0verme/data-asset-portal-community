@@ -86,26 +86,32 @@ def _register_push_routes(app: FastAPI, service: Any) -> None:
         page: str | None = Query(default=None),
         page_size: str | None = Query(default=None, alias="pageSize"),
         limit: str | None = Query(default=None),
+        importance_level: str | None = Query(default=None, alias="importanceLevel"),
+        sort_key: str | None = Query(default=None, alias="sortKey"),
+        sort_direction: str | None = Query(default=None, alias="sortDirection"),
         current_service: Any = Depends(get_service),
         context: Any = Depends(get_request_context),
         authorization: Any = Depends(get_authorization_service),
     ):
         try:
-            items = current_service.get_push_systems(
-                status=status,
-                protocol=protocol,
-                dept=dept,
-                keyword=keyword,
-                page=page,
-                page_size=page_size or limit,
-            )
+            if page is not None or page_size is not None or limit is not None:
+                result = current_service.get_push_system_page(
+                    status=status, protocol=protocol, dept=dept, keyword=keyword,
+                    page=page, page_size=page_size if page_size is not None else limit,
+                    importance_level=importance_level, sort_key=sort_key, sort_direction=sort_direction,
+                )
+            else:
+                filters = {"importance_level": importance_level} if importance_level else {}
+                result = {"items": current_service.get_push_systems(
+                    status=status, protocol=protocol, dept=dept, keyword=keyword,
+                    page=None, page_size=None, **filters,
+                )}
         except Exception as error:
             if isinstance(error, (PushDataSourceError, PushSystemNotFoundError)):
                 return _push_error_response(error)
             raise
         profile = profile_for_request(context, authorization)
-        items = [redact_public_push_system(item, profile=profile) for item in items]
-        return JSONResponse(content={"items": items})
+        return JSONResponse(content=redact_public_push_system(result, profile=profile))
 
     @router.get("/systems/{system_id}/admin-detail", response_model=None)
     def get_system_admin_detail(

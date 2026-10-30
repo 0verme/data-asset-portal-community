@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   deletePushJob,
   deletePushSystem,
   getPushSystemAdminDetail,
-  getPushSystems,
+  getPushSystem,
+  getPushSystemPage,
+  type PushSystemPage,
   savePushJob,
   savePushSystem,
   type PublicPushSystem,
@@ -45,7 +47,6 @@ import {
 } from '../components/push/pushConstants.ts';
 import { UPSTREAM_DEPT_OPTIONS } from '../data/commonCodes.ts';
 import { normalizeDictOptions, type DictOption } from '../utils/optionUtils.ts';
-import { comparePushSystemImportance } from '../utils/push.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
 import type { PushFilter, PushRoute } from '../routing/types.ts';
 
@@ -88,6 +89,16 @@ export interface UsePushModuleProps {
 
 export interface UsePushModuleResult {
   pushSystems: PublicPushSystem[];
+  pushPage: number;
+  pushPageSize: number;
+  pushTotal: number;
+  pushSystemCount: number;
+  pushSort: string;
+  setPushPage: React.Dispatch<React.SetStateAction<number>>;
+  setPushPageSize: React.Dispatch<React.SetStateAction<number>>;
+  setPushSort: React.Dispatch<React.SetStateAction<string>>;
+  pushDetailLoading: boolean;
+  loadPushDetail: () => Promise<void>;
   pushProtocolOptions: DictOption[];
   pushAuthOptions: DictOption[];
   pushDelimiterOptions: DictOption[];
@@ -145,29 +156,53 @@ export function usePushModule({
   const [pushDeptOptions, setPushDeptOptions] = useState<DictOption[]>([]);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushError, setPushError] = useState('');
+  const [pushListError, setPushListError] = useState('');
+  const [detailReloadVersion, setDetailReloadVersion] = useState(0);
   const [pushLoaded, setPushLoaded] = useState(false);
   const [pushView, setPushView] = useState(initialView);
   const [pushFilter, setPushFilter] = useState(initialFilter);
   const [recentSystems, setRecentSystems] = useState<string[]>([]);
   const [pushAdminDetail, setPushAdminDetail] = useState<PushSystemItem | null>(null);
   const [pushAdminDetailLoading, setPushAdminDetailLoading] = useState(false);
+  const [pushPage, setPushPage] = useState(1);
+  const [pushPageSize, setPushPageSize] = useState(20);
+  const [pushSort, setPushSort] = useState('importanceLevel:asc');
+  const [pushPageData, setPushPageData] = useState<PushSystemPage | null>(null);
+  const [publicDetail, setPublicDetail] = useState<PublicPushSystem | null>(null);
+  const [pushDetailLoading, setPushDetailLoading] = useState(false);
+  const [recentSystemRecords, setRecentSystemRecords] = useState<PublicPushSystem[]>([]);
+  const listSequence = useRef(0);
+  const detailSequence = useRef(0);
+  const listKey = JSON.stringify([query, pushFilter.status, pushFilter.protocol, pushFilter.dept,
+    pushFilter.importanceLevel, pushPage, pushPageSize, pushSort, canEdit]);
+  const latestListKey = useRef(listKey);
+  latestListKey.current = listKey;
 
   const loadPushData = useCallback(async (): Promise<void> => {
+    const sequence = ++listSequence.current;
     setPushLoading(true);
-    setPushError('');
+    setPushListError('');
     try {
-      const systems = await getPushSystems();
-      const allJobs = systems.flatMap((system) => system.jobs || []);
-      const protocolItems = fallbackOptions([...DEFAULT_PROTOCOL_OPTIONS, ...systems.map((system) => system.protocol)]);
+      const result = await getPushSystemPage({
+        keyword: query, status: pushFilter.status || undefined, protocol: pushFilter.protocol || undefined,
+        dept: pushFilter.dept || undefined, importanceLevel: pushFilter.importanceLevel || undefined,
+        page: pushPage, pageSize: pushPageSize, sortKey: pushSort.split(':')[0], sortDirection: pushSort.split(':')[1],
+      });
+      if (sequence !== listSequence.current || latestListKey.current !== listKey) return;
+      if (result.pageSize !== pushPageSize) setPushPageSize(result.pageSize);
+      const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
+      if (pushPage > lastPage) { setPushPage(lastPage); return; }
+      const protocolItems = fallbackOptions([...DEFAULT_PROTOCOL_OPTIONS, ...result.options.protocols]);
       const authItems = fallbackOptions(DEFAULT_AUTH_OPTIONS);
       const delimiterItems = fallbackOptions(DEFAULT_DELIMITER_OPTIONS);
       const encodingItems = fallbackOptions(DEFAULT_ENCODING_OPTIONS);
       const freqTypeItems = fallbackOptions([
         ...DEFAULT_FREQ_TYPE_OPTIONS,
-        ...allJobs.map((job) => job.freqType),
+        ...result.options.freqTypes,
       ]);
-      const deptItems = fallbackOptions([...UPSTREAM_DEPT_OPTIONS, ...systems.map((system) => system.dept)]);
-      setPushSystems(systems);
+      const deptItems = fallbackOptions([...UPSTREAM_DEPT_OPTIONS, ...result.options.depts]);
+      setPushPageData(result);
+      setPushSystems(result.items);
       setPushProtocolOptions(protocolItems);
       setPushAuthOptions(authItems);
       setPushDelimiterOptions(delimiterItems);
@@ -176,21 +211,58 @@ export function usePushModule({
       setPushDeptOptions(deptItems);
       setPushLoaded(true);
     } catch (error: unknown) {
-      setPushError(getErrorMessage(error, '下游推送系统加载失败。'));
+      if (sequence === listSequence.current && latestListKey.current === listKey) {
+        setPushListError(getErrorMessage(error, '下游推送系统加载失败。'));
+      }
     } finally {
-      setPushLoading(false);
+      if (sequence === listSequence.current && latestListKey.current === listKey) setPushLoading(false);
     }
+  }, [query, pushFilter.status, pushFilter.protocol, pushFilter.dept, pushFilter.importanceLevel,
+    pushPage, pushPageSize, pushSort, listKey]);
+  const pushReloadRef = useRef(loadPushData);
+  pushReloadRef.current = loadPushData;
+  const retryPushData = useCallback(async (): Promise<void> => {
+    await pushReloadRef.current();
+    setDetailReloadVersion((version) => version + 1);
   }, []);
 
   useEffect(() => {
-    if (active && !pushLoaded && !pushLoading) {
-      loadPushData();
-    }
-  }, [active, pushLoaded, pushLoading, loadPushData]);
+    if (active) void loadPushData();
+    return () => { listSequence.current += 1; };
+  }, [active, loadPushData]);
 
   useEffect(() => {
-    setPushLoaded(false);
-  }, [canEdit]);
+    setPushPage(1);
+  }, [query, pushFilter.status, pushFilter.protocol, pushFilter.dept, pushFilter.importanceLevel, pushPageSize, pushSort]);
+
+  const loadPushDetail = useCallback(async (): Promise<void> => {
+    const sequence = ++detailSequence.current;
+    setPublicDetail(null);
+    if (!active || !pushRoute.sys || pushRoute.page === 'systems') {
+      setPushDetailLoading(false);
+      return;
+    }
+    setPushDetailLoading(true);
+    setPushError('');
+    try {
+      const detail = await getPushSystem(pushRoute.sys);
+      if (sequence !== detailSequence.current) return;
+      setPublicDetail(detail);
+      setRecentSystemRecords((previous) => [
+        { ...detail, jobCount: detail.jobs.length, jobs: [] },
+        ...previous.filter((item) => item.id !== detail.id),
+      ].slice(0, 6));
+    } catch (error: unknown) {
+      if (sequence === detailSequence.current) setPushError(getErrorMessage(error, '下游推送系统详情加载失败。'));
+    } finally {
+      if (sequence === detailSequence.current) setPushDetailLoading(false);
+    }
+  }, [active, pushRoute.sys, pushRoute.page]);
+
+  useEffect(() => {
+    void loadPushDetail();
+    return () => { detailSequence.current += 1; };
+  }, [loadPushDetail, canEdit, detailReloadVersion]);
 
   useEffect(() => {
     setPushView(initialView || DEFAULT_PUSH_VIEW);
@@ -209,6 +281,7 @@ export function usePushModule({
       return;
     }
     let alive = true;
+    setPushAdminDetail(null);
     setPushAdminDetailLoading(true);
     setPushError('');
     if (pushRoute.sys) {
@@ -220,7 +293,7 @@ export function usePushModule({
     return () => {
       alive = false;
     };
-  }, [active, canEdit, pushRoute.page, pushRoute.sys]);
+  }, [active, canEdit, pushRoute.page, pushRoute.sys, detailReloadVersion]);
 
   const rememberSystem = (systemId: string): void => {
     setRecentSystems((prev) => [systemId, ...prev.filter((item) => item !== systemId)].slice(0, 6));
@@ -286,7 +359,7 @@ export function usePushModule({
     await runProtectedMutation(
       async () => {
         await savePushSystem(system, oldId);
-        await loadPushData();
+        await pushReloadRef.current();
         clearModuleNavigationState('push');
         setPushRoute(getPushSystemDetailRoute(system.id) as PushRoute);
         rememberSystem(system.id);
@@ -301,11 +374,8 @@ export function usePushModule({
     await runProtectedMutation(
       async () => {
         await deletePushSystem(systemId);
-        await loadPushData();
+        await pushReloadRef.current();
         clearModuleNavigationState('push');
-        setQuery('');
-        setPushView(DEFAULT_PUSH_VIEW);
-        setPushFilter(DEFAULT_PUSH_FILTER);
         setPushRoute(getModuleListRoute('push') as PushRoute);
         scrollMainToTop();
       },
@@ -319,7 +389,7 @@ export function usePushModule({
     await runProtectedMutation(
       async () => {
         await savePushJob(pushRoute.sys!, job, oldId);
-        await loadPushData();
+        await pushReloadRef.current();
         clearModuleNavigationState('push');
         setPushRoute(getPushInterfaceDetailRoute(pushRoute.sys!, job.id) as PushRoute);
         scrollMainToTop();
@@ -334,7 +404,7 @@ export function usePushModule({
     await runProtectedMutation(
       async () => {
         await deletePushJob(pushRoute.sys!, jobId);
-        await loadPushData();
+        await pushReloadRef.current();
         setPushRoute(getPushSystemDetailRoute(pushRoute.sys!) as PushRoute);
         scrollMainToTop();
       },
@@ -343,84 +413,47 @@ export function usePushModule({
     );
   };
 
-  const filteredPushSystems = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return pushSystems
-      .filter((system) => {
-        if (pushFilter.status && system.status !== pushFilter.status) return false;
-        if (pushFilter.protocol && system.protocol !== pushFilter.protocol) return false;
-        if (pushFilter.dept && system.dept !== pushFilter.dept) return false;
-        if (pushFilter.importanceLevel && system.importanceLevel !== pushFilter.importanceLevel) return false;
-        if (!normalizedQuery) return true;
-        return (
-          system.name.toLowerCase().includes(normalizedQuery) ||
-          system.id.toLowerCase().includes(normalizedQuery) ||
-          system.jobs.some(
-            (job) =>
-              job.cn.toLowerCase().includes(normalizedQuery) ||
-              job.sourceFileName.toLowerCase().includes(normalizedQuery) ||
-              job.targetFileName.toLowerCase().includes(normalizedQuery),
-          )
-        );
-      })
-      .sort(comparePushSystemImportance);
-  }, [pushSystems, query, pushFilter]);
-
-  const pushFacets = useMemo(
-    () =>
-      pushSystems.reduce<PushFacets>(
-        (acc, system) => {
-          if (system.status) {
-            acc.status[system.status] = (acc.status[system.status] || 0) + 1;
-          }
-          if (system.protocol) {
-            acc.protocol[system.protocol] = (acc.protocol[system.protocol] || 0) + 1;
-          }
-          if (system.dept) {
-            acc.dept[system.dept] = (acc.dept[system.dept] || 0) + 1;
-          }
-          if (system.importanceLevel) {
-            acc.importanceLevel[system.importanceLevel] =
-              (acc.importanceLevel[system.importanceLevel] || 0) + 1;
-          }
-          return acc;
-        },
-        { status: {}, protocol: {}, dept: {}, importanceLevel: {} },
-      ),
-    [pushSystems],
-  );
-
-  const currentSystem = useMemo(
-    () => (pushRoute.sys ? pushSystems.find((system) => system.id === pushRoute.sys) || null : null),
-    [pushSystems, pushRoute.sys],
-  );
+  // Page membership must not determine detail access or global statistics.
+  const filteredPushSystems = pushSystems;
+  const pushFacets: PushFacets = pushPageData?.facets ?? { status: {}, protocol: {}, dept: {}, importanceLevel: {} };
+  const currentSystem = publicDetail?.id === pushRoute.sys ? publicDetail : null;
 
   const currentJob = useMemo(() => {
     if (!currentSystem || !pushRoute.job) return null;
     return currentSystem.jobs.find((job) => job.id === pushRoute.job) || null;
   }, [currentSystem, pushRoute.job]);
 
-  const pushIds = useMemo(() => pushSystems.map((system) => system.id), [pushSystems]);
+  const pushIds = pushPageData?.options.systemIds ?? [];
   const pushDepts = useMemo(() => pushDeptOptions.filter((item) => item.value), [pushDeptOptions]);
   const recentPushSystems = useMemo(
     () =>
       recentSystems
-        .map((id) => pushSystems.find((system) => system.id === id))
+        .map((id) => recentSystemRecords.find((system) => system.id === id))
         .filter((item): item is PublicPushSystem => Boolean(item)),
-    [recentSystems, pushSystems],
+    [recentSystems, recentSystemRecords],
   );
 
   return {
     pushSystems,
+    pushPage,
+    pushPageSize,
+    pushTotal: pushPageData?.total ?? 0,
+    pushSystemCount: pushPageData?.stats.systemCount ?? 0,
+    pushSort,
+    setPushPage,
+    setPushPageSize,
+    setPushSort,
+    pushDetailLoading,
+    loadPushDetail,
     pushProtocolOptions,
     pushAuthOptions,
     pushDelimiterOptions,
     pushEncodingOptions,
     pushFreqTypeOptions,
     pushLoading,
-    pushError,
+    pushError: ['systems', 'sysNew'].includes(pushRoute.page) ? pushListError : pushError,
     pushLoaded,
-    loadPushData,
+    loadPushData: retryPushData,
     pushView,
     setPushView,
     pushFilter,

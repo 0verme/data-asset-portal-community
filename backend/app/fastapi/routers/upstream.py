@@ -77,26 +77,29 @@ def _register_upstream_routes(app: FastAPI, service: Any) -> None:
         page: str | None = Query(default=None),
         page_size: str | None = Query(default=None, alias="pageSize"),
         limit: str | None = Query(default=None),
+        sort_key: str | None = Query(default=None, alias="sortKey"),
+        sort_direction: str | None = Query(default=None, alias="sortDirection"),
         current_service: Any = Depends(get_service),
         context: RequestContext = Depends(get_request_context),
         authorization: Any = Depends(get_authorization_service),
     ):
         try:
             profile = profile_for_request(context, authorization)
-            items = current_service.get_systems(
-                keyword=keyword,
-                status=status,
-                db_type=db_type,
-                page=page,
-                page_size=page_size or limit,
-                profile=profile,
-            )
+            if page is not None or page_size is not None or limit is not None:
+                result = current_service.get_system_page(
+                    keyword=keyword, status=status, db_type=db_type, page=page,
+                    page_size=page_size if page_size is not None else limit,
+                    profile=profile, sort_key=sort_key, sort_direction=sort_direction,
+                )
+            else:
+                result = {"items": current_service.get_systems(
+                    keyword=keyword, status=status, db_type=db_type,
+                    page=None, page_size=None, profile=profile,
+                )}
         except UpstreamDataSourceError as error:
             return _upstream_error_response(error)
-        items = project_for_request(items, profile)
-        return JSONResponse(
-            content=validate_contract({"items": items}, UpstreamListResponse)
-        )
+        result = project_for_request(result, profile)
+        return JSONResponse(content=validate_contract(result, UpstreamListResponse))
 
     @router.get("/systems/{system_id}", response_model=None)
     def get_system_detail(
