@@ -51,7 +51,7 @@ export function buildReportOptionSets(
   remoteOptions?: RemoteReportOptions,
 ): ReportOptionSets {
   const reportTypeValues = reportValues(reports, "type");
-  const isMock = import.meta.env?.VITE_API_MODE === "mock";
+  const isMock = import.meta.env?.['VITE_API_MODE'] === "mock";
   if (!isMock) {
     return {
       reportTypes: optionsFromValues([...(remoteOptions?.reportTypes || []), ...reportTypeValues]),
