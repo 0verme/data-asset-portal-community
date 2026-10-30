@@ -30,6 +30,7 @@ import {
   type FormFieldErrors,
 } from "../ui/index.ts";
 import { validateRootForm } from "./rootFormErrors.ts";
+import { parseRootImport, type ParsedRoot } from "./rootImportParser.ts";
 
 interface CatBadgeProps {
   cat: string;
@@ -331,10 +332,6 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
   );
 }
 
-interface ParsedRoot extends SanitizedWordRoot {
-  _line: number;
-}
-
 type ImportAction = "error" | "new" | "same" | "update";
 
 interface ImportPreviewItem {
@@ -347,44 +344,6 @@ interface ImportPreviewItem {
 interface ImportPreview {
   items: ImportPreviewItem[];
   error?: string | undefined;
-}
-
-function parseDelimited(text: string): { items: ParsedRoot[]; error?: string | undefined } {
-  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(Boolean);
-  if (!lines.length) return { items: [], error: "内容为空" };
-
-  const delimiter = lines[0]?.includes("\t") ? "\t" : lines[0]?.includes("|") ? "|" : ",";
-  const rows = lines.map((line) => line.split(delimiter).map((cell) => cell.trim().replace(/^"(.*)"$/, "$1")));
-  const firstRow = (rows[0] || []).map((cell) => cell.toLowerCase());
-  const hasHeader = firstRow.some((cell) => /abbr|root|词根|缩写/.test(cell));
-  const startIndex = hasHeader ? 1 : 0;
-  const header = hasHeader ? firstRow : [];
-  const indexMap: Record<"abbr" | "en" | "cn" | "cat" | "desc", number> = {
-    abbr: 0,
-    en: 1,
-    cn: 2,
-    cat: 3,
-    desc: 4,
-  };
-
-  header.forEach((cell, index) => {
-    if (/abbr|root|词根|缩写/.test(cell)) indexMap.abbr = index;
-    if (/en|english|全称/.test(cell)) indexMap.en = index;
-    if (/cn|中文|名称/.test(cell)) indexMap.cn = index;
-    if (/cat|分类|类别/.test(cell)) indexMap.cat = index;
-    if (/desc|说明|备注|示例/.test(cell)) indexMap.desc = index;
-  });
-
-  return {
-    items: rows.slice(startIndex).map((row, idx) => ({
-      abbr: row[indexMap.abbr] || "",
-      en: row[indexMap.en] || "",
-      cn: row[indexMap.cn] || "",
-      cat: row[indexMap.cat] || "",
-      desc: row[indexMap.desc] || "",
-      _line: idx + startIndex + 1,
-    })),
-  };
 }
 
 export interface RootImportProps {
@@ -402,7 +361,7 @@ export function RootImport({ roots, categories, onBack, onCommit }: RootImportPr
   const existingMap = React.useMemo(() => new Map(roots.map((item) => [item.abbr, item])), [roots]);
 
   const analyze = React.useCallback((value: string) => {
-    const parsed = parseDelimited(value);
+    const parsed = parseRootImport(value);
     if (parsed.error) {
       setPreview({ error: parsed.error, items: [] });
       return;
