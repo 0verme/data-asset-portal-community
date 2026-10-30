@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { getUpstreamBusinessOptions } from "../../api/businessOptions.ts";
 import type { PublicUpstreamSystem } from "../../api/upstream.ts";
 import type { MockUpstreamSystem } from "../../data/upstreamSystems.ts";
 import type { UseUpstreamModuleResult } from "../../hooks/useUpstreamModule.ts";
@@ -21,6 +22,7 @@ import {
   type OptionInputItem,
 } from "../../utils/optionUtils.ts";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
+import { useBusinessOptionCatalog } from "../../hooks/useBusinessOptionCatalog.ts";
 import {
   confirmDeleteAction,
   EmptyState,
@@ -119,6 +121,44 @@ export function UpstreamView({
     currentUpstreamEdit,
   } = upstream;
   const normalizedStatusOptions = normalizeDictOptions(statusOptions);
+  const needsBusinessOptions = ["new", "edit"].includes(upRoute.page);
+  const optionLoad = useBusinessOptionCatalog(
+    needsBusinessOptions,
+    getUpstreamBusinessOptions,
+    upRoute.page,
+    "上游业务候选加载失败。",
+  );
+  const configuredOptions = optionLoad.catalog;
+  const editorDbTypeOptions = configuredOptions?.categories["UPSTREAM_DB_TYPE"] ?? upstreamDbTypes;
+  const editorDeptOptions = configuredOptions?.categories["UPSTREAM_DEPT"] ?? upstreamDeptOptions;
+
+  if (needsBusinessOptions && (optionLoad.loading || (!configuredOptions && !optionLoad.error))) {
+    return <LoadingState title="加载上游业务候选" desc="正在读取已配置的数据库类型和业务部门。" />;
+  }
+  if (needsBusinessOptions && optionLoad.error) {
+    return (
+      <ErrorState
+        title="上游业务候选加载失败"
+        desc={optionLoad.error}
+        onRetry={() => { void optionLoad.reload(); }}
+      />
+    );
+  }
+  if (
+    upRoute.page === "new" && configuredOptions &&
+    configuredOptions.categories["UPSTREAM_DB_TYPE"]?.length === 0
+  ) {
+    const categoryState = configuredOptions.missingCategories.includes("UPSTREAM_DB_TYPE")
+      ? "数据库类型分类不存在或未启用"
+      : "数据库类型分类没有启用项";
+    return (
+      <ErrorState
+        title="上游数据库类型尚未配置"
+        desc={`${categoryState}；请先维护真实码值后重试，不会回退到 Demo 候选。`}
+        onRetry={() => { void optionLoad.reload(); }}
+      />
+    );
+  }
 
   if (upstreamLoading && !upstreamLoaded && !['detail', 'edit'].includes(upRoute.page)) {
     return (
@@ -244,8 +284,8 @@ export function UpstreamView({
     return (
       <UpstreamEditor
         mode="new"
-        dbTypeOptions={upstreamDbTypes}
-        deptOptions={upstreamDeptOptions}
+        dbTypeOptions={editorDbTypeOptions}
+        deptOptions={editorDeptOptions}
         statusOptions={normalizedStatusOptions}
         onSave={handleSaveUpstream}
         onCancel={upBack}
@@ -288,8 +328,8 @@ export function UpstreamView({
       <UpstreamEditor
         mode="edit"
         initial={currentUpstreamEdit}
-        dbTypeOptions={upstreamDbTypes}
-        deptOptions={upstreamDeptOptions}
+        dbTypeOptions={editorDbTypeOptions}
+        deptOptions={editorDeptOptions}
         statusOptions={normalizedStatusOptions}
         onSave={handleSaveUpstream}
         onCancel={() => upGoDetail(currentUpstreamEdit.id)}

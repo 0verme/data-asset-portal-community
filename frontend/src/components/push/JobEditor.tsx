@@ -117,9 +117,10 @@ export function JobEditor({
   const normalizedDelimiterOptions = normalizeDictOptions(delimiterOptions);
   const normalizedEncodingOptions = normalizeDictOptions(encodingOptions);
   const normalizedFreqTypeOptions = normalizeDictOptions(freqTypeOptions);
-  const defaultFreqType = normalizedFreqTypeOptions[0]?.value || DEFAULT_FREQ_TYPE_OPTIONS[0]?.value || "T+1";
-  const defaultDelimiter = normalizedDelimiterOptions[0]?.value || DEFAULT_DELIMITER_OPTIONS[0]?.value || "|";
-  const defaultEncoding = normalizedEncodingOptions[0]?.value || DEFAULT_ENCODING_OPTIONS[0]?.value || "UTF-8";
+  const remoteApi = import.meta.env?.["VITE_API_MODE"] === "remote";
+  const defaultFreqType = normalizedFreqTypeOptions[0]?.value || (remoteApi ? "" : DEFAULT_FREQ_TYPE_OPTIONS[0]?.value || "T+1");
+  const defaultDelimiter = normalizedDelimiterOptions[0]?.value || (remoteApi ? "" : DEFAULT_DELIMITER_OPTIONS[0]?.value || "|");
+  const defaultEncoding = normalizedEncodingOptions[0]?.value || (remoteApi ? "" : DEFAULT_ENCODING_OPTIONS[0]?.value || "UTF-8");
   const defaults = { delimiter: defaultDelimiter, encoding: defaultEncoding, freqType: defaultFreqType };
   const [form, setForm] = React.useState<JobFormData>(() => createForm(initial, defaults));
   const [fields, setFields] = React.useState<PushField[]>(() => (
