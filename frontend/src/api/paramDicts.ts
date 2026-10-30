@@ -14,6 +14,7 @@
 // limitations under the License.
 
 import { requestRemote } from './http.ts';
+import { parseCollectionResponse } from './collectionResponse.ts';
 import {
   PARAM_DICT_CATEGORIES,
   PARAM_DICT_ITEMS,
@@ -50,12 +51,8 @@ function writeItems(items: ParamDictItem[]): void {
   mockItems = clone(items);
 }
 
-function normalizeCollection<T>(payload: unknown, fallbackKey?: string): T[] {
-  if (Array.isArray(payload)) return payload as T[];
-  const record = payload as Record<string, unknown> | null | undefined;
-  if (record && Array.isArray(record['items'])) return record['items'] as T[];
-  if (record && fallbackKey && Array.isArray(record[fallbackKey])) return record[fallbackKey] as T[];
-  return [];
+export function normalizeCollection<T>(payload: unknown): T[] {
+  return parseCollectionResponse<T>(payload, '参数字典列表');
 }
 
 function normalizeDetail<T>(payload: unknown): T {
@@ -101,7 +98,7 @@ export interface ParamDictPayload {
 export async function getParamDictCategories(): Promise<ParamDictCategoryWithCount[]> {
   if (API_MODE === 'remote') {
     const payload = await requestRemote('/system/param-dicts/categories');
-    return normalizeCollection<ParamDictCategoryWithCount>(payload, 'categories');
+    return normalizeCollection<ParamDictCategoryWithCount>(payload);
   }
 
   const categories = readCategories();
@@ -117,7 +114,7 @@ export async function getParamDicts(categoryCode?: string): Promise<ParamDictIte
     const payload = await requestRemote('/system/param-dicts', {
       params: categoryCode ? { categoryCode } : {},
     });
-    return normalizeCollection<ParamDictItemWithCategoryName>(payload, 'items');
+    return normalizeCollection<ParamDictItemWithCategoryName>(payload);
   }
 
   const categories = readCategories();

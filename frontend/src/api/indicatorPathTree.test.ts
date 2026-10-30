@@ -57,7 +57,7 @@ test("Mock and seeded Remote indicator paths share the canonical Demo tree", asy
   }
 });
 
-test("indicator path normalizer preserves compatible array envelopes", () => {
+test("indicator path normalizer accepts only documented arrays and items envelopes", () => {
   const item = { label: "root", value: "ROOT", dimensionCode: "base" };
   assert.deepEqual(normalizeIndicatorPathTree([item]), [
     { ...item, dimension: "base" },
@@ -65,7 +65,8 @@ test("indicator path normalizer preserves compatible array envelopes", () => {
   assert.deepEqual(normalizeIndicatorPathTree({ items: [item] }), [
     { ...item, dimension: "base" },
   ]);
-  assert.deepEqual(normalizeIndicatorPathTree({ data: [item] }), [
-    { ...item, dimension: "base" },
-  ]);
+  assert.deepEqual(normalizeIndicatorPathTree([]), []);
+  assert.deepEqual(normalizeIndicatorPathTree({ items: [] }), []);
+  assert.throws(() => normalizeIndicatorPathTree({ data: [item] }));
+  assert.throws(() => normalizeIndicatorPathTree({ items: null }));
 });

@@ -14,6 +14,7 @@
 // limitations under the License.
 
 import { requestRemote } from './http.ts';
+import { parseCollectionResponse } from './collectionResponse.ts';
 import { LONG_REQUEST_TIMEOUT } from '../config/request.ts';
 import { PUSH_SYSTEMS, type PushSystemItem, type PushJobItem, type PushJobField } from '../data/pushSystems.ts';
 
@@ -45,12 +46,8 @@ function writeStore(systems: PushSystemItem[]): void {
   mockSystems = clone(systems);
 }
 
-function normalizeCollection<T>(payload: unknown, fallbackKey?: string): T[] {
-  if (Array.isArray(payload)) return payload as T[];
-  const record = payload as Record<string, unknown> | null | undefined;
-  if (record && Array.isArray(record['items'])) return record['items'] as T[];
-  if (record && fallbackKey && Array.isArray(record[fallbackKey])) return record[fallbackKey] as T[];
-  return [];
+export function normalizeCollection<T>(payload: unknown): T[] {
+  return parseCollectionResponse<T>(payload, '推送系统列表');
 }
 
 function normalizeDetail<T>(payload: unknown): T {
@@ -137,7 +134,7 @@ export async function getPushSystems(params: PushQueryParams = {}): Promise<Publ
       params,
       timeout: LONG_REQUEST_TIMEOUT,
     });
-    return normalizeCollection<PublicPushSystem>(payload, 'systems');
+    return normalizeCollection<PublicPushSystem>(payload);
   }
   return readStore().map((system, index) => toPublicSystem({ ...system, systemId: index + 1 }));
 }

@@ -239,6 +239,7 @@ export function AssetReferenceSelector({
     indicators: IndicatorReference[];
   }>({ tables: [], indicators: [] });
   const [error, setError] = React.useState("");
+  const [retryRevision, setRetryRevision] = React.useState(0);
   const externalOptions = Array.isArray(tableOptions) || Array.isArray(indicatorOptions);
 
   React.useEffect(() => {
@@ -250,12 +251,13 @@ export function AssetReferenceSelector({
           tables: uniqueBy(tables.map(normalizeTable), "tableName"),
           indicators: uniqueBy(indicators.map(normalizeIndicator), "indicatorId"),
         });
+        setError("");
       }
     }).catch((reason: unknown) => {
       if (!cancelled) setError(reason instanceof Error ? reason.message : "关联资产加载失败。 ");
     });
     return () => { cancelled = true; };
-  }, [externalOptions]);
+  }, [externalOptions, retryRevision]);
 
   const tableCandidates = uniqueBy((Array.isArray(tableOptions) ? tableOptions : options.tables).map(normalizeTable), "tableName");
   const indicatorCandidates = uniqueBy((Array.isArray(indicatorOptions) ? indicatorOptions : options.indicators).map(normalizeIndicator), "indicatorId");
@@ -271,7 +273,12 @@ export function AssetReferenceSelector({
 
   return (
     <>
-      {error && <div className="match-hint" style={{ color: "var(--danger)" }}>{error}</div>}
+      {error && (
+        <div className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
+          {error}{" "}
+          <button className="btn" type="button" onClick={() => setRetryRevision((revision) => revision + 1)}>重试加载关联资产</button>
+        </div>
+      )}
       {loading && <div className="match-hint">正在加载可关联资产…</div>}
       <div className="report-picker-grid">
         <Picker title="关联表" items={tables} candidates={tableCandidates} itemKey="tableName" labelKey="tableName" subtitle={(item) => [item.layer, item.domain, item.tableCn].filter(Boolean).join(" / ")} onChange={onTablesChange} disabled={locked} emptyText="未找到关联表" />

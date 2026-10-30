@@ -20,6 +20,7 @@ import { normalizeAssetDataTypes, normalizeFieldList } from '../constants/dataTy
 import { getAssetLayerValue, normalizeAssetLayerFields } from '../utils/assetFilters.ts';
 import { generateDDLByDialect, getDDLDialectLabel, normalizeDDLResponse, type DDLNormalizedResult } from '../utils/ddlDialect.ts';
 import { requestRemote } from './http.ts';
+import { parseCollectionResponse } from './collectionResponse.ts';
 
 const API_MODE = (
   typeof import.meta !== 'undefined' && import.meta.env?.['VITE_API_MODE']
@@ -310,13 +311,8 @@ async function getMockLayers({ domain }: { domain?: string | undefined } = {}): 
   }));
 }
 
-function normalizeCollection<T = Record<string, unknown>>(payload: unknown, fallbackKey?: string): T[] {
-  if (Array.isArray(payload)) return payload as T[];
-  const record = payload as Record<string, unknown> | null | undefined;
-  if (record && Array.isArray(record['items'])) return record['items'] as T[];
-  if (record && Array.isArray(record['data'])) return record['data'] as T[];
-  if (record && fallbackKey && Array.isArray(record[fallbackKey])) return record[fallbackKey] as T[];
-  return [];
+export function normalizeCollection<T = Record<string, unknown>>(payload: unknown): T[] {
+  return parseCollectionResponse<T>(payload, '数据资产列表');
 }
 
 function normalizeDetail(payload: unknown): Record<string, unknown> {
@@ -333,7 +329,7 @@ function normalizeDetail(payload: unknown): Record<string, unknown> {
 export async function getAssetTables(params: AssetQueryParams = {}): Promise<AssetTableItem[]> {
   if (API_MODE === 'remote') {
     const payload = await requestRemote('/assets/tables', { params });
-    return normalizeTableCollection(normalizeCollection(payload, 'tables'));
+    return normalizeTableCollection(normalizeCollection(payload));
   }
 
   return getMockAssetTables(params);
@@ -346,6 +342,36 @@ export interface AssetTablePageResult {
   total: number;
 }
 
+function isPositiveSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+export function normalizeAssetTablePage(
+  payload: unknown,
+  requestedPage: number,
+  requestedPageSize: number,
+): AssetTablePageResult {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('资产分页接口返回格式无效');
+  }
+  const record = payload as Record<string, unknown>;
+  const rawTotal = record['total'];
+  if (typeof rawTotal !== 'number' || !Number.isSafeInteger(rawTotal) || rawTotal < 0) {
+    throw new Error('资产分页接口返回格式无效：total 必须是非负整数');
+  }
+  const page = record['page'] === undefined ? requestedPage : record['page'];
+  const pageSize = record['pageSize'] === undefined ? requestedPageSize : record['pageSize'];
+  if (!isPositiveSafeInteger(page) || !isPositiveSafeInteger(pageSize)) {
+    throw new Error('资产分页接口返回格式无效：page 和 pageSize 必须是正整数');
+  }
+  return {
+    items: normalizeTableCollection(normalizeCollection<unknown>(payload)),
+    page,
+    pageSize,
+    total: rawTotal,
+  };
+}
+
 export async function getAssetTablePage(params: AssetQueryParams = {}): Promise<AssetTablePageResult> {
   const page = Math.max(1, Number(params.page) || 1);
   const pageSize = Math.max(1, Number(params.pageSize) || 20);
@@ -353,12 +379,7 @@ export async function getAssetTablePage(params: AssetQueryParams = {}): Promise<
     const payload = await requestRemote<Record<string, unknown>>('/assets/tables', {
       params: { ...params, page, pageSize, summary: true },
     });
-    return {
-      items: normalizeTableCollection(normalizeCollection(payload, 'tables')),
-      page: Number(payload?.['page']) || page,
-      pageSize: Number(payload?.['pageSize']) || pageSize,
-      total: Number(payload?.['total']) || 0,
-    };
+    return normalizeAssetTablePage(payload, page, pageSize);
   }
 
   const keyword = String(params.keyword || '').trim().toLowerCase();
@@ -415,7 +436,7 @@ export async function getAssetDetail(identity: AssetIdentity | string): Promise<
 export async function getAssetFields(identity: AssetIdentity | string): Promise<TableField[]> {
   if (API_MODE === 'remote') {
     const payload = await requestRemote(assetResourcePath(identity, '/fields'));
-    return normalizeFieldList(normalizeCollection(payload, 'fields')) as TableField[];
+    return normalizeFieldList(normalizeCollection(payload)) as TableField[];
   }
 
   return getMockAssetFields(identity);
@@ -435,7 +456,7 @@ export async function getAssetDDL(identity: AssetIdentity | string): Promise<DDL
 export async function getDomains(params: { layer?: string | undefined } = {}): Promise<DomainCountItem[]> {
   if (API_MODE === 'remote') {
     const payload = await requestRemote('/assets/domains', { params });
-    return normalizeCollection(payload, 'domains') as DomainCountItem[];
+    return normalizeCollection<DomainCountItem>(payload);
   }
 
   return getMockDomains(params);
@@ -444,7 +465,7 @@ export async function getDomains(params: { layer?: string | undefined } = {}): P
 export async function getLayers(params: { domain?: string | undefined } = {}): Promise<LayerCountItem[]> {
   if (API_MODE === 'remote') {
     const payload = await requestRemote('/assets/layers', { params });
-    return normalizeCollection(payload, 'layers') as LayerCountItem[];
+    return normalizeCollection<LayerCountItem>(payload);
   }
 
   return getMockLayers(params);

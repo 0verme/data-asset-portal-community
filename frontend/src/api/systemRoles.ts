@@ -14,6 +14,7 @@
 // limitations under the License.
 
 import { requestRemote } from './http.ts';
+import { parseCollectionResponse } from './collectionResponse.ts';
 import {
   isPublicPermission,
   MOCK_ROLE_PERMISSIONS,
@@ -68,11 +69,8 @@ function clone<T>(value: T): T {
   }
 }
 
-function normalizeCollection<T>(payload: unknown): T[] {
-  if (Array.isArray(payload)) return payload as T[];
-  const record = payload as Record<string, unknown> | null | undefined;
-  if (record && Array.isArray(record['items'])) return record['items'] as T[];
-  return [];
+export function normalizeCollection<T>(payload: unknown): T[] {
+  return parseCollectionResponse<T>(payload, '系统角色/权限列表');
 }
 
 function normalizeDetail<T>(payload: unknown): T {

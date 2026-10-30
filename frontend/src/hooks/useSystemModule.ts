@@ -164,6 +164,7 @@ export function useSystemModule({
   const [items, setItems] = React.useState<ParamDictItemWithCategoryName[]>([]);
   const [menus, setMenus] = React.useState<MenuItem[]>([]);
   const [selectedCategoryCode, setSelectedCategoryCode] = React.useState('');
+  const selectedCategoryCodeRef = React.useRef('');
 
   const [userModal, setUserModal] = React.useState<SystemModalState<MockSystemUser>>({
     open: false,
@@ -205,6 +206,7 @@ export function useSystemModule({
     setMenuErrors((current) => clearFormFieldErrorEntry(current, field));
   }, []);
   const itemsRequestSeq = React.useRef(0);
+  const itemsLoadingCategoryRef = React.useRef('');
   const loadedItemsCategoryRef = React.useRef('');
   const pageRequestSeq = React.useRef(0);
   const loadedPagesRef = React.useRef(new Set<string>());
@@ -226,26 +228,35 @@ export function useSystemModule({
     setMenus(await getMenus());
   }, []);
 
-  const loadCategories = React.useCallback(async (): Promise<void> => {
+  const loadCategories = React.useCallback(async (): Promise<string> => {
     const nextCategories = await getParamDictCategories();
     setCategories(nextCategories);
-    setSelectedCategoryCode((current) => {
-      if (current && nextCategories.some((item) => item.code === current)) return current;
-      return nextCategories[0]?.code || '';
-    });
+    const currentCategoryCode = selectedCategoryCodeRef.current;
+    const nextSelectedCategoryCode = currentCategoryCode && nextCategories.some((item) => item.code === currentCategoryCode)
+      ? currentCategoryCode
+      : nextCategories[0]?.code || '';
+    selectedCategoryCodeRef.current = nextSelectedCategoryCode;
+    setSelectedCategoryCode(nextSelectedCategoryCode);
+    return nextSelectedCategoryCode;
   }, []);
 
   const loadItems = React.useCallback(async (categoryCode: string): Promise<void> => {
     const requestSeq = ++itemsRequestSeq.current;
     if (!categoryCode) {
       setItems([]);
+      itemsLoadingCategoryRef.current = '';
       loadedItemsCategoryRef.current = '';
       return;
     }
-    const nextItems = await getParamDicts(categoryCode);
-    if (requestSeq !== itemsRequestSeq.current) return;
-    setItems(nextItems);
-    loadedItemsCategoryRef.current = categoryCode;
+    itemsLoadingCategoryRef.current = categoryCode;
+    try {
+      const nextItems = await getParamDicts(categoryCode);
+      if (requestSeq !== itemsRequestSeq.current) return;
+      setItems(nextItems);
+      loadedItemsCategoryRef.current = categoryCode;
+    } finally {
+      if (requestSeq === itemsRequestSeq.current) itemsLoadingCategoryRef.current = '';
+    }
   }, []);
 
   const reloadCurrentItems = React.useCallback(async (): Promise<void> => {
@@ -264,7 +275,8 @@ export function useSystemModule({
       if (currentPage === "menus") {
         await loadMenus();
       } else if (currentPage === "param-dicts") {
-        await loadCategories();
+        const categoryCode = await loadCategories();
+        await loadItems(categoryCode);
       } else if (currentPage !== 'roles') {
         await loadUsers();
       }
@@ -278,7 +290,11 @@ export function useSystemModule({
     } finally {
       if (requestSeq === pageRequestSeq.current) setLoading(false);
     }
-  }, [currentPage, loadCategories, loadMenus, loadUsers]);
+  }, [currentPage, loadCategories, loadItems, loadMenus, loadUsers]);
+
+  React.useEffect(() => {
+    selectedCategoryCodeRef.current = selectedCategoryCode;
+  }, [selectedCategoryCode]);
 
   React.useEffect(() => {
     if (currentPage && loadedPagesRef.current.has(currentPage)) {
@@ -295,8 +311,11 @@ export function useSystemModule({
   React.useEffect(() => {
     if (currentPage !== "param-dicts" || !selectedCategoryCode) return;
     if (loadedItemsCategoryRef.current === selectedCategoryCode) return;
+    if (itemsLoadingCategoryRef.current === selectedCategoryCode) return;
     loadItems(selectedCategoryCode).catch((nextError: unknown) => {
-      setError(getErrorMessage(nextError, '加载参数字典失败。'));
+      if (selectedCategoryCodeRef.current === selectedCategoryCode) {
+        setError(getErrorMessage(nextError, '加载参数字典失败。'));
+      }
     });
   }, [currentPage, loadItems, selectedCategoryCode]);
 
