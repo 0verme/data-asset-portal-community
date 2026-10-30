@@ -274,11 +274,11 @@ class ReportService(AuditActorMixin):
             details.append({"field": "name", "message": "name is required"})
         if not report_type:
             details.append({"field": "type", "message": "type is required"})
-        elif report_type not in self._allowed_code_values(REPORT_TYPE_CATEGORY, DEFAULT_REPORT_TYPES) | self._legacy_values("report_type"):
+        elif report_type not in self._allowed_code_values(REPORT_TYPE_CATEGORY, set()) | self._legacy_values("report_type"):
             details.append({"field": "type", "message": f"type is not allowed: {report_type}"})
         if domain and domain not in self._domain_names() | self._legacy_values("domain_name"):
             details.append({"field": "domain", "message": f"domain does not exist: {domain}"})
-        if stat_period not in self._allowed_code_values(REPORT_PERIOD_CATEGORY, DEFAULT_REPORT_PERIODS) | self._legacy_values("freq_code"):
+        if stat_period not in self._allowed_code_values(REPORT_PERIOD_CATEGORY, set()) | self._legacy_values("freq_code"):
             details.append({"field": "statPeriod", "message": f"statPeriod is not allowed: {stat_period}"})
         if not date_caliber:
             details.append({"field": "statCaliber", "message": "statCaliber is required"})
