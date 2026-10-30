@@ -100,3 +100,27 @@ test("long recommendation chips wrap within their available width", async () => 
   assert.match(styles, /overflow-wrap: anywhere/);
   assert.match(styles, /word-break: break-word/);
 });
+
+test("search result rows size from content instead of the Kumo control box", async () => {
+  const [source, styles] = await Promise.all([
+    readFile(searchPagePath, "utf8"),
+    readFile(searchStylesPath, "utf8"),
+  ]);
+
+  // Kumo Button ships h-9 (36px) + w-max/shrink-0; list rows must release that box.
+  const hitBlock = styles.match(/\.sp-hit \{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(hitBlock, /height: auto/);
+  assert.match(hitBlock, /width: 100%/);
+  assert.match(hitBlock, /border-radius: 0/);
+  assert.doesNotMatch(hitBlock, /height: 36px/);
+  assert.match(styles, /\.sp-result-loading \{[^}]*max-width: 1200px/);
+  assert.match(styles, /\.sp-results \{[^}]*max-width: 1200px/);
+  assert.match(styles, /\.sp-hit-facts \{[\s\S]*?flex: 0 1 auto[\s\S]*?max-width: 56%/);
+  assert.match(styles, /@media \(max-width: 860px\)[\s\S]*?\.sp-hit \{[\s\S]*?grid-template-columns/);
+
+  // Metadata and matched fields travel together so they cannot crowd the arrow.
+  assert.match(
+    source,
+    /<span className="sp-hit-facts">[\s\S]*?sp-hit-meta[\s\S]*?sp-hit-match[\s\S]*?<\/span>/,
+  );
+});

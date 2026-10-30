@@ -176,6 +176,76 @@ test("search result rows remain within desktop-to-phone viewport bounds", async 
   }
 });
 
+test("search result rows expand to their content without overlapping across viewports", async ({ page }, testInfo: TestInfo) => {
+  await openPortal(page, `/?q=${encodeURIComponent("门店")}`);
+  await expect(page.locator(".sp-hit-title").first()).toBeVisible();
+
+  const groupLabels = await page.locator(".sp-group-title").allTextContents();
+  expect(groupLabels).toEqual(expect.arrayContaining(["资产", "系统", "字段"]));
+
+  const minimumResultsWidth = new Map([
+    [1440, 1180],
+    [1280, 1180],
+    [1024, 900],
+    [768, 700],
+    [375, 320],
+  ]);
+
+  for (const width of [1440, 1280, 1024, 768, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.locator(".sp-hit").first()).toBeVisible();
+
+    const metrics = await page.evaluate(() => {
+      const results = document.querySelector(".sp-results");
+      const rows = Array.from(document.querySelectorAll(".sp-hit")).map((hit) => {
+        const hitRect = hit.getBoundingClientRect();
+        const parts = Array.from(
+          hit.querySelectorAll(".sp-hit-main, .sp-hit-meta, .sp-hit-match, .sp-hit-go"),
+        ).map((el) => el.getBoundingClientRect());
+        return {
+          top: hitRect.top + window.scrollY,
+          bottom: hitRect.bottom + window.scrollY,
+          left: hitRect.left,
+          right: hitRect.right,
+          height: hitRect.height,
+          contentBottom: Math.max(...parts.map((p) => p.bottom + window.scrollY)),
+          contentRight: Math.max(...parts.map((p) => p.right)),
+        };
+      });
+      return {
+        viewport: window.innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        resultsWidth: results ? results.getBoundingClientRect().width : 0,
+        rows,
+      };
+    });
+
+    expect(metrics.rows.length).toBeGreaterThan(0);
+    expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewport);
+    expect(metrics.resultsWidth).toBeGreaterThanOrEqual(minimumResultsWidth.get(width) ?? 0);
+
+    for (const row of metrics.rows) {
+      expect(row.height).toBeGreaterThanOrEqual(60);
+      expect(row.left).toBeGreaterThanOrEqual(0);
+      expect(row.right).toBeLessThanOrEqual(metrics.viewport);
+      // Fixed Kumo control heights clip multi-line content into the next row.
+      expect(row.contentBottom).toBeLessThanOrEqual(row.bottom + 0.5);
+      expect(row.contentRight).toBeLessThanOrEqual(row.right + 0.5);
+    }
+
+    for (let index = 0; index < metrics.rows.length - 1; index += 1) {
+      expect(metrics.rows[index]!.contentBottom).toBeLessThanOrEqual(metrics.rows[index + 1]!.top + 0.5);
+    }
+
+    if (width === 1440 || width === 375) {
+      await page.screenshot({
+        path: testInfo.outputPath(`portal-search-layout-${width}.png`),
+        fullPage: false,
+      });
+    }
+  }
+});
+
 test("portal search remains within light/dark and desktop-to-phone viewport bounds", async ({ page }, testInfo: TestInfo) => {
   await openPortal(page);
   const html = page.locator("html");
