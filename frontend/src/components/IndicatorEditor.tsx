@@ -4,7 +4,6 @@ import { getAssetFields, getAssetTables, type AssetTableField, type AssetTableIt
 import { getIndicatorPathTree } from "../api/indicator.ts";
 import {
   getIndicatorDimensionFromPath,
-  INDICATOR_DIMENSION_CODE_MAP,
   normalizeIndicatorDimension,
   type IndicatorPathOptionNode,
 } from "../data/indicatorPathOptions.ts";
@@ -125,7 +124,9 @@ function createFormState(initial: MockIndicatorItem | null | undefined): Indicat
     resultTableName: String(next.resultTableName || "").trim(),
     resultFieldName: String(next.resultFieldName || "").trim(),
     dimension: getIndicatorDimensionFromPath(normalizedPath) || normalizedDimension,
-    path: normalizedPath || (normalizedDimension ? INDICATOR_DIMENSION_CODE_MAP[normalizedDimension] || "" : ""),
+    // A path root may default to the upper-cased dimension code; the operator
+    // can always pick a different root from the configured path tree.
+    path: normalizedPath || (normalizedDimension ? normalizedDimension.toUpperCase() : ""),
   };
 }
 

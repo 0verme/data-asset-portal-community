@@ -20,11 +20,17 @@ import re
 from copy import deepcopy
 from datetime import date
 
-from sqlalchemy import and_, func, insert, or_, select, update
+from sqlalchemy import and_, false, func, insert, or_, select, update
 
 from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
-from ..db.tables import asset_field, asset_table, indicator_change_log, indicator_item
+from ..db.tables import (
+    asset_field,
+    asset_table,
+    indicator_change_log,
+    indicator_item,
+    indicator_path_config,
+)
 from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
@@ -49,20 +55,13 @@ from .semantic_validator import (
 
 INDICATOR_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-ALLOWED_DIMENSIONS = {
-    "cus", "con", "due", "emp", "org",  # finance/corporate dimensions
-    "prd", "mem", "ord", "str", "inv", "mkt", "ful", "svc",  # retail demo dimensions
-}
-DIMENSION_CODE_MAP = {
-    "CUS": "cus", "CON": "con", "DUE": "due", "EMP": "emp", "ORG": "org",
-    "PRD": "prd", "MEM": "mem", "ORD": "ord", "STR": "str",
-    "INV": "inv", "MKT": "mkt", "FUL": "ful", "SVC": "svc",
-}
-DIMENSION_LABEL_MAP = {
-    "客户维度": "cus", "合同维度": "con", "借据维度": "due", "员工维度": "emp", "机构维度": "org",
-    "商品维度": "prd", "会员维度": "mem", "交易维度": "ord", "门店维度": "str",
-    "库存维度": "inv", "营销维度": "mkt", "履约维度": "ful", "售后维度": "svc",
-}
+# p_indicator_item.dimension_code is String(16): a dimension is any short
+# alphanumeric code the data happens to use. This module ships no built-in list
+# of "valid" business dimensions — industry wording never becomes a constraint.
+DIMENSION_CODE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,15}$")
+# Optional parameter-dictionary category used to name dimension codes without a
+# code change. It is read through the existing common-code service.
+DIMENSION_CODE_CATEGORY = "INDICATOR_DIMENSION"
 DEFAULT_STATUS = {"enabled", "disabled"}
 
 
@@ -149,16 +148,96 @@ class IndicatorService(AuditActorMixin):
             return set(DEFAULT_STATUS)
 
     def _normalize_dimension(self, value):
+        """Normalize a dimension code: trim, validate the generic format, lower.
+
+        A dimension is user data, not a program enum. Any well-formed code is
+        kept verbatim (lowercased); only empty or malformed values collapse to
+        an empty string. Whether a dimension already "exists" is answered by
+        the data itself, never by a built-in list.
+        """
         raw = str(value or "").strip()
-        if not raw:
+        if not DIMENSION_CODE_RE.fullmatch(raw):
             return ""
-        lower = raw.lower()
-        if lower in ALLOWED_DIMENSIONS:
-            return lower
-        upper = raw.upper()
-        if upper in DIMENSION_CODE_MAP:
-            return DIMENSION_CODE_MAP[upper]
-        return DIMENSION_LABEL_MAP.get(raw, "")
+        return raw.lower()
+
+    def _dimension_code_items(self):
+        """Optional label overrides from the parameter dictionary (code table).
+
+        Label overrides are best-effort: a missing category, an unreachable
+        database or an unconfigured profile only costs the override, never the
+        directory itself.
+        """
+        try:
+            return common_code_service.get_items(DIMENSION_CODE_CATEGORY)
+        except (
+            CommonCodeCategoryNotFoundError,
+            CommonCodeDataSourceError,
+            RuntimeError,
+        ):
+            return []
+
+    def _dimension_labels(self):
+        """Resolve dimension labels from configuration instead of code.
+
+        Priority: parameter dictionary > indicator path configuration roots.
+        A code with no configured name is displayed as its own code, so the
+        portal never assumes an industry-specific wording for user data.
+        """
+        labels = {}
+        try:
+            rows = self._fetch_rows(
+                select(
+                    indicator_path_config.c.dimension_code,
+                    indicator_path_config.c.path_name,
+                )
+                .where(indicator_path_config.c.path_level == 1)
+                .order_by(indicator_path_config.c.sort_order, indicator_path_config.c.id)
+            )
+        except IndicatorDataSourceError:
+            rows = []
+        for row in rows:
+            code = self._normalize_dimension(row.get("dimension_code"))
+            name = str(row.get("path_name") or "").strip()
+            if code and name:
+                labels[code] = name
+        for item in self._dimension_code_items():
+            code = self._normalize_dimension(item.get("code") or item.get("value"))
+            name = str(item.get("name") or "").strip()
+            if code and name:
+                labels[code] = name
+        return labels
+
+    def get_dimension_catalog(self):
+        """Return the dimension directory discovered from the indicator data.
+
+        The aggregation reuses ``_build_indicator_filters()`` so the catalogue
+        shares the same soft-delete, status and keyword footing as the list API;
+        the sum of ``count`` therefore always equals the unfiltered list total.
+        """
+        statement = (
+            select(
+                func.lower(indicator_item.c.dimension_code).label("dimension_code"),
+                func.count().label("indicator_count"),
+            )
+            .where(*self._build_indicator_filters())
+            .group_by(func.lower(indicator_item.c.dimension_code))
+        )
+        # Count first so a data-source failure keeps the standard error envelope
+        # instead of being masked by best-effort label enrichment.
+        rows = self._fetch_rows(statement)
+        labels = self._dimension_labels()
+        items = []
+        for row in rows:
+            code = self._normalize_dimension(row.get("dimension_code"))
+            items.append(
+                {
+                    "code": code,
+                    "label": labels.get(code) or code.upper(),
+                    "count": int(row.get("indicator_count") or 0),
+                }
+            )
+        items.sort(key=lambda item: (-item["count"], item["code"]))
+        return items
 
     def _derive_dimension_from_path(self, path):
         raw = str(path or "").strip()
@@ -178,7 +257,8 @@ class IndicatorService(AuditActorMixin):
         result_table_name = str(payload.get("resultTableName") or payload.get("result_table_name") or "").strip()
         result_field_name = str(payload.get("resultFieldName") or payload.get("result_field_name") or "").strip()
         path = str(payload.get("path") or "").strip()
-        dimension = self._normalize_dimension(payload.get("dimension")) or self._derive_dimension_from_path(path)
+        raw_dimension = str(payload.get("dimension") or "").strip()
+        dimension = self._normalize_dimension(raw_dimension) or self._derive_dimension_from_path(path)
         caliber = str(payload.get("caliber") or "").strip()
         status = str(payload.get("status") or "").strip()
         registrar = str(payload.get("registrar") or "").strip()
@@ -195,8 +275,22 @@ class IndicatorService(AuditActorMixin):
             details.append({"field": "id", "message": "id format is invalid"})
         if not name:
             details.append({"field": "name", "message": "name is required"})
-        if dimension not in ALLOWED_DIMENSIONS:
-            details.append({"field": "dimension", "message": f"dimension must be one of: {', '.join(sorted(ALLOWED_DIMENSIONS))}"})
+        # Dimensions are user data: the write boundary only checks that the
+        # value is a well-formed code (or derivable from the path root). No
+        # built-in list of "valid" business dimensions is consulted.
+        if raw_dimension and not self._normalize_dimension(raw_dimension):
+            details.append(
+                {
+                    "field": "dimension",
+                    "message": (
+                        "dimension must be a code matching "
+                        f"{DIMENSION_CODE_RE.pattern} "
+                        "(starts with a letter, max 16 characters)"
+                    ),
+                }
+            )
+        elif not dimension:
+            details.append({"field": "dimension", "message": "dimension is required"})
         if status not in allowed_status:
             details.append({"field": "status", "message": f"status is not allowed: {status}"})
         if not registrar:
@@ -291,7 +385,14 @@ class IndicatorService(AuditActorMixin):
     def _build_indicator_filters(self, keyword=None, dimension=None, status=None):
         clauses = [indicator_item.c.is_deleted == "N"]
         if dimension:
-            clauses.append(func.lower(indicator_item.c.dimension_code) == self._normalize_dimension(dimension))
+            code = self._normalize_dimension(dimension)
+            # A malformed filter must match nothing instead of silently
+            # collapsing onto the "unassigned" bucket.
+            clauses.append(
+                func.lower(indicator_item.c.dimension_code) == code
+                if code
+                else false()
+            )
         if status:
             clauses.append(indicator_item.c.status_code == status)
         if keyword:

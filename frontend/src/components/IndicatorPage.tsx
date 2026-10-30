@@ -1,29 +1,15 @@
-import type { MockIndicatorItem } from "../data/indicators.ts";
-import { INDICATOR_DIMENSION_OPTIONS } from "../data/indicators.ts";
+import type { IndicatorDimensionOption, MockIndicatorItem } from "../data/indicators.ts";
+import {
+  findIndicatorDimensionOption,
+  indicatorDimensionCodeLabel,
+  indicatorDimensionLabel,
+} from "../data/indicatorDimensions.ts";
 import type { IndicatorFilter } from "../routing/types.ts";
 import { formatDate, formatDateTime } from "../utils/date.ts";
 import { ActionErrorBanner, CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "./common/index.ts";
 import type { ViewMode } from "./common/ViewModeSwitcher.tsx";
 import { Highlight, Icon, initial } from "./ui.tsx";
 import { Button } from "../ui/index.ts";
-
-const DIMENSION_ORDER = ["prd", "mem", "ord", "str", "inv", "mkt", "ful", "svc"] as const;
-
-interface DimensionMeta {
-  label: string;
-  code: string;
-}
-
-const DIMENSION_META: Record<string, DimensionMeta> = {
-  prd: { label: "商品维度", code: "PRD" },
-  mem: { label: "会员维度", code: "MEM" },
-  ord: { label: "交易维度", code: "ORD" },
-  str: { label: "门店维度", code: "STR" },
-  inv: { label: "库存维度", code: "INV" },
-  mkt: { label: "营销维度", code: "MKT" },
-  ful: { label: "履约维度", code: "FUL" },
-  svc: { label: "售后维度", code: "SVC" },
-};
 
 function isPresent(value: unknown): boolean {
   return value !== undefined && value !== null && String(value).trim() !== "";
@@ -33,12 +19,21 @@ function displayValue(value: unknown): string {
   return isPresent(value) ? String(value) : "-";
 }
 
-function DimensionBadge({ dimension }: { dimension: string }) {
-  const meta = DIMENSION_META[dimension] || { label: dimension || "-", code: "--" };
+function DimensionBadge({
+  dimension,
+  dimensionOptions,
+}: {
+  dimension: string;
+  dimensionOptions: readonly IndicatorDimensionOption[];
+}) {
+  const option = findIndicatorDimensionOption(dimensionOptions, dimension);
+  // Unknown codes fall back to their own code instead of being hidden as "-".
+  const label = option?.label || indicatorDimensionLabel(dimension);
+  const code = option?.code || indicatorDimensionCodeLabel(dimension);
   return (
     <span className="tag tag-neutral">
-      <span className="indicator-dim-code">{meta.code}</span>
-      {meta.label}
+      <span className="indicator-dim-code">{code}</span>
+      {label}
     </span>
   );
 }
@@ -117,9 +112,10 @@ export interface MetricDetailDrawerProps {
   indicator: MockIndicatorItem | null;
   open: boolean;
   onClose: () => void;
+  dimensionOptions: readonly IndicatorDimensionOption[];
 }
 
-export function MetricDetailDrawer({ indicator, open, onClose }: MetricDetailDrawerProps) {
+export function MetricDetailDrawer({ indicator, open, onClose, dimensionOptions }: MetricDetailDrawerProps) {
   if (!open || !indicator) return null;
   const additionalFields = getAdditionalFields(indicator);
 
@@ -161,7 +157,7 @@ export function MetricDetailDrawer({ indicator, open, onClose }: MetricDetailDra
             <div className="indicator-detail-grid">
               <div className="indicator-detail-item">
                 <div className="indicator-detail-label">指标维度</div>
-                <div className="indicator-detail-value"><DimensionBadge dimension={indicator.dimension} /></div>
+                <div className="indicator-detail-value"><DimensionBadge dimension={indicator.dimension} dimensionOptions={dimensionOptions} /></div>
               </div>
               <div className="indicator-detail-item">
                 <div className="indicator-detail-label">状态</div>
@@ -216,9 +212,13 @@ interface IndicatorFilterChip {
   label: string;
 }
 
-function buildFilterChips(filter: IndicatorFilter, query: string): IndicatorFilterChip[] {
+function buildFilterChips(
+  filter: IndicatorFilter,
+  query: string,
+  dimensionOptions: readonly IndicatorDimensionOption[],
+): IndicatorFilterChip[] {
   const chips: IndicatorFilterChip[] = [];
-  const dimensionMeta = INDICATOR_DIMENSION_OPTIONS.find((item) => item.value === filter.dimension);
+  const dimensionMeta = findIndicatorDimensionOption(dimensionOptions, filter.dimension);
 
   if (filter.dimension && filter.dimension !== "all" && dimensionMeta) {
     chips.push({ key: "dimension", label: `维度：${dimensionMeta.label}` });
@@ -235,14 +235,15 @@ function buildFilterChips(filter: IndicatorFilter, query: string): IndicatorFilt
 interface IndicatorFilterBarProps {
   filter: IndicatorFilter;
   query: string;
+  dimensionOptions: readonly IndicatorDimensionOption[];
   onClearDimension: () => void;
   onClearStatus: () => void;
   onClearQuery: () => void;
   onReset: () => void;
 }
 
-function IndicatorFilterBar({ filter, query, onClearDimension, onClearStatus, onClearQuery, onReset }: IndicatorFilterBarProps) {
-  const chips = buildFilterChips(filter, query);
+function IndicatorFilterBar({ filter, query, dimensionOptions, onClearDimension, onClearStatus, onClearQuery, onReset }: IndicatorFilterBarProps) {
+  const chips = buildFilterChips(filter, query, dimensionOptions);
 
   if (!chips.length) return null;
 
@@ -274,6 +275,7 @@ function IndicatorFilterBar({ filter, query, onClearDimension, onClearStatus, on
 interface IndicatorTableProps {
   indicators: readonly MockIndicatorItem[];
   query: string;
+  dimensionOptions: readonly IndicatorDimensionOption[];
   pendingIds?: readonly string[] | undefined;
   canEdit: boolean;
   onView: (indicatorId: string) => void;
@@ -281,7 +283,7 @@ interface IndicatorTableProps {
   onToggleStatus: (indicator: MockIndicatorItem) => void | Promise<unknown>;
 }
 
-function IndicatorTable({ indicators, query, pendingIds = [], canEdit, onView, onEdit, onToggleStatus }: IndicatorTableProps) {
+function IndicatorTable({ indicators, query, dimensionOptions, pendingIds = [], canEdit, onView, onEdit, onToggleStatus }: IndicatorTableProps) {
   if (!indicators.length) return <EmptyState title="没有匹配的指标" desc="试着调整搜索词或筛选条件。" />;
 
   return (
@@ -316,7 +318,7 @@ function IndicatorTable({ indicators, query, pendingIds = [], canEdit, onView, o
                     <span className="indicator-meaning"><Highlight text={item.meaning} q={query} /></span>
                   </button>
                 </td>
-                <td data-label="维度"><DimensionBadge dimension={item.dimension} /></td>
+                <td data-label="维度"><DimensionBadge dimension={item.dimension} dimensionOptions={dimensionOptions} /></td>
                 <td data-label="口径 / 路径">
                   <div className="indicator-caliber"><Highlight text={displayValue(item.caliber)} q={query} /></div>
                   <div className="indicator-path mono"><Highlight text={displayValue(item.path)} q={query} /></div>
@@ -348,10 +350,11 @@ function IndicatorTable({ indicators, query, pendingIds = [], canEdit, onView, o
 interface IndicatorCardLayoutProps {
   indicators: readonly MockIndicatorItem[];
   query: string;
+  dimensionOptions: readonly IndicatorDimensionOption[];
   onView: (indicatorId: string) => void;
 }
 
-function IndicatorCardLayout({ indicators, query, onView }: IndicatorCardLayoutProps) {
+function IndicatorCardLayout({ indicators, query, dimensionOptions, onView }: IndicatorCardLayoutProps) {
   return (
     <CardGridView
       items={indicators}
@@ -359,7 +362,7 @@ function IndicatorCardLayout({ indicators, query, onView }: IndicatorCardLayoutP
       onItemClick={(item) => onView(item.id)}
       renderBadges={(item) => (
         <>
-          <DimensionBadge dimension={item.dimension} />
+          <DimensionBadge dimension={item.dimension} dimensionOptions={dimensionOptions} />
           <StatusBadge status={item.status} />
         </>
       )}
@@ -382,18 +385,21 @@ function IndicatorCardLayout({ indicators, query, onView }: IndicatorCardLayoutP
 interface IndicatorGroupLayoutProps {
   indicators: readonly MockIndicatorItem[];
   query: string;
+  dimensionOptions: readonly IndicatorDimensionOption[];
   onView: (indicatorId: string) => void;
 }
 
-function IndicatorGroupLayout({ indicators, query, onView }: IndicatorGroupLayoutProps) {
+function IndicatorGroupLayout({ indicators, query, dimensionOptions, onView }: IndicatorGroupLayoutProps) {
   return (
     <GroupView
       items={indicators}
       getKey={(item) => item.id}
       onItemClick={(item) => onView(item.id)}
       groupBy={(item) => item.dimension}
-      groupOrder={DIMENSION_ORDER}
-      renderGroupLabel={(dimension) => <DimensionBadge dimension={dimension} />}
+      groupOrder={dimensionOptions.map((item) => item.value)}
+      renderGroupLabel={(dimension) => (
+        <DimensionBadge dimension={dimension} dimensionOptions={dimensionOptions} />
+      )}
       renderGroupCount={(count) => `${count} 个指标`}
       renderCardName={(item) => <Highlight text={item.id} q={query} />}
       renderCardBody={(item) => (
@@ -414,6 +420,7 @@ export interface IndicatorPageProps {
   filter: IndicatorFilter;
   view: ViewMode;
   pendingIds: readonly string[];
+  dimensionOptions: readonly IndicatorDimensionOption[];
   canEdit?: boolean | undefined;
   detailIndicator: MockIndicatorItem | null;
   onChangeView: (view: ViewMode) => void;
@@ -437,6 +444,7 @@ export function IndicatorPage({
   filter,
   view,
   pendingIds,
+  dimensionOptions,
   canEdit = false,
   detailIndicator,
   onChangeView,
@@ -451,7 +459,8 @@ export function IndicatorPage({
   onClearQuery,
   onResetFilters,
 }: IndicatorPageProps) {
-  const activeDimension = INDICATOR_DIMENSION_OPTIONS.find((item) => item.value === filter.dimension);
+  const activeDimension = findIndicatorDimensionOption(dimensionOptions, filter.dimension);
+  const hasActiveDimension = Boolean(activeDimension && activeDimension.value !== "all");
 
   return (
     <div className="indicator-page">
@@ -459,8 +468,9 @@ export function IndicatorPage({
         <div>
           <div className="page-title"><span className="pt-code">指标</span>指标管理</div>
           <div className="page-sub">
-            共 <b>{indicators.length}</b> 个口径指标：商品、会员、交易、门店、库存、营销、履约、售后八大维度统一维护
-            {activeDimension && activeDimension.value !== "all" ? <>，当前维度 <b>{activeDimension.label}</b></> : null}
+            共 <b>{indicators.length}</b> 个口径指标
+            {dimensionOptions.length ? <>，覆盖 <b>{dimensionOptions.length}</b> 个业务维度</> : null}
+            {hasActiveDimension && activeDimension ? <>，当前维度 <b>{activeDimension.label}</b></> : null}
             {allIndicators.length !== indicators.length ? <>，总量 <b>{allIndicators.length}</b></> : null}
           </div>
         </div>
@@ -475,6 +485,7 @@ export function IndicatorPage({
       <IndicatorFilterBar
         filter={filter}
         query={query}
+        dimensionOptions={dimensionOptions}
         onClearDimension={onClearDimension}
         onClearStatus={onClearStatus}
         onClearQuery={onClearQuery}
@@ -487,6 +498,7 @@ export function IndicatorPage({
         <IndicatorTable
           indicators={indicators}
           query={query}
+          dimensionOptions={dimensionOptions}
           pendingIds={pendingIds}
           canEdit={canEdit}
           onView={onView}
@@ -496,14 +508,25 @@ export function IndicatorPage({
       ) : !indicators.length ? (
         <EmptyState title="没有匹配的指标" desc="试着调整搜索词或筛选条件。" />
       ) : view === "card" ? (
-        <IndicatorCardLayout indicators={indicators} query={query} onView={onView} />
+        <IndicatorCardLayout
+          indicators={indicators}
+          query={query}
+          dimensionOptions={dimensionOptions}
+          onView={onView}
+        />
       ) : (
-        <IndicatorGroupLayout indicators={indicators} query={query} onView={onView} />
+        <IndicatorGroupLayout
+          indicators={indicators}
+          query={query}
+          dimensionOptions={dimensionOptions}
+          onView={onView}
+        />
       )}
 
       <MetricDetailDrawer
         open={Boolean(detailIndicator)}
         indicator={detailIndicator}
+        dimensionOptions={dimensionOptions}
         onClose={onCloseDetail}
       />
     </div>

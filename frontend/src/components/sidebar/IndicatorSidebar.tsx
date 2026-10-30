@@ -1,7 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 
 import { DEFAULT_INDICATOR_ROUTE } from "../../config/defaults.ts";
-import { INDICATOR_DIMENSION_OPTIONS } from "../../data/indicators.ts";
 import type { UseIndicatorModuleResult } from "../../hooks/useIndicatorModule.ts";
 import type { IndicatorFilter, IndicatorRoute } from "../../routing/types.ts";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.tsx";
@@ -23,7 +22,7 @@ export function IndicatorSidebar({
   setIndicatorRoute,
   canEdit = false,
 }: IndicatorSidebarProps) {
-  const { indicators, indicatorFacets, indicatorCreate } = indicator;
+  const { indicators, indicatorFacets, indicatorDimensions, indicatorCreate } = indicator;
 
   return (
     <>
@@ -39,30 +38,26 @@ export function IndicatorSidebar({
             setIndicatorRoute(DEFAULT_INDICATOR_ROUTE);
           },
         }}
-        items={[
-          ...INDICATOR_DIMENSION_OPTIONS.filter(
-            (item) => item.value !== "all",
-          ).map((item) => ({
-            key: item.value,
-            active: indicatorFilter.dimension === item.value,
-            onClick: () => {
-              setIndicatorFilter((prev) => ({
-                ...prev,
-                dimension: item.value,
-              }));
-              setIndicatorRoute(DEFAULT_INDICATOR_ROUTE);
-            },
-            content: (
-              <>
-                <span className="badge-layer">{item.code}</span>
-                {item.label}
-                <span className="count">
-                  {indicatorFacets.dimension[item.value] || 0}
-                </span>
-              </>
-            ),
-          })),
-        ]}
+        items={indicatorDimensions.map((item) => ({
+          key: item.value || "__unassigned__",
+          active: indicatorFilter.dimension === item.value,
+          onClick: () => {
+            setIndicatorFilter((prev) => ({
+              ...prev,
+              dimension: item.value,
+            }));
+            setIndicatorRoute(DEFAULT_INDICATOR_ROUTE);
+          },
+          content: (
+            <>
+              <span className="badge-layer">{item.code}</span>
+              {item.label}
+              <span className="count">
+                {indicatorFacets.dimension[item.value] || 0}
+              </span>
+            </>
+          ),
+        }))}
       />
 
       <StatusFilterGroup

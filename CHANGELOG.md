@@ -11,6 +11,16 @@
 
 ## [Unreleased]
 
+### 指标维度目录（Fixed）
+
+- 指标维护页不再使用写死的 8 个零售维度：新增 `GET /api/indicators/dimensions` 从 `p_indicator_item` 真实数据自动发现维度目录，计数与列表接口共用同一套删除标记、权限投影与筛选口径，各维度计数之和恒等于指标总数。
+- 维度名称改为配置驱动：参数字典 `INDICATOR_DIMENSION` 分类 → `p_indicator_path_config` 一级路径名称 → 维度码本身（大写展示）。系统不内置任何行业维度中文名，不再把中文标签反向映射成业务码。
+- 修复未知维度码被静默过滤的问题：后端维度归一不再把未登记码折叠成空串，前端维度解析新增码值回退，徽标不再显示 `--`；`dimension_code` 为空串的指标归入「未标注维度」桶。
+- 侧边栏、分组视图、筛选标签与 `?dimension=` 深链统一改为维度目录驱动，新增业务维度无需改动前端代码。
+- 去掉维度写入的业务白名单：删除 `ALLOWED_DIMENSIONS` / `DIMENSION_CODE_MAP` / `DIMENSION_LABEL_MAP` 与「路径配置已声明才能写」的限制，`dimension_code` 只校验通用格式、长度与必要性。DAP 是跨行业通用门户，金融、零售、制造或自定义维度码均通过数据直接接入，不修改代码即可创建、查询、展示、筛选与编辑。
+- 保留原有动态维度目录、计数一致性、深链与错误包络；格式非法的 `?dimension=` 不再回退到「未标注」桶，而是不命中任何行。
+- 与本变更相关的指标数据未被清理或修改，未重新执行 Seed；SQLite / PostgreSQL / MySQL / GaussDB(DWS) 通用。
+
 ### 语义基础设施（Foundation）
 
 - 建立指标稳定资产/字段引用、最小聚合 contract 与 deterministic validation。

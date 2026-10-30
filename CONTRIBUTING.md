@@ -84,7 +84,7 @@ npm --prefix frontend run build
 # 修改 backend/
 python -m unittest discover -s backend/tests
 
-# 修改文档或 demo 公开数据
+# 修改文档或 demo 公开数据（BLOCKER / SUSPICIOUS 必须为 0，INFO 仅提示）
 python demo/validate_demo_data.py --strict
 git diff --check
 ```

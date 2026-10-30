@@ -25,6 +25,7 @@ REPO_ROOT = BACKEND.parent
 if str(REPO_ROOT / "demo") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "demo"))
 
+# pyright: reportMissingImports=false
 from safety_scan import classify, scan_file  # noqa: E402
 
 
@@ -107,9 +108,17 @@ class ClassifyBusinessTests(unittest.TestCase):
         findings = classify(text, "sample")
         self.assertNotIn("SUSPICIOUS", severities(findings))
 
-    def test_bare_bank_term_is_suspicious(self):
+    def test_internal_system_residue_is_suspicious(self):
         findings = classify("核心银行系统提供账户服务", "sample")
         self.assertIn("SUSPICIOUS", severities(findings))
+
+    def test_generic_industry_vocabulary_is_informational(self):
+        # 贷款 / 存款 / 借据 are ordinary banking words: no customer record,
+        # credential or network locator, so they are reported but never block.
+        for text in ("贷款投放指标", "存款余额口径", "借据维度"):
+            findings = classify(text, "sample")
+            self.assertIn("INFO", severities(findings), text)
+            self.assertNotIn("SUSPICIOUS", severities(findings), text)
 
 
 class ScanFileTests(unittest.TestCase):

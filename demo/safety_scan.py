@@ -6,8 +6,9 @@ Used by:
   - scripts/sync_from_pg.py     (pre-commit scan before repository output)
   - backend/scripts/db_to_init_sql.py (same)
 
-Findings are classified as SAFE / EXPECTED / SUSPICIOUS / BLOCKER so that a
-keyword hit (e.g. ``password: change_me``) is not treated as a leak.
+Findings are classified as INFO / EXPECTED / SAFE / SUSPICIOUS / BLOCKER so
+that a keyword hit (e.g. ``password: change_me``) is not treated as a leak, and
+generic industry vocabulary is reported without failing the public-data gate.
 
 This module contains no private data itself — only generic detection patterns.
 """
@@ -65,20 +66,21 @@ REAL_SECRET_VALUE = re.compile(
     re.IGNORECASE,
 )
 
-# Business-sensitive vocabulary of the original internal product. Kept narrow:
-# only confirmed residue markers from the pre-public tree.
-BUSINESS_TERMS = tuple(
-    _w
-    for _w in (
-        "核心银行",
-        "反洗钱",
-        "信贷管理",
-        "支付清算",
-        "账务系统",
-        "贷款",
-        "存款",
-        "借据",
-    )
+# Residue markers of the original internal product: system/product names that
+# only appear in a pre-public tree. A hit here is SUSPICIOUS and fails the gate.
+INTERNAL_RESIDUE_TERMS = (
+    "核心银行",
+    "反洗钱",
+    "信贷管理",
+    "支付清算",
+    "账务系统",
+)
+# Generic banking-industry vocabulary. It carries no customer record, credential
+# or network locator, so it never blocks a change: reported as INFO for review.
+INDUSTRY_TERMS = (
+    "贷款",
+    "存款",
+    "借据",
 )
 # Words that are fine to discuss (e.g. "bank" as a generic example) — used by
 # scanners to skip an otherwise-forbidden term inside an allowlisted context.
@@ -110,7 +112,7 @@ def classify(text: str, label: str) -> list[dict]:
     """Scan text and return classified findings.
 
     Returns a list of dicts: {"label", "category", "severity", "detail"}.
-    severity is one of SAFE / EXPECTED / SUSPICIOUS / BLOCKER.
+    severity is one of INFO / SAFE / EXPECTED / SUSPICIOUS / BLOCKER.
     """
     findings: list[dict] = []
 
@@ -305,38 +307,56 @@ def classify(text: str, label: str) -> list[dict]:
                 }
             )
 
-    for term in BUSINESS_TERMS:
-        if term.lower() in text.lower():
-            line_context = _line_containing(text, term)
-            if any(word in line_context for word in ALLOWLIST_TERMS):
-                findings.append(
-                    {
-                        "label": label,
-                        "category": "business",
-                        "severity": "SAFE",
-                        "detail": f"allowlisted mention of {term}",
-                    }
-                )
-            elif _is_naming_reference_row(line_context):
-                # seed corpus rows like `loan|loan|贷款|业务对象|用于 loan_no` are
-                # generic naming-reference samples, not real business records.
-                findings.append(
-                    {
-                        "label": label,
-                        "category": "business",
-                        "severity": "SAFE",
-                        "detail": f"generic naming-reference row mentioning {term}",
-                    }
-                )
-            else:
-                findings.append(
-                    {
-                        "label": label,
-                        "category": "business",
-                        "severity": "SUSPICIOUS",
-                        "detail": f"business-sensitive term: {term}",
-                    }
-                )
+    findings.extend(
+        _business_term_findings(text, label, INTERNAL_RESIDUE_TERMS, "SUSPICIOUS")
+    )
+    findings.extend(_business_term_findings(text, label, INDUSTRY_TERMS, "INFO"))
+    return findings
+
+
+def _business_term_findings(
+    text: str, label: str, terms: tuple[str, ...], severity: str
+) -> list[dict]:
+    """Classify business-vocabulary hits, keeping allowlisted contexts SAFE.
+
+    ``severity`` is what an unallowlisted hit is reported as: internal residue
+    stays SUSPICIOUS, plain industry vocabulary is informational only.
+    """
+    findings: list[dict] = []
+    lower_text = text.lower()
+    for term in terms:
+        if term.lower() not in lower_text:
+            continue
+        line_context = _line_containing(text, term)
+        if any(word in line_context for word in ALLOWLIST_TERMS):
+            findings.append(
+                {
+                    "label": label,
+                    "category": "business",
+                    "severity": "SAFE",
+                    "detail": f"allowlisted mention of {term}",
+                }
+            )
+        elif _is_naming_reference_row(line_context):
+            # seed corpus rows like `loan|loan|贷款|业务对象|用于 loan_no` are
+            # generic naming-reference samples, not real business records.
+            findings.append(
+                {
+                    "label": label,
+                    "category": "business",
+                    "severity": "SAFE",
+                    "detail": f"generic naming-reference row mentioning {term}",
+                }
+            )
+        else:
+            findings.append(
+                {
+                    "label": label,
+                    "category": "business",
+                    "severity": severity,
+                    "detail": f"business term: {term}",
+                }
+            )
     return findings
 
 

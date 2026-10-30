@@ -20,6 +20,9 @@ export interface IndicatorPathOptionNode {
   children?: IndicatorPathOptionNode[];
 }
 
+// SAFETY: demo/datasets/indicator_paths.json is generated from the demo seed and
+// follows the PathCatalogNode shape; JSON imports arrive from TypeScript as
+// `unknown`, so the narrowing happens here once instead of at every read.
 const PATH_CATALOG = demoIndicatorPathTree as unknown as readonly PathCatalogNode[];
 
 function orderedChildren(node: PathCatalogNode): readonly PathCatalogNode[] {
@@ -48,25 +51,12 @@ const ROOTS = [...PATH_CATALOG].sort(
   (left, right) => left.sortOrder - right.sortOrder,
 );
 
-export const INDICATOR_DIMENSION_CODE_MAP: Record<string, string> =
-  Object.fromEntries(
-    ROOTS.map((root) => [root.dimensionCode || "", root.pathCode]),
-  );
-export const INDICATOR_DIMENSION_VALUE_MAP: Record<string, string> =
-  Object.fromEntries(
-    ROOTS.map((root) => [root.pathCode.toUpperCase(), root.dimensionCode || ""]),
-  );
-export const INDICATOR_DIMENSION_LABEL_MAP: Record<string, string> =
-  Object.fromEntries(
-    ROOTS.flatMap((root) => [
-      [root.pathName, root.dimensionCode || ""],
-      [`${root.pathCode} ${root.pathName}`, root.dimensionCode || ""],
-    ]),
-  );
-
 export const INDICATOR_PATH_OPTIONS: IndicatorPathOptionNode[] = ROOTS.map(
   (root) => toPathOption(root, root.dimensionCode || "", true),
 );
+
+/** Storage format of `p_indicator_item.dimension_code` (String(16)). */
+export const INDICATOR_DIMENSION_CODE_RE = /^[A-Za-z][A-Za-z0-9_]{0,15}$/;
 
 export function splitIndicatorPath(path?: unknown): string[] {
   return String(path ?? "")
@@ -75,14 +65,17 @@ export function splitIndicatorPath(path?: unknown): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Normalize a dimension code.
+ *
+ * Dimensions are user data: this only checks the generic storage format and
+ * lowercases the code. It never consults a list of "known" business dimensions
+ * and never translates industry wording into a code.
+ */
 export function normalizeIndicatorDimension(value?: unknown): string {
   const raw = String(value ?? "").trim();
-  if (!raw) return "";
-  return INDICATOR_DIMENSION_CODE_MAP[raw.toLowerCase()]
-    ? raw.toLowerCase()
-    : INDICATOR_DIMENSION_VALUE_MAP[raw.toUpperCase()] ||
-        INDICATOR_DIMENSION_LABEL_MAP[raw] ||
-        "";
+  if (!INDICATOR_DIMENSION_CODE_RE.test(raw)) return "";
+  return raw.toLowerCase();
 }
 
 function findOptionBySegment(
@@ -145,9 +138,11 @@ export function getIndicatorDimensionFromPath(
   const first = segments[0] as string | undefined;
   const direct = normalizeIndicatorDimension(first);
   if (direct) return direct;
-  const valPath = Array.isArray(path)
-    ? path
-    : findIndicatorPathValuePath(path, options);
-  const root = String(valPath[0] ?? "");
-  return INDICATOR_DIMENSION_VALUE_MAP[root] || "";
+  // Fall back to the configured path tree: `dimension` there comes from the path
+  // configuration, never from built-in industry vocabulary.
+  const root = String(
+    (Array.isArray(path) ? path[0] : findIndicatorPathValuePath(path, options)[0]) ?? "",
+  );
+  const matched = options.find((option) => option.value === root);
+  return normalizeIndicatorDimension(matched?.dimension);
 }

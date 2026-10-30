@@ -32,6 +32,14 @@ export interface MockIndicatorItem {
   status: string;
 }
 
+/**
+ * Retail demo vocabulary for the seeded Community Demo data.
+ *
+ * These values describe demo rows only: mock mode uses the list to keep the
+ * original eight retail dimensions. Remote mode reads the dimension directory
+ * from the backend, which discovers every dimension from the real indicator
+ * data, so this list is never a production constraint.
+ */
 export const INDICATOR_DIMENSIONS: readonly IndicatorDimensionOption[] = [
   { value: "all", label: "全部指标", code: "ALL" },
   { value: "prd", label: "商品维度", code: "PRD" },
@@ -449,6 +457,3 @@ export const INDICATORS: MockIndicatorItem[] = SPECS.map(
     status: index === 35 ? "disabled" : "enabled",
   }),
 );
-
-export const INDICATOR_DIMENSION_OPTIONS: readonly IndicatorDimensionOption[] =
-  INDICATOR_DIMENSIONS.filter((item) => item.value !== "all");
