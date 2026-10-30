@@ -341,6 +341,82 @@ test -f dist/index.html
 
 服务器只托管已经构建的 `frontend/dist` 时，不需要长期安装 Node.js 或 npm。无论哪种模式，都要确认 `frontend/dist/index.html` 与静态资源属于同一个版本，不要跨 worktree 复制旧的 `dist`。
 
+### 7.3 Windows 内网 npm 镜像构建与部署（Issue #468）
+
+本节只适用于**已正常运行后端、仅需更新前端**的 Windows 环境。沿用现场已有的 5173 静态服务与 `/api` 反向代理配置；5173 是此次内网案例的服务端口，**并非本仓库要求的统一生产端口**。如采用其他端口或服务管理器，按现有配置替换。不要因为前端安装失败重新执行 seed、数据库迁移、覆盖 `.env`，也不要重启健康的后端。
+
+#### 安装前检查（PowerShell）
+
+从仓库 `frontend` 目录执行：
+
+```powershell
+Set-Location .\frontend
+node --version
+npm --version
+npm config get registry
+npm config get proxy
+npm config get omit
+$env:NODE_ENV
+```
+
+Node.js 必须满足 `frontend/package.json` 的 `engines`（当前要求 Node.js 22.13+）；npm 建议 10+。历史内网成功案例为 Node.js 22.20.0 / npm 10.9.3，不代表固定只能用这两个版本。
+
+- `npm config get registry` 是依赖包仓库地址；`npm config get proxy` 是 npm 的 HTTP 代理配置，两者**不是一回事**。内网通过 Nexus Registry 拉包，不等于配置了公网代理；输出 `null` 的 proxy 不必视为异常。
+- 使用环境专属的 Nexus npm **完整 Registry URL** 替换下文 `<INTERNAL_NPM_REGISTRY>`；只能在部署环境中输入，**不得**把实际地址、内部 IP、账号、Token 或私有 `.npmrc` 提交到公开仓库。必要时在部署机器的用户级 npm 配置或受控凭据存储中设置认证。
+- 在允许访问镜像的机器上先执行 `npm ping --registry="<INTERNAL_NPM_REGISTRY>"`。某些 Nexus 仓库可能不支持 ping endpoint；此时请使用 `npm view vite version --registry="<INTERNAL_NPM_REGISTRY>"` 检查包元数据，并在安装时核验 tarball 下载是否成功。元数据成功**不能**证明所有 tarball 都已镜像。
+- 检查 `frontend/package-lock.json` 中的 `resolved` 地址：即使 `.npmrc` 指定了 Nexus，锁文件仍可能指向 `https://registry.npmjs.org/`；不要以修改锁文件为首选修复策略。
+
+#### 干净安装及当前源码构建
+
+```powershell
+# 在 frontend 目录。占位符须由部署人员替换，不能原样运行。
+npm ci --include=dev --registry="<INTERNAL_NPM_REGISTRY>" --replace-registry-host=always
+if ($LASTEXITCODE -ne 0) { throw "npm ci 失败：停止部署，保留原 dist" }
+
+# PowerShell 当前进程内设置，避免残留的 mock 配置影响生产构建
+$env:VITE_API_MODE = "remote"
+$env:VITE_API_BASE_URL = "/api"
+npm run build
+if ($LASTEXITCODE -ne 0) { throw "构建失败：停止部署，保留原 dist" }
+if (-not (Test-Path .\dist\index.html)) { throw "缺少 dist/index.html：停止部署" }
+```
+
+- `--include=dev` 强制安装 Vite、TypeScript、Rolldown 等构建阶段依赖，避免 `NODE_ENV=production` 或用户级 `omit=dev` 导致缺包。此操作发生在**构建机**，不意味着线上静态服务要安装 devDependencies。
+- `--replace-registry-host=always` 要求 npm 把锁文件中可替换的 Registry host 改为本次指定镜像来拉取包，适用于公网 `resolved` 与企业镜像不一致的情况；不能保证所有自定义下载 URL 都被重写，也无法补全镜像缺失的包。
+- 保留锁文件及完整性校验。若 Nexus 缺少特定 tarball、返回 401/403/404、完整性校验失败或证书不可信，**停止**安装并联系镜像管理员核查上游同步、权限、证书与缓存；不得关闭 `strict-ssl`、绕过证书验证或擅自替换锁文件中的 integrity。
+- 若只是暂时性的 5xx、超时或连接断开，先检查镜像连通性、代理环境与 npm 日志；排障后最多手动重试 **2 次**，仍失败即停止并保留旧版。禁止无限循环重试或自动切回公网 Registry。
+- `npm ci` 会重建 `node_modules`，必须在**当前源码与匹配锁文件**的目录执行；不要把上一次的 `dist` 当作本次构建成功的证据。
+
+#### 备份、替换、验收与回滚
+
+**先备份正在对外提供服务的旧版 `dist`，再构建新版本。** 若源码目录里的 `dist` 本身就是现网服务目录，必须先把旧版复制到**服务目录之外**，再运行 `npm run build`；否则构建器可能覆盖现网文件。建议将构建与服务目录分离，并采用版本化目录切换，避免用户在替换过程中请求到不同版本的静态资源。
+
+```powershell
+# 示例路径均为占位符：按现场服务程序配置实际路径，不能直接照搬
+$LiveDir   = "<CURRENT_SERVED_DIST_DIRECTORY>"
+$NewDir    = "<NEW_BUILT_DIST_DIRECTORY>"
+$BackupDir = "<BACKUP_DIRECTORY_OUTSIDE_LIVE_DIST>"
+
+# 备份必须在 npm run build 之前完成；如 LiveDir 与 frontend/dist 相同，
+# 应在上一节构建命令之前先执行本段备份
+if (-not (Test-Path "$LiveDir\index.html")) { throw "找不到当前现网 dist" }
+if (Test-Path $BackupDir) { throw "备份目录已存在：换一个唯一目录，禁止覆盖" }
+Copy-Item -LiteralPath $LiveDir -Destination $BackupDir -Recurse
+if (-not (Test-Path "$BackupDir\index.html")) { throw "备份失败，停止部署" }
+```
+
+构建完成后先检查 `$NewDir\index.html`、`$NewDir\assets` 和生成的 JS/CSS 文件。记录目标 Git commit（如 `git rev-parse HEAD`，zip 导入则记录 zip 版本/哈希），以及构建时间和新 `dist` 文件清单或哈希；特别核对新产物与此次源码对应，不能只看 `index.html` 是否存在。然后按**已有的 Windows 服务管理方式**停止或切换 5173 静态服务，替换成完整的新 `dist` 并启动/重载；不得臆造 Windows 服务名、直接覆盖运行中的文件或更改既有 `/api` 路由。服务目录不得指向旧的源码 worktree。保留原 `/api` → 现有后端（案例为 15099）反代，不能让 SPA fallback 吞掉 API 请求。
+
+验收检查表（HTTP 地址、端口、API 路径按现场实际配置）：
+
+1. `npm ci` 退出码为 **0**，`npm run build` 退出码为 **0**，完整 workspace + Vite 构建成功；记录源码 commit/zip 标识、构建时刻及 `dist` 清单/哈希，与部署后的静态资源核对。
+2. 打开 `http://127.0.0.1:5173/`（或实际入口），SPA 返回 200；直接访问一个前端路由并刷新，确保 SPA fallback 正常。
+3. 从实际返回的 `index.html` 提取引用的 JS/CSS URL，逐个检查 HTTP **200**、Content-Type 合理、内容不是 HTML fallback；必要时与新 `dist` 的文件名/哈希对比，避免命中浏览器或服务端旧缓存。
+4. 用实际存在的 API 端点验证 `/api` 被反代到既有后端且返回预期 JSON，而不是 `index.html`；同时直接检查 `http://127.0.0.1:15099/healthz`（如现场后端端口不同则替换）。`healthz` 只表明进程健康，不能单独证明业务 API 正常。
+5. 验收失败时按原服务管理方式停用新版本、恢复 `$BackupDir` 的完整静态目录并重新启动/切换，**再次验证** SPA、JS/CSS 和 `/api`。保留构建与访问日志以便排障。
+
+**判定原则：HTTP 200 ≠ 新版已上线。** 必须同时有构建成功的退出码、可追溯的源码版本、新旧产物差异、在线 JS/CSS 与 API 代理验收结果。以上是操作模板，不宣称这些 PowerShell 命令已在本次 PR 对真实内网机器执行。
+
 ## 8. systemd
 
 仓库示例 [`deploy/systemd/data-asset-portal.service.example`](./deploy/systemd/data-asset-portal.service.example) 使用当前唯一的 FastAPI/Uvicorn runtime：
