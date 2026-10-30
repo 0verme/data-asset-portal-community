@@ -16,7 +16,7 @@ import React, { type ReactNode } from "react";
 
 import type { AssetTableField, AssetTableItem } from "../api/assets.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
-import { Badge, Button, Input, Tabs } from "../ui/index.ts";
+import { Button, Input, Tabs } from "../ui/index.ts";
 import { AssetRisksPanel } from "./AssetRisksPanel.tsx";
 import { MetaItem, PageHeader } from "./common/index.ts";
 import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.tsx";
@@ -307,7 +307,7 @@ export function DetailPage({
 
       <Tabs
         aria-label="数据表详情内容"
-        appearance="segmented"
+        appearance="line"
         className="asset-detail-tabs"
         size="md"
         value={tab}
@@ -319,12 +319,7 @@ export function DetailPage({
               <span className="asset-detail-tab-label">
                 <Icon name="table" size={14} />
                 <span>字段信息</span>
-                <Badge
-                  className={`asset-detail-tab-count${tab === "fields" ? " is-active" : ""}`}
-                  tone={tab === "fields" ? "brand" : "neutral"}
-                >
-                  {fields.length}
-                </Badge>
+                <span className="asset-detail-tab-count" aria-label={`${fields.length} 个字段`}>{fields.length}</span>
               </span>
             ),
           },
