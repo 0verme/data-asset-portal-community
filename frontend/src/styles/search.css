@@ -92,8 +92,8 @@
 .sp-stats-error :is(h2, h3, p, span) { color: var(--danger); }
 
 /* ===== 检索结果（分组展示）===== */
-.sp-results { width: 100%; max-width: 760px; margin-top: 4px; }
-.sp-result-loading { width: 100%; max-width: 760px; margin-top: 4px; text-align: center; color: var(--ink-3); font-size: 13px; padding: 20px 0; }
+.sp-results { width: 100%; max-width: 1200px; margin-top: 4px; }
+.sp-result-loading { width: 100%; max-width: 1200px; margin-top: 4px; text-align: center; color: var(--ink-3); font-size: 13px; padding: 20px 0; }
 .sp-result-loading h3 { margin: 0; font-size: 13px; font-weight: 400; color: var(--ink-3); }
 .sp-result-loading p:empty { display: none; }
 .sp-result-error { color: var(--danger); }
@@ -115,11 +115,13 @@
   border-radius: var(--radius); overflow: hidden;
 }
 .sp-hit {
-  display: flex; align-items: center; gap: 12px;
-  width: 100%; padding: 11px 14px; border: none;
+  display: flex; align-items: center; gap: 16px;
+  width: 100%; height: auto; border-radius: 0;
+  padding: 12px 16px; border: none; box-shadow: none;
   border-bottom: 0.5px solid var(--line);
   background: transparent; text-align: left; cursor: pointer;
-  font-family: var(--sans); transition: background .14s;
+  font-family: var(--sans); font-weight: 400; white-space: normal;
+  transition: background .14s;
 }
 .sp-hit:last-child { border-bottom: none; }
 .sp-hit:hover { background: var(--surface-2); }
@@ -127,21 +129,28 @@
   display: flex; flex-direction: column; gap: 4px;
   flex: 1 1 auto; min-width: 0;
 }
-.sp-hit-title { font-size: 13px; color: var(--ink); flex: 0 0 auto; }
+.sp-hit-title { font-size: 13px; font-weight: 600; color: var(--ink); flex: 0 0 auto; min-width: 0; overflow-wrap: anywhere; }
 .sp-hit-title.mono { font-family: var(--mono); }
 .sp-hit-sub {
   font-size: 13px; color: var(--ink-2); min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* 右侧事实组整体收缩，避免路径/命中信息挤压标题或压住箭头。 */
+.sp-hit-facts {
+  display: flex; align-items: center; gap: 10px;
+  flex: 0 1 auto; min-width: 0; max-width: 56%;
+}
 .sp-hit-meta {
-  font-size: 12px; color: var(--ink-3); flex: 0 0 auto;
-  max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; color: var(--ink-3);
+  flex: 0 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .sp-hit-match {
-  font-size: 12px; color: var(--ink-2); flex: 0 0 auto;
+  font-size: 12px; color: var(--ink-2);
+  flex: 1 1 auto; min-width: 0; max-width: 100%;
   background: var(--surface-2); border: 0.5px solid var(--line);
   border-radius: var(--radius-sm); padding: 3px 8px;
-  max-width: 48%; white-space: normal; line-height: 1.45;
+  white-space: normal; overflow-wrap: anywhere; line-height: 1.45;
 }
 .sp-hit-go { color: var(--ink-3); flex: 0 0 auto; display: grid; place-items: center; }
 .sp-hit:hover .sp-hit-go { color: var(--accent); }
@@ -168,6 +177,20 @@
 
 @media (max-width: 860px) {
   .sp-stats-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* 中等窄屏：标题/描述与箭头占首行，路径与命中信息另起一行，避免互相挤压。 */
+  .sp-hit {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start; gap: 8px 12px; padding: 12px 14px;
+  }
+  .sp-hit-main { grid-column: 1; grid-row: 1; }
+  .sp-hit-go { grid-column: 2; grid-row: 1; align-self: center; }
+  .sp-hit-facts {
+    grid-column: 1 / -1; grid-row: 2;
+    flex-wrap: wrap; gap: 6px 10px; max-width: 100%;
+  }
+  .sp-hit-meta { white-space: normal; overflow-wrap: anywhere; }
+  .sp-hit-match { flex: 0 1 auto; }
 }
 @media (max-width: 600px) {
   .sp-hero h1 { font-size: 30px; }
@@ -176,7 +199,4 @@
   .sp-search-btn { padding: 0 16px; height: 40px; font-size: 14px; }
   .sp-btn-text { display: none; }
   .sp-stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .sp-hit { align-items: flex-start; flex-wrap: wrap; }
-  .sp-hit-meta, .sp-hit-match { max-width: 100%; }
-  .sp-hit-go { margin-left: auto; }
 }
