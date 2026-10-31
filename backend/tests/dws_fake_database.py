@@ -34,6 +34,7 @@ REVISION_ORDER = (
     "0010_field_mapping_identity",
     "0011_push_job_freq_desc_capacity",
     "0012_search_hot_keywords",
+    "0013_field_filter_index",
 )
 
 OPEN_MODULE_TABLES = (
