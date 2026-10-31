@@ -1521,6 +1521,73 @@ class SearchHotKeywords(DwsRevisionAdapter):
 
 
 # ---------------------------------------------------------------------------
+# 0013_field_filter_index
+# ---------------------------------------------------------------------------
+
+
+class FieldMappingFieldFilterIndex(DwsRevisionAdapter):
+    revision = "0013_field_filter_index"
+    table = "p_field_mapping_field"
+    index = "idx_p_field_mapping_field_table_deleted"
+    columns = ("table_pk", "is_deleted")
+
+    def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
+        table = ctx.table(self.table)
+        if table is None:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                f"{self.table} is missing from the target schema",
+            )
+        index = table.indexes.get(self.index)
+        if index is None:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.NOT_APPLIED,
+                f"{self.index} is absent",
+            )
+        if index.columns != self.columns or index.unique:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                f"{self.index} exists with an unexpected definition",
+                details=(
+                    f"expected columns={self.columns!r}, unique=False",
+                    f"observed columns={index.columns!r}, unique={index.unique!r}",
+                ),
+            )
+        return RevisionInspection(
+            self.revision,
+            RevisionState.APPLIED,
+            f"{self.index} is present with the expected non-unique definition",
+        )
+
+    def apply(self, ctx: DwsRevisionContext) -> None:
+        table = ctx.table(self.table)
+        if table is None:
+            raise DwsMigrationError(
+                self.revision,
+                observed=f"{self.table} is missing",
+                reason="the field-mapping field table must exist before this revision",
+            )
+        if self.index in table.indexes:
+            raise DwsMigrationError(
+                self.revision,
+                observed=f"{self.index} exists with an unexpected definition",
+                reason="the adapter only creates the index when it is absent",
+                details=(
+                    f"expected columns={self.columns!r}, unique=False",
+                    f"observed columns={table.indexes[self.index].columns!r}, "
+                    f"unique={table.indexes[self.index].unique!r}",
+                ),
+            )
+        ctx.execute(
+            f"CREATE INDEX {self.index} ON {ctx.qualified(self.table)} "
+            "(table_pk, is_deleted)"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -1536,6 +1603,7 @@ ADAPTERS: tuple[DwsRevisionAdapter, ...] = (
     FieldMappingIdentity(),
     PushJobFreqDescCapacity(),
     SearchHotKeywords(),
+    FieldMappingFieldFilterIndex(),
 )
 
 _ADAPTERS_BY_REVISION: dict[str, DwsRevisionAdapter] = {
