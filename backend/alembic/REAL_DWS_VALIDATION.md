@@ -55,7 +55,7 @@ Record only profile names and results here; never add credentials, JDBC URLs, ho
 
 1. Use a restorable copy or a disposable schema created from a released legacy baseline. Do not use a production schema without an approved backup/recovery window.
 2. Capture `status` (likely `0001_baseline`) and the read-only DWS metadata preflight.
-3. Run `plan`; review every action. A nearly-head instance must show `adopt` for satisfied revisions, `apply` for `0002_portable_asset_filter`, and `apply` for `0009_upstream_option_contract` / `0012_search_hot_keywords` when their additive seed rows are absent, and `0013_field_mapping_field_filter_index` when the non-unique field lookup index is absent.
+3. Run `plan`; review every action. A nearly-head instance must show `adopt` for satisfied revisions, `apply` for `0002_portable_asset_filter`, and `apply` for `0009_upstream_option_contract` / `0012_search_hot_keywords` when their additive seed rows are absent, and `0013_field_filter_index` when the non-unique field lookup index is absent.
 4. Capture representative business-row counts and stable primary keys for field mappings, indicators, assets/fields, manual code values, upstream systems and upstream options. Protect or anonymize data in retained evidence.
 5. Run `apply` once. Require each revision to be reflected in the ledger only after its post-condition is confirmed. On any error, stop; capture the failed revision/step and current ledger, and do not blindly rerun or repair the schema. A `CONFLICT` message lists the revision, observed state, why it is unsafe and the possible repairs.
 6. Run `status` and `verify`; require repository head and `verify=ok`.

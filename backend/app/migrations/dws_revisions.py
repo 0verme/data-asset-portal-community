@@ -1362,12 +1362,12 @@ class SearchHotKeywords(DwsRevisionAdapter):
 
 
 # ---------------------------------------------------------------------------
-# 0013_field_mapping_field_filter_index
+# 0013_field_filter_index
 # ---------------------------------------------------------------------------
 
 
 class FieldMappingFieldFilterIndex(DwsRevisionAdapter):
-    revision = "0013_field_mapping_field_filter_index"
+    revision = "0013_field_filter_index"
     table = "p_field_mapping_field"
     index = "idx_p_field_mapping_field_table_deleted"
     columns = ("table_pk", "is_deleted")

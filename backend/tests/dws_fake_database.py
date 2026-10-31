@@ -34,7 +34,7 @@ REVISION_ORDER = (
     "0010_field_mapping_identity",
     "0011_push_job_freq_desc_capacity",
     "0012_search_hot_keywords",
-    "0013_field_mapping_field_filter_index",
+    "0013_field_filter_index",
 )
 
 OPEN_MODULE_TABLES = (
@@ -786,7 +786,7 @@ def downgrade_to_prefix(database: FakeDwsDatabase, satisfied: Iterable[str]) -> 
 def _reverse_revision(
     database: FakeDwsDatabase, revision: str, satisfied: set[str]
 ) -> None:
-    if revision == "0013_field_mapping_field_filter_index":
+    if revision == "0013_field_filter_index":
         database.remove_index(
             "p_field_mapping_field", "idx_p_field_mapping_field_table_deleted"
         )

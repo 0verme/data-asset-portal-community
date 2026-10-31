@@ -17,7 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 MIGRATE = REPO_ROOT / "backend" / "scripts" / "schema_migrate.py"
 INDEX_NAME = "idx_p_field_mapping_field_table_deleted"
 LEGACY_REVISION = "0012_search_hot_keywords"
-HEAD_REVISION = "0013_field_mapping_field_filter_index"
+HEAD_REVISION = "0013_field_filter_index"
 
 
 def _temporary_directory(prefix: str):
@@ -70,6 +70,9 @@ def _run_apply(config_file: Path) -> subprocess.CompletedProcess[str]:
 
 
 class FieldMappingFilterIndexMigrationTests(unittest.TestCase):
+    def test_revision_id_fits_the_cross_dialect_version_column(self):
+        self.assertLessEqual(len(HEAD_REVISION), 32)
+
     def test_supported_baselines_and_runtime_metadata_declare_the_lookup_index(self):
         for dialect in ("sqlite", "postgresql", "mysql", "dws"):
             index = baseline_schema(dialect).tables[

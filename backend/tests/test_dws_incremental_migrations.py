@@ -558,7 +558,7 @@ class DwsSearchHotKeywordMigrationTests(unittest.TestCase):
 
 class DwsFieldMappingQueryIndexTests(unittest.TestCase):
     INDEX = "idx_p_field_mapping_field_table_deleted"
-    REVISION = "0013_field_mapping_field_filter_index"
+    REVISION = "0013_field_filter_index"
 
     def test_0013_creates_the_non_unique_field_lookup_index_when_absent(self):
         database = FakeDwsDatabase().seed_from_baseline()
