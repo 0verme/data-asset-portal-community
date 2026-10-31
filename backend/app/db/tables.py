@@ -1,6 +1,16 @@
 """Portable Core table declarations for migrated business queries."""
 
-from sqlalchemy import CheckConstraint, Column, DateTime, Integer, String, Table, Text, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    DateTime,
+    Index,
+    Integer,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+)
 
 from .metadata import metadata
 
@@ -240,6 +250,7 @@ mapping_field = _table(
     Column("created_at", DateTime),
     Column("updated_by", String(64), nullable=False),
     Column("updated_at", DateTime),
+    Index("idx_p_field_mapping_field_table_deleted", "table_pk", "is_deleted"),
 )
 
 manual_code_table = _table(

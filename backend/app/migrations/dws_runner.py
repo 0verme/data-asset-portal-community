@@ -63,6 +63,9 @@ REPAIR_HINTS: dict[str, tuple[str, ...]] = {
     "0010_field_mapping_identity": (
         "remove the obsolete source-only unique index explicitly, then retry",
     ),
+    "0013_field_mapping_field_filter_index": (
+        "resolve the existing same-name index definition explicitly, then retry",
+    ),
 }
 
 
