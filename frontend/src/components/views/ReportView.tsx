@@ -16,7 +16,6 @@ import type { UseReportModuleResult } from "../../hooks/useReportModule.ts";
 import type { ReportRoute } from "../../routing/types.ts";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 import {
-    ActionErrorBanner,
     confirmDeleteAction,
     EmptyState,
     ErrorState,
@@ -50,10 +49,8 @@ export function ReportView({
         reportError,
         loadReportData,
         reportSaveBusy,
-        reportSaveError,
-        setReportSaveError,
-        reportActionError,
-        setReportActionError,
+        reportSaveFieldErrors,
+        clearReportSaveFieldError,
         reportBack,
         reportCloseDetail,
         reportCreate,
@@ -102,8 +99,8 @@ export function ReportView({
                 onCancel={reportBack}
                 onDelete={() => undefined}
                 saveBusy={reportSaveBusy}
-                saveError={reportSaveError}
-                onClearSaveError={() => setReportSaveError("")}
+                serverFieldErrors={reportSaveFieldErrors}
+                onClearServerFieldError={clearReportSaveFieldError}
             />
         );
     }
@@ -137,19 +134,14 @@ export function ReportView({
                     }
                 }}
                 saveBusy={reportSaveBusy}
-                saveError={reportSaveError}
-                onClearSaveError={() => setReportSaveError("")}
+                serverFieldErrors={reportSaveFieldErrors}
+                onClearServerFieldError={clearReportSaveFieldError}
             />
         );
     }
 
     return (
         <>
-            <ActionErrorBanner
-                message={reportActionError}
-                onClose={() => setReportActionError("")}
-            />
-
             <ReportList
                 reports={filteredReports}
                 query={query}

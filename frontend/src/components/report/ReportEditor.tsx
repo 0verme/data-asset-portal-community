@@ -7,13 +7,14 @@ import type { MockIndicatorItem } from "../../data/indicators.ts";
 import type { MockReportItem, RelatedIndicatorSummary, RelatedTableSummary } from "../../data/reports.ts";
 import { buildReportOptionSets, type ReportOptionSets } from "../../config/reportOptions.ts";
 import { getLegacyAwareOptions, normalizeDictOptions, type OptionInputItem } from "../../utils/optionUtils.ts";
-import { ActionErrorBanner, AssetReferencePicker, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader } from "../common/index.ts";
+import { AssetReferencePicker, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader } from "../common/index.ts";
 import { Icon } from "../ui.tsx";
 import {
   Checkbox,
   FormErrorSummary,
   FormField,
   focusFirstFormError,
+  mergeFormFieldErrors,
   Input,
   Select,
   Textarea,
@@ -190,8 +191,8 @@ export interface ReportEditorProps {
   onCancel: () => void;
   onDelete: (reportCode: string) => void | Promise<unknown>;
   saveBusy?: boolean | undefined;
-  saveError?: string | undefined;
-  onClearSaveError?: (() => void) | undefined;
+  serverFieldErrors?: FormFieldErrors | undefined;
+  onClearServerFieldError?: ((field: string) => void) | undefined;
 }
 
 export function ReportEditor({
@@ -201,8 +202,8 @@ export function ReportEditor({
   onCancel,
   onDelete,
   saveBusy = false,
-  saveError = "",
-  onClearSaveError,
+  serverFieldErrors = {},
+  onClearServerFieldError,
 }: ReportEditorProps) {
   const isEdit = mode === "edit";
   const [form, setForm] = React.useState<ReportFormData>(() => createFormState(initial));
@@ -271,8 +272,8 @@ export function ReportEditor({
   }, [referenceRetryRevision]);
 
   const errors: FormFieldErrors = React.useMemo(
-    () => touched ? validateReportForm(form) : {},
-    [form, touched],
+    () => mergeFormFieldErrors(serverFieldErrors, touched ? validateReportForm(form) : {}),
+    [form, serverFieldErrors, touched],
   );
   const hasLifecycleErrors = Boolean(errors["effectiveDate"] || errors["expireDate"]);
 
@@ -294,8 +295,16 @@ export function ReportEditor({
     focusFirstFormError(formRef.current, errors, "auto");
   }, [errors, validationFocusRequest]);
 
+  React.useLayoutEffect(() => {
+    if (!Object.keys(serverFieldErrors).length) return;
+    if (serverFieldErrors["effectiveDate"] || serverFieldErrors["expireDate"]) {
+      if (lifecycleDetailsRef.current) lifecycleDetailsRef.current.open = true;
+    }
+    focusFirstFormError(formRef.current, serverFieldErrors, "smooth");
+  }, [serverFieldErrors]);
+
   const setValues = (nextValues: Partial<ReportFormData>) => {
-    if (saveError) onClearSaveError?.();
+    Object.keys(nextValues).forEach((field) => onClearServerFieldError?.(field));
     setForm((prev) => ({ ...prev, ...nextValues }));
   };
 
@@ -402,7 +411,6 @@ export function ReportEditor({
         subtitle={isEdit ? form.code : "登记新的报表台账并维护归属信息和关联引用。"}
       />
 
-      <ActionErrorBanner title="保存失败" message={saveError} />
       <FormErrorSummary
         formId={REPORT_FORM_ID}
         errors={errors}

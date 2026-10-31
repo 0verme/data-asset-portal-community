@@ -12,14 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createReport, deleteReport, getReportList, updateReport } from '../api/report.ts';
 import type { MockReportItem } from '../data/reports.ts';
 import { isUnauthorizedError } from '../api/http.ts';
+import { normalizeApiError } from '../api/errorNormalizer.ts';
 import { DEFAULT_REPORT_FILTER, DEFAULT_REPORT_ROUTE } from '../config/defaults.ts';
-import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
+import { scrollMainToTop } from '../utils/ui.ts';
+import { clearFormFieldErrors } from '../ui/formErrors.ts';
+import { toast } from '../ui/index.ts';
+import { mapReportApiFieldErrors } from '../components/report/reportFormErrors.ts';
 import type { ReportFilter, ReportRoute } from '../routing/types.ts';
+import type { FormFieldErrors } from '../ui/formErrors.ts';
 
 export interface EnrichedReportItem extends MockReportItem {
   relatedTableCount: number;
@@ -61,10 +66,8 @@ export interface UseReportModuleResult {
   reportLoaded: boolean;
   loadReportData: () => Promise<void>;
   reportSaveBusy: boolean;
-  reportSaveError: string;
-  setReportSaveError: React.Dispatch<React.SetStateAction<string>>;
-  reportActionError: string;
-  setReportActionError: React.Dispatch<React.SetStateAction<string>>;
+  reportSaveFieldErrors: FormFieldErrors;
+  clearReportSaveFieldError: (field: string) => void;
   reportBack: () => void;
   reportCloseDetail: () => void;
   reportCreate: () => void;
@@ -94,8 +97,8 @@ export function useReportModule({
   const [reportError, setReportError] = useState('');
   const [reportLoaded, setReportLoaded] = useState(false);
   const [reportSaveBusy, setReportSaveBusy] = useState(false);
-  const [reportSaveError, setReportSaveError] = useState('');
-  const [reportActionError, setReportActionError] = useState('');
+  const [reportSaveFieldErrors, setReportSaveFieldErrors] = useState<FormFieldErrors>({});
+  const reportSaveInFlight = useRef(false);
 
   const loadReportData = useCallback(async (): Promise<void> => {
     setReportLoading(true);
@@ -117,7 +120,12 @@ export function useReportModule({
     }
   }, [active, reportLoaded, reportLoading, reportError, loadReportData]);
 
+  const clearReportSaveFieldError = (field: string): void => {
+    setReportSaveFieldErrors((current) => clearFormFieldErrors(current, field));
+  };
+
   const reportBack = (): void => {
+    setReportSaveFieldErrors({});
     setReportRoute(DEFAULT_REPORT_ROUTE);
     scrollMainToTop();
   };
@@ -128,6 +136,7 @@ export function useReportModule({
 
   const reportCreate = (): void => {
     requireLogin(() => {
+      setReportSaveFieldErrors({});
       setReportRoute({ page: 'new', code: null });
       scrollMainToTop();
     }, 'report:write');
@@ -135,6 +144,7 @@ export function useReportModule({
 
   const reportEdit = (reportCode: string): void => {
     requireLogin(() => {
+      setReportSaveFieldErrors({});
       setReportRoute({ page: 'edit', code: reportCode });
       scrollMainToTop();
     }, 'report:write');
@@ -150,24 +160,32 @@ export function useReportModule({
       setLoginOpen(true);
       return;
     }
-    if (reportSaveBusy) return;
-    setReportSaveError('');
-    setReportActionError('');
+    if (reportSaveInFlight.current) return;
+    reportSaveInFlight.current = true;
+    const isEditing = reportRoute.page === 'edit' && Boolean(reportRoute.code);
+    setReportSaveFieldErrors({});
     setReportSaveBusy(true);
     try {
-      if (reportRoute.page === 'edit' && reportRoute.code) {
+      if (isEditing && reportRoute.code) {
         await updateReport(reportRoute.code, payload);
       } else {
         await createReport(payload);
       }
       await loadReportData();
+      toast.success(isEditing ? '报表已更新' : '报表已创建');
+      setReportSaveFieldErrors({});
       setReportRoute(DEFAULT_REPORT_ROUTE);
       scrollMainToTop();
     } catch (error: unknown) {
-      if (!isUnauthorizedError(error)) {
-        setReportSaveError(getErrorMessage(error, '保存报表失败。'));
+      if (isUnauthorizedError(error)) return;
+      const mappedErrors = mapReportApiFieldErrors(error);
+      const hasFieldErrors = Object.keys(mappedErrors.fieldErrors).length > 0;
+      if (hasFieldErrors) setReportSaveFieldErrors(mappedErrors.fieldErrors);
+      if (!hasFieldErrors || mappedErrors.hasUnmappedErrors) {
+        toast.error(normalizeApiError(error).safeMessage);
       }
     } finally {
+      reportSaveInFlight.current = false;
       setReportSaveBusy(false);
     }
   };
@@ -179,18 +197,16 @@ export function useReportModule({
       setLoginOpen(true);
       return;
     }
-    setReportActionError('');
     try {
       await deleteReport(reportCode);
       await loadReportData();
       if (reportRoute.code === reportCode) {
         setReportRoute(DEFAULT_REPORT_ROUTE);
       }
+      toast.success('报表已删除');
       scrollMainToTop();
     } catch (error: unknown) {
-      if (!isUnauthorizedError(error)) {
-        setReportActionError(getErrorMessage(error, '删除报表失败。'));
-      }
+      if (!isUnauthorizedError(error)) toast.error(normalizeApiError(error).safeMessage);
     }
   };
 
@@ -267,10 +283,8 @@ export function useReportModule({
     reportLoaded,
     loadReportData,
     reportSaveBusy,
-    reportSaveError,
-    setReportSaveError,
-    reportActionError,
-    setReportActionError,
+    reportSaveFieldErrors,
+    clearReportSaveFieldError,
     reportBack,
     reportCloseDetail,
     reportCreate,

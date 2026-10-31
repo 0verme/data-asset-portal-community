@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 # pi-lens-ignore: reportMissingImports
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
-from backend.app.services.report_service import ReportService
+from backend.app.services.report_service import ReportAlreadyExistsError, ReportService
 
 # pyright: reportMissingImports=false
 
@@ -103,6 +103,22 @@ class ReportCoreCrudTests(unittest.TestCase):
         statement = self.service._db.execute_statements.call_args.args[0][0]
         self._assert_portable(statement)
         self.assertIn("INSERT", str(statement.compile(dialect=sqlite.dialect())))
+
+    def test_update_excludes_current_code_but_rejects_another_report_code(self):
+        current = {"code": "RPT_PAY_DAILY"}
+        self.service.get_report_detail = MagicMock(return_value=current)
+        self.service.get_reports = MagicMock(return_value=[current])
+        self.service._fetch_rows = MagicMock(return_value=[{"report_pk": 7}])
+        self.service._execute = MagicMock()
+
+        self.service._update_report("RPT_PAY_DAILY", self.item)
+        self.service.get_reports.assert_not_called()
+        self.service._execute.assert_called_once()
+
+        self.service.get_reports.return_value = [current, {"code": "RPT_OTHER"}]
+        with self.assertRaises(ReportAlreadyExistsError):
+            self.service._update_report("RPT_PAY_DAILY", {**self.item, "code": "RPT_OTHER"})
+        self.assertEqual(self.service._execute.call_count, 1)
 
     def test_update_and_delete_use_core_mutations(self):
         self.service._db.fetch_rows = MagicMock(side_effect=[[self.row], [{"report_pk": 7}], [self.row]])
