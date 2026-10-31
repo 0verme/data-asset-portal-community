@@ -1135,6 +1135,29 @@ class DwsSchemaMigrateCliTests(unittest.TestCase):
         self.assertEqual(before_items, database.table("p_code_item").rows)
         self.assertEqual(before_keywords, database.table("p_search_hot_keyword").rows)
 
+    def test_verify_allows_legitimate_unlinked_indicator_after_backfill(self):
+        database = FakeDwsDatabase()
+        exit_code, _ = self._run_cli(database, ["apply", "--profile", "dws_test"])
+        self.assertEqual(0, exit_code)
+        _seed_legacy_business_rows(database, include_upstream=False)
+        # A post-migration application write may deliberately leave stable
+        # references NULL even when the legacy names resolve uniquely.
+        indicator = database.table("p_indicator_item").rows[-1]
+        indicator["semantic_state"] = "candidate"
+        indicator["source_asset_id"] = None
+        indicator["result_field_id"] = None
+        self.assertEqual(
+            RevisionState.NOT_APPLIED,
+            inspect_revision(database, CONFIG, "0008_indicator_semantic_contract").state,
+        )
+        exit_code, _ = self._run_cli(database, ["verify", "--profile", "dws_test"])
+        self.assertEqual(0, exit_code)
+        exit_code, output = self._run_cli(database, ["apply", "--profile", "dws_test"])
+        self.assertEqual(0, exit_code)
+        self.assertIn("applied=-", output)
+        self.assertIsNone(indicator["source_asset_id"])
+        self.assertIsNone(indicator["result_field_id"])
+
     def test_cli_plan_lists_adopt_and_apply_actions(self):
         database = FakeDwsDatabase().seed_from_baseline()
         downgrade_to_prefix(database, set(REVISION_ORDER[:4]))
