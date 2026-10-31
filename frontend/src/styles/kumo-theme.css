@@ -60,3 +60,22 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 }
+
+/* Shared read-only status pills (Status / StatusBadge).
+ * Keep Kumo variant colors and the status/action distinction intact. */
+.dap-ui-badge--dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-width: 64px;
+  min-height: 28px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
