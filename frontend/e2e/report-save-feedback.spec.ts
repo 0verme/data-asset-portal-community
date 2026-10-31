@@ -199,6 +199,9 @@ test("long report save failures keep input, locate field conflicts, and show ord
   const actionBarBox = await actionBar.boundingBox();
   expect(toastBox).not.toBeNull();
   expect(actionBarBox).not.toBeNull();
+  const toastToActionBarGap = actionBarBox!.y - (toastBox!.y + toastBox!.height);
+  expect(toastToActionBarGap).toBeGreaterThanOrEqual(8);
+  expect(toastToActionBarGap).toBeLessThanOrEqual(24);
   expect(toastBox!.y).toBeGreaterThanOrEqual(0);
   expect(toastBox!.y + toastBox!.height).toBeLessThanOrEqual(844);
   expect(toastBox!.y + toastBox!.height).toBeLessThanOrEqual(actionBarBox!.y);

@@ -55,9 +55,70 @@ export function ToastHost({ children }: ToastHostProps) {
   const portalRoot = useOverlayPortalRoot();
   useEffect(() => {
     // Ensure the shared portal exists even if a toast is dispatched immediately after mount.
-    if (!ensureOverlayRoot()) return undefined;
+    const overlayRoot = ensureOverlayRoot();
+    if (!overlayRoot) return undefined;
     mountedToastHosts += 1;
+
+    let frame: number | null = null;
+    let observedActionBar: HTMLElement | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+
+    const syncActionBarOffset = (): void => {
+      const region = overlayRoot.querySelector<HTMLElement>('[role="region"][aria-label="Notifications"]');
+      if (!region) return;
+
+      const actionBar = Array.from(document.querySelectorAll<HTMLElement>(".form-action-bar")).find((candidate) => {
+        const rect = candidate.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }) ?? null;
+
+      if (resizeObserver && actionBar !== observedActionBar) {
+        if (observedActionBar) resizeObserver.unobserve(observedActionBar);
+        observedActionBar = actionBar;
+        if (actionBar) resizeObserver.observe(actionBar);
+      }
+
+      if (!window.matchMedia("(max-width: 480px)").matches || !actionBar) {
+        region.style.removeProperty("--dap-toast-action-bar-bottom");
+        return;
+      }
+
+      // Leave a 24px clearance above the bar's actual viewport position. This
+      // accommodates the toast's entry motion while avoiding a fixed offset
+      // that varies with sticky-bar height and scroll.
+      const bottom = Math.max(12, window.innerHeight - actionBar.getBoundingClientRect().top + 24);
+      region.style.setProperty("--dap-toast-action-bar-bottom", `${bottom}px`);
+    };
+
+    const scheduleSync = (): void => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        syncActionBarOffset();
+      });
+    };
+
+    resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleSync);
+    const mutationObserver = new MutationObserver(scheduleSync);
+    mutationObserver.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", scheduleSync);
+    window.addEventListener("scroll", scheduleSync, true);
+    const visualViewport = window.visualViewport;
+    visualViewport?.addEventListener("resize", scheduleSync);
+    visualViewport?.addEventListener("scroll", scheduleSync);
+    syncActionBarOffset();
+
     return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      mutationObserver.disconnect();
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", scheduleSync);
+      window.removeEventListener("scroll", scheduleSync, true);
+      visualViewport?.removeEventListener("resize", scheduleSync);
+      visualViewport?.removeEventListener("scroll", scheduleSync);
+      overlayRoot
+        .querySelector<HTMLElement>('[role="region"][aria-label="Notifications"]')
+        ?.style.removeProperty("--dap-toast-action-bar-bottom");
       mountedToastHosts = Math.max(0, mountedToastHosts - 1);
       if (mountedToastHosts === 0) toastManager.close();
     };
