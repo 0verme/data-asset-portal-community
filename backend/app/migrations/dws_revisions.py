@@ -334,6 +334,39 @@ class MetadataIngestionIdentity(DwsRevisionAdapter):
     legacy_unique = ("table_name",)
     identity_unique = ("source_key", "asset_type", "external_id")
 
+    def _column_contract_conflicts(self, ctx: DwsRevisionContext) -> list[str]:
+        conflicts: list[str] = []
+        expected = baseline_schema("dws", ctx.root)
+        for table_name, definitions in (
+            ("p_asset_table", self.asset_columns),
+            ("p_lineage_snapshot", self.lineage_columns),
+        ):
+            table = ctx.table(table_name)
+            if table is None:
+                continue
+            expected_table = expected.tables[table_name]
+            for column_name, type_name in definitions.items():
+                actual_column = table.columns.get(column_name)
+                if actual_column is None:
+                    continue
+                expected_column = expected_table.columns[column_name]
+                if actual_column.type_name != type_name:
+                    conflicts.append(
+                        f"{table_name}.{column_name} type expected={type_name!r} "
+                        f"observed={actual_column.type_name!r}"
+                    )
+                if actual_column.nullable != expected_column.nullable:
+                    conflicts.append(
+                        f"{table_name}.{column_name} nullable expected="
+                        f"{expected_column.nullable!r} observed={actual_column.nullable!r}"
+                    )
+                if actual_column.default != expected_column.default:
+                    conflicts.append(
+                        f"{table_name}.{column_name} default expected="
+                        f"{expected_column.default!r} observed={actual_column.default!r}"
+                    )
+        return conflicts
+
     def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
         asset = ctx.table("p_asset_table")
         lineage = ctx.table("p_lineage_snapshot")
@@ -351,6 +384,15 @@ class MetadataIngestionIdentity(DwsRevisionAdapter):
                 RevisionState.CONFLICT,
                 "0004 target tables are missing",
                 details=(f"missing: {', '.join(missing)}",),
+            )
+
+        column_conflicts = self._column_contract_conflicts(ctx)
+        if column_conflicts:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                "metadata identity columns do not match their required DWS shape",
+                details=tuple(column_conflicts),
             )
 
         asset_present = [name for name in self.asset_columns if name in asset.columns]
@@ -456,13 +498,59 @@ class MetadataIngestionIdentity(DwsRevisionAdapter):
 class RbacPersistence(DwsRevisionAdapter):
     revision = "0005_rbac_persistence"
     tables = ("p_role", "p_permission", "p_role_permission")
-    expected_columns = {
-        "p_role": {"role_code", "name", "description", "builtin", "enabled", "created_at", "updated_at"},
-        "p_permission": {"permission_code", "resource", "action", "name", "description"},
-        "p_role_permission": {"role_code", "permission_code"},
-    }
     index_name = "idx_p_role_permission_permission"
     index_columns = ("permission_code",)
+
+    def _table_shape_conflicts(
+        self, ctx: DwsRevisionContext, table_name: str
+    ) -> list[str]:
+        actual = ctx.table(table_name)
+        if actual is None:
+            return [f"{table_name} is missing"]
+        expected = baseline_schema("dws", ctx.root).tables[table_name]
+        conflicts: list[str] = []
+        for column_name, expected_column in expected.columns.items():
+            actual_column = actual.columns.get(column_name)
+            if actual_column is None:
+                conflicts.append(f"{table_name} missing column {column_name}")
+                continue
+            if actual_column.type_name != expected_column.type_name:
+                conflicts.append(
+                    f"{table_name}.{column_name} type expected={expected_column.type_name!r} "
+                    f"observed={actual_column.type_name!r}"
+                )
+            if actual_column.nullable != expected_column.nullable:
+                conflicts.append(
+                    f"{table_name}.{column_name} nullable expected={expected_column.nullable!r} "
+                    f"observed={actual_column.nullable!r}"
+                )
+            if actual_column.default != expected_column.default:
+                conflicts.append(
+                    f"{table_name}.{column_name} default expected={expected_column.default!r} "
+                    f"observed={actual_column.default!r}"
+                )
+        if actual.primary_key != expected.primary_key:
+            conflicts.append(
+                f"{table_name} primary key expected={expected.primary_key!r} "
+                f"observed={actual.primary_key!r}"
+            )
+        if actual.unique_constraints != expected.unique_constraints:
+            conflicts.append(f"{table_name} unique constraints differ from canonical DWS shape")
+        if actual.foreign_keys != expected.foreign_keys:
+            conflicts.append(f"{table_name} physical foreign keys differ from DWS policy")
+        for index_name, expected_index in expected.indexes.items():
+            actual_index = actual.indexes.get(index_name)
+            if actual_index is None:
+                continue
+            if (actual_index.columns, actual_index.unique) != (
+                expected_index.columns,
+                expected_index.unique,
+            ):
+                conflicts.append(
+                    f"{table_name}.{index_name} index expected="
+                    f"{expected_index!r} observed={actual_index!r}"
+                )
+        return conflicts
 
     def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
         present = [name for name in self.tables if ctx.has_table(name)]
@@ -484,13 +572,13 @@ class RbacPersistence(DwsRevisionAdapter):
                 ),
             )
         for name in self.tables:
-            missing = self.expected_columns[name] - set(ctx.columns(name))
-            if missing:
+            conflicts = self._table_shape_conflicts(ctx, name)
+            if conflicts:
                 return RevisionInspection(
                     self.revision,
                     RevisionState.CONFLICT,
-                    f"partial RBAC table {name} detected",
-                    details=(f"missing columns: {', '.join(sorted(missing))}",),
+                    f"RBAC table {name} does not match its DWS schema contract",
+                    details=tuple(conflicts),
                 )
         if not _non_unique_index(ctx.table("p_role_permission"), self.index_name, self.index_columns):
             return RevisionInspection(
@@ -602,12 +690,13 @@ class FieldMappingUpstreamId(DwsRevisionAdapter):
             table, self.identity_index, self.identity_index_columns
         )
         upstream_not_null = not table.columns["upstream_system_id"].nullable
+        data_source_nullable = table.columns["data_source_id"].nullable
 
         mapping_rows, system_rows = self._data_state(ctx)
         plan = plan_upstream_backfill(mapping_rows, system_rows)
         duplicates = duplicate_mapping_keys(mapping_rows, plan.updates)
 
-        if upstream_not_null and (index is not None or identity_index):
+        if upstream_not_null and data_source_nullable and (index is not None or identity_index):
             warnings = []
             if plan.errors:
                 warnings.append(
@@ -638,6 +727,7 @@ class FieldMappingUpstreamId(DwsRevisionAdapter):
             details=(
                 f"planned backfill rows: {len(plan.updates)}",
                 "upstream_system_id is nullable: " + str(not upstream_not_null),
+                f"data_source_id is nullable: {data_source_nullable}",
                 f"unique index present: {index is not None}",
             ),
         )
@@ -857,6 +947,34 @@ class IndicatorSemanticContract(DwsRevisionAdapter):
         "semantic_state": "VARCHAR(32) NOT NULL DEFAULT 'candidate'",
     }
 
+    def _column_contract_conflicts(self, ctx: DwsRevisionContext) -> list[str]:
+        actual = ctx.table(self.table)
+        if actual is None:
+            return []
+        expected = baseline_schema("dws", ctx.root).tables[self.table]
+        conflicts: list[str] = []
+        for name in self.new_columns:
+            actual_column = actual.columns.get(name)
+            if actual_column is None:
+                continue
+            expected_column = expected.columns[name]
+            if actual_column.type_name != expected_column.type_name:
+                conflicts.append(
+                    f"{name} type expected={expected_column.type_name!r} "
+                    f"observed={actual_column.type_name!r}"
+                )
+            if actual_column.nullable != expected_column.nullable:
+                conflicts.append(
+                    f"{name} nullable expected={expected_column.nullable!r} "
+                    f"observed={actual_column.nullable!r}"
+                )
+            if actual_column.default != expected_column.default:
+                conflicts.append(
+                    f"{name} default expected={expected_column.default!r} "
+                    f"observed={actual_column.default!r}"
+                )
+        return conflicts
+
     def _data_plan(self, ctx: DwsRevisionContext):
         indicator_rows = ctx.fetchall(
             "SELECT indicator_pk, result_table_name, result_field_name, "
@@ -927,6 +1045,14 @@ class IndicatorSemanticContract(DwsRevisionAdapter):
                     f"present: {', '.join(sorted(present))}",
                     f"missing: {', '.join(sorted(missing))}",
                 ),
+            )
+        column_conflicts = self._column_contract_conflicts(ctx)
+        if column_conflicts:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                "indicator semantic columns do not match their DWS contract",
+                details=tuple(column_conflicts),
             )
         if not _non_unique_index(table, self.reference_index, self.reference_columns):
             return RevisionInspection(
@@ -1268,6 +1394,18 @@ def _canonical_column_type(type_name: str) -> str:
     return normalized
 
 
+def _is_nonempty_keyword_check(expression: str) -> bool:
+    normalized = str(expression or "").lower().replace('"', "").replace("`", "")
+    normalized = re.sub(
+        r"::(?:character varying|varchar|text)(?:\(\d+\))?", "", normalized
+    )
+    normalized = re.sub(r"\s+", "", normalized)
+    if normalized.startswith("check"):
+        normalized = normalized[5:]
+    normalized = re.sub(r"[()]", "", normalized)
+    return normalized == "keyword<>''"
+
+
 class SearchHotKeywords(DwsRevisionAdapter):
     revision = "0012_search_hot_keywords"
     table = "p_search_hot_keyword"
@@ -1307,6 +1445,27 @@ class SearchHotKeywords(DwsRevisionAdapter):
                     f"{name} nullable expected={expected_column.nullable!r} "
                     f"observed={actual_column.nullable!r}"
                 )
+            if actual_column.default != expected_column.default:
+                conflicts.append(
+                    f"{name} default expected={expected_column.default!r} "
+                    f"observed={actual_column.default!r}"
+                )
+        checks = ctx.fetchall(
+            "SELECT c.conname, pg_get_constraintdef(c.oid) "
+            "FROM pg_constraint c "
+            "JOIN pg_class t ON t.oid = c.conrelid "
+            "JOIN pg_namespace n ON n.oid = t.relnamespace "
+            "WHERE n.nspname = ? AND t.relname = ? AND c.contype = 'c' "
+            "ORDER BY c.conname",
+            (ctx.schema, self.table),
+        )
+        keyword_checks = [
+            (str(name), str(expression or ""))
+            for name, expression in checks
+            if "keyword" in str(expression or "").lower()
+        ]
+        if not any(_is_nonempty_keyword_check(expression) for _, expression in keyword_checks):
+            conflicts.append("required CHECK (keyword <> '') constraint is absent or mismatched")
         return conflicts
 
     def _existing_rows(self, ctx: DwsRevisionContext) -> list[dict[str, Any]]:

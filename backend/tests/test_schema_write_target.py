@@ -59,6 +59,14 @@ class RecordingCursor:
             self.connection.rows = [(0, "main", ""), (2, "dwp", "")]
         elif "information_schema.tables" in sql:
             self.result = None
+        elif sql.lower().startswith("select version_num from"):
+            self.result = (self.connection.revision,) if self.connection.revision else None
+        elif sql.lower().startswith("insert into") and "alembic_version" in sql.lower():
+            self.connection.revision = params[0]
+            self.result = None
+        elif sql.lower().startswith("update") and "alembic_version" in sql.lower():
+            self.connection.revision = params[0]
+            self.result = None
         else:
             self.result = None
         return self
@@ -74,7 +82,7 @@ class RecordingCursor:
     def fetchall(self):
         if self.connection.rows is not None:
             return self.connection.rows
-        return []
+        return [self.result] if self.result is not None else []
 
     def close(self):
         self.closed = True
@@ -85,6 +93,7 @@ class RecordingConnection:
         self.schema = schema
         self.search_schemas = [schema] if search_schemas is None else search_schemas
         self.database = database
+        self.revision = None
         self.calls = []
         self.rows = None
         self.commits = 0
@@ -634,7 +643,12 @@ class SchemaWriteTargetContractTests(unittest.TestCase):
             "(version_num VARCHAR(32) NOT NULL PRIMARY KEY)",
             statements,
         )
-        self.assertIn("DELETE FROM dap.alembic_version", statements)
+        self.assertFalse(
+            any(sql.startswith("DELETE FROM dap.alembic_version") for sql in statements)
+        )
+        self.assertTrue(
+            any(sql.startswith("SELECT version_num FROM dap.alembic_version") for sql in statements)
+        )
         self.assertTrue(
             any(sql.startswith("INSERT INTO dap.alembic_version") for sql in statements)
         )
