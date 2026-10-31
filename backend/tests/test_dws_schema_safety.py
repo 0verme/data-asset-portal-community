@@ -45,6 +45,12 @@ class RecordingCursor:
             self.result = (1,) if self.connection.schema_exists else None
         elif lowered.startswith("select version_num from"):
             self.result = (self.connection.revision,) if self.connection.revision else None
+        elif lowered.startswith("insert into") and "alembic_version" in lowered:
+            self.connection.revision = params[0]
+            self.result = None
+        elif lowered.startswith("update") and "alembic_version" in lowered:
+            self.connection.revision = params[0]
+            self.result = None
         elif "from information_schema.tables" in lowered:
             self.result = (
                 (1,)
@@ -208,7 +214,7 @@ class DwsSchemaSafetyTests(unittest.TestCase):
         # The baseline must verify before it is stamped; the recording cursor
         # intentionally cannot answer the full catalog reflection.
         with patch(
-            "backend.app.migrations.schema.verify_database",
+            "backend.app.migrations.schema.verify_schema",
             return_value=None,
         ):
             self.assertTrue(initialize(connection, self.config, "dws"))
@@ -237,7 +243,12 @@ class DwsSchemaSafetyTests(unittest.TestCase):
             "(version_num VARCHAR(32) NOT NULL PRIMARY KEY)",
             [sql for sql, _ in connection.executed],
         )
-        self.assertIn("DELETE FROM dap.alembic_version", [sql for sql, _ in connection.executed])
+        self.assertFalse(
+            any(sql.startswith("DELETE FROM dap.alembic_version") for sql, _ in connection.executed)
+        )
+        self.assertTrue(
+            any(sql.startswith("SELECT version_num FROM dap.alembic_version") for sql, _ in connection.executed)
+        )
         self.assertTrue(any(sql.startswith("INSERT INTO dap.alembic_version") for sql, _ in connection.executed))
         self.assertFalse(any("dwp.alembic_version" in sql for sql, _ in connection.executed))
         schema_check = next(
@@ -265,7 +276,7 @@ class DwsSchemaSafetyTests(unittest.TestCase):
             return None
 
         with patch(
-            "backend.app.migrations.schema.verify_database",
+            "backend.app.migrations.schema.verify_schema",
             side_effect=verify_before_stamp,
         ) as verify:
             self.assertTrue(
@@ -289,7 +300,7 @@ class DwsSchemaSafetyTests(unittest.TestCase):
     def test_dws_fresh_schema_verification_failure_does_not_stamp_head(self):
         connection = RecordingConnection()
         with patch(
-            "backend.app.migrations.schema.verify_database",
+            "backend.app.migrations.schema.verify_schema",
             side_effect=RuntimeError("baseline schema drift"),
         ):
             with self.assertRaisesRegex(RuntimeError, "baseline schema drift"):

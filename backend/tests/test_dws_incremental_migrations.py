@@ -46,6 +46,15 @@ from backend.tests.dws_fake_database import (
 CONFIG = {"type": "gaussdb", "schema": "dap"}
 
 
+def _seed_platform_option_rows(database: FakeDwsDatabase) -> None:
+    apply_revisions(
+        database,
+        CONFIG,
+        "0008_indicator_semantic_contract",
+        "0009_upstream_option_contract",
+    )
+
+
 def _seed_legacy_business_rows(
     database: FakeDwsDatabase, *, include_upstream: bool = True
 ) -> None:
@@ -153,6 +162,13 @@ class DwsAdapterRegistryTests(unittest.TestCase):
             revision_chain("legacy_unknown", head)
         self.assertIn("not known to this repository", str(error.exception))
 
+    def test_unknown_start_does_not_write_an_empty_ledger(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        with self.assertRaises(DwsMigrationError):
+            apply_revisions(database, CONFIG, "unknown_revision", repository_head())
+        self.assertFalse(database.ledger_table)
+        self.assertIsNone(database.ledger)
+
 
 class DwsBaselineStatementTests(unittest.TestCase):
     def test_baseline_table_statements_extract_only_requested_tables(self):
@@ -177,6 +193,15 @@ class DwsBaselineStatementTests(unittest.TestCase):
 
 
 class DwsFreshAndAdoptionTests(unittest.TestCase):
+    def test_rbac_adoption_rejects_default_or_key_drift(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.set_default("p_role", "enabled", "N")
+
+        inspection = inspect_revision(database, CONFIG, "0005_rbac_persistence")
+
+        self.assertIs(RevisionState.CONFLICT, inspection.state)
+        self.assertIn("default", " ".join(inspection.details))
+
     def test_fresh_canonical_baseline_adopts_structure_and_seeds_options(self):
         database = FakeDwsDatabase().seed_from_baseline()
         results = apply_revisions(database, CONFIG, "0001_baseline", repository_head())
@@ -259,11 +284,17 @@ class DwsFreshAndAdoptionTests(unittest.TestCase):
         apply_revisions(database, CONFIG, "0001_baseline", repository_head())
         executed_before = len(database.executed)
         ledger_before = database.ledger
+        code_categories_before = [dict(row) for row in database.table("p_code_category").rows]
+        code_items_before = [dict(row) for row in database.table("p_code_item").rows]
+        search_keywords_before = [dict(row) for row in database.table("p_search_hot_keyword").rows]
 
         results = apply_revisions(database, CONFIG, repository_head(), repository_head())
 
         self.assertEqual([], results)
         self.assertEqual(ledger_before, database.ledger)
+        self.assertEqual(code_categories_before, database.table("p_code_category").rows)
+        self.assertEqual(code_items_before, database.table("p_code_item").rows)
+        self.assertEqual(search_keywords_before, database.table("p_search_hot_keyword").rows)
         mutations = [
             sql
             for sql, _ in database.executed[executed_before:]
@@ -299,7 +330,7 @@ class DwsLegacyUpgradeTests(unittest.TestCase):
             all(
                 action == "apply"
                 for revision, action in actions.items()
-                if revision != "0011_push_job_freq_desc_capacity"
+                if revision not in {"0011_push_job_freq_desc_capacity", "0013_field_filter_index"}
             )
         )
         self.assertEqual(repository_head(), database.ledger)
@@ -357,6 +388,69 @@ class DwsLegacyUpgradeTests(unittest.TestCase):
         self.assertEqual(1, database.table("p_asset_table").rows[0]["asset_id"])
         # The upgraded physical schema must satisfy the repository head
         # contract used by `schema_migrate.py verify`.
+        self.assertEqual(repository_head(), verify_database(database, CONFIG, "dws"))
+
+    def test_existing_0005_upgrades_in_order_and_preserves_business_rows(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        downgrade_to_prefix(database, set(REVISION_ORDER[:4]))
+        _seed_legacy_business_rows(database)
+        database.ledger_table = True
+        database.ledger = "0005_rbac_persistence"
+        original_mapping = dict(database.table("p_field_mapping_table").rows[0])
+        original_indicator = dict(database.table("p_indicator_item").rows[0])
+        original_asset = dict(database.table("p_asset_table").rows[0])
+
+        results = apply_revisions(
+            database, CONFIG, "0005_rbac_persistence", repository_head()
+        )
+
+        self.assertEqual(list(REVISION_ORDER[4:]), [result.revision for result in results])
+        self.assertEqual(repository_head(), database.ledger)
+        mapping = database.table("p_field_mapping_table").rows[0]
+        indicator = database.table("p_indicator_item").rows[0]
+        asset = database.table("p_asset_table").rows[0]
+        self.assertEqual(original_mapping["table_pk"], mapping["table_pk"])
+        self.assertEqual(original_mapping["source_table_name"], mapping["source_table_name"])
+        self.assertEqual(101, mapping["upstream_system_id"])
+        self.assertTrue(
+            database.table("p_field_mapping_table").columns["data_source_id"].nullable
+        )
+        self.assertEqual(original_indicator["indicator_pk"], indicator["indicator_pk"])
+        self.assertEqual(1, indicator["source_asset_id"])
+        self.assertEqual(11, indicator["result_field_id"])
+        self.assertEqual(original_asset["asset_id"], asset["asset_id"])
+        self.assertEqual(original_asset["table_name"], asset["table_name"])
+        self.assertEqual(repository_head(), verify_database(database, CONFIG, "dws"))
+
+    def test_existing_0009_upgrades_to_head_without_duplicate_seed_data(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        downgrade_to_prefix(database, set(REVISION_ORDER[:7]))
+        _seed_legacy_business_rows(database)
+        database.ledger_table = True
+        database.ledger = "0007_binary_status_contract"
+        apply_revisions(
+            database,
+            CONFIG,
+            "0007_binary_status_contract",
+            "0009_upstream_option_contract",
+        )
+        self.assertEqual("0009_upstream_option_contract", database.ledger)
+        original_mapping = dict(database.table("p_field_mapping_table").rows[0])
+        original_indicator = dict(database.table("p_indicator_item").rows[0])
+        original_asset = dict(database.table("p_asset_table").rows[0])
+        original_code_items = [dict(row) for row in database.table("p_code_item").rows]
+
+        results = apply_revisions(
+            database, CONFIG, "0009_upstream_option_contract", repository_head()
+        )
+
+        self.assertEqual(list(REVISION_ORDER[8:]), [result.revision for result in results])
+        self.assertEqual(repository_head(), database.ledger)
+        self.assertEqual(original_mapping["table_pk"], database.table("p_field_mapping_table").rows[0]["table_pk"])
+        self.assertEqual(original_indicator["indicator_pk"], database.table("p_indicator_item").rows[0]["indicator_pk"])
+        self.assertEqual(original_asset["asset_id"], database.table("p_asset_table").rows[0]["asset_id"])
+        self.assertEqual(original_code_items, database.table("p_code_item").rows)
+        self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
         self.assertEqual(repository_head(), verify_database(database, CONFIG, "dws"))
 
     def test_mixed_legacy_resumes_from_first_gap(self):
@@ -467,6 +561,7 @@ class DwsPushJobCapacityTests(unittest.TestCase):
     def test_0011_widens_legacy_freq_desc_and_verifies(self):
         database = FakeDwsDatabase().seed_from_baseline()
         downgrade_to_prefix(database, set(REVISION_ORDER[:9]))
+        _seed_platform_option_rows(database)
         self.assertEqual(
             "VARCHAR(200)",
             database.table("p_push_job").columns["freq_desc"].type_name,
@@ -502,6 +597,8 @@ class DwsPushJobCapacityTests(unittest.TestCase):
 class DwsSearchHotKeywordMigrationTests(unittest.TestCase):
     def test_0012_seeds_only_missing_values_and_preserves_customized_rows(self):
         database = FakeDwsDatabase().seed_from_baseline()
+        _seed_platform_option_rows(database)
+        database.ledger = "0011_push_job_freq_desc_capacity"
         database.table("p_search_hot_keyword").add_row(
             {
                 "id": 91,
@@ -526,6 +623,8 @@ class DwsSearchHotKeywordMigrationTests(unittest.TestCase):
 
     def test_0012_creates_a_missing_table_from_canonical_dws_ddl(self):
         database = FakeDwsDatabase().seed_from_baseline()
+        _seed_platform_option_rows(database)
+        database.ledger = "0011_push_job_freq_desc_capacity"
         database.remove_table("p_search_hot_keyword")
 
         apply_revisions(
@@ -555,6 +654,23 @@ class DwsSearchHotKeywordMigrationTests(unittest.TestCase):
         self.assertIs(RevisionState.CONFLICT, inspection.state)
         self.assertIn("does not match", inspection.summary)
 
+    def test_0012_rejects_default_or_check_constraint_drift(self):
+        for drift in ("default", "check"):
+            with self.subTest(drift=drift):
+                database = FakeDwsDatabase().seed_from_baseline()
+                if drift == "default":
+                    database.set_default("p_search_hot_keyword", "category", "custom")
+                else:
+                    database.remove_check(
+                        "p_search_hot_keyword",
+                        "ck_p_search_hot_keyword_keyword_nonempty",
+                    )
+                inspection = inspect_revision(
+                    database, CONFIG, "0012_search_hot_keywords"
+                )
+                self.assertIs(RevisionState.CONFLICT, inspection.state)
+                self.assertIn("does not match", inspection.summary)
+
 
 class DwsFieldMappingQueryIndexTests(unittest.TestCase):
     INDEX = "idx_p_field_mapping_field_table_deleted"
@@ -562,6 +678,9 @@ class DwsFieldMappingQueryIndexTests(unittest.TestCase):
 
     def test_0013_creates_the_non_unique_field_lookup_index_when_absent(self):
         database = FakeDwsDatabase().seed_from_baseline()
+        apply_revisions(
+            database, CONFIG, "0008_indicator_semantic_contract", "0012_search_hot_keywords"
+        )
         database.remove_index("p_field_mapping_field", self.INDEX)
         database.ledger = "0012_search_hot_keywords"
 
@@ -608,6 +727,28 @@ class DwsFailClosedTests(unittest.TestCase):
                 REVISION_ORDER.index(revision),
             )
 
+    def test_0004_wrong_identity_column_type_fails_closed(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.table("p_asset_table").columns["external_id"].type_name = "VARCHAR(32)"
+
+        inspection = inspect_revision(
+            database, CONFIG, "0004_metadata_ingestion_identity"
+        )
+
+        self.assertIs(RevisionState.CONFLICT, inspection.state)
+        self.assertIn("external_id type", " ".join(inspection.details))
+
+    def test_0008_wrong_semantic_default_fails_closed(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.set_default("p_indicator_item", "semantic_state", "ready")
+
+        inspection = inspect_revision(
+            database, CONFIG, "0008_indicator_semantic_contract"
+        )
+
+        self.assertIs(RevisionState.CONFLICT, inspection.state)
+        self.assertIn("semantic_state default", " ".join(inspection.details))
+
     def test_partial_indicator_columns_fail_closed(self):
         database = FakeDwsDatabase().seed_from_baseline()
         downgrade_to_prefix(database, set(REVISION_ORDER[:6]))
@@ -634,6 +775,9 @@ class DwsFailClosedTests(unittest.TestCase):
             ("semantic_state", "VARCHAR(32)"),
         ):
             database.add_column("p_indicator_item", column, type_name)
+        semantic_state = database.table("p_indicator_item").columns["semantic_state"]
+        semantic_state.default = "candidate"
+        semantic_state.nullable = False
 
         inspection = inspect_revision(
             database, CONFIG, "0008_indicator_semantic_contract"
@@ -759,6 +903,105 @@ class DwsFailClosedTests(unittest.TestCase):
 
 
 class DwsFailureRecoveryTests(unittest.TestCase):
+    def test_head_is_not_stamped_when_full_schema_verification_fails(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.set_default("p_role", "enabled", "N")
+        database.ledger_table = True
+        database.ledger = "0011_push_job_freq_desc_capacity"
+
+        with self.assertRaises(DwsMigrationError) as error:
+            apply_revisions(
+                database,
+                CONFIG,
+                "0011_push_job_freq_desc_capacity",
+                repository_head(),
+            )
+
+        self.assertEqual(repository_head(), error.exception.revision)
+        self.assertIn("full head schema verification failed", str(error.exception))
+        self.assertEqual("0012_search_hot_keywords", database.ledger)
+        self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
+
+    def test_head_stamp_waits_for_all_prior_revision_postconditions(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.ledger_table = True
+        database.ledger = "0011_push_job_freq_desc_capacity"
+
+        with self.assertRaises(DwsMigrationError) as error:
+            apply_revisions(
+                database, CONFIG, "0011_push_job_freq_desc_capacity", repository_head()
+            )
+
+        self.assertEqual("0009_upstream_option_contract", error.exception.revision)
+        self.assertIn("post-condition", str(error.exception))
+        self.assertEqual("0012_search_hot_keywords", database.ledger)
+        self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
+
+    def test_ledger_update_failure_keeps_prior_revision_and_retry_adopts_ddl(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        downgrade_to_prefix(database, set())
+        database.ledger_table = True
+        database.ledger = "0001_baseline"
+        database.fail_on = "UPDATE dap.alembic_version"
+
+        with self.assertRaises(DwsMigrationError) as error:
+            apply_revisions(database, CONFIG, "0001_baseline", repository_head())
+
+        self.assertEqual("0002_portable_asset_filter", error.exception.revision)
+        self.assertIn("previous ledger value is intact", str(error.exception))
+        self.assertEqual("0001_baseline", database.ledger)
+        self.assertIn(
+            "idx_p_asset_table_filter", database.table("p_asset_table").indexes
+        )
+
+        database.fail_on = None
+        results = apply_revisions(database, CONFIG, "0001_baseline", repository_head())
+
+        actions = {result.revision: result.action for result in results}
+        self.assertEqual("adopt", actions["0002_portable_asset_filter"])
+        filter_creates = [
+            sql
+            for sql, _ in database.executed
+            if sql.startswith("CREATE INDEX idx_p_asset_table_filter")
+        ]
+        self.assertEqual(1, len(filter_creates))
+        self.assertEqual(repository_head(), database.ledger)
+
+    def test_fresh_apply_recovers_empty_ledger_only_after_baseline_verifies(self):
+        database = FakeDwsDatabase()
+        database.fail_on = "INSERT INTO dap.alembic_version"
+
+        with self.assertRaises(RuntimeError):
+            initialize(database, CONFIG, "dws")
+
+        self.assertTrue(database.ledger_table)
+        self.assertIsNone(database.ledger)
+        self.assertIn("p_asset_table", database.tables)
+        database.fail_on = None
+
+        exit_code, output = DwsSchemaMigrateCliTests()._run_cli(
+            database, ["apply", "--profile", "dws_test"]
+        )
+
+        self.assertEqual(0, exit_code)
+        self.assertEqual(repository_head(), database.ledger)
+        self.assertIn(f"applied={repository_head()}", output)
+
+    def test_empty_ledger_with_partial_schema_fails_closed(self):
+        database = FakeDwsDatabase()
+        database.fail_on = "INSERT INTO dap.alembic_version"
+        with self.assertRaises(RuntimeError):
+            initialize(database, CONFIG, "dws")
+        database.fail_on = None
+        database.remove_column("p_asset_table", "domain_code")
+
+        with self.assertRaisesRegex(RuntimeError, "Schema verification failed"):
+            DwsSchemaMigrateCliTests()._run_cli(
+                database, ["apply", "--profile", "dws_test"]
+            )
+
+        self.assertIsNone(database.ledger)
+
     def test_failure_before_0008_index_leaves_ledger_at_0007_and_fails_closed(self):
         database = FakeDwsDatabase().seed_from_baseline()
         downgrade_to_prefix(database, set(REVISION_ORDER[:6]))
@@ -821,6 +1064,31 @@ class DwsFailureRecoveryTests(unittest.TestCase):
         )
         self.assertEqual(
             11, database.table("p_indicator_item").rows[0]["result_field_id"]
+        )
+
+    def test_successful_revision_remains_recorded_when_following_revision_fails(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        downgrade_to_prefix(database, set(REVISION_ORDER[:7]))
+        database.ledger_table = True
+        database.ledger = "0008_indicator_semantic_contract"
+        database.fail_on = "CREATE INDEX idx_p_field_mapping_table_identity"
+
+        with self.assertRaises(DwsMigrationError) as error:
+            apply_revisions(
+                database, CONFIG, "0008_indicator_semantic_contract", repository_head()
+            )
+
+        self.assertEqual("0010_field_mapping_identity", error.exception.revision)
+        self.assertEqual("0009_upstream_option_contract", database.ledger)
+        self.assertTrue(
+            any(
+                row.get("category_code") == "UPSTREAM_DB_TYPE"
+                for row in database.table("p_code_category").rows
+            )
+        )
+        self.assertNotIn(
+            "idx_p_field_mapping_table_identity",
+            database.table("p_field_mapping_table").indexes,
         )
 
     def test_post_condition_failure_never_advances_ledger(self):
@@ -889,6 +1157,47 @@ class DwsSchemaMigrateCliTests(unittest.TestCase):
         self.assertIn(f"applied={repository_head()}", output)
         self.assertIn("rbac_seed=inserted:0", output)
 
+    def test_cli_repeat_apply_at_head_does_not_duplicate_revision_seeds(self):
+        database = FakeDwsDatabase()
+        first_exit, _ = self._run_cli(database, ["apply", "--profile", "dws_test"])
+        self.assertEqual(0, first_exit)
+        before_categories = [dict(row) for row in database.table("p_code_category").rows]
+        before_items = [dict(row) for row in database.table("p_code_item").rows]
+        before_keywords = [dict(row) for row in database.table("p_search_hot_keyword").rows]
+
+        second_exit, output = self._run_cli(
+            database, ["apply", "--profile", "dws_test"]
+        )
+
+        self.assertEqual(0, second_exit)
+        self.assertIn("applied=-", output)
+        self.assertEqual(before_categories, database.table("p_code_category").rows)
+        self.assertEqual(before_items, database.table("p_code_item").rows)
+        self.assertEqual(before_keywords, database.table("p_search_hot_keyword").rows)
+
+    def test_verify_allows_legitimate_unlinked_indicator_after_backfill(self):
+        database = FakeDwsDatabase()
+        exit_code, _ = self._run_cli(database, ["apply", "--profile", "dws_test"])
+        self.assertEqual(0, exit_code)
+        _seed_legacy_business_rows(database, include_upstream=False)
+        # A post-migration application write may deliberately leave stable
+        # references NULL even when the legacy names resolve uniquely.
+        indicator = database.table("p_indicator_item").rows[-1]
+        indicator["semantic_state"] = "candidate"
+        indicator["source_asset_id"] = None
+        indicator["result_field_id"] = None
+        self.assertEqual(
+            RevisionState.NOT_APPLIED,
+            inspect_revision(database, CONFIG, "0008_indicator_semantic_contract").state,
+        )
+        exit_code, _ = self._run_cli(database, ["verify", "--profile", "dws_test"])
+        self.assertEqual(0, exit_code)
+        exit_code, output = self._run_cli(database, ["apply", "--profile", "dws_test"])
+        self.assertEqual(0, exit_code)
+        self.assertIn("applied=-", output)
+        self.assertIsNone(indicator["source_asset_id"])
+        self.assertIsNone(indicator["result_field_id"])
+
     def test_cli_plan_lists_adopt_and_apply_actions(self):
         database = FakeDwsDatabase().seed_from_baseline()
         downgrade_to_prefix(database, set(REVISION_ORDER[:4]))
@@ -935,6 +1244,33 @@ class DwsSchemaMigrateCliTests(unittest.TestCase):
         self.assertIn("dialect=dws", output)
         self.assertIn("revision=0005_rbac_persistence", output)
         self.assertIn(f"head={repository_head()}", output)
+
+    def test_cli_verify_rejects_stale_dws_ledger(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.ledger_table = True
+        database.ledger = "0005_rbac_persistence"
+
+        with self.assertRaisesRegex(RuntimeError, "behind repository head"):
+            self._run_cli(database, ["verify", "--profile", "dws_test"])
+
+    def test_verify_checks_every_revision_postcondition_at_head(self):
+        database = FakeDwsDatabase()
+        exit_code, _ = self._run_cli(database, ["apply", "--profile", "dws_test"])
+        self.assertEqual(0, exit_code)
+        database.table("p_search_hot_keyword").checks.clear()
+        executed_before = len(database.executed)
+
+        with self.assertRaisesRegex(RuntimeError, "post-condition"):
+            self._run_cli(database, ["verify", "--profile", "dws_test"])
+
+        writes = [
+            sql
+            for sql, _ in database.executed[executed_before:]
+            if sql.lstrip().upper().startswith(
+                ("INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP")
+            )
+        ]
+        self.assertEqual([], writes)
 
 
 class DwsUnknownLedgerTests(unittest.TestCase):

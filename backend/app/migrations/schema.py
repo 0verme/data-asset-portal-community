@@ -14,6 +14,12 @@ from ..db.write_target import resolve_write_target
 
 BASELINE_REVISION = "0001_baseline"
 SUPPORTED_DIALECTS = ("sqlite", "postgresql", "mysql", "dws")
+
+
+class EmptyRevisionLedgerError(RuntimeError):
+    """The ledger table exists but has no recorded revision."""
+
+
 SCHEMA_ROOT = Path(__file__).resolve().parents[2] / "schema"
 TABLE_RE = re.compile(r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(?:dwp\.)?([A-Za-z0-9_]+)", re.I)
 CREATE_TABLE_RE = re.compile(
@@ -812,6 +818,10 @@ def current_revision(connection, config: dict) -> str | None:
     try:
         cursor.execute(f"SELECT version_num FROM {_prefix(config)}alembic_version")
         rows = cursor.fetchall()
+        if not rows:
+            raise EmptyRevisionLedgerError(
+                "alembic_version must contain exactly one revision; found 0 rows"
+            )
         if len(rows) != 1:
             raise RuntimeError(
                 "alembic_version must contain exactly one revision; "
@@ -883,19 +893,49 @@ def stamp_revision(connection, config: dict, revision: str) -> None:
 
 def _stamp(connection, config: dict, revision: str = BASELINE_REVISION):
     prefix = _prefix(config)
+    provider = get_provider(config["type"])
+    placeholder = provider.placeholder
+    ledger = f"{prefix}alembic_version"
     _execute(
         connection,
-        f"CREATE TABLE IF NOT EXISTS {prefix}alembic_version "
+        f"CREATE TABLE IF NOT EXISTS {ledger} "
         "(version_num VARCHAR(32) NOT NULL PRIMARY KEY)",
         split=False,
     )
     cursor = connection.cursor()
     try:
-        cursor.execute(f"DELETE FROM {prefix}alembic_version")
-        cursor.execute(
-            f"INSERT INTO {prefix}alembic_version (version_num) VALUES ({get_provider(config['type']).placeholder})",
-            (revision,),
-        )
+        cursor.execute(f"SELECT version_num FROM {ledger}")
+        rows = cursor.fetchall()
+        if len(rows) > 1:
+            raise RuntimeError(
+                "alembic_version must contain at most one revision before stamping; "
+                f"found {len(rows)} rows"
+            )
+        if not rows:
+            cursor.execute(
+                f"INSERT INTO {ledger} (version_num) VALUES ({placeholder})",
+                (revision,),
+            )
+        else:
+            current = rows[0][0]
+            if current is None or not str(current).strip():
+                raise RuntimeError("alembic_version contains an empty revision")
+            if str(current) != revision:
+                # UPDATE preserves the last known-good value if the replacement
+                # write fails. DELETE+INSERT could leave an empty ledger on DWS
+                # implementations where DDL/DML rollback behavior differs.
+                cursor.execute(
+                    f"UPDATE {ledger} SET version_num = {placeholder} "
+                    f"WHERE version_num = {placeholder}",
+                    (revision, current),
+                )
+        cursor.execute(f"SELECT version_num FROM {ledger}")
+        recorded = cursor.fetchall()
+        if len(recorded) != 1 or str(recorded[0][0]) != revision:
+            raise RuntimeError(
+                "alembic_version stamp was not confirmed; "
+                f"expected {revision!r}, observed {recorded!r}"
+            )
     finally:
         cursor.close()
 
@@ -910,17 +950,36 @@ def initialize(
 ) -> bool:
     if dialect == "dws":
         _assert_dws_schema_exists(connection, config)
-    if current_revision(connection, config) is not None:
+    try:
+        existing_revision = current_revision(connection, config)
+    except EmptyRevisionLedgerError:
+        if dialect != "dws":
+            raise
+        existing_revision = None
+    if existing_revision is not None:
         return False
     if _has_user_tables(connection, config):
-        raise RuntimeError("database already contains user tables; verify it and use baseline/stamp")
+        if dialect != "dws":
+            raise RuntimeError("database already contains user tables; verify it and use baseline/stamp")
+        # A DWS baseline DDL or its first ledger INSERT may have committed even
+        # when the connection later failed. Recover only if the complete current
+        # canonical schema is physically verified; partial/unknown schemas stay
+        # fail-closed and require explicit repair.
+        verify_schema(connection, config, dialect, root)
+        try:
+            _stamp(connection, config, initial_revision)
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        return False
     sql = render_baseline_for_profile(config, dialect, root)
     try:
         _execute(connection, sql, split=dialect in {"sqlite", "mysql", "dws"})
         if dialect == "dws":
             # DWS's canonical baseline already represents repository head. The
             # physical schema must verify before any logical revision is recorded.
-            verify_database(connection, config, dialect, root)
+            verify_schema(connection, config, dialect, root)
         _stamp(connection, config, initial_revision)
         connection.commit()
         return True
@@ -1612,12 +1671,17 @@ def _format_schema_mismatches(mismatches: list[SchemaMismatch]) -> str:
     return "Schema verification failed:\n" + "\n".join(summary) + ("\n\n" if summary else "") + details
 
 
-def verify_database(connection, config: dict, dialect: str, root: Path = SCHEMA_ROOT):
+def verify_schema(connection, config: dict, dialect: str, root: Path = SCHEMA_ROOT) -> None:
+    """Verify physical schema shape without making a claim about its ledger."""
     expected = baseline_schema(dialect, root)
     actual = reflect_schema(connection, config, expected)
     mismatches = compare_schema(expected, actual)
     if mismatches:
         raise RuntimeError(_format_schema_mismatches(mismatches))
+
+
+def verify_database(connection, config: dict, dialect: str, root: Path = SCHEMA_ROOT):
+    verify_schema(connection, config, dialect, root)
     return current_revision(connection, config)
 
 

@@ -194,6 +194,12 @@ class FakeDwsDatabase:
                 "ck_p_manual_code_table_status_code",
                 "status_code IN ('enabled', 'disabled')",
             )
+        if "p_search_hot_keyword" in self.tables:
+            self.add_check(
+                "p_search_hot_keyword",
+                "ck_p_search_hot_keyword_keyword_nonempty",
+                "CHECK ((keyword <> ''::character varying))",
+            )
         return self
 
     def _table_from_spec(self, name: str, spec) -> FakeTable:
@@ -621,6 +627,8 @@ class FakeDwsDatabase:
                 table.checks["ck_p_manual_code_table_status_code"] = expression
             elif "table_style" in expression:
                 table.checks["ck_p_manual_code_table_table_style"] = expression
+            elif "keyword" in expression:
+                table.checks["ck_p_search_hot_keyword_keyword_nonempty"] = expression
         self.tables[name] = table
 
     # -- DML -------------------------------------------------------------
@@ -731,8 +739,10 @@ class FakeDwsDatabase:
         if lowered.startswith("create table if not exists") and "alembic_version" in lowered:
             self.ledger_table = True
             return True
-        if lowered.startswith("delete from") and "alembic_version" in lowered:
-            self.ledger = None
+        if lowered.startswith("update") and "alembic_version" in lowered:
+            new_revision, previous_revision = params
+            if self.ledger == previous_revision:
+                self.ledger = new_revision
             return True
         if lowered.startswith("insert into") and "alembic_version" in lowered:
             self.ledger = params[0] if params else None
@@ -786,11 +796,7 @@ def downgrade_to_prefix(database: FakeDwsDatabase, satisfied: Iterable[str]) -> 
 def _reverse_revision(
     database: FakeDwsDatabase, revision: str, satisfied: set[str]
 ) -> None:
-    if revision == "0013_field_filter_index":
-        database.remove_index(
-            "p_field_mapping_field", "idx_p_field_mapping_field_table_deleted"
-        )
-    elif revision == "0012_search_hot_keywords":
+    if revision == "0012_search_hot_keywords":
         database.remove_table("p_search_hot_keyword")
     elif revision == "0002_portable_asset_filter":
         database.remove_index("p_asset_table", "idx_p_asset_table_filter")
