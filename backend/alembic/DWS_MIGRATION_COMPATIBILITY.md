@@ -1,6 +1,6 @@
 # GaussDB/DWS revision compatibility contract
 
-> Scope: repository revisions `0002`–`0012` and the JDBC-backed DWS upgrade runner. This matrix is a source audit, not a claim of live GaussDB/DWS 8.1.3 validation. DWS transaction/DDL behavior remains **NOT RUN** until the maintainer executes `REAL_DWS_VALIDATION.md` on the target release.
+> Scope: repository revisions `0002`–`0013` and the JDBC-backed DWS upgrade runner. This matrix is a source audit, not a claim of live GaussDB/DWS 8.1.3 validation. DWS transaction/DDL behavior remains **NOT RUN** until the maintainer executes `REAL_DWS_VALIDATION.md` on the target release.
 
 | Revision | DDL change | DML / backfill | Reflection / Inspector | DWS syntax / adapter finding | Transaction / recovery risk | Reuse and test strategy |
 |---|---|---|---|---|---|---|
@@ -26,6 +26,8 @@
 | GaussDB/DWS | `connect_with_profile` JDBC connection + explicit ordered adapter registry; no online Alembic engine | Schema-aware catalog reflection, `?` binds, canonical DWS table DDL/distribution, no physical FKs, explicit adapters for every revision `0002`–head. SQLite batch operations and PostgreSQL Inspector/transaction assumptions are not used. | DDL autocommit/rollback/savepoint behavior on 8.1.3 is **NOT RUN**. Design retains the old revision on failure, re-inspects actual physical state, and either safely adopts/retries or fails closed. |
 
 The PostgreSQL/MySQL statements above describe their repository-supported Alembic drivers and CI integration, not a claim that DWS implements the same transaction model. Local live PG/MySQL/DWS availability is recorded separately in the PR/test report; CI evidence is not described as local execution.
+
+| `0013_field_filter_index` | Add non-unique `idx_p_field_mapping_field_table_deleted(table_pk, is_deleted)` | None; preserves all mapping rows | DWS schema reflection via `get_indexes` | The current DWS baseline already contains the index; older schemas create it with schema-qualified table DDL and plain `CREATE INDEX` (no `IF NOT EXISTS`). A missing field table or same-name index with different columns/uniqueness is a conflict. Generic Alembic skips an absent table to preserve legacy partial-schema upgrades, while DWS requires the table under its canonical baseline contract. | One DDL statement; failed DDL must leave the revision ledger unchanged. Re-inspect before retry because DWS DDL transactionality is unverified. | Adapter tests cover fresh-baseline adoption, absent-index creation and mismatched-index rejection. Live DWS execution remains NOT RUN. |
 
 ## Ledger and authoring rules
 
@@ -126,5 +128,6 @@ After `NOT_APPLIED` execution the adapter is inspected again; the ledger advance
 * **Distribution clauses are preserved** by creating missing `0003`/`0005` tables from the canonical baseline statements instead of duplicating historical DDL.
 * **`0009` seeds only missing platform `UPSTREAM_DB_TYPE` codes**; it never inserts retail Demo department rows and never overwrites/deletes existing customized or historical codes. The explicit Demo seed owns the complete retail department sample.
 * **`0012` creates from canonical DWS DDL and seeds only missing `(keyword, category)` rows**; existing keywords, enabled state, sort order, IDs, and custom rows are never overwritten.
+* **`0013` adds only a non-unique field lookup index**; existing mapping rows are untouched, and an unexpected same-name index is rejected rather than replaced.
 * **Check-constraint detection for `0007` and `0012`** uses `pg_constraint` + `pg_get_constraintdef`; both target-table queries are part of the maintainer's real-DWS validation checklist.
 * **DDL transactionality is assumed unsafe.** The runner commits each revision only after its post-condition is confirmed; if DWS auto-commits DDL, an interrupted revision is re-inspected and either safely resumed or reported as a conflict.
