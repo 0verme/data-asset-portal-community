@@ -1,6 +1,6 @@
 # GaussDB/DWS revision compatibility contract
 
-> Scope: repository revisions `0002`–`0012` and the JDBC-backed DWS upgrade runner. This matrix is a source audit, not a claim of live GaussDB/DWS 8.1.3 validation. DWS transaction/DDL behavior remains **NOT RUN** until the maintainer executes `REAL_DWS_VALIDATION.md` on the target release.
+> Scope: repository revisions `0002`–`0013` and the JDBC-backed DWS upgrade runner. This matrix is a source audit, not a claim of live GaussDB/DWS 8.1.3 validation. DWS transaction/DDL behavior remains **NOT RUN** until the maintainer executes `REAL_DWS_VALIDATION.md` on the target release.
 
 | Revision | DDL change | DML / backfill | Reflection / Inspector | DWS syntax / adapter finding | Transaction / recovery risk | Reuse and test strategy |
 |---|---|---|---|---|---|---|
@@ -15,6 +15,7 @@
 | `0010_field_mapping_identity` | Drop obsolete source-only unique index; add non-unique five-column identity index | None; deliberately preserves rows | `has_table`, `get_indexes`, `get_unique_constraints` | Current DWS baseline already has the final identity index. DWS catalog reflection and `DROP INDEX` schema behavior need an adapter; reject unexpected remaining unique source-only constraints. | A drop followed by failed create leaves a detectable partial state; ledger remains at 0009 and retry rechecks both indexes. | Reuse validation rules; DWS reflection/DDL tests for old, final, conflicting and partially applied index states. |
 | `0011_push_job_freq_desc_capacity` | `p_push_job.freq_desc` has text capacity >= 1000 | yes: column type reflection | yes | only a recognized text type below 1000 is pending; an unrecognized type is a conflict | widen the column explicitly with `ALTER COLUMN ... TYPE VARCHAR(1000)` |
 | `0012_search_hot_keywords` | Create `p_search_hot_keyword` from the canonical DWS baseline if absent; validate its columns, primary/unique keys, and types | Add only missing neutral recommendations; preserve existing rows and customizations | yes: table/column/PK/unique reflection plus row query | absence or missing seed rows is pending; a partial or mismatched table is a conflict. Uses canonical schema-qualified DWS DDL, including `DISTRIBUTE BY REPLICATION`. | DDL may survive failure; re-inspect before retry. Seed insertion is additive and checked before each write. | DWS adapter tests cover table creation, missing defaults, preserved disabled/custom rows, retry and fail-closed shape mismatch. Real DWS execution remains NOT RUN. |
+| `0013_field_filter_index` | Add non-unique `idx_p_field_mapping_field_table_deleted(table_pk, is_deleted)` | None; preserves all mapping rows | DWS schema reflection via `get_indexes` | The current DWS baseline already contains the index; older schemas create it with schema-qualified table DDL and plain `CREATE INDEX` (no `IF NOT EXISTS`). A missing field table or same-name index with different columns/uniqueness is a conflict. Generic Alembic skips an absent table to preserve legacy partial-schema upgrades, while DWS requires the table under its canonical baseline contract. | One DDL statement; failed DDL must leave the revision ledger unchanged. Re-inspect before retry because DWS DDL transactionality is unverified. | Adapter tests cover fresh-baseline adoption, absent-index creation and mismatched-index rejection. Live DWS execution remains NOT RUN. |
 
 ## Ledger and authoring rules
 
@@ -52,6 +53,7 @@ Git history confirms the released baselines form a *prefix* of the revision chai
 | this Issue | #313 | + `0002` portable filter index in every canonical baseline |
 | `973c709` | #317 | + `0011` `p_push_job.freq_desc` widened to `VARCHAR(1000)` in every canonical baseline |
 | this Issue | #321 | + `0012` search recommendation table and minimal neutral defaults in every canonical baseline |
+| this Issue | #403 | + `0013` non-unique field-mapping `(table_pk, is_deleted)` lookup index in every canonical baseline |
 
 Consequences:
 
@@ -95,6 +97,7 @@ After `NOT_APPLIED` execution the adapter is inspected again; the ledger advance
 | `0010_field_mapping_identity` | obsolete `idx_p_field_mapping_table_uk_01` gone, five-column non-unique `idx_p_field_mapping_table_identity` present, no other source-only unique key | yes: index/unique reflection | yes | obsolete + identity together, or neither, is a conflict | remove the obsolete source-only unique index explicitly before retrying |
 | `0011_push_job_freq_desc_capacity` | `p_push_job.freq_desc` is text with capacity >= 1000 (or unlimited) | yes: column type reflection | yes | only a recognized text type < 1000 is pending; an unrecognized type is a conflict | widen `freq_desc` to `VARCHAR(1000)`; never truncate or rewrite data |
 | `0012_search_hot_keywords` | canonical `p_search_hot_keyword` shape and all neutral default rows are present | yes: table/column/PK/unique reflection + seed query | yes | absent table or missing default subset is additive; mismatched shape is a conflict | create the table from canonical DWS baseline DDL if absent, then insert only missing `(keyword, category)` defaults |
+| `0013_field_filter_index` | non-unique `(table_pk, is_deleted)` index on `p_field_mapping_field` | yes: index reflection | yes | absent index is pending; same-name index with different columns or uniqueness is a conflict | create the index explicitly after verifying the table exists; never drop or replace an existing index |
 
 ### DWS-specific constraints encoded by the adapters
 
@@ -103,5 +106,6 @@ After `NOT_APPLIED` execution the adapter is inspected again; the ledger advance
 * **Distribution clauses are preserved** by creating missing `0003`/`0005` tables from the canonical baseline statements instead of duplicating historical DDL.
 * **`0009` seeds only missing platform `UPSTREAM_DB_TYPE` codes**; it never inserts retail Demo department rows and never overwrites/deletes existing customized or historical codes. The explicit Demo seed owns the complete retail department sample.
 * **`0012` creates from canonical DWS DDL and seeds only missing `(keyword, category)` rows**; existing keywords, enabled state, sort order, IDs, and custom rows are never overwritten.
+* **`0013` adds only a non-unique field lookup index**; existing mapping rows are untouched, and an unexpected same-name index is rejected rather than replaced.
 * **Check-constraint detection for `0007`** uses `pg_constraint` + `pg_get_constraintdef`; this query is part of the maintainer's real-DWS validation checklist.
 * **DDL transactionality is assumed unsafe.** The runner commits each revision only after its post-condition is confirmed; if DWS auto-commits DDL, an interrupted revision is re-inspected and either safely resumed or reported as a conflict.

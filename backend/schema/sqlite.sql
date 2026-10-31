@@ -116,6 +116,8 @@ CREATE TABLE IF NOT EXISTS dwp.p_field_mapping_field (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (table_pk) REFERENCES p_field_mapping_table(table_pk) ON DELETE CASCADE
 );
+CREATE INDEX IF NOT EXISTS dwp.idx_p_field_mapping_field_table_deleted
+    ON p_field_mapping_field (table_pk, is_deleted);
 
 CREATE TABLE IF NOT EXISTS dwp.p_role (
   role_code TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT,

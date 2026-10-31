@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time
@@ -49,7 +48,7 @@ from ..db.facade import (
 from ..db.service import CoreAccess
 from ..db.tables import data_source, mapping_field, mapping_table, upstream_system
 from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
-from ..settings import get_int_env, get_page_size_limits
+from ..settings import get_page_size_limits
 from ..utils.service_perf import log_slow_service_call
 from .operation_log_service import (
     OPERATION_TYPE_IMPORT,
@@ -124,7 +123,6 @@ class FieldMappingService(AuditActorMixin):
         db_profile: str | None = None,
     ):
         self._db_profile = (db_profile or os.getenv("ASSET_DB_PROFILE", "")).strip()
-        self._stats_cache = {}
         self._db = db or CoreAccess(
             profile_getter=lambda: self._db_profile,
             error_factory=FieldMappingDataSourceError,
@@ -314,44 +312,6 @@ class FieldMappingService(AuditActorMixin):
         except (TypeError, ValueError):
             page_size = default_page_size
         return max(1, page), max(1, min(max_page_size, page_size))
-
-    def _stats_cache_key(self, params=None):
-        relevant = {
-            "keyword": (params or {}).get("keyword"),
-            "sourceSystemId": (params or {}).get("sourceSystemId"),
-            "source_system_id": (params or {}).get("source_system_id"),
-            "upstreamSystemId": (params or {}).get("upstreamSystemId"),
-            "dataSourceId": (params or {}).get("dataSourceId"),
-            "srcSystem": (params or {}).get("srcSystem"),
-            "srcTable": (params or {}).get("srcTable"),
-            "srcField": (params or {}).get("srcField"),
-            "emptyComment": (params or {}).get("emptyComment"),
-            "targetTable": (params or {}).get("targetTable"),
-            "targetField": (params or {}).get("targetField"),
-            "tablePk": (params or {}).get("tablePk"),
-        }
-        return json.dumps(relevant, ensure_ascii=False, sort_keys=True)
-
-    def _get_cached_stats(self, params=None):
-        key = self._stats_cache_key(params)
-        entry = self._stats_cache.get(key)
-        if not entry:
-            return None
-        if time.time() - entry["ts"] > get_int_env(
-            "FIELD_MAPPING_STATS_CACHE_TTL_SECONDS", 300, minimum=1
-        ):
-            self._stats_cache.pop(key, None)
-            return None
-        return entry["value"]
-
-    def _set_cached_stats(self, params, value):
-        self._stats_cache[self._stats_cache_key(params)] = {
-            "ts": time.time(),
-            "value": value,
-        }
-
-    def clear_stats_cache(self):
-        self._stats_cache.clear()
 
     @staticmethod
     def _is_active(value: Any) -> bool:
@@ -1063,8 +1023,6 @@ class FieldMappingService(AuditActorMixin):
                     ),
                 )
             results.append(result)
-            if not request.dry_run and result["action"] in {"created", "updated"}:
-                self.clear_stats_cache()
 
         summary_values = {
             "received": len(request.items),
@@ -1230,9 +1188,6 @@ class FieldMappingService(AuditActorMixin):
         ]
 
     def get_stats(self, params=None):
-        cached = self._get_cached_stats(params)
-        if cached is not None:
-            return cached
         statement = (
             select(
                 func.count(distinct(upstream_system.c.system_pk)).label(
@@ -1241,37 +1196,36 @@ class FieldMappingService(AuditActorMixin):
                 func.count(distinct(mapping_table.c.table_pk)).label(
                     "source_table_count"
                 ),
-                func.count(distinct(mapping_field.c.field_pk)).label("field_count"),
+                # Each active field joins to exactly one mapping table and one
+                # upstream system; data_source is a PK lookup. These field
+                # aggregates therefore need no DISTINCT temporary sets.
+                func.count(mapping_field.c.field_pk).label("field_count"),
                 func.count(
-                    distinct(
-                        case(
-                            (
-                                func.coalesce(
-                                    func.length(func.trim(mapping_field.c.target_field_name)),
-                                    0,
-                                )
-                                > 0,
-                                mapping_field.c.field_pk,
-                            ),
-                            else_=None,
-                        )
+                    case(
+                        (
+                            func.coalesce(
+                                func.length(func.trim(mapping_field.c.target_field_name)),
+                                0,
+                            )
+                            > 0,
+                            1,
+                        ),
+                        else_=None,
                     )
                 ).label("mapped_field_count"),
                 func.count(
-                    distinct(
-                        case(
-                            (
-                                func.coalesce(
-                                    func.length(
-                                        func.trim(mapping_field.c.source_field_comment)
-                                    ),
-                                    0,
-                                )
-                                == 0,
-                                mapping_field.c.field_pk,
-                            ),
-                            else_=None,
-                        )
+                    case(
+                        (
+                            func.coalesce(
+                                func.length(
+                                    func.trim(mapping_field.c.source_field_comment)
+                                ),
+                                0,
+                            )
+                            == 0,
+                            1,
+                        ),
+                        else_=None,
                     )
                 ).label("empty_comment_count"),
             )
@@ -1302,7 +1256,6 @@ class FieldMappingService(AuditActorMixin):
             else 0,
             "coverage": round(mapped_count * 100 / total_count) if total_count else 0,
         }
-        self._set_cached_stats(params, result)
         return result
 
     def get_field_mappings(self, params=None):
