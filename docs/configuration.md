@@ -127,7 +127,7 @@ Defaults are shown for orientation and are implemented by the runtime.
 | `ASSET_SCHEMA_PREFIX` | logical schema prefix for asset services | unset; optional |
 | `ASSET_OPERATOR` | name used by explicitly declared system/background actors; not an HTTP fallback | `system` |
 | `APP_PAGE_SIZE_DEFAULT`, `APP_PAGE_SIZE_MAX` | pagination bounds | service defaults; runtime |
-| `FIELD_MAPPING_STATS_CACHE_TTL_SECONDS`, `PORTAL_STATS_CACHE_TTL_SECONDS` | service cache TTLs | `300`, `600` |
+| `PORTAL_STATS_CACHE_TTL_SECONDS` | portal aggregate statistics cache TTL | `600` |
 | `APP_SLOW_SERVICE_SECONDS` | slow-service logging threshold | `3` |
 | `SEARCH_DEFAULT_LIMIT`, `SEARCH_MODULE_LIMIT`, `SEARCH_MAX_LIMIT` | search result limits | `5`, `10`, `50` |
 | `APP_LOG_MAX_BYTES`, `APP_LOG_BACKUP_COUNT` | log rotation | `2097152`, `5` |

@@ -435,8 +435,8 @@ class FieldMappingImportServiceTests(unittest.TestCase):
             ).fetchone(),
         )
 
-    def test_dry_run_has_zero_writes_and_real_replay_still_creates(self):
-        self.service._stats_cache["cached"] = {"value": 1}
+    def test_dry_run_has_zero_writes_and_stats_read_imports_immediately(self):
+        self.assertEqual(0, self.service.get_stats()["fieldCount"])
         preview = self.service.import_mappings(
             self._request().model_copy(update={"dry_run": True})
         )
@@ -446,11 +446,11 @@ class FieldMappingImportServiceTests(unittest.TestCase):
         self.assertEqual(0, self._count("p_field_mapping_table"))
         self.assertEqual(0, self._count("p_field_mapping_field"))
         self.assertEqual(0, self._count("p_operation_log"))
-        self.assertIn("cached", self.service._stats_cache)
+        self.assertEqual(0, self.service.get_stats()["fieldCount"])
 
         created = self.service.import_mappings(self._request())
         self.assertEqual("created", created["items"][0]["action"])
-        self.assertEqual({}, self.service._stats_cache)
+        self.assertEqual(1, self.service.get_stats()["fieldCount"])
 
     def test_invalid_item_is_reported_and_other_items_commit(self):
         valid = self._request().items[0]

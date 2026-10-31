@@ -86,6 +86,8 @@ CREATE INDEX idx_p_field_mapping_table_identity
   ON p_field_mapping_table(
     upstream_system_id, source_table_name, target_layer_code, target_table_name, load_mode
   );
+CREATE INDEX idx_p_field_mapping_field_table_deleted
+  ON p_field_mapping_field(table_pk, is_deleted);
 
 CREATE TABLE IF NOT EXISTS p_role (
   role_code VARCHAR(64) PRIMARY KEY, name VARCHAR(128) NOT NULL,

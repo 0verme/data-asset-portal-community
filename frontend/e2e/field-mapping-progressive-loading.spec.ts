@@ -543,6 +543,57 @@ test("latest filter response wins for both list and stats", async ({ page }) => 
   await expect(statCard(page, "字段维度")).toHaveText("3");
 });
 
+test("late field response cannot replace the latest view after fast tab switches", async ({ page }) => {
+  let releaseOldField!: () => void;
+  let markOldFieldStarted!: () => void;
+  let markOldFieldFinished!: () => void;
+  const oldFieldStarted = new Promise<void>((resolve) => { markOldFieldStarted = resolve; });
+  const oldFieldGate = new Promise<void>((resolve) => { releaseOldField = resolve; });
+  const oldFieldDone = new Promise<void>((resolve) => { markOldFieldFinished = resolve; });
+  let fieldAttempts = 0;
+
+  const requests = await installApiFixtures(page, {
+    onFields: async (route) => {
+      const attempt = ++fieldAttempts;
+      const srcField = attempt === 1 ? "OLD_FIELD_RESULT" : "NEW_FIELD_RESULT";
+      if (attempt === 1) {
+        markOldFieldStarted();
+        await oldFieldGate;
+      }
+      await route.fulfill({
+        json: {
+          items: [{ ...fieldRow, srcField }],
+          total: 1,
+          page: 1,
+          pageSize: 50,
+        },
+      });
+      if (attempt === 1) markOldFieldFinished();
+    },
+  });
+
+  await page.goto("/field-mapping");
+  await expect(page.getByText("TABLE_READY", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /字段维度/ }).click();
+  await oldFieldStarted;
+
+  await page.getByRole("button", { name: /表维度/ }).click();
+  await expect(page.getByText("TABLE_READY", { exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "源系统表名" }).fill("NEW");
+  await page.getByRole("button", { name: "查询" }).click();
+  await expect.poll(() => requests.tables.at(-1)?.searchParams.get("srcTable")).toBe("NEW");
+  await page.getByRole("button", { name: /字段维度/ }).click();
+  await expect(page).toHaveURL(/tab=field/);
+  await expect.poll(() => requests.fields.length).toBe(2);
+  await expect(page.getByRole("cell", { name: "NEW_FIELD_RESULT", exact: true })).toBeVisible();
+
+  releaseOldField();
+  await oldFieldDone;
+  await expect(page.getByRole("cell", { name: "NEW_FIELD_RESULT", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "OLD_FIELD_RESULT", exact: true })).toHaveCount(0);
+  expect(fieldAttempts).toBe(2);
+});
+
 test("table-list failure preserves stats and retries only the active list", async ({ page }) => {
   let tableAttempts = 0;
   const requests = await installApiFixtures(page, {
@@ -646,9 +697,10 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
 
   const table = page.locator("#field-mapping-results-table");
   await expect(table.locator("tbody tr")).toHaveCount(1);
-  await expect(table.locator("thead th")).toHaveCount(9);
-  await expect(table.locator("colgroup col")).toHaveCount(9);
-  await expect(table.locator("tbody tr").first().locator("td")).toHaveCount(9);
+  await expect(table.locator("thead th")).toHaveCount(8);
+  await expect(table.locator("colgroup col")).toHaveCount(8);
+  await expect(table.locator("tbody tr").first().locator("td")).toHaveCount(8);
+  await expect(table.locator("thead")).not.toContainText("目标层");
   const tableCsvRows = await exportAndAssertColumns(page, testInfo, "table", [
     "源系统", "源系统表", "表中文名", "目标层", "目标表名", "入仓方式", "已映射", "空注释率",
   ]);
@@ -711,9 +763,10 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
 
   await page.getByRole("button", { name: /表维度/ }).click();
   await expect(table.locator("tbody tr")).toHaveCount(1);
-  await expect(table.locator("colgroup col")).toHaveCount(9);
-  await expect(table.locator("thead th")).toHaveCount(9);
-  await expect(table.locator("tbody tr").first().locator("td")).toHaveCount(9);
+  await expect(table.locator("colgroup col")).toHaveCount(8);
+  await expect(table.locator("thead th")).toHaveCount(8);
+  await expect(table.locator("tbody tr").first().locator("td")).toHaveCount(8);
+  await expect(table.locator("thead")).not.toContainText("目标层");
   expect(requests.tables.length).toBeGreaterThan(1);
 });
 

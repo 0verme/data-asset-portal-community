@@ -50,6 +50,19 @@ function writeStore(items: MockReportItem[]): void {
   mockReports = clone(items);
 }
 
+function reportAlreadyExistsError(code: string): Error {
+  const error = new Error(`Report already exists: ${code}`);
+  return Object.assign(error, {
+    status: 409,
+    payload: {
+      error: {
+        code: 'REPORT_ALREADY_EXISTS',
+        message: 'Report already exists',
+      },
+    },
+  });
+}
+
 export interface ReportQueryParams {
   type?: string | undefined;
   domain?: string | undefined;
@@ -104,7 +117,7 @@ export async function createReport(payload: MockReportItem): Promise<MockReportI
   }
   const items = readStore();
   if (items.some((item) => item.code === payload.code)) {
-    throw new Error(`Report already exists: ${payload.code}`);
+    throw reportAlreadyExistsError(payload.code);
   }
   const nextItem: MockReportItem = {
     ...clone(payload),
@@ -127,7 +140,7 @@ export async function updateReport(reportCode: string, payload: MockReportItem):
   const current = items.find((item) => item.code === reportCode);
   if (!current) throw new Error(`Report not found: ${reportCode}`);
   if (payload.code !== reportCode && items.some((item) => item.code === payload.code)) {
-    throw new Error(`Report already exists: ${payload.code}`);
+    throw reportAlreadyExistsError(payload.code);
   }
   const nextItem: MockReportItem = {
     ...clone(payload),

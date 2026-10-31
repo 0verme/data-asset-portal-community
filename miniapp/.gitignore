@@ -1,6 +1,0 @@
-node_modules/
-dist/
-.swc/
-.env.development
-.env.*.local
-.env.production

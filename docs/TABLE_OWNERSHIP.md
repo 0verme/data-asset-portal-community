@@ -4,7 +4,7 @@
 
 ## Canonical baseline
 
-`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0012_search_hot_keywords` 共同覆盖以下 40 张 canonical tables：
+`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0013_field_filter_index` 共同覆盖以下 40 张 canonical tables：
 
 | Owner | Tables |
 | --- | --- |

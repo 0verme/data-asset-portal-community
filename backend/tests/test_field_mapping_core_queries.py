@@ -103,12 +103,13 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
         stats_statement = self.service._db.fetch_rows.call_args.args[0]
         self._assert_portable(stats_statement)
         self.assertEqual(stats["coverage"], 50)
-        self.assertIn(
-            "coalesce(length(trim(",
-            str(stats_statement.compile(dialect=sqlite.dialect())).lower(),
-        )
+        stats_sql = str(stats_statement.compile(dialect=sqlite.dialect())).lower()
+        self.assertIn("coalesce(length(trim(", stats_sql)
+        self.assertIn("count(__app__.p_field_mapping_field.field_pk)", stats_sql)
+        self.assertNotIn("count(distinct __app__.p_field_mapping_field", stats_sql)
+        self.assertIn("count(distinct __app__.p_upstream_system.system_pk)", stats_sql)
+        self.assertIn("count(distinct __app__.p_field_mapping_table.table_pk)", stats_sql)
 
-        self.service._stats_cache.clear()
         self.service._db.fetch_rows = MagicMock(side_effect=[[{"total": 1}], [self.table_row]])
         result = self.service._get_table_mappings({"page": 1, "pageSize": 10})
         statements = [call.args[0] for call in self.service._db.fetch_rows.call_args_list]

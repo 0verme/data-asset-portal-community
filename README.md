@@ -77,7 +77,6 @@ DAP 面向的是**没有精力、也没有条件部署一整套元数据平台**
 | 以数仓为中心的元数据 | 表、字段、DDL、指标口径、词根、字段映射、上下游、报表、API 资产都是一等公民 |
 | 中国企业常见数据库环境 | PostgreSQL、MySQL 8.0、GaussDB / DWS 均有适配；SQLite 可用于本地与 CI |
 | 已有整理元数据的程序，只缺一个目录 | 外部系统通过版本化 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 接入，DAP 不侵入你的采集链路 |
-| 需要移动端查阅 | 提供微信小程序只读资产目录 MVP，见 [miniapp/](./miniapp/README.md) |
 
 ## 🪶 与 OpenMetadata 和 DataHub 的定位差异
 
@@ -109,7 +108,6 @@ DAP 只在一个更窄的范围里做取舍：**用更少的组件、更低的�
 | 数据质量 / Profiling | 不提供 | 提供 | 提供（随版本与配置） |
 | 治理广度 | 资产目录 + permission RBAC + 操作日志 | 目录 + 质量 + 血缘 + 词汇表 + 策略 | 目录 + 血缘 + 策略与元数据自动化 |
 | 外部整理元数据导入 | 核心集成方式，版本化契约 | 支持，但更强调内置 ingestion | 支持，但更强调内置 ingestion |
-| 微信小程序只读目录 | 提供（MVP） | 未提供 | 未提供 |
 | 小团队友好度 | 高 | 需要更多运维投入 | 需要更多运维投入 |
 
 Apache Atlas 主要面向 Hadoop 生态的元数据与治理（Hive、HDFS 等），依赖 HBase / Solr 等组件，
@@ -124,7 +122,6 @@ Apache Atlas 主要面向 Hadoop 生态的元数据与治理（Hive、HDFS 等�
 - **词根、指标、API 资产、系统管理**：维护命名规范、指标口径、API 元数据以及用户/菜单/参数字典/操作日志。
 - **Permission-based RBAC**：后端按 permission code 强制授权，支持角色、权限映射、角色管理和单角色用户绑定。
 - **统一搜索与门户统计**：为所有已注册搜索实体和统计 provider 提供聚合入口。
-- **微信小程序只读目录**：匿名只读浏览资产、指标、字段与搜索结果。
 
 完整的页面 / 接口 / 数据表对照见 [模块清单](./docs/modules.md)。
 
@@ -263,12 +260,7 @@ DAP
 
 V1 血缘只支持 self-contained `replace` snapshot：新快照先以 `INACTIVE` 写入，节点/边校验通过后在同一事务内切换为 `ACTIVE`。
 
-## 📱 微信小程序
-
-仓库提供独立的 [Data Asset Portal Pocket 小程序 MVP](./miniapp/README.md)，位于根目录 `miniapp/`，
-使用 Taro 4 + React + TypeScript，面向微信小程序 `weapp`，当前提供**匿名只读**的资产目录浏览体验。
-
-### API 安全边界
+## 🔐 API 安全边界
 
 - **Public Catalog**：普通业务目录、搜索、字段/DDL、映射、血缘、菜单、报表、API 资产、码值表、上/下游目录和门户统计支持匿名只读浏览；公开响应按需脱敏，不是全部 GET 无脑公开。`PUBLIC_CATALOG_PROFILE`（`internal`/`strict`/`disabled`）同时决定可展示字段与可搜索字段：`internal` 允许匿名查看和搜索安全的连接定位元数据（host、port、database、schema、去除凭据的 JDBC endpoint），`strict` 隐藏这些字段且不允许通过搜索命中，`disabled` 关闭匿名目录与匿名搜索。
 - **Authenticated Management**：写操作、管理操作和敏感读取继续由 permission-based RBAC 控制。
