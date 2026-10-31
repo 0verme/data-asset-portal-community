@@ -22,7 +22,7 @@ GitHub 不直接运行仓库中的 HTML；下载交互完整版后用浏览器�
 
 | 组件 / 边界 | 职责与约束 |
 | --- | --- |
-| 浏览器、小程序与外部 Collector | 输入不可信；小程序为只读客户端，Collector 属于外部采集团队。 |
+| 浏览器与外部 Collector | 输入不可信；Collector 属于外部采集团队。 |
 | Nginx / 后端进程 | Nginx 托管静态产物并反代 `/api`；生产后端监听 loopback `127.0.0.1:15099`。Vite 属于构建/开发阶段。 |
 | 会话与 RBAC | 签名 Cookie 解析、数据库角色权限校验位于应用内；写入、管理与敏感读取按接口授权。匿名目录由 `PUBLIC_CATALOG_PROFILE` 的 `internal` / `strict` / `disabled` 策略控制，可展示字段与可搜索字段共用同一策略以避免搜索侧信道；批量导出另有开关与权限限制。 |
 | 目录业务服务 | 聚合资产、指标、映射、词根、码值、上下游、报表、API 台账、门户统计与搜索；这些是同进程逻辑模块。 |
@@ -189,7 +189,7 @@ V1 lineage 只支持 self-contained `replace` snapshot：新 snapshot 先以 `IN
 - `frontend/src/App.tsx` 负责应用编排、登录态和模块路由；`frontend/src/components/app/` 负责容器边界，`frontend/src/api/` 统一访问 `/api`。
 - `VITE_API_MODE=mock` 使用受控前端演示数据；`remote` 访问真实后端数据库。两种模式默认使用同一仓库模块集合，数据和外部执行能力可以不同。
 - Schema deployment contract 是 `backend/schema` 下四份 versioned dialect baseline 加 `backend/alembic` immutable forward revisions；baseline 是 fresh-install/offline physical artifact set，Alembic 负责 existing-database/head upgrade，二者不是同一个来源。`backend/app/db/tables.py` 只承载 runtime SQLAlchemy Core 查询子集，`demo/seed_*.py` 负责完整仓库模块的虚构演示数据。完整职责与编辑顺序见 [ADR-002](./adr/002-schema-canonical-source.md)。
-- 前端 TypeScript 分布：主应用 `frontend/src/`、其中的业务测试以及 `frontend/packages/lineage-viewer*` 三个 workspace 均采用 TypeScript/TSX；`miniapp/` 是 Taro 4 + React + TypeScript。主应用已关闭 `allowJs`，严格规则与迁移状态见 [DEVELOPMENT.md](../DEVELOPMENT.md)。
+- 前端 TypeScript 分布：主应用 `frontend/src/`、其中的业务测试以及 `frontend/packages/lineage-viewer*` 三个 workspace 均采用 TypeScript/TSX。主应用已关闭 `allowJs`，严格规则与迁移状态见 [DEVELOPMENT.md](../DEVELOPMENT.md)。
 - `backend/app/db/` 隔离 SQLite、PostgreSQL、MySQL 和 GaussDB/DWS 的 Provider 差异；数据库 profile 只表达部署连接能力。`docs/pg/`、`docs/dws/` 是方言参考和部署说明，不再作为隐藏模块的 schema 边界。
 - 正式部署由 Nginx 托管前端静态资源，并将 `/api` 代理到 ASGI runtime；详细环境变量、health check 与 Nginx 配置见 [DEPLOYMENT.md](../DEPLOYMENT.md)。
 
