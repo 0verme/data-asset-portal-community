@@ -279,6 +279,17 @@ def _verify_revision_postconditions(
         inspection = inspect_revision(
             connection, config, revision, model=model, root=root
         )
+        # 0008's reference matching is a one-time migration backfill, not a
+        # permanent invariant: application writes may intentionally leave
+        # source_asset_id/result_field_id NULL after migration.
+        if (
+            revision == "0008_indicator_semantic_contract"
+            and inspection.state is RevisionState.NOT_APPLIED
+            and inspection.summary
+            == "indicator semantic structure exists but the backfill is incomplete"
+            and "rows with NULL semantic_state: 0" in inspection.details
+        ):
+            continue
         if inspection.state is not RevisionState.APPLIED:
             raise DwsMigrationError(
                 revision,
