@@ -330,7 +330,7 @@ class DwsLegacyUpgradeTests(unittest.TestCase):
             all(
                 action == "apply"
                 for revision, action in actions.items()
-                if revision != "0011_push_job_freq_desc_capacity"
+                if revision not in {"0011_push_job_freq_desc_capacity", "0013_field_filter_index"}
             )
         )
         self.assertEqual(repository_head(), database.ledger)
@@ -678,6 +678,9 @@ class DwsFieldMappingQueryIndexTests(unittest.TestCase):
 
     def test_0013_creates_the_non_unique_field_lookup_index_when_absent(self):
         database = FakeDwsDatabase().seed_from_baseline()
+        apply_revisions(
+            database, CONFIG, "0008_indicator_semantic_contract", "0012_search_hot_keywords"
+        )
         database.remove_index("p_field_mapping_field", self.INDEX)
         database.ledger = "0012_search_hot_keywords"
 
@@ -914,7 +917,7 @@ class DwsFailureRecoveryTests(unittest.TestCase):
                 repository_head(),
             )
 
-        self.assertEqual("0012_search_hot_keywords", error.exception.revision)
+        self.assertEqual(repository_head(), error.exception.revision)
         self.assertIn("full head schema verification failed", str(error.exception))
         self.assertEqual("0011_push_job_freq_desc_capacity", database.ledger)
         self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
@@ -931,7 +934,7 @@ class DwsFailureRecoveryTests(unittest.TestCase):
 
         self.assertEqual("0009_upstream_option_contract", error.exception.revision)
         self.assertIn("post-condition", str(error.exception))
-        self.assertEqual("0011_push_job_freq_desc_capacity", database.ledger)
+        self.assertEqual("0012_search_hot_keywords", database.ledger)
         self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
 
     def test_ledger_update_failure_keeps_prior_revision_and_retry_adopts_ddl(self):
