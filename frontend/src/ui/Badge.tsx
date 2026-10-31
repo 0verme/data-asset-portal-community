@@ -22,7 +22,11 @@ export type BadgeProps =
     });
 
 export function Badge(props: BadgeProps) {
-  const className = joinClassNames("dap-ui-badge", props.className);
+  const className = joinClassNames(
+    "dap-ui-badge",
+    props.appearance === "dot" ? "dap-ui-badge--dot" : undefined,
+    props.className,
+  );
 
   if (props.appearance === "dot") {
     const tone = props.tone ?? "neutral";
