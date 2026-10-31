@@ -503,17 +503,18 @@ export function FieldMappingPage({
     { key: "srcTable", label: "源系统表", width: 240 },
     { key: "srcTableCn", label: "表中文名", width: 220 },
     { key: "targetLayer", label: "目标层", width: 90 },
-    { key: "targetTable", label: "目标表名", width: 280 },
+    { key: "targetTable", label: "目标表名", width: 370 },
     { key: "mappedCount", label: "已映射", align: "right", width: 100 },
     { key: "loadMode", label: "入仓方式", width: 110 },
     { key: "emptyCommentRate", label: "空注释率", align: "right", width: 140 },
     { key: "__actions", label: "操作", align: "right", sortable: false, width: 150 },
   ];
+  // Keep complete CSV columns even when a redundant column is hidden in the table UI.
+  const tableCsvColumns = tableColumns.filter((column) => column.key !== "__actions");
   const orderedTableColumnKeys: readonly TableColumnKey[] = [
     "srcSystem",
     "srcTable",
     "srcTableCn",
-    "targetLayer",
     "targetTable",
     "loadMode",
     "__actions",
@@ -696,10 +697,8 @@ export function FieldMappingPage({
         return;
       }
       downloadCsv("字段映射_表视图.csv", [
-        orderedTableColumns.filter((item) => item.key !== "__actions").map((item) => item.label),
-        ...exportRows.map((row) => orderedTableColumns
-          .filter((item) => item.key !== "__actions")
-          .map((item) => displayCellValue(row, item))),
+        tableCsvColumns.map((item) => item.label),
+        ...exportRows.map((row) => tableCsvColumns.map((item) => displayCellValue(row, item))),
       ]);
     } catch (exportError: unknown) {
       setExportError(
