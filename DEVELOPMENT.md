@@ -352,7 +352,6 @@ python backend/scripts/db_to_init_sql.py --profile <source-profile> --dialect pg
 | --- | --- |
 | `frontend/src/`（主应用） | 业务模块、顶层容器与测试全部采用 TypeScript/TSX；业务 JS/JSX 为 0，`allowJs: false`，并启用完整 strict 规则 |
 | `frontend/packages/lineage-viewer*` | 完整 TypeScript（三个 npm workspace） |
-| `miniapp/` | 完整 TypeScript（Taro 4 + React） |
 
 主应用 `frontend/src/` 已进入 **全量 TypeScript** 状态，不再保留 JavaScript fallback。`frontend/tsconfig.app.json` 覆盖主应用与 Node 测试的 TypeScript 文件；主应用边界和既有 lineage workspace 可以分别检查，也可以用统一命令检查：
 
