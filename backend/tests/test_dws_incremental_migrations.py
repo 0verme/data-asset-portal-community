@@ -672,6 +672,43 @@ class DwsSearchHotKeywordMigrationTests(unittest.TestCase):
                 self.assertIn("does not match", inspection.summary)
 
 
+class DwsFieldMappingQueryIndexTests(unittest.TestCase):
+    INDEX = "idx_p_field_mapping_field_table_deleted"
+    REVISION = "0013_field_filter_index"
+
+    def test_0013_creates_the_non_unique_field_lookup_index_when_absent(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.remove_index("p_field_mapping_field", self.INDEX)
+        database.ledger = "0012_search_hot_keywords"
+
+        result = apply_revisions(
+            database, CONFIG, "0012_search_hot_keywords", repository_head()
+        )
+
+        self.assertEqual(
+            [(self.REVISION, "apply")],
+            [(item.revision, item.action) for item in result],
+        )
+        index = database.table("p_field_mapping_field").indexes[self.INDEX]
+        self.assertEqual(("table_pk", "is_deleted"), index.columns)
+        self.assertFalse(index.unique)
+        self.assertEqual(repository_head(), database.ledger)
+
+    def test_0013_rejects_same_name_index_with_wrong_definition(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.add_index(
+            "p_field_mapping_field",
+            self.INDEX,
+            ("is_deleted", "table_pk"),
+        )
+        database.ledger = "0012_search_hot_keywords"
+
+        inspection = inspect_revision(database, CONFIG, self.REVISION)
+
+        self.assertIs(RevisionState.CONFLICT, inspection.state)
+        self.assertIn("unexpected definition", inspection.summary)
+
+
 class DwsFailClosedTests(unittest.TestCase):
     def _assert_conflict(self, database, revision, start_revision):
         with self.assertRaises(DwsMigrationError) as error:
