@@ -44,4 +44,8 @@
     width: auto;
     max-width: none;
   }
+
+  body:has(.form-action-bar) #dap-ui-overlay-root [role="region"][aria-label="Notifications"] {
+    bottom: calc(240px + env(safe-area-inset-bottom, 0px));
+  }
 }

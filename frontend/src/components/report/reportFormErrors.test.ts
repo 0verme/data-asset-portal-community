@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { validateReportForm } from "./reportFormErrors.ts";
+import { mapReportApiFieldErrors, validateReportForm } from "./reportFormErrors.ts";
 
 const validReport = {
   code: "RPT_PAY_DAILY",
@@ -65,5 +65,37 @@ test("report validation associates reversed valid date ranges with the expiry fi
     expireDate: "2025-06-16",
   }), {
     expireDate: "失效日期不能早于生效日期",
+  });
+});
+
+test("report API validation errors map only allow-listed fields to safe persistent messages", () => {
+  const error = Object.assign(new Error("Report validation failed"), {
+    status: 422,
+    payload: {
+      error: {
+        code: "REPORT_VALIDATION_FAILED",
+        details: [
+          { field: "ownerDept", message: "ownerDept is not allowed: internal value" },
+          { field: "privateColumn", message: "do not render server details" },
+        ],
+      },
+    },
+  });
+
+  assert.deepEqual(mapReportApiFieldErrors(error), {
+    fieldErrors: { ownerDept: "服务端校验未通过，请检查此字段。" },
+    hasUnmappedErrors: true,
+  });
+});
+
+test("report duplicate-code conflicts remain attached to the editable code field", () => {
+  const error = Object.assign(new Error("Report already exists: RPT_PRIVATE"), {
+    status: 409,
+    payload: { error: { code: "REPORT_ALREADY_EXISTS", message: "Report already exists" } },
+  });
+
+  assert.deepEqual(mapReportApiFieldErrors(error), {
+    fieldErrors: { code: "该报表编码已存在，请修改后重试。" },
+    hasUnmappedErrors: false,
   });
 });

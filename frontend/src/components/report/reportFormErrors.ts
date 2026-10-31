@@ -1,4 +1,40 @@
+import { normalizeApiError } from "../../api/errorNormalizer.ts";
+import { formFieldErrorEntries, mapApiFormFieldErrors } from "../../utils/formFieldErrorMapping.ts";
 import type { FormFieldErrors } from "../../ui/formErrors.ts";
+
+export const REPORT_SERVER_FIELD_NAMES = [
+  "code",
+  "name",
+  "type",
+  "domain",
+  "ownerDept",
+  "ownerName",
+  "statPeriod",
+  "statCaliber",
+  "effectiveDate",
+  "expireDate",
+] as const;
+
+export interface ReportApiFieldErrors {
+  fieldErrors: FormFieldErrors;
+  hasUnmappedErrors: boolean;
+}
+
+export function mapReportApiFieldErrors(error: unknown): ReportApiFieldErrors {
+  const normalized = normalizeApiError(error);
+  if (normalized.code === "REPORT_ALREADY_EXISTS") {
+    return { fieldErrors: { code: "该报表编码已存在，请修改后重试。" }, hasUnmappedErrors: false };
+  }
+  if (normalized.kind !== "validation" && normalized.kind !== "conflict") {
+    return { fieldErrors: {}, hasUnmappedErrors: false };
+  }
+
+  const mapped = mapApiFormFieldErrors(error, REPORT_SERVER_FIELD_NAMES);
+  return {
+    fieldErrors: formFieldErrorEntries(mapped.filter(({ field }) => field !== "form")),
+    hasUnmappedErrors: mapped.some(({ field }) => field === "form"),
+  };
+}
 
 export interface ReportValidationValues {
   code: string;
