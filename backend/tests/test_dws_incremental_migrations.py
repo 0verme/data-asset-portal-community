@@ -919,7 +919,7 @@ class DwsFailureRecoveryTests(unittest.TestCase):
 
         self.assertEqual(repository_head(), error.exception.revision)
         self.assertIn("full head schema verification failed", str(error.exception))
-        self.assertEqual("0011_push_job_freq_desc_capacity", database.ledger)
+        self.assertEqual("0012_search_hot_keywords", database.ledger)
         self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
 
     def test_head_stamp_waits_for_all_prior_revision_postconditions(self):
