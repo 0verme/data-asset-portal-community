@@ -646,9 +646,10 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
 
   const table = page.locator("#field-mapping-results-table");
   await expect(table.locator("tbody tr")).toHaveCount(1);
-  await expect(table.locator("thead th")).toHaveCount(9);
-  await expect(table.locator("colgroup col")).toHaveCount(9);
-  await expect(table.locator("tbody tr").first().locator("td")).toHaveCount(9);
+  await expect(table.locator("thead th")).toHaveCount(8);
+  await expect(table.locator("colgroup col")).toHaveCount(8);
+  await expect(table.locator("tbody tr").first().locator("td")).toHaveCount(8);
+  await expect(table.locator("thead")).not.toContainText("目标层");
   const tableCsvRows = await exportAndAssertColumns(page, testInfo, "table", [
     "源系统", "源系统表", "表中文名", "目标层", "目标表名", "入仓方式", "已映射", "空注释率",
   ]);
