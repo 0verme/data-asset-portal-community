@@ -50,6 +50,7 @@ export function ReportView({
         loadReportData,
         reportSaveBusy,
         reportSaveFieldErrors,
+        reportSaveFieldErrorFocusRequest,
         clearReportSaveFieldError,
         reportBack,
         reportCloseDetail,
@@ -100,6 +101,7 @@ export function ReportView({
                 onDelete={() => undefined}
                 saveBusy={reportSaveBusy}
                 serverFieldErrors={reportSaveFieldErrors}
+                serverFieldErrorFocusRequest={reportSaveFieldErrorFocusRequest}
                 onClearServerFieldError={clearReportSaveFieldError}
             />
         );
@@ -135,6 +137,7 @@ export function ReportView({
                 }}
                 saveBusy={reportSaveBusy}
                 serverFieldErrors={reportSaveFieldErrors}
+                serverFieldErrorFocusRequest={reportSaveFieldErrorFocusRequest}
                 onClearServerFieldError={clearReportSaveFieldError}
             />
         );

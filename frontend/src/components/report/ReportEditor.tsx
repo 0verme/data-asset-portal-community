@@ -192,6 +192,7 @@ export interface ReportEditorProps {
   onDelete: (reportCode: string) => void | Promise<unknown>;
   saveBusy?: boolean | undefined;
   serverFieldErrors?: FormFieldErrors | undefined;
+  serverFieldErrorFocusRequest?: FormFieldErrors | null | undefined;
   onClearServerFieldError?: ((field: string) => void) | undefined;
 }
 
@@ -203,6 +204,7 @@ export function ReportEditor({
   onDelete,
   saveBusy = false,
   serverFieldErrors = {},
+  serverFieldErrorFocusRequest = null,
   onClearServerFieldError,
 }: ReportEditorProps) {
   const isEdit = mode === "edit";
@@ -296,12 +298,12 @@ export function ReportEditor({
   }, [errors, validationFocusRequest]);
 
   React.useLayoutEffect(() => {
-    if (!Object.keys(serverFieldErrors).length) return;
-    if (serverFieldErrors["effectiveDate"] || serverFieldErrors["expireDate"]) {
+    if (!serverFieldErrorFocusRequest) return;
+    if (serverFieldErrorFocusRequest["effectiveDate"] || serverFieldErrorFocusRequest["expireDate"]) {
       if (lifecycleDetailsRef.current) lifecycleDetailsRef.current.open = true;
     }
-    focusFirstFormError(formRef.current, serverFieldErrors, "smooth");
-  }, [serverFieldErrors]);
+    focusFirstFormError(formRef.current, serverFieldErrorFocusRequest, "smooth");
+  }, [serverFieldErrorFocusRequest]);
 
   const setValues = (nextValues: Partial<ReportFormData>) => {
     Object.keys(nextValues).forEach((field) => onClearServerFieldError?.(field));

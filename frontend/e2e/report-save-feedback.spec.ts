@@ -67,6 +67,24 @@ test("long report save failures keep input, locate field conflicts, and show ord
       if (saveRequests === 2) {
         await new Promise((resolve) => setTimeout(resolve, 250));
         await route.fulfill({
+          status: 422,
+          contentType: "application/json",
+          json: {
+            error: {
+              code: "REPORT_VALIDATION_FAILED",
+              message: "Report validation failed",
+              details: [
+                { field: "code", message: "server detail for code" },
+                { field: "name", message: "server detail for name" },
+              ],
+            },
+          },
+        });
+        return;
+      }
+      if (saveRequests === 3) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        await route.fulfill({
           status: 503,
           contentType: "application/json",
           json: { error: { code: "SERVICE_UNAVAILABLE", message: "Internal service details" } },
@@ -140,9 +158,28 @@ test("long report save failures keep input, locate field conflicts, and show ord
   await expect(page.getByRole("button", { name: "报表编码：该报表编码已存在，请修改后重试。" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Notifications" }).getByText("该报表编码已存在")).toHaveCount(0);
 
-  await code.fill("RPT_E2E_UNAVAILABLE");
+  await code.fill("RPT_E2E_SERVER_VALIDATION");
   await expect(code).not.toHaveAttribute("aria-invalid", "true");
   await expect(page.getByRole("alert").filter({ hasText: "报表编码：" })).toHaveCount(0);
+  await main.evaluate((element) => element.scrollTo(0, element.scrollHeight));
+  await save.click();
+
+  await expect.poll(() => saveRequests).toBe(2);
+  await expect(code).toBeFocused();
+  await expect(code).toHaveAttribute("aria-invalid", "true");
+  const name = page.getByLabel("报表名称");
+  await expect(name).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByRole("button", { name: "报表名称：服务端校验未通过，请检查此字段。" })).toBeVisible();
+
+  await code.fill("RPT_E2E_FIELD_CORRECTED");
+  await expect(code).toBeFocused();
+  await expect(code).not.toHaveAttribute("aria-invalid", "true");
+  await expect(name).toHaveAttribute("aria-invalid", "true");
+  await name.fill("E2E 长表单字段修正");
+  await expect(name).toBeFocused();
+  await expect(name).not.toHaveAttribute("aria-invalid", "true");
+
+  await code.fill("RPT_E2E_UNAVAILABLE");
   await main.evaluate((element) => element.scrollTo(0, element.scrollHeight));
   await save.click();
 
@@ -151,7 +188,7 @@ test("long report save failures keep input, locate field conflicts, and show ord
   await expect(serviceError).toBeVisible();
   const errorToast = serviceError.locator("xpath=ancestor::div[contains(@class, 'ring-kumo-danger')][1]");
   await expect(errorToast).toBeVisible();
-  await expect.poll(() => saveRequests).toBe(2);
+  await expect.poll(() => saveRequests).toBe(3);
   await expect(code).toHaveValue("RPT_E2E_UNAVAILABLE");
   await expect(page.getByRole("heading", { name: "保存失败" })).toHaveCount(0);
 
@@ -167,7 +204,7 @@ test("long report save failures keep input, locate field conflicts, and show ord
   expect(toastBox!.y + toastBox!.height).toBeLessThanOrEqual(actionBarBox!.y);
 
   const successfulSubmit = save.click();
-  await expect.poll(() => saveRequests).toBe(3);
+  await expect.poll(() => saveRequests).toBe(4);
   const successToast = notifications.getByText("报表已创建", { exact: true });
   await expect(successToast).toHaveCount(0);
   await successfulSubmit;

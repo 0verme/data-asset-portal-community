@@ -67,6 +67,7 @@ export interface UseReportModuleResult {
   loadReportData: () => Promise<void>;
   reportSaveBusy: boolean;
   reportSaveFieldErrors: FormFieldErrors;
+  reportSaveFieldErrorFocusRequest: FormFieldErrors | null;
   clearReportSaveFieldError: (field: string) => void;
   reportBack: () => void;
   reportCloseDetail: () => void;
@@ -98,6 +99,8 @@ export function useReportModule({
   const [reportLoaded, setReportLoaded] = useState(false);
   const [reportSaveBusy, setReportSaveBusy] = useState(false);
   const [reportSaveFieldErrors, setReportSaveFieldErrors] = useState<FormFieldErrors>({});
+  const [reportSaveFieldErrorFocusRequest, setReportSaveFieldErrorFocusRequest] =
+    useState<FormFieldErrors | null>(null);
   const reportSaveInFlight = useRef(false);
 
   const loadReportData = useCallback(async (): Promise<void> => {
@@ -126,6 +129,7 @@ export function useReportModule({
 
   const reportBack = (): void => {
     setReportSaveFieldErrors({});
+    setReportSaveFieldErrorFocusRequest(null);
     setReportRoute(DEFAULT_REPORT_ROUTE);
     scrollMainToTop();
   };
@@ -137,6 +141,7 @@ export function useReportModule({
   const reportCreate = (): void => {
     requireLogin(() => {
       setReportSaveFieldErrors({});
+      setReportSaveFieldErrorFocusRequest(null);
       setReportRoute({ page: 'new', code: null });
       scrollMainToTop();
     }, 'report:write');
@@ -145,6 +150,7 @@ export function useReportModule({
   const reportEdit = (reportCode: string): void => {
     requireLogin(() => {
       setReportSaveFieldErrors({});
+      setReportSaveFieldErrorFocusRequest(null);
       setReportRoute({ page: 'edit', code: reportCode });
       scrollMainToTop();
     }, 'report:write');
@@ -164,6 +170,7 @@ export function useReportModule({
     reportSaveInFlight.current = true;
     const isEditing = reportRoute.page === 'edit' && Boolean(reportRoute.code);
     setReportSaveFieldErrors({});
+    setReportSaveFieldErrorFocusRequest(null);
     setReportSaveBusy(true);
     try {
       if (isEditing && reportRoute.code) {
@@ -174,13 +181,17 @@ export function useReportModule({
       await loadReportData();
       toast.success(isEditing ? '报表已更新' : '报表已创建');
       setReportSaveFieldErrors({});
+      setReportSaveFieldErrorFocusRequest(null);
       setReportRoute(DEFAULT_REPORT_ROUTE);
       scrollMainToTop();
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
       const mappedErrors = mapReportApiFieldErrors(error);
       const hasFieldErrors = Object.keys(mappedErrors.fieldErrors).length > 0;
-      if (hasFieldErrors) setReportSaveFieldErrors(mappedErrors.fieldErrors);
+      if (hasFieldErrors) {
+        setReportSaveFieldErrors(mappedErrors.fieldErrors);
+        setReportSaveFieldErrorFocusRequest(mappedErrors.fieldErrors);
+      }
       if (!hasFieldErrors || mappedErrors.hasUnmappedErrors) {
         toast.error(normalizeApiError(error).safeMessage);
       }
@@ -284,6 +295,7 @@ export function useReportModule({
     loadReportData,
     reportSaveBusy,
     reportSaveFieldErrors,
+    reportSaveFieldErrorFocusRequest,
     clearReportSaveFieldError,
     reportBack,
     reportCloseDetail,
