@@ -712,9 +712,10 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
 
   await page.getByRole("button", { name: /表维度/ }).click();
   await expect(table.locator("tbody tr")).toHaveCount(1);
-  await expect(table.locator("colgroup col")).toHaveCount(9);
-  await expect(table.locator("thead th")).toHaveCount(9);
-  await expect(table.locator("tbody tr").first().locator("td")).toHaveCount(9);
+  await expect(table.locator("colgroup col")).toHaveCount(8);
+  await expect(table.locator("thead th")).toHaveCount(8);
+  await expect(table.locator("tbody tr").first().locator("td")).toHaveCount(8);
+  await expect(table.locator("thead")).not.toContainText("目标层");
   expect(requests.tables.length).toBeGreaterThan(1);
 });
 
