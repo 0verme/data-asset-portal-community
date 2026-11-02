@@ -16,17 +16,26 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import unicodedata
 from datetime import datetime
 
 # pi-lens-ignore: python-hallucinated-import
+from pydantic import ValidationError
 from sqlalchemy import delete, func, insert, select, update
 
 from ..application import AuditActorMixin, actor_aware
+from ..contracts.rag_search import (
+    DEFAULT_RAG_SEARCH_CONFIG,
+    RagSearchConfig,
+    RagSearchConfigUpdate,
+    RagSearchConfigView,
+)
 from ..authorization import permissions as permission_contract
 from ..db.service import CoreAccess
+from ..settings import get_rag_search_service_token
 from ..db.tables import (
     admin_user,
     code_category,
@@ -50,6 +59,7 @@ from .operation_log_service import (
 USER_STATUSES = {"enabled", "disabled"}
 ROLE_STATUSES = {"enabled", "disabled"}
 DICT_STATUSES = {"enabled", "disabled"}
+RESERVED_PARAM_CATEGORY_CODES = frozenset({"RAG_SEARCH_CONFIG"})
 MENU_STATUSES = {"enabled", "disabled"}
 MENU_NAV_PLACEMENTS = {"primary", "more"}
 MAX_USERNAME_LENGTH = 64
@@ -525,6 +535,8 @@ class SystemManagementService(AuditActorMixin):
             details.append({"field": "categoryCode", "message": "categoryCode is required"})
         elif not DICT_CODE_RE.fullmatch(category_code):
             details.append({"field": "categoryCode", "message": "categoryCode format is invalid"})
+        elif category_code in RESERVED_PARAM_CATEGORY_CODES:
+            details.append({"field": "categoryCode", "message": "categoryCode is reserved for system configuration"})
         if not code:
             details.append({"field": "code", "message": "code is required"})
         elif not DICT_CODE_RE.fullmatch(code):
@@ -817,6 +829,7 @@ class SystemManagementService(AuditActorMixin):
                 code_category.c.is_active,
                 code_category.c.display_order,
             )
+            .where(code_category.c.category_code.not_in(RESERVED_PARAM_CATEGORY_CODES))
             .order_by(code_category.c.display_order, code_category.c.category_code)
         )
         return [
@@ -832,7 +845,9 @@ class SystemManagementService(AuditActorMixin):
         ]
 
     def get_param_dicts(self, category_code: str | None = None):
-        clauses = []
+        if str(category_code or "").strip().upper() in RESERVED_PARAM_CATEGORY_CODES:
+            return []
+        clauses = [code_item.c.category_code.not_in(RESERVED_PARAM_CATEGORY_CODES)]
         if category_code:
             clauses.append(code_item.c.category_code == category_code)
         rows = self._core_fetch(
@@ -868,6 +883,126 @@ class SystemManagementService(AuditActorMixin):
             }
             for row in rows
         ]
+
+    def get_rag_search_config(self):
+        rows = self._core_fetch(
+            select(
+                code_item.c.ext_json,
+                code_item.c.is_active.label("item_active"),
+                code_category.c.is_active.label("category_active"),
+            )
+            .select_from(
+                code_item.join(
+                    code_category,
+                    code_category.c.category_code == code_item.c.category_code,
+                )
+            )
+            .where(
+                code_item.c.category_code == "RAG_SEARCH_CONFIG",
+                code_item.c.item_code == "DEFAULT",
+            )
+        )
+        if not rows:
+            return DEFAULT_RAG_SEARCH_CONFIG.model_dump(by_alias=True)
+        if len(rows) != 1:
+            raise SystemDataSourceError("RAG configuration storage is ambiguous")
+        row = rows[0]
+        if (
+            str(row.get("item_active") or "N").upper() != "N"
+            or str(row.get("category_active") or "N").upper() != "N"
+        ):
+            return DEFAULT_RAG_SEARCH_CONFIG.model_dump(by_alias=True)
+        try:
+            raw = row.get("ext_json")
+            payload = raw if isinstance(raw, dict) else json.loads(str(raw or "{}"))
+            return RagSearchConfig.model_validate(payload).model_dump(by_alias=True)
+        except (TypeError, ValueError):
+            raise SystemDataSourceError("Stored RAG configuration is invalid") from None
+
+    def get_rag_search_config_public(self):
+        """Return browser-safe config; never include the server-side token."""
+        payload = {
+            **self.get_rag_search_config(),
+            "tokenConfigured": bool(get_rag_search_service_token()),
+        }
+        return RagSearchConfigView.model_validate(payload).model_dump(by_alias=True)
+
+    @actor_aware
+    def update_rag_search_config(self, payload):
+        try:
+            config = RagSearchConfigUpdate.model_validate(payload)
+        except ValidationError as error:
+            errors = error.errors()
+            details = [
+                {
+                    "field": ".".join(str(part) for part in issue.get("loc", ())) or "body",
+                    "message": str(issue.get("msg") or "invalid value"),
+                }
+                for issue in errors
+            ]
+            raise SystemValidationError("RAG configuration validation failed", details or None) from None
+        if config.enabled and not get_rag_search_service_token():
+            raise SystemValidationError(
+                "启用 RAG 推荐前必须在后端部署 Secret 中配置 RAG_SEARCH_SERVICE_TOKEN"
+            )
+
+        rows = self._core_fetch(
+            select(
+                code_item.c.item_id,
+                code_item.c.is_active.label("item_active"),
+                code_category.c.is_active.label("category_active"),
+            )
+            .select_from(
+                code_item.join(
+                    code_category,
+                    code_category.c.category_code == code_item.c.category_code,
+                )
+            )
+            .where(
+                code_item.c.category_code == "RAG_SEARCH_CONFIG",
+                code_item.c.item_code == "DEFAULT",
+            )
+        )
+        if (
+            len(rows) != 1
+            or str(rows[0].get("item_active") or "N").upper() != "N"
+            or str(rows[0].get("category_active") or "N").upper() != "N"
+        ):
+            raise SystemDataSourceError("RAG configuration storage is unavailable")
+        item_id = int(rows[0]["item_id"])
+        before = self.get_rag_search_config()
+        after = config.model_dump(by_alias=True)
+        safe_fields = ("enabled", "strategy", "topK", "timeoutMs")
+        with operation_log_service.audit(
+            module_name="系统配置",
+            operation_type=OPERATION_TYPE_UPDATE,
+            operation_object="RAG_SEARCH_CONFIG/DEFAULT",
+            operation_desc="更新 RAG 相关资产推荐配置",
+        ) as audit:
+            self._core_execute([
+                update(code_item)
+                .where(
+                    code_item.c.item_id == item_id,
+                    code_item.c.category_code == "RAG_SEARCH_CONFIG",
+                    code_item.c.item_code == "DEFAULT",
+                    code_item.c.is_active == "N",
+                )
+                .values(
+                    ext_json=json.dumps(after, ensure_ascii=False, separators=(",", ":")),
+                    updated_by=self._default_operator,
+                    updated_at=func.current_timestamp(),
+                )
+            ])
+            audit.before = {
+                **{key: before[key] for key in safe_fields},
+                "serviceUrlConfigured": bool(before.get("serviceUrl")),
+            }
+            audit.after = {
+                **{key: after[key] for key in safe_fields},
+                "serviceUrlConfigured": bool(after.get("serviceUrl")),
+            }
+        common_code_service.invalidate(["RAG_SEARCH_CONFIG"])
+        return self.get_rag_search_config_public()
 
     @actor_aware
     def create_param_dict(self, payload):
@@ -932,9 +1067,13 @@ class SystemManagementService(AuditActorMixin):
         item = self._normalize_param_payload(payload)
         self._ensure_db_category_exists(item["categoryCode"])
         item_id = self._parse_item_id(dict_id)
-        rows = self._core_fetch(select(code_item.c.item_id).where(code_item.c.item_id == item_id))
+        rows = self._core_fetch(
+            select(code_item.c.item_id, code_item.c.category_code).where(code_item.c.item_id == item_id)
+        )
         if not rows:
             raise ParamDictNotFoundError(f"Parameter not found: {dict_id}")
+        if str(rows[0].get("category_code") or "").upper() in RESERVED_PARAM_CATEGORY_CODES:
+            raise SystemValidationError("Reserved system configuration cannot be edited as a parameter dictionary")
         before = next((current for current in self.get_param_dicts() if current["id"] == str(item_id)), None)
         duplicate = self._core_fetch(
             select(code_item.c.item_id).where(
@@ -987,6 +1126,13 @@ class SystemManagementService(AuditActorMixin):
         if normalized not in DICT_STATUSES:
             raise SystemValidationError("Parameter validation failed", [{"field": "status", "message": "status is invalid"}])
         item_id = self._parse_item_id(dict_id)
+        rows = self._core_fetch(
+            select(code_item.c.category_code).where(code_item.c.item_id == item_id)
+        )
+        if not rows:
+            raise ParamDictNotFoundError(f"Parameter not found: {dict_id}")
+        if str(rows[0].get("category_code") or "").upper() in RESERVED_PARAM_CATEGORY_CODES:
+            raise SystemValidationError("Reserved system configuration cannot be toggled as a parameter dictionary")
         self._core_execute([
             update(code_item)
             .where(code_item.c.item_id == item_id)
@@ -1016,9 +1162,13 @@ class SystemManagementService(AuditActorMixin):
 
     def _delete_param_dict(self, dict_id: str):
         item_id = self._parse_item_id(dict_id)
-        rows = self._core_fetch(select(code_item.c.item_id).where(code_item.c.item_id == item_id))
+        rows = self._core_fetch(
+            select(code_item.c.item_id, code_item.c.category_code).where(code_item.c.item_id == item_id)
+        )
         if not rows:
             raise ParamDictNotFoundError(f"Parameter not found: {dict_id}")
+        if str(rows[0].get("category_code") or "").upper() in RESERVED_PARAM_CATEGORY_CODES:
+            raise SystemValidationError("Reserved system configuration cannot be deleted as a parameter dictionary")
         before = next((current for current in self.get_param_dicts() if current["id"] == str(item_id)), None)
         self._core_execute([delete(code_item).where(code_item.c.item_id == item_id)])
         common_code_service.invalidate([(before or {}).get("categoryCode")])
@@ -1349,6 +1499,8 @@ class SystemManagementService(AuditActorMixin):
         return before
 
     def _update_param_category_status(self, category_code: str, status: str):
+        if str(category_code or "").strip().upper() in RESERVED_PARAM_CATEGORY_CODES:
+            raise SystemValidationError("Reserved system configuration category cannot be toggled")
         normalized = str(status or "").strip().lower()
         if normalized not in DICT_STATUSES:
             raise SystemValidationError("Category validation failed", [{"field": "status", "message": "status is invalid"}])

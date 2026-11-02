@@ -13,6 +13,14 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+### Optional RAG recommendation HTTP adapter
+
+RAG recommendations are disabled by default. DAP is only an authenticated HTTP client; it does not import `dap-rag-lab`, install/load BGE or PyTorch, read LanceDB, download a model, or execute a RAG CLI. The optional backend configuration uses the existing protected system-parameter routes and remains hidden from public parameter APIs.
+
+Configure the service URL in the admin panel. Supply `RAG_SEARCH_SERVICE_TOKEN` to the DAP backend through deployment Secret storage; the token is not persisted in the parameter table and is never returned to the browser. Same-host deployments may use a loopback HTTP URL; cross-host deployments must use HTTPS. Diagnostics call `/healthz` and `/readyz` only from the protected admin configuration page or its explicit check action. The current outbound search schema is a synthetic DAP contract pending final agreement with dap-rag-lab Issue #14; passing local tests is not evidence of a live integration. A returned ID is revalidated against the current DAP shared catalog before any recommendation is exposed.
+
+No RAG-specific model/index dependency is required by the DAP Community backend. Remote timeout, authentication failure, service unavailability, or catalog mismatch suppresses recommendations and never blocks deterministic keyword search.
+
 ## GaussDB/DWS JDBC compatibility by Java version
 
 本节是 GaussDB/DWS JDBC 依赖与 JVM 版本的 canonical 安装契约。先确认运行后端的 Java 版本，再选择对应 requirements；不要按 GaussDB/DWS 数据库版本推断 Java 版本。
@@ -124,6 +132,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 | `ASSET_DB_STATEMENT_TIMEOUT_MS` | PostgreSQL / GaussDB 查询超时毫秒数 | `120000` |
 | `APP_DEBUG` | Native FastAPI 的 debug 配置（默认关闭；仅 `1`/`true`/`yes`/`on` 为真） | `false` |
 | `APP_SECRET_KEY` | 必填的 application-owned signed-session 密钥（缺失或空白即启动失败） | `<generate-a-strong-random-value>` |
+| `RAG_SEARCH_SERVICE_TOKEN` | 可选的后端到 RAG Search Service Bearer Token；通过部署 Secret 注入，不写入参数表或浏览器 | `<deployment-secret>` |
 | `APP_ENV` | Cookie/security contract 的运行环境（默认安全生产行为；开发必须显式设置） | `production`、`development` |
 | `APP_CORS_ORIGINS` | Native FastAPI 使用的精确跨域来源 allowlist，逗号分隔 | `https://portal.example.com` |
 

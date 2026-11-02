@@ -86,6 +86,7 @@ class PublicCatalogProfileSettingsTests(unittest.TestCase):
         paths = (
             "/api/portal/stats",
             "/api/search?q=customer",
+            "/api/search/recommendations?q=customer",
             "/api/assets/tables",
             "/api/field-mappings/source-systems",
             "/api/field-mappings/export?view=field",

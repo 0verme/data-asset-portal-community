@@ -35,6 +35,7 @@ REVISION_ORDER = (
     "0011_push_job_freq_desc_capacity",
     "0012_search_hot_keywords",
     "0013_field_filter_index",
+    "0014_rag_search_config",
 )
 
 OPEN_MODULE_TABLES = (
@@ -786,7 +787,16 @@ def downgrade_to_prefix(database: FakeDwsDatabase, satisfied: Iterable[str]) -> 
 def _reverse_revision(
     database: FakeDwsDatabase, revision: str, satisfied: set[str]
 ) -> None:
-    if revision == "0013_field_filter_index":
+    if revision == "0014_rag_search_config":
+        database.table("p_code_category").rows[:] = [
+            row for row in database.table("p_code_category").rows
+            if row.get("category_code") != "RAG_SEARCH_CONFIG"
+        ]
+        database.table("p_code_item").rows[:] = [
+            row for row in database.table("p_code_item").rows
+            if row.get("category_code") != "RAG_SEARCH_CONFIG"
+        ]
+    elif revision == "0013_field_filter_index":
         database.remove_index(
             "p_field_mapping_field", "idx_p_field_mapping_field_table_deleted"
         )

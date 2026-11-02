@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -188,6 +189,7 @@ class DwsFreshAndAdoptionTests(unittest.TestCase):
                     if revision in {
                         "0009_upstream_option_contract",
                         "0012_search_hot_keywords",
+                        "0014_rag_search_config",
                     }
                     else "adopt"
                 )
@@ -197,8 +199,19 @@ class DwsFreshAndAdoptionTests(unittest.TestCase):
         )
         self.assertEqual(repository_head(), database.ledger)
         categories = {row["category_code"] for row in database.table("p_code_category").rows}
-        self.assertEqual({"UPSTREAM_DB_TYPE"}, categories)
-        self.assertEqual(8, len(database.table("p_code_item").rows))
+        self.assertEqual({"UPSTREAM_DB_TYPE", "RAG_SEARCH_CONFIG"}, categories)
+        self.assertEqual(9, len(database.table("p_code_item").rows))
+        rag_category = next(
+            row for row in database.table("p_code_category").rows
+            if row["category_code"] == "RAG_SEARCH_CONFIG"
+        )
+        rag_item = next(
+            row for row in database.table("p_code_item").rows
+            if row["category_code"] == "RAG_SEARCH_CONFIG"
+        )
+        self.assertEqual("N", rag_category["is_active"])
+        self.assertEqual("N", rag_item["is_active"])
+        self.assertFalse(json.loads(rag_item["ext_json"])["enabled"])
 
     def test_nearly_head_legacy_only_applies_missing_revision_and_seed(self):
         database = FakeDwsDatabase().seed_from_baseline()
@@ -215,15 +228,17 @@ class DwsFreshAndAdoptionTests(unittest.TestCase):
         self.assertEqual("apply", actions["0002_portable_asset_filter"])
         self.assertEqual("apply", actions["0009_upstream_option_contract"])
         self.assertEqual("apply", actions["0012_search_hot_keywords"])
+        self.assertEqual("apply", actions["0014_rag_search_config"])
         for revision in satisfied - {
             "0009_upstream_option_contract",
             "0012_search_hot_keywords",
+            "0014_rag_search_config",
         }:
             self.assertEqual("adopt", actions[revision], revision)
         self.assertEqual(repository_head(), database.ledger)
 
         # No structural replay: only the missing index and additive option /
-        # recommendation seeds were written; configured values are preserved.
+        # hot-keyword/RAG config seeds were written; configured values are preserved.
         structural_ddl = [
             sql
             for sql, _ in database.executed
@@ -570,7 +585,10 @@ class DwsFieldMappingQueryIndexTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            [(self.REVISION, "apply")],
+            [
+                (self.REVISION, "apply"),
+                ("0014_rag_search_config", "apply"),
+            ],
             [(item.revision, item.action) for item in result],
         )
         index = database.table("p_field_mapping_field").indexes[self.INDEX]
@@ -591,6 +609,122 @@ class DwsFieldMappingQueryIndexTests(unittest.TestCase):
 
         self.assertIs(RevisionState.CONFLICT, inspection.state)
         self.assertIn("unexpected definition", inspection.summary)
+
+
+class DwsRagSearchConfigSeedTests(unittest.TestCase):
+    REVISION = "0014_rag_search_config"
+
+    def test_0014_adds_one_inactive_reserved_config_and_repeat_apply_is_noop(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.ledger = "0013_field_filter_index"
+
+        result = apply_revisions(
+            database, CONFIG, "0013_field_filter_index", repository_head()
+        )
+
+        self.assertEqual(
+            [(self.REVISION, "apply")],
+            [(item.revision, item.action) for item in result],
+        )
+        categories = [
+            row
+            for row in database.table("p_code_category").rows
+            if row.get("category_code") == "RAG_SEARCH_CONFIG"
+        ]
+        items = [
+            row
+            for row in database.table("p_code_item").rows
+            if row.get("category_code") == "RAG_SEARCH_CONFIG"
+        ]
+        self.assertEqual(1, len(categories))
+        self.assertEqual(1, len(items))
+        self.assertEqual("N", categories[0]["is_active"])
+        self.assertEqual("N", items[0]["is_active"])
+        self.assertFalse(json.loads(items[0]["ext_json"])["enabled"])
+        before = (len(categories), len(items))
+
+        self.assertEqual(
+            [], apply_revisions(database, CONFIG, repository_head(), repository_head())
+        )
+        self.assertEqual(
+            before,
+            (
+                sum(
+                    row.get("category_code") == "RAG_SEARCH_CONFIG"
+                    for row in database.table("p_code_category").rows
+                ),
+                sum(
+                    row.get("category_code") == "RAG_SEARCH_CONFIG"
+                    for row in database.table("p_code_item").rows
+                ),
+            ),
+        )
+
+    def test_0014_preserves_an_existing_disabled_configuration(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.table("p_code_category").add_row(
+            {
+                "category_id": 100,
+                "category_code": "RAG_SEARCH_CONFIG",
+                "category_name": "RAG 搜索配置",
+                "is_active": "N",
+            }
+        )
+        custom_json = '{"enabled":false,"strategy":"keyword","serviceUrl":"https://rag.example.invalid"}'
+        database.table("p_code_item").add_row(
+            {
+                "item_id": 100,
+                "category_code": "RAG_SEARCH_CONFIG",
+                "item_code": "DEFAULT",
+                "item_name": "RAG 相关资产推荐",
+                "ext_json": custom_json,
+                "is_active": "N",
+            }
+        )
+        database.ledger = "0013_field_filter_index"
+
+        result = apply_revisions(
+            database, CONFIG, "0013_field_filter_index", repository_head()
+        )
+
+        self.assertEqual(
+            [(self.REVISION, "adopt")],
+            [(item.revision, item.action) for item in result],
+        )
+        item = next(
+            row
+            for row in database.table("p_code_item").rows
+            if row.get("category_code") == "RAG_SEARCH_CONFIG"
+        )
+        self.assertEqual(custom_json, item["ext_json"])
+
+    def test_0014_rejects_active_reserved_category_without_advancing_ledger(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.table("p_code_category").add_row(
+            {
+                "category_id": 100,
+                "category_code": "RAG_SEARCH_CONFIG",
+                "category_name": "RAG 搜索配置",
+                "is_active": "Y",
+            }
+        )
+        database.ledger = "0013_field_filter_index"
+
+        with self.assertRaises(DwsMigrationError) as error:
+            apply_revisions(
+                database, CONFIG, "0013_field_filter_index", repository_head()
+            )
+
+        self.assertEqual(self.REVISION, error.exception.revision)
+        self.assertEqual("0013_field_filter_index", database.ledger)
+        self.assertEqual(
+            [],
+            [
+                row
+                for row in database.table("p_code_item").rows
+                if row.get("category_code") == "RAG_SEARCH_CONFIG"
+            ],
+        )
 
 
 class DwsFailClosedTests(unittest.TestCase):

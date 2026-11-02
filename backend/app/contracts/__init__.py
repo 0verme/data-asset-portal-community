@@ -38,6 +38,12 @@ from .metadata_ingestion import (  # type: ignore
     MetadataStatusResult,
     MetadataSummary,
 )
+from .rag_search import (
+    RagRecommendation,
+    RagRecommendationsResponse,
+    RagRelatedTable,
+    RagSearchConfig,
+)
 from .models import (
     ApiAssetItem,
     ApiAssetListResponse,
@@ -151,6 +157,10 @@ __all__ = [
     "ManualCodeTableItem",
     "ManualCodeTableListResponse",
     "ManualCodeTableRequest",
+    "RagRecommendation",
+    "RagRecommendationsResponse",
+    "RagRelatedTable",
+    "RagSearchConfig",
     "ReportItem",
     "ReportListResponse",
     "ReportRequest",

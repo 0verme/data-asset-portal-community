@@ -135,6 +135,8 @@
 
 资产范围（`scope=asset`）是独立 chip，URL 中的 `?scope=asset` 可分享、刷新和前进/后退；资产分组支持按字段（`p_asset_field` 字段名 / 中文字段名 / 描述）召回，`matchedFields` 说明命中字段；分组 `count` 是实际命中总数，`hasMore` 为 true 时显示“查看全部”，资产组跳转数据仓库资产列表并保留同一关键字（详情语义见 [api-contract.md](./api-contract.md) 统一搜索章节）。
 
+搜索页保留单一关键词入口：确定性资产搜索结果在前，可选的“相关资产推荐”独立成组并以 canonical asset/field ID 导航；两者按资产身份去重。RAG 默认关闭且通过独立 HTTP Service 调用，失败不影响关键词搜索；不提供智能解答，不展示检索分数。DAP 后端每次按当前目录 profile 复核远端 ID 与父子关系，并仅使用 DAP 权威公开元数据。DAP 不加载 RAG 模型/索引；与 dap-rag-lab #14 的最终契约和真实联调尚未验收。
+
 ## 13. 认证
 
 **数据表**：`p_admin_user`。
@@ -147,7 +149,7 @@
 
 **当前管理入口**：`/api/system/param-dicts*`，由系统管理权限保护；该入口不是 `/api/common-codes/*` 的兼容别名。
 
-**说明**：参数字典页面维护系统级分类及条目。报表类型、上游/推送候选项和二态状态在公共业务页面分别复用当前领域 API、集中本地选项和共享 `enabled` / `disabled` 状态契约；历史 Common Code HTTP route 保持 WAIT_DB，前端不再调用。
+**说明**：参数字典页面维护系统级分类及条目，并折叠展示受管理员权限保护的可选 RAG 搜索配置。RAG URL/策略等非敏感配置使用保持停用、从通用参数字典和公共码值 API 隐藏的保留行；服务 Bearer Token 只从后端部署 Secret `RAG_SEARCH_SERVICE_TOKEN` 读取，浏览器仅获得是否配置的布尔值。功能默认关闭，不增加 RAG/模型/索引依赖。报表类型、上游/推送候选项和二态状态在公共业务页面分别复用当前领域 API、集中本地选项和共享 `enabled` / `disabled` 状态契约；历史 Common Code HTTP route 保持 WAIT_DB，前端不再调用。
 
 ## 15. 操作日志
 

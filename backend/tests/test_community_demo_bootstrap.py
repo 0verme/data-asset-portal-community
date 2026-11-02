@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import importlib
 import os
+import sqlite3
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -17,6 +18,7 @@ check_ports = _demo.check_ports
 ensure_lineage_workspace = _demo.ensure_lineage_workspace
 parse_args = _demo._parse_args
 prepare_demo_runtime = _demo.prepare_demo_runtime
+verify_demo_database = _demo.verify_demo_database
 
 
 class CommunityDemoBootstrapTests(unittest.TestCase):
@@ -25,6 +27,81 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         self.addCleanup(self.temp_dir.cleanup)
         self.root = Path(self.temp_dir.name)
         self.paths = DemoPaths.for_root(self.root)
+
+    def test_demo_verifier_allows_only_the_inactive_migration_owned_rag_rows(self):
+        from backend.app.migrations.rag_search_config_seed import (
+            RAG_CONFIG_CATEGORY_CODE,
+            RAG_CONFIG_CATEGORY_NAME,
+            RAG_CONFIG_DEFAULT_JSON,
+            RAG_CONFIG_ITEM_CODE,
+            RAG_CONFIG_ITEM_NAME,
+        )
+
+        database = self.root / "demo.sqlite"
+        tables = (
+            "p_menu",
+            "p_asset_table",
+            "p_upstream_system",
+            "p_push_system",
+            "p_report_asset",
+            "p_lineage_node",
+        )
+        plan = {table: {"rows": []} for table in tables}
+        plan.update({
+            "p_code_category": {"rows": [{"category_code": "DEMO"}]},
+            "p_code_item": {"rows": [{"category_code": "DEMO"}]},
+        })
+        with sqlite3.connect(database) as connection:
+            for table in tables:
+                connection.execute(f"CREATE TABLE {table} (id INTEGER)")
+            connection.execute(
+                "CREATE TABLE p_code_category "
+                "(category_code TEXT, category_name TEXT, is_active TEXT)"
+            )
+            connection.executemany(
+                "INSERT INTO p_code_category VALUES (?, ?, ?)",
+                [
+                    ("DEMO", "Demo category", "Y"),
+                    (RAG_CONFIG_CATEGORY_CODE, RAG_CONFIG_CATEGORY_NAME, "N"),
+                ],
+            )
+            connection.execute(
+                "CREATE TABLE p_code_item "
+                "(category_code TEXT, item_code TEXT, item_name TEXT, "
+                "item_value TEXT, ext_json TEXT, is_active TEXT)"
+            )
+            connection.executemany(
+                "INSERT INTO p_code_item VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                    ("DEMO", "DEFAULT", "Demo item", "demo", "{}", "Y"),
+                    (
+                        RAG_CONFIG_CATEGORY_CODE,
+                        RAG_CONFIG_ITEM_CODE,
+                        RAG_CONFIG_ITEM_NAME,
+                        "reserved-rag-config",
+                        RAG_CONFIG_DEFAULT_JSON,
+                        "N",
+                    ),
+                ],
+            )
+            connection.execute("CREATE TABLE p_admin_user (username TEXT)")
+            connection.execute("INSERT INTO p_admin_user VALUES ('admin')")
+
+        with (
+            patch("demo.seed_loader.community_seed_plan", return_value=plan),
+            patch("demo.seed_loader.ADMIN_USER", {"username": "admin"}),
+        ):
+            counts = verify_demo_database(database)
+            self.assertEqual(2, counts["p_code_category"])
+            self.assertEqual(2, counts["p_code_item"])
+            with sqlite3.connect(database) as connection:
+                connection.execute(
+                    "UPDATE p_code_category SET is_active = 'Y' "
+                    "WHERE category_code = ?",
+                    (RAG_CONFIG_CATEGORY_CODE,),
+                )
+            with self.assertRaises(BootstrapError):
+                verify_demo_database(database)
 
     def test_generated_runtime_is_stable_and_secret_is_reused(self):
         first_secret = prepare_demo_runtime(self.paths)

@@ -106,6 +106,14 @@ def get_session_secret() -> str:
     return secret_key
 
 
+def get_rag_search_service_token() -> str:
+    """Return a bounded printable server token from deployment Secret storage."""
+    token = (os.getenv("RAG_SEARCH_SERVICE_TOKEN") or "").strip()
+    if len(token) > 4096 or any(not ("!" <= character <= "~") for character in token):
+        return ""
+    return token
+
+
 def get_public_catalog_profile() -> PublicCatalogProfile:
     """Return the validated anonymous catalog exposure profile.
 

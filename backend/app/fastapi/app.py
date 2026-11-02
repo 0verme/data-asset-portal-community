@@ -22,6 +22,7 @@ from ..services.operation_log_service import operation_log_service
 from ..services.portal_service import portal_service
 from ..services.push_service import push_service
 from ..services.report_service import report_service
+from ..services.rag_search_service import rag_search_service
 from ..services.root_service import root_service
 from ..services.search_provider import search_provider
 from ..services.search_hot_keyword_service import search_hot_keyword_service
@@ -62,6 +63,7 @@ def create_fastapi_app(
     portal_service_instance: Any | None = None,
     search_provider_instance: Any | None = None,
     search_hot_keyword_service_instance: Any | None = None,
+    rag_search_service_instance: Any | None = None,
     indicator_service_instance: Any | None = None,
     indicator_path_service_instance: Any | None = None,
     assets_service_instance: Any | None = None,
@@ -125,6 +127,7 @@ def create_fastapi_app(
     portal_stats = portal_service_instance or portal_service
     search = search_provider_instance or search_provider
     hot_keywords = search_hot_keyword_service_instance or search_hot_keyword_service
+    rag_recommendations = rag_search_service_instance or rag_search_service
     indicator = indicator_service_instance or indicator_service
     indicator_paths = indicator_path_service_instance or indicator_path_service
     assets = assets_service_instance or assets_service
@@ -154,6 +157,7 @@ def create_fastapi_app(
         portal_stats,
         search,
         hot_keywords,
+        rag_recommendations,
     )
     # Every router shipped in this repository is part of the default runtime.
     # External dependencies report their own diagnostic errors at request time;
@@ -168,7 +172,7 @@ def create_fastapi_app(
     _register_api_asset_routes(app, api_asset)
     _register_lineage_routes(app, lineage)
     _register_metadata_routes(app, metadata_ingestion)
-    _register_system_management_routes(app, system_management)
+    _register_system_management_routes(app, system_management, rag_recommendations)
     app.include_router(operation_log_router)
     _register_upstream_routes(app, upstream)
     _register_push_routes(app, push)

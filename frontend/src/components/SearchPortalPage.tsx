@@ -19,7 +19,10 @@ import { ActionErrorBanner } from "./common/ActionErrorBanner.tsx";
 import { getPortalStats, type PortalStatItem } from "../api/portal.ts";
 import { getHotKeywords } from "../api/hotKeywords.ts";
 import {
+  getRagRecommendations,
   unifiedSearch,
+  type RagRecommendation,
+  type RagRecommendationsResponse,
   type SearchResult,
   type SearchResultGroup,
   type SearchResultItem,
@@ -53,6 +56,128 @@ function formatMatchedField(item: SearchResultItem): string {
   return parts.length ? `命中：${parts.join(" / ")}` : "";
 }
 
+function recommendationKey(item: RagRecommendation): string {
+  return item.assetType === "field" && item.fieldId
+    ? `field:${item.assetId}:${item.fieldId}`
+    : `table:${item.assetId}`;
+}
+
+function recommendationTarget(item: RagRecommendation): SearchResultItem {
+  const tableName = item.relatedTable?.name || item.name;
+  return {
+    id: recommendationKey(item),
+    title: item.displayName || item.name,
+    subtitle: item.description,
+    meta: [item.relatedTable?.name, item.domain, item.layer].filter(Boolean).join(" / "),
+    module: "dwm",
+    ref: tableName,
+    type: "asset",
+    category: "资产",
+    assetId: item.assetId,
+    matchedFields: item.evidence.map((value) => ({ label: "匹配依据", value })),
+  };
+}
+
+interface RagRecommendationsSectionProps {
+  loading: boolean;
+  failed: boolean;
+  response: RagRecommendationsResponse | null;
+  searchedAssetIds: ReadonlySet<number>;
+  term: string;
+  onNavigate: ((target: SearchNavigationTarget, term: string) => void) | undefined;
+}
+
+function RagRecommendationsSection({
+  loading,
+  failed,
+  response,
+  searchedAssetIds,
+  term,
+  onNavigate,
+}: RagRecommendationsSectionProps) {
+  if (response?.status === "disabled") return null;
+
+  if (
+    failed ||
+    response?.status === "unavailable" ||
+    (response?.status === "degraded" && response.recommendations.length === 0)
+  ) {
+    return (
+      <div className="sp-rag-unavailable" role="status">
+        相关资产推荐暂不可用，关键词搜索不受影响。
+      </div>
+    );
+  }
+
+  if (loading && !response) {
+    return (
+      <div className="sp-rag-loading" role="status" aria-label="正在加载相关资产推荐">
+        <span className="sp-rag-skeleton sp-rag-skeleton-title" />
+        <span className="sp-rag-skeleton" />
+        <span className="sp-rag-skeleton" />
+      </div>
+    );
+  }
+
+  if (!response) return null;
+  const seen = new Set<string>();
+  const recommendations = response.recommendations.filter((item) => {
+    const key = recommendationKey(item);
+    if (seen.has(key) || searchedAssetIds.has(item.assetId)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (!recommendations.length) return null;
+
+  return (
+    <section className="sp-rag-group" aria-label="相关资产推荐">
+      <div className="sp-group-head">
+        <span className="sp-group-title">相关资产推荐</span>
+        <span className="sp-group-count">{recommendations.length} 条</span>
+      </div>
+      {response.status === "degraded" ? (
+        <div className="sp-rag-unavailable" role="status">
+          部分推荐暂不可用，以下结果已通过目录校验。
+        </div>
+      ) : null}
+      <div className="sp-rag-list">
+        {recommendations.map((item) => {
+          const target = recommendationTarget(item);
+          return (
+            <Button
+              key={recommendationKey(item)}
+              variant="tertiary"
+              type="button"
+              className="sp-rag-hit"
+              onClick={() => onNavigate?.(target, term)}
+            >
+              <span className="sp-rag-hit-main">
+                <span className="sp-rag-hit-heading">
+                  <span className="sp-rag-hit-title">{item.displayName || item.name}</span>
+                  <span className="sp-rag-hit-type">{item.assetType === "field" ? "字段" : "数据表"}</span>
+                </span>
+                {item.displayName && item.displayName !== item.name ? (
+                  <span className="sp-rag-hit-name">{item.name}</span>
+                ) : null}
+                {item.description ? <span className="sp-rag-hit-desc">{item.description}</span> : null}
+                {item.relatedTable ? (
+                  <span className="sp-rag-hit-table">所属表：{item.relatedTable.displayName || item.relatedTable.name}</span>
+                ) : null}
+                {item.evidence.length ? (
+                  <span className="sp-rag-hit-evidence">匹配依据：{item.evidence.join("、")}</span>
+                ) : null}
+              </span>
+              <span className="sp-hit-go" aria-hidden="true">
+                <Icon name="arrow" size={14} />
+              </span>
+            </Button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export function SearchPortalPage({
   onNavigate,
   availableModules = [],
@@ -74,6 +199,9 @@ export function SearchPortalPage({
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState("");
   const [result, setResult] = useState<SearchResult | null>(null);
+  const [recommendations, setRecommendations] = useState<RagRecommendationsResponse | null>(null);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [recommendationsError, setRecommendationsError] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [searchedTerm, setSearchedTerm] = useState("");
@@ -125,6 +253,9 @@ export function SearchPortalPage({
     setQuery("");
     setScope(preservedScope);
     setResult(null);
+    setRecommendations(null);
+    setRecommendationsLoading(false);
+    setRecommendationsError(false);
     setSearchLoading(false);
     setSearchError("");
     setSearchedTerm("");
@@ -154,6 +285,9 @@ export function SearchPortalPage({
     setQuery(keyword);
     setScope(nextScope);
     setResult(null);
+    setRecommendations(null);
+    setRecommendationsLoading(true);
+    setRecommendationsError(false);
     setSearchLoading(true);
     setSearchError("");
     setSearchedTerm(keyword);
@@ -172,6 +306,21 @@ export function SearchPortalPage({
         );
         setResult(null);
         setSearchLoading(false);
+      });
+
+    // Recommendations are independent: a slow or failed optional provider never
+    // delays or replaces the deterministic keyword result.
+    getRagRecommendations(keyword)
+      .then((data) => {
+        if (seq !== requestSeq.current) return;
+        setRecommendations(data);
+        setRecommendationsLoading(false);
+      })
+      .catch(() => {
+        if (seq !== requestSeq.current) return;
+        setRecommendations(null);
+        setRecommendationsError(true);
+        setRecommendationsLoading(false);
       });
   };
 
@@ -283,6 +432,11 @@ export function SearchPortalPage({
 
   const hasResult = result !== null && !searchLoading && !searchError;
   const groups = hasResult && result ? result.groups : [];
+  const searchedAssetIds = new Set(
+    groups
+      .flatMap((group) => group.items.map((item) => item.assetId))
+      .filter((assetId): assetId is number => Number.isInteger(assetId) && Number(assetId) > 0),
+  );
 
   return (
     <div className="search-portal">
@@ -387,6 +541,7 @@ export function SearchPortalPage({
             </div>
           ) : (
             <>
+              <div className="sp-business-group-title">资产搜索结果</div>
               <div className="sp-result-summary">
                 {result?.partial ? "已加载" : "共"} <b>{result?.total}</b> 条结果，匹配 “{searchedTerm}”
               </div>
@@ -452,6 +607,16 @@ export function SearchPortalPage({
               ))}
             </>
           )}
+          {!searchLoading && !searchError ? (
+            <RagRecommendationsSection
+              loading={recommendationsLoading}
+              failed={recommendationsError}
+              response={recommendations}
+              searchedAssetIds={searchedAssetIds}
+              term={searchedTerm}
+              onNavigate={handleNavigate}
+            />
+          ) : null}
         </div>
       ) : (
         <div className="sp-stats">
