@@ -9,7 +9,9 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from backend.app.application import Identity
+from backend.app.authorization.core import AuthorizationService
 from backend.app.core.capabilities import resolve_capabilities
+from backend.app.contracts.rag_search import RagRecommendationsResponse
 from backend.app.fastapi_app import create_fastapi_app
 from backend.app.services.search_provider import SearchDataSourceError
 from fastapi.testclient import TestClient
@@ -31,6 +33,15 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
         self.portal_service = MagicMock()
         self.search_provider = MagicMock()
         self.hot_keyword_service = MagicMock()
+        self.rag_search_service = MagicMock()
+        self.rag_search_service.recommend.side_effect = lambda query, profile: RagRecommendationsResponse(
+            query=query,
+            status="disabled",
+            recommendations=[],
+            count=0,
+            elapsedMs=0,
+            reasonCode="disabled",
+        )
 
     def app(self):
         return create_fastapi_app(
@@ -39,6 +50,7 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
             portal_service_instance=self.portal_service,
             search_provider_instance=self.search_provider,
             search_hot_keyword_service_instance=self.hot_keyword_service,
+            rag_search_service_instance=self.rag_search_service,
         )
 
     def test_capabilities_portal_and_search_contracts(self):
@@ -63,6 +75,71 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
         self.search_provider.search.assert_called_once_with(
             "ORDER", scope="indicator", limit="7", profile="internal"
         )
+
+    def test_rag_recommendations_contract_is_optional_and_disabled_by_default(self):
+        client = TestClient(self.app())
+
+        response = client.get("/api/search/recommendations?q=合同金额")
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            {
+                "query": "合同金额",
+                "status": "disabled",
+                "recommendations": [],
+                "count": 0,
+                "elapsedMs": 0.0,
+                "reasonCode": "disabled",
+            },
+            response.json(),
+        )
+        self.assertFalse(self.search_provider.search.called)
+        self.rag_search_service.recommend.assert_called_once_with("合同金额", profile="internal")
+        schema = client.get("/openapi.json").json()
+        operation = schema["paths"]["/api/search/recommendations"]["get"]
+        self.assertIn("RagRecommendationsResponse", str(operation["responses"]))
+
+    def test_admin_rag_configuration_routes_use_the_protected_services(self):
+        system = MagicMock()
+        config = {
+            "enabled": False,
+            "serviceUrl": "",
+            "strategy": "auto",
+            "topK": 5,
+            "timeoutMs": 2000,
+        }
+        public_config = {**config, "tokenConfigured": False}
+        system.get_rag_search_config.return_value = config
+        system.get_rag_search_config_public.return_value = public_config
+        system.update_rag_search_config.return_value = public_config
+        rag = MagicMock()
+        rag.diagnostics.return_value = {
+            "status": "disabled",
+            "reasonCode": "disabled",
+            "health": "unknown",
+            "ready": False,
+            "tokenConfigured": False,
+        }
+        client = TestClient(create_fastapi_app(
+            identity_resolver=lambda _request: Identity("admin", "admin", "Admin"),
+            system_management_service_instance=system,
+            rag_search_service_instance=rag,
+            authorization_service_instance=AuthorizationService(),
+        ))
+
+        read = client.get("/api/system/rag-search-config")
+        self.assertEqual(200, read.status_code)
+        self.assertEqual(public_config, read.json()["data"])
+
+        diagnostics = client.get("/api/system/rag-search-config/diagnostics")
+        self.assertEqual(200, diagnostics.status_code)
+        self.assertEqual("disabled", diagnostics.json()["data"]["status"])
+        rag.diagnostics.assert_called_once_with(config)
+
+        update = client.put("/api/system/rag-search-config", json=config)
+        self.assertEqual(200, update.status_code)
+        self.assertEqual(public_config, update.json()["data"])
+        system.update_rag_search_config.assert_called_once_with(config)
 
     def test_hot_keyword_route_returns_only_the_public_schema_and_is_documented(self):
         self.hot_keyword_service.get_hot_keywords.return_value = [
@@ -148,6 +225,12 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         self.assertTrue(response.json()["partial"])
         self.assertEqual(["asset"], response.json()["failedGroups"])
+
+    def test_rag_recommendations_reject_overlong_query(self):
+        response = TestClient(self.app()).get(
+            "/api/search/recommendations", params={"q": "x" * 501}
+        )
+        self.assertEqual(422, response.status_code)
 
     def test_common_code_remains_wait_db_and_is_not_native_route(self):
         response = TestClient(self.app()).get("/api/common-codes/categories")

@@ -36,6 +36,7 @@ const SCOPE_ALL = 'all';
 const SCOPE_ALIASES: Record<string, string> = { metric: 'indicator', push: 'downstream', apiAsset: 'api' };
 const DEFAULT_LIMIT = 5;
 const REMOTE_SEARCH_TIMEOUT_MS = LONG_REQUEST_TIMEOUT;
+const RAG_RECOMMENDATIONS_TIMEOUT_MS = 12_000;
 
 /** Matched-field entries per asset are capped, mirroring the remote provider. */
 const ASSET_FIELD_MATCH_LIMIT = 3;
@@ -83,6 +84,78 @@ export interface SearchResult {
   estimatedTotal?: number;
   /** True when at least one group is truncated. */
   hasMore?: boolean;
+}
+
+export type RagRecommendationStatus = 'disabled' | 'available' | 'degraded' | 'unavailable';
+
+export interface RagRelatedTable {
+  assetId: number;
+  name: string;
+  displayName: string;
+  description: string;
+  domain: string;
+  layer: string;
+}
+
+export interface RagRecommendation {
+  /** Owning DAP table identity for both table and field recommendations. */
+  assetId: number;
+  fieldId?: number | null;
+  assetType: 'table' | 'field';
+  name: string;
+  displayName: string;
+  description: string;
+  domain: string;
+  layer: string;
+  relatedTable?: RagRelatedTable | null;
+  /** Human-readable evidence only; retrieval scores are never presented as accuracy. */
+  evidence: string[];
+}
+
+export type RagRecommendationReason =
+  | 'disabled'
+  | 'empty_query'
+  | 'index_not_ready'
+  | 'model_mismatch'
+  | 'timeout'
+  | 'visibility_unavailable'
+  | 'service_unavailable'
+  | 'service_unauthorized'
+  | 'service_auth_not_configured'
+  | 'invalid_response'
+  | 'busy';
+
+export interface RagRecommendationsResponse {
+  query: string;
+  status: RagRecommendationStatus;
+  recommendations: RagRecommendation[];
+  count: number;
+  elapsedMs: number;
+  reasonCode?: RagRecommendationReason | null;
+}
+
+export function disabledRagRecommendations(query: string): RagRecommendationsResponse {
+  return {
+    query: String(query || '').trim(),
+    status: 'disabled',
+    recommendations: [],
+    count: 0,
+    elapsedMs: 0,
+    reasonCode: 'disabled',
+  };
+}
+
+export async function getRagRecommendations(query: string): Promise<RagRecommendationsResponse> {
+  const keyword = String(query || '').trim();
+  if (API_MODE === 'remote') {
+    return requestRemote<RagRecommendationsResponse>('/search/recommendations', {
+      params: { q: keyword },
+      timeout: RAG_RECOMMENDATIONS_TIMEOUT_MS,
+      suppressUnauthorizedEvent: true,
+    });
+  }
+  // The mock app has no RAG capability. Do not invent sample AI output.
+  return disabledRagRecommendations(keyword);
 }
 
 export async function unifiedSearch(

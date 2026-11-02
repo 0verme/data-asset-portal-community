@@ -124,3 +124,23 @@ test("search result rows size from content instead of the Kumo control box", asy
     /<span className="sp-hit-facts">[\s\S]*?sp-hit-meta[\s\S]*?sp-hit-match[\s\S]*?<\/span>/,
   );
 });
+
+test("RAG recommendations are a separate business group with asynchronous non-blocking state", async () => {
+  const source = await readFile(searchPagePath, "utf8");
+  const api = await readFile(fileURLToPath(new URL("../api/search.ts", import.meta.url)), "utf8");
+
+  assert.match(source, /getRagRecommendations\(keyword\)/);
+  assert.match(source, /unifiedSearch\(keyword, nextScope\)[\s\S]*?getRagRecommendations\(keyword\)/);
+  assert.match(source, /if \(seq !== requestSeq\.current\) return;/);
+  assert.match(source, /status === "disabled"\) return null/);
+  assert.match(source, /searchedAssetIds\.has\(item\.assetId\)/);
+  assert.match(source, /title: item\.displayName \|\| item\.name/);
+  assert.match(source, /assetId: item\.assetId/);
+  assert.match(source, /sp-business-group-title">资产搜索结果/);
+  assert.match(source, /!searchLoading && !searchError \? \([\s\S]*?<RagRecommendationsSection/);
+  assert.match(source, /相关资产推荐/);
+  assert.doesNotMatch(source, /智能解答|关键词检索|向量检索|混合检索|检索模式/);
+  assert.match(api, /status: 'disabled'[\s\S]*recommendations: \[\]/);
+  assert.match(api, /suppressUnauthorizedEvent: true/);
+  assert.doesNotMatch(api, /similarityScore|confidenceScore|retrievalScore/);
+});

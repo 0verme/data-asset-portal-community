@@ -1,4 +1,4 @@
-"""GaussDB/DWS JDBC revision adapters for revisions ``0002``-``0013``.
+"""GaussDB/DWS JDBC revision adapters for revisions ``0002``-``0014``.
 
 The DWS provider has no SQLAlchemy/Alembic online engine, so every revision
 that can be reached by an existing GaussDB/DWS deployment needs an explicit
@@ -41,6 +41,7 @@ from .revision_logic import (
     plan_upstream_backfill,
 )
 from .search_hot_keyword_seed import plan_search_hot_keyword_seed
+from .rag_search_config_seed import plan_rag_search_config_seed
 from .schema import (
     SCHEMA_ROOT,
     ColumnSpec,
@@ -1429,6 +1430,84 @@ class FieldMappingFieldFilterIndex(DwsRevisionAdapter):
 
 
 # ---------------------------------------------------------------------------
+# 0014_rag_search_config
+# ---------------------------------------------------------------------------
+
+
+class RagSearchConfigSeed(DwsRevisionAdapter):
+    revision = "0014_rag_search_config"
+
+    def _rows(self, ctx: DwsRevisionContext):
+        if not (ctx.has_table("p_code_category") and ctx.has_table("p_code_item")):
+            return None, None
+        category_rows = ctx.fetchall(
+            f"SELECT category_id, category_code, category_name, is_active "
+            f"FROM {ctx.qualified('p_code_category')}"
+        )
+        item_rows = ctx.fetchall(
+            f"SELECT item_id, category_code, item_code, item_name, item_value, ext_json, is_active "
+            f"FROM {ctx.qualified('p_code_item')}"
+        )
+        return (
+            [dict(zip(("category_id", "category_code", "category_name", "is_active"), row)) for row in category_rows],
+            [dict(zip(("item_id", "category_code", "item_code", "item_name", "item_value", "ext_json", "is_active"), row)) for row in item_rows],
+        )
+
+    def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
+        categories, items = self._rows(ctx)
+        if categories is None or items is None:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                "parameter dictionary tables are required for the reserved RAG config seed",
+            )
+        plan = plan_rag_search_config_seed(categories, items)
+        if not plan.safe:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                "reserved RAG configuration storage conflicts with the seed contract",
+                details=(plan.error or "unknown seed conflict",),
+            )
+        if plan.categories or plan.items:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.NOT_APPLIED,
+                "reserved inactive RAG configuration rows are missing",
+                details=(f"missing categories={len(plan.categories)}, items={len(plan.items)}",),
+            )
+        return RevisionInspection(
+            self.revision,
+            RevisionState.APPLIED,
+            "reserved RAG configuration rows exist and remain inactive",
+        )
+
+    def apply(self, ctx: DwsRevisionContext) -> None:
+        categories, items = self._rows(ctx)
+        if categories is None or items is None:
+            raise DwsMigrationError(
+                self.revision,
+                observed="parameter dictionary tables are missing",
+                reason="the RAG settings are stored in the existing parameter dictionary schema",
+            )
+        plan = plan_rag_search_config_seed(categories, items)
+        if not plan.safe:
+            raise DwsMigrationError(
+                self.revision,
+                observed="reserved RAG configuration seed conflict",
+                reason=plan.error or "seed state is ambiguous",
+            )
+        for table, rows in (("p_code_category", plan.categories), ("p_code_item", plan.items)):
+            for values in rows:
+                columns = tuple(values)
+                placeholders = ", ".join("?" for _ in columns)
+                ctx.execute(
+                    f"INSERT INTO {ctx.qualified(table)} ({', '.join(columns)}) "
+                    f"VALUES ({placeholders})",
+                    tuple(values[column] for column in columns),
+                )
+
+
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -1445,6 +1524,7 @@ ADAPTERS: tuple[DwsRevisionAdapter, ...] = (
     PushJobFreqDescCapacity(),
     SearchHotKeywords(),
     FieldMappingFieldFilterIndex(),
+    RagSearchConfigSeed(),
 )
 
 _ADAPTERS_BY_REVISION: dict[str, DwsRevisionAdapter] = {

@@ -11,6 +11,8 @@ const menuPage = read("./components/system/MenuManagementPage.tsx");
 const paramPage = read("./components/system/ParamDictPage.tsx");
 const systemPage = read("./components/system/SystemManagementPage.tsx");
 const rolePage = read("./components/system/RoleManagementPage.tsx");
+const ragConfigPage = read("./components/system/RagSearchConfigPanel.tsx");
+const ragConfigApi = read("./api/ragSearchConfig.ts");
 const oplogPage = read("./components/OperationLog/OperationLogPage.tsx");
 const oplogFilter = read("./components/OperationLog/OperationLogFilter.tsx");
 const oplogDetail = read("./components/OperationLog/OperationLogDetail.tsx");
@@ -45,6 +47,19 @@ test("system pages use the frozen DAP adapters with documented native exceptions
   assert.equal((rolePage.match(/<Input/g) ?? []).length, 2);
   assert.equal((rolePage.match(/<Textarea/g) ?? []).length, 1);
   assert.equal((rolePage.match(/<input/g) ?? []).length, 1, "permission matrix checkbox stays native");
+});
+
+test("optional RAG configuration is admin-controlled and never fabricates answers", () => {
+  assert.match(paramPage, /<RagSearchConfigPanel canEdit=\{canEdit\} \/>/);
+  assert.match(ragConfigPage, /默认关闭/);
+  assert.match(ragConfigPage, /普通关键词搜索不受影响/);
+  assert.match(ragConfigPage, /LLM/);
+  assert.match(ragConfigPage, /checked=\{config\.enabled\}/);
+  assert.match(ragConfigPage, /disabled=\{!canEdit \|\| !supported/);
+  assert.match(ragConfigApi, /\/system\/rag-search-config/);
+  assert.match(ragConfigApi, /模拟模式不支持持久化 RAG 配置/);
+  assert.match(ragConfigPage, /不生成智能解答/);
+  assert.doesNotMatch(ragConfigPage + ragConfigApi, /setAnswer|confidenceScore|similarityScore/);
 });
 
 test("operation log surfaces use the frozen DAP adapters", () => {

@@ -17,7 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 MIGRATE = REPO_ROOT / "backend" / "scripts" / "schema_migrate.py"
 INDEX_NAME = "idx_p_field_mapping_field_table_deleted"
 LEGACY_REVISION = "0012_search_hot_keywords"
-HEAD_REVISION = "0013_field_filter_index"
+HEAD_REVISION = "0014_rag_search_config"
 
 
 def _temporary_directory(prefix: str):

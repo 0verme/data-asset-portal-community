@@ -21,6 +21,7 @@ import { EmptyState, RowActions, StatusBadge } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
 import { Button } from "../../ui/index.ts";
 import { PARAM_STATUS_META } from "./constants.ts";
+import { RagSearchConfigPanel } from "./RagSearchConfigPanel.tsx";
 
 export interface ParamDictPageProps {
   categories: readonly ParamDictCategoryWithCount[];
@@ -68,6 +69,7 @@ export function ParamDictPage({
 
   return (
     <div className="system-page">
+      <RagSearchConfigPanel canEdit={canEdit} />
       <div className="page-head">
         <div>
           <div className="page-title">

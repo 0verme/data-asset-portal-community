@@ -149,7 +149,20 @@ Public Catalog 的“可搜索字段”和“可展示字段”采用同一 prof
 
 匿名批量导出默认关闭（`PUBLIC_CATALOG_EXPORT_ENABLED=false`）。开启后手工码值表与字段映射 CSV endpoint 均在后端执行该开关，并复用页面相同的 public projection；`disabled` profile 仍禁止匿名业务读取与导出。永久敏感字段（password、token、secret、credential、数据库账号、内部路径/诊断等）不会因 profile 或导出开关而公开。受保护的 `admin-detail`、写操作、系统管理和操作日志边界不随该配置放宽。
 
-### 3.5 API authentication boundary
+### 3.5 Optional RAG Search Service (DAP HTTP client)
+
+RAG recommendation is **disabled by default**. DAP is only an authenticated HTTP client and does not embed or import `dap-rag-lab`, install/load BGE/PyTorch, read LanceDB, or launch a RAG CLI. No deployment or remote-service changes are performed automatically by DAP.
+
+When the optional feature is explicitly enabled, set the service URL in the protected System Management panel and inject `RAG_SEARCH_SERVICE_TOKEN` into the DAP backend from the deployment Secret store. The token is not saved in the parameter table, is never sent to the browser, and is not returned by configuration/diagnostic endpoints. Do not place the real value in Git, logs, command history, or public deployment examples. Enabling the feature is rejected until the server-side token is configured.
+
+- Same-host deployment: configure a loopback URL such as `http://127.0.0.1:<port>`; use the actual service port selected by the operator. The RAG service must still validate the Bearer token.
+- Cross-host deployment: configure `https://<RAG_SERVICE_HOST>` with valid TLS. Remote plain HTTP, URL userinfo, query strings, and embedded credentials are rejected.
+- The admin-only availability check requests `/healthz` and `/readyz` when the protected config panel loads or an administrator presses its check action; ordinary portal/search page loads do not call diagnostics. Search calls are bounded by the configured timeout and fail closed.
+- Every returned `assetId`/`fieldId` is resolved against the current DAP public catalog/profile. DAP discards remote names, descriptions, evidence, and scores, and projects only current DAP metadata. A catalog failure or unknown/stale identity yields no recommendation.
+
+DAP Issue #503 currently defines an isolated synthetic HTTP client contract because dap-rag-lab Issue #14 has not finalized its contract. Synthetic tests do not establish that a RAG service is reachable or compatible. Keep the feature disabled until the two contracts are aligned and an explicitly authorized environment completes real HTTP and public-catalog validation. DAP does not configure, deploy, or modify the RAG repository or its database.
+
+### 3.6 API authentication boundary
 
 Community Edition 使用 `Public Catalog + Authenticated Management`：普通业务目录 GET 可以匿名浏览并按规则脱敏；写操作、管理 API、操作日志、Metadata ingestion、上/下游 `admin-detail`、用户/角色/参数和连接/凭据字段仍由后端 authentication 与 permission-based RBAC 保护。不要用 Nginx、隐藏菜单或关闭 OpenAPI 代替后端授权。完整 route inventory 见 [`docs/rbac/authenticated-read-model.md`](./docs/rbac/authenticated-read-model.md)。
 

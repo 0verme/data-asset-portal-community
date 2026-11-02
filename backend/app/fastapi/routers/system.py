@@ -77,7 +77,11 @@ def _system_payload(payload: Any) -> Any:
     return payload
 
 
-def _register_system_management_routes(app: FastAPI, service: Any) -> None:
+def _register_system_management_routes(
+    app: FastAPI,
+    service: Any,
+    rag_search_service: Any | None = None,
+) -> None:
     router = APIRouter(
         prefix="/api/system",
         tags=["system-management-migration"],
@@ -368,6 +372,49 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
         return JSONResponse(
             content=validate_contract({"message": "Menu deleted"}, SystemResponse)
         )
+
+    @router.get("/rag-search-config", response_model=None)
+    def get_rag_search_config(
+        _context: RequestContext = Depends(require_permission("system:param:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.get_rag_search_config_public()
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract({"data": data}, SystemResponse))
+
+    @router.put("/rag-search-config", response_model=None)
+    def update_rag_search_config(
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_rag_search_config(_system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "RAG search configuration updated", "data": data},
+                SystemResponse,
+            )
+        )
+
+    @router.get("/rag-search-config/diagnostics", response_model=None)
+    def get_rag_search_diagnostics(
+        _context: RequestContext = Depends(require_permission("system:param:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            config = current_service.get_rag_search_config()
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        if rag_search_service is None:
+            diagnostics = {"status": "disabled", "reasonCode": "disabled"}
+        else:
+            diagnostics = rag_search_service.diagnostics(config)
+        return JSONResponse(content=validate_contract({"data": diagnostics}, SystemResponse))
 
     @router.get("/param-dicts/categories", response_model=None)
     def get_param_categories(

@@ -25,6 +25,7 @@ class RoutePermissionInventoryTests(unittest.TestCase):
         "/api/portal/stats",
         "/api/search",
         "/api/search/hot-keywords",
+        "/api/search/recommendations",
         "/api/assets/tables",
         "/api/assets/tables/{table_name}",
         "/api/assets/tables/{table_name}/fields",
@@ -122,6 +123,9 @@ class RoutePermissionInventoryTests(unittest.TestCase):
         ("POST", "/api/system/menus"): "system:menu:write",
         ("GET", "/api/system/param-dicts"): "system:param:read",
         ("POST", "/api/system/param-dicts"): "system:param:write",
+        ("GET", "/api/system/rag-search-config"): "system:param:read",
+        ("PUT", "/api/system/rag-search-config"): "system:param:write",
+        ("GET", "/api/system/rag-search-config/diagnostics"): "system:param:read",
     }
 
     @staticmethod

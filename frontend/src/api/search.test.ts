@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { getAssetTablePage } from "./assets.ts";
-import { buildMockSearchResult, type SearchResult } from "./search.ts";
+import {
+  buildMockSearchResult,
+  disabledRagRecommendations,
+  type SearchResult,
+} from "./search.ts";
 
 const ALL_MODULES: ReadonlySet<string> = new Set([
   "dwm",
@@ -25,6 +29,17 @@ function assetGroup(result: SearchResult) {
   assert.ok(group, "asset group is expected");
   return group;
 }
+
+test("RAG-disabled responses are explicit and never fabricate recommendations", () => {
+  assert.deepEqual(disabledRagRecommendations("  业务概念  "), {
+    query: "业务概念",
+    status: "disabled",
+    recommendations: [],
+    count: 0,
+    elapsedMs: 0,
+    reasonCode: "disabled",
+  });
+});
 
 test("mock asset search recalls an asset through a field-only keyword", () => {
   const result = buildMockSearchResult(FIELD_ONLY_KEYWORD, "asset", 5, ALL_MODULES);
