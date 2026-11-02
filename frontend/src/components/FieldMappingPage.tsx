@@ -60,7 +60,7 @@ import {
 } from "./fieldMapping/fieldMappingUtils.ts";
 import type { FieldMappingStatsStatus } from "./fieldMapping/fieldMappingStatsState.ts";
 import { Icon } from "./ui.tsx";
-import { Button, Select } from "../ui/index.ts";
+import { Button, TablePagination } from "../ui/index.ts";
 
 type MappingTab = "table" | "field";
 
@@ -440,11 +440,19 @@ export function FieldMappingPage({
           if (cancelled) return;
           setFieldRows(nextRows.items);
           setFieldTotal(nextRows.total);
+          if (nextRows.pageSize !== pageSize) setPageSize(nextRows.pageSize);
+          const lastPage = Math.max(1, Math.ceil(nextRows.total / nextRows.pageSize));
+          const normalizedPage = Math.min(nextRows.page, lastPage);
+          if (normalizedPage !== requestPage) setPage(normalizedPage);
         } else {
           const nextRows = await getFieldMappingTables(listParams);
           if (cancelled) return;
           setTableRows(nextRows.items);
           setTableTotal(nextRows.total);
+          if (nextRows.pageSize !== pageSize) setPageSize(nextRows.pageSize);
+          const lastPage = Math.max(1, Math.ceil(nextRows.total / nextRows.pageSize));
+          const normalizedPage = Math.min(nextRows.page, lastPage);
+          if (normalizedPage !== requestPage) setPage(normalizedPage);
         }
       } catch (loadError: unknown) {
         if (cancelled) return;
@@ -458,7 +466,7 @@ export function FieldMappingPage({
     return () => {
       cancelled = true;
     };
-  }, [listParams, tab, listRetryVersion]);
+  }, [listParams, pageSize, requestPage, tab, listRetryVersion]);
 
   useEffect(() => {
     previousKeywordRef.current = keyword;
@@ -493,8 +501,6 @@ export function FieldMappingPage({
   );
 
   const totalRows = tab === "field" ? fieldTotal : tableTotal;
-  const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
-  const currentPage = Math.min(page, pageCount);
   const fieldPageRows = tab === "field" ? sortedFieldRows : [];
   const tablePageRows = tab === "table" ? sortedTableRows : [];
 
@@ -884,34 +890,22 @@ export function FieldMappingPage({
               </table>
             </FieldMappingWideTable>
 
-            <div className="fm-pagination">
-              <div>第 {totalRows ? ((currentPage - 1) * pageSize + 1) : 0}-{Math.min(currentPage * pageSize, totalRows)} 条 / 共 {totalRows} 条</div>
-              <div className="fm-pagination-tools">
-                <label>
-                  每页
-                  <Select<string>
-                    aria-label="每页条数"
-                    className="sel fm-page-size"
-                    items={FIELD_MAPPING_PAGE_SIZE_OPTIONS.map((item) => ({ label: String(item), value: String(item) }))}
-                    value={String(pageSize)}
-                    onValueChange={(value) => {
-                      setPage(1);
-                      setPageSize(Number(value));
-                    }}
-                  />
-                  条
-                </label>
-                <Button className="btn" variant="secondary" type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={currentPage <= 1}>
-                  上一页
-                </Button>
-                <span className="mono">{currentPage} / {pageCount}</span>
-                <Button className="btn" variant="secondary" type="button" onClick={() => setPage((current) => Math.min(pageCount, current + 1))} disabled={currentPage >= pageCount}>
-                  下一页
-                </Button>
-              </div>
-            </div>
           </>
         )}
+        <TablePagination
+          ariaLabel="字段映射分页"
+          page={page}
+          pageSize={pageSize}
+          total={totalRows}
+          pageSizeOptions={FIELD_MAPPING_PAGE_SIZE_OPTIONS}
+          loading={listLoading}
+          disabled={Boolean(listError)}
+          onPageChange={setPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPage(1);
+            setPageSize(nextPageSize);
+          }}
+        />
       </section>
     </div>
   );

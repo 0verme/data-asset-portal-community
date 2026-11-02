@@ -37,3 +37,21 @@ export function resolveOperationLogRequestPage(
 ): number {
   return query === previousQuery ? page : 1;
 }
+
+export function resolveOperationLogPageSize(
+  page: number,
+  requestedPageSize: number,
+  result: { items: readonly unknown[]; total: number; pageSize?: number | undefined },
+): number {
+  const actualPageSize = result.pageSize;
+  if (typeof actualPageSize === "number" && Number.isSafeInteger(actualPageSize) && actualPageSize > 0) {
+    return actualPageSize;
+  }
+  // The current operation-log endpoint omits pageSize metadata. On page one,
+  // a short nonempty page with more matching rows proves the configured server
+  // maximum is lower than the requested size.
+  if (page === 1 && result.items.length > 0 && result.items.length < requestedPageSize && result.total > result.items.length) {
+    return result.items.length;
+  }
+  return requestedPageSize;
+}

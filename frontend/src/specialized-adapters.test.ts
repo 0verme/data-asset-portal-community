@@ -25,10 +25,10 @@ test("field mapping controls use DAP Select and retain the unrelated native empt
 });
 
 test("field mapping page uses adapters for actions and pagination", () => {
-  assert.match(page, /import \{ Button, Select \} from "\.\.\/ui\/index\.ts"/);
-  assert.equal((page.match(/<Button/g) ?? []).length, 9);
-  assert.equal((page.match(/<Select<string>/g) ?? []).length, 1);
-  assert.match(page, /className="sel fm-page-size"/);
+  assert.match(page, /import \{ Button, TablePagination \} from "\.\.\/ui\/index\.ts"/);
+  assert.equal((page.match(/<Button/g) ?? []).length, 7);
+  assert.equal((page.match(/<Select<string>/g) ?? []).length, 0);
+  assert.match(page, /<TablePagination[\s\S]*?pageSizeOptions=\{FIELD_MAPPING_PAGE_SIZE_OPTIONS\}/);
   assert.equal((page.match(/<button/g) ?? []).length, 1, "dimension tabs stay native");
 });
 

@@ -32,7 +32,7 @@ import {
   SystemEditor,
 } from "../PushPages.tsx";
 import { Icon } from "../ui.tsx";
-import { Button, Select } from "../../ui/index.ts";
+import { Button, Select, TablePagination } from "../../ui/index.ts";
 
 type RequireLogin = (action?: () => void, permission?: string) => boolean;
 
@@ -141,21 +141,47 @@ export function PushView({
     );
   }
 
-  if ((pushLoading && !pushLoaded && ['systems', 'sysNew'].includes(pushRoute.page)) || pushDetailLoading) {
+  if ((pushLoading && !pushLoaded && ["systems", "sysNew"].includes(pushRoute.page)) || pushDetailLoading) {
     return (
-      <LoadingState
-        title="加载下游推送配置"
-        desc="正在准备系统清单、作业和筛选信息。"
-      />
+      <>
+        <LoadingState
+          title="加载下游推送配置"
+          desc="正在准备系统清单、作业和筛选信息。"
+        />
+        {pushRoute.page === "systems" ? (
+          <TablePagination
+            ariaLabel="下游系统分页"
+            page={pushPage}
+            pageSize={pushPageSize}
+            total={pushTotal}
+            loading
+            onPageChange={setPushPage}
+            onPageSizeChange={setPushPageSize}
+          />
+        ) : null}
+      </>
     );
   }
   if (pushError) {
     return (
-      <ErrorState
-        title="下游推送加载失败"
-        desc={pushError}
-        onRetry={() => { void loadPushData(); void loadPushDetail(); }}
-      />
+      <>
+        <ErrorState
+          title="下游推送加载失败"
+          desc={pushError}
+          onRetry={() => { void loadPushData(); void loadPushDetail(); }}
+        />
+        {pushRoute.page === "systems" ? (
+          <TablePagination
+            ariaLabel="下游系统分页"
+            page={pushPage}
+            pageSize={pushPageSize}
+            total={pushTotal}
+            disabled
+            onPageChange={setPushPage}
+            onPageSizeChange={setPushPageSize}
+          />
+        ) : null}
+      </>
     );
   }
   if (
@@ -170,7 +196,6 @@ export function PushView({
     );
   }
   if (pushRoute.page === "systems") {
-    const pageCount = Math.max(1, Math.ceil(pushTotal / pushPageSize));
     return (
       <div aria-busy={pushLoading}>
         <div className="page-head">
@@ -184,6 +209,19 @@ export function PushView({
             </div>
           </div>
           <div className="head-actions">
+            <Select<string>
+              aria-label="下游系统排序"
+              className="table-list-sort"
+              size="sm"
+              value={pushSort}
+              onValueChange={(value) => setPushSort(value || "importanceLevel:asc")}
+              items={[
+                { label: "重要优先", value: "importanceLevel:asc" },
+                { label: "名称升序", value: "name:asc" },
+                { label: "标识升序", value: "id:asc" },
+                { label: "标识降序", value: "id:desc" },
+              ]}
+            />
             <ViewModeSwitcher
               value={pushView as ViewMode}
               onChange={setPushView}
@@ -210,21 +248,18 @@ export function PushView({
           view={pushView}
           onOpen={pushOpenSystem}
         />
-        <div className="fm-pagination" aria-label="下游系统分页">
-          <div aria-live="polite">{pushLoading ? '正在加载…' : `共 ${pushTotal} 条`}</div>
-          <div className="fm-pagination-tools">
-            <Select<string> aria-label="下游系统排序" value={pushSort} onValueChange={(value) => setPushSort(value || 'importanceLevel:asc')}
-              items={[{ label: '重要优先', value: 'importanceLevel:asc' }, { label: '名称升序', value: 'name:asc' }, { label: '标识升序', value: 'id:asc' }, { label: '标识降序', value: 'id:desc' }]} />
-            <label>每页 <Select<string> aria-label="每页条数" value={String(pushPageSize)}
-              items={[...new Set([10, 20, 50, 100, pushPageSize])].sort((a, b) => a - b).map((size) => ({ label: String(size), value: String(size) }))}
-              onValueChange={(value) => { if (value) { setPushPage(1); setPushPageSize(Number(value)); } }} /> 条</label>
-            <Button variant="secondary" type="button" disabled={pushPage <= 1}
-              onClick={() => setPushPage((page) => Math.max(1, page - 1))}>上一页</Button>
-            <span className="mono">{pushPage} / {pageCount}</span>
-            <Button variant="secondary" type="button" disabled={pushPage >= pageCount}
-              onClick={() => setPushPage((page) => Math.min(pageCount, page + 1))}>下一页</Button>
-          </div>
-        </div>
+        <TablePagination
+          ariaLabel="下游系统分页"
+          page={pushPage}
+          pageSize={pushPageSize}
+          total={pushTotal}
+          loading={pushLoading}
+          onPageChange={setPushPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPushPage(1);
+            setPushPageSize(nextPageSize);
+          }}
+        />
       </div>
     );
   }

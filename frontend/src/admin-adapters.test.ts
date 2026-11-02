@@ -48,7 +48,8 @@ test("system pages use the frozen DAP adapters with documented native exceptions
 });
 
 test("operation log surfaces use the frozen DAP adapters", () => {
-  assert.equal((oplogPage.match(/<Button/g) ?? []).length, 3);
+  assert.equal((oplogPage.match(/<Button/g) ?? []).length, 1);
+  assert.match(oplogPage, /<TablePagination[\s\S]*?ariaLabel="操作日志分页"/);
   assert.match(oplogFilter, /import \{ Button, Input, Select \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((oplogFilter.match(/<Select<string>/g) ?? []).length, 3);
   assert.equal((oplogFilter.match(/<Input/g) ?? []).length, 2);

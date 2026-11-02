@@ -1,0 +1,115 @@
+.table-pagination-fixture {
+  width: 100%;
+  max-width: 1100px;
+  margin: 32px auto;
+  padding: 0 16px;
+}
+
+.table-pagination-fixture h1 {
+  margin-bottom: 24px;
+  color: var(--dap-color-text, var(--ink));
+  font-size: 20px;
+}
+
+.table-pagination-fixture [role="status"],
+.table-pagination-fixture [role="alert"] {
+  margin-bottom: 12px;
+  color: var(--dap-color-text-muted, var(--ink-2));
+}
+
+.dap-table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--dap-color-border, var(--line));
+  color: var(--dap-color-text-muted, var(--ink-2));
+  font-family: var(--dap-font-sans, var(--sans));
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.dap-table-pagination__range {
+  min-width: 0;
+  color: var(--dap-color-text-muted, var(--ink-2));
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dap-table-pagination__controls,
+.dap-table-pagination__size-group,
+.dap-table-pagination__page-controls {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.dap-table-pagination__controls {
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dap-table-pagination__size-group {
+  gap: 7px;
+  color: var(--dap-color-text-muted, var(--ink-2));
+  white-space: nowrap;
+}
+
+.dap-table-pagination .dap-table-pagination__select {
+  width: 72px;
+  min-width: 72px;
+}
+
+.table-list-sort {
+  width: 144px;
+  max-width: 100%;
+}
+
+.dap-table-pagination__page-controls {
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.dap-table-pagination__button {
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+.dap-table-pagination__page-index {
+  min-width: 42px;
+  color: var(--dap-color-text-muted, var(--ink-2));
+  font-family: var(--dap-font-mono, var(--mono));
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 820px) {
+  .dap-table-pagination {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .dap-table-pagination__controls {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dap-table-pagination {
+    padding: 12px;
+  }
+
+  .dap-table-pagination__controls {
+    column-gap: 12px;
+    row-gap: 8px;
+  }
+}
