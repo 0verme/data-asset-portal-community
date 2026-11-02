@@ -17,7 +17,7 @@ import type { MappingRoute } from "../../routing/types.ts";
 import { CardGridView, EmptyState, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.ts";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 import { Icon } from "../ui.tsx";
-import { Button } from "../../ui/index.ts";
+import { Button, Select } from "../../ui/index.ts";
 import { DbBadge } from "./UpstreamParts.tsx";
 
 /**
@@ -55,6 +55,8 @@ export interface UpstreamListProps {
   onNew?: (() => void) | undefined;
   onToggle: (systemId: string, status: string) => void | Promise<unknown>;
   onViewTables?: ((route: Partial<MappingRoute>) => void) | undefined;
+  sort: string;
+  onSortChange: (sort: string) => void;
   canEdit?: boolean | undefined;
 }
 
@@ -70,6 +72,8 @@ export function UpstreamList({
   onNew,
   onToggle,
   onViewTables,
+  sort,
+  onSortChange,
   canEdit = false,
 }: UpstreamListProps) {
   return (
@@ -82,6 +86,19 @@ export function UpstreamList({
           </div>
         </div>
         <div className="head-actions">
+          <Select<string>
+            aria-label="上游系统排序"
+            className="table-list-sort"
+            size="sm"
+            value={sort}
+            onValueChange={(value) => onSortChange(value || "abbr:asc")}
+            items={[
+              { label: "缩写升序", value: "abbr:asc" },
+              { label: "名称升序", value: "name:asc" },
+              { label: "标识升序", value: "id:asc" },
+              { label: "标识降序", value: "id:desc" },
+            ]}
+          />
           <ViewModeSwitcher value={view} onChange={onChangeView} modes={["card", "list"] as const} />
           {canEdit && onNew ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增系统</Button> : null}
         </div>

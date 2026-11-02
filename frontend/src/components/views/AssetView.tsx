@@ -19,10 +19,10 @@ import { DetailPage } from "../DetailPage.tsx";
 import { HomePage } from "../HomePage.tsx";
 import { TableEditor } from "../TableEditor.tsx";
 import {
-  Button,
   EmptyState as AdapterEmptyState,
   ErrorState as AdapterErrorState,
   LoadingState as AdapterLoadingState,
+  TablePagination,
 } from "../../ui/index.ts";
 import { Icon } from "../ui.tsx";
 import { EmptyState } from "../common/index.ts";
@@ -47,8 +47,9 @@ export function AssetView({
     homeError,
     loadHomeData,
     page,
-    pageCount,
+    pageSize,
     setPage,
+    setPageSize,
     totalTables,
     detailAsset,
     detailFields,
@@ -90,20 +91,42 @@ export function AssetView({
   if (route.page === "home") {
     if (homeLoading) {
       return (
-        <AdapterLoadingState
-          title="加载资产元数据"
-          desc="正在准备表清单、主题域和分层信息。"
-          label="正在加载资产元数据"
-        />
+        <div aria-busy="true">
+          <AdapterLoadingState
+            title="加载资产元数据"
+            desc="正在准备表清单、主题域和分层信息。"
+            label="正在加载资产元数据"
+          />
+          <TablePagination
+            ariaLabel="数据仓库资产表分页"
+            page={page}
+            pageSize={pageSize}
+            total={totalTables}
+            loading
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </div>
       );
     }
     if (homeError) {
       return (
-        <AdapterErrorState
-          title="资产列表加载失败"
-          desc={homeError}
-          onRetry={loadHomeData}
-        />
+        <div>
+          <AdapterErrorState
+            title="资产列表加载失败"
+            desc={homeError}
+            onRetry={loadHomeData}
+          />
+          <TablePagination
+            ariaLabel="数据仓库资产表分页"
+            page={page}
+            pageSize={pageSize}
+            total={totalTables}
+            disabled
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </div>
       );
     }
     return (
@@ -148,33 +171,17 @@ export function AssetView({
           query={query}
           onOpen={assetOpen}
         />
-        {pageCount > 1 ? (
-          <div className="oplog-pager">
-            <Button
-              className="btn"
-              variant="secondary"
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-            >
-              <Icon name="chevron" size={14} />
-              上一页
-            </Button>
-            <span className="oplog-pager-info">
-              第 {page} / {pageCount} 页
-            </span>
-            <Button
-              className="btn"
-              variant="secondary"
-              type="button"
-              disabled={page >= pageCount}
-              onClick={() => setPage(page + 1)}
-            >
-              下一页
-              <Icon name="chevron" size={14} />
-            </Button>
-          </div>
-        ) : null}
+        <TablePagination
+          ariaLabel="数据仓库资产表分页"
+          page={page}
+          pageSize={pageSize}
+          total={totalTables}
+          onPageChange={setPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPage(1);
+            setPageSize(nextPageSize);
+          }}
+        />
       </div>
     );
   }

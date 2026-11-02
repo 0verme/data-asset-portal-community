@@ -194,7 +194,7 @@ for (const kind of ['upstream', 'push'] as const) {
     test.skip(!remote, 'Explicit remote HTTP fixture contract');
     const api = await fixture(page, kind);
     await openList(page, kind);
-    const pager = page.getByLabel(title, { exact: true });
+    const pager = page.getByRole('navigation', { name: title, exact: true });
     await expect(pager).toContainText('1 / 2');
     await expect(page.locator('.side-item').filter({ hasText: tail }).locator('.count')).toHaveText('1');
     if (kind === 'push') await expect(page.locator('td[data-label="作业数"] .t-num').first()).toHaveText('1');
@@ -229,7 +229,7 @@ for (const kind of ['upstream', 'push'] as const) {
       await fixture(page, kind, { maxPageSize: size });
       await page.goto(`/${kind}?view=list`);
       await expect(page.locator('table.dt tbody tr')).toHaveCount(size, { timeout: 20_000 });
-      const pager = page.getByLabel(title, { exact: true });
+      const pager = page.getByRole('navigation', { name: title, exact: true });
       await expect(page.getByRole('combobox', { name: '每页条数', exact: true })).toContainText(String(size));
       await expect(pager).toContainText('1 / 3');
       await pager.getByRole('button', { name: '下一页' }).click();
@@ -256,7 +256,7 @@ for (const kind of ['upstream', 'push'] as const) {
       await openList(page, kind);
       await choose(page, '每页条数', '10');
       await expect(page.locator('table.dt tbody tr')).toHaveCount(10);
-      const pager = page.getByLabel(title, { exact: true });
+      const pager = page.getByRole('navigation', { name: title, exact: true });
       await pager.getByRole('button', { name: '下一页' }).click();
       await expect.poll(() => held).toBe(true);
       await pager.getByRole('button', { name: '下一页' }).click();
@@ -308,10 +308,10 @@ for (const kind of ['upstream', 'push'] as const) {
     test.skip(!remote, 'Explicit remote HTTP fixture contract');
     const api = await fixture(page, kind);
     await openList(page, kind);
+    const pager = page.getByRole('navigation', { name: title, exact: true });
     await page.locator('.search-input').fill('Remote');
     await expect.poll(() => api.lists.at(-1)?.searchParams.get('keyword')).toBe('Remote');
     await choose(page, '每页条数', '10');
-    const pager = page.getByLabel(title, { exact: true });
     await pager.getByRole('button', { name: '下一页' }).click();
     await expect(pager).toContainText('2 / 3');
     await pager.getByRole('button', { name: '下一页' }).click();
@@ -322,7 +322,7 @@ for (const kind of ['upstream', 'push'] as const) {
     const confirmation = page.getByRole('alertdialog');
     await confirmation.getByRole('textbox').fill(lastId);
     await confirmation.getByRole('button', { name: '确认删除', exact: true }).click();
-    await expect(page.getByLabel(title, { exact: true })).toContainText('2 / 2');
+    await expect(page.getByRole('navigation', { name: title, exact: true })).toContainText('2 / 2');
     await expect(page.locator('table.dt tbody tr')).toHaveCount(10);
     await expect(page.locator('table.dt tbody')).not.toContainText(lastName);
     expect(api.writes).toContain(`DELETE ${lastId}`);

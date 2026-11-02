@@ -72,7 +72,7 @@ test("field mapping filters and pagination use adapter controls", async ({ page 
   const pageSize = page.getByRole("combobox", { name: "每页条数" });
   if (await pageSize.count()) {
     await expect(pageSize).toHaveClass(/dap-ui-select/);
-    await expect(pageSize).toHaveClass(/fm-page-size/);
+    await expect(pageSize).toHaveClass(/dap-table-pagination__select/);
     await expect(pageSize).not.toHaveClass(/\bsel\b/);
     const pageSizeArrow = await pageSize.evaluate((element) => ({
       backgroundImage: getComputedStyle(element).backgroundImage,
@@ -80,11 +80,10 @@ test("field mapping filters and pagination use adapter controls", async ({ page 
         const rect = svg.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0;
       }).length,
-      width: getComputedStyle(element).width,
     }));
     expect(pageSizeArrow.backgroundImage).toBe("none");
     expect(pageSizeArrow.svgCount).toBe(1);
-    expect(pageSizeArrow.width).toBe("74px");
+    expect(await page.locator(".dap-table-pagination__select").evaluate((element) => getComputedStyle(element).width)).toBe("72px");
     await expect(page.getByRole("button", { name: "下一页" })).toHaveClass(/dap-ui-button/);
   }
 });

@@ -343,6 +343,40 @@ test("default table results render independently of slow stats and field details
   expect(requests.fields).toHaveLength(2);
 });
 
+test("field-mapping pagination adopts the server-clamped page size", async ({ page }) => {
+  const requests = await installApiFixtures(page, {
+    onTables: async (route, url) => {
+      const requestedPage = Math.max(1, Number(url.searchParams.get("page") || 1));
+      const pageSize = Math.min(100, Number(url.searchParams.get("pageSize") || 50));
+      const total = 250;
+      const start = (requestedPage - 1) * pageSize;
+      const count = Math.max(0, Math.min(pageSize, total - start));
+      await route.fulfill({
+        json: {
+          items: Array.from({ length: count }, (_, offset) => tableRow(`SERVER_CAP_${start + offset + 1}`)),
+          total,
+          page: requestedPage,
+          pageSize,
+        },
+      });
+    },
+  });
+
+  await page.goto("/field-mapping");
+  await expect(page.getByRole("cell", { name: "SERVER_CAP_1", exact: true })).toBeVisible();
+  const pager = page.getByRole("navigation", { name: "字段映射分页" });
+  const pageSize = pager.getByRole("combobox", { name: "每页条数" });
+  await expect(pageSize).toContainText("50");
+  await pageSize.click();
+  await page.getByRole("option", { name: "150", exact: true }).click();
+  await expect.poll(() => requests.tables.at(-1)?.searchParams.get("pageSize")).toBe("100");
+  await expect(pageSize).toContainText("100");
+  await expect(pager).toContainText("1 / 3");
+  await pager.getByRole("button", { name: "下一页" }).click();
+  await expect.poll(() => requests.tables.at(-1)?.searchParams.get("page")).toBe("2");
+  await expect(page.getByRole("cell", { name: "SERVER_CAP_101", exact: true })).toBeVisible();
+});
+
 test("complete field-mapping export ignores the current page and preserves filter and sort", async ({ page }, testInfo) => {
   const requests = await installApiFixtures(page, {
     onFields: async (route, url) => {

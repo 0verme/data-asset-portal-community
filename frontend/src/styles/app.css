@@ -2132,16 +2132,11 @@
     color: var(--ink-2);
   }
 
-  .fm-result-tools,
-  .fm-pagination,
-  .fm-pagination-tools {
+  .fm-result-tools {
     display: flex;
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
-  }
-
-  .fm-result-tools {
     color: var(--ink-3);
     font-size: 12.5px;
   }
@@ -2436,19 +2431,6 @@
     height: 100%;
     border-radius: inherit;
     background: var(--ink-3);
-  }
-
-  .fm-pagination {
-    justify-content: space-between;
-    padding: 16px 18px;
-    border-top: 1px solid var(--line);
-    color: var(--ink-3);
-    font-size: 12.5px;
-  }
-
-  .fm-page-size {
-    width: 74px;
-    margin: 0 8px;
   }
 
   @media (max-width: 900px) {
@@ -2862,7 +2844,6 @@
 
     .fm-card-head,
     .fm-result-head,
-    .fm-pagination,
     .fm-context-bar {
       padding-left: 14px;
       padding-right: 14px;
@@ -3070,20 +3051,6 @@
 
   .oplog-filter-reset {
     margin-left: auto;
-  }
-
-  .oplog-pager {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 14px;
-    margin-top: 14px;
-  }
-
-  .oplog-pager-info {
-    font-size: 12.5px;
-    color: var(--ink-3);
-    font-family: var(--mono);
   }
 
   .oplog-detail-grid {

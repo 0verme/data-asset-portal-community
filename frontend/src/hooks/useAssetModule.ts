@@ -46,7 +46,7 @@ import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
 import type { DDLNormalizedResult } from '../utils/ddlDialect.ts';
 import type { AssetRoute } from '../routing/types.ts';
 
-const ASSET_PAGE_SIZE = 20;
+const ASSET_DEFAULT_PAGE_SIZE = 20;
 
 export interface AssetNavigationSnapshot {
   route: AssetRoute;
@@ -86,8 +86,10 @@ export interface UseAssetModuleResult {
   homeLoading: boolean;
   homeError: string;
   page: number;
+  pageSize: number;
   pageCount: number;
   setPage: React.Dispatch<React.SetStateAction<number>>;
+  setPageSize: React.Dispatch<React.SetStateAction<number>>;
   totalTables: number;
   loadHomeData: () => Promise<void>;
   detailAsset: AssetTableItem | null;
@@ -141,6 +143,7 @@ export function useAssetModule({
   const [homeLoading, setHomeLoading] = useState(false);
   const [homeError, setHomeError] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(ASSET_DEFAULT_PAGE_SIZE);
   const [totalTables, setTotalTables] = useState(0);
   const homeRequestRef = useRef(0);
   const facetCacheRef = useRef(new Map<string, Promise<[DomainCountItem[], LayerCountItem[]]>>());
@@ -221,7 +224,7 @@ export function useAssetModule({
       const [tablePage, [domainList, layerList]] = await Promise.all([
         getAssetTablePage({
           page,
-          pageSize: ASSET_PAGE_SIZE,
+          pageSize,
           keyword: query.trim() || undefined,
           domain: domain || undefined,
           layer: selectedLayer || undefined,
@@ -231,6 +234,10 @@ export function useAssetModule({
       if (requestId !== homeRequestRef.current) return;
       setTables(tablePage.items);
       setTotalTables(tablePage.total);
+      if (tablePage.pageSize !== pageSize) setPageSize(tablePage.pageSize);
+      const lastPage = Math.max(1, Math.ceil(tablePage.total / tablePage.pageSize));
+      const normalizedPage = Math.min(tablePage.page, lastPage);
+      if (normalizedPage !== page) setPage(normalizedPage);
       setDomains(domainList);
       setLayers(layerList);
     } catch (error: unknown) {
@@ -239,7 +246,7 @@ export function useAssetModule({
     } finally {
       if (requestId === homeRequestRef.current) setHomeLoading(false);
     }
-  }, [domain, page, query, selectedLayer]);
+  }, [domain, page, pageSize, query, selectedLayer]);
 
   const loadDetailData = useCallback(async (identity: AssetIdentity): Promise<void> => {
     setDetailLoading(true);
@@ -453,8 +460,10 @@ export function useAssetModule({
     homeLoading,
     homeError,
     page,
-    pageCount: Math.max(1, Math.ceil(totalTables / ASSET_PAGE_SIZE)),
+    pageSize,
+    pageCount: Math.max(1, Math.ceil(totalTables / pageSize)),
     setPage,
+    setPageSize,
     totalTables,
     loadHomeData,
     detailAsset,

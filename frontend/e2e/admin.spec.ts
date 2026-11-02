@@ -63,7 +63,7 @@ test("admin operation log filters, pager and detail use adapters", async ({ page
   await reset.click();
   await expect(moduleSelect).toHaveText("全部模块");
 
-  const pager = page.locator(".oplog-pager");
+  const pager = page.locator('.dap-table-pagination[aria-label="操作日志分页"]');
   if (await pager.count()) {
     const next = pager.getByRole("button", { name: "下一页" });
     await expect(next).toHaveClass(/dap-ui-button/);

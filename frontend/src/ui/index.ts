@@ -53,6 +53,7 @@ export {
 export { Breadcrumbs, Grid, GridItem, Surface, type BreadcrumbItem, type BreadcrumbsProps, type GridProps, type SurfaceProps } from "./layout.tsx";
 export { Select, type SelectProps } from "./Select.tsx";
 export { Tabs, type TabsProps } from "./Tabs.tsx";
+export { TablePagination, type TablePaginationProps } from "./TablePagination.tsx";
 export type {
   BadgeTone,
   ButtonVariant,

@@ -58,7 +58,7 @@ test("guest and read-only users can browse assets but do not get asset-write con
       if (auth === "guest") {
         await expect(page.getByRole("button", { name: /上一页/ })).toBeDisabled();
         await page.getByRole("button", { name: /下一页/ }).click();
-        await expect(page.locator(".oplog-pager-info")).toHaveText("第 2 / 12 页");
+        await expect(page.locator(".dap-table-pagination__page-index")).toHaveText("2 / 12");
         await expect(page.getByRole("button", { name: /上一页/ })).toBeEnabled();
       }
     } finally {
