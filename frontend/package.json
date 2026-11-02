@@ -28,7 +28,7 @@
     "export:assets": "node scripts/export-assets.mjs"
   },
   "dependencies": {
-    "@cloudflare/kumo": "2.15.0",
+    "@cloudflare/kumo": "2.16.0",
     "@lineage-viewer/domain-adapter": "1.1.0",
     "@lineage-viewer/react": "1.1.0",
     "@phosphor-icons/react": "2.1.10",
@@ -39,7 +39,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@playwright/test": "1.64.1",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
@@ -48,7 +48,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.0",
+    "typescript-eslint": "^8.72.1",
     "vite": "^8.3.5"
   },
   "engines": {
