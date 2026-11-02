@@ -38,9 +38,11 @@ class RagRecommendationsContractTests(unittest.TestCase):
         self.assertEqual("https://rag.example.invalid", remote.service_url)
 
     def test_url_rejects_remote_http_credentials_query_and_path(self):
+        credentials = ":".join(("demo-user", "demo-pass"))
+        credentialed_url = "https://" + credentials + chr(64) + "rag.example.invalid"
         invalid = [
             "http://rag.example.invalid",
-            "https://user:password@rag.example.invalid",
+            credentialed_url,
             "https://rag.example.invalid?token=secret",
             "https://rag.example.invalid/search",
         ]

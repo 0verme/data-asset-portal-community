@@ -6,6 +6,7 @@ test('Remote data trust distinguishes partial search and unavailable statistics 
     if (path === '/api/auth/me') return route.fulfill({ status: 401, json: { message: 'anonymous' } });
     if (path === '/api/public-catalog/config') return route.fulfill({ json: { profile: 'internal', exportEnabled: false } });
     if (path === '/api/portal/stats') return route.fulfill({ status: 503, json: { error: { code: 'PORTAL_STATS_UNAVAILABLE', message: '统计暂时不可用，请稍后重试。' } } });
+    if (path === '/api/search/recommendations') return route.fulfill({ json: { items: [] } });
     if (path === '/api/search') return route.fulfill({ json: {
       query: 'missing', scope: 'all', groups: [], total: 0, partial: true, failedGroups: ['asset'],
     } });
@@ -17,6 +18,7 @@ test('Remote data trust distinguishes partial search and unavailable statistics 
   await page.getByRole('textbox', { name: '搜索数据资产' }).fill('missing');
   await page.getByRole('button', { name: '搜索', exact: true }).click();
   await expect(page.getByRole('alert').filter({ hasText: '搜索结果不完整' })).toBeVisible();
+  await expect(page.getByText('相关资产推荐暂不可用，关键词搜索不受影响。', { exact: true })).toBeVisible();
   await expect(page.getByText('已查询模块暂无匹配', { exact: true })).toBeVisible();
   await expect(page.getByText('没有找到匹配的资产', { exact: true })).toHaveCount(0);
 });

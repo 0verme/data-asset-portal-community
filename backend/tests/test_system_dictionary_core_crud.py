@@ -66,7 +66,9 @@ class SystemDictionaryCoreCrudTests(unittest.TestCase):
         self._assert_portable(insert_statement)
         self.assertIn("INSERT", str(insert_statement.compile(dialect=sqlite.dialect())))
 
-        self.service._core.fetch_rows = MagicMock(side_effect=[[self.row], [self.row]])
+        self.service._core.fetch_rows = MagicMock(
+            side_effect=[[self.row], [self.row], [self.row]]
+        )
         self.service.update_param_dict_status("7", "disabled")
         update_statement = self.service._core.execute_statements.call_args.args[0][0]
         self._assert_portable(update_statement)

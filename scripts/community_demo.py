@@ -500,6 +500,13 @@ def verify_demo_database(database: Path) -> dict[str, int]:
     """Verify the complete deterministic repository seed contract."""
     import sqlite3
 
+    from backend.app.migrations.rag_search_config_seed import (
+        RAG_CONFIG_CATEGORY_CODE,
+        RAG_CONFIG_CATEGORY_NAME,
+        RAG_CONFIG_DEFAULTS,
+        RAG_CONFIG_ITEM_CODE,
+        RAG_CONFIG_ITEM_NAME,
+    )
     from demo.seed_loader import ADMIN_USER, community_seed_plan
 
     if not database.is_file():
@@ -518,10 +525,47 @@ def verify_demo_database(database: Path) -> dict[str, int]:
             raise BootstrapError(
                 f"Demo database is missing canonical module tables: {', '.join(missing)}"
             )
+        reserved_category = connection.execute(
+            "SELECT category_name, is_active FROM p_code_category WHERE category_code = ?",
+            (RAG_CONFIG_CATEGORY_CODE,),
+        ).fetchall()
+        if (
+            len(reserved_category) != 1
+            or reserved_category[0][0] != RAG_CONFIG_CATEGORY_NAME
+            or str(reserved_category[0][1] or "").upper() != "N"
+        ):
+            raise BootstrapError(
+                "Community database is missing the single inactive RAG configuration category"
+            )
+        reserved_item = connection.execute(
+            "SELECT item_name, item_value, ext_json, is_active FROM p_code_item "
+            "WHERE category_code = ? AND item_code = ?",
+            (RAG_CONFIG_CATEGORY_CODE, RAG_CONFIG_ITEM_CODE),
+        ).fetchall()
+        try:
+            reserved_config = json.loads(reserved_item[0][2]) if len(reserved_item) == 1 else None
+        except (TypeError, ValueError):
+            reserved_config = None
+        if (
+            len(reserved_item) != 1
+            or reserved_item[0][0] != RAG_CONFIG_ITEM_NAME
+            or reserved_item[0][1] != "reserved-rag-config"
+            or str(reserved_item[0][3] or "").upper() != "N"
+            or reserved_config != RAG_CONFIG_DEFAULTS
+        ):
+            raise BootstrapError(
+                "Community database is missing the single inactive, default RAG configuration item"
+            )
+
         counts: dict[str, int] = {}
         for table, spec in plan.items():
             count = connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-            expected = len(spec["rows"])
+            # The migration-owned inactive configuration rows are intentionally
+            # outside the deterministic Community demo seed plan.
+            expected = len(spec["rows"]) + {
+                "p_code_category": 1,
+                "p_code_item": 1,
+            }.get(table, 0)
             if count != expected:
                 raise BootstrapError(
                     f"Unexpected demo count for {table}: {count} (expected {expected})"
