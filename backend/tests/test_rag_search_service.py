@@ -153,6 +153,29 @@ class RagSearchServiceTests(unittest.TestCase):
         self.assertNotIn("private signing secret", response.model_dump_json())
         self.assertNotIn("Bearer private auth token", response.model_dump_json())
 
+    def test_per_request_top_k_can_narrow_but_not_expand_admin_limit(self):
+        request_limits = []
+
+        def handler(request):
+            request_limits.append(json.loads(request.content)["topK"])
+            return self._search_response([
+                {
+                    "entityType": "table", "assetId": 1, "name": "CUSTOMER",
+                    "retrievalChannels": [], "score": 0.9, "evidence": [],
+                },
+                {
+                    "entityType": "field", "assetId": 1, "fieldId": 10, "name": "CUSTOMER_ID",
+                    "retrievalChannels": [], "score": 0.8, "evidence": [],
+                },
+            ])
+
+        service, _assets = self._service(handler)
+        response = service.recommend("客户", profile="strict", top_k=1)
+
+        self.assertEqual([1], request_limits)
+        self.assertEqual(1, response.count)
+        self.assertEqual(1, response.recommendations[0].asset_id)
+
     def test_unknown_and_duplicate_ids_are_filtered_and_deduplicated(self):
         def handler(_request):
             return self._search_response([

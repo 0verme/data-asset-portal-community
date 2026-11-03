@@ -8,6 +8,7 @@ from fastapi import FastAPI  # pyright: ignore[reportAttributeAccessIssue]
 
 from ..authorization.core import AuthorizationService
 from ..core.capabilities import resolve_capabilities
+from ..services.ai_ask_service import ai_ask_service
 from ..services.api_asset_service import api_asset_service
 from ..services.assets_service import assets_service
 from ..services.auth_service import auth_service
@@ -37,6 +38,7 @@ from ..settings import (
 from .auth import LegacySessionMigrationMiddleware
 from .dependencies import IdentityResolver, RequestContextMiddleware
 from .errors import register_exception_handlers
+from .routers.ai_ask import _register_ai_ask_routes
 from .routers.api_assets import _register_api_asset_routes
 from .routers.assets import _register_asset_routes
 from .routers.auth import _register_auth_routes  # pyright: ignore[reportMissingImports]
@@ -64,6 +66,7 @@ def create_fastapi_app(
     search_provider_instance: Any | None = None,
     search_hot_keyword_service_instance: Any | None = None,
     rag_search_service_instance: Any | None = None,
+    ai_ask_service_instance: Any | None = None,
     indicator_service_instance: Any | None = None,
     indicator_path_service_instance: Any | None = None,
     assets_service_instance: Any | None = None,
@@ -128,6 +131,7 @@ def create_fastapi_app(
     search = search_provider_instance or search_provider
     hot_keywords = search_hot_keyword_service_instance or search_hot_keyword_service
     rag_recommendations = rag_search_service_instance or rag_search_service
+    ai_ask = ai_ask_service_instance or ai_ask_service
     indicator = indicator_service_instance or indicator_service
     indicator_paths = indicator_path_service_instance or indicator_path_service
     assets = assets_service_instance or assets_service
@@ -159,6 +163,7 @@ def create_fastapi_app(
         hot_keywords,
         rag_recommendations,
     )
+    _register_ai_ask_routes(app, ai_ask)
     # Every router shipped in this repository is part of the default runtime.
     # External dependencies report their own diagnostic errors at request time;
     # they do not turn an existing source module into a 404.

@@ -81,7 +81,13 @@ class RagSearchService:
         except Exception:
             raise RagHttpClientError("service_unavailable") from None
 
-    def recommend(self, query: str, *, profile: str) -> RagRecommendationsResponse:
+    def recommend(
+        self,
+        query: str,
+        *,
+        profile: str,
+        top_k: int | None = None,
+    ) -> RagRecommendationsResponse:
         normalized_query = str(query or "").strip()
         started = time.monotonic()
         if not normalized_query:
@@ -95,9 +101,17 @@ class RagSearchService:
             )
         try:
             config = self._config()
-        except RagHttpClientError as error:
+            if top_k is not None:
+                # Per-request asks may narrow the administrator's configured
+                # ceiling, but can never increase it.
+                requested_top_k = max(1, min(10, int(top_k)))
+                config = config.model_copy(
+                    update={"top_k": min(config.top_k, requested_top_k)}
+                )
+        except (RagHttpClientError, TypeError, ValueError) as error:
+            reason_code = getattr(error, "reason_code", "service_unavailable")
             return self._unavailable(
-                normalized_query, error.reason_code, (time.monotonic() - started) * 1000
+                normalized_query, reason_code, (time.monotonic() - started) * 1000
             )
         if not config.enabled:
             return self._disabled(normalized_query)
@@ -301,6 +315,17 @@ class RagSearchService:
         except Exception:
             return ""
         return value.strip() if isinstance(value, str) else ""
+
+    def is_configured(self) -> bool:
+        """Return whether retrieval is administratively enabled and authenticated.
+
+        This is a configuration-only check; it does not probe the remote service
+        and never returns its URL or credential to the browser.
+        """
+        try:
+            return self._config().enabled and bool(self._safe_token())
+        except Exception:
+            return False
 
     def diagnostics(self, raw_config: dict[str, Any]) -> dict[str, Any]:
         try:

@@ -44,6 +44,34 @@ separate verification. Limits, expiry, authorization rechecks, disabled behavior
 rollback and remaining integration gates are documented in
 [the catalog snapshot contract](./catalog-snapshot.md).
 
+## Optional single-turn AI asset Q&A
+
+The AI Q&A feature is **disabled by default** and is separate from deterministic
+`GET /api/search` and optional RAG recommendations. It only accepts a single
+metadata question and uses the existing server-side RAG HTTP adapter plus an
+OpenAI-compatible LLM Provider. DAP does not load an embedding model/vector
+index or let the browser access the LLM endpoint.
+
+| Setting | Default / bounds | Purpose |
+|---|---|---|
+| `AI_ASK_ENABLED` | `false` | Explicit feature switch. |
+| `AI_LLM_BASE_URL` | required when enabled | OpenAI-compatible API base URL. HTTPS is required except HTTP loopback; URL credentials, query strings and fragments are rejected. |
+| `AI_LLM_MODEL` | required when enabled | Server-side provider model identifier. |
+| `AI_LLM_API_KEY` | required when enabled | Provider secret, injected from deployment Secret storage only; never stored in DAP parameter rows or returned to the browser. |
+| `AI_LLM_TIMEOUT_MS` | `10000` (250–60000) | Provider request timeout. |
+| `AI_LLM_MAX_TOKENS` | `512` (64–4096) | Output token ceiling. |
+| `AI_LLM_MAX_CONCURRENCY` | `2` (1–16) | Non-blocking Provider concurrency bound. |
+
+The browser-safe `GET /api/ai/status` exposes only `{"enabled": boolean}`. It
+also requires the existing RAG search configuration to be enabled and its
+server-to-server token configured; it does not perform a live health probe.
+`POST /api/ai/ask` reuses the current public-catalog profile and existing RAG
+HTTP service, then validates every model citation against the exact DAP-verified
+candidate identities. Missing/invalid configuration fails closed. See
+[the architecture, contract, test and rollback guide](./ai-ask-mvp.md) for the
+API state semantics and isolated-environment handoff. This configuration does
+not claim that an external RAG HTTP service or DeepSeek endpoint is available.
+
 ## Signed-session contract
 
 The application now writes an application-owned signed `session` cookie using
