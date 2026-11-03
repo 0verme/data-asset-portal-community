@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  createIndicator,
+  deleteIndicator,
   getIndicatorList,
   getIndicatorPage,
   normalizeIndicatorPage,
@@ -37,6 +39,40 @@ test('indicator mock page slices after filters/sort and preserves global dimensi
   assert.equal(outOfRange.total, all.length);
   assert.deepEqual(outOfRange.items, []);
   assert.equal((await getIndicatorList()).length, all.length);
+});
+
+test('indicator mock page explicitly filters the unassigned dimension bucket', async () => {
+  const fixture = {
+    id: 'PAGINATION_UNASSIGNED_FIXTURE',
+    name: 'Unassigned dimension fixture',
+    meaning: 'Synthetic unassigned dimension',
+    resultTableName: '',
+    resultFieldName: '',
+    sourceAssetId: null,
+    sourceAssetName: null,
+    sourceAssetQualifiedName: null,
+    resultFieldId: null,
+    aggregation: null,
+    semanticState: 'candidate',
+    dimension: '',
+    caliber: '',
+    path: '',
+    registrar: 'Pagination test',
+    registeredAt: '2026-01-01',
+    status: 'enabled',
+  };
+  await createIndicator(fixture);
+  try {
+    const all = await getIndicatorList();
+    const expected = all.filter((item) => item.dimension === '').map((item) => item.id).sort();
+    const page = await getIndicatorPage({ dimensionUnassigned: true, page: 1, pageSize: 50 });
+    assert.equal(page.total, expected.length);
+    assert.deepEqual(page.items.map((item) => item.id).sort(), expected);
+    assert.ok(expected.includes(fixture.id));
+    assert.equal(page.facets.dimension[''], expected.length);
+  } finally {
+    await deleteIndicator(fixture.id);
+  }
 });
 
 test('report mock page applies filters and stable sorting while retaining global facets and legacy list', async () => {

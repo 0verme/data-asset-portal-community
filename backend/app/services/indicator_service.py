@@ -385,9 +385,16 @@ class IndicatorService(AuditActorMixin):
             item["resultFieldName"] = str(field_row["field_name"]).strip()
         return item
 
-    def _build_indicator_filters(self, keyword=None, dimension=None, status=None, *, paged=False, profile=None):
+    def _build_indicator_filters(
+        self, keyword=None, dimension=None, status=None, *, dimension_unassigned=False,
+        paged=False, profile=None,
+    ):
         clauses = [indicator_item.c.is_deleted == "N"]
-        if dimension:
+        if dimension_unassigned:
+            # Empty/NULL dimension codes form a real sidebar bucket; model it
+            # explicitly instead of overloading the omitted empty `dimension`.
+            clauses.append(func.trim(func.coalesce(indicator_item.c.dimension_code, "")) == "")
+        elif dimension:
             code = self._normalize_dimension(dimension)
             # A malformed filter must match nothing instead of silently
             # collapsing onto the "unassigned" bucket.
@@ -502,16 +509,22 @@ class IndicatorService(AuditActorMixin):
             )
         )
 
-    def _db_items(self, keyword=None, dimension=None, status=None):
+    def _db_items(self, keyword=None, dimension=None, status=None, dimension_unassigned=False):
         statement = self._item_statement().where(
-            *self._build_indicator_filters(keyword, dimension, status)
+            *self._build_indicator_filters(
+                keyword, dimension, status, dimension_unassigned=dimension_unassigned
+            )
         ).order_by(indicator_item.c.indicator_id)
         return [self._row_to_item(row) for row in self._fetch_rows(statement)]
 
     def get_indicator_page(self, keyword=None, dimension=None, status=None, page=None, page_size=None,
-                           sort_key=None, sort_direction=None, profile=None):
+                           sort_key=None, sort_direction=None, profile=None,
+                           dimension_unassigned=False):
         page, page_size = resolve_paging(page, page_size)
-        filters = self._build_indicator_filters(keyword, dimension, status, paged=True, profile=profile)
+        filters = self._build_indicator_filters(
+            keyword, dimension, status, dimension_unassigned=dimension_unassigned,
+            paged=True, profile=profile,
+        )
         columns = {
             "id": indicator_item.c.indicator_id, "name": indicator_item.c.indicator_name,
             "dimension": indicator_item.c.dimension_code, "status": indicator_item.c.status_code,
@@ -544,8 +557,11 @@ class IndicatorService(AuditActorMixin):
             return {"items": [self._row_to_item(row) for row in rows], "total": int(count[0]["total"]),
                     "page": page, "pageSize": page_size, "facets": facets, "stats": {"indicatorCount": total}}
 
-    def get_indicators(self, keyword=None, dimension=None, status=None):
-        return self._db_items(keyword=keyword, dimension=dimension, status=status)
+    def get_indicators(self, keyword=None, dimension=None, status=None, dimension_unassigned=False):
+        return self._db_items(
+            keyword=keyword, dimension=dimension, status=status,
+            dimension_unassigned=dimension_unassigned,
+        )
 
     def get_indicator_detail(self, indicator_id):
         rows = self._fetch_rows(self._item_statement().where(

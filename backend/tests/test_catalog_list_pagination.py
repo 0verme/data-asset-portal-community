@@ -157,6 +157,28 @@ class _CatalogPaginationContract:
                                   (report_asset, report_asset.c.report_code, self.report_codes)):
             self.assertEqual([], fetch_all_core(self.profile, select(key).select_from(table).where(key.in_(codes)))[1])
 
+    def _insert_unassigned_indicator(self):
+        identifier = self.prefix + "I_UNASSIGNED"
+        pk = next_pk(self.profile, indicator_item, indicator_item.c.indicator_pk)
+        with database_transaction():
+            execute_statements_core(self.profile, [insert(indicator_item).values(
+                indicator_pk=pk, indicator_id=identifier, indicator_name=self.prefix + "unassigned",
+                meaning_desc="Synthetic unassigned dimension", result_table_name="", result_field_name="",
+                source_asset_id=None, result_field_id=None, aggregation_code=None, semantic_state="candidate",
+                dimension_code="", caliber_desc="", path_desc="", status_code="enabled",
+                registrar_name="dap464", registered_date="2026-01-01", is_deleted="N",
+                created_by="dap464", updated_by="dap464",
+            )])
+
+        def cleanup():
+            with database_transaction():
+                execute_statements_core(self.profile, [delete(indicator_item).where(
+                    indicator_item.c.indicator_pk == pk, indicator_item.c.indicator_id == identifier,
+                )])
+
+        self.addCleanup(cleanup)
+        return identifier
+
     def _assert_executed_bounds(self, table):
         queries = [(sql, params, ms) for sql, params, ms in self.executed_sql
                    if table in sql and "ORDER BY" in sql and "LIMIT" in sql]
@@ -179,6 +201,19 @@ class _CatalogPaginationContract:
         self.assertEqual(self.baseline_indicator["facets"]["dimension"].get("mem", 0) + 3, result["facets"]["dimension"]["mem"])
         descending = self.indicator.get_indicator_page(keyword=self.prefix, page_size=3, sort_key="id", sort_direction="desc")
         self.assertEqual(self.indicator_codes[6:3:-1], [item["id"] for item in descending["items"]])
+        self._assert_executed_bounds("p_indicator_item")
+
+    def test_indicator_unassigned_dimension_filter_is_explicit_and_paged(self):
+        identifier = self._insert_unassigned_indicator()
+        unassigned = self.indicator.get_indicator_page(
+            keyword=self.prefix, dimension_unassigned=True, page=1, page_size=20,
+        )
+        self.assertEqual((1, [identifier]), (unassigned["total"], [item["id"] for item in unassigned["items"]]))
+        self.assertEqual(1, unassigned["facets"]["dimension"][""])
+
+        all_items = self.indicator.get_indicator_page(keyword=self.prefix, page=1, page_size=20)
+        self.assertEqual(8, all_items["total"])
+        self.assertEqual(8, len(self.indicator.get_indicators(keyword=self.prefix)))
         self._assert_executed_bounds("p_indicator_item")
 
     def test_indicator_search_uses_resolved_display_names_not_snapshots(self):
@@ -276,6 +311,21 @@ class SQLiteCatalogPaginationTests(_CatalogPaginationContract, unittest.TestCase
             for route in ("/api/indicators", "/api/reports"):
                 data = client.get(f"{route}?page=1&pageSize=10000").json()
                 self.assertEqual(7, data["pageSize"])
+
+    def test_route_filters_unassigned_dimension_with_explicit_query_flag(self):
+        identifier = self._insert_unassigned_indicator()
+        client = self._client()
+        filtered = client.get("/api/indicators", params={
+            "keyword": self.prefix, "page": 1, "pageSize": 20, "dimensionUnassigned": "true",
+        })
+        self.assertEqual(200, filtered.status_code, filtered.text)
+        self.assertEqual((1, [identifier]), (
+            filtered.json()["total"], [item["id"] for item in filtered.json()["items"]],
+        ))
+        unfiltered = client.get("/api/indicators", params={
+            "keyword": self.prefix, "page": 1, "pageSize": 20,
+        })
+        self.assertEqual(8, unfiltered.json()["total"])
 
     def test_public_projection_write_permissions_and_detail_routes(self):
         client = self._client()

@@ -40,6 +40,7 @@ type ReportFixture = {
 };
 
 interface FixtureOptions {
+  includeUnassignedDimension?: boolean;
   failFirstIndicatorList?: boolean;
   reportCount?: number;
   holdIndicatorPage?: number;
@@ -88,11 +89,11 @@ function report(index: number): ReportFixture {
   };
 }
 
-function countBy<T>(items: readonly T[], value: (item: T) => string): Record<string, number> {
+function countBy<T>(items: readonly T[], value: (item: T) => string, includeEmpty = false): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const item of items) {
     const key = value(item);
-    if (key) counts[key] = (counts[key] || 0) + 1;
+    if (key || includeEmpty) counts[key] = (counts[key] || 0) + 1;
   }
   return counts;
 }
@@ -130,6 +131,12 @@ function pageItems<T extends Record<string, unknown>>(
 
 async function setupRemoteFixture(page: Page, options: FixtureOptions = {}) {
   let indicators = Array.from({ length: 23 }, (_, offset) => indicator(offset + 1));
+  if (options.includeUnassignedDimension) {
+    const unassigned = indicator(24);
+    unassigned.dimension = '';
+    unassigned.path = '';
+    indicators.push(unassigned);
+  }
   let reports = Array.from({ length: options.reportCount ?? 23 }, (_, offset) => report(offset + 1));
   const requests: URL[] = [];
   const deletes: string[] = [];
@@ -154,10 +161,14 @@ async function setupRemoteFixture(page: Page, options: FixtureOptions = {}) {
       return;
     }
     if (path === '/api/indicators/dimensions') {
-      await route.fulfill({ json: { items: [
+      const dimensions = [
         { code: 'prd', label: 'Retail dimensions', count: 20 },
         { code: 'custom', label: 'Custom dimension', count: 3 },
-      ] } });
+      ];
+      if (options.includeUnassignedDimension) {
+        dimensions.push({ code: '', label: '未标注维度', count: 1 });
+      }
+      await route.fulfill({ json: { items: dimensions } });
       return;
     }
     if (path === '/api/indicators' && request.method() === 'GET') {
@@ -167,10 +178,17 @@ async function setupRemoteFixture(page: Page, options: FixtureOptions = {}) {
         await route.fulfill({ status: 503, json: { error: { message: 'Synthetic indicator page unavailable' } } });
         return;
       }
-      const result = pageItems(indicators as unknown as Record<string, unknown>[], url, ['dimension', 'status'], 'id');
+      const dimensionUnassigned = url.searchParams.get('dimensionUnassigned') === 'true';
+      const pageSource = dimensionUnassigned ? indicators.filter((item) => item.dimension === '') : indicators;
+      const result = pageItems(
+        pageSource as unknown as Record<string, unknown>[],
+        url,
+        dimensionUnassigned ? ['status'] : ['dimension', 'status'],
+        'id',
+      );
       const payload = {
         ...result,
-        facets: { dimension: countBy(indicators, (item) => item.dimension), status: countBy(indicators, (item) => item.status) },
+        facets: { dimension: countBy(indicators, (item) => item.dimension, true), status: countBy(indicators, (item) => item.status) },
         stats: { indicatorCount: indicators.length },
       };
       if (options.holdIndicatorPage === result.page && url.searchParams.get('pageSize') === '10' && !url.searchParams.get('keyword')) {
@@ -287,6 +305,25 @@ for (const module of ['indicator', 'report'] as const) {
     expect(fixture.requests.every((url) => url.searchParams.has('page') && url.searchParams.has('pageSize'))).toBe(true);
   });
 }
+
+test('indicator remote paging retains the explicit unassigned-dimension filter', async ({ page }) => {
+  test.skip(!remote, 'Exercises the HTTP API mode; fixtures only isolate the remote contract.');
+  const fixture = await setupRemoteFixture(page, { includeUnassignedDimension: true });
+  await page.goto('/indicator-maintenance?view=list');
+  await expect(page.locator('table.dt tbody tr')).toHaveCount(20, { timeout: 20_000 });
+  const pager = page.getByRole('navigation', { name: '指标维护分页', exact: true });
+  await expect(pager).toContainText('共 24 条');
+  const unassigned = page.locator('.side-item').filter({ hasText: '未标注维度' });
+  await expect(unassigned.locator('.count')).toHaveText('1');
+  await unassigned.click();
+  await expect(page.locator('table.dt tbody tr')).toHaveCount(1);
+  await expect(page.locator('table.dt tbody')).toContainText('PAG_IND_24');
+  await expect(pager).toContainText('1 / 1');
+  await expect(pager).toContainText('共 1 条');
+  const filteredRequest = fixture.requests.at(-1);
+  expect(filteredRequest?.searchParams.get('dimensionUnassigned')).toBe('true');
+  expect(filteredRequest?.searchParams.has('dimension')).toBe(false);
+});
 
 test('indicator remote paging retries a failed page request and does not leave a false empty state', async ({ page }) => {
   test.skip(!remote, 'Exercises the HTTP API mode; fixtures only isolate the remote contract.');

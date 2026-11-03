@@ -137,7 +137,10 @@ export function useIndicatorModule({
       const [result, dimensionCatalog] = await Promise.all([
         getIndicatorPage({
           keyword: query,
-          dimension: indicatorFilter.dimension === 'all' ? undefined : indicatorFilter.dimension,
+          dimension: indicatorFilter.dimension === 'all' || indicatorFilter.dimension === ''
+            ? undefined
+            : indicatorFilter.dimension,
+          dimensionUnassigned: indicatorFilter.dimension === '',
           status: indicatorFilter.status === 'all' ? undefined : indicatorFilter.status,
           page: indicatorPage,
           pageSize: indicatorPageSize,

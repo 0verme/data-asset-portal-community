@@ -132,6 +132,7 @@ function normalizeIndicator(item: unknown): MockIndicatorItem {
 export interface IndicatorQueryParams {
   keyword?: string | undefined;
   dimension?: string | undefined;
+  dimensionUnassigned?: boolean | undefined;
   status?: string | undefined;
   page?: number | undefined;
   pageSize?: number | undefined;
@@ -143,7 +144,11 @@ export interface IndicatorQueryParams {
 function filterIndicators(items: readonly MockIndicatorItem[], params: IndicatorQueryParams = {}): MockIndicatorItem[] {
   const keyword = String(params.keyword || '').trim().toLowerCase();
   return items.filter((item) => {
-    if (params.dimension && params.dimension !== 'all' && item.dimension !== params.dimension) return false;
+    if (params.dimensionUnassigned === true) {
+      if (item.dimension !== '') return false;
+    } else if (params.dimension && params.dimension !== 'all' && item.dimension !== params.dimension) {
+      return false;
+    }
     if (params.status && params.status !== 'all' && item.status !== params.status) return false;
     if (!keyword) return true;
     return [
