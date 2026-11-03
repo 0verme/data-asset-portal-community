@@ -29,7 +29,13 @@ import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
-from ..db.facade import _prepare_execute_args, connect_with_profile, fetch_all, resolve_db_profile_name
+from ..db.facade import (
+    _prepare_execute_args,
+    _rollback_if_needed,
+    connect_with_profile,
+    fetch_all,
+    resolve_db_profile_name,
+)
 from ..security.public_field_policy import (
     project_public_value,
     public_field_class_visible,
@@ -56,6 +62,13 @@ class SearchDataSourceError(Exception):
 
     def to_dict(self):
         return {"code": "SEARCH_DATA_SOURCE_ERROR", "message": self.message}
+
+
+class _SearchConnectionState:
+    """Mutable owner for the connection used across isolated search groups."""
+
+    def __init__(self, connection):
+        self.connection = connection
 
 
 class SearchProvider(ABC):
@@ -106,12 +119,9 @@ class KeywordSearchProvider(SearchProvider):
             raise SearchDataSourceError("数据库查询失败") from error
         return [dict(zip(columns, row)) for row in rows]
 
-    @contextmanager
-    def _connection(self):
-        conn = None
+    def _open_connection(self):
         try:
-            conn = connect_with_profile(self._profile())
-            yield conn
+            return connect_with_profile(self._profile())
         except FileNotFoundError as error:
             raise SearchDataSourceError("数据库配置文件不存在") from error
         except KeyError as error:
@@ -120,12 +130,47 @@ class KeywordSearchProvider(SearchProvider):
             raise SearchDataSourceError("数据库服务暂不可用，请稍后重试") from error
         except Exception as error:
             raise SearchDataSourceError("数据库查询失败") from error
+
+    @staticmethod
+    def _close_connection(conn):
+        try:
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
+
+    @contextmanager
+    def _connection(self):
+        state = _SearchConnectionState(self._open_connection())
+        try:
+            yield state
         finally:
-            try:
-                if conn is not None:
-                    conn.close()
-            except Exception:
-                pass
+            self._close_connection(state.connection)
+
+    def _recover_connection_after_group(self, state, *, has_more_groups):
+        """End each read-only module transaction and replace unsafe sessions.
+
+        Search groups are independent. Reuse a connection only when rollback
+        succeeds; an aborted or otherwise unrecoverable JDBC session is closed
+        before another group is allowed to run.
+        """
+        conn = state.connection
+        if conn is None:
+            return
+        try:
+            _rollback_if_needed(conn)
+            return
+        except Exception:
+            LOGGER.warning("search transaction rollback failed; discarding connection")
+
+        state.connection = None
+        self._close_connection(conn)
+        if not has_more_groups:
+            return
+        try:
+            state.connection = self._open_connection()
+        except SearchDataSourceError as error:
+            LOGGER.warning("search connection replacement unavailable: %s", error.message)
 
     def _fetch_rows_with_conn(self, conn, sql, params=None):
         curs = None
@@ -509,12 +554,27 @@ class KeywordSearchProvider(SearchProvider):
         if not configs:
             return {"query": keyword, "scope": normalized_scope, "groups": [], "total": 0}
         groups, failed_groups = [], []
-        with self._connection() as conn:
-            for config in configs:
+        with self._connection() as connection_state:
+            for index, config in enumerate(configs):
+                conn = connection_state.connection
+                if conn is None:
+                    failed_groups.append(config["type"])
+                    continue
                 try:
-                    groups.append(self._search_one_safe(conn, config, keyword, normalized_limit, selected_profile))
+                    group = self._search_one_safe(
+                        conn, config, keyword, normalized_limit, selected_profile
+                    )
                 except SearchDataSourceError:
                     failed_groups.append(config["type"])
+                else:
+                    groups.append(group)
+                # Search groups are read-only and independently useful. Close
+                # their transaction boundary before reusing the session; if a
+                # JDBC rollback fails, replace the connection rather than let
+                # one aborted group poison the rest of the request.
+                self._recover_connection_after_group(
+                    connection_state, has_more_groups=index + 1 < len(configs)
+                )
         if not groups and failed_groups:
             raise SearchDataSourceError("搜索模块暂时不可用，请稍后重试。")
         if normalized_scope == SCOPE_ALL:

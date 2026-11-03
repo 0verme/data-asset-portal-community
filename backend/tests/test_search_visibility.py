@@ -3,6 +3,7 @@
 import os
 import unittest
 from contextlib import contextmanager, nullcontext
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from backend.app.application import Identity
@@ -16,6 +17,11 @@ from fastapi.testclient import TestClient
 class SearchVisibilityTestCase(unittest.TestCase):
     def setUp(self):
         self.provider = KeywordSearchProvider()
+
+    @staticmethod
+    def _connection_context():
+        connection = SimpleNamespace(jconn=SimpleNamespace(getAutoCommit=lambda: True))
+        return nullcontext(SimpleNamespace(connection=connection))
 
     @staticmethod
     def _group(config):
@@ -45,7 +51,7 @@ class SearchVisibilityTestCase(unittest.TestCase):
             ),
             patch.object(self.provider, "_visible_configs", return_value=[config]),
             patch.object(
-                self.provider, "_connection", return_value=nullcontext(object())
+                self.provider, "_connection", return_value=self._connection_context()
             ),
             patch.object(
                 self.provider,
@@ -110,7 +116,7 @@ class SearchVisibilityTestCase(unittest.TestCase):
         with (
             patch.object(self.provider, "_visible_configs", return_value=[config]),
             patch.object(
-                self.provider, "_connection", return_value=nullcontext(object())
+                self.provider, "_connection", return_value=self._connection_context()
             ),
             patch.object(
                 self.provider,
@@ -142,7 +148,7 @@ class SearchVisibilityTestCase(unittest.TestCase):
 
         with (
             patch.object(
-                self.provider, "_connection", return_value=nullcontext(object())
+                self.provider, "_connection", return_value=self._connection_context()
             ),
             patch.object(
                 self.provider,
@@ -187,7 +193,7 @@ class SearchVisibilityTestCase(unittest.TestCase):
 
         with (
             patch.object(
-                self.provider, "_connection", return_value=nullcontext(object())
+                self.provider, "_connection", return_value=self._connection_context()
             ),
             patch.object(
                 self.provider,
