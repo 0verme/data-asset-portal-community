@@ -146,7 +146,7 @@ DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具�
 | 前端 `npm test` | **PASS**：401 个 source tests + 2 个 API-mode tests。 |
 | Frontend static/build | **PASS**：Lineage build/package verify、完整 typecheck、ESLint、`VITE_API_MODE=remote npm run build:frontend`；产物有既有 >500 kB bundle advisory。 |
 | Browser E2E | **PASS**：Issue #513 AI Q&A spec Chromium/WebKit **8/8**；既有 `portal-search.spec.ts` Chromium/WebKit **18 passed / 2 skipped**。AI E2E 在 1440/1280/860/600 宽度检查无横向溢出。 |
-| Community boundary / hygiene | **PASS**：Public Data Guard 扫描 369 files，BLOCKER=0、SUSPICIOUS=0；CI workflow YAML/AI E2E step 校验与 `git diff --check` PASS。 |
+| Community boundary / hygiene | **PASS**：Public Data Guard 扫描 374 files，BLOCKER=0、SUSPICIOUS=0；CI workflow YAML/AI E2E step 校验与 `git diff --check` PASS。 |
 | npm audit | **PASS（CI 高危阈值）**：`npm audit --audit-level=high` 成功；现有锁文件报告 12 moderate advisories。此 PR 未更改依赖或 lockfile。 |
 | Migration / database | **NOT APPLICABLE**：无 Schema/Migration/Seed/数据库依赖改动。真实数据库未连接。 |
 | 全部 Playwright specs 无筛选整套 | **NOT COMPLETE**：本地另行尝试后，发现该仓库其他无关 browser specs 需要未运行的后端 `127.0.0.1:15099`；已停止该广泛运行。它不作为 PASS 声明；Issue #513 及既有搜索 CI specs 已单独通过。 |
