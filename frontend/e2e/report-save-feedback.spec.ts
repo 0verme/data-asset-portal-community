@@ -47,9 +47,17 @@ test("long report save failures keep input, locate field conflicts, and show ord
       return;
     }
     if (path === "/reports" && request.method() === "GET") {
+      const items = savedReport ? [savedReport] : [];
       await route.fulfill({
         contentType: "application/json",
-        json: { items: savedReport ? [savedReport] : [] },
+        json: {
+          items,
+          total: items.length,
+          page: 1,
+          pageSize: 20,
+          facets: { type: {}, status: {}, ownerDept: {} },
+          stats: { reportCount: items.length },
+        },
       });
       return;
     }
