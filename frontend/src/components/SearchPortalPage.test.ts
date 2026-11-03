@@ -13,7 +13,10 @@ test("empty search results expose a clear action that preserves scope and focus"
   ]);
 
   assert.match(source, /groups\.length === 0 \?/);
-  assert.match(source, /<EmptyState[\s\S]*?title=\{result\?\.partial \? "已查询模块暂无匹配" : "没有找到匹配的资产"\}/);
+  assert.match(source, /<EmptyState[\s\S]*?title=\{result\?\.partial \? "已查询模块暂无匹配" : "没有找到精确匹配的资产"\}/);
+  assert.match(source, /!result\?\.partial && aiEnabled/);
+  assert.match(source, /aria-label="问 AI 找资产"/);
+  assert.match(source, /onClick=\{\(\) => runAiAsk\(searchedTerm\)\}/);
   assert.match(source, /className="sp-empty-action"/);
   assert.match(source, /aria-label="清空搜索"/);
   assert.match(source, /onClick=\{\(\) => clearSearch\(scope\)\}/);
@@ -123,6 +126,44 @@ test("search result rows size from content instead of the Kumo control box", asy
     source,
     /<span className="sp-hit-facts">[\s\S]*?sp-hit-meta[\s\S]*?sp-hit-match[\s\S]*?<\/span>/,
   );
+});
+
+test("AI is explicitly enabled, Enter remains traditional search, and model requests are isolated", async () => {
+  const source = await readFile(searchPagePath, "utf8");
+
+  assert.match(source, /getAiAskAvailability\(\)/);
+  assert.match(source, /\.catch\(\(\) => \{\s*if \(!cancelled\) setAiEnabled\(false\)/);
+  assert.match(source, /if \(event\.key === "Enter"\) doSearch\(\)/);
+  assert.match(source, /onClick=\{\(\) => runAiAsk\(query\)\}/);
+  assert.match(source, /askAi\(question, "all", 10\)/);
+  assert.match(source, /syncSearchUrl\(question, scope\)/);
+  assert.match(source, /setAiQuery\(""\)/);
+  assert.match(source, /if \(searchedTerm !== question\)[\s\S]*?setSearchedTerm\(""\)/);
+  assert.match(source, /response\.status === "retrieval_unavailable"/);
+  assert.match(source, /response\.status === "generation_unavailable"/);
+  assert.match(source, /response\.status === "insufficient_evidence"/);
+  assert.match(source, /onRetry=\{\(\) => runAiAsk\(aiQuery\)\}/);
+  assert.match(source, /onNavigate\?\.\(target, query\)/);
+  assert.match(source, /module: "dwm"[\s\S]*?assetId: item\.assetId/);
+});
+
+test("AI answers remain explanatory while only DAP candidate cards navigate responsively", async () => {
+  const [source, styles, api] = await Promise.all([
+    readFile(searchPagePath, "utf8"),
+    readFile(searchStylesPath, "utf8"),
+    readFile(fileURLToPath(new URL("../api/aiAsk.ts", import.meta.url)), "utf8"),
+  ]);
+
+  assert.match(source, /AI 回答摘要/);
+  assert.match(source, /onNavigate=\{handleNavigate\}/);
+  assert.match(source, /aria-label=\{`查看\$\{isField \? "字段" : "数据表"\}详情：/);
+  assert.match(source, /ref: item\.tableName,[\s\S]*?assetId: item\.assetId/);
+  assert.match(source, /证据来源：DAP 资产目录/);
+  assert.match(styles, /\.sp-ai-candidate \{[\s\S]*?width: 100%[\s\S]*?min-width: 0/);
+  assert.match(styles, /\.sp-ai-candidate-main \{[\s\S]*?overflow-wrap: anywhere/);
+  assert.match(styles, /@media \(max-width: 600px\)[\s\S]*?\.sp-ai-candidate \{ padding: 12px/);
+  assert.match(api, /suppressTimeoutPayloadLogging: true/);
+  assert.doesNotMatch(api, /fetch\(.*AI_LLM|AI_LLM_BASE_URL/);
 });
 
 test("RAG recommendations are a separate business group with asynchronous non-blocking state", async () => {

@@ -130,7 +130,7 @@ test("empty all-scope search recovery clears q and restores input focus", async 
   const search = page.getByRole("textbox", { name: "搜索数据资产" });
   await search.fill("no-such-issue-361-asset-9f43");
   await search.press("Enter");
-  await expect(page.getByRole("heading", { name: "没有找到匹配的资产" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "没有找到精确匹配的资产" })).toBeVisible();
   const clearSearch = page.getByRole("button", { name: "清空搜索" });
   await clearSearch.scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath("portal-search-empty-1280.png"), fullPage: true });

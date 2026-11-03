@@ -36,6 +36,8 @@ export interface RemoteRequestOptions {
   timeoutMs?: number | undefined;
   credentials?: RequestCredentials | undefined;
   suppressUnauthorizedEvent?: boolean | undefined;
+  /** Avoid logging user-authored prompt text on timeout. */
+  suppressTimeoutPayloadLogging?: boolean | undefined;
   signal?: AbortSignal | null | undefined;
   headers?: Record<string, string> | undefined;
 }
@@ -162,8 +164,12 @@ export async function requestRemote<T = unknown>(path: string, options: RemoteRe
             url: requestUrl,
             timeoutMs,
             durationMs,
-            params: summarizeRequestPayload(options.params),
-            body: summarizeRequestPayload(options.body),
+            ...(options.suppressTimeoutPayloadLogging
+              ? { payload: '[redacted]' }
+              : {
+                  params: summarizeRequestPayload(options.params),
+                  body: summarizeRequestPayload(options.body),
+                }),
           });
           throw new Error(
             `接口请求超时（${formatTimeoutLabel(timeoutMs)}），可能是查询数据量较大或后端处理较慢，请稍后重试。`,

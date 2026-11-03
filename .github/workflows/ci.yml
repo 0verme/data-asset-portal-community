@@ -681,6 +681,13 @@ jobs:
           VITE_API_MODE: mock
         run: npm run test:browser -- e2e/portal-search.spec.ts --workers=2
 
+      - name: Single-turn AI Q&A browser regression (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/ai-ask-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/ai-ask.spec.ts --workers=2
+
       - name: System management form feedback browser regression (Chromium and WebKit)
         if: matrix.lane == 'b'
         env:

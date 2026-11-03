@@ -14,9 +14,12 @@
 
 from __future__ import annotations
 
+import ipaddress
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT_DIR / "backend"
@@ -112,6 +115,106 @@ def get_rag_search_service_token() -> str:
     if len(token) > 4096 or any(not ("!" <= character <= "~") for character in token):
         return ""
     return token
+
+
+@dataclass(frozen=True)
+class AIAskLLMConfig:
+    """Server-only OpenAI-compatible endpoint configuration."""
+
+    enabled: bool
+    base_url: str
+    model: str
+    api_key: str
+    timeout_ms: int
+    max_tokens: int
+    max_concurrency: int
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.base_url and self.model and self.api_key)
+
+
+def _validated_ai_llm_base_url(value: str) -> str:
+    raw = value.strip()
+    if not raw or len(raw) > 2048 or any(ord(character) < 32 for character in raw):
+        return ""
+    try:
+        parsed = urlsplit(raw)
+        hostname = parsed.hostname
+        _ = parsed.port
+    except ValueError:
+        return ""
+    path = parsed.path.rstrip("/")
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or "\\" in path
+        or any(part in {".", ".."} for part in path.split("/"))
+    ):
+        return ""
+    if parsed.scheme == "http":
+        normalized_host = hostname.strip("[]").lower()
+        try:
+            is_loopback = ipaddress.ip_address(normalized_host).is_loopback
+        except ValueError:
+            is_loopback = normalized_host == "localhost"
+        if not is_loopback:
+            return ""
+    return f"{parsed.scheme}://{parsed.netloc}{path}"
+
+
+def get_ai_llm_config() -> AIAskLLMConfig | None:
+    """Read LLM settings from deployment configuration without exposing them.
+
+    A missing, malformed, or out-of-range value fails closed. The API returns
+    only the enabled boolean; URL, model, and secret never leave the backend.
+    """
+    base_url = _validated_ai_llm_base_url(os.getenv("AI_LLM_BASE_URL", ""))
+    model = (os.getenv("AI_LLM_MODEL") or "").strip()
+    api_key = (os.getenv("AI_LLM_API_KEY") or "").strip()
+    if (
+        not base_url
+        or not model
+        or len(model) > 128
+        or any(ord(character) < 32 for character in model)
+        or not api_key
+        or len(api_key) > 4096
+        or any(not ("!" <= character <= "~") for character in api_key)
+    ):
+        return None
+
+    raw_limits = (
+        ("AI_LLM_TIMEOUT_MS", 10000, 250, 60000),
+        ("AI_LLM_MAX_TOKENS", 512, 64, 4096),
+        ("AI_LLM_MAX_CONCURRENCY", 2, 1, 16),
+    )
+    limits: list[int] = []
+    for name, default, minimum, maximum in raw_limits:
+        raw = os.getenv(name)
+        if raw is None or not raw.strip():
+            limits.append(default)
+            continue
+        try:
+            parsed_value = int(raw.strip())
+        except ValueError:
+            return None
+        if parsed_value < minimum or parsed_value > maximum:
+            return None
+        limits.append(parsed_value)
+
+    return AIAskLLMConfig(
+        enabled=parse_bool(os.getenv("AI_ASK_ENABLED")),
+        base_url=base_url,
+        model=model,
+        api_key=api_key,
+        timeout_ms=limits[0],
+        max_tokens=limits[1],
+        max_concurrency=limits[2],
+    )
 
 
 def get_public_catalog_profile() -> PublicCatalogProfile:

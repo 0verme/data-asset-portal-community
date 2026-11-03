@@ -165,7 +165,40 @@ RAG 相关资产推荐**默认关闭**。DAP 仅作为受认证的服务端 HTTP
 
 DAP 侧的 RAG 配置使用既有参数字典存储，不新增数据库表。本次**不操作内网数据库**；当前内网部署仍须先完成并验证 migration `0012`–`0014`（包括 RAG 配置 seed）后，才能持久化/启用该功能。迁移未完成时保持 RAG 关闭，不要通过跳过迁移或改动内网数据库来绕过前置条件。自动化 HTTP Mock 测试不等于真实服务联调；真实内网 HTTP、BGE/索引 readiness 与部署验收需另行执行并如实记录。本次不修改或部署 `dap-rag-lab`。
 
-### 3.6 API authentication boundary
+### 3.6 Optional single-turn AI asset Q&A
+
+AI asset Q&A is an opt-in metadata-only capability. It does not change the
+ordinary search API, execute SQL, access business values, persist conversation
+history, or load RAG indexes/models inside DAP. Keep it disabled until the
+independent RAG HTTP Search Service v1 and the target LLM Provider have been
+verified in an isolated environment.
+
+- Leave `AI_ASK_ENABLED` unset or `false` by default. The browser receives only
+  the non-secret `GET /api/ai/status` boolean; incomplete Provider/RAG
+  configuration fails closed and hides the AI action.
+- For an authorized isolated test deployment, inject `AI_LLM_API_KEY` from the
+  deployment Secret store. Set `AI_LLM_BASE_URL`, `AI_LLM_MODEL`, and bounded
+  timeout/token/concurrency settings through protected backend configuration.
+  Never put a real key or private endpoint into Git, the DAP parameter table,
+  frontend build variables, shell history, logs, or screenshots.
+- DAP calls only its server-side OpenAI-compatible adapter. The browser calls
+  DAP `/api/ai/ask`; it never calls the LLM provider directly. Configure RAG
+  independently using the existing administrator RAG configuration and
+  `RAG_SEARCH_SERVICE_TOKEN` Secret.
+- Verify current GitHub `dap-rag-lab` HTTP Search Service status before enabling;
+  external issue #14 is not evidence of a completed/live deployment. DAP
+  Client Mock tests do not prove a real HTTP service exists.
+- Search remains usable when AI is disabled or fails. To disable immediately,
+  set `AI_ASK_ENABLED=false` (or remove the LLM Secret/configuration) and restart
+  the backend; confirm `/api/ai/status` reports `enabled=false`. Code rollback
+  requires no schema rollback or data cleanup.
+
+Detailed request/response states, synthetic tests, inter-service verification,
+known unverified work, and rollback notes are in
+[`docs/ai-ask-mvp.md`](./docs/ai-ask-mvp.md). No real RAG, DeepSeek, GaussDB,
+production database, or production service access is part of this change.
+
+### 3.7 API authentication boundary
 
 Community Edition 使用 `Public Catalog + Authenticated Management`：普通业务目录 GET 可以匿名浏览并按规则脱敏；写操作、管理 API、操作日志、Metadata ingestion、上/下游 `admin-detail`、用户/角色/参数和连接/凭据字段仍由后端 authentication 与 permission-based RBAC 保护。不要用 Nginx、隐藏菜单或关闭 OpenAPI 代替后端授权。完整 route inventory 见 [`docs/rbac/authenticated-read-model.md`](./docs/rbac/authenticated-read-model.md)。
 

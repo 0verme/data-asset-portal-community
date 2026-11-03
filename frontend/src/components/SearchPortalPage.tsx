@@ -19,6 +19,12 @@ import { ActionErrorBanner } from "./common/ActionErrorBanner.tsx";
 import { getPortalStats, type PortalStatItem } from "../api/portal.ts";
 import { getHotKeywords } from "../api/hotKeywords.ts";
 import {
+  askAi,
+  getAiAskAvailability,
+  type AiAskCandidate,
+  type AiAskResponse,
+} from "../api/aiAsk.ts";
+import {
   getRagRecommendations,
   unifiedSearch,
   type RagRecommendation,
@@ -75,6 +81,26 @@ function recommendationTarget(item: RagRecommendation): SearchResultItem {
     category: "资产",
     assetId: item.assetId,
     matchedFields: item.evidence.map((value) => ({ label: "匹配依据", value })),
+  };
+}
+
+function askCandidateKey(item: AiAskCandidate): string {
+  return item.fieldId ? `field:${item.assetId}:${item.fieldId}` : `table:${item.assetId}`;
+}
+
+function askCandidateTarget(item: AiAskCandidate): SearchResultItem {
+  const isField = item.assetType === "field";
+  return {
+    id: askCandidateKey(item),
+    title: isField ? item.fieldDisplayName || item.fieldName || "" : item.tableDisplayName || item.tableName,
+    subtitle: isField ? item.fieldDescription || "" : item.tableDescription,
+    meta: [item.tableName, item.domain, item.layer].filter(Boolean).join(" / "),
+    module: "dwm",
+    ref: item.tableName,
+    type: "asset",
+    category: isField ? "字段" : "数据表",
+    assetId: item.assetId,
+    matchedFields: [{ label: "匹配依据", value: item.matchReason }],
   };
 }
 
@@ -178,6 +204,103 @@ function RagRecommendationsSection({
   );
 }
 
+interface AiAskSectionProps {
+  query: string;
+  loading: boolean;
+  error: string;
+  response: AiAskResponse | null;
+  onRetry: () => void;
+  onNavigate: ((target: SearchNavigationTarget, term: string) => void) | undefined;
+}
+
+function AiAskSection({
+  query,
+  loading,
+  error,
+  response,
+  onRetry,
+  onNavigate,
+}: AiAskSectionProps) {
+  if (!query) return null;
+  return (
+    <section className="sp-ai-group" aria-label="AI 问答结果">
+      <div className="sp-group-head">
+        <span className="sp-group-title">AI 回答</span>
+        <span className="sp-group-count">单轮问答 · 基于已校验资产元数据</span>
+      </div>
+      {loading ? (
+        <LoadingState
+          title="正在检索已登记资产并生成回答..."
+          desc=""
+          label="正在生成 AI 回答"
+          className="sp-ai-loading"
+        />
+      ) : error ? (
+        <div className="sp-ai-state sp-ai-error" role="alert">
+          <span>AI 问答请求失败：{error}</span>
+          <Button variant="tertiary" type="button" className="sp-ai-retry" onClick={onRetry}>
+            重试
+          </Button>
+        </div>
+      ) : response ? (
+        <>
+          {response.retrievalStatus === "degraded" ? (
+            <div className="sp-ai-state" role="status">检索部分降级；下方仅展示通过当前 DAP 目录校验的候选资产。</div>
+          ) : null}
+          {response.status === "retrieval_unavailable" ? (
+            <div className="sp-ai-state sp-ai-error" role="status">资产检索暂不可用，无法确认候选资产；传统搜索不受影响。</div>
+          ) : response.status === "generation_unavailable" ? (
+            <div className="sp-ai-state sp-ai-error" role="status">模型暂不可用，未生成回答；下方候选（如有）仍来自 DAP 目录校验。</div>
+          ) : response.status === "insufficient_evidence" ? (
+            <div className="sp-ai-state" role="status">当前元数据不足以确认。</div>
+          ) : (
+            <div className="sp-ai-summary" aria-label="AI 回答摘要">{response.answer}</div>
+          )}
+          {response.candidates.length ? (
+            <div className="sp-ai-candidates">
+              <div className="sp-group-head">
+                <span className="sp-group-title">相关候选资产</span>
+                <span className="sp-group-count">{response.candidates.length} 条</span>
+              </div>
+              <div className="sp-ai-list">
+                {response.candidates.map((item) => {
+                  const isField = item.assetType === "field";
+                  const target = askCandidateTarget(item);
+                  return (
+                    <Button
+                      key={askCandidateKey(item)}
+                      variant="tertiary"
+                      type="button"
+                      className="sp-ai-candidate"
+                      aria-label={`查看${isField ? "字段" : "数据表"}详情：${isField ? item.fieldName : item.tableName}`}
+                      onClick={() => onNavigate?.(target, query)}
+                    >
+                      <span className="sp-ai-candidate-main">
+                        <span className="sp-ai-candidate-heading">
+                          <span className="sp-ai-candidate-title">{isField ? item.fieldDisplayName || item.fieldName : item.tableDisplayName || item.tableName}</span>
+                          <span className="sp-ai-candidate-type">{isField ? "字段" : "数据表"}</span>
+                        </span>
+                        <span className="sp-ai-candidate-name mono">{isField ? item.fieldName : item.tableName}</span>
+                        {isField ? <span className="sp-ai-candidate-meta">所属表：{item.tableDisplayName || item.tableName}（{item.tableName}）</span> : null}
+                        {(isField ? item.fieldDescription : item.tableDescription) ? (
+                          <span className="sp-ai-candidate-desc">中文含义：{isField ? item.fieldDescription : item.tableDescription}</span>
+                        ) : null}
+                        <span className="sp-ai-candidate-meta">主题域/分层：{[item.domain, item.layer].filter(Boolean).join(" / ") || "未登记"}</span>
+                        <span className="sp-ai-candidate-evidence">证据来源：DAP 资产目录 · {item.matchReason}</span>
+                      </span>
+                      <span className="sp-hit-go" aria-hidden="true"><Icon name="arrow" size={14} /></span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 export function SearchPortalPage({
   onNavigate,
   availableModules = [],
@@ -205,6 +328,11 @@ export function SearchPortalPage({
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [searchedTerm, setSearchedTerm] = useState("");
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiResponse, setAiResponse] = useState<AiAskResponse | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   const hotTags = useMemo(
     () => filterPortalHotKeywordsByModules(hotKeywords, availableModules),
     [hotKeywords, availableModules],
@@ -212,6 +340,7 @@ export function SearchPortalPage({
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const requestSeq = useRef(0);
+  const aiRequestSeq = useRef(0);
 
   const syncSearchUrl = (
     nextQuery: string,
@@ -250,6 +379,7 @@ export function SearchPortalPage({
       ? nextScope
       : DEFAULT_PORTAL_SCOPE;
     requestSeq.current += 1;
+    aiRequestSeq.current += 1;
     setQuery("");
     setScope(preservedScope);
     setResult(null);
@@ -259,6 +389,10 @@ export function SearchPortalPage({
     setSearchLoading(false);
     setSearchError("");
     setSearchedTerm("");
+    setAiQuery("");
+    setAiResponse(null);
+    setAiLoading(false);
+    setAiError("");
     syncSearchUrl("", preservedScope);
   };
 
@@ -282,6 +416,11 @@ export function SearchPortalPage({
       return;
     }
     const seq = ++requestSeq.current;
+    aiRequestSeq.current += 1;
+    setAiQuery("");
+    setAiResponse(null);
+    setAiLoading(false);
+    setAiError("");
     setQuery(keyword);
     setScope(nextScope);
     setResult(null);
@@ -323,6 +462,67 @@ export function SearchPortalPage({
         setRecommendationsLoading(false);
       });
   };
+
+  const runAiAsk = (rawQuery = query): void => {
+    const question = String(rawQuery ?? "").trim();
+    if (!publicAccessReady || !aiEnabled || !question) return;
+    const seq = ++aiRequestSeq.current;
+    setQuery(question);
+    setAiQuery(question);
+    setAiResponse(null);
+    setAiLoading(true);
+    setAiError("");
+    if (searchedTerm !== question) {
+      requestSeq.current += 1;
+      setResult(null);
+      setRecommendations(null);
+      setRecommendationsLoading(false);
+      setRecommendationsError(false);
+      setSearchLoading(false);
+      setSearchError("");
+      setSearchedTerm("");
+    }
+    syncSearchUrl(question, scope);
+
+    askAi(question, "all", 10)
+      .then((response) => {
+        if (seq !== aiRequestSeq.current) return;
+        setAiResponse(response);
+        setAiLoading(false);
+      })
+      .catch((error: unknown) => {
+        if (seq !== aiRequestSeq.current) return;
+        setAiError(error instanceof Error ? error.message : "AI 问答暂不可用，请重试。");
+        setAiLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!publicAccessReady) {
+      setAiEnabled(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+    getAiAskAvailability()
+      .then((status) => {
+        if (cancelled) return;
+        setAiEnabled(status.enabled);
+        if (!status.enabled) {
+          setAiQuery("");
+          setAiResponse(null);
+          setAiLoading(false);
+          setAiError("");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAiEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicAccessReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -439,7 +639,7 @@ export function SearchPortalPage({
   );
 
   return (
-    <div className="search-portal">
+    <div className={`search-portal${searchedTerm || aiQuery ? " has-search-results" : ""}`}>
       <div className="sp-hero">
         <h1>数据资产管理与血缘分析平台</h1>
         <p>
@@ -464,10 +664,23 @@ export function SearchPortalPage({
             aria-label="搜索数据资产"
             autoFocus
           />
-          <Button variant="primary" type="button" className="sp-search-btn" onClick={doSearch}>
+          <Button variant="primary" type="button" className="sp-search-btn" aria-label="搜索" onClick={doSearch}>
             <Icon name="search" size={17} />
             <span className="sp-btn-text">搜索</span>
           </Button>
+          {aiEnabled ? (
+            <Button
+              variant="tertiary"
+              type="button"
+              className="sp-ask-btn"
+              aria-label="问 AI"
+              disabled={aiLoading || !query.trim()}
+              onClick={() => runAiAsk(query)}
+            >
+              <span className="sp-ask-mark" aria-hidden="true">✦</span>
+              <span>问 AI</span>
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -505,8 +718,10 @@ export function SearchPortalPage({
         </div>
       ) : null}
 
-      {searchedTerm ? (
+      {searchedTerm || aiQuery ? (
         <div className="sp-results" aria-live="polite">
+          {searchedTerm ? (
+            <>
           {!searchLoading && !searchError && result?.partial ? (
             <ActionErrorBanner title="搜索结果不完整" message="部分模块暂时不可用，以下仅展示已成功查询的结果，请重新搜索。" />
           ) : null}
@@ -525,10 +740,22 @@ export function SearchPortalPage({
                 <Icon name="inbox" size={26} />
               </div>
               <EmptyState
-                title={result?.partial ? "已查询模块暂无匹配" : "没有找到匹配的资产"}
+                title={result?.partial ? "已查询模块暂无匹配" : "没有找到精确匹配的资产"}
                 desc={result?.partial ? "部分模块加载失败，当前无法确认完整搜索结果。" : `没有与 “${searchedTerm}” 相关的资产、系统、字段、词根、指标、报表、API、码值表或下游推送。`}
                 className="sp-empty-adapter"
               />
+              {!result?.partial && aiEnabled ? (
+                <Button
+                  variant="primary"
+                  className="sp-empty-ai-action"
+                  type="button"
+                  aria-label="问 AI 找资产"
+                  disabled={aiLoading}
+                  onClick={() => runAiAsk(searchedTerm)}
+                >
+                  问 AI 找资产
+                </Button>
+              ) : null}
               <Button
                 variant="primary"
                 className="sp-empty-action"
@@ -617,6 +844,16 @@ export function SearchPortalPage({
               onNavigate={handleNavigate}
             />
           ) : null}
+            </>
+          ) : null}
+          <AiAskSection
+            query={aiQuery}
+            loading={aiLoading}
+            error={aiError}
+            response={aiResponse}
+            onRetry={() => runAiAsk(aiQuery)}
+            onNavigate={handleNavigate}
+          />
         </div>
       ) : (
         <div className="sp-stats">
