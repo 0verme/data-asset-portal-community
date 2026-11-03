@@ -133,6 +133,10 @@ export interface IndicatorQueryParams {
   keyword?: string | undefined;
   dimension?: string | undefined;
   status?: string | undefined;
+  page?: number | undefined;
+  pageSize?: number | undefined;
+  sortKey?: string | undefined;
+  sortDirection?: string | undefined;
   [key: string]: unknown;
 }
 
@@ -207,12 +211,8 @@ function normalizeDimensionCatalog(payload: unknown): IndicatorDimensionCatalogE
 }
 
 /**
- * Read the configured indicator dimension directory.
- *
- * The backend derives it from the real indicator data (same soft-delete and
- * permission footing as the list API) and labels it from the parameter
- * dictionary / indicator path configuration. Mock mode keeps the retail demo
- * dimensions so the Community Demo shows its original eight dimensions.
+ * Read the configured indicator dimension directory. The remote directory is
+ * data-driven; the mock-only fallback keeps the Community demo dimensions.
  */
 export async function getIndicatorDimensions(): Promise<IndicatorDimensionCatalogEntry[]> {
   if (API_MODE === 'remote') {
@@ -225,6 +225,75 @@ export async function getIndicatorDimensions(): Promise<IndicatorDimensionCatalo
     label: item.label,
     count: items.filter((indicator) => indicator.dimension === item.value).length,
   }));
+}
+
+export interface IndicatorPageResult {
+  items: MockIndicatorItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  facets: { dimension: Record<string, number>; status: Record<string, number> };
+  stats: { indicatorCount: number };
+}
+
+export function normalizeIndicatorPage(payload: unknown): IndicatorPageResult {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('指标分页接口返回格式无效');
+  }
+  const record = payload as Record<string, unknown>;
+  const facets = record['facets'];
+  const stats = record['stats'];
+  const validCounts = (value: unknown): value is Record<string, number> =>
+    Boolean(value && typeof value === 'object' && !Array.isArray(value) &&
+      Object.values(value as Record<string, unknown>).every((count) => Number.isSafeInteger(count) && Number(count) >= 0));
+  if (!Array.isArray(record['items']) || !Number.isSafeInteger(record['total']) || Number(record['total']) < 0 ||
+      !Number.isSafeInteger(record['page']) || Number(record['page']) < 1 ||
+      !Number.isSafeInteger(record['pageSize']) || Number(record['pageSize']) < 1 ||
+      !facets || typeof facets !== 'object' || !validCounts((facets as Record<string, unknown>)['dimension']) ||
+      !validCounts((facets as Record<string, unknown>)['status']) ||
+      !stats || typeof stats !== 'object' || !Number.isSafeInteger((stats as Record<string, unknown>)['indicatorCount']) ||
+      Number((stats as Record<string, unknown>)['indicatorCount']) < 0) {
+    throw new Error('指标分页接口返回格式无效');
+  }
+  return {
+    items: (record['items'] as unknown[]).map(normalizeIndicator),
+    total: Number(record['total']),
+    page: Number(record['page']),
+    pageSize: Number(record['pageSize']),
+    facets: facets as IndicatorPageResult['facets'],
+    stats: stats as IndicatorPageResult['stats'],
+  };
+}
+
+/** Explicit list pages; getIndicatorList intentionally remains a full options API. */
+export async function getIndicatorPage(params: IndicatorQueryParams = {}): Promise<IndicatorPageResult> {
+  const page = Math.max(1, Number.isSafeInteger(params.page) ? Number(params.page) : 1);
+  const pageSize = Math.max(1, Number.isSafeInteger(params.pageSize) ? Number(params.pageSize) : 20);
+  if (API_MODE === 'remote') {
+    const payload = await requestRemote('/indicators', { params: { ...params, page, pageSize } });
+    return normalizeIndicatorPage(payload);
+  }
+  const all = readStore().map(normalizeIndicator);
+  const matches = filterIndicators(all, params);
+  const columns: Record<string, keyof MockIndicatorItem> = {
+    id: 'id', name: 'name', dimension: 'dimension', status: 'status', registeredAt: 'registeredAt',
+  };
+  const key = columns[String(params.sortKey || '')] || 'id';
+  const direction = params.sortDirection === 'desc' ? -1 : 1;
+  matches.sort((left, right) => String(left[key] || '').localeCompare(String(right[key] || '')) * direction || left.id.localeCompare(right.id));
+  const facets: IndicatorPageResult['facets'] = { dimension: {}, status: {} };
+  for (const item of all) {
+    facets.dimension[item.dimension] = (facets.dimension[item.dimension] || 0) + 1;
+    if (item.status) facets.status[item.status] = (facets.status[item.status] || 0) + 1;
+  }
+  return {
+    items: matches.slice((page - 1) * pageSize, page * pageSize),
+    total: matches.length,
+    page,
+    pageSize,
+    facets,
+    stats: { indicatorCount: all.length },
+  };
 }
 
 export async function getIndicatorDetail(indicatorId: string): Promise<MockIndicatorItem> {

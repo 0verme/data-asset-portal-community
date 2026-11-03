@@ -20,7 +20,7 @@ import re
 from copy import deepcopy
 from datetime import date
 
-from sqlalchemy import and_, false, func, insert, or_, select, update
+from sqlalchemy import and_, case, false, func, insert, or_, select, update
 
 from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
@@ -31,7 +31,10 @@ from ..db.tables import (
     indicator_item,
     indicator_path_config,
 )
+from ..db.facade import database_transaction
+from ..security.public_field_policy import FIELD_CLASS_PERSON, public_field_class_visible
 from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
+from ..utils.pagination import resolve_paging
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
@@ -382,7 +385,7 @@ class IndicatorService(AuditActorMixin):
             item["resultFieldName"] = str(field_row["field_name"]).strip()
         return item
 
-    def _build_indicator_filters(self, keyword=None, dimension=None, status=None):
+    def _build_indicator_filters(self, keyword=None, dimension=None, status=None, *, paged=False, profile=None):
         clauses = [indicator_item.c.is_deleted == "N"]
         if dimension:
             code = self._normalize_dimension(dimension)
@@ -399,16 +402,27 @@ class IndicatorService(AuditActorMixin):
             query = str(keyword).strip().lower()
             escaped_query = escape_like_keyword(query)
             pattern = f"%{escaped_query}%"
-            searchable = (
+            # Page search follows displayed, resolved names, not stale snapshots.
+            table_name = indicator_item.c.result_table_name
+            field_name = indicator_item.c.result_field_name
+            if paged:
+                table_name = func.coalesce(func.nullif(asset_table.c.table_name, ""), table_name)
+                field_name = case(
+                    (or_(asset_field.c.asset_id.is_(None), asset_field.c.asset_id == indicator_item.c.source_asset_id),
+                     func.coalesce(func.nullif(asset_field.c.field_name, ""), field_name)),
+                    else_=field_name,
+                )
+            searchable = [
                 indicator_item.c.indicator_id,
                 indicator_item.c.indicator_name,
                 indicator_item.c.meaning_desc,
-                indicator_item.c.result_table_name,
-                indicator_item.c.result_field_name,
+                table_name,
+                field_name,
                 indicator_item.c.caliber_desc,
                 indicator_item.c.path_desc,
-                indicator_item.c.registrar_name,
-            )
+            ]
+            if not paged or public_field_class_visible(FIELD_CLASS_PERSON, profile):
+                searchable.append(indicator_item.c.registrar_name)
             clauses.append(or_(*(
                 func.lower(func.coalesce(column, "")).like(
                     pattern, escape=LIKE_ESCAPE_CHAR
@@ -452,8 +466,8 @@ class IndicatorService(AuditActorMixin):
             "registeredAt": row["registered_date"],
         }
 
-    def _db_items(self, keyword=None, dimension=None, status=None):
-        statement = select(
+    def _item_statement(self):
+        return select(
             indicator_item.c.indicator_pk,
             indicator_item.c.indicator_id,
             indicator_item.c.indicator_name,
@@ -486,17 +500,60 @@ class IndicatorService(AuditActorMixin):
                     asset_field.c.is_deleted == "N",
                 ),
             )
-        ).where(*self._build_indicator_filters(keyword, dimension, status)).order_by(indicator_item.c.indicator_id)
+        )
+
+    def _db_items(self, keyword=None, dimension=None, status=None):
+        statement = self._item_statement().where(
+            *self._build_indicator_filters(keyword, dimension, status)
+        ).order_by(indicator_item.c.indicator_id)
         return [self._row_to_item(row) for row in self._fetch_rows(statement)]
+
+    def get_indicator_page(self, keyword=None, dimension=None, status=None, page=None, page_size=None,
+                           sort_key=None, sort_direction=None, profile=None):
+        page, page_size = resolve_paging(page, page_size)
+        filters = self._build_indicator_filters(keyword, dimension, status, paged=True, profile=profile)
+        columns = {
+            "id": indicator_item.c.indicator_id, "name": indicator_item.c.indicator_name,
+            "dimension": indicator_item.c.dimension_code, "status": indicator_item.c.status_code,
+            "registeredAt": indicator_item.c.registered_date,
+        }
+        column = columns.get(sort_key, indicator_item.c.indicator_id)
+        order = column.desc() if str(sort_direction).lower() == "desc" else column.asc()
+        # Both joins target unique primary keys, never the asset's one-to-many fields.
+        # COUNT uses the exact same FROM/WHERE as the page (including resolved-name search).
+        base = self._item_statement().where(*filters)
+        with database_transaction():
+            count = self._fetch_rows(select(func.count().label("total")).select_from(base.subquery()))
+            rows = self._fetch_rows(base.order_by(order, indicator_item.c.indicator_id.asc())
+                                    .limit(page_size).offset((page - 1) * page_size))
+            buckets = self._fetch_rows(select(
+                indicator_item.c.dimension_code, indicator_item.c.status_code, func.count().label("total")
+            ).where(indicator_item.c.is_deleted == "N").group_by(
+                indicator_item.c.dimension_code, indicator_item.c.status_code))
+            facets = {"dimension": {}, "status": {}}
+            total = 0
+            for row in buckets:
+                size = int(row["total"])
+                total += size
+                dimension = self._normalize_dimension(row["dimension_code"])
+                status = row["status_code"]
+                # Keep the unassigned dimension as an explicit global bucket.
+                facets["dimension"][dimension] = facets["dimension"].get(dimension, 0) + size
+                if status:
+                    facets["status"][status] = facets["status"].get(status, 0) + size
+            return {"items": [self._row_to_item(row) for row in rows], "total": int(count[0]["total"]),
+                    "page": page, "pageSize": page_size, "facets": facets, "stats": {"indicatorCount": total}}
 
     def get_indicators(self, keyword=None, dimension=None, status=None):
         return self._db_items(keyword=keyword, dimension=dimension, status=status)
 
     def get_indicator_detail(self, indicator_id):
-        item = next((current for current in self.get_indicators() if current["id"] == indicator_id), None)
-        if not item:
+        rows = self._fetch_rows(self._item_statement().where(
+            indicator_item.c.indicator_id == indicator_id, indicator_item.c.is_deleted == "N"
+        ).limit(1))
+        if not rows:
             raise IndicatorNotFoundError(indicator_id)
-        return deepcopy(item)
+        return deepcopy(self._row_to_item(rows[0]))
 
     def _insert_item(self, item, indicator_pk):
         return insert(indicator_item).values(

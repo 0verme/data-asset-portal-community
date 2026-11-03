@@ -48,6 +48,7 @@ function ReportGroupLayout({ reports, query, onView }: ReportGroupLayoutProps) {
 
 export interface ReportListProps {
   reports: readonly EnrichedReportItem[];
+  total?: number | undefined;
   query: string;
   view: ViewMode;
   onChangeView: (view: ViewMode) => void;
@@ -57,14 +58,14 @@ export interface ReportListProps {
   canEdit?: boolean | undefined;
 }
 
-export function ReportList({ reports, query, view, onChangeView, onView, onEdit, onNew, canEdit = false }: ReportListProps) {
+export function ReportList({ reports, total = reports.length, query, view, onChangeView, onView, onEdit, onNew, canEdit = false }: ReportListProps) {
   return (
     <div className="indicator-page">
       <div className="page-head">
         <div>
           <div className="page-title"><span className="pt-code">报表</span>报表资产</div>
           <div className="page-sub">
-            共 <b>{reports.length}</b> 个报表资产{query ? <>，匹配 “{query}”</> : null}
+            共 <b>{total}</b> 个报表资产{query ? <>，匹配 “{query}”</> : null}
           </div>
         </div>
         <div className="head-actions"><ViewModeSwitcher value={view} onChange={onChangeView} />{canEdit ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增报表</Button> : null}</div>

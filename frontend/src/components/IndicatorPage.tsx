@@ -415,6 +415,8 @@ function IndicatorGroupLayout({ indicators, query, dimensionOptions, onView }: I
 export interface IndicatorPageProps {
   indicators: readonly MockIndicatorItem[];
   allIndicators: readonly MockIndicatorItem[];
+  total?: number | undefined;
+  overallCount?: number | undefined;
   query: string;
   actionError: string;
   filter: IndicatorFilter;
@@ -439,6 +441,8 @@ export interface IndicatorPageProps {
 export function IndicatorPage({
   indicators,
   allIndicators,
+  total = indicators.length,
+  overallCount = allIndicators.length,
   query,
   actionError,
   filter,
@@ -468,10 +472,10 @@ export function IndicatorPage({
         <div>
           <div className="page-title"><span className="pt-code">指标</span>指标管理</div>
           <div className="page-sub">
-            共 <b>{indicators.length}</b> 个口径指标
+            共 <b>{total}</b> 个口径指标
             {dimensionOptions.length ? <>，覆盖 <b>{dimensionOptions.length}</b> 个业务维度</> : null}
             {hasActiveDimension && activeDimension ? <>，当前维度 <b>{activeDimension.label}</b></> : null}
-            {allIndicators.length !== indicators.length ? <>，总量 <b>{allIndicators.length}</b></> : null}
+            {overallCount !== total ? <>，总量 <b>{overallCount}</b></> : null}
           </div>
         </div>
         <div className="head-actions">

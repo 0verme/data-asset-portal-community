@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createIndicator,
   deleteIndicator,
   getIndicatorDimensions,
-  getIndicatorList,
+  getIndicatorDetail,
+  getIndicatorPage,
+  type IndicatorPageResult,
   updateIndicator,
   updateIndicatorStatus,
 } from '../api/indicator.ts';
@@ -53,6 +55,17 @@ export interface UseIndicatorModuleResult {
   indicatorLoading: boolean;
   indicatorError: string;
   indicatorLoaded: boolean;
+  indicatorTotal: number;
+  indicatorCount: number;
+  indicatorPage: number;
+  setIndicatorPage: React.Dispatch<React.SetStateAction<number>>;
+  indicatorPageSize: number;
+  setIndicatorPageSize: React.Dispatch<React.SetStateAction<number>>;
+  indicatorSort: string;
+  setIndicatorSort: React.Dispatch<React.SetStateAction<string>>;
+  indicatorDetailLoading: boolean;
+  indicatorDetailError: string;
+  retryIndicatorDetail: () => void;
   loadIndicatorData: () => Promise<void>;
   indicatorPendingIds: string[];
   indicatorSaveBusy: boolean;
@@ -99,31 +112,87 @@ export function useIndicatorModule({
   const [indicatorSaveError, setIndicatorSaveError] = useState('');
   const [indicatorActionError, setIndicatorActionError] = useState('');
 
+  const [indicatorPage, setIndicatorPage] = useState(1);
+  const [indicatorPageSize, setIndicatorPageSize] = useState(20);
+  const [indicatorSort, setIndicatorSort] = useState('id:asc');
+  const [pageData, setPageData] = useState<IndicatorPageResult | null>(null);
+  const listSequence = useRef(0);
+  const listKey = JSON.stringify([active, query, indicatorFilter, indicatorPage, indicatorPageSize, indicatorSort, canEdit]);
+  const latestListKey = useRef(listKey);
+  latestListKey.current = listKey;
+  const [detail, setDetail] = useState<{ key: string; item: MockIndicatorItem | null; error: string }>({ key: '', item: null, error: '' });
+  const [detailVersion, setDetailVersion] = useState(0);
+  const detailKey = JSON.stringify([active, indicatorRoute.page, indicatorRoute.id, canEdit, detailVersion]);
+  const latestDetailKey = useRef(detailKey);
+  latestDetailKey.current = detailKey;
+  const needsDetail = ['view', 'edit'].includes(indicatorRoute.page) && Boolean(indicatorRoute.id);
+  const indicatorDetailLoading = needsDetail && detail.key !== detailKey;
+  const indicatorDetailError = needsDetail && detail.key === detailKey ? detail.error : '';
+
   const loadIndicatorData = useCallback(async (): Promise<void> => {
+    const sequence = ++listSequence.current;
     setIndicatorLoading(true);
     setIndicatorError('');
     try {
-      // The dimension directory only supplies labels and ordering; counts are
-      // derived from the indicator list below so both share one footing.
-      const [items, dimensionCatalog] = await Promise.all([
-        getIndicatorList(),
+      const [result, dimensionCatalog] = await Promise.all([
+        getIndicatorPage({
+          keyword: query,
+          dimension: indicatorFilter.dimension === 'all' ? undefined : indicatorFilter.dimension,
+          status: indicatorFilter.status === 'all' ? undefined : indicatorFilter.status,
+          page: indicatorPage,
+          pageSize: indicatorPageSize,
+          sortKey: indicatorSort.split(':')[0],
+          sortDirection: indicatorSort.split(':')[1],
+        }),
         getIndicatorDimensions(),
       ]);
-      setIndicators(items);
+      if (sequence !== listSequence.current || latestListKey.current !== listKey) return;
+      if (result.pageSize !== indicatorPageSize) setIndicatorPageSize(result.pageSize);
+      const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
+      if (indicatorPage > lastPage) {
+        setIndicators([]);
+        setPageData(result);
+        setIndicatorPage(lastPage);
+        return;
+      }
+      setIndicators(result.items);
+      setPageData(result);
       setIndicatorDimensionCatalog(dimensionCatalog);
       setIndicatorLoaded(true);
     } catch (error: unknown) {
-      setIndicatorError(getErrorMessage(error, '指标数据加载失败。'));
+      if (sequence === listSequence.current && latestListKey.current === listKey) {
+        setIndicatorError(getErrorMessage(error, '指标数据加载失败。'));
+      }
     } finally {
-      setIndicatorLoading(false);
+      if (sequence === listSequence.current && latestListKey.current === listKey) setIndicatorLoading(false);
     }
-  }, []);
+  }, [query, indicatorFilter, indicatorPage, indicatorPageSize, indicatorSort, listKey]);
+  const reloadRef = useRef(loadIndicatorData);
+  reloadRef.current = loadIndicatorData;
 
   useEffect(() => {
-    if (active && !indicatorLoaded && !indicatorLoading && !indicatorError) {
-      loadIndicatorData();
-    }
-  }, [active, indicatorLoaded, indicatorLoading, indicatorError, loadIndicatorData]);
+    if (active) void loadIndicatorData();
+    return () => { listSequence.current += 1; };
+  }, [active, loadIndicatorData]);
+
+  useEffect(() => {
+    setIndicatorPage(1);
+  }, [query, indicatorFilter, indicatorPageSize, indicatorSort]);
+
+  useEffect(() => {
+    if (!active || !needsDetail || !indicatorRoute.id) return;
+    let cancelled = false;
+    void getIndicatorDetail(indicatorRoute.id).then((item) => {
+      if (!cancelled && latestDetailKey.current === detailKey) {
+        setDetail({ key: detailKey, item, error: '' });
+      }
+    }).catch((error: unknown) => {
+      if (!cancelled && latestDetailKey.current === detailKey) {
+        setDetail({ key: detailKey, item: null, error: getErrorMessage(error, '指标详情加载失败。') });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [active, needsDetail, indicatorRoute.id, detailKey]);
 
   const indicatorBack = (): void => {
     setIndicatorRoute(DEFAULT_INDICATOR_ROUTE);
@@ -168,7 +237,7 @@ export function useIndicatorModule({
       } else {
         await createIndicator(payload);
       }
-      await loadIndicatorData();
+      await reloadRef.current();
       setIndicatorSaveError('');
       setIndicatorRoute(DEFAULT_INDICATOR_ROUTE);
       scrollMainToTop();
@@ -191,7 +260,7 @@ export function useIndicatorModule({
     setIndicatorActionError('');
     try {
       await deleteIndicator(indicatorId);
-      await loadIndicatorData();
+      await reloadRef.current();
       if (indicatorRoute.id === indicatorId) {
         setIndicatorRoute(DEFAULT_INDICATOR_ROUTE);
       }
@@ -215,8 +284,9 @@ export function useIndicatorModule({
     setIndicators((prev) => prev.map((item) => (item.id === indicator.id ? { ...item, status: nextStatus } : item)));
 
     try {
-      await updateIndicatorStatus(indicator.id, nextStatus);
-      await loadIndicatorData();
+      const updated = await updateIndicatorStatus(indicator.id, nextStatus);
+      setDetail((previous) => previous.item?.id === indicator.id ? { ...previous, item: updated } : previous);
+      await reloadRef.current();
     } catch (error: unknown) {
       if (!isUnauthorizedError(error)) {
         setIndicatorActionError(getErrorMessage(error, '更新指标状态失败。'));
@@ -227,61 +297,26 @@ export function useIndicatorModule({
     }
   };
 
-  const indicatorFacets = useMemo(
-    () =>
-      indicators.reduce<IndicatorFacets>(
-        (acc, item) => {
-          // Empty codes are a real bucket here: the dimension total must stay
-          // equal to the "全部指标" total even when a row has no dimension.
-          acc.dimension[item.dimension] = (acc.dimension[item.dimension] || 0) + 1;
-          if (item.status) {
-            acc.status[item.status] = (acc.status[item.status] || 0) + 1;
-          }
-          return acc;
-        },
-        { dimension: {}, status: {} },
-      ),
-    [indicators],
-  );
-
+  const indicatorFacets = pageData?.facets || { dimension: {}, status: {} };
   const indicatorDimensions = useMemo(
     () => buildIndicatorDimensionOptions(indicatorDimensionCatalog, indicatorFacets.dimension),
-    [indicatorDimensionCatalog, indicatorFacets],
+    [indicatorDimensionCatalog, indicatorFacets.dimension],
   );
-
-  const filteredIndicators = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return indicators.filter((item) => {
-      if (indicatorFilter.dimension !== 'all' && item.dimension !== indicatorFilter.dimension) return false;
-      if (indicatorFilter.status !== 'all' && item.status !== indicatorFilter.status) return false;
-      if (!normalizedQuery) return true;
-      return [
-        item.id,
-        item.name,
-        item.meaning,
-        item.resultTableName,
-        item.resultFieldName,
-        item.caliber,
-        item.path,
-      ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery));
-    });
-  }, [indicators, indicatorFilter, query]);
-
-  const currentIndicatorEdit = useMemo(() => {
-    if (indicatorRoute.page !== 'edit' || !indicatorRoute.id) return null;
-    return indicators.find((item) => item.id === indicatorRoute.id) || null;
-  }, [indicatorRoute, indicators]);
-
-  const currentIndicatorDetail = useMemo(() => {
-    if (indicatorRoute.page !== 'view' || !indicatorRoute.id) return null;
-    return indicators.find((item) => item.id === indicatorRoute.id) || null;
-  }, [indicatorRoute, indicators]);
+  const filteredIndicators = indicators;
+  const current = detail.key === detailKey ? detail.item : null;
+  const currentIndicatorEdit = indicatorRoute.page === 'edit' ? current : null;
+  const currentIndicatorDetail = indicatorRoute.page === 'view' ? current : null;
 
   return {
     indicators,
     indicatorLoading,
     indicatorError,
     indicatorLoaded,
+    indicatorTotal: pageData?.total || 0,
+    indicatorCount: pageData?.stats.indicatorCount || 0,
+    indicatorPage, setIndicatorPage, indicatorPageSize, setIndicatorPageSize,
+    indicatorSort, setIndicatorSort, indicatorDetailLoading, indicatorDetailError,
+    retryIndicatorDetail: () => setDetailVersion((version) => version + 1),
     loadIndicatorData,
     indicatorPendingIds,
     indicatorSaveBusy,

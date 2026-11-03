@@ -13,6 +13,7 @@ import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 import { IndicatorEditor } from "../IndicatorEditor.tsx";
 import { IndicatorPage } from "../IndicatorPage.tsx";
 import { Icon } from "../ui.tsx";
+import { Select, TablePagination } from "../../ui/index.ts";
 
 export interface IndicatorViewProps {
   indicator: UseIndicatorModuleResult;
@@ -39,6 +40,9 @@ export function IndicatorView({
     indicators,
     indicatorLoading,
     indicatorError,
+    indicatorTotal, indicatorCount, indicatorPage, setIndicatorPage,
+    indicatorPageSize, setIndicatorPageSize, indicatorSort, setIndicatorSort,
+    indicatorDetailLoading, indicatorDetailError, retryIndicatorDetail,
     loadIndicatorData,
     indicatorPendingIds,
     indicatorSaveBusy,
@@ -61,20 +65,20 @@ export function IndicatorView({
     canEdit,
   } = indicator;
 
-  if (indicatorLoading) {
+  if (indicatorDetailLoading || (indicatorRoute.page === 'list' && indicatorLoading)) {
     return (
       <LoadingState
-        title="加载指标维护清单"
-        desc="正在准备指标列表、维度和状态信息。"
+        title={indicatorDetailLoading ? "加载指标详情" : "加载指标维护清单"}
+        desc="正在准备指标信息。"
       />
     );
   }
-  if (indicatorError) {
+  if (indicatorDetailError || (indicatorRoute.page === 'list' && indicatorError)) {
     return (
       <ErrorState
         title="指标维护加载失败"
-        desc={indicatorError}
-        onRetry={loadIndicatorData}
+        desc={indicatorDetailError || indicatorError}
+        onRetry={indicatorDetailError ? retryIndicatorDetail : loadIndicatorData}
       />
     );
   }
@@ -142,9 +146,12 @@ export function IndicatorView({
     );
   }
   return (
+    <>
     <IndicatorPage
       indicators={filteredIndicators}
       allIndicators={indicators}
+      total={indicatorTotal}
+      overallCount={indicatorCount}
       query={query}
       actionError={indicatorActionError}
       filter={indicatorFilter}
@@ -172,5 +179,31 @@ export function IndicatorView({
         setQuery("");
       }}
     />
+    <div className="catalog-pagination-footer">
+      <label className="catalog-list-sort">
+        <span>排序</span>
+        <Select<string>
+          aria-label="指标排序"
+          className="table-list-sort"
+          value={indicatorSort}
+          onValueChange={(value) => setIndicatorSort(value || 'id:asc')}
+          items={[
+            { label: '标识升序', value: 'id:asc' },
+            { label: '标识降序', value: 'id:desc' },
+            { label: '名称升序', value: 'name:asc' },
+            { label: '名称降序', value: 'name:desc' },
+          ]}
+        />
+      </label>
+      <TablePagination
+        page={indicatorPage}
+        pageSize={indicatorPageSize}
+        total={indicatorTotal}
+        onPageChange={setIndicatorPage}
+        onPageSizeChange={setIndicatorPageSize}
+        ariaLabel="指标维护分页"
+      />
+    </div>
+    </>
   );
 }

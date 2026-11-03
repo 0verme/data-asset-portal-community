@@ -354,3 +354,39 @@
     .indicator-path-panel {
       width: min(100vw - 24px, 720px);
     }}
+
+.catalog-pagination-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin-top: 12px;
+}
+
+.catalog-pagination-footer > .dap-table-pagination {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+.catalog-list-sort {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+@media (max-width: 820px) {
+  .catalog-pagination-footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .catalog-pagination-footer > .dap-table-pagination {
+    width: 100%;
+  }
+}
