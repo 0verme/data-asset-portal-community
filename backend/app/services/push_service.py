@@ -1057,7 +1057,13 @@ class PushService(AuditActorMixin):
                        push_system.c.dept_name, self._importance_value().label("importance_level"))
             buckets = self._fetch_rows_logged(
                 select(*columns, func.count().label("total"))
-                .where(push_system.c.is_deleted == "N").group_by(*columns),
+                .where(push_system.c.is_deleted == "N")
+                .group_by(
+                    push_system.c.status_code,
+                    push_system.c.protocol_type,
+                    push_system.c.dept_name,
+                    push_system.c.importance_level_code,
+                ),
                 purpose="push global facets", method="get_push_system_page",
             )
             facets = {"status": {}, "protocol": {}, "dept": {}, "importanceLevel": {}}
