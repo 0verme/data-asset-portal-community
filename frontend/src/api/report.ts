@@ -115,7 +115,7 @@ export interface ReportPageResult {
 
 export function normalizeReportPage(payload: unknown): ReportPageResult {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    throw new Error('报表分页接口返回格式无效');
+    throw new Error('报表列表接口返回格式无效');
   }
   const record = payload as Record<string, unknown>;
   const facets = record['facets'];
@@ -131,7 +131,7 @@ export function normalizeReportPage(payload: unknown): ReportPageResult {
       !validCounts((facets as Record<string, unknown>)['ownerDept']) ||
       !stats || typeof stats !== 'object' || !Number.isSafeInteger((stats as Record<string, unknown>)['reportCount']) ||
       Number((stats as Record<string, unknown>)['reportCount']) < 0) {
-    throw new Error('报表分页接口返回格式无效');
+    throw new Error('报表列表接口返回格式无效');
   }
   const items = normalizeCollection({ items: record['items'] });
   return {
