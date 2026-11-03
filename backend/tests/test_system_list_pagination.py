@@ -202,6 +202,33 @@ class SystemListPaginationTests(unittest.TestCase):
         self.assertFalse(any("p_push_job_field" in statement for statement in self.sql))
         self.assertFalse(any("source_path" in statement or "host_name" in statement for statement in self.sql))
 
+    def test_push_facets_group_by_raw_importance_for_gaussdb_dws_compatibility(self):
+        self.connection.execute(
+            "UPDATE dwp.p_push_system SET importance_level_code = '' WHERE system_id = 6"
+        )
+        self.connection.commit()
+
+        result = self.push.get_push_system_page(page=1, page_size=2)
+        self.assertEqual({"important": 3, "normal": 4}, result["facets"]["importanceLevel"])
+
+        # GaussDB/DWS uses the PostgreSQL Core compiler with qmark binds in
+        # backend.app.db.core; preserve the normalized SELECT but GROUP BY the
+        # underlying column, which is accepted by the GaussDB SQL parser.
+        facet_statements = [
+            statement for statement in self.statements
+            if "importance_level" in str(statement.compile(dialect=postgresql.dialect())).lower()
+            and statement._group_by_clauses
+        ]
+        self.assertEqual(1, len(facet_statements))
+        compiled = str(
+            facet_statements[0].compile(dialect=postgresql.dialect(paramstyle="qmark"))
+        ).lower()
+        select_clause = compiled.split(" from ", 1)[0]
+        group_by_clause = compiled.split(" group by ", 1)[1]
+        self.assertIn("coalesce(nullif(", select_clause)
+        self.assertIn("importance_level_code", group_by_clause)
+        self.assertNotIn("coalesce(nullif(", group_by_clause)
+
     def test_push_job_search_count_does_not_multiply_rows_and_importance_filters(self):
         result = self.push.get_push_system_page(keyword="needle", importance_level="important", status="enabled",
                                                 page=1, page_size=1)
