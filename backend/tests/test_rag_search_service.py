@@ -22,6 +22,11 @@ class RagSearchServiceTests(unittest.TestCase):
             "layer": "DWM",
             "owner": "private owner",
             "host": "private locator",
+            "password": "private database password",
+            "token": "private service token",
+            "cookie": "private browser cookie",
+            "secret": "private signing secret",
+            "authorization": "Bearer private auth token",
             "fields": [{
                 "assetId": 1,
                 "fieldId": 10,
@@ -58,7 +63,14 @@ class RagSearchServiceTests(unittest.TestCase):
     def _search_response(results):
         return httpx.Response(200, json={
             "status": "ok",
-            "indexGeneration": "synthetic-generation-1",
+            "indexGeneration": "generation-1",
+            "retrieval": {
+                "requestedMode": "hybrid",
+                "effectiveMode": "hybrid",
+                "channelsUsed": ["vector", "bm25"],
+                "degradationReason": None,
+                "routeReason": None,
+            },
             "results": results,
         })
 
@@ -87,7 +99,7 @@ class RagSearchServiceTests(unittest.TestCase):
             requests.append(request)
             body = json.loads(request.content)
             self.assertEqual("Bearer test-server-token", request.headers["Authorization"])
-            self.assertEqual({"query": "客户", "topK": 5, "strategy": "hybrid"}, body)
+            self.assertEqual({"query": "客户", "topK": 5}, body)
             return self._search_response([
                 {
                     "entityType": "table",
@@ -95,7 +107,12 @@ class RagSearchServiceTests(unittest.TestCase):
                     "name": "UNTRUSTED_REMOTE_NAME",
                     "retrievalChannels": ["vector"],
                     "score": 0.93,
-                    "evidence": ["untrusted hidden metadata"],
+                    "evidence": [{
+                        "channel": "vector",
+                        "rank": 1,
+                        "rawScore": 0.82,
+                        "matchedTerms": ["untrusted hidden metadata"],
+                    }],
                 },
                 {
                     "entityType": "field",
@@ -104,7 +121,12 @@ class RagSearchServiceTests(unittest.TestCase):
                     "name": "REMOTE_FIELD_NAME",
                     "retrievalChannels": ["hybrid"],
                     "score": 0.82,
-                    "evidence": ["untrusted private description"],
+                    "evidence": [{
+                        "channel": "bm25",
+                        "rank": 2,
+                        "rawScore": 0.77,
+                        "matchedTerms": ["untrusted private description"],
+                    }],
                 },
             ])
 
@@ -121,9 +143,15 @@ class RagSearchServiceTests(unittest.TestCase):
         self.assertEqual("客户编号公开说明", response.recommendations[1].description)
         self.assertNotIn("UNTRUSTED_REMOTE_NAME", response.model_dump_json())
         self.assertNotIn("untrusted hidden metadata", response.model_dump_json())
+        self.assertNotIn("untrusted private description", response.model_dump_json())
         self.assertNotIn("0.93", response.model_dump_json())
         self.assertNotIn("private owner", response.model_dump_json())
         self.assertNotIn("private locator", response.model_dump_json())
+        self.assertNotIn("private database password", response.model_dump_json())
+        self.assertNotIn("private service token", response.model_dump_json())
+        self.assertNotIn("private browser cookie", response.model_dump_json())
+        self.assertNotIn("private signing secret", response.model_dump_json())
+        self.assertNotIn("Bearer private auth token", response.model_dump_json())
 
     def test_unknown_and_duplicate_ids_are_filtered_and_deduplicated(self):
         def handler(_request):
@@ -154,6 +182,35 @@ class RagSearchServiceTests(unittest.TestCase):
         self.assertEqual(1, response.count)
         self.assertEqual(1, response.recommendations[0].asset_id)
 
+    def test_field_id_must_match_its_current_parent_table(self):
+        def handler(_request):
+            return self._search_response([{
+                "entityType": "field",
+                "assetId": 2,
+                "fieldId": 10,
+                "name": "remote field",
+                "retrievalChannels": ["vector"],
+                "score": 0.9,
+                "evidence": [],
+            }])
+
+        catalog = [
+            self.catalog[0],
+            {
+                "assetId": 2,
+                "name": "OTHER_TABLE",
+                "cn": "其他表",
+                "fields": [],
+            },
+        ]
+        service, _assets = self._service(handler, catalog=catalog)
+
+        response = service.recommend("客户", profile="internal")
+
+        self.assertEqual("degraded", response.status)
+        self.assertEqual("visibility_unavailable", response.reason_code)
+        self.assertEqual([], response.recommendations)
+
     def test_missing_token_fails_closed_without_network_request(self):
         handler = MagicMock()
         service, assets = self._service(handler, token="")
@@ -181,6 +238,7 @@ class RagSearchServiceTests(unittest.TestCase):
             (lambda request: httpx.Response(401), "service_unauthorized"),
             (lambda request: httpx.Response(503, json={"error": {"code": "INDEX_NOT_READY"}}), "index_not_ready"),
             (lambda request: httpx.Response(503, json={"error": {"code": "MODEL_MISMATCH"}}), "model_mismatch"),
+            (lambda request: httpx.Response(503, json={"error": {"code": "SERVICE_BUSY"}}), "busy"),
             (lambda request: httpx.Response(503, json={"error": {"code": "SEARCH_TIMEOUT"}}), "timeout"),
             (lambda request: httpx.Response(401, json={"error": {"code": "UNAUTHORIZED"}}), "service_unauthorized"),
             (lambda request: httpx.Response(400, json={"error": {"code": "INVALID_REQUEST"}}), "invalid_response"),

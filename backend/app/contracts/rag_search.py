@@ -1,8 +1,8 @@
 """DAP-side HTTP contracts for optional RAG related-asset recommendations.
 
-The outbound wire schema is a synthetic, provisional contract for DAP #503.
-It is intentionally isolated from ``dap-rag-lab`` implementation packages and
-must be aligned with dap-rag-lab Issue #14 before any real service integration.
+The outbound request and response models mirror dap-rag-lab HTTP Search Service
+v1. DAP remains isolated from ``dap-rag-lab`` implementation packages and only
+trusts DAP's current catalog when building browser-visible recommendations.
 """
 
 from __future__ import annotations
@@ -32,7 +32,8 @@ RagRecommendationReason = Literal[
 RagSearchStrategy = Literal["keyword", "vector", "hybrid", "auto"]
 RemoteStableId = Annotated[int, Field(strict=True, gt=0)] | Annotated[str, Field(min_length=1, max_length=32)]
 RemoteLabel = Annotated[str, Field(max_length=128)]
-RemoteEvidence = Annotated[str, Field(max_length=1024)]
+RemoteEvidenceTerm = Annotated[str, Field(max_length=256)]
+RagHttpSearchMode = Literal["keyword", "vector", "hybrid", "auto"]
 
 
 class _RagContractModel(ContractModel):
@@ -100,15 +101,33 @@ class RagSearchConfigView(_RagContractModel):
 
 
 class RagHttpSearchRequest(_RagContractModel):
-    """DAP #503 synthetic request contract, pending alignment with Issue #14."""
+    """HTTP Search Service v1 request; the service selects retrieval mode."""
 
     query: str = Field(min_length=1, max_length=500)
     top_k: int = Field(alias="topK", ge=1, le=20)
-    strategy: RagSearchStrategy
+
+
+class RagHttpSearchEvidence(_RagContractModel):
+    """Structured v1 evidence; accepted for internal processing only."""
+
+    channel: RemoteLabel
+    rank: int = Field(gt=0)
+    raw_score: float = Field(alias="rawScore", allow_inf_nan=False)
+    matched_terms: list[RemoteEvidenceTerm] = Field(alias="matchedTerms", max_length=32)
+
+
+class RagHttpSearchRetrieval(_RagContractModel):
+    """Bounded retrieval diagnostics returned by the v1 service."""
+
+    requested_mode: RagHttpSearchMode = Field(alias="requestedMode")
+    effective_mode: RagHttpSearchMode = Field(alias="effectiveMode")
+    channels_used: list[RemoteLabel] = Field(alias="channelsUsed", max_length=8)
+    degradation_reason: str | None = Field(default=None, alias="degradationReason", max_length=128)
+    route_reason: str | None = Field(default=None, alias="routeReason", max_length=128)
 
 
 class RagHttpSearchHit(_RagContractModel):
-    """Bounded provisional remote hit; authority/display metadata is not trusted."""
+    """Bounded v1 hit; authority/display metadata is never trusted."""
 
     entity_type: Literal["table", "field"] = Field(alias="entityType")
     asset_id: RemoteStableId = Field(alias="assetId")
@@ -116,7 +135,7 @@ class RagHttpSearchHit(_RagContractModel):
     name: str = Field(max_length=256)
     retrieval_channels: list[RemoteLabel] = Field(alias="retrievalChannels", max_length=8)
     score: float = Field(allow_inf_nan=False)
-    evidence: list[RemoteEvidence] = Field(max_length=8)
+    evidence: list[RagHttpSearchEvidence] = Field(max_length=8)
 
     @model_validator(mode="after")
     def validate_stable_identity(self) -> RagHttpSearchHit:
@@ -128,10 +147,11 @@ class RagHttpSearchHit(_RagContractModel):
 
 
 class RagHttpSearchResponse(_RagContractModel):
-    """Synthetic `/api/v1/search` response schema; not evidence of a live API."""
+    """HTTP Search Service v1 response with bounded retrieval metadata."""
 
     status: Literal["ok"]
     index_generation: str = Field(alias="indexGeneration", min_length=1, max_length=256)
+    retrieval: RagHttpSearchRetrieval
     results: list[RagHttpSearchHit] = Field(max_length=20)
 
 

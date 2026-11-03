@@ -59,6 +59,10 @@ test("optional RAG configuration is admin-controlled and never fabricates answer
   assert.match(ragConfigApi, /\/system\/rag-search-config/);
   assert.match(ragConfigApi, /模拟模式不支持持久化 RAG 配置/);
   assert.match(ragConfigPage, /不生成智能解答/);
+  assert.match(ragConfigPage, /HTTP Search Service v1/);
+  assert.match(ragConfigPage, /DAP_RAG_SEARCH_MODE/);
+  assert.match(ragConfigPage, /strategy 字段仅为兼容保留/);
+  assert.doesNotMatch(ragConfigPage, /<select/);
   assert.doesNotMatch(ragConfigPage + ragConfigApi, /setAnswer|confidenceScore|similarityScore/);
 });
 

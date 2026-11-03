@@ -151,16 +151,19 @@ Public Catalog 的“可搜索字段”和“可展示字段”采用同一 prof
 
 ### 3.5 Optional RAG Search Service (DAP HTTP client)
 
-RAG recommendation is **disabled by default**. DAP is only an authenticated HTTP client and does not embed or import `dap-rag-lab`, install/load BGE/PyTorch, read LanceDB, or launch a RAG CLI. No deployment or remote-service changes are performed automatically by DAP.
+RAG 相关资产推荐**默认关闭**。DAP 仅作为受认证的服务端 HTTP Client，不导入 `dap-rag-lab`，不安装/加载 BGE 或 PyTorch，不读取 LanceDB，也不启动 RAG CLI。DAP 不会自动部署或修改 RAG 服务。
 
-When the optional feature is explicitly enabled, set the service URL in the protected System Management panel and inject `RAG_SEARCH_SERVICE_TOKEN` into the DAP backend from the deployment Secret store. The token is not saved in the parameter table, is never sent to the browser, and is not returned by configuration/diagnostic endpoints. Do not place the real value in Git, logs, command history, or public deployment examples. Enabling the feature is rejected until the server-side token is configured.
+匿名搜索继续受 `PUBLIC_CATALOG_PROFILE` 约束：`internal` 和 `strict` 按各自现有公共目录投影允许匿名查询；`disabled` 继续由现有公共目录路由拒绝匿名访问。本轮不新增游客共享目录审批、用户级 ACL，也不放宽系统管理、写操作或凭据管理边界。RAG 服务若有其既有的全局索引准入启动保护，仍由部署方按 RAG 服务契约配置；它不是每位访客的登录或审批前置。
 
-- Same-host deployment: configure a loopback URL such as `http://127.0.0.1:<port>`; use the actual service port selected by the operator. The RAG service must still validate the Bearer token.
-- Cross-host deployment: configure `https://<RAG_SERVICE_HOST>` with valid TLS. Remote plain HTTP, URL userinfo, query strings, and embedded credentials are rejected.
-- The admin-only availability check requests `/healthz` and `/readyz` when the protected config panel loads or an administrator presses its check action; ordinary portal/search page loads do not call diagnostics. Search calls are bounded by the configured timeout and fail closed.
-- Every returned `assetId`/`fieldId` is resolved against the current DAP public catalog/profile. DAP discards remote names, descriptions, evidence, and scores, and projects only current DAP metadata. A catalog failure or unknown/stale identity yields no recommendation.
+显式启用前，在受保护的系统管理配置页设置服务 URL，并通过部署 Secret 向 DAP 后端注入 `RAG_SEARCH_SERVICE_TOKEN`。Token 不写入参数表、不传给浏览器，也不由配置/诊断接口返回。不要将真实值写入 Git、日志、命令历史或部署示例。没有后端 Secret 时，系统拒绝启用。
 
-DAP Issue #503 currently defines an isolated synthetic HTTP client contract because dap-rag-lab Issue #14 has not finalized its contract. Synthetic tests do not establish that a RAG service is reachable or compatible. Keep the feature disabled until the two contracts are aligned and an explicitly authorized environment completes real HTTP and public-catalog validation. DAP does not configure, deploy, or modify the RAG repository or its database.
+- 同机部署使用 loopback 地址，例如 `http://127.0.0.1:<port>`；RAG 服务仍须校验 Bearer Token。
+- 跨机部署使用有效 TLS 的 `https://<RAG_SERVICE_HOST>`；禁止远端明文 HTTP、URL userinfo、query string 和 URL 内嵌凭据。
+- HTTP Search Service v1 请求为 `POST /api/v1/search`，请求体仅包含 `query`、`topK`。检索策略由 RAG 服务端 `DAP_RAG_SEARCH_MODE` 决定；HTTP v1 不支持按请求切换策略。DAP 参数表中为兼容保留的 `strategy` 不会改变实际检索行为，管理界面已明确说明。
+- 响应解析包括 `status`、`indexGeneration`、`retrieval`、`results`，以及每个结果的稳定 ID、检索渠道、评分和结构化 evidence。远端名称、描述、评分和 evidence 不作为 DAP 前端权威数据；DAP 依据 `assetId`/`fieldId` 回查当前资产，并按当前 profile 投影。目录读取失败、未知/失效 ID、父表不匹配均不展示推荐。
+- 管理诊断仅由受保护配置页加载或管理员主动触发时访问 `/healthz` 和 `/readyz`；普通搜索不请求诊断。RAG 调用有界超时，超时、鉴权失败、索引未就绪或服务异常都只降级相关资产推荐，不阻塞普通关键词搜索。
+
+DAP 侧的 RAG 配置使用既有参数字典存储，不新增数据库表。本次**不操作内网数据库**；当前内网部署仍须先完成并验证 migration `0012`–`0014`（包括 RAG 配置 seed）后，才能持久化/启用该功能。迁移未完成时保持 RAG 关闭，不要通过跳过迁移或改动内网数据库来绕过前置条件。自动化 HTTP Mock 测试不等于真实服务联调；真实内网 HTTP、BGE/索引 readiness 与部署验收需另行执行并如实记录。本次不修改或部署 `dap-rag-lab`。
 
 ### 3.6 API authentication boundary
 
