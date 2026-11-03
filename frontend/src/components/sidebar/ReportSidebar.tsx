@@ -21,7 +21,7 @@ import { SidebarFilterGroup } from "./common/SidebarFilterGroup.tsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.tsx";
 
 export interface ReportSidebarProps {
-  report: Pick<UseReportModuleResult, "reports" | "reportFacets"> & {
+  report: Pick<UseReportModuleResult, "reportCount" | "reportFacets"> & {
     reportFilter: ReportFilter;
     setReportFilter: Dispatch<SetStateAction<ReportFilter>>;
   };
@@ -31,7 +31,7 @@ export interface ReportSidebarProps {
 }
 
 export function ReportSidebar({ report, requireLogin, canEdit = false, setReportRoute }: ReportSidebarProps) {
-  const { reports, reportFilter, setReportFilter, reportFacets } = report;
+  const { reportCount, reportFilter, setReportFilter, reportFacets } = report;
   // Report type is a facet of the current report-asset response, not a
   // common-code endpoint. This also preserves types added in the database.
   const reportTypeOptions = Object.keys(reportFacets.type)
@@ -44,7 +44,7 @@ export function ReportSidebar({ report, requireLogin, canEdit = false, setReport
         allOption={{
           key: "all-report-types",
           label: "全部报表类型",
-          count: reports.length,
+          count: reportCount,
           active: !reportFilter.type,
           onClick: () => setReportFilter((prev) => ({ ...prev, type: null })),
         }}
@@ -64,7 +64,7 @@ export function ReportSidebar({ report, requireLogin, canEdit = false, setReport
         allValue={DEFAULT_REPORT_FILTER.status}
         enabledValue="enabled"
         disabledValue="disabled"
-        totalCount={reports.length}
+        totalCount={reportCount}
         enabledCount={reportFacets.status["enabled"] || 0}
         disabledCount={reportFacets.status["disabled"] || 0}
         onChange={(status) => setReportFilter((prev: ReportFilter) => ({ ...prev, status }))}
@@ -75,7 +75,7 @@ export function ReportSidebar({ report, requireLogin, canEdit = false, setReport
         allOption={{
           key: "all-owner-depts",
           label: "全部归属部门",
-          count: reports.length,
+          count: reportCount,
           active: !reportFilter.ownerDept,
           onClick: () => setReportFilter((prev) => ({ ...prev, ownerDept: null })),
         }}

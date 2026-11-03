@@ -29,7 +29,10 @@ from ..application import AuditActorMixin, actor_aware
 
 from ..db.service import CoreAccess
 from ..db.tables import asset_domain, asset_table, indicator_item, report_asset
+from ..db.facade import database_transaction
+from ..security.public_field_policy import FIELD_CLASS_PERSON, public_field_class_visible
 from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
+from ..utils.pagination import resolve_paging
 from .common_code_service import (
     CommonCodeCategoryNotFoundError,
     CommonCodeDataSourceError,
@@ -413,7 +416,8 @@ class ReportService(AuditActorMixin):
             "remark": str(payload.get("remark") or "").strip(),
         }
 
-    def _build_report_filters(self, keyword=None, report_type=None, domain=None, status=None, owner_dept=None):
+    def _build_report_filters(self, keyword=None, report_type=None, domain=None, status=None, owner_dept=None,
+                              *, paged=False, profile=None):
         clauses = [report_asset.c.is_deleted == "N"]
         if report_type:
             clauses.append(report_asset.c.report_type == report_type)
@@ -427,15 +431,16 @@ class ReportService(AuditActorMixin):
             query = str(keyword).strip().lower()
             escaped_query = escape_like_keyword(query)
             pattern = f"%{escaped_query}%"
-            searchable = (
+            searchable = [
                 report_asset.c.report_code,
                 report_asset.c.report_name,
                 report_asset.c.report_alias,
-                report_asset.c.owner_name,
                 report_asset.c.owner_dept_name,
                 report_asset.c.domain_name,
                 report_asset.c.purpose_desc,
-            )
+            ]
+            if not paged or public_field_class_visible(FIELD_CLASS_PERSON, profile):
+                searchable.append(report_asset.c.owner_name)
             clauses.append(or_(*(
                 func.lower(func.coalesce(column, "")).like(
                     pattern, escape=LIKE_ESCAPE_CHAR
@@ -490,7 +495,7 @@ class ReportService(AuditActorMixin):
         item["timeCaliber"] = row.get("time_caliber_desc") or ""
         return item
 
-    def _db_reports(self, keyword=None, report_type=None, domain=None, status=None, owner_dept=None):
+    def _report_statement(self):
         columns = (
             report_asset.c.report_code,
             report_asset.c.report_name,
@@ -521,20 +526,62 @@ class ReportService(AuditActorMixin):
             report_asset.c.updated_by,
             report_asset.c.updated_at,
         )
-        statement = select(*columns).where(
+        return select(*columns)
+
+    def _db_reports(self, keyword=None, report_type=None, domain=None, status=None, owner_dept=None):
+        statement = self._report_statement().where(
             *self._build_report_filters(keyword, report_type, domain, status, owner_dept)
         ).order_by(report_asset.c.report_code)
         return [self._row_to_item(row) for row in self._fetch_rows(statement)]
+
+    def get_report_page(self, keyword=None, report_type=None, domain=None, status=None, owner_dept=None,
+                        page=None, page_size=None, sort_key=None, sort_direction=None, profile=None):
+        page, page_size = resolve_paging(page, page_size)
+        filters = self._build_report_filters(keyword, report_type, domain, status, owner_dept,
+                                             paged=True, profile=profile)
+        columns = {
+            "code": report_asset.c.report_code, "name": report_asset.c.report_name,
+            "type": report_asset.c.report_type, "status": report_asset.c.status_code,
+            "ownerDept": report_asset.c.owner_dept_name, "updatedAt": report_asset.c.updated_at,
+        }
+        column = columns.get(sort_key, report_asset.c.report_code)
+        order = column.desc() if str(sort_direction).lower() == "desc" else column.asc()
+        with database_transaction():
+            count = self._fetch_rows(select(func.count().label("total")).select_from(report_asset).where(*filters))
+            rows = self._fetch_rows(self._report_statement().where(*filters)
+                                    .order_by(order, report_asset.c.report_code.asc())
+                                    .limit(page_size).offset((page - 1) * page_size))
+            buckets = self._fetch_rows(select(
+                report_asset.c.report_type, report_asset.c.status_code, report_asset.c.owner_dept_name,
+                func.count().label("total")
+            ).where(report_asset.c.is_deleted == "N").group_by(
+                report_asset.c.report_type, report_asset.c.status_code, report_asset.c.owner_dept_name))
+            facets = {"type": {}, "status": {}, "ownerDept": {}}
+            total = 0
+            for row in buckets:
+                size = int(row["total"])
+                total += size
+                for key, column_name in (("type", "report_type"), ("status", "status_code"),
+                                         ("ownerDept", "owner_dept_name")):
+                    value = row[column_name]
+                    if value:
+                        facets[key][value] = facets[key].get(value, 0) + size
+            # Only selected reports are decoded; their full reference arrays/counts
+            # remain compatible with details, editors and legacy export consumers.
+            return {"items": [self._row_to_item(row) for row in rows], "total": int(count[0]["total"]),
+                    "page": page, "pageSize": page_size, "facets": facets, "stats": {"reportCount": total}}
 
     def get_reports(self, keyword=None, report_type=None, domain=None, status=None, owner_dept=None):
         return self._db_reports(keyword=keyword, report_type=report_type, domain=domain, status=status, owner_dept=owner_dept)
 
     def get_report_detail(self, report_code):
         normalized_code = str(report_code or "").strip().upper()
-        item = next((current for current in self.get_reports() if current["code"] == normalized_code), None)
-        if not item:
+        rows = self._fetch_rows(self._report_statement().where(
+            report_asset.c.report_code == normalized_code, report_asset.c.is_deleted == "N"
+        ).limit(1))
+        if not rows:
             raise ReportNotFoundError(report_code)
-        return deepcopy(item)
+        return deepcopy(self._row_to_item(rows[0]))
 
     @actor_aware
     def create_report(self, payload):

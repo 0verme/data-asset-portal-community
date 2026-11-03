@@ -22,7 +22,7 @@ export function IndicatorSidebar({
   setIndicatorRoute,
   canEdit = false,
 }: IndicatorSidebarProps) {
-  const { indicators, indicatorFacets, indicatorDimensions, indicatorCreate } = indicator;
+  const { indicatorCount, indicatorFacets, indicatorDimensions, indicatorCreate } = indicator;
 
   return (
     <>
@@ -31,7 +31,7 @@ export function IndicatorSidebar({
         allOption={{
           key: "all",
           label: "全部指标",
-          count: indicators.length,
+          count: indicatorCount,
           active: indicatorFilter.dimension === "all",
           onClick: () => {
             setIndicatorFilter((prev) => ({ ...prev, dimension: "all" }));
@@ -63,7 +63,7 @@ export function IndicatorSidebar({
       <StatusFilterGroup
         value={indicatorFilter.status}
         allValue="all"
-        totalCount={indicators.length}
+        totalCount={indicatorCount}
         enabledCount={indicatorFacets.status["enabled"] || 0}
         disabledCount={indicatorFacets.status["disabled"] || 0}
         onChange={(status) => {

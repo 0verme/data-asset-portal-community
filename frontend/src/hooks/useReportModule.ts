@@ -14,12 +14,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { createReport, deleteReport, getReportList, updateReport } from '../api/report.ts';
+import { createReport, deleteReport, getReportDetail, getReportPage, updateReport, type ReportPageResult } from '../api/report.ts';
 import type { MockReportItem } from '../data/reports.ts';
 import { isUnauthorizedError } from '../api/http.ts';
 import { normalizeApiError } from '../api/errorNormalizer.ts';
-import { DEFAULT_REPORT_FILTER, DEFAULT_REPORT_ROUTE } from '../config/defaults.ts';
-import { scrollMainToTop } from '../utils/ui.ts';
+import { DEFAULT_REPORT_ROUTE } from '../config/defaults.ts';
+import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
 import { clearFormFieldErrors } from '../ui/formErrors.ts';
 import { toast } from '../ui/index.ts';
 import { mapReportApiFieldErrors } from '../components/report/reportFormErrors.ts';
@@ -64,6 +64,17 @@ export interface UseReportModuleResult {
   reportLoading: boolean;
   reportError: string;
   reportLoaded: boolean;
+  reportTotal: number;
+  reportCount: number;
+  reportPage: number;
+  setReportPage: React.Dispatch<React.SetStateAction<number>>;
+  reportPageSize: number;
+  setReportPageSize: React.Dispatch<React.SetStateAction<number>>;
+  reportSort: string;
+  setReportSort: React.Dispatch<React.SetStateAction<string>>;
+  reportDetailLoading: boolean;
+  reportDetailError: string;
+  retryReportDetail: () => void;
   loadReportData: () => Promise<void>;
   reportSaveBusy: boolean;
   reportSaveFieldErrors: FormFieldErrors;
@@ -103,25 +114,76 @@ export function useReportModule({
     useState<FormFieldErrors | null>(null);
   const reportSaveInFlight = useRef(false);
 
+  const [reportPage, setReportPage] = useState(1);
+  const [reportPageSize, setReportPageSize] = useState(20);
+  const [reportSort, setReportSort] = useState('code:asc');
+  const [pageData, setPageData] = useState<ReportPageResult | null>(null);
+  const listSequence = useRef(0);
+  const listKey = JSON.stringify([active, query, reportFilter, reportPage, reportPageSize, reportSort, canEdit]);
+  const latestListKey = useRef(listKey);
+  latestListKey.current = listKey;
+  const [detail, setDetail] = useState<{ key: string; item: MockReportItem | null; error: string }>({ key: '', item: null, error: '' });
+  const [detailVersion, setDetailVersion] = useState(0);
+  const detailKey = JSON.stringify([active, reportRoute.page, reportRoute.code, canEdit, detailVersion]);
+  const latestDetailKey = useRef(detailKey);
+  latestDetailKey.current = detailKey;
+  const needsDetail = ['view', 'edit'].includes(reportRoute.page) && Boolean(reportRoute.code);
+  const reportDetailLoading = needsDetail && detail.key !== detailKey;
+  const reportDetailError = needsDetail && detail.key === detailKey ? detail.error : '';
+
   const loadReportData = useCallback(async (): Promise<void> => {
+    const sequence = ++listSequence.current;
     setReportLoading(true);
     setReportError('');
     try {
-      const items = await getReportList();
-      setReports(Array.isArray(items) ? items : []);
+      const result = await getReportPage({
+        keyword: query, type: reportFilter.type === 'all' ? undefined : reportFilter.type || undefined,
+        status: reportFilter.status === 'all' ? undefined : reportFilter.status || undefined,
+        ownerDept: reportFilter.ownerDept === 'all' ? undefined : reportFilter.ownerDept || undefined,
+        page: reportPage, pageSize: reportPageSize,
+        sortKey: reportSort.split(':')[0], sortDirection: reportSort.split(':')[1],
+      });
+      if (sequence !== listSequence.current || latestListKey.current !== listKey) return;
+      if (result.pageSize !== reportPageSize) setReportPageSize(result.pageSize);
+      const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
+      if (reportPage > lastPage) { setReportPage(lastPage); return; }
+      setReports(result.items);
+      setPageData(result);
       setReportLoaded(true);
     } catch (error: unknown) {
-      setReportError(error instanceof Error ? error.message : '加载报表资产失败。');
+      if (sequence === listSequence.current && latestListKey.current === listKey) {
+        setReportError(getErrorMessage(error, '加载报表资产失败。'));
+      }
     } finally {
-      setReportLoading(false);
+      if (sequence === listSequence.current && latestListKey.current === listKey) setReportLoading(false);
     }
-  }, []);
+  }, [query, reportFilter, reportPage, reportPageSize, reportSort, listKey]);
+  const reloadRef = useRef(loadReportData);
+  reloadRef.current = loadReportData;
 
   useEffect(() => {
-    if (active && !reportLoaded && !reportLoading && !reportError) {
-      loadReportData();
-    }
-  }, [active, reportLoaded, reportLoading, reportError, loadReportData]);
+    if (active) void loadReportData();
+    return () => { listSequence.current += 1; };
+  }, [active, loadReportData]);
+
+  useEffect(() => {
+    setReportPage(1);
+  }, [query, reportFilter, reportPageSize, reportSort]);
+
+  useEffect(() => {
+    if (!active || !needsDetail || !reportRoute.code) return;
+    let cancelled = false;
+    void getReportDetail(reportRoute.code).then((item) => {
+      if (!cancelled && latestDetailKey.current === detailKey) {
+        setDetail({ key: detailKey, item, error: '' });
+      }
+    }).catch((error: unknown) => {
+      if (!cancelled && latestDetailKey.current === detailKey) {
+        setDetail({ key: detailKey, item: null, error: getErrorMessage(error, '报表详情加载失败。') });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [active, needsDetail, reportRoute.code, detailKey]);
 
   const clearReportSaveFieldError = (field: string): void => {
     setReportSaveFieldErrors((current) => clearFormFieldErrors(current, field));
@@ -178,7 +240,7 @@ export function useReportModule({
       } else {
         await createReport(payload);
       }
-      await loadReportData();
+      await reloadRef.current();
       toast.success(isEditing ? '报表已更新' : '报表已创建');
       setReportSaveFieldErrors({});
       setReportSaveFieldErrorFocusRequest(null);
@@ -210,7 +272,7 @@ export function useReportModule({
     }
     try {
       await deleteReport(reportCode);
-      await loadReportData();
+      await reloadRef.current();
       if (reportRoute.code === reportCode) {
         setReportRoute(DEFAULT_REPORT_ROUTE);
       }
@@ -221,77 +283,24 @@ export function useReportModule({
     }
   };
 
-  const reportFacets = useMemo(
-    () =>
-      reports.reduce<ReportFacets>(
-        (acc, item) => {
-          if (item.type) {
-            acc.type[item.type] = (acc.type[item.type] || 0) + 1;
-          }
-          if (item.status) {
-            acc.status[item.status] = (acc.status[item.status] || 0) + 1;
-          }
-          if (item.ownerDept) {
-            acc.ownerDept[item.ownerDept] = (acc.ownerDept[item.ownerDept] || 0) + 1;
-          }
-          return acc;
-        },
-        { type: {}, status: {}, ownerDept: {} },
-      ),
-    [reports],
-  );
-
-  const filteredReports = useMemo<EnrichedReportItem[]>(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return reports
-      .filter((item) => {
-        if (reportFilter.type !== DEFAULT_REPORT_FILTER.type && item.type !== reportFilter.type) return false;
-        if (reportFilter.status !== DEFAULT_REPORT_FILTER.status && item.status !== reportFilter.status) return false;
-        if (
-          reportFilter.ownerDept !== DEFAULT_REPORT_FILTER.ownerDept &&
-          item.ownerDept !== reportFilter.ownerDept
-        ) {
-          return false;
-        }
-        if (!normalizedQuery) return true;
-        return [
-          item.code,
-          item.name,
-          item.alias,
-          item.ownerName,
-          item.ownerDept,
-          item.domain,
-          item.purpose,
-        ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery));
-      })
-      .map((item) => ({
-        ...item,
-        relatedTableCount: getRelatedTableCount(item),
-        relatedIndicatorCount: getRelatedIndicatorCount(item),
-      }));
-  }, [query, reportFilter, reports]);
-
-  const currentReportEdit = useMemo(() => {
-    if (reportRoute.page !== 'edit' || !reportRoute.code) return null;
-    return reports.find((item) => item.code === reportRoute.code) || null;
-  }, [reportRoute, reports]);
-
-  const currentReportDetail = useMemo<EnrichedReportItem | null>(() => {
-    if (reportRoute.page !== 'view' || !reportRoute.code) return null;
-    const item = reports.find((report) => report.code === reportRoute.code) || null;
-    if (!item) return null;
-    return {
-      ...item,
-      relatedTableCount: getRelatedTableCount(item),
-      relatedIndicatorCount: getRelatedIndicatorCount(item),
-    };
-  }, [reportRoute, reports]);
+  const reportFacets = pageData?.facets || { type: {}, status: {}, ownerDept: {} };
+  const filteredReports = useMemo<EnrichedReportItem[]>(() => reports.map((item) => ({
+    ...item, relatedTableCount: getRelatedTableCount(item), relatedIndicatorCount: getRelatedIndicatorCount(item),
+  })), [reports]);
+  const current = detail.key === detailKey ? detail.item : null;
+  const currentReportEdit = reportRoute.page === 'edit' ? current : null;
+  const currentReportDetail: EnrichedReportItem | null = reportRoute.page === 'view' && current ? {
+    ...current, relatedTableCount: getRelatedTableCount(current), relatedIndicatorCount: getRelatedIndicatorCount(current),
+  } : null;
 
   return {
     reports,
     reportLoading,
     reportError,
     reportLoaded,
+    reportTotal: pageData?.total || 0, reportCount: pageData?.stats.reportCount || 0,
+    reportPage, setReportPage, reportPageSize, setReportPageSize, reportSort, setReportSort,
+    reportDetailLoading, reportDetailError, retryReportDetail: () => setDetailVersion((version) => version + 1),
     loadReportData,
     reportSaveBusy,
     reportSaveFieldErrors,

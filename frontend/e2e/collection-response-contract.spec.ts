@@ -10,7 +10,15 @@ test("Remote strict collection response rejects malformed report envelopes and r
     if (path === "/reports") {
       reportRequests += 1;
       if (!allowReportRecovery) return route.fulfill({ json: { data: { items: [] } } });
-      return route.fulfill({ json: { items: [] } });
+      const url = new URL(route.request().url());
+      return route.fulfill({ json: {
+        items: [],
+        total: 0,
+        page: Number(url.searchParams.get("page") || 1),
+        pageSize: Number(url.searchParams.get("pageSize") || 20),
+        facets: { type: {}, status: {}, ownerDept: {} },
+        stats: { reportCount: 0 },
+      } });
     }
     return route.fulfill({ json: { items: [] } });
   });
