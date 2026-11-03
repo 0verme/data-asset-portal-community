@@ -1,5 +1,6 @@
 import unittest
 from contextlib import nullcontext
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from backend.app.services.search_provider import KeywordSearchProvider
@@ -8,6 +9,11 @@ from backend.app.services.search_provider import KeywordSearchProvider
 class SearchProviderRegistryTestCase(unittest.TestCase):
     def setUp(self):
         self.provider = KeywordSearchProvider()
+
+    @staticmethod
+    def _connection_context():
+        connection = SimpleNamespace(jconn=SimpleNamespace(getAutoCommit=lambda: True))
+        return nullcontext(SimpleNamespace(connection=connection))
 
     def _group(self, config):
         return {
@@ -25,11 +31,18 @@ class SearchProviderRegistryTestCase(unittest.TestCase):
     @patch("backend.app.services.search_provider.system_management_service.get_enabled_menu_codes")
     def test_menu_status_filters_open_entities(self, mock_menus):
         mock_menus.return_value = {"dwm"}
-        with patch.object(self.provider, "_connection", return_value=nullcontext(object())), patch.object(
-            self.provider,
-            "_search_one_safe",
-            side_effect=lambda conn, config, query, limit, profile=None: self._group(config),
-        ) as mock_search_one:
+        with (
+            patch.object(
+                self.provider,
+                "_connection",
+                return_value=self._connection_context(),
+            ),
+            patch.object(
+                self.provider,
+                "_search_one_safe",
+                side_effect=lambda conn, config, query, limit, profile=None: self._group(config),
+            ) as mock_search_one,
+        ):
             result = self.provider.search("首贷", scope="all", limit=5)
 
         self.assertEqual(["asset"], [call.args[1]["type"] for call in mock_search_one.call_args_list])
@@ -38,11 +51,18 @@ class SearchProviderRegistryTestCase(unittest.TestCase):
     @patch("backend.app.services.search_provider.system_management_service.get_enabled_menu_codes")
     def test_module_scope_uses_menu_status_not_edition(self, mock_menus):
         mock_menus.return_value = {"push"}
-        with patch.object(self.provider, "_connection", return_value=nullcontext(object())), patch.object(
-            self.provider,
-            "_search_one_safe",
-            side_effect=lambda conn, config, query, limit, profile=None: self._group(config),
-        ) as mock_search_one:
+        with (
+            patch.object(
+                self.provider,
+                "_connection",
+                return_value=self._connection_context(),
+            ),
+            patch.object(
+                self.provider,
+                "_search_one_safe",
+                side_effect=lambda conn, config, query, limit, profile=None: self._group(config),
+            ) as mock_search_one,
+        ):
             result = self.provider.search("推送", scope="push", limit=5)
 
         self.assertEqual("downstream", result["scope"])
