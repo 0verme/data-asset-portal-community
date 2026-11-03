@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from typing import Any
 
 import httpx
@@ -76,6 +77,21 @@ class OpenAICompatibleLLMProvider:
         if not capacity.acquire(blocking=False):
             raise LLMProviderError("llm_busy")
 
+        deadline_expired = threading.Event()
+        response_lock = threading.Lock()
+        active_response: list[httpx.Response] = []
+        deadline_timer: threading.Timer | None = None
+
+        def expire_deadline() -> None:
+            deadline_expired.set()
+            with response_lock:
+                response = active_response[0] if active_response else None
+            if response is not None:
+                try:
+                    response.close()
+                except Exception:
+                    pass
+
         try:
             body = {
                 "model": settings.model,
@@ -94,6 +110,11 @@ class OpenAICompatibleLLMProvider:
                 "max_tokens": settings.max_tokens,
                 "response_format": {"type": "json_object"},
             }
+            timeout_seconds = max(0.001, settings.timeout_ms / 1000)
+            deadline = time.monotonic() + timeout_seconds
+            deadline_timer = threading.Timer(timeout_seconds, expire_deadline)
+            deadline_timer.daemon = True
+            deadline_timer.start()
             try:
                 with self._client.stream(
                     "POST",
@@ -104,18 +125,37 @@ class OpenAICompatibleLLMProvider:
                         "Content-Type": "application/json",
                     },
                     json=body,
-                    timeout=max(0.001, settings.timeout_ms / 1000),
+                    timeout=timeout_seconds,
                     follow_redirects=False,
                 ) as response:
+                    with response_lock:
+                        active_response.append(response)
+                    # HTTPX's read timeout applies to each socket read. Check an
+                    # absolute request deadline between streamed chunks so a
+                    # slow-drip response cannot overrun the configured budget.
+                    if deadline_expired.is_set() or time.monotonic() >= deadline:
+                        raise LLMProviderError("llm_timeout")
                     chunks = bytearray()
                     for chunk in response.iter_bytes():
+                        if deadline_expired.is_set() or time.monotonic() >= deadline:
+                            raise LLMProviderError("llm_timeout")
                         if len(chunks) + len(chunk) > MAX_LLM_RESPONSE_BYTES:
                             raise LLMProviderError("invalid_model_output")
                         chunks.extend(chunk)
+                    if deadline_expired.is_set() or time.monotonic() >= deadline:
+                        raise LLMProviderError("llm_timeout")
                     status_code = response.status_code
+            except LLMProviderError:
+                raise
             except httpx.TimeoutException:
                 raise LLMProviderError("llm_timeout") from None
             except httpx.HTTPError:
+                if deadline_expired.is_set() or time.monotonic() >= deadline:
+                    raise LLMProviderError("llm_timeout") from None
+                raise LLMProviderError("llm_unavailable") from None
+            except Exception:
+                if deadline_expired.is_set() or time.monotonic() >= deadline:
+                    raise LLMProviderError("llm_timeout") from None
                 raise LLMProviderError("llm_unavailable") from None
 
             if status_code in (408, 504):
@@ -135,6 +175,11 @@ class OpenAICompatibleLLMProvider:
                 raise LLMProviderError("invalid_model_output")
             return content.strip()
         finally:
+            if deadline_timer is not None:
+                deadline_timer.cancel()
+                deadline_timer.join()
+            with response_lock:
+                active_response.clear()
             capacity.release()
 
     def close(self) -> None:

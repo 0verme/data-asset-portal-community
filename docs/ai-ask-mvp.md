@@ -98,7 +98,7 @@ DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具�
 | `AI_LLM_BASE_URL` | 无 | OpenAI-compatible API base URL（例如经过批准的 HTTPS endpoint；本机 HTTP 仅限 loopback）。后端使用 `{base}/chat/completions`。 |
 | `AI_LLM_MODEL` | 无 | 部署提供的模型标识，例如 DeepSeek Flash 实例对应的兼容模型名。 |
 | `AI_LLM_API_KEY` | 无 | 可选 Provider 的服务端密钥；只由部署 Secret 注入，不写数据库、前端、仓库或日志。当前实现要求非空。 |
-| `AI_LLM_TIMEOUT_MS` | `10000`；250–60000 | 单次 Provider HTTP 超时。 |
+| `AI_LLM_TIMEOUT_MS` | `10000`；250–60000 | 单次 Provider 请求/响应总时限，覆盖流式 body 接收；不只是单次 read inactivity timeout。 |
 | `AI_LLM_MAX_TOKENS` | `512`；64–4096 | 单次生成 token 上限。 |
 | `AI_LLM_MAX_CONCURRENCY` | `2`；1–16 | DAP Provider 并发上限；满载立即返回安全的 busy 状态。 |
 
@@ -115,7 +115,7 @@ DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具�
 
 ## Mock 测试与合成样例
 
-后端测试通过 `httpx.MockTransport` 替代 RAG HTTP 和 OpenAI-compatible LLM，验证授权头/JSON 请求、异常/超时/并发上限、prompt 注入文本隔离、模型输出格式、稳定 ID/父表校验及无证据拒答。Mock Secret 只存在测试进程内，不能在日志/响应泄露。
+后端测试通过 `httpx.MockTransport` 替代 RAG HTTP 和 OpenAI-compatible LLM，验证授权头/JSON 请求、异常/超时/并发上限、慢速分块响应的绝对 deadline 与超时后并发 slot 释放、prompt 注入文本隔离、模型输出格式、稳定 ID/父表校验及无证据拒答。Mock Secret 只存在测试进程内，不能在日志/响应泄露。
 
 样例使用合成元数据覆盖字段定位、字段解释、多个余额相关字段、主题域、未登记字段和相近但不同的命名；没有将贷款/银行词汇写成 DAP 全局硬编码规则。浏览器 E2E 模拟 `/api/ai/status` 和 `/api/ai/ask`，不直连真实模型。
 
@@ -142,7 +142,7 @@ DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具�
 
 | 检查 | 结果 |
 |---|---|
-| 后端全量 `python -m unittest discover -s backend/tests` | **PASS**：1155 tests，29 skipped；环境为 Python 3.11 + task-local 已安装依赖。新增 AI API/契约/Orchestrator/Provider/RAG/RBAC focused suite **44/44 PASS**（包含全量测试运行后新增的匿名公共目录回归）。 |
+| 后端全量 `python -m unittest discover -s backend/tests` | **PASS**：1158 tests，29 skipped；环境为 Python 3.11 + task-local 已安装依赖，包含最终 LLM 总 deadline 与 slot-release regressions。新增 AI API/契约/Orchestrator/Provider/RAG/RBAC focused suite **46/46 PASS**（包含匿名公共目录、慢速分块总 deadline、deadline close 及超时后并发 slot 释放回归）。 |
 | 前端 `npm test` | **PASS**：401 个 source tests + 2 个 API-mode tests。 |
 | Frontend static/build | **PASS**：Lineage build/package verify、完整 typecheck、ESLint、`VITE_API_MODE=remote npm run build:frontend`；产物有既有 >500 kB bundle advisory。 |
 | Browser E2E | **PASS**：Issue #513 AI Q&A spec Chromium/WebKit **8/8**；既有 `portal-search.spec.ts` Chromium/WebKit **18 passed / 2 skipped**。AI E2E 在 1440/1280/860/600 宽度检查无横向溢出。 |

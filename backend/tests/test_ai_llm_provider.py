@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -31,6 +32,21 @@ def success_response(content='{"answer":"ok","citations":[{"assetId":1}]}'):
     return httpx.Response(200, json={
         "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
     })
+
+
+class SlowDripBody(httpx.SyncByteStream):
+    def __init__(self, *, interval=0.09):
+        self.interval = interval
+        self.closed = threading.Event()
+
+    def __iter__(self):
+        for chunk in (b'{"choices":', b'{"message":'):
+            if self.closed.wait(self.interval):
+                return
+            yield chunk
+
+    def close(self):
+        self.closed.set()
 
 
 class OpenAICompatibleLLMProviderTests(unittest.TestCase):
@@ -121,6 +137,48 @@ class OpenAICompatibleLLMProviderTests(unittest.TestCase):
         with self.assertRaises(LLMProviderError) as raised:
             provider.complete_json(system_prompt="x", user_payload={})
         self.assertEqual("invalid_model_output", raised.exception.reason_code)
+
+    def test_overall_deadline_stops_slow_drip_and_releases_concurrency_slot(self):
+        calls = []
+
+        def handler(_request):
+            calls.append(None)
+            if len(calls) == 1:
+                return httpx.Response(200, stream=SlowDripBody())
+            return success_response()
+
+        provider = self._provider(
+            handler,
+            config=llm_config(max_concurrency=1, timeout_ms=150),
+        )
+        started = time.monotonic()
+        with self.assertRaises(LLMProviderError) as raised:
+            provider.complete_json(system_prompt="x", user_payload={})
+        elapsed = time.monotonic() - started
+
+        self.assertEqual("llm_timeout", raised.exception.reason_code)
+        self.assertGreaterEqual(elapsed, 0.15)
+        self.assertLess(elapsed, 0.35)
+        self.assertEqual(
+            '{"answer":"ok","citations":[{"assetId":1}]}',
+            provider.complete_json(system_prompt="x", user_payload={}),
+            "timed-out requests must release their provider concurrency slot",
+        )
+
+    def test_deadline_closes_a_stalled_response_at_the_overall_limit(self):
+        body = SlowDripBody(interval=0.5)
+        provider = self._provider(
+            lambda _request: httpx.Response(200, stream=body),
+            config=llm_config(timeout_ms=150),
+        )
+        started = time.monotonic()
+
+        with self.assertRaises(LLMProviderError) as raised:
+            provider.complete_json(system_prompt="x", user_payload={})
+
+        self.assertEqual("llm_timeout", raised.exception.reason_code)
+        self.assertTrue(body.closed.is_set())
+        self.assertLess(time.monotonic() - started, 0.35)
 
     def test_concurrency_limit_rejects_excess_requests_without_waiting(self):
         entered = threading.Event()

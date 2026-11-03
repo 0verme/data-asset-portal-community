@@ -58,7 +58,7 @@ index or let the browser access the LLM endpoint.
 | `AI_LLM_BASE_URL` | required when enabled | OpenAI-compatible API base URL. HTTPS is required except HTTP loopback; URL credentials, query strings and fragments are rejected. |
 | `AI_LLM_MODEL` | required when enabled | Server-side provider model identifier. |
 | `AI_LLM_API_KEY` | required when enabled | Provider secret, injected from deployment Secret storage only; never stored in DAP parameter rows or returned to the browser. |
-| `AI_LLM_TIMEOUT_MS` | `10000` (250–60000) | Provider request timeout. |
+| `AI_LLM_TIMEOUT_MS` | `10000` (250–60000) | Absolute Provider request/response deadline, including streaming-body delivery (not only per-read inactivity). |
 | `AI_LLM_MAX_TOKENS` | `512` (64–4096) | Output token ceiling. |
 | `AI_LLM_MAX_CONCURRENCY` | `2` (1–16) | Non-blocking Provider concurrency bound. |
 
