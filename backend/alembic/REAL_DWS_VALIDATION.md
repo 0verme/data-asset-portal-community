@@ -40,6 +40,20 @@ Record only profile names and results here; never add credentials, JDBC URLs, ho
 
 `revision = 0001_baseline` does not mean the schema is old. Released `dws.sql` baselines form a prefix of the revision chain, so the runner inspects the physical schema and adopts every satisfied revision before executing anything. When preparing a controlled legacy snapshot, construct it from a known released baseline (for example, the 0001-era schema) and record which structures it contains; do not assume the ledger value alone describes it. See `DWS_MIGRATION_COMPATIBILITY.md` for the per-revision post-conditions.
 
+## `0013` large-table index preflight
+
+When `0013_field_filter_index` must build its non-unique index on a populated `p_field_mapping_field`, treat it as a potentially high-impact operation: index construction reads the table and can consume significant I/O, storage/temporary space and elapsed time. GaussDB 8.1.3 lock duration and write availability have **NOT RUN** in this validation; do not assume online or concurrent index-build semantics.
+
+Before approving the `0013` action, record the table row count/size, available storage, write workload, backup/snapshot and recovery plan, and the approved maintenance window. The maintainer must confirm the unverified lock/write impact is acceptable. If not, stop; do not run the revision or try to drop/replace an existing index. In an authorized isolated validation copy, record build duration, observed lock/write impact, resource use, resulting index definition and ledger before/after.
+
+## GaussDB timestamp default normalization check
+
+1. Use a restorable non-production validation copy with a valid DWS baseline and ledger. Confirm the profile's physical schema is the intended `dap` schema; do not probe other business schemas.
+2. Run `dws_verify_metadata_preflight.py --profile <profile>` and require all five catalog queries plus `SchemaModel normalization` to pass.
+3. Run `schema_migrate.py verify --profile <profile>` and require `verify=ok`. Confirm catalog defaults reported as `pg_systimestamp()` for timestamp columns compare equal to canonical `CURRENT_TIMESTAMP`; the check must not suppress unrelated missing or different defaults.
+4. On a separate disposable copy only, remove the default from `p_system.system_abbr` using the DBA-approved GaussDB procedure. Run `verify` and require a non-zero result identifying `default.system_abbr` as drift. Restore that copy and confirm `verify=ok` again. Never alter the real validation schema for this negative control.
+5. Record the repository SHA, profile name (not connection details), DWS version, schema name only if approved for internal notes, command exit status and redacted mismatch summary.
+
 ## Scenario 1 — fresh install (isolated empty schema)
 
 1. Confirm the target schema exists and contains no application tables; capture the preflight report.

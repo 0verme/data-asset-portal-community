@@ -330,8 +330,13 @@ def _default_token(rest: str) -> str | None:
     return rest[index:end]
 
 
-def normalize_default(value: Any, type_name: str | None = None) -> str | None:
-    """Normalize only the default forms used by the Community baseline."""
+def normalize_default(
+    value: Any,
+    type_name: str | None = None,
+    *,
+    db_type: str | None = None,
+) -> str | None:
+    """Normalize only known-equivalent default forms for the target dialect."""
     if value is None:
         return None
     expression = str(value).strip()
@@ -343,11 +348,29 @@ def normalize_default(value: Any, type_name: str | None = None) -> str | None:
             break
         expression = expression[1:-1].strip()
     expression = re.sub(r"::[A-Za-z0-9_ .\[\]]+$", "", expression).strip()
+    while expression.startswith("(") and expression.endswith(")"):
+        try:
+            if _find_matching_parenthesis(expression, 0) != len(expression) - 1:
+                break
+        except ValueError:
+            break
+        expression = expression[1:-1].strip()
     upper = expression.upper()
     if upper == "NULL":
         return None
     if upper in {"CURRENT_TIMESTAMP", "CURRENT_TIMESTAMP()", "NOW()", "CURRENT_DATE", "CURRENT_DATE()"}:
         return "CURRENT_TIMESTAMP" if upper.startswith(("CURRENT_TIMESTAMP", "NOW")) else "CURRENT_DATE"
+    if (
+        db_type == "gaussdb"
+        and type_name is not None
+        and type_name.upper().startswith("TIMESTAMP")
+        and re.fullmatch(r"PG_SYSTIMESTAMP\s*\(\s*\)", upper)
+    ):
+        # GaussDB 8.1.3 exposes this equivalent timestamp default through its
+        # catalog even when the canonical DDL uses CURRENT_TIMESTAMP. Keep the
+        # exception dialect- and type-specific; other defaults still compare
+        # strictly.
+        return "CURRENT_TIMESTAMP"
     if len(expression) >= 2 and expression[0] == expression[-1] and expression[0] in "'\"":
         expression = expression[1:-1].replace(expression[0] * 2, expression[0])
     elif type_name and type_name.startswith(("CHAR", "VARCHAR", "TEXT")):
@@ -389,7 +412,7 @@ def _normalize_reflected_column_default(
         and _is_sequence_default(value)
     ):
         return None
-    return normalize_default(value, type_name)
+    return normalize_default(value, type_name, db_type=db_type)
 
 
 def _foreign_key_from_text(text: str) -> ForeignKeySpec | None:
