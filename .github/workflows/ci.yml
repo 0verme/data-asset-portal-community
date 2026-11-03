@@ -639,6 +639,13 @@ jobs:
           VITE_API_MODE: remote
         run: npm run test:browser -- --grep "API asset validation|Remote data trust|strict collection response|indicator path malformed envelope|source options failure|field-mapping column contract"
 
+      - name: Indicator and report database pagination browser regression (Chromium and WebKit)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/catalog-pagination-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/catalog-pagination.spec.ts --workers=2
+
       - name: Report long-form save feedback regression (Chromium and WebKit)
         if: matrix.lane == 'a'
         env:
