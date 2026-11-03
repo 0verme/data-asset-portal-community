@@ -99,6 +99,79 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
         operation = schema["paths"]["/api/search/recommendations"]["get"]
         self.assertIn("RagRecommendationsResponse", str(operation["responses"]))
 
+    def test_anonymous_recommendations_follow_profile_and_rag_failure_does_not_block_search(self):
+        for profile in ("internal", "strict"):
+            with self.subTest(profile=profile), patch.dict(
+                os.environ, {"PUBLIC_CATALOG_PROFILE": profile}, clear=False
+            ):
+                search_provider = MagicMock()
+                search_provider.search.return_value = {
+                    "query": "合同金额",
+                    "scope": "all",
+                    "groups": [],
+                    "total": 0,
+                }
+                rag_service = MagicMock()
+                rag_service.recommend.return_value = RagRecommendationsResponse(
+                    query="合同金额",
+                    status="unavailable",
+                    recommendations=[],
+                    count=0,
+                    elapsedMs=4,
+                    reasonCode="service_unauthorized",
+                )
+                client = TestClient(create_fastapi_app(
+                    identity_resolver=lambda _request: None,
+                    search_provider_instance=search_provider,
+                    rag_search_service_instance=rag_service,
+                    authorization_service_instance=AuthorizationService(),
+                ))
+
+                recommendations = client.get(
+                    "/api/search/recommendations", params={"q": "合同金额"}
+                )
+                ordinary_search = client.get("/api/search", params={"q": "合同金额"})
+
+                self.assertEqual(200, recommendations.status_code)
+                self.assertEqual("unavailable", recommendations.json()["status"])
+                self.assertEqual(200, ordinary_search.status_code)
+                self.assertEqual("合同金额", ordinary_search.json()["query"])
+                rag_service.recommend.assert_called_once_with("合同金额", profile=profile)
+                search_provider.search.assert_called_once_with(
+                    "合同金额", scope="all", limit="5", profile=profile
+                )
+
+    def test_anonymous_internal_profile_can_receive_current_catalog_recommendations(self):
+        rag_service = MagicMock()
+        rag_service.recommend.return_value = RagRecommendationsResponse(
+            query="客户",
+            status="available",
+            recommendations=[{
+                "assetId": 7,
+                "assetType": "table",
+                "name": "CUSTOMER",
+                "displayName": "客户",
+                "description": "客户主表",
+            }],
+            count=1,
+            elapsedMs=3,
+        )
+        with patch.dict(
+            os.environ, {"PUBLIC_CATALOG_PROFILE": "internal"}, clear=False
+        ):
+            client = TestClient(create_fastapi_app(
+                identity_resolver=lambda _request: None,
+                rag_search_service_instance=rag_service,
+                authorization_service_instance=AuthorizationService(),
+            ))
+
+            response = client.get("/api/search/recommendations", params={"q": "客户"})
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("available", response.json()["status"])
+        self.assertEqual("CUSTOMER", response.json()["recommendations"][0]["name"])
+        rag_service.recommend.assert_called_once_with("客户", profile="internal")
+
     def test_admin_rag_configuration_routes_use_the_protected_services(self):
         system = MagicMock()
         config = {

@@ -1,8 +1,8 @@
 """HTTP-only RAG adapter with request-scoped public-catalog authorization.
 
 DAP never imports dap-rag-lab, loads a model, opens LanceDB, or shells out to a
-CLI. The remote wire contract is synthetic/provisional until dap-rag-lab #14
-is finalized; every returned ID is rebuilt from DAP's current public catalog.
+CLI. The adapter speaks HTTP Search Service v1; every returned ID is rebuilt
+from DAP's current public catalog before it is exposed.
 """
 
 from __future__ import annotations

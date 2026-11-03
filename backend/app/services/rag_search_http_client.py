@@ -1,7 +1,7 @@
-"""HTTP client for the provisional dap-rag-lab Issue #14 search API.
+"""HTTP client for the dap-rag-lab HTTP Search Service v1 contract.
 
 This module deliberately has no imports from dap-rag-lab and performs no local
-model/index loading. The wire contract is synthetic until Issue #14 finalizes it.
+model/index loading. Retrieval strategy is selected by the RAG service.
 """
 
 from __future__ import annotations
@@ -75,6 +75,8 @@ class RagSearchHttpClient:
             raise RagHttpClientError("index_not_ready")
         if code == "MODEL_MISMATCH":
             raise RagHttpClientError("model_mismatch")
+        if code == "SERVICE_BUSY":
+            raise RagHttpClientError("busy")
         if code == "INVALID_REQUEST":
             raise RagHttpClientError("invalid_response")
         if status_code >= 500:
@@ -147,7 +149,6 @@ class RagSearchHttpClient:
             request = RagHttpSearchRequest(
                 query=query,
                 topK=config.top_k,
-                strategy=config.strategy,
             )
         except ValidationError:
             raise RagHttpClientError("invalid_response") from None

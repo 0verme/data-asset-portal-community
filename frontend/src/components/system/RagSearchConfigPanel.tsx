@@ -127,19 +127,13 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
             />
             <span>启用相关资产推荐</span>
           </label>
-          <label className="rag-config-field">
+          <div className="rag-config-field" role="note">
             <span>检索策略</span>
-            <select
-              value={config.strategy}
-              disabled={!canEdit || !supported || loading || saving}
-              onChange={(event) => update("strategy", event.target.value as RagSearchConfig["strategy"])}
-            >
-              <option value="auto">自动（优先确定性线索）</option>
-              <option value="keyword">关键词</option>
-              <option value="vector">向量</option>
-              <option value="hybrid">混合</option>
-            </select>
-          </label>
+            <strong>由 RAG 服务端配置决定</strong>
+            <small>
+              HTTP Search Service v1 仅接受 query 和 topK，不接受请求级策略。实际策略由 RAG 服务端的 DAP_RAG_SEARCH_MODE 配置；DAP 已保存的 strategy 字段仅为兼容保留，不会影响检索。
+            </small>
+          </div>
           <label className="rag-config-field">
             <span>最多推荐条数</span>
             <input
@@ -207,7 +201,7 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
           </Button>
         </div>
         <p className="rag-config-footnote">
-          只有受保护的管理配置页加载或管理员手动检查时才请求 /healthz 与 /readyz；普通搜索不请求诊断。推荐请求有超时限制；远端服务错误、令牌缺失或目录校验失败时 fail closed，不影响确定性关键词搜索。HTTP 契约当前为 DAP 合成客户端契约，须与 dap-rag-lab #14 最终契约对齐后才能真实联调。
+          只有受保护的管理配置页加载或管理员手动检查时才请求 /healthz 与 /readyz；普通搜索不请求诊断。推荐请求有超时限制；远端服务错误、令牌缺失或目录校验失败时 fail closed，不影响确定性关键词搜索。DAP 按 HTTP Search Service v1 请求与解析；算法模式在 RAG 服务端配置。
         </p>
       </div>
     </details>

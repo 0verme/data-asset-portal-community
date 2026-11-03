@@ -1,4 +1,4 @@
-"""Regression tests for DAP's synthetic, provisional HTTP contract."""
+"""Regression tests for DAP's HTTP Search Service v1 and recommendation contracts."""
 
 from __future__ import annotations
 
@@ -75,35 +75,62 @@ class RagRecommendationsContractTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValidationError):
                 RagSearchConfigUpdate.model_validate({key: "must-not-enter-browser-payload"})
 
-    def test_outbound_request_aliases_and_retrieval_strategy_are_explicit(self):
-        request = RagHttpSearchRequest(query="客户", topK=7, strategy="hybrid")
+    def test_outbound_v1_request_contains_only_query_and_top_k(self):
+        request = RagHttpSearchRequest(query="客户", topK=7)
         self.assertEqual(
-            {"query": "客户", "topK": 7, "strategy": "hybrid"},
+            {"query": "客户", "topK": 7},
             request.model_dump(by_alias=True),
         )
         with self.assertRaises(ValidationError):
-            RagHttpSearchRequest(query="客户", topK=100, strategy="hybrid")
+            RagHttpSearchRequest(query="客户", topK=7, strategy="hybrid")
+        with self.assertRaises(ValidationError):
+            RagHttpSearchRequest(query="客户", topK=100)
 
-    def test_synthetic_http_response_contract_is_bounded_and_requires_field_identity(self):
+    def test_http_v1_response_parses_retrieval_and_structured_evidence(self):
         response = RagHttpSearchResponse.model_validate({
             "status": "ok",
-            "indexGeneration": "synthetic-generation",
+            "indexGeneration": "generation-1",
+            "retrieval": {
+                "requestedMode": "hybrid",
+                "effectiveMode": "hybrid",
+                "channelsUsed": ["vector", "bm25"],
+                "degradationReason": None,
+                "routeReason": None,
+            },
             "results": [{
                 "entityType": "field",
                 "assetId": "42",
                 "fieldId": 99,
                 "name": "REMOTE_NAME",
-                "retrievalChannels": ["vector"],
+                "retrievalChannels": ["vector", "bm25"],
                 "score": 0.91,
-                "evidence": ["synthetic evidence"],
+                "evidence": [{
+                    "channel": "vector",
+                    "rank": 1,
+                    "rawScore": 0.82,
+                    "matchedTerms": [],
+                }],
             }],
         })
-        self.assertEqual("synthetic-generation", response.index_generation)
+        self.assertEqual("generation-1", response.index_generation)
+        self.assertEqual("hybrid", response.retrieval.effective_mode)
+        self.assertEqual(["vector", "bm25"], response.retrieval.channels_used)
         self.assertEqual(99, response.results[0].field_id)
+        self.assertEqual(0.82, response.results[0].evidence[0].raw_score)
+        self.assertEqual([], response.results[0].evidence[0].matched_terms)
+
+    def test_http_v1_response_requires_identity_and_rejects_unknown_fields(self):
         with self.assertRaises(ValidationError):
             RagHttpSearchResponse.model_validate({
                 "status": "ok",
-                "indexGeneration": "synthetic-generation",
+                "indexGeneration": "generation-1",
+                "retrieval": {
+                    "requestedMode": "hybrid",
+                    "effectiveMode": "hybrid",
+                    "channelsUsed": [],
+                    "degradationReason": None,
+                    "routeReason": None,
+                },
                 "results": [{
                     "entityType": "field",
                     "assetId": 42,
@@ -116,7 +143,14 @@ class RagRecommendationsContractTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             RagHttpSearchResponse.model_validate({
                 "status": "ok",
-                "indexGeneration": "synthetic-generation",
+                "indexGeneration": "generation-1",
+                "retrieval": {
+                    "requestedMode": "hybrid",
+                    "effectiveMode": "hybrid",
+                    "channelsUsed": [],
+                    "degradationReason": None,
+                    "routeReason": None,
+                },
                 "results": [],
                 "privateDebug": "must be rejected",
             })
