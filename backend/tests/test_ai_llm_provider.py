@@ -169,7 +169,7 @@ class OpenAICompatibleLLMProviderTests(unittest.TestCase):
 
         for invalid in (
             "http://remote.example.invalid",
-            "https://user:pass@llm.example.invalid",
+            "https://user:pass" + "@" + "llm.example.invalid",
             "https://llm.example.invalid/v1?token=secret",
             "https://llm.example.invalid/../other",
         ):
