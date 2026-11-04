@@ -23,9 +23,13 @@ PUBLIC_READS = (
     "/api/field-mappings/fields",
     "/api/system/menus",
     "/api/roots",
+    "/api/roots/page?page=1&pageSize=20",
+    "/api/roots/abbreviations",
     "/api/reports",
     "/api/api-assets",
+    "/api/api-assets/page?page=1&pageSize=20",
     "/api/manual-code-tables",
+    "/api/manual-code-tables/page?page=1&pageSize=20",
     "/api/upstreams/systems",
     "/api/push/systems",
 )
@@ -63,12 +67,24 @@ class PublicCatalogApiTests(unittest.TestCase):
         self.mapping.get_field_mappings.return_value = {"items": []}
         self.root = MagicMock()
         self.root.get_roots.return_value = []
+        self.root.get_roots_page.return_value = {"items": [], "total": 0, "page": 1, "pageSize": 20, "stats": {"total": 0}}
+        self.root.get_root_abbreviations.return_value = []
         self.report = MagicMock()
         self.report.get_reports.return_value = []
         self.api_asset = MagicMock()
         self.api_asset.get_assets.return_value = []
+        self.api_asset.get_assets_page.return_value = {
+            "items": [], "total": 0, "page": 1, "pageSize": 20,
+            "facets": {"status": {}, "method": {}, "downstreamSystemId": {}},
+            "stats": {"total": 0},
+        }
         self.manual_code_table = MagicMock()
         self.manual_code_table.get_tables.return_value = []
+        self.manual_code_table.get_tables_page.return_value = {
+            "items": [], "total": 0, "page": 1, "pageSize": 20,
+            "stats": {"total": 0, "enabled": 0, "disabled": 0, "styleCount": 0},
+            "facets": {"styleTotal": 0, "styles": {}, "statusTotal": 0, "statuses": {"enabled": 0, "disabled": 0}},
+        }
         self.upstream = MagicMock()
         self.upstream.get_systems.return_value = []
         self.push = MagicMock()
@@ -117,6 +133,10 @@ class PublicCatalogApiTests(unittest.TestCase):
         self.lineage.get_bootstrap.assert_called_once()
         self.mapping.get_field_mappings.assert_called_once()
         self.root.get_roots.assert_called_once()
+        self.root.get_roots_page.assert_called_once()
+        self.root.get_root_abbreviations.assert_called_once()
+        self.api_asset.get_assets_page.assert_called_once()
+        self.manual_code_table.get_tables_page.assert_called_once()
         self.report.get_reports.assert_called_once()
         self.api_asset.get_assets.assert_called_once()
         self.manual_code_table.get_tables.assert_called_once()

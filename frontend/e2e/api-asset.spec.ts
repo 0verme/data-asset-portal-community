@@ -61,6 +61,10 @@ async function mockRemoteApiAssetApi(page: Page): Promise<{
       });
       return;
     }
+    if (pathname === "/api-assets/page" && request.method() === "GET") {
+      await route.fulfill({ json: { items: [], total: 0, page: 1, pageSize: 20, facets: { status: {}, method: {}, downstreamSystemId: {} }, stats: { total: 0 } } });
+      return;
+    }
     if (pathname === "/api-assets" && request.method() === "GET") {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) });
       return;
@@ -150,6 +154,11 @@ test("API asset validation edit saves the selected system and child options on r
       { id: 8, name: "停用系统", short_name: "旧", status: "disabled" },
       { id: 3, name: "订单中心", short_name: "订单", status: "enabled" },
     ] } });
+    if (path === "/api/api-assets/page") return route.fulfill({ json: {
+      items: [item], total: 1, page: 1, pageSize: 20,
+      facets: { status: { enabled: 1 }, method: { HEAD: 1 }, downstreamSystemId: { "8": 1 } }, stats: { total: 1 },
+    } });
+    if (path === "/api/api-assets/REBIND_API" && route.request().method() === "GET") return route.fulfill({ json: { data: item } });
     if (route.request().method() === "PUT") {
       saveCount += 1;
       item = route.request().postDataJSON();

@@ -18,6 +18,7 @@ from ..db.tables import (
     system_table,
 )
 from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
+from ..utils.pagination import resolve_paging
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
     OPERATION_TYPE_DELETE,
@@ -382,7 +383,8 @@ class ApiAssetService(AuditActorMixin):
             for row in rows
         ]
 
-    def get_assets(self, keyword=None, status=None, method=None, downstream_system_id=None):
+    @staticmethod
+    def _asset_list_filters(keyword=None, status=None, method=None, downstream_system_id=None):
         if status and status not in BINARY_STATUS_VALUES:
             raise ApiAssetValidationError(
                 "API asset validation failed",
@@ -418,6 +420,30 @@ class ApiAssetService(AuditActorMixin):
                     )
                 )
             )
+        return clauses
+
+    def _asset_facets(self):
+        clauses = [api_asset.c.is_deleted == "N"]
+        facets = {"status": {}, "method": {}, "downstreamSystemId": {}}
+        for key, column in (("status", api_asset.c.status_code), ("method", api_asset.c.method_code)):
+            rows = self._rows(
+                select(column.label("value"), func.count().label("count"))
+                .where(*clauses)
+                .group_by(column)
+            )
+            facets[key] = {str(row["value"]): int(row["count"] or 0) for row in rows}
+        rows = self._rows(
+            select(api_asset.c.system_id.label("value"), func.count().label("count"))
+            .where(*clauses, api_asset.c.system_id.is_not(None))
+            .group_by(api_asset.c.system_id)
+        )
+        facets["downstreamSystemId"] = {
+            str(row["value"]): int(row["count"] or 0) for row in rows
+        }
+        return facets
+
+    def get_assets(self, keyword=None, status=None, method=None, downstream_system_id=None):
+        clauses = self._asset_list_filters(keyword, status, method, downstream_system_id)
         statement = (
             select(
                 *self._asset_columns(),
@@ -432,6 +458,46 @@ class ApiAssetService(AuditActorMixin):
         )
         with database_transaction():
             return self._items(self._rows(statement))
+
+    def get_assets_page(
+        self, keyword=None, status=None, method=None, downstream_system_id=None,
+        page=None, page_size=None,
+    ):
+        page, page_size = resolve_paging(page, page_size)
+        clauses = self._asset_list_filters(keyword, status, method, downstream_system_id)
+        with database_transaction():
+            count_rows = self._rows(
+                select(func.count().label("total"))
+                .select_from(self._asset_from())
+                .where(*clauses)
+            )
+            total = int(count_rows[0]["total"] or 0) if count_rows else 0
+            last_page = max(1, (total + page_size - 1) // page_size)
+            page = min(page, last_page)
+            statement = (
+                select(
+                    *self._asset_columns(),
+                    system_table.c.system_code,
+                    system_table.c.system_name,
+                    system_table.c.system_abbr,
+                    system_table.c.system_type,
+                )
+                .select_from(self._asset_from())
+                .where(*clauses)
+                .order_by(api_asset.c.api_code)
+                .limit(page_size)
+                .offset((page - 1) * page_size)
+            )
+            items = self._items(self._rows(statement))
+            facets = self._asset_facets()
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+            "facets": facets,
+            "stats": {"total": sum(facets["status"].values())},
+        }
 
     def get_downstream_systems(self, keyword=None):
         clauses = [system_table.c.is_deleted == "N"]

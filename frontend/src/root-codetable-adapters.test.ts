@@ -29,7 +29,7 @@ test("root pages keep the documented native exceptions only", () => {
 });
 
 test("code-table page uses frozen DAP adapters without raw controls", () => {
-  assert.match(codeTablePage, /import \{ Button, IconButton, Input, Select, Textarea \} from "\.\.\/ui\/index\.ts"/);
+  assert.match(codeTablePage, /import \{ Button, IconButton, Input, Select, TablePagination, Textarea \} from "\.\.\/ui\/index\.ts"/);
   assert.match(codeTablePage, /import \{ FormErrorSummary, FormField \} from "\.\.\/ui\/FormErrors\.tsx"/);
   assert.match(codeTablePage, /import \{ focusFirstFormError \} from "\.\.\/ui\/formErrors\.ts"/);
   assert.equal((codeTablePage.match(/<Input/g) ?? []).length, 3);

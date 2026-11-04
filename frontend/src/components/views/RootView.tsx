@@ -41,8 +41,13 @@ export function RootView({
   canEdit = false,
 }: RootViewProps) {
   const {
-    roots = [],
     rootCategories = [],
+    rootTotal,
+    rootGlobalTotal,
+    rootPage,
+    rootPageSize,
+    setRootPage,
+    setRootPageSize,
     rootLoading,
     rootError,
     loadRootData,
@@ -55,6 +60,13 @@ export function RootView({
     filteredRoots = [],
     currentRoot,
     rootAbbrs,
+    rootImportCandidates,
+    rootImportLoading,
+    rootImportError,
+    loadRootImportCandidates,
+    rootDetailLoading,
+    rootDetailError,
+    loadRootDetail,
   } = root;
 
   if (rootLoading) {
@@ -67,7 +79,7 @@ export function RootView({
       <ErrorState
         title="词根模块加载失败"
         desc={rootError}
-        onRetry={loadRootData}
+        onRetry={() => loadRootData()}
       />
     );
   }
@@ -83,7 +95,12 @@ export function RootView({
     return (
       <RootLibrary
         roots={filteredRoots}
-        allRoots={roots}
+        total={rootTotal}
+        globalTotal={rootGlobalTotal}
+        page={rootPage}
+        pageSize={rootPageSize}
+        onPageChange={setRootPage}
+        onPageSizeChange={setRootPageSize}
         query={query}
         activeCategory={rootCategory}
         categories={rootCategories}
@@ -132,6 +149,18 @@ export function RootView({
       />
     );
   }
+  if (rootRoute.page === "edit" && rootDetailLoading) {
+    return <LoadingState title="加载词根详情" desc="正在按词根缩写读取记录。" />;
+  }
+  if (rootRoute.page === "edit" && rootDetailError) {
+    return <ErrorState title="词根详情加载失败" desc={rootDetailError} onRetry={loadRootDetail} />;
+  }
+  if (rootRoute.page === "import" && rootImportLoading) {
+    return <LoadingState title="读取导入候选" desc="正在读取完整词根集合用于导入预览。" />;
+  }
+  if (rootRoute.page === "import" && rootImportError) {
+    return <ErrorState title="导入候选读取失败" desc={rootImportError} onRetry={loadRootImportCandidates} />;
+  }
   if (rootRoute.page === "new") {
     return (
       <RootEditor
@@ -160,7 +189,7 @@ export function RootView({
   if (rootRoute.page === "import") {
     return (
       <RootImport
-        roots={roots}
+        roots={rootImportCandidates}
         categories={rootCategories}
         onBack={rootBack}
         onCommit={handleImportRoots}

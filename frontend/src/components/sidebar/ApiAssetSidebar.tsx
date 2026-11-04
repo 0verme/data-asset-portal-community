@@ -40,7 +40,7 @@ export function ApiAssetSidebar({
       allOption={{
         key: `all-${String(key)}`,
         label: allLabel,
-        count: apiAsset.items.length,
+        count: apiAsset.globalTotal,
         active:
           filter[key] === null ||
           filter[key] === undefined ||
@@ -88,7 +88,7 @@ export function ApiAssetSidebar({
         onChange={(status) =>
           setFilter((previous) => ({ ...previous, status }))
         }
-        totalCount={apiAsset.items.length}
+        totalCount={apiAsset.globalTotal}
         enabledCount={apiAsset.facets.status["enabled"] || 0}
         disabledCount={apiAsset.facets.status["disabled"] || 0}
         allValue={null}

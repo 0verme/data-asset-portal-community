@@ -26,6 +26,7 @@ import {
   focusFirstFormError,
   Input,
   Select,
+  TablePagination,
   Textarea,
   type FormFieldErrors,
 } from "../ui/index.ts";
@@ -42,7 +43,12 @@ function CatBadge({ cat }: CatBadgeProps) {
 
 export interface RootLibraryProps {
   roots: readonly SanitizedWordRoot[];
-  allRoots: readonly SanitizedWordRoot[];
+  total: number;
+  globalTotal: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   query: string;
   activeCategory: string | null;
   categories: readonly RootCategoryItem[];
@@ -56,7 +62,12 @@ export interface RootLibraryProps {
 
 export function RootLibrary({
   roots,
-  allRoots,
+  total,
+  globalTotal,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
   query,
   activeCategory,
   categories,
@@ -67,18 +78,13 @@ export function RootLibrary({
   onClearQuery,
   canEdit = false,
 }: RootLibraryProps) {
-  const counts = allRoots.reduce<Record<string, number>>((acc, item) => {
-    acc[item.cat] = (acc[item.cat] || 0) + 1;
-    return acc;
-  }, {});
-
   return (
     <div className="root-page">
       <div className="page-head">
         <div>
           <div className="page-title"><Icon name="book" size={21} color="var(--ink-2)" />词根库</div>
           <div className="page-sub">
-            数据仓库命名规范词根，用于拼装表名与字段名，共 <b>{roots.length}</b> 个
+            数据仓库命名规范词根，用于拼装表名与字段名，共 <b>{total}</b> 个匹配词根
             {query ? <>，匹配 “{query}”</> : null}
           </div>
         </div>
@@ -90,7 +96,7 @@ export function RootLibrary({
 
       <div className="stat-row">
         <div className="stat-card">
-          <div className="sv">{allRoots.length}</div>
+          <div className="sv">{globalTotal}</div>
           <div className="sl">词根总数</div>
         </div>
         {categories.map((item) => (
@@ -99,7 +105,7 @@ export function RootLibrary({
             className={`stat-card${activeCategory === item.name ? " active" : ""}`}
             onClick={() => onSetCategory(activeCategory === item.name ? null : item.name)}
           >
-            <div className="sv">{counts[item.name] || item.count || 0}</div>
+            <div className="sv">{item.count}</div>
             <div className="sl">{item.name}</div>
           </div>
         ))}
@@ -155,6 +161,14 @@ export function RootLibrary({
           </table>
         </div>
       )}
+      <TablePagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        ariaLabel="词根列表分页"
+      />
     </div>
   );
 }

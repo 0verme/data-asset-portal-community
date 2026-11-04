@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from ...application import RequestContext
 from ...contracts import (
     DataEnvelope,
+    ItemsResponse,
     MessageDataResponse,
     RootCategoryListResponse,
     RootItem,
@@ -72,6 +73,38 @@ def _register_root_routes(app: FastAPI, service: Any) -> None:
         return JSONResponse(
             content=validate_contract({"items": items}, RootListResponse)
         )
+
+    @router.get("/page", response_model=None)
+    def get_root_page(
+        keyword: str | None = Query(default=None),
+        cat: str | None = Query(default=None),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
+    ):
+        try:
+            payload = current_service.get_roots_page(
+                keyword=keyword, cat=cat, page=page, page_size=page_size
+            )
+        except RootDataSourceError as error:
+            return _service_error_response(error, 500)
+        payload["items"] = project_for_request(payload["items"], context, authorization)
+        return JSONResponse(content=validate_contract(payload, RootListResponse))
+
+    @router.get("/abbreviations", response_model=None)
+    def get_root_abbreviations(
+        current_service: Any = Depends(get_service),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
+    ):
+        try:
+            items = current_service.get_root_abbreviations()
+        except RootDataSourceError as error:
+            return _service_error_response(error, 500)
+        items = project_for_request(items, context, authorization)
+        return JSONResponse(content=validate_contract({"items": items}, ItemsResponse[str]))
 
     @router.get("/categories", response_model=None)
     def get_root_categories(

@@ -36,6 +36,38 @@ class RootCoreCrudTests(unittest.TestCase):
                 self.assertIn("__app__", str(compiled))
                 self.assertNotIn("dwp.", str(compiled))
 
+    def test_root_page_uses_database_count_limit_and_keeps_global_total(self):
+        self.service._db.fetch_rows = MagicMock(side_effect=[
+            [{"total": 5}], [self.row], [{"total": 12}],
+        ])
+
+        result = self.service.get_roots_page(
+            keyword="customer", cat="business", page="2", page_size="1"
+        )
+
+        self.assertEqual((5, 2, 1), (result["total"], result["page"], result["pageSize"]))
+        self.assertEqual(12, result["stats"]["total"])
+        self.assertEqual(["customer"], [item["abbr"] for item in result["items"]])
+        count_statement, page_statement = [
+            call.args[0] for call in self.service._db.fetch_rows.call_args_list[:2]
+        ]
+        for statement in (count_statement, page_statement):
+            self._assert_portable(statement)
+            compiled = str(statement.compile(dialect=sqlite.dialect()))
+            self.assertIn("category_name", compiled)
+            self.assertIn("root_abbr", compiled)
+        page_sql = str(page_statement.compile(dialect=sqlite.dialect())).upper()
+        self.assertIn("LIMIT", page_sql)
+        self.assertIn("OFFSET", page_sql)
+
+    def test_full_root_list_and_abbreviation_candidates_remain_unpaged(self):
+        self.service._db.fetch_rows = MagicMock(side_effect=[[self.row, {**self.row, "root_abbr": "order"}], [{"root_abbr": "customer"}, {"root_abbr": "order"}]])
+
+        self.assertEqual(2, len(self.service.get_roots()))
+        full_list_statement = self.service._db.fetch_rows.call_args_list[0].args[0]
+        self.assertNotIn("LIMIT", str(full_list_statement.compile(dialect=sqlite.dialect())).upper())
+        self.assertEqual(["customer", "order"], self.service.get_root_abbreviations())
+
     def test_list_and_category_queries_use_bound_core_expressions(self):
         self.service._db.fetch_rows = MagicMock(return_value=[self.row])
 
