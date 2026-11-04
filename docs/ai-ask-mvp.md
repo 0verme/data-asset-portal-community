@@ -39,6 +39,20 @@ DAP Search Portal
 
 DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具调用、SQL 或业务数值查询。该功能每个请求独立，无会话/历史/持久化/流式输出。
 
+## 回答质量修复（基于最新 main `b245fd38e52756e802857b1a4bb19fe31598c65b`）
+
+Phase 0 复核 PR #514 合入后的实现，确认根因是回答策略和证据契约过度保守，而不是 RAG 没有返回候选：旧 System Prompt 明确禁止模型复述候选表名/字段名；API 仅有 `answered` 与 `insufficient_evidence` 两种证据结果；服务把空 citations 一律变成拒答，没有二次核验证据遗漏；前端把所有已校验 RAG 候选都标为相关候选，既不能筛除无关字段，也无法表达部分回答。问答请求最多 topK 10，列表问题没有不完整标记。
+
+后续实现调整为：
+
+- System Prompt 定义企业数据资产助手，保留不可信元数据、Prompt Injection、禁止 SQL/越权/秘密泄露规则；模型只能返回 `questionType` 与按稳定 ID 选择的结构化 `claims`，不得产生自由文本答案。
+- DAP 服务逐一校验 claim 的 `(assetId, fieldId)` 与本次目录候选完全匹配，只保留 `direct` / `related`；`context_only` 不进入回答。表名、字段名、中文名与描述全部由 DAP 使用当前校验后的目录元数据组成，避免“一个有效 citation 为整段自由文本背书”。候选卡与 citations 一一对应。
+- 有候选但模型未选择时，执行最多一次更严格的结构化证据复核。复核后仍无相关 claim 才返回 `insufficient_evidence`；Provider/JSON/身份校验错误返回明确 `generation_unavailable`，不显示未筛选候选为回答。
+- 新增 `partial_answer`：列表问题使用既有 RAG HTTP Search v1 topK 上限扩到最多 20（仍受管理员 topK 上限约束；只对列表问题且请求 topK 为 10 时启用），非列表请求保持原 topK。RAG 不提供完整清单保证，因此列表回答始终明确为本次有界检索的部分结果；降级检索和仅有间接线索也不冒充完整直接回答。
+- 列表答案按表归组、对稳定 ID 去重，并把直接证据与相关线索分开；UI 仅显示答案引用的已校验表/字段、标明相关性并复用现有 DAP 详情导航。完整目录枚举若需要超出 RAG v1 有界搜索的改造，不在本 PR 范围内。
+
+真实目录、RAG HTTP、DeepSeek 的准确性仍须在授权隔离环境验证；Mock 只证明结构化选取、身份校验、回退和 UI 契约，不代表真实模型效果。
+
 ## API 契约
 
 ### `GET /api/ai/status`
@@ -57,14 +71,14 @@ DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具�
 {"query":"贷款余额在哪个表？","scope":"all","topK":10}
 ```
 
-`query` trim 后 1–500 字符；本期 `scope` 仅为 `all`；`topK` 1–10，且不能超过管理员在既有 RAG 配置中的上限。额外字段（包括 session/conversation ID）拒绝。
+`query` trim 后 1–500 字符；本期 `scope` 仅为 `all`；API `topK` 1–10。列表问题仅在请求 topK 为 10 时，服务端可向现有 Search v1 请求最多 20 条候选，且始终受管理员 RAG topK 上限约束；其他问题保持请求 topK，不扩大模型上下文。额外字段（包括 session/conversation ID）拒绝。RAG 是有界相关性检索，不承诺全目录枚举，列表答案标记为部分结果。
 
 成功结构示例（仅合成 ID）：
 
 ```json
 {
   "status":"answered",
-  "answer":"目录中存在可核实的相关候选，请查看下方资产卡片。",
+  "answer":"根据当前 DAP 目录，以下资产可直接支持回答：\n- 数据表：合成表（SYNTHETIC_TABLE）\n  字段：合成字段（SYNTHETIC_FIELD）",
   "citations":[{"assetId":123,"fieldId":456,"source":"dap_catalog"}],
   "candidates":[{
     "assetId":123,"fieldId":456,"assetType":"field",
@@ -72,10 +86,12 @@ DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具�
     "tableDescription":"合成说明","fieldName":"SYNTHETIC_FIELD",
     "fieldDisplayName":"合成字段","fieldDescription":"合成字段说明",
     "domain":"合成主题域","layer":"DWS","source":"dap_catalog",
-    "matchReason":"字段、父表和稳定 ID 已由当前 DAP 目录校验。"
+    "matchReason":"RAG 命中字段；字段、父表和稳定 ID 已由当前 DAP 目录校验。",
+    "relevance":"direct"
   }],
   "retrievalStatus":"available",
   "generationStatus":"completed",
+  "resultsTruncated":false,
   "reasonCode":null,
   "elapsedMs":12.5
 }
@@ -83,12 +99,13 @@ DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具�
 
 状态语义：
 
-- `answered`：至少一个模型引用精确匹配本次已校验候选；引用 ID 再次做 DAP 候选集合校验。
-- `insufficient_evidence`：检索成功但没有可信证据，固定回答「当前元数据不足以确认。」；LLM 不得补造候选。
-- `retrieval_unavailable`：RAG 禁用、不可用，或降级且无有效证据；不调用 LLM。
-- `generation_unavailable`：AI/LLM 禁用、未配置、超时、并发忙、非法 JSON 或引用无效；不会伪装成无搜索结果。
+- `answered`：至少一个 `direct` claim 精确匹配本次已校验候选；回答文字由服务端元数据组装，引用与候选一一对应。
+- `partial_answer`：存在已验证的直接/相关证据，但问题为有界列表、检索降级或仅有间接线索；说明当前范围不完整，不声称完整清单。`resultsTruncated=true` 显式标记列表/降级检索受当前候选上限约束（服务不返回遗漏总数，因此表示可能截断而非精确遗漏数量）；仅有相关线索时为 `false`。
+- `insufficient_evidence`：没有足以支持问题的证据；回答说明当前目录检索未找到可验证资产，不显示未筛选候选。
+- `retrieval_unavailable`：RAG 禁用、不可用/超时，或降级且无有效证据；不调用 LLM，不误判成无数据。
+- `generation_unavailable`：AI/LLM 禁用、未配置、超时、并发忙、非法 JSON 或引用身份无效；不显示模型自由文本或未筛选候选。
 - `retrievalStatus` 另区分 `available/degraded/unavailable/not_run`；`generationStatus` 区分 `completed/unavailable/disabled/not_run`。
-- 候选卡片只由服务端 DAP 回查的元数据生成。模型输出不能提供表名/字段名作为可点击资产；候选的 `assetId` / `fieldId` 是唯一详情身份。检索分数不作为可信度或准确率返回。
+- 候选卡片只由服务端 DAP 回查的元数据生成。模型只能返回结构化候选身份与直接/相关关系；回答中的表/字段名也由服务端元数据生成。稳定 `assetId` / `fieldId` 是唯一详情身份。检索分数不作为可信度或准确率返回。
 
 ## LLM Provider 配置
 
@@ -111,11 +128,11 @@ DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具�
 - 普通搜索成功且零结果才出现「没有找到精确匹配的资产」和「问 AI 找资产」，原问题直接沿用；部分搜索失败或接口失败不转换为空结果，也不显示无结果误导。
 - 搜索结果和 AI 答案可在原页面共存；资产搜索、RAG 推荐、AI 候选按 stable ID 区分/去重。模型异常不清空普通搜索结果。
 - AI 加载、检索失败、生成失败、无证据、重试及 RAG 降级分别呈现；AI 关闭或状态接口失败时隐藏 AI 按钮。
-- 模型摘要作为解释文本；资产名称、字段名、中文含义、来源和详情入口只由 DAP 校验后的候选卡呈现。
+- 回答摘要由 DAP 按已验证的字段/表元数据生成；模型不输出自由文本，候选卡与答案引用保持一致。表/字段名、中文名、已登记描述和详情入口只来自 DAP 当前目录。
 
 ## Mock 测试与合成样例
 
-后端测试通过 `httpx.MockTransport` 替代 RAG HTTP 和 OpenAI-compatible LLM，验证授权头/JSON 请求、异常/超时/并发上限、慢速分块响应的绝对 deadline 与超时后并发 slot 释放、prompt 注入文本隔离、模型输出格式、稳定 ID/父表校验及无证据拒答。Mock Secret 只存在测试进程内，不能在日志/响应泄露。
+后端测试通过 `httpx.MockTransport` 替代 RAG HTTP 和 OpenAI-compatible LLM，验证授权头/JSON 请求、异常/超时/并发上限、慢速分块响应的绝对 deadline 与超时后并发 slot 释放、prompt 注入文本隔离、选择型 JSON Contract、稳定 ID/父表校验、空选择有界复核、直接/间接相关性及无证据降级。Mock Secret 只存在测试进程内，不能在日志/响应泄露。
 
 样例使用合成元数据覆盖字段定位、字段解释、多个余额相关字段、主题域、未登记字段和相近但不同的命名；没有将贷款/银行词汇写成 DAP 全局硬编码规则。浏览器 E2E 模拟 `/api/ai/status` 和 `/api/ai/ask`，不直连真实模型。
 
@@ -142,16 +159,16 @@ DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具�
 
 | 检查 | 结果 |
 |---|---|
-| 后端全量 `python -m unittest discover -s backend/tests` | **PASS**：1158 tests，29 skipped；环境为 Python 3.11 + task-local 已安装依赖，包含最终 LLM 总 deadline 与 slot-release regressions。新增 AI API/契约/Orchestrator/Provider/RAG/RBAC focused suite **46/46 PASS**（包含匿名公共目录、慢速分块总 deadline、deadline close 及超时后并发 slot 释放回归）。 |
+| 后端全量 `python -m unittest discover -s backend/tests` | **PASS**：1169 tests，29 skipped（Python 3.11 + task-local 依赖，271.833s）；AI Ask API/contract/service、LLM Provider 与 RAG Search focused suite **52/52 PASS**。 |
 | 前端 `npm test` | **PASS**：401 个 source tests + 2 个 API-mode tests。 |
-| Frontend static/build | **PASS**：Lineage build/package verify、完整 typecheck、ESLint、`VITE_API_MODE=remote npm run build:frontend`；产物有既有 >500 kB bundle advisory。 |
-| Browser E2E | **PASS**：Issue #513 AI Q&A spec Chromium/WebKit **8/8**；既有 `portal-search.spec.ts` Chromium/WebKit **18 passed / 2 skipped**。AI E2E 在 1440/1280/860/600 宽度检查无横向溢出。 |
-| Community boundary / hygiene | **PASS**：Public Data Guard 扫描 374 files，BLOCKER=0、SUSPICIOUS=0；CI workflow YAML/AI E2E step 校验与 `git diff --check` PASS。 |
-| npm audit | **PASS（CI 高危阈值）**：`npm audit --audit-level=high` 成功；现有锁文件报告 12 moderate advisories。此 PR 未更改依赖或 lockfile。 |
-| Migration / database | **NOT APPLICABLE**：无 Schema/Migration/Seed/数据库依赖改动。真实数据库未连接。 |
-| 全部 Playwright specs 无筛选整套 | **NOT COMPLETE**：本地另行尝试后，发现该仓库其他无关 browser specs 需要未运行的后端 `127.0.0.1:15099`；已停止该广泛运行。它不作为 PASS 声明；Issue #513 及既有搜索 CI specs 已单独通过。 |
+| Frontend static/build | **PASS**：Lineage build/package verify、完整 typecheck、ESLint、`VITE_API_MODE=remote npm run build:frontend`；构建有既有 >500 kB bundle advisory。 |
+| Browser E2E | **PASS**：`e2e/ai-ask.spec.ts` Chromium/WebKit **10/10**（合成 DAP API fixture）；1440/1280/860/600 宽度无横向溢出。 |
+| Community boundary / hygiene | **PASS**：Public Data Guard 扫描 374 files，BLOCKER=0、SUSPICIOUS=0；`compileall` 与 `git diff --check` PASS。 |
+| npm audit | **PASS**：CI 阈值 `npm audit --audit-level=high` exit 0，报告 0 vulnerabilities；未修改依赖或 lockfile。 |
+| Migration / database | **NOT APPLICABLE**：无 Schema/Migration/Seed/数据库依赖改动；未连接真实数据库。 |
+| 未筛选全部 Playwright specs | **NOT RUN**：本地只运行与本改动相关的 AI Q&A spec；其他浏览器 specs 由 PR CI 覆盖。 |
 
-本地 Mock / synthetic 测试结果不代替 PR GitHub CI；CI 在创建 PR 后由远端 exact-HEAD workflow 实测。
+本地 Mock / synthetic 测试结果不代替 GitHub CI；PR 创建后须以远端 exact-HEAD workflow 结果为准。
 
 ## 未完成与未验证项
 

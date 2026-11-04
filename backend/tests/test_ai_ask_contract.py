@@ -61,14 +61,20 @@ class AiAskContractTests(unittest.TestCase):
                 "source": "rag_service",
             })
 
-    def test_model_may_explicitly_return_no_citations_but_not_blank_answer(self):
+    def test_model_contract_is_selection_only_and_rejects_free_text(self):
         no_evidence = AiGeneratedAnswer.model_validate({
-            "answer": "当前元数据不足以确认。",
-            "citations": [],
+            "questionType": "general",
+            "claims": [],
         })
-        self.assertEqual([], no_evidence.citations)
+        self.assertEqual([], no_evidence.claims)
         with self.assertRaises(ValidationError):
-            AiGeneratedAnswer.model_validate({"answer": "  ", "citations": []})
+            AiGeneratedAnswer.model_validate({
+                "questionType": "general",
+                "claims": [],
+                "answer": "unvalidated free text",
+            })
+        with self.assertRaises(ValidationError):
+            AiGeneratedAnswer.model_validate({"questionType": "general", "claims": "bad"})
 
     def test_answered_response_requires_stable_candidate_bound_citations(self):
         candidate = {
@@ -85,6 +91,7 @@ class AiAskContractTests(unittest.TestCase):
             "layer": "DWS",
             "source": "dap_catalog",
             "matchReason": "已由目录校验",
+            "relevance": "direct",
         }
         response = AiAskResponse.model_validate({
             "status": "answered",
@@ -93,12 +100,38 @@ class AiAskContractTests(unittest.TestCase):
             "citations": [{"assetId": 7, "fieldId": 11, "source": "dap_catalog"}],
             "retrievalStatus": "available",
             "generationStatus": "completed",
+            "resultsTruncated": False,
         })
         self.assertEqual(7, response.citations[0].asset_id)
+        self.assertEqual("direct", response.candidates[0].relevance)
+        partial = AiAskResponse.model_validate({
+            **response.model_dump(by_alias=True),
+            "status": "partial_answer",
+            "reasonCode": "partial_results",
+            "resultsTruncated": True,
+            "answer": "本次只确认部分资产。",
+        })
+        self.assertEqual("partial_answer", partial.status)
+        self.assertTrue(partial.results_truncated)
+        with self.assertRaises(ValidationError):
+            AiAskResponse.model_validate({
+                **response.model_dump(by_alias=True),
+                "resultsTruncated": True,
+            })
         with self.assertRaises(ValidationError):
             AiAskResponse.model_validate({
                 **response.model_dump(by_alias=True),
                 "citations": [],
+            })
+        with self.assertRaises(ValidationError):
+            AiAskResponse.model_validate({
+                **response.model_dump(by_alias=True),
+                "candidates": [],
+            })
+        with self.assertRaises(ValidationError):
+            AiAskResponse.model_validate({
+                **response.model_dump(by_alias=True),
+                "candidates": [{**candidate, "relevance": "related"}],
             })
         with self.assertRaises(ValidationError):
             AiAskCitation.model_validate({"assetId": True, "source": "dap_catalog"})

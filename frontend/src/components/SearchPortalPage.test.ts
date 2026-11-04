@@ -142,6 +142,8 @@ test("AI is explicitly enabled, Enter remains traditional search, and model requ
   assert.match(source, /response\.status === "retrieval_unavailable"/);
   assert.match(source, /response\.status === "generation_unavailable"/);
   assert.match(source, /response\.status === "insufficient_evidence"/);
+  assert.match(source, /response\.status === "partial_answer"/);
+  assert.match(source, /相关线索 · 非直接结论/);
   assert.match(source, /onRetry=\{\(\) => runAiAsk\(aiQuery\)\}/);
   assert.match(source, /onNavigate\?\.\(target, query\)/);
   assert.match(source, /module: "dwm"[\s\S]*?assetId: item\.assetId/);
@@ -159,6 +161,9 @@ test("AI answers remain explanatory while only DAP candidate cards navigate resp
   assert.match(source, /aria-label=\{`查看\$\{isField \? "字段" : "数据表"\}详情：/);
   assert.match(source, /ref: item\.tableName,[\s\S]*?assetId: item\.assetId/);
   assert.match(source, /证据来源：DAP 资产目录/);
+  assert.match(source, /答案引用的目录资产/);
+  assert.match(source, /item\.relevance === "direct"/);
+  assert.match(source, /response\.resultsTruncated[\s\S]*?有界检索结果可能不完整/);
   assert.match(styles, /\.sp-ai-candidate \{[\s\S]*?width: 100%[\s\S]*?min-width: 0/);
   assert.match(styles, /\.sp-ai-candidate-main \{[\s\S]*?overflow-wrap: anywhere/);
   assert.match(styles, /@media \(max-width: 600px\)[\s\S]*?\.sp-ai-candidate \{ padding: 12px/);

@@ -10,6 +10,7 @@ from .models import ContractModel
 
 AiAskStatus = Literal[
     "answered",
+    "partial_answer",
     "insufficient_evidence",
     "retrieval_unavailable",
     "generation_unavailable",
@@ -20,8 +21,10 @@ AiAskReason = Literal[
     "ai_disabled",
     "llm_not_configured",
     "retrieval_disabled",
+    "retrieval_timeout",
     "retrieval_unavailable",
     "retrieval_degraded_without_evidence",
+    "partial_results",
     "insufficient_evidence",
     "llm_timeout",
     "llm_busy",
@@ -84,6 +87,7 @@ class AiAskCandidate(_AiAskContract):
     layer: str = Field(default="", max_length=32)
     source: Literal["dap_catalog"] = "dap_catalog"
     match_reason: str = Field(alias="matchReason", min_length=1, max_length=300)
+    relevance: Literal["direct", "related"] | None = None
 
     @model_validator(mode="after")
     def validate_candidate_identity(self) -> AiAskCandidate:
@@ -98,31 +102,55 @@ class AiAskCandidate(_AiAskContract):
 class AiAskResponse(_AiAskContract):
     status: AiAskStatus
     answer: str = Field(max_length=2000)
-    citations: list[AiAskCitation] = Field(default_factory=list, max_length=10)
-    candidates: list[AiAskCandidate] = Field(default_factory=list, max_length=10)
+    citations: list[AiAskCitation] = Field(default_factory=list, max_length=20)
+    candidates: list[AiAskCandidate] = Field(default_factory=list, max_length=20)
     retrieval_status: AiRetrievalStatus = Field(alias="retrievalStatus")
     generation_status: AiGenerationStatus = Field(alias="generationStatus")
+    results_truncated: bool = Field(default=False, alias="resultsTruncated")
     reason_code: AiAskReason | None = Field(default=None, alias="reasonCode")
     elapsed_ms: float = Field(default=0, alias="elapsedMs", ge=0)
 
     @model_validator(mode="after")
     def validate_response_state(self) -> AiAskResponse:
-        if self.status == "answered":
+        if self.results_truncated and self.status != "partial_answer":
+            raise ValueError("resultsTruncated 只能用于显式 partial_answer 响应")
+        if self.status in {"answered", "partial_answer"}:
             if (
                 not self.answer.strip()
                 or not self.citations
                 or self.generation_status != "completed"
                 or self.retrieval_status not in {"available", "degraded"}
             ):
-                raise ValueError("answered 响应必须含有效引用与完成状态")
+                raise ValueError("answered/partial_answer 响应必须含有效引用与完成状态")
+            candidate_ids = {
+                (candidate.asset_id, candidate.field_id) for candidate in self.candidates
+            }
+            citation_ids = {
+                (citation.asset_id, citation.field_id) for citation in self.citations
+            }
+            if (
+                candidate_ids != citation_ids
+                or len(candidate_ids) != len(self.candidates)
+                or len(self.candidates) != len(self.citations)
+                or any(candidate.relevance is None for candidate in self.candidates)
+            ):
+                raise ValueError("回答候选必须与有效引用一一对应并标记相关性")
+            if self.status == "answered" and not any(
+                candidate.relevance == "direct" for candidate in self.candidates
+            ):
+                raise ValueError("answered 响应必须包含直接相关证据")
         if self.status == "retrieval_unavailable":
             if self.retrieval_status != "unavailable" or self.generation_status != "not_run":
                 raise ValueError("retrieval_unavailable 状态不一致")
         if self.status == "generation_unavailable":
-            if self.generation_status not in {"unavailable", "disabled"} or self.citations:
+            if (
+                self.generation_status not in {"unavailable", "disabled"}
+                or self.citations
+                or self.candidates
+            ):
                 raise ValueError("generation_unavailable 状态不一致")
-        if self.status == "insufficient_evidence" and self.citations:
-            raise ValueError("insufficient_evidence 不得包含模型引用")
+        if self.status == "insufficient_evidence" and (self.citations or self.candidates):
+            raise ValueError("insufficient_evidence 不得包含答案候选或模型引用")
         identities = [
             (citation.asset_id, citation.field_id) for citation in self.citations
         ]
@@ -131,26 +159,24 @@ class AiAskResponse(_AiAskContract):
         return self
 
 
-class AiGeneratedCitation(_AiAskContract):
-    """Strict model-output citation; validated again against retrieved DAP IDs."""
+class AiGeneratedClaim(_AiAskContract):
+    """One model-selected candidate; relevance is validated against DAP IDs."""
 
     asset_id: StableAssetId = Field(alias="assetId")
     field_id: StableFieldId | None = Field(default=None, alias="fieldId")
+    relevance: Literal["direct", "related", "context_only"]
 
 
 class AiGeneratedAnswer(_AiAskContract):
-    """Strict JSON-only response required from the OpenAI-compatible provider."""
+    """Strict selection-only JSON; the backend composes all user-visible prose."""
 
-    answer: str = Field(min_length=1, max_length=2000)
-    citations: list[AiGeneratedCitation] = Field(max_length=10)
-
-    @field_validator("answer")
-    @classmethod
-    def validate_answer_text(cls, value: str) -> str:
-        answer = value.strip()
-        if not answer:
-            raise ValueError("answer 不能为空")
-        return answer
+    question_type: Literal[
+        "asset_location",
+        "field_explanation",
+        "asset_list",
+        "general",
+    ] = Field(alias="questionType")
+    claims: list[AiGeneratedClaim] = Field(max_length=20)
 
 
 class AiAskErrorEnvelope(_AiAskContract):
@@ -162,6 +188,7 @@ __all__ = [
     "AiAskAvailability",
     "AiAskCandidate",
     "AiAskCitation",
+    "AiGeneratedClaim",
     "AiAskReason",
     "AiAskRequest",
     "AiAskResponse",

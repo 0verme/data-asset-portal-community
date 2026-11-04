@@ -3,6 +3,7 @@ import { requestRemote } from "./http.ts";
 
 export type AiAskStatus =
   | "answered"
+  | "partial_answer"
   | "insufficient_evidence"
   | "retrieval_unavailable"
   | "generation_unavailable";
@@ -27,6 +28,7 @@ export interface AiAskCandidate {
   layer: string;
   source: "dap_catalog";
   matchReason: string;
+  relevance: "direct" | "related";
 }
 
 export interface AiAskCitation {
@@ -42,6 +44,7 @@ export interface AiAskResponse {
   candidates: AiAskCandidate[];
   retrievalStatus: AiRetrievalStatus;
   generationStatus: AiGenerationStatus;
+  resultsTruncated: boolean;
   reasonCode?: string | null;
   elapsedMs: number;
 }
@@ -57,6 +60,7 @@ const RETRIEVAL_STATUSES = new Set<string>(["available", "degraded", "unavailabl
 const GENERATION_STATUSES = new Set<string>(["completed", "unavailable", "disabled", "not_run"]);
 const ASK_STATUSES = new Set<string>([
   "answered",
+  "partial_answer",
   "insufficient_evidence",
   "retrieval_unavailable",
   "generation_unavailable",
@@ -83,6 +87,7 @@ function parseCandidate(value: unknown): AiAskCandidate {
   const assetId = value["assetId"];
   const fieldId = value["fieldId"];
   const assetType = value["assetType"];
+  const relevance = value["relevance"];
   const optionalFieldId = fieldId === undefined ? null : fieldId;
   if (
     !isStableId(assetId)
@@ -95,6 +100,7 @@ function parseCandidate(value: unknown): AiAskCandidate {
     || !isText(value["domain"])
     || !isText(value["layer"])
     || value["source"] !== "dap_catalog"
+    || (relevance !== "direct" && relevance !== "related")
     || !isText(value["matchReason"])
     || !value["matchReason"].trim()
   ) {
@@ -130,6 +136,7 @@ function parseCandidate(value: unknown): AiAskCandidate {
     layer: value["layer"],
     source: "dap_catalog",
     matchReason: value["matchReason"],
+    relevance,
   };
 }
 
@@ -145,6 +152,7 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
   const status = value["status"];
   const retrievalStatus = value["retrievalStatus"];
   const generationStatus = value["generationStatus"];
+  const resultsTruncated = value["resultsTruncated"];
   const answer = value["answer"];
   const rawCandidates = value["candidates"];
   const rawCitations = value["citations"];
@@ -156,12 +164,13 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     || !RETRIEVAL_STATUSES.has(retrievalStatus)
     || typeof generationStatus !== "string"
     || !GENERATION_STATUSES.has(generationStatus)
+    || typeof resultsTruncated !== "boolean"
     || !isText(answer)
     || answer.length > 2000
     || !Array.isArray(rawCandidates)
-    || rawCandidates.length > 10
+    || rawCandidates.length > 20
     || !Array.isArray(rawCitations)
-    || rawCitations.length > 10
+    || rawCitations.length > 20
     || typeof elapsedMs !== "number"
     || !Number.isFinite(elapsedMs)
     || elapsedMs < 0
@@ -188,11 +197,26 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
   if (new Set(citationIds).size !== citationIds.length) {
     throw new Error("Duplicate AI ask citation.");
   }
-  if (status === "answered" && (!citations.length || generationStatus !== "completed")) {
-    throw new Error("Answered AI response must contain verified citations.");
+  if (resultsTruncated && status !== "partial_answer") {
+    throw new Error("Truncated AI results must use an explicit partial-answer status.");
   }
-  if (status !== "answered" && citations.length) {
-    throw new Error("Non-answered AI response must not contain citations.");
+  if (status === "answered" || status === "partial_answer") {
+    if (!citations.length || generationStatus !== "completed") {
+      throw new Error("Answered AI response must contain verified citations.");
+    }
+    const citationIds = new Set(citations.map((item) => citationKey(item.assetId, item.fieldId)));
+    if (
+      candidateIds.size !== candidates.length
+      || candidateIds.size !== citationIds.size
+      || [...candidateIds].some((identity) => !citationIds.has(identity))
+    ) {
+      throw new Error("AI answer candidates must exactly match its verified citations.");
+    }
+    if (status === "answered" && !candidates.some((item) => item.relevance === "direct")) {
+      throw new Error("Answered AI response must contain directly relevant evidence.");
+    }
+  } else if (citations.length || candidates.length) {
+    throw new Error("Unanswered AI response must not contain answer candidates or citations.");
   }
   return {
     status: status as AiAskStatus,
@@ -201,6 +225,7 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     candidates,
     retrievalStatus: retrievalStatus as AiRetrievalStatus,
     generationStatus: generationStatus as AiGenerationStatus,
+    resultsTruncated,
     reasonCode: isText(value["reasonCode"]) ? value["reasonCode"] : null,
     elapsedMs,
   };
@@ -232,6 +257,7 @@ export async function askAi(
       candidates: [],
       retrievalStatus: "not_run",
       generationStatus: "disabled",
+      resultsTruncated: false,
       reasonCode: "ai_disabled",
       elapsedMs: 0,
     };
