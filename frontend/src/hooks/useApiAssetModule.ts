@@ -130,6 +130,7 @@ export function useApiAssetModule({
       setFacets(result.facets);
       setSystems(nextSystems);
       if (result.page !== page) setPage(result.page);
+      if (result.pageSize !== pageSize) setPageSize(result.pageSize);
       setError('');
     } catch (e: unknown) {
       if (sequence === requestSequence.current) {

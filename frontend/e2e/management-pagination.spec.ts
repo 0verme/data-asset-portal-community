@@ -90,17 +90,17 @@ function codeTable(index: number): ManualCodeTable {
   };
 }
 
-function pagePayload<T>(items: readonly T[], url: URL, pageItems: (item: T) => boolean, sortKey: (item: T) => string, direction: 'asc' | 'desc' = 'asc') {
+function pagePayload<T>(items: readonly T[], url: URL, pageItems: (item: T) => boolean, sortKey: (item: T) => string, direction: 'asc' | 'desc' = 'asc', maxPageSize = Number.MAX_SAFE_INTEGER) {
   const matches = items.filter(pageItems).slice().sort((left, right) =>
     sortKey(left).localeCompare(sortKey(right)) * (direction === 'desc' ? -1 : 1),
   );
-  const pageSize = Number(url.searchParams.get('pageSize') || 20);
+  const pageSize = Math.min(Number(url.searchParams.get('pageSize') || 20), maxPageSize);
   const pageCount = Math.max(1, Math.ceil(matches.length / pageSize));
   const page = Math.min(Math.max(1, Number(url.searchParams.get('page') || 1)), pageCount);
   return { items: matches.slice((page - 1) * pageSize, page * pageSize), total: matches.length, page, pageSize };
 }
 
-async function installRemoteApiFixtures(page: Page) {
+async function installRemoteApiFixtures(page: Page, options: { apiAssetPageSizeLimit?: number } = {}) {
   const apis = Array.from({ length: 23 }, (_, index) => apiAsset(index + 1));
   const roots = Array.from({ length: 23 }, (_, index) => root(index + 1));
   const codeTables = Array.from({ length: 23 }, (_, index) => codeTable(index + 1));
@@ -142,7 +142,7 @@ async function installRemoteApiFixtures(page: Page) {
         return (!status || item.status === status) && (!method || item.method === method) &&
           (!systemId || String(item.downstreamSystemId) === systemId) &&
           (!keyword || `${item.code} ${item.name} ${item.path}`.toLowerCase().includes(keyword));
-      }, (item) => item.code);
+      }, (item) => item.code, 'asc', options.apiAssetPageSizeLimit);
       const count = (select: (item: ApiAsset) => string) => Object.fromEntries(
         [...new Set(apis.map(select))].map((key) => [key, apis.filter((item) => select(item) === key).length]),
       );
@@ -263,6 +263,24 @@ test('API assets request server pages and load a cross-page detail by code', asy
   await page.goto('/api-assets/PAGE_API_001');
   await expect(page.getByText('Pagination API 1').first()).toBeVisible();
   await expect.poll(() => fixture.details.includes('PAGE_API_001')).toBe(true);
+});
+
+test('API asset pagination synchronizes a server-clamped page size and keeps every row reachable', async ({ page }) => {
+  const fixture = await installRemoteApiFixtures(page, { apiAssetPageSizeLimit: 10 });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/api-assets?view=list');
+  await expect(page.locator('.page-title')).toContainText('API 资产', { timeout: 20_000 });
+  const pager = page.locator('.dap-table-pagination[aria-label="API 资产分页"]');
+  await expect(pager.locator('.dap-table-pagination__page-index')).toHaveText('1 / 3');
+  await expect(pager.locator('.dap-table-pagination__range')).toContainText('第 1–10 条 / 共 23 条');
+  await expect(page.locator('table.dt tbody tr')).toHaveCount(10);
+  await page.getByRole('button', { name: '下一页' }).click();
+  await expect(pager.locator('.dap-table-pagination__page-index')).toHaveText('2 / 3');
+  await page.getByRole('button', { name: '下一页' }).click();
+  await expect(pager.locator('.dap-table-pagination__page-index')).toHaveText('3 / 3');
+  await expect(page.locator('table.dt tbody tr')).toHaveCount(3);
+  await expect(page.locator('table.dt tbody tr').filter({ hasText: 'PAGE_API_023' })).toBeVisible();
+  expect(fixture.requests.some((url) => url.pathname === '/api/api-assets/page' && url.searchParams.get('page') === '3' && url.searchParams.get('pageSize') === '10')).toBe(true);
 });
 
 test('root library pages table rows while keeping complete abbreviations and import candidates', async ({ page }) => {
