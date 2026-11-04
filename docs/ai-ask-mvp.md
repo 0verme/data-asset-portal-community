@@ -17,7 +17,7 @@
 
 ### 重叠与验收边界
 
-- #513 与 #503 已合并的搜索 UI/RAG 推荐工作相邻，但不重建 `/api/search`、索引、Embedding 或 BGE；只增加独立单轮 `/api/ai/ask`。
+- #513 与 #503 已合并的搜索 UI/RAG 推荐工作相邻，但不重建 `/api/search`、索引、Embedding 或 BGE；在保持单轮 `/api/ai/ask` 兼容的前提下，增加传输真实阶段状态和完整最终结果（不流式传 Token）的 `/api/ai/ask/progress` SSE 入口。
 - #465 现有合并内容提供稳定目录/只读快照基础；#444 仍是架构 Roadmap；#414 管理显式降级；#511/#512 已修复搜索事务错误扩散。本 PR 不关闭这些关联 Issue，也不扩大到它们的范围。
 - 外网自动化使用合成目录候选、Mock RAG HTTP 和 Mock LLM；不需要真实 DeepSeek、GaussDB、LanceDB 或业务数据。浏览器 E2E 只证明浏览器交互与 Mock API 契约，不代替内网链路或视觉人工验收。
 
@@ -27,8 +27,8 @@
 DAP Search Portal
   ├─ Enter / “搜索” ── GET /api/search（原有确定性搜索）
   ├─ 可选 RAG 推荐 ─── GET /api/search/recommendations（原有 HTTP RAG adapter）
-  └─ 显式“问 AI” ─── POST /api/ai/ask
-                           │
+  └─ 显式“问 AI” ─── POST /api/ai/ask/progress（SSE 状态 + 完整最终结果）
+                           │  原 POST /api/ai/ask JSON 接口继续兼容
                            ├─ 当前请求的 public-catalog profile
                            ├─ 复用 RagSearchService + HTTP Search v1
                            ├─ DAP 当前目录 authority check / stable-ID 检查
@@ -37,9 +37,9 @@ DAP Search Portal
                            └─ 严格 JSON 与引用 ID 校验 → 仅返回 DAP 候选/引用
 ```
 
-DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具调用、SQL 或业务数值查询。该功能每个请求独立，无会话/历史/持久化/流式输出。
+DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具调用、SQL 或业务数值查询。每个请求独立，无会话/历史/持久化；SSE 仅传执行阶段状态及完整最终结果，不流式传输 LLM token。
 
-## 回答质量修复（基于最新 main `b245fd38e52756e802857b1a4bb19fe31598c65b`）
+## 回答质量修复（起始基线 `b245fd38e52756e802857b1a4bb19fe31598c65b`；冲突整合后包含最新 main `3dc668b42c7dcb7a4d4b46a6089ae11cfd7fdbef`）
 
 Phase 0 复核 PR #514 合入后的实现，确认根因是回答策略和证据契约过度保守，而不是 RAG 没有返回候选：旧 System Prompt 明确禁止模型复述候选表名/字段名；API 仅有 `answered` 与 `insufficient_evidence` 两种证据结果；服务把空 citations 一律变成拒答，没有二次核验证据遗漏；前端把所有已校验 RAG 候选都标为相关候选，既不能筛除无关字段，也无法表达部分回答。问答请求最多 topK 10，列表问题没有不完整标记。
 
@@ -107,6 +107,16 @@ Phase 0 复核 PR #514 合入后的实现，确认根因是回答策略和证据
 - `retrievalStatus` 另区分 `available/degraded/unavailable/not_run`；`generationStatus` 区分 `completed/unavailable/disabled/not_run`。
 - 候选卡片只由服务端 DAP 回查的元数据生成。模型只能返回结构化候选身份与直接/相关关系；回答中的表/字段名也由服务端元数据生成。稳定 `assetId` / `fieldId` 是唯一详情身份。检索分数不作为可信度或准确率返回。
 
+### `POST /api/ai/ask/progress`（新增的状态传输，不替换旧接口）
+
+请求体与 `POST /api/ai/ask` 相同。成功连接后以 `text/event-stream` 返回 `progress` 事件和一个 `result` 事件；进度事件不含用户问题、候选、LLM 输出或隐藏推理。`result` 仅在本请求实际执行的阶段结束后一次性携带完整 `AiAskResponse`（完整回答、DAP 校验候选和引用）；不传 LLM token 或增量文本。旧 JSON 接口仍调用相同服务并保持原响应形状。
+
+每个进度事件仅含 `id`、`status`、`elapsedMs`，命中统计阶段另含 `tableCount` / `fieldCount`，失败阶段可含有限安全 `errorCode`。状态为 `pending`、`running`、`completed` 或 `failed`。服务只发布实际开始的阶段；例如无候选时不会出现 LLM 生成阶段。耗时由后端 `monotonic` 阶段计时，运行中的重复 `running` 心跳只更新实际经过的时间，不会合成完成状态。
+
+阶段为问题输入规范化/配置校验、现有 RAG HTTP 检索、命中计数、候选整理、LLM 结构化候选选择与引用 ID 校验（初轮无相关 claim 时最多进行一次有界复核），以及成功时的最终响应组装。表数为当前已校验命中的不同 `assetId` 数，字段数为不同 `(assetId, fieldId)` 数；零命中 `0/0` 只会在检索成功并实际得到空列表时发送，不以 RAG 索引总量或猜测值替代。
+
+浏览器取消会 abort SSE；服务在阶段边界检查取消信号，并尝试关闭正在读取的 RAG/LLM HTTP 响应。取消可能发生在上游连接建立阶段，届时最多等待该现有客户端的配置 timeout；页面立即呈现「已取消」，旧请求结果不会覆盖后续提交。SSE 断连/超时不改变传统搜索，也不增加上游调用。
+
 ## LLM Provider 配置
 
 | 环境变量 | 默认/范围 | 说明 |
@@ -124,17 +134,18 @@ Phase 0 复核 PR #514 合入后的实现，确认根因是回答策略和证据
 ## 搜索与 AI 共存交互
 
 - 首次进入保留 Hero 和原搜索；Enter 与「搜索」继续执行普通确定性搜索。
-- 「问 AI」是显式动作，独立请求 `/api/ai/ask`；常规搜索、热词、范围变化不会自动调用 LLM。
+- 「问 AI」是显式动作，独立请求 `/api/ai/ask/progress`；兼容的 JSON `/api/ai/ask` 仍供既有客户端使用。常规搜索、热词、范围变化不会自动调用 LLM。
 - 普通搜索成功且零结果才出现「没有找到精确匹配的资产」和「问 AI 找资产」，原问题直接沿用；部分搜索失败或接口失败不转换为空结果，也不显示无结果误导。
 - 搜索结果和 AI 答案可在原页面共存；资产搜索、RAG 推荐、AI 候选按 stable ID 区分/去重。模型异常不清空普通搜索结果。
-- AI 加载、检索失败、生成失败、无证据、重试及 RAG 降级分别呈现；AI 关闭或状态接口失败时隐藏 AI 按钮。
-- 回答摘要由 DAP 按已验证的字段/表元数据生成；模型不输出自由文本，候选卡与答案引用保持一致。表/字段名、中文名、已登记描述和详情入口只来自 DAP 当前目录。
+- AI 执行面板在请求期间默认展开并呈现后端实际阶段、状态、命中表/字段数和耗时；结束后折叠，可重新展开。失败/超时/取消均明确呈现；取消后可重新提交，旧响应不能覆盖新请求。模型生成期间不逐 token 输出，最终回答一次性返回。
+- 检索失败、生成失败、无证据、部分回答与 RAG 降级分别呈现；AI 关闭或状态接口失败时隐藏 AI 按钮。
+- 模型只输出候选稳定 ID 和相关性；回答文字、候选卡、表/字段名、中文名、描述和来源由 DAP 使用当前校验后的元数据生成，候选与 citations 一一对应。
 
 ## Mock 测试与合成样例
 
 后端测试通过 `httpx.MockTransport` 替代 RAG HTTP 和 OpenAI-compatible LLM，验证授权头/JSON 请求、异常/超时/并发上限、慢速分块响应的绝对 deadline 与超时后并发 slot 释放、prompt 注入文本隔离、选择型 JSON Contract、稳定 ID/父表校验、空选择有界复核、直接/间接相关性及无证据降级。Mock Secret 只存在测试进程内，不能在日志/响应泄露。
 
-样例使用合成元数据覆盖字段定位、字段解释、多个余额相关字段、主题域、未登记字段和相近但不同的命名；没有将贷款/银行词汇写成 DAP 全局硬编码规则。浏览器 E2E 模拟 `/api/ai/status` 和 `/api/ai/ask`，不直连真实模型。
+样例使用合成元数据覆盖字段定位、字段解释、多个余额相关字段、主题域、未登记字段和相近但不同的命名；没有将贷款/银行词汇写成 DAP 全局硬编码规则。浏览器 E2E 模拟 `/api/ai/status` 和 `/api/ai/ask/progress` SSE，不直连真实模型。
 
 ## 内网 DeepSeek 联调（待外部环境执行）
 
@@ -159,14 +170,13 @@ Phase 0 复核 PR #514 合入后的实现，确认根因是回答策略和证据
 
 | 检查 | 结果 |
 |---|---|
-| 后端全量 `python -m unittest discover -s backend/tests` | **PASS**：1169 tests，29 skipped（Python 3.11 + task-local 依赖，271.833s）；AI Ask API/contract/service、LLM Provider 与 RAG Search focused suite **52/52 PASS**。 |
-| 前端 `npm test` | **PASS**：401 个 source tests + 2 个 API-mode tests。 |
-| Frontend static/build | **PASS**：Lineage build/package verify、完整 typecheck、ESLint、`VITE_API_MODE=remote npm run build:frontend`；构建有既有 >500 kB bundle advisory。 |
-| Browser E2E | **PASS**：`e2e/ai-ask.spec.ts` Chromium/WebKit **10/10**（合成 DAP API fixture）；1440/1280/860/600 宽度无横向溢出。 |
-| Community boundary / hygiene | **PASS**：Public Data Guard 扫描 374 files，BLOCKER=0、SUSPICIOUS=0；`compileall` 与 `git diff --check` PASS。 |
-| npm audit | **PASS**：CI 阈值 `npm audit --audit-level=high` exit 0，报告 0 vulnerabilities；未修改依赖或 lockfile。 |
-| Migration / database | **NOT APPLICABLE**：无 Schema/Migration/Seed/数据库依赖改动；未连接真实数据库。 |
-| 未筛选全部 Playwright specs | **NOT RUN**：本地只运行与本改动相关的 AI Q&A spec；其他浏览器 specs 由 PR CI 覆盖。 |
+| 后端全量 `python3 -m unittest discover -s backend/tests` | **PASS**：1176 tests，29 skipped（Python 3.11.2 + task-local dependencies；260.606s）。AI Ask files 36/36、LLM Provider 10/10、RAG service 13/13、RBAC route enforcement 5/5 focused tests 均通过。 |
+| 前端 `npm test` | **PASS**：405 个 source tests + 2 个 API-mode tests；完整 typecheck、ESLint、Lineage build/package verify、`VITE_API_MODE=remote npm run build:frontend` 均 PASS。 |
+| Browser E2E | **PASS**：`e2e/ai-ask.spec.ts` Chromium/WebKit **12/12**（合成 DAP API + SSE fixture），覆盖普通搜索隔离、部分清单、零证据、禁用、超时、重试、取消/旧响应隔离及 1440/1280/860/600px 布局检查。 |
+| Community boundary / hygiene | **PASS**：Public Data Guard 扫描 374 files，BLOCKER=0、SUSPICIOUS=0；`compileall` 与 staged/working-tree `git diff --check` PASS。 |
+| npm audit | **PASS**：`npm audit --audit-level=high` exit 0，0 vulnerabilities；未修改依赖或 lockfile。 |
+| Migration / database | **NOT APPLICABLE**：本 PR 无 Schema/Migration/Seed/数据库依赖改动；真实数据库验证保持 **NOT RUN**。 |
+| 未筛选全部 Playwright specs | **NOT RUN**：本地只运行本 Issue 的 AI Q&A E2E；其他浏览器 specs 未运行。 |
 
 本地 Mock / synthetic 测试结果不代替 GitHub CI；PR 创建后须以远端 exact-HEAD workflow 结果为准。
 

@@ -1,5 +1,5 @@
 import { LONG_REQUEST_TIMEOUT } from "../config/request.ts";
-import { requestRemote } from "./http.ts";
+import { requestRemote, requestRemoteEventStream } from "./http.ts";
 
 export type AiAskStatus =
   | "answered"
@@ -37,6 +37,24 @@ export interface AiAskCitation {
   source: "dap_catalog";
 }
 
+export type AiAskProgressStepId =
+  | "analyzing"
+  | "retrieving"
+  | "counting"
+  | "organizing"
+  | "generating"
+  | "completed";
+export type AiAskProgressStatus = "pending" | "running" | "completed" | "failed";
+
+export interface AiAskProgressStep {
+  id: AiAskProgressStepId;
+  status: AiAskProgressStatus;
+  elapsedMs: number;
+  tableCount?: number | null;
+  fieldCount?: number | null;
+  errorCode?: "timeout" | "unavailable" | "invalid_response" | "disabled" | "cancelled" | null;
+}
+
 export interface AiAskResponse {
   status: AiAskStatus;
   answer: string;
@@ -65,6 +83,11 @@ const ASK_STATUSES = new Set<string>([
   "retrieval_unavailable",
   "generation_unavailable",
 ]);
+const PROGRESS_STEP_IDS = new Set<string>([
+  "analyzing", "retrieving", "counting", "organizing", "generating", "completed",
+]);
+const PROGRESS_STATUSES = new Set<string>(["pending", "running", "completed", "failed"]);
+const PROGRESS_ERRORS = new Set<string>(["timeout", "unavailable", "invalid_response", "disabled", "cancelled"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -231,6 +254,38 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
   };
 }
 
+export function parseAiAskProgressStep(value: unknown): AiAskProgressStep {
+  if (!isRecord(value)) throw new Error("Invalid AI ask progress event.");
+  const allowedKeys = new Set(["id", "status", "elapsedMs", "tableCount", "fieldCount", "errorCode"]);
+  if (Object.keys(value).some((key) => !allowedKeys.has(key))) {
+    throw new Error("Unexpected data in AI ask progress event.");
+  }
+  const id = value["id"];
+  const status = value["status"];
+  const elapsedMs = value["elapsedMs"];
+  const tableCount = value["tableCount"];
+  const fieldCount = value["fieldCount"];
+  const errorCode = value["errorCode"];
+  if (
+    typeof id !== "string" || !PROGRESS_STEP_IDS.has(id)
+    || typeof status !== "string" || !PROGRESS_STATUSES.has(status)
+    || (elapsedMs !== undefined && (typeof elapsedMs !== "number" || !Number.isFinite(elapsedMs) || elapsedMs < 0))
+    || (tableCount !== undefined && tableCount !== null && (!Number.isInteger(tableCount) || Number(tableCount) < 0))
+    || (fieldCount !== undefined && fieldCount !== null && (!Number.isInteger(fieldCount) || Number(fieldCount) < 0))
+    || (errorCode !== undefined && errorCode !== null && (typeof errorCode !== "string" || !PROGRESS_ERRORS.has(errorCode)))
+  ) {
+    throw new Error("Invalid AI ask progress event.");
+  }
+  return {
+    id: id as AiAskProgressStepId,
+    status: status as AiAskProgressStatus,
+    elapsedMs: typeof elapsedMs === "number" ? elapsedMs : 0,
+    ...(tableCount === undefined ? {} : { tableCount: tableCount as number | null }),
+    ...(fieldCount === undefined ? {} : { fieldCount: fieldCount as number | null }),
+    ...(errorCode === undefined ? {} : { errorCode: errorCode as Exclude<AiAskProgressStep["errorCode"], undefined> }),
+  };
+}
+
 export async function getAiAskAvailability(): Promise<AiAskAvailability> {
   if (API_MODE !== "remote") return { enabled: false };
   const response = await requestRemote<unknown>("/ai/status", {
@@ -238,6 +293,47 @@ export async function getAiAskAvailability(): Promise<AiAskAvailability> {
     suppressUnauthorizedEvent: true,
   });
   return parseAiAskAvailability(response);
+}
+
+export async function askAiWithProgress(
+  query: string,
+  onProgress: (step: AiAskProgressStep) => void,
+  scope = "all",
+  topK = 10,
+  signal?: AbortSignal,
+): Promise<AiAskResponse> {
+  const normalizedQuery = String(query ?? "").trim();
+  if (!normalizedQuery || normalizedQuery.length > 500) {
+    throw new Error("问题长度必须为 1–500 个字符。");
+  }
+  if (API_MODE !== "remote") {
+    return parseAiAskResponse({
+      status: "generation_unavailable",
+      answer: "AI 问答暂不可用，请稍后重试。",
+      citations: [], candidates: [], retrievalStatus: "not_run",
+      generationStatus: "disabled", resultsTruncated: false,
+      reasonCode: "ai_disabled", elapsedMs: 0,
+    });
+  }
+
+  let result: AiAskResponse | null = null;
+  await requestRemoteEventStream("/ai/ask/progress", {
+    method: "POST",
+    body: { query: normalizedQuery, scope, topK },
+    timeout: AI_ASK_TIMEOUT_MS,
+    suppressUnauthorizedEvent: true,
+    suppressTimeoutPayloadLogging: true,
+    signal,
+  }, (event) => {
+    if (event.event === "progress") {
+      onProgress(parseAiAskProgressStep(JSON.parse(event.data) as unknown));
+    } else if (event.event === "result") {
+      if (result !== null) throw new Error("AI ask returned more than one final result.");
+      result = parseAiAskResponse(JSON.parse(event.data) as unknown);
+    }
+  });
+  if (result === null) throw new Error("AI 问答进度流未返回完整答案。");
+  return result;
 }
 
 export async function askAi(

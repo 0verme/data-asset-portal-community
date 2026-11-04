@@ -1,10 +1,12 @@
-"""Single-turn metadata Q&A over verified DAP catalog candidates."""
+"""Single-turn metadata Q&A orchestration over the existing DAP RAG adapter."""
 
 from __future__ import annotations
 
 import re
+import threading
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from typing import Any
 
 from pydantic import ValidationError
@@ -12,6 +14,7 @@ from pydantic import ValidationError
 from ..contracts.ai_ask import (
     AiAskCandidate,
     AiAskCitation,
+    AiAskProgressStep,
     AiAskRequest,
     AiAskResponse,
     AiGeneratedAnswer,
@@ -21,6 +24,7 @@ from .ai_llm_provider import LLMProviderError, OpenAICompatibleLLMProvider
 INSUFFICIENT_EVIDENCE_ANSWER = "当前目录检索没有找到足以回答问题的已验证资产。"
 _GENERATION_UNAVAILABLE_ANSWER = "AI 问答暂不可用，未生成基于证据的回答；请稍后重试。"
 _RETRIEVAL_UNAVAILABLE_ANSWER = "资产检索暂不可用，无法基于目录回答；请稍后重试。"
+_RETRIEVAL_TIMEOUT_ANSWER = "资产检索超时，无法基于目录回答；请稍后重试。"
 _MAX_CANDIDATES = 20
 _MAX_ANSWER_LENGTH = 1800
 _LIST_QUERY_PATTERNS = (
@@ -43,14 +47,75 @@ _SYSTEM_PROMPT = """你是企业数据资产目录的专业 AI 助手，擅长�
 只输出一个严格 JSON object，字段仅为 questionType 和 claims：
 {"questionType":"asset_location|field_explanation|asset_list|general","claims":[{"assetId":正整数,"fieldId":正整数或 null,"relevance":"direct|related|context_only"}]}
 claims 中只能使用输入 candidates 的精确稳定 ID；只选直接回答或有明确业务相关性的候选。纯上下文候选标为 context_only。没有足够证据时 claims 返回空数组。不得在 JSON 中输出自由文本答案、资产名、ID 以外的事实、Markdown、SQL、秘密、会话标识或追问内容；最终文字由 DAP 使用已校验元数据生成。"""
-
 _REPAIR_SYSTEM_PROMPT = _SYSTEM_PROMPT + """
 
 这是一次有界的证据复核：上一轮没有给出任何可直接支持问题的候选。重新比较原问题与每个已验证候选的表名、字段名及目录描述；如果至少有一项直接回答问题，或有明确相关性但不能直接回答，请用精确 ID 标记 direct/related。若所有候选都只是上下文或无关线索，claims 仍返回空数组。不得为了凑答案引用候选，也不得生成自由文本。"""
 
 
+class AIAskCancelled(RuntimeError):
+    """Raised when the browser disconnects while an ask is being processed."""
+
+
+class _ProgressReporter:
+    """Emit only real step transitions and measured durations."""
+
+    def __init__(
+        self,
+        callback: Callable[[AiAskProgressStep], None] | None,
+        cancel_event: threading.Event | None,
+    ) -> None:
+        self._callback = callback
+        self._cancel_event = cancel_event
+        self._active: tuple[str, float] | None = None
+
+    def check_cancelled(self) -> None:
+        if self._cancel_event is not None and self._cancel_event.is_set():
+            raise AIAskCancelled("request_cancelled")
+
+    def _emit(self, step_id: str, status: str, **values: Any) -> None:
+        if self._callback is None:
+            return
+        try:
+            self._callback(AiAskProgressStep(id=step_id, status=status, **values))
+        except Exception:
+            # Progress delivery must never change the existing answer contract.
+            return
+
+    def start(self, step_id: str) -> None:
+        self.check_cancelled()
+        self._emit(step_id, "pending")
+        started = time.monotonic()
+        self._active = (step_id, started)
+        self._emit(step_id, "running")
+
+    def complete(self, step_id: str, **values: Any) -> None:
+        active = self._active
+        elapsed_ms = (
+            max(0.0, (time.monotonic() - active[1]) * 1000)
+            if active is not None and active[0] == step_id
+            else 0.0
+        )
+        self._emit(step_id, "completed", elapsedMs=elapsed_ms, **values)
+        self._active = None
+
+    def fail(self, step_id: str, error_code: str = "unavailable") -> None:
+        active = self._active
+        elapsed_ms = (
+            max(0.0, (time.monotonic() - active[1]) * 1000)
+            if active is not None and active[0] == step_id
+            else 0.0
+        )
+        self._emit(
+            step_id,
+            "failed",
+            elapsedMs=elapsed_ms,
+            errorCode=error_code,
+        )
+        self._active = None
+
+
 class AIAskService:
-    """Retrieve, authorize, select and render answers from current DAP metadata."""
+    """Retrieve, authorize, generate, and bind every citation to DAP stable IDs."""
 
     def __init__(self, rag_service: Any, llm_provider: Any) -> None:
         self._rag_service = rag_service
@@ -89,7 +154,7 @@ class AIAskService:
                 domain=item.domain,
                 layer=item.layer,
                 source="dap_catalog",
-                matchReason="RAG 命中字段；字段、父表和稳定 ID 已由当前 DAP 目录校验。",
+                matchReason="RAG 检索候选；字段、父表和稳定 ID 已由当前 DAP 目录校验。",
             )
         if item.asset_type != "table" or item.field_id is not None:
             raise ValueError("unsupported candidate identity")
@@ -102,32 +167,7 @@ class AIAskService:
             domain=item.domain,
             layer=item.layer,
             source="dap_catalog",
-            matchReason="RAG 命中数据表；表和稳定 ID 已由当前 DAP 目录校验。",
-        )
-
-    @staticmethod
-    def _response(
-        *,
-        status: str,
-        answer: str,
-        retrieval_status: str,
-        generation_status: str,
-        reason_code: str | None,
-        started: float,
-        candidates: list[AiAskCandidate] | None = None,
-        citations: list[AiAskCitation] | None = None,
-        results_truncated: bool = False,
-    ) -> AiAskResponse:
-        return AiAskResponse(
-            status=status,
-            answer=answer,
-            candidates=candidates or [],
-            citations=citations or [],
-            retrievalStatus=retrieval_status,
-            generationStatus=generation_status,
-            resultsTruncated=results_truncated,
-            reasonCode=reason_code,
-            elapsedMs=max(0.0, (time.monotonic() - started) * 1000),
+            matchReason="RAG 检索候选；表和稳定 ID 已由当前 DAP 目录校验。",
         )
 
     @staticmethod
@@ -258,17 +298,16 @@ class AIAskService:
             notes.append("相关线索不能直接证明问题所问的资产或业务含义。")
 
         rendered: list[str] = []
-        truncated = False
+        summary_truncated = False
         for line in lines:
             suffix = "\n" + "\n".join(notes) if notes else ""
             if len("\n".join([*rendered, line])) + len(suffix) > _MAX_ANSWER_LENGTH - 100:
-                truncated = True
+                summary_truncated = True
                 break
             rendered.append(line)
-        if truncated:
+        if summary_truncated:
             notes.append("摘要受长度限制；其余已校验引用请查看下方资产卡片。")
-        result = "\n".join([*rendered, *notes])
-        return result[:_MAX_ANSWER_LENGTH]
+        return "\n".join([*rendered, *notes])[:_MAX_ANSWER_LENGTH]
 
     @classmethod
     def _parse_selection(
@@ -300,191 +339,325 @@ class AIAskService:
             return "llm_unavailable"
         return "llm_not_configured" if reason_code == "llm_not_configured" else reason_code
 
-    def _generation_failure(
-        self,
+    @staticmethod
+    def _response(
         *,
-        started: float,
+        status: str,
+        answer: str,
         retrieval_status: str,
-        reason_code: str,
+        generation_status: str,
+        reason_code: str | None,
+        started: float,
+        candidates: list[AiAskCandidate] | None = None,
+        citations: list[AiAskCitation] | None = None,
+        results_truncated: bool = False,
     ) -> AiAskResponse:
-        return self._response(
-            status="generation_unavailable",
-            answer=_GENERATION_UNAVAILABLE_ANSWER,
-            retrieval_status=retrieval_status,
-            generation_status="unavailable",
-            reason_code=reason_code,
-            started=started,
+        return AiAskResponse(
+            status=status,
+            answer=answer,
+            candidates=candidates or [],
+            citations=citations or [],
+            retrievalStatus=retrieval_status,
+            generationStatus=generation_status,
+            resultsTruncated=results_truncated,
+            reasonCode=reason_code,
+            elapsedMs=max(0.0, (time.monotonic() - started) * 1000),
         )
 
-    def ask(self, request: AiAskRequest, *, profile: str) -> AiAskResponse:
+    def ask(
+        self,
+        request: AiAskRequest,
+        *,
+        profile: str,
+        progress_callback: Callable[[AiAskProgressStep], None] | None = None,
+        cancel_event: threading.Event | None = None,
+    ) -> AiAskResponse:
         started = time.monotonic()
-        if not self.enabled():
-            return self._response(
+        progress = _ProgressReporter(progress_callback, cancel_event)
+
+        def respond(
+            *,
+            status: str,
+            answer: str,
+            retrieval_status: str,
+            generation_status: str,
+            reason_code: str | None,
+            candidates: list[AiAskCandidate] | None = None,
+            citations: list[AiAskCitation] | None = None,
+            results_truncated: bool = False,
+            completed: bool = False,
+        ) -> AiAskResponse:
+            if completed:
+                progress.start("completed")
+            response = self._response(
+                status=status,
+                answer=answer,
+                retrieval_status=retrieval_status,
+                generation_status=generation_status,
+                reason_code=reason_code,
+                started=started,
+                candidates=candidates,
+                citations=citations,
+                results_truncated=results_truncated,
+            )
+            if completed:
+                progress.complete("completed")
+            return response
+
+        progress.start("analyzing")
+        try:
+            query = request.query.strip()
+            is_list_query = self._is_asset_list_query(query)
+            enabled = self.enabled()
+            if not query:
+                progress.fail("analyzing", "invalid_response")
+                return respond(
+                    status="generation_unavailable",
+                    answer=_GENERATION_UNAVAILABLE_ANSWER,
+                    retrieval_status="not_run",
+                    generation_status="unavailable",
+                    reason_code="llm_unavailable",
+                )
+        except Exception:
+            progress.fail("analyzing", "unavailable")
+            return respond(
                 status="generation_unavailable",
-                answer="AI 问答未启用或未完成服务端配置。",
+                answer=_GENERATION_UNAVAILABLE_ANSWER,
+                retrieval_status="not_run",
+                generation_status="unavailable",
+                reason_code="llm_unavailable",
+            )
+        progress.complete("analyzing")
+        if not enabled:
+            return respond(
+                status="generation_unavailable",
+                answer=_GENERATION_UNAVAILABLE_ANSWER,
                 retrieval_status="not_run",
                 generation_status="disabled",
                 reason_code="ai_disabled",
-                started=started,
             )
 
-        query = request.query.strip()
-        is_list_query = self._is_asset_list_query(query)
-        # List questions may use the existing Search v1 limit of 20, but only
-        # when the user requested the normal maximum. Admin topK remains the
-        # effective ceiling; non-list queries keep the existing <=10 context.
-        retrieval_top_k = (
-            _MAX_CANDIDATES
-            if is_list_query and request.top_k == 10
-            else request.top_k
-        )
+        progress.start("retrieving")
         try:
+            retrieval_options = (
+                {"cancel_event": cancel_event}
+                if cancel_event is not None
+                else {}
+            )
             retrieval = self._rag_service.recommend(
                 query,
                 profile=profile,
-                top_k=retrieval_top_k,
+                top_k=(
+                    _MAX_CANDIDATES
+                    if is_list_query and request.top_k == 10
+                    else request.top_k
+                ),
+                **retrieval_options,
             )
+            progress.check_cancelled()
+        except AIAskCancelled:
+            raise
         except Exception:
-            return self._response(
+            if cancel_event is not None and cancel_event.is_set():
+                raise AIAskCancelled("request_cancelled") from None
+            progress.fail("retrieving", "unavailable")
+            return respond(
                 status="retrieval_unavailable",
                 answer=_RETRIEVAL_UNAVAILABLE_ANSWER,
                 retrieval_status="unavailable",
                 generation_status="not_run",
                 reason_code="retrieval_unavailable",
-                started=started,
             )
 
         if retrieval.status in {"disabled", "unavailable"}:
+            retrieval_reason = retrieval.reason_code
+            error_code = (
+                "disabled" if retrieval.status == "disabled"
+                else "timeout" if retrieval_reason == "timeout"
+                else "invalid_response" if retrieval_reason == "invalid_response"
+                else "unavailable"
+            )
+            progress.fail("retrieving", error_code)
             reason = (
-                "retrieval_disabled"
-                if retrieval.status == "disabled"
-                else "retrieval_timeout"
-                if retrieval.reason_code == "timeout"
+                "retrieval_disabled" if retrieval.status == "disabled"
+                else "retrieval_timeout" if retrieval_reason == "timeout"
                 else "retrieval_unavailable"
             )
-            return self._response(
+            return respond(
                 status="retrieval_unavailable",
                 answer=(
-                    "资产检索超时，无法基于目录回答；请稍后重试。"
+                    _RETRIEVAL_TIMEOUT_ANSWER
                     if reason == "retrieval_timeout"
                     else _RETRIEVAL_UNAVAILABLE_ANSWER
                 ),
                 retrieval_status="unavailable",
                 generation_status="not_run",
                 reason_code=reason,
-                started=started,
             )
         if retrieval.status not in {"available", "degraded"}:
-            return self._response(
+            progress.fail("retrieving", "invalid_response")
+            return respond(
                 status="retrieval_unavailable",
                 answer=_RETRIEVAL_UNAVAILABLE_ANSWER,
                 retrieval_status="unavailable",
                 generation_status="not_run",
                 reason_code="retrieval_unavailable",
-                started=started,
             )
+        progress.complete("retrieving")
 
         retrieval_status = retrieval.status
+        progress.start("counting")
         try:
-            candidates = [self._candidate(item) for item in retrieval.recommendations]
+            recommendations = list(retrieval.recommendations)
+            table_ids = {item.asset_id for item in recommendations}
+            field_ids = {
+                (item.asset_id, item.field_id)
+                for item in recommendations
+                if item.asset_type == "field" and item.field_id is not None
+            }
+            table_count = len(table_ids)
+            field_count = len(field_ids)
         except Exception:
-            return self._response(
+            progress.fail("counting", "invalid_response")
+            return respond(
                 status="retrieval_unavailable",
                 answer=_RETRIEVAL_UNAVAILABLE_ANSWER,
                 retrieval_status="unavailable",
                 generation_status="not_run",
                 reason_code="retrieval_unavailable",
-                started=started,
             )
+        progress.complete(
+            "counting",
+            tableCount=table_count,
+            fieldCount=field_count,
+        )
+
+        progress.start("organizing")
+        try:
+            candidates = [self._candidate(item) for item in recommendations]
+            user_payload = {
+                "query": query,
+                "scope": request.scope,
+                "candidates": [item.model_dump(by_alias=True) for item in candidates],
+            }
+        except Exception:
+            progress.fail("organizing", "invalid_response")
+            return respond(
+                status="retrieval_unavailable",
+                answer=_RETRIEVAL_UNAVAILABLE_ANSWER,
+                retrieval_status="unavailable",
+                generation_status="not_run",
+                reason_code="retrieval_unavailable",
+            )
+        progress.complete("organizing")
 
         if not candidates:
             if retrieval_status == "degraded":
-                return self._response(
+                return respond(
                     status="retrieval_unavailable",
                     answer=_RETRIEVAL_UNAVAILABLE_ANSWER,
                     retrieval_status="unavailable",
                     generation_status="not_run",
                     reason_code="retrieval_degraded_without_evidence",
-                    started=started,
                 )
-            return self._response(
+            return respond(
                 status="insufficient_evidence",
                 answer=INSUFFICIENT_EVIDENCE_ANSWER,
                 retrieval_status="available",
                 generation_status="not_run",
                 reason_code="insufficient_evidence",
-                started=started,
+                completed=True,
             )
 
-        user_payload = {
-            "query": query,
-            "scope": request.scope,
-            "candidates": [
-                item.model_dump(by_alias=True, exclude_none=True)
-                for item in candidates
-            ],
-        }
+        progress.start("generating")
         try:
+            provider_options = (
+                {"cancel_event": cancel_event}
+                if cancel_event is not None
+                else {}
+            )
             raw_output = self._llm_provider.complete_json(
                 system_prompt=_SYSTEM_PROMPT,
                 user_payload=user_payload,
+                **provider_options,
             )
-        except LLMProviderError as error:
-            return self._generation_failure(
-                started=started,
-                retrieval_status=retrieval_status,
-                reason_code=self._provider_reason(error),
-            )
-        except Exception:
-            return self._generation_failure(
-                started=started,
-                retrieval_status=retrieval_status,
-                reason_code="llm_unavailable",
-            )
-        generated, selected, selection_error = self._parse_selection(raw_output, candidates)
-        if selection_error:
-            return self._generation_failure(
-                started=started,
-                retrieval_status=retrieval_status,
-                reason_code=selection_error,
-            )
-        if not selected:
-            # A second, stricter evidence-selection pass distinguishes true
-            # no-evidence from an initially omitted citation. It never accepts
-            # free-text model output and is bounded to one retry.
-            try:
+            progress.check_cancelled()
+            generated, selected, selection_error = self._parse_selection(raw_output, candidates)
+            if selection_error:
+                progress.fail("generating", "invalid_response")
+                return respond(
+                    status="generation_unavailable",
+                    answer=_GENERATION_UNAVAILABLE_ANSWER,
+                    retrieval_status=retrieval_status,
+                    generation_status="unavailable",
+                    reason_code=selection_error,
+                )
+            if not selected:
+                # One bounded selection-only review distinguishes omitted evidence
+                # from a true no-evidence result; it never accepts model prose.
+                progress.check_cancelled()
                 raw_output = self._llm_provider.complete_json(
                     system_prompt=_REPAIR_SYSTEM_PROMPT,
                     user_payload=user_payload,
+                    **provider_options,
                 )
-            except LLMProviderError as error:
-                return self._generation_failure(
-                    started=started,
-                    retrieval_status=retrieval_status,
-                    reason_code=self._provider_reason(error),
-                )
-            except Exception:
-                return self._generation_failure(
-                    started=started,
-                    retrieval_status=retrieval_status,
-                    reason_code="llm_unavailable",
-                )
-            generated, selected, selection_error = self._parse_selection(raw_output, candidates)
-            if selection_error:
-                return self._generation_failure(
-                    started=started,
-                    retrieval_status=retrieval_status,
-                    reason_code=selection_error,
-                )
+                progress.check_cancelled()
+                generated, selected, selection_error = self._parse_selection(raw_output, candidates)
+                if selection_error:
+                    progress.fail("generating", "invalid_response")
+                    return respond(
+                        status="generation_unavailable",
+                        answer=_GENERATION_UNAVAILABLE_ANSWER,
+                        retrieval_status=retrieval_status,
+                        generation_status="unavailable",
+                        reason_code=selection_error,
+                    )
+        except LLMProviderError as error:
+            if error.reason_code == "cancelled" or (
+                cancel_event is not None and cancel_event.is_set()
+            ):
+                raise AIAskCancelled("request_cancelled") from None
+            reason_code = self._provider_reason(error)
+            progress.fail(
+                "generating",
+                "timeout" if reason_code == "llm_timeout"
+                else "disabled" if reason_code in {"ai_disabled", "llm_not_configured"}
+                else "invalid_response" if reason_code == "invalid_model_output"
+                else "unavailable",
+            )
+            generation_status = (
+                "disabled"
+                if reason_code in {"ai_disabled", "llm_not_configured"}
+                else "unavailable"
+            )
+            return respond(
+                status="generation_unavailable",
+                answer=_GENERATION_UNAVAILABLE_ANSWER,
+                retrieval_status=retrieval_status,
+                generation_status=generation_status,
+                reason_code=reason_code,
+            )
+        except Exception:
+            if cancel_event is not None and cancel_event.is_set():
+                raise AIAskCancelled("request_cancelled") from None
+            progress.fail("generating", "unavailable")
+            return respond(
+                status="generation_unavailable",
+                answer=_GENERATION_UNAVAILABLE_ANSWER,
+                retrieval_status=retrieval_status,
+                generation_status="unavailable",
+                reason_code="llm_unavailable",
+            )
 
         if not selected:
-            return self._response(
+            progress.complete("generating")
+            return respond(
                 status="insufficient_evidence",
                 answer=INSUFFICIENT_EVIDENCE_ANSWER,
                 retrieval_status=retrieval_status,
                 generation_status="completed",
                 reason_code="insufficient_evidence",
-                started=started,
+                completed=True,
             )
 
         selected_candidates = [
@@ -499,6 +672,8 @@ class AIAskService:
             )
             for candidate, _relevance in selected
         ]
+        progress.complete("generating")
+
         list_answer = is_list_query or generated.question_type == "asset_list"
         has_direct = any(relevance == "direct" for _, relevance in selected)
         is_partial = list_answer or retrieval_status == "degraded" or not has_direct
@@ -508,16 +683,16 @@ class AIAskService:
             is_list_query=is_list_query,
             retrieval_degraded=retrieval_status == "degraded",
         )
-        return self._response(
+        return respond(
             status="partial_answer" if is_partial else "answered",
             answer=answer,
             retrieval_status=retrieval_status,
             generation_status="completed",
             reason_code="partial_results" if is_partial else None,
-            started=started,
             candidates=selected_candidates,
             citations=citations,
             results_truncated=list_answer or retrieval_status == "degraded",
+            completed=True,
         )
 
 

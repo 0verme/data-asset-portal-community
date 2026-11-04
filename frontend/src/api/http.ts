@@ -70,6 +70,121 @@ function resolveNow(): number {
   return (typeof performance !== 'undefined' && performance.now?.()) || Date.now();
 }
 
+export interface RemoteServerSentEvent {
+  event: string;
+  data: string;
+}
+
+export async function requestRemoteEventStream(
+  path: string,
+  options: RemoteRequestOptions = {},
+  onEvent: (event: RemoteServerSentEvent) => void,
+): Promise<void> {
+  const timeoutMs = resolveRequestTimeout(options.timeout ?? options.timeoutMs, REQUEST_TIMEOUT);
+  const requestUrl = buildUrl(path, options.params);
+  const method = String(options.method || "GET").toUpperCase();
+  const controller = new AbortController();
+  const abortFromCaller = (): void => controller.abort();
+  if (options.signal?.aborted) controller.abort();
+  else options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+  const startedAt = resolveNow();
+  let timedOut = false;
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+
+  const dispatchFrame = (frame: string): void => {
+    let event = "message";
+    const data: string[] = [];
+    for (const line of frame.split(/\r\n|\r|\n/)) {
+      if (line.startsWith("event:")) event = line.slice(6).trimStart();
+      else if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
+    }
+    if (data.length) onEvent({ event, data: data.join("\n") });
+  };
+
+  try {
+    const fetchInit: RequestInit = {
+      method,
+      credentials: options.credentials || "include",
+      headers: {
+        Accept: "text/event-stream",
+        ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {}),
+      },
+      signal: controller.signal,
+    };
+    if (options.body !== undefined) fetchInit.body = JSON.stringify(options.body);
+    const response = await fetch(requestUrl, fetchInit);
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type") || "";
+      const payload: unknown = contentType.includes("application/json")
+        ? await response.json()
+        : await response.text();
+      const record = payload as Record<string, unknown> | null | undefined;
+      const errorObj = record?.["error"] as Record<string, unknown> | undefined;
+      const message =
+        (typeof errorObj?.["message"] === "string" ? errorObj["message"] : undefined)
+        || (typeof record?.["message"] === "string" ? record["message"] : undefined)
+        || `请求失败: ${response.status} ${response.statusText}`;
+      const error = new Error(message) as ApiHttpError;
+      error.status = response.status;
+      error.payload = payload;
+      if (response.status === 401 && !options.suppressUnauthorizedEvent && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("app:unauthorized"));
+      }
+      throw error;
+    }
+    if (!(response.headers.get("content-type") || "").includes("text/event-stream") || !response.body) {
+      throw new Error("服务器未返回 AI 问答进度流。");
+    }
+
+    reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      if (buffer.length > 1_000_000) throw new Error("AI 问答进度响应超出大小限制。");
+      const boundary = /\r\n\r\n|\n\n|\r\r/;
+      let match: RegExpExecArray | null;
+      while ((match = boundary.exec(buffer)) !== null) {
+        dispatchFrame(buffer.slice(0, match.index));
+        buffer = buffer.slice(match.index + match[0].length);
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) dispatchFrame(buffer);
+  } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      if (!timedOut) throw error;
+      const durationMs = Math.round(resolveNow() - startedAt);
+      console.warn("[request-timeout]", {
+        method,
+        url: requestUrl,
+        timeoutMs,
+        durationMs,
+        payload: options.suppressTimeoutPayloadLogging
+          ? "[redacted]"
+          : undefined,
+      });
+      throw new Error(`AI 问答请求超时（${formatTimeoutLabel(timeoutMs)}），请重试。`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    options.signal?.removeEventListener("abort", abortFromCaller);
+    try {
+      reader?.releaseLock();
+    } catch {
+      // The fetch abort already released the stream reader.
+    }
+  }
+}
+
 export async function requestRemote<T = unknown>(path: string, options: RemoteRequestOptions = {}): Promise<T> {
   const timeoutMs = resolveRequestTimeout(options.timeout ?? options.timeoutMs, REQUEST_TIMEOUT);
   const requestUrl = buildUrl(path, options.params);

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from backend.app.application import Identity
 from backend.app.authorization.core import AuthorizationService
-from backend.app.contracts.ai_ask import AiAskResponse
+from backend.app.contracts.ai_ask import AiAskProgressStep, AiAskResponse
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi_app import create_fastapi_app
 from fastapi.testclient import TestClient
@@ -45,8 +45,12 @@ class StubAIAskService:
     def enabled(self):
         return self._enabled
 
-    def ask(self, payload, *, profile):
+    def ask(self, payload, *, profile, progress_callback=None, cancel_event=None):
         self.calls.append((payload, profile))
+        if progress_callback is not None:
+            progress_callback(AiAskProgressStep(id="analyzing", status="pending"))
+            progress_callback(AiAskProgressStep(id="analyzing", status="running"))
+            progress_callback(AiAskProgressStep(id="analyzing", status="completed", elapsedMs=1))
         return self.response
 
 
@@ -157,7 +161,24 @@ class AiAskApiTests(unittest.TestCase):
         self.assertEqual("legacy", result.json()["query"])
         search.search.assert_called_once_with("legacy", scope="all", limit="5", profile="internal")
         self.assertIn("/api/ai/ask", schema["paths"])
+        self.assertIn("/api/ai/ask/progress", schema["paths"])
         self.assertIn("/api/ai/status", schema["paths"])
+
+    def test_progress_endpoint_emits_safe_sse_and_keeps_existing_json_api(self):
+        service = StubAIAskService()
+        client, _search = self._client(service=service)
+
+        response = client.post("/api/ai/ask/progress", json={"query": "合成目录问题"})
+
+        self.assertEqual(200, response.status_code)
+        self.assertIn("text/event-stream", response.headers["content-type"])
+        self.assertIn("event: progress\n", response.text)
+        self.assertIn('"status":"running"', response.text)
+        self.assertIn('"elapsedMs":1', response.text)
+        self.assertIn("event: result\n", response.text)
+        self.assertIn("发现已校验的目录候选。", response.text)
+        self.assertNotIn("apiKey", response.text)
+        self.assertEqual(1, len(service.calls))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import unittest
 from unittest.mock import MagicMock
 
@@ -9,6 +10,21 @@ import httpx
 from backend.app.contracts.rag_search import DEFAULT_RAG_SEARCH_CONFIG
 from backend.app.services.rag_search_http_client import RagSearchHttpClient
 from backend.app.services.rag_search_service import RagSearchService
+
+
+class _BlockingResponseBody(httpx.SyncByteStream):
+    def __init__(self):
+        self.started = threading.Event()
+        self.closed = threading.Event()
+
+    def __iter__(self):
+        self.started.set()
+        if self.closed.wait(1):
+            return
+        yield b"not needed after cancellation"
+
+    def close(self):
+        self.closed.set()
 
 
 class RagSearchServiceTests(unittest.TestCase):
@@ -295,6 +311,28 @@ class RagSearchServiceTests(unittest.TestCase):
                 response = service.recommend("客户", profile="strict")
                 self.assertEqual("unavailable", response.status)
                 self.assertEqual(reason, response.reason_code)
+
+    def test_cancellation_closes_the_active_rag_response(self):
+        body = _BlockingResponseBody()
+        service, _assets = self._service(lambda _request: httpx.Response(200, stream=body))
+        cancel_event = threading.Event()
+        responses = []
+
+        thread = threading.Thread(
+            target=lambda: responses.append(
+                service.recommend("客户", profile="strict", cancel_event=cancel_event)
+            )
+        )
+        thread.start()
+        self.assertTrue(body.started.wait(1), "RAG request should be reading the active response")
+        cancel_event.set()
+        thread.join(1)
+
+        self.assertFalse(thread.is_alive())
+        self.assertTrue(body.closed.is_set())
+        self.assertEqual(1, len(responses))
+        self.assertEqual("unavailable", responses[0].status)
+        self.assertEqual("service_unavailable", responses[0].reason_code)
 
     def test_http_timeout_is_degraded_without_leaking_exception_text(self):
         def timeout(_request):

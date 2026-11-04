@@ -63,6 +63,29 @@ class AiAskAvailability(_AiAskContract):
     enabled: bool
 
 
+AiAskProgressStepId = Literal[
+    "analyzing",
+    "retrieving",
+    "counting",
+    "organizing",
+    "generating",
+    "completed",
+]
+AiAskProgressStatus = Literal["pending", "running", "completed", "failed"]
+AiAskProgressError = Literal["timeout", "unavailable", "invalid_response", "disabled", "cancelled"]
+
+
+class AiAskProgressStep(_AiAskContract):
+    """One real, safe-to-display step in an AI ask execution."""
+
+    step_id: AiAskProgressStepId = Field(alias="id")
+    status: AiAskProgressStatus
+    elapsed_ms: float = Field(default=0, alias="elapsedMs", ge=0)
+    table_count: int | None = Field(default=None, alias="tableCount", ge=0)
+    field_count: int | None = Field(default=None, alias="fieldCount", ge=0)
+    error_code: AiAskProgressError | None = Field(default=None, alias="errorCode")
+
+
 class AiAskCitation(_AiAskContract):
     """A generated citation bound to a DAP stable identity."""
 
@@ -187,6 +210,9 @@ class AiAskErrorEnvelope(_AiAskContract):
 __all__ = [
     "AiAskAvailability",
     "AiAskCandidate",
+    "AiAskProgressStep",
+    "AiAskProgressStepId",
+    "AiAskProgressStatus",
     "AiAskCitation",
     "AiGeneratedClaim",
     "AiAskReason",
