@@ -15,7 +15,7 @@ test("user validation allows flexible usernames and reset feedback does not disc
   assert.doesNotMatch(source, /临时密码|tempPassword/);
 });
 
-test("system management loads only the active server-paged subroute and keys dictionary requests by query/page", async () => {
+test("system management loads active server-paged subroutes and rejects superseded dictionary generations", async () => {
   const source = await readFile(hookPath, "utf8");
 
   assert.match(source, /currentPage === "menus"/);
@@ -23,6 +23,9 @@ test("system management loads only the active server-paged subroute and keys dic
   assert.match(source, /getUserPage\(\{ keyword: query, page: userPage, pageSize: userPageSize \}\)/);
   assert.match(source, /getMenuPage\(\{ keyword: query, page: menuPage, pageSize: menuPageSize \}\)/);
   assert.match(source, /getParamDictPage\(categoryCode, \{/);
+  assert.match(source, /const loadCategories = React\.useCallback\(async \(parentRequestSeq = pageRequestSeq\.current\)[\s\S]*?const nextCategories = await getParamDictCategories\(\);\s*if \(parentRequestSeq !== pageRequestSeq\.current\) return selectedCategoryCodeRef\.current;\s*setCategories\(nextCategories\)/);
+  assert.match(source, /const result = await getParamDictPage\(categoryCode,\s*\{[\s\S]*?if \(requestSeq !== itemsRequestSeq\.current \|\| parentRequestSeq !== pageRequestSeq\.current\) return/);
+  assert.match(source, /const categoryCode = await loadCategories\(requestSeq\);[\s\S]*?if \(requestSeq !== pageRequestSeq\.current\) return;[\s\S]*?await loadItems\(categoryCode, requestSeq\)/);
   assert.match(source, /const requestKey = `\$\{categoryCode\}\|\$\{query\.trim\(\)\}\|\$\{itemPage\}\|\$\{itemPageSize\}`/);
   assert.match(source, /currentPage !== "param-dicts" \|\| !selectedCategoryCode/);
   assert.match(source, /setUserPage\(1\)/);

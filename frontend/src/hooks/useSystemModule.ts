@@ -280,8 +280,9 @@ export function useSystemModule({
     if (result.pageSize !== menuPageSize) setMenuPageSize(result.pageSize);
   }, [query, menuPage, menuPageSize]);
 
-  const loadCategories = React.useCallback(async (): Promise<string> => {
+  const loadCategories = React.useCallback(async (parentRequestSeq = pageRequestSeq.current): Promise<string> => {
     const nextCategories = await getParamDictCategories();
+    if (parentRequestSeq !== pageRequestSeq.current) return selectedCategoryCodeRef.current;
     setCategories(nextCategories);
     const currentCategoryCode = selectedCategoryCodeRef.current;
     const nextSelectedCategoryCode = currentCategoryCode && nextCategories.some((item) => item.code === currentCategoryCode)
@@ -292,9 +293,13 @@ export function useSystemModule({
     return nextSelectedCategoryCode;
   }, []);
 
-  const loadItems = React.useCallback(async (categoryCode: string): Promise<void> => {
+  const loadItems = React.useCallback(async (
+    categoryCode: string,
+    parentRequestSeq = pageRequestSeq.current,
+  ): Promise<void> => {
     const requestSeq = ++itemsRequestSeq.current;
     const requestKey = `${categoryCode}|${query.trim()}|${itemPage}|${itemPageSize}`;
+    if (parentRequestSeq !== pageRequestSeq.current || requestSeq !== itemsRequestSeq.current) return;
     if (!categoryCode) {
       setItems([]);
       setItemsTotal(0);
@@ -309,7 +314,7 @@ export function useSystemModule({
         page: itemPage,
         pageSize: itemPageSize,
       });
-      if (requestSeq !== itemsRequestSeq.current) return;
+      if (requestSeq !== itemsRequestSeq.current || parentRequestSeq !== pageRequestSeq.current) return;
       setItems(result.items);
       setItemsTotal(result.total);
       const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
@@ -338,8 +343,9 @@ export function useSystemModule({
       if (currentPage === "menus") {
         await loadMenus();
       } else if (currentPage === "param-dicts") {
-        const categoryCode = await loadCategories();
-        await loadItems(categoryCode);
+        const categoryCode = await loadCategories(requestSeq);
+        if (requestSeq !== pageRequestSeq.current) return;
+        await loadItems(categoryCode, requestSeq);
       } else if (currentPage !== 'roles') {
         await loadUsers();
       }
@@ -378,8 +384,9 @@ export function useSystemModule({
     const requestKey = `${selectedCategoryCode}|${query.trim()}|${itemPage}|${itemPageSize}`;
     if (loadedItemsKeyRef.current === requestKey) return;
     if (itemsLoadingKeyRef.current === requestKey) return;
-    loadItems(selectedCategoryCode).catch((nextError: unknown) => {
-      if (selectedCategoryCodeRef.current === selectedCategoryCode) {
+    const parentRequestSeq = pageRequestSeq.current;
+    loadItems(selectedCategoryCode, parentRequestSeq).catch((nextError: unknown) => {
+      if (parentRequestSeq === pageRequestSeq.current && selectedCategoryCodeRef.current === selectedCategoryCode) {
         setError(getErrorMessage(nextError, '加载参数字典失败。'));
       }
     });
