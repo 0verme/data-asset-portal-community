@@ -61,11 +61,19 @@ class OpenAICompatibleLLMProvider:
     def _endpoint(settings: AIAskLLMConfig) -> str:
         return f"{settings.base_url.rstrip('/')}/chat/completions"
 
-    def complete_json(self, *, system_prompt: str, user_payload: dict[str, Any]) -> str:
+    def complete_json(
+        self,
+        *,
+        system_prompt: str,
+        user_payload: dict[str, Any],
+        cancel_event: threading.Event | None = None,
+    ) -> str:
         try:
             settings = self._config_getter()
         except Exception:
             raise LLMProviderError("llm_unavailable") from None
+        if cancel_event is not None and cancel_event.is_set():
+            raise LLMProviderError("cancelled")
         if not isinstance(settings, AIAskLLMConfig) or not settings.configured:
             raise LLMProviderError("llm_not_configured")
         if not settings.enabled:
@@ -81,6 +89,22 @@ class OpenAICompatibleLLMProvider:
         response_lock = threading.Lock()
         active_response: list[httpx.Response] = []
         deadline_timer: threading.Timer | None = None
+        cancel_watch_stop = threading.Event()
+        cancel_watcher: threading.Thread | None = None
+
+        def close_response_on_cancel() -> None:
+            if cancel_event is None:
+                return
+            while not cancel_watch_stop.wait(0.025):
+                if cancel_event.is_set():
+                    with response_lock:
+                        response = active_response[0] if active_response else None
+                    if response is not None:
+                        try:
+                            response.close()
+                        except Exception:
+                            pass
+                    return
 
         def expire_deadline() -> None:
             deadline_expired.set()
@@ -93,6 +117,15 @@ class OpenAICompatibleLLMProvider:
                     pass
 
         try:
+            if cancel_event is not None:
+                cancel_watcher = threading.Thread(
+                    target=close_response_on_cancel,
+                    name="dap-llm-request-cancel",
+                    daemon=True,
+                )
+                cancel_watcher.start()
+                if cancel_event.is_set():
+                    raise LLMProviderError("cancelled")
             body = {
                 "model": settings.model,
                 "messages": [
@@ -130,6 +163,8 @@ class OpenAICompatibleLLMProvider:
                 ) as response:
                     with response_lock:
                         active_response.append(response)
+                    if cancel_event is not None and cancel_event.is_set():
+                        raise LLMProviderError("cancelled")
                     # HTTPX's read timeout applies to each socket read. Check an
                     # absolute request deadline between streamed chunks so a
                     # slow-drip response cannot overrun the configured budget.
@@ -137,19 +172,27 @@ class OpenAICompatibleLLMProvider:
                         raise LLMProviderError("llm_timeout")
                     chunks = bytearray()
                     for chunk in response.iter_bytes():
+                        if cancel_event is not None and cancel_event.is_set():
+                            raise LLMProviderError("cancelled")
                         if deadline_expired.is_set() or time.monotonic() >= deadline:
                             raise LLMProviderError("llm_timeout")
                         if len(chunks) + len(chunk) > MAX_LLM_RESPONSE_BYTES:
                             raise LLMProviderError("invalid_model_output")
                         chunks.extend(chunk)
+                    if cancel_event is not None and cancel_event.is_set():
+                        raise LLMProviderError("cancelled")
                     if deadline_expired.is_set() or time.monotonic() >= deadline:
                         raise LLMProviderError("llm_timeout")
                     status_code = response.status_code
             except LLMProviderError:
                 raise
             except httpx.TimeoutException:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise LLMProviderError("cancelled") from None
                 raise LLMProviderError("llm_timeout") from None
             except httpx.HTTPError:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise LLMProviderError("cancelled") from None
                 if deadline_expired.is_set() or time.monotonic() >= deadline:
                     raise LLMProviderError("llm_timeout") from None
                 raise LLMProviderError("llm_unavailable") from None
@@ -175,6 +218,9 @@ class OpenAICompatibleLLMProvider:
                 raise LLMProviderError("invalid_model_output")
             return content.strip()
         finally:
+            cancel_watch_stop.set()
+            if cancel_watcher is not None:
+                cancel_watcher.join()
             if deadline_timer is not None:
                 deadline_timer.cancel()
                 deadline_timer.join()

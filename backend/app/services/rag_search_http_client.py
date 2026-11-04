@@ -101,14 +101,43 @@ class RagSearchHttpClient:
         token: str,
         timeout_ms: int,
         json_body: dict[str, Any] | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> bytes:
         if not token:
             raise RagHttpClientError("service_unavailable")
         if not self._capacity.acquire(blocking=False):
             raise RagHttpClientError("busy")
         response: httpx.Response | None = None
+        active_responses: list[httpx.Response] = []
+        response_lock = threading.Lock()
+        cancel_watch_stop = threading.Event()
+        cancel_watcher: threading.Thread | None = None
+
+        def close_response_on_cancel() -> None:
+            if cancel_event is None:
+                return
+            while not cancel_watch_stop.wait(0.025):
+                if cancel_event.is_set():
+                    with response_lock:
+                        active = active_responses[0] if active_responses else None
+                    if active is not None:
+                        try:
+                            active.close()
+                        except Exception:
+                            pass
+                    return
+
         try:
+            if cancel_event is not None:
+                cancel_watcher = threading.Thread(
+                    target=close_response_on_cancel,
+                    name="dap-rag-request-cancel",
+                    daemon=True,
+                )
+                cancel_watcher.start()
             try:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise RagHttpClientError("cancelled")
                 request = self._client.build_request(
                     method,
                     url,
@@ -121,19 +150,34 @@ class RagSearchHttpClient:
                     stream=True,
                     follow_redirects=False,
                 )
+                with response_lock:
+                    active_responses.append(response)
+                if cancel_event is not None and cancel_event.is_set():
+                    raise RagHttpClientError("cancelled")
                 chunks = bytearray()
                 for chunk in response.iter_bytes():
+                    if cancel_event is not None and cancel_event.is_set():
+                        raise RagHttpClientError("cancelled")
                     if len(chunks) + len(chunk) > MAX_HTTP_RESPONSE_BYTES:
                         raise RagHttpClientError("invalid_response")
                     chunks.extend(chunk)
+                if cancel_event is not None and cancel_event.is_set():
+                    raise RagHttpClientError("cancelled")
             except httpx.TimeoutException:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise RagHttpClientError("cancelled") from None
                 raise RagHttpClientError("timeout") from None
             except httpx.HTTPError:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise RagHttpClientError("cancelled") from None
                 raise RagHttpClientError("service_unavailable") from None
             content = bytes(chunks)
             self._raise_for_status(response.status_code, content)
             return content
         finally:
+            cancel_watch_stop.set()
+            if cancel_watcher is not None:
+                cancel_watcher.join()
             if response is not None:
                 response.close()
             self._capacity.release()
@@ -144,6 +188,7 @@ class RagSearchHttpClient:
         *,
         token: str,
         query: str,
+        cancel_event: threading.Event | None = None,
     ) -> RagHttpSearchResponse:
         try:
             request = RagHttpSearchRequest(
@@ -158,6 +203,7 @@ class RagSearchHttpClient:
             token=token,
             timeout_ms=config.timeout_ms,
             json_body=request.model_dump(by_alias=True),
+            cancel_event=cancel_event,
         )
         body = self._decode_json(content)
         try:

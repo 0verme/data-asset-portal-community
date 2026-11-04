@@ -19,9 +19,10 @@ import { ActionErrorBanner } from "./common/ActionErrorBanner.tsx";
 import { getPortalStats, type PortalStatItem } from "../api/portal.ts";
 import { getHotKeywords } from "../api/hotKeywords.ts";
 import {
-  askAi,
+  askAiWithProgress,
   getAiAskAvailability,
   type AiAskCandidate,
+  type AiAskProgressStep,
   type AiAskResponse,
 } from "../api/aiAsk.ts";
 import {
@@ -204,12 +205,110 @@ function RagRecommendationsSection({
   );
 }
 
+type AiAskRunStatus = "running" | "completed" | "failed" | "cancelled";
+
+const AI_ASK_STEP_TITLES: Record<AiAskProgressStep["id"], string> = {
+  analyzing: "正在分析问题",
+  retrieving: "正在检索数据资产",
+  counting: "已找到相关表和字段",
+  organizing: "正在整理检索结果",
+  generating: "正在生成回答",
+  completed: "回答完成",
+};
+
+function formatAiAskElapsed(elapsedMs: number): string {
+  return elapsedMs < 1000
+    ? `${Math.round(elapsedMs)} 毫秒`
+    : `${(elapsedMs / 1000).toFixed(1)} 秒`;
+}
+
+interface AiAskProgressPanelProps {
+  steps: AiAskProgressStep[];
+  status: AiAskRunStatus | null;
+  loading: boolean;
+  onCancel: () => void;
+}
+
+function AiAskProgressPanel({ steps, status, loading, onCancel }: AiAskProgressPanelProps) {
+  const [expanded, setExpanded] = useState(loading);
+  useEffect(() => {
+    setExpanded(loading);
+  }, [loading, status]);
+
+  if (!status && !steps.length) return null;
+  const summary = status === "running" ? "执行中"
+    : status === "completed" ? "已完成"
+      : status === "cancelled" ? "已取消"
+        : "执行失败";
+  const statusLabels = {
+    pending: "等待中",
+    running: "进行中",
+    completed: "已完成",
+    failed: "失败",
+  } as const;
+  const errorLabels = {
+    timeout: "请求超时",
+    unavailable: "服务不可用",
+    invalid_response: "返回数据无效",
+    disabled: "功能未启用",
+    cancelled: "已取消",
+  } as const;
+
+  return (
+    <details
+      className="sp-ai-progress"
+      open={loading || expanded}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+      aria-label="AI 问答执行过程"
+    >
+      <summary className="sp-ai-progress-summary">
+        <span>问答执行过程</span>
+        <span className={`sp-ai-progress-overall sp-ai-progress-${status}`}>{summary}</span>
+      </summary>
+      {steps.length ? (
+        <ol className="sp-ai-progress-list">
+          {steps.map((step) => (
+            <li className={`sp-ai-progress-step sp-ai-progress-step-${step.status}`} key={step.id}>
+              <span className="sp-ai-progress-indicator" aria-hidden="true" />
+              <span className="sp-ai-progress-step-main">
+                <span className="sp-ai-progress-step-title">{AI_ASK_STEP_TITLES[step.id]}</span>
+                {step.id === "counting" && step.tableCount !== undefined && step.tableCount !== null ? (
+                  <span className="sp-ai-progress-count">
+                    {step.tableCount} 张表 · {step.fieldCount ?? 0} 个字段
+                  </span>
+                ) : null}
+                {step.errorCode ? (
+                  <span className="sp-ai-progress-error">{errorLabels[step.errorCode]}</span>
+                ) : null}
+              </span>
+              <span className="sp-ai-progress-step-meta">
+                <span>{statusLabels[step.status]}</span>
+                {step.status !== "pending" ? <span>{formatAiAskElapsed(step.elapsedMs)}</span> : null}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="sp-ai-progress-waiting" role="status">正在连接问答服务并等待后端进度。</p>
+      )}
+      {loading ? (
+        <Button variant="tertiary" type="button" className="sp-ai-cancel" onClick={onCancel}>
+          取消问答
+        </Button>
+      ) : null}
+    </details>
+  );
+}
+
 interface AiAskSectionProps {
   query: string;
   loading: boolean;
   error: string;
   response: AiAskResponse | null;
+  progress: AiAskProgressStep[];
+  progressStatus: AiAskRunStatus | null;
   onRetry: () => void;
+  onCancel: () => void;
   onNavigate: ((target: SearchNavigationTarget, term: string) => void) | undefined;
 }
 
@@ -218,7 +317,10 @@ function AiAskSection({
   loading,
   error,
   response,
+  progress,
+  progressStatus,
   onRetry,
+  onCancel,
   onNavigate,
 }: AiAskSectionProps) {
   if (!query) return null;
@@ -228,19 +330,15 @@ function AiAskSection({
         <span className="sp-group-title">AI 回答</span>
         <span className="sp-group-count">单轮问答 · 基于已校验资产元数据</span>
       </div>
-      {loading ? (
-        <LoadingState
-          title="正在检索已登记资产并生成回答..."
-          desc=""
-          label="正在生成 AI 回答"
-          className="sp-ai-loading"
-        />
-      ) : error ? (
+      <AiAskProgressPanel steps={progress} status={progressStatus} loading={loading} onCancel={onCancel} />
+      {loading ? null : error ? (
         <div className="sp-ai-state sp-ai-error" role="alert">
-          <span>AI 问答请求失败：{error}</span>
-          <Button variant="tertiary" type="button" className="sp-ai-retry" onClick={onRetry}>
-            重试
-          </Button>
+          <span>{progressStatus === "cancelled" ? error : `AI 问答请求失败：${error}`}</span>
+          {progressStatus !== "cancelled" ? (
+            <Button variant="tertiary" type="button" className="sp-ai-retry" onClick={onRetry}>
+              重试
+            </Button>
+          ) : null}
         </div>
       ) : response ? (
         <>
@@ -248,9 +346,13 @@ function AiAskSection({
             <div className="sp-ai-state" role="status">检索部分降级；下方仅展示通过当前 DAP 目录校验的候选资产。</div>
           ) : null}
           {response.status === "retrieval_unavailable" ? (
-            <div className="sp-ai-state sp-ai-error" role="status">资产检索暂不可用，无法确认候选资产；传统搜索不受影响。</div>
+            <div className="sp-ai-state sp-ai-error" role="status">
+              {response.reasonCode === "retrieval_timeout" ? "资产检索超时，未能确认候选资产；传统搜索不受影响。" : "资产检索暂不可用，无法确认候选资产；传统搜索不受影响。"}
+            </div>
           ) : response.status === "generation_unavailable" ? (
-            <div className="sp-ai-state sp-ai-error" role="status">模型暂不可用，未生成回答；下方候选（如有）仍来自 DAP 目录校验。</div>
+            <div className="sp-ai-state sp-ai-error" role="status">
+              {response.reasonCode === "llm_timeout" ? "模型生成超时，未生成回答；下方候选（如有）仍来自 DAP 目录校验。" : "模型暂不可用，未生成回答；下方候选（如有）仍来自 DAP 目录校验。"}
+            </div>
           ) : response.status === "insufficient_evidence" ? (
             <div className="sp-ai-state" role="status">当前元数据不足以确认。</div>
           ) : (
@@ -333,6 +435,8 @@ export function SearchPortalPage({
   const [aiResponse, setAiResponse] = useState<AiAskResponse | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [aiProgress, setAiProgress] = useState<AiAskProgressStep[]>([]);
+  const [aiProgressStatus, setAiProgressStatus] = useState<AiAskRunStatus | null>(null);
   const hotTags = useMemo(
     () => filterPortalHotKeywordsByModules(hotKeywords, availableModules),
     [hotKeywords, availableModules],
@@ -341,6 +445,13 @@ export function SearchPortalPage({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const requestSeq = useRef(0);
   const aiRequestSeq = useRef(0);
+  const aiAbortController = useRef<AbortController | null>(null);
+
+  useEffect(() => () => {
+    aiRequestSeq.current += 1;
+    aiAbortController.current?.abort();
+    aiAbortController.current = null;
+  }, []);
 
   const syncSearchUrl = (
     nextQuery: string,
@@ -380,6 +491,8 @@ export function SearchPortalPage({
       : DEFAULT_PORTAL_SCOPE;
     requestSeq.current += 1;
     aiRequestSeq.current += 1;
+    aiAbortController.current?.abort();
+    aiAbortController.current = null;
     setQuery("");
     setScope(preservedScope);
     setResult(null);
@@ -393,6 +506,8 @@ export function SearchPortalPage({
     setAiResponse(null);
     setAiLoading(false);
     setAiError("");
+    setAiProgress([]);
+    setAiProgressStatus(null);
     syncSearchUrl("", preservedScope);
   };
 
@@ -417,10 +532,14 @@ export function SearchPortalPage({
     }
     const seq = ++requestSeq.current;
     aiRequestSeq.current += 1;
+    aiAbortController.current?.abort();
+    aiAbortController.current = null;
     setAiQuery("");
     setAiResponse(null);
     setAiLoading(false);
     setAiError("");
+    setAiProgress([]);
+    setAiProgressStatus(null);
     setQuery(keyword);
     setScope(nextScope);
     setResult(null);
@@ -467,11 +586,16 @@ export function SearchPortalPage({
     const question = String(rawQuery ?? "").trim();
     if (!publicAccessReady || !aiEnabled || !question) return;
     const seq = ++aiRequestSeq.current;
+    aiAbortController.current?.abort();
+    const controller = new AbortController();
+    aiAbortController.current = controller;
     setQuery(question);
     setAiQuery(question);
     setAiResponse(null);
     setAiLoading(true);
     setAiError("");
+    setAiProgress([]);
+    setAiProgressStatus("running");
     if (searchedTerm !== question) {
       requestSeq.current += 1;
       setResult(null);
@@ -484,17 +608,68 @@ export function SearchPortalPage({
     }
     syncSearchUrl(question, scope);
 
-    askAi(question, "all", 10)
+    askAiWithProgress(
+      question,
+      (step) => {
+        if (seq !== aiRequestSeq.current) return;
+        setAiProgress((current) => {
+          const index = current.findIndex((item) => item.id === step.id);
+          if (index < 0) return [...current, step];
+          const next = [...current];
+          next[index] = step;
+          return next;
+        });
+        if (step.status === "failed") setAiProgressStatus("failed");
+        else if (step.id === "completed" && step.status === "completed") setAiProgressStatus("completed");
+      },
+      "all",
+      10,
+      controller.signal,
+    )
       .then((response) => {
         if (seq !== aiRequestSeq.current) return;
+        aiAbortController.current = null;
         setAiResponse(response);
         setAiLoading(false);
+        setAiProgressStatus(
+          response.status === "answered" || response.status === "insufficient_evidence"
+            ? "completed"
+            : "failed",
+        );
       })
       .catch((error: unknown) => {
         if (seq !== aiRequestSeq.current) return;
-        setAiError(error instanceof Error ? error.message : "AI 问答暂不可用，请重试。");
+        aiAbortController.current = null;
         setAiLoading(false);
+        if (controller.signal.aborted) {
+          setAiError("问答已取消。");
+          setAiProgressStatus("cancelled");
+          setAiProgress((current) => current.map((step) => step.status === "running"
+            ? { ...step, status: "failed", errorCode: "cancelled" }
+            : step));
+          return;
+        }
+        const message = error instanceof Error ? error.message : "AI 问答暂不可用，请重试。";
+        const timedOut = /超时|timed out|timeout/i.test(message);
+        setAiError(message);
+        setAiProgressStatus("failed");
+        setAiProgress((current) => current.map((step) => step.status === "running"
+          ? { ...step, status: "failed", errorCode: timedOut ? "timeout" : "unavailable" }
+          : step));
       });
+  };
+
+  const cancelAiAsk = (): void => {
+    if (!aiAbortController.current) return;
+    aiRequestSeq.current += 1;
+    aiAbortController.current.abort();
+    aiAbortController.current = null;
+    setAiLoading(false);
+    setAiError("问答已取消。");
+    setAiProgressStatus("cancelled");
+    setAiProgress((current) => current.map((step) => step.status === "running"
+      ? { ...step, status: "failed", errorCode: "cancelled" }
+      : step));
   };
 
   useEffect(() => {
@@ -510,10 +685,15 @@ export function SearchPortalPage({
         if (cancelled) return;
         setAiEnabled(status.enabled);
         if (!status.enabled) {
+          aiRequestSeq.current += 1;
+          aiAbortController.current?.abort();
+          aiAbortController.current = null;
           setAiQuery("");
           setAiResponse(null);
           setAiLoading(false);
           setAiError("");
+          setAiProgress([]);
+          setAiProgressStatus(null);
         }
       })
       .catch(() => {
@@ -851,7 +1031,10 @@ export function SearchPortalPage({
             loading={aiLoading}
             error={aiError}
             response={aiResponse}
+            progress={aiProgress}
+            progressStatus={aiProgressStatus}
             onRetry={() => runAiAsk(aiQuery)}
+            onCancel={cancelAiAsk}
             onNavigate={handleNavigate}
           />
         </div>

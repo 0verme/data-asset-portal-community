@@ -222,9 +222,41 @@
 
 /* AI text is explanatory only; every clickable asset card is rebuilt from a DAP-validated ID. */
 .sp-ai-group { width: 100%; min-width: 0; margin-top: 6px; }
-.sp-ai-loading { width: 100%; max-width: 1200px; padding: 16px 0; text-align: center; color: var(--ink-3); }
-.sp-ai-loading h3 { margin: 0; font-size: 13px; font-weight: 400; color: var(--ink-3); }
-.sp-ai-loading p:empty { display: none; }
+.sp-ai-progress {
+  margin: 8px 0 14px; overflow: hidden; border: 1px solid var(--line);
+  border-radius: var(--radius); background: var(--surface);
+}
+.sp-ai-progress-summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 42px; padding: 10px 14px; color: var(--ink); font-size: 13px; font-weight: 600;
+  cursor: pointer; list-style: none;
+}
+.sp-ai-progress-summary::-webkit-details-marker { display: none; }
+.sp-ai-progress-summary::after { content: "⌄"; color: var(--ink-3); font-size: 15px; }
+.sp-ai-progress[open] .sp-ai-progress-summary::after { content: "⌃"; }
+.sp-ai-progress-overall { margin-left: auto; color: var(--ink-3); font-size: 12px; font-weight: 500; }
+.sp-ai-progress-completed { color: var(--accent); }
+.sp-ai-progress-failed, .sp-ai-progress-cancelled { color: var(--danger); }
+.sp-ai-progress-list { margin: 0; padding: 0 14px 8px; list-style: none; }
+.sp-ai-progress-step {
+  display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: start; gap: 10px;
+  min-width: 0; padding: 10px 0; border-top: 1px solid var(--line-2);
+}
+.sp-ai-progress-indicator {
+  width: 8px; height: 8px; margin-top: 5px; border: 1px solid var(--line-strong);
+  border-radius: 50%; background: var(--surface-2);
+}
+.sp-ai-progress-step-running .sp-ai-progress-indicator,
+.sp-ai-progress-step-completed .sp-ai-progress-indicator { border-color: var(--accent); background: var(--accent); }
+.sp-ai-progress-step-failed .sp-ai-progress-indicator { border-color: var(--danger); background: var(--danger); }
+.sp-ai-progress-step-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sp-ai-progress-step-title { color: var(--ink-2); font-size: 12.5px; line-height: 1.45; }
+.sp-ai-progress-step-completed .sp-ai-progress-step-title { color: var(--ink); }
+.sp-ai-progress-count, .sp-ai-progress-error { color: var(--ink-3); font-size: 11.5px; line-height: 1.4; }
+.sp-ai-progress-error { color: var(--danger); }
+.sp-ai-progress-step-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; color: var(--ink-3); font-size: 11px; white-space: nowrap; }
+.sp-ai-progress-waiting { margin: 0; padding: 0 14px 12px; color: var(--ink-3); font-size: 12px; }
+.sp-ai-cancel { margin: 0 14px 12px; color: var(--ink-2); }
 .sp-ai-summary, .sp-ai-state {
   min-width: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--surface); color: var(--ink-2); font-size: 14px; line-height: 1.7;

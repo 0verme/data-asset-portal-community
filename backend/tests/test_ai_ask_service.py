@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import unittest
 from types import SimpleNamespace
 
@@ -65,7 +66,7 @@ class StubRagService:
     def is_configured(self):
         return self.configured
 
-    def recommend(self, query, *, profile, top_k=None):
+    def recommend(self, query, *, profile, top_k=None, cancel_event=None):
         self.calls.append((query, profile, top_k))
         if self.error:
             raise self.error
@@ -85,7 +86,7 @@ class StubLLMProvider:
     def is_enabled(self):
         return self.enabled
 
-    def complete_json(self, *, system_prompt, user_payload):
+    def complete_json(self, *, system_prompt, user_payload, cancel_event=None):
         self.calls.append((system_prompt, user_payload))
         if self.error:
             raise self.error
@@ -97,6 +98,95 @@ class AiAskServiceTests(unittest.TestCase):
         rag = StubRagService(retrieval, retrieval_error)
         provider = llm or StubLLMProvider()
         return AIAskService(rag, provider), rag, provider
+
+    def test_progress_reports_real_steps_and_authoritative_table_field_counts(self):
+        service, _rag, llm = self._service()
+        events = []
+
+        response = service.ask(
+            AiAskRequest(query="贷款余额在哪个表？"),
+            profile="strict",
+            progress_callback=events.append,
+        )
+
+        self.assertEqual("answered", response.status)
+        completed = [event for event in events if event.status == "completed"]
+        self.assertEqual(
+            ["analyzing", "retrieving", "counting", "organizing", "generating", "completed"],
+            [event.step_id for event in completed],
+        )
+        counts = next(event for event in completed if event.step_id == "counting")
+        self.assertEqual((1, 1), (counts.table_count, counts.field_count))
+        self.assertTrue(all(event.elapsed_ms >= 0 for event in events))
+        self.assertFalse(any(hasattr(event, "answer") for event in events))
+        self.assertEqual(1, len(llm.calls))
+
+    def test_zero_hits_reports_zero_and_does_not_claim_an_llm_step(self):
+        retrieval = RagRecommendationsResponse(
+            query="未登记业务字段在哪里？",
+            status="available",
+            recommendations=[],
+            count=0,
+        )
+        service, _rag, llm = self._service(retrieval=retrieval)
+        events = []
+
+        response = service.ask(
+            AiAskRequest(query="未登记业务字段在哪里？"),
+            profile="internal",
+            progress_callback=events.append,
+        )
+
+        self.assertEqual("insufficient_evidence", response.status)
+        counts = next(event for event in events if event.step_id == "counting" and event.status == "completed")
+        self.assertEqual((0, 0), (counts.table_count, counts.field_count))
+        self.assertNotIn("generating", [event.step_id for event in events])
+        self.assertEqual("completed", events[-1].status)
+        self.assertEqual([], llm.calls)
+
+    def test_progress_marks_rag_and_llm_failures_with_measured_step_status(self):
+        unavailable = RagRecommendationsResponse(
+            query="x", status="unavailable", reasonCode="timeout", count=0
+        )
+        rag_service, _rag, _llm = self._service(retrieval=unavailable)
+        rag_events = []
+        retrieval_response = rag_service.ask(
+            AiAskRequest(query="x"), profile="strict", progress_callback=rag_events.append
+        )
+        self.assertEqual("retrieval_timeout", retrieval_response.reason_code)
+        self.assertEqual("failed", next(event for event in rag_events if event.step_id == "retrieving" and event.status == "failed").status)
+        self.assertNotIn("generating", [event.step_id for event in rag_events])
+
+        llm_service, _rag, _llm = self._service(llm=StubLLMProvider(error=LLMProviderError("llm_timeout")))
+        llm_events = []
+        generation_response = llm_service.ask(
+            AiAskRequest(query="x"), profile="strict", progress_callback=llm_events.append
+        )
+        failed = next(event for event in llm_events if event.step_id == "generating" and event.status == "failed")
+        self.assertEqual("timeout", failed.error_code)
+        self.assertEqual("llm_timeout", generation_response.reason_code)
+        self.assertNotIn("completed", [event.step_id for event in llm_events])
+
+    def test_cancellation_after_retrieval_stops_before_counting_and_model_call(self):
+        service, _rag, llm = self._service()
+        cancel_event = threading.Event()
+        events = []
+
+        def report(event):
+            events.append(event)
+            if event.step_id == "retrieving" and event.status == "completed":
+                cancel_event.set()
+
+        with self.assertRaisesRegex(RuntimeError, "request_cancelled"):
+            service.ask(
+                AiAskRequest(query="x"),
+                profile="strict",
+                progress_callback=report,
+                cancel_event=cancel_event,
+            )
+
+        self.assertNotIn("counting", [event.step_id for event in events])
+        self.assertEqual([], llm.calls)
 
     def test_retrieval_candidates_and_model_citations_are_bound_to_dap_ids(self):
         service, rag, llm = self._service()

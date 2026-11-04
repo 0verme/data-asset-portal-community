@@ -36,9 +36,49 @@ function answer(query: string) {
   };
 }
 
+function sseResponse(response: ReturnType<typeof answer> | Record<string, unknown>) {
+  const events: string[] = [];
+  const emit = (id: string, status: string, extra: Record<string, unknown> = {}) => {
+    events.push(`event: progress\ndata: ${JSON.stringify({ id, status, elapsedMs: status === "pending" || status === "running" ? 0 : 2, ...extra })}\n\n`);
+  };
+  const stage = (id: string, extra: Record<string, unknown> = {}) => {
+    emit(id, "pending");
+    emit(id, "running");
+    emit(id, "completed", extra);
+  };
+  stage("analyzing");
+  if (response.status === "retrieval_unavailable") {
+    emit("retrieving", "pending");
+    emit("retrieving", "running");
+    emit("retrieving", "failed", { errorCode: response.reasonCode === "retrieval_timeout" ? "timeout" : "unavailable" });
+  } else {
+    stage("retrieving");
+    const candidates = Array.isArray(response.candidates) ? response.candidates as Array<{ assetId: number; assetType: string; fieldId?: number | null }> : [];
+    const tableCount = new Set(candidates.map((item) => item.assetId)).size;
+    const fieldCount = new Set(candidates.filter((item) => item.assetType === "field" && item.fieldId).map((item) => `${item.assetId}:${item.fieldId}`)).size;
+    stage("counting", { tableCount, fieldCount });
+    stage("organizing");
+    if (response.generationStatus !== "not_run") {
+      if (response.status === "generation_unavailable") {
+        emit("generating", "pending");
+        emit("generating", "running");
+        emit("generating", "failed", { errorCode: response.reasonCode === "llm_timeout" ? "timeout" : "unavailable" });
+      } else stage("generating");
+    }
+    if (response.status === "answered" || response.status === "insufficient_evidence") stage("completed");
+  }
+  events.push(`event: result\ndata: ${JSON.stringify(response)}\n\n`);
+  return {
+    status: 200,
+    contentType: "text/event-stream",
+    body: events.join(""),
+  };
+}
+
 async function mockPortalApis(page: Page, options: {
   aiEnabled?: boolean;
   askFailureCount?: number;
+  delayFirstAsk?: boolean;
 } = {}) {
   const asked: Array<{ query: string; scope: string; topK: number }> = [];
   let aiEnabled = options.aiEnabled ?? true;
@@ -69,32 +109,40 @@ async function mockPortalApis(page: Page, options: {
       return json({ query: url.searchParams.get("q") || "", status: "disabled", recommendations: [], count: 0, elapsedMs: 0, reasonCode: "disabled" });
     }
     if (path === "/api/ai/status") return json({ enabled: aiEnabled });
-    if (path === "/api/ai/ask") {
+    if (path === "/api/ai/ask/progress") {
       const payload = route.request().postDataJSON() as { query: string; scope: string; topK: number };
       asked.push(payload);
+      if (options.delayFirstAsk && payload.query.includes("cancel-first")) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        try {
+          return await route.fulfill(sseResponse(answer(payload.query)));
+        } catch {
+          return;
+        }
+      }
       if (askFailuresRemaining > 0 && payload.query.includes("retry")) {
         askFailuresRemaining -= 1;
         return json({ error: { code: "MOCK_PROVIDER_UNAVAILABLE", message: "Mock provider unavailable" } }, 503);
       }
       if (payload.query.includes("未登记")) {
-        return json({
+        return route.fulfill(sseResponse({
           status: "insufficient_evidence",
           answer: "当前元数据不足以确认。",
           citations: [], candidates: [],
           retrievalStatus: "available", generationStatus: "not_run",
           reasonCode: "insufficient_evidence", elapsedMs: 3,
-        });
+        }));
       }
       if (payload.query.includes("timeout")) {
-        return json({
+        return route.fulfill(sseResponse({
           status: "generation_unavailable",
           answer: "AI 问答暂不可用，请稍后重试。",
           citations: [], candidates: [candidate()],
           retrievalStatus: "available", generationStatus: "unavailable",
           reasonCode: "llm_timeout", elapsedMs: 12000,
-        });
+        }));
       }
-      return json(answer(payload.query));
+      return route.fulfill(sseResponse(answer(payload.query)));
     }
     if (path === "/api/search") {
       const query = url.searchParams.get("q") || "";
@@ -132,7 +180,7 @@ async function mockPortalApis(page: Page, options: {
   };
 }
 
-async function openAiPortal(page: Page, options?: { aiEnabled?: boolean; askFailureCount?: number }) {
+async function openAiPortal(page: Page, options?: { aiEnabled?: boolean; askFailureCount?: number; delayFirstAsk?: boolean }) {
   const fixtures = await mockPortalApis(page, options);
   await page.addInitScript(() => {
     localStorage.removeItem("dap_auth");
@@ -166,6 +214,11 @@ test("Enter and Search stay deterministic; explicit AI preserves query and opens
   await page.getByRole("button", { name: "问 AI", exact: true }).click();
   await expect(page.getByLabel("AI 回答摘要")).toContainText(query);
   await expect(page.getByText("相关候选资产", { exact: true })).toBeVisible();
+  const progress = page.locator(".sp-ai-progress");
+  await expect(progress).not.toHaveAttribute("open", "");
+  await progress.locator("summary").click();
+  await expect(progress).toContainText("1 张表 · 1 个字段");
+  await expect(progress).toContainText("回答完成");
   expect(fixtures.asked[0]).toEqual({ query, scope: "all", topK: 10 });
   await expect(input).toHaveValue(query);
 
@@ -188,6 +241,10 @@ test("true zero-match offers AI with the existing query; no-evidence refusal is 
   await expect(page.getByRole("heading", { name: "没有找到精确匹配的资产" })).toBeVisible();
   await page.getByRole("button", { name: "问 AI 找资产" }).click();
   await expect(page.getByText("当前元数据不足以确认。", { exact: true })).toBeVisible();
+  const progress = page.locator(".sp-ai-progress");
+  await progress.locator("summary").click();
+  await expect(progress).toContainText("0 张表 · 0 个字段");
+  await expect(progress).not.toContainText("正在生成回答");
   expect(fixtures.asked[0]?.query).toBe(query);
   await expect(input).toHaveValue(query);
 });
@@ -208,7 +265,7 @@ test("model timeout is distinguished and transient ask errors can be retried", a
   const input = page.getByRole("textbox", { name: "搜索数据资产" });
   await input.fill("timeout question");
   await page.getByRole("button", { name: "问 AI", exact: true }).click();
-  await expect(page.getByText("模型暂不可用，未生成回答", { exact: false })).toBeVisible();
+  await expect(page.getByText("模型生成超时，未生成回答", { exact: false })).toBeVisible();
   await expect(page.getByText("timeout", { exact: false })).toHaveCount(0);
 
   await input.fill("retry candidate");
@@ -217,4 +274,21 @@ test("model timeout is distinguished and transient ask errors can be retried", a
   await page.getByRole("button", { name: "重试" }).click();
   await expect(page.getByLabel("AI 回答摘要")).toBeVisible();
   expect(fixtures.asked).toHaveLength(3);
+});
+
+test("cancelled requests are explicit and cannot overwrite a subsequent answer", async ({ page }) => {
+  const fixtures = await openAiPortal(page, { delayFirstAsk: true });
+  const input = page.getByRole("textbox", { name: "搜索数据资产" });
+  await input.fill("cancel-first question");
+  await page.getByRole("button", { name: "问 AI", exact: true }).click();
+  await expect(page.getByRole("button", { name: "取消问答" })).toBeVisible();
+  await page.getByRole("button", { name: "取消问答" }).click();
+  await expect(page.getByText("问答已取消。", { exact: true })).toBeVisible();
+
+  await input.fill("replacement question");
+  await page.getByRole("button", { name: "问 AI", exact: true }).click();
+  await expect(page.getByLabel("AI 回答摘要")).toContainText("replacement question");
+  expect(fixtures.asked.map((item) => item.query)).toEqual([
+    "cancel-first question", "replacement question",
+  ]);
 });

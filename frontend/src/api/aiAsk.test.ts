@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   askAi,
   parseAiAskAvailability,
+  parseAiAskProgressStep,
   parseAiAskResponse,
 } from "./aiAsk.ts";
 
@@ -37,6 +38,22 @@ const validResponse = {
 test("AI availability response exposes only the feature boolean", () => {
   assert.deepEqual(parseAiAskAvailability({ enabled: false, baseUrl: "must-not-be-used" }), { enabled: false });
   assert.throws(() => parseAiAskAvailability({ enabled: "true" }), /Invalid AI ask availability/);
+});
+
+test("progress parser accepts real states and counts but rejects answer/token payloads", () => {
+  assert.deepEqual(parseAiAskProgressStep({
+    id: "counting", status: "completed", elapsedMs: 14.5, tableCount: 2, fieldCount: 7,
+  }), {
+    id: "counting", status: "completed", elapsedMs: 14.5, tableCount: 2, fieldCount: 7,
+  });
+  assert.throws(
+    () => parseAiAskProgressStep({ id: "generating", status: "running", answer: "must-not-stream" }),
+    /Unexpected data in AI ask progress event/,
+  );
+  assert.throws(
+    () => parseAiAskProgressStep({ id: "counting", status: "completed", tableCount: -1 }),
+    /Invalid AI ask progress event/,
+  );
 });
 
 test("AI ask response preserves DAP stable IDs and validates citations against candidates", () => {

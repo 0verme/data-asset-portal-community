@@ -201,6 +201,7 @@ class RoutePermissionInventoryTests(unittest.TestCase):
             ("GET", "/api/capabilities"),
             ("GET", "/api/public-catalog/config"),
             ("POST", "/api/ai/ask"),
+            ("POST", "/api/ai/ask/progress"),
         }
         for path, operations in app.openapi()["paths"].items():
             for method in operations:
