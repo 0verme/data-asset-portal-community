@@ -286,9 +286,13 @@ class PublicCatalogApiTests(unittest.TestCase):
         self.current_identity = None
         for path in (
             "/api/system/users",
+            "/api/system/users/page",
             "/api/system/roles",
+            "/api/system/roles/page",
+            "/api/system/menus/page",
             "/api/system/permissions",
             "/api/system/param-dicts",
+            "/api/system/param-dicts/page",
             "/api/operation-logs",
             "/api/metadata/ingestions/ing-1",
             "/api/upstreams/systems/UPSTREAM/admin-detail",
@@ -320,7 +324,11 @@ class PublicCatalogApiTests(unittest.TestCase):
         sensitive = self.client.get("/api/system/roles")
         self.assertEqual(403, sensitive.status_code)
         self.assertEqual("FORBIDDEN", sensitive.json()["error"]["code"])
+        paged_sensitive = self.client.get("/api/system/roles/page?page=1&pageSize=20")
+        self.assertEqual(403, paged_sensitive.status_code)
+        self.assertEqual("FORBIDDEN", paged_sensitive.json()["error"]["code"])
         self.system.get_roles.assert_not_called()
+        self.system.get_roles_page.assert_not_called()
 
         mutation = self.client.post("/api/indicators", json={"name": "blocked"})
         self.assertEqual(403, mutation.status_code)

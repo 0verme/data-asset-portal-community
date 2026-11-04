@@ -17,7 +17,7 @@ import {
   createParamDict,
   deleteParamDict,
   getParamDictCategories,
-  getParamDicts,
+  getParamDictPage,
   updateParamDict,
   updateParamDictStatus,
   type ParamDictCategoryWithCount,
@@ -26,7 +26,7 @@ import {
 import {
   createUser,
   deleteUser,
-  getUsers,
+  getUserPage,
   resetUserPassword,
   updateUser,
   updateUserStatus,
@@ -35,7 +35,7 @@ import type { MockSystemUser } from '../data/systemUsers.ts';
 import {
   createMenu,
   deleteMenu,
-  getMenus,
+  getMenuPage,
   moveMenu,
   updateMenu,
   updateMenuStatus,
@@ -95,6 +95,7 @@ export interface SystemModalState<T> {
 
 export interface UseSystemModuleProps {
   page?: string | undefined;
+  query?: string | undefined;
   requireLogin: (action: () => void, permission?: string) => boolean;
   actionIntent?: string | undefined;
   onActionHandled?: (() => void) | undefined;
@@ -104,11 +105,26 @@ export interface UseSystemModuleResult {
   loading: boolean;
   error: string;
   users: MockSystemUser[];
+  usersTotal: number;
+  userPage: number;
+  userPageSize: number;
+  setUserPage: React.Dispatch<React.SetStateAction<number>>;
+  setUserPageSize: React.Dispatch<React.SetStateAction<number>>;
   categories: ParamDictCategoryWithCount[];
   items: ParamDictItemWithCategoryName[];
+  itemsTotal: number;
+  itemPage: number;
+  itemPageSize: number;
+  setItemPage: React.Dispatch<React.SetStateAction<number>>;
+  setItemPageSize: React.Dispatch<React.SetStateAction<number>>;
   menus: MenuItem[];
+  menusTotal: number;
+  menuPage: number;
+  menuPageSize: number;
+  setMenuPage: React.Dispatch<React.SetStateAction<number>>;
+  setMenuPageSize: React.Dispatch<React.SetStateAction<number>>;
   selectedCategoryCode: string;
-  setSelectedCategoryCode: React.Dispatch<React.SetStateAction<string>>;
+  pickCategory: (categoryCode: string) => void;
   userModal: SystemModalState<MockSystemUser>;
   setUserModal: React.Dispatch<React.SetStateAction<SystemModalState<MockSystemUser>>>;
   paramModal: SystemModalState<ParamDictItemWithCategoryName>;
@@ -152,6 +168,7 @@ export interface UseSystemModuleResult {
 
 export function useSystemModule({
   page,
+  query = '',
   requireLogin,
   actionIntent,
   onActionHandled,
@@ -160,9 +177,18 @@ export function useSystemModule({
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
   const [users, setUsers] = React.useState<MockSystemUser[]>([]);
+  const [usersTotal, setUsersTotal] = React.useState(0);
+  const [userPage, setUserPage] = React.useState(1);
+  const [userPageSize, setUserPageSize] = React.useState(20);
   const [categories, setCategories] = React.useState<ParamDictCategoryWithCount[]>([]);
   const [items, setItems] = React.useState<ParamDictItemWithCategoryName[]>([]);
+  const [itemsTotal, setItemsTotal] = React.useState(0);
+  const [itemPage, setItemPage] = React.useState(1);
+  const [itemPageSize, setItemPageSize] = React.useState(20);
   const [menus, setMenus] = React.useState<MenuItem[]>([]);
+  const [menusTotal, setMenusTotal] = React.useState(0);
+  const [menuPage, setMenuPage] = React.useState(1);
+  const [menuPageSize, setMenuPageSize] = React.useState(20);
   const [selectedCategoryCode, setSelectedCategoryCode] = React.useState('');
   const selectedCategoryCodeRef = React.useRef('');
 
@@ -205,11 +231,21 @@ export function useSystemModule({
   const clearMenuFieldError = React.useCallback((field: string) => {
     setMenuErrors((current) => clearFormFieldErrorEntry(current, field));
   }, []);
+  const usersRequestSeq = React.useRef(0);
+  const menusRequestSeq = React.useRef(0);
   const itemsRequestSeq = React.useRef(0);
-  const itemsLoadingCategoryRef = React.useRef('');
-  const loadedItemsCategoryRef = React.useRef('');
+  const itemsLoadingKeyRef = React.useRef('');
+  const loadedItemsKeyRef = React.useRef('');
   const pageRequestSeq = React.useRef(0);
-  const loadedPagesRef = React.useRef(new Set<string>());
+  const previousQueryRef = React.useRef(query.trim());
+
+  const pickCategory = React.useCallback((categoryCode: string): void => {
+    selectedCategoryCodeRef.current = categoryCode;
+    loadedItemsKeyRef.current = '';
+    setError('');
+    setItemPage(1);
+    setSelectedCategoryCode(categoryCode);
+  }, []);
 
   const guarded = React.useCallback(
     (action: () => void | Promise<void>) => {
@@ -221,12 +257,28 @@ export function useSystemModule({
   );
 
   const loadUsers = React.useCallback(async (): Promise<void> => {
-    setUsers(await getUsers());
-  }, []);
+    const requestSeq = ++usersRequestSeq.current;
+    const result = await getUserPage({ keyword: query, page: userPage, pageSize: userPageSize });
+    if (requestSeq !== usersRequestSeq.current) return;
+    setUsers(result.items);
+    setUsersTotal(result.total);
+    const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
+    const resolvedPage = Math.min(userPage, lastPage);
+    if (resolvedPage !== userPage) setUserPage(resolvedPage);
+    if (result.pageSize !== userPageSize) setUserPageSize(result.pageSize);
+  }, [query, userPage, userPageSize]);
 
   const loadMenus = React.useCallback(async (): Promise<void> => {
-    setMenus(await getMenus());
-  }, []);
+    const requestSeq = ++menusRequestSeq.current;
+    const result = await getMenuPage({ keyword: query, page: menuPage, pageSize: menuPageSize });
+    if (requestSeq !== menusRequestSeq.current) return;
+    setMenus(result.items);
+    setMenusTotal(result.total);
+    const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
+    const resolvedPage = Math.min(menuPage, lastPage);
+    if (resolvedPage !== menuPage) setMenuPage(resolvedPage);
+    if (result.pageSize !== menuPageSize) setMenuPageSize(result.pageSize);
+  }, [query, menuPage, menuPageSize]);
 
   const loadCategories = React.useCallback(async (): Promise<string> => {
     const nextCategories = await getParamDictCategories();
@@ -242,22 +294,33 @@ export function useSystemModule({
 
   const loadItems = React.useCallback(async (categoryCode: string): Promise<void> => {
     const requestSeq = ++itemsRequestSeq.current;
+    const requestKey = `${categoryCode}|${query.trim()}|${itemPage}|${itemPageSize}`;
     if (!categoryCode) {
       setItems([]);
-      itemsLoadingCategoryRef.current = '';
-      loadedItemsCategoryRef.current = '';
+      setItemsTotal(0);
+      itemsLoadingKeyRef.current = '';
+      loadedItemsKeyRef.current = '';
       return;
     }
-    itemsLoadingCategoryRef.current = categoryCode;
+    itemsLoadingKeyRef.current = requestKey;
     try {
-      const nextItems = await getParamDicts(categoryCode);
+      const result = await getParamDictPage(categoryCode, {
+        keyword: query,
+        page: itemPage,
+        pageSize: itemPageSize,
+      });
       if (requestSeq !== itemsRequestSeq.current) return;
-      setItems(nextItems);
-      loadedItemsCategoryRef.current = categoryCode;
+      setItems(result.items);
+      setItemsTotal(result.total);
+      const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
+      const resolvedPage = Math.min(itemPage, lastPage);
+      if (resolvedPage !== itemPage) setItemPage(resolvedPage);
+      if (result.pageSize !== itemPageSize) setItemPageSize(result.pageSize);
+      loadedItemsKeyRef.current = requestKey;
     } finally {
-      if (requestSeq === itemsRequestSeq.current) itemsLoadingCategoryRef.current = '';
+      if (requestSeq === itemsRequestSeq.current) itemsLoadingKeyRef.current = '';
     }
-  }, []);
+  }, [itemPage, itemPageSize, query]);
 
   const reloadCurrentItems = React.useCallback(async (): Promise<void> => {
     if (!selectedCategoryCode) {
@@ -280,9 +343,6 @@ export function useSystemModule({
       } else if (currentPage !== 'roles') {
         await loadUsers();
       }
-      if (currentPage) {
-        loadedPagesRef.current.add(currentPage);
-      }
     } catch (nextError: unknown) {
       if (requestSeq === pageRequestSeq.current) {
         setError(getErrorMessage(nextError, '加载系统管理数据失败。'));
@@ -297,11 +357,16 @@ export function useSystemModule({
   }, [selectedCategoryCode]);
 
   React.useEffect(() => {
-    if (currentPage && loadedPagesRef.current.has(currentPage)) {
-      setLoading(false);
-      setError('');
-      return undefined;
-    }
+    const nextQuery = query.trim();
+    if (previousQueryRef.current === nextQuery) return;
+    previousQueryRef.current = nextQuery;
+    setUserPage(1);
+    setMenuPage(1);
+    setItemPage(1);
+    loadedItemsKeyRef.current = '';
+  }, [query]);
+
+  React.useEffect(() => {
     loadAll();
     return () => {
       pageRequestSeq.current += 1;
@@ -310,14 +375,15 @@ export function useSystemModule({
 
   React.useEffect(() => {
     if (currentPage !== "param-dicts" || !selectedCategoryCode) return;
-    if (loadedItemsCategoryRef.current === selectedCategoryCode) return;
-    if (itemsLoadingCategoryRef.current === selectedCategoryCode) return;
+    const requestKey = `${selectedCategoryCode}|${query.trim()}|${itemPage}|${itemPageSize}`;
+    if (loadedItemsKeyRef.current === requestKey) return;
+    if (itemsLoadingKeyRef.current === requestKey) return;
     loadItems(selectedCategoryCode).catch((nextError: unknown) => {
       if (selectedCategoryCodeRef.current === selectedCategoryCode) {
         setError(getErrorMessage(nextError, '加载参数字典失败。'));
       }
     });
-  }, [currentPage, loadItems, selectedCategoryCode]);
+  }, [currentPage, itemPage, itemPageSize, loadItems, query, selectedCategoryCode]);
 
   React.useEffect(() => {
     if (!actionIntent) return;
@@ -640,11 +706,26 @@ export function useSystemModule({
     loading,
     error,
     users,
+    usersTotal,
+    userPage,
+    userPageSize,
+    setUserPage,
+    setUserPageSize,
     categories,
     items,
+    itemsTotal,
+    itemPage,
+    itemPageSize,
+    setItemPage,
+    setItemPageSize,
     menus,
+    menusTotal,
+    menuPage,
+    menuPageSize,
+    setMenuPage,
+    setMenuPageSize,
     selectedCategoryCode,
-    setSelectedCategoryCode,
+    pickCategory,
     userModal,
     setUserModal,
     paramModal,

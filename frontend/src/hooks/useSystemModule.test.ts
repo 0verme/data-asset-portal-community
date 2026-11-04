@@ -15,14 +15,18 @@ test("user validation allows flexible usernames and reset feedback does not disc
   assert.doesNotMatch(source, /临时密码|tempPassword/);
 });
 
-test("system management loads and caches only the current subroute", async () => {
+test("system management loads only the active server-paged subroute and keys dictionary requests by query/page", async () => {
   const source = await readFile(hookPath, "utf8");
 
   assert.match(source, /currentPage === "menus"/);
   assert.match(source, /currentPage === "param-dicts"/);
-  assert.match(source, /loadedPagesRef\.current\.has\(currentPage\)/);
-  assert.match(source, /loadedPagesRef\.current\.add\(currentPage\)/);
+  assert.match(source, /getUserPage\(\{ keyword: query, page: userPage, pageSize: userPageSize \}\)/);
+  assert.match(source, /getMenuPage\(\{ keyword: query, page: menuPage, pageSize: menuPageSize \}\)/);
+  assert.match(source, /getParamDictPage\(categoryCode, \{/);
+  assert.match(source, /const requestKey = `\$\{categoryCode\}\|\$\{query\.trim\(\)\}\|\$\{itemPage\}\|\$\{itemPageSize\}`/);
   assert.match(source, /currentPage !== "param-dicts" \|\| !selectedCategoryCode/);
-  assert.match(source, /loadedItemsCategoryRef\.current === selectedCategoryCode/);
+  assert.match(source, /setUserPage\(1\)/);
+  assert.match(source, /setMenuPage\(1\)/);
+  assert.match(source, /setItemPage\(1\)/);
   assert.doesNotMatch(source, /Promise\.all\(\[loadUsers\(\), loadCategories\(\), loadMenus\(\)\]\)/);
 });

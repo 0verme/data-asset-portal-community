@@ -14,6 +14,13 @@
 // limitations under the License.
 
 import { requestRemote } from './http.ts';
+import {
+  normalizeSystemManagementPage,
+  sliceSystemManagementPage,
+  systemManagementPageUrl,
+  type SystemManagementPage,
+  type SystemManagementPageQuery,
+} from './systemManagementPagination.ts';
 import { MENU_ITEMS, type MenuItem } from '../data/menus.ts';
 
 const API_MODE = (
@@ -111,6 +118,22 @@ export async function getMenus(): Promise<MenuItem[]> {
     return normalizeCollection(payload, 'menus');
   }
   return sortMenus(readMenus());
+}
+
+export async function getMenuPage(query: SystemManagementPageQuery): Promise<SystemManagementPage<MenuItem>> {
+  if (API_MODE === 'remote') {
+    const payload = await requestRemote(
+      systemManagementPageUrl('/system/menus/page', query),
+      { suppressUnauthorizedEvent: true },
+    );
+    return normalizeSystemManagementPage<MenuItem>(payload, '系统菜单');
+  }
+  const keyword = String(query.keyword || '').trim().toLowerCase();
+  const filtered = sortMenus(readMenus()).filter((item) =>
+    !keyword || [item.code, item.name, item.path, item.desc]
+      .some((value) => String(value || '').toLowerCase().includes(keyword)),
+  );
+  return sliceSystemManagementPage(filtered, query.page, query.pageSize);
 }
 
 export async function createMenu(payload: MenuPayload): Promise<MenuItem> {

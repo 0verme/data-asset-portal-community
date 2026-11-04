@@ -13,12 +13,14 @@ test("role management consumes role and permission APIs", async () => {
     readFile(`${here}/RoleManagementPage.tsx`, "utf8"),
   ]);
   assert.match(api, /\/system\/roles/);
+  assert.match(api, /getRolesPage/);
   assert.match(api, /\/system\/permissions/);
   assert.match(api, /assignableOnly/);
   assert.match(api, /getRoleAssignablePermissions/);
   assert.match(api, /Built-in role cannot be deleted/);
   assert.match(api, /method:\s*["']DELETE["']/);
   assert.match(hook, /getRoleAssignablePermissions/);
+  assert.match(hook, /getRolesPage/);
   assert.match(hook, /normalizeRolePermissionCodes/);
   assert.match(hook, /system:role:write/);
   assert.match(hook, /deleteRole\(code\)/);

@@ -16,6 +16,13 @@
 import { requestRemote } from './http.ts';
 import { parseCollectionResponse } from './collectionResponse.ts';
 import {
+  normalizeSystemManagementPage,
+  sliceSystemManagementPage,
+  systemManagementPageUrl,
+  type SystemManagementPage,
+  type SystemManagementPageQuery,
+} from './systemManagementPagination.ts';
+import {
   isPublicPermission,
   MOCK_ROLE_PERMISSIONS,
   normalizeRolePermissionCodes,
@@ -168,6 +175,21 @@ export async function getRoleAssignablePermissions(): Promise<SystemPermissionIt
 export async function getRoles(): Promise<SystemRoleItem[]> {
   if (API_MODE === 'remote') return normalizeCollection<SystemRoleItem>(await requestRemote('/system/roles'));
   return clone(localRoles);
+}
+
+export async function getRolesPage(query: SystemManagementPageQuery): Promise<SystemManagementPage<SystemRoleItem>> {
+  if (API_MODE === 'remote') {
+    const payload = await requestRemote(
+      systemManagementPageUrl('/system/roles/page', query),
+    );
+    return normalizeSystemManagementPage<SystemRoleItem>(payload, '系统角色');
+  }
+  const keyword = String(query.keyword || '').trim().toLowerCase();
+  const filtered = clone(localRoles).filter((role) =>
+    !keyword || [role.roleCode, role.name, role.description]
+      .some((value) => String(value || '').toLowerCase().includes(keyword)),
+  );
+  return sliceSystemManagementPage(filtered, query.page, query.pageSize);
 }
 
 export async function createRole(payload: SystemRolePayload): Promise<SystemRoleItem> {

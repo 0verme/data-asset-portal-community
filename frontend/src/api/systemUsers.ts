@@ -15,6 +15,13 @@
 
 import { requestRemote } from './http.ts';
 import { parseCollectionResponse } from './collectionResponse.ts';
+import {
+  normalizeSystemManagementPage,
+  sliceSystemManagementPage,
+  systemManagementPageUrl,
+  type SystemManagementPage,
+  type SystemManagementPageQuery,
+} from './systemManagementPagination.ts';
 import { SYSTEM_USERS, type MockSystemUser } from '../data/systemUsers.ts';
 
 const API_MODE = (
@@ -90,6 +97,23 @@ export async function getUsers(): Promise<MockSystemUser[]> {
     return normalizeCollection<MockSystemUser>(payload);
   }
   return readStore();
+}
+
+export async function getUserPage(query: SystemManagementPageQuery): Promise<SystemManagementPage<MockSystemUser>> {
+  if (API_MODE === 'remote') {
+    const payload = await requestRemote(
+      systemManagementPageUrl('/system/users/page', query),
+    );
+    return normalizeSystemManagementPage<MockSystemUser>(payload, '系统用户');
+  }
+  const keyword = String(query.keyword || '').trim().toLowerCase();
+  const filtered = readStore().filter((user) => {
+    if (!keyword) return true;
+    const roleLabel = user.role === 'admin' ? '系统管理员' : user.role === 'maintainer' ? '业务维护员' : '系统管理员';
+    return [user.username, user.displayName, user.email, user.status, roleLabel, user.role, user.remark]
+      .some((value) => String(value || '').toLowerCase().includes(keyword));
+  });
+  return sliceSystemManagementPage(filtered, query.page, query.pageSize);
 }
 
 export async function createUser(payload: SystemUserPayload): Promise<MockSystemUser> {
