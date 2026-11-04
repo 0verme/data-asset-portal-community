@@ -282,6 +282,8 @@
 .sp-ai-candidate-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px 9px; min-width: 0; }
 .sp-ai-candidate-title { min-width: 0; color: var(--ink); font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
 .sp-ai-candidate-type { flex: 0 0 auto; color: var(--ink-3); font-size: 11px; }
+.sp-ai-candidate-relevance { flex: 0 0 auto; color: var(--accent); font-size: 11px; }
+.sp-ai-candidate-relevance.related { color: var(--ink-3); }
 .sp-ai-candidate-name, .sp-ai-candidate-meta, .sp-ai-candidate-desc, .sp-ai-candidate-evidence {
   min-width: 0; max-width: 100%; color: var(--ink-2); font-size: 12px; line-height: 1.5;
   white-space: normal; overflow-wrap: anywhere; word-break: break-word;

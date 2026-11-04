@@ -22,6 +22,7 @@ const validCandidate = {
   layer: "DWS",
   source: "dap_catalog",
   matchReason: "字段、父表和稳定 ID 已由当前 DAP 目录校验。",
+  relevance: "direct",
 };
 
 const validResponse = {
@@ -31,6 +32,7 @@ const validResponse = {
   candidates: [validCandidate],
   retrievalStatus: "available",
   generationStatus: "completed",
+  resultsTruncated: false,
   reasonCode: null,
   elapsedMs: 10,
 };
@@ -61,6 +63,7 @@ test("AI ask response preserves DAP stable IDs and validates citations against c
   assert.equal(parsed.status, "answered");
   assert.equal(parsed.citations[0]?.assetId, 42);
   assert.equal(parsed.candidates[0]?.fieldId, 99);
+  assert.equal(parsed.resultsTruncated, false);
 
   assert.throws(
     () => parseAiAskResponse({
@@ -100,6 +103,31 @@ test("AI ask parser rejects malformed field parent identity, source and duplicat
     }),
     /Duplicate AI ask citation/,
   );
+  assert.throws(
+    () => parseAiAskResponse({
+      ...validResponse,
+      status: "partial_answer",
+      answer: "仅确认部分资产。",
+      reasonCode: "partial_results",
+      citations: [],
+    }),
+    /must contain verified citations/,
+  );
+  assert.equal(parseAiAskResponse({
+    ...validResponse,
+    status: "partial_answer",
+    answer: "仅确认部分资产，不代表完整清单。",
+    resultsTruncated: true,
+    reasonCode: "partial_results",
+  }).resultsTruncated, true);
+  assert.throws(
+    () => parseAiAskResponse({ ...validResponse, resultsTruncated: true }),
+    /explicit partial-answer status/,
+  );
+  assert.throws(
+    () => parseAiAskResponse({ ...validResponse, resultsTruncated: undefined }),
+    /Invalid AI ask response/,
+  );
 });
 
 test("failure and no-evidence statuses remain explicit and cannot carry model citations", () => {
@@ -111,6 +139,7 @@ test("failure and no-evidence statuses remain explicit and cannot carry model ci
       candidates: [],
       retrievalStatus: "available",
       generationStatus: "not_run",
+      resultsTruncated: false,
       reasonCode: "insufficient_evidence",
       elapsedMs: 4,
     },
@@ -121,6 +150,7 @@ test("failure and no-evidence statuses remain explicit and cannot carry model ci
       candidates: [],
       retrievalStatus: "unavailable",
       generationStatus: "not_run",
+      resultsTruncated: false,
       reasonCode: "retrieval_unavailable",
       elapsedMs: 4,
     },
@@ -128,9 +158,10 @@ test("failure and no-evidence statuses remain explicit and cannot carry model ci
       status: "generation_unavailable",
       answer: "模型暂不可用。",
       citations: [],
-      candidates: [validCandidate],
+      candidates: [],
       retrievalStatus: "available",
       generationStatus: "unavailable",
+      resultsTruncated: false,
       reasonCode: "llm_timeout",
       elapsedMs: 4,
     },
@@ -142,7 +173,7 @@ test("failure and no-evidence statuses remain explicit and cannot carry model ci
       ...validResponse,
       status: "generation_unavailable",
     }),
-    /Non-answered AI response/,
+    /Unanswered AI response/,
   );
 });
 

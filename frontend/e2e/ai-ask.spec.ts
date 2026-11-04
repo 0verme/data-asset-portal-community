@@ -20,18 +20,23 @@ function candidate() {
     layer: "DWS",
     source: "dap_catalog",
     matchReason: "字段、所属表和稳定 ID 均来自本测试的 DAP 目录 fixture。",
+    relevance: "direct",
   };
 }
 
 function answer(query: string) {
+  const isList = /有哪些|列出|清单/.test(query);
   return {
-    status: "answered",
-    answer: `已根据合成目录为“${query}”找到相关候选，请核对下方 DAP 资产卡片。`,
+    status: isList ? "partial_answer" : "answered",
+    answer: isList
+      ? `本次检索确认部分资产：${longName}，字段 ${longField}。以上仅为本次检索确认的部分资产，不代表完整清单。`
+      : `已根据合成目录为“${query}”找到相关候选，请核对下方 DAP 资产卡片。`,
     citations: [{ assetId: ASSET_ID, fieldId: FIELD_ID, source: "dap_catalog" }],
     candidates: [candidate()],
     retrievalStatus: "available",
     generationStatus: "completed",
-    reasonCode: null,
+    resultsTruncated: isList,
+    reasonCode: isList ? "partial_results" : null,
     elapsedMs: 12,
   };
 }
@@ -65,7 +70,7 @@ function sseResponse(response: ReturnType<typeof answer> | Record<string, unknow
         emit("generating", "failed", { errorCode: response.reasonCode === "llm_timeout" ? "timeout" : "unavailable" });
       } else stage("generating");
     }
-    if (response.status === "answered" || response.status === "insufficient_evidence") stage("completed");
+    if (response.status === "answered" || response.status === "partial_answer" || response.status === "insufficient_evidence") stage("completed");
   }
   events.push(`event: result\ndata: ${JSON.stringify(response)}\n\n`);
   return {
@@ -129,7 +134,7 @@ async function mockPortalApis(page: Page, options: {
           status: "insufficient_evidence",
           answer: "当前元数据不足以确认。",
           citations: [], candidates: [],
-          retrievalStatus: "available", generationStatus: "not_run",
+          retrievalStatus: "available", generationStatus: "not_run", resultsTruncated: false,
           reasonCode: "insufficient_evidence", elapsedMs: 3,
         }));
       }
@@ -137,8 +142,8 @@ async function mockPortalApis(page: Page, options: {
         return route.fulfill(sseResponse({
           status: "generation_unavailable",
           answer: "AI 问答暂不可用，请稍后重试。",
-          citations: [], candidates: [candidate()],
-          retrievalStatus: "available", generationStatus: "unavailable",
+          citations: [], candidates: [],
+          retrievalStatus: "available", generationStatus: "unavailable", resultsTruncated: false,
           reasonCode: "llm_timeout", elapsedMs: 12000,
         }));
       }
@@ -213,7 +218,7 @@ test("Enter and Search stay deterministic; explicit AI preserves query and opens
 
   await page.getByRole("button", { name: "问 AI", exact: true }).click();
   await expect(page.getByLabel("AI 回答摘要")).toContainText(query);
-  await expect(page.getByText("相关候选资产", { exact: true })).toBeVisible();
+  await expect(page.getByText("答案引用的目录资产", { exact: true })).toBeVisible();
   const progress = page.locator(".sp-ai-progress");
   await expect(progress).not.toHaveAttribute("open", "");
   await progress.locator("summary").click();
@@ -230,6 +235,18 @@ test("Enter and Search stay deterministic; explicit AI preserves query and opens
   await page.getByRole("button", { name: `查看字段详情：${longField}` }).click();
   await expect(page).toHaveURL(/\/data-warehouse(?:\/|\?)/);
   await expect(page).toHaveURL(new RegExp(`assetId=${ASSET_ID}`));
+});
+
+test("list answer is explicitly partial and keeps verified table/field references clickable", async ({ page }) => {
+  await openAiPortal(page);
+  const input = page.getByRole("textbox", { name: "搜索数据资产" });
+  await input.fill("我们行有哪些存款字段和表？");
+  await page.getByRole("button", { name: "问 AI", exact: true }).click();
+
+  await expect(page.getByLabel("AI 部分回答")).toContainText("不代表完整清单");
+  await expect(page.getByRole("status")).toContainText("有界检索结果可能不完整");
+  await expect(page.getByText("答案引用的目录资产", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: `查看字段详情：${longField}` })).toBeVisible();
 });
 
 test("true zero-match offers AI with the existing query; no-evidence refusal is explicit", async ({ page }) => {
