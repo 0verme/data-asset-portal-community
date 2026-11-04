@@ -135,7 +135,7 @@ test("AI is explicitly enabled, Enter remains traditional search, and model requ
   assert.match(source, /\.catch\(\(\) => \{\s*if \(!cancelled\) setAiEnabled\(false\)/);
   assert.match(source, /if \(event\.key === "Enter"\) doSearch\(\)/);
   assert.match(source, /onClick=\{\(\) => runAiAsk\(query\)\}/);
-  assert.match(source, /askAi\(question, "all", 10\)/);
+  assert.match(source, /askAiWithProgress\(\s*question/);
   assert.match(source, /syncSearchUrl\(question, scope\)/);
   assert.match(source, /setAiQuery\(""\)/);
   assert.match(source, /if \(searchedTerm !== question\)[\s\S]*?setSearchedTerm\(""\)/);
@@ -143,6 +143,7 @@ test("AI is explicitly enabled, Enter remains traditional search, and model requ
   assert.match(source, /response\.status === "generation_unavailable"/);
   assert.match(source, /response\.status === "insufficient_evidence"/);
   assert.match(source, /onRetry=\{\(\) => runAiAsk\(aiQuery\)\}/);
+  assert.match(source, /onCancel=\{cancelAiAsk\}/);
   assert.match(source, /onNavigate\?\.\(target, query\)/);
   assert.match(source, /module: "dwm"[\s\S]*?assetId: item\.assetId/);
 });
@@ -164,6 +165,31 @@ test("AI answers remain explanatory while only DAP candidate cards navigate resp
   assert.match(styles, /@media \(max-width: 600px\)[\s\S]*?\.sp-ai-candidate \{ padding: 12px/);
   assert.match(api, /suppressTimeoutPayloadLogging: true/);
   assert.doesNotMatch(api, /fetch\(.*AI_LLM|AI_LLM_BASE_URL/);
+});
+
+test("AI progress is backend-driven, collapsible, timed, count-backed, and never token-streamed", async () => {
+  const [source, styles] = await Promise.all([
+    readFile(searchPagePath, "utf8"),
+    readFile(searchStylesPath, "utf8"),
+  ]);
+
+  assert.match(source, /<AiAskProgressPanel steps=\{progress\}/);
+  assert.match(source, /open=\{loading \|\| expanded\}/);
+  assert.match(source, /setExpanded\(loading\)/);
+  assert.match(source, /"正在分析问题"/);
+  assert.match(source, /"正在检索数据资产"/);
+  assert.match(source, /"已找到相关表和字段"/);
+  assert.match(source, /step\.tableCount/);
+  assert.match(source, /step\.fieldCount/);
+  assert.match(source, /formatAiAskElapsed\(step\.elapsedMs\)/);
+  assert.match(source, /"正在生成回答"/);
+  assert.match(source, /"回答完成"/);
+  assert.match(source, /response\.reasonCode === "llm_timeout"/);
+  assert.match(source, /errorCode: "cancelled"/);
+  assert.doesNotMatch(source, /setInterval\(/);
+  assert.doesNotMatch(source, /正在检索已登记资产并生成回答/);
+  assert.match(styles, /\.sp-ai-progress \{[^}]*background: var\(--surface\)/);
+  assert.match(styles, /\.sp-ai-progress-step-failed[\s\S]*?var\(--danger\)/);
 });
 
 test("RAG recommendations are a separate business group with asynchronous non-blocking state", async () => {

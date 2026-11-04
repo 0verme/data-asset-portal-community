@@ -38,8 +38,10 @@ class SlowDripBody(httpx.SyncByteStream):
     def __init__(self, *, interval=0.09):
         self.interval = interval
         self.closed = threading.Event()
+        self.started = threading.Event()
 
     def __iter__(self):
+        self.started.set()
         for chunk in (b'{"choices":', b'{"message":'):
             if self.closed.wait(self.interval):
                 return
@@ -179,6 +181,44 @@ class OpenAICompatibleLLMProviderTests(unittest.TestCase):
         self.assertEqual("llm_timeout", raised.exception.reason_code)
         self.assertTrue(body.closed.is_set())
         self.assertLess(time.monotonic() - started, 0.35)
+
+    def test_cancellation_closes_active_response_and_releases_concurrency_slot(self):
+        body = SlowDripBody(interval=0.5)
+        calls = []
+
+        def handler(_request):
+            calls.append(None)
+            return httpx.Response(200, stream=body) if len(calls) == 1 else success_response()
+
+        provider = self._provider(
+            handler,
+            config=llm_config(max_concurrency=1, timeout_ms=1000),
+        )
+        cancel_event = threading.Event()
+        errors = []
+
+        def ask():
+            try:
+                provider.complete_json(
+                    system_prompt="x", user_payload={}, cancel_event=cancel_event
+                )
+            except LLMProviderError as error:
+                errors.append(error.reason_code)
+
+        thread = threading.Thread(target=ask)
+        thread.start()
+        self.assertTrue(body.started.wait(1), "the provider should be reading the active response")
+        cancel_event.set()
+        thread.join(1)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(["cancelled"], errors)
+        self.assertTrue(body.closed.is_set())
+        self.assertEqual(
+            '{"answer":"ok","citations":[{"assetId":1}]}',
+            provider.complete_json(system_prompt="x", user_payload={}),
+            "a cancelled request must release its provider capacity slot",
+        )
 
     def test_concurrency_limit_rejects_excess_requests_without_waiting(self):
         entered = threading.Event()

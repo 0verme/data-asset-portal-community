@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -87,9 +88,14 @@ class RagSearchService:
         *,
         profile: str,
         top_k: int | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> RagRecommendationsResponse:
         normalized_query = str(query or "").strip()
         started = time.monotonic()
+        if cancel_event is not None and cancel_event.is_set():
+            return self._unavailable(
+                normalized_query, "service_unavailable", 0
+            )
         if not normalized_query:
             return RagRecommendationsResponse(
                 query="",
@@ -130,17 +136,35 @@ class RagSearchService:
                 (time.monotonic() - started) * 1000,
             )
         try:
+            search_options = (
+                {"cancel_event": cancel_event}
+                if cancel_event is not None
+                else {}
+            )
             remote = self._http_client.search(
                 config,
                 token=token,
                 query=normalized_query,
+                **search_options,
             )
         except RagHttpClientError as error:
+            reason_code = (
+                "service_unavailable"
+                if error.reason_code == "cancelled"
+                else error.reason_code
+            )
             return self._unavailable(
-                normalized_query, error.reason_code, (time.monotonic() - started) * 1000
+                normalized_query, reason_code, (time.monotonic() - started) * 1000
             )
         except Exception:
             LOGGER.warning("RAG HTTP search failed without a safe error code")
+            return self._unavailable(
+                normalized_query,
+                "service_unavailable",
+                (time.monotonic() - started) * 1000,
+            )
+
+        if cancel_event is not None and cancel_event.is_set():
             return self._unavailable(
                 normalized_query,
                 "service_unavailable",
