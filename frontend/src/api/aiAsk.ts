@@ -47,9 +47,12 @@ export type AiAskProgressStepId =
   | "completed";
 export type AiAskProgressStatus = "pending" | "running" | "completed" | "failed";
 
+export type AiAskProgressIntent = "metadata_count";
+
 export interface AiAskProgressStep {
   id: AiAskProgressStepId;
   status: AiAskProgressStatus;
+  intent?: AiAskProgressIntent | null;
   elapsedMs: number;
   tableCount?: number | null;
   fieldCount?: number | null;
@@ -72,6 +75,26 @@ export interface AiAskStatisticalResult {
   sourceLink?: string | null;
 }
 
+export interface AiMetadataCountFilter {
+  code: string;
+  displayName: string;
+  matchedAs: "catalog_value" | "catalog_alias";
+  inferred: boolean;
+}
+
+export interface AiMetadataCount {
+  metric: "table_count";
+  value: number;
+  filters: {
+    domain: AiMetadataCountFilter | null;
+    layer: AiMetadataCountFilter | null;
+  };
+  source: "dap_catalog";
+  complete: true;
+  catalogProfile: "internal" | "strict" | "disabled";
+  sourceLink: string;
+}
+
 export interface AiAskResponse {
   status: AiAskStatus;
   answer: string;
@@ -82,6 +105,7 @@ export interface AiAskResponse {
   resultsTruncated: boolean;
   reasonCode?: string | null;
   elapsedMs: number;
+  metadataCount?: AiMetadataCount;
   statisticalResult?: AiAskStatisticalResult;
 }
 
@@ -100,6 +124,10 @@ const ASK_STATUSES = new Set<string>([
   "insufficient_evidence",
   "retrieval_unavailable",
   "generation_unavailable",
+  "statistical_answer",
+  "metadata_count_answered",
+  "ambiguous_scope",
+  "metadata_count_unavailable",
 ]);
 const PROGRESS_STEP_IDS = new Set<string>([
   "analyzing", "retrieving", "counting", "organizing", "generating", "completed",
@@ -165,6 +193,75 @@ function parseStatisticalResult(value: unknown): AiAskStatisticalResult | null {
     source: "dap_catalog",
     complete: value["complete"],
     ...(sourceLink === undefined ? {} : { sourceLink: sourceLink as string | null }),
+  };
+}
+
+function parseMetadataCountFilter(value: unknown): AiMetadataCountFilter | null {
+  if (value === undefined || value === null) return null;
+  if (!isRecord(value)) throw new Error("Invalid AI metadata count filter.");
+  const code = value["code"];
+  const displayName = value["displayName"];
+  const matchedAs = value["matchedAs"];
+  const inferred = value["inferred"];
+  if (
+    !isText(code) || !code.trim() || code.length > 64
+    || !isText(displayName) || !displayName.trim() || displayName.length > 256
+    || (matchedAs !== "catalog_value" && matchedAs !== "catalog_alias")
+    || typeof inferred !== "boolean"
+  ) {
+    throw new Error("Invalid AI metadata count filter.");
+  }
+  return { code, displayName, matchedAs, inferred };
+}
+
+function parseMetadataCount(value: unknown): AiMetadataCount {
+  if (!isRecord(value) || !isRecord(value["filters"])) {
+    throw new Error("Invalid AI metadata count evidence.");
+  }
+  const count = value["value"];
+  const sourceLink = value["sourceLink"];
+  const catalogProfile = value["catalogProfile"];
+  const filters = value["filters"];
+  if (
+    value["metric"] !== "table_count"
+    || !Number.isSafeInteger(count) || Number(count) < 0
+    || value["source"] !== "dap_catalog"
+    || value["complete"] !== true
+    || (catalogProfile !== "internal" && catalogProfile !== "strict" && catalogProfile !== "disabled")
+    || !isText(sourceLink) || !/^\/data-warehouse(?:\?.*)?$/.test(sourceLink)
+    || Object.keys(filters).some((key) => key !== "domain" && key !== "layer")
+  ) {
+    throw new Error("Invalid AI metadata count evidence.");
+  }
+  return {
+    metric: "table_count",
+    value: Number(count),
+    filters: {
+      domain: parseMetadataCountFilter(filters["domain"]),
+      layer: parseMetadataCountFilter(filters["layer"]),
+    },
+    source: "dap_catalog",
+    complete: true,
+    catalogProfile,
+    sourceLink,
+  };
+}
+
+function metadataCountToStatisticalResult(count: AiMetadataCount): AiAskStatisticalResult {
+  const filters: AiAskStatisticalFilter[] = [];
+  if (count.filters.domain) {
+    filters.push({ dimension: "domain", value: count.filters.domain.displayName, displayName: "主题域" });
+  }
+  if (count.filters.layer) {
+    filters.push({ dimension: "layer", value: count.filters.layer.displayName, displayName: "数据分层" });
+  }
+  return {
+    metric: count.metric,
+    value: count.value,
+    filters,
+    source: "dap_catalog",
+    complete: count.complete,
+    sourceLink: count.sourceLink,
   };
 }
 
@@ -238,7 +335,14 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
   const status = value["status"];
   const retrievalStatus = value["retrievalStatus"];
   const generationStatus = value["generationStatus"];
-  const statisticalResult = parseStatisticalResult(value["statisticalResult"]);
+  const rawStatisticalResult = parseStatisticalResult(value["statisticalResult"]);
+  const metadataCount = value["metadataCount"] === undefined || value["metadataCount"] === null
+    ? null
+    : parseMetadataCount(value["metadataCount"]);
+  if (rawStatisticalResult && metadataCount) {
+    throw new Error("AI ask response cannot contain two statistical evidence shapes.");
+  }
+  const statisticalResult = rawStatisticalResult || (metadataCount ? metadataCountToStatisticalResult(metadataCount) : null);
   const resultsTruncated = value["resultsTruncated"] ?? (statisticalResult ? false : undefined);
   const answer = value["answer"] ?? (statisticalResult ? "" : undefined);
   const rawCandidates = value["candidates"] ?? (statisticalResult ? [] : undefined);
@@ -247,7 +351,7 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
   if (
     typeof status !== "string"
     || !status.trim()
-    || (!ASK_STATUSES.has(status) && !statisticalResult)
+    || (!ASK_STATUSES.has(status) && !rawStatisticalResult)
     || typeof retrievalStatus !== "string"
     || !RETRIEVAL_STATUSES.has(retrievalStatus)
     || typeof generationStatus !== "string"
@@ -288,6 +392,25 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
   if (resultsTruncated && status !== "partial_answer" && !statisticalResult) {
     throw new Error("Truncated AI results must use an explicit partial-answer status.");
   }
+  if (status === "metadata_count_answered") {
+    if (
+      !metadataCount || !metadataCount.complete
+      || retrievalStatus !== "not_run" || generationStatus !== "not_run"
+      || candidates.length || citations.length || resultsTruncated
+    ) {
+      throw new Error("Metadata count answer must contain exact count evidence only.");
+    }
+  } else if (status === "ambiguous_scope" || status === "metadata_count_unavailable") {
+    if (
+      metadataCount || statisticalResult
+      || retrievalStatus !== "not_run" || generationStatus !== "not_run"
+      || candidates.length || citations.length || resultsTruncated
+    ) {
+      throw new Error("Unresolved metadata count must not contain count values or citations.");
+    }
+  } else if (metadataCount) {
+    throw new Error("Non-count AI responses must not contain metadata count evidence.");
+  }
   if ((status === "answered" || status === "partial_answer") && !statisticalResult) {
     if (!citations.length || generationStatus !== "completed") {
       throw new Error("Answered AI response must contain verified citations.");
@@ -318,18 +441,20 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     resultsTruncated,
     reasonCode: isText(value["reasonCode"]) ? value["reasonCode"] : null,
     elapsedMs,
+    ...(metadataCount ? { metadataCount } : {}),
     ...(statisticalResult ? { statisticalResult } : {}),
   };
 }
 
 export function parseAiAskProgressStep(value: unknown): AiAskProgressStep {
   if (!isRecord(value)) throw new Error("Invalid AI ask progress event.");
-  const allowedKeys = new Set(["id", "status", "elapsedMs", "tableCount", "fieldCount", "errorCode"]);
+  const allowedKeys = new Set(["id", "status", "intent", "elapsedMs", "tableCount", "fieldCount", "errorCode"]);
   if (Object.keys(value).some((key) => !allowedKeys.has(key))) {
     throw new Error("Unexpected data in AI ask progress event.");
   }
   const id = value["id"];
   const status = value["status"];
+  const intent = value["intent"];
   const elapsedMs = value["elapsedMs"];
   const tableCount = value["tableCount"];
   const fieldCount = value["fieldCount"];
@@ -337,6 +462,7 @@ export function parseAiAskProgressStep(value: unknown): AiAskProgressStep {
   if (
     typeof id !== "string" || !PROGRESS_STEP_IDS.has(id)
     || typeof status !== "string" || !PROGRESS_STATUSES.has(status)
+    || (intent !== undefined && intent !== null && intent !== "metadata_count")
     || (elapsedMs !== undefined && (typeof elapsedMs !== "number" || !Number.isFinite(elapsedMs) || elapsedMs < 0))
     || (tableCount !== undefined && tableCount !== null && (!Number.isInteger(tableCount) || Number(tableCount) < 0))
     || (fieldCount !== undefined && fieldCount !== null && (!Number.isInteger(fieldCount) || Number(fieldCount) < 0))
@@ -347,6 +473,7 @@ export function parseAiAskProgressStep(value: unknown): AiAskProgressStep {
   return {
     id: id as AiAskProgressStepId,
     status: status as AiAskProgressStatus,
+    ...(intent === undefined ? {} : { intent: intent as AiAskProgressIntent | null }),
     elapsedMs: typeof elapsedMs === "number" ? elapsedMs : 0,
     ...(tableCount === undefined ? {} : { tableCount: tableCount as number | null }),
     ...(fieldCount === undefined ? {} : { fieldCount: fieldCount as number | null }),

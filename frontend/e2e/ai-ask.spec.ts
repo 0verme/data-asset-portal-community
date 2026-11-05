@@ -51,8 +51,13 @@ function sseResponse(response: ReturnType<typeof answer> | Record<string, unknow
     emit(id, "running");
     emit(id, "completed", extra);
   };
-  stage("analyzing");
-  if (response.status === "retrieval_unavailable") {
+  const isMetadataCountStatus = [
+    "metadata_count_answered", "ambiguous_scope", "metadata_count_unavailable",
+  ].includes(String(response.status));
+  stage("analyzing", isMetadataCountStatus ? { intent: "metadata_count" } : {});
+  if (isMetadataCountStatus) {
+    // Authoritative directory counts bypass RAG candidate and generation stages.
+  } else if (response.status === "retrieval_unavailable") {
     emit("retrieving", "pending");
     emit("retrieving", "running");
     emit("retrieving", "failed", { errorCode: response.reasonCode === "retrieval_timeout" ? "timeout" : "unavailable" });
@@ -146,20 +151,28 @@ async function mockPortalApis(page: Page, options: {
       asked.push(payload);
       if (payload.query.includes("deterministic-count")) {
         return route.fulfill(sseResponse({
-          status: "statistical_answer",
-          answer: "",
+          status: "metadata_count_answered",
+          answer: "当前 DAP 目录中，合成主题域、数据集市层共有 118 张数据表。",
           citations: [], candidates: [],
-          retrievalStatus: "available", generationStatus: "not_run", resultsTruncated: false,
+          retrievalStatus: "not_run", generationStatus: "not_run", resultsTruncated: false,
           elapsedMs: 3,
-          statisticalResult: {
+          metadataCount: {
             metric: "table_count", value: 118,
-            filters: [
-              { dimension: "domain", value: "国业", displayName: "主题域" },
-              { dimension: "layer", value: "DM", displayName: "数据分层" },
-            ],
-            source: "dap_catalog", complete: true,
-            sourceLink: "/data-warehouse?domain=%E5%9B%BD%E4%B8%9A&layer=DM",
+            filters: {
+              domain: { code: "SYN521", displayName: "合成主题域", matchedAs: "catalog_value", inferred: false },
+              layer: { code: "DM", displayName: "数据集市层", matchedAs: "catalog_alias", inferred: true },
+            },
+            source: "dap_catalog", complete: true, catalogProfile: "strict",
+            sourceLink: "/data-warehouse?domain=%E5%90%88%E6%88%90%E4%B8%BB%E9%A2%98%E5%9F%9F&layer=DM",
           },
+        }));
+      }
+      if (payload.query.includes("ambiguous-metadata-count")) {
+        return route.fulfill(sseResponse({
+          status: "ambiguous_scope",
+          answer: "无法从当前 DAP 目录唯一确认统计范围，请明确主题域或数据分层后重试。",
+          citations: [], candidates: [], retrievalStatus: "not_run", generationStatus: "not_run",
+          resultsTruncated: false, reasonCode: "ambiguous_scope", elapsedMs: 3,
         }));
       }
       if (options.delayFirstAsk && (payload.query.includes("cancel-first") || payload.query.includes("slow-old"))) {
@@ -436,10 +449,24 @@ test("future deterministic catalog counts render as structured evidence without 
   await page.getByRole("button", { name: "问 AI", exact: true }).click();
   const statistic = page.getByRole("region", { name: "确定性统计结果" });
   await expect(statistic).toContainText("118 张表");
-  await expect(statistic).toContainText("主题域=国业");
-  await expect(statistic).toContainText("数据分层=DM");
+  await expect(statistic).toContainText("主题域=合成主题域");
+  await expect(statistic).toContainText("数据分层=数据集市层");
   await expect(statistic.getByRole("link", { name: "查看筛选后的全部资产" })).toHaveAttribute("href", /\/data-warehouse\?/);
   await expect(page.locator(".sp-ai-candidate")).toHaveCount(0);
+  const progress = page.locator(".sp-ai-progress");
+  await progress.locator("summary").click();
+  await expect(progress).toContainText("已识别目录统计意图");
+  await expect(page.getByRole("tab", { name: /AI 问答/ })).toContainText("已完成");
+});
+
+test("ambiguous authoritative count stays an explicit failure without a numeric result", async ({ page }) => {
+  await openAiPortal(page);
+  await page.getByRole("textbox", { name: "搜索数据资产" }).fill("ambiguous-metadata-count question");
+  await page.getByRole("button", { name: "问 AI", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("无法从当前 DAP 目录唯一确认统计范围");
+  await expect(page.getByRole("region", { name: "确定性统计结果" })).toHaveCount(0);
+  await expect(page.locator(".sp-ai-candidate")).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: /AI 问答/ })).toContainText("执行失败");
 });
 
 test("AI disabled or failed status hides the action; ordinary search failure is not an empty state", async ({ page }) => {

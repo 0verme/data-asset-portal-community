@@ -218,6 +218,12 @@ const AI_ASK_STEP_TITLES: Record<AiAskProgressStep["id"], { running: string; com
   generating: { running: "正在生成回答", completed: "已生成回答", failed: "回答生成失败", pending: "等待生成回答" },
   completed: { running: "正在完成问答", completed: "回答完成", failed: "问答未完成", pending: "等待完成问答" },
 };
+const METADATA_COUNT_PROGRESS_TITLES: Record<AiAskProgressStep["status"], string> = {
+  pending: "等待查询目录统计",
+  running: "正在查询目录统计",
+  completed: "已识别目录统计意图",
+  failed: "统计意图识别失败",
+};
 
 function formatAiAskElapsed(elapsedMs: number): string {
   return elapsedMs < 1000
@@ -298,7 +304,11 @@ function AiAskProgressPanel({ steps, status, loading, onCancel }: AiAskProgressP
             <li className={`sp-ai-progress-step sp-ai-progress-step-${step.status}`} key={step.id}>
               <span className="sp-ai-progress-indicator" aria-hidden="true" />
               <span className="sp-ai-progress-step-main">
-                <span className="sp-ai-progress-step-title">{AI_ASK_STEP_TITLES[step.id][step.status]}</span>
+                <span className="sp-ai-progress-step-title">
+                  {step.id === "analyzing" && step.intent === "metadata_count"
+                    ? METADATA_COUNT_PROGRESS_TITLES[step.status]
+                    : AI_ASK_STEP_TITLES[step.id][step.status]}
+                </span>
                 {step.id === "counting" && step.tableCount !== undefined && step.tableCount !== null ? (
                   <span className="sp-ai-progress-count">
                     {step.tableCount} 张表 · {step.fieldCount ?? 0} 个字段
@@ -359,7 +369,11 @@ function AiAskSection({
       ? response.reasonCode === "llm_timeout"
         ? "模型生成超时，未生成回答；不会把未筛选候选当作答案。"
         : "模型暂不可用，未生成回答；不会把未筛选候选当作答案。"
-      : "";
+      : !response?.statisticalResult && response?.status === "ambiguous_scope"
+        ? response.answer || "无法从当前目录唯一确认统计范围，请明确主题域或数据分层后重试。"
+        : !response?.statisticalResult && response?.status === "metadata_count_unavailable"
+          ? response.answer || "当前 DAP 目录统计暂不可用，未返回统计值；请稍后重试。"
+          : "";
   const failureMessage = error || responseFailure;
   return (
     <section className="sp-ai-group" aria-label="AI 问答结果">
@@ -398,7 +412,7 @@ function AiAskSection({
               </div>
               <div className="sp-ai-summary" aria-label="AI 部分回答">{response.answer}</div>
             </>
-          ) : response.answer.trim() ? (
+          ) : !response.statisticalResult && response.answer.trim() ? (
             <div className="sp-ai-summary" aria-label="AI 回答摘要">{response.answer}</div>
           ) : null}
           {response.candidates.length ? (
@@ -905,7 +919,12 @@ export function SearchPortalPage({
   const hasResult = result !== null && !searchLoading && !searchError;
   const groups = hasResult && result ? result.groups : [];
   const hasSubmittedQuery = Boolean(searchedTerm || aiQuery);
-  const aiResponseFailed = !aiResponse?.statisticalResult && (aiResponse?.status === "retrieval_unavailable" || aiResponse?.status === "generation_unavailable");
+  const aiResponseFailed = !aiResponse?.statisticalResult && (
+    aiResponse?.status === "retrieval_unavailable"
+    || aiResponse?.status === "generation_unavailable"
+    || aiResponse?.status === "ambiguous_scope"
+    || aiResponse?.status === "metadata_count_unavailable"
+  );
   const searchTabStatus = searchLoading ? "搜索中" : searchError ? "搜索失败" : searchedTerm ? "已搜索" : "未搜索";
   const aiTabStatus = aiLoading ? "问答中" : aiError || aiResponseFailed ? "执行失败" : aiResponse ? "已完成" : "未提问";
   const searchedAssetIds = new Set(
