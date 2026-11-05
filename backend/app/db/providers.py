@@ -154,8 +154,9 @@ class PostgreSQLProvider:
             required = [key for key in ("user", "password") if not config.get(key)]
             if required:
                 raise ValueError(f"postgres profile '{profile}' requires {', '.join(required)}")
-        if config.get("schema") not in (None, ""):
-            config["schema"] = _postgres_schema(config)
+        # Application metadata must always have an explicit Profile target.
+        # Never silently fall back to a data-warehouse/business schema.
+        config["schema"] = _postgres_schema(config)
         return config
 
     @staticmethod
@@ -184,8 +185,7 @@ class PostgreSQLProvider:
         return self.create_engine(config).raw_connection()
 
     def physical_schema(self, config: dict):
-        schema = config.get("schema")
-        return "dwp" if schema is None or schema == "" else _postgres_schema(config)
+        return _postgres_schema(config)
 
 
 @dataclass(frozen=True)
