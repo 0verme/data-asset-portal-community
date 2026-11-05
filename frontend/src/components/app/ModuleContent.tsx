@@ -212,6 +212,10 @@ const MODULE_RENDERERS: Record<ModuleId, ModuleRenderer> = {
       route={context.lineageRoute}
       onRouteChange={context.setLineageRoute}
       onBootstrap={context.setLineageBootstrap}
+      selectedNodeId={context.lineageSelectedNodeId}
+      focusRequest={context.lineageFocusRequest}
+      onNodesChange={context.setLineageNodes}
+      onSelectedNodeChange={context.handleLineageSelectionChange}
     />
   ),
   dwm: ({ context }) => (

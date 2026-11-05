@@ -22,3 +22,4 @@ export { SystemSidebar } from "./SystemSidebar.tsx";
 export { UpstreamSidebar } from "./UpstreamSidebar.tsx";
 export { MappingSidebar } from "./MappingSidebar.tsx";
 export { ManualCodeTableSidebar } from "./ManualCodeTableSidebar.tsx";
+export { LineageAssetSidebar } from "./LineageAssetSidebar.tsx";

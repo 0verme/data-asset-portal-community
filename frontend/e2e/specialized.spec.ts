@@ -140,3 +140,77 @@ test("lineage chrome uses adapters and keeps the canvas mounted", async ({ page 
   await expect(page.locator(".lineage-canvas, .lineage-viewer").first()).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("lineage-select-after.png"), fullPage: true });
 });
+
+test("lineage asset navigation filters, expands, selects, and follows graph state", async ({ page }, testInfo) => {
+  await setMockAuth(page, "admin");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/lineage");
+
+  await expect(page.locator(".page-title")).toContainText("血缘分析", { timeout: 20_000 });
+  const search = page.getByLabel("Schema 名和表名搜索");
+  await expect(search).toBeVisible();
+  await expect(search).toHaveAttribute("type", "search");
+  await expect(page.locator(".lineage-asset-count")).toContainText("5 张表");
+
+  const schema = (name: string) => page.locator(".lineage-schema-heading").filter({ hasText: name });
+  const unclassified = schema("未分类");
+  await expect(page.locator(".lineage-schema-heading")).toHaveCount(1);
+  await expect(unclassified).toHaveAttribute("aria-expanded", "true");
+
+  await search.fill("DWD");
+  await expect(page.locator(".lineage-schema-heading")).toHaveCount(1);
+  await expect(unclassified).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: /DWD_TRADE_ORDER/ })).toBeVisible();
+  await search.fill("");
+  await expect(page.locator(".lineage-schema-heading")).toHaveCount(1);
+  await expect(unclassified).toHaveAttribute("aria-expanded", "true");
+
+  await page.getByRole("button", { name: "全部折叠" }).click();
+  await expect(page.locator(".lineage-schema-heading[aria-expanded='true']")).toHaveCount(0);
+  await page.getByRole("button", { name: "全部展开" }).click();
+  await expect(page.locator(".lineage-schema-heading[aria-expanded='true']")).toHaveCount(1);
+  await page.getByRole("button", { name: "全部折叠" }).click();
+  await expect(page.locator(".lineage-schema-heading[aria-expanded='true']")).toHaveCount(0);
+  await search.fill("no-match");
+  await expect(page.locator(".lineage-asset-empty")).toContainText("没有匹配的 Schema 或表名");
+  await search.fill("");
+
+  await unclassified.click();
+  await page.getByRole("button", { name: /DWD_TRADE_ORDER/ }).click();
+  await expect(page.locator(".lineage-detail h2")).toHaveText("DWD_TRADE_ORDER");
+  await expect.poll(async () => page.locator("lineage-viewer").evaluate((viewer) => (
+    viewer as HTMLElement & { selectedNodeId?: string | null }
+  ).selectedNodeId)).toBe("table:dwd:DWD_TRADE_ORDER");
+  await expect(page.getByRole("button", { name: /DWD_TRADE_ORDER/ })).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: "全部折叠" }).click();
+  await page.locator("lineage-viewer").locator('g.node[data-node-id="table:dwm:DWM_TRADE_ORDER_DETAIL_DI"]').click({ force: true });
+  await expect(page.locator(".lineage-detail h2")).toHaveText("DWM_TRADE_ORDER_DETAIL_DI");
+  await expect(unclassified).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: /DWM_TRADE_ORDER_DETAIL_DI/ })).toHaveAttribute("aria-pressed", "true");
+
+  const snapshotInfo = page.locator(".lineage-snapshot-info");
+  await expect(snapshotInfo).toHaveJSProperty("open", false);
+  await snapshotInfo.locator("summary").click();
+  await expect(snapshotInfo).toContainText("retail-demo-20260720");
+  await expect(snapshotInfo).toContainText("节点数量");
+  await expect(snapshotInfo).toContainText("关系数量");
+  await page.screenshot({ path: testInfo.outputPath("lineage-asset-navigation-after.png"), fullPage: true });
+
+  await page.getByLabel("血缘节点名称").fill("POS_RECEIPT");
+  await page.getByRole("button", { name: "查询" }).click();
+  await expect(page.locator(".lineage-detail h2")).toHaveText("POS_RECEIPT");
+  await expect(page.getByRole("button", { name: /POS_RECEIPT/ })).toHaveAttribute("aria-pressed", "true");
+
+  const direction = page.getByRole("combobox", { name: "血缘方向" });
+  await direction.focus();
+  await page.keyboard.press("ArrowDown");
+  await page.getByRole("option", { name: "仅上游" }).click();
+  const depth = page.getByRole("combobox", { name: "血缘层级" });
+  await depth.focus();
+  await page.keyboard.press("ArrowDown");
+  await page.getByRole("option", { name: "3 层" }).click();
+  await page.getByRole("button", { name: /刷新|加载中/ }).click();
+  await expect(page.locator(".lineage-detail h2")).toHaveText("POS_RECEIPT");
+  await expect(page.getByRole("button", { name: /POS_RECEIPT/ })).toHaveAttribute("aria-pressed", "true");
+});

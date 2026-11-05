@@ -4,6 +4,7 @@ import {
   AssetSidebar,
   ApiAssetSidebar,
   IndicatorSidebar,
+  LineageAssetSidebar,
   MappingSidebar,
   ManualCodeTableSidebar,
   PushSidebar,
@@ -37,6 +38,10 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
     indicator,
     indicatorFilter,
     lineageBootstrap,
+    lineageNodes,
+    lineageSelectedNodeId,
+    lineageSelectionSequence,
+    focusLineageNode,
     manualCodeTable,
     push,
     pushRoute,
@@ -167,22 +172,14 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
     );
   }
   if (module === "lineage") {
-    const details = lineageBootstrap;
-    const note = details?.mode === "persistent"
-      ? `当前为持久化血缘快照${details.snapshotName ? `：${details.snapshotName}` : ""}`
-      : ["poc", "demo"].includes(details?.mode || "")
-        ? "当前为全渠道零售演示血缘，不是数据库真实血缘。"
-        : "血缘数据源尚未配置";
     return (
-      <div className="side-group">
-        <div className="side-title">血缘范围</div>
-        <div className="side-note">{note}</div>
-        {details?.mode === "persistent" && details.snapshotAt ? (
-          <div className="side-note">
-            更新时间：{details.snapshotAt} · 节点：{details.nodeCount} · 关系：{details.edgeCount}
-          </div>
-        ) : null}
-      </div>
+      <LineageAssetSidebar
+        nodes={lineageNodes}
+        selectedNodeId={lineageSelectedNodeId}
+        selectionSequence={lineageSelectionSequence}
+        snapshot={lineageBootstrap}
+        onSelectNode={focusLineageNode}
+      />
     );
   }
   return <AssetSidebar asset={asset} route={context.route} canEdit={canPermission("asset:write")} />;

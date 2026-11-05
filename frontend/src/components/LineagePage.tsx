@@ -74,12 +74,23 @@ export interface LineagePageProps {
   route: LineageRoute;
   onRouteChange: (route: LineageRoute) => void;
   onBootstrap: (bootstrap: LineageBootstrap) => void;
+  selectedNodeId: string | null;
+  focusRequest: { nodeId: string; sequence: number } | null;
+  onNodesChange: (nodes: LineageNode[]) => void;
+  onSelectedNodeChange: (nodeId: string | null) => void;
 }
 
-export function LineagePage({ route, onRouteChange, onBootstrap }: LineagePageProps) {
+export function LineagePage({
+  route,
+  onRouteChange,
+  onBootstrap,
+  selectedNodeId,
+  focusRequest,
+  onNodesChange,
+  onSelectedNodeChange,
+}: LineagePageProps) {
   const [graph, setGraph] = React.useState<LineageSubgraph | null>(null);
   const [pendingFilters, setPendingFilters] = React.useState<PendingLineageFilters>(() => routeFilters(route));
-  const [selectedId, setSelectedId] = React.useState<string | null>(route.rootId);
   const [query, setQuery] = React.useState("");
   const [queryError, setQueryError] = React.useState("");
   const [querying, setQuerying] = React.useState(false);
@@ -116,6 +127,8 @@ export function LineagePage({ route, onRouteChange, onBootstrap }: LineagePagePr
       if (!result.graph) {
         appliedRouteRef.current = routeKey(nextRoute);
         setGraph(null);
+        onNodesChange([]);
+        onSelectedNodeChange(null);
         return;
       }
       const data = result.graph;
@@ -135,7 +148,8 @@ export function LineagePage({ route, onRouteChange, onBootstrap }: LineagePagePr
         view: normalizeView(data.view),
         snapshot: { ...data.snapshot, generatedAt: formatDateTime(data.snapshot.generatedAt) },
       });
-      setSelectedId(data.rootId);
+      onNodesChange(data.nodes);
+      onSelectedNodeChange(data.rootId);
       onRouteChange(resolvedRoute);
     } catch (cause: unknown) {
       if (isAbortError(cause) || requestSequenceRef.current !== sequence) return;
@@ -143,7 +157,7 @@ export function LineagePage({ route, onRouteChange, onBootstrap }: LineagePagePr
     } finally {
       if (requestSequenceRef.current === sequence) setLoading(false);
     }
-  }, [onBootstrap, onRouteChange]);
+  }, [onBootstrap, onNodesChange, onRouteChange, onSelectedNodeChange]);
 
   React.useEffect(() => {
     const key = routeKey(route);
@@ -156,7 +170,9 @@ export function LineagePage({ route, onRouteChange, onBootstrap }: LineagePagePr
 
   React.useEffect(() => () => {
     requestSequenceRef.current += 1;
-  }, []);
+    onNodesChange([]);
+    onSelectedNodeChange(null);
+  }, [onNodesChange, onSelectedNodeChange]);
 
   const openCandidate = async (candidate: LineageNode): Promise<void> => {
     const view: LineageView = candidate.kind === "task" ? "detail" : pendingFilters.view;
@@ -214,7 +230,7 @@ export function LineagePage({ route, onRouteChange, onBootstrap }: LineagePagePr
     return <ErrorState title="当前没有可用的血缘快照数据" desc={`${emptyDescription}请先采集并发布血缘快照。`} onRetry={() => void loadGraph(route)} />;
   }
 
-  const selected = graph.nodes.find((node) => node.id === selectedId)
+  const selected = graph.nodes.find((node) => node.id === selectedNodeId)
     || graph.nodes.find((node) => node.id === graph.rootId);
   const related = graph.edges.filter((edge) => edge.sourceId === selected?.id || edge.targetId === selected?.id);
   const upstreamCount = graph.edges.filter((edge) => edge.targetId === selected?.id).length;
@@ -251,7 +267,7 @@ export function LineagePage({ route, onRouteChange, onBootstrap }: LineagePagePr
       <div className="lineage-layout">
         <section className="lineage-card" aria-busy={loading}>
           <div className="lineage-card-head"><span>{sourceLabel}：{root?.name} · {route.view === "table" ? "表级简图" : "作业详图"}</span><span className="tag tag-info">{graph.nodes.length} 节点 / {graph.edges.length} 关系</span></div>
-          <LineageCanvas graph={graph} onSelect={setSelectedId} />
+          <LineageCanvas graph={graph} selectedNodeId={selectedNodeId} focusRequest={focusRequest} onSelect={onSelectedNodeChange} />
         </section>
         <aside className="lineage-detail">
           <div className="lineage-card-head"><span>节点详情</span><span className="tag tag-neutral">{selected?.kind}</span></div>

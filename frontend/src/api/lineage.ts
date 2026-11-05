@@ -17,6 +17,7 @@ export interface LineageNode {
   name: string;
   displayName: string;
   namespace: string;
+  schema?: string | undefined;
   attributes: Record<string, unknown>;
 }
 

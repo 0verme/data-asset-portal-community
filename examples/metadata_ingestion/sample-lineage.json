@@ -20,6 +20,7 @@
       "type": "table",
       "name": "public.orders",
       "namespace": "public",
+      "schema": "public",
       "attributes": {"layer": "source"}
     },
     {
@@ -27,6 +28,7 @@
       "type": "table",
       "name": "public.orders_daily",
       "namespace": "public",
+      "schema": "public",
       "attributes": {"layer": "dwm"}
     }
   ],

@@ -15,6 +15,8 @@ const ROOT_NEIGHBORHOOD_FIT_OPTIONS = { padding: 48, maxScale: 1 };
 
 export interface LineageCanvasProps {
     graph: DomainLineageGraph;
+    selectedNodeId: string | null;
+    focusRequest: { nodeId: string; sequence: number } | null;
     onSelect: (nodeId: string) => void;
 }
 
@@ -28,7 +30,7 @@ export interface LineageCanvasHandle {
 export const LineageCanvas = React.forwardRef<
     LineageCanvasHandle,
     LineageCanvasProps
->(function LineageCanvas({ graph, onSelect }, ref) {
+>(function LineageCanvas({ graph, selectedNodeId, focusRequest, onSelect }, ref) {
     const viewerRef = React.useRef<LineageViewerCanvasHandle | null>(null);
     const viewerGraph = React.useMemo(() => toViewerGraph(graph), [graph]);
     const rootNodeIds = React.useMemo(
@@ -46,6 +48,17 @@ export const LineageCanvas = React.forwardRef<
         }),
         [],
     );
+
+    React.useEffect(() => {
+        if (!selectedNodeId || !graph.nodes.some((node) => node.id === selectedNodeId)) return;
+        viewerRef.current?.selectNode(selectedNodeId);
+    }, [graph.nodes, selectedNodeId, viewerGraph]);
+
+    React.useEffect(() => {
+        if (!focusRequest || !graph.nodes.some((node) => node.id === focusRequest.nodeId)) return;
+        viewerRef.current?.selectNode(focusRequest.nodeId);
+        viewerRef.current?.focusNode(focusRequest.nodeId);
+    }, [focusRequest, graph.nodes, viewerGraph]);
 
     React.useImperativeHandle(
         ref,

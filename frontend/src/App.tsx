@@ -14,7 +14,7 @@
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import type { LineageBootstrap } from "./api/lineage.ts";
+import type { LineageBootstrap, LineageNode } from "./api/lineage.ts";
 import { getMenus, MENUS_CHANGED_EVENT } from "./api/menus.ts";
 import type { MenuItem } from "./data/menus.ts";
 import { isDbAuthMode } from "./auth.ts";
@@ -103,6 +103,20 @@ export default function App(): React.ReactElement {
   const [moreNavOpen, setMoreNavOpen] = useState(false);
   const [navigationFitSnapshot, setNavigationFitSnapshot] = useState<NavigationFitSnapshot | null>(null);
   const [lineageBootstrap, setLineageBootstrap] = useState<LineageBootstrap | null>(null);
+  const [lineageNodes, setLineageNodes] = useState<LineageNode[]>([]);
+  const [lineageSelectedNodeId, setLineageSelectedNodeId] = useState<string | null>(null);
+  const [lineageSelectionSequence, setLineageSelectionSequence] = useState(0);
+  const handleLineageSelectionChange = React.useCallback((nodeId: string | null): void => {
+    setLineageSelectedNodeId(nodeId);
+    setLineageSelectionSequence((current) => current + 1);
+  }, []);
+  const [lineageFocusRequest, setLineageFocusRequest] = useState<{ nodeId: string; sequence: number } | null>(null);
+  const lineageFocusSequenceRef = useRef(0);
+  const focusLineageNode = React.useCallback((nodeId: string): void => {
+    handleLineageSelectionChange(nodeId);
+    lineageFocusSequenceRef.current += 1;
+    setLineageFocusRequest({ nodeId, sequence: lineageFocusSequenceRef.current });
+  }, [handleLineageSelectionChange]);
   const [systemActionIntent, setSystemActionIntent] = useState("");
   const [navMenuSnapshot, setNavMenuSnapshot] = useState<{ authKey: string; menus: MenuItem[] }>({
     authKey: "",
@@ -161,6 +175,14 @@ export default function App(): React.ReactElement {
     apiAssetView,
     setApiAssetView,
   } = navigation;
+
+  useEffect(() => {
+    if (module === "lineage") return;
+    setLineageBootstrap(null);
+    setLineageNodes([]);
+    setLineageSelectedNodeId(null);
+    setLineageFocusRequest(null);
+  }, [module]);
 
   const { theme, toggleTheme } = useTheme();
   const themeToggleLabel = theme === "dark" ? "切换到浅色主题" : "切换到深色主题";
@@ -718,6 +740,11 @@ export default function App(): React.ReactElement {
     indicatorRoute,
     indicatorView,
     lineageBootstrap,
+    lineageNodes,
+    lineageSelectedNodeId,
+    lineageSelectionSequence,
+    handleLineageSelectionChange,
+    lineageFocusRequest,
     lineageRoute,
     manualCodeTable,
     mappingRoute,
@@ -740,6 +767,10 @@ export default function App(): React.ReactElement {
     setIndicatorRoute,
     setIndicatorView,
     setLineageBootstrap,
+    setLineageNodes,
+    setLineageSelectedNodeId,
+    focusLineageNode,
+    setLineageFocusRequest,
     setLineageRoute,
     setMappingRoute,
     setPushRoute,
