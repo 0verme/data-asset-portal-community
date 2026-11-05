@@ -192,6 +192,28 @@ class RagSearchServiceTests(unittest.TestCase):
         self.assertEqual(1, response.count)
         self.assertEqual(1, response.recommendations[0].asset_id)
 
+    def test_bounded_list_expansion_respects_the_administrator_ceiling(self):
+        request_limits = []
+
+        def handler(request):
+            request_limits.append(json.loads(request.content)["topK"])
+            return self._search_response([{
+                "entityType": "table", "assetId": 1, "name": "CUSTOMER",
+                "retrievalChannels": [], "score": 0.9, "evidence": [],
+            }])
+
+        config = {**self.config, "topK": 20}
+        service, _assets = self._service(handler, config=config)
+        response = service.recommend("客户有哪些表和字段？", profile="strict", top_k=20)
+
+        self.assertEqual([20], request_limits)
+        self.assertEqual("available", response.status)
+        self.assertEqual(1, response.count)
+
+        limited_service, _assets = self._service(handler, config={**self.config, "topK": 6})
+        limited_service.recommend("客户有哪些表和字段？", profile="strict", top_k=20)
+        self.assertEqual([20, 6], request_limits)
+
     def test_unknown_and_duplicate_ids_are_filtered_and_deduplicated(self):
         def handler(_request):
             return self._search_response([

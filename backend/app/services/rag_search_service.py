@@ -110,7 +110,7 @@ class RagSearchService:
             if top_k is not None:
                 # Per-request asks may narrow the administrator's configured
                 # ceiling, but can never increase it.
-                requested_top_k = max(1, min(10, int(top_k)))
+                requested_top_k = max(1, min(20, int(top_k)))
                 config = config.model_copy(
                     update={"top_k": min(config.top_k, requested_top_k)}
                 )

@@ -35,6 +35,7 @@ class StubAIAskService:
                 "layer": "DWS",
                 "source": "dap_catalog",
                 "matchReason": "由当前 DAP 目录校验",
+                "relevance": "direct",
             }],
             retrievalStatus="available",
             generationStatus="completed",

@@ -26,6 +26,7 @@ from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
 from ..db.tables import root_category, root_change_log, root_item
 from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
+from ..utils.pagination import resolve_paging
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
     OPERATION_TYPE_DELETE,
@@ -213,6 +214,45 @@ class RootService(AuditActorMixin):
 
     def get_roots(self, keyword=None, cat=None):
         return self._db_items(keyword=keyword, cat=cat)
+
+    def get_roots_page(self, keyword=None, cat=None, page=None, page_size=None):
+        page, page_size = resolve_paging(page, page_size)
+        clauses = self._build_item_filters(keyword=keyword, cat=cat)
+        count_rows = self._fetch_rows(
+            select(func.count().label("total")).select_from(root_item).where(*clauses)
+        )
+        total = int(count_rows[0].get("total") or 0) if count_rows else 0
+        last_page = max(1, (total + page_size - 1) // page_size)
+        page = min(page, last_page)
+        statement = (
+            select(*self._columns())
+            .where(*clauses)
+            .order_by(root_item.c.root_abbr)
+            .limit(page_size)
+            .offset((page - 1) * page_size)
+        )
+        items = [self._row_to_item(row) for row in self._fetch_rows(statement)]
+        total_rows = self._fetch_rows(
+            select(func.count().label("total"))
+            .select_from(root_item)
+            .where(root_item.c.is_deleted == "N")
+        )
+        global_total = int(total_rows[0].get("total") or 0) if total_rows else 0
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+            "stats": {"total": global_total},
+        }
+
+    def get_root_abbreviations(self):
+        rows = self._fetch_rows(
+            select(root_item.c.root_abbr)
+            .where(root_item.c.is_deleted == "N")
+            .order_by(root_item.c.root_abbr)
+        )
+        return [str(row["root_abbr"]) for row in rows]
 
     def get_root_categories(self):
         return self._db_categories()

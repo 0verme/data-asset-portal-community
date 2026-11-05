@@ -347,21 +347,30 @@ function AiAskSection({
           ) : null}
           {response.status === "retrieval_unavailable" ? (
             <div className="sp-ai-state sp-ai-error" role="status">
-              {response.reasonCode === "retrieval_timeout" ? "资产检索超时，未能确认候选资产；传统搜索不受影响。" : "资产检索暂不可用，无法确认候选资产；传统搜索不受影响。"}
+              {response.reasonCode === "retrieval_timeout" ? "资产检索超时，无法基于目录回答；传统搜索不受影响。" : "资产检索暂不可用，无法确认候选资产；传统搜索不受影响。"}
             </div>
           ) : response.status === "generation_unavailable" ? (
             <div className="sp-ai-state sp-ai-error" role="status">
-              {response.reasonCode === "llm_timeout" ? "模型生成超时，未生成回答；下方候选（如有）仍来自 DAP 目录校验。" : "模型暂不可用，未生成回答；下方候选（如有）仍来自 DAP 目录校验。"}
+              {response.reasonCode === "llm_timeout" ? "模型生成超时，未生成回答；不会把未筛选候选当作答案。" : "模型暂不可用，未生成回答；不会把未筛选候选当作答案。"}
             </div>
           ) : response.status === "insufficient_evidence" ? (
-            <div className="sp-ai-state" role="status">当前元数据不足以确认。</div>
+            <div className="sp-ai-state" role="status">{response.answer}</div>
+          ) : response.status === "partial_answer" ? (
+            <>
+              <div className="sp-ai-state" role="status">
+                {response.resultsTruncated
+                  ? "部分回答：本次有界检索结果可能不完整；请核对下方已验证候选。"
+                  : "部分回答：仅找到相关线索，尚不足以直接确认问题结论。"}
+              </div>
+              <div className="sp-ai-summary" aria-label="AI 部分回答">{response.answer}</div>
+            </>
           ) : (
             <div className="sp-ai-summary" aria-label="AI 回答摘要">{response.answer}</div>
           )}
           {response.candidates.length ? (
             <div className="sp-ai-candidates">
               <div className="sp-group-head">
-                <span className="sp-group-title">相关候选资产</span>
+                <span className="sp-group-title">答案引用的目录资产</span>
                 <span className="sp-group-count">{response.candidates.length} 条</span>
               </div>
               <div className="sp-ai-list">
@@ -381,6 +390,9 @@ function AiAskSection({
                         <span className="sp-ai-candidate-heading">
                           <span className="sp-ai-candidate-title">{isField ? item.fieldDisplayName || item.fieldName : item.tableDisplayName || item.tableName}</span>
                           <span className="sp-ai-candidate-type">{isField ? "字段" : "数据表"}</span>
+                          <span className={`sp-ai-candidate-relevance ${item.relevance === "direct" ? "direct" : "related"}`}>
+                            {item.relevance === "direct" ? "直接相关" : "相关线索 · 非直接结论"}
+                          </span>
                         </span>
                         <span className="sp-ai-candidate-name mono">{isField ? item.fieldName : item.tableName}</span>
                         {isField ? <span className="sp-ai-candidate-meta">所属表：{item.tableDisplayName || item.tableName}（{item.tableName}）</span> : null}
@@ -632,7 +644,9 @@ export function SearchPortalPage({
         setAiResponse(response);
         setAiLoading(false);
         setAiProgressStatus(
-          response.status === "answered" || response.status === "insufficient_evidence"
+          response.status === "answered" ||
+          response.status === "partial_answer" ||
+          response.status === "insufficient_evidence"
             ? "completed"
             : "failed",
         );

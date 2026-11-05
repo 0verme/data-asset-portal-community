@@ -99,6 +99,39 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
             content=validate_contract({"items": items}, ManualCodeTableListResponse)
         )
 
+    @router.get("/page", response_model=None)
+    def page_manual_code_tables(
+        keyword: str | None = Query(default=None),
+        style: str | None = Query(default=None),
+        status: str | None = Query(default=None),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        current_service: Any = Depends(get_service),
+        context: Any = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
+    ):
+        try:
+            payload = current_service.get_tables_page(
+                keyword=keyword,
+                style=style,
+                status=status,
+                page=page,
+                page_size=page_size,
+            )
+        except (
+            ManualCodeTableValidationError,
+            ManualCodeTableDataSourceError,
+        ) as error:
+            return error_response(error)
+        profile = profile_for_request(context, authorization)
+        payload["items"] = [
+            redact_public_manual_code_table(item, profile=profile)
+            for item in payload["items"]
+        ]
+        return JSONResponse(
+            content=validate_contract(payload, ManualCodeTableListResponse)
+        )
+
     @router.get("/export", response_model=None)
     def export_manual_code_tables(
         keyword: str | None = Query(default=None),

@@ -11,7 +11,7 @@ export interface RootSidebarProps {
 }
 
 export function RootSidebar({ root, requireLogin, canEdit = false, setRootRoute }: RootSidebarProps) {
-  const { roots, rootCategories, rootCategory, setRootCategory } = root;
+  const { rootGlobalTotal, rootCategories, rootCategory, setRootCategory } = root;
 
   return (
     <>
@@ -20,7 +20,7 @@ export function RootSidebar({ root, requireLogin, canEdit = false, setRootRoute 
         allOption={{
           key: "all-roots",
           label: "全部词根",
-          count: roots.length,
+          count: rootGlobalTotal,
           active: !rootCategory,
           onClick: () => setRootCategory(null),
         }}

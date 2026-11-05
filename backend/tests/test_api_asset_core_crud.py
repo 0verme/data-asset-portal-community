@@ -58,6 +58,42 @@ class ApiAssetCoreCrudTests(unittest.TestCase):
                 self.assertIn("__app__", str(compiled))
                 self.assertNotIn("dwp.", str(compiled))
 
+    def test_paginated_list_counts_filters_limits_only_current_page_and_keeps_global_facets(self):
+        self.service._db.fetch_rows = MagicMock(side_effect=[
+            [{"total": 5}],
+            [self.row],
+            [], [], [],
+            [{"value": "enabled", "count": 8}],
+            [{"value": "GET", "count": 7}],
+            [{"value": 3, "count": 6}],
+        ])
+
+        result = self.service.get_assets_page(
+            keyword="customer", status="enabled", method="GET",
+            downstream_system_id="3", page="2", page_size="1",
+        )
+
+        self.assertEqual((5, 2, 1), (result["total"], result["page"], result["pageSize"]))
+        self.assertEqual(["CUSTOMER_API"], [item["code"] for item in result["items"]])
+        self.assertEqual(8, result["facets"]["status"]["enabled"])
+        self.assertEqual(7, result["facets"]["method"]["GET"])
+        self.assertEqual(6, result["facets"]["downstreamSystemId"]["3"])
+        self.assertEqual({"total": 8}, result["stats"])
+        count_statement, page_statement = [
+            call.args[0] for call in self.service._db.fetch_rows.call_args_list[:2]
+        ]
+        for statement in (count_statement, page_statement):
+            self._assert_portable(statement)
+            compiled = str(statement.compile(dialect=sqlite.dialect()))
+            self.assertIn("api_name", compiled)
+            self.assertIn("status_code", compiled)
+            self.assertIn("method_code", compiled)
+            self.assertIn("system_id", compiled)
+        page_sql = str(page_statement.compile(dialect=sqlite.dialect())).upper()
+        self.assertIn("LIMIT", page_sql)
+        self.assertIn("OFFSET", page_sql)
+        self.assertIn("api_code", page_sql.lower())
+
     def test_create_validation_returns_structured_field_details(self):
         payload = {
             **self.item,

@@ -27,15 +27,130 @@ export interface ApiAssetQueryParams {
   status?: string | undefined;
   method?: string | undefined;
   downstreamSystemId?: string | number | undefined;
+  page?: number | undefined;
+  pageSize?: number | undefined;
   [key: string]: unknown;
+}
+
+export interface ApiAssetFacets {
+  status: Record<string, number>;
+  method: Record<string, number>;
+  downstreamSystemId: Record<string, number>;
+}
+
+export interface ApiAssetPage {
+  items: MockApiAsset[];
+  total: number;
+  page: number;
+  pageSize: number;
+  facets: ApiAssetFacets;
+  stats: { total: number };
 }
 
 interface ApiAssetListEnvelope {
   items?: MockApiAsset[] | undefined;
 }
 
+function normalizeApiAssetPage(payload: unknown): ApiAssetPage {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('API 资产分页接口返回格式无效');
+  }
+  const value = payload as Record<string, unknown>;
+  const facets = value['facets'];
+  if (
+    !Array.isArray(value['items']) ||
+    !Number.isSafeInteger(value['total']) || Number(value['total']) < 0 ||
+    !Number.isSafeInteger(value['page']) || Number(value['page']) < 1 ||
+    !Number.isSafeInteger(value['pageSize']) || Number(value['pageSize']) < 1 ||
+    !facets || typeof facets !== 'object' || Array.isArray(facets) ||
+    !value['stats'] || typeof value['stats'] !== 'object' || Array.isArray(value['stats']) ||
+    !Number.isSafeInteger((value['stats'] as Record<string, unknown>)['total']) ||
+    Number((value['stats'] as Record<string, unknown>)['total']) < 0
+  ) throw new Error('API 资产分页接口返回格式无效');
+  const facetRecord = facets as Record<string, unknown>;
+  const normalizeCounts = (candidate: unknown): Record<string, number> => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      throw new Error('API 资产分页统计返回格式无效');
+    }
+    const result: Record<string, number> = {};
+    for (const [key, count] of Object.entries(candidate as Record<string, unknown>)) {
+      if (!Number.isSafeInteger(count) || Number(count) < 0) {
+        throw new Error('API 资产分页统计返回格式无效');
+      }
+      result[key] = Number(count);
+    }
+    return result;
+  };
+  return {
+    items: value['items'] as MockApiAsset[],
+    total: Number(value['total']),
+    page: Number(value['page']),
+    pageSize: Number(value['pageSize']),
+    facets: {
+      status: normalizeCounts(facetRecord['status']),
+      method: normalizeCounts(facetRecord['method']),
+      downstreamSystemId: normalizeCounts(facetRecord['downstreamSystemId']),
+    },
+    stats: { total: Number((value['stats'] as Record<string, unknown>)['total']) },
+  };
+}
+
 interface SystemsListEnvelope {
   items?: MockSystem[] | undefined;
+}
+
+export async function getApiAssetPage(params: ApiAssetQueryParams = {}): Promise<ApiAssetPage> {
+  const requestedPage = Math.max(1, Number(params.page) || 1);
+  const requestedPageSize = Math.max(1, Number(params.pageSize) || 20);
+  if (remote) {
+    return normalizeApiAssetPage(await requestRemote<unknown>('/api-assets/page', {
+      params: { ...params, page: requestedPage, pageSize: requestedPageSize },
+    }));
+  }
+  const all = store.filter((item) => !params.status || item.status === params.status)
+    .filter((item) => !params.method || item.method === params.method)
+    .filter((item) => !params.downstreamSystemId || String(item.downstreamSystemId) === String(params.downstreamSystemId))
+    .filter((item) => {
+      const keyword = String(params.keyword || '').trim().toLowerCase();
+      return !keyword || [item.code, item.name, item.path, item.description, item.ownerName,
+        item.ownerDept, item.downstreamSystemName, item.downstreamSystemShortName]
+        .some((value) => String(value || '').toLowerCase().includes(keyword));
+    })
+    .sort((left, right) => left.code.localeCompare(right.code));
+  const lastPage = Math.max(1, Math.ceil(all.length / requestedPageSize));
+  const page = Math.min(requestedPage, lastPage);
+  const facets: ApiAssetFacets = { status: {}, method: {}, downstreamSystemId: {} };
+  for (const item of store) {
+    facets.status[item.status] = (facets.status[item.status] || 0) + 1;
+    facets.method[item.method] = (facets.method[item.method] || 0) + 1;
+    if (item.downstreamSystemId != null) {
+      const key = String(item.downstreamSystemId);
+      facets.downstreamSystemId[key] = (facets.downstreamSystemId[key] || 0) + 1;
+    }
+  }
+  return {
+    items: clone(all.slice((page - 1) * requestedPageSize, page * requestedPageSize)),
+    total: all.length,
+    page,
+    pageSize: requestedPageSize,
+    facets,
+    stats: { total: store.length },
+  };
+}
+
+export async function getApiAsset(code: string): Promise<MockApiAsset> {
+  if (remote) {
+    const payload = await requestRemote<unknown>(`/api-assets/${encodeURIComponent(code)}`);
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      const record = payload as Record<string, unknown>;
+      const item = record['data'] ?? payload;
+      if (item && typeof item === 'object' && !Array.isArray(item)) return item as MockApiAsset;
+    }
+    throw new Error('API 资产详情接口返回格式无效');
+  }
+  const item = store.find((entry) => entry.code === code);
+  if (!item) throw new Error('API asset not found');
+  return clone(item);
 }
 
 export async function getApiAssets(params: ApiAssetQueryParams = {}): Promise<MockApiAsset[]> {
