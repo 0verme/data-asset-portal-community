@@ -100,8 +100,8 @@ function pagePayload<T>(items: readonly T[], url: URL, pageItems: (item: T) => b
   return { items: matches.slice((page - 1) * pageSize, page * pageSize), total: matches.length, page, pageSize };
 }
 
-async function installRemoteApiFixtures(page: Page, options: { apiAssetPageSizeLimit?: number } = {}) {
-  const apis = Array.from({ length: 23 }, (_, index) => apiAsset(index + 1));
+async function installRemoteApiFixtures(page: Page, options: { apiAssetPageSizeLimit?: number; apiAssetTotal?: number } = {}) {
+  const apis = Array.from({ length: options.apiAssetTotal ?? 23 }, (_, index) => apiAsset(index + 1));
   const roots = Array.from({ length: 23 }, (_, index) => root(index + 1));
   const codeTables = Array.from({ length: 23 }, (_, index) => codeTable(index + 1));
   const requests: URL[] = [];
@@ -265,22 +265,34 @@ test('API assets request server pages and load a cross-page detail by code', asy
   await expect.poll(() => fixture.details.includes('PAGE_API_001')).toBe(true);
 });
 
-test('API asset pagination synchronizes a server-clamped page size and keeps every row reachable', async ({ page }) => {
-  const fixture = await installRemoteApiFixtures(page, { apiAssetPageSizeLimit: 10 });
+test('API asset pagination synchronizes a server-clamped page size and keeps all 100 rows reachable', async ({ page }) => {
+  const fixture = await installRemoteApiFixtures(page, { apiAssetPageSizeLimit: 10, apiAssetTotal: 100 });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/api-assets?view=list');
   await expect(page.locator('.page-title')).toContainText('API 资产', { timeout: 20_000 });
   const pager = page.locator('.dap-table-pagination[aria-label="API 资产分页"]');
-  await expect(pager.locator('.dap-table-pagination__page-index')).toHaveText('1 / 3');
-  await expect(pager.locator('.dap-table-pagination__range')).toContainText('第 1–10 条 / 共 23 条');
-  await expect(page.locator('table.dt tbody tr')).toHaveCount(10);
-  await page.getByRole('button', { name: '下一页' }).click();
-  await expect(pager.locator('.dap-table-pagination__page-index')).toHaveText('2 / 3');
-  await page.getByRole('button', { name: '下一页' }).click();
-  await expect(pager.locator('.dap-table-pagination__page-index')).toHaveText('3 / 3');
-  await expect(page.locator('table.dt tbody tr')).toHaveCount(3);
-  await expect(page.locator('table.dt tbody tr').filter({ hasText: 'PAGE_API_023' })).toBeVisible();
-  expect(fixture.requests.some((url) => url.pathname === '/api/api-assets/page' && url.searchParams.get('page') === '3' && url.searchParams.get('pageSize') === '10')).toBe(true);
+  const rows = page.locator('table.dt tbody tr');
+  const visitedCodes = new Set<string>();
+  const apiPageRequests = (): URL[] => fixture.requests.filter((url) => url.pathname === '/api/api-assets/page');
+
+  await expect(pager.locator('.dap-table-pagination__page-index')).toHaveText('1 / 10');
+  await expect(pager.locator('.dap-table-pagination__range')).toContainText('第 1–10 条 / 共 100 条');
+  expect(apiPageRequests().some((url) => url.searchParams.get('page') === '1' && url.searchParams.get('pageSize') === '20')).toBe(true);
+  for (let pageNumber = 1; pageNumber <= 10; pageNumber += 1) {
+    await expect(pager.locator('.dap-table-pagination__page-index')).toHaveText(`${pageNumber} / 10`);
+    const pageRows = await rows.allTextContents();
+    expect(pageRows).toHaveLength(10);
+    for (const row of pageRows) {
+      const code = row.match(/PAGE_API_\d{3}/)?.[0];
+      if (!code) throw new Error(`API asset row has no fixture code: ${row}`);
+      visitedCodes.add(code);
+    }
+    if (pageNumber < 10) await page.getByRole('button', { name: '下一页' }).click();
+  }
+
+  expect([...visitedCodes].sort()).toEqual(Array.from({ length: 100 }, (_, index) => `PAGE_API_${String(index + 1).padStart(3, '0')}`));
+  expect(apiPageRequests().some((url) => url.searchParams.get('page') === '10' && url.searchParams.get('pageSize') === '10')).toBe(true);
+  expect(apiPageRequests().filter((url) => Number(url.searchParams.get('pageSize')) === 10).length).toBeGreaterThanOrEqual(10);
 });
 
 test('root library pages table rows while keeping complete abbreviations and import candidates', async ({ page }) => {
