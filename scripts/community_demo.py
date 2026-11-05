@@ -237,6 +237,7 @@ def build_demo_environment(
             "APP_SECRET_KEY",
             "APP_CORS_ORIGINS",
             "LINEAGE_DB_PROFILE",
+            "LINEAGE_STORAGE_MODE",
             "COMMUNITY_DEMO_BOOTSTRAP",
         }
     }
@@ -253,7 +254,6 @@ def build_demo_environment(
             "APP_DEBUG": "false",
             "APP_SECRET_KEY": secret,
             "APP_CORS_ORIGINS": f"http://127.0.0.1:{frontend_port},http://localhost:{frontend_port}",
-            "LINEAGE_DB_PROFILE": "community_sqlite",
             "VITE_API_MODE": "remote",
             "VITE_API_BASE_URL": "/api",
             "VITE_BACKEND_URL": f"http://127.0.0.1:{backend_port}",
