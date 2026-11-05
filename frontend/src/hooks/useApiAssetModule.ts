@@ -155,14 +155,14 @@ export function useApiAssetModule({
   }, [active, filterKey, load, page]);
 
   const loadDetail = useCallback(async (): Promise<void> => {
+    const sequence = ++detailSequence.current;
     const code = route.code;
-    if (!['view', 'edit'].includes(route.page) || !code) {
+    if (!active || !['view', 'edit'].includes(route.page) || !code) {
       setCurrentRecord(null);
       setDetailError('');
       setDetailLoading(false);
       return;
     }
-    const sequence = ++detailSequence.current;
     setCurrentRecord(null);
     setDetailLoading(true);
     setDetailError('');
@@ -174,7 +174,7 @@ export function useApiAssetModule({
     } finally {
       if (sequence === detailSequence.current) setDetailLoading(false);
     }
-  }, [route.code, route.page]);
+  }, [active, route.code, route.page]);
 
   useEffect(() => {
     void loadDetail();

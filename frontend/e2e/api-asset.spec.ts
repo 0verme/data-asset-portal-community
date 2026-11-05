@@ -93,6 +93,62 @@ test("guest api asset list stays read-only and opens the detail view", async ({ 
   await expect(page.getByRole("button", { name: "编辑" })).toHaveCount(0);
 });
 
+test("disabled anonymous catalog defers API detail reads until login grants catalog access", async ({ page }) => {
+  let authenticated = false;
+  const detailAccessStates: boolean[] = [];
+  const item = {
+    code: "PROTECTED_API", name: "受保护的 API 资产", method: "GET", path: "/protected", version: "v1",
+    systemId: 1, downstreamSystemId: 1, downstreamSystemName: "业务系统", downstreamSystemShortName: "业务",
+    type: "query", status: "enabled", ownerDept: "测试", ownerName: "测试", maintainerName: "测试",
+    description: "synthetic", remark: "", params: [], responseFields: [], relations: [], updatedBy: "test", updatedAt: "2026-11-05",
+  };
+  await page.addInitScript(() => {
+    localStorage.removeItem("dap_auth");
+    sessionStorage.removeItem("dap_auth");
+  });
+  await page.route((url) => url.pathname.startsWith("/api/"), async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/auth/me") {
+      return authenticated
+        ? route.fulfill({ json: { data: { role: "admin", user: "operator", name: "测试管理员", permissions: ["api_asset:read", "api_asset:write"] } } })
+        : route.fulfill({ status: 401, json: { message: "anonymous" } });
+    }
+    if (path === "/api/public-catalog/config") return route.fulfill({ json: { profile: "disabled", exportEnabled: false } });
+    if (path === "/api/auth/login" && request.method() === "POST") {
+      authenticated = true;
+      return route.fulfill({ json: { data: { role: "admin", user: "operator", name: "测试管理员", permissions: ["api_asset:read", "api_asset:write"] } } });
+    }
+    if (path === "/api/api-assets/PROTECTED_API" && request.method() === "GET") {
+      detailAccessStates.push(authenticated);
+      return authenticated
+        ? route.fulfill({ json: { data: item } })
+        : route.fulfill({ status: 403, json: { error: { message: "catalog access disabled" } } });
+    }
+    if (path === "/api/api-assets/page") {
+      return route.fulfill({ json: { items: [item], total: 1, page: 1, pageSize: 20, facets: { status: { enabled: 1 }, method: { GET: 1 }, downstreamSystemId: { "1": 1 } }, stats: { total: 1 } } });
+    }
+    if (path === "/api/api-assets/systems" || path === "/api/api-assets/downstream-systems") {
+      return route.fulfill({ json: { items: [{ id: 1, code: "BUSINESS", name: "业务系统", short_name: "业务", type: "business", status: "enabled" }] } });
+    }
+    if (path === "/api/system/menus") return route.fulfill({ json: { items: [] } });
+    return route.fulfill({ json: { items: [] } });
+  });
+
+  await page.goto("/api-assets/PROTECTED_API");
+  await expect(page.getByText("匿名目录访问已关闭")).toBeVisible({ timeout: 20_000 });
+  expect(detailAccessStates).toEqual([]);
+
+  await page.getByRole("button", { name: "登录后继续" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByPlaceholder("请输入管理员账号").fill("operator");
+  await dialog.getByPlaceholder("请输入密码").fill("test-password");
+  await dialog.getByRole("button", { name: "登录", exact: true }).click();
+
+  await expect(page.getByText(item.name, { exact: true }).first()).toBeVisible({ timeout: 20_000 });
+  expect(detailAccessStates).toEqual([true]);
+});
+
 test("API asset validation blocks an empty form and focuses the first missing field", async ({ page }) => {
   test.setTimeout(60_000);
   const api = await mockRemoteApiAssetApi(page);
@@ -287,4 +343,53 @@ test("admin api asset editor uses adapter controls and row editing", async ({ pa
   await codeInput.fill("API_E2E");
   await page.getByRole("button", { name: "取消", exact: true }).click();
   await expect(page.locator(".page-title")).toContainText("API 资产");
+});
+
+test("API asset list refreshes keep unsaved editor drafts mounted", async ({ page }) => {
+  const item = {
+    code: "DRAFT_API", name: "Original API name", method: "GET", path: "/draft", version: "v1",
+    systemId: 1, downstreamSystemId: 1, downstreamSystemName: "业务系统", downstreamSystemShortName: "业务",
+    type: "query", status: "enabled", ownerDept: "测试", ownerName: "测试", maintainerName: "测试",
+    description: "synthetic", remark: "", params: [], responseFields: [], relations: [], updatedBy: "test", updatedAt: "2026-11-05",
+  };
+  let releaseRefresh: (() => void) | undefined;
+  let observeRefresh: (() => void) | undefined;
+  const refreshStarted = new Promise<void>((resolve) => { observeRefresh = resolve; });
+  const refreshGate = new Promise<void>((resolve) => { releaseRefresh = resolve; });
+  await page.route((url) => url.pathname.startsWith("/api/"), async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname;
+    if (path === "/api/auth/me") return route.fulfill({ json: { data: { role: "admin", user: "operator", name: "测试管理员", permissions: ["api_asset:read", "api_asset:write"] } } });
+    if (path === "/api/public-catalog/config") return route.fulfill({ json: { profile: "internal", exportEnabled: false } });
+    if (path === "/api/api-assets/DRAFT_API" && request.method() === "GET") return route.fulfill({ json: { data: item } });
+    if (path === "/api/api-assets/page") {
+      if (url.searchParams.get("method") === "POST") {
+        observeRefresh?.();
+        await refreshGate;
+      }
+      return route.fulfill({ json: { items: [item], total: 1, page: 1, pageSize: 20, facets: { status: { enabled: 1 }, method: { GET: 1, POST: 1 }, downstreamSystemId: { "1": 1 } }, stats: { total: 1 } } });
+    }
+    if (path === "/api/api-assets/systems" || path === "/api/api-assets/downstream-systems") {
+      return route.fulfill({ json: { items: [{ id: 1, code: "BUSINESS", name: "业务系统", short_name: "业务", type: "business", status: "enabled" }] } });
+    }
+    if (path === "/api/system/menus") return route.fulfill({ json: { items: [] } });
+    return route.fulfill({ json: { items: [] } });
+  });
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/api-assets/DRAFT_API/edit");
+  await expect(page.getByRole("heading", { name: "编辑 API" })).toBeVisible({ timeout: 20_000 });
+  const name = page.getByLabel("API 名称");
+  await name.fill("Unsaved API draft");
+  await page.locator(".side-group").filter({ hasText: "请求方式" }).getByRole("button", { name: /POST/ }).click();
+
+  try {
+    await refreshStarted;
+    await expect(page.getByRole("heading", { name: "编辑 API" })).toBeVisible();
+    await expect(name).toHaveValue("Unsaved API draft");
+  } finally {
+    releaseRefresh?.();
+  }
+  await expect(name).toHaveValue("Unsaved API draft");
 });

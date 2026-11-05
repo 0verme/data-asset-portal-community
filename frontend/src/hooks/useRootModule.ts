@@ -158,14 +158,14 @@ export function useRootModule({
   }, [query, rootCategory, rootPage, rootPageSize]);
 
   const loadRootDetail = useCallback(async (): Promise<void> => {
+    const sequence = ++detailSequence.current;
     const abbr = rootRoute.abbr;
-    if (rootRoute.page !== 'edit' || !abbr) {
+    if (!active || rootRoute.page !== 'edit' || !abbr) {
       setCurrentRoot(null);
       setRootDetailError('');
       setRootDetailLoading(false);
       return;
     }
-    const sequence = ++detailSequence.current;
     setCurrentRoot(null);
     setRootDetailLoading(true);
     setRootDetailError('');
@@ -179,10 +179,16 @@ export function useRootModule({
     } finally {
       if (sequence === detailSequence.current) setRootDetailLoading(false);
     }
-  }, [rootRoute.abbr, rootRoute.page]);
+  }, [active, rootRoute.abbr, rootRoute.page]);
 
   const loadRootImportCandidates = useCallback(async (): Promise<void> => {
     const sequence = ++importSequence.current;
+    if (!active) {
+      setRootImportCandidates([]);
+      setRootImportError('');
+      setRootImportLoading(false);
+      return;
+    }
     setRootImportLoading(true);
     setRootImportError('');
     try {
@@ -195,7 +201,7 @@ export function useRootModule({
     } finally {
       if (sequence === importSequence.current) setRootImportLoading(false);
     }
-  }, []);
+  }, [active]);
 
   useEffect(() => {
     if (!active) return;
@@ -216,8 +222,9 @@ export function useRootModule({
   }, [loadRootDetail]);
 
   useEffect(() => {
-    if (rootRoute.page === 'import') void loadRootImportCandidates();
-  }, [loadRootImportCandidates, rootRoute.page]);
+    if (active && rootRoute.page === 'import') void loadRootImportCandidates();
+    return () => { importSequence.current += 1; };
+  }, [active, loadRootImportCandidates, rootRoute.page]);
 
   const rootBack = useSmartBack<RootNavigationSnapshot>({
     moduleKey: 'root',

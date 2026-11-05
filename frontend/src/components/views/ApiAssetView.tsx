@@ -954,11 +954,11 @@ export function ApiAssetView({
   onChangeView,
   canEdit = false,
 }: ApiAssetViewProps) {
-  if (apiAsset.loading)
+  if (route.page === "list" && apiAsset.loading)
     return (
       <LoadingState title="加载 API 资产" desc="正在读取 API 元数据台账。" />
     );
-  if (apiAsset.error)
+  if (route.page === "list" && apiAsset.error)
     return (
       <ErrorState
         title="API 资产加载失败"

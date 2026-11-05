@@ -25,6 +25,24 @@ test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog acce
   assert.match(moduleContent, /匿名目录访问已关闭/);
 });
 
+test("catalog readiness gates API asset and root detail/candidate requests", async () => {
+  const [apiAssetModule, apiAssetView, rootModule] = await Promise.all([
+    read("hooks/useApiAssetModule.ts"),
+    read("components/views/ApiAssetView.tsx"),
+    read("hooks/useRootModule.ts"),
+  ]);
+
+  assert.match(apiAssetModule, /if \(!active \|\| !\['view', 'edit'\]\.includes\(route\.page\) \|\| !code\)/);
+  assert.match(apiAssetModule, /\[active, route\.code, route\.page\]/);
+  assert.match(apiAssetView, /route\.page === "list" && apiAsset\.loading/);
+  assert.match(apiAssetView, /route\.page === "list" && apiAsset\.error/);
+  assert.match(rootModule, /if \(!active \|\| rootRoute\.page !== 'edit' \|\| !abbr\)/);
+  assert.match(rootModule, /\[active, rootRoute\.abbr, rootRoute\.page\]/);
+  assert.match(rootModule, /if \(!active\) \{\s*setRootImportCandidates\(\[\]\)/);
+  assert.match(rootModule, /if \(active && rootRoute\.page === 'import'\)/);
+  assert.match(rootModule, /\[active, loadRootImportCandidates, rootRoute\.page\]/);
+});
+
 test("anonymous UI exposes catalog actions only and keeps write controls permission-gated", async () => {
   const sources = await Promise.all([
     read("components/views/AssetView.tsx"),
