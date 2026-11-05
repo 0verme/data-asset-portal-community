@@ -102,6 +102,24 @@ test("lineage search accepts table and task nodes", async () => {
   assert.doesNotMatch(api, /findLineageTables/);
 });
 
+test("lineage search selects exact table matches and labels ambiguous candidates", async () => {
+  const [page, search, api] = await Promise.all([
+    readFile(pagePath, "utf8"),
+    readFile(fileURLToPath(new URL("./lineage/lineageSearch.ts", import.meta.url)), "utf8"),
+    readFile(apiPath, "utf8"),
+  ]);
+
+  assert.match(page, /resolveLineageSearchMatches\(nodeName, matches\)/);
+  assert.match(page, /if \(resolution\.directMatch\)/);
+  assert.match(page, /describeLineageSearchCandidate\(candidate\)/);
+  assert.match(search, /String\(node\.namespace \|\| ""\)\.trim\(\)\.toLowerCase\(\) === namespace/);
+  assert.match(search, /exactTables\.length === 1/);
+  assert.match(search, /业务 Schema \/ namespace_name/);
+  assert.match(search, /isTable \? "表名" : "作业名"/);
+  assert.match(search, /node\.name/);
+  assert.match(api, /node\.namespace\.trim\(\)\.toLowerCase\(\)\.includes\(namespace\)/);
+});
+
 test("lineage filters wait for an explicit query", async () => {
   const page = await readFile(pagePath, "utf8");
 

@@ -83,6 +83,42 @@ class LineageCoreQueryTests(unittest.TestCase):
             self.assertNotIn("f!_accr", sql)
             self.assertEqual("%f!_accr!_day!_sum!_r%", compiled.params["lower_1"])
 
+    def test_schema_qualified_search_compiles_with_bound_portable_predicates(self):
+        db = MagicMock()
+        db.fetch_rows.return_value = []
+        reader = LineageDatabaseReader(db)
+        reader.search_nodes(
+            "S1",
+            "%m!_jjqd%",
+            7,
+            exact_name="m_jjqd_list",
+            namespace_pattern="%d!_wm%",
+            exact_namespace="d_wm",
+        )
+        statement = db.fetch_rows.call_args.args[0]
+
+        for dialect in (
+            sqlite.dialect(),
+            postgresql.dialect(),
+            postgresql.dialect(paramstyle="qmark"),
+            mysql.dialect(),
+        ):
+            compiled = statement.compile(dialect=dialect)
+            sql = str(compiled).lower()
+            self.assertIn("namespace_name", sql)
+            self.assertIn("coalesce", sql)
+            self.assertIn("kind_code", sql)
+            self.assertIn("case", sql)
+            self.assertIn('escape', sql)
+            self.assertIn('!', sql)
+            self.assertNotIn(" || ", sql)
+            self.assertNotIn(" concat(", sql)
+            self.assertNotIn("m_jjqd_list", sql)
+            self.assertEqual("%m!_jjqd%", compiled.params["lower_1"])
+            self.assertEqual("%d!_wm%", compiled.params["lower_2"])
+            self.assertEqual("m_jjqd_list", compiled.params["lower_3"])
+            self.assertEqual("d_wm", compiled.params["lower_4"])
+
     def test_database_snapshot_reads_use_bound_core_queries(self):
         db = MagicMock()
         db.fetch_rows.side_effect = [
