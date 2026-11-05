@@ -46,11 +46,12 @@ class RuntimeSettingsTestCase(unittest.TestCase):
             config_path = Path(directory) / "database.yaml"
             config_path.write_text(
                 "profiles:\n  test:\n    type: postgres\n    host: yaml-host\n    port: 5432\n"
-                "    database: yaml-db\n    user: yaml-user\n    password: yaml-password\n",
+                "    database: yaml-db\n    schema: dap\n    user: yaml-user\n    password: yaml-password\n",
                 encoding="utf-8",
             )
             os.environ["ASSET_DB_CONFIG_PATH"] = str(config_path)
             self.assertEqual("yaml-host", get_db_profile("test")["host"])
+            self.assertEqual("dap", get_db_profile("test")["schema"])
 
             os.environ.update({
                 "ASSET_DB_HOST": "env-host",
@@ -65,6 +66,7 @@ class RuntimeSettingsTestCase(unittest.TestCase):
             self.assertEqual("env-db", profile["database"])
             self.assertEqual("env-user", profile["user"])
             self.assertEqual("env-password", profile["password"])
+            self.assertEqual("dap", profile["schema"])
 
     def test_global_db_overrides_apply_to_every_selected_profile(self):
         """Current precedence: profile selection does not isolate ASSET_DB_*."""
@@ -72,13 +74,14 @@ class RuntimeSettingsTestCase(unittest.TestCase):
             config_path = Path(directory) / "database.yaml"
             config_path.write_text(
                 "profiles:\n  primary:\n    type: postgres\n    host: primary-host\n"
-                "    database: assetdb\n    user: sample\n    password: placeholder\n"
+                "    database: assetdb\n    schema: dap\n    user: sample\n    password: placeholder\n"
                 "  lineage:\n    type: postgres\n    host: lineage-host\n"
-                "    database: lineagedb\n    user: sample\n    password: placeholder\n",
+                "    database: lineagedb\n    schema: dap\n    user: sample\n    password: placeholder\n",
                 encoding="utf-8",
             )
             os.environ["ASSET_DB_CONFIG_PATH"] = str(config_path)
             self.assertEqual("lineage-host", get_db_profile("lineage")["host"])
+            self.assertEqual("dap", get_db_profile("lineage")["schema"])
             os.environ["ASSET_DB_HOST"] = "explicit-global-host"
             self.assertEqual("explicit-global-host", get_db_profile("primary")["host"])
             self.assertEqual("explicit-global-host", get_db_profile("lineage")["host"])
