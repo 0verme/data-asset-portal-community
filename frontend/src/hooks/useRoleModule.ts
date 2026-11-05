@@ -18,6 +18,7 @@ import {
   deleteRole,
   getRoleAssignablePermissions,
   getRoles,
+  getRolesPage,
   updateRole,
   type SystemPermissionItem,
   type SystemRoleItem,
@@ -61,6 +62,8 @@ export interface RoleModalState {
 
 export interface UseRoleModuleProps {
   active?: boolean | undefined;
+  paged?: boolean | undefined;
+  query?: string | undefined;
   requireLogin: (action: () => void, permission?: string) => boolean;
   actionIntent?: string | undefined;
   onActionHandled?: (() => void) | undefined;
@@ -70,6 +73,12 @@ export interface UseRoleModuleResult {
   loading: boolean;
   error: string;
   roles: SystemRoleItem[];
+  pageRoles: SystemRoleItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  setPage: React.Dispatch<React.SetStateAction<number>>;
+  setPageSize: React.Dispatch<React.SetStateAction<number>>;
   permissions: SystemPermissionItem[];
   modal: RoleModalState;
   setModal: React.Dispatch<React.SetStateAction<RoleModalState>>;
@@ -88,6 +97,8 @@ export interface UseRoleModuleResult {
 
 export function useRoleModule({
   active,
+  paged = false,
+  query = '',
   requireLogin,
   actionIntent,
   onActionHandled,
@@ -95,6 +106,10 @@ export function useRoleModule({
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
   const [roles, setRoles] = React.useState<SystemRoleItem[]>([]);
+  const [pageRoles, setPageRoles] = React.useState<SystemRoleItem[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(20);
   const [permissions, setPermissions] = React.useState<SystemPermissionItem[]>([]);
   const [modal, setModal] = React.useState<RoleModalState>({
     open: false,
@@ -112,33 +127,69 @@ export function useRoleModule({
   const [deletingRoleCode, setDeletingRoleCode] = React.useState('');
   const requestSeq = React.useRef(0);
   const deletingRoleCodes = React.useRef(new Set<string>());
+  const previousQueryRef = React.useRef(query.trim());
+  const queryRef = React.useRef(query);
+  const pageRef = React.useRef(page);
+  const pageSizeRef = React.useRef(pageSize);
+
+  React.useEffect(() => {
+    queryRef.current = query;
+    pageRef.current = page;
+    pageSizeRef.current = pageSize;
+  }, [page, pageSize, query]);
 
   const load = React.useCallback(async (): Promise<void> => {
+    const requestedQuery = queryRef.current;
+    const requestedPage = pageRef.current;
+    const requestedPageSize = pageSizeRef.current;
     const requestId = ++requestSeq.current;
     setLoading(true);
     setError('');
     try {
-      const [nextRoles, nextPermissions] = await Promise.all([
-        getRoles(),
+      const [roleResult, nextPermissions] = await Promise.all([
+        paged
+          ? getRolesPage({ keyword: requestedQuery, page: requestedPage, pageSize: requestedPageSize })
+          : getRoles(),
         getRoleAssignablePermissions(),
       ]);
       if (requestId !== requestSeq.current) return;
-      setRoles(nextRoles);
+      if (paged) {
+        setPageRoles('items' in roleResult ? roleResult.items : []);
+        setTotal('items' in roleResult ? roleResult.total : 0);
+        const resultPageSize = 'items' in roleResult ? roleResult.pageSize : requestedPageSize;
+        const resultTotal = 'items' in roleResult ? roleResult.total : 0;
+        const lastPage = Math.max(1, Math.ceil(resultTotal / resultPageSize));
+        const resolvedPage = Math.min(requestedPage, lastPage);
+        if (resolvedPage !== requestedPage) setPage(resolvedPage);
+        if ('items' in roleResult && roleResult.pageSize !== requestedPageSize) setPageSize(roleResult.pageSize);
+        setRoles([]);
+      } else {
+        setRoles(roleResult as SystemRoleItem[]);
+        setPageRoles([]);
+        setTotal(0);
+      }
       setPermissions(nextPermissions);
     } catch (nextError: unknown) {
       if (requestId === requestSeq.current) setError(getErrorMessage(nextError, '加载角色权限数据失败。'));
     } finally {
       if (requestId === requestSeq.current) setLoading(false);
     }
-  }, []);
+  }, [paged]);
 
   React.useEffect(() => {
     if (!active) return undefined;
+    const nextQuery = query.trim();
+    const queryChanged = previousQueryRef.current !== nextQuery;
+    previousQueryRef.current = nextQuery;
+    if (paged && queryChanged && page !== 1) {
+      setPage(1);
+      return undefined;
+    }
     load();
     return () => {
       requestSeq.current += 1;
     };
-  }, [active, load]);
+  }, [active, load, page, pageSize, paged, query]);
 
   const openNew = React.useCallback((): void => {
     requireLogin(() => {
@@ -244,6 +295,12 @@ export function useRoleModule({
     loading,
     error,
     roles,
+    pageRoles,
+    total,
+    page,
+    pageSize,
+    setPage,
+    setPageSize,
     permissions,
     modal,
     setModal,

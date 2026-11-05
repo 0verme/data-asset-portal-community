@@ -13,12 +13,14 @@ test("role management consumes role and permission APIs", async () => {
     readFile(`${here}/RoleManagementPage.tsx`, "utf8"),
   ]);
   assert.match(api, /\/system\/roles/);
+  assert.match(api, /getRolesPage/);
   assert.match(api, /\/system\/permissions/);
   assert.match(api, /assignableOnly/);
   assert.match(api, /getRoleAssignablePermissions/);
   assert.match(api, /Built-in role cannot be deleted/);
   assert.match(api, /method:\s*["']DELETE["']/);
   assert.match(hook, /getRoleAssignablePermissions/);
+  assert.match(hook, /getRolesPage/);
   assert.match(hook, /normalizeRolePermissionCodes/);
   assert.match(hook, /system:role:write/);
   assert.match(hook, /deleteRole\(code\)/);
@@ -55,6 +57,13 @@ test("role deletion refreshes state, reports success, and preserves backend erro
   ]);
   assert.match(hook, /setDeletingRoleCode/);
   assert.match(hook, /setRoles\(\(current\) => current\.filter/);
+  assert.match(hook, /const queryRef = React\.useRef\(query\)/);
+  assert.match(hook, /const pageRef = React\.useRef\(page\)/);
+  assert.match(hook, /const pageSizeRef = React\.useRef\(pageSize\)/);
+  assert.match(hook, /const requestedQuery = queryRef\.current/);
+  assert.match(hook, /const requestedPage = pageRef\.current/);
+  assert.match(hook, /const requestedPageSize = pageSizeRef\.current/);
+  assert.match(hook, /\[active, load, page, pageSize, paged, query\]/);
   assert.match(hook, /await load\(\)/);
   assert.match(hook, /toast\.success\(`角色/);
   assert.match(hook, /toast\.error\(getErrorMessage\(nextError/);

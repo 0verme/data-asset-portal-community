@@ -15,11 +15,16 @@
 import type { MenuItem } from "../../data/menus.ts";
 import { EmptyState, RowActions, StatusBadge } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
-import { Button, IconButton } from "../../ui/index.ts";
+import { Button, IconButton, TablePagination } from "../../ui/index.ts";
 import { MENU_STATUS_META } from "./constants.ts";
 
 export interface MenuManagementPageProps {
   menus: readonly MenuItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   query: string;
   canEdit: boolean;
   onNew: () => void;
@@ -30,6 +35,11 @@ export interface MenuManagementPageProps {
 
 export function MenuManagementPage({
   menus,
+  total,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
   query,
   canEdit,
   onNew,
@@ -50,8 +60,8 @@ export function MenuManagementPage({
         <div>
           <div className="page-title"><span className="pt-code">MENU</span>菜单管理</div>
           <div className="page-sub">
-            共 <b>{menus.length}</b> 个系统菜单
-            {query ? <>，匹配 “{query}” 命中 <b>{filteredMenus.length}</b> 条</> : null}
+            共 <b>{total}</b> 个系统菜单
+            {query ? <>，匹配 “{query}”</> : null}
             ，维护菜单启停与排序，权限分配后续开放。
           </div>
         </div>
@@ -93,7 +103,7 @@ export function MenuManagementPage({
                       <span className="mono">{item.order}</span>
                       <IconButton
                         aria-label="上移"
-                        disabled={!!query || index === 0}
+                        disabled={!!query || (page === 1 && index === 0)}
                         icon={<Icon name="up" size={14} />}
                         onClick={() => onMove(item, "up")}
                         size="sm"
@@ -102,7 +112,7 @@ export function MenuManagementPage({
                       />
                       <IconButton
                         aria-label="下移"
-                        disabled={!!query || index === filteredMenus.length - 1}
+                        disabled={!!query || (page === Math.max(1, Math.ceil(total / pageSize)) && index === filteredMenus.length - 1)}
                         icon={<Icon name="down" size={14} />}
                         onClick={() => onMove(item, "down")}
                         size="sm"
@@ -139,6 +149,14 @@ export function MenuManagementPage({
           </table>
         </div>
       )}
+      <TablePagination
+        ariaLabel="菜单管理分页"
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </div>
   );
 }

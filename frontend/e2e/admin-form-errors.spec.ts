@@ -49,6 +49,15 @@ async function mockAdminApi(page: Page, onSave: SaveHandler) {
       return;
     }
 
+    if (["/system/users/page", "/system/roles/page", "/system/menus/page", "/system/param-dicts/page"].includes(path)) {
+      const url = new URL(request.url());
+      await route.fulfill({ json: {
+        items: [], total: 0,
+        page: Number(url.searchParams.get("page") || 1),
+        pageSize: Number(url.searchParams.get("pageSize") || 20),
+      } });
+      return;
+    }
     if (path === "/system/users") {
       await route.fulfill({ json: { items: [] } });
       return;
