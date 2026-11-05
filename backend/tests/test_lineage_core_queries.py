@@ -72,7 +72,12 @@ class LineageCoreQueryTests(unittest.TestCase):
         db = MagicMock()
         db.fetch_rows.return_value = []
         reader = LineageDatabaseReader(db)
-        reader.search_nodes("S1", "%f!_accr!_day!_sum!_r%", 100)
+        reader.search_nodes(
+            "S1",
+            "%f!_accr!_day!_sum!_r%",
+            100,
+            exact_name="f_accr_day_sum_r",
+        )
         statement = db.fetch_rows.call_args.args[0]
         for dialect in (sqlite.dialect(), postgresql.dialect(), mysql.dialect()):
             compiled = statement.compile(dialect=dialect)
@@ -82,6 +87,74 @@ class LineageCoreQueryTests(unittest.TestCase):
             # The user pattern is bound, never inlined into the SQL text.
             self.assertNotIn("f!_accr", sql)
             self.assertEqual("%f!_accr!_day!_sum!_r%", compiled.params["lower_1"])
+            self.assertIn("%.f!_accr!_day!_sum!_r", compiled.params.values())
+            self.assertNotIn("%.f!_accr", sql)
+
+    def test_schema_qualified_search_compiles_with_bound_portable_predicates(self):
+        db = MagicMock()
+        db.fetch_rows.return_value = []
+        reader = LineageDatabaseReader(db)
+        reader.search_nodes(
+            "S1",
+            "%m!_jjqd%",
+            7,
+            exact_name="m_jjqd_list",
+            namespace_pattern="%d!_wm%",
+            exact_namespace="d_wm",
+            exact_qualified_name="d_wm.m_jjqd_list",
+        )
+        statement = db.fetch_rows.call_args.args[0]
+
+        for dialect in (
+            sqlite.dialect(),
+            postgresql.dialect(),
+            postgresql.dialect(paramstyle="qmark"),
+            mysql.dialect(),
+        ):
+            compiled = statement.compile(dialect=dialect)
+            sql = str(compiled).lower()
+            self.assertIn("namespace_name", sql)
+            self.assertIn("coalesce", sql)
+            self.assertIn("kind_code", sql)
+            self.assertIn("case", sql)
+            self.assertIn('escape', sql)
+            self.assertIn('!', sql)
+            self.assertNotIn(" || ", sql)
+            self.assertNotIn(" concat(", sql)
+            self.assertNotIn("m_jjqd_list", sql)
+            self.assertEqual("%m!_jjqd%", compiled.params["lower_1"])
+            self.assertEqual("%d!_wm%", compiled.params["lower_2"])
+            self.assertIn("m_jjqd_list", compiled.params.values())
+            self.assertIn("d_wm.m_jjqd_list", compiled.params.values())
+            self.assertIn("d_wm", compiled.params.values())
+
+    def test_poc_search_supports_business_namespace_and_exact_table_precedence(self):
+        nodes = [
+            {"id": "table:sales:orders", "kind": "table", "name": "ORDERS", "namespace": "SALES"},
+            {"id": "table:archive:orders", "kind": "table", "name": "ORDERS", "namespace": "ARCHIVE"},
+            {"id": "table:sales:qualified", "kind": "table", "name": "SALES.ACCOUNT", "namespace": "sales"},
+            {"id": "task:account", "kind": "task", "name": "ACCOUNT", "namespace": "scheduler"},
+            {"id": "task:job:orders", "kind": "task", "name": "JOB_ORDERS", "namespace": "scheduler"},
+            {"id": "task:job:monthly", "kind": "task", "name": "JOB_MONTHLY_SALES", "namespace": "scheduler"},
+        ]
+        with (
+            patch.object(lineage_service, "lineage_storage_status", return_value={"mode": "poc"}),
+            patch.object(lineage_service, "_current_snapshot", return_value={"nodes": nodes}),
+        ):
+            qualified = lineage_service.search_nodes("sales.orders", limit=1)
+            matches = lineage_service.search_nodes("orders", limit=10)
+            job = lineage_service.search_nodes("JOB_MONTHLY_SALES", limit=10)
+            collector_bare = lineage_service.search_nodes("ACCOUNT", limit=1)
+            collector_qualified = lineage_service.search_nodes("sales.account", limit=1)
+
+        self.assertEqual(["table:sales:orders"], [node["id"] for node in qualified])
+        self.assertEqual(
+            {"table:sales:orders", "table:archive:orders"},
+            {node["id"] for node in matches[:2]},
+        )
+        self.assertEqual("task:job:monthly", job[0]["id"])
+        self.assertEqual(["table:sales:qualified"], [node["id"] for node in collector_bare])
+        self.assertEqual(["table:sales:qualified"], [node["id"] for node in collector_qualified])
 
     def test_database_snapshot_reads_use_bound_core_queries(self):
         db = MagicMock()

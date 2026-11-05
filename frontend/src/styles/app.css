@@ -1129,8 +1129,9 @@
   .lineage-query input { height: 36px; min-width: 220px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); color: var(--ink); font-family: var(--mono); }
   .lineage-query-status { color: var(--danger); font-size: 13px; }
   .lineage-candidates { display: grid; gap: 8px; margin: 0 0 16px; }
-  .lineage-candidate { display: grid; grid-template-columns: minmax(160px, 1fr) 120px minmax(160px, 1fr); gap: 12px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .lineage-candidate { display: grid; grid-template-columns: minmax(0, 1fr) minmax(80px, 120px) minmax(0, 1fr); gap: 12px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .lineage-candidate:hover, .lineage-candidate:focus-visible { background: var(--surface-2); }
+  .lineage-candidate > * { min-width: 0; overflow-wrap: anywhere; }
   .lineage-candidate b { font-family: var(--mono); }
   .lineage-candidate span, .lineage-candidate small { color: var(--ink-2); }
   .lineage-notice { margin: 0 0 16px; color: var(--warn); font-size: 13px; }
