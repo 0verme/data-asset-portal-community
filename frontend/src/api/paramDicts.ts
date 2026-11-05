@@ -16,6 +16,13 @@
 import { requestRemote } from './http.ts';
 import { parseCollectionResponse } from './collectionResponse.ts';
 import {
+  normalizeSystemManagementPage,
+  sliceSystemManagementPage,
+  systemManagementPageUrl,
+  type SystemManagementPage,
+  type SystemManagementPageQuery,
+} from './systemManagementPagination.ts';
+import {
   PARAM_DICT_CATEGORIES,
   PARAM_DICT_ITEMS,
   type ParamDictCategory,
@@ -125,6 +132,24 @@ export async function getParamDicts(categoryCode?: string): Promise<ParamDictIte
       ...item,
       categoryName: categoryMap.get(item.categoryCode)?.name || item.categoryCode,
     }));
+}
+
+export async function getParamDictPage(
+  categoryCode: string,
+  query: SystemManagementPageQuery,
+): Promise<SystemManagementPage<ParamDictItemWithCategoryName>> {
+  if (API_MODE === 'remote') {
+    const payload = await requestRemote(
+      systemManagementPageUrl('/system/param-dicts/page', query, { categoryCode }),
+    );
+    return normalizeSystemManagementPage<ParamDictItemWithCategoryName>(payload, '参数字典列表');
+  }
+  const normalizedQuery = String(query.keyword || '').trim().toLowerCase();
+  const filtered = (await getParamDicts(categoryCode)).filter((item) =>
+    !normalizedQuery || [item.categoryCode, item.categoryName, item.code, item.name, item.value, item.desc]
+      .some((value) => String(value || '').toLowerCase().includes(normalizedQuery)),
+  );
+  return sliceSystemManagementPage(filtered, query.page, query.pageSize);
 }
 
 export async function createParamDict(payload: ParamDictPayload): Promise<ParamDictItem> {

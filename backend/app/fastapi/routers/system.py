@@ -36,6 +36,7 @@ from ..dependencies import (
 from ..errors import _service_error_response
 from ..public_catalog import is_authenticated_request, public_navigation_menus
 from ...settings import get_public_catalog_profile
+from ...utils.pagination import resolve_paging
 
 
 def _system_error_status(error: SystemManagementError) -> int:
@@ -97,6 +98,25 @@ def _register_system_management_routes(
     ):
         try:
             payload = {"items": current_service.get_users()}
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract(payload, SystemResponse))
+
+    @router.get("/users/page", response_model=None)
+    def get_users_page(
+        keyword: str = Query(default=""),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        _context: RequestContext = Depends(require_permission("system:user:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        page, page_size = resolve_paging(page, page_size)
+        try:
+            payload = current_service.get_users_page(
+                keyword=keyword,
+                page=page,
+                page_size=page_size,
+            )
         except SystemManagementError as error:
             return _system_error_response(error)
         return JSONResponse(content=validate_contract(payload, SystemResponse))
@@ -227,6 +247,25 @@ def _register_system_management_routes(
             return _system_error_response(error)
         return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
 
+    @router.get("/roles/page", response_model=None)
+    def get_roles_page(
+        keyword: str = Query(default=""),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        _context: RequestContext = Depends(require_permission("system:role:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        page, page_size = resolve_paging(page, page_size)
+        try:
+            payload = current_service.get_roles_page(
+                keyword=keyword,
+                page=page,
+                page_size=page_size,
+            )
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract(payload, SystemResponse))
+
     @router.post("/roles", response_model=None, status_code=201)
     def create_role(
         payload: Any = Body(default=None),
@@ -288,6 +327,25 @@ def _register_system_management_routes(
         # anonymous callers already receive the explicit public navigation
         # projection above. This endpoint is not an authorization engine.
         return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
+
+    @router.get("/menus/page", response_model=None)
+    def get_menus_page(
+        keyword: str = Query(default=""),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        _context: RequestContext = Depends(require_permission("system:menu:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        page, page_size = resolve_paging(page, page_size)
+        try:
+            payload = current_service.get_menus_page(
+                keyword=keyword,
+                page=page,
+                page_size=page_size,
+            )
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract(payload, SystemResponse))
 
     @router.post("/menus", response_model=None, status_code=201)
     def create_menu(
@@ -458,6 +516,27 @@ def _register_system_management_routes(
         except SystemManagementError as error:
             return _system_error_response(error)
         return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
+
+    @router.get("/param-dicts/page", response_model=None)
+    def get_param_dicts_page(
+        category_code: str = Query(default="", alias="categoryCode"),
+        keyword: str = Query(default=""),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        _context: RequestContext = Depends(require_permission("system:param:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        page, page_size = resolve_paging(page, page_size)
+        try:
+            payload = current_service.get_param_dicts_page(
+                category_code=category_code or None,
+                keyword=keyword,
+                page=page,
+                page_size=page_size,
+            )
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract(payload, SystemResponse))
 
     @router.post("/param-dicts", response_model=None, status_code=201)
     def create_param_dict(

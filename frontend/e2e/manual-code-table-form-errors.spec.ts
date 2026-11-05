@@ -68,6 +68,27 @@ async function mockManualCodeTableApi(
       return;
     }
 
+    if (path === "/manual-code-tables/page" && method === "GET") {
+      await route.fulfill({ json: {
+        items, total: items.length, page: 1, pageSize: 20,
+        stats: {
+          total: items.length,
+          enabled: items.filter((item) => item["status"] === "enabled").length,
+          disabled: items.filter((item) => item["status"] === "disabled").length,
+          styleCount: new Set(items.map((item) => String(item["style"] || ""))).size,
+        },
+        facets: {
+          styleTotal: items.length,
+          styles: Object.fromEntries([...new Set(items.map((item) => String(item["style"] || "")))].map((style) => [style, items.filter((item) => item["style"] === style).length])),
+          statusTotal: items.length,
+          statuses: {
+            enabled: items.filter((item) => item["status"] === "enabled").length,
+            disabled: items.filter((item) => item["status"] === "disabled").length,
+          },
+        },
+      } });
+      return;
+    }
     if (path === "/manual-code-tables" && method === "GET") {
       await route.fulfill({ json: { items } });
       return;

@@ -8,12 +8,13 @@ from __future__ import annotations
 import os
 import re
 
-from sqlalchemy import delete, func, insert, or_, select, update
+from sqlalchemy import case, delete, func, insert, or_, select, update
 
 from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
 from ..db.tables import manual_code_table
 from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
+from ..utils.pagination import resolve_paging
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
     OPERATION_TYPE_DELETE,
@@ -192,7 +193,8 @@ class ManualCodeTableService(AuditActorMixin):
             )
         return clauses
 
-    def get_tables(self, keyword=None, style=None, status=None):
+    @staticmethod
+    def _normalize_list_filters(keyword=None, style=None, status=None):
         normalized_style = str(style or "").strip().lower()
         normalized_status = str(status or "").strip().lower()
         if normalized_style and normalized_style not in TABLE_STYLES:
@@ -203,13 +205,102 @@ class ManualCodeTableService(AuditActorMixin):
             raise ManualCodeTableValidationError(
                 [{"field": "status", "message": "状态无效"}]
             )
+        return str(keyword or "").strip(), normalized_style, normalized_status
 
+    def get_tables(self, keyword=None, style=None, status=None):
+        keyword, normalized_style, normalized_status = self._normalize_list_filters(
+            keyword, style, status
+        )
         statement = (
             select(*self._columns())
             .where(*self._build_filters(keyword, normalized_style, normalized_status))
-            .order_by(manual_code_table.c.updated_at.desc(), manual_code_table.c.table_code)
+            .order_by(
+                manual_code_table.c.updated_at.desc(),
+                manual_code_table.c.table_code,
+                manual_code_table.c.table_id,
+            )
         )
         return [self._row_to_item(row) for row in self._fetch_rows(statement)]
+
+    def get_tables_page(
+        self, keyword=None, style=None, status=None, page=None, page_size=None
+    ):
+        keyword, normalized_style, normalized_status = self._normalize_list_filters(
+            keyword, style, status
+        )
+        page, page_size = resolve_paging(page, page_size)
+        filters = self._build_filters(keyword, normalized_style, normalized_status)
+        count_rows = self._fetch_rows(
+            select(func.count().label("total"))
+            .select_from(manual_code_table)
+            .where(*filters)
+        )
+        total = int(count_rows[0].get("total") or 0) if count_rows else 0
+        last_page = max(1, (total + page_size - 1) // page_size)
+        page = min(page, last_page)
+        page_rows = self._fetch_rows(
+            select(*self._columns())
+            .where(*filters)
+            .order_by(
+                manual_code_table.c.updated_at.desc(),
+                manual_code_table.c.table_code,
+                manual_code_table.c.table_id,
+            )
+            .limit(page_size)
+            .offset((page - 1) * page_size)
+        )
+        stats_rows = self._fetch_rows(
+            select(
+                func.count().label("total"),
+                func.sum(case((manual_code_table.c.status_code == "enabled", 1), else_=0)).label("enabled"),
+                func.sum(case((manual_code_table.c.status_code == "disabled", 1), else_=0)).label("disabled"),
+                func.count(func.distinct(manual_code_table.c.table_style)).label("styleCount"),
+            )
+        )
+        stats = stats_rows[0] if stats_rows else {}
+        style_facet_rows = self._fetch_rows(
+            select(
+                manual_code_table.c.table_style.label("value"),
+                func.count().label("count"),
+            )
+            .where(*self._build_filters(keyword, status=normalized_status))
+            .group_by(manual_code_table.c.table_style)
+        )
+        status_facet_rows = self._fetch_rows(
+            select(
+                manual_code_table.c.status_code.label("value"),
+                func.count().label("count"),
+            )
+            .where(*self._build_filters(keyword, style=normalized_style))
+            .group_by(manual_code_table.c.status_code)
+        )
+        styles = {
+            str(row["value"]): int(row["count"] or 0) for row in style_facet_rows
+        }
+        statuses = {
+            str(row["value"]): int(row["count"] or 0) for row in status_facet_rows
+        }
+        return {
+            "items": [self._row_to_item(row) for row in page_rows],
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+            "stats": {
+                "total": int(stats.get("total") or 0),
+                "enabled": int(stats.get("enabled") or 0),
+                "disabled": int(stats.get("disabled") or 0),
+                "styleCount": int(stats.get("styleCount") or 0),
+            },
+            "facets": {
+                "styleTotal": sum(styles.values()),
+                "styles": styles,
+                "statusTotal": sum(statuses.values()),
+                "statuses": {
+                    "enabled": statuses.get("enabled", 0),
+                    "disabled": statuses.get("disabled", 0),
+                },
+            },
+        }
 
     def get_table(self, table_id):
         normalized_id = self._parse_id(table_id)

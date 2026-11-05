@@ -58,6 +58,19 @@ export interface RootQueryParams {
   [key: string]: unknown;
 }
 
+export interface RootPageParams extends RootQueryParams {
+  page?: number | undefined;
+  pageSize?: number | undefined;
+}
+
+export interface RootPage {
+  items: SanitizedWordRoot[];
+  total: number;
+  page: number;
+  pageSize: number;
+  stats: { total: number };
+}
+
 export interface RootImportResult {
   inserted: number;
   updated: number;
@@ -126,6 +139,62 @@ export async function getRoots(params: RootQueryParams = {}): Promise<SanitizedW
       String(value || '').toLowerCase().includes(q),
     );
   });
+}
+
+export async function getRootPage(params: RootPageParams = {}): Promise<RootPage> {
+  const pageSize = Math.max(1, Number(params.pageSize) || 20);
+  const requestedPage = Math.max(1, Number(params.page) || 1);
+  if (API_MODE === 'remote') {
+    const payload = await requestRemote<unknown>('/roots/_page', {
+      params: { keyword: params.keyword, cat: params.cat, page: requestedPage, pageSize },
+    });
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('词根分页接口返回格式无效');
+    const record = payload as Record<string, unknown>;
+    const stats = record['stats'];
+    if (!Array.isArray(record['items']) || !Number.isSafeInteger(record['total']) || Number(record['total']) < 0 ||
+      !Number.isSafeInteger(record['page']) || Number(record['page']) < 1 ||
+      !Number.isSafeInteger(record['pageSize']) || Number(record['pageSize']) < 1 ||
+      !stats || typeof stats !== 'object' || Array.isArray(stats) ||
+      !Number.isSafeInteger((stats as Record<string, unknown>)['total']) || Number((stats as Record<string, unknown>)['total']) < 0) {
+      throw new Error('词根分页接口返回格式无效');
+    }
+    return {
+      items: sanitizeRoots(record['items']),
+      total: Number(record['total']),
+      page: Number(record['page']),
+      pageSize: Number(record['pageSize']),
+      stats: { total: Number((stats as Record<string, unknown>)['total']) },
+    };
+  }
+  const all = await getRoots(params);
+  all.sort((left, right) => left.abbr.localeCompare(right.abbr));
+  const lastPage = Math.max(1, Math.ceil(all.length / pageSize));
+  const page = Math.min(requestedPage, lastPage);
+  const totalRoots = sanitizeRoots(readStore()).length;
+  return {
+    items: all.slice((page - 1) * pageSize, page * pageSize),
+    total: all.length,
+    page,
+    pageSize,
+    stats: { total: totalRoots },
+  };
+}
+
+export async function getRootAbbreviations(): Promise<string[]> {
+  if (API_MODE === 'remote') {
+    return normalizeCollection<unknown>(await requestRemote('/roots/_abbreviations'))
+      .map((item) => String(item || '').trim()).filter(Boolean);
+  }
+  return sanitizeRoots(readStore()).map((item) => item.abbr).sort((left, right) => left.localeCompare(right));
+}
+
+export async function getRootDetail(abbr: string): Promise<SanitizedWordRoot> {
+  if (API_MODE === 'remote') {
+    return normalizeDetail<SanitizedWordRoot>(await requestRemote(`/roots/${encodeURIComponent(abbr)}`));
+  }
+  const item = sanitizeRoots(readStore()).find((root) => root.abbr === abbr);
+  if (!item) throw new Error(`词根不存在：${abbr}`);
+  return clone(item);
 }
 
 export async function getRootCategories(): Promise<RootCategoryItem[]> {

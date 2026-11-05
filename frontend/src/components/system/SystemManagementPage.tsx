@@ -31,16 +31,31 @@ export function SystemManagementPage({
   actionIntent,
   onActionHandled,
 }: SystemManagementPageProps) {
-  const systemModule: UseSystemModuleResult = useSystemModule({ page: route.page, requireLogin, actionIntent, onActionHandled });
+  const systemModule: UseSystemModuleResult = useSystemModule({ page: route.page, query, requireLogin, actionIntent, onActionHandled });
   const {
     loading,
     error,
     users,
+    usersTotal,
+    userPage,
+    userPageSize,
+    setUserPage,
+    setUserPageSize,
     categories,
     items,
+    itemsTotal,
+    itemPage,
+    itemPageSize,
+    setItemPage,
+    setItemPageSize,
     menus,
+    menusTotal,
+    menuPage,
+    menuPageSize,
+    setMenuPage,
+    setMenuPageSize,
     selectedCategoryCode,
-    setSelectedCategoryCode,
+    pickCategory,
     userModal,
     setUserModal,
     paramModal,
@@ -83,6 +98,8 @@ export function SystemManagementPage({
   } = systemModule;
   const roleModule: UseRoleModuleResult = useRoleModule({
     active: route.page === "roles" || route.page === "users",
+    paged: route.page === "roles",
+    query,
     requireLogin,
     actionIntent,
     onActionHandled,
@@ -113,7 +130,12 @@ export function SystemManagementPage({
     <>
       {route.page === "roles" ? (
         <RoleManagementPage
-          roles={roleModule.roles}
+          roles={roleModule.pageRoles}
+          total={roleModule.total}
+          page={roleModule.page}
+          pageSize={roleModule.pageSize}
+          onPageChange={roleModule.setPage}
+          onPageSizeChange={(nextSize) => { roleModule.setPage(1); roleModule.setPageSize(nextSize); }}
           permissions={roleModule.permissions}
           query={query}
           canEdit={canEdit}
@@ -123,11 +145,11 @@ export function SystemManagementPage({
           deletingRoleCode={roleModule.deletingRoleCode}
         />
       ) : route.page === "menus" ? (
-        <MenuManagementPage menus={menus} query={query} canEdit={canEdit} onNew={openNewMenu} onEdit={openEditMenu} onChangeStatus={handleChangeMenuStatus} onMove={handleMoveMenu} />
+        <MenuManagementPage menus={menus} total={menusTotal} page={menuPage} pageSize={menuPageSize} onPageChange={setMenuPage} onPageSizeChange={(nextSize) => { setMenuPage(1); setMenuPageSize(nextSize); }} query={query} canEdit={canEdit} onNew={openNewMenu} onEdit={openEditMenu} onChangeStatus={handleChangeMenuStatus} onMove={handleMoveMenu} />
       ) : route.page === "param-dicts" ? (
-        <ParamDictPage categories={categories} items={items} selectedCategoryCode={selectedCategoryCode} query={query} canEdit={canEdit} onPickCategory={setSelectedCategoryCode} onNew={openNewParam} onEdit={openEditParam} onChangeStatus={handleChangeParamStatus} />
+        <ParamDictPage categories={categories} items={items} total={itemsTotal} page={itemPage} pageSize={itemPageSize} onPageChange={setItemPage} onPageSizeChange={(nextSize) => { setItemPage(1); setItemPageSize(nextSize); }} selectedCategoryCode={selectedCategoryCode} query={query} canEdit={canEdit} onPickCategory={pickCategory} onNew={openNewParam} onEdit={openEditParam} onChangeStatus={handleChangeParamStatus} />
       ) : (
-        <UserManagementPage users={users} query={query} canEdit={canEdit} onNew={openNewUser} onEdit={openEditUser} onResetPassword={handleResetPassword} onChangeStatus={handleChangeUserStatus} />
+        <UserManagementPage users={users} total={usersTotal} page={userPage} pageSize={userPageSize} onPageChange={setUserPage} onPageSizeChange={(nextSize) => { setUserPage(1); setUserPageSize(nextSize); }} query={query} canEdit={canEdit} onNew={openNewUser} onEdit={openEditUser} onResetPassword={handleResetPassword} onChangeStatus={handleChangeUserStatus} />
       )}
 
       <FormModal

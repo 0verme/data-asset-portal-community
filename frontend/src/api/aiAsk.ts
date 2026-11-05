@@ -60,6 +60,21 @@ export interface AiAskProgressStep {
   errorCode?: "timeout" | "unavailable" | "invalid_response" | "disabled" | "cancelled" | null;
 }
 
+export interface AiAskStatisticalFilter {
+  dimension: string;
+  value: string | number;
+  displayName?: string;
+}
+
+/** Presentation-only shape derived from the authoritative metadataCount. */
+export interface AiAskStatisticalResult {
+  metric: string;
+  value: number;
+  filters: AiAskStatisticalFilter[];
+  source: "dap_catalog";
+  complete: boolean;
+  sourceLink?: string | null;
+}
 export interface AiMetadataCountFilter {
   code: string;
   displayName: string;
@@ -91,6 +106,7 @@ export interface AiAskResponse {
   resultsTruncated: boolean;
   reasonCode?: string | null;
   elapsedMs: number;
+  statisticalResult?: AiAskStatisticalResult;
 }
 
 const API_MODE = (
@@ -134,6 +150,51 @@ function citationKey(assetId: number, fieldId?: number | null): string {
   return `${assetId}:${fieldId ?? "table"}`;
 }
 
+function parseStatisticalResult(value: unknown): AiAskStatisticalResult | null {
+  if (value === undefined || value === null) return null;
+  if (!isRecord(value)) throw new Error("Invalid AI ask statistical result.");
+  const metric = value["metric"];
+  const resultValue = value["value"];
+  const filters = value["filters"];
+  const sourceLink = value["sourceLink"];
+  if (
+    !isText(metric) || !metric.trim()
+    || !Number.isInteger(resultValue) || Number(resultValue) < 0
+    || !Array.isArray(filters) || filters.length > 20
+    || value["source"] !== "dap_catalog"
+    || typeof value["complete"] !== "boolean"
+    || (sourceLink !== undefined && sourceLink !== null && !isText(sourceLink))
+  ) {
+    throw new Error("Invalid AI ask statistical result.");
+  }
+  const parsedFilters = filters.map((filter): AiAskStatisticalFilter => {
+    if (!isRecord(filter)) throw new Error("Invalid AI ask statistical filter.");
+    const dimension = filter["dimension"];
+    const filterValue = filter["value"];
+    const displayName = filter["displayName"];
+    if (
+      !isText(dimension) || !dimension.trim()
+      || !(isText(filterValue) || (typeof filterValue === "number" && Number.isFinite(filterValue)))
+      || (displayName !== undefined && !isText(displayName))
+    ) {
+      throw new Error("Invalid AI ask statistical filter.");
+    }
+    return {
+      dimension,
+      value: filterValue,
+      ...(isText(displayName) ? { displayName } : {}),
+    };
+  });
+  return {
+    metric,
+    value: Number(resultValue),
+    filters: parsedFilters,
+    source: "dap_catalog",
+    complete: value["complete"],
+    ...(sourceLink === undefined ? {} : { sourceLink: sourceLink as string | null }),
+  };
+}
+
 function parseMetadataCountFilter(value: unknown): AiMetadataCountFilter | null {
   if (value === undefined || value === null) return null;
   if (!isRecord(value)) throw new Error("Invalid AI metadata count filter.");
@@ -159,6 +220,7 @@ function parseMetadataCount(value: unknown): AiMetadataCount {
   const count = value["value"];
   const sourceLink = value["sourceLink"];
   const catalogProfile = value["catalogProfile"];
+  const filters = value["filters"];
   if (
     value["metric"] !== "table_count"
     || !Number.isSafeInteger(count) || Number(count) < 0
@@ -166,6 +228,7 @@ function parseMetadataCount(value: unknown): AiMetadataCount {
     || value["complete"] !== true
     || (catalogProfile !== "internal" && catalogProfile !== "strict" && catalogProfile !== "disabled")
     || !isText(sourceLink) || !/^\/data-warehouse(?:\?.*)?$/.test(sourceLink)
+    || Object.keys(filters).some((key) => key !== "domain" && key !== "layer")
   ) {
     throw new Error("Invalid AI metadata count evidence.");
   }
@@ -173,13 +236,31 @@ function parseMetadataCount(value: unknown): AiMetadataCount {
     metric: "table_count",
     value: Number(count),
     filters: {
-      domain: parseMetadataCountFilter(value["filters"]["domain"]),
-      layer: parseMetadataCountFilter(value["filters"]["layer"]),
+      domain: parseMetadataCountFilter(filters["domain"]),
+      layer: parseMetadataCountFilter(filters["layer"]),
     },
     source: "dap_catalog",
     complete: true,
     catalogProfile,
     sourceLink,
+  };
+}
+
+function metadataCountToStatisticalResult(count: AiMetadataCount): AiAskStatisticalResult {
+  const filters: AiAskStatisticalFilter[] = [];
+  if (count.filters.domain) {
+    filters.push({ dimension: "domain", value: count.filters.domain.displayName, displayName: "主题域" });
+  }
+  if (count.filters.layer) {
+    filters.push({ dimension: "layer", value: count.filters.layer.displayName, displayName: "数据分层" });
+  }
+  return {
+    metric: count.metric,
+    value: count.value,
+    filters,
+    source: "dap_catalog",
+    complete: count.complete,
+    sourceLink: count.sourceLink,
   };
 }
 
@@ -250,20 +331,33 @@ export function parseAiAskAvailability(value: unknown): AiAskAvailability {
 
 export function parseAiAskResponse(value: unknown): AiAskResponse {
   if (!isRecord(value)) throw new Error("Invalid AI ask response.");
+  const allowedKeys = new Set([
+    "status", "answer", "citations", "candidates", "metadataCount", "statisticalResult",
+    "retrievalStatus", "generationStatus", "resultsTruncated", "reasonCode", "elapsedMs",
+  ]);
+  if (Object.keys(value).some((key) => !allowedKeys.has(key))) {
+    throw new Error("Unexpected data in AI ask response.");
+  }
   const status = value["status"];
   const retrievalStatus = value["retrievalStatus"];
   const generationStatus = value["generationStatus"];
-  const resultsTruncated = value["resultsTruncated"];
-  const answer = value["answer"];
-  const rawCandidates = value["candidates"];
-  const rawCitations = value["citations"];
-  const elapsedMs = value["elapsedMs"];
+  const rawStatisticalResult = parseStatisticalResult(value["statisticalResult"]);
   const rawMetadataCount = value["metadataCount"];
   const metadataCount = rawMetadataCount === undefined || rawMetadataCount === null
     ? null
     : parseMetadataCount(rawMetadataCount);
+  if (rawStatisticalResult) {
+    throw new Error("statisticalResult is a presentation adapter and must be derived from metadataCount.");
+  }
+  const statisticalResult = metadataCount ? metadataCountToStatisticalResult(metadataCount) : null;
+  const resultsTruncated = value["resultsTruncated"] ?? (metadataCount ? false : undefined);
+  const answer = value["answer"] ?? (metadataCount ? "" : undefined);
+  const rawCandidates = value["candidates"] ?? (metadataCount ? [] : undefined);
+  const rawCitations = value["citations"] ?? (metadataCount ? [] : undefined);
+  const elapsedMs = value["elapsedMs"];
   if (
     typeof status !== "string"
+    || !status.trim()
     || !ASK_STATUSES.has(status)
     || typeof retrievalStatus !== "string"
     || !RETRIEVAL_STATUSES.has(retrievalStatus)
@@ -302,7 +396,7 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
   if (new Set(citationIds).size !== citationIds.length) {
     throw new Error("Duplicate AI ask citation.");
   }
-  if (resultsTruncated && status !== "partial_answer") {
+  if (resultsTruncated && status !== "partial_answer" && !statisticalResult) {
     throw new Error("Truncated AI results must use an explicit partial-answer status.");
   }
   if (status === "metadata_count_answered") {
@@ -315,7 +409,8 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     }
   } else if (status === "ambiguous_scope" || status === "metadata_count_unavailable") {
     if (
-      metadataCount || retrievalStatus !== "not_run" || generationStatus !== "not_run"
+      metadataCount || statisticalResult
+      || retrievalStatus !== "not_run" || generationStatus !== "not_run"
       || candidates.length || citations.length || resultsTruncated
     ) {
       throw new Error("Unresolved metadata count must not contain count values or citations.");
@@ -327,6 +422,10 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     if (!citations.length || generationStatus !== "completed") {
       throw new Error("Answered AI response must contain verified citations.");
     }
+  } else if (!statisticalResult && (citations.length || candidates.length)) {
+    throw new Error("Unanswered AI response must not contain answer candidates or citations.");
+  }
+  if (citations.length || candidates.length) {
     const citationIds = new Set(citations.map((item) => citationKey(item.assetId, item.fieldId)));
     if (
       candidateIds.size !== candidates.length
@@ -335,11 +434,9 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     ) {
       throw new Error("AI answer candidates must exactly match its verified citations.");
     }
-    if (status === "answered" && !candidates.some((item) => item.relevance === "direct")) {
-      throw new Error("Answered AI response must contain directly relevant evidence.");
-    }
-  } else if (citations.length || candidates.length) {
-    throw new Error("Unanswered AI response must not contain answer candidates or citations.");
+  }
+  if (status === "answered" && !statisticalResult && !candidates.some((item) => item.relevance === "direct")) {
+    throw new Error("Answered AI response must contain directly relevant evidence.");
   }
   return {
     status: status as AiAskStatus,
@@ -352,6 +449,7 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     resultsTruncated,
     reasonCode: isText(value["reasonCode"]) ? value["reasonCode"] : null,
     elapsedMs,
+    ...(statisticalResult ? { statisticalResult } : {}),
   };
 }
 

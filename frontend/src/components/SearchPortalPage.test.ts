@@ -81,7 +81,8 @@ test("portal scope parsing is the shared whitelist parser", async () => {
   const source = await readFile(searchPagePath, "utf8");
 
   assert.match(source, /readPortalSearchParams/);
-  assert.match(source, /useRef\(readPortalSearchParams\(validScopeKeys\)\)/);
+  assert.match(source, /readPortalSearchParams\(initialScopeKeys, initialSearchLocationRef\.current\)/);
+  assert.match(source, /requestedScope && !validScopeKeys\.has\(requestedScope\) && availableModules\.length === 0/);
 });
 
 test("recommendations load independently, hide when empty or failed, and reuse search clicks", async () => {
@@ -132,22 +133,42 @@ test("AI is explicitly enabled, Enter remains traditional search, and model requ
   const source = await readFile(searchPagePath, "utf8");
 
   assert.match(source, /getAiAskAvailability\(\)/);
-  assert.match(source, /\.catch\(\(\) => \{\s*if \(!cancelled\) setAiEnabled\(false\)/);
+  assert.match(source, /\.catch\(\(\) => \{[\s\S]*?if \(!cancelled\) \{[\s\S]*?setAiEnabled\(false\)/);
   assert.match(source, /if \(event\.key === "Enter"\) doSearch\(\)/);
   assert.match(source, /onClick=\{\(\) => runAiAsk\(query\)\}/);
   assert.match(source, /askAiWithProgress\(\s*question/);
   assert.match(source, /syncSearchUrl\(question, scope\)/);
   assert.match(source, /setAiQuery\(""\)/);
   assert.match(source, /if \(searchedTerm !== question\)[\s\S]*?setSearchedTerm\(""\)/);
-  assert.match(source, /response\.status === "retrieval_unavailable"/);
-  assert.match(source, /response\.status === "generation_unavailable"/);
+  assert.match(source, /response\?\.status === "retrieval_unavailable"/);
+  assert.match(source, /response\?\.status === "generation_unavailable"/);
   assert.match(source, /response\.status === "insufficient_evidence"/);
   assert.match(source, /response\.status === "partial_answer"/);
+  assert.match(source, /\(response\.status === "metadata_count_answered" && response\.metadataCount !== null\)/);
+  assert.match(source, /!response\?\.metadataCount && response\?\.status === "ambiguous_scope"/);
   assert.match(source, /相关线索 · 非直接结论/);
   assert.match(source, /onRetry=\{\(\) => runAiAsk\(aiQuery\)\}/);
   assert.match(source, /onCancel=\{cancelAiAsk\}/);
   assert.match(source, /onNavigate\?\.\(target, query\)/);
   assert.match(source, /module: "dwm"[\s\S]*?assetId: item\.assetId/);
+});
+
+test("submitted search and AI use one mutually exclusive accessible result panel", async () => {
+  const [source, styles] = await Promise.all([
+    readFile(searchPagePath, "utf8"),
+    readFile(searchStylesPath, "utf8"),
+  ]);
+  assert.match(source, /role="tablist"[\s\S]*?aria-label="搜索与问答结果"/);
+  assert.match(source, /role="tab"[\s\S]*?id="sp-search-tab"/);
+  assert.match(source, /role="tab"[\s\S]*?id="sp-ai-tab"/);
+  assert.match(source, /setActiveResultTab\("search"\)/);
+  assert.match(source, /setActiveResultTab\("ai"\)/);
+  assert.match(source, /id="sp-search-panel"[\s\S]*?hidden=\{activeResultTab !== "search"\}/);
+  assert.match(source, /id="sp-ai-panel"[\s\S]*?hidden=\{activeResultTab !== "ai"\}/);
+  assert.match(source, /event\.key === "ArrowRight"/);
+  assert.match(source, /scrollContainer\.scrollTo\(\{ top: Math\.max\(0, top\), behavior: "smooth" \}\)/);
+  assert.match(source, /results\?\.scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/);
+  assert.match(styles, /\.sp-results \{[^}]*scroll-margin-top: 14px/);
 });
 
 test("AI answers remain explanatory while only DAP candidate cards navigate responsively", async () => {

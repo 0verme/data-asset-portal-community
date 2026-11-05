@@ -105,7 +105,31 @@
 .sp-stats-error :is(h2, h3, p, span) { color: var(--danger); }
 
 /* ===== 检索结果（分组展示）===== */
-.sp-results { width: 100%; max-width: 1200px; margin-top: 4px; }
+.sp-results { width: 100%; max-width: 1200px; min-width: 0; margin-top: 4px; scroll-margin-top: 14px; }
+.sp-result-tabs {
+  display: flex; align-items: stretch; gap: 6px; min-width: 0; margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.sp-result-tab {
+  display: inline-flex; flex: 1 1 0; align-items: center; justify-content: flex-start; gap: 8px;
+  min-width: 0; min-height: 42px; height: auto; padding: 8px 13px;
+  border: 0; border-bottom: 2px solid transparent; border-radius: 9px 9px 0 0;
+  background: transparent; box-shadow: none; color: var(--ink-2);
+  font-family: var(--sans); font-size: 13px; font-weight: 550; text-align: left; white-space: nowrap;
+}
+.sp-result-tab:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+.sp-result-tab.active { border-bottom-color: var(--accent); background: var(--surface); color: var(--accent); }
+.sp-result-tab:disabled { opacity: .55; cursor: not-allowed; }
+.sp-result-tab-status { min-width: 0; margin-left: auto; color: var(--ink-3); font-size: 11px; font-weight: 450; }
+.sp-result-panel { width: 100%; min-width: 0; }
+.sp-result-panel[hidden] { display: none; }
+.sp-panel-query { margin: 0 2px 10px; color: var(--ink-3); font-size: 12px; overflow-wrap: anywhere; }
+.sp-tab-empty {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 72px; padding: 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
+  color: var(--ink-3); font-size: 13px;
+}
+.sp-panel-action { flex: 0 0 auto; color: var(--accent); }
 .sp-result-loading { width: 100%; max-width: 1200px; margin-top: 4px; text-align: center; color: var(--ink-3); font-size: 13px; padding: 20px 0; }
 .sp-result-loading h3 { margin: 0; font-size: 13px; font-weight: 400; color: var(--ink-3); }
 .sp-result-loading p:empty { display: none; }
@@ -222,6 +246,17 @@
 
 /* AI text is explanatory only; every clickable asset card is rebuilt from a DAP-validated ID. */
 .sp-ai-group { width: 100%; min-width: 0; margin-top: 6px; }
+.sp-ai-question { margin: 0 2px 8px; color: var(--ink-3); font-size: 12px; overflow-wrap: anywhere; }
+.sp-ai-statistic {
+  min-width: 0; margin-bottom: 10px; padding: 15px 16px; border: 1px solid var(--accent-line);
+  border-radius: var(--radius); background: var(--surface-2); color: var(--ink-2);
+}
+.sp-ai-statistic-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; }
+.sp-ai-statistic-head strong { color: var(--accent); font-size: 22px; font-variant-numeric: tabular-nums; }
+.sp-ai-statistic-head span { color: var(--ink-3); font-size: 11px; }
+.sp-ai-statistic p { margin-top: 5px; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.sp-ai-statistic-link { display: inline-flex; margin-top: 8px; color: var(--accent); font-size: 12px; font-weight: 550; text-decoration: none; }
+.sp-ai-statistic-link:hover { color: var(--accent-strong); text-decoration: underline; }
 .sp-ai-progress {
   margin: 8px 0 14px; overflow: hidden; border: 1px solid var(--line);
   border-radius: var(--radius); background: var(--surface);
@@ -322,5 +357,10 @@
   .sp-ask-mark { display: none; }
   .sp-btn-text { display: inline; }
   .sp-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .sp-result-tabs { gap: 4px; margin-bottom: 10px; }
+  .sp-result-tab { gap: 5px; min-height: 40px; padding: 7px 9px; font-size: 12px; }
+  .sp-result-tab-status { font-size: 10px; }
+  .sp-tab-empty { align-items: flex-start; flex-direction: column; gap: 9px; }
+  .sp-panel-action { align-self: flex-start; }
   .sp-ai-candidate { padding: 12px; gap: 8px; }
 }

@@ -43,10 +43,14 @@ test("system pages use the frozen DAP adapters with documented native exceptions
   assert.match(paramPage, /<Button className="btn primary" variant="primary"/);
   assert.equal((paramPage.match(/<button/g) ?? []).length, 1, "category list item stays native");
   assert.match(systemPage, /<Button className="btn state-btn" variant="secondary"/);
-  assert.match(rolePage, /import \{ Button, FormErrorSummary, FormField, focusFirstFormError, Input, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.match(rolePage, /import \{ Button, FormErrorSummary, FormField, focusFirstFormError, Input, TablePagination, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((rolePage.match(/<Input/g) ?? []).length, 2);
   assert.equal((rolePage.match(/<Textarea/g) ?? []).length, 1);
   assert.equal((rolePage.match(/<input/g) ?? []).length, 1, "permission matrix checkbox stays native");
+  assert.match(userPage, /<TablePagination[\s\S]*?ariaLabel="用户管理分页"/);
+  assert.match(rolePage, /<TablePagination[\s\S]*?ariaLabel="角色管理分页"/);
+  assert.match(menuPage, /<TablePagination[\s\S]*?ariaLabel="菜单管理分页"/);
+  assert.match(paramPage, /<TablePagination[\s\S]*?ariaLabel="参数字典明细分页"/);
 });
 
 test("optional RAG configuration is admin-controlled and never fabricates answers", () => {

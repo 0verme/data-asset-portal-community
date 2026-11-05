@@ -37,6 +37,30 @@ const validResponse = {
   elapsedMs: 10,
 };
 
+const validMetadataCountResponse = {
+  status: "metadata_count_answered",
+  answer: "当前 DAP 目录中，合成主题域、数据集市层共有 73 张数据表。",
+  citations: [],
+  candidates: [],
+  metadataCount: {
+    metric: "table_count",
+    value: 73,
+    filters: {
+      domain: { code: "SYN521", displayName: "合成主题域", matchedAs: "catalog_value", inferred: false },
+      layer: { code: "DM", displayName: "数据集市层", matchedAs: "catalog_alias", inferred: true },
+    },
+    source: "dap_catalog",
+    complete: true,
+    catalogProfile: "strict",
+    sourceLink: "/data-warehouse?domain=%E5%90%88%E6%88%90%E4%B8%BB%E9%A2%98%E5%9F%9F&layer=DM",
+  },
+  retrievalStatus: "not_run",
+  generationStatus: "not_run",
+  resultsTruncated: false,
+  reasonCode: null,
+  elapsedMs: 3,
+};
+
 test("AI availability response exposes only the feature boolean", () => {
   assert.deepEqual(parseAiAskAvailability({ enabled: false, baseUrl: "must-not-be-used" }), { enabled: false });
   assert.throws(() => parseAiAskAvailability({ enabled: "true" }), /Invalid AI ask availability/);
@@ -53,6 +77,15 @@ test("progress parser accepts real states and counts but rejects answer/token pa
   }), {
     id: "counting", status: "completed", elapsedMs: 14.5, tableCount: 2, fieldCount: 7,
   });
+  assert.deepEqual(parseAiAskProgressStep({
+    id: "analyzing", status: "running", intent: "metadata_count", elapsedMs: 3,
+  }), {
+    id: "analyzing", status: "running", intent: "metadata_count", elapsedMs: 3,
+  });
+  assert.throws(
+    () => parseAiAskProgressStep({ id: "analyzing", status: "running", intent: "unknown" }),
+    /Invalid AI ask progress event/,
+  );
   assert.throws(
     () => parseAiAskProgressStep({ id: "generating", status: "running", answer: "must-not-stream" }),
     /Unexpected data in AI ask progress event/,
@@ -81,6 +114,7 @@ test("AI ask response preserves DAP stable IDs and validates citations against c
     }),
     /Invalid AI ask citation/,
   );
+  assert.throws(() => parseAiAskResponse({ ...validResponse, internalReasoning: "must-not-be-exposed" }), /Unexpected data in AI ask response/);
   assert.throws(
     () => parseAiAskResponse({
       ...validResponse,
@@ -88,6 +122,78 @@ test("AI ask response preserves DAP stable IDs and validates citations against c
     }),
     /Invalid AI ask citation/,
   );
+});
+
+test("AI ask parser rejects independent statistical results without authoritative metadataCount", () => {
+  assert.throws(() => parseAiAskResponse({
+    status: "statistical_answer",
+    answer: "",
+    retrievalStatus: "available",
+    generationStatus: "not_run",
+    elapsedMs: 4,
+    statisticalResult: {
+      metric: "table_count",
+      value: 118,
+      filters: [
+        { dimension: "domain", value: "国业", displayName: "主题域" },
+        { dimension: "layer", value: "DM", displayName: "数据分层" },
+      ],
+      source: "dap_catalog",
+      complete: true,
+      sourceLink: "/data-warehouse?domain=%E5%9B%BD%E4%B8%9A&layer=DM",
+    },
+  }), /statisticalResult is a presentation adapter/);
+});
+
+test("AI ask parser adapts the authoritative metadata count contract and keeps it separate from RAG", () => {
+  const parsed = parseAiAskResponse(validMetadataCountResponse);
+  assert.equal(parsed.status, "metadata_count_answered");
+  assert.equal(parsed.metadataCount?.value, 73);
+  assert.equal(parsed.metadataCount?.filters.domain?.matchedAs, "catalog_value");
+  assert.equal(parsed.metadataCount?.filters.layer?.inferred, true);
+  assert.equal(parsed.statisticalResult?.value, 73);
+  assert.deepEqual(parsed.statisticalResult?.filters, [
+    { dimension: "domain", value: "合成主题域", displayName: "主题域" },
+    { dimension: "layer", value: "数据集市层", displayName: "数据分层" },
+  ]);
+  assert.equal(parsed.retrievalStatus, "not_run");
+  assert.equal(parsed.generationStatus, "not_run");
+  assert.deepEqual(parsed.candidates, []);
+  assert.deepEqual(parsed.citations, []);
+
+  assert.throws(() => parseAiAskResponse({
+    ...validMetadataCountResponse,
+    metadataCount: { ...validMetadataCountResponse.metadataCount, sourceLink: "https://example.com/data-warehouse" },
+  }), /Invalid AI metadata count evidence/);
+  assert.throws(() => parseAiAskResponse({
+    ...validMetadataCountResponse,
+    metadataCount: { ...validMetadataCountResponse.metadataCount, complete: false },
+  }), /Invalid AI metadata count evidence/);
+  assert.throws(() => parseAiAskResponse({
+    ...validMetadataCountResponse,
+    statisticalResult: { metric: "table_count", value: 0, filters: [], source: "dap_catalog", complete: true },
+  }), /statisticalResult is a presentation adapter/);
+});
+
+test("unresolved metadata count statuses remain failures without numeric evidence", () => {
+  for (const status of ["ambiguous_scope", "metadata_count_unavailable"] as const) {
+    const parsed = parseAiAskResponse({
+      ...validMetadataCountResponse,
+      status,
+      answer: "未返回统计数。",
+      metadataCount: undefined,
+      reasonCode: status,
+    });
+    assert.equal(parsed.status, status);
+    assert.equal(parsed.metadataCount, null);
+    assert.equal(parsed.statisticalResult, undefined);
+    assert.deepEqual(parsed.candidates, []);
+    assert.deepEqual(parsed.citations, []);
+  }
+  assert.throws(() => parseAiAskResponse({
+    ...validMetadataCountResponse,
+    status: "ambiguous_scope",
+  }), /Unresolved metadata count/);
 });
 
 test("AI ask parser rejects malformed field parent identity, source and duplicate citations", () => {
@@ -164,6 +270,7 @@ test("metadata count response preserves exact zero/count evidence and a same-fil
     elapsedMs: 3,
   });
   assert.equal(countResponse.metadataCount?.value, 0);
+  assert.equal(countResponse.statisticalResult?.value, 0);
   assert.equal(countResponse.metadataCount?.filters.layer?.code, "DM");
   assert.equal(countResponse.generationStatus, "not_run");
 

@@ -3,28 +3,19 @@ import { MANUAL_CODE_TABLE_STYLES } from "../../hooks/useManualCodeTableModule.t
 import { SidebarActionGroup } from "./common/SidebarActionGroup.tsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.tsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.tsx";
-import { getManualCodeTableFacetCounts } from "./manualCodeTableFacets.ts";
 
 export interface ManualCodeTableSidebarProps {
   module: UseManualCodeTableModuleResult;
-  query: string;
   canEdit: boolean;
   canExport: boolean;
 }
 
 export function ManualCodeTableSidebar({
   module,
-  query,
   canEdit,
   canExport,
 }: ManualCodeTableSidebarProps) {
-  const facets = getManualCodeTableFacetCounts(
-    module.items,
-    MANUAL_CODE_TABLE_STYLES,
-    query,
-    module.styleFilter,
-    module.statusFilter,
-  );
+  const facets = module.facets;
   return (
     <>
       <SidebarFilterGroup

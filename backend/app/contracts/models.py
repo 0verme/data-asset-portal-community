@@ -475,6 +475,8 @@ class SystemResponse(ContractModel):
     data: Any = None
     items: list[Any] | None = None
     total: int | None = None
+    page: int | None = None
+    pageSize: int | None = None
 
 
 class UpstreamSystemItem(ContractModel):
