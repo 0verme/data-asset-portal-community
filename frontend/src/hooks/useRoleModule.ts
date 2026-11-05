@@ -189,7 +189,7 @@ export function useRoleModule({
     return () => {
       requestSeq.current += 1;
     };
-  }, [active, load, page, paged, query]);
+  }, [active, load, page, pageSize, paged, query]);
 
   const openNew = React.useCallback((): void => {
     requireLogin(() => {

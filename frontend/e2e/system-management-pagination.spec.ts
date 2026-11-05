@@ -267,6 +267,24 @@ test('status mutations reload the current server query and page', async ({ page 
   expect(latestParameterRequest?.page).toBe('1');
 });
 
+test('role page-size changes fetch the matching server page size', async ({ page }) => {
+  const api = await installFixtures(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/system-management/roles');
+  const rows = page.locator('table.dt tbody tr');
+  const pager = page.getByRole('navigation', { name: '角色管理分页', exact: true });
+  await expect(rows).toHaveCount(20, { timeout: 20_000 });
+
+  const pageSize = pager.getByRole('combobox', { name: '每页条数', exact: true });
+  await pageSize.click();
+  await page.getByRole('option', { name: '50', exact: true }).click();
+  await expect.poll(() => api.requests.filter((request) => request.path === '/system/roles/page').at(-1)?.pageSize)
+    .toBe('50');
+  await expect(rows).toHaveCount(23);
+  await expect(pageSize).toContainText('50');
+  await expect(pager).toContainText('1 / 1');
+});
+
 test('role deletion refreshes the current server query and page', async ({ page }) => {
   const api = await installFixtures(page);
   let mutationPath = '';

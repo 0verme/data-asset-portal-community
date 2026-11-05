@@ -63,6 +63,7 @@ test("role deletion refreshes state, reports success, and preserves backend erro
   assert.match(hook, /const requestedQuery = queryRef\.current/);
   assert.match(hook, /const requestedPage = pageRef\.current/);
   assert.match(hook, /const requestedPageSize = pageSizeRef\.current/);
+  assert.match(hook, /\[active, load, page, pageSize, paged, query\]/);
   assert.match(hook, /await load\(\)/);
   assert.match(hook, /toast\.success\(`角色/);
   assert.match(hook, /toast\.error\(getErrorMessage\(nextError/);
