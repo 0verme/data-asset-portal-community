@@ -74,7 +74,7 @@ def _register_root_routes(app: FastAPI, service: Any) -> None:
             content=validate_contract({"items": items}, RootListResponse)
         )
 
-    @router.get("/page", response_model=None)
+    @router.get("/_page", response_model=None)
     def get_root_page(
         keyword: str | None = Query(default=None),
         cat: str | None = Query(default=None),
@@ -93,7 +93,7 @@ def _register_root_routes(app: FastAPI, service: Any) -> None:
         payload["items"] = project_for_request(payload["items"], context, authorization)
         return JSONResponse(content=validate_contract(payload, RootListResponse))
 
-    @router.get("/abbreviations", response_model=None)
+    @router.get("/_abbreviations", response_model=None)
     def get_root_abbreviations(
         current_service: Any = Depends(get_service),
         context: RequestContext = Depends(get_request_context),

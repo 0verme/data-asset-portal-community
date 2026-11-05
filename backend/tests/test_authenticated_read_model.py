@@ -23,8 +23,8 @@ PUBLIC_READS = (
     "/api/field-mappings/fields",
     "/api/system/menus",
     "/api/roots",
-    "/api/roots/page?page=1&pageSize=20",
-    "/api/roots/abbreviations",
+    "/api/roots/_page?page=1&pageSize=20",
+    "/api/roots/_abbreviations",
     "/api/reports",
     "/api/api-assets",
     "/api/api-assets/page?page=1&pageSize=20",
@@ -142,6 +142,32 @@ class PublicCatalogApiTests(unittest.TestCase):
         self.manual_code_table.get_tables.assert_called_once()
         self.upstream.get_systems.assert_called_once()
         self.push.get_push_systems.assert_called_once()
+
+    def test_root_page_routes_do_not_shadow_valid_abbreviations(self):
+        self.root.get_root_detail.side_effect = lambda abbr: {
+            "abbr": abbr, "en": abbr, "cn": abbr, "cat": "业务", "desc": "",
+        }
+        self.root.get_roots_page.return_value = {
+            "items": [
+                {"abbr": "page", "en": "Page", "cn": "分页", "cat": "业务", "desc": ""},
+                {"abbr": "abbreviations", "en": "Abbreviations", "cn": "缩写", "cat": "业务", "desc": ""},
+            ],
+            "total": 2, "page": 1, "pageSize": 20, "stats": {"total": 2},
+        }
+        self.root.get_root_abbreviations.return_value = ["abbreviations", "page"]
+
+        for abbr in ("page", "abbreviations"):
+            with self.subTest(abbr=abbr):
+                detail = self.client.get(f"/api/roots/{abbr}")
+                self.assertEqual(200, detail.status_code, detail.text)
+                self.assertEqual(abbr, detail.json()["data"]["abbr"])
+
+        page = self.client.get("/api/roots/_page?page=1&pageSize=20")
+        self.assertEqual(200, page.status_code, page.text)
+        self.assertEqual(["page", "abbreviations"], [item["abbr"] for item in page.json()["items"]])
+        abbreviations = self.client.get("/api/roots/_abbreviations")
+        self.assertEqual(200, abbreviations.status_code, abbreviations.text)
+        self.assertEqual(["abbreviations", "page"], abbreviations.json()["items"])
 
     def test_anonymous_navigation_is_public_but_management_menu_is_filtered(self):
         response = self.client.get("/api/system/menus")

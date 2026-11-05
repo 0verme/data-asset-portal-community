@@ -167,7 +167,7 @@ async function installRemoteApiFixtures(page: Page, options: { apiAssetPageSizeL
       await route.fulfill({ status: item ? 200 : 404, json: item ? { data: item } : { error: { message: 'Fixture API asset not found' } } });
       return;
     }
-    if (path === '/api/roots/page' && request.method() === 'GET') {
+    if (path === '/api/roots/_page' && request.method() === 'GET') {
       requests.push(url);
       const category = url.searchParams.get('cat');
       const keyword = (url.searchParams.get('keyword') || '').trim().toLowerCase();
@@ -181,7 +181,7 @@ async function installRemoteApiFixtures(page: Page, options: { apiAssetPageSizeL
       await route.fulfill({ json: { items: [{ name: '业务对象', count: roots.length }] } });
       return;
     }
-    if (path === '/api/roots/abbreviations') {
+    if (path === '/api/roots/_abbreviations') {
       await route.fulfill({ json: { items: roots.map((item) => item.abbr) } });
       return;
     }
@@ -303,11 +303,13 @@ test('root library pages table rows while keeping complete abbreviations and imp
   const pager = page.locator('.dap-table-pagination[aria-label="词根列表分页"]');
   await expect(pager.locator('.dap-table-pagination__page-index')).toHaveText('1 / 2');
   await expect(page.locator('.root-page table.dt tbody tr')).toHaveCount(20);
+  const rootSidebar = page.locator('.side-group').filter({ has: page.locator('.side-title', { hasText: '词根分类' }) });
+  await expect(rootSidebar.locator('.side-item').first().locator('.count')).toHaveText('23');
   await page.getByRole('button', { name: '下一页' }).click();
   await expect(pager.locator('.dap-table-pagination__page-index')).toHaveText('2 / 2');
   const lastRow = page.locator('.root-page table.dt tbody tr').filter({ hasText: 'root023' });
   await expect(lastRow).toBeVisible();
-  await expect.poll(() => fixture.requests.some((url) => url.pathname === '/api/roots/page' && url.searchParams.get('page') === '2')).toBe(true);
+  await expect.poll(() => fixture.requests.some((url) => url.pathname === '/api/roots/_page' && url.searchParams.get('page') === '2')).toBe(true);
   await lastRow.click();
   await expect(page.getByRole('heading', { name: '编辑词根' })).toBeVisible();
   await expect.poll(() => fixture.details.includes('root023')).toBe(true);

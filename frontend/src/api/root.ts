@@ -145,7 +145,7 @@ export async function getRootPage(params: RootPageParams = {}): Promise<RootPage
   const pageSize = Math.max(1, Number(params.pageSize) || 20);
   const requestedPage = Math.max(1, Number(params.page) || 1);
   if (API_MODE === 'remote') {
-    const payload = await requestRemote<unknown>('/roots/page', {
+    const payload = await requestRemote<unknown>('/roots/_page', {
       params: { keyword: params.keyword, cat: params.cat, page: requestedPage, pageSize },
     });
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('词根分页接口返回格式无效');
@@ -182,7 +182,7 @@ export async function getRootPage(params: RootPageParams = {}): Promise<RootPage
 
 export async function getRootAbbreviations(): Promise<string[]> {
   if (API_MODE === 'remote') {
-    return normalizeCollection<unknown>(await requestRemote('/roots/abbreviations'))
+    return normalizeCollection<unknown>(await requestRemote('/roots/_abbreviations'))
       .map((item) => String(item || '').trim()).filter(Boolean);
   }
   return sanitizeRoots(readStore()).map((item) => item.abbr).sort((left, right) => left.localeCompare(right));
