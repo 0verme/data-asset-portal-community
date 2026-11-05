@@ -8,7 +8,8 @@ from fastapi import FastAPI  # pyright: ignore[reportAttributeAccessIssue]
 
 from ..authorization.core import AuthorizationService
 from ..core.capabilities import resolve_capabilities
-from ..services.ai_ask_service import ai_ask_service
+from ..services.ai_ask_service import AIAskService, ai_ask_service
+from ..services.ai_ask_execution_service import AIAskExecutionService
 from ..services.api_asset_service import api_asset_service
 from ..services.assets_service import assets_service
 from ..services.auth_service import auth_service
@@ -67,6 +68,7 @@ def create_fastapi_app(
     search_hot_keyword_service_instance: Any | None = None,
     rag_search_service_instance: Any | None = None,
     ai_ask_service_instance: Any | None = None,
+    ai_ask_execution_service_instance: Any | None = None,
     indicator_service_instance: Any | None = None,
     indicator_path_service_instance: Any | None = None,
     assets_service_instance: Any | None = None,
@@ -135,6 +137,9 @@ def create_fastapi_app(
     indicator = indicator_service_instance or indicator_service
     indicator_paths = indicator_path_service_instance or indicator_path_service
     assets = assets_service_instance or assets_service
+    ai_ask_execution = ai_ask_execution_service_instance
+    if ai_ask_execution is None and isinstance(ai_ask, AIAskService):
+        ai_ask_execution = AIAskExecutionService(ai_ask, assets)
     field_mapping = field_mapping_service_instance or field_mapping_service
     root = root_service_instance or root_service
     manual_code_table = manual_code_table_service_instance or manual_code_table_service
@@ -163,7 +168,7 @@ def create_fastapi_app(
         hot_keywords,
         rag_recommendations,
     )
-    _register_ai_ask_routes(app, ai_ask)
+    _register_ai_ask_routes(app, ai_ask, ai_ask_execution)
     # Every router shipped in this repository is part of the default runtime.
     # External dependencies report their own diagnostic errors at request time;
     # they do not turn an existing source module into a 404.

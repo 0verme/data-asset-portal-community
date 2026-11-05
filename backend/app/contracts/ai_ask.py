@@ -26,6 +26,7 @@ AiAskReason = Literal[
     "retrieval_disabled",
     "retrieval_timeout",
     "retrieval_unavailable",
+    "asset_verification_unavailable",
     "retrieval_degraded_without_evidence",
     "partial_results",
     "insufficient_evidence",

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import threading
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 from pydantic import ValidationError
@@ -102,6 +102,7 @@ class RagSearchHttpClient:
         timeout_ms: int,
         json_body: dict[str, Any] | None = None,
         cancel_event: threading.Event | None = None,
+        on_request_start: Callable[[], None] | None = None,
     ) -> bytes:
         if not token:
             raise RagHttpClientError("service_unavailable")
@@ -145,6 +146,8 @@ class RagSearchHttpClient:
                     json=json_body,
                     timeout=max(0.001, timeout_ms / 1000),
                 )
+                if on_request_start is not None:
+                    on_request_start()
                 response = self._client.send(
                     request,
                     stream=True,
@@ -189,6 +192,7 @@ class RagSearchHttpClient:
         token: str,
         query: str,
         cancel_event: threading.Event | None = None,
+        on_request_start: Callable[[], None] | None = None,
     ) -> RagHttpSearchResponse:
         try:
             request = RagHttpSearchRequest(
@@ -204,6 +208,7 @@ class RagSearchHttpClient:
             timeout_ms=config.timeout_ms,
             json_body=request.model_dump(by_alias=True),
             cancel_event=cancel_event,
+            on_request_start=on_request_start,
         )
         body = self._decode_json(content)
         try:
