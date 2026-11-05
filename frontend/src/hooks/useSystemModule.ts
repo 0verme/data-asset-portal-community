@@ -239,6 +239,8 @@ export function useSystemModule({
   const pageRequestSeq = React.useRef(0);
   const previousQueryRef = React.useRef(query.trim());
   const queryRef = React.useRef(query);
+  const itemPageRef = React.useRef(itemPage);
+  const itemPageSizeRef = React.useRef(itemPageSize);
   const userPageRef = React.useRef(userPage);
   const userPageSizeRef = React.useRef(userPageSize);
   const menuPageRef = React.useRef(menuPage);
@@ -327,9 +329,13 @@ export function useSystemModule({
   const loadItems = React.useCallback(async (
     categoryCode: string,
     parentRequestSeq = pageRequestSeq.current,
+    params: { keyword?: string; page?: number; pageSize?: number } = {},
   ): Promise<void> => {
+    const keyword = params.keyword ?? query;
+    const requestedPage = params.page ?? itemPage;
+    const requestedPageSize = params.pageSize ?? itemPageSize;
     const requestSeq = ++itemsRequestSeq.current;
-    const requestKey = `${categoryCode}|${query.trim()}|${itemPage}|${itemPageSize}`;
+    const requestKey = `${categoryCode}|${keyword.trim()}|${requestedPage}|${requestedPageSize}`;
     if (parentRequestSeq !== pageRequestSeq.current || requestSeq !== itemsRequestSeq.current) return;
     if (!categoryCode) {
       setItems([]);
@@ -341,17 +347,17 @@ export function useSystemModule({
     itemsLoadingKeyRef.current = requestKey;
     try {
       const result = await getParamDictPage(categoryCode, {
-        keyword: query,
-        page: itemPage,
-        pageSize: itemPageSize,
+        keyword,
+        page: requestedPage,
+        pageSize: requestedPageSize,
       });
       if (requestSeq !== itemsRequestSeq.current || parentRequestSeq !== pageRequestSeq.current) return;
       setItems(result.items);
       setItemsTotal(result.total);
       const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
-      const resolvedPage = Math.min(itemPage, lastPage);
-      if (resolvedPage !== itemPage) setItemPage(resolvedPage);
-      if (result.pageSize !== itemPageSize) setItemPageSize(result.pageSize);
+      const resolvedPage = Math.min(requestedPage, lastPage);
+      if (resolvedPage !== requestedPage) setItemPage(resolvedPage);
+      if (result.pageSize !== requestedPageSize) setItemPageSize(result.pageSize);
       loadedItemsKeyRef.current = requestKey;
     } finally {
       if (requestSeq === itemsRequestSeq.current) itemsLoadingKeyRef.current = '';
@@ -359,12 +365,17 @@ export function useSystemModule({
   }, [itemPage, itemPageSize, query]);
 
   const reloadCurrentItems = React.useCallback(async (): Promise<void> => {
-    if (!selectedCategoryCode) {
+    const categoryCode = selectedCategoryCodeRef.current;
+    if (!categoryCode) {
       setItems([]);
       return;
     }
-    await loadItems(selectedCategoryCode);
-  }, [loadItems, selectedCategoryCode]);
+    await loadItems(categoryCode, pageRequestSeq.current, {
+      keyword: queryRef.current,
+      page: itemPageRef.current,
+      pageSize: itemPageSizeRef.current,
+    });
+  }, [loadItems]);
 
   const loadAll = React.useCallback(async (): Promise<void> => {
     const requestSeq = ++pageRequestSeq.current;
@@ -395,11 +406,13 @@ export function useSystemModule({
 
   React.useEffect(() => {
     queryRef.current = query;
+    itemPageRef.current = itemPage;
+    itemPageSizeRef.current = itemPageSize;
     userPageRef.current = userPage;
     userPageSizeRef.current = userPageSize;
     menuPageRef.current = menuPage;
     menuPageSizeRef.current = menuPageSize;
-  }, [menuPage, menuPageSize, query, userPage, userPageSize]);
+  }, [itemPage, itemPageSize, menuPage, menuPageSize, query, userPage, userPageSize]);
 
   React.useEffect(() => {
     const nextQuery = query.trim();

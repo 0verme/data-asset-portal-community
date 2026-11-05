@@ -28,7 +28,8 @@ test("system management loads active server-paged subroutes and rejects supersed
   assert.match(source, /const loadCategories = React\.useCallback\(async \(parentRequestSeq = pageRequestSeq\.current\)[\s\S]*?const nextCategories = await getParamDictCategories\(\);\s*if \(parentRequestSeq !== pageRequestSeq\.current\) return selectedCategoryCodeRef\.current;\s*setCategories\(nextCategories\)/);
   assert.match(source, /const result = await getParamDictPage\(categoryCode,\s*\{[\s\S]*?if \(requestSeq !== itemsRequestSeq\.current \|\| parentRequestSeq !== pageRequestSeq\.current\) return/);
   assert.match(source, /const categoryCode = await loadCategories\(requestSeq\);[\s\S]*?if \(requestSeq !== pageRequestSeq\.current\) return;[\s\S]*?await loadItems\(categoryCode, requestSeq\)/);
-  assert.match(source, /const requestKey = `\$\{categoryCode\}\|\$\{query\.trim\(\)\}\|\$\{itemPage\}\|\$\{itemPageSize\}`/);
+  assert.match(source, /const requestKey = `\$\{categoryCode\}\|\$\{keyword\.trim\(\)\}\|\$\{requestedPage\}\|\$\{requestedPageSize\}`/);
+  assert.match(source, /const reloadCurrentItems = React\.useCallback\(async \(\): Promise<void> => \{\s*const categoryCode = selectedCategoryCodeRef\.current;[\s\S]*?keyword: queryRef\.current,[\s\S]*?page: itemPageRef\.current,[\s\S]*?pageSize: itemPageSizeRef\.current/);
   assert.match(source, /currentPage !== "param-dicts" \|\| !selectedCategoryCode/);
   assert.match(source, /setUserPage\(1\)/);
   assert.match(source, /setMenuPage\(1\)/);

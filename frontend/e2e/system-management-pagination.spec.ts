@@ -208,7 +208,10 @@ test('status mutations reload the current server query and page', async ({ page 
   await userMutation.started;
   await page.locator('.search-input').fill('Tail User');
   await expect(rows).toHaveCount(1);
+  const userRequestCount = api.requests.filter((request) => request.path === '/system/users/page').length;
   await userMutation.release();
+  await expect.poll(() => api.requests.filter((request) => request.path === '/system/users/page').length)
+    .toBeGreaterThan(userRequestCount);
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('Tail User');
   await expect(userPager).toContainText('1 / 1');
@@ -228,7 +231,10 @@ test('status mutations reload the current server query and page', async ({ page 
   await menuMutation.started;
   await page.locator('.search-input').fill('Tail Menu');
   await expect(rows).toHaveCount(1);
+  const menuRequestCount = api.requests.filter((request) => request.path === '/system/menus/page').length;
   await menuMutation.release();
+  await expect.poll(() => api.requests.filter((request) => request.path === '/system/menus/page').length)
+    .toBeGreaterThan(menuRequestCount);
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('Tail Menu');
   await expect(menuPager).toContainText('1 / 1');
@@ -236,6 +242,29 @@ test('status mutations reload the current server query and page', async ({ page 
   const latestMenuRequest = api.requests.filter((request) => request.path === '/system/menus/page').at(-1);
   expect(latestMenuRequest?.keyword).toBe('tail menu');
   expect(latestMenuRequest?.page).toBe('1');
+
+  await page.goto('/system-management/param-dicts');
+  await expect(rows).toHaveCount(20, { timeout: 20_000 });
+  const parameterPager = page.getByRole('navigation', { name: '参数字典明细分页', exact: true });
+  await parameterPager.getByRole('button', { name: '下一页' }).click();
+  await expect(rows).toHaveCount(3);
+  const parameterMutation = armMutation('/api/system/param-dicts/1021/status', { ...parameter(21), status: 'disabled' });
+  await rows.filter({ hasText: 'ITEM_21' }).getByRole('button', { name: '禁用', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '禁用', exact: true }).click();
+  await parameterMutation.started;
+  await page.locator('.search-input').fill('Tail Parameter');
+  await expect(rows).toHaveCount(1);
+  const parameterRequestCount = api.requests.filter((request) => request.path === '/system/param-dicts/page').length;
+  await parameterMutation.release();
+  await expect.poll(() => api.requests.filter((request) => request.path === '/system/param-dicts/page').length)
+    .toBeGreaterThan(parameterRequestCount);
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Tail Parameter');
+  await expect(parameterPager).toContainText('1 / 1');
+  await expect(parameterPager).toContainText('共 1 条');
+  const latestParameterRequest = api.requests.filter((request) => request.path === '/system/param-dicts/page').at(-1);
+  expect(latestParameterRequest?.keyword).toBe('tail parameter');
+  expect(latestParameterRequest?.page).toBe('1');
 });
 
 test('system pagination footers stay in a narrow viewport without clipping', async ({ page }) => {
