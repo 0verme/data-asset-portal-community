@@ -169,6 +169,73 @@ class RagSearchServiceTests(unittest.TestCase):
         self.assertNotIn("private signing secret", response.model_dump_json())
         self.assertNotIn("Bearer private auth token", response.model_dump_json())
 
+    def test_execution_observer_reports_only_actual_request_and_authorized_hit_evidence(self):
+        sequence = []
+
+        def handler(request):
+            sequence.append("http_request")
+            return self._search_response([{
+                "entityType": "field",
+                "assetId": 1,
+                "fieldId": 10,
+                "name": "UNTRUSTED_FIELD_NAME",
+                "retrievalChannels": ["vector"],
+                "score": 0.999,
+                "evidence": [{
+                    "channel": "bm25", "rank": 1, "rawScore": 7.3,
+                    "matchedTerms": ["客户编号", "索引真实命中词"],
+                }],
+            }])
+
+        service, _assets = self._service(handler)
+        observations = []
+        response = service.recommend(
+            "客户编号",
+            profile="strict",
+            search_id="search-123",
+            execution_callback=lambda event, data: (sequence.append(event), observations.append((event, data))),
+        )
+
+        self.assertEqual("available", response.status)
+        self.assertEqual(["start", "http_request", "complete"], sequence)
+        self.assertEqual(["start", "complete"], [event for event, _data in observations])
+        started = observations[0][1]
+        completed = observations[1][1]
+        self.assertEqual("search-123", started["searchId"])
+        self.assertEqual(1, started["requestCount"])
+        self.assertEqual("hybrid", completed["effectiveMode"])
+        self.assertEqual(["vector", "bm25"], completed["channelsUsed"])
+        self.assertEqual(1, completed["resultCount"])
+        self.assertEqual(1, completed["verifiedCount"])
+        self.assertEqual("客户编号", completed["hits"][0]["name"])
+        self.assertNotIn("UNTRUSTED_FIELD_NAME", json.dumps(completed, ensure_ascii=False))
+        self.assertEqual(["客户编号", "索引真实命中词"], completed["hits"][0]["matchedTerms"])
+        serialized = json.dumps(completed, ensure_ascii=False)
+        self.assertNotIn("UNTRUSTED_FIELD_NAME", serialized)
+        self.assertNotIn("0.999", serialized)
+        self.assertNotIn("7.3", serialized)
+
+    def test_execution_observer_does_not_count_a_request_rejected_before_http_send(self):
+        client = RagSearchHttpClient(
+            client=httpx.Client(transport=httpx.MockTransport(lambda _request: httpx.Response(200))),
+            max_concurrent_requests=0,
+        )
+        assets = MagicMock()
+        assets.get_asset_tables.return_value = self.catalog
+        service = RagSearchService(assets, lambda: self.config, lambda: "test-token", http_client=client)
+        observations = []
+
+        response = service.recommend(
+            "客户",
+            profile="strict",
+            search_id="not-sent",
+            execution_callback=lambda event, data: observations.append((event, data)),
+        )
+
+        self.assertEqual("busy", response.reason_code)
+        self.assertEqual([], observations)
+        assets.get_asset_tables.assert_not_called()
+
     def test_per_request_top_k_can_narrow_but_not_expand_admin_limit(self):
         request_limits = []
 

@@ -65,7 +65,7 @@ class AiAskApiTests(unittest.TestCase):
         self.addCleanup(self.environment.stop)
         self.identity = Identity("test-user", "admin", "测试管理员")
 
-    def _client(self, *, service=None, identity=_DEFAULT_IDENTITY, search=None, rag=None, authorization=None):
+    def _client(self, *, service=None, execution=None, identity=_DEFAULT_IDENTITY, search=None, rag=None, authorization=None):
         search_provider = search or MagicMock()
         search_provider.search.return_value = {
             "query": "legacy", "scope": "all", "groups": [], "total": 0,
@@ -74,6 +74,7 @@ class AiAskApiTests(unittest.TestCase):
             capabilities=resolve_capabilities(),
             identity_resolver=lambda _request: self.identity if identity is _DEFAULT_IDENTITY else identity,
             ai_ask_service_instance=service or StubAIAskService(),
+            ai_ask_execution_service_instance=execution,
             search_provider_instance=search_provider,
             rag_search_service_instance=rag or MagicMock(),
             authorization_service_instance=authorization or AuthorizationService(),
@@ -162,7 +163,53 @@ class AiAskApiTests(unittest.TestCase):
         search.search.assert_called_once_with("legacy", scope="all", limit="5", profile="internal")
         self.assertIn("/api/ai/ask", schema["paths"])
         self.assertIn("/api/ai/ask/progress", schema["paths"])
+        self.assertIn("/api/ai/ask/stream", schema["paths"])
         self.assertIn("/api/ai/status", schema["paths"])
+
+    def test_execution_stream_emits_real_steps_answer_and_terminal_status_with_request_id(self):
+        service = StubAIAskService()
+
+        class StubExecutionService:
+            def __init__(self):
+                self.calls = []
+
+            def ask(self, payload, *, profile, request_id, event_callback, cancel_event=None):
+                self.calls.append((payload, profile, request_id))
+                event_callback("step_start", {
+                    "request_id": request_id,
+                    "step_id": "planning",
+                    "timestamp": "2026-01-01T00:00:00.000Z",
+                    "message": "正在分析合成问题。",
+                    "data": {"query": payload.query},
+                })
+                event_callback("step_complete", {
+                    "request_id": request_id,
+                    "step_id": "planning",
+                    "timestamp": "2026-01-01T00:00:00.001Z",
+                    "message": "已完成查询规划。",
+                    "data": {"planningMode": "structured_llm", "queries": [payload.query]},
+                })
+                return service.response
+
+        execution = StubExecutionService()
+        client, _search = self._client(service=service, execution=execution)
+
+        response = client.post("/api/ai/ask/stream", json={"query": "合成目录问题"})
+
+        self.assertEqual(200, response.status_code)
+        self.assertIn("text/event-stream", response.headers["content-type"])
+        self.assertIn("event: step_start\n", response.text)
+        self.assertIn("event: step_complete\n", response.text)
+        self.assertIn("event: answer\n", response.text)
+        self.assertIn("event: done\n", response.text)
+        self.assertIn('"status":"completed"', response.text)
+        self.assertIn("发现已校验的目录候选。", response.text)
+        self.assertNotIn("apiKey", response.text)
+        self.assertNotIn("token", response.text.lower())
+        self.assertEqual(1, len(execution.calls))
+        self.assertEqual("internal", execution.calls[0][1])
+        self.assertEqual(32, len(execution.calls[0][2]))
+        self.assertEqual(execution.calls[0][2], response.text.split('"request_id":"', 1)[1][:32])
 
     def test_progress_endpoint_emits_safe_sse_and_keeps_existing_json_api(self):
         service = StubAIAskService()

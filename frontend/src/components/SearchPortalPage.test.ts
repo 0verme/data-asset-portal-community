@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 
 const searchPagePath = fileURLToPath(new URL("./SearchPortalPage.tsx", import.meta.url));
 const searchStylesPath = fileURLToPath(new URL("../styles/search.css", import.meta.url));
+const executionPanelPath = fileURLToPath(new URL("./AiAskExecutionPanel.tsx", import.meta.url));
+const executionStylesPath = fileURLToPath(new URL("../styles/aiAskExecution.css", import.meta.url));
+const executionApiPath = fileURLToPath(new URL("../api/aiAskExecution.ts", import.meta.url));
 
 test("empty search results expose a clear action that preserves scope and focus", async () => {
   const [source, styles] = await Promise.all([
@@ -135,7 +138,7 @@ test("AI is explicitly enabled, Enter remains traditional search, and model requ
   assert.match(source, /\.catch\(\(\) => \{\s*if \(!cancelled\) setAiEnabled\(false\)/);
   assert.match(source, /if \(event\.key === "Enter"\) doSearch\(\)/);
   assert.match(source, /onClick=\{\(\) => runAiAsk\(query\)\}/);
-  assert.match(source, /askAiWithProgress\(\s*question/);
+  assert.match(source, /askAiWithExecution\(\s*question/);
   assert.match(source, /syncSearchUrl\(question, scope\)/);
   assert.match(source, /setAiQuery\(""\)/);
   assert.match(source, /if \(searchedTerm !== question\)[\s\S]*?setSearchedTerm\(""\)/);
@@ -172,29 +175,35 @@ test("AI answers remain explanatory while only DAP candidate cards navigate resp
   assert.doesNotMatch(api, /fetch\(.*AI_LLM|AI_LLM_BASE_URL/);
 });
 
-test("AI progress is backend-driven, collapsible, timed, count-backed, and never token-streamed", async () => {
-  const [source, styles] = await Promise.all([
+test("AI progress displays real SSE execution, search evidence, authoritative verification, and collapsible status", async () => {
+  const [source, panel, styles, api] = await Promise.all([
     readFile(searchPagePath, "utf8"),
-    readFile(searchStylesPath, "utf8"),
+    readFile(executionPanelPath, "utf8"),
+    readFile(executionStylesPath, "utf8"),
+    readFile(executionApiPath, "utf8"),
   ]);
 
-  assert.match(source, /<AiAskProgressPanel steps=\{progress\}/);
-  assert.match(source, /open=\{loading \|\| expanded\}/);
-  assert.match(source, /setExpanded\(loading\)/);
-  assert.match(source, /"正在分析问题"/);
-  assert.match(source, /"正在检索数据资产"/);
-  assert.match(source, /"已找到相关表和字段"/);
-  assert.match(source, /step\.tableCount/);
-  assert.match(source, /step\.fieldCount/);
-  assert.match(source, /formatAiAskElapsed\(step\.elapsedMs\)/);
-  assert.match(source, /"正在生成回答"/);
-  assert.match(source, /"回答完成"/);
-  assert.match(source, /response\.reasonCode === "llm_timeout"/);
-  assert.match(source, /errorCode: "cancelled"/);
-  assert.doesNotMatch(source, /setInterval\(/);
-  assert.doesNotMatch(source, /正在检索已登记资产并生成回答/);
-  assert.match(styles, /\.sp-ai-progress \{[^}]*background: var\(--surface\)/);
-  assert.match(styles, /\.sp-ai-progress-step-failed[\s\S]*?var\(--danger\)/);
+  assert.match(source, /askAiWithExecution\(/);
+  assert.match(source, /setAiExecutionEvents\(\(current\) => \[\.\.\.current, event\]\)/);
+  assert.match(panel, /open=\{expanded\}/);
+  assert.match(panel, /useState\(status === "running"\)/);
+  assert.match(panel, /setExpanded\(true\)/);
+  assert.match(panel, /touchedForRun\.current/);
+  assert.match(panel, /retrievalMode|effectiveMode/);
+  assert.match(panel, /channelsUsed/);
+  assert.match(panel, /matchedTerms/);
+  assert.match(panel, /verifiedTableCount/);
+  assert.match(panel, /dap_authoritative_metadata/);
+  assert.match(panel, /RRF/);
+  assert.match(panel, /取消问答/);
+  assert.match(api, /requestRemoteEventStream\("\/ai\/ask\/stream"/);
+  assert.match(api, /parseAiAskResponse\(data\["response"\]\)/);
+  assert.match(api, /event\.requestId !== requestId/);
+  assert.match(api, /AbortSignal/);
+  assert.doesNotMatch(api, /token|apiKey|baseUrl/i);
+  assert.doesNotMatch(api, /setInterval\(/);
+  assert.match(styles, /\.sp-ai-execution \{[^}]*background: var\(--surface\)/);
+  assert.match(styles, /\.sp-ai-execution-step-failed[\s\S]*?var\(--danger\)/);
 });
 
 test("RAG recommendations are a separate business group with asynchronous non-blocking state", async () => {

@@ -41,43 +41,80 @@ function answer(query: string) {
   };
 }
 
-function sseResponse(response: ReturnType<typeof answer> | Record<string, unknown>) {
+function sseResponse(response: ReturnType<typeof answer> | Record<string, unknown>, query: string) {
   const events: string[] = [];
-  const emit = (id: string, status: string, extra: Record<string, unknown> = {}) => {
-    events.push(`event: progress\ndata: ${JSON.stringify({ id, status, elapsedMs: status === "pending" || status === "running" ? 0 : 2, ...extra })}\n\n`);
+  const requestId = "0123456789abcdef0123456789abcdef";
+  const emit = (event: string, stepId: string, message: string, data: Record<string, unknown> = {}) => {
+    events.push(`event: ${event}\ndata: ${JSON.stringify({
+      request_id: requestId,
+      step_id: stepId,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      message,
+      data,
+    })}\n\n`);
   };
-  const stage = (id: string, extra: Record<string, unknown> = {}) => {
-    emit(id, "pending");
-    emit(id, "running");
-    emit(id, "completed", extra);
+  const stage = (stepId: string, message: string, data: Record<string, unknown> = {}) => {
+    emit("step_start", stepId, message, data);
+    emit("step_complete", stepId, message, data);
   };
-  stage("analyzing");
-  if (response.status === "retrieval_unavailable") {
-    emit("retrieving", "pending");
-    emit("retrieving", "running");
-    emit("retrieving", "failed", { errorCode: response.reasonCode === "retrieval_timeout" ? "timeout" : "unavailable" });
-  } else {
-    stage("retrieving");
-    const candidates = Array.isArray(response.candidates) ? response.candidates as Array<{ assetId: number; assetType: string; fieldId?: number | null }> : [];
-    const tableCount = new Set(candidates.map((item) => item.assetId)).size;
-    const fieldCount = new Set(candidates.filter((item) => item.assetType === "field" && item.fieldId).map((item) => `${item.assetId}:${item.fieldId}`)).size;
-    stage("counting", { tableCount, fieldCount });
-    stage("organizing");
-    if (response.generationStatus !== "not_run") {
-      if (response.status === "generation_unavailable") {
-        emit("generating", "pending");
-        emit("generating", "running");
-        emit("generating", "failed", { errorCode: response.reasonCode === "llm_timeout" ? "timeout" : "unavailable" });
-      } else stage("generating");
-    }
-    if (response.status === "answered" || response.status === "partial_answer" || response.status === "insufficient_evidence") stage("completed");
+  stage("planning", "已完成问题分析与查询规划。", {
+    originalQuery: query,
+    queryType: "natural_language",
+    keyConcepts: ["合成账户余额"],
+    queries: [query],
+    planningMode: "structured_llm",
+    fallbackReason: null,
+  });
+  const hasCandidates = Array.isArray(response.candidates) && response.candidates.length > 0;
+  stage("rag-round-1", "首轮检索结束。", { round: 1, queryCount: 1, requestCount: 1, resultCount: hasCandidates ? 1 : 0 });
+  const searchId = "0123456789abcdef";
+  const hit = hasCandidates ? {
+    rank: 1,
+    assetId: ASSET_ID,
+    fieldId: FIELD_ID,
+    entityType: "field",
+    name: longField,
+    retrievalChannels: ["vector", "bm25"],
+    matchedTerms: ["合成余额字段", "真实命中词"],
+  } : null;
+  emit("step_start", `search-${searchId}`, `检索：${query}`, {
+    searchId, query, round: 1, status: "running", requestCount: 1,
+    retrievalMode: "auto", startedAt: "2026-01-01T00:00:00.000Z",
+  });
+  emit("step_complete", `search-${searchId}`, `检索完成：${query}`, {
+    searchId, query, round: 1, requestCount: 1, resultCount: hasCandidates ? 1 : 0,
+    verifiedCount: hasCandidates ? 1 : 0, effectiveMode: "hybrid", requestedMode: "auto",
+    channelsUsed: hasCandidates ? ["vector", "bm25"] : [], hits: hit ? [hit] : [], status: "available",
+  });
+  stage("merge", "已按跨查询排名融合合并并去重候选。", {
+    requestCount: 1, retrievalRounds: 1, resultCount: hasCandidates ? 1 : 0,
+    deduplicatedCount: hasCandidates ? 1 : 0, selectedAssetIds: hasCandidates ? [ASSET_ID] : [],
+    fusionMethod: "reciprocal_rank_fusion",
+  });
+  if (hasCandidates) {
+    stage("verification", "权威资产明细核实完成。", {
+      verifiedTableCount: 1, verifiedFieldCount: 1, candidateCount: 1,
+      source: "dap_authoritative_metadata",
+    });
+    stage("asset-42", `已读取资产明细：${longName}`, {
+      assetId: ASSET_ID, tableName: longName, fieldCount: 1, source: "dap_authoritative_metadata",
+    });
+    stage("field-42-99", `已核实字段：${longField}`, {
+      assetId: ASSET_ID, fieldId: FIELD_ID, fieldName: longField,
+      tableName: longName, source: "dap_authoritative_metadata",
+    });
   }
-  events.push(`event: result\ndata: ${JSON.stringify(response)}\n\n`);
-  return {
-    status: 200,
-    contentType: "text/event-stream",
-    body: events.join(""),
-  };
+  if (response.generationStatus !== "not_run") {
+    stage("generating", response.generationStatus === "completed" ? "模型已基于已核实证据完成回答。" : "模型生成回答失败。", {
+      evidenceCount: hasCandidates ? 1 : 0,
+      errorCode: response.reasonCode === "llm_timeout" ? "llm_timeout" : undefined,
+    });
+  }
+  emit("answer", "answer", "已完成问答并返回可信证据。", { response });
+  emit("done", "done", "问答执行完成。", {
+    status: response.status === "answered" || response.status === "partial_answer" || response.status === "insufficient_evidence" ? "completed" : "failed",
+  });
+  return { status: 200, contentType: "text/event-stream", body: `: keep-alive\n\n${events.join("")}` };
 }
 
 async function mockPortalApis(page: Page, options: {
@@ -114,13 +151,13 @@ async function mockPortalApis(page: Page, options: {
       return json({ query: url.searchParams.get("q") || "", status: "disabled", recommendations: [], count: 0, elapsedMs: 0, reasonCode: "disabled" });
     }
     if (path === "/api/ai/status") return json({ enabled: aiEnabled });
-    if (path === "/api/ai/ask/progress") {
+    if (path === "/api/ai/ask/stream") {
       const payload = route.request().postDataJSON() as { query: string; scope: string; topK: number };
       asked.push(payload);
       if (options.delayFirstAsk && payload.query.includes("cancel-first")) {
         await new Promise((resolve) => setTimeout(resolve, 500));
         try {
-          return await route.fulfill(sseResponse(answer(payload.query)));
+          return await route.fulfill(sseResponse(answer(payload.query), payload.query));
         } catch {
           return;
         }
@@ -136,7 +173,7 @@ async function mockPortalApis(page: Page, options: {
           citations: [], candidates: [],
           retrievalStatus: "available", generationStatus: "not_run", resultsTruncated: false,
           reasonCode: "insufficient_evidence", elapsedMs: 3,
-        }));
+        }, payload.query));
       }
       if (payload.query.includes("timeout")) {
         return route.fulfill(sseResponse({
@@ -145,9 +182,9 @@ async function mockPortalApis(page: Page, options: {
           citations: [], candidates: [],
           retrievalStatus: "available", generationStatus: "unavailable", resultsTruncated: false,
           reasonCode: "llm_timeout", elapsedMs: 12000,
-        }));
+        }, payload.query));
       }
-      return route.fulfill(sseResponse(answer(payload.query)));
+      return route.fulfill(sseResponse(answer(payload.query), payload.query));
     }
     if (path === "/api/search") {
       const query = url.searchParams.get("q") || "";
@@ -219,11 +256,11 @@ test("Enter and Search stay deterministic; explicit AI preserves query and opens
   await page.getByRole("button", { name: "问 AI", exact: true }).click();
   await expect(page.getByLabel("AI 回答摘要")).toContainText(query);
   await expect(page.getByText("答案引用的目录资产", { exact: true })).toBeVisible();
-  const progress = page.locator(".sp-ai-progress");
+  const progress = page.locator(".sp-ai-execution");
   await expect(progress).not.toHaveAttribute("open", "");
-  await progress.locator("summary").click();
-  await expect(progress).toContainText("1 张表 · 1 个字段");
-  await expect(progress).toContainText("回答完成");
+  await progress.locator(":scope > summary").click();
+  await expect(progress).toContainText("已读取 1 张表，核实 1 个字段。");
+  await expect(progress).toContainText("已完成");
   expect(fixtures.asked[0]).toEqual({ query, scope: "all", topK: 10 });
   await expect(input).toHaveValue(query);
 
@@ -258,10 +295,10 @@ test("true zero-match offers AI with the existing query; no-evidence refusal is 
   await expect(page.getByRole("heading", { name: "没有找到精确匹配的资产" })).toBeVisible();
   await page.getByRole("button", { name: "问 AI 找资产" }).click();
   await expect(page.getByText("当前元数据不足以确认。", { exact: true })).toBeVisible();
-  const progress = page.locator(".sp-ai-progress");
-  await progress.locator("summary").click();
-  await expect(progress).toContainText("0 张表 · 0 个字段");
-  await expect(progress).not.toContainText("正在生成回答");
+  const progress = page.locator(".sp-ai-execution");
+  await progress.locator(":scope > summary").click();
+  await expect(progress).toContainText("跨查询去重后保留 0 个候选资产身份。");
+  await expect(progress).not.toContainText("模型已基于");
   expect(fixtures.asked[0]?.query).toBe(query);
   await expect(input).toHaveValue(query);
 });
@@ -283,7 +320,7 @@ test("model timeout is distinguished and transient ask errors can be retried", a
   await input.fill("timeout question");
   await page.getByRole("button", { name: "问 AI", exact: true }).click();
   await expect(page.getByText("模型生成超时，未生成回答", { exact: false })).toBeVisible();
-  await expect(page.getByText("timeout", { exact: false })).toHaveCount(0);
+  await expect(page.getByText("llm_timeout", { exact: false })).toHaveCount(0);
 
   await input.fill("retry candidate");
   await page.getByRole("button", { name: "问 AI", exact: true }).click();

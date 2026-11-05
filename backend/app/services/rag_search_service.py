@@ -12,6 +12,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, Callable
 
 from pydantic import ValidationError
@@ -34,6 +35,10 @@ _DIGITS = re.compile(r"[1-9][0-9]*\Z")
 class _CatalogSnapshot:
     tables: dict[int, dict[str, Any]]
     fields: dict[tuple[int, int], dict[str, Any]]
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 class RagSearchService:
@@ -89,6 +94,8 @@ class RagSearchService:
         profile: str,
         top_k: int | None = None,
         cancel_event: threading.Event | None = None,
+        search_id: str | None = None,
+        execution_callback: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> RagRecommendationsResponse:
         normalized_query = str(query or "").strip()
         started = time.monotonic()
@@ -135,6 +142,31 @@ class RagSearchService:
                 "service_auth_not_configured",
                 (time.monotonic() - started) * 1000,
             )
+        search_started = started
+        search_started_at = ""
+        search_was_sent = False
+
+        def report_execution(event: str, data: dict[str, Any]) -> None:
+            if execution_callback is None:
+                return
+            try:
+                execution_callback(event, {"searchId": search_id, **data})
+            except Exception:
+                # Execution reporting must not alter the search contract.
+                return
+
+        def on_http_request_start() -> None:
+            nonlocal search_started, search_started_at, search_was_sent
+            search_started = time.monotonic()
+            search_started_at = _utc_timestamp()
+            search_was_sent = True
+            report_execution("start", {
+                "query": normalized_query,
+                "startedAt": search_started_at,
+                "retrievalMode": config.strategy,
+                "requestCount": 1,
+            })
+
         try:
             search_options = (
                 {"cancel_event": cancel_event}
@@ -145,6 +177,7 @@ class RagSearchService:
                 config,
                 token=token,
                 query=normalized_query,
+                on_request_start=on_http_request_start,
                 **search_options,
             )
         except RagHttpClientError as error:
@@ -153,38 +186,111 @@ class RagSearchService:
                 if error.reason_code == "cancelled"
                 else error.reason_code
             )
-            return self._unavailable(
+            response = self._unavailable(
                 normalized_query, reason_code, (time.monotonic() - started) * 1000
             )
+            if search_was_sent:
+                finished_at = _utc_timestamp()
+                report_execution("complete", {
+                    "query": normalized_query,
+                    "startedAt": search_started_at,
+                    "finishedAt": finished_at,
+                    "durationMs": max(0.0, (time.monotonic() - search_started) * 1000),
+                    "retrievalMode": config.strategy,
+                    "requestedMode": None,
+                    "effectiveMode": None,
+                    "channelsUsed": [],
+                    "resultCount": 0,
+                    "verifiedCount": 0,
+                    "hits": [],
+                    "status": "unavailable",
+                    "errorCode": reason_code,
+                    "requestCount": 1,
+                })
+            return response
         except Exception:
             LOGGER.warning("RAG HTTP search failed without a safe error code")
-            return self._unavailable(
+            response = self._unavailable(
                 normalized_query,
                 "service_unavailable",
                 (time.monotonic() - started) * 1000,
             )
+            if search_was_sent:
+                finished_at = _utc_timestamp()
+                report_execution("complete", {
+                    "query": normalized_query,
+                    "startedAt": search_started_at,
+                    "finishedAt": finished_at,
+                    "durationMs": max(0.0, (time.monotonic() - search_started) * 1000),
+                    "retrievalMode": config.strategy,
+                    "requestedMode": None,
+                    "effectiveMode": None,
+                    "channelsUsed": [],
+                    "resultCount": 0,
+                    "verifiedCount": 0,
+                    "hits": [],
+                    "status": "unavailable",
+                    "errorCode": "service_unavailable",
+                    "requestCount": 1,
+                })
+            return response
 
         if cancel_event is not None and cancel_event.is_set():
-            return self._unavailable(
+            response = self._unavailable(
                 normalized_query,
                 "service_unavailable",
                 (time.monotonic() - started) * 1000,
             )
+            report_execution("complete", {
+                "query": normalized_query,
+                "startedAt": search_started_at,
+                "finishedAt": _utc_timestamp(),
+                "durationMs": max(0.0, (time.monotonic() - search_started) * 1000),
+                "retrievalMode": config.strategy,
+                "requestedMode": remote.retrieval.requested_mode,
+                "effectiveMode": remote.retrieval.effective_mode,
+                "channelsUsed": remote.retrieval.channels_used,
+                "resultCount": len(remote.results),
+                "verifiedCount": 0,
+                "hits": [],
+                "status": "unavailable",
+                "errorCode": "cancelled",
+                "requestCount": 1,
+            })
+            return response
 
         try:
             snapshot = self._snapshot(profile)
         except Exception:
             LOGGER.info("RAG candidate validation could not read the public catalog")
-            return self._unavailable(
+            response = self._unavailable(
                 normalized_query,
                 "visibility_unavailable",
                 (time.monotonic() - started) * 1000,
             )
+            report_execution("complete", {
+                "query": normalized_query,
+                "startedAt": search_started_at,
+                "finishedAt": _utc_timestamp(),
+                "durationMs": max(0.0, (time.monotonic() - search_started) * 1000),
+                "retrievalMode": config.strategy,
+                "requestedMode": remote.retrieval.requested_mode,
+                "effectiveMode": remote.retrieval.effective_mode,
+                "channelsUsed": remote.retrieval.channels_used,
+                "resultCount": len(remote.results),
+                "verifiedCount": 0,
+                "hits": [],
+                "status": "unavailable",
+                "errorCode": "visibility_unavailable",
+                "requestCount": 1,
+            })
+            return response
 
         recommendations: list[RagRecommendation] = []
+        execution_hits: list[dict[str, Any]] = []
         seen: set[tuple[str, int, int | None]] = set()
         rejected = False
-        for hit in remote.results:
+        for rank, hit in enumerate(remote.results, start=1):
             identity = self._resolve_hit(hit, snapshot)
             if identity is None:
                 rejected = True
@@ -208,6 +314,7 @@ class RagSearchService:
                         evidence=["已通过当前共享目录校验"],
                     )
                 )
+                item_name = item["displayName"] or item["name"]
             else:
                 item = snapshot.fields[(asset_id, int(field_id))]
                 parent = snapshot.tables[asset_id]
@@ -232,12 +339,26 @@ class RagSearchService:
                         evidence=["已通过当前共享目录校验"],
                     )
                 )
+                item_name = item["displayName"] or item["name"]
+            execution_hits.append({
+                "rank": rank,
+                "assetId": asset_id,
+                "fieldId": int(field_id) if field_id is not None else None,
+                "entityType": entity_type,
+                "name": item_name,
+                "retrievalChannels": list(hit.retrieval_channels),
+                "matchedTerms": list(dict.fromkeys(
+                    term
+                    for evidence in hit.evidence
+                    for term in evidence.matched_terms
+                ))[:8],
+            })
             if len(recommendations) >= config.top_k:
                 break
 
         reason_code = "visibility_unavailable" if rejected else None
         status = "degraded" if reason_code else "available"
-        return RagRecommendationsResponse(
+        response = RagRecommendationsResponse(
             query=normalized_query,
             status=status,
             recommendations=recommendations,
@@ -245,6 +366,24 @@ class RagSearchService:
             elapsedMs=(time.monotonic() - started) * 1000,
             reasonCode=reason_code,
         )
+        if search_was_sent:
+            report_execution("complete", {
+                "query": normalized_query,
+                "startedAt": search_started_at,
+                "finishedAt": _utc_timestamp(),
+                "durationMs": max(0.0, (time.monotonic() - search_started) * 1000),
+                "retrievalMode": config.strategy,
+                "requestedMode": remote.retrieval.requested_mode,
+                "effectiveMode": remote.retrieval.effective_mode,
+                "channelsUsed": list(remote.retrieval.channels_used),
+                "resultCount": len(remote.results),
+                "verifiedCount": len(recommendations),
+                "hits": execution_hits[:20],
+                "status": status,
+                "errorCode": reason_code,
+                "requestCount": 1,
+            })
+        return response
 
     @staticmethod
     def _parse_id(value: int | str | None) -> int | None:
