@@ -214,9 +214,14 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
   const [validationFocusRequest, setValidationFocusRequest] = React.useState(0);
   const handledFocusRequestRef = React.useRef(0);
   const initialSnapshotRef = React.useRef(JSON.stringify(form));
+  const previousEditorRef = React.useRef<{ mode: RootEditorProps["mode"]; initial: SanitizedWordRoot | null } | null>(null);
   const isDirty = initialSnapshotRef.current !== JSON.stringify(form);
 
   React.useEffect(() => {
+    const previousEditor = previousEditorRef.current;
+    if (previousEditor?.mode === mode && previousEditor.initial === initial && isDirty) return;
+    previousEditorRef.current = { mode, initial };
+
     const nextForm: RootFormData = initial ? {
       abbr: initial.abbr,
       en: initial.en,
@@ -230,7 +235,7 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
     setForm(nextForm);
     setTouched(false);
     initialSnapshotRef.current = JSON.stringify(nextForm);
-  }, [initial, categories]);
+  }, [initial, mode, categories, isDirty]);
 
   const categoryNames = categories.map((item) => item.name);
   const errors: FormFieldErrors = touched

@@ -328,8 +328,13 @@ test('root editor retains unsaved drafts during category-triggered list refreshe
   let observeRefresh!: () => void;
   const refreshStarted = new Promise<void>((resolve) => { observeRefresh = resolve; });
   const refreshGate = new Promise<void>((resolve) => { releaseRefresh = resolve; });
+  let categoryRefreshActive = false;
   await page.route(/^https?:\/\/[^/]+\/api(?:\/|$)/, async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname === '/api/roots/categories') {
+      await route.fulfill({ json: { items: [{ name: '业务对象', count: categoryRefreshActive ? 22 : 23 }] } });
+      return;
+    }
     if (url.pathname === '/api/roots/_page' && delayNextRootPage) {
       delayNextRootPage = false;
       observeRefresh();
@@ -348,8 +353,10 @@ test('root editor retains unsaved drafts during category-triggered list refreshe
   await englishName.fill('Unsaved root editor draft');
 
   delayNextRootPage = true;
-  await page.locator('.side-group').filter({ has: page.locator('.side-title', { hasText: '词根分类' }) })
-    .getByRole('button', { name: /业务对象/ }).click();
+  categoryRefreshActive = true;
+  const categoryButton = page.locator('.side-group').filter({ has: page.locator('.side-title', { hasText: '词根分类' }) })
+    .getByRole('button', { name: /业务对象/ });
+  await categoryButton.click();
   try {
     await refreshStarted;
     await expect(page.getByRole('heading', { name: '编辑词根' })).toBeVisible();
@@ -357,6 +364,8 @@ test('root editor retains unsaved drafts during category-triggered list refreshe
   } finally {
     releaseRefresh();
   }
+  await expect(categoryButton).toContainText('22');
+  categoryRefreshActive = false;
   await expect(englishName).toHaveValue('Unsaved root editor draft');
 });
 
