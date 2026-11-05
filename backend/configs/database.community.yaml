@@ -11,7 +11,7 @@ profiles:
     host: 127.0.0.1
     port: 5432
     database: asset_portal_community
-    schema: dwp
+    schema: dap
     user: community
     password: configure_via_environment
 
