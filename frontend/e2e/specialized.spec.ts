@@ -21,27 +21,17 @@ test("field mapping filters and pagination use adapter controls", async ({ page 
   }
   await expect(srcTable).toHaveClass(/dap-ui-input/);
   await expect(page.getByLabel("DWF 字段名")).toHaveClass(/dap-ui-input/);
-  await expect(page.getByRole("button", { name: "查询" })).toHaveClass(/dap-ui-button/);
+  await expect(page.getByRole("button", { name: "查询", exact: true })).toHaveClass(/dap-ui-button/);
   await expect(page.getByRole("button", { name: "重置" })).toHaveClass(/dap-ui-button/);
 
-  const sourceSystemSelect = page.getByRole("combobox", { name: "源系统" });
-  await expect(sourceSystemSelect).toBeVisible();
-  await expect(sourceSystemSelect).toHaveClass(/dap-ui-select/);
-  await expect(sourceSystemSelect).not.toHaveClass(/\bsel\b/);
-  await page.screenshot({ path: testInfo.outputPath("field-mapping-source-system-kumo-light.png"), fullPage: true });
-  const sourceArrow = await sourceSystemSelect.evaluate((element) => ({
-    backgroundImage: getComputedStyle(element).backgroundImage,
-    visibleSvgCount: Array.from(element.querySelectorAll("svg")).filter((svg) => {
-      const rect = svg.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    }).length,
-  }));
-  expect(sourceArrow.backgroundImage).toBe("none");
-  expect(sourceArrow.visibleSvgCount).toBe(1);
+  const sourceSystemSearch = page.getByRole("searchbox", { name: "搜索源系统" });
+  await expect(sourceSystemSearch).toBeVisible();
+  await expect(sourceSystemSearch).toHaveClass(/dap-ui-input/);
+  await page.screenshot({ path: testInfo.outputPath("field-mapping-source-navigator-light.png"), fullPage: true });
 
-  const nativeSelect = page.locator("select.sel").first();
+  const nativeSelect = page.locator(".fm-optional-filter select");
   await expect(nativeSelect).toBeVisible();
-  await expect(page.locator("select.sel")).toHaveCount(1);
+  await expect(nativeSelect).toHaveCount(1);
   const nativeArrow = await nativeSelect.evaluate((element) => ({
     tagName: element.tagName,
     backgroundImage: getComputedStyle(element).backgroundImage,
@@ -51,22 +41,25 @@ test("field mapping filters and pagination use adapter controls", async ({ page 
   expect(nativeArrow.backgroundImage).toContain("linear-gradient");
   expect(nativeArrow.svgCount).toBe(0);
 
+  const allSystems = page.getByRole("button", { name: "全部源系统", exact: true });
+  await expect(allSystems).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".fm-system")).toHaveCount(12);
-  await sourceSystemSelect.click();
-  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(9);
-  await page.getByRole("option", { name: "商品中心 · PIM", exact: true }).click();
-  await expect(sourceSystemSelect).toContainText("商品中心 · PIM");
-  await page.getByRole("button", { name: "查询" }).click();
+  await sourceSystemSearch.fill("PIM");
+  await expect(page.locator(".mapping-system-list .mapping-system-item")).toHaveCount(2);
+  const productSystem = page.getByRole("button", { name: "商品中心 · PIM", exact: true });
+  await productSystem.click();
+  await expect(productSystem).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".fm-system")).toHaveCount(2);
   await expect(page.locator(".fm-system").first()).toContainText("商品中心 · PIM");
-  await sourceSystemSelect.click();
-  await page.getByRole("listbox").getByRole("option", { name: "全部", exact: true }).click();
-  await expect(sourceSystemSelect).toContainText("全部");
-  await page.getByRole("button", { name: "查询" }).click();
+  await sourceSystemSearch.fill("");
+  await allSystems.click();
+  await expect(allSystems).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".fm-system")).toHaveCount(12);
+  await page.getByLabel("源系统表名").fill("MEMBER_PROFILE");
   await page.getByRole("button", { name: "重置" }).click();
-  await expect(sourceSystemSelect).toContainText("全部");
-  await page.getByRole("button", { name: "查询" }).click();
+  await expect(page.getByLabel("源系统表名")).toHaveValue("");
+  await expect(allSystems).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "查询帮助" })).toBeVisible();
   await expect(page.locator(".fm-system")).toHaveCount(12);
 
   const pageSize = page.getByRole("combobox", { name: "每页条数" });
@@ -99,7 +92,7 @@ test("lineage chrome uses adapters and keeps the canvas mounted", async ({ page 
   await expect(page.getByRole("combobox", { name: "血缘层级" })).toBeVisible();
   await expect(page.getByLabel("血缘节点名称")).toHaveClass(/dap-ui-input/);
   await expect(page.getByRole("button", { name: /刷新|加载中/ })).toHaveClass(/dap-ui-button/);
-  await expect(page.getByRole("button", { name: "查询" })).toHaveClass(/dap-ui-button/);
+  await expect(page.getByRole("button", { name: "查询", exact: true })).toHaveClass(/dap-ui-button/);
   await expect(page.getByRole("button", { name: "清空" })).toHaveClass(/dap-ui-button/);
 
   const lineageSelects = [

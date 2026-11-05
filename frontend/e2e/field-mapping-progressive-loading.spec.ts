@@ -259,9 +259,9 @@ test("source options failure stays visible and can be retried independently", as
       : { json: { items: [] } });
   });
   await page.goto("/field-mapping");
-  await expect(page.getByRole("alert").filter({ hasText: "来源系统加载失败" })).toBeVisible();
-  await page.getByRole("button", { name: "重试来源系统" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "来源系统加载失败" })).toHaveCount(0);
+  await expect(page.getByText("源系统清单加载失败", { exact: true })).toBeVisible();
+  await page.locator(".mapping-system-retry").click();
+  await expect(page.getByText("源系统清单加载失败", { exact: true })).toHaveCount(0);
   expect(attempts).toBe(2);
 });
 
@@ -560,11 +560,11 @@ test("latest filter response wins for both list and stats", async ({ page }) => 
   await expect(page.getByText("INITIAL_RESULT", { exact: true })).toBeVisible();
   const tableName = page.getByRole("textbox", { name: "源系统表名" });
   await tableName.fill("OLD");
-  await page.getByRole("button", { name: "查询" }).click();
+  await page.getByRole("button", { name: "查询", exact: true }).click();
   await Promise.all([oldStatsStarted, oldTablesStarted]);
 
   await tableName.fill("NEW");
-  await page.getByRole("button", { name: "查询" }).click();
+  await page.getByRole("button", { name: "查询", exact: true }).click();
   await Promise.all([newStatsStarted, newTablesStarted]);
   await expect(page.getByText("NEW_RESULT", { exact: true })).toBeVisible();
   await expect(statCard(page, "字段维度")).toHaveText("3");
@@ -614,7 +614,7 @@ test("late field response cannot replace the latest view after fast tab switches
   await page.getByRole("button", { name: /表维度/ }).click();
   await expect(page.getByText("TABLE_READY", { exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "源系统表名" }).fill("NEW");
-  await page.getByRole("button", { name: "查询" }).click();
+  await page.getByRole("button", { name: "查询", exact: true }).click();
   await expect.poll(() => requests.tables.at(-1)?.searchParams.get("srcTable")).toBe("NEW");
   await page.getByRole("button", { name: /字段维度/ }).click();
   await expect(page).toHaveURL(/tab=field/);

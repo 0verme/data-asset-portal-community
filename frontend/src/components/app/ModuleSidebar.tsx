@@ -29,6 +29,7 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
     canEdit,
     auth,
     catalogAccessDisabled,
+    catalogDataAccessReady,
     catalogExportEnabled,
     canManageMenus,
     canManageParams,
@@ -38,6 +39,8 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
     indicatorFilter,
     lineageBootstrap,
     manualCodeTable,
+    mappingRoute,
+    setMappingRoute,
     push,
     pushRoute,
     report,
@@ -160,9 +163,9 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
   if (module === "mapping") {
     return (
       <MappingSidebar
-        canExport={auth.user
-          ? canPermission("field_mapping:read")
-          : catalogExportEnabled && !catalogAccessDisabled}
+        catalogAccessReady={catalogDataAccessReady}
+        route={mappingRoute}
+        setRoute={setMappingRoute}
       />
     );
   }
