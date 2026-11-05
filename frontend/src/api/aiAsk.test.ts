@@ -81,6 +81,38 @@ test("AI ask response preserves DAP stable IDs and validates citations against c
   );
 });
 
+test("AI ask parser accepts an additive deterministic DAP statistic without RAG candidates", () => {
+  const parsed = parseAiAskResponse({
+    status: "statistical_answer",
+    answer: "",
+    retrievalStatus: "available",
+    generationStatus: "not_run",
+    elapsedMs: 4,
+    statisticalResult: {
+      metric: "table_count",
+      value: 118,
+      filters: [
+        { dimension: "domain", value: "国业", displayName: "主题域" },
+        { dimension: "layer", value: "DM", displayName: "数据分层" },
+      ],
+      source: "dap_catalog",
+      complete: true,
+      sourceLink: "/data-warehouse?domain=%E5%9B%BD%E4%B8%9A&layer=DM",
+    },
+  });
+  assert.equal(parsed.statisticalResult?.value, 118);
+  assert.deepEqual(parsed.candidates, []);
+  assert.equal(parsed.resultsTruncated, false);
+  assert.throws(() => parseAiAskResponse({
+    status: "statistical_answer",
+    answer: "",
+    retrievalStatus: "available",
+    generationStatus: "not_run",
+    elapsedMs: 4,
+    statisticalResult: { metric: "table_count", value: -1, filters: [], source: "dap_catalog", complete: true },
+  }), /Invalid AI ask statistical result/);
+});
+
 test("AI ask parser rejects malformed field parent identity, source and duplicate citations", () => {
   assert.throws(
     () => parseAiAskResponse({

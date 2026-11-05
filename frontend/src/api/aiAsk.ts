@@ -6,7 +6,8 @@ export type AiAskStatus =
   | "partial_answer"
   | "insufficient_evidence"
   | "retrieval_unavailable"
-  | "generation_unavailable";
+  | "generation_unavailable"
+  | (string & {});
 export type AiRetrievalStatus = "available" | "degraded" | "unavailable" | "not_run";
 export type AiGenerationStatus = "completed" | "unavailable" | "disabled" | "not_run";
 
@@ -55,6 +56,22 @@ export interface AiAskProgressStep {
   errorCode?: "timeout" | "unavailable" | "invalid_response" | "disabled" | "cancelled" | null;
 }
 
+export interface AiAskStatisticalFilter {
+  dimension: string;
+  value: string | number;
+  displayName?: string;
+}
+
+/** Additive contract for deterministic catalog statistics (implemented separately from RAG). */
+export interface AiAskStatisticalResult {
+  metric: string;
+  value: number;
+  filters: AiAskStatisticalFilter[];
+  source: "dap_catalog";
+  complete: boolean;
+  sourceLink?: string | null;
+}
+
 export interface AiAskResponse {
   status: AiAskStatus;
   answer: string;
@@ -65,6 +82,7 @@ export interface AiAskResponse {
   resultsTruncated: boolean;
   reasonCode?: string | null;
   elapsedMs: number;
+  statisticalResult?: AiAskStatisticalResult;
 }
 
 const API_MODE = (
@@ -103,6 +121,51 @@ function isText(value: unknown): value is string {
 
 function citationKey(assetId: number, fieldId?: number | null): string {
   return `${assetId}:${fieldId ?? "table"}`;
+}
+
+function parseStatisticalResult(value: unknown): AiAskStatisticalResult | null {
+  if (value === undefined || value === null) return null;
+  if (!isRecord(value)) throw new Error("Invalid AI ask statistical result.");
+  const metric = value["metric"];
+  const resultValue = value["value"];
+  const filters = value["filters"];
+  const sourceLink = value["sourceLink"];
+  if (
+    !isText(metric) || !metric.trim()
+    || !Number.isInteger(resultValue) || Number(resultValue) < 0
+    || !Array.isArray(filters) || filters.length > 20
+    || value["source"] !== "dap_catalog"
+    || typeof value["complete"] !== "boolean"
+    || (sourceLink !== undefined && sourceLink !== null && !isText(sourceLink))
+  ) {
+    throw new Error("Invalid AI ask statistical result.");
+  }
+  const parsedFilters = filters.map((filter): AiAskStatisticalFilter => {
+    if (!isRecord(filter)) throw new Error("Invalid AI ask statistical filter.");
+    const dimension = filter["dimension"];
+    const filterValue = filter["value"];
+    const displayName = filter["displayName"];
+    if (
+      !isText(dimension) || !dimension.trim()
+      || !(isText(filterValue) || (typeof filterValue === "number" && Number.isFinite(filterValue)))
+      || (displayName !== undefined && !isText(displayName))
+    ) {
+      throw new Error("Invalid AI ask statistical filter.");
+    }
+    return {
+      dimension,
+      value: filterValue,
+      ...(isText(displayName) ? { displayName } : {}),
+    };
+  });
+  return {
+    metric,
+    value: Number(resultValue),
+    filters: parsedFilters,
+    source: "dap_catalog",
+    complete: value["complete"],
+    ...(sourceLink === undefined ? {} : { sourceLink: sourceLink as string | null }),
+  };
 }
 
 function parseCandidate(value: unknown): AiAskCandidate {
@@ -175,14 +238,16 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
   const status = value["status"];
   const retrievalStatus = value["retrievalStatus"];
   const generationStatus = value["generationStatus"];
-  const resultsTruncated = value["resultsTruncated"];
-  const answer = value["answer"];
-  const rawCandidates = value["candidates"];
-  const rawCitations = value["citations"];
+  const statisticalResult = parseStatisticalResult(value["statisticalResult"]);
+  const resultsTruncated = value["resultsTruncated"] ?? (statisticalResult ? false : undefined);
+  const answer = value["answer"] ?? (statisticalResult ? "" : undefined);
+  const rawCandidates = value["candidates"] ?? (statisticalResult ? [] : undefined);
+  const rawCitations = value["citations"] ?? (statisticalResult ? [] : undefined);
   const elapsedMs = value["elapsedMs"];
   if (
     typeof status !== "string"
-    || !ASK_STATUSES.has(status)
+    || !status.trim()
+    || (!ASK_STATUSES.has(status) && !statisticalResult)
     || typeof retrievalStatus !== "string"
     || !RETRIEVAL_STATUSES.has(retrievalStatus)
     || typeof generationStatus !== "string"
@@ -220,13 +285,17 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
   if (new Set(citationIds).size !== citationIds.length) {
     throw new Error("Duplicate AI ask citation.");
   }
-  if (resultsTruncated && status !== "partial_answer") {
+  if (resultsTruncated && status !== "partial_answer" && !statisticalResult) {
     throw new Error("Truncated AI results must use an explicit partial-answer status.");
   }
-  if (status === "answered" || status === "partial_answer") {
+  if ((status === "answered" || status === "partial_answer") && !statisticalResult) {
     if (!citations.length || generationStatus !== "completed") {
       throw new Error("Answered AI response must contain verified citations.");
     }
+  } else if (!statisticalResult && (citations.length || candidates.length)) {
+    throw new Error("Unanswered AI response must not contain answer candidates or citations.");
+  }
+  if (citations.length || candidates.length) {
     const citationIds = new Set(citations.map((item) => citationKey(item.assetId, item.fieldId)));
     if (
       candidateIds.size !== candidates.length
@@ -235,11 +304,9 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     ) {
       throw new Error("AI answer candidates must exactly match its verified citations.");
     }
-    if (status === "answered" && !candidates.some((item) => item.relevance === "direct")) {
-      throw new Error("Answered AI response must contain directly relevant evidence.");
-    }
-  } else if (citations.length || candidates.length) {
-    throw new Error("Unanswered AI response must not contain answer candidates or citations.");
+  }
+  if (status === "answered" && !statisticalResult && !candidates.some((item) => item.relevance === "direct")) {
+    throw new Error("Answered AI response must contain directly relevant evidence.");
   }
   return {
     status: status as AiAskStatus,
@@ -251,6 +318,7 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     resultsTruncated,
     reasonCode: isText(value["reasonCode"]) ? value["reasonCode"] : null,
     elapsedMs,
+    ...(statisticalResult ? { statisticalResult } : {}),
   };
 }
 
