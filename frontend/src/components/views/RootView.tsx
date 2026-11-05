@@ -69,12 +69,12 @@ export function RootView({
     loadRootDetail,
   } = root;
 
-  if (rootLoading) {
+  if (rootRoute.page === "library" && rootLoading) {
     return (
       <LoadingState title="加载词根库" desc="正在准备词根清单和分类统计。" />
     );
   }
-  if (rootError) {
+  if (rootRoute.page === "library" && rootError) {
     return (
       <ErrorState
         title="词根模块加载失败"

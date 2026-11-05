@@ -321,6 +321,45 @@ test('root library pages table rows while keeping complete abbreviations and imp
   expect(fixture.roots).toHaveLength(23);
 });
 
+test('root editor retains unsaved drafts during category-triggered list refreshes', async ({ page }) => {
+  await installRemoteApiFixtures(page);
+  let delayNextRootPage = false;
+  let releaseRefresh!: () => void;
+  let observeRefresh!: () => void;
+  const refreshStarted = new Promise<void>((resolve) => { observeRefresh = resolve; });
+  const refreshGate = new Promise<void>((resolve) => { releaseRefresh = resolve; });
+  await page.route(/^https?:\/\/[^/]+\/api(?:\/|$)/, async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/roots/_page' && delayNextRootPage) {
+      delayNextRootPage = false;
+      observeRefresh();
+      await refreshGate;
+    }
+    await route.fallback();
+  });
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/root-management');
+  await expect(page.locator('.root-page .page-title')).toContainText('词根库', { timeout: 20_000 });
+  const row = page.locator('.root-page table.dt tbody tr').filter({ hasText: 'root020' });
+  await row.click();
+  await expect(page.getByRole('heading', { name: '编辑词根' })).toBeVisible();
+  const englishName = page.getByLabel('英文全称');
+  await englishName.fill('Unsaved root editor draft');
+
+  delayNextRootPage = true;
+  await page.locator('.side-group').filter({ has: page.locator('.side-title', { hasText: '词根分类' }) })
+    .getByRole('button', { name: /业务对象/ }).click();
+  try {
+    await refreshStarted;
+    await expect(page.getByRole('heading', { name: '编辑词根' })).toBeVisible();
+    await expect(englishName).toHaveValue('Unsaved root editor draft');
+  } finally {
+    releaseRefresh();
+  }
+  await expect(englishName).toHaveValue('Unsaved root editor draft');
+});
+
 test('management pagination controls remain inside the mobile viewport', async ({ page }) => {
   await installRemoteApiFixtures(page);
   await page.setViewportSize({ width: 390, height: 844 });

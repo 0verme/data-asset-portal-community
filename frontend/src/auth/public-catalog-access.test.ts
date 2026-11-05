@@ -26,16 +26,19 @@ test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog acce
 });
 
 test("catalog readiness gates API asset and root detail/candidate requests", async () => {
-  const [apiAssetModule, apiAssetView, rootModule] = await Promise.all([
+  const [apiAssetModule, apiAssetView, rootModule, rootView] = await Promise.all([
     read("hooks/useApiAssetModule.ts"),
     read("components/views/ApiAssetView.tsx"),
     read("hooks/useRootModule.ts"),
+    read("components/views/RootView.tsx"),
   ]);
 
   assert.match(apiAssetModule, /if \(!active \|\| !\['view', 'edit'\]\.includes\(route\.page\) \|\| !code\)/);
   assert.match(apiAssetModule, /\[active, route\.code, route\.page\]/);
   assert.match(apiAssetView, /route\.page === "list" && apiAsset\.loading/);
   assert.match(apiAssetView, /route\.page === "list" && apiAsset\.error/);
+  assert.match(rootView, /rootRoute\.page === "library" && rootLoading/);
+  assert.match(rootView, /rootRoute\.page === "library" && rootError/);
   assert.match(rootModule, /if \(!active \|\| rootRoute\.page !== 'edit' \|\| !abbr\)/);
   assert.match(rootModule, /\[active, rootRoute\.abbr, rootRoute\.page\]/);
   assert.match(rootModule, /if \(!active\) \{\s*setRootImportCandidates\(\[\]\)/);
