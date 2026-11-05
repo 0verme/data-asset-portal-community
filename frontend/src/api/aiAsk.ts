@@ -6,7 +6,10 @@ export type AiAskStatus =
   | "partial_answer"
   | "insufficient_evidence"
   | "retrieval_unavailable"
-  | "generation_unavailable";
+  | "generation_unavailable"
+  | "metadata_count_answered"
+  | "ambiguous_scope"
+  | "metadata_count_unavailable";
 export type AiRetrievalStatus = "available" | "degraded" | "unavailable" | "not_run";
 export type AiGenerationStatus = "completed" | "unavailable" | "disabled" | "not_run";
 
@@ -45,14 +48,36 @@ export type AiAskProgressStepId =
   | "generating"
   | "completed";
 export type AiAskProgressStatus = "pending" | "running" | "completed" | "failed";
+export type AiAskProgressIntent = "metadata_count";
 
 export interface AiAskProgressStep {
   id: AiAskProgressStepId;
   status: AiAskProgressStatus;
+  intent?: AiAskProgressIntent | null;
   elapsedMs: number;
   tableCount?: number | null;
   fieldCount?: number | null;
   errorCode?: "timeout" | "unavailable" | "invalid_response" | "disabled" | "cancelled" | null;
+}
+
+export interface AiMetadataCountFilter {
+  code: string;
+  displayName: string;
+  matchedAs: "catalog_value" | "catalog_alias";
+  inferred: boolean;
+}
+
+export interface AiMetadataCount {
+  metric: "table_count";
+  value: number;
+  filters: {
+    domain: AiMetadataCountFilter | null;
+    layer: AiMetadataCountFilter | null;
+  };
+  source: "dap_catalog";
+  complete: true;
+  catalogProfile: "internal" | "strict" | "disabled";
+  sourceLink: string;
 }
 
 export interface AiAskResponse {
@@ -60,6 +85,7 @@ export interface AiAskResponse {
   answer: string;
   citations: AiAskCitation[];
   candidates: AiAskCandidate[];
+  metadataCount: AiMetadataCount | null;
   retrievalStatus: AiRetrievalStatus;
   generationStatus: AiGenerationStatus;
   resultsTruncated: boolean;
@@ -82,6 +108,9 @@ const ASK_STATUSES = new Set<string>([
   "insufficient_evidence",
   "retrieval_unavailable",
   "generation_unavailable",
+  "metadata_count_answered",
+  "ambiguous_scope",
+  "metadata_count_unavailable",
 ]);
 const PROGRESS_STEP_IDS = new Set<string>([
   "analyzing", "retrieving", "counting", "organizing", "generating", "completed",
@@ -103,6 +132,55 @@ function isText(value: unknown): value is string {
 
 function citationKey(assetId: number, fieldId?: number | null): string {
   return `${assetId}:${fieldId ?? "table"}`;
+}
+
+function parseMetadataCountFilter(value: unknown): AiMetadataCountFilter | null {
+  if (value === undefined || value === null) return null;
+  if (!isRecord(value)) throw new Error("Invalid AI metadata count filter.");
+  const code = value["code"];
+  const displayName = value["displayName"];
+  const matchedAs = value["matchedAs"];
+  const inferred = value["inferred"];
+  if (
+    !isText(code) || !code.trim() || code.length > 64
+    || !isText(displayName) || !displayName.trim() || displayName.length > 256
+    || (matchedAs !== "catalog_value" && matchedAs !== "catalog_alias")
+    || typeof inferred !== "boolean"
+  ) {
+    throw new Error("Invalid AI metadata count filter.");
+  }
+  return { code, displayName, matchedAs, inferred };
+}
+
+function parseMetadataCount(value: unknown): AiMetadataCount {
+  if (!isRecord(value) || !isRecord(value["filters"])) {
+    throw new Error("Invalid AI metadata count evidence.");
+  }
+  const count = value["value"];
+  const sourceLink = value["sourceLink"];
+  const catalogProfile = value["catalogProfile"];
+  if (
+    value["metric"] !== "table_count"
+    || !Number.isSafeInteger(count) || Number(count) < 0
+    || value["source"] !== "dap_catalog"
+    || value["complete"] !== true
+    || (catalogProfile !== "internal" && catalogProfile !== "strict" && catalogProfile !== "disabled")
+    || !isText(sourceLink) || !/^\/data-warehouse(?:\?.*)?$/.test(sourceLink)
+  ) {
+    throw new Error("Invalid AI metadata count evidence.");
+  }
+  return {
+    metric: "table_count",
+    value: Number(count),
+    filters: {
+      domain: parseMetadataCountFilter(value["filters"]["domain"]),
+      layer: parseMetadataCountFilter(value["filters"]["layer"]),
+    },
+    source: "dap_catalog",
+    complete: true,
+    catalogProfile,
+    sourceLink,
+  };
 }
 
 function parseCandidate(value: unknown): AiAskCandidate {
@@ -180,6 +258,10 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
   const rawCandidates = value["candidates"];
   const rawCitations = value["citations"];
   const elapsedMs = value["elapsedMs"];
+  const rawMetadataCount = value["metadataCount"];
+  const metadataCount = rawMetadataCount === undefined || rawMetadataCount === null
+    ? null
+    : parseMetadataCount(rawMetadataCount);
   if (
     typeof status !== "string"
     || !ASK_STATUSES.has(status)
@@ -223,6 +305,24 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
   if (resultsTruncated && status !== "partial_answer") {
     throw new Error("Truncated AI results must use an explicit partial-answer status.");
   }
+  if (status === "metadata_count_answered") {
+    if (
+      !metadataCount || !metadataCount.complete
+      || retrievalStatus !== "not_run" || generationStatus !== "not_run"
+      || candidates.length || citations.length || resultsTruncated
+    ) {
+      throw new Error("Metadata count answer must contain exact count evidence only.");
+    }
+  } else if (status === "ambiguous_scope" || status === "metadata_count_unavailable") {
+    if (
+      metadataCount || retrievalStatus !== "not_run" || generationStatus !== "not_run"
+      || candidates.length || citations.length || resultsTruncated
+    ) {
+      throw new Error("Unresolved metadata count must not contain count values or citations.");
+    }
+  } else if (metadataCount) {
+    throw new Error("Non-count AI responses must not contain metadata count evidence.");
+  }
   if (status === "answered" || status === "partial_answer") {
     if (!citations.length || generationStatus !== "completed") {
       throw new Error("Answered AI response must contain verified citations.");
@@ -246,6 +346,7 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     answer,
     citations,
     candidates,
+    metadataCount,
     retrievalStatus: retrievalStatus as AiRetrievalStatus,
     generationStatus: generationStatus as AiGenerationStatus,
     resultsTruncated,
@@ -256,12 +357,13 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
 
 export function parseAiAskProgressStep(value: unknown): AiAskProgressStep {
   if (!isRecord(value)) throw new Error("Invalid AI ask progress event.");
-  const allowedKeys = new Set(["id", "status", "elapsedMs", "tableCount", "fieldCount", "errorCode"]);
+  const allowedKeys = new Set(["id", "status", "intent", "elapsedMs", "tableCount", "fieldCount", "errorCode"]);
   if (Object.keys(value).some((key) => !allowedKeys.has(key))) {
     throw new Error("Unexpected data in AI ask progress event.");
   }
   const id = value["id"];
   const status = value["status"];
+  const intent = value["intent"];
   const elapsedMs = value["elapsedMs"];
   const tableCount = value["tableCount"];
   const fieldCount = value["fieldCount"];
@@ -269,6 +371,7 @@ export function parseAiAskProgressStep(value: unknown): AiAskProgressStep {
   if (
     typeof id !== "string" || !PROGRESS_STEP_IDS.has(id)
     || typeof status !== "string" || !PROGRESS_STATUSES.has(status)
+    || (intent !== undefined && intent !== null && intent !== "metadata_count")
     || (elapsedMs !== undefined && (typeof elapsedMs !== "number" || !Number.isFinite(elapsedMs) || elapsedMs < 0))
     || (tableCount !== undefined && tableCount !== null && (!Number.isInteger(tableCount) || Number(tableCount) < 0))
     || (fieldCount !== undefined && fieldCount !== null && (!Number.isInteger(fieldCount) || Number(fieldCount) < 0))
@@ -279,6 +382,7 @@ export function parseAiAskProgressStep(value: unknown): AiAskProgressStep {
   return {
     id: id as AiAskProgressStepId,
     status: status as AiAskProgressStatus,
+    ...(intent === undefined ? {} : { intent: intent as AiAskProgressIntent | null }),
     elapsedMs: typeof elapsedMs === "number" ? elapsedMs : 0,
     ...(tableCount === undefined ? {} : { tableCount: tableCount as number | null }),
     ...(fieldCount === undefined ? {} : { fieldCount: fieldCount as number | null }),
@@ -351,6 +455,7 @@ export async function askAi(
       answer: "AI 问答暂不可用，请稍后重试。",
       citations: [],
       candidates: [],
+      metadataCount: null,
       retrievalStatus: "not_run",
       generationStatus: "disabled",
       resultsTruncated: false,

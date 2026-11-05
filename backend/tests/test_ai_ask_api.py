@@ -115,6 +115,51 @@ class AiAskApiTests(unittest.TestCase):
         self.assertEqual("answered", response.json()["status"])
         self.assertEqual("internal", service.calls[0][1])
 
+    def test_metadata_count_contract_is_returned_without_rag_citations_or_model_success(self):
+        response_contract = AiAskResponse(
+            status="metadata_count_answered",
+            answer="当前 DAP 目录中，合成主题域、数据集市层共有 0 张数据表。",
+            metadataCount={
+                "metric": "table_count",
+                "value": 0,
+                "filters": {
+                    "domain": {
+                        "code": "SYNTH",
+                        "displayName": "合成主题域",
+                        "matchedAs": "catalog_value",
+                        "inferred": False,
+                    },
+                    "layer": {
+                        "code": "DM",
+                        "displayName": "数据集市层",
+                        "matchedAs": "catalog_alias",
+                        "inferred": True,
+                    },
+                },
+                "source": "dap_catalog",
+                "complete": True,
+                "catalogProfile": "strict",
+                "sourceLink": "/data-warehouse?domain=%E5%90%88%E6%88%90%E4%B8%BB%E9%A2%98%E5%9F%9F&layer=DM",
+            },
+            retrievalStatus="not_run",
+            generationStatus="not_run",
+            reasonCode=None,
+        )
+        service = StubAIAskService(response=response_contract)
+        with patch.dict(os.environ, {"PUBLIC_CATALOG_PROFILE": "strict"}, clear=False):
+            client, _search = self._client(service=service, identity=None)
+            response = client.post("/api/ai/ask", json={"query": "合成主题域集市有几张表？"})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("metadata_count_answered", payload["status"])
+        self.assertEqual(0, payload["metadataCount"]["value"])
+        self.assertTrue(payload["metadataCount"]["complete"])
+        self.assertEqual("strict", payload["metadataCount"]["catalogProfile"])
+        self.assertEqual("not_run", payload["generationStatus"])
+        self.assertEqual([], payload["citations"])
+        self.assertEqual("strict", service.calls[0][1])
+
     def test_disabled_status_is_false_and_does_not_leak_configuration(self):
         client, _search = self._client(service=StubAIAskService(enabled=False))
 

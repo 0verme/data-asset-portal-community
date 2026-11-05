@@ -44,6 +44,11 @@ test("AI availability response exposes only the feature boolean", () => {
 
 test("progress parser accepts real states and counts but rejects answer/token payloads", () => {
   assert.deepEqual(parseAiAskProgressStep({
+    id: "analyzing", status: "running", intent: "metadata_count", elapsedMs: 14.5,
+  }), {
+    id: "analyzing", status: "running", intent: "metadata_count", elapsedMs: 14.5,
+  });
+  assert.deepEqual(parseAiAskProgressStep({
     id: "counting", status: "completed", elapsedMs: 14.5, tableCount: 2, fieldCount: 7,
   }), {
     id: "counting", status: "completed", elapsedMs: 14.5, tableCount: 2, fieldCount: 7,
@@ -54,6 +59,10 @@ test("progress parser accepts real states and counts but rejects answer/token pa
   );
   assert.throws(
     () => parseAiAskProgressStep({ id: "counting", status: "completed", tableCount: -1 }),
+    /Invalid AI ask progress event/,
+  );
+  assert.throws(
+    () => parseAiAskProgressStep({ id: "analyzing", status: "running", intent: "model_guess" }),
     /Invalid AI ask progress event/,
   );
 });
@@ -128,6 +137,71 @@ test("AI ask parser rejects malformed field parent identity, source and duplicat
     () => parseAiAskResponse({ ...validResponse, resultsTruncated: undefined }),
     /Invalid AI ask response/,
   );
+});
+
+test("metadata count response preserves exact zero/count evidence and a same-filter catalog link", () => {
+  const countResponse = parseAiAskResponse({
+    status: "metadata_count_answered",
+    answer: "当前 DAP 目录中，合成主题域、数据集市层共有 0 张数据表。",
+    citations: [],
+    candidates: [],
+    metadataCount: {
+      metric: "table_count",
+      value: 0,
+      filters: {
+        domain: { code: "SYNTH", displayName: "合成主题域", matchedAs: "catalog_value", inferred: false },
+        layer: { code: "DM", displayName: "数据集市层", matchedAs: "catalog_alias", inferred: true },
+      },
+      source: "dap_catalog",
+      complete: true,
+      catalogProfile: "strict",
+      sourceLink: "/data-warehouse?domain=%E5%90%88%E6%88%90%E4%B8%BB%E9%A2%98%E5%9F%9F&layer=DM",
+    },
+    retrievalStatus: "not_run",
+    generationStatus: "not_run",
+    resultsTruncated: false,
+    reasonCode: null,
+    elapsedMs: 3,
+  });
+  assert.equal(countResponse.metadataCount?.value, 0);
+  assert.equal(countResponse.metadataCount?.filters.layer?.code, "DM");
+  assert.equal(countResponse.generationStatus, "not_run");
+
+  for (const invalid of [
+    { value: -1 },
+    { complete: false },
+    { sourceLink: "https://example.invalid/data-warehouse" },
+  ]) {
+    assert.throws(() => parseAiAskResponse({
+      status: "metadata_count_answered",
+      answer: "bad",
+      citations: [],
+      candidates: [],
+      metadataCount: {
+        metric: "table_count", value: 4,
+        filters: { domain: null, layer: null },
+        source: "dap_catalog", complete: true,
+        catalogProfile: "strict", sourceLink: "/data-warehouse",
+        ...invalid,
+      },
+      retrievalStatus: "not_run",
+      generationStatus: "not_run",
+      resultsTruncated: false,
+      elapsedMs: 0,
+    }));
+  }
+  assert.equal(parseAiAskResponse({
+    status: "ambiguous_scope",
+    answer: "请明确统计范围。",
+    citations: [],
+    candidates: [],
+    metadataCount: null,
+    retrievalStatus: "not_run",
+    generationStatus: "not_run",
+    resultsTruncated: false,
+    reasonCode: "ambiguous_scope",
+    elapsedMs: 1,
+  }).metadataCount, null);
 });
 
 test("failure and no-evidence statuses remain explicit and cannot carry model citations", () => {

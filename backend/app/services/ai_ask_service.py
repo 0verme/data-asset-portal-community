@@ -8,6 +8,7 @@ import time
 from collections import OrderedDict
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlencode
 
 from pydantic import ValidationError
 
@@ -17,9 +18,15 @@ from ..contracts.ai_ask import (
     AiAskProgressStep,
     AiAskRequest,
     AiAskResponse,
+    AiMetadataCount,
+    AiMetadataCountFilter,
+    AiMetadataCountFilters,
     AiGeneratedAnswer,
 )
+from ..security.public_field_policy import redact_public_text
+from .ai_metadata_count import is_metadata_count_query, resolve_metadata_count_intent
 from .ai_llm_provider import LLMProviderError, OpenAICompatibleLLMProvider
+from .assets_service import AssetFilterCatalogChangedError
 
 INSUFFICIENT_EVIDENCE_ANSWER = "当前目录检索没有找到足以回答问题的已验证资产。"
 _GENERATION_UNAVAILABLE_ANSWER = "AI 问答暂不可用，未生成基于证据的回答；请稍后重试。"
@@ -67,6 +74,7 @@ class _ProgressReporter:
         self._callback = callback
         self._cancel_event = cancel_event
         self._active: tuple[str, float] | None = None
+        self._intent: str | None = None
 
     def check_cancelled(self) -> None:
         if self._cancel_event is not None and self._cancel_event.is_set():
@@ -75,11 +83,22 @@ class _ProgressReporter:
     def _emit(self, step_id: str, status: str, **values: Any) -> None:
         if self._callback is None:
             return
+        if self._intent is not None:
+            values.setdefault("intent", self._intent)
         try:
             self._callback(AiAskProgressStep(id=step_id, status=status, **values))
         except Exception:
             # Progress delivery must never change the existing answer contract.
             return
+
+    def set_intent(self, intent: str) -> None:
+        self._intent = intent
+        active = self._active
+        if active is not None:
+            elapsed_ms = max(0.0, (time.monotonic() - active[1]) * 1000)
+            # Refresh the current running step so the UI can distinguish a
+            # directory COUNT from semantic retrieval without inventing a step.
+            self._emit(active[0], "running", elapsedMs=elapsed_ms, intent=intent)
 
     def start(self, step_id: str) -> None:
         self.check_cancelled()
@@ -117,9 +136,15 @@ class _ProgressReporter:
 class AIAskService:
     """Retrieve, authorize, generate, and bind every citation to DAP stable IDs."""
 
-    def __init__(self, rag_service: Any, llm_provider: Any) -> None:
+    def __init__(
+        self,
+        rag_service: Any,
+        llm_provider: Any,
+        assets_service: Any | None = None,
+    ) -> None:
         self._rag_service = rag_service
         self._llm_provider = llm_provider
+        self._assets_service = assets_service
 
     def enabled(self) -> bool:
         try:
@@ -351,12 +376,14 @@ class AIAskService:
         candidates: list[AiAskCandidate] | None = None,
         citations: list[AiAskCitation] | None = None,
         results_truncated: bool = False,
+        metadata_count: AiMetadataCount | None = None,
     ) -> AiAskResponse:
         return AiAskResponse(
             status=status,
             answer=answer,
             candidates=candidates or [],
             citations=citations or [],
+            metadataCount=metadata_count,
             retrievalStatus=retrieval_status,
             generationStatus=generation_status,
             resultsTruncated=results_truncated,
@@ -385,10 +412,9 @@ class AIAskService:
             candidates: list[AiAskCandidate] | None = None,
             citations: list[AiAskCitation] | None = None,
             results_truncated: bool = False,
+            metadata_count: AiMetadataCount | None = None,
             completed: bool = False,
         ) -> AiAskResponse:
-            if completed:
-                progress.start("completed")
             response = self._response(
                 status=status,
                 answer=answer,
@@ -399,8 +425,10 @@ class AIAskService:
                 candidates=candidates,
                 citations=citations,
                 results_truncated=results_truncated,
+                metadata_count=metadata_count,
             )
             if completed:
+                progress.start("completed")
                 progress.complete("completed")
             return response
 
@@ -408,7 +436,7 @@ class AIAskService:
         try:
             query = request.query.strip()
             is_list_query = self._is_asset_list_query(query)
-            enabled = self.enabled()
+            is_count_query = is_metadata_count_query(query)
             if not query:
                 progress.fail("analyzing", "invalid_response")
                 return respond(
@@ -427,8 +455,19 @@ class AIAskService:
                 generation_status="unavailable",
                 reason_code="llm_unavailable",
             )
+        if is_count_query:
+            progress.set_intent("metadata_count")
         progress.complete("analyzing")
-        if not enabled:
+        if is_count_query:
+            return self._answer_metadata_count(
+                query,
+                profile=profile,
+                started=started,
+                progress=progress,
+                respond=respond,
+            )
+
+        if not self.enabled():
             return respond(
                 status="generation_unavailable",
                 answer=_GENERATION_UNAVAILABLE_ANSWER,
@@ -696,11 +735,156 @@ class AIAskService:
         )
 
 
-# The global runtime composes the existing HTTP RAG adapter and the optional
-# provider. Neither a model nor an index is loaded into the DAP process.
+    @staticmethod
+    def _metadata_count_unavailable(*, respond):
+        return respond(
+            status="metadata_count_unavailable",
+            answer="当前 DAP 目录统计暂不可用，未将检索候选数当作总数；请稍后重试。",
+            retrieval_status="not_run",
+            generation_status="not_run",
+            reason_code="metadata_count_unavailable",
+        )
+
+    @staticmethod
+    def _metadata_count_ambiguous(*, respond):
+        return respond(
+            status="ambiguous_scope",
+            answer="无法从当前 DAP 目录唯一确认统计范围，请明确主题域或数据分层后重试。",
+            retrieval_status="not_run",
+            generation_status="not_run",
+            reason_code="ambiguous_scope",
+        )
+
+    @staticmethod
+    def _count_source_link(domain, layer, profile):
+        filters = {}
+        if domain is not None:
+            visible_name = " ".join(
+                redact_public_text(domain.display_name, profile=profile).split()
+            )
+            # The page's domain parameter accepts the canonical display name;
+            # if profile redaction changes it, the stable catalog code is the
+            # equivalent supported filter and avoids disclosing the raw label.
+            filters["domain"] = (
+                visible_name if visible_name == domain.display_name else domain.code
+            )
+        if layer is not None:
+            filters["layer"] = layer.code
+        suffix = f"?{urlencode(filters)}" if filters else ""
+        if len(f"/data-warehouse{suffix}") > 2048 and domain is not None:
+            filters["domain"] = domain.code
+            suffix = f"?{urlencode(filters)}"
+        return f"/data-warehouse{suffix}"
+
+    @staticmethod
+    def _render_metadata_count_answer(value, domain, layer, source_link, profile):
+        domain_name = (
+            " ".join(redact_public_text(domain.display_name, profile=profile).split())
+            if domain is not None else ""
+        )
+        layer_name = (
+            " ".join(redact_public_text(layer.display_name, profile=profile).split())
+            if layer is not None else ""
+        )
+        if domain is not None and layer is not None:
+            scope = f"{domain_name}主题域、{layer_name}"
+        elif domain is not None:
+            scope = f"{domain_name}主题域"
+        elif layer is not None:
+            scope = layer_name
+        else:
+            scope = "当前 DAP 目录"
+        lines = [f"当前 DAP 目录中，{scope}共有 {value} 张数据表。"]
+        filters = []
+        if domain is not None:
+            filters.append(f"主题域={domain_name}")
+        if layer is not None:
+            filters.append(f"数据分层={layer.code}（{layer_name}）")
+        if filters:
+            lines.append(f"统计口径：{'；'.join(filters)}。")
+        lines.append("数据来源：DAP 数据资产目录。")
+        lines.append(f"查看筛选后的完整资产清单：{source_link}")
+        return "\n".join(lines)
+
+    def _answer_metadata_count(self, query, *, profile, started, progress, respond):
+        if self._assets_service is None:
+            return self._metadata_count_unavailable(respond=respond)
+        try:
+            progress.check_cancelled()
+            catalog = self._assets_service.get_asset_count_filter_catalog()
+            intent = resolve_metadata_count_intent(query, catalog)
+            if intent is None:
+                return self._metadata_count_ambiguous(respond=respond)
+            progress.check_cancelled()
+            value = self._assets_service.count_asset_tables(
+                domain_code=intent.domain.code if intent.domain else None,
+                domain_name=intent.domain.display_name if intent.domain else None,
+                layer_code=intent.layer.code if intent.layer else None,
+                layer_name=intent.layer.display_name if intent.layer else None,
+            )
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                return self._metadata_count_unavailable(respond=respond)
+            progress.check_cancelled()
+        except AIAskCancelled:
+            raise
+        except AssetFilterCatalogChangedError:
+            return self._metadata_count_ambiguous(respond=respond)
+        except Exception:
+            return self._metadata_count_unavailable(respond=respond)
+
+        def evidence_filter(dimension):
+            if dimension is None:
+                return None
+            visible_name = " ".join(
+                redact_public_text(dimension.display_name, profile=profile).split()
+            ) or dimension.code
+            return AiMetadataCountFilter(
+                code=dimension.code,
+                displayName=visible_name,
+                matchedAs=dimension.matched_as,
+                inferred=dimension.inferred,
+            )
+
+        try:
+            source_link = self._count_source_link(intent.domain, intent.layer, profile)
+            metadata_count = AiMetadataCount(
+                metric="table_count",
+                value=value,
+                filters=AiMetadataCountFilters(
+                    domain=evidence_filter(intent.domain),
+                    layer=evidence_filter(intent.layer),
+                ),
+                source="dap_catalog",
+                complete=True,
+                catalogProfile=profile if profile in {"internal", "strict", "disabled"} else "strict",
+                sourceLink=source_link,
+            )
+            answer = self._render_metadata_count_answer(
+                value, intent.domain, intent.layer, source_link, profile
+            )
+            return respond(
+                status="metadata_count_answered",
+                answer=answer,
+                retrieval_status="not_run",
+                generation_status="not_run",
+                reason_code=None,
+                metadata_count=metadata_count,
+                completed=True,
+            )
+        except AIAskCancelled:
+            raise
+        except Exception:
+            return self._metadata_count_unavailable(respond=respond)
+
+
+# The global runtime composes the existing HTTP RAG adapter, current authoritative
+# asset catalog service, and optional provider. Neither a model nor an index is
+# loaded into the DAP process.
+from .assets_service import assets_service
 from .rag_search_service import rag_search_service
 
 ai_ask_service = AIAskService(
     rag_service=rag_search_service,
     llm_provider=OpenAICompatibleLLMProvider(),
+    assets_service=assets_service,
 )

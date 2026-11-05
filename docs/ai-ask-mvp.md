@@ -184,3 +184,7 @@ Phase 0 复核 PR #514 合入后的实现，确认根因是回答策略和证据
 
 - dap-rag-lab #14 HTTP server 实现及内网 DeepSeek Flash 的具体 wire compatibility 尚未通过真实联调确认；不得宣称已在目标服务验证。
 - 真实 GaussDB、生产、DeepSeek、内网真实 RAG、模型性能/准确率、真实业务元数据均非本 PR 自动化测试范围，保持 `NOT RUN`。
+
+## Issue #521：权威资产目录统计
+
+单轮问答现在可在 RAG/LLM 之外识别受控的表数意图，使用同一资产列表过滤与精确 COUNT，并通过 `metadataCount` 证据契约返回结果；SSE 进度附带 `intent=metadata_count` 与普通问答区分，不复用 RAG 候选计数步骤。审计口径、歧义/失败状态、筛选链接和与 #520 的前端集成边界见 [`ai-metadata-count.md`](ai-metadata-count.md)。统计结果不属于 RAG citation，不标记模型生成成功。
