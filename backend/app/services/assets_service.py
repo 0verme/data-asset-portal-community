@@ -174,6 +174,10 @@ class AssetDataSourceError(Exception):
         }
 
 
+class AssetFilterCatalogChangedError(ValueError):
+    """A resolved catalog filter no longer matches the live facet catalog."""
+
+
 class AssetsService(AuditActorMixin):
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
@@ -328,6 +332,31 @@ class AssetsService(AuditActorMixin):
             name_to_code[name] = code
         return code_to_name, name_to_code
 
+    def _asset_count_filter_catalog(self):
+        """Return the same live domain/layer facets consumed by the asset page."""
+        domains = self._load_domain_rows()
+        layers = self._load_layer_rows()
+        return {
+            "domains": [
+                {"code": str(row.get("domain_code") or "").strip(),
+                 "name": str(row.get("domain_name") or "").strip()}
+                for row in domains
+                if str(row.get("domain_code") or "").strip()
+                and str(row.get("domain_name") or "").strip()
+            ],
+            "layers": [
+                {"code": str(row.get("layer_code") or "").strip(),
+                 "name": str(row.get("layer_name") or row.get("layer_code") or "").strip()}
+                for row in layers
+                if str(row.get("layer_code") or "").strip()
+            ],
+        }
+
+    def get_asset_count_filter_catalog(self):
+        """Read the current asset-page filter values for natural-language parsing."""
+        with database_transaction():
+            return self._asset_count_filter_catalog()
+
     def _asset_field_keyword_condition(self, keyword):
         """Shared asset-field keyword predicate (see ``services.asset_field_match``)."""
         like = f"%{str(keyword or '').strip().lower()}%"
@@ -474,6 +503,55 @@ class AssetsService(AuditActorMixin):
             keyword=keyword,
         )
         return int(rows[0].get("total_count") or 0)
+
+    def count_asset_tables(
+        self,
+        *,
+        domain_code=None,
+        domain_name=None,
+        layer_code=None,
+        layer_name=None,
+    ):
+        """Count full asset-list rows using its existing filter and identity rules.
+
+        The catalog-value recheck and COUNT share one transaction. COUNT(*) is
+        correct here because ``p_asset_table.asset_id`` is its stable primary
+        key and the joined domain code is a primary key (one-to-zero/one join);
+        repeated table names from different sources remain distinct rows.
+        """
+        with database_transaction():
+            catalog = self._asset_count_filter_catalog()
+            domains = catalog["domains"]
+            layers = catalog["layers"]
+
+            resolved_domain = None
+            if domain_code is not None or domain_name is not None:
+                matches = [
+                    item for item in domains
+                    if (domain_code is None or item["code"] == str(domain_code).strip())
+                    and (domain_name is None or item["name"] == str(domain_name).strip())
+                ]
+                if len(matches) != 1:
+                    raise AssetFilterCatalogChangedError("主题域筛选项已变化或无法唯一确定")
+                resolved_domain = matches[0]
+                if sum(item["name"] == resolved_domain["name"] for item in domains) != 1:
+                    raise AssetFilterCatalogChangedError("主题域名称无法唯一对应资产列表筛选")
+
+            resolved_layer = None
+            if layer_code is not None or layer_name is not None:
+                matches = [
+                    item for item in layers
+                    if (layer_code is None or item["code"] == str(layer_code).strip())
+                    and (layer_name is None or item["name"] == str(layer_name).strip())
+                ]
+                if len(matches) != 1:
+                    raise AssetFilterCatalogChangedError("数据分层筛选项已变化或无法唯一确定")
+                resolved_layer = matches[0]
+
+            return self._count_asset_rows(
+                domain=resolved_domain["name"] if resolved_domain else None,
+                layer=resolved_layer["code"] if resolved_layer else None,
+            )
 
     def _load_table_rows(self, layer=None, domain=None):
         clauses, code_to_name = self._build_asset_filters(layer=layer, domain=domain)

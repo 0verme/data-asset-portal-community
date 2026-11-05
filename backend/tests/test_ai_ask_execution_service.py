@@ -139,9 +139,11 @@ class StubRagService:
 
 
 class StubAssetsService:
-    def __init__(self, *, missing_field=False, fail_ids=()):
+    def __init__(self, *, missing_field=False, fail_ids=(), count_error=False):
         self.calls = []
+        self.count_calls = []
         self.fail_ids = set(fail_ids)
+        self.count_error = count_error
         fields_7 = [{
             "assetId": 7,
             "fieldId": 11 if not missing_field else 999,
@@ -179,6 +181,18 @@ class StubAssetsService:
         if asset_id in self.fail_ids or asset_id not in self.details:
             raise RuntimeError("private data source error")
         return self.details[asset_id]
+
+    def get_asset_count_filter_catalog(self):
+        return {
+            "domains": [{"code": "SYNTH", "name": "合成主题域"}],
+            "layers": [{"code": "MART", "name": "数据集市层"}],
+        }
+
+    def count_asset_tables(self, **filters):
+        self.count_calls.append(filters)
+        if self.count_error:
+            raise RuntimeError("synthetic catalog count failure")
+        return 73
 
 
 class AIAskExecutionServiceTests(unittest.TestCase):
@@ -235,6 +249,76 @@ class AIAskExecutionServiceTests(unittest.TestCase):
         self.assertTrue(any(event == "step_complete" and data["step_id"] == "field-7-11" for event, data in events))
         answer_event = next(data for event, data in events if event == "answer")
         self.assertEqual("request-test-1", answer_event["request_id"])
+
+    def test_metadata_count_short_circuits_planner_rag_and_model_with_exact_count_evidence(self):
+        service, rag, llm, assets = self._service()
+        events = []
+
+        response = service.ask(
+            AiAskRequest(query="合成主题域集市有几张表？"),
+            profile="strict",
+            request_id="metadata-count",
+            event_callback=lambda event, data: events.append((event, data)),
+        )
+
+        self.assertEqual("metadata_count_answered", response.status)
+        self.assertEqual(73, response.metadata_count.value)
+        self.assertEqual([{
+            "domain_code": "SYNTH",
+            "domain_name": "合成主题域",
+            "layer_code": "MART",
+            "layer_name": "数据集市层",
+        }], assets.count_calls)
+        self.assertEqual([], rag.calls)
+        self.assertEqual([], llm.calls)
+        self.assertEqual(
+            [("step_start", "metadata-count"), ("step_complete", "metadata-count"), ("answer", "answer")],
+            [(event, data["step_id"]) for event, data in events],
+        )
+        count_event = events[1][1]
+        self.assertEqual(73, count_event["data"]["tableCount"])
+        self.assertNotIn("planning", [data["step_id"] for event, data in events])
+        self.assertNotIn("rag-round-1", [data["step_id"] for event, data in events])
+
+    def test_metadata_count_ambiguity_failure_and_cancellation_never_call_rag_or_model(self):
+        service, rag, llm, assets = self._service()
+        ambiguous_events = []
+        ambiguous = service.ask(
+            AiAskRequest(query="未知主题域有几张表？"),
+            profile="strict",
+            request_id="ambiguous-count",
+            event_callback=lambda event, data: ambiguous_events.append((event, data)),
+        )
+        self.assertEqual("ambiguous_scope", ambiguous.status)
+        self.assertIsNone(ambiguous.metadata_count)
+        self.assertEqual([], assets.count_calls)
+        self.assertTrue(any(event == "step_error" and data["step_id"] == "metadata-count" for event, data in ambiguous_events))
+
+        failed_assets = StubAssetsService(count_error=True)
+        failed_service, failed_rag, failed_llm, _assets = self._service(assets=failed_assets)
+        unavailable = failed_service.ask(
+            AiAskRequest(query="共有多少张数据表？"), profile="strict", request_id="count-failed"
+        )
+        self.assertEqual("metadata_count_unavailable", unavailable.status)
+        self.assertIsNone(unavailable.metadata_count)
+        self.assertEqual(1, len(failed_assets.count_calls))
+        self.assertEqual([], failed_rag.calls)
+        self.assertEqual([], failed_llm.calls)
+
+        cancel_event = threading.Event()
+        cancel_event.set()
+        cancelled_events = []
+        with self.assertRaises(AIAskCancelled):
+            service.ask(
+                AiAskRequest(query="共有多少张数据表？"),
+                profile="strict",
+                request_id="count-cancelled",
+                event_callback=lambda event, data: cancelled_events.append((event, data)),
+                cancel_event=cancel_event,
+            )
+        self.assertFalse(any(event == "answer" for event, _data in cancelled_events))
+        self.assertEqual([], rag.calls)
+        self.assertEqual([], llm.calls)
 
     def test_exact_identifier_uses_a_single_precise_search_without_planner_call(self):
         responses = {"CUSTOMER_ID": search_response("CUSTOMER_ID", [FIELD_7])}

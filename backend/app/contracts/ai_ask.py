@@ -14,6 +14,9 @@ AiAskStatus = Literal[
     "insufficient_evidence",
     "retrieval_unavailable",
     "generation_unavailable",
+    "metadata_count_answered",
+    "ambiguous_scope",
+    "metadata_count_unavailable",
 ]
 AiRetrievalStatus = Literal["available", "degraded", "unavailable", "not_run"]
 AiGenerationStatus = Literal["completed", "unavailable", "disabled", "not_run"]
@@ -32,6 +35,8 @@ AiAskReason = Literal[
     "llm_unavailable",
     "invalid_model_output",
     "invalid_citation",
+    "ambiguous_scope",
+    "metadata_count_unavailable",
 ]
 
 StableAssetId = Annotated[int, Field(strict=True, gt=0)]
@@ -73,6 +78,7 @@ AiAskProgressStepId = Literal[
     "completed",
 ]
 AiAskProgressStatus = Literal["pending", "running", "completed", "failed"]
+AiAskProgressIntent = Literal["metadata_count"]
 AiAskProgressError = Literal["timeout", "unavailable", "invalid_response", "disabled", "cancelled"]
 
 
@@ -81,6 +87,7 @@ class AiAskProgressStep(_AiAskContract):
 
     step_id: AiAskProgressStepId = Field(alias="id")
     status: AiAskProgressStatus
+    intent: AiAskProgressIntent | None = None
     elapsed_ms: float = Field(default=0, alias="elapsedMs", ge=0)
     table_count: int | None = Field(default=None, alias="tableCount", ge=0)
     field_count: int | None = Field(default=None, alias="fieldCount", ge=0)
@@ -93,6 +100,44 @@ class AiAskCitation(_AiAskContract):
     asset_id: StableAssetId = Field(alias="assetId")
     field_id: StableFieldId | None = Field(default=None, alias="fieldId")
     source: Literal["dap_catalog"] = "dap_catalog"
+
+
+class AiMetadataCountFilter(_AiAskContract):
+    """One filter resolved from the current asset-list facet catalog."""
+
+    code: str = Field(min_length=1, max_length=64)
+    display_name: str = Field(alias="displayName", min_length=1, max_length=256)
+    matched_as: Literal["catalog_value", "catalog_alias"] = Field(alias="matchedAs")
+    inferred: bool
+
+
+class AiMetadataCountFilters(_AiAskContract):
+    domain: AiMetadataCountFilter | None = None
+    layer: AiMetadataCountFilter | None = None
+
+
+class AiMetadataCount(_AiAskContract):
+    """Exact COUNT evidence, kept separate from semantic RAG citations."""
+
+    metric: Literal["table_count"]
+    value: Annotated[int, Field(strict=True, ge=0)]
+    filters: AiMetadataCountFilters
+    source: Literal["dap_catalog"]
+    complete: bool
+    catalog_profile: Literal["internal", "strict", "disabled"] = Field(alias="catalogProfile")
+    source_link: str = Field(
+        alias="sourceLink",
+        min_length=15,
+        max_length=2048,
+        pattern=r"^/data-warehouse(?:\?.*)?$",
+    )
+
+    @field_validator("complete")
+    @classmethod
+    def require_complete_count(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("精确元数据 COUNT 必须标记 complete=true")
+        return value
 
 
 class AiAskCandidate(_AiAskContract):
@@ -128,6 +173,7 @@ class AiAskResponse(_AiAskContract):
     answer: str = Field(max_length=2000)
     citations: list[AiAskCitation] = Field(default_factory=list, max_length=20)
     candidates: list[AiAskCandidate] = Field(default_factory=list, max_length=20)
+    metadata_count: AiMetadataCount | None = Field(default=None, alias="metadataCount")
     retrieval_status: AiRetrievalStatus = Field(alias="retrievalStatus")
     generation_status: AiGenerationStatus = Field(alias="generationStatus")
     results_truncated: bool = Field(default=False, alias="resultsTruncated")
@@ -138,6 +184,29 @@ class AiAskResponse(_AiAskContract):
     def validate_response_state(self) -> AiAskResponse:
         if self.results_truncated and self.status != "partial_answer":
             raise ValueError("resultsTruncated 只能用于显式 partial_answer 响应")
+        if self.status == "metadata_count_answered":
+            if (
+                self.metadata_count is None
+                or not self.metadata_count.complete
+                or self.citations
+                or self.candidates
+                or self.retrieval_status != "not_run"
+                or self.generation_status != "not_run"
+                or self.results_truncated
+            ):
+                raise ValueError("metadata_count_answered 必须仅包含完整目录统计证据")
+        elif self.status in {"ambiguous_scope", "metadata_count_unavailable"}:
+            if (
+                self.metadata_count is not None
+                or self.citations
+                or self.candidates
+                or self.retrieval_status != "not_run"
+                or self.generation_status != "not_run"
+                or self.results_truncated
+            ):
+                raise ValueError("未完成的目录统计不得包含数值或 RAG 引用")
+        elif self.metadata_count is not None:
+            raise ValueError("非统计响应不得包含 metadataCount")
         if self.status in {"answered", "partial_answer"}:
             if (
                 not self.answer.strip()
@@ -211,6 +280,9 @@ class AiAskErrorEnvelope(_AiAskContract):
 __all__ = [
     "AiAskAvailability",
     "AiAskCandidate",
+    "AiMetadataCount",
+    "AiMetadataCountFilter",
+    "AiMetadataCountFilters",
     "AiAskProgressStep",
     "AiAskProgressStepId",
     "AiAskProgressStatus",

@@ -73,6 +73,31 @@ class StubRagService:
         return self.response
 
 
+class StubAssetCountService:
+    def __init__(self, *, value=73, catalog_error=None, count_error=None, catalog=None):
+        self.catalog = catalog or {
+            "domains": [{"code": "SYNTH", "name": "合成主题域"}],
+            "layers": [{"code": "DM", "name": "数据集市层"}],
+        }
+        self.value = value
+        self.catalog_error = catalog_error
+        self.count_error = count_error
+        self.catalog_calls = 0
+        self.count_calls = []
+
+    def get_asset_count_filter_catalog(self):
+        self.catalog_calls += 1
+        if self.catalog_error:
+            raise self.catalog_error
+        return self.catalog
+
+    def count_asset_tables(self, **filters):
+        self.count_calls.append(filters)
+        if self.count_error:
+            raise self.count_error
+        return self.value
+
+
 class StubLLMProvider:
     def __init__(self, content=None, error=None, enabled=True):
         self.contents = content if isinstance(content, list) else [content]
@@ -97,10 +122,115 @@ class StubLLMProvider:
 
 
 class AiAskServiceTests(unittest.TestCase):
-    def _service(self, *, retrieval=None, retrieval_error=None, llm=None):
+    def _service(self, *, retrieval=None, retrieval_error=None, llm=None, assets=None):
         rag = StubRagService(retrieval, retrieval_error)
         provider = llm or StubLLMProvider()
-        return AIAskService(rag, provider), rag, provider
+        return AIAskService(rag, provider, assets_service=assets), rag, provider
+
+    def test_metadata_count_uses_live_domain_and_layer_without_rag_or_llm(self):
+        four_rag_candidates = RagRecommendationsResponse(
+            query="合成主题域集市有几张表？",
+            status="available",
+            recommendations=[TABLE.model_copy(update={"assetId": asset_id}) for asset_id in range(7, 11)],
+            count=4,
+        )
+        assets = StubAssetCountService(value=73)
+        service, rag, llm = self._service(
+            retrieval=four_rag_candidates,
+            llm=StubLLMProvider(enabled=False),
+            assets=assets,
+        )
+
+        progress_events = []
+        response = service.ask(
+            AiAskRequest(query="合成主题域集市有几张表？"),
+            profile="strict",
+            progress_callback=progress_events.append,
+        )
+
+        self.assertEqual("metadata_count_answered", response.status)
+        self.assertNotIn("counting", [event.step_id for event in progress_events])
+        analyzing_events = [event for event in progress_events if event.step_id == "analyzing"]
+        self.assertEqual("metadata_count", analyzing_events[-1].intent)
+        self.assertEqual("metadata_count", analyzing_events[-2].intent)
+        self.assertEqual(73, response.metadata_count.value)
+        self.assertTrue(response.metadata_count.complete)
+        self.assertEqual("not_run", response.retrieval_status)
+        self.assertEqual("not_run", response.generation_status)
+        self.assertEqual([], response.citations)
+        self.assertEqual([], response.candidates)
+        self.assertIn("73 张数据表", response.answer)
+        self.assertIn("主题域=合成主题域", response.answer)
+        self.assertIn("layer=DM", response.metadata_count.source_link)
+        self.assertEqual([], rag.calls)
+        self.assertEqual([], llm.calls)
+        self.assertEqual([{
+            "domain_code": "SYNTH",
+            "domain_name": "合成主题域",
+            "layer_code": "DM",
+            "layer_name": "数据集市层",
+        }], assets.count_calls)
+        self.assertEqual("strict", response.metadata_count.catalog_profile)
+
+    def test_metadata_count_zero_and_single_dimension_queries_are_exact(self):
+        cases = (
+            ("合成主题域有多少张表？", 0, "SYNTH", "合成主题域", None, None),
+            ("DM 数据集市层总数是多少表？", 9, None, None, "DM", "数据集市层"),
+            ("共有多少张数据表？", 17, None, None, None, None),
+        )
+        for query, value, domain_code, domain_name, layer_code, layer_name in cases:
+            with self.subTest(query=query):
+                assets = StubAssetCountService(value=value)
+                service, rag, llm = self._service(assets=assets)
+                response = service.ask(AiAskRequest(query=query), profile="internal")
+                self.assertEqual("metadata_count_answered", response.status)
+                self.assertEqual(value, response.metadata_count.value)
+                self.assertEqual({
+                    "domain_code": domain_code,
+                    "domain_name": domain_name,
+                    "layer_code": layer_code,
+                    "layer_name": layer_name,
+                }, assets.count_calls[0])
+                self.assertEqual([], rag.calls)
+                self.assertEqual([], llm.calls)
+
+    def test_metadata_count_ambiguity_and_query_failure_never_become_zero(self):
+        assets = StubAssetCountService(value=0)
+        service, rag, llm = self._service(assets=assets)
+        ambiguous = service.ask(
+            AiAskRequest(query="未知主题域有几张表？"), profile="internal"
+        )
+        self.assertEqual("ambiguous_scope", ambiguous.status)
+        self.assertIsNone(ambiguous.metadata_count)
+        self.assertEqual([], assets.count_calls)
+
+        failed_assets = StubAssetCountService(count_error=RuntimeError("synthetic database failure"))
+        failed_service, failed_rag, failed_llm = self._service(assets=failed_assets)
+        unavailable = failed_service.ask(
+            AiAskRequest(query="共有多少张数据表？"), profile="internal"
+        )
+        self.assertEqual("metadata_count_unavailable", unavailable.status)
+        self.assertIsNone(unavailable.metadata_count)
+        self.assertNotIn("0 张", unavailable.answer)
+        self.assertEqual([], failed_rag.calls)
+        self.assertEqual([], failed_llm.calls)
+        self.assertEqual([], rag.calls)
+        self.assertEqual([], llm.calls)
+
+        overlong_domain = "X" * 257
+        invalid_catalog = StubAssetCountService(
+            catalog={
+                "domains": [{"code": "LONG", "name": overlong_domain}],
+                "layers": [],
+            }
+        )
+        invalid_service, _, _ = self._service(assets=invalid_catalog)
+        invalid_evidence = invalid_service.ask(
+            AiAskRequest(query=f"{overlong_domain}有多少张表？"), profile="internal"
+        )
+        self.assertEqual("metadata_count_unavailable", invalid_evidence.status)
+        self.assertIsNone(invalid_evidence.metadata_count)
+        self.assertNotIn("73 张", invalid_evidence.answer)
 
     def test_list_detection_requires_an_explicit_asset_enumeration_phrase(self):
         for query in (
@@ -139,6 +269,7 @@ class AiAskServiceTests(unittest.TestCase):
         counts = next(event for event in completed if event.step_id == "counting")
         self.assertEqual((1, 1), (counts.table_count, counts.field_count))
         self.assertTrue(all(event.elapsed_ms >= 0 for event in events))
+        self.assertTrue(all(event.intent is None for event in events))
         self.assertFalse(any(hasattr(event, "answer") for event in events))
         self.assertEqual(1, len(llm.calls))
 

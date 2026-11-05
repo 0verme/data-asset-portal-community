@@ -24,7 +24,7 @@ from datetime import datetime
 
 # pi-lens-ignore: python-hallucinated-import
 from pydantic import ValidationError
-from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy import delete, func, insert, or_, select, update
 
 from ..application import AuditActorMixin, actor_aware
 from ..contracts.rag_search import (
@@ -158,6 +158,22 @@ class SystemManagementService(AuditActorMixin):
     def _now_text(self):
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    @staticmethod
+    def _contains_query(columns, query: str):
+        value = str(query or "").strip().lower()
+        if not value:
+            return None
+        escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        return or_(*[
+            func.lower(func.coalesce(column, "")).like(pattern, escape="\\")
+            for column in columns
+        ])
+
+    @staticmethod
+    def _page_envelope(items, total: int, page: int, page_size: int):
+        return {"items": items, "total": total, "page": page, "pageSize": page_size}
+
     def _parse_item_id(self, dict_id: str):
         value = str(dict_id or "").strip()
         if not value.isdigit():
@@ -270,22 +286,25 @@ class SystemManagementService(AuditActorMixin):
             if permission_contract.is_role_assignable_permission(code)
         ]
 
-    def _role_payload(self, row):
+    def _role_payload(self, row, *, user_count: int | None = None, permission_codes: list[str] | None = None):
         role_code = str(row.get("role_code") or "").strip().lower()
-        user_rows = self._core_fetch(
-            select(func.count().label("count"))
-            .select_from(admin_user)
-            .where(admin_user.c.role == role_code)
-        )
+        if user_count is None:
+            user_rows = self._core_fetch(
+                select(func.count().label("count"))
+                .select_from(admin_user)
+                .where(admin_user.c.role == role_code)
+            )
+            user_count = int(user_rows[0].get("count") or 0) if user_rows else 0
+        if permission_codes is None:
+            permission_codes = self._role_permission_codes(role_code)
         return {
             "roleCode": role_code,
             "name": str(row.get("name") or ""),
             "description": str(row.get("description") or ""),
             "builtin": str(row.get("builtin") or "N").upper() == "Y",
             "enabled": self._db_status_to_role_status(row.get("enabled")),
-            "permissionCodes": self._role_permission_codes(role_code),
-            # pi-lens-ignore: unchecked-throwing-call-python
-            "userCount": int(user_rows[0].get("count") or 0) if user_rows else 0,
+            "permissionCodes": permission_codes,
+            "userCount": user_count,
             "createdAt": str(row.get("created_at") or ""),
             "updatedAt": str(row.get("updated_at") or ""),
         }
@@ -324,6 +343,37 @@ class SystemManagementService(AuditActorMixin):
             if permission_contract.is_role_assignable_permission(item["code"])
         ]
 
+    def _role_payloads(self, rows):
+        role_codes = [str(row.get("role_code") or "").strip().lower() for row in rows]
+        if not role_codes:
+            return []
+        user_counts = {
+            str(row.get("role") or "").strip().lower(): int(row.get("count") or 0)
+            for row in self._core_fetch(
+                select(admin_user.c.role, func.count().label("count"))
+                .where(admin_user.c.role.in_(role_codes))
+                .group_by(admin_user.c.role)
+            )
+        }
+        permissions: dict[str, list[str]] = {code: [] for code in role_codes}
+        for row in self._core_fetch(
+            select(rbac_role_permission.c.role_code, rbac_role_permission.c.permission_code)
+            .where(rbac_role_permission.c.role_code.in_(role_codes))
+            .order_by(rbac_role_permission.c.role_code, rbac_role_permission.c.permission_code)
+        ):
+            code = str(row.get("role_code") or "").strip().lower()
+            permission = str(row.get("permission_code") or "").strip().lower()
+            if code in permissions and permission_contract.is_role_assignable_permission(permission):
+                permissions[code].append(permission)
+        return [
+            self._role_payload(
+                row,
+                user_count=user_counts.get(code, 0),
+                permission_codes=permissions[code],
+            )
+            for row, code in zip(rows, role_codes)
+        ]
+
     def get_roles(self):
         rows = self._core_fetch(
             select(
@@ -336,7 +386,35 @@ class SystemManagementService(AuditActorMixin):
                 rbac_role.c.updated_at,
             ).order_by(rbac_role.c.builtin.desc(), rbac_role.c.role_code)
         )
-        return [self._role_payload(row) for row in rows]
+        return self._role_payloads(rows)
+
+    def get_roles_page(self, *, keyword: str = "", page: int = 1, page_size: int = 20):
+        clauses = []
+        search = self._contains_query(
+            (rbac_role.c.role_code, rbac_role.c.name, rbac_role.c.description), keyword
+        )
+        if search is not None:
+            clauses.append(search)
+        total_rows = self._core_fetch(
+            select(func.count().label("count")).select_from(rbac_role).where(*clauses)
+        )
+        total = int(total_rows[0].get("count") or 0) if total_rows else 0
+        rows = self._core_fetch(
+            select(
+                rbac_role.c.role_code,
+                rbac_role.c.name,
+                rbac_role.c.description,
+                rbac_role.c.builtin,
+                rbac_role.c.enabled,
+                rbac_role.c.created_at,
+                rbac_role.c.updated_at,
+            )
+            .where(*clauses)
+            .order_by(rbac_role.c.builtin.desc(), rbac_role.c.role_code)
+            .limit(page_size)
+            .offset((page - 1) * page_size)
+        )
+        return self._page_envelope(self._role_payloads(rows), total, page, page_size)
 
     @actor_aware
     def create_role(self, payload):
@@ -568,8 +646,46 @@ class SystemManagementService(AuditActorMixin):
         # pi-lens-ignore: unchecked-throwing-call-python
         return int(rows[0]["category_id"])
 
-    def get_users(self):
-        rows = self._core_fetch(
+    def _user_payload(self, row):
+        return {
+            # pi-lens-ignore: unchecked-throwing-call-python
+            "id": f"USR{int(row['id']):03d}",
+            "username": row["username"],
+            "displayName": row.get("display_name") or row["username"],
+            "status": self._db_status_to_user_status(str(row.get("status") or "")),
+            "role": str(row.get("role") or "").strip().lower(),
+            "lastLoginAt": str(row.get("last_login_at") or ""),
+            "createdAt": str(row.get("created_at") or ""),
+            "email": "",
+            "remark": "",
+        }
+
+    @staticmethod
+    def _user_search_clause(keyword: str):
+        value = str(keyword or "").strip().lower()
+        clauses = []
+        search = SystemManagementService._contains_query(
+            (admin_user.c.username, admin_user.c.display_name, admin_user.c.status, admin_user.c.role),
+            value,
+        )
+        if search is not None:
+            clauses.append(search)
+        if value and (value in "启用" or value in "enabled"):
+            clauses.append(admin_user.c.status == "ACTIVE")
+        if value and (value in "禁用" or value in "disabled"):
+            clauses.append(admin_user.c.status == "DISABLED")
+        if value and value in "系统管理员":
+            clauses.append(admin_user.c.role != "maintainer")
+        elif value and value in "业务维护员":
+            clauses.append(admin_user.c.role == "maintainer")
+        return or_(*clauses) if clauses else None
+
+    def _user_rows(self, *, keyword: str = "", page: int | None = None, page_size: int | None = None):
+        clauses = []
+        search = self._user_search_clause(keyword)
+        if search is not None:
+            clauses.append(search)
+        statement = (
             select(
                 admin_user.c.id,
                 admin_user.c.username,
@@ -578,23 +694,28 @@ class SystemManagementService(AuditActorMixin):
                 admin_user.c.role,
                 admin_user.c.last_login_at,
                 admin_user.c.created_at,
-            ).order_by(admin_user.c.created_at.desc(), admin_user.c.username)
+            )
+            .where(*clauses)
+            .order_by(admin_user.c.created_at.desc(), admin_user.c.username)
         )
-        return [
-            {
-                # pi-lens-ignore: unchecked-throwing-call-python
-                "id": f"USR{int(row['id']):03d}",
-                "username": row["username"],
-                "displayName": row.get("display_name") or row["username"],
-                "status": self._db_status_to_user_status(str(row.get("status") or "")),
-                "role": str(row.get("role") or "").strip().lower(),
-                "lastLoginAt": str(row.get("last_login_at") or ""),
-                "createdAt": str(row.get("created_at") or ""),
-                "email": "",
-                "remark": "",
-            }
-            for row in rows
-        ]
+        return clauses, statement.limit(page_size).offset((page - 1) * page_size) if page is not None and page_size is not None else statement
+
+    def get_users(self):
+        _, statement = self._user_rows()
+        return [self._user_payload(row) for row in self._core_fetch(statement)]
+
+    def get_users_page(self, *, keyword: str = "", page: int = 1, page_size: int = 20):
+        clauses, statement = self._user_rows(keyword=keyword, page=page, page_size=page_size)
+        total_rows = self._core_fetch(
+            select(func.count().label("count")).select_from(admin_user).where(*clauses)
+        )
+        total = int(total_rows[0].get("count") or 0) if total_rows else 0
+        return self._page_envelope(
+            [self._user_payload(row) for row in self._core_fetch(statement)],
+            total,
+            page,
+            page_size,
+        )
 
     @actor_aware
     def create_user(self, payload):
@@ -844,13 +965,24 @@ class SystemManagementService(AuditActorMixin):
             for row in rows
         ]
 
-    def get_param_dicts(self, category_code: str | None = None):
-        if str(category_code or "").strip().upper() in RESERVED_PARAM_CATEGORY_CODES:
-            return []
+    def _param_dict_rows(self, *, category_code: str | None = None, keyword: str = "", page: int | None = None, page_size: int | None = None):
         clauses = [code_item.c.category_code.not_in(RESERVED_PARAM_CATEGORY_CODES)]
         if category_code:
             clauses.append(code_item.c.category_code == category_code)
-        rows = self._core_fetch(
+        search = self._contains_query(
+            (
+                code_item.c.category_code,
+                code_category.c.category_name,
+                code_item.c.item_code,
+                code_item.c.item_name,
+                code_item.c.item_value,
+                code_item.c.item_desc,
+            ),
+            keyword,
+        )
+        if search is not None:
+            clauses.append(search)
+        statement = (
             select(
                 code_item.c.item_id,
                 code_item.c.category_code,
@@ -867,22 +999,61 @@ class SystemManagementService(AuditActorMixin):
                 code_category.c.category_code == code_item.c.category_code,
             ))
             .where(*clauses)
-            .order_by(code_item.c.category_code, code_item.c.display_order, code_item.c.item_code)
+            .order_by(
+                code_item.c.category_code,
+                code_item.c.display_order,
+                code_item.c.item_code,
+                code_item.c.item_id,
+            )
         )
-        return [
-            {
-                "id": str(row["item_id"]),
-                "categoryCode": row["category_code"],
-                "categoryName": row["category_name"],
-                "code": row["item_code"],
-                "name": row["item_name"],
-                "value": row.get("item_value") or row["item_name"],
-                "status": "enabled" if str(row.get("is_active") or "").upper() == "Y" else "disabled",
-                "updatedAt": str(row.get("updated_at") or ""),
-                "desc": row.get("item_desc") or "",
-            }
-            for row in rows
-        ]
+        if page is not None and page_size is not None:
+            statement = statement.limit(page_size).offset((page - 1) * page_size)
+        return clauses, statement
+
+    @staticmethod
+    def _param_dict_payload(row):
+        return {
+            "id": str(row["item_id"]),
+            "categoryCode": row["category_code"],
+            "categoryName": row["category_name"],
+            "code": row["item_code"],
+            "name": row["item_name"],
+            "value": row.get("item_value") or row["item_name"],
+            "status": "enabled" if str(row.get("is_active") or "").upper() == "Y" else "disabled",
+            "updatedAt": str(row.get("updated_at") or ""),
+            "desc": row.get("item_desc") or "",
+        }
+
+    def get_param_dicts(self, category_code: str | None = None):
+        if str(category_code or "").strip().upper() in RESERVED_PARAM_CATEGORY_CODES:
+            return []
+        _, statement = self._param_dict_rows(category_code=category_code)
+        return [self._param_dict_payload(row) for row in self._core_fetch(statement)]
+
+    def get_param_dicts_page(self, *, category_code: str | None = None, keyword: str = "", page: int = 1, page_size: int = 20):
+        if str(category_code or "").strip().upper() in RESERVED_PARAM_CATEGORY_CODES:
+            return self._page_envelope([], 0, page, page_size)
+        clauses, statement = self._param_dict_rows(
+            category_code=category_code,
+            keyword=keyword,
+            page=page,
+            page_size=page_size,
+        )
+        total_rows = self._core_fetch(
+            select(func.count().label("count"))
+            .select_from(code_item.join(
+                code_category,
+                code_category.c.category_code == code_item.c.category_code,
+            ))
+            .where(*clauses)
+        )
+        total = int(total_rows[0].get("count") or 0) if total_rows else 0
+        return self._page_envelope(
+            [self._param_dict_payload(row) for row in self._core_fetch(statement)],
+            total,
+            page,
+            page_size,
+        )
 
     def get_rag_search_config(self):
         rows = self._core_fetch(
@@ -1247,6 +1418,23 @@ class SystemManagementService(AuditActorMixin):
             "desc": desc,
         }
 
+    @staticmethod
+    def _menu_payload(row):
+        return {
+            "id": str(row["menu_id"]),
+            "code": row["menu_code"],
+            "name": row["menu_name"],
+            "icon": SystemManagementService._normalize_menu_icon(row.get("menu_code"), row.get("menu_icon")),
+            "path": row.get("menu_path") or "",
+            # pi-lens-ignore: unchecked-throwing-call-python
+            "order": int(row.get("display_order") or 0),
+            "navPlacement": str(row.get("nav_placement") or "more").lower(),
+            "adminOnly": str(row.get("admin_only") or "").upper() == "Y",
+            "status": "enabled" if str(row.get("is_active") or "").upper() == "Y" else "disabled",
+            "desc": row.get("menu_desc") or "",
+            "updatedAt": str(row.get("updated_at") or ""),
+        }
+
     def get_menus(self):
         rows = self._core_fetch(
             select(
@@ -1263,23 +1451,40 @@ class SystemManagementService(AuditActorMixin):
                 menu_table.c.updated_at,
             ).order_by(menu_table.c.display_order, menu_table.c.menu_id)
         )
-        return [
-            {
-                "id": str(row["menu_id"]),
-                "code": row["menu_code"],
-                "name": row["menu_name"],
-                "icon": self._normalize_menu_icon(row.get("menu_code"), row.get("menu_icon")),
-                "path": row.get("menu_path") or "",
-                # pi-lens-ignore: unchecked-throwing-call-python
-                "order": int(row.get("display_order") or 0),
-                "navPlacement": str(row.get("nav_placement") or "more").lower(),
-                "adminOnly": str(row.get("admin_only") or "").upper() == "Y",
-                "status": "enabled" if str(row.get("is_active") or "").upper() == "Y" else "disabled",
-                "desc": row.get("menu_desc") or "",
-                "updatedAt": str(row.get("updated_at") or ""),
-            }
-            for row in rows
-        ]
+        return [self._menu_payload(row) for row in rows]
+
+    def get_menus_page(self, *, keyword: str = "", page: int = 1, page_size: int = 20):
+        clauses = []
+        search = self._contains_query(
+            (menu_table.c.menu_code, menu_table.c.menu_name, menu_table.c.menu_path, menu_table.c.menu_desc),
+            keyword,
+        )
+        if search is not None:
+            clauses.append(search)
+        total_rows = self._core_fetch(
+            select(func.count().label("count")).select_from(menu_table).where(*clauses)
+        )
+        total = int(total_rows[0].get("count") or 0) if total_rows else 0
+        rows = self._core_fetch(
+            select(
+                menu_table.c.menu_id,
+                menu_table.c.menu_code,
+                menu_table.c.menu_name,
+                menu_table.c.menu_icon,
+                menu_table.c.menu_path,
+                menu_table.c.display_order,
+                menu_table.c.nav_placement,
+                menu_table.c.admin_only,
+                menu_table.c.is_active,
+                menu_table.c.menu_desc,
+                menu_table.c.updated_at,
+            )
+            .where(*clauses)
+            .order_by(menu_table.c.display_order, menu_table.c.menu_id)
+            .limit(page_size)
+            .offset((page - 1) * page_size)
+        )
+        return self._page_envelope([self._menu_payload(row) for row in rows], total, page, page_size)
 
     def get_enabled_menu_codes(self):
         return {

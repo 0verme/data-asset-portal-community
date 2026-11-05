@@ -19,13 +19,18 @@ import type {
 import { formatDateTime } from "../../utils/date.ts";
 import { EmptyState, RowActions, StatusBadge } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
-import { Button } from "../../ui/index.ts";
+import { Button, TablePagination } from "../../ui/index.ts";
 import { PARAM_STATUS_META } from "./constants.ts";
 import { RagSearchConfigPanel } from "./RagSearchConfigPanel.tsx";
 
 export interface ParamDictPageProps {
   categories: readonly ParamDictCategoryWithCount[];
   items: readonly ParamDictItemWithCategoryName[];
+  total: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   selectedCategoryCode: string;
   query: string;
   canEdit: boolean;
@@ -38,6 +43,11 @@ export interface ParamDictPageProps {
 export function ParamDictPage({
   categories,
   items,
+  total,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
   selectedCategoryCode,
   query,
   canEdit,
@@ -79,7 +89,7 @@ export function ParamDictPage({
             当前分类 <b>{selectedCategory?.name || "未选择"}</b>
             {selectedCategory ? (
               <>
-                ，共 <b>{filteredItems.length}</b> 条字典项
+                ，共 <b>{total}</b> 条字典项
               </>
             ) : null}
             {query ? <>，匹配 “{query}”</> : null}
@@ -227,6 +237,14 @@ export function ParamDictPage({
           )}
         </div>
       </div>
+      <TablePagination
+        ariaLabel="参数字典明细分页"
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </div>
   );
 }

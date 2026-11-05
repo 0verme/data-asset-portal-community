@@ -22,6 +22,7 @@ import {
   getAiAskAvailability,
   type AiAskCandidate,
   type AiAskResponse,
+  type AiAskStatisticalResult,
 } from "../api/aiAsk.ts";
 import {
   askAiWithExecution,
@@ -40,6 +41,7 @@ import {
 } from "../api/search.ts";
 import {
   DEFAULT_PORTAL_SCOPE,
+  PORTAL_SCOPE_CONFIGS,
   filterPortalHotKeywordsByModules,
   filterPortalScopesByModules,
   isMonospaceHotKeyword,
@@ -48,6 +50,7 @@ import {
 } from "../config/portalSearch.ts";
 
 type SearchNavigationTarget = SearchResultItem | SearchResultGroup;
+type PortalResultTab = "search" | "ai";
 
 export interface SearchPortalPageProps {
   onNavigate?:
@@ -209,6 +212,29 @@ function RagRecommendationsSection({
   );
 }
 
+function safeCatalogLink(value: string | null | undefined): string | null {
+  return value && value.startsWith("/") && !value.startsWith("//") && !value.includes("\\")
+    ? value
+    : null;
+}
+
+function AiAskStatisticalCard({ result }: { result: AiAskStatisticalResult }) {
+  const link = safeCatalogLink(result.sourceLink);
+  const metricLabel = result.metric === "table_count" ? "张表" : result.metric === "field_count" ? "个字段" : "统计值";
+  const filterSummary = result.filters.map((filter) =>
+    `${filter.displayName || filter.dimension}=${filter.value}`,
+  ).join("；");
+  return (
+    <section className="sp-ai-statistic" aria-label="确定性统计结果">
+      <div className="sp-ai-statistic-head">
+        <strong>{result.value} {metricLabel}</strong>
+        <span>{result.complete ? "完整统计" : "部分统计"}</span>
+      </div>
+      <p>统计依据：DAP 资产目录{filterSummary ? ` · ${filterSummary}` : " · 全目录"}</p>
+      {link ? <a className="sp-ai-statistic-link" href={link}>查看筛选后的全部资产</a> : null}
+    </section>
+  );
+}
 interface AiAskSectionProps {
   query: string;
   loading: boolean;
@@ -235,12 +261,38 @@ function AiAskSection({
   onNavigate,
 }: AiAskSectionProps) {
   if (!query) return null;
+  const responseFailure = !response?.metadataCount && response?.status === "retrieval_unavailable"
+    ? response.reasonCode === "retrieval_timeout"
+      ? "资产检索超时，无法基于目录回答；传统搜索不受影响。"
+      : "资产检索暂不可用，无法确认候选资产；传统搜索不受影响。"
+    : !response?.metadataCount && response?.status === "generation_unavailable"
+      ? response.reasonCode === "llm_timeout"
+        ? "模型生成超时，未生成回答；不会把未筛选候选当作答案。"
+        : "模型暂不可用，未生成回答；不会把未筛选候选当作答案。"
+      : !response?.metadataCount && response?.status === "ambiguous_scope"
+        ? response.answer || "无法从当前目录唯一确认统计范围，请明确主题域或数据分层后重试。"
+        : !response?.metadataCount && response?.status === "metadata_count_unavailable"
+          ? response.answer || "当前 DAP 目录统计暂不可用，未返回统计值；请稍后重试。"
+          : "";
+  const failureMessage = error || responseFailure;
   return (
     <section className="sp-ai-group" aria-label="AI 问答结果">
       <div className="sp-group-head">
         <span className="sp-group-title">AI 回答</span>
         <span className="sp-group-count">单轮问答 · 基于已校验资产元数据</span>
       </div>
+      {loading ? null : failureMessage ? (
+        <div className="sp-ai-state sp-ai-error" role="alert">
+          <span>{error
+            ? executionStatus === "cancelled" ? error : `AI 问答请求失败：${error}`
+            : failureMessage}</span>
+          {executionStatus !== "cancelled" ? (
+            <Button variant="tertiary" type="button" className="sp-ai-retry" onClick={onRetry}>
+              重试
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       <AiAskExecutionPanel
         events={executionEvents}
         status={executionStatus}
@@ -248,29 +300,14 @@ function AiAskSection({
         loading={loading}
         onCancel={onCancel}
       />
-      {loading ? null : error ? (
-        <div className="sp-ai-state sp-ai-error" role="alert">
-          <span>{executionStatus === "cancelled" ? error : `AI 问答请求失败：${error}`}</span>
-          {executionStatus !== "cancelled" ? (
-            <Button variant="tertiary" type="button" className="sp-ai-retry" onClick={onRetry}>
-              重试
-            </Button>
-          ) : null}
-        </div>
-      ) : response ? (
+      <div className="sp-ai-question">问题：{query}</div>
+      {loading || failureMessage ? null : response ? (
         <>
           {response.retrievalStatus === "degraded" ? (
             <div className="sp-ai-state" role="status">检索部分降级；下方仅展示通过当前 DAP 目录校验的候选资产。</div>
           ) : null}
-          {response.status === "retrieval_unavailable" ? (
-            <div className="sp-ai-state sp-ai-error" role="status">
-              {response.reasonCode === "retrieval_timeout" ? "资产检索超时，无法基于目录回答；传统搜索不受影响。" : "资产检索暂不可用，无法确认候选资产；传统搜索不受影响。"}
-            </div>
-          ) : response.status === "generation_unavailable" ? (
-            <div className="sp-ai-state sp-ai-error" role="status">
-              {response.reasonCode === "llm_timeout" ? "模型生成超时，未生成回答；不会把未筛选候选当作答案。" : "模型暂不可用，未生成回答；不会把未筛选候选当作答案。"}
-            </div>
-          ) : response.status === "insufficient_evidence" ? (
+          {response.statisticalResult ? <AiAskStatisticalCard result={response.statisticalResult} /> : null}
+          {response.status === "insufficient_evidence" ? (
             <div className="sp-ai-state" role="status">{response.answer}</div>
           ) : response.status === "partial_answer" ? (
             <>
@@ -281,9 +318,9 @@ function AiAskSection({
               </div>
               <div className="sp-ai-summary" aria-label="AI 部分回答">{response.answer}</div>
             </>
-          ) : (
+          ) : !response.metadataCount && response.answer.trim() ? (
             <div className="sp-ai-summary" aria-label="AI 回答摘要">{response.answer}</div>
-          )}
+          ) : null}
           {response.candidates.length ? (
             <div className="sp-ai-candidates">
               <div className="sp-group-head">
@@ -345,7 +382,10 @@ export function SearchPortalPage({
     () => new Set(scopeOptions.map((item) => item.key)),
     [scopeOptions],
   );
-  const initialSearchRef = useRef(readPortalSearchParams(validScopeKeys));
+  const initialSearchLocationRef = useRef(typeof window === "undefined" ? "" : window.location.search || "");
+  const initialScopeKeys = useMemo(() => new Set(PORTAL_SCOPE_CONFIGS.map((item) => item.key)), []);
+  const initialSearchRef = useRef(readPortalSearchParams(initialScopeKeys, initialSearchLocationRef.current));
+  const initialSearchBootstrapPendingRef = useRef(true);
   const [query, setQuery] = useState(initialSearchRef.current.query);
   const [scope, setScope] = useState(initialSearchRef.current.scope);
   const [hotKeywords, setHotKeywords] = useState<PortalHotKeyword[]>([]);
@@ -359,6 +399,8 @@ export function SearchPortalPage({
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [searchedTerm, setSearchedTerm] = useState("");
+  const [activeResultTab, setActiveResultTab] = useState<PortalResultTab>("search");
+  const [resultScrollRequest, setResultScrollRequest] = useState(0);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiQuery, setAiQuery] = useState("");
   const [aiResponse, setAiResponse] = useState<AiAskResponse | null>(null);
@@ -373,6 +415,7 @@ export function SearchPortalPage({
   );
 
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const resultContainerRef = useRef<HTMLDivElement | null>(null);
   const requestSeq = useRef(0);
   const aiRequestSeq = useRef(0);
   const aiAbortController = useRef<AbortController | null>(null);
@@ -382,6 +425,25 @@ export function SearchPortalPage({
     aiAbortController.current?.abort();
     aiAbortController.current = null;
   }, []);
+
+  useEffect(() => {
+    if (!resultScrollRequest) return;
+    const frame = window.requestAnimationFrame(() => {
+      const results = resultContainerRef.current;
+      const scrollContainer = results?.closest<HTMLElement>(".main");
+      if (results && scrollContainer) {
+        const top = results.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top + scrollContainer.scrollTop - 14;
+        scrollContainer.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+        return;
+      }
+      results?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [resultScrollRequest]);
+
+  const requestResultScroll = (): void => {
+    setResultScrollRequest((current) => current + 1);
+  };
 
   const syncSearchUrl = (
     nextQuery: string,
@@ -416,6 +478,7 @@ export function SearchPortalPage({
   };
 
   const resetSearchState = (nextScope = scope): void => {
+    initialSearchBootstrapPendingRef.current = false;
     const preservedScope = validScopeKeys.has(nextScope)
       ? nextScope
       : DEFAULT_PORTAL_SCOPE;
@@ -432,6 +495,7 @@ export function SearchPortalPage({
     setSearchLoading(false);
     setSearchError("");
     setSearchedTerm("");
+    setActiveResultTab("search");
     setAiQuery("");
     setAiResponse(null);
     setAiLoading(false);
@@ -461,15 +525,19 @@ export function SearchPortalPage({
       return;
     }
     const seq = ++requestSeq.current;
-    aiRequestSeq.current += 1;
-    aiAbortController.current?.abort();
-    aiAbortController.current = null;
-    setAiQuery("");
-    setAiResponse(null);
-    setAiLoading(false);
-    setAiError("");
-    setAiExecutionEvents([]);
-    setAiExecutionStatus(null);
+    setActiveResultTab("search");
+    requestResultScroll();
+    if (aiQuery !== keyword) {
+      aiRequestSeq.current += 1;
+      aiAbortController.current?.abort();
+      aiAbortController.current = null;
+      setAiQuery("");
+      setAiResponse(null);
+      setAiLoading(false);
+      setAiError("");
+      setAiExecutionEvents([]);
+      setAiExecutionStatus(null);
+    }
     setQuery(keyword);
     setScope(nextScope);
     setResult(null);
@@ -486,6 +554,7 @@ export function SearchPortalPage({
         if (seq !== requestSeq.current) return;
         setResult(data);
         setSearchLoading(false);
+        requestResultScroll();
       })
       .catch((error: unknown) => {
         if (seq !== requestSeq.current) return;
@@ -494,6 +563,7 @@ export function SearchPortalPage({
         );
         setResult(null);
         setSearchLoading(false);
+        requestResultScroll();
       });
 
     // Recommendations are independent: a slow or failed optional provider never
@@ -515,6 +585,8 @@ export function SearchPortalPage({
   const runAiAsk = (rawQuery = query): void => {
     const question = String(rawQuery ?? "").trim();
     if (!publicAccessReady || !aiEnabled || !question) return;
+    setActiveResultTab("ai");
+    requestResultScroll();
     const seq = ++aiRequestSeq.current;
     aiAbortController.current?.abort();
     const controller = new AbortController();
@@ -564,6 +636,7 @@ export function SearchPortalPage({
         setAiResponse(response);
         setAiLoading(false);
         setAiExecutionStatus(status);
+        requestResultScroll();
       })
       .catch((error: unknown) => {
         if (seq !== aiRequestSeq.current) return;
@@ -577,6 +650,7 @@ export function SearchPortalPage({
         const message = error instanceof Error ? error.message : "AI 问答暂不可用，请重试。";
         setAiError(message);
         setAiExecutionStatus("failed");
+        requestResultScroll();
       });
   };
 
@@ -588,6 +662,7 @@ export function SearchPortalPage({
     setAiLoading(false);
     setAiError("问答已取消。");
     setAiExecutionStatus("cancelled");
+    requestResultScroll();
   };
 
   useEffect(() => {
@@ -603,6 +678,7 @@ export function SearchPortalPage({
         if (cancelled) return;
         setAiEnabled(status.enabled);
         if (!status.enabled) {
+          setActiveResultTab("search");
           aiRequestSeq.current += 1;
           aiAbortController.current?.abort();
           aiAbortController.current = null;
@@ -615,7 +691,10 @@ export function SearchPortalPage({
         }
       })
       .catch(() => {
-        if (!cancelled) setAiEnabled(false);
+        if (!cancelled) {
+          setAiEnabled(false);
+          setActiveResultTab("search");
+        }
       });
     return () => {
       cancelled = true;
@@ -677,8 +756,18 @@ export function SearchPortalPage({
 
   useEffect(() => {
     if (!publicAccessReady) return;
-    const nextScope = validScopeKeys.has(scope) ? scope : DEFAULT_PORTAL_SCOPE;
-    const activeQuery = String(searchedTerm || query || "").trim();
+    const requestedScope = new URLSearchParams(initialSearchLocationRef.current).get("scope");
+    if (requestedScope && !validScopeKeys.has(requestedScope) && availableModules.length === 0) {
+      // The app shell may mount before its visible-module list is ready. Keep a
+      // scoped deep link intact until that list can validate it instead of
+      // silently rewriting it to the default scope.
+      return;
+    }
+    const initialSearch = readPortalSearchParams(validScopeKeys, initialSearchLocationRef.current);
+    const nextScope = validScopeKeys.has(scope) ? scope : initialSearch.scope;
+    const initialQuery = initialSearchBootstrapPendingRef.current ? initialSearch.query : "";
+    initialSearchBootstrapPendingRef.current = false;
+    const activeQuery = String(searchedTerm || query || initialQuery).trim();
 
     if (nextScope !== scope) {
       setScope(nextScope);
@@ -694,15 +783,6 @@ export function SearchPortalPage({
     // public access readiness changes. The called search updates state, so adding its
     // render-scoped dependencies would loop.
   }, [availableModules, publicAccessReady]);
-
-  useEffect(() => {
-    if (!publicAccessReady) return;
-    const initialQuery = String(initialSearchRef.current.query || "").trim();
-    if (!initialQuery) return;
-    runSearch(initialQuery, initialSearchRef.current.scope);
-    // Bootstrap the URL query once per authentication bootstrap; re-running on the
-    // render-scoped callback would repeat the search.
-  }, [publicAccessReady]);
 
   const doSearch = (): void => runSearch(query, scope);
 
@@ -730,6 +810,15 @@ export function SearchPortalPage({
 
   const hasResult = result !== null && !searchLoading && !searchError;
   const groups = hasResult && result ? result.groups : [];
+  const hasSubmittedQuery = Boolean(searchedTerm || aiQuery);
+  const aiResponseFailed = !aiResponse?.metadataCount && (
+    aiResponse?.status === "retrieval_unavailable"
+    || aiResponse?.status === "generation_unavailable"
+    || aiResponse?.status === "ambiguous_scope"
+    || aiResponse?.status === "metadata_count_unavailable"
+  );
+  const searchTabStatus = searchLoading ? "搜索中" : searchError ? "搜索失败" : searchedTerm ? "已搜索" : "未搜索";
+  const aiTabStatus = aiLoading ? "问答中" : aiError || aiResponseFailed ? "执行失败" : aiResponse ? "已完成" : "未提问";
   const searchedAssetIds = new Set(
     groups
       .flatMap((group) => group.items.map((item) => item.assetId))
@@ -754,7 +843,10 @@ export function SearchPortalPage({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              initialSearchBootstrapPendingRef.current = false;
+              setQuery(event.target.value);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter") doSearch();
             }}
@@ -772,7 +864,7 @@ export function SearchPortalPage({
               type="button"
               className="sp-ask-btn"
               aria-label="问 AI"
-              disabled={aiLoading || !query.trim()}
+              disabled={!query.trim() || (aiLoading && query.trim() === aiQuery)}
               onClick={() => runAiAsk(query)}
             >
               <span className="sp-ask-mark" aria-hidden="true">✦</span>
@@ -816,10 +908,65 @@ export function SearchPortalPage({
         </div>
       ) : null}
 
-      {searchedTerm || aiQuery ? (
-        <div className="sp-results" aria-live="polite">
-          {searchedTerm ? (
-            <>
+      {hasSubmittedQuery ? (
+        <div className="sp-results" ref={resultContainerRef} aria-live="polite">
+          <div
+            className="sp-result-tabs"
+            role="tablist"
+            aria-label="搜索与问答结果"
+            onKeyDown={(event) => {
+              const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)'));
+              const currentTab = event.target instanceof HTMLElement
+                ? event.target.closest<HTMLButtonElement>('[role="tab"]')
+                : null;
+              const currentIndex = currentTab ? tabs.indexOf(currentTab) : -1;
+              if (currentIndex < 0) return;
+              let nextIndex = -1;
+              if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tabs.length;
+              else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+              else if (event.key === "Home") nextIndex = 0;
+              else if (event.key === "End") nextIndex = tabs.length - 1;
+              if (nextIndex < 0) return;
+              const nextTab = tabs[nextIndex];
+              if (!nextTab) return;
+              event.preventDefault();
+              nextTab.focus();
+              setActiveResultTab(nextTab.dataset["resultTab"] === "ai" ? "ai" : "search");
+            }}
+          >
+            <Button
+              variant="tertiary"
+              type="button"
+              role="tab"
+              id="sp-search-tab"
+              aria-controls="sp-search-panel"
+              aria-selected={activeResultTab === "search"}
+              data-result-tab="search"
+              tabIndex={activeResultTab === "search" ? 0 : -1}
+              className={`sp-result-tab${activeResultTab === "search" ? " active" : ""}`}
+              onClick={() => setActiveResultTab("search")}
+            >
+              <span>搜索结果</span><span className="sp-result-tab-status">{searchTabStatus}</span>
+            </Button>
+            <Button
+              variant="tertiary"
+              type="button"
+              role="tab"
+              id="sp-ai-tab"
+              aria-controls="sp-ai-panel"
+              aria-selected={activeResultTab === "ai"}
+              data-result-tab="ai"
+              tabIndex={activeResultTab === "ai" ? 0 : -1}
+              className={`sp-result-tab${activeResultTab === "ai" ? " active" : ""}`}
+              onClick={() => setActiveResultTab("ai")}
+            >
+              <span>AI 问答</span><span className="sp-result-tab-status">{aiEnabled || aiQuery ? aiTabStatus : "暂不可用"}</span>
+            </Button>
+          </div>
+          <div className="sp-result-panel sp-search-panel" role="tabpanel" id="sp-search-panel" aria-labelledby="sp-search-tab" hidden={activeResultTab !== "search"}>
+            {searchedTerm ? (
+              <>
+                <div className="sp-panel-query">搜索问题：{searchedTerm}</div>
           {!searchLoading && !searchError && result?.partial ? (
             <ActionErrorBanner title="搜索结果不完整" message="部分模块暂时不可用，以下仅展示已成功查询的结果，请重新搜索。" />
           ) : null}
@@ -942,20 +1089,46 @@ export function SearchPortalPage({
               onNavigate={handleNavigate}
             />
           ) : null}
-            </>
-          ) : null}
-          <AiAskSection
-            query={aiQuery}
-            loading={aiLoading}
-            error={aiError}
-            response={aiResponse}
-            executionEvents={aiExecutionEvents}
-            executionStatus={aiExecutionStatus}
-            executionRunId={aiExecutionRunId}
-            onRetry={() => runAiAsk(aiQuery)}
-            onCancel={cancelAiAsk}
-            onNavigate={handleNavigate}
-          />
+              </>
+            ) : (
+              <div className="sp-tab-empty">
+                <p>{query.trim() ? `尚未对“${query.trim()}”执行传统搜索。` : "尚未输入要搜索的问题。"}</p>
+                <Button variant="tertiary" type="button" className="sp-panel-action" disabled={!query.trim()} onClick={doSearch}>
+                  搜索当前问题
+                </Button>
+              </div>
+            )}
+          </div>
+          <div className="sp-result-panel sp-ai-panel" role="tabpanel" id="sp-ai-panel" aria-labelledby="sp-ai-tab" hidden={activeResultTab !== "ai"}>
+            {aiQuery ? (
+              <>
+                <div className="sp-panel-query">问答问题：{aiQuery}</div>
+                <AiAskSection
+                  query={aiQuery}
+                  loading={aiLoading}
+                  error={aiError}
+                  response={aiResponse}
+                  executionEvents={aiExecutionEvents}
+                  executionStatus={aiExecutionStatus}
+                  executionRunId={aiExecutionRunId}
+                  onRetry={() => runAiAsk(aiQuery)}
+                  onCancel={cancelAiAsk}
+                  onNavigate={handleNavigate}
+                />
+              </>
+            ) : (
+              <div className="sp-tab-empty">
+                {aiEnabled ? (
+                  <>
+                    <p>{query.trim() ? `尚未对“${query.trim()}”发起 AI 问答。` : "尚未输入要问的问题。"}</p>
+                    <Button variant="tertiary" type="button" className="sp-panel-action" disabled={!query.trim()} onClick={() => runAiAsk(query)}>
+                      开始问 AI
+                    </Button>
+                  </>
+                ) : <p>AI 问答暂不可用，传统搜索仍可使用。</p>}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="sp-stats">

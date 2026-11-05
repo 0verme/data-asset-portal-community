@@ -146,19 +146,32 @@ export function useLocationSynchronization({
     });
     const currentPathname = window.location.pathname;
     const currentUrl = `${currentPathname}${window.location.search}`;
+    let nextUrl = nextLocation.url;
+    if (navigation.module === 'portal' && currentPathname === nextLocation.pathname) {
+      // The portal owns q/scope locally. Preserve its deep-link state while the
+      // shell synchronizes unrelated navigation state on the same route.
+      const currentParams = new URLSearchParams(window.location.search || '');
+      const nextParams = new URLSearchParams(nextLocation.search);
+      for (const key of ['q', 'scope']) {
+        if (currentParams.has(key)) nextParams.set(key, currentParams.get(key) || '');
+        else nextParams.delete(key);
+      }
+      const search = nextParams.toString() ? `?${nextParams.toString()}` : '';
+      nextUrl = `${nextLocation.pathname}${search}`;
+    }
     const action = resolveHistoryAction({
       currentUrl,
       currentPathname,
-      nextUrl: nextLocation.url,
+      nextUrl,
       nextPathname: nextLocation.pathname,
       historyReady: historyReadyRef.current,
       isPopstate,
     });
 
     if (action === 'push') {
-      window.history.pushState({}, '', nextLocation.url);
+      window.history.pushState({}, '', nextUrl);
     } else if (action === 'replace') {
-      window.history.replaceState({}, '', nextLocation.url);
+      window.history.replaceState({}, '', nextUrl);
     }
     if (isPopstate) lastPopstateRevisionRef.current = navigation.locationRevision;
     historyReadyRef.current = true;

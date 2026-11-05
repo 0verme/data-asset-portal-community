@@ -36,6 +36,7 @@ from .ai_ask_service import (
     _SYSTEM_PROMPT,
 )
 from .ai_llm_provider import LLMProviderError
+from .ai_metadata_count import is_metadata_count_query
 
 LOGGER = logging.getLogger(__name__)
 
@@ -144,8 +145,11 @@ class AIAskExecutionService(AIAskService):
     """Bounded multi-query RAG pipeline that reports only real execution data."""
 
     def __init__(self, base_service: AIAskService, assets_service: Any) -> None:
-        super().__init__(base_service._rag_service, base_service._llm_provider)
-        self._assets_service = assets_service
+        super().__init__(
+            base_service._rag_service,
+            base_service._llm_provider,
+            assets_service=assets_service,
+        )
 
     @staticmethod
     def _normalized_query_key(value: str) -> str:
@@ -800,6 +804,69 @@ class AIAskExecutionService(AIAskService):
             )
 
         try:
+            if is_metadata_count_query(query):
+                events.start(
+                    "metadata-count",
+                    "正在按当前 DAP 目录解析统计口径并执行精确 COUNT。",
+                    {"intent": "metadata_count"},
+                )
+
+                def unavailable_count() -> AiAskResponse:
+                    return unavailable(
+                        "metadata_count_unavailable",
+                        "当前 DAP 目录统计暂不可用，未将检索候选数当作总数；请稍后重试。",
+                        status="metadata_count_unavailable",
+                        retrieval_status="not_run",
+                        generation_status="not_run",
+                    )
+
+                try:
+                    response = super().ask(
+                        request,
+                        profile=profile,
+                        progress_callback=None,
+                        cancel_event=cancel_signal,
+                    )
+                except AIAskCancelled:
+                    if cancel_event is not None and cancel_event.is_set():
+                        raise
+                    if not deadline_event.is_set():
+                        raise
+                    events.error(
+                        "metadata-count",
+                        "DAP 目录精确 COUNT 超过单次问答总时限。",
+                        {"intent": "metadata_count", "errorCode": "timeout"},
+                    )
+                    return emit_answer(unavailable_count())
+                except Exception:
+                    LOGGER.warning("AI metadata count execution failed without exposing catalog details")
+                    events.error(
+                        "metadata-count",
+                        "DAP 目录精确 COUNT 未能完成。",
+                        {"intent": "metadata_count", "errorCode": "unavailable"},
+                    )
+                    return emit_answer(unavailable_count())
+
+                if response.status == "metadata_count_answered" and response.metadata_count is not None:
+                    events.complete(
+                        "metadata-count",
+                        "DAP 目录精确 COUNT 已完成。",
+                        {"intent": "metadata_count", "tableCount": response.metadata_count.value},
+                    )
+                else:
+                    code = response.reason_code or "metadata_count_unavailable"
+                    message = (
+                        "无法唯一确认 DAP 目录统计范围，未执行 COUNT。"
+                        if response.status == "ambiguous_scope"
+                        else "DAP 目录精确 COUNT 未返回可核实数值。"
+                    )
+                    events.error(
+                        "metadata-count",
+                        message,
+                        {"intent": "metadata_count", "errorCode": code},
+                    )
+                return emit_answer(response)
+
             events.start("planning", "正在分析问题并规划检索查询。", {"query": query})
             if not query:
                 events.error("planning", "问题为空，无法规划检索。", {"errorCode": "invalid_request"})

@@ -166,6 +166,7 @@ def _register_ai_ask_routes(
             queue: asyncio.Queue[tuple[str, dict[str, Any] | None]] = asyncio.Queue()
             cancel_event = threading.Event()
             step_ids: set[str] = set()
+            answer_emitted = False
             step_lock = threading.Lock()
 
             def enqueue(event: str, data: dict[str, Any] | None) -> None:
@@ -177,9 +178,14 @@ def _register_ai_ask_routes(
                     return
 
             def report_execution(event: str, data: dict[str, Any]) -> None:
+                nonlocal answer_emitted
                 step_id = data.get("step_id")
-                if isinstance(step_id, str) and step_id not in {"answer", "done"}:
-                    with step_lock:
+                with step_lock:
+                    if event == "answer":
+                        if answer_emitted:
+                            return
+                        answer_emitted = True
+                    elif isinstance(step_id, str) and step_id not in {"answer", "done"}:
                         step_ids.add(step_id)
                 enqueue(event, data)
 
@@ -232,7 +238,7 @@ def _register_ai_ask_routes(
                     })
                 if response is not None:
                     with step_lock:
-                        answer_sent = "answer" in step_ids
+                        answer_sent = answer_emitted
                     if not answer_sent:
                         timestamp = datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
                         report_execution("answer", {
@@ -242,7 +248,12 @@ def _register_ai_ask_routes(
                             "message": "已返回问答结果。",
                             "data": {"response": response.model_dump(by_alias=True)},
                         })
-                    success = response.status in {"answered", "partial_answer", "insufficient_evidence"}
+                    success = response.status in {
+                        "answered",
+                        "partial_answer",
+                        "insufficient_evidence",
+                        "metadata_count_answered",
+                    }
                     with step_lock:
                         count = len(step_ids)
                     timestamp = datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")

@@ -29,7 +29,7 @@ const EXECUTION_DATA_KEYS = new Set([
   "maxTables", "candidateCount", "verifiedTableCount", "verifiedFieldCount",
   "errorCount", "truncated", "source", "indexEvidenceOnly", "assetId", "nameHint",
   "tableName", "fieldCount", "fieldId", "fieldName", "evidenceCount", "assetIds",
-  "selectedEvidenceCount", "citationIds",
+  "selectedEvidenceCount", "citationIds", "intent", "tableCount", "elapsedMs",
 ]);
 const HIT_DATA_KEYS = new Set([
   "rank", "assetId", "fieldId", "entityType", "name", "retrievalChannels", "matchedTerms",
@@ -87,6 +87,15 @@ export function parseAiAskExecutionEvent(event: RemoteServerSentEvent): AiAskExe
     }
     if (!data || !("response" in data)) throw new Error("AI 问答进度流缺少完整答案。");
     data["response"] = parseAiAskResponse(data["response"]);
+  }
+  if (event.event.startsWith("step_") && stepId === "metadata-count") {
+    const count = data?.["tableCount"];
+    if (
+      data?.["intent"] !== "metadata_count"
+      || (count !== undefined && (!Number.isSafeInteger(count) || Number(count) < 0))
+    ) {
+      throw new Error("AI 问答统计进度事件格式无效。");
+    }
   }
   if (event.event.startsWith("step_") && data?.["hits"] !== undefined) {
     const hits = data["hits"];

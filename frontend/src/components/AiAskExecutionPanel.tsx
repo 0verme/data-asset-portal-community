@@ -52,12 +52,15 @@ function errorLabel(value: unknown): string {
     llm_busy: "模型服务繁忙",
     llm_unavailable: "模型服务不可用",
     ai_disabled: "问答服务未启用",
+    ambiguous_scope: "无法唯一确认统计范围",
+    metadata_count_unavailable: "DAP 目录统计暂不可用",
   };
   return typeof value === "string" ? labels[value] || "执行步骤失败" : "执行步骤失败";
 }
 
 function stepLabel(id: string, message: string): string {
   if (message) return message;
+  if (id === "metadata-count") return "查询 DAP 元数据精确总数";
   if (id === "planning") return "分析问题并规划查询";
   if (id.startsWith("rag-round-")) return "检索数据资产";
   if (id === "merge") return "合并并去重检索结果";
@@ -85,6 +88,15 @@ function StepDetails({ step }: { step: ExecutionStep }) {
     ? data["selectedAssetIds"].filter((item): item is number => typeof item === "number")
     : [];
 
+  if (step.id === "metadata-count") {
+    const count = numberValue(data["tableCount"]);
+    return (
+      <div className="sp-ai-execution-detail">
+        {count !== null ? <p>DAP 目录精确 COUNT：{count} 张表。</p> : <p>未返回可核实的统计数值；检索候选数不会替代目录 COUNT。</p>}
+        {typeof data["errorCode"] === "string" ? <p className="sp-ai-execution-error">{errorLabel(data["errorCode"])}</p> : null}
+      </div>
+    );
+  }
   if (step.id === "planning") {
     return (
       <div className="sp-ai-execution-detail">
@@ -193,7 +205,8 @@ export function AiAskExecutionPanel({ events, status, runId, loading, onCancel }
   useEffect(() => {
     const previous = previousStatus.current;
     previousStatus.current = status;
-    if (previous === "running" && status === "completed" && !touchedForRun.current) {
+    const terminal = status === "completed" || status === "failed" || status === "cancelled";
+    if (previous === "running" && terminal && !touchedForRun.current) {
       setExpanded(false);
     }
   }, [status]);

@@ -9,6 +9,7 @@ from backend.app.authorization.core import AuthorizationService
 from backend.app.contracts.ai_ask import AiAskProgressStep, AiAskResponse
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi_app import create_fastapi_app
+from backend.app.services.ai_ask_service import AIAskCancelled
 from fastapi.testclient import TestClient
 
 _DEFAULT_IDENTITY = object()
@@ -116,6 +117,51 @@ class AiAskApiTests(unittest.TestCase):
         self.assertEqual("answered", response.json()["status"])
         self.assertEqual("internal", service.calls[0][1])
 
+    def test_metadata_count_contract_is_returned_without_rag_citations_or_model_success(self):
+        response_contract = AiAskResponse(
+            status="metadata_count_answered",
+            answer="当前 DAP 目录中，合成主题域、数据集市层共有 0 张数据表。",
+            metadataCount={
+                "metric": "table_count",
+                "value": 0,
+                "filters": {
+                    "domain": {
+                        "code": "SYNTH",
+                        "displayName": "合成主题域",
+                        "matchedAs": "catalog_value",
+                        "inferred": False,
+                    },
+                    "layer": {
+                        "code": "DM",
+                        "displayName": "数据集市层",
+                        "matchedAs": "catalog_alias",
+                        "inferred": True,
+                    },
+                },
+                "source": "dap_catalog",
+                "complete": True,
+                "catalogProfile": "strict",
+                "sourceLink": "/data-warehouse?domain=%E5%90%88%E6%88%90%E4%B8%BB%E9%A2%98%E5%9F%9F&layer=DM",
+            },
+            retrievalStatus="not_run",
+            generationStatus="not_run",
+            reasonCode=None,
+        )
+        service = StubAIAskService(response=response_contract)
+        with patch.dict(os.environ, {"PUBLIC_CATALOG_PROFILE": "strict"}, clear=False):
+            client, _search = self._client(service=service, identity=None)
+            response = client.post("/api/ai/ask", json={"query": "合成主题域集市有几张表？"})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("metadata_count_answered", payload["status"])
+        self.assertEqual(0, payload["metadataCount"]["value"])
+        self.assertTrue(payload["metadataCount"]["complete"])
+        self.assertEqual("strict", payload["metadataCount"]["catalogProfile"])
+        self.assertEqual("not_run", payload["generationStatus"])
+        self.assertEqual([], payload["citations"])
+        self.assertEqual("strict", service.calls[0][1])
+
     def test_disabled_status_is_false_and_does_not_leak_configuration(self):
         client, _search = self._client(service=StubAIAskService(enabled=False))
 
@@ -189,6 +235,13 @@ class AiAskApiTests(unittest.TestCase):
                     "message": "已完成查询规划。",
                     "data": {"planningMode": "structured_llm", "queries": [payload.query]},
                 })
+                event_callback("answer", {
+                    "request_id": request_id,
+                    "step_id": "answer",
+                    "timestamp": "2026-01-01T00:00:00.002Z",
+                    "message": "已生成答案。",
+                    "data": {"response": service.response.model_dump(by_alias=True)},
+                })
                 return service.response
 
         execution = StubExecutionService()
@@ -201,6 +254,8 @@ class AiAskApiTests(unittest.TestCase):
         self.assertIn("event: step_start\n", response.text)
         self.assertIn("event: step_complete\n", response.text)
         self.assertIn("event: answer\n", response.text)
+        self.assertEqual(1, response.text.count("event: answer\n"))
+        self.assertEqual(1, response.text.count("event: done\n"))
         self.assertIn("event: done\n", response.text)
         self.assertIn('"status":"completed"', response.text)
         self.assertIn("发现已校验的目录候选。", response.text)
@@ -210,6 +265,91 @@ class AiAskApiTests(unittest.TestCase):
         self.assertEqual("internal", execution.calls[0][1])
         self.assertEqual(32, len(execution.calls[0][2]))
         self.assertEqual(execution.calls[0][2], response.text.split('"request_id":"', 1)[1][:32])
+
+    def test_execution_stream_compatibility_and_exception_paths_emit_only_one_answer(self):
+        service = StubAIAskService()
+        client, _search = self._client(service=service, execution=service)
+        compatible = client.post("/api/ai/ask/stream", json={"query": "兼容目录问题"})
+        self.assertEqual(1, compatible.text.count("event: answer\n"))
+        self.assertEqual(1, compatible.text.count("event: done\n"))
+        self.assertIn('"status":"completed"', compatible.text)
+
+        class BrokenExecutionService:
+            def ask(self, *_args, **_kwargs):
+                raise RuntimeError("private provider details")
+
+        client, _search = self._client(service=service, execution=BrokenExecutionService())
+        failed = client.post("/api/ai/ask/stream", json={"query": "异常目录问题"})
+        self.assertEqual(1, failed.text.count("event: answer\n"))
+        self.assertEqual(1, failed.text.count("event: done\n"))
+        self.assertIn('"status":"failed"', failed.text)
+        self.assertNotIn("private provider details", failed.text)
+
+    def test_execution_stream_cancellation_is_terminal_without_an_answer(self):
+        service = StubAIAskService()
+
+        class CancelledExecutionService:
+            def ask(self, *_args, **_kwargs):
+                raise AIAskCancelled("request_cancelled")
+
+        client, _search = self._client(service=service, execution=CancelledExecutionService())
+        response = client.post("/api/ai/ask/stream", json={"query": "取消目录问题"})
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(0, response.text.count("event: answer\n"))
+        self.assertEqual(1, response.text.count("event: done\n"))
+        self.assertIn('"status":"cancelled"', response.text)
+
+    def test_metadata_count_stream_is_successful_and_emits_one_answer(self):
+        response_contract = AiAskResponse(
+            status="metadata_count_answered",
+            answer="当前 DAP 目录中共有 0 张数据表。",
+            metadataCount={
+                "metric": "table_count",
+                "value": 0,
+                "filters": {"domain": None, "layer": None},
+                "source": "dap_catalog",
+                "complete": True,
+                "catalogProfile": "strict",
+                "sourceLink": "/data-warehouse",
+            },
+            retrievalStatus="not_run",
+            generationStatus="not_run",
+        )
+        service = StubAIAskService(response=response_contract)
+
+        class MetadataCountExecutionService:
+            def ask(self, payload, *, profile, request_id, event_callback, cancel_event=None):
+                event_callback("step_start", {
+                    "request_id": request_id,
+                    "step_id": "metadata-count",
+                    "timestamp": "2026-01-01T00:00:00.000Z",
+                    "message": "正在执行精确目录 COUNT。",
+                    "data": {"intent": "metadata_count"},
+                })
+                event_callback("step_complete", {
+                    "request_id": request_id,
+                    "step_id": "metadata-count",
+                    "timestamp": "2026-01-01T00:00:00.001Z",
+                    "message": "DAP 目录精确 COUNT 已完成。",
+                    "data": {"intent": "metadata_count", "tableCount": 0},
+                })
+                event_callback("answer", {
+                    "request_id": request_id,
+                    "step_id": "answer",
+                    "timestamp": "2026-01-01T00:00:00.002Z",
+                    "message": "已返回精确目录统计。",
+                    "data": {"response": response_contract.model_dump(by_alias=True)},
+                })
+                return response_contract
+
+        client, _search = self._client(service=service, execution=MetadataCountExecutionService())
+        response = client.post("/api/ai/ask/stream", json={"query": "共有多少张表？"})
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(1, response.text.count("event: answer\n"))
+        self.assertIn('"status":"completed"', response.text)
+        self.assertIn('"metadataCount":{"metric":"table_count","value":0', response.text)
 
     def test_progress_endpoint_emits_safe_sse_and_keeps_existing_json_api(self):
         service = StubAIAskService()

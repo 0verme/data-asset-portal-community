@@ -61,10 +61,10 @@ test("Remote strict collection response retries malformed parameter items and pr
       await route.fulfill({ json: { items: [{ code: "CUSTOM", name: "自定义分类", count: 0 }] } });
       return;
     }
-    if (path === "/system/param-dicts" && request.method() === "GET") {
+    if (path === "/system/param-dicts/page" && request.method() === "GET") {
       itemRequests += 1;
       if (!allowItemRecovery) return route.fulfill({ json: { items: null } });
-      return route.fulfill({ json: { items: [] } });
+      return route.fulfill({ json: { items: [], total: 0, page: 1, pageSize: 20 } });
     }
     await route.fulfill({ json: { items: [] } });
   });
@@ -199,17 +199,18 @@ test("Remote strict collection response reloads a failed category after navigati
         { code: "CATEGORY_B", name: "分类 B", count: 1 },
       ] } });
     }
-    if (path === "/system/param-dicts" && request.method() === "GET") {
+    if (path === "/system/param-dicts/page" && request.method() === "GET") {
       const categoryCode = new URL(request.url()).searchParams.get("categoryCode");
       if (categoryCode === "CATEGORY_A") {
-        return route.fulfill({ json: { items: [{ id: "a1", categoryCode, categoryName: "分类 A", code: "A_ENTRY", name: "A 字典项", value: "a", status: "enabled" }] } });
+        return route.fulfill({ json: { items: [{ id: "a1", categoryCode, categoryName: "分类 A", code: "A_ENTRY", name: "A 字典项", value: "a", status: "enabled" }], total: 1, page: 1, pageSize: 20 } });
       }
       if (categoryCode === "CATEGORY_B") {
         categoryBRequests += 1;
         if (categoryBRequests === 1) return route.fulfill({ json: { items: null } });
-        return route.fulfill({ json: { items: [{ id: "b1", categoryCode, categoryName: "分类 B", code: "B_ENTRY", name: "B 字典项", value: "b", status: "enabled" }] } });
+        return route.fulfill({ json: { items: [{ id: "b1", categoryCode, categoryName: "分类 B", code: "B_ENTRY", name: "B 字典项", value: "b", status: "enabled" }], total: 1, page: 1, pageSize: 20 } });
       }
     }
+    if (path === "/system/users/page") return route.fulfill({ json: { items: [], total: 0, page: 1, pageSize: 20 } });
     if (path === "/system/users") return route.fulfill({ json: { items: [] } });
     return route.fulfill({ json: { items: [] } });
   });
@@ -218,7 +219,7 @@ test("Remote strict collection response reloads a failed category after navigati
   await expect(page.getByText("A 字典项")).toBeVisible({ timeout: 20_000 });
   await page.locator(".system-category-item").filter({ hasText: "分类 B" }).click();
   await expect(page.getByRole("heading", { name: "系统管理加载失败" })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole("alert")).toContainText("参数字典列表接口返回格式无效：预期数组或 items 数组");
+  await expect(page.getByRole("alert")).toContainText("参数字典列表接口返回格式无效：分页响应必须包含 items");
 
   await page.locator(".side-item").filter({ hasText: "用户管理" }).click();
   await expect(page.locator(".page-title")).toContainText("用户管理", { timeout: 20_000 });

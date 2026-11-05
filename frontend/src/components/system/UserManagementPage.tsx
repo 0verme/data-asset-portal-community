@@ -17,7 +17,7 @@ import type { MockSystemUser } from "../../data/systemUsers.ts";
 import { formatDateTime } from "../../utils/date.ts";
 import { EmptyState, RowActions, StatusBadge } from "../common/index.ts";
 import { Highlight, Icon, initial } from "../ui.tsx";
-import { Button } from "../../ui/index.ts";
+import { Button, TablePagination } from "../../ui/index.ts";
 import { USER_ROLE_META, USER_STATUS_META } from "./constants.ts";
 
 // 用户账号状态统一为启用/禁用，重置密码和状态切换作为业务动作展示。
@@ -55,6 +55,11 @@ export function buildUserStatusActions(
 
 export interface UserManagementPageProps {
   users: readonly MockSystemUser[];
+  total: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   query: string;
   canEdit: boolean;
   onNew: () => void;
@@ -65,6 +70,11 @@ export interface UserManagementPageProps {
 
 export function UserManagementPage({
   users,
+  total,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
   query,
   canEdit,
   onNew,
@@ -72,12 +82,7 @@ export function UserManagementPage({
   onResetPassword,
   onChangeStatus,
 }: UserManagementPageProps) {
-  const normalizedQuery = query.trim().toLowerCase();
-  const filteredUsers = users.filter((user) => {
-    if (!normalizedQuery) return true;
-    return [user.username, user.displayName, user.email, user.status, USER_ROLE_META[user.role] || user.role]
-      .some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
-  });
+  const filteredUsers = users;
 
   return (
     <div className="system-page">
@@ -85,8 +90,7 @@ export function UserManagementPage({
         <div>
           <div className="page-title"><span className="pt-code">SYS</span>用户管理</div>
           <div className="page-sub">
-            共 <b>{filteredUsers.length}</b> 个账号
-            {filteredUsers.length !== users.length ? <>，总量 <b>{users.length}</b></> : null}
+            共 <b>{total}</b> 个账号
             {query ? <>，匹配 “{query}”</> : null}
           </div>
         </div>
@@ -150,6 +154,14 @@ export function UserManagementPage({
           </table>
         </div>
       )}
+      <TablePagination
+        ariaLabel="用户管理分页"
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </div>
   );
 }

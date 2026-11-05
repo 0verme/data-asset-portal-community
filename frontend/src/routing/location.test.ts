@@ -77,6 +77,13 @@ test("initial location parsing restores deep links and query state", () => {
   assert.equal(location.indicatorView, "card");
 });
 
+test("asset deep links preserve layer codes supplied by the live catalog", () => {
+  const location = parseLocation("/data-warehouse?domain=synthetic&layer=MART");
+
+  assert.equal(location.assetDomain, "synthetic");
+  assert.equal(location.assetLayer, "MART");
+});
+
 test("canonical module paths restore their existing route shapes", () => {
   const cases: LocationCase[] = [
     ["/data-warehouse/orders/edit", "dwm", { page: "edit", table: "orders" }, "assetRoute"],

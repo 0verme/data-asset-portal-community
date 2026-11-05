@@ -29,12 +29,12 @@ const response = {
   elapsedMs: 10,
 };
 
-function event(name: string, data: Record<string, unknown>) {
+function event(name: string, data: Record<string, unknown>, stepId?: string) {
   return {
     event: name,
     data: JSON.stringify({
       request_id: "0123456789abcdef0123456789abcdef",
-      step_id: name === "answer" ? "answer" : name === "keep_alive" ? "keep-alive" : "search-0123456789abcdef",
+      step_id: stepId ?? (name === "answer" ? "answer" : name === "keep_alive" ? "keep-alive" : "search-0123456789abcdef"),
       timestamp: "2026-01-01T00:00:00.000Z",
       message: "Synthetic progress event.",
       ...(name === "keep_alive" ? {} : { data }),
@@ -57,6 +57,26 @@ test("execution parser validates event envelope and preserves only DAP-authorize
   })), /citation/i);
   assert.throws(() => parseAiAskExecutionEvent(event("answer", { response, token: "must-not-stream" })), /包含不支持的数据/);
   assert.throws(() => parseAiAskExecutionEvent({ event: "answer", data: "{" }), /事件格式无效/);
+});
+
+test("metadata-count execution events accept exact zero and reject malformed count evidence", () => {
+  const parsed = parseAiAskExecutionEvent(event(
+    "step_complete",
+    { intent: "metadata_count", tableCount: 0 },
+    "metadata-count",
+  ));
+  assert.equal(parsed.stepId, "metadata-count");
+  assert.equal(parsed.data?.["tableCount"], 0);
+  assert.throws(() => parseAiAskExecutionEvent(event(
+    "step_complete",
+    { intent: "metadata_count", tableCount: -1 },
+    "metadata-count",
+  )), /统计进度事件格式无效/);
+  assert.throws(() => parseAiAskExecutionEvent(event(
+    "step_start",
+    { intent: "retrieval" },
+    "metadata-count",
+  )), /统计进度事件格式无效/);
 });
 
 test("keep-alive events are accepted as metadata-free transport heartbeats", () => {
