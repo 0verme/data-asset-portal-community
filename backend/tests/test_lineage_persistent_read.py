@@ -30,7 +30,6 @@ class PersistentLineageReadTests(unittest.TestCase):
             {
                 "ASSET_DB_CONFIG_PATH": str(self.config_path),
                 "ASSET_DB_PROFILE": "lineage_test",
-                "LINEAGE_DB_PROFILE": "lineage_test",
             },
             clear=False,
         )
