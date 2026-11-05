@@ -38,7 +38,6 @@ import {
   ASSET_VIEW_OPTIONS,
 } from "../config/defaults.ts";
 import { normalizeIndicatorDimensionCode } from "../data/indicatorDimensions.ts";
-import { LAYER_OPTIONS } from "../config/assets.ts";
 import { getActiveModuleRoute } from "./navigation.ts";
 import type {
   ApiAssetFilter,
@@ -193,10 +192,10 @@ export function parseInitialLocation(): LocationSnapshot {
   const assetId = Number.isInteger(requestedAssetId) && requestedAssetId > 0
     ? requestedAssetId
     : null;
-  const requestedLayer = searchParams.get("layer")?.trim().toUpperCase() || "";
-  const assetLayer = LAYER_OPTIONS.some((item) => item.code === requestedLayer)
-    ? requestedLayer
-    : null;
+  // Layer codes are supplied by the live asset catalog; do not reject a valid
+  // deep-link filter merely because it is absent from this bundle's static UI options.
+  const requestedLayer = searchParams.get("layer")?.trim() || "";
+  const assetLayer = requestedLayer || null;
   const lineageRoute: LineageRoute = {
     rootId: searchParams.get("rootId") || null,
     direction: readEnum(
