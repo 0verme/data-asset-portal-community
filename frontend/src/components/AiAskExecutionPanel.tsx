@@ -205,8 +205,7 @@ export function AiAskExecutionPanel({ events, status, runId, loading, onCancel }
   useEffect(() => {
     const previous = previousStatus.current;
     previousStatus.current = status;
-    const terminal = status === "completed" || status === "failed" || status === "cancelled";
-    if (previous === "running" && terminal && !touchedForRun.current) {
+    if (previous === "running" && status === "completed" && !touchedForRun.current) {
       setExpanded(false);
     }
   }, [status]);

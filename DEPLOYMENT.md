@@ -466,6 +466,35 @@ if (-not (Test-Path "$BackupDir\index.html")) { throw "备份失败，停止部�
 
 **判定原则：HTTP 200 ≠ 新版已上线。** 必须同时有构建成功的退出码、可追溯的源码版本、新旧产物差异、在线 JS/CSS 与 API 代理验收结果。以上是操作模板，不宣称这些 PowerShell 命令已在本次 PR 对真实内网机器执行。
 
+### 7.4 Linux Python 静态文件与 API 代理入口（Issue #538）
+
+仓库正式维护 [`frontend/serve-dist-linux.py`](./frontend/serve-dist-linux.py)：使用 Python 标准库托管已构建的 `frontend/dist/`，并将同源 API 请求代理到 FastAPI。它是可选的 Linux 静态文件/API 入口，不替换后端、API 契约或现有 Nginx 部署；使用 Nginx 时仍优先按本手册既有 Nginx 配置运行。
+
+从仓库根目录构建前端后，可在**启动进程时**配置入口。下例绑定 loopback，适用于本机验收或同机可信反向代理；需要让局域网客户端直连时，应显式选择受控监听地址、配置防火墙，并由可信 HTTPS 入口承担 TLS，不能把此脚本当作身份认证层：
+
+```bash
+VITE_API_MODE=remote VITE_API_BASE_URL=/api npm --prefix frontend run build
+DAP_BACKEND_URL=http://127.0.0.1:15099 \
+DAP_HOST=127.0.0.1 \
+DAP_PORT=15198 \
+python3 frontend/serve-dist-linux.py
+```
+
+启动后可在服务机本地检查 `http://127.0.0.1:15198/`；绑定 loopback 时，远端用户需经同机反向代理访问。
+
+环境变量契约：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `DAP_FRONTEND_DIST` | `dist/`（相对脚本所在目录） | 静态构建目录。未设置或为空时默认路径不受启动 cwd 影响；显式相对路径按进程启动 cwd 解析。 |
+| `DAP_BACKEND_URL` | `http://127.0.0.1:15099` | 后端 HTTP(S) origin；不接受 URL 凭据、路径、query 或 fragment。按现场后端监听配置显式设置。 |
+| `DAP_HOST` | `0.0.0.0` | 监听地址。建议只让可信入口访问；经 Nginx 暴露时可绑定 loopback。 |
+| `DAP_PORT` | `15198` | 监听 TCP 端口，必须为 1–65535。 |
+
+本代理对 `text/event-stream` 使用 HTTP/1.1 chunked 转发并逐段 flush；若前面还有 Nginx/负载均衡器，应单独确认该层也关闭 SSE 响应缓冲。代理不提供 TLS、身份认证或授权，不应被当作后端安全边界；需要登录/session 的正式环境应继续使用 HTTPS 与受控入口。它会拒绝 chunked 请求体（避免误读），保留 JSON/API 状态与 Cookie 透传，并忽略客户端伪造的 forwarded headers。
+
+**升级既有 Linux 部署时不得盲目覆盖运行文件。** 仓库中的脚本是后续正式维护的版本，但不宣称与既有内网文件逐字相同。操作人员应先记录现有服务命令、owner/mode、环境变量及 backend 监听配置，在服务目录外备份旧脚本；对比本仓库版本与现场版本，保留现场明确需要的配置，通过 `DAP_*` 环境变量迁移配置；先在隔离/预发布实例验证静态资源、JSON API、Cookie、SSE 中间事件和回滚路径，再由维护者按既有服务管理方式人工切换。不要把现场真实地址、凭据、绝对路径写入仓库，也不要在本 PR 中部署或重启。
+
 ## 8. systemd
 
 仓库示例 [`deploy/systemd/data-asset-portal.service.example`](./deploy/systemd/data-asset-portal.service.example) 使用当前唯一的 FastAPI/Uvicorn runtime：

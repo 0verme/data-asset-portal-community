@@ -480,6 +480,7 @@ test("switching tabs during an AI request preserves running state and sends one 
   await page.getByRole("textbox", { name: "搜索数据资产" }).fill(query);
   await page.getByRole("button", { name: "问 AI", exact: true }).click();
   await expect(page.getByRole("button", { name: "取消问答" })).toBeVisible();
+  await expect(page.locator(".sp-ai-execution")).toHaveAttribute("open", "");
   await page.getByRole("tab", { name: /搜索结果/ }).click();
   await expect(page.getByText("尚未对“cancel-first running query”执行传统搜索。")).toBeVisible();
   await page.getByRole("tab", { name: /AI 问答/ }).click();
@@ -487,6 +488,35 @@ test("switching tabs during an AI request preserves running state and sends one 
   expect(fixtures.asked).toHaveLength(1);
   await expect(page.getByLabel("AI 回答摘要")).toContainText(query);
   expect(fixtures.asked).toHaveLength(1);
+});
+
+test("manual collapse during execution stays collapsed after normal completion", async ({ page }) => {
+  await openAiPortal(page, { delayFirstAsk: true });
+  const input = page.getByRole("textbox", { name: "搜索数据资产" });
+  await input.fill("slow-old manual collapse question");
+  await page.getByRole("button", { name: "问 AI", exact: true }).click();
+  const progress = page.locator(".sp-ai-execution");
+  await expect(progress).toHaveAttribute("open", "");
+  await expect(page.getByRole("button", { name: "取消问答" })).toBeVisible();
+  await progress.locator(":scope > summary").click();
+  await expect(progress).not.toHaveAttribute("open", "");
+  await expect(page.getByLabel("AI 回答摘要")).toContainText("slow-old manual collapse question");
+  await expect(progress).not.toHaveAttribute("open", "");
+});
+
+test("manual expansion during execution stays expanded after normal completion", async ({ page }) => {
+  await openAiPortal(page, { delayFirstAsk: true });
+  const input = page.getByRole("textbox", { name: "搜索数据资产" });
+  await input.fill("slow-old manual expand question");
+  await page.getByRole("button", { name: "问 AI", exact: true }).click();
+  const progress = page.locator(".sp-ai-execution");
+  await expect(progress).toHaveAttribute("open", "");
+  await progress.locator(":scope > summary").click();
+  await expect(progress).not.toHaveAttribute("open", "");
+  await progress.locator(":scope > summary").click();
+  await expect(progress).toHaveAttribute("open", "");
+  await expect(page.getByLabel("AI 回答摘要")).toContainText("slow-old manual expand question");
+  await expect(progress).toHaveAttribute("open", "");
 });
 
 test("a new AI question supersedes a slow old response without relabeling", async ({ page }) => {
@@ -558,13 +588,14 @@ test("model timeout is distinguished and transient ask errors can be retried", a
   await expect(page.getByText("llm_timeout", { exact: false })).toHaveCount(0);
   const timeoutAlert = page.locator(".sp-ai-group [role=alert]");
   await expect(timeoutAlert).toBeVisible();
-  await expect(page.locator(".sp-ai-execution")).not.toHaveAttribute("open", "");
+  const progress = page.locator(".sp-ai-execution");
+  await expect(progress).toHaveAttribute("open", "");
   const failurePrecedesProgress = await page.evaluate(() => {
     const alert = document.querySelector(".sp-ai-group [role=alert]");
     const progress = document.querySelector(".sp-ai-execution");
     return Boolean(alert && progress && (alert.compareDocumentPosition(progress) & Node.DOCUMENT_POSITION_FOLLOWING));
   });
-  expect(failurePrecedesProgress).toBe(true, "AI failures should be announced before collapsed execution details");
+  expect(failurePrecedesProgress).toBe(true, "AI failures should be announced before execution details");
   await expect(timeoutAlert).not.toContainText("llm_timeout");
 
   await input.fill("retry candidate");
@@ -583,6 +614,7 @@ test("cancelled requests are explicit and cannot overwrite a subsequent answer",
   await expect(page.getByRole("button", { name: "取消问答" })).toBeVisible();
   await page.getByRole("button", { name: "取消问答" }).click();
   await expect(page.getByText("问答已取消。", { exact: true })).toBeVisible();
+  await expect(page.locator(".sp-ai-execution")).toHaveAttribute("open", "");
 
   await input.fill("replacement question");
   await page.getByRole("button", { name: "问 AI", exact: true }).click();
