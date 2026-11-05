@@ -401,15 +401,24 @@ class ProxyHarness(unittest.TestCase):
         response.close()
         connection.close()
 
-    def test_chunked_request_body_is_rejected_instead_of_misframed(self):
-        with socket.create_connection(("127.0.0.1", self.proxy_port), timeout=3) as sock:
-            sock.sendall(
-                b"POST /api/echo HTTP/1.1\r\nHost: localhost\r\n"
-                b"Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
-                b"4\r\ntest\r\n0\r\n\r\n"
-            )
-            status = sock.makefile("rb").readline().decode("ascii").strip()
-        self.assertIn(" 501 ", status)
+    def test_unsupported_request_bodies_are_rejected_instead_of_misframed(self):
+        chunked_body = b"4\r\ntest\r\n0\r\n\r\n"
+        requests = (
+            (b"POST /api/echo", b"Transfer-Encoding: chunked\r\n", chunked_body, b" 501 "),
+            (b"GET /", b"Transfer-Encoding: chunked\r\n", chunked_body, b" 400 "),
+            (b"HEAD /", b"Transfer-Encoding: chunked\r\n", chunked_body, b" 400 "),
+            (b"OPTIONS /api/echo", b"Transfer-Encoding: chunked\r\n", chunked_body, b" 400 "),
+            (b"GET /", b"Content-Length: 4\r\n", b"test", b" 400 "),
+        )
+        for request_line, framing, body, expected_status in requests:
+            with self.subTest(request_line=request_line, framing=framing):
+                with socket.create_connection(("127.0.0.1", self.proxy_port), timeout=3) as sock:
+                    sock.sendall(
+                        request_line + b" HTTP/1.1\r\nHost: localhost\r\n"
+                        + framing + b"Connection: close\r\n\r\n" + body
+                    )
+                    status = sock.makefile("rb").readline().decode("ascii").strip()
+                self.assertIn(expected_status.decode("ascii"), status)
 
     def test_relative_dist_uses_launch_directory_and_default_dist_uses_script_directory(self):
         relative_dist = self.root / "relative-dist"

@@ -380,6 +380,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception:
                 pass
 
+    def _reject_unexpected_body(self):
+        """Static and preflight routes do not accept request bodies."""
+        lengths = self.headers.get_all("Content-Length") or []
+        has_body = bool(self.headers.get_all("Transfer-Encoding")) or len(lengths) > 1
+        if lengths and not has_body:
+            try:
+                has_body = int(lengths[0]) != 0
+            except ValueError:
+                has_body = True
+        if has_body:
+            self.close_connection = True
+            self.send_error(400, "request body is not supported on this route")
+            return True
+        return False
+
     def _safe_static_path(self, request_path):
         """Resolve a request using SimpleHTTPRequestHandler rules, then contain symlinks."""
         translated = super().translate_path(request_path)
@@ -419,13 +434,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if _is_proxy_path(self.path):
             self._proxy()
-        else:
+        elif not self._reject_unexpected_body():
             self._serve_static_or_spa()
 
     def do_HEAD(self):
         if _is_proxy_path(self.path):
             self._proxy()
-        else:
+        elif not self._reject_unexpected_body():
             self._serve_static_or_spa(head_only=True)
 
     def do_POST(self):
@@ -439,6 +454,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     do_DELETE = do_POST
 
     def do_OPTIONS(self):
+        if self._reject_unexpected_body():
+            return
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
