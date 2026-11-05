@@ -238,6 +238,11 @@ export function useSystemModule({
   const loadedItemsKeyRef = React.useRef('');
   const pageRequestSeq = React.useRef(0);
   const previousQueryRef = React.useRef(query.trim());
+  const queryRef = React.useRef(query);
+  const userPageRef = React.useRef(userPage);
+  const userPageSizeRef = React.useRef(userPageSize);
+  const menuPageRef = React.useRef(menuPage);
+  const menuPageSizeRef = React.useRef(menuPageSize);
 
   const pickCategory = React.useCallback((categoryCode: string): void => {
     selectedCategoryCodeRef.current = categoryCode;
@@ -256,29 +261,55 @@ export function useSystemModule({
     [requireLogin],
   );
 
-  const loadUsers = React.useCallback(async (): Promise<void> => {
+  const loadUsers = React.useCallback(async (params: {
+    keyword?: string;
+    page?: number;
+    pageSize?: number;
+  } = {}): Promise<void> => {
+    const keyword = params.keyword ?? query;
+    const requestedPage = params.page ?? userPage;
+    const requestedPageSize = params.pageSize ?? userPageSize;
     const requestSeq = ++usersRequestSeq.current;
-    const result = await getUserPage({ keyword: query, page: userPage, pageSize: userPageSize });
+    const result = await getUserPage({ keyword, page: requestedPage, pageSize: requestedPageSize });
     if (requestSeq !== usersRequestSeq.current) return;
     setUsers(result.items);
     setUsersTotal(result.total);
     const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
-    const resolvedPage = Math.min(userPage, lastPage);
-    if (resolvedPage !== userPage) setUserPage(resolvedPage);
-    if (result.pageSize !== userPageSize) setUserPageSize(result.pageSize);
+    const resolvedPage = Math.min(requestedPage, lastPage);
+    if (resolvedPage !== requestedPage) setUserPage(resolvedPage);
+    if (result.pageSize !== requestedPageSize) setUserPageSize(result.pageSize);
   }, [query, userPage, userPageSize]);
 
-  const loadMenus = React.useCallback(async (): Promise<void> => {
+  const loadMenus = React.useCallback(async (params: {
+    keyword?: string;
+    page?: number;
+    pageSize?: number;
+  } = {}): Promise<void> => {
+    const keyword = params.keyword ?? query;
+    const requestedPage = params.page ?? menuPage;
+    const requestedPageSize = params.pageSize ?? menuPageSize;
     const requestSeq = ++menusRequestSeq.current;
-    const result = await getMenuPage({ keyword: query, page: menuPage, pageSize: menuPageSize });
+    const result = await getMenuPage({ keyword, page: requestedPage, pageSize: requestedPageSize });
     if (requestSeq !== menusRequestSeq.current) return;
     setMenus(result.items);
     setMenusTotal(result.total);
     const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
-    const resolvedPage = Math.min(menuPage, lastPage);
-    if (resolvedPage !== menuPage) setMenuPage(resolvedPage);
-    if (result.pageSize !== menuPageSize) setMenuPageSize(result.pageSize);
+    const resolvedPage = Math.min(requestedPage, lastPage);
+    if (resolvedPage !== requestedPage) setMenuPage(resolvedPage);
+    if (result.pageSize !== requestedPageSize) setMenuPageSize(result.pageSize);
   }, [query, menuPage, menuPageSize]);
+
+  const reloadUsersForCurrentView = React.useCallback(() => loadUsers({
+    keyword: queryRef.current,
+    page: userPageRef.current,
+    pageSize: userPageSizeRef.current,
+  }), [loadUsers]);
+
+  const reloadMenusForCurrentView = React.useCallback(() => loadMenus({
+    keyword: queryRef.current,
+    page: menuPageRef.current,
+    pageSize: menuPageSizeRef.current,
+  }), [loadMenus]);
 
   const loadCategories = React.useCallback(async (parentRequestSeq = pageRequestSeq.current): Promise<string> => {
     const nextCategories = await getParamDictCategories();
@@ -361,6 +392,14 @@ export function useSystemModule({
   React.useEffect(() => {
     selectedCategoryCodeRef.current = selectedCategoryCode;
   }, [selectedCategoryCode]);
+
+  React.useEffect(() => {
+    queryRef.current = query;
+    userPageRef.current = userPage;
+    userPageSizeRef.current = userPageSize;
+    menuPageRef.current = menuPage;
+    menuPageSizeRef.current = menuPageSize;
+  }, [menuPage, menuPageSize, query, userPage, userPageSize]);
 
   React.useEffect(() => {
     const nextQuery = query.trim();
@@ -544,7 +583,7 @@ export function useSystemModule({
       } else {
         await createUser(payload);
       }
-      await loadUsers();
+      await reloadUsersForCurrentView();
       setUserModal({ open: false, mode: 'new', initial: null, busy: false });
       setUserForm(DEFAULT_USER_FORM);
     } catch (nextError: unknown) {
@@ -614,7 +653,7 @@ export function useSystemModule({
       } else {
         await createMenu(payload);
       }
-      await loadMenus();
+      await reloadMenusForCurrentView();
       setMenuModal({ open: false, mode: 'new', initial: null, busy: false });
       setMenuForm(DEFAULT_MENU_FORM);
     } catch (nextError: unknown) {
@@ -630,7 +669,7 @@ export function useSystemModule({
     guarded(async () => {
       try {
         await updateMenuStatus(menu.id, status);
-        await loadMenus();
+        await reloadMenusForCurrentView();
       } catch (nextError: unknown) {
         toast.error(getErrorMessage(nextError, '更新菜单状态失败。'));
       }
@@ -640,7 +679,7 @@ export function useSystemModule({
     guarded(async () => {
       try {
         await moveMenu(menu.id, direction);
-        await loadMenus();
+        await reloadMenusForCurrentView();
       } catch (nextError: unknown) {
         toast.error(getErrorMessage(nextError, '调整菜单排序失败。'));
       }
@@ -651,7 +690,7 @@ export function useSystemModule({
     guarded(async () => {
       try {
         await deleteMenu(menu.id);
-        await loadMenus();
+        await reloadMenusForCurrentView();
       } catch (nextError: unknown) {
         toast.error(getErrorMessage(nextError, '删除菜单失败。'));
       }
@@ -671,7 +710,7 @@ export function useSystemModule({
     guarded(async () => {
       try {
         await updateUserStatus(user.username, status);
-        await loadUsers();
+        await reloadUsersForCurrentView();
       } catch (nextError: unknown) {
         toast.error(getErrorMessage(nextError, '更新用户状态失败。'));
       }
@@ -692,7 +731,7 @@ export function useSystemModule({
     guarded(async () => {
       try {
         await deleteUser(user.username);
-        await loadUsers();
+        await reloadUsersForCurrentView();
       } catch (nextError: unknown) {
         toast.error(getErrorMessage(nextError, '删除用户失败。'));
       }

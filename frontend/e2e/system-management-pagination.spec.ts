@@ -72,7 +72,7 @@ async function installFixtures(page: Page) {
       await route.fulfill({ json: { data: {
         role: 'admin', user: 'pagination-admin', name: 'Pagination Admin',
         permissions: [
-          'system:user:read', 'system:user:write', 'system:role:read', 'system:role:write',
+          'asset:write', 'system:user:read', 'system:user:write', 'system:role:read', 'system:role:write',
           'system:menu:read', 'system:menu:write', 'system:param:read', 'system:param:write',
         ],
       } } });
@@ -168,6 +168,74 @@ test('system management tables fetch database pages, reset server search, and re
   }
   expect(api.fullRoleCandidates).toBeGreaterThan(0);
   expect(api.fullDictionaryCandidates).toBe(0); // Management uses a page; legacy full candidate API remains available independently.
+});
+
+test('status mutations reload the current server query and page', async ({ page }) => {
+  const api = await installFixtures(page);
+  let mutationPath = '';
+  let mutationResponse: Item = {};
+  let signalMutationStarted: () => void = () => {};
+  let releaseMutation: () => void = () => {};
+  let mutationGate: Promise<void> = Promise.resolve();
+  await page.route(/^https?:\/\/[^/]+\/api(?:\/|$)/, async (route) => {
+    const request = route.request();
+    if (request.method() === 'PATCH' && new URL(request.url()).pathname === mutationPath) {
+      signalMutationStarted();
+      await mutationGate;
+      await route.fulfill({ json: { data: mutationResponse } });
+      return;
+    }
+    await route.fallback();
+  });
+  const armMutation = (path: string, response: Item) => {
+    mutationPath = path;
+    mutationResponse = response;
+    const started = new Promise<void>((resolve) => { signalMutationStarted = resolve; });
+    mutationGate = new Promise<void>((resolve) => { releaseMutation = resolve; });
+    return { started, release: () => releaseMutation() };
+  };
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/system-management/users');
+  const rows = page.locator('table.dt tbody tr');
+  const userPager = page.getByRole('navigation', { name: '用户管理分页', exact: true });
+  await expect(rows).toHaveCount(20, { timeout: 20_000 });
+  await userPager.getByRole('button', { name: '下一页' }).click();
+  await expect(rows).toHaveCount(3);
+  const userMutation = armMutation('/api/system/users/fixture-user-21/status', { ...user(21), status: 'disabled' });
+  await rows.filter({ hasText: 'fixture-user-21' }).getByRole('button', { name: '禁用', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '禁用', exact: true }).click();
+  await userMutation.started;
+  await page.locator('.search-input').fill('Tail User');
+  await expect(rows).toHaveCount(1);
+  await userMutation.release();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Tail User');
+  await expect(userPager).toContainText('1 / 1');
+  await expect(userPager).toContainText('共 1 条');
+  const latestUserRequest = api.requests.filter((request) => request.path === '/system/users/page').at(-1);
+  expect(latestUserRequest?.keyword).toBe('tail user');
+  expect(latestUserRequest?.page).toBe('1');
+
+  await page.goto('/system-management/menus');
+  await expect(rows).toHaveCount(20, { timeout: 20_000 });
+  const menuPager = page.getByRole('navigation', { name: '菜单管理分页', exact: true });
+  await menuPager.getByRole('button', { name: '下一页' }).click();
+  await expect(rows).toHaveCount(3);
+  const menuMutation = armMutation('/api/system/menus/21/status', { ...menu(21), status: 'disabled' });
+  await rows.filter({ hasText: 'fixture-menu-21' }).getByRole('button', { name: '禁用', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '禁用', exact: true }).click();
+  await menuMutation.started;
+  await page.locator('.search-input').fill('Tail Menu');
+  await expect(rows).toHaveCount(1);
+  await menuMutation.release();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Tail Menu');
+  await expect(menuPager).toContainText('1 / 1');
+  await expect(menuPager).toContainText('共 1 条');
+  const latestMenuRequest = api.requests.filter((request) => request.path === '/system/menus/page').at(-1);
+  expect(latestMenuRequest?.keyword).toBe('tail menu');
+  expect(latestMenuRequest?.page).toBe('1');
 });
 
 test('system pagination footers stay in a narrow viewport without clipping', async ({ page }) => {

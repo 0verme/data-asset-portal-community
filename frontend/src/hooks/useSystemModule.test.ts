@@ -20,8 +20,10 @@ test("system management loads active server-paged subroutes and rejects supersed
 
   assert.match(source, /currentPage === "menus"/);
   assert.match(source, /currentPage === "param-dicts"/);
-  assert.match(source, /getUserPage\(\{ keyword: query, page: userPage, pageSize: userPageSize \}\)/);
-  assert.match(source, /getMenuPage\(\{ keyword: query, page: menuPage, pageSize: menuPageSize \}\)/);
+  assert.match(source, /const requestedPage = params\.page \?\? userPage;[\s\S]*?const requestedPageSize = params\.pageSize \?\? userPageSize;[\s\S]*?getUserPage\(\{ keyword, page: requestedPage, pageSize: requestedPageSize \}\)/);
+  assert.match(source, /const requestedPage = params\.page \?\? menuPage;[\s\S]*?const requestedPageSize = params\.pageSize \?\? menuPageSize;[\s\S]*?getMenuPage\(\{ keyword, page: requestedPage, pageSize: requestedPageSize \}\)/);
+  assert.match(source, /const reloadUsersForCurrentView = React\.useCallback\(\(\) => loadUsers\(\{[\s\S]*?keyword: queryRef\.current,[\s\S]*?page: userPageRef\.current,[\s\S]*?pageSize: userPageSizeRef\.current/);
+  assert.match(source, /const reloadMenusForCurrentView = React\.useCallback\(\(\) => loadMenus\(\{[\s\S]*?keyword: queryRef\.current,[\s\S]*?page: menuPageRef\.current,[\s\S]*?pageSize: menuPageSizeRef\.current/);
   assert.match(source, /getParamDictPage\(categoryCode, \{/);
   assert.match(source, /const loadCategories = React\.useCallback\(async \(parentRequestSeq = pageRequestSeq\.current\)[\s\S]*?const nextCategories = await getParamDictCategories\(\);\s*if \(parentRequestSeq !== pageRequestSeq\.current\) return selectedCategoryCodeRef\.current;\s*setCategories\(nextCategories\)/);
   assert.match(source, /const result = await getParamDictPage\(categoryCode,\s*\{[\s\S]*?if \(requestSeq !== itemsRequestSeq\.current \|\| parentRequestSeq !== pageRequestSeq\.current\) return/);
