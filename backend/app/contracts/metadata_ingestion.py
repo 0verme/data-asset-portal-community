@@ -203,6 +203,12 @@ class LineageNode(MetadataContractModel):
     )
     name: str = Field(min_length=1, max_length=256)
     namespace: str | None = Field(default=None, max_length=128)
+    schema_name: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("schema", "schemaName", "schema_name"),
+        serialization_alias="schema",
+        max_length=128,
+    )
     attributes: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")

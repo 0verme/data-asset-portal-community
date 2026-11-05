@@ -147,3 +147,28 @@ test("lineage page supports table and detail views with snapshot diagnostics", a
   assert.match(page, /快照诊断/);
   assert.match(styles, /\.lineage-diagnostics \{[^}]*var\(--warn-line\)/);
 });
+
+test("asset navigation uses only the loaded graph and shares node selection with the viewer", async () => {
+  const [page, sidebar, canvas, app, moduleSidebar] = await Promise.all([
+    readFile(pagePath, "utf8"),
+    readFile(fileURLToPath(new URL("./sidebar/LineageAssetSidebar.tsx", import.meta.url)), "utf8"),
+    readFile(canvasPath, "utf8"),
+    readFile(fileURLToPath(new URL("../App.tsx", import.meta.url)), "utf8"),
+    readFile(fileURLToPath(new URL("./app/ModuleSidebar.tsx", import.meta.url)), "utf8"),
+  ]);
+
+  assert.match(page, /onNodesChange\(data\.nodes\)/);
+  assert.match(page, /selectedNodeId=\{selectedNodeId\}/);
+  assert.match(page, /onFocusRequestHandled=\{onFocusRequestHandled\}/);
+  assert.match(app, /const \[lineageNodes, setLineageNodes\] = useState/);
+  assert.match(moduleSidebar, /<LineageAssetSidebar/);
+  assert.match(sidebar, /aria-expanded=\{tablesVisible\}/);
+  assert.match(sidebar, /aria-pressed=\{selectedNodeId === node\.id\}/);
+  assert.match(sidebar, /selectionSequence/);
+  assert.match(sidebar, /<details className="lineage-snapshot-info">/);
+  assert.doesNotMatch(sidebar, /getLineageInitialView|findLineageNodes|requestRemote/);
+  assert.match(canvas, /viewerRef\.current\?\.selectNode\(selectedNodeId\)/);
+  assert.match(canvas, /viewer\.focusNode\(focusRequest\.nodeId\)/);
+  assert.match(canvas, /onFocusRequestHandled\(focusRequest\.sequence\)/);
+  assert.match(app, /setLineageFocusRequest\(\(current\) => current\?\.sequence === sequence \? null : current\)/);
+});

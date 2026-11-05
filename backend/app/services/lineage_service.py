@@ -210,14 +210,18 @@ def _database_snapshot(profile):
     for item in node_rows:
         attributes = decode(item["attributes_json"], {})
         diagnostics.extend(attributes.get("diagnostics", []))
-        nodes.append({
+        node = {
             "id": item["node_id"],
             "kind": item["kind_code"],
             "name": item["node_name"],
             "displayName": item["display_name"],
             "namespace": item["namespace_name"],
             "attributes": attributes,
-        })
+        }
+        schema_name = _lineage_schema_from_attributes(attributes)
+        if schema_name is not None:
+            node["schema"] = schema_name
+        nodes.append(node)
     edges = []
     for item in edge_rows:
         edge_diagnostics = decode(item["diagnostics_json"], [])
@@ -321,6 +325,16 @@ def _decode_json(value, fallback):
     return parsed
 
 
+def _lineage_schema_from_attributes(attributes):
+    if not isinstance(attributes, dict):
+        return None
+    for key in ("schema", "schemaName", "schema_name"):
+        value = attributes.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def _database_node(row, *, joined=False):
     if joined:
         node_id = row.get("node_id")
@@ -337,14 +351,19 @@ def _database_node(row, *, joined=False):
         namespace = row.get("namespace_name")
         attributes_json = row.get("attributes_json")
     attributes = _decode_json(attributes_json, {})
-    return {
+    attributes = attributes if isinstance(attributes, dict) else {}
+    node = {
         "id": node_id,
         "kind": kind,
         "name": name,
         "displayName": display_name,
         "namespace": namespace,
-        "attributes": attributes if isinstance(attributes, dict) else {},
+        "attributes": attributes,
     }
+    schema_name = _lineage_schema_from_attributes(attributes)
+    if schema_name is not None:
+        node["schema"] = schema_name
+    return node
 
 
 def _database_edge(row, *, joined=False):

@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 
 import type { AuthSession } from '../../api/auth.ts';
-import type { LineageBootstrap } from '../../api/lineage.ts';
+import type { LineageBootstrap, LineageNode } from '../../api/lineage.ts';
 import type { UseApiAssetModuleResult } from '../../hooks/useApiAssetModule.ts';
 import type { UseAssetModuleResult } from '../../hooks/useAssetModule.ts';
 import type { UseAuthSessionResult } from '../../hooks/useAuthSession.ts';
@@ -63,6 +63,12 @@ export interface AppModuleContext {
   indicatorRoute: IndicatorRoute;
   indicatorView: string;
   lineageBootstrap: LineageBootstrap | null;
+  lineageNodes: LineageNode[];
+  lineageSelectedNodeId: string | null;
+  lineageSelectionSequence: number;
+  handleLineageSelectionChange: (nodeId: string | null) => void;
+  lineageFocusRequest: { nodeId: string; sequence: number } | null;
+  handleLineageFocusRequestHandled: (sequence: number) => void;
   lineageRoute: LineageRoute;
   manualCodeTable: UseManualCodeTableModuleResult;
   mappingRoute: MappingRoute;
@@ -85,6 +91,10 @@ export interface AppModuleContext {
   setIndicatorRoute: UseNavigationControllerResult['setIndicatorRoute'];
   setIndicatorView: UseNavigationControllerResult['setIndicatorView'];
   setLineageBootstrap: Dispatch<SetStateAction<LineageBootstrap | null>>;
+  setLineageNodes: Dispatch<SetStateAction<LineageNode[]>>;
+  setLineageSelectedNodeId: Dispatch<SetStateAction<string | null>>;
+  focusLineageNode: (nodeId: string) => void;
+  setLineageFocusRequest: Dispatch<SetStateAction<{ nodeId: string; sequence: number } | null>>;
   setLineageRoute: UseNavigationControllerResult['setLineageRoute'];
   setMappingRoute: UseNavigationControllerResult['setMappingRoute'];
   setPushRoute: UseNavigationControllerResult['setPushRoute'];

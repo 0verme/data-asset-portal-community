@@ -159,6 +159,27 @@ class PersistentLineageReadTests(unittest.TestCase):
         self.assertNotIn("p_lineage_edge", search_sql)
         self.assertTrue(all("p_lineage_edge" not in sql for sql, _count in statements))
 
+    def test_persistent_nodes_expose_only_explicit_schema_metadata(self):
+        connection = connect({"type": "sqlite", "database": str(self.database)})
+        try:
+            connection.execute(
+                "UPDATE dwp.p_lineage_node SET attributes_json = ? WHERE snapshot_id = ? AND node_id = ?",
+                (json.dumps({"schema": "sales"}), "active", "table:input_a"),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        snapshot = lineage_service._database_snapshot("lineage_test")
+        snapshot_nodes = {node["id"]: node for node in snapshot["nodes"]}
+        self.assertEqual("sales", snapshot_nodes["table:input_a"]["schema"])
+        self.assertNotIn("schema", snapshot_nodes["table:input_b"])
+        self.assertEqual("ODS", snapshot_nodes["table:input_b"]["namespace"])
+
+        search_nodes = {node["id"]: node for node in lineage_service.search_nodes("INPUT", limit=10)}
+        self.assertEqual("sales", search_nodes["table:input_a"]["schema"])
+        self.assertNotIn("schema", search_nodes["table:input_b"])
+
     def test_search_treats_percent_underscore_and_escape_char_literally(self):
         literals = [
             ("table:escape:underscore", "F_ACCR_DAY_SUM_R"),

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
@@ -106,6 +107,20 @@ class MetadataContractTests(unittest.TestCase):
         normalized = self.service._preflight_lineage(request)
         self.assertEqual(2, len(normalized["nodes"]))
         self.assertEqual(1, len(normalized["edges"]))
+
+    def test_lineage_schema_is_explicit_and_legacy_namespace_is_not_promoted(self):
+        request = lineage_request()
+        request.nodes[0] = request.nodes[0].model_copy(update={"schema_name": "public"})
+        payload = request.model_dump(by_alias=True)
+        self.assertEqual("public", payload["nodes"][0]["schema"])
+
+        normalized = self.service._preflight_lineage(request)
+        self.assertEqual("finance", normalized["nodes"][0]["namespace"])
+        self.assertEqual("public", normalized["nodes"][0]["attributes"]["schema"])
+
+        legacy = self.service._preflight_lineage(lineage_request())
+        self.assertEqual("finance", legacy["nodes"][0]["namespace"])
+        self.assertNotIn("schema", legacy["nodes"][0]["attributes"])
 
     def test_lineage_configurable_limits_reject_over_limit_before_persistence(self):
         request = lineage_request()
@@ -231,6 +246,23 @@ class MetadataSqlitePersistenceTests(unittest.TestCase):
         self.assertEqual("preview", preview["status"])
         self.assertGreaterEqual(candidates["summary"]["deleteCandidate"], 1)
         self.assertEqual(2, self._asset_count())
+
+    def test_lineage_schema_persists_in_existing_node_attributes_without_migration(self):
+        request = lineage_request(import_id="run-schema")
+        request.nodes[0] = request.nodes[0].model_copy(update={"schema_name": "public"})
+        result = self.service.ingest_lineage(request)
+
+        connection = connect({"type": "sqlite", "database": str(self.database)})
+        try:
+            row = connection.execute(
+                "SELECT attributes_json FROM dwp.p_lineage_node WHERE snapshot_id = ? AND node_id = ?",
+                (result["snapshotId"], "source"),
+            ).fetchone()
+        finally:
+            connection.close()
+
+        self.assertIsNotNone(row)
+        self.assertEqual("public", json.loads(row[0])["schema"])
 
     def test_lineage_persistence_failure_keeps_old_active_snapshot(self):
         self.service.ingest_lineage(lineage_request(import_id="run-old"))
