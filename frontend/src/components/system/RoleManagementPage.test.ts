@@ -57,6 +57,12 @@ test("role deletion refreshes state, reports success, and preserves backend erro
   ]);
   assert.match(hook, /setDeletingRoleCode/);
   assert.match(hook, /setRoles\(\(current\) => current\.filter/);
+  assert.match(hook, /const queryRef = React\.useRef\(query\)/);
+  assert.match(hook, /const pageRef = React\.useRef\(page\)/);
+  assert.match(hook, /const pageSizeRef = React\.useRef\(pageSize\)/);
+  assert.match(hook, /const requestedQuery = queryRef\.current/);
+  assert.match(hook, /const requestedPage = pageRef\.current/);
+  assert.match(hook, /const requestedPageSize = pageSizeRef\.current/);
   assert.match(hook, /await load\(\)/);
   assert.match(hook, /toast\.success\(`角色/);
   assert.match(hook, /toast\.error\(getErrorMessage\(nextError/);

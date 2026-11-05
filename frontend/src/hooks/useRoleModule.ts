@@ -128,15 +128,27 @@ export function useRoleModule({
   const requestSeq = React.useRef(0);
   const deletingRoleCodes = React.useRef(new Set<string>());
   const previousQueryRef = React.useRef(query.trim());
+  const queryRef = React.useRef(query);
+  const pageRef = React.useRef(page);
+  const pageSizeRef = React.useRef(pageSize);
+
+  React.useEffect(() => {
+    queryRef.current = query;
+    pageRef.current = page;
+    pageSizeRef.current = pageSize;
+  }, [page, pageSize, query]);
 
   const load = React.useCallback(async (): Promise<void> => {
+    const requestedQuery = queryRef.current;
+    const requestedPage = pageRef.current;
+    const requestedPageSize = pageSizeRef.current;
     const requestId = ++requestSeq.current;
     setLoading(true);
     setError('');
     try {
       const [roleResult, nextPermissions] = await Promise.all([
         paged
-          ? getRolesPage({ keyword: query, page, pageSize })
+          ? getRolesPage({ keyword: requestedQuery, page: requestedPage, pageSize: requestedPageSize })
           : getRoles(),
         getRoleAssignablePermissions(),
       ]);
@@ -144,12 +156,12 @@ export function useRoleModule({
       if (paged) {
         setPageRoles('items' in roleResult ? roleResult.items : []);
         setTotal('items' in roleResult ? roleResult.total : 0);
-        const resultPageSize = 'items' in roleResult ? roleResult.pageSize : pageSize;
+        const resultPageSize = 'items' in roleResult ? roleResult.pageSize : requestedPageSize;
         const resultTotal = 'items' in roleResult ? roleResult.total : 0;
         const lastPage = Math.max(1, Math.ceil(resultTotal / resultPageSize));
-        const resolvedPage = Math.min(page, lastPage);
-        if (resolvedPage !== page) setPage(resolvedPage);
-        if ('items' in roleResult && roleResult.pageSize !== pageSize) setPageSize(roleResult.pageSize);
+        const resolvedPage = Math.min(requestedPage, lastPage);
+        if (resolvedPage !== requestedPage) setPage(resolvedPage);
+        if ('items' in roleResult && roleResult.pageSize !== requestedPageSize) setPageSize(roleResult.pageSize);
         setRoles([]);
       } else {
         setRoles(roleResult as SystemRoleItem[]);
@@ -162,7 +174,7 @@ export function useRoleModule({
     } finally {
       if (requestId === requestSeq.current) setLoading(false);
     }
-  }, [page, pageSize, paged, query]);
+  }, [paged]);
 
   React.useEffect(() => {
     if (!active) return undefined;

@@ -267,6 +267,59 @@ test('status mutations reload the current server query and page', async ({ page 
   expect(latestParameterRequest?.page).toBe('1');
 });
 
+test('role deletion refreshes the current server query and page', async ({ page }) => {
+  const api = await installFixtures(page);
+  let mutationPath = '';
+  let signalMutationStarted: () => void = () => {};
+  let releaseMutation: () => void = () => {};
+  let mutationGate: Promise<void> = Promise.resolve();
+  await page.route(/^https?:\/\/[^/]+\/api(?:\/|$)/, async (route) => {
+    const request = route.request();
+    if (request.method() === 'DELETE' && new URL(request.url()).pathname === mutationPath) {
+      signalMutationStarted();
+      await mutationGate;
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/system-management/roles');
+  const rows = page.locator('table.dt tbody tr');
+  const pager = page.getByRole('navigation', { name: '角色管理分页', exact: true });
+  await expect(rows).toHaveCount(20, { timeout: 20_000 });
+  await pager.getByRole('button', { name: '下一页' }).click();
+  await expect(rows).toHaveCount(3);
+
+  const roleRow = rows.filter({ hasText: 'fixture-role-21' });
+  await roleRow.getByRole('button', { name: '删除', exact: true }).click();
+  const confirmation = page.getByRole('alertdialog');
+  await confirmation.locator('input').fill('fixture-role-21');
+  mutationPath = '/api/system/roles/fixture-role-21';
+  const mutationStarted = new Promise<void>((resolve) => { signalMutationStarted = resolve; });
+  mutationGate = new Promise<void>((resolve) => { releaseMutation = resolve; });
+  await confirmation.getByRole('button', { name: '确认删除', exact: true }).click();
+  await mutationStarted;
+
+  const roleRequests = () => api.requests.filter((request) => request.path === '/system/roles/page');
+  const beforeSearch = roleRequests().length;
+  await page.locator('.search-input').fill('Tail Role');
+  await expect.poll(() => roleRequests().length).toBeGreaterThan(beforeSearch);
+  await expect.poll(() => roleRequests().at(-1)?.keyword).toBe('tail role');
+  await expect.poll(() => roleRequests().at(-1)?.page).toBe('1');
+  const beforeMutationRefresh = roleRequests().length;
+
+  releaseMutation();
+  await expect.poll(() => roleRequests().length).toBeGreaterThan(beforeMutationRefresh);
+  await expect.poll(() => roleRequests().at(-1)?.keyword).toBe('tail role');
+  await expect.poll(() => roleRequests().at(-1)?.page).toBe('1');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Tail Role');
+  await expect(pager).toContainText('1 / 1');
+  await expect(pager).toContainText('共 1 条');
+});
+
 test('system pagination footers stay in a narrow viewport without clipping', async ({ page }) => {
   const api = await installFixtures(page);
   await page.setViewportSize({ width: 390, height: 844 });
