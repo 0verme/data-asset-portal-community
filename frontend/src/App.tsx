@@ -117,6 +117,9 @@ export default function App(): React.ReactElement {
     lineageFocusSequenceRef.current += 1;
     setLineageFocusRequest({ nodeId, sequence: lineageFocusSequenceRef.current });
   }, [handleLineageSelectionChange]);
+  const handleLineageFocusRequestHandled = React.useCallback((sequence: number): void => {
+    setLineageFocusRequest((current) => current?.sequence === sequence ? null : current);
+  }, []);
   const [systemActionIntent, setSystemActionIntent] = useState("");
   const [navMenuSnapshot, setNavMenuSnapshot] = useState<{ authKey: string; menus: MenuItem[] }>({
     authKey: "",
@@ -745,6 +748,7 @@ export default function App(): React.ReactElement {
     lineageSelectionSequence,
     handleLineageSelectionChange,
     lineageFocusRequest,
+    handleLineageFocusRequestHandled,
     lineageRoute,
     manualCodeTable,
     mappingRoute,

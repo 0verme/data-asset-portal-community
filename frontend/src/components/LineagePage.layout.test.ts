@@ -159,6 +159,7 @@ test("asset navigation uses only the loaded graph and shares node selection with
 
   assert.match(page, /onNodesChange\(data\.nodes\)/);
   assert.match(page, /selectedNodeId=\{selectedNodeId\}/);
+  assert.match(page, /onFocusRequestHandled=\{onFocusRequestHandled\}/);
   assert.match(app, /const \[lineageNodes, setLineageNodes\] = useState/);
   assert.match(moduleSidebar, /<LineageAssetSidebar/);
   assert.match(sidebar, /aria-expanded=\{tablesVisible\}/);
@@ -167,5 +168,7 @@ test("asset navigation uses only the loaded graph and shares node selection with
   assert.match(sidebar, /<details className="lineage-snapshot-info">/);
   assert.doesNotMatch(sidebar, /getLineageInitialView|findLineageNodes|requestRemote/);
   assert.match(canvas, /viewerRef\.current\?\.selectNode\(selectedNodeId\)/);
-  assert.match(canvas, /viewerRef\.current\?\.focusNode\(focusRequest\.nodeId\)/);
+  assert.match(canvas, /viewer\.focusNode\(focusRequest\.nodeId\)/);
+  assert.match(canvas, /onFocusRequestHandled\(focusRequest\.sequence\)/);
+  assert.match(app, /setLineageFocusRequest\(\(current\) => current\?\.sequence === sequence \? null : current\)/);
 });

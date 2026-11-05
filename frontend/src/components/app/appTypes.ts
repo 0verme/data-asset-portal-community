@@ -67,6 +67,7 @@ export interface AppModuleContext {
   lineageSelectionSequence: number;
   handleLineageSelectionChange: (nodeId: string | null) => void;
   lineageFocusRequest: { nodeId: string; sequence: number } | null;
+  handleLineageFocusRequestHandled: (sequence: number) => void;
   lineageRoute: LineageRoute;
   manualCodeTable: UseManualCodeTableModuleResult;
   mappingRoute: MappingRoute;

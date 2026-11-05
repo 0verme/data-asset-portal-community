@@ -76,6 +76,7 @@ export interface LineagePageProps {
   onBootstrap: (bootstrap: LineageBootstrap) => void;
   selectedNodeId: string | null;
   focusRequest: { nodeId: string; sequence: number } | null;
+  onFocusRequestHandled: (sequence: number) => void;
   onNodesChange: (nodes: LineageNode[]) => void;
   onSelectedNodeChange: (nodeId: string | null) => void;
 }
@@ -86,6 +87,7 @@ export function LineagePage({
   onBootstrap,
   selectedNodeId,
   focusRequest,
+  onFocusRequestHandled,
   onNodesChange,
   onSelectedNodeChange,
 }: LineagePageProps) {
@@ -267,7 +269,7 @@ export function LineagePage({
       <div className="lineage-layout">
         <section className="lineage-card" aria-busy={loading}>
           <div className="lineage-card-head"><span>{sourceLabel}：{root?.name} · {route.view === "table" ? "表级简图" : "作业详图"}</span><span className="tag tag-info">{graph.nodes.length} 节点 / {graph.edges.length} 关系</span></div>
-          <LineageCanvas graph={graph} selectedNodeId={selectedNodeId} focusRequest={focusRequest} onSelect={onSelectedNodeChange} />
+          <LineageCanvas graph={graph} selectedNodeId={selectedNodeId} focusRequest={focusRequest} onFocusRequestHandled={onFocusRequestHandled} onSelect={onSelectedNodeChange} />
         </section>
         <aside className="lineage-detail">
           <div className="lineage-card-head"><span>节点详情</span><span className="tag tag-neutral">{selected?.kind}</span></div>

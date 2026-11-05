@@ -214,6 +214,7 @@ const MODULE_RENDERERS: Record<ModuleId, ModuleRenderer> = {
       onBootstrap={context.setLineageBootstrap}
       selectedNodeId={context.lineageSelectedNodeId}
       focusRequest={context.lineageFocusRequest}
+      onFocusRequestHandled={context.handleLineageFocusRequestHandled}
       onNodesChange={context.setLineageNodes}
       onSelectedNodeChange={context.handleLineageSelectionChange}
     />

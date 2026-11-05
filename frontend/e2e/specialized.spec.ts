@@ -200,6 +200,9 @@ test("lineage asset navigation filters, expands, selects, and follows graph stat
   await page.getByLabel("血缘节点名称").fill("POS_RECEIPT");
   await page.getByRole("button", { name: "查询" }).click();
   await expect(page.locator(".lineage-detail h2")).toHaveText("POS_RECEIPT");
+  await expect.poll(async () => page.locator("lineage-viewer").evaluate((viewer) => (
+    viewer as HTMLElement & { selectedNodeId?: string | null }
+  ).selectedNodeId)).toBe("table:pos:POS_RECEIPT");
   await expect(page.getByRole("button", { name: /POS_RECEIPT/ })).toHaveAttribute("aria-pressed", "true");
 
   const direction = page.getByRole("combobox", { name: "血缘方向" });
@@ -212,5 +215,8 @@ test("lineage asset navigation filters, expands, selects, and follows graph stat
   await page.getByRole("option", { name: "3 层" }).click();
   await page.getByRole("button", { name: /刷新|加载中/ }).click();
   await expect(page.locator(".lineage-detail h2")).toHaveText("POS_RECEIPT");
+  await expect.poll(async () => page.locator("lineage-viewer").evaluate((viewer) => (
+    viewer as HTMLElement & { selectedNodeId?: string | null }
+  ).selectedNodeId)).toBe("table:pos:POS_RECEIPT");
   await expect(page.getByRole("button", { name: /POS_RECEIPT/ })).toHaveAttribute("aria-pressed", "true");
 });
