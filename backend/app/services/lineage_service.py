@@ -1,7 +1,7 @@
-"""Controlled lineage POC data contract.
+"""Lineage graph services backed by the selected DAP metadata database.
 
-The daily collector will replace this in-memory snapshot.  The portal owns the
-contract and graph traversal; renderers only receive the resulting subgraph.
+An in-memory snapshot remains as a controlled test fixture, never as the
+runtime fallback when the DAP database or its lineage snapshot is unavailable.
 """
 
 # pyright: reportMissingImports=false
@@ -13,23 +13,17 @@ from copy import deepcopy
 import hashlib
 import json
 import logging
-import os
 
 from sqlalchemy import select
 
-from ..db.facade import database_transaction, get_db_profile
+from ..db.facade import database_transaction, get_db_profile, resolve_db_profile_name
 from ..db.registry import get_provider
 from ..db.service import CoreAccess
 from ..db.tables import lineage_edge, lineage_node, lineage_snapshot
-from ..settings import get_runtime_environment
 from .lineage_database_reader import LineageDatabaseReader, escape_like_operand
 
 
 LOGGER = logging.getLogger(__name__)
-LINEAGE_PROFILE_ENV = "LINEAGE_DB_PROFILE"
-LINEAGE_MODE_ENV = "LINEAGE_STORAGE_MODE"
-LINEAGE_SUPPORTED_MODES = frozenset({"auto", "persistent", "poc"})
-POC_ENVIRONMENTS = {"development", "dev", "test"}
 LINEAGE_SEARCH_DEFAULT_LIMIT = 100
 LINEAGE_SEARCH_MAX_LIMIT = 300
 MAX_LINEAGE_SUBGRAPH_EDGE_ROWS = 10_000
@@ -92,39 +86,18 @@ class LineageConfigurationError(LineageDataSourceError):
 
 
 def lineage_storage_status():
-    """Return the safe, explicit storage mode selected for this process."""
-    profile = os.getenv(LINEAGE_PROFILE_ENV, "").strip()
-    mode = os.getenv(LINEAGE_MODE_ENV, "auto").strip().lower() or "auto"
-    if mode not in LINEAGE_SUPPORTED_MODES:
-        raise LineageConfigurationError(
-            "invalid LINEAGE_STORAGE_MODE; expected auto, persistent, or poc"
-        )
-    environment = get_runtime_environment()
-    if mode == "poc":
-        if profile:
-            raise LineageConfigurationError(
-                "LINEAGE_STORAGE_MODE=poc conflicts with LINEAGE_DB_PROFILE"
-            )
-        if environment not in POC_ENVIRONMENTS:
-            raise LineageConfigurationError(
-                "LINEAGE_STORAGE_MODE=poc is restricted to development/test"
-            )
-        return {"mode": "poc", "profile": None, "schema": None}
-    if profile:
+    """Resolve lineage storage from the same DB profile as all DAP metadata."""
+    try:
+        profile = resolve_db_profile_name()
         config = get_db_profile(profile)
         provider = get_provider(config["type"])
         schema = provider.physical_schema(config) or config.get("database")
-        return {"mode": "persistent", "profile": profile, "schema": schema}
-    if mode == "persistent":
+    except Exception as error:
+        # Fail closed: a missing/misconfigured DAP DB is never a demo graph.
         raise LineageConfigurationError(
-            "LINEAGE_STORAGE_MODE=persistent requires LINEAGE_DB_PROFILE"
-        )
-    if environment in POC_ENVIRONMENTS:
-        return {"mode": "poc", "profile": None, "schema": None}
-    raise LineageConfigurationError(
-        "lineage data source is not configured; set LINEAGE_DB_PROFILE for non-development environments"
-    )
-
+            "血缘使用 ASSET_DB_PROFILE 对应的 DAP 参数库，请检查数据库配置。"
+        ) from error
+    return {"mode": "persistent", "profile": profile, "schema": schema}
 
 def log_lineage_storage_status():
     """Log only mode, profile name, and schema; never connection details."""
@@ -135,12 +108,11 @@ def log_lineage_storage_status():
         return
     if status["mode"] == "persistent":
         LOGGER.info(
-            "Lineage storage mode: persistent; Lineage DB profile: %s; Lineage schema: %s",
+            "Lineage storage mode: persistent; DAP DB profile: %s; DAP schema: %s",
             status["profile"],
             status["schema"],
         )
         return
-    LOGGER.warning("Lineage storage mode: POC; page data is not database lineage")
 
 
 def _database_snapshot(profile):
