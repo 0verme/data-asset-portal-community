@@ -175,23 +175,23 @@ not control an external proxy or load balancer.
 also supported as provider/profile overrides. `ASSET_DB_PASSWORD` and DSNs/JDBC
 URLs are sensitive and should not be placed in committed files.
 
-## Lineage storage mode (#414)
+## Lineage storage: same DAP metadata database (#536)
 
-`LINEAGE_STORAGE_MODE` supports `auto` (default, backward compatible),
-`persistent` and `poc`. In `persistent` mode, `LINEAGE_DB_PROFILE`
-is required; missing configuration fails closed. In `poc` mode, the
-lineage graph is synthetic and permitted **only** for development/dev/test
-when `LINEAGE_DB_PROFILE` is unset. Production never serves POC data.
-Conflicting or unknown modes fail closed.
+The lineage API always uses the configured `ASSET_DB_PROFILE` and its effective
+physical schema to read the persisted `p_lineage_snapshot`, `p_lineage_node`,
+and `p_lineage_edge` tables. It does **not** select a separate database through
+`LINEAGE_DB_PROFILE`, nor does `LINEAGE_STORAGE_MODE` enable POC data. Both
+legacy lineage-specific variables are ignored and should be removed from
+existing deployment environments. This applies to development, test and
+production backend runtimes; synthetic lineage is only suitable for isolated
+test fixtures or an explicitly separated frontend Mock build.
 
-In legacy `auto` mode an explicitly configured `LINEAGE_DB_PROFILE`
-selects persistent storage; otherwise development/dev/test retains the
-existing labeled in-memory POC, and production fails closed. To prevent
-an accidentally missing profile from appearing as a demo graph in a
-development-like deployed environment, explicitly set
-`LINEAGE_STORAGE_MODE=persistent`. This setting does not change
-`ASSET_DB_*` override precedence; profile override isolation remains
-a separate #414 decision.
+An absent/invalid `ASSET_DB_PROFILE` causes a configuration error; missing
+lineage tables or database access failures are reported as data-source errors.
+A configured database without an ACTIVE snapshot returns the existing
+`no_active_snapshot` empty-state contract, never an in-memory demo graph.
+Do not interpret switching to the shared DB as having collected lineage: a
+real ACTIVE snapshot still needs to be created and published separately.
 
 ## Database files and precedence
 
@@ -210,14 +210,11 @@ Resolution is:
 1. `ASSET_DB_PROFILE` (and optional `ASSET_AUTH_DB_PROFILE`) selects profiles.
 2. YAML `defaults` are merged with the selected profile.
 3. Non-empty `ASSET_DB_*` environment overrides replace YAML/profile values.
-   This is **global to every selected named profile**, including an explicit
-   `LINEAGE_DB_PROFILE` and `ASSET_AUTH_DB_PROFILE`; choosing a distinct profile
-   name does not bypass these overrides. When a dedicated lineage database
-   must retain its own host/credentials, do not set conflicting global
-   `ASSET_DB_HOST`/`ASSET_DB_DATABASE`/`ASSET_DB_USER`/`ASSET_DB_PASSWORD`
-   variables: instead put the connection fields in the per-profile YAML and
-   protect the config file appropriately. Do not assume that a profile switch
-   provides connection isolation.
+   This is **global to every selected named profile**, including the optional
+   authentication profile. The lineage module always consumes the final
+   `ASSET_DB_PROFILE` configuration; it has no independent profile override.
+   A separate authentication profile is not isolated from these environment
+   overrides merely by choosing a distinct profile name.
 4. `ASSET_DB_JAR_PATH` overrides a GaussDB `jar_path`.
 5. A relative GaussDB `jar_path` is resolved against `backend/` (the parent of
    `configs/`); with the default `backend/configs/database.yaml`,
