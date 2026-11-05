@@ -28,6 +28,27 @@ class RuntimeSqlProfileSchemaTests(unittest.TestCase):
                 if field_match:
                     self.assertNotIn("dwp.", field_match["table"].lower())
 
+    def test_community_postgres_profile_defaults_to_dap(self):
+        import yaml
+
+        config_path = Path(__file__).resolve().parents[1] / "configs" / "database.community.yaml"
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        self.assertEqual("dap", config["profiles"]["community_postgres"]["schema"])
+
+    def test_postgres_profile_requires_explicit_schema(self):
+        base = {"database": "asset_db", "user": "tester", "password": "test-only"}
+
+        with self.assertRaisesRegex(ValueError, "Profile schema"):
+            PostgreSQLProvider().validate("missing", dict(base), config_path=Path("database.yaml"))
+        with self.assertRaisesRegex(ValueError, "Profile schema"):
+            PostgreSQLProvider().physical_schema(dict(base))
+
+        normalized = PostgreSQLProvider().validate(
+            "named", {**base, "schema": "DaP"}, config_path=Path("database.yaml")
+        )
+        self.assertEqual("dap", normalized["schema"])
+        self.assertEqual("dap", PostgreSQLProvider().physical_schema(normalized))
+
     def test_unqualified_sql_is_left_to_each_profile_connection(self):
         sql = "SELECT COUNT(*) FROM p_asset_table"
         profiles = {

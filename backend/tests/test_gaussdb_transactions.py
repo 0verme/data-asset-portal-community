@@ -202,7 +202,7 @@ class DatabaseTransactionTests(unittest.TestCase):
     def test_postgres_placeholder_conversion_keeps_bound_values_separate(self):
         with patch(
             "backend.app.db.facade.get_db_profile",
-            return_value={"type": "postgres"},
+            return_value={"type": "postgres", "schema": "dap"},
         ):
             sql, params = _prepare_execute_args(
                 "primary",
