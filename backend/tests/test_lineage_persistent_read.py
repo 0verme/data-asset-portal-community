@@ -117,6 +117,8 @@ class PersistentLineageReadTests(unittest.TestCase):
             ("active", "table:search:dwm", "table", "M_JJQD_LIST", "DWM"),
             ("active", "table:search:dwd", "table", "M_JJQD_LIST", "DWD"),
             ("active", "table:search:dwm-archive", "table", "M_JJQD_LIST_ARCHIVE", "DWM"),
+            ("active", "table:search:collector-qualified", "table", "DWM.ACCOUNT", "DWM"),
+            ("active", "task:search:exact-account", "task", "ACCOUNT", "scheduler"),
             ("active", "task:search:fuzzy-job", "task", "JOB_M_JJQD_LIST", "scheduler"),
             ("active", "task:search:plain-job", "task", "JOB_SEARCH_LINEAGE", "scheduler"),
             ("active", "table:search:special", "table", "A!B_C%D", "D_WM"),
@@ -223,6 +225,16 @@ class PersistentLineageReadTests(unittest.TestCase):
             next(index for index, node in enumerate(bare) if node["id"] == "task:search:fuzzy-job"),
         )
         self.assertNotIn("table:search:inactive", {node["id"] for node in bare})
+
+    def test_collector_qualified_node_names_are_exact_for_bare_and_schema_search(self):
+        self._insert_search_fixture()
+
+        bare = lineage_service.search_nodes("ACCOUNT", limit=1)
+        qualified = lineage_service.search_nodes("dwm.account", limit=1)
+
+        self.assertEqual(["table:search:collector-qualified"], [node["id"] for node in bare])
+        self.assertEqual(["table:search:collector-qualified"], [node["id"] for node in qualified])
+        self.assertEqual("DWM.ACCOUNT", qualified[0]["name"])
 
     def test_search_escapes_schema_and_table_wildcards_and_preserves_job_search(self):
         self._insert_search_fixture()

@@ -112,10 +112,14 @@ test("lineage search selects exact table matches and labels ambiguous candidates
   assert.match(page, /resolveLineageSearchMatches\(nodeName, matches\)/);
   assert.match(page, /if \(resolution\.directMatch\)/);
   assert.match(page, /describeLineageSearchCandidate\(candidate\)/);
-  assert.match(search, /String\(node\.namespace \|\| ""\)\.trim\(\)\.toLowerCase\(\) === namespace/);
+  assert.match(search, /const nodeNamespace = String\(node\.namespace \|\| ""\)\.trim\(\)\.toLowerCase\(\)/);
+  assert.match(search, /nodeName === `\$\{namespace\}\.\$\{tableName\}`/);
+  assert.match(search, /matchesUnqualifiedTableName/);
   assert.match(search, /exactTables\.length === 1/);
   assert.match(search, /业务 Schema \/ namespace_name/);
   assert.match(search, /isTable \? "表名" : "作业名"/);
+  assert.match(search, /terminalTableName\(node\.name\)/);
+  assert.match(search, /lineageSearchQueryForCandidate/);
   assert.match(search, /node\.name/);
   assert.match(api, /node\.namespace\.trim\(\)\.toLowerCase\(\)\.includes\(namespace\)/);
 });

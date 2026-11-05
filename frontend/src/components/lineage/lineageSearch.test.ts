@@ -4,6 +4,7 @@ import test from "node:test";
 import type { LineageNode } from "../../api/lineage.ts";
 import {
   describeLineageSearchCandidate,
+  lineageSearchQueryForCandidate,
   resolveLineageSearchMatches,
 } from "./lineageSearch.ts";
 
@@ -14,12 +15,24 @@ function node(id: string, kind: string, name: string, namespace: string): Lineag
 const exactDwmTable = node("table:dwm:M_JJQD_LIST", "table", "M_JJQD_LIST", "DWM");
 const exactDwdTable = node("table:dwd:M_JJQD_LIST", "table", "M_JJQD_LIST", "DWD");
 const fuzzyJob = node("task:job:M_JJQD_LIST", "task", "JOB_M_JJQD_LIST", "scheduler");
+const collectorQualifiedTable = node("table:dwm:ACCOUNT", "table", "DWM.ACCOUNT", "dwm");
+const exactAccountJob = node("task:ACCOUNT", "task", "ACCOUNT", "scheduler");
 
 test("a unique exact table wins over fuzzy job candidates for a bare table name", () => {
   const result = resolveLineageSearchMatches("M_JJQD_LIST", [fuzzyJob, exactDwmTable]);
 
   assert.equal(result.directMatch?.id, exactDwmTable.id);
   assert.deepEqual(result.candidates, []);
+});
+
+test("collector-qualified table names normalize to exact matches before exact task names", () => {
+  const bare = resolveLineageSearchMatches("ACCOUNT", [exactAccountJob, collectorQualifiedTable]);
+  const qualified = resolveLineageSearchMatches("DWM.ACCOUNT", [exactAccountJob, collectorQualifiedTable]);
+
+  assert.equal(bare.directMatch?.id, collectorQualifiedTable.id);
+  assert.equal(qualified.directMatch?.id, collectorQualifiedTable.id);
+  assert.equal(lineageSearchQueryForCandidate(collectorQualifiedTable), "dwm.ACCOUNT");
+  assert.equal(describeLineageSearchCandidate(collectorQualifiedTable).nameLabel, "表名：ACCOUNT");
 });
 
 test("same-name exact tables in different schemas remain explicit candidates", () => {

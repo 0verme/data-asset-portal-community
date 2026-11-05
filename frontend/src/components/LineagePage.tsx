@@ -13,6 +13,7 @@ import { ActionErrorBanner, ErrorState, LoadingState } from "./common/index.ts";
 import { LineageCanvas } from "./lineage/LineageCanvas.tsx";
 import {
   describeLineageSearchCandidate,
+  lineageSearchQueryForCandidate,
   resolveLineageSearchMatches,
 } from "./lineage/lineageSearch.ts";
 import { Icon } from "./ui.tsx";
@@ -224,9 +225,7 @@ export function LineagePage({
 
   const selectCandidate = (candidate: LineageNode) => {
     setCandidates([]);
-    setQuery(candidate.kind === "table" && candidate.namespace
-      ? `${candidate.namespace}.${candidate.name}`
-      : candidate.name);
+    setQuery(lineageSearchQueryForCandidate(candidate));
     void openCandidate(candidate);
   };
 

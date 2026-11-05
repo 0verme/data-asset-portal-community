@@ -451,7 +451,12 @@ def _split_lineage_search_name(normalized_name):
 def _lineage_search_rank(node, table_name, namespace=None):
     name = str(node.get("name") or "").casefold()
     node_namespace = str(node.get("namespace") or "").casefold()
-    exact_name = name == table_name.casefold()
+    normalized_table_name = table_name.casefold()
+    if namespace is None:
+        exact_name = name.rsplit(".", 1)[-1] == normalized_table_name
+    else:
+        qualified_name = f"{namespace.casefold()}.{normalized_table_name}"
+        exact_name = name in {normalized_table_name, qualified_name}
     if namespace is not None:
         rank = 0 if exact_name and node_namespace == namespace.casefold() else 1
         return rank, node_namespace, name, node.get("id", "")
@@ -503,6 +508,11 @@ def search_nodes(name, limit=None):
                 exact_name=table_name.casefold(),
                 namespace_pattern=namespace_pattern,
                 exact_namespace=namespace.casefold() if namespace is not None else None,
+                exact_qualified_name=(
+                    f"{namespace}.{table_name}".casefold()
+                    if namespace is not None
+                    else None
+                ),
             )
             return [_database_node(row) for row in rows]
 

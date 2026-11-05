@@ -5,6 +5,16 @@ export interface LineageSearchResolution {
   candidates: LineageNode[];
 }
 
+function terminalTableName(value: string): string {
+  const normalized = value.trim();
+  return normalized.slice(normalized.lastIndexOf(".") + 1);
+}
+
+function matchesUnqualifiedTableName(node: LineageNode, tableName: string): boolean {
+  const normalizedName = node.name.trim().toLowerCase();
+  return normalizedName === tableName || terminalTableName(normalizedName) === tableName;
+}
+
 /** Prefer a unique exact table even when the server also returned fuzzy jobs. */
 export function resolveLineageSearchMatches(
   query: string,
@@ -17,12 +27,13 @@ export function resolveLineageSearchMatches(
   const tableName = qualified ? normalized.slice(separator + 1).trim() : normalized;
 
   if (qualified && namespace && tableName) {
-    const exactTables = matches.filter(
-      (node) =>
-        node.kind === "table" &&
-        String(node.namespace || "").trim().toLowerCase() === namespace &&
-        node.name.trim().toLowerCase() === tableName,
-    );
+    const exactTables = matches.filter((node) => {
+      if (node.kind !== "table") return false;
+      const nodeNamespace = String(node.namespace || "").trim().toLowerCase();
+      const nodeName = node.name.trim().toLowerCase();
+      return nodeNamespace === namespace &&
+        (nodeName === tableName || nodeName === `${namespace}.${tableName}`);
+    });
     if (exactTables.length === 1) {
       return { directMatch: exactTables[0] || null, candidates: [] };
     }
@@ -33,7 +44,7 @@ export function resolveLineageSearchMatches(
   }
 
   const exactTables = matches.filter(
-    (node) => node.kind === "table" && node.name.trim().toLowerCase() === normalized,
+    (node) => node.kind === "table" && matchesUnqualifiedTableName(node, normalized),
   );
   if (exactTables.length) {
     return exactTables.length === 1
@@ -55,6 +66,13 @@ export function resolveLineageSearchMatches(
     : { directMatch: null, candidates: matches };
 }
 
+export function lineageSearchQueryForCandidate(node: LineageNode): string {
+  if (node.kind !== "table") return node.name;
+  const tableName = terminalTableName(node.name);
+  const namespace = String(node.namespace || "").trim();
+  return namespace ? `${namespace}.${tableName}` : tableName;
+}
+
 export function describeLineageSearchCandidate(node: LineageNode): {
   kindLabel: string;
   namespaceLabel: string;
@@ -65,6 +83,6 @@ export function describeLineageSearchCandidate(node: LineageNode): {
   return {
     kindLabel: isTable ? "表节点" : "作业节点",
     namespaceLabel: `${isTable ? "业务 Schema / namespace_name" : "命名空间"}：${namespace}`,
-    nameLabel: `${isTable ? "表名" : "作业名"}：${node.name}`,
+    nameLabel: `${isTable ? "表名" : "作业名"}：${isTable ? terminalTableName(node.name) : node.name}`,
   };
 }

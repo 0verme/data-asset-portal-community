@@ -8,7 +8,7 @@ snapshot identity.
 
 from __future__ import annotations
 
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import and_, case, func, or_, select
 
 from ..db.tables import lineage_edge, lineage_node, lineage_snapshot
 
@@ -198,6 +198,7 @@ class LineageDatabaseReader:
         exact_name: str | None = None,
         namespace_pattern: str | None = None,
         exact_namespace: str | None = None,
+        exact_qualified_name: str | None = None,
     ) -> list[dict]:
         node_name = func.lower(lineage_node.c.node_name)
         namespace_name = func.lower(func.coalesce(lineage_node.c.namespace_name, ""))
@@ -218,17 +219,30 @@ class LineageDatabaseReader:
                     ),
                 )
             )
-            exact_match = and_(
+            exact_node_name = or_(
                 exact_name is not None and node_name == exact_name,
+                exact_qualified_name is not None and node_name == exact_qualified_name,
+            )
+            exact_match = and_(
+                exact_node_name,
                 exact_namespace is not None and namespace_name == exact_namespace,
             )
             match_rank = case((exact_match, 0), else_=1)
         else:
             predicates.append(kind.in_(("table", "task")))
-            exact_table = and_(
-                kind == "table",
-                exact_name is not None and node_name == exact_name,
+            qualified_exact_pattern = (
+                f"%.{escape_like_operand(exact_name)}"
+                if exact_name is not None
+                else None
             )
+            exact_table_name = or_(
+                exact_name is not None and node_name == exact_name,
+                qualified_exact_pattern is not None
+                and node_name.like(
+                    qualified_exact_pattern, escape=LINEAGE_LIKE_ESCAPE_CHAR
+                ),
+            )
+            exact_table = and_(kind == "table", exact_table_name)
             exact_task = and_(
                 kind == "task",
                 exact_name is not None and node_name == exact_name,
