@@ -99,6 +99,7 @@ def lineage_storage_status():
         ) from error
     return {"mode": "persistent", "profile": profile, "schema": schema}
 
+
 def log_lineage_storage_status():
     """Log only mode, profile name, and schema; never connection details."""
     try:
