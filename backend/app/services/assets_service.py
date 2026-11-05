@@ -519,38 +519,55 @@ class AssetsService(AuditActorMixin):
         key and the joined domain code is a primary key (one-to-zero/one join);
         repeated table names from different sources remain distinct rows.
         """
-        with database_transaction():
-            catalog = self._asset_count_filter_catalog()
-            domains = catalog["domains"]
-            layers = catalog["layers"]
+        started_at = perf_counter()
+        database_call_count = 0
+        outcome = "failed"
+        try:
+            with database_transaction():
+                catalog = self._asset_count_filter_catalog()
+                database_call_count = 2  # current domain and layer filter catalogs
+                domains = catalog["domains"]
+                layers = catalog["layers"]
 
-            resolved_domain = None
-            if domain_code is not None or domain_name is not None:
-                matches = [
-                    item for item in domains
-                    if (domain_code is None or item["code"] == str(domain_code).strip())
-                    and (domain_name is None or item["name"] == str(domain_name).strip())
-                ]
-                if len(matches) != 1:
-                    raise AssetFilterCatalogChangedError("主题域筛选项已变化或无法唯一确定")
-                resolved_domain = matches[0]
-                if sum(item["name"] == resolved_domain["name"] for item in domains) != 1:
-                    raise AssetFilterCatalogChangedError("主题域名称无法唯一对应资产列表筛选")
+                resolved_domain = None
+                if domain_code is not None or domain_name is not None:
+                    matches = [
+                        item for item in domains
+                        if (domain_code is None or item["code"] == str(domain_code).strip())
+                        and (domain_name is None or item["name"] == str(domain_name).strip())
+                    ]
+                    if len(matches) != 1:
+                        raise AssetFilterCatalogChangedError("主题域筛选项已变化或无法唯一确定")
+                    resolved_domain = matches[0]
+                    if sum(item["name"] == resolved_domain["name"] for item in domains) != 1:
+                        raise AssetFilterCatalogChangedError("主题域名称无法唯一对应资产列表筛选")
 
-            resolved_layer = None
-            if layer_code is not None or layer_name is not None:
-                matches = [
-                    item for item in layers
-                    if (layer_code is None or item["code"] == str(layer_code).strip())
-                    and (layer_name is None or item["name"] == str(layer_name).strip())
-                ]
-                if len(matches) != 1:
-                    raise AssetFilterCatalogChangedError("数据分层筛选项已变化或无法唯一确定")
-                resolved_layer = matches[0]
+                resolved_layer = None
+                if layer_code is not None or layer_name is not None:
+                    matches = [
+                        item for item in layers
+                        if (layer_code is None or item["code"] == str(layer_code).strip())
+                        and (layer_name is None or item["name"] == str(layer_name).strip())
+                    ]
+                    if len(matches) != 1:
+                        raise AssetFilterCatalogChangedError("数据分层筛选项已变化或无法唯一确定")
+                    resolved_layer = matches[0]
 
-            return self._count_asset_rows(
-                domain=resolved_domain["name"] if resolved_domain else None,
-                layer=resolved_layer["code"] if resolved_layer else None,
+                database_call_count += 1
+                result = self._count_asset_rows(
+                    domain=resolved_domain["name"] if resolved_domain else None,
+                    layer=resolved_layer["code"] if resolved_layer else None,
+                )
+            outcome = "complete"
+            return result
+        finally:
+            elapsed_ms = (perf_counter() - started_at) * 1000
+            logger = LOGGER.warning if outcome != "complete" or elapsed_ms >= 3000 else LOGGER.info
+            logger(
+                "AI metadata count stage %s database_call_count=%s elapsed_ms=%.2f",
+                outcome,
+                database_call_count,
+                elapsed_ms,
             )
 
     def _load_table_rows(self, layer=None, domain=None):
@@ -583,9 +600,22 @@ class AssetsService(AuditActorMixin):
             row["domain_name"] = code_to_name.get(row.get("domain_code"), row.get("domain_code") or "")
         return rows
 
-    def _load_field_rows(self, asset_ids, *, purpose="asset field list", method="_load_field_rows"):
-        if not asset_ids:
+    def _load_field_rows(
+        self,
+        asset_ids,
+        *,
+        field_ids=None,
+        purpose="asset field list",
+        method="_load_field_rows",
+    ):
+        if not asset_ids or (field_ids is not None and not field_ids):
             return {}
+        clauses = [
+            asset_field.c.asset_id.in_([int(asset_id) for asset_id in asset_ids]),
+            asset_field.c.is_deleted == "N",
+        ]
+        if field_ids is not None:
+            clauses.append(asset_field.c.field_id.in_([int(field_id) for field_id in field_ids]))
         rows = self._fetch_rows_logged(
             select(
                 asset_field.c.field_id,
@@ -600,10 +630,7 @@ class AssetsService(AuditActorMixin):
                 asset_field.c.enum_desc,
                 asset_field.c.field_desc,
             )
-            .where(
-                asset_field.c.asset_id.in_([int(asset_id) for asset_id in asset_ids]),
-                asset_field.c.is_deleted == "N",
-            )
+            .where(*clauses)
             .order_by(asset_field.c.asset_id, asset_field.c.field_order, asset_field.c.field_name),
             purpose=purpose,
             method=method,
@@ -1232,6 +1259,133 @@ class AssetsService(AuditActorMixin):
             after_json=json.dumps(after_data, ensure_ascii=False) if after_data is not None else None,
             operator_name=self._default_operator,
         )
+
+    def get_rag_candidate_catalog(self, asset_ids, field_ids_by_asset=None):
+        """Batch-read current active DAP metadata for a bounded RAG candidate set.
+
+        Only the candidate tables and explicitly referenced active field IDs are
+        loaded. The returned rows use the ordinary asset projection shape so the
+        caller can apply the same public visibility policy as catalog endpoints.
+        """
+        normalized_asset_id_set: set[int] = set()
+        for asset_id in asset_ids or []:
+            if isinstance(asset_id, bool):
+                continue
+            try:
+                normalized_asset_id = int(asset_id)
+            except (TypeError, ValueError):
+                continue
+            if 0 < normalized_asset_id <= 2_147_483_647:
+                normalized_asset_id_set.add(normalized_asset_id)
+        normalized_asset_ids = sorted(normalized_asset_id_set)
+        if len(normalized_asset_ids) > 20:
+            raise ValueError("RAG candidate table set exceeds the bounded limit")
+        normalized_fields: dict[int, set[int]] = {}
+        for asset_id, field_ids in (field_ids_by_asset or {}).items():
+            if isinstance(asset_id, bool):
+                continue
+            try:
+                normalized_asset_id = int(asset_id)
+            except (TypeError, ValueError):
+                continue
+            if normalized_asset_id not in normalized_asset_ids:
+                continue
+            try:
+                requested_field_ids = iter(field_ids or ())
+            except TypeError:
+                continue
+            for field_id in requested_field_ids:
+                try:
+                    normalized_field_id = int(field_id)
+                except (TypeError, ValueError):
+                    continue
+                if not isinstance(field_id, bool) and 0 < normalized_field_id <= 2_147_483_647:
+                    normalized_fields.setdefault(normalized_asset_id, set()).add(normalized_field_id)
+        field_ids = sorted({field_id for values in normalized_fields.values() for field_id in values})
+        if len(field_ids) > 20:
+            raise ValueError("RAG candidate field set exceeds the bounded limit")
+
+        started_at = perf_counter()
+        if not normalized_asset_ids:
+            LOGGER.info(
+                "RAG candidate metadata lookup complete db_call_count=0 candidate_assets=0 candidate_fields=0"
+            )
+            return []
+
+        table_rows: list[dict] = []
+        fields_by_asset: dict[int, list[dict]] = {}
+        db_call_count = 0
+        try:
+            with database_transaction():
+                db_call_count += 1
+                table_rows = self._fetch_rows_logged(
+                    select(
+                        asset_table.c.asset_id,
+                        asset_table.c.table_name,
+                        asset_table.c.table_cn_name,
+                        asset_table.c.schema_name,
+                        asset_table.c.layer_code,
+                        asset_table.c.domain_code,
+                        asset_table.c.owner_name,
+                        asset_table.c.grain_desc,
+                        asset_table.c.cycle_desc,
+                        asset_table.c.table_desc,
+                        asset_table.c.field_count,
+                        asset_domain.c.domain_name.label("domain_name"),
+                    )
+                    .select_from(
+                        asset_table.outerjoin(
+                            asset_domain,
+                            asset_domain.c.domain_code == asset_table.c.domain_code,
+                        )
+                    )
+                    .where(
+                        asset_table.c.asset_id.in_(normalized_asset_ids),
+                        asset_table.c.is_deleted == "N",
+                    )
+                    .order_by(asset_table.c.asset_id),
+                    purpose="RAG candidate table validation",
+                    method="get_rag_candidate_catalog",
+                )
+                if field_ids:
+                    db_call_count += 1
+                    fields_by_asset = self._load_field_rows(
+                        normalized_asset_ids,
+                        field_ids=field_ids,
+                        purpose="RAG candidate field validation",
+                        method="get_rag_candidate_catalog",
+                    )
+            result = [
+                self._to_asset_table(
+                    row,
+                    [
+                        field
+                        for field in fields_by_asset.get(int(row["asset_id"]), [])
+                        if field["fieldId"] in normalized_fields.get(int(row["asset_id"]), set())
+                    ],
+                )
+                for row in table_rows
+            ]
+            elapsed_ms = (perf_counter() - started_at) * 1000
+            logger = LOGGER.warning if elapsed_ms >= 3000 else LOGGER.info
+            logger(
+                "RAG candidate metadata lookup complete db_call_count=%s candidate_assets=%s candidate_fields=%s verified_assets=%s elapsed_ms=%.2f",
+                db_call_count,
+                len(normalized_asset_ids),
+                len(field_ids),
+                len(result),
+                elapsed_ms,
+            )
+            return result
+        except Exception:
+            LOGGER.warning(
+                "RAG candidate metadata lookup failed db_call_count=%s candidate_assets=%s candidate_fields=%s elapsed_ms=%.2f",
+                db_call_count,
+                len(normalized_asset_ids),
+                len(field_ids),
+                (perf_counter() - started_at) * 1000,
+            )
+            raise
 
     def get_asset_tables(
         self,

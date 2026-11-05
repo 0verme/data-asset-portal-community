@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
 from backend.app.application import Identity
@@ -10,6 +11,7 @@ from backend.app.contracts.ai_ask import AiAskProgressStep, AiAskResponse
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi_app import create_fastapi_app
 from backend.app.services.ai_ask_service import AIAskCancelled
+from backend.app.services.ai_ask_admission import AIAskAdmissionController
 from fastapi.testclient import TestClient
 
 _DEFAULT_IDENTITY = object()
@@ -66,7 +68,7 @@ class AiAskApiTests(unittest.TestCase):
         self.addCleanup(self.environment.stop)
         self.identity = Identity("test-user", "admin", "测试管理员")
 
-    def _client(self, *, service=None, execution=None, identity=_DEFAULT_IDENTITY, search=None, rag=None, authorization=None):
+    def _client(self, *, service=None, execution=None, identity=_DEFAULT_IDENTITY, search=None, rag=None, authorization=None, assets=None, field_mapping=None):
         search_provider = search or MagicMock()
         search_provider.search.return_value = {
             "query": "legacy", "scope": "all", "groups": [], "total": 0,
@@ -78,6 +80,8 @@ class AiAskApiTests(unittest.TestCase):
             ai_ask_execution_service_instance=execution,
             search_provider_instance=search_provider,
             rag_search_service_instance=rag or MagicMock(),
+            assets_service_instance=assets,
+            field_mapping_service_instance=field_mapping,
             authorization_service_instance=authorization or AuthorizationService(),
             openapi_enabled=True,
         )), search_provider
@@ -194,6 +198,148 @@ class AiAskApiTests(unittest.TestCase):
 
         self.assertEqual(401, status.status_code)
         self.assertEqual(401, ask.status_code)
+
+    def test_blocked_ai_worker_does_not_block_ordinary_search_api(self):
+        import threading
+
+        service = StubAIAskService()
+        started = threading.Event()
+        release = threading.Event()
+
+        class BlockingExecutionService:
+            def ask(self, *_args, **_kwargs):
+                started.set()
+                release.wait(5)
+                return service.response
+
+        assets = MagicMock()
+        assets.get_asset_tables.return_value = []
+        field_mapping = MagicMock()
+        field_mapping.get_source_systems.return_value = []
+        client, search = self._client(
+            service=service,
+            execution=BlockingExecutionService(),
+            assets=assets,
+            field_mapping=field_mapping,
+        )
+        controller = AIAskAdmissionController(max_concurrent=1, max_queued=0)
+        with patch("backend.app.fastapi.routers.ai_ask.ai_ask_admission", controller):
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                pending = executor.submit(
+                    client.post,
+                    "/api/ai/ask/stream",
+                    json={"query": "并发合成问答"},
+                )
+                self.assertTrue(started.wait(2), "AI worker should have entered the blocking fixture")
+                self.assertEqual((1, 0), controller.snapshot())
+                ordinary_response = client.get("/api/search?q=ordinary")
+                asset_response = client.get("/api/assets/tables")
+                field_mapping_response = client.get("/api/field-mappings/source-systems")
+                self.assertEqual(200, ordinary_response.status_code)
+                self.assertEqual(200, asset_response.status_code)
+                self.assertEqual(200, field_mapping_response.status_code)
+                release.set()
+                stream_response = pending.result(timeout=5)
+
+        self.assertEqual(1, stream_response.text.count("event: answer\n"))
+        search.search.assert_called_once_with("ordinary", scope="all", limit="5", profile="internal")
+        assets.get_asset_tables.assert_called_once()
+        field_mapping.get_source_systems.assert_called_once()
+        self.assertEqual((0, 0), controller.snapshot())
+
+    def test_default_app_composition_runs_stream_through_the_isolated_worker_seam(self):
+        import threading
+
+        service = StubAIAskService()
+        workers = []
+
+        class StubProcessWorker:
+            def __init__(self, *, mode, payload, profile, request_id="", **_kwargs):
+                self.mode = mode
+                self.payload = payload
+                self.profile = profile
+                self.request_id = request_id
+                self.timeout_seconds = 2
+                self.database_timeout_seconds = 1
+                self.cancel_event = threading.Event()
+                self.running = False
+                self.messages = [
+                    ("event", "answer", {
+                        "request_id": request_id,
+                        "step_id": "answer",
+                        "timestamp": "2026-01-01T00:00:00.000Z",
+                        "message": "已返回合成答案。",
+                        "data": {"response": service.response.model_dump(by_alias=True)},
+                    }),
+                    ("result", service.response.model_dump(by_alias=True)),
+                    ("__end__", None),
+                ] if mode == "stream" else [
+                    ("result", service.response.model_dump(by_alias=True)),
+                    ("__end__", None),
+                ]
+                workers.append(self)
+
+            def start(self):
+                self.running = True
+
+            def get_message(self, _timeout=0.1):
+                return self.messages.pop(0) if self.messages else None
+
+            def has_timed_out(self):
+                return False
+
+            def is_alive(self):
+                return self.running
+
+            def join_after_completion(self):
+                self.running = False
+                return True
+
+            def cancel_and_stop(self):
+                self.running = False
+                return True
+
+        app = create_fastapi_app(
+            capabilities=resolve_capabilities(),
+            identity_resolver=lambda _request: None,
+            authorization_service_instance=AuthorizationService(),
+            openapi_enabled=True,
+        )
+        client = TestClient(app)
+        with patch("backend.app.fastapi.routers.ai_ask.AIAskProcessWorker", StubProcessWorker):
+            response = client.post("/api/ai/ask/stream", json={"query": "默认隔离路径合成问题"})
+            json_response = client.post("/api/ai/ask", json={"query": "默认隔离 JSON 问题"})
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(200, json_response.status_code)
+        self.assertEqual(["stream", "progress"], [worker.mode for worker in workers])
+        self.assertTrue(all(worker.profile == "internal" for worker in workers))
+        self.assertEqual(1, response.text.count("event: answer\n"))
+        self.assertEqual(1, response.text.count("event: done\n"))
+        self.assertIn('"status":"completed"', response.text)
+        self.assertEqual("answered", json_response.json()["status"])
+
+    def test_ai_overload_is_explicit_and_does_not_block_ordinary_search(self):
+        service = StubAIAskService()
+        client, search = self._client(service=service)
+        controller = AIAskAdmissionController(max_concurrent=1, max_queued=0)
+        active = controller.reserve()
+
+        with patch("backend.app.fastapi.routers.ai_ask.ai_ask_admission", controller):
+            json_response = client.post("/api/ai/ask", json={"query": "合成问答"})
+            stream_response = client.post("/api/ai/ask/stream", json={"query": "合成流式问答"})
+            ordinary_response = client.get("/api/search?q=ordinary")
+
+        active.release()
+        self.assertEqual(200, json_response.status_code)
+        self.assertEqual("generation_unavailable", json_response.json()["status"])
+        self.assertEqual("llm_busy", json_response.json()["reasonCode"])
+        self.assertEqual(1, stream_response.text.count("event: answer\n"))
+        self.assertEqual(1, stream_response.text.count("event: done\n"))
+        self.assertIn('"reasonCode":"llm_busy"', stream_response.text)
+        self.assertEqual(200, ordinary_response.status_code)
+        search.search.assert_called_once_with("ordinary", scope="all", limit="5", profile="internal")
+        self.assertEqual([], service.calls)
 
     def test_traditional_search_route_remains_unchanged_and_documented(self):
         client, search = self._client()

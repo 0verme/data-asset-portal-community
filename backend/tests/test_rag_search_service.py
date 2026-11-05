@@ -67,7 +67,24 @@ class RagSearchServiceTests(unittest.TestCase):
             trust_env=False,
         ))
         assets = MagicMock()
-        assets.get_asset_tables.return_value = self.catalog if catalog is None else catalog
+        source_catalog = self.catalog if catalog is None else catalog
+        assets.get_asset_tables.return_value = source_catalog
+
+        def load_candidates(asset_ids, field_ids_by_asset):
+            result = []
+            for item in source_catalog:
+                asset_id = item.get("assetId")
+                if asset_id not in asset_ids:
+                    continue
+                projected = dict(item)
+                projected["fields"] = [
+                    field for field in item.get("fields", [])
+                    if field.get("fieldId") in field_ids_by_asset.get(asset_id, set())
+                ]
+                result.append(projected)
+            return result
+
+        assets.get_rag_candidate_catalog.side_effect = load_candidates
         return RagSearchService(
             assets,
             lambda: self.config if config is None else config,
@@ -146,13 +163,16 @@ class RagSearchServiceTests(unittest.TestCase):
                 },
             ])
 
-        service, _assets = self._service(handler)
+        service, assets = self._service(handler)
         response = service.recommend("客户", profile="strict")
 
         self.assertEqual(1, len(requests))
         self.assertEqual("https://rag.example.invalid/api/v1/search", str(requests[0].url))
         self.assertEqual("available", response.status)
         self.assertEqual(2, response.count)
+        self.assertEqual([1], assets.get_rag_candidate_catalog.call_args.args[0])
+        self.assertEqual({1: {10}}, assets.get_rag_candidate_catalog.call_args.args[1])
+        assets.get_asset_tables.assert_not_called()
         self.assertEqual("CUSTOMER", response.recommendations[0].name)
         self.assertEqual("客户主表公开说明", response.recommendations[0].description)
         self.assertEqual("CUSTOMER_ID", response.recommendations[1].name)
@@ -197,10 +217,19 @@ class RagSearchServiceTests(unittest.TestCase):
         )
 
         self.assertEqual("available", response.status)
-        self.assertEqual(["start", "http_request", "complete"], sequence)
-        self.assertEqual(["start", "complete"], [event for event, _data in observations])
+        self.assertEqual(
+            ["start", "http_request", "catalog_start", "catalog_complete", "complete"],
+            sequence,
+        )
+        self.assertEqual(
+            ["start", "catalog_start", "catalog_complete", "complete"],
+            [event for event, _data in observations],
+        )
         started = observations[0][1]
-        completed = observations[1][1]
+        completed = next(data for event, data in observations if event == "complete")
+        catalog_started = observations[1][1]
+        self.assertEqual("database", catalog_started["phase"])
+        self.assertEqual(2, completed["databaseCallCount"])
         self.assertEqual("search-123", started["searchId"])
         self.assertEqual(1, started["requestCount"])
         self.assertEqual("hybrid", completed["effectiveMode"])
@@ -435,7 +464,7 @@ class RagSearchServiceTests(unittest.TestCase):
             }])
 
         service, assets = self._service(handler, catalog=[])
-        assets.get_asset_tables.side_effect = RuntimeError("catalog unavailable")
+        assets.get_rag_candidate_catalog.side_effect = RuntimeError("catalog unavailable")
         response = service.recommend("客户", profile="strict")
 
         self.assertEqual("unavailable", response.status)

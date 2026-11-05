@@ -91,6 +91,27 @@ class DatabaseExampleConfigTests(unittest.TestCase):
             profile = get_db_profile("gauss_primary")
         self.assertEqual(override.resolve(), Path(profile["jar_path"]))
 
+    def test_ai_database_timeout_overrides_tighten_gaussdb_jdbc_profile(self):
+        from urllib.parse import parse_qsl, urlsplit
+
+        with self.configured_runtime(), patch(
+            "backend.app.db.facade.get_db_profile_overrides",
+            return_value={
+                "connect_timeout": "5",
+                "socket_timeout": "8",
+                "statement_timeout_ms": "7000",
+            },
+        ):
+            profile = get_db_profile("gauss_primary")
+
+        query = dict(parse_qsl(urlsplit(profile["jdbc_url"].removeprefix("jdbc:")).query))
+        self.assertEqual(5, profile["connect_timeout"])
+        self.assertEqual(8, profile["socket_timeout"])
+        self.assertEqual(7000, profile["statement_timeout_ms"])
+        self.assertEqual("5", query["loginTimeout"])
+        self.assertEqual("5000", query["connectTimeout"])
+        self.assertEqual("8000", query["socketTimeout"])
+
     def test_gauss_schema_drives_physical_schema_sql_and_migration_prefix(self):
         with self.configured_runtime():
             profile = get_db_profile("gauss_primary")
