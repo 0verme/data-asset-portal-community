@@ -295,8 +295,20 @@ class AIAskExecutionServiceTests(unittest.TestCase):
         )
 
         self.assertEqual("answered", response.status)
-        self.assertEqual(["概念甲", "概念乙", "问题在哪个资产？", "概念丙"], [call[0] for call in rag.calls])
+        self.assertCountEqual(
+            ["概念甲", "概念乙", "问题在哪个资产？", "概念丙"],
+            [call[0] for call in rag.calls],
+        )
         self.assertEqual(4, len({call[3] for call in rag.calls}))
+        round_one_complete = next(
+            index for index, (event, data) in enumerate(events)
+            if event == "step_complete" and data["step_id"] == "rag-round-1"
+        )
+        round_two_start = next(
+            index for index, (event, data) in enumerate(events)
+            if event == "step_start" and data["step_id"] == "rag-round-2"
+        )
+        self.assertLess(round_one_complete, round_two_start)
         round_two = next(data for event, data in events if event == "step_start" and data["step_id"] == "rag-round-2")
         self.assertEqual(1, round_two["data"]["maxRequests"])
 
