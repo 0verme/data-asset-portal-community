@@ -85,9 +85,14 @@ async function mockPortalApis(page: Page, options: {
   askFailureCount?: number;
   delayFirstAsk?: boolean;
   recommendationCount?: number;
+  holdMenus?: boolean;
 } = {}) {
   const asked: Array<{ query: string; scope: string; topK: number }> = [];
   const searches: Array<{ query: string; scope: string }> = [];
+  let notifyMenuRequest: () => void = () => {};
+  let releaseMenuResponse: () => void = () => {};
+  const menuRequestStarted = new Promise<void>((resolve) => { notifyMenuRequest = resolve; });
+  const menuResponseGate = new Promise<void>((resolve) => { releaseMenuResponse = resolve; });
   let aiEnabled = options.aiEnabled ?? true;
   let askFailuresRemaining = options.askFailureCount ?? 0;
 
@@ -104,6 +109,8 @@ async function mockPortalApis(page: Page, options: {
     if (path === "/api/auth/me") return json({ message: "anonymous" }, 401);
     if (path === "/api/public-catalog/config") return json({ profile: "internal", exportEnabled: false });
     if (path === "/api/system/menus") {
+      notifyMenuRequest();
+      if (options.holdMenus) await menuResponseGate;
       return json({ items: [{
         id: "1", code: "dwm", name: "数据仓库", path: "/data-warehouse",
         icon: "database", order: 1, status: "enabled", adminOnly: false,
@@ -222,11 +229,13 @@ async function mockPortalApis(page: Page, options: {
   return {
     asked,
     searches,
+    waitForMenuRequest: () => menuRequestStarted,
+    releaseMenus: () => releaseMenuResponse(),
     setAiEnabled(value: boolean) { aiEnabled = value; },
   };
 }
 
-async function openAiPortal(page: Page, options?: { aiEnabled?: boolean; askFailureCount?: number; delayFirstAsk?: boolean; recommendationCount?: number }, path = "/") {
+async function openAiPortal(page: Page, options?: { aiEnabled?: boolean; askFailureCount?: number; delayFirstAsk?: boolean; recommendationCount?: number; holdMenus?: boolean }, path = "/") {
   const fixtures = await mockPortalApis(page, options);
   await page.addInitScript(() => {
     localStorage.removeItem("dap_auth");
@@ -302,6 +311,29 @@ test("existing q/scope URL filters restore the traditional search result mode", 
   await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe(query);
   await expect.poll(() => new URL(page.url()).searchParams.get("scope")).toBe("asset");
   expect(fixtures.searches.some((item) => item.query === query && item.scope === "asset")).toBe(true);
+});
+
+test("clearing a scoped deep-link before menus load does not restore its initial query", async ({ page }) => {
+  const query = "candidate account balance";
+  const fixtures = await openAiPortal(
+    page,
+    { holdMenus: true },
+    `/?q=${encodeURIComponent(query)}&scope=asset`,
+  );
+  await fixtures.waitForMenuRequest();
+
+  const input = page.getByRole("textbox", { name: "搜索数据资产" });
+  await expect(input).toHaveValue(query);
+  await input.fill("");
+  await input.press("Enter");
+  await expect(input).toHaveValue("");
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBeNull();
+
+  fixtures.releaseMenus();
+  await expect(page.getByRole("button", { name: "资产", exact: true })).toBeVisible();
+  await expect(input).toHaveValue("");
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBeNull();
+  expect(fixtures.searches).toHaveLength(0);
 });
 
 test("list answer is explicitly partial and keeps verified table/field references clickable", async ({ page }) => {

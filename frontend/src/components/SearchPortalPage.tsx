@@ -465,6 +465,7 @@ export function SearchPortalPage({
   const initialSearchLocationRef = useRef(typeof window === "undefined" ? "" : window.location.search || "");
   const initialScopeKeys = useMemo(() => new Set(PORTAL_SCOPE_CONFIGS.map((item) => item.key)), []);
   const initialSearchRef = useRef(readPortalSearchParams(initialScopeKeys, initialSearchLocationRef.current));
+  const initialSearchBootstrapPendingRef = useRef(true);
   const [query, setQuery] = useState(initialSearchRef.current.query);
   const [scope, setScope] = useState(initialSearchRef.current.scope);
   const [hotKeywords, setHotKeywords] = useState<PortalHotKeyword[]>([]);
@@ -556,6 +557,7 @@ export function SearchPortalPage({
   };
 
   const resetSearchState = (nextScope = scope): void => {
+    initialSearchBootstrapPendingRef.current = false;
     const preservedScope = validScopeKeys.has(nextScope)
       ? nextScope
       : DEFAULT_PORTAL_SCOPE;
@@ -857,7 +859,9 @@ export function SearchPortalPage({
     }
     const initialSearch = readPortalSearchParams(validScopeKeys, initialSearchLocationRef.current);
     const nextScope = validScopeKeys.has(scope) ? scope : initialSearch.scope;
-    const activeQuery = String(searchedTerm || query || initialSearch.query || "").trim();
+    const initialQuery = initialSearchBootstrapPendingRef.current ? initialSearch.query : "";
+    initialSearchBootstrapPendingRef.current = false;
+    const activeQuery = String(searchedTerm || query || initialQuery).trim();
 
     if (nextScope !== scope) {
       setScope(nextScope);
@@ -928,7 +932,10 @@ export function SearchPortalPage({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              initialSearchBootstrapPendingRef.current = false;
+              setQuery(event.target.value);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter") doSearch();
             }}
