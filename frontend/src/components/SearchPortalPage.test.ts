@@ -144,6 +144,8 @@ test("AI is explicitly enabled, Enter remains traditional search, and model requ
   assert.match(source, /response\?\.status === "generation_unavailable"/);
   assert.match(source, /response\.status === "insufficient_evidence"/);
   assert.match(source, /response\.status === "partial_answer"/);
+  assert.match(source, /\(response\.status === "metadata_count_answered" && response\.metadataCount !== null\)/);
+  assert.match(source, /!response\?\.metadataCount && response\?\.status === "ambiguous_scope"/);
   assert.match(source, /相关线索 · 非直接结论/);
   assert.match(source, /onRetry=\{\(\) => runAiAsk\(aiQuery\)\}/);
   assert.match(source, /onCancel=\{cancelAiAsk\}/);

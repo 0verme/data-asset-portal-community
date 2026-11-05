@@ -361,17 +361,17 @@ function AiAskSection({
   onNavigate,
 }: AiAskSectionProps) {
   if (!query) return null;
-  const responseFailure = !response?.statisticalResult && response?.status === "retrieval_unavailable"
+  const responseFailure = !response?.metadataCount && response?.status === "retrieval_unavailable"
     ? response.reasonCode === "retrieval_timeout"
       ? "资产检索超时，无法基于目录回答；传统搜索不受影响。"
       : "资产检索暂不可用，无法确认候选资产；传统搜索不受影响。"
-    : !response?.statisticalResult && response?.status === "generation_unavailable"
+    : !response?.metadataCount && response?.status === "generation_unavailable"
       ? response.reasonCode === "llm_timeout"
         ? "模型生成超时，未生成回答；不会把未筛选候选当作答案。"
         : "模型暂不可用，未生成回答；不会把未筛选候选当作答案。"
-      : !response?.statisticalResult && response?.status === "ambiguous_scope"
+      : !response?.metadataCount && response?.status === "ambiguous_scope"
         ? response.answer || "无法从当前目录唯一确认统计范围，请明确主题域或数据分层后重试。"
-        : !response?.statisticalResult && response?.status === "metadata_count_unavailable"
+        : !response?.metadataCount && response?.status === "metadata_count_unavailable"
           ? response.answer || "当前 DAP 目录统计暂不可用，未返回统计值；请稍后重试。"
           : "";
   const failureMessage = error || responseFailure;
@@ -412,7 +412,7 @@ function AiAskSection({
               </div>
               <div className="sp-ai-summary" aria-label="AI 部分回答">{response.answer}</div>
             </>
-          ) : !response.statisticalResult && response.answer.trim() ? (
+          ) : !response.metadataCount && response.answer.trim() ? (
             <div className="sp-ai-summary" aria-label="AI 回答摘要">{response.answer}</div>
           ) : null}
           {response.candidates.length ? (
@@ -727,7 +727,7 @@ export function SearchPortalPage({
         setAiResponse(response);
         setAiLoading(false);
         setAiProgressStatus(
-          response.statisticalResult ||
+          (response.status === "metadata_count_answered" && response.metadataCount !== null) ||
           response.status === "answered" ||
           response.status === "partial_answer" ||
           response.status === "insufficient_evidence"
@@ -919,7 +919,7 @@ export function SearchPortalPage({
   const hasResult = result !== null && !searchLoading && !searchError;
   const groups = hasResult && result ? result.groups : [];
   const hasSubmittedQuery = Boolean(searchedTerm || aiQuery);
-  const aiResponseFailed = !aiResponse?.statisticalResult && (
+  const aiResponseFailed = !aiResponse?.metadataCount && (
     aiResponse?.status === "retrieval_unavailable"
     || aiResponse?.status === "generation_unavailable"
     || aiResponse?.status === "ambiguous_scope"

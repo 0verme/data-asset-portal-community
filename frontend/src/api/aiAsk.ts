@@ -7,7 +7,9 @@ export type AiAskStatus =
   | "insufficient_evidence"
   | "retrieval_unavailable"
   | "generation_unavailable"
-  | (string & {});
+  | "metadata_count_answered"
+  | "ambiguous_scope"
+  | "metadata_count_unavailable";
 export type AiRetrievalStatus = "available" | "degraded" | "unavailable" | "not_run";
 export type AiGenerationStatus = "completed" | "unavailable" | "disabled" | "not_run";
 
@@ -46,7 +48,6 @@ export type AiAskProgressStepId =
   | "generating"
   | "completed";
 export type AiAskProgressStatus = "pending" | "running" | "completed" | "failed";
-
 export type AiAskProgressIntent = "metadata_count";
 
 export interface AiAskProgressStep {
@@ -65,7 +66,7 @@ export interface AiAskStatisticalFilter {
   displayName?: string;
 }
 
-/** Additive contract for deterministic catalog statistics (implemented separately from RAG). */
+/** Presentation-only shape derived from the authoritative metadataCount. */
 export interface AiAskStatisticalResult {
   metric: string;
   value: number;
@@ -74,7 +75,6 @@ export interface AiAskStatisticalResult {
   complete: boolean;
   sourceLink?: string | null;
 }
-
 export interface AiMetadataCountFilter {
   code: string;
   displayName: string;
@@ -100,12 +100,12 @@ export interface AiAskResponse {
   answer: string;
   citations: AiAskCitation[];
   candidates: AiAskCandidate[];
+  metadataCount: AiMetadataCount | null;
   retrievalStatus: AiRetrievalStatus;
   generationStatus: AiGenerationStatus;
   resultsTruncated: boolean;
   reasonCode?: string | null;
   elapsedMs: number;
-  metadataCount?: AiMetadataCount;
   statisticalResult?: AiAskStatisticalResult;
 }
 
@@ -124,7 +124,6 @@ const ASK_STATUSES = new Set<string>([
   "insufficient_evidence",
   "retrieval_unavailable",
   "generation_unavailable",
-  "statistical_answer",
   "metadata_count_answered",
   "ambiguous_scope",
   "metadata_count_unavailable",
@@ -332,26 +331,34 @@ export function parseAiAskAvailability(value: unknown): AiAskAvailability {
 
 export function parseAiAskResponse(value: unknown): AiAskResponse {
   if (!isRecord(value)) throw new Error("Invalid AI ask response.");
+  const allowedKeys = new Set([
+    "status", "answer", "citations", "candidates", "metadataCount", "statisticalResult",
+    "retrievalStatus", "generationStatus", "resultsTruncated", "reasonCode", "elapsedMs",
+  ]);
+  if (Object.keys(value).some((key) => !allowedKeys.has(key))) {
+    throw new Error("Unexpected data in AI ask response.");
+  }
   const status = value["status"];
   const retrievalStatus = value["retrievalStatus"];
   const generationStatus = value["generationStatus"];
   const rawStatisticalResult = parseStatisticalResult(value["statisticalResult"]);
-  const metadataCount = value["metadataCount"] === undefined || value["metadataCount"] === null
+  const rawMetadataCount = value["metadataCount"];
+  const metadataCount = rawMetadataCount === undefined || rawMetadataCount === null
     ? null
-    : parseMetadataCount(value["metadataCount"]);
-  if (rawStatisticalResult && metadataCount) {
-    throw new Error("AI ask response cannot contain two statistical evidence shapes.");
+    : parseMetadataCount(rawMetadataCount);
+  if (rawStatisticalResult) {
+    throw new Error("statisticalResult is a presentation adapter and must be derived from metadataCount.");
   }
-  const statisticalResult = rawStatisticalResult || (metadataCount ? metadataCountToStatisticalResult(metadataCount) : null);
-  const resultsTruncated = value["resultsTruncated"] ?? (statisticalResult ? false : undefined);
-  const answer = value["answer"] ?? (statisticalResult ? "" : undefined);
-  const rawCandidates = value["candidates"] ?? (statisticalResult ? [] : undefined);
-  const rawCitations = value["citations"] ?? (statisticalResult ? [] : undefined);
+  const statisticalResult = metadataCount ? metadataCountToStatisticalResult(metadataCount) : null;
+  const resultsTruncated = value["resultsTruncated"] ?? (metadataCount ? false : undefined);
+  const answer = value["answer"] ?? (metadataCount ? "" : undefined);
+  const rawCandidates = value["candidates"] ?? (metadataCount ? [] : undefined);
+  const rawCitations = value["citations"] ?? (metadataCount ? [] : undefined);
   const elapsedMs = value["elapsedMs"];
   if (
     typeof status !== "string"
     || !status.trim()
-    || (!ASK_STATUSES.has(status) && !rawStatisticalResult)
+    || !ASK_STATUSES.has(status)
     || typeof retrievalStatus !== "string"
     || !RETRIEVAL_STATUSES.has(retrievalStatus)
     || typeof generationStatus !== "string"
@@ -411,7 +418,7 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
   } else if (metadataCount) {
     throw new Error("Non-count AI responses must not contain metadata count evidence.");
   }
-  if ((status === "answered" || status === "partial_answer") && !statisticalResult) {
+  if (status === "answered" || status === "partial_answer") {
     if (!citations.length || generationStatus !== "completed") {
       throw new Error("Answered AI response must contain verified citations.");
     }
@@ -436,12 +443,12 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     answer,
     citations,
     candidates,
+    metadataCount,
     retrievalStatus: retrievalStatus as AiRetrievalStatus,
     generationStatus: generationStatus as AiGenerationStatus,
     resultsTruncated,
     reasonCode: isText(value["reasonCode"]) ? value["reasonCode"] : null,
     elapsedMs,
-    ...(metadataCount ? { metadataCount } : {}),
     ...(statisticalResult ? { statisticalResult } : {}),
   };
 }
@@ -546,6 +553,7 @@ export async function askAi(
       answer: "AI 问答暂不可用，请稍后重试。",
       citations: [],
       candidates: [],
+      metadataCount: null,
       retrievalStatus: "not_run",
       generationStatus: "disabled",
       resultsTruncated: false,

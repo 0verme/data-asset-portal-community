@@ -136,6 +136,78 @@ class AiAskContractTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             AiAskCitation.model_validate({"assetId": True, "source": "dap_catalog"})
 
+    def test_metadata_count_contract_is_exact_complete_and_separate_from_rag_citations(self):
+        evidence = {
+            "metric": "table_count",
+            "value": 73,
+            "filters": {
+                "domain": {
+                    "code": "SYNTH",
+                    "displayName": "合成主题域",
+                    "matchedAs": "catalog_value",
+                    "inferred": False,
+                },
+                "layer": {
+                    "code": "DM",
+                    "displayName": "数据集市层",
+                    "matchedAs": "catalog_alias",
+                    "inferred": True,
+                },
+            },
+            "source": "dap_catalog",
+            "complete": True,
+            "catalogProfile": "strict",
+            "sourceLink": "/data-warehouse?domain=%E5%90%88%E6%88%90%E4%B8%BB%E9%A2%98%E5%9F%9F&layer=DM",
+        }
+        response = AiAskResponse.model_validate({
+            "status": "metadata_count_answered",
+            "answer": "当前 DAP 目录中，合成主题域、数据集市层共有 73 张数据表。",
+            "metadataCount": evidence,
+            "citations": [],
+            "candidates": [],
+            "retrievalStatus": "not_run",
+            "generationStatus": "not_run",
+            "resultsTruncated": False,
+        })
+        self.assertEqual(73, response.metadata_count.value)
+        self.assertEqual("DM", response.metadata_count.filters.layer.code)
+        self.assertEqual("not_run", response.generation_status)
+
+        invalid = (
+            {**evidence, "value": -1},
+            {**evidence, "complete": False},
+            {**evidence, "sourceLink": "https://example.invalid/data-warehouse"},
+            {**evidence, "source": "rag_candidate_count"},
+        )
+        for payload in invalid:
+            with self.subTest(payload=payload), self.assertRaises(ValidationError):
+                AiAskResponse.model_validate({
+                    "status": "metadata_count_answered",
+                    "answer": "精确统计。",
+                    "metadataCount": payload,
+                    "citations": [],
+                    "candidates": [],
+                    "retrievalStatus": "not_run",
+                    "generationStatus": "not_run",
+                    "resultsTruncated": False,
+                })
+        with self.assertRaises(ValidationError):
+            AiAskResponse.model_validate({
+                "status": "metadata_count_answered",
+                "answer": "统计失败。",
+                "metadataCount": None,
+                "retrievalStatus": "not_run",
+                "generationStatus": "not_run",
+            })
+        ambiguous = AiAskResponse.model_validate({
+            "status": "ambiguous_scope",
+            "answer": "请明确统计范围。",
+            "retrievalStatus": "not_run",
+            "generationStatus": "not_run",
+            "reasonCode": "ambiguous_scope",
+        })
+        self.assertIsNone(ambiguous.metadata_count)
+
     def test_failure_contract_distinguishes_retrieval_generation_and_no_evidence(self):
         retrieval_failure = AiAskResponse(
             status="retrieval_unavailable",
