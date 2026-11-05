@@ -84,7 +84,9 @@ test("anonymous CSV export stays hidden unless the server explicitly enables it"
   assert.match(codeTables, /canExport \? <(?:button|Button)/);
   assert.match(mappings, /canExport \? <(?:button|Button)/);
   assert.match(codeSidebar, /canExport\s*\?/);
-  assert.match(mappingSidebar, /canExport\s*\?/);
+  assert.match(mappingSidebar, /getFieldMappingSourceSystems/);
+  assert.match(mappingSidebar, /源系统导航/);
+  assert.doesNotMatch(mappingSidebar, /查询说明|筛选建议/);
   assert.match(mappingApi, /field-mappings\/export/);
   assert.match(codeTableApi, /manual-code-tables\/export/);
   assert.match(codeTableHook, /exportManualCodeTablesCsv/);

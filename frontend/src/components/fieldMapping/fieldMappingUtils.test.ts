@@ -43,6 +43,10 @@ test("linked request filters rely on the stable upstream system id", () => {
     ...filters,
     sourceSystemId: "101",
   });
+  assert.deepEqual(buildFieldMappingRequestFilters({ ...filters, sourceSystemId: "101" }, { sourceSystemId: "" }), {
+    ...filters,
+    sourceSystemId: "",
+  });
   assert.deepEqual(buildFieldMappingRequestFilters(filters, {}), filters);
   assert.equal(areFieldMappingFiltersEqual(filters, { ...filters }), true);
   assert.equal(areFieldMappingFiltersEqual(filters, { ...filters, srcField: "MEMBER_CODE" }), false);

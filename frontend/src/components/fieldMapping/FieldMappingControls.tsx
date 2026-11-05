@@ -1,13 +1,9 @@
 import type { ChangeEventHandler, ReactNode } from "react";
 
-import type { FieldMappingSourceSystemOption, FieldMappingStats } from "../../api/fieldMapping.ts";
+import type { FieldMappingStats } from "../../api/fieldMapping.ts";
 import { Icon } from "../ui.tsx";
-import { Button, Input, Select, Tooltip } from "../../ui/index.ts";
-import {
-  formatSystemLabel,
-  getSourceSystemId,
-  type FieldMappingFilters,
-} from "./fieldMappingUtils.ts";
+import { Button, Input, Tooltip } from "../../ui/index.ts";
+import type { FieldMappingFilters } from "./fieldMappingUtils.ts";
 import {
   fieldMappingStatDisplayValue,
   fieldMappingStatsDisplayHint,
@@ -88,10 +84,8 @@ type FieldMappingChangeHandler = ChangeEventHandler<
 export interface FieldMappingFiltersProps {
   open: boolean;
   draftFilters: FieldMappingFilters;
-  sourceSystems: readonly FieldMappingSourceSystemOption[];
   onToggle: () => void;
   onChange: (key: FieldMappingFilterField) => FieldMappingChangeHandler;
-  onSourceSystemChange: (value: string | null) => void;
   onReset: () => void;
   onApply: () => void;
 }
@@ -99,45 +93,11 @@ export interface FieldMappingFiltersProps {
 export function FieldMappingFilters({
   open,
   draftFilters,
-  sourceSystems,
   onToggle,
   onChange,
-  onSourceSystemChange,
   onReset,
   onApply,
 }: FieldMappingFiltersProps) {
-  const selectedSourceSystemId = String(draftFilters.sourceSystemId ?? "");
-  const selectedSourceSystem = sourceSystems.find(
-    (item) => String(getSourceSystemId(item)) === selectedSourceSystemId,
-  );
-  const selectedSourceSystemLabel = selectedSourceSystem
-    ? formatSystemLabel(selectedSourceSystem)
-    : selectedSourceSystemId || "全部";
-  const sourceSystemSelect = (
-    <Select<string>
-      aria-label="源系统"
-      className="sel"
-      placeholder="全部"
-      items={[
-        { label: "全部", value: "" },
-        ...sourceSystems.map((item) => ({
-          label: formatSystemLabel(item),
-          value: String(getSourceSystemId(item)),
-        })),
-      ]}
-      value={selectedSourceSystemId || null}
-      onValueChange={onSourceSystemChange}
-    />
-  );
-  // Keep the tooltip/trigger tree stable so selecting a long label never remounts Select.
-  const sourceSystemControl = (
-    <Tooltip
-      trigger={<div>{sourceSystemSelect}</div>}
-      content={selectedSourceSystemLabel}
-      delay={500}
-    />
-  );
-
   return (
     <section className="fm-card">
       <div className="fm-card-head">
@@ -154,10 +114,6 @@ export function FieldMappingFilters({
       {open ? (
         <>
           <div className="fm-filter-grid">
-            <div className="fm-field">
-              <span>源系统</span>
-              {sourceSystemControl}
-            </div>
             <label className="fm-field">
               <span>源系统表名</span>
               <Input
@@ -177,18 +133,6 @@ export function FieldMappingFilters({
                 onChange={onChange("srcField")}
                 placeholder="例如：ACCT_NO"
               />
-            </label>
-            <label className="fm-field">
-              <span>注释是否为空</span>
-              <select
-                className="sel"
-                value={draftFilters.emptyComment}
-                onChange={onChange("emptyComment")}
-              >
-                <option value="">全部</option>
-                <option value="yes">注释为空</option>
-                <option value="no">注释不为空</option>
-              </select>
             </label>
             <label className="fm-field">
               <span>DWF 表名</span>
@@ -212,6 +156,26 @@ export function FieldMappingFilters({
             </label>
           </div>
           <div className="fm-actions">
+            <label className="fm-field fm-optional-filter">
+              <span>注释是否为空</span>
+              <select
+                className="sel"
+                value={draftFilters.emptyComment}
+                onChange={onChange("emptyComment")}
+              >
+                <option value="">全部</option>
+                <option value="yes">注释为空</option>
+                <option value="no">注释不为空</option>
+              </select>
+            </label>
+            <Tooltip
+              trigger={(
+                <button className="fm-help-trigger" type="button" aria-label="查询帮助">
+                  <Icon name="info" size={15} />
+                </button>
+              )}
+              content="输入源系统表名、源字段名、DWF 表名或 DWF 字段名后点击查询；也可在左侧选择源系统即时筛选。注释条件用于定位源字段注释为空或不为空的记录。重置会清空查询条件并恢复全部源系统。"
+            />
             <Button className="btn" variant="secondary" type="button" onClick={onReset}>
               重置
             </Button>

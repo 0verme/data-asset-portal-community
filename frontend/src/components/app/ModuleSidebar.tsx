@@ -38,6 +38,8 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
     indicatorFilter,
     lineageBootstrap,
     manualCodeTable,
+    mappingRoute,
+    setMappingRoute,
     push,
     pushRoute,
     report,
@@ -159,11 +161,7 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
   }
   if (module === "mapping") {
     return (
-      <MappingSidebar
-        canExport={auth.user
-          ? canPermission("field_mapping:read")
-          : catalogExportEnabled && !catalogAccessDisabled}
-      />
+      <MappingSidebar route={mappingRoute} setRoute={setMappingRoute} />
     );
   }
   if (module === "lineage") {
