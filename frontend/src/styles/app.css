@@ -723,7 +723,8 @@
   .side-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .main { flex: 1; min-width: 0; overflow-y: auto; }
-  .main.fm-has-wide-table-scrollbar { margin-bottom: 14px; }
+  .main.fm-has-wide-table-scrollbar,
+  .main.wide-table-has-horizontal-scrollbar { margin-bottom: 14px; }
   .main-inner { max-width: 1320px; margin: 0 auto; padding: 30px 36px 60px; }
 
   /* ===== Page header ===== */
@@ -787,7 +788,24 @@
 
   /* ===== LIST (table rows) layout ===== */
   .tbl-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .wide-table-scroll {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-color: var(--ink-3) var(--surface-2);
+    scrollbar-width: thin;
+  }
+  .wide-table-scroll > table.dt { min-width: 100%; }
   table.dt { width: 100%; border-collapse: collapse; }
+  table.dt.asset-wide-table { min-width: 1220px; }
+  table.dt.root-wide-table { min-width: 1040px; }
+  table.dt.manual-code-wide-table { min-width: 1320px; }
+  table.dt.api-assets-wide-table { min-width: 1260px; }
+  table.dt.menu-management-table { table-layout: fixed; min-width: 1260px; }
+  .operation-log-wide-table { min-width: 1780px; }
   table.dt thead th {
     text-align: left; font-size: 11.5px; font-weight: 600; letter-spacing: 0.4px; color: var(--ink-3); text-transform: uppercase;
     padding: 12px 18px; background: var(--surface-2); border-bottom: 1px solid var(--line); white-space: nowrap;
@@ -2248,7 +2266,8 @@
     margin: 0;
   }
 
-  .fm-sticky-horizontal-scrollbar {
+  .fm-sticky-horizontal-scrollbar,
+  .wide-table-sticky-scrollbar {
     position: fixed;
     z-index: 29;
     height: 14px;
@@ -2260,7 +2279,8 @@
     user-select: none;
   }
 
-  .fm-scrollbar-track {
+  .fm-scrollbar-track,
+  .wide-table-scrollbar-track {
     position: absolute;
     top: 50%;
     right: 8px;
@@ -2271,7 +2291,8 @@
     transform: translateY(-50%);
   }
 
-  .fm-scrollbar-thumb {
+  .fm-scrollbar-thumb,
+  .wide-table-scrollbar-thumb {
     position: absolute;
     top: 0;
     left: 0;
@@ -2282,15 +2303,18 @@
     cursor: grab;
   }
 
-  .fm-scrollbar-thumb:hover {
+  .fm-scrollbar-thumb:hover,
+  .wide-table-scrollbar-thumb:hover {
     background: var(--ink-2);
   }
 
-  .fm-sticky-horizontal-scrollbar:active .fm-scrollbar-thumb {
+  .fm-sticky-horizontal-scrollbar:active .fm-scrollbar-thumb,
+  .wide-table-sticky-scrollbar:active .wide-table-scrollbar-thumb {
     cursor: grabbing;
   }
 
-  .fm-sticky-horizontal-scrollbar:focus-visible {
+  .fm-sticky-horizontal-scrollbar:focus-visible,
+  .wide-table-sticky-scrollbar:focus-visible {
     outline: 2px solid var(--accent-line);
     outline-offset: 2px;
   }
@@ -2714,6 +2738,9 @@
       box-shadow: none;
     }
 
+    .wide-table-scroll:has(.mobile-card-table) { overflow: visible; }
+    .wide-table-scroll > table.mobile-card-table { min-width: 0; table-layout: auto; }
+
     table.mobile-card-table,
     .mobile-card-table tbody {
       display: block;
@@ -2888,7 +2915,8 @@
     }
 
     .fm-sticky-table-head,
-    .fm-sticky-horizontal-scrollbar {
+    .fm-sticky-horizontal-scrollbar,
+    .wide-table-sticky-scrollbar {
       display: none;
     }
 

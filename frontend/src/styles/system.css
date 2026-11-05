@@ -160,12 +160,65 @@
     border-radius: 0 0 var(--radius) var(--radius);
     box-shadow: none;
     max-width: 100%;
-    overflow-x: auto;
-    overflow-y: visible;
+    overflow: hidden;
   }
 
   .system-panel-main {
     min-width: 0;
+  }
+
+  .system-users-table { min-width: 1420px; }
+  .system-roles-table { min-width: 1200px; }
+
+  @media (min-width: 769px) {
+    .menu-management-table-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      align-items: stretch;
+      min-width: 0;
+    }
+
+    .menu-management-table thead tr { height: 42px; }
+    .menu-management-table tbody tr { height: 62px; }
+    .menu-management-table .menu-actions-head,
+    .menu-management-table .menu-actions-cell { display: none; }
+
+    .menu-actions-fixed {
+      min-width: 0;
+      border-left: 1px solid var(--line);
+      background: var(--surface);
+    }
+
+    .menu-actions-fixed-header {
+      box-sizing: border-box;
+      display: flex;
+      height: 42px;
+      align-items: center;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-2);
+      color: var(--ink-2);
+      font-size: 13px;
+      font-weight: 500;
+      text-align: right;
+    }
+
+    .menu-actions-fixed-header [role="columnheader"] { width: 100%; }
+
+    .menu-actions-fixed-row {
+      box-sizing: border-box;
+      display: flex;
+      height: 62px;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 13px 12px;
+      border-bottom: 1px solid var(--line-2);
+    }
+
+    .menu-actions-fixed-row:last-child { border-bottom: 0; }
+    .menu-actions-fixed-row [role="cell"] { width: 100%; min-width: 0; }
+    .menu-actions-fixed-row .row-actions { width: 100%; gap: 6px; }
+    .menu-actions-fixed-row .row-actions .btn { padding: 0 8px; gap: 5px; font-size: 12.5px; }
   }
 
   .param-dict-table {
@@ -183,21 +236,17 @@
 
   .param-dict-table th.param-col-actions,
   .param-dict-table td.param-col-actions {
-    position: sticky;
-    right: 0;
-    z-index: 1;
     text-align: right;
-    background: var(--surface);
-    box-shadow: -1px 0 0 var(--line);
   }
 
-  .param-dict-table th.param-col-actions {
-    z-index: 2;
-    background: var(--surface-2);
-  }
-
-  .system-page .param-dict-table tbody tr:hover td.param-col-actions {
-    background: var(--surface-2);
+  @media (max-width: 768px) {
+    .menu-management-table-shell { display: block; }
+    .menu-actions-fixed { display: none; }
+    .system-page table.mobile-card-table.system-users-table,
+    .system-page table.mobile-card-table.system-roles-table,
+    .system-page table.mobile-card-table.param-dict-table {
+      min-width: 0;
+    }
   }
 
   .param-dict-table .row-actions {

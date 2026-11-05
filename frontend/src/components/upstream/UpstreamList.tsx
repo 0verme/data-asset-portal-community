@@ -14,7 +14,7 @@
 
 import type { PublicUpstreamSystem } from "../../api/upstream.ts";
 import type { MappingRoute } from "../../routing/types.ts";
-import { CardGridView, EmptyState, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.ts";
+import { CardGridView, EmptyState, RowActions, StatusBadge, ViewModeSwitcher, WideTableScroll } from "../common/index.ts";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 import { Icon } from "../ui.tsx";
 import { Button, Select } from "../../ui/index.ts";
@@ -158,7 +158,8 @@ export function UpstreamList({
         />
       ) : (
         <div className="tbl-wrap">
-          <table className="dt mobile-card-table">
+          <WideTableScroll ariaLabel="上游卸数系统列表" className="upstream-wide-scroll">
+            <table className="dt mobile-card-table upstream-wide-table">
             <thead>
               <tr>
                 <th style={{ width: "24%" }}>系统</th>
@@ -212,7 +213,8 @@ export function UpstreamList({
                 );
               })}
             </tbody>
-          </table>
+            </table>
+          </WideTableScroll>
         </div>
       )}
     </div>

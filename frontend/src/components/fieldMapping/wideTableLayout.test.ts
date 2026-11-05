@@ -120,7 +120,7 @@ test("observes container/table resize and keeps the field mapping scroll control
   assert.match(tableSource, /onPointerDown=\{handleScrollbarPointerDown\}/);
   assert.match(tableSource, /onKeyDown=\{handleScrollbarKeyDown\}/);
   assert.match(styles, /\.fm-scrollbar-thumb[\s\S]*?cursor: grab/);
-  assert.match(styles, /\.main\.fm-has-wide-table-scrollbar\s*\{\s*margin-bottom: 14px;/);
+  assert.match(styles, /\.main\.fm-has-wide-table-scrollbar,\s*\.main\.wide-table-has-horizontal-scrollbar\s*\{\s*margin-bottom: 14px;/);
 });
 
 test("freezes only the two source context columns and preserves long values behind ellipsis titles", () => {

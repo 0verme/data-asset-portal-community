@@ -17,7 +17,7 @@ import React from "react";
 import type { RootCategoryItem, SanitizedWordRoot } from "../api/root.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { ROOT_ABBR_RULE_MESSAGE, isValidRootAbbr } from "../utils/rootValidation.ts";
-import { ActionErrorBanner, confirmDeleteAction, DangerZone, EmptyState, FormActionBar, PageHeader, RowActions } from "./common/index.ts";
+import { ActionErrorBanner, confirmDeleteAction, DangerZone, EmptyState, FormActionBar, PageHeader, RowActions, WideTableScroll } from "./common/index.ts";
 import { Highlight, Icon } from "./ui.tsx";
 import {
   Button,
@@ -133,7 +133,8 @@ export function RootLibrary({
         <EmptyState title="未找到匹配的词根" desc="换个关键词，或新增 / 导入词根。" />
       ) : (
         <div className="tbl-wrap root-tbl">
-          <table className="dt mobile-card-table">
+          <WideTableScroll ariaLabel="数据词根列表" className="root-wide-scroll">
+            <table className="dt mobile-card-table root-wide-table">
             <thead>
               <tr>
                 <th style={{ width: 130 }}>词根</th>
@@ -158,7 +159,8 @@ export function RootLibrary({
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </WideTableScroll>
         </div>
       )}
       <TablePagination

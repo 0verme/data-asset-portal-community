@@ -226,7 +226,9 @@ test('status mutations reload the current server query and page', async ({ page 
   await menuPager.getByRole('button', { name: '下一页' }).click();
   await expect(rows).toHaveCount(3);
   const menuMutation = armMutation('/api/system/menus/21/status', { ...menu(21), status: 'disabled' });
-  await rows.filter({ hasText: 'fixture-menu-21' }).getByRole('button', { name: '禁用', exact: true }).click();
+  await page.getByRole('table', { name: '菜单操作' })
+    .getByRole('row', { name: '菜单 Fixture Menu 21 操作' })
+    .getByRole('button', { name: '禁用', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: '禁用', exact: true }).click();
   await menuMutation.started;
   await page.locator('.search-input').fill('Tail Menu');

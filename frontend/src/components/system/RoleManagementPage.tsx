@@ -31,6 +31,7 @@ import {
   RowActions,
   StatusBadge,
   BinaryStatusToggle,
+  WideTableScroll,
 } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
 import { Button, FormErrorSummary, FormField, focusFirstFormError, Input, TablePagination, Textarea } from "../../ui/index.ts";
@@ -322,7 +323,8 @@ export function RoleManagementPage({
         />
       ) : (
         <div className="tbl-wrap">
-          <table className="dt mobile-card-table">
+          <WideTableScroll ariaLabel="角色管理表格" className="system-roles-wide-scroll">
+            <table className="dt mobile-card-table system-roles-table">
             <thead>
               <tr>
                 <th>角色</th>
@@ -392,7 +394,8 @@ export function RoleManagementPage({
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </WideTableScroll>
         </div>
       )}
       <TablePagination
