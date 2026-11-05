@@ -119,6 +119,28 @@ class LineageCoreQueryTests(unittest.TestCase):
             self.assertEqual("m_jjqd_list", compiled.params["lower_3"])
             self.assertEqual("d_wm", compiled.params["lower_4"])
 
+    def test_poc_search_supports_business_namespace_and_exact_table_precedence(self):
+        nodes = [
+            {"id": "table:sales:orders", "kind": "table", "name": "ORDERS", "namespace": "SALES"},
+            {"id": "table:archive:orders", "kind": "table", "name": "ORDERS", "namespace": "ARCHIVE"},
+            {"id": "task:job:orders", "kind": "task", "name": "JOB_ORDERS", "namespace": "scheduler"},
+            {"id": "task:job:monthly", "kind": "task", "name": "JOB_MONTHLY_SALES", "namespace": "scheduler"},
+        ]
+        with (
+            patch.object(lineage_service, "lineage_storage_status", return_value={"mode": "poc"}),
+            patch.object(lineage_service, "_current_snapshot", return_value={"nodes": nodes}),
+        ):
+            qualified = lineage_service.search_nodes("sales.orders", limit=1)
+            matches = lineage_service.search_nodes("orders", limit=10)
+            job = lineage_service.search_nodes("JOB_MONTHLY_SALES", limit=10)
+
+        self.assertEqual(["table:sales:orders"], [node["id"] for node in qualified])
+        self.assertEqual(
+            {"table:sales:orders", "table:archive:orders"},
+            {node["id"] for node in matches[:2]},
+        )
+        self.assertEqual("task:job:monthly", job[0]["id"])
+
     def test_database_snapshot_reads_use_bound_core_queries(self):
         db = MagicMock()
         db.fetch_rows.side_effect = [
