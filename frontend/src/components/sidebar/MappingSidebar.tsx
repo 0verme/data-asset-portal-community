@@ -10,6 +10,7 @@ import { Icon } from "../ui.tsx";
 import { formatSystemLabel, getRouteSourceSystemId } from "../fieldMapping/fieldMappingUtils.ts";
 
 interface MappingSidebarProps {
+  catalogAccessReady: boolean;
   route: MappingRoute;
   setRoute: (value: MappingRoute | ((current: MappingRoute) => MappingRoute)) => void;
 }
@@ -22,7 +23,7 @@ function sourceSystemCode(system: FieldMappingSourceSystemOption): string {
   return String(system.systemCode || system.systemAbbr || "").trim();
 }
 
-export function MappingSidebar({ route, setRoute }: MappingSidebarProps) {
+export function MappingSidebar({ catalogAccessReady, route, setRoute }: MappingSidebarProps) {
   const [sourceSystems, setSourceSystems] = useState<FieldMappingSourceSystemOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,6 +33,15 @@ export function MappingSidebar({ route, setRoute }: MappingSidebarProps) {
 
   useEffect(() => {
     let cancelled = false;
+    if (!catalogAccessReady) {
+      setSourceSystems([]);
+      setLoading(false);
+      setError("");
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setLoading(true);
     setError("");
 
@@ -53,7 +63,7 @@ export function MappingSidebar({ route, setRoute }: MappingSidebarProps) {
     return () => {
       cancelled = true;
     };
-  }, [retryVersion]);
+  }, [catalogAccessReady, retryVersion]);
 
   const filteredSystems = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -119,7 +129,9 @@ export function MappingSidebar({ route, setRoute }: MappingSidebarProps) {
             >
               <span className="mapping-system-name">全部源系统</span>
             </button>
-            {loading ? (
+            {!catalogAccessReady ? (
+              <div className="mapping-system-state" role="status">等待目录访问权限…</div>
+            ) : loading ? (
               <div className="mapping-system-state" role="status">正在加载源系统…</div>
             ) : error ? (
               <div className="mapping-system-state mapping-system-error" role="alert">

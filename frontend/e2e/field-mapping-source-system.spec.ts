@@ -328,6 +328,78 @@ test("source-system navigator searches locally and filters table/field queries, 
   await page.screenshot({ path: testInfo.outputPath("field-mapping-source-navigator-dark-mobile.png") });
 });
 
+test("disabled anonymous catalog defers source-system loading until login", async ({ page }) => {
+  test.skip(!remoteFixturesEnabled, "This access-gating test uses isolated remote API fixtures.");
+  let authenticated = false;
+  const sourceSystemAccessStates: boolean[] = [];
+  const sourceSystem = {
+    id: "91",
+    sourceSystemId: "91",
+    upstreamSystemId: "91",
+    name: "登录后可见系统",
+    systemName: "登录后可见系统",
+    systemCode: "AUTH-SYS",
+    systemAbbr: "AUTH-SYS",
+    count: 1,
+  };
+  const user = {
+    role: "admin",
+    user: "issue-527-auth-e2e",
+    name: "Issue 527 Auth E2E",
+    permissions: ["field_mapping:read", "system:menu:read"],
+  };
+
+  await page.addInitScript(() => {
+    localStorage.removeItem("dap_auth");
+    sessionStorage.removeItem("dap_auth");
+  });
+  await page.route((url) => url.pathname.startsWith("/api/"), async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/auth/me") {
+      return authenticated
+        ? route.fulfill({ json: { data: user } })
+        : route.fulfill({ status: 401, json: { message: "anonymous" } });
+    }
+    if (path === "/api/public-catalog/config") {
+      return route.fulfill({ json: { profile: "disabled", exportEnabled: false } });
+    }
+    if (path === "/api/auth/login" && request.method() === "POST") {
+      authenticated = true;
+      return route.fulfill({ json: { data: user } });
+    }
+    if (path === "/api/system/menus") return route.fulfill({ json: { items: [] } });
+    if (path === "/api/field-mappings/source-systems") {
+      sourceSystemAccessStates.push(authenticated);
+      return authenticated
+        ? route.fulfill({ json: { items: [sourceSystem] } })
+        : route.fulfill({ status: 403, json: { error: { message: "catalog access disabled" } } });
+    }
+    if (path === "/api/field-mappings/stats") {
+      return route.fulfill({ json: { sourceSystemCount: 1, sourceTableCount: 0, fieldCount: 0, coverage: 0 } });
+    }
+    if (path === "/api/field-mappings/tables" || path === "/api/field-mappings/fields") {
+      return route.fulfill({ json: { items: [], total: 0, page: 1, pageSize: 50 } });
+    }
+    return route.fulfill({ json: { items: [] } });
+  });
+
+  await page.goto("/field-mapping", { waitUntil: "networkidle" });
+  await expect(page.getByText("匿名目录访问已关闭")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("等待目录访问权限…")).toBeVisible();
+  expect(sourceSystemAccessStates).toEqual([]);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "登录后继续" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByPlaceholder("请输入管理员账号").fill("operator");
+  await dialog.getByPlaceholder("请输入密码").fill("test-password");
+  await dialog.getByRole("button", { name: "登录", exact: true }).click();
+
+  await expect(page.getByRole("button", { name: "登录后可见系统 · AUTH-SYS", exact: true })).toBeVisible({ timeout: 20_000 });
+  expect(sourceSystemAccessStates).toEqual([true]);
+});
+
 test("source-system empty list and mapping query failure have clear states", async ({ page }) => {
   test.skip(!remoteFixturesEnabled, "This state test uses isolated remote API fixtures.");
   const requests = createRequestLog();

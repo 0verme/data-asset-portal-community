@@ -698,6 +698,7 @@ export default function App(): React.ReactElement {
     backToUpstreamList,
     businessAccessReady,
     catalogAccessDisabled,
+    catalogDataAccessReady,
     catalogExportEnabled: publicCatalogConfig.exportEnabled,
     can,
     canEdit,

@@ -29,6 +29,7 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
     canEdit,
     auth,
     catalogAccessDisabled,
+    catalogDataAccessReady,
     catalogExportEnabled,
     canManageMenus,
     canManageParams,
@@ -161,7 +162,11 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
   }
   if (module === "mapping") {
     return (
-      <MappingSidebar route={mappingRoute} setRoute={setMappingRoute} />
+      <MappingSidebar
+        catalogAccessReady={catalogDataAccessReady}
+        route={mappingRoute}
+        setRoute={setMappingRoute}
+      />
     );
   }
   if (module === "lineage") {

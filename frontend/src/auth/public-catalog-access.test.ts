@@ -7,10 +7,12 @@ const src = fileURLToPath(new URL("..", import.meta.url));
 const read = (relativePath: string) => readFile(`${src}/${relativePath}`, "utf8");
 
 test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog access", async () => {
-  const [app, search, moduleContent] = await Promise.all([
+  const [app, search, moduleContent, moduleSidebar, mappingSidebar] = await Promise.all([
     read("App.tsx"),
     read("components/SearchPortalPage.tsx"),
     read("components/app/ModuleContent.tsx"),
+    read("components/app/ModuleSidebar.tsx"),
+    read("components/sidebar/MappingSidebar.tsx"),
   ]);
 
   assert.match(app, /businessAccessReady = \(!isDbAuthMode\(\) \|\| authReady\) && publicCatalogConfigReady/);
@@ -18,6 +20,10 @@ test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog acce
   assert.match(app, /navMenus = getNavigationMenusForAuth\(navMenuSnapshot, navigationAuthKey\)/);
   assert.match(app, /if \(!catalogDataAccessReady\)\s*\{\s*navMenuRequestRef\.current \+= 1;\s*setNavMenuSnapshot\(\{ authKey: navigationAuthKey, menus: \[\] \}\)/);
   assert.match(app, /loadMenus\(navigationAuthKey\)/);
+  assert.match(app, /catalogDataAccessReady = businessAccessReady && !catalogAccessDisabled/);
+  assert.match(moduleSidebar, /catalogAccessReady=\{catalogDataAccessReady\}/);
+  assert.match(mappingSidebar, /if \(!catalogAccessReady\)\s*\{\s*setSourceSystems\(\[\]\)/);
+  assert.match(mappingSidebar, /\[catalogAccessReady, retryVersion\]/);
   assert.match(search, /publicAccessReady = true/);
   assert.doesNotMatch(search, /请先登录后搜索/);
   assert.doesNotMatch(moduleContent, /AuthenticatedBusinessPrompt/);
