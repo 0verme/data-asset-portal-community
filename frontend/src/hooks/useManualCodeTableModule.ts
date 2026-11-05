@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createManualCodeTable,
   deleteManualCodeTable,
   exportManualCodeTablesCsv,
   getManualCodeTables,
+  getManualCodeTablePage,
   updateManualCodeTable,
   updateManualCodeTableStatus,
 } from '../api/manualCodeTables.ts';
+import type { ManualCodeTablePage } from '../api/manualCodeTables.ts';
 import type { MockManualCodeTable } from '../data/manualCodeTables.ts';
 import { getBinaryStatusValue, toast } from '../components/common/index.ts';
 import { downloadCsvRows, downloadCsvContent } from '../utils/csv.ts';
@@ -76,6 +78,13 @@ export interface UseManualCodeTableModuleProps {
 export interface UseManualCodeTableModuleResult {
   items: MockManualCodeTable[];
   filteredItems: MockManualCodeTable[];
+  total: number;
+  stats: ManualCodeTablePage['stats'];
+  facets: ManualCodeTablePage['facets'];
+  page: number;
+  pageSize: number;
+  setPage: React.Dispatch<React.SetStateAction<number>>;
+  setPageSize: React.Dispatch<React.SetStateAction<number>>;
   loading: boolean;
   error: string;
   load: () => Promise<void>;
@@ -106,7 +115,16 @@ export function useManualCodeTableModule({
   requireLogin,
 }: UseManualCodeTableModuleProps): UseManualCodeTableModuleResult {
   const [items, setItems] = useState<MockManualCodeTable[]>([]);
+  const [total, setTotal] = useState(0);
+  const [stats, setStats] = useState<ManualCodeTablePage['stats']>({ total: 0, enabled: 0, disabled: 0, styleCount: 0 });
+  const [facets, setFacets] = useState<ManualCodeTablePage['facets']>({
+    styleTotal: 0, styles: {}, statusTotal: 0, statuses: { enabled: 0, disabled: 0 },
+  });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [loading, setLoading] = useState(true);
+  const requestSequence = useRef(0);
+  const previousFilterKey = useRef<string | null>(null);
   const [error, setError] = useState('');
   const [styleFilter, setStyleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -125,36 +143,44 @@ export function useManualCodeTableModule({
     setFormErrors((current) => clearFormFieldErrorEntry(current, field));
   }, []);
 
-  const load = useCallback(async (): Promise<void> => {
+  const load = useCallback(async (requestedPage = page): Promise<void> => {
+    const sequence = ++requestSequence.current;
     setLoading(true);
     setError('');
     try {
-      const nextItems = await getManualCodeTables();
-      setItems(nextItems.map((item) => ({ ...item, status: getBinaryStatusValue(item.status) })));
+      const result = await getManualCodeTablePage({
+        keyword: query || '',
+        style: styleFilter || undefined,
+        status: statusFilter || undefined,
+      }, requestedPage, pageSize);
+      if (sequence !== requestSequence.current) return;
+      setItems(result.items.map((item) => ({ ...item, status: getBinaryStatusValue(item.status) })));
+      setTotal(result.total);
+      setStats(result.stats);
+      setFacets(result.facets);
+      if (result.page !== page) setPage(result.page);
+      if (result.pageSize !== pageSize) setPageSize(result.pageSize);
     } catch (nextError: unknown) {
-      setError(getErrorMessage(nextError, '加载码值表失败。'));
+      if (sequence === requestSequence.current) setError(getErrorMessage(nextError, '加载码值表失败。'));
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
-  }, []);
+  }, [page, pageSize, query, statusFilter, styleFilter]);
 
+  const filterKey = JSON.stringify([String(query || '').trim(), styleFilter, statusFilter]);
   useEffect(() => {
-    if (active) load();
-  }, [active, load]);
+    if (!active) return;
+    if (previousFilterKey.current !== filterKey) {
+      previousFilterKey.current = filterKey;
+      if (page !== 1) {
+        setPage(1);
+        return;
+      }
+    }
+    void load();
+  }, [active, filterKey, load, page]);
 
-  const filteredItems = useMemo(() => {
-    const keyword = String(query || '').trim().toLowerCase();
-    return items.filter((item) => {
-      if (styleFilter && item.style !== styleFilter) return false;
-      if (statusFilter && item.status !== statusFilter) return false;
-      return (
-        !keyword ||
-        [item.tableCode, item.tableName, item.owner, item.remark].some((value) =>
-          String(value || '').toLowerCase().includes(keyword),
-        )
-      );
-    });
-  }, [items, query, statusFilter, styleFilter]);
+  const filteredItems = items;
 
   const openNew = (): void => {
     requireLogin(() => {
@@ -213,10 +239,12 @@ export function useManualCodeTableModule({
     try {
       if (formModal.mode === 'edit' && formModal.initial) {
         await updateManualCodeTable(formModal.initial.id, payload);
+        await load();
       } else {
         await createManualCodeTable(payload);
+        setPage(1);
+        await load(1);
       }
-      await load();
       setFormModal({ open: false, mode: 'new', initial: null, busy: false });
       toast.success(formModal.mode === 'edit' ? '码值表已更新' : '码值表已新增');
     } catch (nextError: unknown) {
@@ -269,9 +297,14 @@ export function useManualCodeTableModule({
       const statusMap = Object.fromEntries(
         Object.entries(MANUAL_CODE_TABLE_STATUS_META).map(([key, value]) => [key, value.label]),
       );
+      const exportItems = await getManualCodeTables({
+        keyword: query || '',
+        style: styleFilter,
+        status: statusFilter,
+      });
       const rows = [
         ['表编码', '表名称', '表样式', '负责人', '状态', '说明', '更新时间'],
-        ...filteredItems.map((item) => [
+        ...exportItems.map((item) => [
           item.tableCode,
           item.tableName,
           styleMap[item.style] || item.style,
@@ -290,6 +323,13 @@ export function useManualCodeTableModule({
   return {
     items,
     filteredItems,
+    total,
+    stats,
+    facets,
+    page,
+    pageSize,
+    setPage,
+    setPageSize,
     loading,
     error,
     load,

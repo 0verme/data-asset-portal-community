@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   deleteApiAsset,
-  getApiAssets,
+  getApiAsset,
+  getApiAssetPage,
   getApiDownstreamSystems,
   saveApiAsset,
   setApiAssetStatus,
 } from '../api/apiAssets.ts';
+import type { ApiAssetFacets } from '../api/apiAssets.ts';
 import type { MockApiAsset } from '../data/apiAssets.ts';
 import {
   normalizeApiAssetSaveFailure,
@@ -17,12 +19,6 @@ import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
 import { toast } from '../components/common/index.ts';
 import { runOptimisticStatusMutation } from '../utils/statusMutation.ts';
 import type { ApiAssetFilter, ApiAssetRoute } from '../routing/types.ts';
-
-export interface ApiAssetFacets {
-  status: Record<string, number>;
-  method: Record<string, number>;
-  downstreamSystemId: Record<string | number, number>;
-}
 
 export interface UseApiAssetModuleProps {
   active?: boolean | undefined;
@@ -38,10 +34,19 @@ export interface UseApiAssetModuleProps {
 
 export interface UseApiAssetModuleResult {
   items: MockApiAsset[];
+  total: number;
+  globalTotal: number;
+  page: number;
+  pageSize: number;
+  setPage: React.Dispatch<React.SetStateAction<number>>;
+  setPageSize: React.Dispatch<React.SetStateAction<number>>;
   systems: MockSystem[];
   loading: boolean;
+  detailLoading: boolean;
+  detailError: string;
   error: string;
   load: () => Promise<void>;
+  loadDetail: () => Promise<void>;
   filtered: MockApiAsset[];
   facets: ApiAssetFacets;
   current: MockApiAsset | null;
@@ -71,10 +76,20 @@ export function useApiAssetModule({
   setLoginOpen,
 }: UseApiAssetModuleProps): UseApiAssetModuleResult {
   const [items, setItems] = useState<MockApiAsset[]>([]);
+  const [total, setTotal] = useState(0);
+  const [globalTotal, setGlobalTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [facets, setFacets] = useState<ApiAssetFacets>({ status: {}, method: {}, downstreamSystemId: {} });
+  const [currentRecord, setCurrentRecord] = useState<{ code: string; item: MockApiAsset } | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
   const [systems, setSystems] = useState<MockSystem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [loaded, setLoaded] = useState(false);
+  const requestSequence = useRef(0);
+  const detailSequence = useRef(0);
+  const previousFilterKey = useRef<string | null>(null);
   const [saveError, setSaveError] = useState('');
   const [saveFieldErrors, setSaveFieldErrors] = useState<ApiAssetFieldErrors>({});
   const [saveFailureRevision, setSaveFailureRevision] = useState(0);
@@ -94,70 +109,80 @@ export function useApiAssetModule({
   const pendingRef = useRef(new Set<string>());
 
   const load = useCallback(async (): Promise<void> => {
+    const sequence = ++requestSequence.current;
     setLoading(true);
     try {
-      const [nextItems, nextSystems] = await Promise.all([getApiAssets(), getApiDownstreamSystems()]);
-      setItems(nextItems);
+      const [result, nextSystems] = await Promise.all([
+        getApiAssetPage({
+          keyword: query,
+          status: filter.status || undefined,
+          method: filter.method || undefined,
+          downstreamSystemId: filter.downstreamSystemId || undefined,
+          page,
+          pageSize,
+        }),
+        getApiDownstreamSystems(),
+      ]);
+      if (sequence !== requestSequence.current) return;
+      setItems(result.items);
+      setTotal(result.total);
+      setGlobalTotal(result.stats.total);
+      setFacets(result.facets);
       setSystems(nextSystems);
+      if (result.page !== page) setPage(result.page);
+      if (result.pageSize !== pageSize) setPageSize(result.pageSize);
       setError('');
     } catch (e: unknown) {
-      setError(e instanceof Error && e.message ? e.message : '加载 API 资产失败');
+      if (sequence === requestSequence.current) {
+        setError(e instanceof Error && e.message ? e.message : '加载 API 资产失败');
+      }
     } finally {
-      setLoaded(true);
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
-  }, []);
+  }, [filter.downstreamSystemId, filter.method, filter.status, page, pageSize, query]);
+
+  const filterKey = JSON.stringify([query.trim(), filter.status || '', filter.method || '', filter.downstreamSystemId || '']);
+  useEffect(() => {
+    if (!active) return;
+    if (previousFilterKey.current !== filterKey) {
+      previousFilterKey.current = filterKey;
+      if (page !== 1) {
+        setPage(1);
+        return;
+      }
+    }
+    void load();
+  }, [active, filterKey, load, page]);
+
+  const loadDetail = useCallback(async (): Promise<void> => {
+    const sequence = ++detailSequence.current;
+    const code = route.code;
+    if (!active || !['view', 'edit'].includes(route.page) || !code) {
+      setCurrentRecord(null);
+      setDetailError('');
+      setDetailLoading(false);
+      return;
+    }
+    setCurrentRecord(null);
+    setDetailLoading(true);
+    setDetailError('');
+    try {
+      const item = await getApiAsset(code);
+      if (sequence === detailSequence.current) setCurrentRecord({ code, item });
+    } catch (e: unknown) {
+      if (sequence === detailSequence.current) setDetailError(e instanceof Error && e.message ? e.message : '加载 API 资产详情失败');
+    } finally {
+      if (sequence === detailSequence.current) setDetailLoading(false);
+    }
+  }, [active, route.code, route.page]);
 
   useEffect(() => {
-    if (active && !loaded && !loading) load();
-  }, [active, loaded, loading, load]);
+    void loadDetail();
+    return () => { detailSequence.current += 1; };
+  }, [loadDetail]);
 
-  const filtered = useMemo(
-    () =>
-      items.filter((x) => {
-        const q = query.trim().toLowerCase();
-        return (
-          (!filter.status || x.status === filter.status) &&
-          (!filter.method || x.method === filter.method) &&
-          (!filter.downstreamSystemId || String(x.downstreamSystemId) === String(filter.downstreamSystemId)) &&
-          (!q ||
-            [
-              x.code,
-              x.name,
-              x.path,
-              x.description,
-              x.ownerName,
-              x.ownerDept,
-              x.downstreamSystemName,
-              x.downstreamSystemShortName,
-            ].some((v) => String(v || '').toLowerCase().includes(q)))
-        );
-      }),
-    [items, filter, query],
-  );
-
-  const facets = useMemo(
-    () =>
-      items.reduce<ApiAssetFacets>(
-        (result, item) => {
-          if (item.status) {
-            result.status[item.status] = (result.status[item.status] || 0) + 1;
-          }
-          if (item.method) {
-            result.method[item.method] = (result.method[item.method] || 0) + 1;
-          }
-          if (item.downstreamSystemId != null) {
-            result.downstreamSystemId[item.downstreamSystemId] =
-              (result.downstreamSystemId[item.downstreamSystemId] || 0) + 1;
-          }
-          return result;
-        },
-        { status: {}, method: {}, downstreamSystemId: {} },
-      ),
-    [items],
-  );
-
-  const current = items.find((x) => x.code === route.code) || null;
+  const filtered = items;
+  const current = currentRecord?.code === route.code ? currentRecord.item : null;
   const guard = (fn: () => void): void => {
     requireLogin(() => fn());
   };
@@ -193,26 +218,41 @@ export function useApiAssetModule({
     pendingRef.current.add(item.code);
     const nextStatus = item.status === 'enabled' ? 'disabled' : 'enabled';
     setPendingIds((currentIds) => [...currentIds, item.code]);
+    let updated = false;
     await runOptimisticStatusMutation({
       apply: () =>
         setItems((currentItems) =>
           currentItems.map((row) => (row.code === item.code ? { ...row, status: nextStatus } : row)),
         ),
-      request: () => setApiAssetStatus(item.code, nextStatus),
+      request: async () => {
+        const result = await setApiAssetStatus(item.code, nextStatus);
+        updated = true;
+        return result;
+      },
       rollback: () =>
         setItems((currentItems) => currentItems.map((row) => (row.code === item.code ? item : row))),
       onError: (e) => toast.error(getErrorMessage(e, '更新 API 资产状态失败。')),
     });
     pendingRef.current.delete(item.code);
     setPendingIds((currentIds) => currentIds.filter((code) => code !== item.code));
+    if (updated) await load();
   };
 
   return {
     items,
+    total,
+    globalTotal,
+    page,
+    pageSize,
+    setPage,
+    setPageSize,
     systems,
     loading,
+    detailLoading,
+    detailError,
     error,
     load,
+    loadDetail,
     filtered,
     facets,
     current,

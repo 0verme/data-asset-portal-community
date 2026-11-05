@@ -76,9 +76,10 @@ test("manual code-table status remains a filter separate from row mutations and 
   ]);
 
   assert.match(sidebar, /<StatusFilterGroup[\s\S]*?value=\{module\.statusFilter\}[\s\S]*?onChange=\{\(status\) => module\.setStatusFilter\(status \|\| ""\)\}/);
-  assert.match(sidebar, /getManualCodeTableFacetCounts/);
+  assert.match(sidebar, /const facets = module\.facets/);
+  assert.doesNotMatch(sidebar, /getManualCodeTableFacetCounts/);
   assert.doesNotMatch(sidebar, /module\.changeStatus/);
-  assert.match(moduleSidebar, /query=\{context\.query\}/);
+  assert.match(moduleSidebar, /<ManualCodeTableSidebar\s+module=\{manualCodeTable\}\s+canEdit=/);
   assert.doesNotMatch(page, /aria-label="状态筛选"|code-table-status-filter/);
   assert.match(page, /code-table-active-filters/);
   assert.match(page, /module\.changeStatus/);

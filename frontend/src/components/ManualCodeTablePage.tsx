@@ -20,7 +20,7 @@ import {
   confirmDeleteAction,
 } from "./common/index.ts";
 import { Highlight, Icon } from "./ui.tsx";
-import { Button, IconButton, Input, Select, Textarea } from "../ui/index.ts";
+import { Button, IconButton, Input, Select, TablePagination, Textarea } from "../ui/index.ts";
 import { FormErrorSummary, FormField } from "../ui/FormErrors.tsx";
 import { focusFirstFormError } from "../ui/formErrors.ts";
 
@@ -157,10 +157,10 @@ export function ManualCodeTablePage({ module, query, canEdit, canExport }: Manua
   if (module.error) return <ErrorState title="码值表加载失败" desc={module.error} onRetry={module.load} />;
 
   const stats: Array<[string, number]> = [
-    ["码表总数", module.items.length],
-    ["启用", module.items.filter((item) => item.status === "enabled").length],
-    ["禁用", module.items.filter((item) => item.status === "disabled").length],
-    ["样式种类", new Set(module.items.map((item) => item.style)).size],
+    ["码表总数", module.stats.total],
+    ["启用", module.stats.enabled],
+    ["禁用", module.stats.disabled],
+    ["样式种类", module.stats.styleCount],
   ];
   const activeStyleLabel = MANUAL_CODE_TABLE_STYLES.find(
     (style) => style.value === module.styleFilter,
@@ -218,7 +218,7 @@ export function ManualCodeTablePage({ module, query, canEdit, canExport }: Manua
               ) : null}
             </div>
           ) : null}
-          <div className="ft-info">共 {module.filteredItems.length} 张码表{query ? `，匹配“${query}”` : ""}</div>
+          <div className="ft-info">共 {module.total} 张匹配码表{query ? `，匹配“${query}”` : ""}</div>
         </div>
         {!module.filteredItems.length ? (
           <EmptyState title="暂无匹配的手工码值表" desc="请调整搜索或筛选条件，管理员也可以新增一张码值表。" actionText={canEdit ? "新增码值表" : ""} onAction={canEdit ? module.openNew : undefined} />
@@ -245,6 +245,15 @@ export function ManualCodeTablePage({ module, query, canEdit, canExport }: Manua
             ))}</tbody>
           </table>
         )}
+        <TablePagination
+          page={module.page}
+          pageSize={module.pageSize}
+          total={module.total}
+          onPageChange={module.setPage}
+          onPageSizeChange={module.setPageSize}
+          loading={module.loading}
+          ariaLabel="码值表管理分页"
+        />
       </div>
 
       <FormModal open={module.formModal.open} title={module.formModal.mode === "edit" ? "编辑码值表" : "新增码值表"} subtitle={module.formModal.mode === "edit" ? `正在编辑：${module.formModal.initial?.tableCode}` : "登记一张湖仓手工码值表"} icon="table" onClose={module.closeForm} onSubmit={module.submit} submitText={module.formModal.mode === "edit" ? "保存修改" : "创建"} busy={module.formModal.busy}>

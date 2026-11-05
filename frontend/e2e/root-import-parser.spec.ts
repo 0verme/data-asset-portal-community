@@ -49,6 +49,14 @@ async function installRootApiFixtures(page: Page): Promise<RootRecord[][]> {
       await route.fulfill({ json: { items: [{ name: "公共词根", count: roots.length }] } });
       return;
     }
+    if (pathname === "/api/roots/_page" && request.method() === "GET") {
+      await route.fulfill({ json: { items: roots, total: roots.length, page: 1, pageSize: 20, stats: { total: roots.length } } });
+      return;
+    }
+    if (pathname === "/api/roots/_abbreviations" && request.method() === "GET") {
+      await route.fulfill({ json: { items: roots.map((item) => item.abbr) } });
+      return;
+    }
     if (pathname === "/api/roots" && request.method() === "GET") {
       await route.fulfill({ json: { items: roots } });
       return;

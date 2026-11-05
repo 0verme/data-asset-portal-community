@@ -76,6 +76,38 @@ def _register_api_asset_routes(app: FastAPI, service: Any) -> None:
             return error_response(error)
         return JSONResponse(content=validate_contract(data, ApiAssetListResponse))
 
+    @router.get("/page", response_model=None)
+    def page_assets(
+        keyword: str | None = Query(default=None),
+        status: str | None = Query(default=None),
+        method: str | None = Query(default=None),
+        downstream_system_id: str | None = Query(
+            default=None, alias="downstreamSystemId"
+        ),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        current_service: Any = Depends(get_service),
+        context: Any = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
+    ):
+        try:
+            data = current_service.get_assets_page(
+                keyword=keyword,
+                status=status,
+                method=method,
+                downstream_system_id=downstream_system_id,
+                page=page,
+                page_size=page_size,
+            )
+            profile = profile_for_request(context, authorization)
+            data["items"] = [
+                redact_public_api_asset(item, profile=profile)
+                for item in data["items"]
+            ]
+        except ApiAssetError as error:
+            return error_response(error)
+        return JSONResponse(content=validate_contract(data, ApiAssetListResponse))
+
     @router.get("/downstream-systems", response_model=None)
     def downstream_systems(
         keyword: str | None = Query(default=None),

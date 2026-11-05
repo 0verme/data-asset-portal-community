@@ -68,7 +68,6 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
     return (
       <ManualCodeTableSidebar
         module={manualCodeTable}
-        query={context.query}
         canEdit={canPermission("code_table:write")}
         canExport={auth.user
           ? canPermission("code_table:read")
