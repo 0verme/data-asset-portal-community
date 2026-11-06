@@ -279,7 +279,8 @@ function AiAskSection({
     <section className="sp-ai-group" aria-label="AI 问答结果">
       <div className="sp-group-head">
         <span className="sp-group-title">AI 回答</span>
-        <span className="sp-group-count">单轮问答 · 基于已校验资产元数据</span>
+        <span className="sp-group-count">{import.meta.env.VITE_API_MODE === "mock"
+          ? "模拟演示 · 非真实 AI 回答" : "单轮问答 · 基于已校验资产元数据"}</span>
       </div>
       {loading ? null : failureMessage ? (
         <div className="sp-ai-state sp-ai-error" role="alert">
