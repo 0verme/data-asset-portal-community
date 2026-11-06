@@ -15,7 +15,7 @@
 import type { RowAction } from "../common/RowActions.tsx";
 import type { MockSystemUser } from "../../data/systemUsers.ts";
 import { formatDateTime } from "../../utils/date.ts";
-import { EmptyState, RowActions, StatusBadge } from "../common/index.ts";
+import { EmptyState, RowActions, StatusBadge, WideTableScroll } from "../common/index.ts";
 import { Highlight, Icon, initial } from "../ui.tsx";
 import { Button, TablePagination } from "../../ui/index.ts";
 import { USER_ROLE_META, USER_STATUS_META } from "./constants.ts";
@@ -110,7 +110,8 @@ export function UserManagementPage({
         />
       ) : (
         <div className="tbl-wrap">
-          <table className="dt mobile-card-table">
+          <WideTableScroll ariaLabel="用户管理表格" className="system-users-wide-scroll">
+            <table className="dt mobile-card-table system-users-table">
             <thead>
               <tr>
                 <th style={{ width: 180 }}>用户名</th>
@@ -151,7 +152,8 @@ export function UserManagementPage({
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </WideTableScroll>
         </div>
       )}
       <TablePagination

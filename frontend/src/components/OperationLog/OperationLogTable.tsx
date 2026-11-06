@@ -16,7 +16,7 @@ import type { CSSProperties } from "react";
 
 import type { MockOperationLogItem } from "../../data/operationLogs.ts";
 import { formatDateTime } from "../../utils/date.ts";
-import { RowActions, StatusBadge } from "../common/index.ts";
+import { RowActions, StatusBadge, WideTableScroll } from "../common/index.ts";
 import { Highlight } from "../ui.tsx";
 
 export function formatCost(ms: unknown): string {
@@ -41,7 +41,8 @@ export function OperationLogTable({
 
   return (
     <div className="tbl-wrap">
-      <table className="dt mobile-card-table">
+      <WideTableScroll ariaLabel="系统操作日志列表" className="operation-log-wide-scroll">
+        <table className="dt mobile-card-table operation-log-wide-table">
         <thead>
           <tr>
             <th style={width(168)}>操作时间</th>
@@ -112,7 +113,8 @@ export function OperationLogTable({
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </WideTableScroll>
     </div>
   );
 }

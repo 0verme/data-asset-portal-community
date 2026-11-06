@@ -16,6 +16,7 @@ export { GroupView } from "./GroupView.tsx";
 export { ViewModeSwitcher } from "./ViewModeSwitcher.tsx";
 export { MetaItem } from "./MetaItem.tsx";
 export { DangerZone } from "./DangerZone.tsx";
+export { WideTableScroll } from "./WideTableScroll.tsx";
 export { FormActionBar, PageHeader } from "./FormPageParts.tsx";
 export { AssetReferencePicker, AssetReferenceSelector } from "./AssetReferenceSelector.tsx";
 export {

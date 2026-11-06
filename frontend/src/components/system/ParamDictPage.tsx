@@ -17,7 +17,7 @@ import type {
   ParamDictItemWithCategoryName,
 } from "../../api/paramDicts.ts";
 import { formatDateTime } from "../../utils/date.ts";
-import { EmptyState, RowActions, StatusBadge } from "../common/index.ts";
+import { EmptyState, RowActions, StatusBadge, WideTableScroll } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
 import { Button, TablePagination } from "../../ui/index.ts";
 import { PARAM_STATUS_META } from "./constants.ts";
@@ -154,7 +154,8 @@ export function ParamDictPage({
             />
           ) : (
             <div className="tbl-wrap system-inner-table param-dict-table-wrap">
-              <table className="dt param-dict-table mobile-card-table">
+              <WideTableScroll ariaLabel="参数字典表格" className="param-dict-wide-scroll">
+                <table className="dt param-dict-table mobile-card-table">
                 <thead>
                   <tr>
                     <th className="param-col-category">参数分类</th>
@@ -232,7 +233,8 @@ export function ParamDictPage({
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </WideTableScroll>
             </div>
           )}
         </div>

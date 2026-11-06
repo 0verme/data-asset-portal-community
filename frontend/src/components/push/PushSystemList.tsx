@@ -1,6 +1,6 @@
 import type { PublicPushSystem } from "../../api/push.ts";
 import { getSystemBadgeText } from "../../utils/push.ts";
-import { EmptyState, StatusBadge } from "../common/index.ts";
+import { EmptyState, StatusBadge, WideTableScroll } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
 
 export interface ProtocolTagProps {
@@ -37,7 +37,8 @@ export function PushSystemList({ systems, query, view, onOpen }: PushSystemListP
   if (view === "list") {
     return (
       <div className="tbl-wrap">
-        <table className="dt mobile-card-table">
+        <WideTableScroll ariaLabel="下游推送系统列表" className="push-systems-wide-scroll">
+          <table className="dt mobile-card-table push-systems-wide-table">
           <thead>
             <tr>
               <th style={{ width: "26%" }}>系统</th>
@@ -81,7 +82,8 @@ export function PushSystemList({ systems, query, view, onOpen }: PushSystemListP
               );
             })}
           </tbody>
-        </table>
+          </table>
+        </WideTableScroll>
       </div>
     );
   }

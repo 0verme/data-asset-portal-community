@@ -32,6 +32,7 @@ import {
   RowActions,
   StatusBadge,
   ViewModeSwitcher,
+  WideTableScroll,
 } from "../common/index.ts";
 import { Button, Checkbox, Input, Select, TablePagination, Textarea } from "../../ui/index.ts";
 
@@ -858,7 +859,8 @@ function ApiList({
         <ApiEmptyState query={query} />
       ) : view === "list" ? (
         <div className="tbl-wrap">
-          <table className="dt mobile-card-table">
+          <WideTableScroll ariaLabel="API 资产列表" className="api-assets-wide-scroll">
+            <table className="dt mobile-card-table api-assets-wide-table">
             <thead>
               <tr>
                 <th>API</th>
@@ -910,7 +912,8 @@ function ApiList({
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </WideTableScroll>
         </div>
       ) : view === "card" ? (
         <ApiCards

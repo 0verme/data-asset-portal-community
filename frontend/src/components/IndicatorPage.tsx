@@ -6,7 +6,7 @@ import {
 } from "../data/indicatorDimensions.ts";
 import type { IndicatorFilter } from "../routing/types.ts";
 import { formatDate, formatDateTime } from "../utils/date.ts";
-import { ActionErrorBanner, CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "./common/index.ts";
+import { ActionErrorBanner, CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher, WideTableScroll } from "./common/index.ts";
 import type { ViewMode } from "./common/ViewModeSwitcher.tsx";
 import { Highlight, Icon, initial } from "./ui.tsx";
 import { Button } from "../ui/index.ts";
@@ -288,7 +288,8 @@ function IndicatorTable({ indicators, query, dimensionOptions, pendingIds = [], 
 
   return (
     <div className="tbl-wrap indicator-tbl">
-      <table className="dt mobile-card-table">
+      <WideTableScroll ariaLabel="指标列表" className="indicator-wide-scroll">
+        <table className="dt mobile-card-table indicator-wide-table">
         <thead>
           <tr>
             <th style={{ width: 148 }}>指标 ID</th>
@@ -342,7 +343,8 @@ function IndicatorTable({ indicators, query, dimensionOptions, pendingIds = [], 
             );
           })}
         </tbody>
-      </table>
+        </table>
+      </WideTableScroll>
     </div>
   );
 }

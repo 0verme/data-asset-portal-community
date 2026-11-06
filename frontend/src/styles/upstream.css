@@ -152,6 +152,9 @@
   .upstream-page table.dt tbody tr { border-bottom: 0.5px solid var(--line); }
   .upstream-page table.dt tbody tr:last-child { border-bottom: none; }
   .upstream-page table.dt tbody tr:hover { background: var(--surface-2); }
+  @media (min-width: 769px) {
+    table.dt.upstream-wide-table { min-width: 1160px; }
+  }
 
   .schedule-card {
     padding: 14px 20px 10px;

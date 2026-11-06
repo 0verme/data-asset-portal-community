@@ -192,6 +192,11 @@
     table-layout: fixed;
   }
 
+  @media (min-width: 769px) {
+    table.dt.push-systems-wide-table { min-width: 1200px; }
+    table.dt.push-jobs-wide-table { min-width: 980px; }
+  }
+
   .push-job-table tbody td {
     min-width: 0;
   }
