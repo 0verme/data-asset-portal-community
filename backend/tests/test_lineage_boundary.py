@@ -16,6 +16,8 @@ import ast
 import unittest
 from pathlib import Path
 
+from backend.app.services import lineage_service
+
 ROOT = Path(__file__).resolve().parents[2]
 LINEAGE_PKG = ROOT / "backend" / "app" / "services" / "lineage"
 LINEAGE_ROUTES = ROOT / "backend" / "app" / "fastapi" / "routers" / "lineage.py"
@@ -39,9 +41,15 @@ def _imported_modules(path: Path) -> set[str]:
 class LineageBoundaryTestCase(unittest.TestCase):
     def test_reader_package_exists(self):
         self.assertTrue((LINEAGE_PKG / "reader.py").is_file())
-        self.assertTrue((LINEAGE_PKG / "repository.py").is_file())
         self.assertTrue((LINEAGE_PKG / "collector_protocol.py").is_file())
         self.assertTrue(LINEAGE_COLLECTOR.is_file())
+
+    def test_snapshot_loading_has_no_second_entry_point(self):
+        # repository.py used to pick between POC and DB snapshot loading. The
+        # single read path is LineageDatabaseReader via lineage_service.
+        self.assertFalse((LINEAGE_PKG / "repository.py").exists())
+        self.assertFalse(hasattr(lineage_service, "_current_snapshot"))
+        self.assertFalse(hasattr(lineage_service, "_database_snapshot"))
 
     def test_native_router_imports_reader_not_collector(self):
         imports = _imported_modules(LINEAGE_ROUTES)

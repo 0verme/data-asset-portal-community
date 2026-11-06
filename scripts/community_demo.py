@@ -236,6 +236,8 @@ def build_demo_environment(
             "APP_DEBUG",
             "APP_SECRET_KEY",
             "APP_CORS_ORIGINS",
+            # Deprecated lineage selectors: runtime ignores them, and dropping
+            # them keeps a stale shell from implying a second lineage DB.
             "LINEAGE_DB_PROFILE",
             "LINEAGE_STORAGE_MODE",
             "COMMUNITY_DEMO_BOOTSTRAP",

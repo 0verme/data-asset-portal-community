@@ -169,7 +169,9 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         )
         self.assertEqual("community_sqlite", environment["ASSET_AUTH_DB_PROFILE"])
         self.assertNotIn("BACKEND_RUNTIME", environment)
-        self.assertEqual("community_sqlite", environment["LINEAGE_DB_PROFILE"])
+        # Deprecated lineage selectors must never survive into the demo child env.
+        self.assertNotIn("LINEAGE_DB_PROFILE", environment)
+        self.assertNotIn("LINEAGE_STORAGE_MODE", environment)
         self.assertEqual("development", environment["APP_ENV"])
         self.assertEqual("false", environment["APP_DEBUG"])
         self.assertEqual(
@@ -324,7 +326,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
                 os.environ,
                 {
                     "APP_ENV": "production",
-                    "LINEAGE_DB_PROFILE": "production_lineage",
+                    "ASSET_DB_PROFILE": "production_dap",
                 },
                 clear=False,
             ),
@@ -337,7 +339,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             self.assertEqual(
                 {
                     "mode": "persistent",
-                    "profile": "production_lineage",
+                    "profile": "production_dap",
                     "schema": "dap",
                 },
                 lineage_service.lineage_storage_status(),
@@ -349,7 +351,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         )
         with patch.dict(
             os.environ,
-            {"APP_ENV": "production", "LINEAGE_DB_PROFILE": ""},
+            {"APP_ENV": "production", "ASSET_DB_PROFILE": ""},
             clear=False,
         ), self.assertRaises(lineage_service.LineageConfigurationError):
             lineage_service.lineage_storage_status()

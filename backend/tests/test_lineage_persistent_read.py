@@ -166,7 +166,6 @@ class PersistentLineageReadTests(unittest.TestCase):
 
         with (
             patch.object(CoreAccess, "fetch_rows", track),
-            patch.object(lineage_service, "_database_snapshot", side_effect=AssertionError("full snapshot loaded")),
         ):
             bootstrap = lineage_service.get_bootstrap()
             initial = lineage_service.get_initial_view(
@@ -269,7 +268,7 @@ class PersistentLineageReadTests(unittest.TestCase):
         finally:
             connection.close()
 
-        snapshot = lineage_service._database_snapshot("lineage_test")
+        snapshot = lineage_service.get_subgraph("task:shared", "both", 1, 20, "detail")
         snapshot_nodes = {node["id"]: node for node in snapshot["nodes"]}
         self.assertEqual("sales", snapshot_nodes["table:input_a"]["schema"])
         self.assertNotIn("schema", snapshot_nodes["table:input_b"])
@@ -464,7 +463,6 @@ class PersistentLineageReadTests(unittest.TestCase):
 
         with (
             patch.object(CoreAccess, "fetch_rows", track),
-            patch.object(lineage_service, "_database_snapshot", side_effect=AssertionError("full snapshot loaded")),
         ):
             bootstrap = lineage_service.get_bootstrap()
             matches = lineage_service.search_nodes("SYNTH_TABLE", limit=100)

@@ -117,7 +117,6 @@ class CommunityDemoSeedTests(unittest.TestCase):
                 "ASSET_DB_DATABASE": str(self.database),
                 "APP_ENV": "production",
                 "APP_SECRET_KEY": os.urandom(24).hex(),
-                "LINEAGE_DB_PROFILE": "",
             },
             clear=False,
         )
