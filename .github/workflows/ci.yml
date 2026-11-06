@@ -606,6 +606,15 @@ jobs:
           VITE_API_MODE: remote
         run: npm run build:frontend
 
+      - name: Verify Remote bundle excludes Mock AI answers
+        run: node scripts/verify-remote-ai-isolation.mjs
+
+      - name: Explicit static Demo build
+        env:
+          VITE_API_MODE: mock
+          DAP_STATIC_MOCK_BUILD: "1"
+        run: npm run build:frontend
+
       - name: Dependency audit gate (Critical/High must be 0)
         run: npm audit --audit-level=high
 
@@ -690,6 +699,13 @@ jobs:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/ai-ask-playwright
           VITE_API_MODE: remote
         run: npm run test:browser -- e2e/ai-ask.spec.ts --workers=2
+
+      - name: Static Mock AI browser regression (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/ai-ask-mock-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- e2e/ai-ask-mock.spec.ts --workers=2
 
       - name: System management form feedback browser regression (Chromium and WebKit)
         if: matrix.lane == 'b'

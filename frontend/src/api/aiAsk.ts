@@ -489,6 +489,7 @@ export function parseAiAskProgressStep(value: unknown): AiAskProgressStep {
 }
 
 export async function getAiAskAvailability(): Promise<AiAskAvailability> {
+  if (typeof import.meta.env !== "undefined" && import.meta.env.VITE_API_MODE === "mock") return { enabled: true };
   if (API_MODE !== "remote") return { enabled: false };
   const response = await requestRemote<unknown>("/ai/status", {
     timeout: 5_000,
@@ -507,6 +508,10 @@ export async function askAiWithProgress(
   const normalizedQuery = String(query ?? "").trim();
   if (!normalizedQuery || normalizedQuery.length > 500) {
     throw new Error("问题长度必须为 1–500 个字符。");
+  }
+  if (typeof import.meta.env !== "undefined" && import.meta.env.VITE_API_MODE === "mock") {
+    const { askMockAiWithProgress } = await import("../mock/aiAsk.ts");
+    return askMockAiWithProgress(normalizedQuery, onProgress, topK, signal);
   }
   if (API_MODE !== "remote") {
     return parseAiAskResponse({
@@ -546,6 +551,10 @@ export async function askAi(
   const normalizedQuery = String(query ?? "").trim();
   if (!normalizedQuery || normalizedQuery.length > 500) {
     throw new Error("问题长度必须为 1–500 个字符。");
+  }
+  if (typeof import.meta.env !== "undefined" && import.meta.env.VITE_API_MODE === "mock") {
+    const { createMockAiAnswer } = await import("../mock/aiAsk.ts");
+    return createMockAiAnswer(normalizedQuery, topK);
   }
   if (API_MODE !== "remote") {
     return {

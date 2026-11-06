@@ -135,6 +135,10 @@ export async function askAiWithExecution(
   if (!normalizedQuery || normalizedQuery.length > 500) {
     throw new Error("问题长度必须为 1–500 个字符。");
   }
+  if (typeof import.meta.env !== "undefined" && import.meta.env.VITE_API_MODE === "mock") {
+    const { askMockAiWithExecution } = await import("../mock/aiAsk.ts");
+    return askMockAiWithExecution(normalizedQuery, onEvent, scope, topK, signal);
+  }
   if (API_MODE !== "remote") {
     throw new Error("当前运行模式未启用真实 AI 问答服务。");
   }
