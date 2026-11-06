@@ -8,7 +8,7 @@ snapshot identity.
 
 from __future__ import annotations
 
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import and_, case, func, or_, select
 
 from ..db.tables import lineage_edge, lineage_node, lineage_snapshot
 
@@ -189,17 +189,75 @@ class LineageDatabaseReader:
                 return rows[0]["node_id"]
         return None
 
-    def search_nodes(self, snapshot_id: str, name_pattern: str, limit: int) -> list[dict]:
-        return self._db.fetch_rows(
-            select(*_NODE_COLUMNS)
-            .where(
-                lineage_node.c.snapshot_id == snapshot_id,
-                lineage_node.c.kind_code.in_(("table", "task")),
-                func.lower(lineage_node.c.node_name).like(
-                    name_pattern, escape=LINEAGE_LIKE_ESCAPE_CHAR
+    def search_nodes(
+        self,
+        snapshot_id: str,
+        name_pattern: str,
+        limit: int,
+        *,
+        exact_name: str | None = None,
+        namespace_pattern: str | None = None,
+        exact_namespace: str | None = None,
+        exact_qualified_name: str | None = None,
+    ) -> list[dict]:
+        node_name = func.lower(lineage_node.c.node_name)
+        namespace_name = func.lower(func.coalesce(lineage_node.c.namespace_name, ""))
+        kind = lineage_node.c.kind_code
+        predicates = [
+            lineage_node.c.snapshot_id == snapshot_id,
+            node_name.like(name_pattern, escape=LINEAGE_LIKE_ESCAPE_CHAR),
+        ]
+
+        if namespace_pattern is not None:
+            # A qualified search is a business namespace + table-name lookup.
+            # Do not compare against DAP's physical storage schema or task namespace.
+            predicates.extend(
+                (
+                    kind == "table",
+                    namespace_name.like(
+                        namespace_pattern, escape=LINEAGE_LIKE_ESCAPE_CHAR
+                    ),
+                )
+            )
+            exact_node_name = or_(
+                exact_name is not None and node_name == exact_name,
+                exact_qualified_name is not None and node_name == exact_qualified_name,
+            )
+            exact_match = and_(
+                exact_node_name,
+                exact_namespace is not None and namespace_name == exact_namespace,
+            )
+            match_rank = case((exact_match, 0), else_=1)
+        else:
+            predicates.append(kind.in_(("table", "task")))
+            qualified_exact_pattern = (
+                f"%.{escape_like_operand(exact_name)}"
+                if exact_name is not None
+                else None
+            )
+            exact_table_name = or_(
+                exact_name is not None and node_name == exact_name,
+                qualified_exact_pattern is not None
+                and node_name.like(
+                    qualified_exact_pattern, escape=LINEAGE_LIKE_ESCAPE_CHAR
                 ),
             )
-            .order_by(lineage_node.c.node_id)
+            exact_table = and_(kind == "table", exact_table_name)
+            exact_task = and_(
+                kind == "task",
+                exact_name is not None and node_name == exact_name,
+            )
+            match_rank = case(
+                (exact_table, 0),
+                (exact_task, 1),
+                (kind == "table", 2),
+                else_=3,
+            )
+
+        return self._db.fetch_rows(
+            select(*_NODE_COLUMNS)
+            .where(*predicates)
+            .order_by(match_rank, namespace_name, node_name, lineage_node.c.node_id)
             .limit(limit)
         )
 

@@ -11,6 +11,11 @@ import type { LineageRoute } from "../routing/types.ts";
 import { formatDateTime } from "../utils/date.ts";
 import { ActionErrorBanner, ErrorState, LoadingState } from "./common/index.ts";
 import { LineageCanvas } from "./lineage/LineageCanvas.tsx";
+import {
+  describeLineageSearchCandidate,
+  lineageSearchQueryForCandidate,
+  resolveLineageSearchMatches,
+} from "./lineage/lineageSearch.ts";
 import { Icon } from "./ui.tsx";
 import { Button, Input, Select } from "../ui/index.ts";
 
@@ -187,6 +192,7 @@ export function LineagePage({
     if (querying) return;
     setQuerying(true);
     setQueryError("");
+    setCandidates([]);
     try {
       if (!nodeName) {
         const currentRoot = graph?.nodes.find((node) => node.id === graph.rootId);
@@ -201,12 +207,14 @@ export function LineagePage({
       }
       const matches = await findLineageNodes(nodeName);
       if (!matches.length) {
-        setQueryError(`当前受控快照中未找到表或作业“${nodeName}”。`);
-      } else if (matches.length === 1) {
-        const [match] = matches;
-        if (match) await openCandidate(match);
+        setQueryError(`当前快照中未找到表或作业“${nodeName}”。`);
       } else {
-        setCandidates(matches);
+        const resolution = resolveLineageSearchMatches(nodeName, matches);
+        if (resolution.directMatch) {
+          await openCandidate(resolution.directMatch);
+        } else {
+          setCandidates(resolution.candidates);
+        }
       }
     } catch (cause: unknown) {
       if (!isAbortError(cause)) setQueryError(getErrorMessage(cause, "节点名称查询失败，请稍后重试。"));
@@ -217,7 +225,7 @@ export function LineagePage({
 
   const selectCandidate = (candidate: LineageNode) => {
     setCandidates([]);
-    setQuery(candidate.name);
+    setQuery(lineageSearchQueryForCandidate(candidate));
     void openCandidate(candidate);
   };
 
@@ -256,12 +264,36 @@ export function LineagePage({
       </div>
       <form className="lineage-query" onSubmit={(event) => void submitQuery(event)}>
         <label htmlFor="lineage-node-name">表或作业名称查询</label>
-        <Input id="lineage-node-name" aria-label="血缘节点名称" value={query} onChange={(event) => { setQuery(event.target.value); setQueryError(""); setCandidates([]); }} placeholder="例如：DWS_TRADE_SALES_STAT_1D 或 JOB_AGGREGATE_DAILY_SALES" disabled={querying} aria-describedby="lineage-query-status" />
+        <Input id="lineage-node-name" aria-label="血缘节点名称" value={query} onChange={(event) => { setQuery(event.target.value); setQueryError(""); setCandidates([]); }} placeholder="例如：schema.table_name、table_name 或作业名" disabled={querying} aria-describedby="lineage-query-status" />
         <Button className="btn primary" variant="primary" type="submit" disabled={querying}>{querying ? "查询中…" : "查询"}</Button>
         <Button className="btn" variant="secondary" type="button" onClick={() => { setQuery(""); setQueryError(""); setCandidates([]); }} disabled={!query || querying}>清空</Button>
         <span id="lineage-query-status" className="lineage-query-status" role={queryError ? "alert" : "status"} aria-live="polite">{queryError}</span>
       </form>
-      {candidates.length ? <div className="lineage-candidates" role="list" aria-label="血缘节点候选项">{candidates.map((candidate) => <button className="lineage-candidate" type="button" role="listitem" key={candidate.id} onClick={() => selectCandidate(candidate)}><b>{candidate.name}</b><span>{candidate.namespace}</span><small>{candidate.displayName}</small></button>)}</div> : null}
+      {candidates.length ? (
+        <div className="lineage-candidates" role="list" aria-label="血缘节点候选项">
+          {candidates.map((candidate) => {
+            const label = describeLineageSearchCandidate(candidate);
+            return (
+              <button
+                className="lineage-candidate"
+                type="button"
+                role="listitem"
+                key={candidate.id}
+                onClick={() => selectCandidate(candidate)}
+              >
+                <b>{label.nameLabel}</b>
+                <span>{label.kindLabel}</span>
+                <small>
+                  {label.namespaceLabel}
+                  {candidate.displayName && candidate.displayName !== candidate.name
+                    ? ` · ${candidate.displayName}`
+                    : ""}
+                </small>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
       {notice ? <p className="lineage-notice" role="status">{notice}</p> : null}
       <ActionErrorBanner title="血缘图加载失败" message={error} />
       {graph.truncated ? <p className="lineage-notice" role="status">图谱节点已达到 {MAX_NODES} 个上限，当前结果已截断。</p> : null}

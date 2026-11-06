@@ -411,6 +411,39 @@ def _validate_search_name(name):
     return normalized_name
 
 
+def _split_lineage_search_name(normalized_name):
+    """Return optional business namespace and table-name search fragments."""
+    if "." not in normalized_name:
+        return None, normalized_name
+    namespace, table_name = (part.strip() for part in normalized_name.split(".", 1))
+    if not namespace or not table_name:
+        raise LineageValidationError("schema.table must include both names")
+    return namespace, table_name
+
+
+def _lineage_search_rank(node, table_name, namespace=None):
+    name = str(node.get("name") or "").casefold()
+    node_namespace = str(node.get("namespace") or "").casefold()
+    normalized_table_name = table_name.casefold()
+    if namespace is None:
+        exact_name = name.rsplit(".", 1)[-1] == normalized_table_name
+    else:
+        qualified_name = f"{namespace.casefold()}.{normalized_table_name}"
+        exact_name = name in {normalized_table_name, qualified_name}
+    if namespace is not None:
+        rank = 0 if exact_name and node_namespace == namespace.casefold() else 1
+        return rank, node_namespace, name, node.get("id", "")
+    if node.get("kind") == "table" and exact_name:
+        rank = 0
+    elif node.get("kind") == "task" and exact_name:
+        rank = 1
+    elif node.get("kind") == "table":
+        rank = 2
+    else:
+        rank = 3
+    return rank, node_namespace, name, node.get("id", "")
+
+
 def get_bootstrap():
     """Return safe page initialization data without exposing storage configuration."""
     status = lineage_storage_status()
@@ -428,28 +461,56 @@ def get_bootstrap():
 
 def search_nodes(name, limit=None):
     normalized_name = _validate_search_name(name)
+    namespace, table_name = _split_lineage_search_name(normalized_name)
     result_limit = _search_limit(limit)
+    name_pattern = f"%{escape_like_operand(table_name.casefold())}%"
+    namespace_pattern = (
+        f"%{escape_like_operand(namespace.casefold())}%"
+        if namespace is not None
+        else None
+    )
     status = lineage_storage_status()
     if status["mode"] == "persistent":
-        escaped = escape_like_operand(normalized_name.casefold())
-        pattern = f"%{escaped}%"
-
         def search(reader, active):
             if active is None:
                 raise LineageNoActiveSnapshotError("no active lineage snapshot is available")
-            rows = reader.search_nodes(active["snapshot_id"], pattern, result_limit)
+            rows = reader.search_nodes(
+                active["snapshot_id"],
+                name_pattern,
+                result_limit,
+                exact_name=table_name.casefold(),
+                namespace_pattern=namespace_pattern,
+                exact_namespace=namespace.casefold() if namespace is not None else None,
+                exact_qualified_name=(
+                    f"{namespace}.{table_name}".casefold()
+                    if namespace is not None
+                    else None
+                ),
+            )
             return [_database_node(row) for row in rows]
 
         return _run_persistent_read(status["profile"], search)
 
-    searchable_kinds = {"table", "task"}
-    matches = [
-        deepcopy(node)
-        for node in _current_snapshot()["nodes"]
-        if node["kind"] in searchable_kinds
-        and normalized_name.casefold() in node["name"].casefold()
-    ]
-    return matches if limit is None else matches[:result_limit]
+    query = table_name.casefold()
+    namespace_query = namespace.casefold() if namespace is not None else None
+    matches = []
+    for node in _current_snapshot()["nodes"]:
+        if node.get("kind") not in {"table", "task"}:
+            continue
+        node_name = str(node.get("name") or "").casefold()
+        node_namespace = str(node.get("namespace") or "").casefold()
+        if namespace_query is not None:
+            if (
+                node.get("kind") != "table"
+                or namespace_query not in node_namespace
+                or query not in node_name
+            ):
+                continue
+        elif query not in node_name:
+            continue
+        matches.append(deepcopy(node))
+    matches.sort(key=lambda node: _lineage_search_rank(node, table_name, namespace))
+    return matches[:result_limit]
 
 
 def _bounded_int(value, default, minimum, maximum, name):

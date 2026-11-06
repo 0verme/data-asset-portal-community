@@ -234,11 +234,22 @@ export async function findLineageNodes(
     return response.data;
   }
   const query = String(name || '').trim().toLowerCase();
-  return query
-    ? nodes.filter(
-        (node) =>
-          ['table', 'task'].includes(node.kind) &&
-          `${node.name} ${node.displayName}`.toLowerCase().includes(query),
-      )
-    : [];
+  if (!query) return [];
+  const separator = query.indexOf('.');
+  if (separator >= 0) {
+    const namespace = query.slice(0, separator).trim();
+    const tableName = query.slice(separator + 1).trim();
+    if (!namespace || !tableName) return [];
+    return nodes.filter(
+      (node) =>
+        node.kind === 'table' &&
+        node.namespace.trim().toLowerCase().includes(namespace) &&
+        node.name.trim().toLowerCase().includes(tableName),
+    );
+  }
+  return nodes.filter(
+    (node) =>
+      ['table', 'task'].includes(node.kind) &&
+      `${node.name} ${node.displayName}`.toLowerCase().includes(query),
+  );
 }

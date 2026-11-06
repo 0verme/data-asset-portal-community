@@ -111,6 +111,50 @@ class PersistentLineageReadTests(unittest.TestCase):
         )
         connection.commit()
 
+    def _insert_search_fixture(self):
+        nodes = [
+            ("active", "table:search:dwm", "table", "M_JJQD_LIST", "DWM"),
+            ("active", "table:search:dwd", "table", "M_JJQD_LIST", "DWD"),
+            ("active", "table:search:dwm-archive", "table", "M_JJQD_LIST_ARCHIVE", "DWM"),
+            ("active", "table:search:collector-qualified", "table", "DWM.ACCOUNT", "DWM"),
+            ("active", "task:search:exact-account", "task", "ACCOUNT", "scheduler"),
+            ("active", "task:search:fuzzy-job", "task", "JOB_M_JJQD_LIST", "scheduler"),
+            ("active", "task:search:plain-job", "task", "JOB_SEARCH_LINEAGE", "scheduler"),
+            ("active", "table:search:special", "table", "A!B_C%D", "D_WM"),
+            ("active", "table:search:special-decoy", "table", "AXBXCZD", "DXWM"),
+            ("inactive", "table:search:inactive", "table", "M_JJQD_LIST", "DWM"),
+        ]
+        connection = connect({"type": "sqlite", "database": str(self.database)})
+        try:
+            connection.executemany(
+                "INSERT INTO dwp.p_lineage_node "
+                "(snapshot_id, node_id, kind_code, node_name, display_name, namespace_name, attributes_json) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (snapshot, node_id, kind, name, name, namespace, "{}")
+                    for snapshot, node_id, kind, name, namespace in nodes
+                ],
+            )
+            connection.executemany(
+                "INSERT INTO dwp.p_lineage_edge "
+                "(snapshot_id, edge_id, source_node_id, target_node_id, kind_code, evidence_type, "
+                "source_record_id, evidence_description, confidence_code, generated_at, diagnostics_json) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        "active", edge_id, source, target, kind, "test", edge_id,
+                        "lineage search regression", "high", "2026-10-01T00:00:00", "[]",
+                    )
+                    for edge_id, source, target, kind in (
+                        ("e-search-input-job", "table:input_a", "task:search:fuzzy-job", "reads"),
+                        ("e-search-job-output", "task:search:fuzzy-job", "table:search:dwm", "writes"),
+                    )
+                ],
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
     def test_bootstrap_and_initial_view_do_not_load_the_full_snapshot(self):
         original_fetch_rows = CoreAccess.fetch_rows
         statements = []
@@ -157,6 +201,62 @@ class PersistentLineageReadTests(unittest.TestCase):
         self.assertIn("snapshot_id", search_sql)
         self.assertNotIn("p_lineage_edge", search_sql)
         self.assertTrue(all("p_lineage_edge" not in sql for sql, _count in statements))
+
+    def test_schema_qualified_search_prefers_exact_tables_and_keeps_schema_candidates(self):
+        self._insert_search_fixture()
+
+        qualified = lineage_service.search_nodes("DWM.M_JJQD_LIST", limit=1)
+        self.assertEqual(["table:search:dwm"], [node["id"] for node in qualified])
+        self.assertEqual("table", qualified[0]["kind"])
+
+        case_insensitive = lineage_service.search_nodes("dwm.m_jjqd_list", limit=1)
+        self.assertEqual(["table:search:dwm"], [node["id"] for node in case_insensitive])
+        partial_qualified = lineage_service.search_nodes("dwm.m_jjqd", limit=10)
+        self.assertEqual({"table:search:dwm", "table:search:dwm-archive"}, {node["id"] for node in partial_qualified})
+
+        bare = lineage_service.search_nodes("M_JJQD_LIST", limit=10)
+        exact_tables = [node for node in bare if node["kind"] == "table" and node["name"] == "M_JJQD_LIST"]
+        self.assertEqual({"table:search:dwm", "table:search:dwd"}, {node["id"] for node in exact_tables})
+        self.assertEqual({"DWM", "DWD"}, {node["namespace"] for node in exact_tables})
+        self.assertEqual({"table:search:dwm", "table:search:dwd"}, {node["id"] for node in bare[:2]})
+        self.assertLess(
+            next(index for index, node in enumerate(bare) if node["kind"] == "table" and node["name"] == "M_JJQD_LIST"),
+            next(index for index, node in enumerate(bare) if node["id"] == "task:search:fuzzy-job"),
+        )
+        self.assertNotIn("table:search:inactive", {node["id"] for node in bare})
+
+    def test_collector_qualified_node_names_are_exact_for_bare_and_schema_search(self):
+        self._insert_search_fixture()
+
+        bare = lineage_service.search_nodes("ACCOUNT", limit=1)
+        qualified = lineage_service.search_nodes("dwm.account", limit=1)
+
+        self.assertEqual(["table:search:collector-qualified"], [node["id"] for node in bare])
+        self.assertEqual(["table:search:collector-qualified"], [node["id"] for node in qualified])
+        self.assertEqual("DWM.ACCOUNT", qualified[0]["name"])
+
+    def test_search_escapes_schema_and_table_wildcards_and_preserves_job_search(self):
+        self._insert_search_fixture()
+
+        special = lineage_service.search_nodes("d_wm.a!b_c%d", limit=10)
+        self.assertEqual(["table:search:special"], [node["id"] for node in special])
+        job = lineage_service.search_nodes("JOB_SEARCH_LINEAGE", limit=10)
+        self.assertEqual(["task:search:plain-job"], [node["id"] for node in job])
+        self.assertEqual("task", job[0]["kind"])
+
+    def test_search_results_load_table_projection_and_job_detail(self):
+        self._insert_search_fixture()
+
+        table = lineage_service.search_nodes("DWM.M_JJQD_LIST", limit=1)[0]
+        table_graph = lineage_service.get_subgraph(table["id"], "both", 1, 20, "table")
+        self.assertEqual(table["id"], table_graph["rootId"])
+        self.assertIn("table:input_a", {node["id"] for node in table_graph["nodes"]})
+
+        task = lineage_service.search_nodes("JOB_M_JJQD_LIST", limit=10)[0]
+        detail_graph = lineage_service.get_subgraph(task["id"], "both", 1, 20, "detail")
+        self.assertEqual(task["id"], detail_graph["rootId"])
+        self.assertIn("table:input_a", {node["id"] for node in detail_graph["nodes"]})
+        self.assertIn("table:search:dwm", {node["id"] for node in detail_graph["nodes"]})
 
     def test_persistent_nodes_expose_only_explicit_schema_metadata(self):
         connection = connect({"type": "sqlite", "database": str(self.database)})
