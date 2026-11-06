@@ -1,5 +1,5 @@
 import type { EnrichedReportItem } from "../../hooks/useReportModule.ts";
-import { CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "../common/index.ts";
+import { CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher, WideTableScroll } from "../common/index.ts";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 import { Highlight, Icon } from "../ui.tsx";
 import { Button } from "../../ui/index.ts";
@@ -72,7 +72,8 @@ export function ReportList({ reports, total = reports.length, query, view, onCha
       </div>
 
       {!reports.length ? <EmptyState title={query ? "未找到符合条件的报表资产" : "暂无报表资产"} /> : view === "list" ? <div className="tbl-wrap indicator-tbl">
-        <table className="dt mobile-card-table">
+        <WideTableScroll ariaLabel="报表资产列表" className="report-wide-scroll">
+          <table className="dt mobile-card-table report-wide-table">
           <thead>
             <tr>
               <th style={{ width: 150 }}>报表编码</th>
@@ -108,7 +109,8 @@ export function ReportList({ reports, total = reports.length, query, view, onCha
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </WideTableScroll>
       </div> : view === "card" ? <ReportCardLayout reports={reports} query={query} onView={onView} onEdit={onEdit} canEdit={canEdit} /> : <ReportGroupLayout reports={reports} query={query} onView={onView} />}
     </div>
   );

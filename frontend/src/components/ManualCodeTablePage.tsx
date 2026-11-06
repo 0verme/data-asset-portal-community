@@ -17,6 +17,7 @@ import {
   LoadingState,
   RowActions,
   StatusBadge,
+  WideTableScroll,
   confirmDeleteAction,
 } from "./common/index.ts";
 import { Highlight, Icon } from "./ui.tsx";
@@ -223,7 +224,8 @@ export function ManualCodeTablePage({ module, query, canEdit, canExport }: Manua
         {!module.filteredItems.length ? (
           <EmptyState title="暂无匹配的手工码值表" desc="请调整搜索或筛选条件，管理员也可以新增一张码值表。" actionText={canEdit ? "新增码值表" : ""} onAction={canEdit ? module.openNew : undefined} />
         ) : (
-          <table className="dt mobile-card-table">
+          <WideTableScroll ariaLabel="手工码值表列表" className="manual-code-wide-scroll">
+            <table className="dt mobile-card-table manual-code-wide-table">
             <thead><tr><th>表编码</th><th>表名称</th><th>表样式</th><th>负责人</th><th>状态</th><th>更新时间</th><th>说明</th><th>操作</th></tr></thead>
             <tbody>{module.filteredItems.map((item) => (
               <tr key={item.id}>
@@ -243,7 +245,8 @@ export function ManualCodeTablePage({ module, query, canEdit, canExport }: Manua
                 </td>
               </tr>
             ))}</tbody>
-          </table>
+            </table>
+          </WideTableScroll>
         )}
         <TablePagination
           page={module.page}

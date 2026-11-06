@@ -160,12 +160,40 @@
     border-radius: 0 0 var(--radius) var(--radius);
     box-shadow: none;
     max-width: 100%;
-    overflow-x: auto;
-    overflow-y: visible;
+    overflow: hidden;
   }
 
   .system-panel-main {
     min-width: 0;
+  }
+
+  .system-users-table { min-width: 1420px; }
+  .system-roles-table { min-width: 1200px; }
+
+  /* 长名称/长路由在固定列宽内换行，行高由内容决定；操作列随同一行同步伸缩。 */
+  .menu-management-table .menu-name-cell,
+  .menu-management-table .menu-path-cell { overflow-wrap: anywhere; }
+
+  @media (min-width: 769px) {
+    /* 操作列与数据行同属一个表格行：行高随长名称/长路由自适应，操作按钮不会与菜单错位。
+       sticky 只负责横向滚动时保持操作列可见，不参与行高计算。 */
+    .menu-management-table th.menu-actions-head,
+    .menu-management-table td.menu-actions-cell {
+      position: sticky;
+      right: 0;
+      z-index: 1;
+      background: var(--surface);
+      box-shadow: -1px 0 0 var(--line);
+    }
+
+    .menu-management-table th.menu-actions-head {
+      z-index: 2;
+      background: var(--surface-2);
+    }
+
+    .system-page .menu-management-table tbody tr:hover td.menu-actions-cell {
+      background: var(--surface-2);
+    }
   }
 
   .param-dict-table {
@@ -183,21 +211,15 @@
 
   .param-dict-table th.param-col-actions,
   .param-dict-table td.param-col-actions {
-    position: sticky;
-    right: 0;
-    z-index: 1;
     text-align: right;
-    background: var(--surface);
-    box-shadow: -1px 0 0 var(--line);
   }
 
-  .param-dict-table th.param-col-actions {
-    z-index: 2;
-    background: var(--surface-2);
-  }
-
-  .system-page .param-dict-table tbody tr:hover td.param-col-actions {
-    background: var(--surface-2);
+  @media (max-width: 768px) {
+    .system-page table.mobile-card-table.system-users-table,
+    .system-page table.mobile-card-table.system-roles-table,
+    .system-page table.mobile-card-table.param-dict-table {
+      min-width: 0;
+    }
   }
 
   .param-dict-table .row-actions {

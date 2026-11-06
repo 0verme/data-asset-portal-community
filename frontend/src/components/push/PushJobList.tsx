@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 import type { PublicPushJob, PublicPushSystem } from "../../api/push.ts";
 import { getSystemBadgeText } from "../../utils/push.ts";
-import { EmptyState, MetaItem, RowActions, StatusBadge } from "../common/index.ts";
+import { EmptyState, MetaItem, RowActions, StatusBadge, WideTableScroll } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
 import { Button } from "../../ui/index.ts";
 import { ProtocolTag } from "./PushSystemList.tsx";
@@ -130,7 +130,8 @@ export function PushJobList({
         <EmptyState title="暂无推送作业" desc="当前系统还没有配置推送文件。" />
       ) : (
         <div className="tbl-wrap">
-          <table className="dt mobile-card-table push-job-table">
+          <WideTableScroll ariaLabel="推送作业列表" className="push-jobs-wide-scroll">
+            <table className="dt mobile-card-table push-job-table push-jobs-wide-table">
             <thead>
               <tr>
                 {PUSH_JOB_TABLE_COLUMNS.map((column) => (
@@ -158,7 +159,8 @@ export function PushJobList({
                 );
               })}
             </tbody>
-          </table>
+            </table>
+          </WideTableScroll>
         </div>
       )}
     </div>

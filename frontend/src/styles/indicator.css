@@ -87,6 +87,10 @@
   .indicator-tbl table.dt tbody tr { border-bottom: 0.5px solid var(--line); }
   .indicator-tbl table.dt tbody tr:last-child { border-bottom: none; }
   .indicator-tbl table.dt tbody tr:hover { background: var(--surface-2); }
+  @media (min-width: 769px) {
+    table.dt.indicator-wide-table { min-width: 1380px; }
+    table.dt.report-wide-table { min-width: 1240px; }
+  }
 
   .indicator-detail-shell {
     position: fixed;
