@@ -1,6 +1,8 @@
-"""Disposable real-socket probes for the reconstructed Linux proxy.
+"""Real-socket integration tests for the Linux frontend proxy.
 
-This file and all generated fixtures are local test assets; do not commit them.
+These tests spawn the actual proxy process and talk to it over TCP, so they
+cover behaviour that an in-process unit test cannot: chunk framing, header
+timing, and socket teardown. All fixtures live in a temporary directory.
 """
 from __future__ import annotations
 
@@ -9,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import select
 import subprocess
 import sys
 import tempfile
@@ -22,6 +25,14 @@ SCRIPT = Path(os.environ.get(
     Path(__file__).resolve().parents[1] / "serve-dist-linux.py",
 )).resolve()
 
+# How long the burst upstream keeps its connection open after writing its
+# events. A proxy that gates reads on raw-socket readiness holds those events
+# until this window expires.
+_BURST_HOLD = 1.5
+# Head start the upstream gives the proxy to consume the response headers on
+# their own, so the events below land in a separate segment.
+_BURST_HEADER_LEAD = 0.35
+
 
 class State:
     def __init__(self):
@@ -29,6 +40,7 @@ class State:
         self.stream_times: list[float] = []
         self.active_streams = 0
         self.stream_closed = threading.Event()
+        self.idle_released = threading.Event()
 
     def add_stream(self):
         with self.lock:
@@ -48,15 +60,21 @@ class BackendHandler(BaseHTTPRequestHandler):
     def log_message(self, *_args):
         pass
 
-    def _json(self, status: int, body: object, cookies: tuple[str, ...] = ()):
+    def _json(self, status: int, body: object, cookies: tuple[str, ...] = (), cache: str | None = None):
         payload = json.dumps(body).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
+        if cache:
+            self.send_header("Cache-Control", cache)
         for cookie in cookies:
             self.send_header("Set-Cookie", cookie)
         self.end_headers()
         self.wfile.write(payload)
+        self.wfile.flush()
+
+    def _write_chunk(self, payload: bytes):
+        self.wfile.write(b"%x\r\n" % len(payload) + payload + b"\r\n")
         self.wfile.flush()
 
     def do_GET(self):
@@ -71,9 +89,36 @@ class BackendHandler(BaseHTTPRequestHandler):
                 for number in range(3):
                     time.sleep(0.32)
                     self.state.stream_times.append(time.monotonic())
-                    event = f"data: event-{number}\n\n".encode()
-                    self.wfile.write(f"{len(event):x}\r\n".encode() + event + b"\r\n")
-                    self.wfile.flush()
+                    self._write_chunk(f"data: event-{number}\n\n".encode())
+                self.wfile.write(b"0\r\n\r\n")
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+            finally:
+                self.close_connection = True
+            return
+        if self.path == "/api/sse-burst":
+            # Response headers arrive on their own, then two complete SSE chunks
+            # in a single write, then the connection is held open. Reading the
+            # headers leaves both chunks buffered in the proxy's reader while
+            # the raw socket has nothing to report.
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            self.wfile.flush()
+            time.sleep(_BURST_HEADER_LEAD)
+            first = b"data: burst-0\n\n"
+            second = b"data: burst-1\n\n"
+            self.wfile.write(
+                b"%x\r\n" % len(first) + first + b"\r\n"
+                + b"%x\r\n" % len(second) + second + b"\r\n"
+            )
+            self.wfile.flush()
+            self.state.stream_times.append(time.monotonic())
+            try:
+                time.sleep(_BURST_HOLD)
                 self.wfile.write(b"0\r\n\r\n")
                 self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError, OSError):
@@ -86,6 +131,46 @@ class BackendHandler(BaseHTTPRequestHandler):
             self.send_header("Location", "/api/json")
             self.send_header("Content-Length", "0")
             self.end_headers()
+            return
+        if self.path == "/api/chunked-json":
+            payload = json.dumps({"ok": True, "framing": "chunked"}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            self._write_chunk(payload[:8])
+            self._write_chunk(payload[8:])
+            self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+            return
+        if self.path == "/api/no-content":
+            self.send_response(204)
+            self.end_headers()
+            return
+        if self.path == "/api/idle-stream":
+            # One event, then a long silence. Nothing is ever written again, so a
+            # downstream disconnect can only be noticed by cancelling the read.
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            self.state.add_stream()
+            self._write_chunk(b"data: idle-0\n\n")
+            deadline = time.monotonic() + 6
+            try:
+                while time.monotonic() < deadline:
+                    readable, _, _ = select.select([self.connection], [], [], 0.1)
+                    if not readable:
+                        continue
+                    if self.connection.recv(1) == b"":
+                        self.state.idle_released.set()
+                        break
+            except (OSError, ValueError):
+                # Proxy shut the upstream read side down: the stream was cancelled.
+                self.state.idle_released.set()
+            finally:
+                self.close_connection = True
+                self.state.close_stream()
             return
         if self.path == "/api/long-stream":
             self.send_response(200)
@@ -112,7 +197,7 @@ class BackendHandler(BaseHTTPRequestHandler):
             self.send_header("Transfer-Encoding", "chunked")
             self.end_headers()
             chunk = b"data: partial\n\n"
-            self.wfile.write(f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n")
+            self.wfile.write(b"%x\r\n" % len(chunk) + chunk + b"\r\n")
             self.wfile.flush()
             try:
                 self.connection.shutdown(socket.SHUT_RDWR)
@@ -124,8 +209,13 @@ class BackendHandler(BaseHTTPRequestHandler):
         if self.path == "/api/json":
             self._json(200, {"ok": True, "kind": "json"}, ("session=one; Path=/", "theme=blue; Path=/"))
             return
+        if self.path == "/api/no-store":
+            # Mirrors backend/app/fastapi/routers/catalog_snapshots.py, which
+            # marks authenticated snapshot responses as uncacheable.
+            self._json(200, {"ok": True, "kind": "snapshot"}, cache="no-store")
+            return
         if self.path == "/api/error":
-            self._json(409, {"error": "conflict"})
+            self._json(409, {"error": "conflict"}, cache="no-store")
             return
         if self.path == "/api/echo":
             self._json(200, {
@@ -179,6 +269,7 @@ class ProxyHarness(unittest.TestCase):
         self.outside.write_text("OUTSIDE_SENTINEL_MUST_NEVER_BE_SERVED")
         try:
             (self.dist / "assets" / "outside-link.txt").symlink_to(self.outside)
+            (self.dist / "assets" / "index.html").symlink_to(self.outside)
         except (OSError, NotImplementedError):
             pass
 
@@ -242,6 +333,22 @@ class ProxyHarness(unittest.TestCase):
         response = connection.getresponse()
         return connection, response
 
+    def read_events(self, response, expected, deadline_seconds=5.0):
+        """Read SSE events, returning ``(payload, arrival_monotonic)`` pairs."""
+        events: list[tuple[str, float]] = []
+        pending = bytearray()
+        deadline = time.monotonic() + deadline_seconds
+        while len(events) < expected and time.monotonic() < deadline:
+            chunk = response.read1(4096)
+            if not chunk:
+                break
+            pending.extend(chunk)
+            while b"\n\n" in pending:
+                raw, _, rest = pending.partition(b"\n\n")
+                pending = bytearray(rest)
+                events.append((raw.decode(), time.monotonic()))
+        return events
+
     def start_aux_proxy(self, *, script, cwd, dist_value, backend_url=None):
         port = free_port()
         env = os.environ.copy()
@@ -268,6 +375,36 @@ class ProxyHarness(unittest.TestCase):
         process.wait(timeout=3)
         self.fail("auxiliary proxy did not start")
 
+    def test_sse_events_buffered_behind_headers_are_not_held_until_upstream_writes(self):
+        """Regression: events already buffered must not wait for raw-socket readiness.
+
+        Upstream sends headers alone, then two complete chunks in one write, then
+        keeps the connection open for ``_BURST_HOLD``. Reading the headers leaves
+        both chunks inside urllib's reader while the socket is empty, so a
+        ``select()``-gated read releases them only when upstream writes again.
+        """
+        started = time.monotonic()
+        connection, response = self.request("GET", "/api/sse-burst")
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.getheader("Transfer-Encoding", "").lower(), "chunked")
+        events = self.read_events(response, 2)
+        connection.close()
+
+        self.assertEqual([payload for payload, _ in events], ["data: burst-0", "data: burst-1"])
+        first_arrival = events[0][1] - started
+        last_arrival = events[1][1] - started
+        self.assertLess(
+            last_arrival, _BURST_HOLD * 0.6,
+            "buffered events must be forwarded before upstream writes again "
+            f"(last event at {last_arrival:.3f}s, upstream held {_BURST_HOLD}s)",
+        )
+        self.assertLess(
+            events[1][1] - events[0][1], 0.25,
+            "events written together must reach the client together",
+        )
+        self.assertGreaterEqual(first_arrival, 0.0)
+        self.assertEqual(len(self.state.stream_times), 1)
+
     def test_sse_events_are_delivered_while_upstream_is_still_running(self):
         connection, response = self.request("GET", "/api/stream")
         self.assertEqual(response.status, 200)
@@ -275,19 +412,10 @@ class ProxyHarness(unittest.TestCase):
         self.assertIsNone(response.getheader("Content-Length"))
         self.assertEqual(response.getheader("Connection", "").lower(), "close")
         self.assertIn("text/event-stream", response.getheader("Content-Type", ""))
+        self.assertEqual(response.getheader("Cache-Control"), "no-cache, no-transform")
+        self.assertEqual(response.getheader("X-Accel-Buffering"), "no")
 
-        events: list[tuple[str, float]] = []
-        pending = bytearray()
-        deadline = time.monotonic() + 3
-        while len(events) < 3 and time.monotonic() < deadline:
-            chunk = response.read1(4096)
-            if not chunk:
-                break
-            pending.extend(chunk)
-            while b"\n\n" in pending:
-                raw, _, rest = pending.partition(b"\n\n")
-                pending = bytearray(rest)
-                events.append((raw.decode(), time.monotonic()))
+        events = self.read_events(response, 3)
         connection.close()
         self.assertEqual([item[0] for item in events], [f"data: event-{i}" for i in range(3)])
         sent = self.state.stream_times
@@ -341,6 +469,39 @@ class ProxyHarness(unittest.TestCase):
         self.assertEqual(response.read(), b"")
         connection.close()
 
+    def test_upstream_cache_control_is_forwarded_on_buffered_responses(self):
+        connection, response = self.request("GET", "/api/no-store")
+        body = response.read()
+        connection.close()
+        self.assertEqual(response.status, 200)
+        self.assertEqual(json.loads(body), {"ok": True, "kind": "snapshot"})
+        self.assertEqual(
+            response.getheader("Cache-Control"), "no-store",
+            "an authenticated no-store response must stay uncacheable through the proxy",
+        )
+
+        connection, response = self.request("GET", "/api/error")
+        self.assertEqual(response.status, 409)
+        response.read()
+        connection.close()
+        self.assertEqual(response.getheader("Cache-Control"), "no-store")
+
+    def test_chunked_and_empty_upstream_responses_are_reframed_correctly(self):
+        connection, response = self.request("GET", "/api/chunked-json")
+        body = response.read()
+        connection.close()
+        self.assertEqual(response.status, 200)
+        self.assertEqual(json.loads(body), {"ok": True, "framing": "chunked"})
+        # A buffered (non-SSE) response is reframed with an exact length.
+        self.assertEqual(int(response.getheader("Content-Length")), len(body))
+        self.assertIsNone(response.getheader("Transfer-Encoding"))
+
+        connection, response = self.request("GET", "/api/no-content")
+        self.assertEqual(response.status, 204)
+        self.assertIsNone(response.getheader("Content-Length"))
+        self.assertEqual(response.read(), b"")
+        connection.close()
+
     def test_request_cookie_authorization_and_json_body_are_forwarded(self):
         payload = json.dumps({"question": "test"})
         connection, response = self.request(
@@ -376,6 +537,84 @@ class ProxyHarness(unittest.TestCase):
         self.assertNotIn("OUTSIDE_SENTINEL_MUST_NEVER_BE_SERVED", response.read().decode(errors="replace"))
         connection.close()
 
+    def test_directory_index_symlink_cannot_escape_dist_root(self):
+        """Regression: the directory index that is actually served must be validated.
+
+        ``/assets/`` resolves through ``dist/assets/index.html``. Checking only the
+        root ``/index.html`` let a symlinked directory index read a file outside
+        dist while still answering 200.
+        """
+        link = self.dist / "assets" / "index.html"
+        if not link.is_symlink():
+            self.skipTest("symlinks unavailable")
+
+        connection, response = self.request("GET", "/assets/")
+        body = response.read().decode(errors="replace")
+        connection.close()
+        self.assertEqual(response.status, 200)
+        self.assertNotIn("OUTSIDE_SENTINEL_MUST_NEVER_BE_SERVED", body)
+        # The out-of-bounds index is treated as absent, so the SPA shell is served.
+        self.assertIn("probe-spa", body)
+
+        connection, response = self.request("HEAD", "/assets/")
+        self.assertEqual(response.status, 200)
+        self.assertNotIn("OUTSIDE_SENTINEL_MUST_NEVER_BE_SERVED", response.read().decode(errors="replace"))
+        connection.close()
+
+        # The in-tree root index is still served normally.
+        connection, response = self.request("GET", "/")
+        self.assertEqual(response.status, 200)
+        self.assertIn("probe-spa", response.read().decode())
+        connection.close()
+
+    def test_static_get_and_head_report_consistent_lengths(self):
+        connection, response = self.request("GET", "/assets/app.js")
+        body = response.read()
+        self.assertEqual(response.status, 200)
+        self.assertEqual(int(response.getheader("Content-Length")), len(body))
+        self.assertIn("javascript", response.getheader("Content-Type", ""))
+        self.assertIsNotNone(response.getheader("Last-Modified"))
+        connection.close()
+
+        connection, response = self.request("HEAD", "/assets/app.js")
+        self.assertEqual(response.status, 200)
+        self.assertEqual(int(response.getheader("Content-Length")), len(body))
+        self.assertEqual(response.read(), b"")
+        connection.close()
+
+        connection, response = self.request("HEAD", "/")
+        self.assertEqual(response.status, 200)
+        self.assertIn("text/html", response.getheader("Content-Type", ""))
+        self.assertEqual(response.read(), b"")
+        connection.close()
+
+    def test_conditional_static_request_returns_not_modified(self):
+        connection, response = self.request("GET", "/assets/app.js")
+        last_modified = response.getheader("Last-Modified")
+        response.read()
+        connection.close()
+        self.assertIsNotNone(last_modified)
+
+        connection, response = self.request(
+            "GET", "/assets/app.js", headers={"If-Modified-Since": last_modified},
+        )
+        self.assertEqual(response.status, 304)
+        self.assertEqual(response.read(), b"")
+        connection.close()
+
+    def test_directory_request_without_trailing_slash_redirects(self):
+        connection, response = self.request("GET", "/assets")
+        self.assertEqual(response.status, 301)
+        self.assertEqual(response.getheader("Location"), "/assets/")
+        self.assertEqual(response.read(), b"")
+        connection.close()
+
+    def test_missing_static_asset_falls_back_to_spa(self):
+        connection, response = self.request("GET", "/no/such/route")
+        self.assertEqual(response.status, 200)
+        self.assertIn("probe-spa", response.read().decode())
+        connection.close()
+
     def test_client_disconnect_releases_upstream_stream(self):
         connection, response = self.request("GET", "/api/long-stream")
         self.assertEqual(response.status, 200)
@@ -384,6 +623,7 @@ class ProxyHarness(unittest.TestCase):
         response.close()
         connection.close()
         deadline = time.monotonic() + 2.5
+        active = -1
         while time.monotonic() < deadline:
             with self.state.lock:
                 active = self.state.active_streams
@@ -391,6 +631,18 @@ class ProxyHarness(unittest.TestCase):
                 break
             time.sleep(0.05)
         self.assertEqual(active, 0, "closing the downstream client should close the upstream response")
+
+    def test_client_disconnect_releases_idle_upstream_stream(self):
+        """An idle stream must still notice a disconnect; nothing is written to fail on."""
+        connection, response = self.request("GET", "/api/idle-stream")
+        self.assertEqual(response.status, 200)
+        self.assertTrue(response.read1(4096))
+        response.close()
+        connection.close()
+        self.assertTrue(
+            self.state.idle_released.wait(timeout=3),
+            "a silent SSE stream must be cancelled once the browser disconnects",
+        )
 
     def test_upstream_abort_does_not_emit_clean_chunked_termination(self):
         connection, response = self.request("GET", "/api/upstream-abort")

@@ -15,10 +15,13 @@ import http.server
 import urllib.request
 import urllib.error
 import urllib.parse
+import email.utils
 import os
 import select
+import shutil
 import socket
 import sys
+import threading
 
 
 def _resolve_dist():
@@ -40,8 +43,10 @@ BACKEND = os.environ.get("DAP_BACKEND_URL", "http://127.0.0.1:15099")
 # forwarded chunk-by-chunk with flush() so the browser sees each event as the
 # upstream produces it. Block size for streaming reads in bytes.
 _STREAM_CHUNK_SIZE = 65536
-# How long an idle upstream read waits before we recheck the client socket.
-_STREAM_READ_IDLE = 1.0
+# How often the downstream watchdog rechecks the client socket while an SSE
+# stream is open. This only bounds disconnect detection latency; it never gates
+# forwarding of upstream data.
+_CLIENT_POLL_INTERVAL = 0.25
 # Preserve the existing buffered API timeout.
 _NON_STREAM_TIMEOUT = 120
 # Bound SSE memory/network use; on overflow the response is aborted, not marked
@@ -61,6 +66,8 @@ _RESPONSE_HEADERS = (
     "Cache-Control", "ETag", "Last-Modified", "Expires", "Vary", "Location",
     "Retry-After", "WWW-Authenticate",
 )
+# Directory index candidates, matching http.server.SimpleHTTPRequestHandler.
+_DIRECTORY_INDEX_FILES = ("index.html", "index.htm")
 
 
 def _normalize_backend_url(value):
@@ -93,6 +100,24 @@ def _is_proxy_path(path):
         or clean == "/docs" or clean.startswith("/docs/")
         or clean == "/openapi.json"
     )
+
+
+def _upstream_socket(resp):
+    """Best-effort access to the raw upstream socket behind urllib's reader.
+
+    Works for both ``HTTPResponse`` and ``HTTPError`` (whose body lives on
+    ``.fp``). Returns ``None`` when the socket cannot be located, in which case
+    streaming still works but a downstream disconnect is only noticed on the
+    next write.
+    """
+    for candidate in (resp, getattr(resp, "fp", None)):
+        if candidate is None:
+            continue
+        raw = getattr(candidate, "raw", None) or candidate
+        sock = getattr(raw, "_sock", None)
+        if sock is not None:
+            return sock
+    return None
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -132,7 +157,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_header("Content-Type", "application/octet-stream")
         for name in _RESPONSE_HEADERS:
-            if name.lower() in ("content-type", "cache-control"):
+            # Forward upstream Cache-Control verbatim: buffered API responses
+            # (e.g. authenticated snapshot pages) rely on no-store reaching the
+            # browser. Only the SSE path overrides it.
+            if name.lower() == "content-type":
                 continue
             for value in headers.get_all(name) or []:
                 self.send_header(name, value)
@@ -157,6 +185,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", headers.get("Content-Type", "text/event-stream"))
         for name in _RESPONSE_HEADERS:
+            # Cache-Control is set below: a streamed response must never be
+            # cached or buffered by an intermediary, whatever upstream said.
             if name.lower() in ("content-type", "cache-control"):
                 continue
             for value in headers.get_all(name) or []:
@@ -188,44 +218,37 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         urllib's ``HTTPResponse`` is a ``BufferedReader``; calling ``read(n)`` with
         a large ``n`` blocks until it has collected ``n`` bytes or EOF, so a small
         SSE body would be buffered to completion. We therefore use ``read1(n)``,
-        which returns at most one underlying socket read (one SSE event as soon as
-        the upstream produces it), preserving incremental delivery.
+        which returns at most one underlying socket read, preserving incremental
+        delivery.
 
-        A non-blocking client peek runs before every upstream read as well as
-        during idle periods. This detects a disconnected browser even while the
-        upstream is continuously producing data. Closing the response cancels
-        further upstream reads. Returns total bytes copied.
+        ``read1`` is called unconditionally. Gating it on raw-socket readiness
+        (``select``) is wrong: when upstream writes headers and events in a
+        single segment, the reader already holds those body bytes while the
+        socket has nothing left to report, so a ``select`` gate delays every
+        buffered event until upstream writes again or closes.
+
+        Disconnect detection therefore moved to a watchdog thread that peeks the
+        client socket and shuts the upstream read side down on disconnect. That
+        wakes the blocking ``read1`` without ever bounding it by a socket
+        timeout: a timed-out ``BufferedReader`` cannot be read from again.
+        Returns total bytes copied.
         """
-        raw_sock = None
-        try:
-            fp = getattr(resp, "fp", None)
-            if fp is not None and hasattr(fp, "raw"):
-                raw = fp.raw
-                if hasattr(raw, "_sock"):
-                    raw_sock = raw._sock
-        except Exception:
-            raw_sock = None
+        upstream_socket = _upstream_socket(resp)
+        stop = threading.Event()
+        watchdog = None
+        if upstream_socket is not None:
+            watchdog = threading.Thread(
+                target=self._watch_downstream,
+                args=(stop, upstream_socket),
+                daemon=True,
+            )
+            watchdog.start()
 
         total = 0
-        clean_eof = False
         try:
             while True:
-                if self._client_disconnected():
-                    # Do not emit a terminal chunk after downstream cancellation.
-                    break
-                if raw_sock is not None:
-                    try:
-                        ready, _, _ = select.select([raw_sock], [], [], _STREAM_READ_IDLE)
-                    except (OSError, ValueError):
-                        # Fall back to read1 if the implementation's socket is
-                        # unavailable; do not spin forever on a failed select.
-                        raw_sock = None
-                    else:
-                        if not ready:
-                            continue
                 chunk = resp.read1(_STREAM_CHUNK_SIZE) if hasattr(resp, "read1") else resp.read(_STREAM_CHUNK_SIZE)
                 if not chunk:
-                    clean_eof = True
                     break
                 total += len(chunk)
                 if total > _MAX_STREAM_TOTAL:
@@ -233,41 +256,51 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     self.close_connection = True
                     return total
                 self._write_stream_chunk(chunk)
-            if clean_eof:
-                # Only a clean upstream EOF gets the terminal HTTP chunk.
-                self.wfile.write(b"0\r\n\r\n")
-                self.wfile.flush()
-            else:
-                self.close_connection = True
+            # Only a clean upstream EOF gets the terminal HTTP chunk; an aborted
+            # stream returns early above and leaves the body unterminated.
+            self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
         finally:
+            stop.set()
+            if watchdog is not None:
+                watchdog.join(timeout=2)
             try:
                 resp.close()
             except Exception:
                 pass
         return total
 
+    def _watch_downstream(self, stop, upstream_socket):
+        """Cancel the upstream read as soon as the browser goes away.
+
+        Shutting the upstream socket down (rather than closing the response)
+        unblocks the in-flight ``read1`` without corrupting the reader state.
+        """
+        while not stop.wait(_CLIENT_POLL_INTERVAL):
+            if not self._client_disconnected():
+                continue
+            try:
+                upstream_socket.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                # Already closed; the pending read has nothing left to wait for.
+                pass
+
     def _client_disconnected(self):
         """Return True if the browser has closed the connection.
 
-        Uses a non-blocking MSG_PEEK so we never consume or block on client
-        data. SSE streams have Connection: close, so pending request bytes are
-        not consumed; only EOF/reset indicates a disconnect.
+        A zero-timeout readiness check followed by MSG_PEEK keeps this from
+        blocking or consuming client bytes, and never mutates the socket timeout
+        that concurrent writes depend on.
         """
         try:
-            orig_timeout = self.connection.gettimeout()
-            self.connection.settimeout(0)  # non-blocking
-            try:
-                data = self.connection.recv(1, socket.MSG_PEEK)
-                if data == b"":
-                    return True  # peer closed (EOF)
+            readable, _, _ = select.select([self.connection], [], [], 0)
+            if not readable:
                 return False
-            except (BlockingIOError, socket.timeout):
-                return False  # still open, just no pending data
-            except ConnectionResetError:
-                return True
-            finally:
-                self.connection.settimeout(orig_timeout)
-        except OSError:
+            # Readable with no data means the peer closed its send direction.
+            return self.connection.recv(1, socket.MSG_PEEK) == b""
+        except (ConnectionResetError, ConnectionAbortedError):
+            return True
+        except (OSError, ValueError):
             return True
 
     def _forward_upstream_error(self, error):
@@ -276,7 +309,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if self._is_sse(error.headers) and error.fp is not None:
                 self._forward_stream_headers(error.code, error.headers)
                 try:
-                    self._stream_upstream(error.fp)
+                    self._stream_upstream(error)
                 except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
                     self.close_connection = True
                 except Exception:
@@ -395,11 +428,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return True
         return False
 
-    def _safe_static_path(self, request_path):
-        """Resolve a request using SimpleHTTPRequestHandler rules, then contain symlinks."""
-        translated = super().translate_path(request_path)
+    def _contained_path(self, path):
+        """Return ``path`` resolved if it stays inside dist, otherwise ``None``.
+
+        ``realpath`` expands every symlink component, so a link inside dist that
+        points outside is rejected here rather than by a later consumer.
+        """
         root = os.path.realpath(DIST)
-        candidate = os.path.realpath(translated)
+        candidate = os.path.realpath(path)
         try:
             if os.path.commonpath((root, candidate)) != root:
                 return None
@@ -407,29 +443,103 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return None
         return candidate
 
-    def _serve_static_or_spa(self, head_only=False):
-        clean = urllib.parse.urlsplit(self.path).path
-        candidate = self._safe_static_path(self.path)
-        if clean == "/" or (candidate is not None and os.path.isdir(candidate)):
-            candidate = self._safe_static_path("/index.html")
-        if candidate is not None and os.path.isfile(candidate):
-            if head_only:
-                super().do_HEAD()
-            else:
-                super().do_GET()
-            return
+    def _resolve_static_target(self):
+        """Resolve the exact file that will be served, directory index included.
 
-        index_path = self._safe_static_path("/index.html")
-        if index_path is not None and os.path.isfile(index_path):
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(os.path.getsize(index_path)))
-            self.end_headers()
-            if not head_only:
-                with open(index_path, "rb") as index_file:
-                    self.wfile.write(index_file.read())
-        else:
+        Validation must describe the file that is actually read. Delegating a
+        directory request to SimpleHTTPRequestHandler after only checking
+        ``/index.html`` let it resolve ``<dir>/index.html`` on its own, so a
+        symlinked index under dist was served from outside dist.
+        """
+        candidate = self._contained_path(super().translate_path(self.path))
+        if candidate is None:
+            return None
+        if not os.path.isdir(candidate):
+            return candidate if os.path.isfile(candidate) else None
+        for name in _DIRECTORY_INDEX_FILES:
+            index_path = self._contained_path(os.path.join(candidate, name))
+            if index_path is not None and os.path.isfile(index_path):
+                return index_path
+        return None
+
+    def _redirect_directory_without_slash(self):
+        """Match SimpleHTTPRequestHandler: a directory URL needs its trailing slash.
+
+        Without it, relative asset URLs inside a served index resolve against the
+        parent directory instead of the directory being served.
+        """
+        parts = urllib.parse.urlsplit(self.path)
+        if parts.path.endswith("/"):
+            return False
+        directory = self._contained_path(super().translate_path(self.path))
+        if directory is None or not os.path.isdir(directory):
+            return False
+        self.send_response(301)
+        self.send_header(
+            "Location",
+            urllib.parse.urlunsplit((parts[0], parts[1], parts[2] + "/", parts[3], parts[4])),
+        )
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return True
+
+    def _serve_static_or_spa(self, head_only=False):
+        if self._redirect_directory_without_slash():
+            return
+        target = self._resolve_static_target()
+        if target is None:
+            # The SPA fallback goes through the same containment check.
+            target = self._contained_path(os.path.join(DIST, "index.html"))
+        if target is None or not os.path.isfile(target):
             self.send_error(404, "not found")
+            return
+        self._send_static_file(target, head_only)
+
+    def _send_static_file(self, path, head_only):
+        """Serve one already-validated file, so validation and delivery agree."""
+        try:
+            handle = open(path, "rb")
+        except OSError:
+            self.send_error(404, "not found")
+            return
+        with handle:
+            stat = os.fstat(handle.fileno())
+            last_modified = self.date_time_string(stat.st_mtime)
+            if self._not_modified_since(stat.st_mtime):
+                self.send_response(304)
+                self.send_header("Last-Modified", last_modified)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", self._content_type_for(path))
+            self.send_header("Content-Length", str(stat.st_size))
+            self.send_header("Last-Modified", last_modified)
+            self.end_headers()
+            if head_only:
+                return
+            try:
+                shutil.copyfileobj(handle, self.wfile)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                self.close_connection = True
+
+    def _content_type_for(self, path):
+        content_type = self.guess_type(path)
+        if content_type.startswith("text/") and "charset=" not in content_type:
+            content_type += "; charset=utf-8"
+        return content_type
+
+    def _not_modified_since(self, mtime):
+        """Honour If-Modified-Since so static assets keep their 304 behaviour."""
+        value = self.headers.get("If-Modified-Since")
+        if not value:
+            return False
+        parsed = email.utils.parsedate_tz(value)
+        if parsed is None:
+            return False
+        try:
+            return int(mtime) <= int(email.utils.mktime_tz(parsed))
+        except (OSError, OverflowError, ValueError):
+            return False
 
     def do_GET(self):
         if _is_proxy_path(self.path):

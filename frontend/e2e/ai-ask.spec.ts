@@ -245,7 +245,10 @@ async function mockPortalApis(page: Page, options: {
         }));
       }
       if (options.delayFirstAsk && (payload.query.includes("cancel-first") || payload.query.includes("slow-old"))) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // Wide enough that the "still running" window survives tab switching,
+        // summary toggling and assertions on slower engines (WebKit), where the
+        // same steps take noticeably longer than in Chromium.
+        await new Promise((resolve) => setTimeout(resolve, 2500));
         try {
           return await route.fulfill(sseResponse(answer(payload.query), payload.query));
         } catch {

@@ -493,6 +493,17 @@ python3 frontend/serve-dist-linux.py
 
 本代理对 `text/event-stream` 使用 HTTP/1.1 chunked 转发并逐段 flush；若前面还有 Nginx/负载均衡器，应单独确认该层也关闭 SSE 响应缓冲。代理不提供 TLS、身份认证或授权，不应被当作后端安全边界；需要登录/session 的正式环境应继续使用 HTTPS 与受控入口。它会拒绝 chunked 请求体（避免误读），保留 JSON/API 状态与 Cookie 透传，并忽略客户端伪造的 forwarded headers。
 
+响应语义（PR #541 修复后）：
+
+| 场景 | 行为 |
+| --- | --- |
+| SSE `text/event-stream` | chunked 逐段转发并 flush；事件一旦可读即转发，不等待上游后续写入，也不受上游是否关闭连接影响；`Cache-Control` 固定为 `no-cache, no-transform` 并附加 `X-Accel-Buffering: no` |
+| 普通 API | 透传上游状态码、`Cache-Control`（含 `no-store`）、`Set-Cookie`、`Content-Type`/`ETag`/`Vary` 等响应头；上游为 chunked 且无 `Content-Length` 时，按实际长度重新封装 |
+| 静态文件与目录索引 | 目录请求会先解析出实际要返回的索引文件，再与普通文件走同一套 realpath containment 校验；指向 dist 之外的符号链接一律拒绝；支持 `If-Modified-Since` 返回 304，`GET`/`HEAD` 的 `Content-Length` 一致 |
+| 客户端断连 | 由独立看门狗线程检测下游断开并取消上游读取，避免空闲 SSE 连接长期占用后端 |
+
+以上行为已由 `frontend/tests/test_serve_dist_linux.py` 的真实 Socket 集成测试覆盖（含事件到达时间断言），但**测试环境通过不等于内网部署成功**。内网仍需逐项确认：真实反代/网关是否缓冲 SSE、后端 `no-store` 接口在真实浏览器中的缓存表现、真实 dist 目录是否存在越界符号链接、以及升级回滚路径。
+
 **升级既有 Linux 部署时不得盲目覆盖运行文件。** 仓库中的脚本是后续正式维护的版本，但不宣称与既有内网文件逐字相同。操作人员应先记录现有服务命令、owner/mode、环境变量及 backend 监听配置，在服务目录外备份旧脚本；对比本仓库版本与现场版本，保留现场明确需要的配置，通过 `DAP_*` 环境变量迁移配置；先在隔离/预发布实例验证静态资源、JSON API、Cookie、SSE 中间事件和回滚路径，再由维护者按既有服务管理方式人工切换。不要把现场真实地址、凭据、绝对路径写入仓库，也不要在本 PR 中部署或重启。
 
 ## 8. systemd
