@@ -1,6 +1,27 @@
 # 智能问数底座与语义推荐路线
 
-> 状态：**Phase 1 — Semantic Contract 已实现；DAP #503 提供默认关闭的 HTTP Client Adapter 与合成契约测试**。dap-rag-lab #14 的最终接口和真实服务联调尚未验收。普通关键词搜索仍是主路径；此工作不代表 RAG 在线可用、LLM、智能解答或经业务验收的语义准确率已经上线。
+> 状态（`origin/main`，基线 `f7a8450`）：**Phase 1 Semantic Contract 已实现**；**DAP #503 提供默认关闭的 HTTP Client Adapter 与合成契约测试**；**单轮 AI 资产问答（#514 / #516 / #521 / #526 / #534 / #542）已合入 `main` 并默认关闭**。普通关键词搜索仍是主路径。
+>
+> 本节不构成在线能力声明：dap-rag-lab 的最终 HTTP 契约与真实服务联调 **NOT VERIFIED**；真实 LLM 端点的 wire 兼容性与回答质量 **NOT VERIFIED**；经业务验收的语义准确率 **未验收**。
+
+## 0. 真实边界
+
+先把边界说清楚，避免两种相反的误读：
+
+**DAP 不内置以下能力**（这是架构边界，不是能力评级）：
+
+- 不内置向量引擎、Embedding 模型或向量索引存储；DAP 进程不加载 BGE / PyTorch，也不读 LanceDB。
+- 不提供 NL2SQL、可执行语义层或问数执行引擎；AI 问答只回答“元数据在哪里、字段是什么”，不查业务数值。
+- 不自动把关键词搜索改道为模型调用；`/api/search` 永远走确定性路径。
+- 不把向量扩展写进通用初始化 DDL，也不让未启用语义能力的部署承担模型或扩展依赖。
+
+**“不内置”不等于“不支持可选集成”**。`main` 上已经落地的可选集成是：
+
+1. `GET /api/search/recommendations`：默认关闭，通过独立 HTTP Client Adapter 调用外部 RAG 服务（BGE Embedding + LanceDB 由该服务自己持有）。
+2. `POST /api/ai/ask`、`POST /api/ai/ask/progress`、`POST /api/ai/ask/stream`：默认关闭，复用同一个 RAG 适配器，再叠加一个 OpenAI-compatible LLM Provider（当前 UI 使用 `/api/ai/ask/stream`）。
+3. 两者的共同前提：DAP 始终是目录权威，远端和模型只能返回候选稳定 ID。
+
+因此“DAP 没有向量检索”与“DAP 支持可选 RAG / AI 集成”同时成立，二者不矛盾。
 
 ## 1. 产品定位
 
@@ -21,11 +42,13 @@
 
 DAP #503 增加了**可选、默认关闭**的 HTTP Client Adapter 与独立推荐 UI：DAP 仅向配置的 RAG Search Service 发送带服务 Bearer Token 的 HTTP 请求；本地只执行合成协议解析与 DAP 权威目录复核，不导入 RAG Python、不加载模型/索引、不执行 CLI。推荐仅使用当前请求可见的共享目录资产；远端服务失败、超时、ID 不存在或目录不可用时 fail closed，不影响确定性关键词搜索。DAP 与 RAG 服务间的最终字段/错误码仍待 Issue #14 对齐，现有 MockTransport 测试不是在线联通证据。
 
+AI 问答层（#514 起）在同一 RAG 适配器上增加了受限的 LLM 结构化选择：模型只能返回 `questionType` 与按稳定 ID 选择的 `claims`，回答文本、表名、字段名、描述与引用卡均由 DAP 用当前校验后的元数据生成。受控统计意图（#521）绕过 RAG/LLM，直接对 DAP 目录做精确 COUNT。
+
 仍未实现或验收：
 
 - dap-rag-lab #14 最终 HTTP 契约对齐及经授权环境的真实服务联调；DAP 当前只覆盖本地合成 HTTP contract。
 - 在线索引刷新、完整快照/撤权传播契约和跨实例原子切换。
-- LLM 调用、智能解答、结构化输出组装与推荐结果持久化。
+- 真实 OpenAI-compatible / DeepSeek 端点的 wire 兼容性、回答质量与经业务标注的准确率验收。
 - 有业务标注的 golden query 离线评测，以及不同领域的召回质量验收。
 - PostgreSQL、GaussDB/DWS、Community SQLite 的统一向量存储方案；DAP 本身不读取任何 RAG 索引。
 
@@ -78,6 +101,15 @@ DAP #503 增加了**可选、默认关闭**的 HTTP Client Adapter 与独立推�
 5. 管理配置有 RBAC 与审计；服务 Token 来自后端部署 Secret，不发给浏览器。管理员可显式请求 health/readiness 诊断；普通搜索失败不阻塞。
 6. 与 dap-rag-lab #14 的最终契约及真实联调仍是待完成前置条件，不将 synthetic tests 描述成真实联通。
 
+### Delivered — Single-turn AI Asset Q&A (#514 / #516 / #521 / #526 / #534 / #542)
+
+1. `GET /api/ai/status` 只暴露浏览器安全布尔开关；`AI_ASK_ENABLED` 默认 `false`，且要求 RAG 已配置。
+2. `POST /api/ai/ask`（JSON）、`POST /api/ai/ask/progress`（SSE 阶段）、`POST /api/ai/ask/stream`（当前 UI 使用的 SSE 执行流）共享同一服务；SSE 只传真实阶段与完整最终结果，不逐 token 输出。
+3. 模型只能返回结构化候选 ID 与直接/相关关系；所有展示文本由 DAP 元数据组装，引用与候选一一对应。
+4. 受控统计意图（表数/字段数）走 DAP 目录精确 COUNT，不复用 RAG 候选计数，也不标记为模型生成成功。
+5. Mock 演示（`VITE_API_MODE=mock`）使用独立前端适配器；Remote 零回退，Remote Bundle 由 CI 校验不含 Mock AI 语料。
+6. 真实 RAG 服务与真实 LLM 端点仍未联调；不得把 Mock / synthetic 测试描述为生产可用。
+
 ### Next — Offline Evaluation + Refresh Contract
 
 1. 建立含授权数据边界的 golden query set，覆盖同义词、歧义、无匹配与撤权。
@@ -102,3 +134,9 @@ DAP #503 增加了**可选、默认关闭**的 HTTP Client Adapter 与独立推�
 - 未认证候选不会被表达为正式指标。
 - 模型不可用时关键词搜索无回归。
 - 有离线评测集覆盖同义词、歧义词、无匹配、复合聚合和恶意输入。
+
+### 当前仍未满足的前置条件
+
+- 外部 RAG 服务的最终 HTTP 契约与真实联调证据（当前仅合成契约测试）。
+- 外部 LLM 端点的真实 wire 兼容性、超时行为与回答质量证据。
+- 跨 PostgreSQL / GaussDB-DWS / SQLite 的索引与撤权传播契约。

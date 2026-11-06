@@ -67,6 +67,10 @@ The following routes intentionally accept anonymous requests:
 | `GET /api/capabilities` | `200`; bounded source-backed module metadata |
 | `GET /api/portal/stats` | `200`; public catalog-level counts |
 | `GET /api/search` | `200`; public search result projection |
+| `GET /api/search/hot-keywords` | `200`; public hot keyword list; profile-projected |
+| `GET /api/search/recommendations` | `200`; shares the `/api/search` public-catalog gate and per-request profile. Returns `status=disabled` with an empty list when RAG is not enabled; never bypasses `PUBLIC_CATALOG_PROFILE` |
+| `GET /api/ai/status` | `200`; browser-safe `{"enabled": boolean}` only. `enabled=true` requires `AI_ASK_ENABLED`, a complete LLM provider configuration, and an enabled RAG configuration with its server token; it does not probe live health |
+| `POST /api/ai/ask`, `POST /api/ai/ask/progress`, `POST /api/ai/ask/stream` | Same public-catalog gate and per-request profile as `/api/search`. Single-turn metadata Q&A only; disabled by default; no conversation state, no SQL, no business values. All model citations are re-validated against DAP-verified candidate identities |
 | `GET /api/system/menus` | `200`; enabled, non-management navigation entries only; `disabled` returns an empty list |
 | `GET /api/assets/*` | `200`; tables, fields, DDL, facets, and summaries |
 | `GET /api/field-mappings/*` | `200`; field/table mapping metadata and statistics |
@@ -74,6 +78,7 @@ The following routes intentionally accept anonymous requests:
 | `GET /api/lineage/*` | `200`; public graph metadata with sensitive nested values redacted |
 | `GET /api/roots/*` | `200`; root dictionary metadata |
 | `GET /api/indicators/*` | `200`; indicator metadata |
+| `GET /api/indicator-path/tree` | `200`; enabled indicator path tree, profile-projected |
 | `GET /api/reports/*` | `200`; report metadata without audit actors |
 | `GET /api/api-assets/*` | `200`; API catalog metadata without examples/credentials/audit actors |
 | `GET /api/manual-code-tables` and `GET /api/manual-code-tables/{table_id}` | `200`; table-level code metadata without audit actors |

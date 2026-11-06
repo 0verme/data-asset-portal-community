@@ -2,6 +2,24 @@
 
 > 本文档描述 DAP Community Edition 的单轮元数据问答实现边界。AI 能力默认关闭；文档和自动化 Mock 不代表内网 RAG / DeepSeek 服务已联调或生产可用。
 
+## 当前状态（`origin/main` 基线 `f7a8450`）
+
+本文最初为 Issue #513 的 PR 记录，后续 #516 / #521 / #526 / #534 / #542 继续演进。为避免把历史 PR 描述当成当前事实，先列明当前 `main` 的实际状态：
+
+| 事项 | `main` 实际状态 | 依据 |
+|---|---|---|
+| `GET /api/ai/status` | 已实现；受 `require_public_catalog_access` 保护；只返回 `{"enabled": boolean}` | `backend/app/fastapi/routers/ai_ask.py`；`backend/tests/test_ai_ask_api.py` |
+| `POST /api/ai/ask` | 已实现，JSON 响应；兼容接口，当前 UI 不直接使用 | 同上 |
+| `POST /api/ai/ask/progress` | 已实现，SSE `progress` + 单个 `result`；兼容接口，当前 UI 不直接使用 | `test_progress_endpoint_emits_safe_sse_and_keeps_existing_json_api` |
+| `POST /api/ai/ask/stream` | 已实现；**当前前端 UI 实际使用的传输**（`frontend/src/api/aiAskExecution.ts`），SSE 真实阶段 + 单个 `answer` + 终止 `done` | `test_execution_stream_*`；`frontend/e2e/ai-ask.spec.ts` |
+| 搜索页结果区 Tab | 「搜索结果」与「AI 问答」双 Tab，带 `role="tablist"` 与方向键导航 | `frontend/src/components/SearchPortalPage.tsx` |
+| 统计意图（表数/字段数） | 已实现，走 DAP 目录精确 COUNT，不复用 RAG 候选计数 | `docs/ai-metadata-count.md`；`backend/app/services/ai_metadata_count.py` |
+| Mock 演示适配器 | `VITE_API_MODE=mock` 专用，动态导入；Remote 零回退 | `frontend/src/mock/aiAsk.ts`；`frontend/scripts/verify-remote-ai-isolation.mjs` |
+| 真实 RAG 服务 / 真实 LLM 端点联调 | **NOT VERIFIED** | 无外部环境证据 |
+| 真实回答准确率、GaussDB / LanceDB 实测 | **NOT VERIFIED** | 无外部环境证据 |
+
+下面的“Phase 0”“回答质量修复”“本地验证结果”等章节保留为**历史 PR 记录**，数字与结论对应当时那次 PR 的本地运行，不代表当前 `main` 的 CI 结果。
+
 ## Phase 0：基线审计与契约
 
 审计基线：GitHub `main` / `origin/main` `3993e2bfc7a81c5770629401b802e0800c740af5`（2026-11-03 UTC）。相关事实：
@@ -27,8 +45,10 @@
 DAP Search Portal
   ├─ Enter / “搜索” ── GET /api/search（原有确定性搜索）
   ├─ 可选 RAG 推荐 ─── GET /api/search/recommendations（原有 HTTP RAG adapter）
-  └─ 显式“问 AI” ─── POST /api/ai/ask/progress（SSE 状态 + 完整最终结果）
-                           │  原 POST /api/ai/ask JSON 接口继续兼容
+  └─ 显式“问 AI” ─── POST /api/ai/ask/stream（当前 UI 使用：SSE 真实阶段 + 完整最终结果）
+                           ├─ POST /api/ai/ask/progress（兼容：SSE progress + result）
+                           ├─ POST /api/ai/ask（兼容：单次 JSON）
+                           │
                            ├─ 当前请求的 public-catalog profile
                            ├─ 复用 RagSearchService + HTTP Search v1
                            ├─ DAP 当前目录 authority check / stable-ID 检查
@@ -37,7 +57,7 @@ DAP Search Portal
                            └─ 严格 JSON 与引用 ID 校验 → 仅返回 DAP 候选/引用
 ```
 
-DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具调用、SQL 或业务数值查询。每个请求独立，无会话/历史/持久化；SSE 仅传执行阶段状态及完整最终结果，不流式传输 LLM token。
+DAP 不加载 embedding、BGE、向量库或 dap-rag-lab 包，不执行工具调用、SQL 或业务数值查询。每个请求独立，无会话/历史/持久化；三个 SSE / JSON 入口都不流式传输 LLM token。
 
 ## 回答质量修复（起始基线 `b245fd38e52756e802857b1a4bb19fe31598c65b`；冲突整合后包含最新 main `3dc668b42c7dcb7a4d4b46a6089ae11cfd7fdbef`）
 
@@ -107,7 +127,9 @@ Phase 0 复核 PR #514 合入后的实现，确认根因是回答策略和证据
 - `retrievalStatus` 另区分 `available/degraded/unavailable/not_run`；`generationStatus` 区分 `completed/unavailable/disabled/not_run`。
 - 候选卡片只由服务端 DAP 回查的元数据生成。模型只能返回结构化候选身份与直接/相关关系；回答中的表/字段名也由服务端元数据生成。稳定 `assetId` / `fieldId` 是唯一详情身份。检索分数不作为可信度或准确率返回。
 
-### `POST /api/ai/ask/progress`（新增的状态传输，不替换旧接口）
+### `POST /api/ai/ask/progress`（兼容的状态传输）
+
+> 当前前端 UI 不再直接调用此入口，它已由 `POST /api/ai/ask/stream` 取代；此入口继续保留并测试，供既有客户端使用。
 
 请求体与 `POST /api/ai/ask` 相同。成功连接后以 `text/event-stream` 返回 `progress` 事件和一个 `result` 事件；进度事件不含用户问题、候选、LLM 输出或隐藏推理。`result` 仅在本请求实际执行的阶段结束后一次性携带完整 `AiAskResponse`（完整回答、DAP 校验候选和引用）；不传 LLM token 或增量文本。旧 JSON 接口仍调用相同服务并保持原响应形状。
 
@@ -116,6 +138,28 @@ Phase 0 复核 PR #514 合入后的实现，确认根因是回答策略和证据
 阶段为问题输入规范化/配置校验、现有 RAG HTTP 检索、命中计数、候选整理、LLM 结构化候选选择与引用 ID 校验（初轮无相关 claim 时最多进行一次有界复核），以及成功时的最终响应组装。表数为当前已校验命中的不同 `assetId` 数，字段数为不同 `(assetId, fieldId)` 数；零命中 `0/0` 只会在检索成功并实际得到空列表时发送，不以 RAG 索引总量或猜测值替代。
 
 浏览器取消会 abort SSE；服务在阶段边界检查取消信号，并尝试关闭正在读取的 RAG/LLM HTTP 响应。取消可能发生在上游连接建立阶段，届时最多等待该现有客户端的配置 timeout；页面立即呈现「已取消」，旧请求结果不会覆盖后续提交。SSE 断连/超时不改变传统搜索，也不增加上游调用。
+
+### `POST /api/ai/ask/stream`（当前 UI 使用的执行流）
+
+请求体与 `POST /api/ai/ask` 相同。事件名为 `step_start` / `step_complete` / `step_error` / `answer` / `done` / `keep_alive`，每个事件都带 `request_id`，前端会拒绝请求标识不一致或事件顺序异常的流：
+
+- `step_*`：后端实际执行的阶段与 `elapsedMs`；统计意图阶段 `step_id=metadata-count`，命中数量以 `hits` 字段返回。
+- `answer`：仅在本请求确实产生答案时出现一次，携带完整 `AiAskResponse`；不会出现第二个 `answer`。
+- `done`：终止事件，携带 `status`（`completed` / `failed` / `cancelled`）与 `reasonCode`。
+- `keep_alive`：长连接保活，不携带业务数据。
+
+与 `/ask/progress` 的差异：`/ask/stream` 传输执行面板所需的细粒度事件，`/ask/progress` 传输进度状态加单个最终结果。两者共享同一后端服务、同一证据契约与同一 fail-closed 行为，均不逐 token 输出模型文本。
+
+## 前端 Tab 与实际状态
+
+搜索页结果区（`frontend/src/components/SearchPortalPage.tsx`）使用两个 `role="tab"` 项：
+
+| Tab | 状态文案 | 触发方式 |
+|---|---|---|
+| 搜索结果 | 搜索中 / 搜索失败 / 已搜索 / 未搜索 | Enter 或「搜索」；只调用 `GET /api/search` |
+| AI 问答 | 问答中 / 执行失败 / 已完成 / 未提问；AI 未启用时显示「暂不可用」 | 显式点击「问 AI」或零结果时的「问 AI 找资产」；调用 `/api/ai/status` 与 `/api/ai/ask/stream` |
+
+Tab 支持 `ArrowLeft` / `ArrowRight` / `Home` / `End` 键盘导航；两个面板通过 `aria-controls` / `aria-labelledby` 关联。传统搜索永不自动切到 AI Tab，模型异常也不清空搜索结果。
 
 ## LLM Provider 配置
 
@@ -134,7 +178,7 @@ Phase 0 复核 PR #514 合入后的实现，确认根因是回答策略和证据
 ## 搜索与 AI 共存交互
 
 - 首次进入保留 Hero 和原搜索；Enter 与「搜索」继续执行普通确定性搜索。
-- 「问 AI」是显式动作，独立请求 `/api/ai/ask/progress`；兼容的 JSON `/api/ai/ask` 仍供既有客户端使用。常规搜索、热词、范围变化不会自动调用 LLM。
+- 「问 AI」是显式动作，独立请求 `/api/ai/ask/stream`（当前 UI）；兼容的 `/api/ai/ask/progress` 与 JSON `/api/ai/ask` 仍供既有客户端使用。常规搜索、热词、范围变化不会自动调用 LLM。
 - 普通搜索成功且零结果才出现「没有找到精确匹配的资产」和「问 AI 找资产」，原问题直接沿用；部分搜索失败或接口失败不转换为空结果，也不显示无结果误导。
 - 搜索结果和 AI 答案可在原页面共存；资产搜索、RAG 推荐、AI 候选按 stable ID 区分/去重。模型异常不清空普通搜索结果。
 - AI 执行面板在请求期间默认展开并呈现后端实际阶段、状态、命中表/字段数和耗时；结束后折叠，可重新展开。失败/超时/取消均明确呈现；取消后可重新提交，旧响应不能覆盖新请求。模型生成期间不逐 token 输出，最终回答一次性返回。
@@ -145,7 +189,7 @@ Phase 0 复核 PR #514 合入后的实现，确认根因是回答策略和证据
 
 后端测试通过 `httpx.MockTransport` 替代 RAG HTTP 和 OpenAI-compatible LLM，验证授权头/JSON 请求、异常/超时/并发上限、慢速分块响应的绝对 deadline 与超时后并发 slot 释放、prompt 注入文本隔离、选择型 JSON Contract、稳定 ID/父表校验、空选择有界复核、直接/间接相关性及无证据降级。Mock Secret 只存在测试进程内，不能在日志/响应泄露。
 
-样例使用合成元数据覆盖字段定位、字段解释、多个余额相关字段、主题域、未登记字段和相近但不同的命名；没有将贷款/银行词汇写成 DAP 全局硬编码规则。浏览器 E2E 模拟 `/api/ai/status` 和 `/api/ai/ask/progress` SSE，不直连真实模型。
+样例使用合成元数据覆盖字段定位、字段解释、多个余额相关字段、主题域、未登记字段和相近但不同的命名；没有将贷款/银行词汇写成 DAP 全局硬编码规则。浏览器 E2E 模拟 `/api/ai/status` 和 `/api/ai/ask/stream` SSE，不直连真实模型。
 
 ## 内网 DeepSeek 联调（待外部环境执行）
 
@@ -166,7 +210,9 @@ Phase 0 复核 PR #514 合入后的实现，确认根因是回答策略和证据
 - 回滚代码时先将 `AI_ASK_ENABLED=false` 并滚动重启，再部署上一个 DAP 版本；没有数据库回滚步骤。不要删除或更改现有 RAG 配置表/目录。
 - 不执行生产部署、数据库操作或自动合并。
 
-## 本地验证结果
+## 本地验证结果（历史记录 · Issue #513 当次 PR）
+
+> 以下数字与结论对应当时那次 PR 的本地运行，不是当前 `main` 的 CI 结果，也不代表外部服务已联调。当前状态的权威来源是 GitHub Actions 与 `main` 上的实际代码/测试。
 
 | 检查 | 结果 |
 |---|---|

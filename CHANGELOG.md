@@ -1,13 +1,13 @@
 # 更新日志 · Changelog
 
 本文档记录 Data Asset Portal 的重要变更。
-格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
+格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
 本文不是 Git 提交历史，而是基于仓库状态整理的阶段性变更摘要。
+条目按发布时间倒序排列；最新发布 tag 为 `v0.2.4`。
 
-## [0.1.1] - 2026-08-23
-
-正式发布的 v0.1.1 收口了 FastAPI Native 唯一运行时、Database Provider / SQLAlchemy Core / Alembic 数据层、MySQL 8 + PyMySQL acceptance、Metadata Ingestion Contract、open repository module contract，以及 permission-based RBAC（后端权限强制、角色管理和单角色用户绑定）。同时完成 backend configuration surface 收敛：`APP_*` 为主配置名，旧 `FLASK_*` 仅作兼容 fallback 名称。
+> **版本元数据说明**：`frontend/package.json` 的 `version` 当前仍为 `0.2.0`，因此页脚显示的
+> `V0.2.0` 是前端构建元数据，不等于最新 GitHub Release tag。两者的对齐属于独立事项，不在本文范围内。
 
 ## [Unreleased]
 
@@ -24,7 +24,119 @@
 ### 语义基础设施（Foundation）
 
 - 建立指标稳定资产/字段引用、最小聚合 contract 与 deterministic validation。
-- 既有指标只在唯一精确匹配时 backfill，保留原字符串快照；本变更不包含 LLM、Embedding、Vector DB 或语义推荐 API。
+- 既有指标只在唯一精确匹配时 backfill，保留原字符串快照。
+
+> 本条目描述的是**指标语义 contract 本身**，它不引入 Embedding 或向量存储。
+> 可选 RAG 相关资产推荐与单轮 AI 资产问答是独立的默认关闭能力，已分别随 `v0.2.4` 落地，
+> 见下方 `[0.2.4]` 与 [docs/ai-ask-mvp.md](./docs/ai-ask-mvp.md)、
+> [docs/semantic-recommendation-roadmap.md](./docs/semantic-recommendation-roadmap.md)。
+
+## [0.2.4] - 2026-11-06
+
+### 搜索与 AI（Added，默认关闭）
+
+- 搜索页新增默认关闭的单轮 AI 数据资产问答（#514），随后补充真实执行阶段进度（#516）、已验证的部分回答（#517）、基于权威元数据的表数统计（#521）、搜索与 AI 问答互斥结果 Tab（#522）、实时 SSE 与有界多查询 RAG 编排（#526）。
+- `GET /api/ai/status`、`POST /api/ai/ask`、`POST /api/ai/ask/progress`、`POST /api/ai/ask/stream` 共享同一服务与证据契约；`AI_ASK_ENABLED` 默认 `false`，配置不完整时 fail closed。
+- 前端 UI 使用 `/api/ai/ask/stream`；`/api/ai/ask` 与 `/api/ai/ask/progress` 作为兼容接口保留。SSE 只传真实阶段与完整最终结果，不逐 token 输出。
+- 新增 `VITE_API_MODE=mock` 专用 AI 演示适配器（#542），Remote 零回退，CI 校验 Remote Bundle 不含 Mock AI 语料。
+- 真实 RAG 服务与真实 LLM 端点联调、回答准确率验收仍为 **NOT VERIFIED**。
+
+### 部署与代理（Fixed）
+
+- 纳管 Linux 前端代理并修复 SSE 实时转发（#541）：代理不再按 `select()` 门控 `read1()`，SSE 事件不再被延迟；静态目录索引走与其他路径一致的 realpath 包含检查；上游 `Cache-Control` 在缓冲响应中透传。
+- 血缘统一使用 `ASSET_DB_PROFILE`，移除隐式 POC / Mock 回退（#539）：`LINEAGE_DB_PROFILE` 与 `LINEAGE_STORAGE_MODE` 被忽略，无 ACTIVE 快照时返回 `no_active_snapshot` 空状态。
+
+### 数据库与迁移（Fixed）
+
+- AI 问答隔离阻塞 JDBC 执行并移除 RAG 全量快照（#540）。
+- 默认管理 Schema 改为 `dap`，移除 PostgreSQL 隐式 `dwp` 回退（#531）。
+
+### 血缘与字段映射（Changed）
+
+- 血缘分析支持动态 Schema 资产导航树（#530）与 Schema 限定节点检索、精确候选选择（#535）。
+- 字段映射左侧改为可搜索源系统导航并联动查询（#529）。
+
+### 界面（Fixed）
+
+- 修复全站宽表格裁切，提供横向滚动（#537）。
+
+### 数据库契约（Changed）
+
+- 全站分页 Phase 1–3：指标与报表（#509）、API 资产 / 词根 / 码值表（#518）、系统管理用户 / 角色 / 菜单 / 字典明细（#519）接通数据库分页。
+
+## [0.2.3] - 2026-10-31
+
+### 数据边界（Fixed）
+
+- 将零售演示数据与通用 migration 隔离（#488），避免演示词汇进入通用 DDL / 迁移路径。
+
+### 数据可信性（Changed）
+
+- 统一数据可信性治理（#482）：资产详情、API 表单契约与 WebKit 焦点回归收口（#435）。
+- 严格校验 Remote 集合响应格式（#485），字段映射导出补全完整结果（#486），词根导入正确解析 CSV / TSV 引号与多行内容（#487）。
+- Remote 编辑器改用已配置的业务选项（#484）。
+
+### 元数据与血缘（Added）
+
+- 实现授权元数据读取与一致性快照契约（#474），见 [catalog-snapshot.md](./docs/catalog-snapshot.md)。
+- 指标维度目录改为数据驱动，修复银行 `CUS` / `EMP` / `DUE` / `CON` / `ORG` 维度被静默过滤（#473）。
+- 上游系统与下游推送接通数据库分页（#466）。
+- 新增共享表格分页适配器（#500）。
+
+### 文档（Added）
+
+- 固化 Windows 内网 npm 镜像安装、构建与部署回滚流程（#476），见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
+
+## [0.2.2] - 2026-10-02
+
+### 数据库（Added）
+
+- 补齐 GaussDB/DWS 阶梯式 schema migration（#316）：按 provider capability 逐级应用 forward head。
+- GaussDB/DWS fresh-init 兼容性修复：8.1.3 schema reflection（#307）、schema verify 元数据隔离（#306）、fresh-init 兼容缺口（#304）、不生成不支持的物理外键（#303）、补全 baseline 显式分布策略（#302）、按 `profile.schema` 安全执行 migration（#282）、`p_push_job.freq_desc` 扩至 `VARCHAR(1000)`（#317）。
+- GaussDB JDBC 按 Java 版本区分 profile（#294），见 [backend/README.md](./backend/README.md#gaussdbdws-jdbc-compatibility-by-java-version)。
+
+### 公共目录（Added）
+
+- 新增可配置 Public Catalog profile（#296）：`PUBLIC_CATALOG_PROFILE=internal|strict|disabled`，展示字段与可搜索字段使用同一策略。
+- 门户统计与统一搜索遵循当前数据库 Schema（#311）。
+- 打通资产探索最小闭环（#269）。
+
+### 资产身份（Changed）
+
+- 建立 Stable Field Identity 与字段增量同步（#263）、Metadata Ownership 与资产同步 Merge Policy（#266）、统一资产身份与详情精确寻址（#262）。
+- 保证整表删除后 stable identity 不被复用（#275）。
+- 修复字段映射身份键，支持同源表多目标映射（#301）。
+
+### 前端（Changed）
+
+- 协调升级 React 19 依赖栈（#273）。
+- 修复菜单在认证状态变化后不刷新的问题（#287）；优化 header 搜索与身份展示（#293）；稳定响应式全局 header（#312）。
+
+### 安全（Fixed）
+
+- 修复前端 `GHSA-mrhx-c7xc-m3w5` 安全公告（#448）。
+
+## [0.2.1] - 2026-09-05
+
+### 前端工程化（Changed）
+
+- 完成业务模块与 HTTP / API 契约层、常量与数据层、utils、Hooks / Auth / Capabilities / Routing、Common 与共享 UI 组件的 TypeScript 迁移（#229–#236），并完成 TypeScript strict hardening（#241）。
+- 修复前端测试递归发现问题，统一 capabilities HTTP 导入方式（#237）。
+
+### 运行时（Changed）
+
+- 后端端口统一为 `15099`，并同步 miniapp 项目设置。
+
+### 演示与认证（Fixed）
+
+- 统一 Community Demo 管理员口令为 `123456`（#285），并澄清 Demo 管理员与生产管理员的区别。
+- 修复认证数据源故障的可诊断错误契约（#238）。
+- 修复上游卸数新增系统保存失败（#235）并优化表单校验反馈（#234）。
+- 修复下游推送远程数据加载。
+
+### 安全（Fixed）
+
+- 收敛小程序可兼容传递依赖安全风险（#239），加固 miniapp 依赖安全（#244）。
 
 ## [0.2.0] - 2026-08-25
 
@@ -63,6 +175,10 @@
 - Fresh Community/local databases use `backend/schema` + Alembic + demo seed. For existing databases, verify the schema before applying the current head; this release does not provide a general database downgrade.
 - ESLint 10 is intentionally not included because upstream `eslint-plugin-react` peer compatibility does not yet cover ESLint 10.
 
+## [0.1.1] - 2026-08-23
+
+正式发布的 v0.1.1 收口了 FastAPI Native 唯一运行时、Database Provider / SQLAlchemy Core / Alembic 数据层、MySQL 8 + PyMySQL acceptance、Metadata Ingestion Contract、open repository module contract，以及 permission-based RBAC（后端权限强制、角色管理和单角色用户绑定）。同时完成 backend configuration surface 收敛：`APP_*` 为主配置名，旧 `FLASK_*` 仅作兼容 fallback 名称。
+
 ## [0.1.0]
 
 首个社区版本（Community Edition），聚焦"元数据可见、可查、可维护"。
@@ -73,9 +189,6 @@
 - **依赖安全策略**：`SECURITY.md`（漏洞私下报告流程）、`Dependabot`（npm / pip / GitHub Actions 每周更新）、npm audit 门禁（Critical / High = 0）。
 - **贡献模板**：Issue（bug / feature）与 Pull Request 模板（含敏感数据与 Community 边界自查项）。
 - **本地发布检查**：`python scripts/release_check.py fast|full`，一条命令复现 CI 关键检查。
-
-### 新增（Added）
-
 - **数据仓库**：DWM 表资产列表、详情、字段、DDL，支持新增 / 编辑 / 删除。
 - **字段映射**：字段视图、表视图、统计卡片、CSV 导出（以查询治理为主，无前端编辑入口）。
 - **词根管理**：列表、分类、新增 / 编辑 / 删除、批量导入（含预览）。

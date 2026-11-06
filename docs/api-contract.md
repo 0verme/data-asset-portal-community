@@ -359,7 +359,7 @@ Base Path: `/api/search`
 - 由于 dap-rag-lab #14 尚未形成最终 HTTP 契约，DAP 当前只实现了隔离的**合成、临时客户端契约**，并通过本地 MockTransport 测试，不代表已与 RAG 服务联通。临时调用形状为 `GET /healthz`、`GET /readyz` 与 Bearer 认证的 `POST /api/v1/search`，请求 `{ "query": "...", "topK": 5, "strategy": "auto" }`；预期成功响应为 `{ "status": "ok", "indexGeneration": "...", "results": [{ "entityType": "table|field", "assetId": "...", "fieldId": "...", "name": "...", "retrievalChannels": [], "score": 0.0, "evidence": [] }] }`。DAP 临时错误解析期待 `{ "error": { "code": "..." } }`，只映射已知的 `INDEX_NOT_READY`、`MODEL_MISMATCH`、`SEARCH_TIMEOUT`、`UNAUTHORIZED`、`INVALID_REQUEST`；内部错误映射为通用服务不可用，不回传远端正文。字段、错误码/封装与 readiness 语义必须在 #14 最终契约确定后重新对齐。
 - DAP 不信任远端名称、描述、URL、检索证据或分数。每个远端 `assetId` / `fieldId` 均按当前请求的公共目录重新回查，核验实体类型与父子关系，只从 DAP 权威公开投影生成展示字段；未知或陈旧 ID 会被拒绝。目录不可用时 fail closed。公开响应不含远端分数、索引代次或 LLM 文本。
 - DAP 推荐响应包含 `query`、`status`（`disabled` / `available` / `degraded` / `unavailable`）、`recommendations`、`count`、`elapsedMs` 和安全原因码 `reasonCode`。`available` 且 `count=0` 表示检索成功但没有命中；它与 `disabled`、`unavailable` 有明确区别。字段项返回 DAP 规范 `assetId`、`fieldId` 与同一 `assetId` 的 `relatedTable`；UI 以 canonical ID 打开既有资产详情。
-- RAG 接入仅使用基础后端 HTTPX 依赖；不增加 LanceDB、BGE、PyTorch 等依赖。超时、认证失败、服务不可用或目录验证失败只隐藏/降级推荐，不影响确定性搜索。RAG 不调用 LLM、不提供“智能解答”，也不写入或修改资产目录。
+- RAG 接入仅使用基础后端 HTTPX 依赖；不增加 LanceDB、BGE、PyTorch 等依赖。超时、认证失败、服务不可用或目录验证失败只隐藏/降级推荐，不影响确定性搜索。推荐接口不调用 LLM、不提供“智能解答”，也不写入或修改资产目录；单轮 AI 问答是另一个独立的默认关闭入口（`POST /api/ai/ask`、`/api/ai/ask/progress`、`/api/ai/ask/stream`，当前 UI 使用 `/api/ai/ask/stream`），其契约见 [单轮 AI 数据资产问答](./ai-ask-mvp.md)。
 
 ### 接口与查询参数
 

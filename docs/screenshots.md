@@ -67,5 +67,5 @@
 ## 说明
 
 - 所有数据均为**虚构零售演示数据**，不包含任何真实业务信息。
-- 截图来自 repository Community remote path；如果页面显示 `V0.2.0`，它表示 frontend application/build metadata，不是线上 static Demo 的 `V1.0.0`，也不改变 published GitHub Release `v0.2.0` 的语义。
-- 血缘分析页（POC）暂未纳入公开截图，等待 Demo 口径确认后补充；未出现在画廊不表示该 route 在所有 profile 都不可用。
+- 截图来自 repository Community remote path；如果页面显示 `V0.2.0`，它表示 frontend application/build metadata（`frontend/package.json` 当前为 `0.2.0`），不是线上 static Demo 的 `V1.0.0`，也不等于最新 GitHub Release tag（当前为 `v0.2.4`）。
+- 血缘分析页暂未纳入公开截图，因为 Remote 模式需要先发布 ACTIVE 血缘快照；未出现在画廊不表示该 route 在所有 profile 都不可用。
