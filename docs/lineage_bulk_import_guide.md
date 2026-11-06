@@ -36,8 +36,9 @@
 
 ## 首次运行
 
-先根据数据库类型执行血缘 DDL，并确保数据库配置中存在目标 profile。采集源表和血缘三表
-当前要求位于同一个 profile：
+先根据数据库类型核验血缘 DDL，并确保数据库配置中存在 `ASSET_DB_PROFILE` 对应的参数库。
+血缘 API 不支持独立的数据库 Profile；以下 CLI 的 `--profile` 只用于显式核对采集写入目标，
+必须与当前 `ASSET_DB_PROFILE` 一致。采集源表和血缘三表当前要求位于同一个 profile：
 
 ```bash
 python backend/scripts/collect_lineage_snapshot.py --profile <profile> --dry-run
@@ -45,11 +46,7 @@ python backend/scripts/collect_lineage_snapshot.py --profile <profile>
 ```
 
 `--dry-run` 只读取、解析和校验，不写数据库。成功发布会输出快照 ID、节点数、边数和诊断数。
-后端需设置：
-
-```bash
-LINEAGE_DB_PROFILE=<profile>
-```
+血缘页面自动读取 `ASSET_DB_PROFILE` 指向的参数库；`LINEAGE_DB_PROFILE`、`LINEAGE_STORAGE_MODE` 已不再参与运行时选择，请从现有部署变量中移除。没有 ACTIVE 快照时页面显示空状态，不会生成演示数据。
 
 ## 原子发布与失败回退
 

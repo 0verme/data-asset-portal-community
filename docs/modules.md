@@ -65,7 +65,7 @@
 
 **数据表**：`p_lineage_snapshot`、`p_lineage_node`、`p_lineage_edge`。
 
-**说明**：基于当前可用的血缘快照查询表或任务节点，可选择上游、下游或双向关系及 1～5 层深度；图中展示节点、关系、证据和置信度。Community remote Demo 默认使用 POC/in-memory 快照；配置 `LINEAGE_DB_PROFILE` 并准备对应 `p_lineage_*` 表后才进入 persistent 模式，mock 模式使用前端受控演示图。
+**说明**：基于当前可用的血缘快照查询表或任务节点，可选择上游、下游或双向关系及 1～5 层深度；图中展示节点、关系、证据和置信度。Remote 模式始终使用 `ASSET_DB_PROFILE` 指向的参数库持久化快照；没有 ACTIVE 快照时展示空状态，不回退演示图。前端显式 mock 开发模式仍可使用受控演示图。
 
 ## 5. 词根管理
 

@@ -4986,7 +4986,7 @@
         <ul>
           <li>&bull; 目录服务框聚合资产、指标、字段映射、词根、码值、报表、API 台账、上下游、搜索与门户统计。</li>
           <li>&bull; 系统管理、权限仓库和操作日志复用数据库访问能力；为保持主图简洁，支持性数据库调用不重复连线。</li>
-          <li>&bull; 血缘服务读取快照并遍历子图；持久化模式由 LINEAGE_DB_PROFILE 配置，受控 POC 仅限开发/测试条件。</li>
+          <li>&bull; 血缘服务从 ASSET_DB_PROFILE 指向的 DAP 参数库读取快照并遍历子图，没有独立的 lineage profile，也没有隐式 POC 回退。</li>
         </ul>
       </div>
 

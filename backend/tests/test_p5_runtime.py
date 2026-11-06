@@ -5,23 +5,62 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from backend.app.application import Identity, current_request_context
 from backend.app.core.capabilities import resolve_capabilities
+from backend.app.db.sqlite_adapter import connect
 from backend.app.fastapi_app import create_fastapi_app
+from backend.app.migrations.schema import initialize
 from fastapi.testclient import TestClient
 
 
 class NativeFastApiRuntimeTests(unittest.TestCase):
     def setUp(self):
+        # Lineage reads the DAP metadata DB, so the runtime needs an explicit,
+        # isolated profile instead of relying on an ambient environment.
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        root = Path(self.temp_dir.name)
+        database = root / "runtime.sqlite"
+        config_path = root / "database.yaml"
+        config_path.write_text(
+            "profiles:\n  runtime_lineage:\n    type: sqlite\n    database: "
+            + database.as_posix()
+            + "\n",
+            encoding="utf-8",
+        )
+        config = {"type": "sqlite", "database": str(database)}
+        connection = connect(config)
+        try:
+            initialize(connection, config, "sqlite")
+            connection.execute(
+                "INSERT INTO dwp.p_lineage_snapshot "
+                "(snapshot_id, generated_at, generator_name, generator_version, "
+                "import_batch_id, status_code) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    "runtime-active",
+                    "2026-10-01T00:00:00",
+                    "runtime-test",
+                    "1",
+                    "runtime-import",
+                    "ACTIVE",
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
         self.environment = patch.dict(
             os.environ,
             {
                 "APP_ENV": "development",
                 "APP_SECRET_KEY": "test-native-runtime",
-                "LINEAGE_DB_PROFILE": "",
+                "ASSET_DB_CONFIG_PATH": str(config_path),
+                "ASSET_DB_PROFILE": "runtime_lineage",
             },
             clear=False,
         )

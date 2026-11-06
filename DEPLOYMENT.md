@@ -304,7 +304,7 @@ Community Demo 初始化过程中会自动创建演示管理员：
 - 不应作为生产环境凭据
 - 正式部署请使用 `backend/scripts/create_admin.py` 交互创建管理员；生产 bootstrap 不提供默认密码
 
-如果启用了 persistent lineage，先设置 `LINEAGE_DB_PROFILE`，再按 [`血缘快照采集与发布指南`](./docs/lineage_bulk_import_guide.md) 执行 `collect_lineage_snapshot.py --dry-run` 和正式发布；采集失败应保留原 ACTIVE 快照。
+血缘 API 与其他 DAP 元数据模块使用同一个 `ASSET_DB_PROFILE`，不需要单独设置 `LINEAGE_DB_PROFILE` 或 `LINEAGE_STORAGE_MODE`。先确认该参数库的血缘三表和有效快照；如需首次采集，请按 [`血缘快照采集与发布指南`](./docs/lineage_bulk_import_guide.md) 使用同一个 Profile 执行 `collect_lineage_snapshot.py --dry-run`，确认后再单独授权正式发布。无 ACTIVE 快照会显示空状态，采集失败应保留原 ACTIVE 快照。
 
 ### 5.2 Existing database
 
