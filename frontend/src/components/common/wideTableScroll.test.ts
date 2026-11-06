@@ -70,12 +70,13 @@ test("table overflow is scoped to the reusable table viewport, not globally over
   assert.match(styles, /\.fm-sticky-horizontal-scrollbar,\s*\.wide-table-sticky-scrollbar\s*\{[^}]*position:\s*fixed/);
 });
 
-test("menu navigation position precedes actions and the action cell is the final table column", () => {
+test("menu navigation position precedes actions and the action cell stays in the same row", () => {
   const navHeading = menuSource.indexOf(">导航位置</th>");
   const actionHeading = menuSource.indexOf(">操作</th>");
   assert.ok(navHeading >= 0 && actionHeading > navHeading);
   assert.match(menuSource, /className="mobile-card-actions menu-actions-cell"/);
-  assert.match(systemStyles, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+300px/);
-  assert.match(systemStyles, /menu-management-table \.menu-actions-head,[\s\S]*?menu-management-table \.menu-actions-cell\s*\{\s*display:\s*none/);
+  assert.match(systemStyles, /menu-management-table th\.menu-actions-head,[\s\S]*?menu-management-table td\.menu-actions-cell\s*\{[\s\S]*?position:\s*sticky/);
+  assert.match(systemStyles, /menu-management-table th\.menu-actions-head\s*\{[\s\S]*?z-index:\s*2/);
+  assert.doesNotMatch(systemStyles, /menu-management-table tbody tr\s*\{[^}]*height:\s*62px/);
   assert.doesNotMatch(systemStyles, /\.param-dict-table (?:th|td)\.param-col-actions\s*\{[^}]*position:\s*sticky/);
 });

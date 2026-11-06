@@ -695,6 +695,13 @@ jobs:
           VITE_API_MODE: remote
         run: npm run test:browser -- e2e/admin-form-errors.spec.ts --workers=2
 
+      - name: Menu management operation column regression (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/menu-management-columns-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/menu-management-columns.spec.ts e2e/wide-table-scroll.spec.ts --workers=2
+
       - name: Manual code table form feedback browser regression (Chromium and WebKit)
         if: matrix.lane == 'b'
         env:

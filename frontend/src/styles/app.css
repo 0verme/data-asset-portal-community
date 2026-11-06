@@ -804,7 +804,7 @@
   table.dt.root-wide-table { min-width: 1040px; }
   table.dt.manual-code-wide-table { min-width: 1320px; }
   table.dt.api-assets-wide-table { min-width: 1260px; }
-  table.dt.menu-management-table { table-layout: fixed; min-width: 1260px; }
+  table.dt.menu-management-table { table-layout: fixed; min-width: 1400px; }
   .operation-log-wide-table { min-width: 1780px; }
   table.dt thead th {
     text-align: left; font-size: 11.5px; font-weight: 600; letter-spacing: 0.4px; color: var(--ink-3); text-transform: uppercase;

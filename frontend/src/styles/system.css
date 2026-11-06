@@ -170,55 +170,30 @@
   .system-users-table { min-width: 1420px; }
   .system-roles-table { min-width: 1200px; }
 
+  /* 长名称/长路由在固定列宽内换行，行高由内容决定；操作列随同一行同步伸缩。 */
+  .menu-management-table .menu-name-cell,
+  .menu-management-table .menu-path-cell { overflow-wrap: anywhere; }
+
   @media (min-width: 769px) {
-    .menu-management-table-shell {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 300px;
-      align-items: stretch;
-      min-width: 0;
-    }
-
-    .menu-management-table thead tr { height: 42px; }
-    .menu-management-table tbody tr { height: 62px; }
-    .menu-management-table .menu-actions-head,
-    .menu-management-table .menu-actions-cell { display: none; }
-
-    .menu-actions-fixed {
-      min-width: 0;
-      border-left: 1px solid var(--line);
+    /* 操作列与数据行同属一个表格行：行高随长名称/长路由自适应，操作按钮不会与菜单错位。
+       sticky 只负责横向滚动时保持操作列可见，不参与行高计算。 */
+    .menu-management-table th.menu-actions-head,
+    .menu-management-table td.menu-actions-cell {
+      position: sticky;
+      right: 0;
+      z-index: 1;
       background: var(--surface);
+      box-shadow: -1px 0 0 var(--line);
     }
 
-    .menu-actions-fixed-header {
-      box-sizing: border-box;
-      display: flex;
-      height: 42px;
-      align-items: center;
-      padding: 12px 18px;
-      border-bottom: 1px solid var(--line);
+    .menu-management-table th.menu-actions-head {
+      z-index: 2;
       background: var(--surface-2);
-      color: var(--ink-2);
-      font-size: 13px;
-      font-weight: 500;
-      text-align: right;
     }
 
-    .menu-actions-fixed-header [role="columnheader"] { width: 100%; }
-
-    .menu-actions-fixed-row {
-      box-sizing: border-box;
-      display: flex;
-      height: 62px;
-      align-items: center;
-      justify-content: flex-end;
-      padding: 13px 12px;
-      border-bottom: 1px solid var(--line-2);
+    .system-page .menu-management-table tbody tr:hover td.menu-actions-cell {
+      background: var(--surface-2);
     }
-
-    .menu-actions-fixed-row:last-child { border-bottom: 0; }
-    .menu-actions-fixed-row [role="cell"] { width: 100%; min-width: 0; }
-    .menu-actions-fixed-row .row-actions { width: 100%; gap: 6px; }
-    .menu-actions-fixed-row .row-actions .btn { padding: 0 8px; gap: 5px; font-size: 12.5px; }
   }
 
   .param-dict-table {
@@ -240,8 +215,6 @@
   }
 
   @media (max-width: 768px) {
-    .menu-management-table-shell { display: block; }
-    .menu-actions-fixed { display: none; }
     .system-page table.mobile-card-table.system-users-table,
     .system-page table.mobile-card-table.system-roles-table,
     .system-page table.mobile-card-table.param-dict-table {
