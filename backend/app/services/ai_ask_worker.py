@@ -7,8 +7,10 @@ import multiprocessing
 import os
 import queue
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
+from ..contracts.ai_ask import AiAskProgressStep, AiAskRequest, AiAskResponse
 from ..settings import (
     get_ai_ask_db_timeout_seconds,
     get_ai_ask_worker_timeout_seconds,
@@ -17,6 +19,12 @@ from .ai_ask_service import AIAskCancelled
 
 LOGGER = logging.getLogger(__name__)
 _EVENT_QUEUE_SIZE = 128
+# A child that already exited can still have queue records readable here: the
+# queue is handed to the OS through a feeder thread, and the child flushes it
+# during normal interpreter shutdown. Records are therefore drained before an
+# exit is turned into a failure answer.
+EXIT_DRAIN_BUDGET_SECONDS = 1.0
+EXIT_GRACE_SECONDS = 1.0
 
 
 def _queue_put(output_queue, message, *, required: bool = False) -> bool:
@@ -58,7 +66,6 @@ def _ai_ask_process_entry(
         _queue_put(output_queue, message)
 
     try:
-        from ..contracts.ai_ask import AiAskRequest, AiAskResponse
         from .ai_ask_service import ai_ask_service
 
         request = AiAskRequest.model_validate(payload)
@@ -75,8 +82,6 @@ def _ai_ask_process_entry(
                 cancel_event=cancel_event,
             )
         elif mode == "progress":
-            from ..contracts.ai_ask import AiAskProgressStep
-
             def report_progress(step: AiAskProgressStep) -> None:
                 emit(("progress", step.model_dump(by_alias=True, exclude_none=True)))
 
@@ -181,6 +186,34 @@ class AIAskProcessWorker:
             return self._output_queue.get(timeout=max(0.0, timeout))
         except queue.Empty:
             return None
+        except (EOFError, OSError, ValueError):
+            # A child killed mid-write closes the pipe / the queue is closed
+            # after teardown; both mean "no further message" here.
+            return None
+
+    def drain_messages(
+        self,
+        *,
+        timeout: float = 0.05,
+        budget_seconds: float = EXIT_DRAIN_BUDGET_SECONDS,
+    ) -> list:
+        """Read records the child already queued, bounded by ``budget_seconds``.
+
+        Used before process exit is treated as a failure so a completed child
+        that queued ``result``/``__end__`` still yields its real answer.
+        """
+        drained: list = []
+        deadline = time.monotonic() + max(0.0, budget_seconds)
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return drained
+            message = self.get_message(min(timeout, remaining))
+            if message is None:
+                return drained
+            drained.append(message)
+            if message[0] == "__end__":
+                return drained
 
     def is_alive(self) -> bool:
         return self._started and self.process.is_alive()
@@ -193,7 +226,12 @@ class AIAskProcessWorker:
         )
 
     def cancel_and_stop(self, *, grace_seconds: float = 0.25) -> bool:
-        """Signal cooperative cancellation, then terminate/kill and reap the child."""
+        """Signal cooperative cancellation, then terminate/kill and reap the child.
+
+        Bounded and idempotent: the worst case is ``grace_seconds`` + 0.5s
+        terminate + 1.0s kill, so repeated cancellation or cleanup never waits
+        forever.
+        """
         self.cancel_event.set()
         if not self._started:
             self.close()

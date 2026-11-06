@@ -41,6 +41,8 @@
 - [ ] 等待配置的 JDBC socket timeout；若驱动仍未返回，确认父进程在数据库阶段硬期限内终止并回收**隔离 AI worker 进程**，而不是仅记录一个 Python Future/线程超时。
 - [ ] 用进程清单确认该 worker PID 已退出；确认 SSE 有 `retrieval_unavailable` / `retrieval_timeout` 或与实际失败阶段相符的明确终态，未输出未验证 RAG 内容。
 - [ ] 取消进行中的问答并重复提交；确认断开连接会触发 worker 停止/回收，不会持续累积 worker 进程或 `ai-ask-rag` 线程。
+- [ ] 连续取消不少于 5 次 `/api/ai/ask/stream`（每次都在首个事件后断开），随后提交一次正常问答；确认它仍被正常准入而不是 `llm_busy`，且进程清单里没有残留 worker。该步骤直接验证“断连不泄漏准入容量”。
+- [ ] 观察一次子进程正常完成前后的日志与进程清单：确认即使子进程先退出，只要它已写入结果记录，请求仍返回真实结果，不会变成 `llm_unavailable`。
 
 ## 5. 并发、过载与普通 API 可用性
 

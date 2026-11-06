@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import collections
 import json
 import logging
 import threading
@@ -19,7 +20,15 @@ from ...contracts.ai_ask import AiAskAvailability, AiAskRequest, AiAskResponse
 from ...services.ai_ask_admission import AIAskAdmissionLease, ai_ask_admission
 from ...services.ai_ask_service import AIAskCancelled, AIAskService
 from ...services.ai_ask_execution_service import AIAskExecutionService
-from ...services.ai_ask_worker import AIAskProcessWorker
+from ...services.ai_ask_request_guard import (
+    AIAskRequestGuard,
+    defer_release_until,
+)
+from ...services.ai_ask_worker import (
+    AIAskProcessWorker,
+    EXIT_DRAIN_BUDGET_SECONDS,
+    EXIT_GRACE_SECONDS,
+)
 from ..dependencies import (
     get_authorization_service,
     get_request_context,
@@ -135,6 +144,23 @@ def _slow_database_step(active: dict[str, float], timeout_seconds: int) -> str |
     return min(timed_out, key=lambda item: item[1])[0] if timed_out else None
 
 
+async def _recover_exited_worker_messages(worker: Any, pending: collections.deque) -> bool:
+    """Buffer records that an already-exited child still has queued.
+
+    ``is_alive() == False`` is not proof of failure: the child may have queued
+    its ``result`` and ``__end__`` records just before exiting. Recovering them
+    keeps a completed request from being answered with ``llm_unavailable``.
+    """
+    leftover = await asyncio.to_thread(
+        worker.drain_messages,
+        budget_seconds=EXIT_DRAIN_BUDGET_SECONDS,
+    )
+    if not leftover:
+        return False
+    pending.extend(leftover)
+    return True
+
+
 def _register_ai_ask_routes(
     app: FastAPI,
     ai_ask_service: AIAskService | Any,
@@ -174,10 +200,11 @@ def _register_ai_ask_routes(
             if lease is None:
                 yield _sse_message("result", _busy_response().model_dump(by_alias=True))
                 return
+            guard = AIAskRequestGuard(lease)
             worker: AIAskProcessWorker | None = None
             local_worker: asyncio.Task | None = None
+            pending: collections.deque = collections.deque()
             response: AiAskResponse | None = None
-            lease_can_release = True
 
             def enqueue(event: str, data: dict[str, Any] | None) -> None:
                 if loop.is_closed():
@@ -220,6 +247,7 @@ def _register_ai_ask_routes(
                         payload=payload.model_dump(by_alias=True),
                         profile=profile,
                     )
+                    guard.attach_worker(worker)
                     try:
                         await asyncio.to_thread(worker.start)
                     except Exception:
@@ -235,14 +263,18 @@ def _register_ai_ask_routes(
                 dead_since: float | None = None
                 while True:
                     if await request.is_disconnected():
+                        # Teardown happens in the finalizer thread so an
+                        # already-cancelled scope cannot skip worker reaping
+                        # or the admission release.
                         cancel_event.set()
-                        if worker is not None:
-                            worker.cancel_event.set()
                         return
                     if not queue.empty():
                         event, data = queue.get_nowait()
                     elif worker is not None:
-                        message = await asyncio.to_thread(worker.get_message, 0.1)
+                        if pending:
+                            message = pending.popleft()
+                        else:
+                            message = await asyncio.to_thread(worker.get_message, 0.1)
                         if message is None:
                             if worker.has_timed_out():
                                 elapsed_ms = worker.timeout_seconds * 1000
@@ -262,15 +294,23 @@ def _register_ai_ask_routes(
                                     elapsed_ms=elapsed_ms,
                                 )
                                 if await asyncio.to_thread(worker.cancel_and_stop):
+                                    guard.detach_worker()
                                     worker = None
                                 yield _sse_message("result", response.model_dump(by_alias=True))
                                 break
                             if not worker.is_alive():
+                                if await _recover_exited_worker_messages(worker, pending):
+                                    dead_since = None
+                                    continue
                                 if dead_since is None:
                                     dead_since = time.monotonic()
-                                elif time.monotonic() - dead_since > 0.5:
+                                elif time.monotonic() - dead_since > EXIT_GRACE_SECONDS:
+                                    LOGGER.warning(
+                                        "AI ask progress worker exited without a terminal message"
+                                    )
                                     yield _sse_message("result", _generic_failure_response().model_dump(by_alias=True))
                                     break
+                                continue
                             if active_step is not None and time.monotonic() - last_heartbeat >= 1.0:
                                 heartbeat = dict(active_step)
                                 heartbeat["elapsedMs"] = max(
@@ -287,6 +327,7 @@ def _register_ai_ask_routes(
                             event, data = "result", response.model_dump(by_alias=True)
                         elif kind == "__end__":
                             if await asyncio.to_thread(worker.join_after_completion):
+                                guard.detach_worker()
                                 worker = None
                             break
                         elif kind == "cancelled":
@@ -324,20 +365,13 @@ def _register_ai_ask_routes(
                     yield _sse_message(event, data)
             finally:
                 cancel_event.set()
-                if worker is not None:
-                    stopped = await asyncio.to_thread(worker.cancel_and_stop)
-                    if not stopped:
-                        LOGGER.error("AI ask progress worker could not be reaped; admission slot retained")
-                    lease_can_release = lease_can_release and stopped
                 if local_worker is not None and not local_worker.done():
-                    try:
-                        await asyncio.shield(local_worker)
-                    except asyncio.CancelledError:
-                        # Keep the lease until the injected worker actually exits.
-                        local_worker.add_done_callback(lambda _task: lease.release())
-                        lease_can_release = False
-                if lease_can_release:
-                    lease.release()
+                    # An injected in-process worker cannot be killed: the lease
+                    # is released only once it really exits.
+                    defer_release_until(guard, local_worker)
+                else:
+                    # Bounded, idempotent, and independent of this cancelled scope.
+                    guard.begin_cleanup()
 
         return StreamingResponse(
             event_stream(),
@@ -384,9 +418,10 @@ def _register_ai_ask_routes(
                     "data": {"status": "failed", "stepCount": 0, "reasonCode": "llm_busy"},
                 })
                 return
+            guard = AIAskRequestGuard(lease)
             worker: AIAskProcessWorker | None = None
             local_worker: asyncio.Task | None = None
-            lease_can_release = True
+            pending: collections.deque = collections.deque()
             result_response: AiAskResponse | None = None
             cancelled = False
 
@@ -521,6 +556,7 @@ def _register_ai_ask_routes(
                         profile=profile,
                         request_id=request_id,
                     )
+                    guard.attach_worker(worker)
                     try:
                         await asyncio.to_thread(worker.start)
                     except Exception:
@@ -553,14 +589,18 @@ def _register_ai_ask_routes(
                 dead_since: float | None = None
                 while True:
                     if await request.is_disconnected():
+                        # Teardown happens in the finalizer thread so an
+                        # already-cancelled scope cannot skip worker reaping
+                        # or the admission release.
                         cancel_event.set()
-                        if worker is not None:
-                            worker.cancel_event.set()
                         return
                     if not queue.empty():
                         event, data = queue.get_nowait()
                     elif worker is not None and not process_terminal:
-                        message = await asyncio.to_thread(worker.get_message, 0.1)
+                        if pending:
+                            message = pending.popleft()
+                        else:
+                            message = await asyncio.to_thread(worker.get_message, 0.1)
                         if message is None:
                             stage = _slow_database_step(
                                 active_database_steps,
@@ -587,6 +627,7 @@ def _register_ai_ask_routes(
                                 )
                                 process_terminal = True
                                 if await asyncio.to_thread(worker.cancel_and_stop):
+                                    guard.detach_worker()
                                     worker = None
                                 timestamp = datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
                                 if not answer_emitted:
@@ -612,9 +653,15 @@ def _register_ai_ask_routes(
                                 enqueue("__end__", None)
                                 continue
                             if not worker.is_alive():
+                                if await _recover_exited_worker_messages(worker, pending):
+                                    dead_since = None
+                                    continue
                                 if dead_since is None:
                                     dead_since = time.monotonic()
-                                elif time.monotonic() - dead_since > 0.5:
+                                elif time.monotonic() - dead_since > EXIT_GRACE_SECONDS:
+                                    LOGGER.warning(
+                                        "AI ask stream worker exited without a terminal message"
+                                    )
                                     result_response = _generic_failure_response()
                                     process_terminal = True
                                     if not answer_emitted:
@@ -666,6 +713,7 @@ def _register_ai_ask_routes(
                         if kind == "__end__":
                             process_terminal = True
                             if await asyncio.to_thread(worker.join_after_completion):
+                                guard.detach_worker()
                                 worker = None
                             if result_response is not None:
                                 if not answer_emitted:
@@ -727,20 +775,13 @@ def _register_ai_ask_routes(
                         yield _sse_message(event, data)
             finally:
                 cancel_event.set()
-                if worker is not None:
-                    worker.cancel_event.set()
-                    stopped = await asyncio.to_thread(worker.cancel_and_stop)
-                    if not stopped:
-                        LOGGER.error("AI ask stream worker could not be reaped; admission slot retained")
-                    lease_can_release = lease_can_release and stopped
                 if local_worker is not None and not local_worker.done():
-                    try:
-                        await asyncio.shield(local_worker)
-                    except asyncio.CancelledError:
-                        local_worker.add_done_callback(lambda _task: lease.release())
-                        lease_can_release = False
-                if lease_can_release:
-                    lease.release()
+                    # An injected in-process worker cannot be killed: the lease
+                    # is released only once it really exits.
+                    defer_release_until(guard, local_worker)
+                else:
+                    # Bounded, idempotent, and independent of this cancelled scope.
+                    guard.begin_cleanup()
 
         return StreamingResponse(
             event_stream(),
@@ -761,7 +802,8 @@ def _register_ai_ask_routes(
         lease = ai_ask_admission.acquire()
         if lease is None:
             return _busy_response()
-        worker: AIAskProcessWorker | None = None
+        guard = AIAskRequestGuard(lease)
+        pending: collections.deque = collections.deque()
         try:
             if isolate_execution:
                 worker = AIAskProcessWorker(
@@ -769,12 +811,14 @@ def _register_ai_ask_routes(
                     payload=payload.model_dump(by_alias=True),
                     profile=profile,
                 )
+                guard.attach_worker(worker)
                 worker.start()
                 started = time.monotonic()
                 active_stage: str | None = None
                 result: AiAskResponse | None = None
+                dead_since: float | None = None
                 while True:
-                    message = worker.get_message(0.1)
+                    message = pending.popleft() if pending else worker.get_message(0.1)
                     if message is not None:
                         if message[0] == "progress":
                             progress = message[1]
@@ -792,10 +836,11 @@ def _register_ai_ask_routes(
                         elif message[0] == "result":
                             result = AiAskResponse.model_validate(message[1])
                         elif message[0] == "__end__":
-                            stopped = worker.join_after_completion()
-                            if stopped:
-                                worker = None
+                            if worker.join_after_completion():
+                                guard.detach_worker()
                             return result or _generic_failure_response()
+                        dead_since = None
+                        continue
                     if worker.has_timed_out():
                         elapsed_ms = (time.monotonic() - started) * 1000
                         LOGGER.warning(
@@ -803,32 +848,42 @@ def _register_ai_ask_routes(
                             active_stage or "unknown",
                             elapsed_ms,
                         )
-                        stopped = worker.cancel_and_stop()
-                        if stopped:
-                            worker = None
+                        if worker.cancel_and_stop():
+                            guard.detach_worker()
                         return _timeout_response(
                             payload.query,
                             stage=active_stage,
                             elapsed_ms=elapsed_ms,
                         )
-                    if not worker.is_alive():
+                    if worker.is_alive():
+                        dead_since = None
+                        continue
+                    # The child exited, but ``is_alive() == False`` does not
+                    # prove failure: its ``result``/``__end__`` records may
+                    # still be readable. Recover them before deciding.
+                    leftover = worker.drain_messages(
+                        budget_seconds=EXIT_DRAIN_BUDGET_SECONDS
+                    )
+                    if leftover:
+                        pending.extend(leftover)
+                        dead_since = None
+                        continue
+                    if dead_since is None:
+                        dead_since = time.monotonic()
+                        continue
+                    if time.monotonic() - dead_since >= EXIT_GRACE_SECONDS:
+                        LOGGER.warning(
+                            "AI ask JSON worker exited without a terminal message"
+                        )
                         return result or _generic_failure_response()
             return ai_ask_service.ask(payload, profile=profile)
         except Exception:
             LOGGER.warning("AI ask failed without provider details")
             return _generic_failure_response()
         finally:
-            if worker is not None:
-                if worker.is_alive():
-                    stopped = worker.cancel_and_stop()
-                    if stopped:
-                        lease.release()
-                    else:
-                        LOGGER.error("AI ask JSON worker could not be reaped; admission slot retained")
-                else:
-                    worker.cancel_and_stop()
-                    lease.release()
-            else:
-                lease.release()
+            # This is a sync endpoint running in a worker thread, so a bounded
+            # synchronous teardown is safe and guarantees the child is reaped
+            # and the admission slot is free before the response is returned.
+            guard.close()
 
     app.include_router(router)
