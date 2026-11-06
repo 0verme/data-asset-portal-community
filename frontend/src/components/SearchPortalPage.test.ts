@@ -230,6 +230,27 @@ test("AI progress displays real SSE execution, search evidence, authoritative ve
   assert.match(styles, /\.sp-ai-execution-step-failed[\s\S]*?var\(--danger\)/);
 });
 
+test("AI execution panel never reports an unreported request count as zero requests", async () => {
+  const [panel, source] = await Promise.all([
+    readFile(executionPanelPath, "utf8"),
+    readFile(searchPagePath, "utf8"),
+  ]);
+
+  // 请求次数必须走统一口径，未知不得冒充 0 次。
+  assert.match(panel, /from "\.\.\/api\/aiAskExecutionSummary\.ts"/);
+  assert.match(panel, /httpRequestCountLabel\(data\)/);
+  assert.match(panel, /searchRequestNote\(data\)/);
+  assert.doesNotMatch(panel, /requestCount \?\? 0/);
+
+  // 未收到后端 done 时不得直接断言后端检索失败。
+  assert.match(panel, /receivedTerminalEvent\(events\)/);
+  assert.match(panel, /不能据此判断后端检索失败/);
+
+  // 前端契约解析失败与后端失败必须可区分。
+  assert.match(source, /AiAskExecutionContractError/);
+  assert.match(source, /不代表后端检索失败/);
+});
+
 test("RAG recommendations are a separate business group with asynchronous non-blocking state", async () => {
   const source = await readFile(searchPagePath, "utf8");
   const api = await readFile(fileURLToPath(new URL("../api/search.ts", import.meta.url)), "utf8");
