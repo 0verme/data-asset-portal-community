@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import threading
 import unittest
+from copy import deepcopy
 
 from backend.app.contracts.ai_ask import AiAskRequest
 from backend.app.contracts.rag_search import (
@@ -141,6 +142,7 @@ class StubRagService:
 class StubAssetsService:
     def __init__(self, *, missing_field=False, fail_ids=(), count_error=False):
         self.calls = []
+        self.batch_calls = []
         self.count_calls = []
         self.fail_ids = set(fail_ids)
         self.count_error = count_error
@@ -181,6 +183,24 @@ class StubAssetsService:
         if asset_id in self.fail_ids or asset_id not in self.details:
             raise RuntimeError("private data source error")
         return self.details[asset_id]
+
+    def get_rag_candidate_catalog(self, asset_ids, field_ids_by_asset=None):
+        self.batch_calls.append((list(asset_ids), {
+            asset_id: set(field_ids)
+            for asset_id, field_ids in (field_ids_by_asset or {}).items()
+        }))
+        result = []
+        for asset_id in asset_ids:
+            if asset_id in self.fail_ids or asset_id not in self.details:
+                continue
+            detail = deepcopy(self.details[asset_id])
+            allowed_fields = set((field_ids_by_asset or {}).get(asset_id, set()))
+            detail["fields"] = [
+                field for field in detail.get("fields", [])
+                if field.get("fieldId") in allowed_fields
+            ]
+            result.append(detail)
+        return result
 
     def get_asset_count_filter_catalog(self):
         return {
@@ -232,7 +252,7 @@ class AIAskExecutionServiceTests(unittest.TestCase):
         self.assertNotIn("INDEX_FIELD_11", response.answer)
         self.assertEqual(3, len(rag.calls))
         self.assertEqual(3, len({call[3] for call in rag.calls}))
-        self.assertEqual([7, 8], assets.calls)
+        self.assertEqual([([7, 8], {7: {11}})], assets.batch_calls)
         self.assertEqual(2, len(llm.calls))  # one structured plan + one answer selection
         answer_payload = llm.calls[-1][1]
         self.assertEqual("AUTHORITATIVE_FIELD_11", answer_payload["candidates"][0]["fieldName"])
@@ -242,6 +262,13 @@ class AIAskExecutionServiceTests(unittest.TestCase):
         self.assertEqual(3, len(planning["data"]["queries"]))
         search_starts = [data for event, data in events if event == "step_start" and data["step_id"].startswith("search-")]
         self.assertEqual(3, len(search_starts))
+        asset_starts = [
+            data for event, data in events
+            if event == "step_start" and data["step_id"].startswith("asset-")
+        ]
+        self.assertEqual(2, len(asset_starts))
+        self.assertTrue(all(item["data"]["phase"] == "database" for item in asset_starts))
+        self.assertTrue(all(item["data"]["databaseCallCount"] == 2 for item in asset_starts))
         self.assertEqual(3, len({item["data"]["searchId"] for item in search_starts}))
         search_completes = [data for event, data in events if event == "step_complete" and data["step_id"].startswith("search-")]
         self.assertTrue(all(item["data"]["effectiveMode"] == "hybrid" for item in search_completes))
@@ -577,7 +604,7 @@ class AIAskExecutionServiceTests(unittest.TestCase):
         self.assertEqual(1, len(outcome))
         self.assertIsInstance(outcome[0], AIAskCancelled)
         self.assertEqual(1, len(llm.calls))  # planner only; no answer generation
-        self.assertEqual([], assets.calls)
+        self.assertEqual([], assets.batch_calls)
         self.assertFalse(any(event == "answer" for event, _data in events))
 
     def test_search_count_and_planning_query_count_are_bounded(self):

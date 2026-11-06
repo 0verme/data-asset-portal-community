@@ -42,7 +42,7 @@ LOGGER = logging.getLogger(__name__)
 
 _MAX_INITIAL_QUERIES = 3
 _MAX_TOTAL_SEARCHES = 4
-_MAX_PARALLEL_SEARCHES = 3
+_MAX_PARALLEL_SEARCHES = 2
 _MAX_DETAIL_TABLES = 5
 _QUERY_ROUND_TIMEOUT_SECONDS = 12.0
 _OVERALL_TIMEOUT_SECONDS = 105.0
@@ -102,6 +102,9 @@ class _ExecutionEvents:
         self.request_id = request_id
         self.callback = callback
         self.step_count = 0
+        self.started_at = time.monotonic()
+        self._stage_started: dict[str, float] = {}
+        self._lock = threading.Lock()
 
     @staticmethod
     def timestamp() -> str:
@@ -115,6 +118,29 @@ class _ExecutionEvents:
         data: dict[str, Any] | None = None,
     ) -> None:
         self.step_count += 1
+        now = time.monotonic()
+        if event == "step_start":
+            with self._lock:
+                self._stage_started[step_id] = now
+        elif event in {"step_complete", "step_error"}:
+            with self._lock:
+                stage_started = self._stage_started.pop(step_id, now)
+            LOGGER.info(
+                "AI ask stage request_id=%s stage=%s outcome=%s elapsed_ms=%.2f",
+                self.request_id,
+                step_id,
+                "failed" if event == "step_error" else "complete",
+                max(0.0, (now - stage_started) * 1000),
+            )
+        elif event == "answer":
+            response = data.get("response") if isinstance(data, dict) else None
+            status = response.get("status") if isinstance(response, dict) else "unknown"
+            LOGGER.info(
+                "AI ask complete request_id=%s status=%s elapsed_ms=%.2f",
+                self.request_id,
+                status,
+                max(0.0, (now - self.started_at) * 1000),
+            )
         if self.callback is None:
             return
         payload: dict[str, Any] = {
@@ -333,6 +359,21 @@ class AIAskExecutionService(AIAskService):
 
         def report_for(search_id: str):
             def callback(event: str, data: dict[str, Any]) -> None:
+                if event == "catalog_start":
+                    events.start(
+                        f"catalog-{search_id}",
+                        "正在按资产与字段 ID 批量核验当前 DAP 目录。",
+                        {**data, "round": round_number, "phase": "database"},
+                    )
+                    return
+                if event in {"catalog_complete", "catalog_error"}:
+                    method = events.error if event == "catalog_error" else events.complete
+                    method(
+                        f"catalog-{search_id}",
+                        "DAP 目录候选核验失败。" if event == "catalog_error" else "DAP 目录候选核验完成。",
+                        {**data, "round": round_number, "phase": "database"},
+                    )
+                    return
                 if event == "start":
                     with lock:
                         started_searches.add(search_id)
@@ -513,7 +554,12 @@ class AIAskExecutionService(AIAskService):
             if pending:
                 for signal in child_signals.values():
                     signal.set()
-            executor.shutdown(wait=False, cancel_futures=True)
+            # A timed-out/cancelled search must finish its cooperative cleanup
+            # before this request releases its admission slot. In production,
+            # the enclosing AI worker process is also hard-terminated if a JDBC
+            # driver ignores cancellation, so these threads cannot leak across
+            # requests or accumulate without bound.
+            executor.shutdown(wait=True, cancel_futures=True)
 
         ordered: list[tuple[str, RagRecommendationsResponse, dict[str, Any] | None]] = []
         for _future, (query, search_id) in future_info.items():
@@ -614,56 +660,106 @@ class AIAskExecutionService(AIAskService):
             for item in merged
             if item["recommendation"].asset_id in table_ids
         }
-        details_by_id: dict[int, dict[str, Any]] = {}
+        field_ids_by_asset: dict[int, set[int]] = {}
+        for (asset_id, field_id), _item in source_items.items():
+            if field_id is not None:
+                field_ids_by_asset.setdefault(asset_id, set()).add(field_id)
+        hint_names: dict[int, str] = {}
         for asset_id in table_ids:
-            if cancel_signal._caller is not None and cancel_signal._caller.is_set():
-                raise AIAskCancelled("request_cancelled")
-            if cancel_signal._deadline.is_set():
-                raise _DeadlineExceeded("overall_timeout")
             hint = next(
                 (entry["recommendation"] for entry in merged if entry["recommendation"].asset_id == asset_id),
                 None,
             )
-            hint_name = (hint.related_table.name if hint and hint.related_table else hint.name if hint else "")
-            step_id = f"asset-{asset_id}"
-            events.start(
-                step_id,
-                f"读取资产明细：{hint_name or f'资产 {asset_id}'}",
-                {"assetId": asset_id, "nameHint": hint_name, "source": "dap_catalog"},
+            hint_names[asset_id] = (
+                hint.related_table.name if hint and hint.related_table
+                else hint.name if hint else ""
             )
-            try:
-                raw_detail = self._assets_service.get_asset_detail_by_id(asset_id)
+            events.start(
+                f"asset-{asset_id}",
+                f"读取资产明细：{hint_names[asset_id] or f'资产 {asset_id}'}",
+                {
+                    "assetId": asset_id,
+                    "nameHint": hint_names[asset_id],
+                    "source": "dap_catalog",
+                    "phase": "database",
+                    "databaseCallCount": int(bool(table_ids)) + int(bool(field_ids_by_asset)),
+                },
+            )
+
+        details_by_id: dict[int, dict[str, Any]] = {}
+        batch_error = False
+        try:
+            if cancel_signal._caller is not None and cancel_signal._caller.is_set():
+                raise AIAskCancelled("request_cancelled")
+            if cancel_signal._deadline.is_set():
+                raise _DeadlineExceeded("overall_timeout")
+            candidate_loader = getattr(self._rag_service, "load_candidate_catalog", None)
+            if callable(candidate_loader):
+                raw_details = candidate_loader(
+                    table_ids,
+                    field_ids_by_asset,
+                    profile=profile,
+                    cancel_event=cancel_signal,
+                )
+            else:
+                raw_details = self._assets_service.get_rag_candidate_catalog(
+                    table_ids,
+                    field_ids_by_asset,
+                )
+                raw_details = project_public_catalog_value(raw_details, profile=profile)
+            if not isinstance(raw_details, list):
+                raise ValueError("invalid_candidate_catalog")
+            for raw_detail in raw_details:
                 if not isinstance(raw_detail, dict):
-                    raise ValueError("invalid_detail")
+                    continue
+                asset_id = self._positive_id(raw_detail.get("assetId"))
                 detail = project_public_catalog_value(raw_detail, profile=profile)
                 if (
-                    not isinstance(detail, dict)
-                    or self._positive_id(detail.get("assetId")) != asset_id
+                    asset_id not in table_ids
+                    or asset_id in details_by_id
+                    or not isinstance(detail, dict)
                     or not isinstance(detail.get("name"), str)
                     or not detail.get("name", "").strip()
                     or not isinstance(detail.get("fields"), list)
                 ):
-                    raise ValueError("invalid_detail")
+                    continue
                 details_by_id[asset_id] = detail
-                verified_table_ids.append(asset_id)
-                events.complete(
-                    step_id,
-                    f"已读取资产明细：{detail['name']}",
-                    {
-                        "assetId": asset_id,
-                        "tableName": detail["name"],
-                        "fieldCount": len(detail["fields"]),
-                        "source": "dap_authoritative_metadata",
-                    },
-                )
-            except Exception as error:
-                error_code = "not_found" if error.__class__.__name__ == "AssetNotFoundError" else "unavailable"
+        except AIAskCancelled:
+            raise
+        except _DeadlineExceeded:
+            raise
+        except Exception:
+            batch_error = True
+            LOGGER.warning(
+                "AI authoritative candidate batch read failed candidate_tables=%s candidate_fields=%s",
+                len(table_ids),
+                sum(len(values) for values in field_ids_by_asset.values()),
+            )
+
+        for asset_id in table_ids:
+            detail = details_by_id.get(asset_id)
+            step_id = f"asset-{asset_id}"
+            if detail is None:
+                error_code = "unavailable" if batch_error else "not_found"
                 errors.append({"assetId": asset_id, "errorCode": error_code})
                 events.error(
                     step_id,
-                    f"无法读取资产明细：{hint_name or f'资产 {asset_id}'}",
+                    f"无法读取资产明细：{hint_names[asset_id] or f'资产 {asset_id}'}",
                     {"assetId": asset_id, "errorCode": error_code, "source": "dap_authoritative_metadata"},
                 )
+                continue
+            details_by_id[asset_id] = detail
+            verified_table_ids.append(asset_id)
+            events.complete(
+                step_id,
+                f"已读取资产明细：{detail['name']}",
+                {
+                    "assetId": asset_id,
+                    "tableName": detail["name"],
+                    "fieldCount": len(detail["fields"]),
+                    "source": "dap_authoritative_metadata",
+                },
+            )
 
         for identity, item in source_items.items():
             asset_id, field_id = identity
@@ -808,7 +904,7 @@ class AIAskExecutionService(AIAskService):
                 events.start(
                     "metadata-count",
                     "正在按当前 DAP 目录解析统计口径并执行精确 COUNT。",
-                    {"intent": "metadata_count"},
+                    {"intent": "metadata_count", "phase": "database"},
                 )
 
                 def unavailable_count() -> AiAskResponse:
@@ -1006,7 +1102,7 @@ class AIAskExecutionService(AIAskService):
             events.start(
                 "verification",
                 "按检索返回的稳定资产 ID 读取有限数量的 DAP 权威详情。",
-                {"maxTables": _MAX_DETAIL_TABLES, "candidateCount": len(merged)},
+                {"maxTables": _MAX_DETAIL_TABLES, "candidateCount": len(merged), "phase": "database"},
             )
             verified, verified_table_ids, verification_errors, verification_truncated = self._verify_candidates(
                 merged,

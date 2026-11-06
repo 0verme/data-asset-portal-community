@@ -47,16 +47,52 @@ def gaussdb_schema_sql_identifier(schema: str) -> str:
 
 
 def with_jdbc_timeouts(jdbc_url: str, *, connect_timeout_seconds=None, socket_timeout_seconds=None) -> str:
+    """Apply finite driver timeouts, tightening (never loosening) URL values.
+
+    GaussDB's driver consumes ``loginTimeout`` in seconds and
+    ``connectTimeout``/``socketTimeout`` in milliseconds. Existing URL values
+    used to win via ``setdefault``; a stale or zero value could therefore
+    silently disable the application's configured limits.
+    """
     raw_url = (jdbc_url or "").strip()
     if not raw_url:
         return raw_url
-    connect_timeout_seconds = connect_timeout_seconds or get_db_connect_timeout_seconds()
-    socket_timeout_seconds = socket_timeout_seconds or max(1, get_db_statement_timeout_ms() // 1000)
+    connect_timeout_seconds = (
+        get_db_connect_timeout_seconds()
+        if connect_timeout_seconds is None
+        else max(1, int(connect_timeout_seconds))
+    )
+    socket_timeout_seconds = (
+        max(1, get_db_statement_timeout_ms() // 1000)
+        if socket_timeout_seconds is None
+        else max(1, int(socket_timeout_seconds))
+    )
     split = urlsplit(raw_url.replace("jdbc:", "", 1))
-    params = dict(parse_qsl(split.query, keep_blank_values=True))
-    params.setdefault("loginTimeout", str(int(connect_timeout_seconds)))
-    params.setdefault("connectTimeout", str(int(connect_timeout_seconds) * 1000))
-    params.setdefault("socketTimeout", str(int(socket_timeout_seconds) * 1000))
+    params = parse_qsl(split.query, keep_blank_values=True)
+
+    def tighten(name: str, configured: int) -> None:
+        existing = [
+            value for key, value in params
+            if key.casefold() == name.casefold()
+        ]
+        values = [configured]
+        for value in existing:
+            try:
+                parsed = int(value)
+            except (TypeError, ValueError):
+                continue
+            if parsed > 0:
+                values.append(parsed)
+        effective = min(values)
+        params[:] = [
+            (key, value) for key, value in params
+            if key.casefold() != name.casefold()
+        ]
+        params.append((name, str(effective)))
+
+    tighten("loginTimeout", connect_timeout_seconds)
+    tighten("connectTimeout", connect_timeout_seconds * 1000)
+    tighten("socketTimeout", socket_timeout_seconds * 1000)
     rebuilt = urlunsplit((split.scheme, split.netloc, split.path, urlencode(params), split.fragment))
     return f"jdbc:{rebuilt}"
 

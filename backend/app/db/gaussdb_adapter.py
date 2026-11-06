@@ -95,6 +95,18 @@ def connect(config: dict):
         java_connection.setAutoCommit(False)
         if java_connection.getAutoCommit():
             raise RuntimeError("GaussDB JDBC connection remained in auto-commit mode")
+        timeout_ms = config.get("statement_timeout_ms")
+        if timeout_ms is not None:
+            timeout_ms = int(timeout_ms)
+            if timeout_ms < 1:
+                raise ValueError("GaussDB statement_timeout_ms must be positive")
+            statement = java_connection.createStatement()
+            try:
+                # This server-side session limit covers statement execution;
+                # socketTimeout below separately bounds JDBC result reads.
+                statement.execute(f"SET statement_timeout = {timeout_ms}")
+            finally:
+                statement.close()
         return connection
     except Exception:
         connection.close()

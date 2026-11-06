@@ -168,7 +168,18 @@ def create_fastapi_app(
         hot_keywords,
         rag_recommendations,
     )
-    _register_ai_ask_routes(app, ai_ask, ai_ask_execution)
+    isolate_ai_ask_execution = all(value is None for value in (
+        ai_ask_service_instance,
+        ai_ask_execution_service_instance,
+        assets_service_instance,
+        rag_search_service_instance,
+    ))
+    _register_ai_ask_routes(
+        app,
+        ai_ask,
+        ai_ask_execution,
+        isolate_execution=isolate_ai_ask_execution,
+    )
     # Every router shipped in this repository is part of the default runtime.
     # External dependencies report their own diagnostic errors at request time;
     # they do not turn an existing source module into a 404.

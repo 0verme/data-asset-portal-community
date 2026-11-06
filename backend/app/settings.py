@@ -117,6 +117,26 @@ def get_rag_search_service_token() -> str:
     return token
 
 
+def get_ai_ask_max_concurrency() -> int:
+    return get_int_env("AI_ASK_MAX_CONCURRENCY", 2, minimum=1, maximum=16)
+
+
+def get_ai_ask_max_queue() -> int:
+    return get_int_env("AI_ASK_MAX_QUEUE", 4, minimum=0, maximum=128)
+
+
+def get_ai_ask_queue_wait_ms() -> int:
+    return get_int_env("AI_ASK_QUEUE_WAIT_MS", 2000, minimum=0, maximum=10000)
+
+
+def get_ai_ask_worker_timeout_seconds() -> int:
+    return get_int_env("AI_ASK_WORKER_TIMEOUT_SECONDS", 115, minimum=1, maximum=600)
+
+
+def get_ai_ask_db_timeout_seconds() -> int:
+    return get_int_env("AI_ASK_DB_TIMEOUT_SECONDS", 10, minimum=1, maximum=60)
+
+
 @dataclass(frozen=True)
 class AIAskLLMConfig:
     """Server-only OpenAI-compatible endpoint configuration."""
@@ -278,6 +298,9 @@ def get_db_profile_overrides() -> dict[str, object]:
     fields = {
         "ASSET_DB_TYPE": "type",
         "ASSET_DB_HOST": "host",
+        "ASSET_DB_CONNECT_TIMEOUT_SECONDS": "connect_timeout",
+        "ASSET_DB_SOCKET_TIMEOUT_SECONDS": "socket_timeout",
+        "ASSET_DB_STATEMENT_TIMEOUT_MS": "statement_timeout_ms",
         "ASSET_DB_PORT": "port",
         "ASSET_DB_DATABASE": "database",
         "ASSET_DB_USER": "user",

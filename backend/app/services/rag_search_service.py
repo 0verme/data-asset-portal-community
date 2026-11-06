@@ -259,10 +259,41 @@ class RagSearchService:
             })
             return response
 
+        http_elapsed_ms = max(0.0, (time.monotonic() - search_started) * 1000)
+        LOGGER.info(
+            "RAG stage complete stage=http_search elapsed_ms=%.2f database_call_count=0 result_count=%s",
+            http_elapsed_ms,
+            len(remote.results),
+        )
+        candidate_asset_ids, candidate_fields = self._candidate_ids(remote.results)
+        expected_db_calls = int(bool(candidate_asset_ids)) + int(bool(candidate_fields))
+        catalog_started = time.monotonic()
+        report_execution("catalog_start", {
+            "startedAt": _utc_timestamp(),
+            "phase": "database",
+            "candidateAssetCount": len(candidate_asset_ids),
+            "candidateFieldCount": sum(len(values) for values in candidate_fields.values()),
+            "databaseCallCount": expected_db_calls,
+        })
         try:
-            snapshot = self._snapshot(profile)
+            snapshot = self._snapshot(
+                profile,
+                asset_ids=candidate_asset_ids,
+                field_ids_by_asset=candidate_fields,
+            )
         except Exception:
-            LOGGER.info("RAG candidate validation could not read the public catalog")
+            catalog_elapsed_ms = (time.monotonic() - catalog_started) * 1000
+            LOGGER.warning(
+                "RAG stage failed stage=catalog_validation elapsed_ms=%.2f database_call_count=%s reason=visibility_unavailable",
+                catalog_elapsed_ms,
+                expected_db_calls,
+            )
+            report_execution("catalog_error", {
+                "finishedAt": _utc_timestamp(),
+                "durationMs": max(0.0, catalog_elapsed_ms),
+                "databaseCallCount": expected_db_calls,
+                "errorCode": "visibility_unavailable",
+            })
             response = self._unavailable(
                 normalized_query,
                 "visibility_unavailable",
@@ -273,6 +304,11 @@ class RagSearchService:
                 "startedAt": search_started_at,
                 "finishedAt": _utc_timestamp(),
                 "durationMs": max(0.0, (time.monotonic() - search_started) * 1000),
+                "stageTimings": {
+                    "httpSearchMs": http_elapsed_ms,
+                    "catalogValidationMs": catalog_elapsed_ms,
+                },
+                "databaseCallCount": expected_db_calls,
                 "retrievalMode": config.strategy,
                 "requestedMode": remote.retrieval.requested_mode,
                 "effectiveMode": remote.retrieval.effective_mode,
@@ -285,6 +321,23 @@ class RagSearchService:
                 "requestCount": 1,
             })
             return response
+        catalog_elapsed_ms = (time.monotonic() - catalog_started) * 1000
+        catalog_logger = LOGGER.warning if catalog_elapsed_ms >= 3000 else LOGGER.info
+        catalog_logger(
+            "RAG stage complete stage=catalog_validation elapsed_ms=%.2f database_call_count=%s candidate_assets=%s candidate_fields=%s verified_assets=%s",
+            catalog_elapsed_ms,
+            expected_db_calls,
+            len(candidate_asset_ids),
+            sum(len(values) for values in candidate_fields.values()),
+            len(snapshot.tables),
+        )
+        report_execution("catalog_complete", {
+            "finishedAt": _utc_timestamp(),
+            "durationMs": max(0.0, catalog_elapsed_ms),
+            "databaseCallCount": expected_db_calls,
+            "verifiedAssetCount": len(snapshot.tables),
+            "verifiedFieldCount": len(snapshot.fields),
+        })
 
         recommendations: list[RagRecommendation] = []
         execution_hits: list[dict[str, Any]] = []
@@ -372,6 +425,11 @@ class RagSearchService:
                 "startedAt": search_started_at,
                 "finishedAt": _utc_timestamp(),
                 "durationMs": max(0.0, (time.monotonic() - search_started) * 1000),
+                "stageTimings": {
+                    "httpSearchMs": http_elapsed_ms,
+                    "catalogValidationMs": catalog_elapsed_ms,
+                },
+                "databaseCallCount": expected_db_calls,
                 "retrievalMode": config.strategy,
                 "requestedMode": remote.retrieval.requested_mode,
                 "effectiveMode": remote.retrieval.effective_mode,
@@ -390,14 +448,14 @@ class RagSearchService:
         if isinstance(value, bool) or value is None:
             return None
         if isinstance(value, int):
-            return value if value > 0 else None
+            return value if 0 < value <= 2_147_483_647 else None
         if not isinstance(value, str) or not _DIGITS.fullmatch(value):
             return None
         try:
             parsed = int(value)
         except ValueError:
             return None
-        return parsed if parsed > 0 else None
+        return parsed if 0 < parsed <= 2_147_483_647 else None
 
     def _resolve_hit(
         self,
@@ -414,11 +472,73 @@ class RagSearchService:
             return None
         return "field", asset_id, field_id
 
-    def _snapshot(self, profile: str) -> _CatalogSnapshot:
-        source = self._assets_service.get_asset_tables()
-        projected = project_public_catalog_value(source, profile=profile)
-        if not isinstance(projected, list):
-            raise ValueError("public asset projection is unavailable")
+    @staticmethod
+    def _candidate_ids(hits: list[RagHttpSearchHit]) -> tuple[list[int], dict[int, set[int]]]:
+        asset_ids: set[int] = set()
+        field_ids_by_asset: dict[int, set[int]] = {}
+        for hit in hits[:20]:
+            asset_id = RagSearchService._parse_id(hit.asset_id)
+            if asset_id is None:
+                continue
+            asset_ids.add(asset_id)
+            if hit.entity_type == "field":
+                field_id = RagSearchService._parse_id(hit.field_id)
+                if field_id is not None:
+                    field_ids_by_asset.setdefault(asset_id, set()).add(field_id)
+        return sorted(asset_ids), field_ids_by_asset
+
+    def load_candidate_catalog(
+        self,
+        asset_ids: list[int],
+        field_ids_by_asset: dict[int, set[int]],
+        *,
+        profile: str,
+        cancel_event: Any | None = None,
+    ) -> list[dict[str, Any]]:
+        """Batch-read and project the current authoritative DAP candidates."""
+        if cancel_event is not None and cancel_event.is_set():
+            raise RuntimeError("catalog validation cancelled")
+        started = time.monotonic()
+        database_call_count = int(bool(asset_ids)) + int(
+            any(bool(values) for values in field_ids_by_asset.values())
+        )
+        completed = False
+        try:
+            source = self._assets_service.get_rag_candidate_catalog(
+                asset_ids,
+                field_ids_by_asset,
+            )
+            projected = project_public_catalog_value(source, profile=profile)
+            if not isinstance(projected, list):
+                raise ValueError("public asset projection is unavailable")
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("catalog validation cancelled")
+            completed = True
+            return projected
+        finally:
+            elapsed_ms = (time.monotonic() - started) * 1000
+            logger = LOGGER.warning if elapsed_ms >= 3000 or not completed else LOGGER.info
+            logger(
+                "RAG stage %s stage=candidate_metadata_lookup elapsed_ms=%.2f database_call_count=%s candidate_assets=%s candidate_fields=%s",
+                "complete" if completed else "failed",
+                elapsed_ms,
+                database_call_count,
+                len(asset_ids),
+                sum(len(values) for values in field_ids_by_asset.values()),
+            )
+
+    def _snapshot(
+        self,
+        profile: str,
+        *,
+        asset_ids: list[int],
+        field_ids_by_asset: dict[int, set[int]],
+    ) -> _CatalogSnapshot:
+        projected = self.load_candidate_catalog(
+            asset_ids,
+            field_ids_by_asset,
+            profile=profile,
+        )
 
         tables: dict[int, dict[str, Any]] = {}
         fields: dict[tuple[int, int], dict[str, Any]] = {}
