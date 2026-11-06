@@ -72,6 +72,19 @@ candidate identities. Missing/invalid configuration fails closed. See
 API state semantics and isolated-environment handoff. This configuration does
 not claim that an external RAG HTTP service or DeepSeek endpoint is available.
 
+Three request transports share one service and one evidence contract:
+
+| Transport | Shape | Consumer |
+|---|---|---|
+| `POST /api/ai/ask/stream` | SSE `step_start` / `step_complete` / `step_error` / `answer` / `done` / `keep_alive` | Current frontend UI (`frontend/src/api/aiAskExecution.ts`) |
+| `POST /api/ai/ask/progress` | SSE `progress` + single `result` | Compatibility client |
+| `POST /api/ai/ask` | Single JSON `AiAskResponse` | Compatibility client |
+
+None of them streams model tokens; the answer is delivered as one validated
+payload. The search page exposes these as two result tabs —「搜索结果」(deterministic
+`GET /api/search`) and「AI 问答」(the explicit AI action). Ordinary search never
+invokes the model.
+
 ## Signed-session contract
 
 The application now writes an application-owned signed `session` cookie using

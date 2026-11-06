@@ -182,9 +182,17 @@ verified in an isolated environment.
   Never put a real key or private endpoint into Git, the DAP parameter table,
   frontend build variables, shell history, logs, or screenshots.
 - DAP calls only its server-side OpenAI-compatible adapter. The browser calls
-  DAP `/api/ai/ask`; it never calls the LLM provider directly. Configure RAG
+  DAP `/api/ai/ask/stream` (the transport used by the current search page);
+  `/api/ai/ask/progress` and `/api/ai/ask` remain available as compatibility
+  endpoints. The browser never calls the LLM provider directly. Configure RAG
   independently using the existing administrator RAG configuration and
   `RAG_SEARCH_SERVICE_TOKEN` Secret.
+- The search page exposes two result tabs:「搜索结果」(deterministic
+  `GET /api/search`) and「AI 问答」(the explicit AI action). Ordinary search never
+  invokes the model; zero-result guidance to ask the AI only appears when
+  `GET /api/ai/status` reports `enabled=true`.
+- SSE carries real backend stages plus one complete validated answer. Model
+  tokens are never streamed, and no conversation history is persisted.
 - Verify current GitHub `dap-rag-lab` HTTP Search Service status before enabling;
   external issue #14 is not evidence of a completed/live deployment. DAP
   Client Mock tests do not prove a real HTTP service exists.

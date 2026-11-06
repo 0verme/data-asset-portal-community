@@ -11,9 +11,9 @@
 | 上游卸数 | `UpstreamView.tsx` | `/api/upstreams/*` | canonical baseline/migration + demo seed；实际连接需要外部上游配置 |
 | 数据仓库 | `AssetView.tsx` | `/api/assets/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
 | 字段映射 | `FieldMappingPage.tsx` | `/api/field-mappings/*` | mapping core 表在 baseline；变更日志 DDL 为补充；Community seed |
-| 血缘分析 | `LineagePage.tsx` | `/api/lineage/*` | canonical `p_lineage_*` baseline/migration + demo snapshot；无 storage profile 时使用开发/测试 POC |
+| 血缘分析 | `LineagePage.tsx` | `/api/lineage/*` | canonical `p_lineage_*` baseline/migration + demo snapshot；Remote 始终使用 `ASSET_DB_PROFILE`，无 ACTIVE 快照时为空状态 |
 | 词根管理 | `RootView.tsx` | `/api/roots/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
-| 指标维护 | `IndicatorView.tsx` | `/api/indicators/*` | indicator item/path baseline；Community seed；当前没有独立 `/api/indicator-path/*` route |
+| 指标维护 | `IndicatorView.tsx` | `/api/indicators/*`、`GET /api/indicator-path/tree` | indicator item/path baseline；Community seed |
 | 报表资产 | `ReportView.tsx` | `/api/reports/*` | canonical baseline/migration + demo seed；外部数据集不是本模块 route 前置条件 |
 | API 资产 | `ApiAssetView.tsx` | `/api/api-assets/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
 | 下游推送 | `PushView.tsx` | `/api/push/*` | canonical baseline/migration + demo metadata；实际推送执行不在当前职责内 |
@@ -26,6 +26,8 @@
 
 - 门户统计：`/api/portal/stats`
 - 统一搜索：`/api/search`
+- 可选 RAG 相关资产推荐：`/api/search/recommendations`（默认关闭）
+- 可选单轮 AI 资产问答：`/api/ai/status`、`/api/ai/ask`、`/api/ai/ask/progress`、`/api/ai/ask/stream`（默认关闭）
 - Repository module capability contract（兼容 endpoint）：`/api/capabilities`
 
 基础能力：
@@ -135,7 +137,9 @@
 
 资产范围（`scope=asset`）是独立 chip，URL 中的 `?scope=asset` 可分享、刷新和前进/后退；资产分组支持按字段（`p_asset_field` 字段名 / 中文字段名 / 描述）召回，`matchedFields` 说明命中字段；分组 `count` 是实际命中总数，`hasMore` 为 true 时显示“查看全部”，资产组跳转数据仓库资产列表并保留同一关键字（详情语义见 [api-contract.md](./api-contract.md) 统一搜索章节）。
 
-搜索页保留单一关键词入口：确定性资产搜索结果在前，可选的“相关资产推荐”独立成组并以 canonical asset/field ID 导航；两者按资产身份去重。RAG 默认关闭且通过独立 HTTP Service 调用，失败不影响关键词搜索；不提供智能解答，不展示检索分数。DAP 后端每次按当前目录 profile 复核远端 ID 与父子关系，并仅使用 DAP 权威公开元数据。DAP 不加载 RAG 模型/索引；与 dap-rag-lab #14 的最终契约和真实联调尚未验收。
+搜索页保留单一关键词入口：确定性资产搜索结果在前，可选的“相关资产推荐”独立成组并以 canonical asset/field ID 导航；两者按资产身份去重。RAG 默认关闭且通过独立 HTTP Service 调用，失败不影响关键词搜索；不展示检索分数。DAP 后端每次按当前目录 profile 复核远端 ID 与父子关系，并仅使用 DAP 权威公开元数据。DAP 不加载 RAG 模型/索引；与 dap-rag-lab #14 的最终契约和真实联调尚未验收。
+
+结果区使用两个 Tab：「搜索结果」与「AI 问答」。传统搜索（Enter /「搜索」）永不自动调用模型；「问 AI」是显式动作，走 `POST /api/ai/ask/stream`（SSE 阶段进度 + 完整最终答案，不逐 token 流式输出），`POST /api/ai/ask` 与 `POST /api/ai/ask/progress` 作为兼容接口保留。AI 默认关闭：`AI_ASK_ENABLED=false` 或 LLM / RAG 配置不完整时，`GET /api/ai/status` 返回 `{"enabled": false}`，前端隐藏入口。回答状态、证据校验与统计意图详见 [单轮 AI 数据资产问答](./ai-ask-mvp.md) 与 [权威资产目录统计](./ai-metadata-count.md)；公网静态 Demo 的问答是前端演示适配器，不调用 RAG 或 LLM。
 
 ## 13. 认证
 
