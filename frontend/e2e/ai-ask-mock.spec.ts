@@ -13,7 +13,7 @@ test("static Mock AI uses catalog assets and never calls remote AI endpoints", a
   await expect(page.locator(".sp-ai-summary")).toContainText("【模拟演示】");
   expect(remoteAiCalls).toEqual([]);
   await page.locator(".sp-ai-candidate").first().click();
-  await expect(page).toHaveURL(/\/data-warehouse(?:\?|$)/);
+  await expect(page).toHaveURL(/\/data-warehouse\/dwm_trade_order_detail_di\?(?=.*assetId=\d+)/);
   await expect(page.locator(".asset-page")).toContainText(/trade_order/i);
 });
 
