@@ -598,6 +598,9 @@ jobs:
       - name: Frontend tests
         run: npm test
 
+      - name: Linux static/API proxy and live SSE integration tests
+        run: python3 -m unittest discover -s tests -p 'test_serve_dist_linux.py' -v
+
       - name: Frontend production build
         env:
           VITE_API_MODE: remote
