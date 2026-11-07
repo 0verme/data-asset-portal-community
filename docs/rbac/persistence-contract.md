@@ -35,7 +35,7 @@ The forward-only RBAC Alembic revision is
 [the schema migration guide](../../backend/schema/README.md).
 Fresh baselines contain
 the same tables so `schema_migrate.py verify --offline` and fresh initialization
-see one identical 40-table contract. Existing SQLite/PostgreSQL/MySQL
+see one identical 41-table contract. Existing SQLite/PostgreSQL/MySQL
 installations at the previous RBAC head receive the tables through revision `0005`; field-mapping installations are then upgraded by revision `0006`.
 The GaussDB/DWS provider has no online Alembic path in the current repository;
 `seed_rbac` applies the same forward DDL when a pre-RBAC DWS database is

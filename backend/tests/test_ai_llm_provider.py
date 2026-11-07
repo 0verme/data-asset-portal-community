@@ -8,6 +8,11 @@ from unittest.mock import patch
 
 import httpx
 
+from backend.app.services.ai_llm_daily_quota import (
+    DailyLLMQuotaExceeded,
+    DailyLLMQuotaReservation,
+    DailyLLMQuotaUnavailable,
+)
 from backend.app.services.ai_llm_provider import (
     MAX_LLM_RESPONSE_BYTES,
     LLMProviderError,
@@ -52,13 +57,37 @@ class SlowDripBody(httpx.SyncByteStream):
         self.closed.set()
 
 
+class _FakeQuotaService:
+    def __init__(self, *, exceeded=False, unavailable=False, on_reserve=None):
+        self.exceeded = exceeded
+        self.unavailable = unavailable
+        self.on_reserve = on_reserve
+        self.reservations = 0
+        self.refunds = []
+
+    def reserve(self):
+        self.reservations += 1
+        if self.on_reserve is not None:
+            self.on_reserve()
+        if self.unavailable:
+            raise DailyLLMQuotaUnavailable()
+        if self.exceeded:
+            raise DailyLLMQuotaExceeded()
+        return DailyLLMQuotaReservation("2026-11-07")
+
+    def refund(self, reservation):
+        self.refunds.append(reservation)
+        return True
+
+
 class OpenAICompatibleLLMProviderTests(unittest.TestCase):
-    def _provider(self, handler, *, config=None):
+    def _provider(self, handler, *, config=None, quota_service=None):
         transport = httpx.MockTransport(handler)
         client = httpx.Client(transport=transport, follow_redirects=False, trust_env=False)
         return OpenAICompatibleLLMProvider(
             client=client,
             config_getter=lambda: config or llm_config(),
+            quota_service=quota_service or _FakeQuotaService(),
         )
 
     def test_openai_compatible_contract_uses_server_key_and_json_mode(self):
@@ -109,6 +138,7 @@ class OpenAICompatibleLLMProviderTests(unittest.TestCase):
         provider = OpenAICompatibleLLMProvider(
             client=httpx.Client(transport=transport, follow_redirects=False, trust_env=False),
             config_getter=lambda: current_config[0],
+            quota_service=_FakeQuotaService(),
         )
 
         self.assertFalse(provider.is_enabled())
@@ -133,6 +163,75 @@ class OpenAICompatibleLLMProviderTests(unittest.TestCase):
         with self.assertRaises(LLMProviderError) as raised:
             unconfigured.complete_json(system_prompt="x", user_payload={})
         self.assertEqual("llm_not_configured", raised.exception.reason_code)
+
+    def test_each_provider_http_call_reserves_one_quota_slot(self):
+        quota = _FakeQuotaService()
+        provider = self._provider(lambda _request: success_response(), quota_service=quota)
+
+        provider.complete_json(system_prompt="first", user_payload={})
+        provider.complete_json(system_prompt="second", user_payload={})
+
+        self.assertEqual(2, quota.reservations)
+        self.assertEqual([], quota.refunds)
+
+    def test_daily_limit_denies_before_provider_http_request(self):
+        quota = _FakeQuotaService(exceeded=True)
+        provider = self._provider(
+            lambda _request: self.fail("quota-denied request must not leave DAP"),
+            quota_service=quota,
+        )
+        with self.assertRaises(LLMProviderError) as raised:
+            provider.complete_json(system_prompt="x", user_payload={})
+        self.assertEqual("llm_daily_quota_exceeded", raised.exception.reason_code)
+        self.assertEqual(1, quota.reservations)
+        self.assertEqual([], quota.refunds)
+
+    def test_unavailable_quota_store_denies_before_provider_http_request(self):
+        quota = _FakeQuotaService(unavailable=True)
+        provider = self._provider(
+            lambda _request: self.fail("unavailable quota storage must fail closed"),
+            quota_service=quota,
+        )
+        with self.assertRaises(LLMProviderError) as raised:
+            provider.complete_json(system_prompt="x", user_payload={})
+        self.assertEqual("llm_quota_unavailable", raised.exception.reason_code)
+        self.assertEqual(1, quota.reservations)
+        self.assertEqual([], quota.refunds)
+
+    def test_pre_dispatch_deadline_refunds_reservation_without_http_request(self):
+        quota = _FakeQuotaService(on_reserve=lambda: time.sleep(0.05))
+        provider = self._provider(
+            lambda _request: self.fail("expired pre-dispatch request must not leave DAP"),
+            config=llm_config(timeout_ms=20),
+            quota_service=quota,
+        )
+        with self.assertRaises(LLMProviderError) as raised:
+            provider.complete_json(system_prompt="x", user_payload={})
+        self.assertEqual("llm_timeout", raised.exception.reason_code)
+        self.assertEqual(1, quota.reservations)
+        self.assertEqual(1, len(quota.refunds))
+
+    def test_pre_dispatch_cancellation_refunds_but_dispatched_failure_counts(self):
+        cancellation = threading.Event()
+        quota = _FakeQuotaService(on_reserve=cancellation.set)
+        provider = self._provider(
+            lambda _request: self.fail("cancelled pre-dispatch request must not leave DAP"),
+            quota_service=quota,
+        )
+        with self.assertRaises(LLMProviderError) as raised:
+            provider.complete_json(system_prompt="x", user_payload={}, cancel_event=cancellation)
+        self.assertEqual("cancelled", raised.exception.reason_code)
+        self.assertEqual(1, len(quota.refunds))
+
+        dispatched_quota = _FakeQuotaService()
+        failed = self._provider(
+            lambda _request: httpx.Response(503, text="provider unavailable"),
+            quota_service=dispatched_quota,
+        )
+        with self.assertRaises(LLMProviderError):
+            failed.complete_json(system_prompt="x", user_payload={})
+        self.assertEqual(1, dispatched_quota.reservations)
+        self.assertEqual([], dispatched_quota.refunds)
 
     def test_timeout_status_redirect_and_invalid_json_are_sanitized(self):
         cases = [

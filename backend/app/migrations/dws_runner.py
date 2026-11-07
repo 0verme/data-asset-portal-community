@@ -69,6 +69,9 @@ REPAIR_HINTS: dict[str, tuple[str, ...]] = {
     "0014_rag_search_config": (
         "resolve duplicate or conflicting reserved RAG rows explicitly and keep both rows inactive; do not enable them through generic parameter APIs",
     ),
+    "0015_ai_llm_daily_quota": (
+        "resolve duplicate, invalid or active reserved AI LLM quota rows explicitly; preserve valid configured limits and usage values before retrying",
+    ),
 }
 
 

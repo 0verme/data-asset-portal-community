@@ -149,8 +149,8 @@ for P3; ordinary public catalog reads are now governed by Issue #180.
 | system user | `POST /api/system/users`, `PUT /api/system/users/{username}`, `PATCH /api/system/users/{username}/status`, `POST /api/system/users/{username}/reset-password`, `DELETE /api/system/users/{username}` | No | No | No | Yes | Yes | `system:user:write` |
 | system menu | `GET /api/system/menus` | Yes, filtered | Optional | Current maintainer sees enabled menu plus `system`; admin sees full list | Yes | No | Public filtered read; `system:menu:read` for management read |
 | system menu | `POST /api/system/menus`, `PUT /api/system/menus/{menu_id}`, `PATCH /api/system/menus/{menu_id}/status`, `PATCH /api/system/menus/{menu_id}/move`, `DELETE /api/system/menus/{menu_id}` | No | No | No | Yes | Yes | `system:menu:write` |
-| system param | `GET /api/system/param-dicts/categories`, `GET /api/system/param-dicts` | No | No | No | Yes | No | `system:param:read` |
-| system param | `PATCH /api/system/param-dicts/categories/{category_code}/status`, `POST /api/system/param-dicts`, `PUT /api/system/param-dicts/{dict_id}`, `PATCH /api/system/param-dicts/{dict_id}/status`, `DELETE /api/system/param-dicts/{dict_id}` | No | No | No | Yes | Yes | `system:param:write` |
+| system param | `GET /api/system/param-dicts/categories`, `GET /api/system/param-dicts`, `GET /api/system/ai-llm-daily-quota` | No | No | No | Yes | No | `system:param:read` |
+| system param | `PATCH /api/system/param-dicts/categories/{category_code}/status`, `POST /api/system/param-dicts`, `PUT /api/system/param-dicts/{dict_id}`, `PATCH /api/system/param-dicts/{dict_id}/status`, `DELETE /api/system/param-dicts/{dict_id}`, `PUT /api/system/ai-llm-daily-quota` | No | No | No | Yes | Yes | `system:param:write` |
 | system role | No current endpoint at P0 | — | — | — | — | — | `system:role:read/write` reserved for P6 |
 
 The two hidden Metadata aliases are included because they are real mutation

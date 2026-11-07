@@ -132,6 +132,8 @@ class RoutePermissionInventoryTests(unittest.TestCase):
         ("GET", "/api/system/param-dicts"): "system:param:read",
         ("GET", "/api/system/param-dicts/page"): "system:param:read",
         ("POST", "/api/system/param-dicts"): "system:param:write",
+        ("GET", "/api/system/ai-llm-daily-quota"): "system:param:read",
+        ("PUT", "/api/system/ai-llm-daily-quota"): "system:param:write",
         ("GET", "/api/system/rag-search-config"): "system:param:read",
         ("PUT", "/api/system/rag-search-config"): "system:param:write",
         ("GET", "/api/system/rag-search-config/diagnostics"): "system:param:read",
