@@ -319,6 +319,7 @@
 .sp-ai-candidate-type { flex: 0 0 auto; color: var(--ink-3); font-size: 11px; }
 .sp-ai-candidate-relevance { flex: 0 0 auto; color: var(--accent); font-size: 11px; }
 .sp-ai-candidate-relevance.related { color: var(--ink-3); }
+.sp-ai-candidate-verified { flex: 0 0 auto; padding: 1px 6px; border-radius: 999px; background: var(--success-soft, var(--surface-2)); color: var(--success, var(--ink-2)); font-size: 10px; line-height: 1.5; }
 .sp-ai-candidate-name, .sp-ai-candidate-meta, .sp-ai-candidate-desc, .sp-ai-candidate-evidence {
   min-width: 0; max-width: 100%; color: var(--ink-2); font-size: 12px; line-height: 1.5;
   white-space: normal; overflow-wrap: anywhere; word-break: break-word;

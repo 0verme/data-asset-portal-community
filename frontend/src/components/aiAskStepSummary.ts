@@ -41,9 +41,13 @@ export const AI_ASK_EXECUTION_COPY = {
     verifiedTables: (count: number) => `已核实 ${count} 张表`,
     verifiedFields: (count: number) => `${count} 个字段`,
     answerGenerated: "回答已生成",
+    completedVerified: (parts: string[]) => `已核实 ${parts.join(" · ")}`,
+    completedWithoutCounts: "问答已完成",
+    sourcesTraceable: "来源可追溯",
   },
   details: "查看详细过程",
   fullSteps: "查看完整执行步骤",
+  hideFullSteps: "收起完整执行步骤",
   copyDebug: "复制排查信息",
   copied: "已复制排查信息",
   copyFailed: "复制失败，请检查浏览器剪贴板权限",
@@ -184,6 +188,26 @@ function candidateCount(steps: readonly AiAskRawStep[]): number | null {
  * stages. It reads counts only from structured event data; unknown/special
  * steps are intentionally ignored here and remain available to StepDetail.
  */
+export function formatCompletedSummary(
+  stages: readonly AiAskStageSummary[],
+  citationCount: number,
+): string {
+  const verification = stages.find((stage) => stage.id === "verification");
+  const verifiedParts: string[] = [];
+  if (verification?.verifiedTableCount !== null && verification?.verifiedTableCount !== undefined) {
+    verifiedParts.push(`${verification.verifiedTableCount} 张表`);
+  }
+  if (verification?.verifiedFieldCount !== null && verification?.verifiedFieldCount !== undefined) {
+    verifiedParts.push(`${verification.verifiedFieldCount} 个字段`);
+  }
+  const summary = verifiedParts.length
+    ? AI_ASK_EXECUTION_COPY.summary.completedVerified(verifiedParts)
+    : AI_ASK_EXECUTION_COPY.summary.completedWithoutCounts;
+  return citationCount > 0
+    ? `${summary} · ${AI_ASK_EXECUTION_COPY.summary.sourcesTraceable}`
+    : summary;
+}
+
 export function groupSteps(rawSteps: readonly unknown[] | null | undefined): AiAskStageSummary[] {
   const validSteps: AiAskRawStep[] = [];
   if (Array.isArray(rawSteps)) {

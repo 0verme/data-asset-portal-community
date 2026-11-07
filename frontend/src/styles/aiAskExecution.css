@@ -1,6 +1,7 @@
+.sp-ai-execution-shell { width: 100%; min-width: 0; }
 .sp-ai-execution {
   width: 100%;
-  margin: 12px 0 16px;
+  margin: 12px 0 4px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md, 10px);
   background: var(--surface);
@@ -24,9 +25,14 @@
 .sp-ai-execution-summary::after { content: "⌄"; color: var(--ink-3); font-size: 15px; }
 .sp-ai-execution[open] > .sp-ai-execution-summary::after { content: "⌃"; }
 .sp-ai-execution-overall { margin-left: auto; color: var(--ink-2); font-size: 12px; font-weight: 500; }
+.sp-ai-execution-summary.is-collapsed { align-items: center; }
+.sp-ai-execution-collapsed-summary { flex: 1 1 auto; min-width: 0; color: var(--ink-2); font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.sp-ai-execution-details-link { flex: 0 0 auto; color: var(--accent); font-size: 12px; font-weight: 550; white-space: nowrap; }
 .sp-ai-execution-running .sp-ai-execution-overall { color: var(--accent, #3858d6); }
 .sp-ai-execution-failed .sp-ai-execution-overall { color: var(--danger); }
 .sp-ai-execution-cancel { margin: 0 14px 12px; }
+.sp-ai-execution-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 16px; }
+.sp-ai-execution-copy-feedback { color: var(--ink-2); font-size: 11px; }
 .sp-ai-execution-list { display: grid; gap: 0; margin: 0; padding: 0 14px 8px; list-style: none; }
 .sp-ai-execution-step { position: relative; display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; padding: 10px 0 11px; }
 .sp-ai-execution-step + .sp-ai-execution-step { border-top: 1px solid var(--line); }
@@ -72,6 +78,9 @@
 
 @media (max-width: 600px) {
   .sp-ai-execution-summary { padding: 10px 12px; }
+  .sp-ai-execution-actions { justify-content: flex-start; padding: 0 6px; }
+  .sp-ai-execution-summary.is-collapsed { align-items: flex-start; }
+  .sp-ai-execution-details-link { font-size: 11px; }
   .sp-ai-execution-list { padding-right: 12px; padding-left: 12px; }
   .sp-ai-stage-list { padding-right: 12px; padding-left: 12px; }
   .sp-ai-stage-heading { align-items: flex-start; }

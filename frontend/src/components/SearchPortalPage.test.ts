@@ -190,7 +190,8 @@ test("AI answers remain explanatory while only DAP candidate cards navigate resp
   assert.match(source, /aria-label=\{`查看\$\{isField \? "字段" : "数据表"\}详情：/);
   assert.match(source, /ref: item\.tableName,[\s\S]*?assetId: item\.assetId/);
   assert.match(source, /证据来源：DAP 资产目录/);
-  assert.match(source, /答案引用的目录资产/);
+  assert.match(source, /已核实引用来源/);
+  assert.match(source, /selectVerifiedCitedCandidates\(response\.candidates, response\.citations\)/);
   assert.match(source, /item\.relevance === "direct"/);
   assert.match(source, /response\.resultsTruncated[\s\S]*?有界检索结果可能不完整/);
   assert.match(styles, /\.sp-ai-candidate \{[\s\S]*?width: 100%[\s\S]*?min-width: 0/);
@@ -213,10 +214,17 @@ test("AI progress displays real SSE execution, search evidence, authoritative ve
 
   assert.match(source, /askAiWithExecution\(/);
   assert.match(source, /setAiExecutionEvents\(\(current\) => \[\.\.\.current, event\]\)/);
-  assert.match(panel, /open=\{expanded\}/);
+  assert.match(panel, /open=\{status === "running" \|\| expanded\}/);
   assert.match(panel, /useState\(status === "running"\)/);
   assert.match(panel, /setExpanded\(true\)/);
-  assert.match(panel, /touchedForRun\.current/);
+  assert.match(panel, /previous === "running" && status === "completed"/);
+  assert.match(panel, /setExpanded\(false\)/);
+  assert.match(panel, /formatCompletedSummary\(groupSteps\(displayedSteps\), citationCount\)/);
+  assert.match(panel, /formatSafeAiAskDiagnostics\(events, status, query\)/);
+  assert.match(panel, /AI_ASK_EXECUTION_COPY\.copyDebug/);
+  assert.match(panel, /AI_ASK_EXECUTION_COPY\.details/);
+  assert.match(panel, /open=\{status === "running" \|\| expanded\}/);
+  assert.match(source, /citationCount=\{response\?\.citations\.length \?\? 0\}/);
   assert.match(panel, /<StepSummary steps=\{displayedSteps\}/);
   assert.match(panel, /<StepDetail steps=\{displayedSteps\}/);
   assert.match(detail, /retrievalMode|effectiveMode/);
@@ -233,6 +241,9 @@ test("AI progress displays real SSE execution, search evidence, authoritative ve
   assert.match(grouping, /export function groupSteps/);
   assert.match(styles, /\.sp-ai-stage-list/);
   assert.match(styles, /\.sp-ai-execution-details/);
+  assert.match(styles, /\.sp-ai-execution-collapsed-summary/);
+  assert.match(styles, /\.sp-ai-execution-details-link/);
+  assert.match(styles, /\.sp-ai-execution-actions/);
   assert.match(api, /requestRemoteEventStream\("\/ai\/ask\/stream"/);
   assert.match(api, /parseAiAskResponse\(data\["response"\]\)/);
   assert.match(api, /event\.requestId !== requestId/);

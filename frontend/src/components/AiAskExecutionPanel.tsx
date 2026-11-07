@@ -4,7 +4,13 @@ import type { AiAskExecutionEvent, AiAskExecutionStatus } from "../api/aiAskExec
 import { receivedTerminalEvent } from "../api/aiAskExecutionSummary.ts";
 import { StepDetail } from "./StepDetail.tsx";
 import { StepSummary } from "./StepSummary.tsx";
-import { AI_ASK_EXECUTION_COPY, type AiAskRawStep } from "./aiAskStepSummary.ts";
+import { formatSafeAiAskDiagnostics } from "./aiAskExecutionDiagnostics.ts";
+import {
+  AI_ASK_EXECUTION_COPY,
+  formatCompletedSummary,
+  groupSteps,
+  type AiAskRawStep,
+} from "./aiAskStepSummary.ts";
 import "../styles/aiAskExecution.css";
 
 interface AiAskExecutionPanelProps {
@@ -12,6 +18,8 @@ interface AiAskExecutionPanelProps {
   status: AiAskExecutionStatus | null;
   runId: number;
   loading: boolean;
+  citationCount: number;
+  query: string;
   onCancel: () => void;
 }
 
@@ -21,16 +29,18 @@ function record(value: unknown): Record<string, unknown> {
     : {};
 }
 
-export function AiAskExecutionPanel({ events, status, runId, loading, onCancel }: AiAskExecutionPanelProps) {
+export function AiAskExecutionPanel({ events, status, runId, loading, citationCount, query, onCancel }: AiAskExecutionPanelProps) {
   const [expanded, setExpanded] = useState(status === "running");
-  const touchedForRun = useRef(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState("");
   const previousRun = useRef(runId);
   const previousStatus = useRef(status);
 
   useEffect(() => {
     if (runId !== previousRun.current) {
       previousRun.current = runId;
-      touchedForRun.current = false;
+      setDetailsExpanded(false);
+      setCopyFeedback("");
       setExpanded(true);
     }
   }, [runId]);
@@ -38,7 +48,7 @@ export function AiAskExecutionPanel({ events, status, runId, loading, onCancel }
   useEffect(() => {
     const previous = previousStatus.current;
     previousStatus.current = status;
-    if (previous === "running" && status === "completed" && !touchedForRun.current) {
+    if (previous === "running" && status === "completed") {
       setExpanded(false);
     }
   }, [status]);
@@ -76,42 +86,88 @@ export function AiAskExecutionPanel({ events, status, runId, loading, onCancel }
       ? status === "completed" ? "completed" : "failed"
       : step.status,
   }));
+  const collapsedSummary = formatCompletedSummary(groupSteps(displayedSteps), citationCount);
+  const completedAndCollapsed = status === "completed" && !expanded;
+
+  const copyDiagnostics = async (): Promise<void> => {
+    setCopyFeedback("");
+    try {
+      if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(formatSafeAiAskDiagnostics(events, status, query));
+      setCopyFeedback(AI_ASK_EXECUTION_COPY.copied);
+    } catch {
+      setCopyFeedback(AI_ASK_EXECUTION_COPY.copyFailed);
+    }
+  };
 
   return (
-    <details
-      className={`sp-ai-execution sp-ai-execution-${status || "running"}`}
-      open={expanded}
-      onToggle={(event) => setExpanded(event.currentTarget.open)}
-      aria-label="AI 问答执行过程"
-    >
-      <summary
-        className="sp-ai-execution-summary"
-        onClick={() => {
-          if (status === "running") touchedForRun.current = true;
+    <div className="sp-ai-execution-shell">
+      <details
+        className={`sp-ai-execution sp-ai-execution-${status || "running"}`}
+        open={status === "running" || expanded}
+        onToggle={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (status === "running") {
+            setExpanded(true);
+            return;
+          }
+          setExpanded(event.currentTarget.open);
         }}
+        aria-label="AI 问答执行过程"
       >
-        <span>问答执行过程</span>
-        <span className="sp-ai-execution-overall">{overallLabel}</span>
-      </summary>
-      {status === "failed" && !backendTerminated ? (
-        <p className="sp-ai-execution-note" role="status">
-          未收到后端结束事件：本次失败可能来自前端事件契约或传输中断，不能据此判断后端检索失败。
-        </p>
-      ) : null}
-      {steps.length ? (
-        <>
-          <StepSummary steps={displayedSteps} />
-          <details className="sp-ai-execution-details" key={runId}>
-            <summary>{AI_ASK_EXECUTION_COPY.fullSteps}</summary>
-            <StepDetail steps={displayedSteps} />
-          </details>
-        </>
-      ) : <p className="sp-ai-execution-waiting" role="status">{AI_ASK_EXECUTION_COPY.noSteps}</p>}
-      {loading ? (
-        <Button variant="tertiary" type="button" className="sp-ai-execution-cancel" onClick={onCancel}>
-          取消问答
+        <summary
+          className={`sp-ai-execution-summary${completedAndCollapsed ? " is-collapsed" : ""}`}
+          onClick={(event) => {
+            if (status === "running") event.preventDefault();
+          }}
+        >
+          {completedAndCollapsed ? (
+            <>
+              <span className="sp-ai-execution-collapsed-summary">{collapsedSummary}</span>
+              <span className="sp-ai-execution-details-link">{AI_ASK_EXECUTION_COPY.details}</span>
+            </>
+          ) : (
+            <>
+              <span>问答执行过程</span>
+              <span className="sp-ai-execution-overall">{overallLabel}</span>
+            </>
+          )}
+        </summary>
+        {status === "failed" && !backendTerminated ? (
+          <p className="sp-ai-execution-note" role="status">
+            未收到后端结束事件：本次失败可能来自前端事件契约或传输中断，不能据此判断后端检索失败。
+          </p>
+        ) : null}
+        {steps.length ? (
+          <>
+            <StepSummary steps={displayedSteps} />
+            <details
+              className="sp-ai-execution-details"
+              key={runId}
+              open={detailsExpanded}
+              onToggle={(event) => {
+                if (event.target === event.currentTarget) setDetailsExpanded(event.currentTarget.open);
+              }}
+            >
+              <summary>{detailsExpanded ? AI_ASK_EXECUTION_COPY.hideFullSteps : AI_ASK_EXECUTION_COPY.fullSteps}</summary>
+              <StepDetail steps={displayedSteps} />
+            </details>
+          </>
+        ) : <p className="sp-ai-execution-waiting" role="status">{AI_ASK_EXECUTION_COPY.noSteps}</p>}
+        {loading ? (
+          <Button variant="tertiary" type="button" className="sp-ai-execution-cancel" onClick={onCancel}>
+            取消问答
+          </Button>
+        ) : null}
+      </details>
+      <div className="sp-ai-execution-actions">
+        <Button variant="tertiary" type="button" onClick={() => void copyDiagnostics()}>
+          {AI_ASK_EXECUTION_COPY.copyDebug}
         </Button>
-      ) : null}
-    </details>
+        {copyFeedback ? <span className="sp-ai-execution-copy-feedback" role="status">{copyFeedback}</span> : null}
+      </div>
+    </div>
   );
 }

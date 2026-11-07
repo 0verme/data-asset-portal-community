@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { groupSteps, type AiAskRawStep } from "./aiAskStepSummary.ts";
+import { formatCompletedSummary, groupSteps, type AiAskRawStep } from "./aiAskStepSummary.ts";
 
 function stage(id: string, rawSteps: readonly unknown[]) {
   const result = groupSteps(rawSteps).find((item) => item.id === id);
@@ -108,6 +108,19 @@ test("special, unknown, malformed, or empty steps never throw or affect the four
     { id: "unrecognized-type", status: "completed" },
   ]);
   assert.ok(grouped.every((item) => item.status === "pending"));
+});
+
+test("completion line uses verified counts and only claims traceable sources when citations exist", () => {
+  const grouped = groupSteps([
+    {
+      id: "verification",
+      status: "completed",
+      data: { verifiedTableCount: 4, verifiedFieldCount: 7 },
+    },
+  ]);
+
+  assert.equal(formatCompletedSummary(grouped, 2), "已核实 4 张表 · 7 个字段 · 来源可追溯");
+  assert.equal(formatCompletedSummary(groupSteps([]), 0), "问答已完成");
 });
 
 test("recognizes mock progress and propagates failures only to their mapped stage", () => {

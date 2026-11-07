@@ -32,6 +32,7 @@ import {
 } from "../api/aiAskExecution.ts";
 import { receivedTerminalEvent } from "../api/aiAskExecutionSummary.ts";
 import { AiAskExecutionPanel } from "./AiAskExecutionPanel.tsx";
+import { selectVerifiedCitedCandidates } from "./aiAskSources.ts";
 import {
   getRagRecommendations,
   unifiedSearch,
@@ -281,6 +282,9 @@ function AiAskSection({
           ? response.answer || "当前 DAP 目录统计暂不可用，未返回统计值；请稍后重试。"
           : "";
   const failureMessage = error || responseFailure;
+  const sourceCandidates = response
+    ? selectVerifiedCitedCandidates(response.candidates, response.citations)
+    : [];
   return (
     <section className="sp-ai-group" aria-label="AI 问答结果">
       <div className="sp-group-head">
@@ -305,6 +309,8 @@ function AiAskSection({
         status={executionStatus}
         runId={executionRunId}
         loading={loading}
+        citationCount={response?.citations.length ?? 0}
+        query={query}
         onCancel={onCancel}
       />
       <div className="sp-ai-question">问题：{query}</div>
@@ -328,14 +334,14 @@ function AiAskSection({
           ) : !response.metadataCount && response.answer.trim() ? (
             <div className="sp-ai-summary" aria-label="AI 回答摘要">{response.answer}</div>
           ) : null}
-          {response.candidates.length ? (
-            <div className="sp-ai-candidates">
+          {sourceCandidates.length ? (
+            <section className="sp-ai-candidates" aria-label="已核实引用来源">
               <div className="sp-group-head">
-                <span className="sp-group-title">答案引用的目录资产</span>
-                <span className="sp-group-count">{response.candidates.length} 条</span>
+                <span className="sp-group-title">已核实引用来源</span>
+                <span className="sp-group-count">{sourceCandidates.length} 条</span>
               </div>
               <div className="sp-ai-list">
-                {response.candidates.map((item) => {
+                {sourceCandidates.map((item) => {
                   const isField = item.assetType === "field";
                   const target = askCandidateTarget(item);
                   return (
@@ -354,6 +360,7 @@ function AiAskSection({
                           <span className={`sp-ai-candidate-relevance ${item.relevance === "direct" ? "direct" : "related"}`}>
                             {item.relevance === "direct" ? "直接相关" : "相关线索 · 非直接结论"}
                           </span>
+                          <span className="sp-ai-candidate-verified">已核实引用</span>
                         </span>
                         <span className="sp-ai-candidate-name mono">{isField ? item.fieldName : item.tableName}</span>
                         {isField ? <span className="sp-ai-candidate-meta">所属表：{item.tableDisplayName || item.tableName}（{item.tableName}）</span> : null}
@@ -368,7 +375,7 @@ function AiAskSection({
                   );
                 })}
               </div>
-            </div>
+            </section>
           ) : null}
         </>
       ) : null}

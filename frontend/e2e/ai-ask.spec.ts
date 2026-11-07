@@ -356,12 +356,31 @@ test("Enter and Search stay deterministic; explicit AI preserves query and opens
   await expect(aiTab).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#sp-search-panel .sp-hit").first()).toBeHidden({ timeout: 3000 });
   await expect(page.getByLabel("AI 回答摘要")).toContainText(query);
-  await expect(page.getByText("答案引用的目录资产", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "已核实引用来源" })).toBeVisible();
   const progress = page.locator(".sp-ai-execution");
   await expect(progress).not.toHaveAttribute("open", "");
+  await expect(progress.locator(":scope > summary")).toContainText("已核实 1 张表 · 1 个字段 · 来源可追溯");
+  await expect(progress.locator(":scope > summary")).toContainText("查看详细过程");
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.screenshot({ path: testInfo.outputPath("ai-ask-summary-light-desktop.png"), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: testInfo.outputPath("ai-ask-summary-light-mobile.png"), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 960 });
   await progress.locator(":scope > summary").click();
-  await expect(progress).toContainText("已读取 1 张表，核实 1 个字段。");
   await expect(progress).toContainText("已完成");
+  await progress.locator(".sp-ai-execution-details > summary").click();
+  await expect(progress).toContainText("已读取 1 张表，核实 1 个字段。");
+  await expect(progress.locator(".sp-ai-execution-details")).toHaveAttribute("open", "");
+  await page.screenshot({ path: testInfo.outputPath("ai-ask-full-steps-light-desktop.png"), fullPage: true });
+  await page.getByRole("button", { name: "切换到深色主题" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.screenshot({ path: testInfo.outputPath("ai-ask-full-steps-dark-desktop.png"), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: testInfo.outputPath("ai-ask-full-steps-dark-mobile.png"), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.getByRole("button", { name: "切换到浅色主题" }).click();
   await page.getByRole("tab", { name: /搜索结果/ }).click();
   await expect(page.locator(".sp-hit").first()).toBeVisible();
   await page.getByRole("tab", { name: /AI 问答/ }).click();
@@ -429,8 +448,36 @@ test("list answer is explicitly partial and keeps verified table/field reference
 
   await expect(page.getByLabel("AI 部分回答")).toContainText("不代表完整清单");
   await expect(page.getByRole("status")).toContainText("有界检索结果可能不完整");
-  await expect(page.getByText("答案引用的目录资产", { exact: true })).toBeVisible();
+  const sources = page.getByRole("region", { name: "已核实引用来源" });
+  await expect(sources).toBeVisible();
+  await expect(sources).toContainText("已核实引用");
   await expect(page.getByRole("button", { name: `查看字段详情：${longField}` })).toBeVisible();
+});
+
+test("safe diagnostics copy excludes user text, asset names, and arbitrary event data", async ({ page }) => {
+  await page.addInitScript(() => {
+    const pageWindow = window as Window & { __copiedDiagnostics?: string };
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (text: string) => { pageWindow.__copiedDiagnostics = text; } },
+    });
+  });
+  await openAiPortal(page);
+  const privateQuery = "PRIVATE_PROMPT_DO_NOT_COPY";
+  await page.getByRole("textbox", { name: "搜索数据资产" }).fill(privateQuery);
+  await page.getByRole("button", { name: "问 AI", exact: true }).click();
+  await expect(page.getByLabel("AI 回答摘要")).toBeVisible();
+  const execution = page.locator(".sp-ai-execution-shell");
+  await execution.getByRole("button", { name: "复制排查信息" }).click();
+  await expect(execution.getByText("已复制排查信息")).toBeVisible();
+
+  const copied = await page.evaluate(() => (window as Window & { __copiedDiagnostics?: string }).__copiedDiagnostics || "");
+  expect(copied).toContain("dap-ai-ask-diagnostics-v1");
+  expect(copied).toContain("requestCount");
+  expect(copied).not.toContain(privateQuery);
+  expect(copied).not.toContain(longName);
+  expect(copied).not.toContain(longField);
+  expect(copied).not.toContain("matchedTerms");
 });
 
 test("true zero-match offers AI with the existing query; no-evidence refusal is explicit", async ({ page }) => {
@@ -493,33 +540,40 @@ test("switching tabs during an AI request preserves running state and sends one 
   expect(fixtures.asked).toHaveLength(1);
 });
 
-test("manual collapse during execution stays collapsed after normal completion", async ({ page }) => {
+test("execution stays expanded while running and auto-collapses with a detailed-process entry", async ({ page }) => {
   await openAiPortal(page, { delayFirstAsk: true });
   const input = page.getByRole("textbox", { name: "搜索数据资产" });
-  await input.fill("slow-old manual collapse question");
+  await input.fill("slow-old auto-collapse question");
   await page.getByRole("button", { name: "问 AI", exact: true }).click();
   const progress = page.locator(".sp-ai-execution");
   await expect(progress).toHaveAttribute("open", "");
   await expect(page.getByRole("button", { name: "取消问答" })).toBeVisible();
   await progress.locator(":scope > summary").click();
+  await expect(progress).toHaveAttribute("open", "");
+  await expect(page.getByLabel("AI 回答摘要")).toContainText("slow-old auto-collapse question");
   await expect(progress).not.toHaveAttribute("open", "");
-  await expect(page.getByLabel("AI 回答摘要")).toContainText("slow-old manual collapse question");
-  await expect(progress).not.toHaveAttribute("open", "");
+  await expect(progress.locator(":scope > summary")).toContainText("查看详细过程");
+  await progress.locator(":scope > summary").click();
+  await expect(progress).toHaveAttribute("open", "");
+  await expect(progress.locator(".sp-ai-stage-list > li")).toHaveCount(4);
+  const fullSteps = progress.locator(".sp-ai-execution-details");
+  await expect(fullSteps).not.toHaveAttribute("open", "");
+  await fullSteps.locator(":scope > summary").click();
+  await expect(fullSteps).toHaveAttribute("open", "");
+  await expect(progress).toContainText("RRF");
 });
 
-test("manual expansion during execution stays expanded after normal completion", async ({ page }) => {
+test("a running progress expansion never prevents automatic collapse after completion", async ({ page }) => {
   await openAiPortal(page, { delayFirstAsk: true });
   const input = page.getByRole("textbox", { name: "搜索数据资产" });
-  await input.fill("slow-old manual expand question");
+  await input.fill("slow-old expanded auto-collapse question");
   await page.getByRole("button", { name: "问 AI", exact: true }).click();
   const progress = page.locator(".sp-ai-execution");
   await expect(progress).toHaveAttribute("open", "");
-  await progress.locator(":scope > summary").click();
+  await expect(progress.locator(".sp-ai-stage-list > li")).toHaveCount(4);
+  await expect(page.getByLabel("AI 回答摘要")).toContainText("slow-old expanded auto-collapse question");
   await expect(progress).not.toHaveAttribute("open", "");
-  await progress.locator(":scope > summary").click();
-  await expect(progress).toHaveAttribute("open", "");
-  await expect(page.getByLabel("AI 回答摘要")).toContainText("slow-old manual expand question");
-  await expect(progress).toHaveAttribute("open", "");
+  await expect(progress.locator(":scope > summary")).toContainText("查看详细过程");
 });
 
 test("a new AI question supersedes a slow old response without relabeling", async ({ page }) => {
