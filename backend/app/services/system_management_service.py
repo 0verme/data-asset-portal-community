@@ -24,7 +24,7 @@ from datetime import datetime
 
 # pi-lens-ignore: python-hallucinated-import
 from pydantic import ValidationError
-from sqlalchemy import delete, func, insert, or_, select, update
+from sqlalchemy import delete, func, insert, literal_column, or_, select, update
 
 from ..application import AuditActorMixin, actor_aware
 from ..contracts.rag_search import (
@@ -32,6 +32,11 @@ from ..contracts.rag_search import (
     RagSearchConfig,
     RagSearchConfigUpdate,
     RagSearchConfigView,
+)
+from ..contracts.ai_llm_quota import (
+    AI_LLM_DAILY_LIMIT_CODE,
+    AI_LLM_QUOTA_CATEGORY_CODE,
+    parse_daily_limit,
 )
 from ..authorization import permissions as permission_contract
 from ..db.service import CoreAccess
@@ -45,6 +50,7 @@ from ..db.tables import (
     rbac_role_permission,
 )
 from .auth_service import build_password_hash
+from .ai_llm_daily_quota import DailyLLMQuotaUnavailable, daily_llm_quota_service
 from .common_code_service import common_code_service
 from .operation_log_service import (
     OPERATION_TYPE_CREATE,
@@ -59,7 +65,7 @@ from .operation_log_service import (
 USER_STATUSES = {"enabled", "disabled"}
 ROLE_STATUSES = {"enabled", "disabled"}
 DICT_STATUSES = {"enabled", "disabled"}
-RESERVED_PARAM_CATEGORY_CODES = frozenset({"RAG_SEARCH_CONFIG"})
+RESERVED_PARAM_CATEGORY_CODES = frozenset({"RAG_SEARCH_CONFIG", AI_LLM_QUOTA_CATEGORY_CODE})
 MENU_STATUSES = {"enabled", "disabled"}
 MENU_NAV_PLACEMENTS = {"primary", "more"}
 MAX_USERNAME_LENGTH = 64
@@ -1054,6 +1060,65 @@ class SystemManagementService(AuditActorMixin):
             page,
             page_size,
         )
+
+    def get_ai_llm_daily_quota(self):
+        try:
+            return daily_llm_quota_service.snapshot().as_dict()
+        except DailyLLMQuotaUnavailable:
+            raise SystemDataSourceError("Daily LLM quota storage is unavailable") from None
+
+    @actor_aware
+    def update_ai_llm_daily_quota(self, payload):
+        if not isinstance(payload, dict):
+            raise SystemValidationError(
+                "Daily LLM quota validation failed",
+                [{"field": "body", "message": "Request body must be a JSON object"}],
+            )
+        try:
+            daily_limit = parse_daily_limit(payload.get("dailyLimit"))
+        except (TypeError, ValueError):
+            raise SystemValidationError(
+                "Daily LLM quota validation failed",
+                [{"field": "dailyLimit", "message": "dailyLimit must be an integer greater than zero"}],
+            ) from None
+        with operation_log_service.audit(
+            module_name="系统配置",
+            operation_type=OPERATION_TYPE_UPDATE,
+            operation_object=AI_LLM_DAILY_LIMIT_CODE,
+            operation_desc="更新全站每日 LLM Provider 请求上限",
+        ) as audit:
+            self._core.execute(
+                update(code_item)
+                .where(
+                    code_item.c.category_code == AI_LLM_QUOTA_CATEGORY_CODE,
+                    code_item.c.item_code == AI_LLM_DAILY_LIMIT_CODE,
+                    code_item.c.is_active == "N",
+                )
+                .values(item_value=literal_column("item_value"))
+            )
+            try:
+                before_limit = daily_llm_quota_service.get_daily_limit()
+            except DailyLLMQuotaUnavailable:
+                raise SystemDataSourceError("Daily LLM quota storage is unavailable") from None
+            changed = self._core.execute(
+                update(code_item)
+                .where(
+                    code_item.c.category_code == AI_LLM_QUOTA_CATEGORY_CODE,
+                    code_item.c.item_code == AI_LLM_DAILY_LIMIT_CODE,
+                    code_item.c.is_active == "N",
+                )
+                .values(
+                    item_value=str(daily_limit),
+                    updated_by=self._default_operator,
+                    updated_at=func.current_timestamp(),
+                )
+            )
+            if changed != 1:
+                raise SystemDataSourceError("Daily LLM quota configuration is unavailable")
+            audit.before = {"dailyLimit": before_limit}
+            audit.after = {"dailyLimit": daily_limit}
+        common_code_service.invalidate([AI_LLM_QUOTA_CATEGORY_CODE])
+        return self.get_ai_llm_daily_quota()
 
     def get_rag_search_config(self):
         rows = self._core_fetch(

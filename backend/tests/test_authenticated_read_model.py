@@ -339,6 +339,7 @@ class PublicCatalogApiTests(unittest.TestCase):
             "/api/system/permissions",
             "/api/system/param-dicts",
             "/api/system/param-dicts/page",
+            "/api/system/ai-llm-daily-quota",
             "/api/operation-logs",
             "/api/metadata/ingestions/ing-1",
             "/api/upstreams/systems/UPSTREAM/admin-detail",
@@ -355,6 +356,7 @@ class PublicCatalogApiTests(unittest.TestCase):
             ("PATCH", "/api/indicators/I1/status"),
             ("DELETE", "/api/indicators/I1"),
             ("POST", "/api/system/menus"),
+            ("PUT", "/api/system/ai-llm-daily-quota"),
         ):
             with self.subTest(method=method, path=path):
                 response = self.client.request(method, path, json={})

@@ -12,6 +12,7 @@ from urllib.parse import urlencode
 
 from pydantic import ValidationError
 
+from ..contracts.ai_llm_quota import AI_LLM_QUOTA_FAILURE_MESSAGES
 from ..contracts.ai_ask import (
     AiAskCandidate,
     AiAskCitation,
@@ -357,6 +358,8 @@ class AIAskService:
             "llm_timeout",
             "llm_busy",
             "llm_unavailable",
+            "llm_quota_unavailable",
+            "llm_daily_quota_exceeded",
             "llm_not_configured",
             "ai_disabled",
             "invalid_model_output",
@@ -671,7 +674,9 @@ class AIAskService:
             )
             return respond(
                 status="generation_unavailable",
-                answer=_GENERATION_UNAVAILABLE_ANSWER,
+                answer=AI_LLM_QUOTA_FAILURE_MESSAGES.get(
+                    reason_code, _GENERATION_UNAVAILABLE_ANSWER
+                ),
                 retrieval_status=retrieval_status,
                 generation_status=generation_status,
                 reason_code=reason_code,

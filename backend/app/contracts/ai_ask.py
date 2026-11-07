@@ -33,6 +33,8 @@ AiAskReason = Literal[
     "llm_timeout",
     "llm_busy",
     "llm_unavailable",
+    "llm_daily_quota_exceeded",
+    "llm_quota_unavailable",
     "invalid_model_output",
     "invalid_citation",
     "ambiguous_scope",

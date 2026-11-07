@@ -688,12 +688,20 @@ class AiAskServiceTests(unittest.TestCase):
         self.assertEqual([], response.candidates)
 
     def test_provider_timeout_busy_and_malformed_output_are_safe(self):
-        for reason in ("llm_timeout", "llm_busy", "invalid_model_output", "llm_unavailable"):
+        for reason in (
+            "llm_timeout", "llm_busy", "llm_unavailable",
+            "llm_daily_quota_exceeded", "llm_quota_unavailable",
+            "invalid_model_output",
+        ):
             with self.subTest(reason=reason):
                 service, _rag, _llm = self._service(llm=StubLLMProvider(error=LLMProviderError(reason)))
                 response = service.ask(AiAskRequest(query="x"), profile="strict")
                 self.assertEqual("generation_unavailable", response.status)
                 self.assertEqual(reason, response.reason_code)
+                if reason == "llm_daily_quota_exceeded":
+                    self.assertEqual("今日 AI 问答额度已用完，请明日再试。", response.answer)
+                elif reason == "llm_quota_unavailable":
+                    self.assertEqual("每日 AI 问答额度服务暂不可用，请稍后重试。", response.answer)
                 self.assertNotIn("authorization", response.model_dump_json().lower())
 
     def test_malformed_candidate_parent_fails_closed_before_generation(self):

@@ -474,6 +474,31 @@ def _register_system_management_routes(
             diagnostics = rag_search_service.diagnostics(config)
         return JSONResponse(content=validate_contract({"data": diagnostics}, SystemResponse))
 
+    @router.get("/ai-llm-daily-quota", response_model=None)
+    def get_ai_llm_daily_quota(
+        _context: RequestContext = Depends(require_permission("system:param:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.get_ai_llm_daily_quota()
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract({"data": data}, SystemResponse))
+
+    @router.put("/ai-llm-daily-quota", response_model=None)
+    def update_ai_llm_daily_quota(
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_ai_llm_daily_quota(_system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract(
+            {"message": "Daily LLM quota updated", "data": data}, SystemResponse
+        ))
+
     @router.get("/param-dicts/categories", response_model=None)
     def get_param_categories(
         _context: RequestContext = Depends(require_permission("system:param:read")),

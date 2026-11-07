@@ -123,7 +123,7 @@
 
 **页面**：用户管理、菜单管理、参数字典管理、操作日志。
 
-**数据表**：用户 `p_admin_user`；菜单 `p_menu`；参数字典 `p_code_category`、`p_code_item`；操作日志 `p_operation_log`。
+**数据表**：用户 `p_admin_user`；菜单 `p_menu`；参数字典 `p_code_category`、`p_code_item`；每日真实 LLM Provider 全局计数 `p_ai_llm_daily_usage`；操作日志 `p_operation_log`。
 
 **说明**：用户状态为 `enabled` / `disabled`，每个用户当前绑定一个角色；角色通过 Role-Permission 映射获得权限。后端使用 permission code 强制保护用户、菜单、参数字典、业务模块和操作日志，前端菜单/按钮隐藏只是 UX。内置 `admin`、`maintainer` 仍提供默认映射，菜单管理支持启停、排序、主导航 / “更多”区域布局和管理员可见性配置。
 
@@ -153,7 +153,7 @@
 
 **当前管理入口**：`/api/system/param-dicts*`，由系统管理权限保护；该入口不是 `/api/common-codes/*` 的兼容别名。
 
-**说明**：参数字典页面维护系统级分类及条目，并折叠展示受管理员权限保护的可选 RAG 搜索配置。RAG URL/策略等非敏感配置使用保持停用、从通用参数字典和公共码值 API 隐藏的保留行；服务 Bearer Token 只从后端部署 Secret `RAG_SEARCH_SERVICE_TOKEN` 读取，浏览器仅获得是否配置的布尔值。功能默认关闭，不增加 RAG/模型/索引依赖。报表类型、上游/推送候选项和二态状态在公共业务页面分别复用当前领域 API、集中本地选项和共享 `enabled` / `disabled` 状态契约；历史 Common Code HTTP route 保持 WAIT_DB，前端不再调用。
+**说明**：参数字典页面维护系统级分类及条目，并折叠展示受管理员权限保护的可选 RAG 搜索配置与全站每日真实 LLM 请求额度。RAG URL/策略等非敏感配置及每日上限使用保持停用、从通用参数字典和公共码值 API 隐藏的保留行；服务 Bearer Token 只从后端部署 Secret `RAG_SEARCH_SERVICE_TOKEN` 读取，浏览器仅获得是否配置的布尔值。LLM 请求默认每日共享 50 次，按 Asia/Shanghai 自然日原子计数；读写使用现有 `system:param:read/write` 权限，更新写入操作审计。Mock、普通搜索和 RAG 推荐不消耗额度。功能默认关闭，不增加 RAG/模型/索引依赖。报表类型、上游/推送候选项和二态状态在公共业务页面分别复用当前领域 API、集中本地选项和共享 `enabled` / `disabled` 状态契约；历史 Common Code HTTP route 保持 WAIT_DB，前端不再调用。
 
 ## 15. 操作日志
 

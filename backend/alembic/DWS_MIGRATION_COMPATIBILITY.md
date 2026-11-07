@@ -1,6 +1,6 @@
 # GaussDB/DWS revision compatibility contract
 
-> Scope: repository revisions `0002`–`0014` and the JDBC-backed DWS upgrade runner. This matrix is a source audit, not a claim of live GaussDB/DWS 8.1.3 validation. DWS transaction/DDL behavior remains **NOT RUN** until the maintainer executes `REAL_DWS_VALIDATION.md` on the target release.
+> Scope: repository revisions `0002`–`0015` and the JDBC-backed DWS upgrade runner. This matrix is a source audit, not a claim of live GaussDB/DWS 8.1.3 validation. DWS transaction/DDL behavior remains **NOT RUN** until the maintainer executes `REAL_DWS_VALIDATION.md` on the target release.
 
 | Revision | DDL change | DML / backfill | Reflection / Inspector | DWS syntax / adapter finding | Transaction / recovery risk | Reuse and test strategy |
 |---|---|---|---|---|---|---|
@@ -17,6 +17,7 @@
 | `0012_search_hot_keywords` | Create `p_search_hot_keyword` from the canonical DWS baseline if absent; validate its columns, primary/unique keys, and types | Add only missing neutral recommendations; preserve existing rows and customizations | yes: table/column/PK/unique reflection plus row query | absence or missing seed rows is pending; a partial or mismatched table is a conflict. Uses canonical schema-qualified DWS DDL, including `DISTRIBUTE BY REPLICATION`. | DDL may survive failure; re-inspect before retry. Seed insertion is additive and checked before each write. | DWS adapter tests cover table creation, missing defaults, preserved disabled/custom rows, retry and fail-closed shape mismatch. Real DWS execution remains NOT RUN. |
 | `0013_field_filter_index` | Add non-unique `idx_p_field_mapping_field_table_deleted(table_pk, is_deleted)` | None; preserves all mapping rows | DWS schema reflection via `get_indexes` | The current DWS baseline already contains the index; older schemas create it with schema-qualified table DDL and plain `CREATE INDEX` (no `IF NOT EXISTS`). A missing field table or same-name index with different columns/uniqueness is a conflict. Generic Alembic skips an absent table to preserve legacy partial-schema upgrades, while DWS requires the table under its canonical baseline contract. | One DDL statement; index construction reads the target table and may consume substantial I/O, temporary space and elapsed time. Lock/write impact and DDL transaction behavior on GaussDB 8.1.3 are NOT RUN; do not assume an online/concurrent build. Keep the ledger unchanged on failure and re-inspect before retry. | Adapter tests cover fresh-baseline adoption, absent-index creation and mismatched-index rejection. Live DWS execution remains NOT RUN. |
 | `0014_rag_search_config` | None; reuse existing `p_code_category` / `p_code_item.ext_json` | Add one reserved RAG configuration category/item only when absent; both remain inactive (`N`); never overwrite existing values | Existing-row reads detect duplicates, wrong names or activation | Schema-qualified `SELECT`/`INSERT` with JDBC `?` parameters; missing parameter tables or an active/conflicting reserved row is a conflict. The reserved row is explicitly hidden from generic parameter/common-code APIs. | Additive seed only; no DDL. Re-inspect before retry; never activate, delete or reset a pre-existing row. | Pure seed-plan, Alembic SQLite and DWS fake-connection tests. Real DWS execution remains NOT RUN. |
+| `0015_ai_llm_daily_quota` | Add `p_ai_llm_daily_usage` from canonical DWS baseline if absent; reuse existing parameter tables | Add inactive quota setting and one `GLOBAL` usage row only when absent; preserve a valid customized limit/count | Physical table/column/PK/type/nullability reflection and row query | Schema-qualified canonical DDL with `DISTRIBUTE BY REPLICATION`; JDBC `?` inserts; malformed/duplicate configuration or usage is a conflict. Generic parameter APIs keep reserved rows hidden. | Additive DDL/seed only; do not overwrite a valid setting or usage count. Re-inspect before retry and retain ledger on failure. | DWS fake-connection tests cover fresh baseline, additive seed, preservation and conflicts. Real GaussDB/DWS execution remains NOT RUN. |
 
 ## `0013` large-table index operational risk
 
@@ -27,7 +28,7 @@ Before applying `0013` to a populated instance, the maintainer must review table
 ## Ledger and authoring rules
 
 1. The ledger value must be a known Alembic revision on the repository's single head. Unknown values fail closed; they are never treated as an unmanaged/fresh database.
-2. Fresh DWS executes the complete canonical `dws.sql`, verifies its schema, and then advances through the revision runner to the *dynamically discovered repository head*. Structural revisions are adopted from the verified baseline; additive seed revisions (`0009`, `0012` and `0014`) still execute because the schema baseline does not represent their rows. It does not replay changes already represented by that baseline.
+2. Fresh DWS executes the complete canonical `dws.sql`, verifies its schema, and then advances through the revision runner to the *dynamically discovered repository head*. Structural revisions are adopted from the verified baseline; additive seed revisions (`0009`, `0012`, `0014` and `0015`) still execute because the schema baseline does not represent their rows. It does not replay changes already represented by that baseline.
 3. Existing DWS executes every missing revision in order. A revision value is persisted only after that revision's post-condition is confirmed. A failed or partially applied revision is never stamped complete.
 4. DWS may use a JDBC-specific dialect/runner and per-revision adapter. Each adapter must declare the physical schema, DWS syntax/constraint/distribution policy, retry/partial-state checks, and tests; do not silently skip a revision or maintain the fresh baseline alone. A test asserts that every Alembic revision except `0001_baseline` has a registered DWS adapter.
 5. DDL rollback guarantees for DWS 8.1.3 are unverified. Until live validation establishes otherwise, design as if DDL may leave partial physical state: make steps idempotent when safe, detect unsafe partial state, retain the old ledger, report the failed revision/step, and require explicit recovery rather than silently advancing.
@@ -62,6 +63,7 @@ Git history confirms the released baselines form a *prefix* of the revision chai
 | this Issue | #321 | + `0012` search recommendation table and minimal neutral defaults in every canonical baseline |
 | this Issue | #403 | + `0013` non-unique field-mapping `(table_pk, is_deleted)` lookup index in every canonical baseline |
 | this Issue | #503 | + `0014` inactive reserved RAG search configuration seed using existing parameter tables; no vector schema or mandatory dependency |
+| this Issue | #549 | + `0015` shared LLM usage table in every canonical baseline; migration seeds the inactive default limit and one `GLOBAL` counter row additively |
 
 Consequences:
 
@@ -70,6 +72,7 @@ Consequences:
 * `0009` is a data-only revision that no schema baseline can represent, so fresh installs and existing upgrades execute its additive platform `UPSTREAM_DB_TYPE` seed; retail `UPSTREAM_DEPT` Demo values are excluded and remain the responsibility of an explicit Community Demo seed.
 * `0012` represents both a new table and its defaults: canonical current baselines already contain the table, but the adapter still inserts only missing defaults; older instances create the table from canonical DWS DDL before seeding.
 * `0014` is a data-only reserved option seed. Both category and item remain inactive (`N`) so generic parameter/common-code paths cannot publish the local index/model configuration; the dedicated admin endpoint is the only supported writer.
+* `0015` adds `p_ai_llm_daily_usage` to the canonical baselines and additively seeds the inactive default quota parameter plus a `GLOBAL` usage row. Existing valid limits and counts are preserved; the dedicated audited admin endpoint is the only supported writer for the limit.
 
 ### Resolution contract
 
@@ -108,6 +111,7 @@ After `NOT_APPLIED` execution the adapter is inspected again; the ledger advance
 | `0012_search_hot_keywords` | canonical `p_search_hot_keyword` shape and all neutral default rows are present | yes: table/column/PK/unique reflection + seed query | yes | absent table or missing default subset is additive; mismatched shape is a conflict | create the table from canonical DWS baseline DDL if absent, then insert only missing `(keyword, category)` defaults |
 | `0013_field_filter_index` | non-unique `(table_pk, is_deleted)` index on `p_field_mapping_field` | yes: index reflection | yes | absent index is pending; same-name index with different columns or uniqueness is a conflict | create the index explicitly after verifying the table exists; never drop or replace an existing index |
 | `0014_rag_search_config` | reserved RAG config category/item exist and both are inactive | yes: category/item row query | yes | missing rows are additive; duplicate, active or mismatched-name rows are a conflict | insert only missing reserved rows; never rewrite customized config or expose/activate it through generic parameter APIs |
+| `0015_ai_llm_daily_quota` | canonical usage table exists; inactive quota category/item and one valid `GLOBAL` usage row exist | yes: schema reflection + config/usage row queries | yes | missing table/seed rows are additive; wrong table shape, duplicate/invalid config or noncanonical usage is a conflict | create only from canonical DWS DDL and insert only missing reserved rows; preserve valid configured limits and counts; do not expose through generic parameter APIs |
 
 ### DWS-specific constraints encoded by the adapters
 
@@ -119,5 +123,6 @@ After `NOT_APPLIED` execution the adapter is inspected again; the ledger advance
 * **`0012` creates from canonical DWS DDL and seeds only missing `(keyword, category)` rows**; existing keywords, enabled state, sort order, IDs, and custom rows are never overwritten.
 * **`0013` adds only a non-unique field lookup index**; existing mapping rows are untouched, and an unexpected same-name index is rejected rather than replaced.
 * **`0014` adds only an inactive reserved parameter seed**; it does not create a vector table, enable RAG, expose local paths via common codes, or change search behavior. Both rows must stay inactive; configuration is writable only through the permission-protected system endpoint.
+* **`0015` adds the shared daily LLM usage table and inactive quota setting additively**; it preserves valid custom limits and usage values, rejects malformed/duplicate state, and exposes writes only through the audited, permission-protected system endpoint. No live GaussDB/DWS execution has been performed for this revision.
 * **Check-constraint detection for `0007`** uses `pg_constraint` + `pg_get_constraintdef`; this query is part of the maintainer's real-DWS validation checklist.
 * **DDL transactionality is assumed unsafe.** The runner commits each revision only after its post-condition is confirmed; if DWS auto-commits DDL, an interrupted revision is re-inspected and either safely resumed or reported as a conflict.

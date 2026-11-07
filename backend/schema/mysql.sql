@@ -255,6 +255,13 @@ CREATE TABLE IF NOT EXISTS p_code_item (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(category_code, item_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+CREATE TABLE IF NOT EXISTS p_ai_llm_daily_usage (
+  scope_key VARCHAR(32) PRIMARY KEY,
+  business_date VARCHAR(10) NOT NULL,
+  used_count INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT ck_p_ai_llm_daily_usage_nonnegative CHECK (used_count >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 CREATE TABLE IF NOT EXISTS p_root_change_log (
   change_id BIGINT PRIMARY KEY, root_id BIGINT, root_abbr VARCHAR(64) NOT NULL,
   change_type VARCHAR(64) NOT NULL, change_summary VARCHAR(512),
