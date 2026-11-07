@@ -29,7 +29,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         self.paths = DemoPaths.for_root(self.root)
 
     def test_demo_verifier_allows_only_inactive_migration_owned_config_rows(self):
-        from backend.app.contracts.ai_llm_quota import (
+        from backend.app.ai_llm_quota_contract import (
             AI_LLM_DAILY_LIMIT_CODE,
             AI_LLM_QUOTA_CATEGORY_CODE,
             AI_LLM_QUOTA_CATEGORY_NAME,

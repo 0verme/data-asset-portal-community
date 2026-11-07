@@ -502,7 +502,7 @@ def verify_demo_database(database: Path) -> dict[str, int]:
     """Verify the complete deterministic repository seed contract."""
     import sqlite3
 
-    from backend.app.contracts.ai_llm_quota import (
+    from backend.app.ai_llm_quota_contract import (
         AI_LLM_DAILY_LIMIT_CODE,
         AI_LLM_QUOTA_CATEGORY_CODE,
         AI_LLM_QUOTA_CATEGORY_NAME,
