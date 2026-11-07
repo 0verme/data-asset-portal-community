@@ -16,7 +16,7 @@ from backend.app.services.ai_llm_provider import (
 from backend.app.settings import AIAskLLMConfig, get_ai_llm_config
 
 
-def llm_config(*, enabled=True, max_concurrency=2, timeout_ms=1000):
+def llm_config(*, enabled=True, max_concurrency=2, timeout_ms=1000, disable_thinking=False):
     return AIAskLLMConfig(
         enabled=enabled,
         base_url="https://llm.example.invalid/v1",
@@ -25,6 +25,7 @@ def llm_config(*, enabled=True, max_concurrency=2, timeout_ms=1000):
         timeout_ms=timeout_ms,
         max_tokens=256,
         max_concurrency=max_concurrency,
+        disable_thinking=disable_thinking,
     )
 
 
@@ -83,6 +84,24 @@ class OpenAICompatibleLLMProviderTests(unittest.TestCase):
         self.assertEqual('{"answer":"ok","citations":[{"assetId":1}]}', output)
         self.assertEqual(1, len(requests))
         self.assertNotIn("test-provider-key", output)
+
+    def test_thinking_is_disabled_only_when_configured(self):
+        """DeepSeek 默认开启 Thinking；仅在显式配置时发送关闭指令。"""
+        captured = []
+
+        def handler(request):
+            captured.append(json.loads(request.content))
+            return success_response()
+
+        # 默认不发送 thinking，保持与其它 OpenAI 兼容端点兼容。
+        provider = self._provider(handler)
+        provider.complete_json(system_prompt="strict test prompt", user_payload={"query": "q"})
+        self.assertNotIn("thinking", captured[-1])
+
+        # 显式开启后发送 DeepSeek 的非思考模式指令。
+        provider = self._provider(handler, config=llm_config(disable_thinking=True))
+        provider.complete_json(system_prompt="strict test prompt", user_payload={"query": "q"})
+        self.assertEqual({"type": "disabled"}, captured[-1]["thinking"])
 
     def test_provider_can_load_runtime_configuration_after_app_import(self):
         current_config = [None]
