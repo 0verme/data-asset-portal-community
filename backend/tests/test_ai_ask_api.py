@@ -166,6 +166,36 @@ class AiAskApiTests(unittest.TestCase):
         self.assertEqual([], payload["citations"])
         self.assertEqual("strict", service.calls[0][1])
 
+    def test_report_count_json_response_preserves_exact_zero_and_report_list_link(self):
+        response_contract = AiAskResponse(
+            status="metadata_count_answered",
+            answer="当前 DAP 报表资产目录共有 0 个报表资产。",
+            metadataCount={
+                "metric": "report_count",
+                "value": 0,
+                "filters": {"domain": None, "layer": None},
+                "source": "dap_catalog",
+                "complete": True,
+                "catalogProfile": "strict",
+                "sourceLink": "/report-assets",
+            },
+            retrievalStatus="not_run",
+            generationStatus="not_run",
+        )
+        service = StubAIAskService(response=response_contract)
+        client, _search = self._client(service=service)
+
+        response = client.post("/api/ai/ask", json={"query": "报表资产总数是多少？"})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("report_count", payload["metadataCount"]["metric"])
+        self.assertEqual(0, payload["metadataCount"]["value"])
+        self.assertEqual("/report-assets", payload["metadataCount"]["sourceLink"])
+        self.assertEqual([], payload["citations"])
+        self.assertEqual("not_run", payload["retrievalStatus"])
+        self.assertEqual("not_run", payload["generationStatus"])
+
     def test_disabled_status_is_false_and_does_not_leak_configuration(self):
         client, _search = self._client(service=StubAIAskService(enabled=False))
 

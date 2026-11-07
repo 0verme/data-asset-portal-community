@@ -222,7 +222,11 @@ function safeCatalogLink(value: string | null | undefined): string | null {
 
 function AiAskStatisticalCard({ result }: { result: AiAskStatisticalResult }) {
   const link = safeCatalogLink(result.sourceLink);
-  const metricLabel = result.metric === "table_count" ? "张表" : result.metric === "field_count" ? "个字段" : "统计值";
+  const isReportCount = result.metric === "report_count";
+  const assetType = isReportCount ? "报表资产" : "数据表";
+  const metricLabel = isReportCount ? "个报表资产" : "张表";
+  const sourceLabel = isReportCount ? "DAP 报表资产目录" : "DAP 数据资产目录";
+  const linkLabel = isReportCount ? "查看全部报表资产" : "查看筛选后的全部资产";
   const filterSummary = result.filters.map((filter) =>
     `${filter.displayName || filter.dimension}=${filter.value}`,
   ).join("；");
@@ -232,8 +236,10 @@ function AiAskStatisticalCard({ result }: { result: AiAskStatisticalResult }) {
         <strong>{result.value} {metricLabel}</strong>
         <span>{result.complete ? "完整统计" : "部分统计"}</span>
       </div>
-      <p>统计依据：DAP 资产目录{filterSummary ? ` · ${filterSummary}` : " · 全目录"}</p>
-      {link ? <a className="sp-ai-statistic-link" href={link}>查看筛选后的全部资产</a> : null}
+      <p>资产类型：{assetType}</p>
+      <p>数据来源：{sourceLabel}</p>
+      <p>统计范围：{filterSummary || "全量目录"}</p>
+      {link ? <a className="sp-ai-statistic-link" href={link}>{linkLabel}</a> : null}
     </section>
   );
 }

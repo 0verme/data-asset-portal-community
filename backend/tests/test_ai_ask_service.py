@@ -98,6 +98,19 @@ class StubAssetCountService:
         return self.value
 
 
+class StubReportCountService:
+    def __init__(self, *, value=6, error=None):
+        self.value = value
+        self.error = error
+        self.calls = 0
+
+    def count_reports(self):
+        self.calls += 1
+        if self.error:
+            raise self.error
+        return self.value
+
+
 class StubLLMProvider:
     def __init__(self, content=None, error=None, enabled=True):
         self.contents = content if isinstance(content, list) else [content]
@@ -122,10 +135,12 @@ class StubLLMProvider:
 
 
 class AiAskServiceTests(unittest.TestCase):
-    def _service(self, *, retrieval=None, retrieval_error=None, llm=None, assets=None):
+    def _service(self, *, retrieval=None, retrieval_error=None, llm=None, assets=None, reports=None):
         rag = StubRagService(retrieval, retrieval_error)
         provider = llm or StubLLMProvider()
-        return AIAskService(rag, provider, assets_service=assets), rag, provider
+        return AIAskService(
+            rag, provider, assets_service=assets, reports_service=reports
+        ), rag, provider
 
     def test_metadata_count_uses_live_domain_and_layer_without_rag_or_llm(self):
         four_rag_candidates = RagRecommendationsResponse(
@@ -149,7 +164,11 @@ class AiAskServiceTests(unittest.TestCase):
         )
 
         self.assertEqual("metadata_count_answered", response.status)
-        self.assertNotIn("counting", [event.step_id for event in progress_events])
+        count_event = next(
+            event for event in progress_events
+            if event.step_id == "counting" and event.status == "completed"
+        )
+        self.assertEqual(("metadata_count", 73), (count_event.intent, count_event.table_count))
         analyzing_events = [event for event in progress_events if event.step_id == "analyzing"]
         self.assertEqual("metadata_count", analyzing_events[-1].intent)
         self.assertEqual("metadata_count", analyzing_events[-2].intent)
@@ -172,6 +191,23 @@ class AiAskServiceTests(unittest.TestCase):
         }], assets.count_calls)
         self.assertEqual("strict", response.metadata_count.catalog_profile)
 
+    def test_required_table_count_phrases_reach_the_authoritative_count_service(self):
+        for query in (
+            "有几张表？",
+            "当前系统有多少张表？",
+            "一共有多少张数据表？",
+            "数据表总数是多少？",
+        ):
+            with self.subTest(query=query):
+                assets = StubAssetCountService(value=42)
+                service, rag, llm = self._service(assets=assets)
+                response = service.ask(AiAskRequest(query=query), profile="strict")
+                self.assertEqual("metadata_count_answered", response.status)
+                self.assertEqual(42, response.metadata_count.value)
+                self.assertEqual(1, len(assets.count_calls))
+                self.assertEqual([], rag.calls)
+                self.assertEqual([], llm.calls)
+
     def test_metadata_count_zero_and_single_dimension_queries_are_exact(self):
         cases = (
             ("合成主题域有多少张表？", 0, "SYNTH", "合成主题域", None, None),
@@ -193,6 +229,64 @@ class AiAskServiceTests(unittest.TestCase):
                 }, assets.count_calls[0])
                 self.assertEqual([], rag.calls)
                 self.assertEqual([], llm.calls)
+
+    def test_report_count_has_its_own_metric_and_never_calls_rag_or_llm(self):
+        report_service = StubReportCountService(value=0)
+        service, rag, llm = self._service(
+            assets=StubAssetCountService(), reports=report_service,
+            llm=StubLLMProvider(enabled=False),
+        )
+        events = []
+        response = service.ask(
+            AiAskRequest(query="报表资产总数是多少？"),
+            profile="strict",
+            progress_callback=events.append,
+        )
+        self.assertEqual("metadata_count_answered", response.status)
+        self.assertEqual(("report_count", 0), (response.metadata_count.metric, response.metadata_count.value))
+        self.assertEqual("/report-assets", response.metadata_count.source_link)
+        self.assertIsNone(response.metadata_count.filters.domain)
+        self.assertIsNone(response.metadata_count.filters.layer)
+        self.assertIn("0 个报表资产", response.answer)
+        self.assertEqual(1, report_service.calls)
+        self.assertEqual([], rag.calls)
+        self.assertEqual([], llm.calls)
+        count_event = next(
+            event for event in events
+            if event.step_id == "counting" and event.status == "completed"
+        )
+        self.assertEqual(("report_count", 0), (count_event.intent, count_event.report_count))
+
+    def test_report_count_failure_never_becomes_zero_or_calls_rag(self):
+        report_service = StubReportCountService(error=RuntimeError("synthetic database error"))
+        service, rag, llm = self._service(
+            assets=StubAssetCountService(), reports=report_service,
+        )
+        response = service.ask(
+            AiAskRequest(query="报表资产总数是多少？"), profile="strict"
+        )
+        self.assertEqual("metadata_count_unavailable", response.status)
+        self.assertIsNone(response.metadata_count)
+        self.assertEqual(1, report_service.calls)
+        self.assertEqual([], rag.calls)
+        self.assertEqual([], llm.calls)
+
+    def test_unsupported_report_scope_and_compound_counts_fail_closed(self):
+        report_service = StubReportCountService(value=6)
+        assets = StubAssetCountService(value=73)
+        service, rag, llm = self._service(assets=assets, reports=report_service)
+        for query in (
+            "财务主题域有多少份报表？",
+            "数据表和报表资产分别有多少？",
+        ):
+            with self.subTest(query=query):
+                response = service.ask(AiAskRequest(query=query), profile="strict")
+                self.assertEqual("ambiguous_scope", response.status)
+                self.assertIsNone(response.metadata_count)
+        self.assertEqual(0, report_service.calls)
+        self.assertEqual([], assets.count_calls)
+        self.assertEqual([], rag.calls)
+        self.assertEqual([], llm.calls)
 
     def test_metadata_count_ambiguity_and_query_failure_never_become_zero(self):
         assets = StubAssetCountService(value=0)
