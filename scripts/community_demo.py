@@ -502,6 +502,13 @@ def verify_demo_database(database: Path) -> dict[str, int]:
     """Verify the complete deterministic repository seed contract."""
     import sqlite3
 
+    from backend.app.ai_llm_quota_contract import (
+        AI_LLM_DAILY_LIMIT_CODE,
+        AI_LLM_QUOTA_CATEGORY_CODE,
+        AI_LLM_QUOTA_CATEGORY_NAME,
+        AI_LLM_QUOTA_ITEM_NAME,
+        parse_daily_limit,
+    )
     from backend.app.migrations.rag_search_config_seed import (
         RAG_CONFIG_CATEGORY_CODE,
         RAG_CONFIG_CATEGORY_NAME,
@@ -559,14 +566,49 @@ def verify_demo_database(database: Path) -> dict[str, int]:
                 "Community database is missing the single inactive, default RAG configuration item"
             )
 
+        reserved_quota_category = connection.execute(
+            "SELECT category_name, is_active FROM p_code_category WHERE category_code = ?",
+            (AI_LLM_QUOTA_CATEGORY_CODE,),
+        ).fetchall()
+        if (
+            len(reserved_quota_category) != 1
+            or reserved_quota_category[0][0] != AI_LLM_QUOTA_CATEGORY_NAME
+            or str(reserved_quota_category[0][1] or "").upper() != "N"
+        ):
+            raise BootstrapError(
+                "Community database is missing the single inactive AI LLM quota category"
+            )
+        reserved_quota_item = connection.execute(
+            "SELECT item_name, item_value, is_active FROM p_code_item "
+            "WHERE category_code = ? AND item_code = ?",
+            (AI_LLM_QUOTA_CATEGORY_CODE, AI_LLM_DAILY_LIMIT_CODE),
+        ).fetchall()
+        try:
+            quota_limit = (
+                parse_daily_limit(reserved_quota_item[0][1])
+                if len(reserved_quota_item) == 1
+                else None
+            )
+        except (TypeError, ValueError):
+            quota_limit = None
+        if (
+            len(reserved_quota_item) != 1
+            or reserved_quota_item[0][0] != AI_LLM_QUOTA_ITEM_NAME
+            or quota_limit is None
+            or str(reserved_quota_item[0][2] or "").upper() != "N"
+        ):
+            raise BootstrapError(
+                "Community database is missing the single inactive, valid AI LLM quota item"
+            )
+
         counts: dict[str, int] = {}
         for table, spec in plan.items():
             count = connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
             # The migration-owned inactive configuration rows are intentionally
             # outside the deterministic Community demo seed plan.
             expected = len(spec["rows"]) + {
-                "p_code_category": 1,
-                "p_code_item": 1,
+                "p_code_category": 2,
+                "p_code_item": 2,
             }.get(table, 0)
             if count != expected:
                 raise BootstrapError(

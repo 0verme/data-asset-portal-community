@@ -28,7 +28,14 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         self.root = Path(self.temp_dir.name)
         self.paths = DemoPaths.for_root(self.root)
 
-    def test_demo_verifier_allows_only_the_inactive_migration_owned_rag_rows(self):
+    def test_demo_verifier_allows_only_inactive_migration_owned_config_rows(self):
+        from backend.app.ai_llm_quota_contract import (
+            AI_LLM_DAILY_LIMIT_CODE,
+            AI_LLM_QUOTA_CATEGORY_CODE,
+            AI_LLM_QUOTA_CATEGORY_NAME,
+            AI_LLM_QUOTA_ITEM_NAME,
+            DEFAULT_AI_LLM_DAILY_LIMIT,
+        )
         from backend.app.migrations.rag_search_config_seed import (
             RAG_CONFIG_CATEGORY_CODE,
             RAG_CONFIG_CATEGORY_NAME,
@@ -63,6 +70,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
                 [
                     ("DEMO", "Demo category", "Y"),
                     (RAG_CONFIG_CATEGORY_CODE, RAG_CONFIG_CATEGORY_NAME, "N"),
+                    (AI_LLM_QUOTA_CATEGORY_CODE, AI_LLM_QUOTA_CATEGORY_NAME, "N"),
                 ],
             )
             connection.execute(
@@ -82,6 +90,14 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
                         RAG_CONFIG_DEFAULT_JSON,
                         "N",
                     ),
+                    (
+                        AI_LLM_QUOTA_CATEGORY_CODE,
+                        AI_LLM_DAILY_LIMIT_CODE,
+                        AI_LLM_QUOTA_ITEM_NAME,
+                        str(DEFAULT_AI_LLM_DAILY_LIMIT),
+                        None,
+                        "N",
+                    ),
                 ],
             )
             connection.execute("CREATE TABLE p_admin_user (username TEXT)")
@@ -92,9 +108,46 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             patch("demo.seed_loader.ADMIN_USER", {"username": "admin"}),
         ):
             counts = verify_demo_database(database)
-            self.assertEqual(2, counts["p_code_category"])
-            self.assertEqual(2, counts["p_code_item"])
+            self.assertEqual(3, counts["p_code_category"])
+            self.assertEqual(3, counts["p_code_item"])
             with sqlite3.connect(database) as connection:
+                connection.execute(
+                    "UPDATE p_code_item SET item_value = '75' "
+                    "WHERE category_code = ? AND item_code = ?",
+                    (AI_LLM_QUOTA_CATEGORY_CODE, AI_LLM_DAILY_LIMIT_CODE),
+                )
+            verify_demo_database(database)
+            with sqlite3.connect(database) as connection:
+                connection.execute(
+                    "UPDATE p_code_item SET item_value = '0' "
+                    "WHERE category_code = ? AND item_code = ?",
+                    (AI_LLM_QUOTA_CATEGORY_CODE, AI_LLM_DAILY_LIMIT_CODE),
+                )
+            with self.assertRaises(BootstrapError):
+                verify_demo_database(database)
+            with sqlite3.connect(database) as connection:
+                connection.execute(
+                    "UPDATE p_code_item SET item_value = ? "
+                    "WHERE category_code = ? AND item_code = ?",
+                    (
+                        str(DEFAULT_AI_LLM_DAILY_LIMIT),
+                        AI_LLM_QUOTA_CATEGORY_CODE,
+                        AI_LLM_DAILY_LIMIT_CODE,
+                    ),
+                )
+                connection.execute(
+                    "UPDATE p_code_category SET is_active = 'Y' "
+                    "WHERE category_code = ?",
+                    (AI_LLM_QUOTA_CATEGORY_CODE,),
+                )
+            with self.assertRaises(BootstrapError):
+                verify_demo_database(database)
+            with sqlite3.connect(database) as connection:
+                connection.execute(
+                    "UPDATE p_code_category SET is_active = 'N' "
+                    "WHERE category_code = ?",
+                    (AI_LLM_QUOTA_CATEGORY_CODE,),
+                )
                 connection.execute(
                     "UPDATE p_code_category SET is_active = 'Y' "
                     "WHERE category_code = ?",

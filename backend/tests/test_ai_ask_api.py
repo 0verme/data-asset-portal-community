@@ -319,6 +319,33 @@ class AiAskApiTests(unittest.TestCase):
         self.assertIn('"status":"completed"', response.text)
         self.assertEqual("answered", json_response.json()["status"])
 
+    def test_daily_quota_errors_survive_json_progress_and_execution_stream_responses(self):
+        quota_response = AiAskResponse(
+            status="generation_unavailable",
+            answer="今日 AI 问答额度已用完，请明日再试。",
+            citations=[],
+            candidates=[],
+            retrievalStatus="available",
+            generationStatus="unavailable",
+            reasonCode="llm_daily_quota_exceeded",
+            elapsedMs=1,
+        )
+
+        class StubExecutionService:
+            def ask(self, *_args, **_kwargs):
+                return quota_response
+
+        service = StubAIAskService(response=quota_response)
+        client, _search = self._client(service=service, execution=StubExecutionService())
+        json_response = client.post("/api/ai/ask", json={"query": "合成问答"})
+        progress_response = client.post("/api/ai/ask/progress", json={"query": "合成问答"})
+        stream_response = client.post("/api/ai/ask/stream", json={"query": "合成问答"})
+
+        self.assertEqual("llm_daily_quota_exceeded", json_response.json()["reasonCode"])
+        self.assertEqual("今日 AI 问答额度已用完，请明日再试。", json_response.json()["answer"])
+        self.assertIn('"reasonCode":"llm_daily_quota_exceeded"', progress_response.text)
+        self.assertIn('"reasonCode":"llm_daily_quota_exceeded"', stream_response.text)
+
     def test_ai_overload_is_explicit_and_does_not_block_ordinary_search(self):
         service = StubAIAskService()
         client, search = self._client(service=service)

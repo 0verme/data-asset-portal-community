@@ -56,6 +56,8 @@ function errorLabel(value: unknown): string {
     llm_timeout: "模型请求超时",
     llm_busy: "模型服务繁忙",
     llm_unavailable: "模型服务不可用",
+    llm_daily_quota_exceeded: "今日 AI 问答额度已用完，请明日再试",
+    llm_quota_unavailable: "每日 AI 问答额度服务暂不可用，请稍后重试",
     ai_disabled: "问答服务未启用",
     ambiguous_scope: "无法唯一确认统计范围",
     metadata_count_unavailable: "DAP 目录统计暂不可用",

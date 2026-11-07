@@ -266,6 +266,13 @@ CREATE TABLE IF NOT EXISTS dwp.p_code_item (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(category_code, item_code)
 );
+CREATE TABLE IF NOT EXISTS dwp.p_ai_llm_daily_usage (
+  scope_key TEXT NOT NULL PRIMARY KEY,
+  business_date TEXT NOT NULL,
+  used_count INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT ck_p_ai_llm_daily_usage_nonnegative CHECK (used_count >= 0)
+);
 CREATE TABLE IF NOT EXISTS dwp.p_root_change_log (
   change_id INTEGER PRIMARY KEY, root_id INTEGER, root_abbr TEXT NOT NULL,
   change_type TEXT NOT NULL, change_summary TEXT, before_json TEXT, after_json TEXT,

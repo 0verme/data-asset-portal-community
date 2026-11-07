@@ -7,6 +7,7 @@ URLs, response bodies, or upstream exception strings.
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from typing import Any
@@ -14,8 +15,15 @@ from typing import Any
 import httpx
 
 from ..settings import AIAskLLMConfig, get_ai_llm_config
+from .ai_llm_daily_quota import (
+    DailyLLMQuotaExceeded,
+    DailyLLMQuotaReservation,
+    DailyLLMQuotaUnavailable,
+    daily_llm_quota_service,
+)
 
 MAX_LLM_RESPONSE_BYTES = 256_000
+LOGGER = logging.getLogger(__name__)
 
 
 class LLMProviderError(RuntimeError):
@@ -34,12 +42,14 @@ class OpenAICompatibleLLMProvider:
         *,
         client: httpx.Client | None = None,
         config_getter=get_ai_llm_config,
+        quota_service=daily_llm_quota_service,
     ) -> None:
         self._client = client or httpx.Client(
             follow_redirects=False,
             trust_env=False,
         )
         self._config_getter = config_getter
+        self._quota_service = quota_service
         # App composition imports this module before ``load_runtime_env`` in
         # the ASGI entrypoint. Create the semaphore lazily on the first
         # configured request so the deployment limit comes from the loaded env.
@@ -89,6 +99,8 @@ class OpenAICompatibleLLMProvider:
         response_lock = threading.Lock()
         active_response: list[httpx.Response] = []
         deadline_timer: threading.Timer | None = None
+        reservation: DailyLLMQuotaReservation | None = None
+        request_dispatched = False
         cancel_watch_stop = threading.Event()
         cancel_watcher: threading.Thread | None = None
 
@@ -152,6 +164,21 @@ class OpenAICompatibleLLMProvider:
             deadline_timer = threading.Timer(timeout_seconds, expire_deadline)
             deadline_timer.daemon = True
             deadline_timer.start()
+            if cancel_event is not None and cancel_event.is_set():
+                raise LLMProviderError("cancelled")
+            if deadline_expired.is_set() or time.monotonic() >= deadline:
+                raise LLMProviderError("llm_timeout")
+            try:
+                reservation = self._quota_service.reserve()
+            except DailyLLMQuotaExceeded:
+                raise LLMProviderError("llm_daily_quota_exceeded") from None
+            except DailyLLMQuotaUnavailable:
+                raise LLMProviderError("llm_quota_unavailable") from None
+            if cancel_event is not None and cancel_event.is_set():
+                raise LLMProviderError("cancelled")
+            if deadline_expired.is_set() or time.monotonic() >= deadline:
+                raise LLMProviderError("llm_timeout")
+            request_dispatched = True
             try:
                 with self._client.stream(
                     "POST",
@@ -230,6 +257,11 @@ class OpenAICompatibleLLMProvider:
                 deadline_timer.join()
             with response_lock:
                 active_response.clear()
+            if reservation is not None and not request_dispatched:
+                try:
+                    self._quota_service.refund(reservation)
+                except DailyLLMQuotaUnavailable:
+                    LOGGER.warning("LLM quota reservation refund failed; the unused slot remains charged")
             capacity.release()
 
     def close(self) -> None:

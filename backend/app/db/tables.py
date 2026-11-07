@@ -356,6 +356,15 @@ code_item = _table(
     Column("updated_at", DateTime),
 )
 
+ai_llm_daily_usage = _table(
+    "p_ai_llm_daily_usage",
+    Column("scope_key", String(32), primary_key=True),
+    Column("business_date", String(10), nullable=False),
+    Column("used_count", Integer, nullable=False),
+    Column("updated_at", DateTime, nullable=False),
+    CheckConstraint("used_count >= 0", name="ck_p_ai_llm_daily_usage_nonnegative"),
+)
+
 menu_table = _table(
     "p_menu",
     Column("menu_id", Integer, primary_key=True),

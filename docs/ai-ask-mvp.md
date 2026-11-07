@@ -15,6 +15,7 @@
 | 搜索页结果区 Tab | 「搜索结果」与「AI 问答」双 Tab，带 `role="tablist"` 与方向键导航 | `frontend/src/components/SearchPortalPage.tsx` |
 | 统计意图（表数/字段数） | 已实现，走 DAP 目录精确 COUNT，不复用 RAG 候选计数 | `docs/ai-metadata-count.md`；`backend/app/services/ai_metadata_count.py` |
 | Mock 演示适配器 | `VITE_API_MODE=mock` 专用，动态导入；Remote 零回退 | `frontend/src/mock/aiAsk.ts`；`frontend/scripts/verify-remote-ai-isolation.mjs` |
+| 全站真实 LLM 每日额度（Issue #549） | 本次增量增加：默认 50 次、Asia/Shanghai 日切、共享数据库并发安全预留；仅真实 Provider HTTP 请求计数，Mock/Remote 搜索路径隔离 | `backend/app/services/ai_llm_daily_quota.py`；`backend/alembic/versions/0015_ai_llm_daily_quota.py` |
 | 真实 RAG 服务 / 真实 LLM 端点联调 | **NOT VERIFIED** | 无外部环境证据 |
 | 真实回答准确率、GaussDB / LanceDB 实测 | **NOT VERIFIED** | 无外部环境证据 |
 
@@ -202,7 +203,9 @@ Tab 支持 `ArrowLeft` / `ArrowRight` / `Home` / `End` 键盘导航；两个面�
 
 本轮没有内网凭据或服务授权，真实 RAG HTTP、DeepSeek、GaussDB/LanceDB、内网浏览器和生产验证均 `NOT RUN`。
 
-## 部署、功能关闭与回滚
+## 部署、功能关闭与回滚（Issue #513 初版配置边界）
+
+> 本节记录初版 #513 的 AI 开关行为。每日额度的数据库升级与管理操作见文末 Issue #549 补充；该增量不改变下列 `AI_ASK_ENABLED` / RAG 配置安全边界。
 
 - 没有 Schema/Migration/Seed 或新运行依赖；关闭 AI 不影响现有 `/api/search` / RAG 推荐配置和使用。
 - 部署默认/回滚：`AI_ASK_ENABLED=false`（或 unset）、移除对应 LLM Secret/环境配置并重启 DAP 后端；`GET /api/ai/status` 应返回 `{enabled:false}`，前端隐藏按钮。
@@ -234,3 +237,14 @@ Tab 支持 `ArrowLeft` / `ArrowRight` / `Home` / `End` 键盘导航；两个面�
 ## Issue #521：权威资产目录统计
 
 单轮问答现在可在 RAG/LLM 之外识别受控的表数意图，使用同一资产列表过滤与精确 COUNT，并通过 `metadataCount` 证据契约返回结果；SSE 进度附带 `intent=metadata_count` 与普通问答区分，不复用 RAG 候选计数步骤。审计口径、歧义/失败状态、筛选链接和与 #520 的前端集成边界见 [`ai-metadata-count.md`](ai-metadata-count.md)。统计结果不属于 RAG citation，不标记模型生成成功。
+
+## Issue #549：全站真实 LLM Provider 每日请求额度
+
+- 默认每日额度为 **50 次 Provider HTTP 请求**，全站用户及所有 DAP 应用实例共享。`POST /api/ai/ask`、`/api/ai/ask/progress`、`/api/ai/ask/stream` 共用真实 `OpenAICompatibleLLMProvider` 出站门禁；每个实际发起的 HTTP 请求单独计数（一次自然语言问题可能分别消耗规划与回答请求额度）。Provider 返回成功、错误、超时或取消发生在请求发起后，均保守计入；取消/超时在请求发起前时会退还预留额度。
+- 使用北京时间 `Asia/Shanghai` 自然日作为业务日期。午夜不依赖定时任务：下一个预留请求在共享数据库事务中原子重置日期和计数。`GET /api/system/ai-llm-daily-quota` 返回当前上限、已用、剩余和业务日期。
+- `PUT /api/system/ai-llm-daily-quota` 只接受正整数 `dailyLimit`（1–2,147,483,647），使用现有 `system:param:write` 权限、系统参数表和必需操作审计。专用管理面板位于系统管理 → 参数字典；保留的 `AI_LLM_QUOTA_CONFIG/AI_LLM_DAILY_LIMIT` 字典项为 inactive，并从通用字典读写/启停接口隐藏与保护。其值保存在既有 `p_code_item.item_value`，不从环境变量覆盖。
+- Schema 增量为 `0015_ai_llm_daily_quota`；在 `backend/schema/` 四方言基线中加入 `p_ai_llm_daily_usage`，在现有 DB 中 add-only 创建表/默认参数/单条 `GLOBAL` 用量行，保留合法的既有值。GaussDB/DWS 使用同 revision 的显式 DWS adapter；静态/模拟验证不能替代真实 GaussDB/DWS 执行。
+- Provider 在发出 HTTP 请求前通过共享数据库原子预留额度，门禁不放在路由或前端。数据库/计数/配置无效时 fail closed，返回安全错误码 `llm_quota_unavailable`；额度耗尽返回 `llm_daily_quota_exceeded`。不新增 Redis、用户/IP 配额、数据库连接配置或依赖。
+- 模拟问答适配器、`VITE_API_MODE=mock`、普通 Remote 搜索及 Remote RAG 推荐不经过真实 LLM Provider，因此不读、不改、不消耗该额度；不会把 Mock 的成功结果写入额度表。
+- 变更上限会和 Provider 预留在参数行上串行化；降低上限不会取消已经发起的请求或抹去既有 usage。只要当前 `used >= new limit`，当天后续新 Provider 请求即会拒绝。
+- 数据库迁移必须按部署既有流程先运行 `schema_migrate.py apply --profile <profile>` 并验证；如果当前额度存储缺失或损坏，Provider 请求拒绝而不是绕过限额。关闭 `AI_ASK_ENABLED` 仍保持问答禁用，且不影响传统搜索。

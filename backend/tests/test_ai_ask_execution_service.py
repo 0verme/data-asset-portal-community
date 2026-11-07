@@ -52,7 +52,7 @@ def search_response(query: str, items=(), *, status="available", reason=None):
 
 
 class StubLLMProvider:
-    def __init__(self, *, plan=None, answer=None, planning_error=None):
+    def __init__(self, *, plan=None, answer=None, planning_error=None, answer_error=None):
         self.plan = plan or {
             "queryType": "natural_language",
             "keyConcepts": ["合成概念", "合成字段"],
@@ -64,6 +64,7 @@ class StubLLMProvider:
             "claims": [{"assetId": 7, "fieldId": 11, "relevance": "direct"}],
         }
         self.planning_error = planning_error
+        self.answer_error = answer_error
         self.calls = []
 
     def is_enabled(self):
@@ -75,6 +76,8 @@ class StubLLMProvider:
             if self.planning_error:
                 raise self.planning_error
             return json.dumps(self.plan, ensure_ascii=False)
+        if self.answer_error:
+            raise self.answer_error
         return json.dumps(self.answer, ensure_ascii=False)
 
 
@@ -216,9 +219,11 @@ class StubAssetsService:
 
 
 class AIAskExecutionServiceTests(unittest.TestCase):
-    def _service(self, *, plan=None, answer=None, planning_error=None, responses=None, assets=None):
+    def _service(self, *, plan=None, answer=None, planning_error=None, answer_error=None, responses=None, assets=None):
         rag = StubRagService(responses)
-        provider = StubLLMProvider(plan=plan, answer=answer, planning_error=planning_error)
+        provider = StubLLMProvider(
+            plan=plan, answer=answer, planning_error=planning_error, answer_error=answer_error
+        )
         base = AIAskService(rag, provider)
         assets_service = assets or StubAssetsService()
         return AIAskExecutionService(base, assets_service), rag, provider, assets_service
@@ -381,6 +386,23 @@ class AIAskExecutionServiceTests(unittest.TestCase):
         self.assertEqual("raw_query_fallback", planning["data"]["planningMode"])
         self.assertEqual("llm_timeout", planning["data"]["fallbackReason"])
         self.assertEqual(2, len(llm.calls))
+
+    def test_quota_failure_codes_survive_the_execution_stream_contract(self):
+        for reason in ("llm_daily_quota_exceeded", "llm_quota_unavailable"):
+            with self.subTest(reason=reason):
+                service, _rag, _llm, _assets = self._service(
+                    answer_error=LLMProviderError(reason),
+                    responses={"CUSTOMER_ID": search_response("CUSTOMER_ID", [FIELD_7])},
+                )
+                response = service.ask(
+                    AiAskRequest(query="CUSTOMER_ID"), profile="strict", request_id=f"quota-{reason}"
+                )
+                self.assertEqual("generation_unavailable", response.status)
+                self.assertEqual(reason, response.reason_code)
+                if reason == "llm_daily_quota_exceeded":
+                    self.assertEqual("今日 AI 问答额度已用完，请明日再试。", response.answer)
+                elif reason == "llm_quota_unavailable":
+                    self.assertEqual("每日 AI 问答额度服务暂不可用，请稍后重试。", response.answer)
 
     def test_supplemental_search_runs_once_only_after_zero_authorized_first_round_hits(self):
         plan = {

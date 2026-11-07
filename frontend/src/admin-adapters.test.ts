@@ -13,6 +13,8 @@ const systemPage = read("./components/system/SystemManagementPage.tsx");
 const rolePage = read("./components/system/RoleManagementPage.tsx");
 const ragConfigPage = read("./components/system/RagSearchConfigPanel.tsx");
 const ragConfigApi = read("./api/ragSearchConfig.ts");
+const aiLlmQuotaPage = read("./components/system/AiLlmDailyQuotaPanel.tsx");
+const aiLlmQuotaApi = read("./api/aiLlmDailyQuota.ts");
 const oplogPage = read("./components/OperationLog/OperationLogPage.tsx");
 const oplogFilter = read("./components/OperationLog/OperationLogFilter.tsx");
 const oplogDetail = read("./components/OperationLog/OperationLogDetail.tsx");
@@ -68,6 +70,17 @@ test("optional RAG configuration is admin-controlled and never fabricates answer
   assert.match(ragConfigPage, /strategy 字段仅为兼容保留/);
   assert.doesNotMatch(ragConfigPage, /<select/);
   assert.doesNotMatch(ragConfigPage + ragConfigApi, /setAnswer|confidenceScore|similarityScore/);
+});
+
+test("daily LLM quota admin is remote-only, permission-aware, and documents shared usage", () => {
+  assert.match(paramPage, /<AiLlmDailyQuotaPanel canEdit=\{canEdit\} \/>/);
+  assert.match(aiLlmQuotaPage, /disabled=\{!canEdit \|\| !supported/);
+  assert.match(aiLlmQuotaPage, /Asia\/Shanghai/);
+  assert.match(aiLlmQuotaPage, /Mock \/ Remote/);
+  assert.match(aiLlmQuotaPage, /system:param:write/);
+  assert.match(aiLlmQuotaApi, /API_MODE === "remote"/);
+  assert.match(aiLlmQuotaApi, /requestRemote\("\/system\/ai-llm-daily-quota"/);
+  assert.match(aiLlmQuotaApi, /模拟模式不支持持久化每日 LLM 额度/);
 });
 
 test("operation log surfaces use the frozen DAP adapters", () => {

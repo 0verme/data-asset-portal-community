@@ -19,6 +19,7 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from datetime import UTC, datetime
 from typing import Any, Callable
 
+from ..contracts.ai_llm_quota import AI_LLM_QUOTA_FAILURE_MESSAGES
 from ..contracts.ai_ask import (
     AiAskCandidate,
     AiAskCitation,
@@ -334,8 +335,8 @@ class AIAskExecutionService(AIAskService):
                     raise _DeadlineExceeded("overall_timeout") from None
                 raise AIAskCancelled("request_cancelled") from None
             reason = error.reason_code if error.reason_code in {
-                "llm_timeout", "llm_busy", "llm_unavailable", "llm_not_configured",
-                "ai_disabled", "invalid_model_output",
+                "llm_timeout", "llm_busy", "llm_unavailable", "llm_quota_unavailable",
+                "llm_daily_quota_exceeded", "llm_not_configured", "ai_disabled", "invalid_model_output",
             } else "llm_unavailable"
         except (ValueError, TypeError):
             reason = "invalid_plan"
@@ -1219,13 +1220,19 @@ class AIAskExecutionService(AIAskService):
                         ))
                     raise AIAskCancelled("request_cancelled") from None
                 safe_reason = error.reason_code if error.reason_code in {
-                    "llm_timeout", "llm_busy", "llm_unavailable", "llm_not_configured",
-                    "ai_disabled", "invalid_model_output",
+                    "llm_timeout", "llm_busy", "llm_unavailable", "llm_quota_unavailable",
+                    "llm_daily_quota_exceeded", "llm_not_configured", "ai_disabled", "invalid_model_output",
                 } else "llm_unavailable"
-                events.error("generating", "模型生成回答失败。", {"errorCode": safe_reason})
+                quota_failure_message = AI_LLM_QUOTA_FAILURE_MESSAGES.get(safe_reason)
+                failure_message = quota_failure_message or _GENERATION_UNAVAILABLE_ANSWER
+                events.error(
+                    "generating",
+                    quota_failure_message or "模型生成回答失败。",
+                    {"errorCode": safe_reason},
+                )
                 return emit_answer(unavailable(
                     safe_reason,
-                    _GENERATION_UNAVAILABLE_ANSWER,
+                    failure_message,
                     status="generation_unavailable",
                     retrieval_status="degraded" if retrieval_degraded or verification_partial else "available",
                     generation_status="disabled" if safe_reason in {"ai_disabled", "llm_not_configured"} else "unavailable",

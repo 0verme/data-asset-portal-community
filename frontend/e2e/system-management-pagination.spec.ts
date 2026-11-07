@@ -42,6 +42,8 @@ function parameter(index: number): Item {
   };
 }
 
+const remote = process.env['VITE_API_MODE'] === 'remote';
+
 const fixtures: Record<ManagementKind, Item[]> = {
   users: Array.from({ length: 23 }, (_, offset) => user(offset + 1)),
   roles: Array.from({ length: 23 }, (_, offset) => role(offset + 1)),
@@ -60,6 +62,11 @@ async function installFixtures(page: Page) {
   const requests: Array<{ path: string; keyword: string; page: string; pageSize: string }> = [];
   let fullRoleCandidates = 0;
   let fullDictionaryCandidates = 0;
+  let dailyQuota: Item = {
+    parameterCode: 'AI_LLM_DAILY_LIMIT', dailyLimit: 50, used: 4, remaining: 46,
+    businessDate: '2026-11-07', timezone: 'Asia/Shanghai',
+  };
+  let dailyQuotaUpdates = 0;
   await page.addInitScript(() => {
     localStorage.setItem('dap_auth', JSON.stringify({ role: 'admin', user: 'pagination-admin', name: 'Pagination Admin' }));
     localStorage.setItem('dap-theme', 'light');
@@ -80,6 +87,18 @@ async function installFixtures(page: Page) {
     }
     if (path === '/public-catalog/config') {
       await route.fulfill({ json: { profile: 'internal', exportEnabled: false } });
+      return;
+    }
+    if (path === '/system/ai-llm-daily-quota' && request.method() === 'GET') {
+      await route.fulfill({ json: { data: dailyQuota } });
+      return;
+    }
+    if (path === '/system/ai-llm-daily-quota' && request.method() === 'PUT') {
+      const body = request.postDataJSON() as { dailyLimit?: number };
+      const dailyLimit = Number(body.dailyLimit || 0);
+      dailyQuotaUpdates += 1;
+      dailyQuota = { ...dailyQuota, dailyLimit, remaining: Math.max(0, dailyLimit - Number(dailyQuota['used'] || 0)) };
+      await route.fulfill({ json: { data: dailyQuota } });
       return;
     }
     if (path === '/system/permissions') {
@@ -128,7 +147,13 @@ async function installFixtures(page: Page) {
     }
     await route.fulfill({ json: { items: [] } });
   });
-  return { requests, get fullRoleCandidates() { return fullRoleCandidates; }, get fullDictionaryCandidates() { return fullDictionaryCandidates; } };
+  return {
+    requests,
+    get fullRoleCandidates() { return fullRoleCandidates; },
+    get fullDictionaryCandidates() { return fullDictionaryCandidates; },
+    get dailyQuota() { return dailyQuota; },
+    get dailyQuotaUpdates() { return dailyQuotaUpdates; },
+  };
 }
 
 const cases: Array<{ kind: ManagementKind; path: string; pager: string; tail: string; keyword: string }> = [
@@ -168,6 +193,25 @@ test('system management tables fetch database pages, reset server search, and re
   }
   expect(api.fullRoleCandidates).toBeGreaterThan(0);
   expect(api.fullDictionaryCandidates).toBe(0); // Management uses a page; legacy full candidate API remains available independently.
+});
+
+test('daily LLM quota panel reads and saves the shared remote configuration', async ({ page }) => {
+  test.skip(!remote, 'Requires VITE_API_MODE=remote and synthetic intercepted API responses.');
+  const api = await installFixtures(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/system-management/param-dicts');
+  const panel = page.locator('.llm-quota-panel');
+  await panel.locator('summary').click();
+  await expect(panel).toContainText('今日剩余 46 次');
+  await expect(panel.getByText('4 / 46')).toBeVisible();
+  const limit = panel.locator('input[type="number"]');
+  await expect(limit).toHaveValue('50');
+  await limit.fill('75');
+  await panel.getByRole('button', { name: '保存每日上限' }).click();
+  await expect(panel).toContainText('全站每日 LLM 请求上限已保存');
+  expect(api.dailyQuotaUpdates).toBe(1);
+  expect(api.dailyQuota['dailyLimit']).toBe(75);
+  expect(api.dailyQuota['remaining']).toBe(71);
 });
 
 test('status mutations reload the current server query and page', async ({ page }) => {
