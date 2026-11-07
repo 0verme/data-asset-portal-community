@@ -143,6 +143,10 @@ class OpenAICompatibleLLMProvider:
                 "max_tokens": settings.max_tokens,
                 "response_format": {"type": "json_object"},
             }
+            if settings.disable_thinking:
+                # DeepSeek 默认开启 Thinking；结构化选择任务必须显式关闭，
+                # 否则 reasoning tokens 会挤占 max_tokens 预算并截断 JSON 输出。
+                body["thinking"] = {"type": "disabled"}
             timeout_seconds = max(0.001, settings.timeout_ms / 1000)
             deadline = time.monotonic() + timeout_seconds
             deadline_timer = threading.Timer(timeout_seconds, expire_deadline)

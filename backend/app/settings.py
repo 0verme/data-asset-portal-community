@@ -148,6 +148,7 @@ class AIAskLLMConfig:
     timeout_ms: int
     max_tokens: int
     max_concurrency: int
+    disable_thinking: bool = False
 
     @property
     def configured(self) -> bool:
@@ -234,6 +235,7 @@ def get_ai_llm_config() -> AIAskLLMConfig | None:
         timeout_ms=limits[0],
         max_tokens=limits[1],
         max_concurrency=limits[2],
+        disable_thinking=parse_bool(os.getenv("AI_LLM_DISABLE_THINKING")),
     )
 
 
