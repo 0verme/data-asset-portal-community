@@ -61,6 +61,14 @@ index or let the browser access the LLM endpoint.
 | `AI_LLM_TIMEOUT_MS` | `10000` (250–60000) | Absolute Provider request/response deadline, including streaming-body delivery (not only per-read inactivity). |
 | `AI_LLM_MAX_TOKENS` | `512` (64–4096) | Output token ceiling. |
 | `AI_LLM_MAX_CONCURRENCY` | `2` (1–16) | Non-blocking Provider concurrency bound. |
+| `AI_LLM_DISABLE_THINKING` | `false` | Send `thinking: {"type": "disabled"}` to providers that enable reasoning by default (DeepSeek). Omitted unless enabled, so providers that reject unknown request fields keep working. |
+
+Some OpenAI-compatible providers (notably DeepSeek) enable a reasoning mode by
+default. Reasoning tokens are billed inside `AI_LLM_MAX_TOKENS` and can consume
+the budget before the strict selection JSON is emitted, which surfaces as
+`invalid_model_output`. Set `AI_LLM_DISABLE_THINKING=true` to add
+`"thinking": {"type": "disabled"}` to the request body. The field is omitted by
+default so providers that reject unknown request fields keep working.
 
 The browser-safe `GET /api/ai/status` exposes only `{"enabled": boolean}`. It
 also requires the existing RAG search configuration to be enabled and its
