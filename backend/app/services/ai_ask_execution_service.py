@@ -167,6 +167,43 @@ class _ExecutionEvents:
         self.emit("step_error", step_id, message, data)
 
 
+#: `done` 事件的唯一合法终态取值。
+DONE_TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled"})
+
+#: 视为一次问答“成功完成”的响应状态；其余状态在 `done` 中记为 failed。
+DONE_SUCCESS_ASK_STATUSES = frozenset({
+    "answered", "partial_answer", "insufficient_evidence", "metadata_count_answered",
+})
+
+
+def build_done_data(
+    *,
+    status: str,
+    step_count: int,
+    reason_code: str | None = None,
+) -> dict[str, Any]:
+    """构建 `done` 事件的 data 负载（SSE 终态契约的单一事实源）。
+
+    前端 `frontend/src/api/aiAskExecution.ts` 只接受 `status`/`stepCount`/`reasonCode`
+    三个字段。契约回归样本 `backend/tests/fixtures/ai_ask_stream_contract.json`
+    使用本函数生成，因此任何字段变更都会在 CI 中触发前后端配套修改。
+    """
+    if status not in DONE_TERMINAL_STATUSES:
+        raise ValueError("invalid_done_status")
+    payload: dict[str, Any] = {
+        "status": status,
+        "stepCount": max(0, int(step_count)),
+    }
+    if reason_code:
+        payload["reasonCode"] = reason_code
+    return payload
+
+
+def done_status_for_result(result: AiAskResponse) -> str:
+    """把一次问答响应映射为 `done` 事件的终态取值。"""
+    return "completed" if result.status in DONE_SUCCESS_ASK_STATUSES else "failed"
+
+
 class AIAskExecutionService(AIAskService):
     """Bounded multi-query RAG pipeline that reports only real execution data."""
 

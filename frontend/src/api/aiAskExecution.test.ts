@@ -92,3 +92,52 @@ test("done event requires an explicit terminal status", () => {
   assert.equal(parsed.data?.["status"], "completed");
   assert.throws(() => parseAiAskExecutionEvent(event("done", { status: "running" })), /状态无效/);
 });
+
+test("done event accepts the backend reasonCode field and still rejects other terminal data", () => {
+  const parsed = parseAiAskExecutionEvent(event("done", {
+    status: "completed",
+    stepCount: 5,
+    reasonCode: "insufficient_evidence",
+  }));
+  assert.equal(parsed.data?.["reasonCode"], "insufficient_evidence");
+
+  // 终态只允许 status/stepCount/reasonCode，errorCode 不属于 done 事件。
+  assert.throws(
+    () => parseAiAskExecutionEvent(event("done", { status: "completed", errorCode: "timeout" })),
+    /结束事件包含不支持的数据/,
+  );
+  assert.throws(
+    () => parseAiAskExecutionEvent(event("done", { status: "completed", reasonCode: "Bad Code" })),
+    /结束事件包含不支持的数据/,
+  );
+  assert.throws(
+    () => parseAiAskExecutionEvent(event("done", { status: "completed", stepCount: -1 })),
+    /结束事件包含不支持的数据/,
+  );
+});
+
+test("catalog progress events accept the directory verification fields the backend emits", () => {
+  const parsed = parseAiAskExecutionEvent(event("step_start", {
+    searchId: "0123456789abcdef",
+    startedAt: "2026-01-01T00:00:00.000Z",
+    phase: "database",
+    candidateAssetCount: 2,
+    candidateFieldCount: 1,
+    databaseCallCount: 2,
+    round: 1,
+  }, "catalog-0123456789abcdef"));
+  assert.equal(parsed.data?.["phase"], "database");
+  assert.equal(parsed.data?.["candidateAssetCount"], 2);
+
+  const completed = parseAiAskExecutionEvent(event("step_complete", {
+    searchId: "0123456789abcdef",
+    finishedAt: "2026-01-01T00:00:00.010Z",
+    durationMs: 10.5,
+    databaseCallCount: 2,
+    verifiedAssetCount: 2,
+    verifiedFieldCount: 1,
+    round: 1,
+    phase: "database",
+  }, "catalog-0123456789abcdef"));
+  assert.equal(completed.data?.["verifiedAssetCount"], 2);
+});

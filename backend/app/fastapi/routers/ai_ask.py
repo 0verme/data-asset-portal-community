@@ -19,7 +19,12 @@ from ...application import RequestContext
 from ...contracts.ai_ask import AiAskAvailability, AiAskRequest, AiAskResponse
 from ...services.ai_ask_admission import AIAskAdmissionLease, ai_ask_admission
 from ...services.ai_ask_service import AIAskCancelled, AIAskService
-from ...services.ai_ask_execution_service import AIAskExecutionService
+from ...services.ai_ask_execution_service import (
+    AIAskExecutionService,
+    DONE_SUCCESS_ASK_STATUSES,
+    build_done_data,
+    done_status_for_result,
+)
 from ...services.ai_ask_request_guard import (
     AIAskRequestGuard,
     defer_release_until,
@@ -415,7 +420,7 @@ def _register_ai_ask_routes(
                     "step_id": "done",
                     "timestamp": datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
                     "message": response.answer,
-                    "data": {"status": "failed", "stepCount": 0, "reasonCode": "llm_busy"},
+                    "data": build_done_data(status="failed", step_count=0, reason_code="llm_busy"),
                 })
                 return
             guard = AIAskRequestGuard(lease)
@@ -495,18 +500,15 @@ def _register_ai_ask_routes(
                             "message": "已返回问答结果。",
                             "data": {"response": result.model_dump(by_alias=True)},
                         })
-                    success = result.status in {
-                        "answered", "partial_answer", "insufficient_evidence", "metadata_count_answered",
-                    }
+                    success = result.status in DONE_SUCCESS_ASK_STATUSES
                     with step_lock:
                         count = len(step_ids)
                     timestamp = datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-                    done_data: dict[str, Any] = {
-                        "status": "completed" if success else "failed",
-                        "stepCount": count,
-                    }
-                    if result.reason_code:
-                        done_data["reasonCode"] = result.reason_code
+                    done_data = build_done_data(
+                        status=done_status_for_result(result),
+                        step_count=count,
+                        reason_code=result.reason_code,
+                    )
                     enqueue("done", {
                         "request_id": request_id,
                         "step_id": "done",
@@ -521,7 +523,7 @@ def _register_ai_ask_routes(
                         "step_id": "done",
                         "timestamp": timestamp,
                         "message": "问答请求已取消。",
-                        "data": {"status": "cancelled", "stepCount": len(step_ids)},
+                        "data": build_done_data(status="cancelled", step_count=len(step_ids)),
                     })
                 enqueue("__end__", None)
 
@@ -544,7 +546,7 @@ def _register_ai_ask_routes(
                         "step_id": "done",
                         "timestamp": timestamp,
                         "message": response.answer,
-                        "data": {"status": "failed", "stepCount": 0, "reasonCode": "llm_busy"},
+                        "data": build_done_data(status="failed", step_count=0, reason_code="llm_busy"),
                     })
                     return
 
@@ -576,7 +578,9 @@ def _register_ai_ask_routes(
                             "step_id": "done",
                             "timestamp": timestamp,
                             "message": "问答执行失败。",
-                            "data": {"status": "failed", "stepCount": 0, "reasonCode": "llm_unavailable"},
+                            "data": build_done_data(
+                                status="failed", step_count=0, reason_code="llm_unavailable"
+                            ),
                         })
                         enqueue("__end__", None)
                 else:

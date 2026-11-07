@@ -1,0 +1,182 @@
+{
+  "generatedBy": "backend/tests/test_ai_ask_sse_contract.py",
+  "note": "由真实 AIAskExecutionService + RagSearchService 生成；仅归一化时间戳、耗时与随机 searchId。请勿手改，运行 AI_ASK_SSE_FIXTURE_UPDATE=1 重新生成。",
+  "scenarios": [
+    {
+      "name": "insufficient_evidence",
+      "query": "123",
+      "responseStatus": "insufficient_evidence",
+      "doneReasonCode": "insufficient_evidence",
+      "events": [
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"planning\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"正在分析问题并规划检索查询。\",\"data\":{\"query\":\"123\"}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"planning\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"已完成问题分析与查询规划。\",\"data\":{\"originalQuery\":\"123\",\"queryType\":\"natural_language\",\"keyConcepts\":[\"123\"],\"queries\":[\"123\"],\"planningMode\":\"structured_llm\",\"fallbackReason\":null}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"rag-round-1\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"开始第 1 轮检索，执行 1 个候选查询。\",\"data\":{\"round\":1,\"queryCount\":1,\"maxRequests\":3}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"search-searchid0001\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"检索：123\",\"data\":{\"searchId\":\"searchid0001\",\"query\":\"123\",\"startedAt\":\"2026-01-01T00:00:00.000Z\",\"retrievalMode\":\"hybrid\",\"requestCount\":1,\"round\":1,\"status\":\"running\"}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"catalog-searchid0001\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"正在按资产与字段 ID 批量核验当前 DAP 目录。\",\"data\":{\"searchId\":\"searchid0001\",\"startedAt\":\"2026-01-01T00:00:00.000Z\",\"phase\":\"database\",\"candidateAssetCount\":0,\"candidateFieldCount\":0,\"databaseCallCount\":0,\"round\":1}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"catalog-searchid0001\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"DAP 目录候选核验完成。\",\"data\":{\"searchId\":\"searchid0001\",\"finishedAt\":\"2026-01-01T00:00:00.000Z\",\"durationMs\":1.0,\"databaseCallCount\":0,\"verifiedAssetCount\":0,\"verifiedFieldCount\":0,\"round\":1,\"phase\":\"database\"}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"search-searchid0001\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"检索完成：123\",\"data\":{\"searchId\":\"searchid0001\",\"query\":\"123\",\"startedAt\":\"2026-01-01T00:00:00.000Z\",\"finishedAt\":\"2026-01-01T00:00:00.000Z\",\"durationMs\":1.0,\"stageTimings\":{\"httpSearchMs\":1.0,\"catalogValidationMs\":1.0},\"databaseCallCount\":0,\"retrievalMode\":\"hybrid\",\"requestedMode\":\"hybrid\",\"effectiveMode\":\"hybrid\",\"channelsUsed\":[\"vector\",\"bm25\"],\"resultCount\":0,\"verifiedCount\":0,\"hits\":[],\"status\":\"available\",\"errorCode\":null,\"requestCount\":1,\"round\":1}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"rag-round-1\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"首轮检索结束。\",\"data\":{\"round\":1,\"queryCount\":1,\"requestCount\":1,\"resultCount\":0}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"merge\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"已合并检索结果；没有找到可核实资产。\",\"data\":{\"requestCount\":1,\"retrievalRounds\":1,\"resultCount\":0,\"deduplicatedCount\":0}}"
+        },
+        {
+          "event": "answer",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"answer\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"已完成问答并返回可解释结果。\",\"data\":{\"response\":{\"status\":\"insufficient_evidence\",\"answer\":\"当前目录检索没有找到足以回答问题的已验证资产。\",\"citations\":[],\"candidates\":[],\"metadataCount\":null,\"retrievalStatus\":\"available\",\"generationStatus\":\"not_run\",\"resultsTruncated\":false,\"reasonCode\":\"insufficient_evidence\",\"elapsedMs\":1.0}}}"
+        },
+        {
+          "event": "done",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"done\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"问答执行完成。\",\"data\":{\"status\":\"completed\",\"stepCount\":5,\"reasonCode\":\"insufficient_evidence\"}}"
+        }
+      ]
+    },
+    {
+      "name": "multi_query_rag",
+      "query": "贷款余额在哪个表？",
+      "responseStatus": "answered",
+      "doneReasonCode": null,
+      "events": [
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"planning\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"正在分析问题并规划检索查询。\",\"data\":{\"query\":\"贷款余额在哪个表？\"}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"planning\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"已完成问题分析与查询规划。\",\"data\":{\"originalQuery\":\"贷款余额在哪个表？\",\"queryType\":\"natural_language\",\"keyConcepts\":[\"贷款余额\",\"数据表\"],\"queries\":[\"贷款余额表\",\"贷款余额字段\",\"贷款余额在哪个表？\"],\"planningMode\":\"structured_llm\",\"fallbackReason\":null}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"rag-round-1\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"开始第 1 轮检索，执行 3 个候选查询。\",\"data\":{\"round\":1,\"queryCount\":3,\"maxRequests\":3}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"search-searchid0001\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"检索：贷款余额表\",\"data\":{\"searchId\":\"searchid0001\",\"query\":\"贷款余额表\",\"startedAt\":\"2026-01-01T00:00:00.000Z\",\"retrievalMode\":\"hybrid\",\"requestCount\":1,\"round\":1,\"status\":\"running\"}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"catalog-searchid0001\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"正在按资产与字段 ID 批量核验当前 DAP 目录。\",\"data\":{\"searchId\":\"searchid0001\",\"startedAt\":\"2026-01-01T00:00:00.000Z\",\"phase\":\"database\",\"candidateAssetCount\":2,\"candidateFieldCount\":2,\"databaseCallCount\":2,\"round\":1}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"catalog-searchid0001\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"DAP 目录候选核验完成。\",\"data\":{\"searchId\":\"searchid0001\",\"finishedAt\":\"2026-01-01T00:00:00.000Z\",\"durationMs\":1.0,\"databaseCallCount\":2,\"verifiedAssetCount\":2,\"verifiedFieldCount\":2,\"round\":1,\"phase\":\"database\"}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"search-searchid0001\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"检索完成：贷款余额表\",\"data\":{\"searchId\":\"searchid0001\",\"query\":\"贷款余额表\",\"startedAt\":\"2026-01-01T00:00:00.000Z\",\"finishedAt\":\"2026-01-01T00:00:00.000Z\",\"durationMs\":1.0,\"stageTimings\":{\"httpSearchMs\":1.0,\"catalogValidationMs\":1.0},\"databaseCallCount\":2,\"retrievalMode\":\"hybrid\",\"requestedMode\":\"hybrid\",\"effectiveMode\":\"hybrid\",\"channelsUsed\":[\"vector\",\"bm25\"],\"resultCount\":3,\"verifiedCount\":3,\"hits\":[{\"rank\":1,\"assetId\":7,\"fieldId\":null,\"entityType\":\"table\",\"name\":\"贷款余额表\",\"retrievalChannels\":[\"vector\",\"bm25\"],\"matchedTerms\":[\"贷款余额表 命中词1\"]},{\"rank\":2,\"assetId\":7,\"fieldId\":11,\"entityType\":\"field\",\"name\":\"贷款余额\",\"retrievalChannels\":[\"bm25\"],\"matchedTerms\":[\"贷款余额表 命中词2\"]},{\"rank\":3,\"assetId\":8,\"fieldId\":21,\"entityType\":\"field\",\"name\":\"合同编号\",\"retrievalChannels\":[\"bm25\"],\"matchedTerms\":[\"贷款余额表 命中词3\"]}],\"status\":\"available\",\"errorCode\":null,\"requestCount\":1,\"round\":1}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"search-searchid0002\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"检索：贷款余额字段\",\"data\":{\"searchId\":\"searchid0002\",\"query\":\"贷款余额字段\",\"startedAt\":\"2026-01-01T00:00:00.000Z\",\"retrievalMode\":\"hybrid\",\"requestCount\":1,\"round\":1,\"status\":\"running\"}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"catalog-searchid0002\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"正在按资产与字段 ID 批量核验当前 DAP 目录。\",\"data\":{\"searchId\":\"searchid0002\",\"startedAt\":\"2026-01-01T00:00:00.000Z\",\"phase\":\"database\",\"candidateAssetCount\":2,\"candidateFieldCount\":2,\"databaseCallCount\":2,\"round\":1}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"catalog-searchid0002\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"DAP 目录候选核验完成。\",\"data\":{\"searchId\":\"searchid0002\",\"finishedAt\":\"2026-01-01T00:00:00.000Z\",\"durationMs\":1.0,\"databaseCallCount\":2,\"verifiedAssetCount\":2,\"verifiedFieldCount\":2,\"round\":1,\"phase\":\"database\"}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"search-searchid0002\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"检索完成：贷款余额字段\",\"data\":{\"searchId\":\"searchid0002\",\"query\":\"贷款余额字段\",\"startedAt\":\"2026-01-01T00:00:00.000Z\",\"finishedAt\":\"2026-01-01T00:00:00.000Z\",\"durationMs\":1.0,\"stageTimings\":{\"httpSearchMs\":1.0,\"catalogValidationMs\":1.0},\"databaseCallCount\":2,\"retrievalMode\":\"hybrid\",\"requestedMode\":\"hybrid\",\"effectiveMode\":\"hybrid\",\"channelsUsed\":[\"vector\",\"bm25\"],\"resultCount\":3,\"verifiedCount\":3,\"hits\":[{\"rank\":1,\"assetId\":7,\"fieldId\":null,\"entityType\":\"table\",\"name\":\"贷款余额表\",\"retrievalChannels\":[\"vector\",\"bm25\"],\"matchedTerms\":[\"贷款余额字段 命中词1\"]},{\"rank\":2,\"assetId\":7,\"fieldId\":11,\"entityType\":\"field\",\"name\":\"贷款余额\",\"retrievalChannels\":[\"bm25\"],\"matchedTerms\":[\"贷款余额字段 命中词2\"]},{\"rank\":3,\"assetId\":8,\"fieldId\":21,\"entityType\":\"field\",\"name\":\"合同编号\",\"retrievalChannels\":[\"bm25\"],\"matchedTerms\":[\"贷款余额字段 命中词3\"]}],\"status\":\"available\",\"errorCode\":null,\"requestCount\":1,\"round\":1}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"search-searchid0003\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"检索：贷款余额在哪个表？\",\"data\":{\"searchId\":\"searchid0003\",\"query\":\"贷款余额在哪个表？\",\"startedAt\":\"2026-01-01T00:00:00.000Z\",\"retrievalMode\":\"hybrid\",\"requestCount\":1,\"round\":1,\"status\":\"running\"}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"catalog-searchid0003\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"正在按资产与字段 ID 批量核验当前 DAP 目录。\",\"data\":{\"searchId\":\"searchid0003\",\"startedAt\":\"2026-01-01T00:00:00.000Z\",\"phase\":\"database\",\"candidateAssetCount\":2,\"candidateFieldCount\":2,\"databaseCallCount\":2,\"round\":1}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"catalog-searchid0003\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"DAP 目录候选核验完成。\",\"data\":{\"searchId\":\"searchid0003\",\"finishedAt\":\"2026-01-01T00:00:00.000Z\",\"durationMs\":1.0,\"databaseCallCount\":2,\"verifiedAssetCount\":2,\"verifiedFieldCount\":2,\"round\":1,\"phase\":\"database\"}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"search-searchid0003\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"检索完成：贷款余额在哪个表？\",\"data\":{\"searchId\":\"searchid0003\",\"query\":\"贷款余额在哪个表？\",\"startedAt\":\"2026-01-01T00:00:00.000Z\",\"finishedAt\":\"2026-01-01T00:00:00.000Z\",\"durationMs\":1.0,\"stageTimings\":{\"httpSearchMs\":1.0,\"catalogValidationMs\":1.0},\"databaseCallCount\":2,\"retrievalMode\":\"hybrid\",\"requestedMode\":\"hybrid\",\"effectiveMode\":\"hybrid\",\"channelsUsed\":[\"vector\",\"bm25\"],\"resultCount\":3,\"verifiedCount\":3,\"hits\":[{\"rank\":1,\"assetId\":7,\"fieldId\":null,\"entityType\":\"table\",\"name\":\"贷款余额表\",\"retrievalChannels\":[\"vector\",\"bm25\"],\"matchedTerms\":[\"贷款余额在哪个表？ 命中词1\"]},{\"rank\":2,\"assetId\":7,\"fieldId\":11,\"entityType\":\"field\",\"name\":\"贷款余额\",\"retrievalChannels\":[\"bm25\"],\"matchedTerms\":[\"贷款余额在哪个表？ 命中词2\"]},{\"rank\":3,\"assetId\":8,\"fieldId\":21,\"entityType\":\"field\",\"name\":\"合同编号\",\"retrievalChannels\":[\"bm25\"],\"matchedTerms\":[\"贷款余额在哪个表？ 命中词3\"]}],\"status\":\"available\",\"errorCode\":null,\"requestCount\":1,\"round\":1}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"rag-round-1\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"首轮检索结束。\",\"data\":{\"round\":1,\"queryCount\":3,\"requestCount\":3,\"resultCount\":9}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"merge\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"已按跨查询排名融合合并并去重候选。\",\"data\":{\"requestCount\":3,\"retrievalRounds\":1,\"resultCount\":9,\"deduplicatedCount\":3,\"selectedAssetIds\":[7,8],\"fusionMethod\":\"reciprocal_rank_fusion\"}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"verification\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"按检索返回的稳定资产 ID 读取有限数量的 DAP 权威详情。\",\"data\":{\"maxTables\":5,\"candidateCount\":3,\"phase\":\"database\"}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"asset-7\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"读取资产明细：DWS_LOAN_BALANCE\",\"data\":{\"assetId\":7,\"nameHint\":\"DWS_LOAN_BALANCE\",\"source\":\"dap_catalog\",\"phase\":\"database\",\"databaseCallCount\":2}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"asset-8\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"读取资产明细：DWD_LOAN_CONTRACT\",\"data\":{\"assetId\":8,\"nameHint\":\"DWD_LOAN_CONTRACT\",\"source\":\"dap_catalog\",\"phase\":\"database\",\"databaseCallCount\":2}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"asset-7\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"已读取资产明细：DWS_LOAN_BALANCE\",\"data\":{\"assetId\":7,\"tableName\":\"DWS_LOAN_BALANCE\",\"fieldCount\":1,\"source\":\"dap_authoritative_metadata\"}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"asset-8\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"已读取资产明细：DWD_LOAN_CONTRACT\",\"data\":{\"assetId\":8,\"tableName\":\"DWD_LOAN_CONTRACT\",\"fieldCount\":1,\"source\":\"dap_authoritative_metadata\"}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"field-7-11\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"已核实字段：BALANCE_AMT\",\"data\":{\"assetId\":7,\"fieldId\":11,\"fieldName\":\"BALANCE_AMT\",\"tableName\":\"DWS_LOAN_BALANCE\",\"source\":\"dap_authoritative_metadata\"}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"field-8-21\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"已核实字段：CONTRACT_NO\",\"data\":{\"assetId\":8,\"fieldId\":21,\"fieldName\":\"CONTRACT_NO\",\"tableName\":\"DWD_LOAN_CONTRACT\",\"source\":\"dap_authoritative_metadata\"}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"verification\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"权威资产明细核实完成。\",\"data\":{\"verifiedTableCount\":2,\"verifiedFieldCount\":2,\"candidateCount\":3,\"errorCount\":0,\"truncated\":false,\"selectedAssetIds\":[7,8],\"source\":\"dap_authoritative_metadata\"}}"
+        },
+        {
+          "event": "step_start",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"generating\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"正在基于已核实的 DAP 资产证据生成完整回答。\",\"data\":{\"evidenceCount\":3,\"assetIds\":[7,8]}}"
+        },
+        {
+          "event": "step_complete",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"generating\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"模型已基于已核实证据完成回答。\",\"data\":{\"selectedEvidenceCount\":2,\"citationIds\":[{\"assetId\":7,\"fieldId\":11},{\"assetId\":8,\"fieldId\":21}]}}"
+        },
+        {
+          "event": "answer",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"answer\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"已生成完整回答。\",\"data\":{\"response\":{\"status\":\"answered\",\"answer\":\"根据当前 DAP 目录，以下资产可直接支持回答：\\n- 数据表：贷款余额表（DWS_LOAN_BALANCE）\\n  字段：贷款余额（BALANCE_AMT）\\n以下为相关线索，不作为直接结论：\\n- 数据表：贷款合同表（DWD_LOAN_CONTRACT）\\n  字段：合同编号（CONTRACT_NO）\",\"citations\":[{\"assetId\":7,\"fieldId\":11,\"source\":\"dap_catalog\"},{\"assetId\":8,\"fieldId\":21,\"source\":\"dap_catalog\"}],\"candidates\":[{\"assetId\":7,\"fieldId\":11,\"assetType\":\"field\",\"tableName\":\"DWS_LOAN_BALANCE\",\"tableDisplayName\":\"贷款余额表\",\"tableDescription\":\"按客户与账期汇总的贷款余额。\",\"fieldName\":\"BALANCE_AMT\",\"fieldDisplayName\":\"贷款余额\",\"fieldDescription\":\"账期期末贷款余额。\",\"domain\":\"信贷\",\"layer\":\"DWS\",\"source\":\"dap_catalog\",\"matchReason\":\"字段详情已按稳定 assetId + fieldId 核实，并确认所属表身份。\",\"relevance\":\"direct\"},{\"assetId\":8,\"fieldId\":21,\"assetType\":\"field\",\"tableName\":\"DWD_LOAN_CONTRACT\",\"tableDisplayName\":\"贷款合同表\",\"tableDescription\":\"贷款合同主档。\",\"fieldName\":\"CONTRACT_NO\",\"fieldDisplayName\":\"合同编号\",\"fieldDescription\":\"贷款合同编号。\",\"domain\":\"信贷\",\"layer\":\"DWD\",\"source\":\"dap_catalog\",\"matchReason\":\"字段详情已按稳定 assetId + fieldId 核实，并确认所属表身份。\",\"relevance\":\"related\"}],\"metadataCount\":null,\"retrievalStatus\":\"available\",\"generationStatus\":\"completed\",\"resultsTruncated\":false,\"reasonCode\":null,\"elapsedMs\":1.0}}}"
+        },
+        {
+          "event": "done",
+          "data": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"step_id\":\"done\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":\"问答执行完成。\",\"data\":{\"status\":\"completed\",\"stepCount\":15}}"
+        }
+      ]
+    }
+  ]
+}

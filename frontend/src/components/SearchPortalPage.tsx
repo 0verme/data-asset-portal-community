@@ -25,10 +25,12 @@ import {
   type AiAskStatisticalResult,
 } from "../api/aiAsk.ts";
 import {
+  AiAskExecutionContractError,
   askAiWithExecution,
   type AiAskExecutionEvent,
   type AiAskExecutionStatus,
 } from "../api/aiAskExecution.ts";
+import { receivedTerminalEvent } from "../api/aiAskExecutionSummary.ts";
 import { AiAskExecutionPanel } from "./AiAskExecutionPanel.tsx";
 import {
   getRagRecommendations,
@@ -649,7 +651,11 @@ export function SearchPortalPage({
           return;
         }
         const message = error instanceof Error ? error.message : "AI 问答暂不可用，请重试。";
-        setAiError(message);
+        setAiError(
+          error instanceof AiAskExecutionContractError
+            ? `问答进度事件解析失败（前端事件契约，不代表后端检索失败）：${message}`
+            : message,
+        );
         setAiExecutionStatus("failed");
         requestResultScroll();
       });
@@ -819,7 +825,10 @@ export function SearchPortalPage({
     || aiResponse?.status === "metadata_count_unavailable"
   );
   const searchTabStatus = searchLoading ? "搜索中" : searchError ? "搜索失败" : searchedTerm ? "已搜索" : "未搜索";
-  const aiTabStatus = aiLoading ? "问答中" : aiError || aiResponseFailed ? "执行失败" : aiResponse ? "已完成" : "未提问";
+  const aiProgressInterrupted = Boolean(aiError)
+    && aiExecutionStatus !== "cancelled"
+    && !receivedTerminalEvent(aiExecutionEvents);
+  const aiTabStatus = aiLoading ? "问答中" : aiProgressInterrupted ? "进度中断" : aiError || aiResponseFailed ? "执行失败" : aiResponse ? "已完成" : "未提问";
   const searchedAssetIds = new Set(
     groups
       .flatMap((group) => group.items.map((item) => item.assetId))

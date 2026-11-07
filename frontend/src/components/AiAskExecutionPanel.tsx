@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../ui/index.ts";
 import type { AiAskExecutionEvent, AiAskExecutionStatus } from "../api/aiAskExecution.ts";
+import {
+  httpRequestCountLabel,
+  receivedTerminalEvent,
+  searchRequestNote,
+} from "../api/aiAskExecutionSummary.ts";
 import "../styles/aiAskExecution.css";
 
 interface AiAskExecutionPanelProps {
@@ -82,7 +87,7 @@ function StepDetails({ step }: { step: ExecutionStep }) {
   const requestedMode = typeof data["requestedMode"] === "string" ? data["requestedMode"] : null;
   const retrievedCount = numberValue(data["resultCount"]);
   const verifiedCount = numberValue(data["verifiedCount"]);
-  const requestCount = numberValue(data["requestCount"]);
+  const searchNote = step.id.startsWith("search-") ? searchRequestNote(data) : null;
   const deduplicatedCount = numberValue(data["deduplicatedCount"]);
   const selectedIds = Array.isArray(data["selectedAssetIds"])
     ? data["selectedAssetIds"].filter((item): item is number => typeof item === "number")
@@ -117,7 +122,7 @@ function StepDetails({ step }: { step: ExecutionStep }) {
         <p><strong>检索策略：</strong>{effectiveMode || requestedMode || "未返回策略信息"}{requestedMode && effectiveMode && requestedMode !== effectiveMode ? `（请求 ${requestedMode}）` : ""}</p>
         {channels.length ? <p><strong>实际通道：</strong>{channels.join("、")}</p> : null}
         <p><strong>结果：</strong>{retrievedCount ?? 0} 条检索结果；{verifiedCount ?? hits.length} 条通过当前目录身份校验</p>
-        {requestCount === 0 ? <p className="sp-ai-execution-note">未向 RAG HTTP Search API 发出请求。</p> : null}
+        {searchNote ? <p className="sp-ai-execution-note">{searchNote}</p> : null}
         {hits.length ? (
           <details className="sp-ai-execution-nested">
             <summary>查看命中资产（{hits.length}）</summary>
@@ -147,7 +152,7 @@ function StepDetails({ step }: { step: ExecutionStep }) {
   if (step.id === "merge") {
     return (
       <div className="sp-ai-execution-detail">
-        <p>实际 HTTP Search 请求 {requestCount ?? 0} 次 · 检索轮次 {numberValue(data["retrievalRounds"]) ?? 0}</p>
+        <p>{httpRequestCountLabel(data)} · 检索轮次 {numberValue(data["retrievalRounds"]) ?? 0}</p>
         <p>跨查询去重后保留 {deduplicatedCount ?? 0} 个候选资产身份。</p>
         {selectedIds.length ? <p>候选资产 ID：{selectedIds.join("、")}</p> : null}
         {typeof data["fusionMethod"] === "string" ? <p>排名融合：RRF（只融合各次查询内排名，不比较原始分数）。</p> : null}
@@ -173,7 +178,7 @@ function StepDetails({ step }: { step: ExecutionStep }) {
   if (step.id.startsWith("rag-round-")) {
     return (
       <div className="sp-ai-execution-detail">
-        <p>本轮 {numberValue(data["queryCount"]) ?? 0} 个查询 · 实际 HTTP 请求 {requestCount ?? 0} 次 · 返回 {retrievedCount ?? 0} 条。</p>
+        <p>本轮 {numberValue(data["queryCount"]) ?? 0} 个查询 · {httpRequestCountLabel(data)} · 返回 {retrievedCount ?? 0} 条。</p>
         {typeof data["supplementalQuery"] === "string" ? <p>补充查询：{data["supplementalQuery"]}</p> : null}
       </div>
     );
@@ -232,10 +237,11 @@ export function AiAskExecutionPanel({ events, status, runId, loading, onCancel }
 
   if (!status && !events.length) return null;
   const terminal = status === "completed" || status === "failed" || status === "cancelled";
+  const backendTerminated = receivedTerminalEvent(events);
   const overallLabel = status === "running" ? "执行中"
     : status === "completed" ? `已完成 ${steps.filter((step) => step.status === "completed").length} 步`
       : status === "cancelled" ? "已取消"
-        : "执行失败";
+        : backendTerminated ? "执行失败" : "进度中断";
   return (
     <details
       className={`sp-ai-execution sp-ai-execution-${status || "running"}`}
@@ -252,6 +258,11 @@ export function AiAskExecutionPanel({ events, status, runId, loading, onCancel }
         <span>问答执行过程</span>
         <span className="sp-ai-execution-overall">{overallLabel}</span>
       </summary>
+      {status === "failed" && !backendTerminated ? (
+        <p className="sp-ai-execution-note" role="status">
+          未收到后端结束事件：本次失败可能来自前端事件契约或传输中断，不能据此判断后端检索失败。
+        </p>
+      ) : null}
       {steps.length ? (
         <ol className="sp-ai-execution-list">
           {steps.map((step) => {
