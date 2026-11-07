@@ -50,10 +50,32 @@
 .sp-ai-execution-note { color: var(--ink-3); }
 .sp-ai-execution-error { color: var(--danger); }
 .sp-ai-execution-waiting { margin: 0; padding: 4px 14px 14px; color: var(--ink-3); font-size: 12px; }
+.sp-ai-stage-list { display: grid; gap: 0; margin: 0; padding: 2px 14px 8px; list-style: none; }
+.sp-ai-stage { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; min-width: 0; padding: 8px 0; }
+.sp-ai-stage + .sp-ai-stage { border-top: 1px solid var(--line); }
+.sp-ai-stage-marker { display: grid; place-items: center; width: 16px; height: 16px; margin-top: 1px; border: 1px solid var(--ink-3); border-radius: 50%; color: var(--ink-3); font-size: 11px; line-height: 1; }
+.sp-ai-stage-completed .sp-ai-stage-marker { border-color: var(--success, #27844d); color: var(--success, #27844d); }
+.sp-ai-stage-running .sp-ai-stage-marker { border: 2px solid var(--line); border-top-color: var(--accent); animation: sp-ai-stage-spin 0.8s linear infinite; }
+.sp-ai-stage-failed .sp-ai-stage-marker { border-color: var(--danger); color: var(--danger); font-weight: 700; }
+.sp-ai-stage-content { display: grid; gap: 3px; min-width: 0; }
+.sp-ai-stage-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; font-size: 12px; }
+.sp-ai-stage-heading strong { min-width: 0; font-weight: 600; }
+.sp-ai-stage-status { flex: 0 0 auto; color: var(--ink-3); font-size: 11px; }
+.sp-ai-stage-running .sp-ai-stage-status { color: var(--accent); }
+.sp-ai-stage-failed .sp-ai-stage-status { color: var(--danger); }
+.sp-ai-stage-description { min-width: 0; color: var(--ink-2); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.sp-ai-execution-details { margin: 0 14px 12px; border-top: 1px solid var(--line); }
+.sp-ai-execution-details > summary { width: fit-content; max-width: 100%; padding: 10px 0 2px; cursor: pointer; color: var(--accent); font-size: 12px; overflow-wrap: anywhere; }
+.sp-ai-execution-details[open] > summary { margin-bottom: 4px; }
+.sp-ai-execution-details > .sp-ai-execution-list { padding-right: 0; padding-left: 0; }
+@keyframes sp-ai-stage-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 600px) {
   .sp-ai-execution-summary { padding: 10px 12px; }
   .sp-ai-execution-list { padding-right: 12px; padding-left: 12px; }
+  .sp-ai-stage-list { padding-right: 12px; padding-left: 12px; }
+  .sp-ai-stage-heading { align-items: flex-start; }
+  .sp-ai-execution-details { margin-right: 12px; margin-left: 12px; }
   .sp-ai-execution-step-head { align-items: flex-start; }
   .sp-ai-execution-cancel { margin-left: 12px; }
 }

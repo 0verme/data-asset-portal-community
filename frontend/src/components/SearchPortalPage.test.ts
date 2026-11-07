@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 const searchPagePath = fileURLToPath(new URL("./SearchPortalPage.tsx", import.meta.url));
 const searchStylesPath = fileURLToPath(new URL("../styles/search.css", import.meta.url));
 const executionPanelPath = fileURLToPath(new URL("./AiAskExecutionPanel.tsx", import.meta.url));
+const stepDetailPath = fileURLToPath(new URL("./StepDetail.tsx", import.meta.url));
+const stepSummaryPath = fileURLToPath(new URL("./StepSummary.tsx", import.meta.url));
+const stepGroupingPath = fileURLToPath(new URL("./aiAskStepSummary.ts", import.meta.url));
 const executionStylesPath = fileURLToPath(new URL("../styles/aiAskExecution.css", import.meta.url));
 const executionApiPath = fileURLToPath(new URL("../api/aiAskExecution.ts", import.meta.url));
 
@@ -198,9 +201,12 @@ test("AI answers remain explanatory while only DAP candidate cards navigate resp
 });
 
 test("AI progress displays real SSE execution, search evidence, authoritative verification, and collapsible status", async () => {
-  const [source, panel, styles, api] = await Promise.all([
+  const [source, panel, detail, summary, grouping, styles, api] = await Promise.all([
     readFile(searchPagePath, "utf8"),
     readFile(executionPanelPath, "utf8"),
+    readFile(stepDetailPath, "utf8"),
+    readFile(stepSummaryPath, "utf8"),
+    readFile(stepGroupingPath, "utf8"),
     readFile(executionStylesPath, "utf8"),
     readFile(executionApiPath, "utf8"),
   ]);
@@ -211,15 +217,22 @@ test("AI progress displays real SSE execution, search evidence, authoritative ve
   assert.match(panel, /useState\(status === "running"\)/);
   assert.match(panel, /setExpanded\(true\)/);
   assert.match(panel, /touchedForRun\.current/);
-  assert.match(panel, /retrievalMode|effectiveMode/);
-  assert.match(panel, /channelsUsed/);
-  assert.match(panel, /matchedTerms/);
-  assert.match(panel, /verifiedTableCount/);
-  assert.match(panel, /step\.id === "metadata-count"/);
-  assert.match(panel, /tableCount/);
-  assert.match(panel, /dap_authoritative_metadata/);
-  assert.match(panel, /RRF/);
+  assert.match(panel, /<StepSummary steps=\{displayedSteps\}/);
+  assert.match(panel, /<StepDetail steps=\{displayedSteps\}/);
+  assert.match(detail, /retrievalMode|effectiveMode/);
+  assert.match(detail, /channelsUsed/);
+  assert.match(detail, /matchedTerms/);
+  assert.match(detail, /verifiedTableCount/);
+  assert.match(detail, /step\.id === "metadata-count"/);
+  assert.match(detail, /tableCount/);
+  assert.match(detail, /dap_authoritative_metadata/);
+  assert.match(detail, /RRF/);
   assert.match(panel, /取消问答/);
+  assert.match(summary, /AI_ASK_EXECUTION_COPY\.summary/);
+  assert.match(summary, /TECHNICAL_TERMS/);
+  assert.match(grouping, /export function groupSteps/);
+  assert.match(styles, /\.sp-ai-stage-list/);
+  assert.match(styles, /\.sp-ai-execution-details/);
   assert.match(api, /requestRemoteEventStream\("\/ai\/ask\/stream"/);
   assert.match(api, /parseAiAskResponse\(data\["response"\]\)/);
   assert.match(api, /event\.requestId !== requestId/);
@@ -231,16 +244,17 @@ test("AI progress displays real SSE execution, search evidence, authoritative ve
 });
 
 test("AI execution panel never reports an unreported request count as zero requests", async () => {
-  const [panel, source] = await Promise.all([
+  const [panel, detail, source] = await Promise.all([
     readFile(executionPanelPath, "utf8"),
+    readFile(stepDetailPath, "utf8"),
     readFile(searchPagePath, "utf8"),
   ]);
 
   // 请求次数必须走统一口径，未知不得冒充 0 次。
-  assert.match(panel, /from "\.\.\/api\/aiAskExecutionSummary\.ts"/);
-  assert.match(panel, /httpRequestCountLabel\(data\)/);
-  assert.match(panel, /searchRequestNote\(data\)/);
-  assert.doesNotMatch(panel, /requestCount \?\? 0/);
+  assert.match(detail, /from "\.\.\/api\/aiAskExecutionSummary\.ts"/);
+  assert.match(detail, /httpRequestCountLabel\(data\)/);
+  assert.match(detail, /searchRequestNote\(data\)/);
+  assert.doesNotMatch(detail, /requestCount \?\? 0/);
 
   // 未收到后端 done 时不得直接断言后端检索失败。
   assert.match(panel, /receivedTerminalEvent\(events\)/);
