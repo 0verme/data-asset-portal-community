@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 const searchPagePath = fileURLToPath(new URL("./SearchPortalPage.tsx", import.meta.url));
 const searchStylesPath = fileURLToPath(new URL("../styles/search.css", import.meta.url));
 const executionPanelPath = fileURLToPath(new URL("./AiAskExecutionPanel.tsx", import.meta.url));
+const stepDetailPath = fileURLToPath(new URL("./StepDetail.tsx", import.meta.url));
+const stepSummaryPath = fileURLToPath(new URL("./StepSummary.tsx", import.meta.url));
+const stepGroupingPath = fileURLToPath(new URL("./aiAskStepSummary.ts", import.meta.url));
 const executionStylesPath = fileURLToPath(new URL("../styles/aiAskExecution.css", import.meta.url));
 const executionApiPath = fileURLToPath(new URL("../api/aiAskExecution.ts", import.meta.url));
 
@@ -197,7 +200,8 @@ test("AI answers remain explanatory while only DAP candidate cards navigate resp
   assert.match(source, /aria-label=\{`查看\$\{isField \? "字段" : "数据表"\}详情：/);
   assert.match(source, /ref: item\.tableName,[\s\S]*?assetId: item\.assetId/);
   assert.match(source, /证据来源：DAP 资产目录/);
-  assert.match(source, /答案引用的目录资产/);
+  assert.match(source, /已核实引用来源/);
+  assert.match(source, /selectVerifiedCitedCandidates\(response\.candidates, response\.citations\)/);
   assert.match(source, /item\.relevance === "direct"/);
   assert.match(source, /response\.resultsTruncated[\s\S]*?有界检索结果可能不完整/);
   assert.match(styles, /\.sp-ai-candidate \{[\s\S]*?width: 100%[\s\S]*?min-width: 0/);
@@ -208,29 +212,48 @@ test("AI answers remain explanatory while only DAP candidate cards navigate resp
 });
 
 test("AI progress displays real SSE execution, search evidence, authoritative verification, and collapsible status", async () => {
-  const [source, panel, styles, api] = await Promise.all([
+  const [source, panel, detail, summary, grouping, styles, api] = await Promise.all([
     readFile(searchPagePath, "utf8"),
     readFile(executionPanelPath, "utf8"),
+    readFile(stepDetailPath, "utf8"),
+    readFile(stepSummaryPath, "utf8"),
+    readFile(stepGroupingPath, "utf8"),
     readFile(executionStylesPath, "utf8"),
     readFile(executionApiPath, "utf8"),
   ]);
 
   assert.match(source, /askAiWithExecution\(/);
   assert.match(source, /setAiExecutionEvents\(\(current\) => \[\.\.\.current, event\]\)/);
-  assert.match(panel, /open=\{expanded\}/);
+  assert.match(panel, /open=\{status === "running" \|\| expanded\}/);
   assert.match(panel, /useState\(status === "running"\)/);
   assert.match(panel, /setExpanded\(true\)/);
-  assert.match(panel, /touchedForRun\.current/);
-  assert.match(panel, /retrievalMode|effectiveMode/);
-  assert.match(panel, /channelsUsed/);
-  assert.match(panel, /matchedTerms/);
-  assert.match(panel, /verifiedTableCount/);
-  assert.match(panel, /step\.id === "metadata-count"/);
-  assert.match(panel, /tableCount/);
-  assert.match(panel, /reportCount/);
-  assert.match(panel, /dap_authoritative_metadata/);
-  assert.match(panel, /RRF/);
+  assert.match(panel, /previous === "running" && status === "completed"/);
+  assert.match(panel, /setExpanded\(false\)/);
+  assert.match(panel, /formatCompletedSummary\(groupSteps\(displayedSteps\), citationCount\)/);
+  assert.match(panel, /formatSafeAiAskDiagnostics\(events, status, query\)/);
+  assert.match(panel, /AI_ASK_EXECUTION_COPY\.copyDebug/);
+  assert.match(panel, /AI_ASK_EXECUTION_COPY\.details/);
+  assert.match(source, /citationCount=\{response\?\.citations\.length \?\? 0\}/);
+  assert.match(panel, /<StepSummary steps=\{displayedSteps\}/);
+  assert.match(panel, /<StepDetail steps=\{displayedSteps\}/);
+  assert.match(detail, /retrievalMode|effectiveMode/);
+  assert.match(detail, /channelsUsed/);
+  assert.match(detail, /matchedTerms/);
+  assert.match(detail, /verifiedTableCount/);
+  assert.match(detail, /step\.id === "metadata-count"/);
+  assert.match(detail, /tableCount/);
+  assert.match(detail, /reportCount/);
+  assert.match(detail, /dap_authoritative_metadata/);
+  assert.match(detail, /RRF/);
   assert.match(panel, /取消问答/);
+  assert.match(summary, /AI_ASK_EXECUTION_COPY\.summary/);
+  assert.match(summary, /TECHNICAL_TERMS/);
+  assert.match(grouping, /export function groupSteps/);
+  assert.match(styles, /\.sp-ai-stage-list/);
+  assert.match(styles, /\.sp-ai-execution-details/);
+  assert.match(styles, /\.sp-ai-execution-collapsed-summary/);
+  assert.match(styles, /\.sp-ai-execution-details-link/);
+  assert.match(styles, /\.sp-ai-execution-actions/);
   assert.match(api, /requestRemoteEventStream\("\/ai\/ask\/stream"/);
   assert.match(api, /parseAiAskResponse\(data\["response"\]\)/);
   assert.match(api, /event\.requestId !== requestId/);
@@ -242,16 +265,17 @@ test("AI progress displays real SSE execution, search evidence, authoritative ve
 });
 
 test("AI execution panel never reports an unreported request count as zero requests", async () => {
-  const [panel, source] = await Promise.all([
+  const [panel, detail, source] = await Promise.all([
     readFile(executionPanelPath, "utf8"),
+    readFile(stepDetailPath, "utf8"),
     readFile(searchPagePath, "utf8"),
   ]);
 
   // 请求次数必须走统一口径，未知不得冒充 0 次。
-  assert.match(panel, /from "\.\.\/api\/aiAskExecutionSummary\.ts"/);
-  assert.match(panel, /httpRequestCountLabel\(data\)/);
-  assert.match(panel, /searchRequestNote\(data\)/);
-  assert.doesNotMatch(panel, /requestCount \?\? 0/);
+  assert.match(detail, /from "\.\.\/api\/aiAskExecutionSummary\.ts"/);
+  assert.match(detail, /httpRequestCountLabel\(data\)/);
+  assert.match(detail, /searchRequestNote\(data\)/);
+  assert.doesNotMatch(detail, /requestCount \?\? 0/);
 
   // 未收到后端 done 时不得直接断言后端检索失败。
   assert.match(panel, /receivedTerminalEvent\(events\)/);
