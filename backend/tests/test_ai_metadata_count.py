@@ -13,9 +13,13 @@ from backend.app.db.facade import clear_engine_cache, connect_with_profile
 from backend.app.migrations.schema import initialize, verify_database
 from backend.app.services.ai_ask_service import AIAskService
 from backend.app.services.ai_metadata_count import (
+    classify_count_query,
     is_metadata_count_query,
+    is_report_count_query,
     resolve_metadata_count_intent,
+    resolve_report_count_intent,
 )
+from backend.app.services.report_service import ReportService
 from backend.app.services.assets_service import AssetsService
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,9 +46,24 @@ class MetadataCountIntentTests(unittest.TestCase):
             "MART 层表数量是多少？",
             "共有多少张数据表？",
             "How many tables are in the catalog?",
+            "有几张表？",
+            "当前系统有多少张表？",
+            "一共有多少张数据表？",
+            "数据表总数是多少？",
         ):
             with self.subTest(query=query):
                 self.assertTrue(is_metadata_count_query(query))
+        for query in (
+            "有几张报表资产？",
+            "一共有多少个报表？",
+            "当前有多少张报表？",
+            "报表资产总数是多少？",
+            "有多少份报表？",
+        ):
+            with self.subTest(query=query):
+                self.assertTrue(is_report_count_query(query))
+                self.assertEqual("report_count", classify_count_query(query))
+                self.assertFalse(is_metadata_count_query(query))
         for query in (
             "贷款余额在哪张表？",
             "哪个字段表示总数？",
@@ -53,6 +72,16 @@ class MetadataCountIntentTests(unittest.TestCase):
         ):
             with self.subTest(query=query):
                 self.assertFalse(is_metadata_count_query(query))
+
+    def test_report_count_rejects_unimplemented_scope_conditions_and_mixed_asset_counts(self):
+        self.assertTrue(resolve_report_count_intent("当前系统有多少张报表？"))
+        self.assertFalse(resolve_report_count_intent("财务主题域有多少份报表？"))
+        self.assertFalse(resolve_report_count_intent("启用状态的报表总数是多少？"))
+        self.assertEqual(
+            "ambiguous_count",
+            classify_count_query("数据表和报表资产分别有多少？"),
+        )
+        self.assertEqual("report_count", classify_count_query("报表资产总数是多少？"))
 
     def test_dimensions_are_resolved_only_from_live_catalog_values_and_aliases(self):
         intent = resolve_metadata_count_intent("财务集市有几张表？", self.catalog)
@@ -76,6 +105,9 @@ class MetadataCountIntentTests(unittest.TestCase):
         )
         self.assertIsNone(
             resolve_metadata_count_intent("某个主题域有几张表？", self.catalog)
+        )
+        self.assertIsNone(
+            resolve_metadata_count_intent("当前系统主题域有几张表？", self.catalog)
         )
         self.assertIsNone(
             resolve_metadata_count_intent("数据有多少表？", self.catalog)
@@ -126,6 +158,34 @@ class AssetCountCatalogIntegrationTests(unittest.TestCase):
             connection.close()
         self._insert_synthetic_assets()
         self.service = AssetsService()
+        self.report_service = ReportService()
+
+    def _insert_synthetic_reports(self):
+        connection = sqlite3.connect(self.database)
+        try:
+            for report_pk in range(1, 4):
+                connection.execute(
+                    "INSERT INTO p_report_asset "
+                    "(report_pk, report_code, report_name, report_type, domain_name, status_code, "
+                    "owner_dept_name, owner_name, related_tables_json, related_indicators_json, "
+                    "is_deleted, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        report_pk, f"SYN_REPORT_{report_pk}", f"合成报表{report_pk}",
+                        "经营分析", "合成主题域", "enabled", "测试部门", "test",
+                        "[]", "[]", "N", "test", "test",
+                    ),
+                )
+            connection.execute(
+                "INSERT INTO p_report_asset "
+                "(report_pk, report_code, report_name, report_type, domain_name, status_code, "
+                "owner_dept_name, owner_name, related_tables_json, related_indicators_json, "
+                "is_deleted, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (4, "SYN_REPORT_DELETED", "已删除合成报表", "经营分析", "合成主题域", "enabled",
+                 "测试部门", "test", "[]", "[]", "Y", "test", "test"),
+            )
+            connection.commit()
+        finally:
+            connection.close()
 
     def _insert_synthetic_assets(self):
         connection = sqlite3.connect(self.database)
@@ -268,6 +328,54 @@ class AssetCountCatalogIntegrationTests(unittest.TestCase):
         catalog = self.service.get_asset_count_filter_catalog()
         self.assertIn({"code": "SYN521", "name": "合成主题域"}, catalog["domains"])
         self.assertIn({"code": "DM", "name": "数据集市层"}, catalog["layers"])
+
+    def test_report_count_matches_page_total_and_returns_real_zero_without_rag_or_llm(self):
+        self.assertEqual(0, self.report_service.count_reports())
+        self.assertEqual(0, self.report_service.get_report_page(page=1, page_size=1)["total"])
+        self._insert_synthetic_reports()
+        page = self.report_service.get_report_page(page=1, page_size=1)
+        self.assertEqual((3, 1), (page["total"], len(page["items"])))
+        self.assertEqual(3, self.report_service.count_reports())
+
+        class EmptyRag:
+            def __init__(self):
+                self.calls = []
+
+            def is_configured(self):
+                return True
+
+            def recommend(self, *args, **kwargs):
+                self.calls.append((args, kwargs))
+                raise AssertionError("report COUNT must not call RAG")
+
+        class DisabledLlm:
+            def __init__(self):
+                self.calls = []
+
+            def is_enabled(self):
+                return False
+
+            def complete_json(self, **kwargs):
+                self.calls.append(kwargs)
+                raise AssertionError("report COUNT must not call the LLM")
+
+        rag = EmptyRag()
+        llm = DisabledLlm()
+        ai_service = AIAskService(
+            rag, llm, assets_service=self.service, reports_service=self.report_service
+        )
+        response = ai_service.ask(
+            AiAskRequest(query="一共有多少个报表？"), profile="strict"
+        )
+        self.assertEqual("metadata_count_answered", response.status)
+        self.assertEqual("report_count", response.metadata_count.metric)
+        self.assertEqual(3, response.metadata_count.value)
+        self.assertEqual("/report-assets", response.metadata_count.source_link)
+        self.assertIsNone(response.metadata_count.filters.domain)
+        self.assertIsNone(response.metadata_count.filters.layer)
+        self.assertIn("3 个报表资产", response.answer)
+        self.assertEqual([], rag.calls)
+        self.assertEqual([], llm.calls)
 
 
 if __name__ == "__main__":

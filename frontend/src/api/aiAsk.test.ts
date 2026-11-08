@@ -7,6 +7,7 @@ import {
   parseAiAskProgressStep,
   parseAiAskResponse,
 } from "./aiAsk.ts";
+import { createMockAiAnswer } from "../mock/aiAsk.ts";
 
 const validCandidate = {
   assetId: 42,
@@ -78,6 +79,11 @@ test("progress parser accepts real states and counts but rejects answer/token pa
     id: "counting", status: "completed", elapsedMs: 14.5, tableCount: 2, fieldCount: 7,
   });
   assert.deepEqual(parseAiAskProgressStep({
+    id: "counting", status: "completed", intent: "report_count", reportCount: 0,
+  }), {
+    id: "counting", status: "completed", intent: "report_count", elapsedMs: 0, reportCount: 0,
+  });
+  assert.deepEqual(parseAiAskProgressStep({
     id: "analyzing", status: "running", intent: "metadata_count", elapsedMs: 3,
   }), {
     id: "analyzing", status: "running", intent: "metadata_count", elapsedMs: 3,
@@ -96,6 +102,10 @@ test("progress parser accepts real states and counts but rejects answer/token pa
   );
   assert.throws(
     () => parseAiAskProgressStep({ id: "analyzing", status: "running", intent: "model_guess" }),
+    /Invalid AI ask progress event/,
+  );
+  assert.throws(
+    () => parseAiAskProgressStep({ id: "counting", status: "completed", intent: "report_count", tableCount: 1 }),
     /Invalid AI ask progress event/,
   );
 });
@@ -311,6 +321,53 @@ test("metadata count response preserves exact zero/count evidence and a same-fil
   }).metadataCount, null);
 });
 
+test("report-count metadata adapts zero precisely and only links to the report-asset list", () => {
+  const parsed = parseAiAskResponse({
+    status: "metadata_count_answered",
+    answer: "当前 DAP 报表资产目录共有 0 个报表资产。",
+    citations: [],
+    candidates: [],
+    metadataCount: {
+      metric: "report_count",
+      value: 0,
+      filters: { domain: null, layer: null },
+      source: "dap_catalog",
+      complete: true,
+      catalogProfile: "strict",
+      sourceLink: "/report-assets",
+    },
+    retrievalStatus: "not_run",
+    generationStatus: "not_run",
+    resultsTruncated: false,
+    reasonCode: null,
+    elapsedMs: 1,
+  });
+  assert.equal(parsed.metadataCount?.metric, "report_count");
+  assert.equal(parsed.metadataCount?.value, 0);
+  assert.equal(parsed.statisticalResult?.metric, "report_count");
+  assert.equal(parsed.statisticalResult?.value, 0);
+  assert.equal(parsed.statisticalResult?.sourceLink, "/report-assets");
+
+  for (const invalid of [
+    { sourceLink: "/data-warehouse" },
+    { filters: { domain: { code: "FIN", displayName: "财务", matchedAs: "catalog_value", inferred: false }, layer: null } },
+  ]) {
+    assert.throws(() => parseAiAskResponse({
+      status: "metadata_count_answered",
+      answer: "非法统计。",
+      citations: [], candidates: [],
+      metadataCount: {
+        metric: "report_count", value: 2,
+        filters: { domain: null, layer: null }, source: "dap_catalog",
+        complete: true, catalogProfile: "strict", sourceLink: "/report-assets",
+        ...invalid,
+      },
+      retrievalStatus: "not_run", generationStatus: "not_run",
+      resultsTruncated: false, elapsedMs: 0,
+    }), /Invalid AI metadata count evidence|unsupported filters/);
+  }
+});
+
 test("failure and no-evidence statuses remain explicit and cannot carry model citations", () => {
   for (const response of [
     {
@@ -358,10 +415,21 @@ test("failure and no-evidence statuses remain explicit and cannot carry model ci
   );
 });
 
-test("mock mode explicitly refuses AI instead of inventing an answer", async () => {
-  const response = await askAi("贷款余额在哪个表？");
-  assert.equal(response.status, "generation_unavailable");
-  assert.equal(response.generationStatus, "disabled");
-  assert.deepEqual(response.candidates, []);
-  assert.deepEqual(response.citations, []);
+test("mock mode refuses remote AI and never invents table or report counts", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() => { throw new Error("Mock mode must not call the remote API."); }) as typeof fetch;
+  try {
+    const unavailable = await askAi("贷款余额在哪个表？");
+    assert.equal(unavailable.status, "generation_unavailable");
+    assert.equal(unavailable.generationStatus, "disabled");
+    assert.deepEqual(unavailable.candidates, []);
+    assert.deepEqual(unavailable.citations, []);
+
+    const mockReportCount = await createMockAiAnswer("报表资产总数是多少？");
+    assert.equal(mockReportCount.metadataCount, null);
+    assert.notEqual(mockReportCount.status, "metadata_count_answered");
+    assert.match(mockReportCount.answer, /不会编造表数量/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

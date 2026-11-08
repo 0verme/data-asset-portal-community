@@ -75,10 +75,18 @@ function StepDetails({ step }: { step: AiAskRawStep }) {
     : [];
 
   if (step.id === "metadata-count") {
-    const count = numberValue(data["tableCount"]);
+    const intent = data["intent"];
+    const reportCount = numberValue(data["reportCount"]);
+    const tableCount = numberValue(data["tableCount"]);
+    const count = intent === "report_count" ? reportCount : tableCount;
+    const countLabel = intent === "report_count" ? "个报表资产" : "张数据表";
     return (
       <div className="sp-ai-execution-detail">
-        {count !== null ? <p>DAP 目录精确 COUNT：{count} 张表。</p> : <p>未返回可核实的统计数值；检索候选数不会替代目录 COUNT。</p>}
+        {count !== null
+          ? <p>DAP 权威目录精确 COUNT：{count} {countLabel}。</p>
+          : step.status === "running"
+            ? <p>正在核对资产类型与统计范围；检索候选数不会替代目录 COUNT。</p>
+            : <p>未返回可核实的统计数值；检索候选数不会替代目录 COUNT。</p>}
         {typeof data["errorCode"] === "string" ? <p className="sp-ai-execution-error">{errorLabel(data["errorCode"])}</p> : null}
       </div>
     );

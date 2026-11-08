@@ -48,7 +48,7 @@ export type AiAskProgressStepId =
   | "generating"
   | "completed";
 export type AiAskProgressStatus = "pending" | "running" | "completed" | "failed";
-export type AiAskProgressIntent = "metadata_count";
+export type AiAskProgressIntent = "metadata_count" | "report_count" | "ambiguous_count";
 
 export interface AiAskProgressStep {
   id: AiAskProgressStepId;
@@ -56,6 +56,7 @@ export interface AiAskProgressStep {
   intent?: AiAskProgressIntent | null;
   elapsedMs: number;
   tableCount?: number | null;
+  reportCount?: number | null;
   fieldCount?: number | null;
   errorCode?: "timeout" | "unavailable" | "invalid_response" | "disabled" | "cancelled" | null;
 }
@@ -68,7 +69,7 @@ export interface AiAskStatisticalFilter {
 
 /** Presentation-only shape derived from the authoritative metadataCount. */
 export interface AiAskStatisticalResult {
-  metric: string;
+  metric: "table_count" | "report_count";
   value: number;
   filters: AiAskStatisticalFilter[];
   source: "dap_catalog";
@@ -83,7 +84,7 @@ export interface AiMetadataCountFilter {
 }
 
 export interface AiMetadataCount {
-  metric: "table_count";
+  metric: "table_count" | "report_count";
   value: number;
   filters: {
     domain: AiMetadataCountFilter | null;
@@ -158,7 +159,7 @@ function parseStatisticalResult(value: unknown): AiAskStatisticalResult | null {
   const filters = value["filters"];
   const sourceLink = value["sourceLink"];
   if (
-    !isText(metric) || !metric.trim()
+    (metric !== "table_count" && metric !== "report_count")
     || !Number.isInteger(resultValue) || Number(resultValue) < 0
     || !Array.isArray(filters) || filters.length > 20
     || value["source"] !== "dap_catalog"
@@ -221,24 +222,29 @@ function parseMetadataCount(value: unknown): AiMetadataCount {
   const sourceLink = value["sourceLink"];
   const catalogProfile = value["catalogProfile"];
   const filters = value["filters"];
+  const metric = value["metric"];
   if (
-    value["metric"] !== "table_count"
+    (metric !== "table_count" && metric !== "report_count")
     || !Number.isSafeInteger(count) || Number(count) < 0
     || value["source"] !== "dap_catalog"
     || value["complete"] !== true
     || (catalogProfile !== "internal" && catalogProfile !== "strict" && catalogProfile !== "disabled")
-    || !isText(sourceLink) || !/^\/data-warehouse(?:\?.*)?$/.test(sourceLink)
+    || !isText(sourceLink)
+    || (metric === "table_count" && !/^\/data-warehouse(?:\?.*)?$/.test(sourceLink))
+    || (metric === "report_count" && sourceLink !== "/report-assets")
     || Object.keys(filters).some((key) => key !== "domain" && key !== "layer")
   ) {
     throw new Error("Invalid AI metadata count evidence.");
   }
+  const domain = parseMetadataCountFilter(filters["domain"]);
+  const layer = parseMetadataCountFilter(filters["layer"]);
+  if (metric === "report_count" && (domain || layer)) {
+    throw new Error("Report count evidence cannot contain unsupported filters.");
+  }
   return {
-    metric: "table_count",
+    metric,
     value: Number(count),
-    filters: {
-      domain: parseMetadataCountFilter(filters["domain"]),
-      layer: parseMetadataCountFilter(filters["layer"]),
-    },
+    filters: { domain, layer },
     source: "dap_catalog",
     complete: true,
     catalogProfile,
@@ -455,7 +461,7 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
 
 export function parseAiAskProgressStep(value: unknown): AiAskProgressStep {
   if (!isRecord(value)) throw new Error("Invalid AI ask progress event.");
-  const allowedKeys = new Set(["id", "status", "intent", "elapsedMs", "tableCount", "fieldCount", "errorCode"]);
+  const allowedKeys = new Set(["id", "status", "intent", "elapsedMs", "tableCount", "reportCount", "fieldCount", "errorCode"]);
   if (Object.keys(value).some((key) => !allowedKeys.has(key))) {
     throw new Error("Unexpected data in AI ask progress event.");
   }
@@ -464,14 +470,19 @@ export function parseAiAskProgressStep(value: unknown): AiAskProgressStep {
   const intent = value["intent"];
   const elapsedMs = value["elapsedMs"];
   const tableCount = value["tableCount"];
+  const reportCount = value["reportCount"];
   const fieldCount = value["fieldCount"];
   const errorCode = value["errorCode"];
   if (
     typeof id !== "string" || !PROGRESS_STEP_IDS.has(id)
     || typeof status !== "string" || !PROGRESS_STATUSES.has(status)
-    || (intent !== undefined && intent !== null && intent !== "metadata_count")
+    || (intent !== undefined && intent !== null && !["metadata_count", "report_count", "ambiguous_count"].includes(String(intent)))
     || (elapsedMs !== undefined && (typeof elapsedMs !== "number" || !Number.isFinite(elapsedMs) || elapsedMs < 0))
     || (tableCount !== undefined && tableCount !== null && (!Number.isInteger(tableCount) || Number(tableCount) < 0))
+    || (reportCount !== undefined && reportCount !== null && (!Number.isInteger(reportCount) || Number(reportCount) < 0))
+    || (intent === "metadata_count" && reportCount !== undefined && reportCount !== null)
+    || (intent === "report_count" && tableCount !== undefined && tableCount !== null)
+    || (intent === "ambiguous_count" && ((tableCount !== undefined && tableCount !== null) || (reportCount !== undefined && reportCount !== null)))
     || (fieldCount !== undefined && fieldCount !== null && (!Number.isInteger(fieldCount) || Number(fieldCount) < 0))
     || (errorCode !== undefined && errorCode !== null && (typeof errorCode !== "string" || !PROGRESS_ERRORS.has(errorCode)))
   ) {
@@ -483,6 +494,7 @@ export function parseAiAskProgressStep(value: unknown): AiAskProgressStep {
     ...(intent === undefined ? {} : { intent: intent as AiAskProgressIntent | null }),
     elapsedMs: typeof elapsedMs === "number" ? elapsedMs : 0,
     ...(tableCount === undefined ? {} : { tableCount: tableCount as number | null }),
+    ...(reportCount === undefined ? {} : { reportCount: reportCount as number | null }),
     ...(fieldCount === undefined ? {} : { fieldCount: fieldCount as number | null }),
     ...(errorCode === undefined ? {} : { errorCode: errorCode as Exclude<AiAskProgressStep["errorCode"], undefined> }),
   };

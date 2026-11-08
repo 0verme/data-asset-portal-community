@@ -37,7 +37,7 @@ from .ai_ask_service import (
     _SYSTEM_PROMPT,
 )
 from .ai_llm_provider import LLMProviderError
-from .ai_metadata_count import is_metadata_count_query
+from .ai_metadata_count import classify_count_query
 
 LOGGER = logging.getLogger(__name__)
 
@@ -213,6 +213,7 @@ class AIAskExecutionService(AIAskService):
             base_service._rag_service,
             base_service._llm_provider,
             assets_service=assets_service,
+            reports_service=base_service._reports_service,
         )
 
     @staticmethod
@@ -938,11 +939,15 @@ class AIAskExecutionService(AIAskService):
             )
 
         try:
-            if is_metadata_count_query(query):
+            count_intent = classify_count_query(query)
+            if count_intent is not None:
+                count_start_data = {"intent": count_intent}
+                if count_intent != "ambiguous_count":
+                    count_start_data["phase"] = "database"
                 events.start(
                     "metadata-count",
-                    "正在按当前 DAP 目录解析统计口径并执行精确 COUNT。",
-                    {"intent": "metadata_count", "phase": "database"},
+                    "正在解析统计对象与范围，并核对 DAP 权威目录计数。",
+                    count_start_data,
                 )
 
                 def unavailable_count() -> AiAskResponse:
@@ -969,7 +974,7 @@ class AIAskExecutionService(AIAskService):
                     events.error(
                         "metadata-count",
                         "DAP 目录精确 COUNT 超过单次问答总时限。",
-                        {"intent": "metadata_count", "errorCode": "timeout"},
+                        {"intent": count_intent, "errorCode": "timeout"},
                     )
                     return emit_answer(unavailable_count())
                 except Exception:
@@ -977,16 +982,18 @@ class AIAskExecutionService(AIAskService):
                     events.error(
                         "metadata-count",
                         "DAP 目录精确 COUNT 未能完成。",
-                        {"intent": "metadata_count", "errorCode": "unavailable"},
+                        {"intent": count_intent, "errorCode": "unavailable"},
                     )
                     return emit_answer(unavailable_count())
 
                 if response.status == "metadata_count_answered" and response.metadata_count is not None:
-                    events.complete(
-                        "metadata-count",
-                        "DAP 目录精确 COUNT 已完成。",
-                        {"intent": "metadata_count", "tableCount": response.metadata_count.value},
-                    )
+                    if response.metadata_count.metric == "report_count":
+                        count_data = {"intent": "report_count", "reportCount": response.metadata_count.value}
+                        message = "DAP 报表资产目录精确 COUNT 已完成。"
+                    else:
+                        count_data = {"intent": "metadata_count", "tableCount": response.metadata_count.value}
+                        message = "DAP 数据表目录精确 COUNT 已完成。"
+                    events.complete("metadata-count", message, count_data)
                 else:
                     code = response.reason_code or "metadata_count_unavailable"
                     message = (
@@ -997,7 +1004,7 @@ class AIAskExecutionService(AIAskService):
                     events.error(
                         "metadata-count",
                         message,
-                        {"intent": "metadata_count", "errorCode": code},
+                        {"intent": count_intent, "errorCode": code},
                     )
                 return emit_answer(response)
 

@@ -80,7 +80,7 @@ AiAskProgressStepId = Literal[
     "completed",
 ]
 AiAskProgressStatus = Literal["pending", "running", "completed", "failed"]
-AiAskProgressIntent = Literal["metadata_count"]
+AiAskProgressIntent = Literal["metadata_count", "report_count", "ambiguous_count"]
 AiAskProgressError = Literal["timeout", "unavailable", "invalid_response", "disabled", "cancelled"]
 
 
@@ -92,6 +92,7 @@ class AiAskProgressStep(_AiAskContract):
     intent: AiAskProgressIntent | None = None
     elapsed_ms: float = Field(default=0, alias="elapsedMs", ge=0)
     table_count: int | None = Field(default=None, alias="tableCount", ge=0)
+    report_count: int | None = Field(default=None, alias="reportCount", ge=0)
     field_count: int | None = Field(default=None, alias="fieldCount", ge=0)
     error_code: AiAskProgressError | None = Field(default=None, alias="errorCode")
 
@@ -121,7 +122,7 @@ class AiMetadataCountFilters(_AiAskContract):
 class AiMetadataCount(_AiAskContract):
     """Exact COUNT evidence, kept separate from semantic RAG citations."""
 
-    metric: Literal["table_count"]
+    metric: Literal["table_count", "report_count"]
     value: Annotated[int, Field(strict=True, ge=0)]
     filters: AiMetadataCountFilters
     source: Literal["dap_catalog"]
@@ -129,9 +130,9 @@ class AiMetadataCount(_AiAskContract):
     catalog_profile: Literal["internal", "strict", "disabled"] = Field(alias="catalogProfile")
     source_link: str = Field(
         alias="sourceLink",
-        min_length=15,
+        min_length=14,
         max_length=2048,
-        pattern=r"^/data-warehouse(?:\?.*)?$",
+        pattern=r"^/(?:data-warehouse|report-assets)(?:\?.*)?$",
     )
 
     @field_validator("complete")
@@ -140,6 +141,18 @@ class AiMetadataCount(_AiAskContract):
         if value is not True:
             raise ValueError("精确元数据 COUNT 必须标记 complete=true")
         return value
+
+    @model_validator(mode="after")
+    def validate_metric_target(self) -> AiMetadataCount:
+        if self.metric == "table_count" and not self.source_link.startswith("/data-warehouse"):
+            raise ValueError("数据表统计必须链接到数据表资产列表")
+        if self.metric == "report_count" and (
+            self.filters.domain is not None
+            or self.filters.layer is not None
+            or self.source_link != "/report-assets"
+        ):
+            raise ValueError("报表资产统计只允许全量口径并链接到报表资产列表")
+        return self
 
 
 class AiAskCandidate(_AiAskContract):

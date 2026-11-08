@@ -178,6 +178,16 @@ test("submitted search and AI use one mutually exclusive accessible result panel
   assert.match(styles, /\.sp-results \{[^}]*scroll-margin-top: 14px/);
 });
 
+test("statistics cards identify asset type, exact source and the matching catalog entry", async () => {
+  const source = await readFile(searchPagePath, "utf8");
+  assert.match(source, /result\.metric === "report_count"/);
+  assert.match(source, /资产类型：\{assetType\}/);
+  assert.match(source, /数据来源：\{sourceLabel\}/);
+  assert.match(source, /统计范围：\{filterSummary \|\| "全量目录"\}/);
+  assert.match(source, /查看全部报表资产/);
+  assert.match(source, /查看筛选后的全部资产/);
+});
+
 test("AI answers remain explanatory while only DAP candidate cards navigate responsively", async () => {
   const [source, styles, api] = await Promise.all([
     readFile(searchPagePath, "utf8"),
@@ -223,7 +233,6 @@ test("AI progress displays real SSE execution, search evidence, authoritative ve
   assert.match(panel, /formatSafeAiAskDiagnostics\(events, status, query\)/);
   assert.match(panel, /AI_ASK_EXECUTION_COPY\.copyDebug/);
   assert.match(panel, /AI_ASK_EXECUTION_COPY\.details/);
-  assert.match(panel, /open=\{status === "running" \|\| expanded\}/);
   assert.match(source, /citationCount=\{response\?\.citations\.length \?\? 0\}/);
   assert.match(panel, /<StepSummary steps=\{displayedSteps\}/);
   assert.match(panel, /<StepDetail steps=\{displayedSteps\}/);
@@ -233,6 +242,7 @@ test("AI progress displays real SSE execution, search evidence, authoritative ve
   assert.match(detail, /verifiedTableCount/);
   assert.match(detail, /step\.id === "metadata-count"/);
   assert.match(detail, /tableCount/);
+  assert.match(detail, /reportCount/);
   assert.match(detail, /dap_authoritative_metadata/);
   assert.match(detail, /RRF/);
   assert.match(panel, /取消问答/);

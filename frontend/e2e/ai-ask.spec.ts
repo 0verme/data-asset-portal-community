@@ -65,9 +65,13 @@ function sseResponse(response: ReturnType<typeof answer> | Record<string, unknow
     const evidence = typeof response.metadataCount === "object" && response.metadataCount !== null
       ? response.metadataCount as { value?: unknown }
       : null;
-    const tableCount = Number.isSafeInteger(evidence?.value) ? Number(evidence?.value) : undefined;
-    if (response.status === "metadata_count_answered" && tableCount !== undefined) {
-      stage("metadata-count", "DAP 目录精确 COUNT 已完成。", { intent: "metadata_count", tableCount });
+    const count = Number.isSafeInteger(evidence?.value) ? Number(evidence?.value) : undefined;
+    if (response.status === "metadata_count_answered" && count !== undefined) {
+      if ((evidence as { metric?: unknown } | null)?.metric === "report_count") {
+        stage("metadata-count", "DAP 报表资产目录精确 COUNT 已完成。", { intent: "report_count", reportCount: count });
+      } else {
+        stage("metadata-count", "DAP 数据表目录精确 COUNT 已完成。", { intent: "metadata_count", tableCount: count });
+      }
     } else {
       emit("step_start", "metadata-count", "正在按当前 DAP 目录确认统计口径。", { intent: "metadata_count" });
       emit("step_error", "metadata-count", "未能确认可核实的统计数值。", {
@@ -221,6 +225,21 @@ async function mockPortalApis(page: Page, options: {
     if (path === "/api/ai/ask/stream") {
       const payload = route.request().postDataJSON() as { query: string; scope: string; topK: number };
       asked.push(payload);
+      if (payload.query.includes("报表资产总数是多少")) {
+        return route.fulfill(sseResponse({
+          status: "metadata_count_answered",
+          answer: "当前 DAP 报表资产目录共有 13 个报表资产。",
+          citations: [], candidates: [],
+          retrievalStatus: "not_run", generationStatus: "not_run", resultsTruncated: false,
+          elapsedMs: 3,
+          metadataCount: {
+            metric: "report_count", value: 13,
+            filters: { domain: null, layer: null },
+            source: "dap_catalog", complete: true, catalogProfile: "strict",
+            sourceLink: "/report-assets",
+          },
+        }));
+      }
       if (payload.query.includes("deterministic-count")) {
         return route.fulfill(sseResponse({
           status: "metadata_count_answered",
@@ -629,8 +648,26 @@ test("future deterministic catalog counts render as structured evidence without 
   await expect(page.locator(".sp-ai-candidate")).toHaveCount(0);
   const progress = page.locator(".sp-ai-execution");
   await progress.locator(":scope > summary").click();
-  await expect(progress).toContainText("DAP 目录精确 COUNT：118 张表");
+  await expect(progress).toContainText("DAP 权威目录精确 COUNT：118 张数据表");
   await expect(page.getByRole("tab", { name: /AI 问答/ })).toContainText("已完成");
+});
+
+test("report count displays its asset type, exact total, source, report-list link, and SSE progress", async ({ page }) => {
+  await openAiPortal(page);
+  await page.getByRole("textbox", { name: "搜索数据资产" }).fill("报表资产总数是多少？");
+  await page.getByRole("button", { name: "问 AI", exact: true }).click();
+
+  const statistic = page.getByRole("region", { name: "确定性统计结果" });
+  await expect(statistic).toContainText("13 个报表资产");
+  await expect(statistic).toContainText("资产类型：报表资产");
+  await expect(statistic).toContainText("数据来源：DAP 报表资产目录");
+  await expect(statistic).toContainText("统计范围：全量目录");
+  await expect(statistic.getByRole("link", { name: "查看全部报表资产" })).toHaveAttribute("href", "/report-assets");
+  await expect(page.locator(".sp-ai-candidate")).toHaveCount(0);
+
+  const progress = page.locator(".sp-ai-execution");
+  await progress.locator(":scope > summary").click();
+  await expect(progress).toContainText("DAP 权威目录精确 COUNT：13 个报表资产");
 });
 
 test("ambiguous authoritative count stays an explicit failure without a numeric result", async ({ page }) => {
