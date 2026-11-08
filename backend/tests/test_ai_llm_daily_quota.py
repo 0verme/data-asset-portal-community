@@ -126,7 +126,8 @@ class DailyLLMQuotaServiceTests(unittest.TestCase):
 
     def test_cross_process_race_allows_only_one_last_slot(self):
         process_count = 6
-        today = current_business_date().isoformat()
+        # Keep the parent snapshot and spawned workers on the same fixed clock.
+        today = current_business_date(self.now[0]).isoformat()
         self.connection.execute(
             "UPDATE dwp.p_code_item SET item_value = '1' WHERE item_code = 'AI_LLM_DAILY_LIMIT'"
         )
@@ -153,7 +154,9 @@ class DailyLLMQuotaServiceTests(unittest.TestCase):
             self.assertTrue(all(process.exitcode == 0 for process in processes))
             self.assertEqual(1, outcomes.count("reserved"), outcomes)
             self.assertEqual(process_count - 1, outcomes.count("exceeded"), outcomes)
-            self.assertEqual(1, self.services[0].snapshot().used)
+            snapshot = self.services[0].snapshot()
+            self.assertEqual(today, snapshot.business_date)
+            self.assertEqual(1, snapshot.used)
         finally:
             for process in processes:
                 if process.is_alive():
