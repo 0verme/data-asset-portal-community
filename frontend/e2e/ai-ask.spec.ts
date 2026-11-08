@@ -158,6 +158,7 @@ async function mockPortalApis(page: Page, options: {
   aiEnabled?: boolean;
   askFailureCount?: number;
   delayFirstAsk?: boolean;
+  holdFirstAsk?: boolean;
   recommendationCount?: number;
   holdMenus?: boolean;
 } = {}) {
@@ -167,6 +168,8 @@ async function mockPortalApis(page: Page, options: {
   let releaseMenuResponse: () => void = () => {};
   const menuRequestStarted = new Promise<void>((resolve) => { notifyMenuRequest = resolve; });
   const menuResponseGate = new Promise<void>((resolve) => { releaseMenuResponse = resolve; });
+  let releaseAskResponse: () => void = () => {};
+  const askResponseGate = new Promise<void>((resolve) => { releaseAskResponse = resolve; });
   let aiEnabled = options.aiEnabled ?? true;
   let askFailuresRemaining = options.askFailureCount ?? 0;
 
@@ -244,6 +247,14 @@ async function mockPortalApis(page: Page, options: {
           resultsTruncated: false, reasonCode: "ambiguous_scope", elapsedMs: 3,
         }));
       }
+      if (options.holdFirstAsk) {
+        await askResponseGate;
+        try {
+          return await route.fulfill(sseResponse(answer(payload.query), payload.query));
+        } catch {
+          return;
+        }
+      }
       if (options.delayFirstAsk && (payload.query.includes("cancel-first") || payload.query.includes("slow-old"))) {
         // Wide enough that the "still running" window survives tab switching,
         // summary toggling and assertions on slower engines (WebKit), where the
@@ -316,11 +327,12 @@ async function mockPortalApis(page: Page, options: {
     searches,
     waitForMenuRequest: () => menuRequestStarted,
     releaseMenus: () => releaseMenuResponse(),
+    releaseFirstAsk: () => releaseAskResponse(),
     setAiEnabled(value: boolean) { aiEnabled = value; },
   };
 }
 
-async function openAiPortal(page: Page, options?: { aiEnabled?: boolean; askFailureCount?: number; delayFirstAsk?: boolean; recommendationCount?: number; holdMenus?: boolean }, path = "/") {
+async function openAiPortal(page: Page, options?: { aiEnabled?: boolean; askFailureCount?: number; delayFirstAsk?: boolean; holdFirstAsk?: boolean; recommendationCount?: number; holdMenus?: boolean }, path = "/") {
   const fixtures = await mockPortalApis(page, options);
   await page.addInitScript(() => {
     localStorage.removeItem("dap_auth");
@@ -541,16 +553,22 @@ test("switching tabs during an AI request preserves running state and sends one 
 });
 
 test("execution stays expanded while running and auto-collapses with a detailed-process entry", async ({ page }) => {
-  await openAiPortal(page, { delayFirstAsk: true });
+  const fixtures = await openAiPortal(page, { holdFirstAsk: true });
+  const query = "slow-old auto-collapse question";
   const input = page.getByRole("textbox", { name: "搜索数据资产" });
-  await input.fill("slow-old auto-collapse question");
+  await input.fill(query);
   await page.getByRole("button", { name: "问 AI", exact: true }).click();
   const progress = page.locator(".sp-ai-execution");
-  await expect(progress).toHaveAttribute("open", "");
-  await expect(page.getByRole("button", { name: "取消问答" })).toBeVisible();
-  await progress.locator(":scope > summary").click();
-  await expect(progress).toHaveAttribute("open", "");
-  await expect(page.getByLabel("AI 回答摘要")).toContainText("slow-old auto-collapse question");
+  try {
+    await expect(progress).toHaveAttribute("open", "");
+    await expect(page.getByRole("button", { name: "取消问答" })).toBeVisible();
+    await progress.locator(":scope > summary").click();
+    await expect(progress).toHaveAttribute("open", "");
+    await expect(page.getByRole("button", { name: "取消问答" })).toBeVisible();
+  } finally {
+    fixtures.releaseFirstAsk();
+  }
+  await expect(page.getByLabel("AI 回答摘要")).toContainText(query);
   await expect(progress).not.toHaveAttribute("open", "");
   await expect(progress.locator(":scope > summary")).toContainText("查看详细过程");
   await progress.locator(":scope > summary").click();
