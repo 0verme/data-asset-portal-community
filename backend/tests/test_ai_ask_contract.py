@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from backend.app.contracts.ai_ask import (
     AiAskCandidate,
     AiAskCitation,
+    AiAskProgressStep,
     AiAskRequest,
     AiAskResponse,
     AiGeneratedAnswer,
@@ -207,6 +208,44 @@ class AiAskContractTests(unittest.TestCase):
             "reasonCode": "ambiguous_scope",
         })
         self.assertIsNone(ambiguous.metadata_count)
+
+    def test_report_count_contract_requires_its_asset_list_and_unfiltered_scope(self):
+        evidence = {
+            "metric": "report_count",
+            "value": 0,
+            "filters": {"domain": None, "layer": None},
+            "source": "dap_catalog",
+            "complete": True,
+            "catalogProfile": "strict",
+            "sourceLink": "/report-assets",
+        }
+        response = AiAskResponse.model_validate({
+            "status": "metadata_count_answered",
+            "answer": "当前 DAP 报表资产目录共有 0 个报表资产。",
+            "metadataCount": evidence,
+            "retrievalStatus": "not_run",
+            "generationStatus": "not_run",
+            "resultsTruncated": False,
+        })
+        self.assertEqual("report_count", response.metadata_count.metric)
+        self.assertEqual(0, response.metadata_count.value)
+        self.assertEqual("/report-assets", response.metadata_count.source_link)
+        self.assertEqual(0, AiAskProgressStep(
+            id="counting", status="completed", intent="report_count", reportCount=0
+        ).report_count)
+        for invalid in (
+            {**evidence, "sourceLink": "/data-warehouse"},
+            {**evidence, "filters": {"domain": {"code": "FIN", "displayName": "财务", "matchedAs": "catalog_value", "inferred": False}, "layer": None}},
+        ):
+            with self.subTest(invalid=invalid), self.assertRaises(ValidationError):
+                AiAskResponse.model_validate({
+                    "status": "metadata_count_answered",
+                    "answer": "非法报表统计。",
+                    "metadataCount": invalid,
+                    "retrievalStatus": "not_run",
+                    "generationStatus": "not_run",
+                    "resultsTruncated": False,
+                })
 
     def test_failure_contract_distinguishes_retrieval_generation_and_no_evidence(self):
         retrieval_failure = AiAskResponse(

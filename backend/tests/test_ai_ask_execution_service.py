@@ -142,6 +142,16 @@ class StubRagService:
         return response
 
 
+class StubReportCountService:
+    def __init__(self, value=4):
+        self.value = value
+        self.calls = 0
+
+    def count_reports(self):
+        self.calls += 1
+        return self.value
+
+
 class StubAssetsService:
     def __init__(self, *, missing_field=False, fail_ids=(), count_error=False):
         self.calls = []
@@ -219,12 +229,12 @@ class StubAssetsService:
 
 
 class AIAskExecutionServiceTests(unittest.TestCase):
-    def _service(self, *, plan=None, answer=None, planning_error=None, answer_error=None, responses=None, assets=None):
+    def _service(self, *, plan=None, answer=None, planning_error=None, answer_error=None, responses=None, assets=None, reports=None):
         rag = StubRagService(responses)
         provider = StubLLMProvider(
             plan=plan, answer=answer, planning_error=planning_error, answer_error=answer_error
         )
-        base = AIAskService(rag, provider)
+        base = AIAskService(rag, provider, reports_service=reports)
         assets_service = assets or StubAssetsService()
         return AIAskExecutionService(base, assets_service), rag, provider, assets_service
 
@@ -311,6 +321,34 @@ class AIAskExecutionServiceTests(unittest.TestCase):
         self.assertEqual(73, count_event["data"]["tableCount"])
         self.assertNotIn("planning", [data["step_id"] for event, data in events])
         self.assertNotIn("rag-round-1", [data["step_id"] for event, data in events])
+
+    def test_report_count_short_circuits_planner_rag_and_emits_report_count_sse_contract(self):
+        reports = StubReportCountService(value=0)
+        service, rag, llm, _assets = self._service(reports=reports)
+        events = []
+
+        response = service.ask(
+            AiAskRequest(query="有多少份报表？"),
+            profile="strict",
+            request_id="report-count",
+            event_callback=lambda event, data: events.append((event, data)),
+        )
+
+        self.assertEqual("metadata_count_answered", response.status)
+        self.assertEqual("report_count", response.metadata_count.metric)
+        self.assertEqual(0, response.metadata_count.value)
+        self.assertEqual("/report-assets", response.metadata_count.source_link)
+        self.assertEqual(1, reports.calls)
+        self.assertEqual([], rag.calls)
+        self.assertEqual([], llm.calls)
+        count_event = next(
+            data for event, data in events
+            if event == "step_complete" and data["step_id"] == "metadata-count"
+        )
+        self.assertEqual("report_count", count_event["data"]["intent"])
+        self.assertEqual(0, count_event["data"]["reportCount"])
+        self.assertNotIn("tableCount", count_event["data"])
+        self.assertEqual("report_count", events[0][1]["data"]["intent"])
 
     def test_metadata_count_ambiguity_failure_and_cancellation_never_call_rag_or_model(self):
         service, rag, llm, assets = self._service()

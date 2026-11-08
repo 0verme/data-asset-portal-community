@@ -29,7 +29,7 @@ const EXECUTION_DATA_KEYS = new Set([
   "maxTables", "candidateCount", "verifiedTableCount", "verifiedFieldCount",
   "errorCount", "truncated", "source", "indexEvidenceOnly", "assetId", "nameHint",
   "tableName", "fieldCount", "fieldId", "fieldName", "evidenceCount", "assetIds",
-  "selectedEvidenceCount", "citationIds", "intent", "tableCount", "elapsedMs",
+  "selectedEvidenceCount", "citationIds", "intent", "tableCount", "reportCount", "elapsedMs",
   // 阶段与目录核验统计。来源为后端实际发出的字段：
   // backend/app/services/rag_search_service.py（catalog_*、search complete）与
   // backend/app/services/ai_ask_execution_service.py（verification、asset-*、metadata-count）。
@@ -61,7 +61,7 @@ const EXECUTION_COUNT_KEYS = [
   "stepCount", "round", "queryCount", "maxRequests", "requestCount", "resultCount",
   "verifiedCount", "retrievalRounds", "deduplicatedCount", "maxTables", "candidateCount",
   "verifiedTableCount", "verifiedFieldCount", "errorCount", "fieldCount", "evidenceCount",
-  "selectedEvidenceCount", "tableCount", "candidateAssetCount", "candidateFieldCount",
+  "selectedEvidenceCount", "tableCount", "reportCount", "candidateAssetCount", "candidateFieldCount",
   "databaseCallCount", "verifiedAssetCount",
 ];
 
@@ -202,13 +202,15 @@ export function parseAiAskExecutionEvent(event: RemoteServerSentEvent): AiAskExe
     data["response"] = parseAiAskResponse(data["response"]);
   }
   if (event.event.startsWith("step_") && stepId === "metadata-count") {
-    const count = data?.["tableCount"];
-    if (
-      data?.["intent"] !== "metadata_count"
-      || (count !== undefined && !isNonNegativeCount(count))
-    ) {
-      contractError("AI 问答统计进度事件格式无效。");
-    }
+    const intent = data?.["intent"];
+    const tableCount = data?.["tableCount"];
+    const reportCount = data?.["reportCount"];
+    const validCountEvent = intent === "metadata_count"
+      ? reportCount === undefined && (tableCount === undefined || isNonNegativeCount(tableCount))
+      : intent === "report_count"
+        ? tableCount === undefined && (reportCount === undefined || isNonNegativeCount(reportCount))
+        : intent === "ambiguous_count" && tableCount === undefined && reportCount === undefined;
+    if (!validCountEvent) contractError("AI 问答统计进度事件格式无效。");
   }
   if (event.event.startsWith("step_") && data?.["hits"] !== undefined) {
     const hits = data["hits"];

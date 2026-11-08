@@ -79,6 +79,30 @@ test("metadata-count execution events accept exact zero and reject malformed cou
   )), /统计进度事件格式无效/);
 });
 
+test("report-count SSE events preserve a real zero and reject table/report metric confusion", () => {
+  const parsed = parseAiAskExecutionEvent(event(
+    "step_complete",
+    { intent: "report_count", reportCount: 0 },
+    "metadata-count",
+  ));
+  assert.equal(parsed.data?.["reportCount"], 0);
+  assert.throws(() => parseAiAskExecutionEvent(event(
+    "step_complete",
+    { intent: "report_count", tableCount: 1 },
+    "metadata-count",
+  )), /统计进度事件格式无效/);
+  assert.throws(() => parseAiAskExecutionEvent(event(
+    "step_complete",
+    { intent: "report_count", reportCount: -1 },
+    "metadata-count",
+  )), /统计进度事件格式无效/);
+  assert.doesNotThrow(() => parseAiAskExecutionEvent(event(
+    "step_start",
+    { intent: "ambiguous_count" },
+    "metadata-count",
+  )));
+});
+
 test("keep-alive events are accepted as metadata-free transport heartbeats", () => {
   const parsed = parseAiAskExecutionEvent(event("keep_alive", {}));
   assert.equal(parsed.event, "keep_alive");

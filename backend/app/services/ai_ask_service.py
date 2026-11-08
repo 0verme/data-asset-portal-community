@@ -25,7 +25,11 @@ from ..contracts.ai_ask import (
     AiGeneratedAnswer,
 )
 from ..security.public_field_policy import redact_public_text
-from .ai_metadata_count import is_metadata_count_query, resolve_metadata_count_intent
+from .ai_metadata_count import (
+    classify_count_query,
+    resolve_metadata_count_intent,
+    resolve_report_count_intent,
+)
 from .ai_llm_provider import LLMProviderError, OpenAICompatibleLLMProvider
 from .assets_service import AssetFilterCatalogChangedError
 
@@ -142,10 +146,12 @@ class AIAskService:
         rag_service: Any,
         llm_provider: Any,
         assets_service: Any | None = None,
+        reports_service: Any | None = None,
     ) -> None:
         self._rag_service = rag_service
         self._llm_provider = llm_provider
         self._assets_service = assets_service
+        self._reports_service = reports_service
 
     def enabled(self) -> bool:
         try:
@@ -439,7 +445,7 @@ class AIAskService:
         try:
             query = request.query.strip()
             is_list_query = self._is_asset_list_query(query)
-            is_count_query = is_metadata_count_query(query)
+            count_intent = classify_count_query(query)
             if not query:
                 progress.fail("analyzing", "invalid_response")
                 return respond(
@@ -458,11 +464,24 @@ class AIAskService:
                 generation_status="unavailable",
                 reason_code="llm_unavailable",
             )
-        if is_count_query:
-            progress.set_intent("metadata_count")
+        if count_intent is not None:
+            progress.set_intent(count_intent)
         progress.complete("analyzing")
-        if is_count_query:
+        if count_intent == "ambiguous_count":
+            return self._metadata_count_ambiguous(
+                respond=respond,
+                answer="问题同时涉及数据表和报表资产，无法确定统计对象；请分开询问其中一种资产。",
+            )
+        if count_intent == "metadata_count":
             return self._answer_metadata_count(
+                query,
+                profile=profile,
+                started=started,
+                progress=progress,
+                respond=respond,
+            )
+        if count_intent == "report_count":
+            return self._answer_report_count(
                 query,
                 profile=profile,
                 started=started,
@@ -751,10 +770,10 @@ class AIAskService:
         )
 
     @staticmethod
-    def _metadata_count_ambiguous(*, respond):
+    def _metadata_count_ambiguous(*, respond, answer=None):
         return respond(
             status="ambiguous_scope",
-            answer="无法从当前 DAP 目录唯一确认统计范围，请明确主题域或数据分层后重试。",
+            answer=answer or "无法从当前 DAP 目录唯一确认统计范围，请明确主题域或数据分层后重试。",
             retrieval_status="not_run",
             generation_status="not_run",
             reason_code="ambiguous_scope",
@@ -811,9 +830,19 @@ class AIAskService:
         lines.append(f"查看筛选后的完整资产清单：{source_link}")
         return "\n".join(lines)
 
+    @staticmethod
+    def _render_report_count_answer(value, source_link):
+        return "\n".join((
+            f"当前 DAP 报表资产目录共有 {value} 个报表资产。",
+            "统计范围：全部未删除的报表资产。",
+            "数据来源：DAP 报表资产目录。",
+            f"查看完整报表资产列表：{source_link}",
+        ))
+
     def _answer_metadata_count(self, query, *, profile, started, progress, respond):
         if self._assets_service is None:
             return self._metadata_count_unavailable(respond=respond)
+        counting_started = False
         try:
             progress.check_cancelled()
             catalog = self._assets_service.get_asset_count_filter_catalog()
@@ -821,6 +850,8 @@ class AIAskService:
             if intent is None:
                 return self._metadata_count_ambiguous(respond=respond)
             progress.check_cancelled()
+            progress.start("counting")
+            counting_started = True
             value = self._assets_service.count_asset_tables(
                 domain_code=intent.domain.code if intent.domain else None,
                 domain_name=intent.domain.display_name if intent.domain else None,
@@ -828,14 +859,20 @@ class AIAskService:
                 layer_name=intent.layer.display_name if intent.layer else None,
             )
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                progress.fail("counting", "invalid_response")
                 return self._metadata_count_unavailable(respond=respond)
             progress.check_cancelled()
         except AIAskCancelled:
             raise
         except AssetFilterCatalogChangedError:
+            if counting_started:
+                progress.fail("counting", "invalid_response")
             return self._metadata_count_ambiguous(respond=respond)
         except Exception:
+            if counting_started:
+                progress.fail("counting", "unavailable")
             return self._metadata_count_unavailable(respond=respond)
+        progress.complete("counting", tableCount=value)
 
         def evidence_filter(dimension):
             if dimension is None:
@@ -881,15 +918,65 @@ class AIAskService:
         except Exception:
             return self._metadata_count_unavailable(respond=respond)
 
+    def _answer_report_count(self, query, *, profile, started, progress, respond):
+        if self._reports_service is None:
+            return self._metadata_count_unavailable(respond=respond)
+        if not resolve_report_count_intent(query):
+            return self._metadata_count_ambiguous(
+                respond=respond,
+                answer="当前报表资产统计仅支持全量范围；检测到未支持的筛选条件，未执行 COUNT。",
+            )
+        try:
+            progress.check_cancelled()
+            progress.start("counting")
+            value = self._reports_service.count_reports()
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                progress.fail("counting", "invalid_response")
+                return self._metadata_count_unavailable(respond=respond)
+            progress.check_cancelled()
+        except AIAskCancelled:
+            raise
+        except Exception:
+            progress.fail("counting", "unavailable")
+            return self._metadata_count_unavailable(respond=respond)
+        progress.complete("counting", reportCount=value)
+
+        try:
+            metadata_count = AiMetadataCount(
+                metric="report_count",
+                value=value,
+                filters=AiMetadataCountFilters(domain=None, layer=None),
+                source="dap_catalog",
+                complete=True,
+                catalogProfile=profile if profile in {"internal", "strict", "disabled"} else "strict",
+                sourceLink="/report-assets",
+            )
+            answer = self._render_report_count_answer(value, metadata_count.source_link)
+            return respond(
+                status="metadata_count_answered",
+                answer=answer,
+                retrieval_status="not_run",
+                generation_status="not_run",
+                reason_code=None,
+                metadata_count=metadata_count,
+                completed=True,
+            )
+        except AIAskCancelled:
+            raise
+        except Exception:
+            return self._metadata_count_unavailable(respond=respond)
+
 
 # The global runtime composes the existing HTTP RAG adapter, current authoritative
 # asset catalog service, and optional provider. Neither a model nor an index is
 # loaded into the DAP process.
 from .assets_service import assets_service
 from .rag_search_service import rag_search_service
+from .report_service import report_service
 
 ai_ask_service = AIAskService(
     rag_service=rag_search_service,
     llm_provider=OpenAICompatibleLLMProvider(),
     assets_service=assets_service,
+    reports_service=report_service,
 )

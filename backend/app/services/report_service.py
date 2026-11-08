@@ -449,6 +449,17 @@ class ReportService(AuditActorMixin):
             )))
         return clauses
 
+    def _count_report_rows(self, filters):
+        rows = self._fetch_rows(
+            select(func.count().label("total")).select_from(report_asset).where(*filters)
+        )
+        return self._row_int(rows, "total")
+
+    def count_reports(self):
+        """Return the unfiltered active-report total used by the report-list page."""
+        with database_transaction():
+            return self._count_report_rows(self._build_report_filters())
+
     def _row_to_item(self, row):
         related_tables = self._normalize_json_array(row.get("related_tables_json"))
         related_indicators = self._normalize_json_array(row.get("related_indicators_json"))
@@ -547,7 +558,7 @@ class ReportService(AuditActorMixin):
         column = columns.get(sort_key, report_asset.c.report_code)
         order = column.desc() if str(sort_direction).lower() == "desc" else column.asc()
         with database_transaction():
-            count = self._fetch_rows(select(func.count().label("total")).select_from(report_asset).where(*filters))
+            filtered_total = self._count_report_rows(filters)
             rows = self._fetch_rows(self._report_statement().where(*filters)
                                     .order_by(order, report_asset.c.report_code.asc())
                                     .limit(page_size).offset((page - 1) * page_size))
@@ -557,10 +568,10 @@ class ReportService(AuditActorMixin):
             ).where(report_asset.c.is_deleted == "N").group_by(
                 report_asset.c.report_type, report_asset.c.status_code, report_asset.c.owner_dept_name))
             facets = {"type": {}, "status": {}, "ownerDept": {}}
-            total = 0
+            all_report_count = 0
             for row in buckets:
                 size = int(row["total"])
-                total += size
+                all_report_count += size
                 for key, column_name in (("type", "report_type"), ("status", "status_code"),
                                          ("ownerDept", "owner_dept_name")):
                     value = row[column_name]
@@ -568,8 +579,9 @@ class ReportService(AuditActorMixin):
                         facets[key][value] = facets[key].get(value, 0) + size
             # Only selected reports are decoded; their full reference arrays/counts
             # remain compatible with details, editors and legacy export consumers.
-            return {"items": [self._row_to_item(row) for row in rows], "total": int(count[0]["total"]),
-                    "page": page, "pageSize": page_size, "facets": facets, "stats": {"reportCount": total}}
+            return {"items": [self._row_to_item(row) for row in rows], "total": filtered_total,
+                    "page": page, "pageSize": page_size, "facets": facets,
+                    "stats": {"reportCount": all_report_count}}
 
     def get_reports(self, keyword=None, report_type=None, domain=None, status=None, owner_dept=None):
         return self._db_reports(keyword=keyword, report_type=report_type, domain=domain, status=status, owner_dept=owner_dept)

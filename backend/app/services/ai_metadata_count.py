@@ -1,8 +1,9 @@
-"""Catalog-driven parsing for safe table-count questions.
+"""Catalog-driven parsing for safe metadata-count questions.
 
-This module recognizes a narrow metadata-count intent. Filter values are never
-invented: they must match the current asset-list facet catalog supplied by the
-caller. It deliberately does not generate or execute SQL.
+This module recognizes narrow data-table and report-asset count intents.
+Table filters are never invented: they must match the current asset-list facet
+catalog supplied by the caller. Unsupported report filters fail closed. It
+never generates or executes SQL.
 """
 
 from __future__ import annotations
@@ -18,26 +19,45 @@ _FIELD_COUNT_PATTERN = re.compile(
 )
 
 _COUNT_PATTERNS = (
-    re.compile(r"(?:多少|几)\s*(?:张|个)?\s*(?:数据\s*)?表", re.IGNORECASE),
-    re.compile(r"(?:数据\s*)?表\s*(?:的\s*)?(?:数量|总数|个数)", re.IGNORECASE),
-    re.compile(r"(?:数据\s*)?表(?!示).{0,8}(?:多少|几|数量|总数|个数)", re.IGNORECASE),
+    re.compile(r"(?:多少|几)\s*(?:张|个)?\s*(?:数据\s*)?(?<!报)表", re.IGNORECASE),
+    re.compile(r"(?<!报)(?:数据\s*)?表\s*(?:的\s*)?(?:数量|总数|个数)", re.IGNORECASE),
+    re.compile(r"(?<!报)(?:数据\s*)?表(?!示).{0,8}(?:多少|几|数量|总数|个数)", re.IGNORECASE),
     re.compile(r"\bhow\s+many\s+(?:data\s+)?tables?\b", re.IGNORECASE),
     re.compile(r"\b(?:data\s+)?table\s+(?:count|number)\b", re.IGNORECASE),
     re.compile(r"\bcount\s+of\s+(?:data\s+)?tables?\b", re.IGNORECASE),
     re.compile(r"\btotal\s+(?:number\s+of\s+)?(?:data\s+)?tables?\b", re.IGNORECASE),
 )
 
+_REPORT_COUNT_PATTERNS = (
+    re.compile(r"(?:多少|几)\s*(?:张|个|份)?\s*(?:个\s*)?(?:报表资产|报表)", re.IGNORECASE),
+    re.compile(
+        r"(?:报表资产|报表)\s*(?:的\s*)?(?:(?:总数|数量|个数)(?:\s*(?:是|有))?(?:多少|几)?|(?:有|共有|一共|总共)\s*(?:多少|几)\s*(?:张|个|份)?)",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bhow\s+many\s+reports?\b", re.IGNORECASE),
+    re.compile(r"\b(?:reports?|report\s+assets?)\s+(?:count|number|total)\b", re.IGNORECASE),
+    re.compile(r"\b(?:total\s+(?:number\s+of\s+)?reports?|number\s+of\s+reports?)\b", re.IGNORECASE),
+)
+
+_TABLE_ASSET_REFERENCE_PATTERN = re.compile(r"(?<!报)(?:数据\s*)?表(?!示)", re.IGNORECASE)
+_REPORT_ASSET_REFERENCE_PATTERN = re.compile(r"报表资产|报表|\breports?\b|\breport\b", re.IGNORECASE)
+_COUNT_CUE_PATTERN = re.compile(
+    r"多少|几|数量|总数|个数|一共|总共|共有|\b(?:count|number|total|how\s+many)\b",
+    re.IGNORECASE,
+)
+
 # These are generic question words, not business-domain aliases. Dimension
 # aliases always come from the live catalog, never from this list.
 _GENERIC_REMAINDERS = (
     "当前数据资产目录", "当前dap目录", "数据资产目录", "资产目录", "当前目录", "dap目录",
-    "数据表", "数据", "主题域", "分层", "数据层", "层", "表",
-    "how many", "total number of", "number of", "count of", "table count", "tables count",
-    "data tables", "data table", "tables", "table", "catalog", "assets", "asset", "data",
-    "一共", "总共", "总计", "共有", "所有", "全部", "某个", "多少张", "几张", "多少个",
+    "当前系统", "目前系统", "现有系统", "本系统", "全系统", "整个系统", "本目录",
+    "数据表", "报表资产", "报表", "数据", "主题域", "分层", "数据层", "层", "表",
+    "how many", "total number of", "number of", "count of", "table count", "tables count", "count", "number",
+    "data tables", "data table", "tables", "table", "reports", "report", "catalog", "assets", "asset", "data",
+    "一共", "总共", "总计", "共有", "所有", "全部", "某个", "多少张", "几张", "多少个", "多少份", "几份", "份",
     "是多少", "多少", "几", "数量", "总数", "个数", "有", "的", "中", "当前", "现在", "请问",
     "帮我", "能否", "可以", "是", "和", "在", "按", "what", "are", "the", "all", "how", "many", "total",
-    "please", "in", "of", "has", "have", "do", "we", "you",
+    "please", "in", "of", "has", "have", "do", "we", "you", "current", "currently", "system",
 )
 
 
@@ -76,11 +96,47 @@ class _Match:
 
 
 def is_metadata_count_query(query: str) -> bool:
-    """Return whether *query* explicitly asks for a table count."""
+    """Return whether *query* explicitly asks for a data-table count."""
     normalized = " ".join(str(query or "").split()).casefold()
     if _FIELD_COUNT_PATTERN.search(normalized):
         return False
     return any(pattern.search(normalized) for pattern in _COUNT_PATTERNS)
+
+
+def is_report_count_query(query: str) -> bool:
+    """Return whether *query* explicitly asks for a report-asset count."""
+    normalized = " ".join(str(query or "").split()).casefold()
+    if _FIELD_COUNT_PATTERN.search(normalized):
+        return False
+    return any(pattern.search(normalized) for pattern in _REPORT_COUNT_PATTERNS)
+
+
+def classify_count_query(query: str) -> str | None:
+    """Classify supported count wording without confusing reports with tables.
+
+    A compound question that mentions both asset types and a count cue is
+    deliberately returned as ``ambiguous_count`` so neither count can be
+    silently substituted for the other.
+    """
+    normalized = " ".join(str(query or "").split()).casefold()
+    if _FIELD_COUNT_PATTERN.search(normalized):
+        return None
+    mentions_both = (
+        _TABLE_ASSET_REFERENCE_PATTERN.search(normalized)
+        and _REPORT_ASSET_REFERENCE_PATTERN.search(normalized)
+        and _COUNT_CUE_PATTERN.search(normalized)
+    )
+    if mentions_both:
+        return "ambiguous_count"
+    table_count = is_metadata_count_query(normalized)
+    report_count = is_report_count_query(normalized)
+    if table_count and report_count:
+        return "ambiguous_count"
+    if table_count:
+        return "metadata_count"
+    if report_count:
+        return "report_count"
+    return None
 
 
 def _layer_aliases(code: str, display_name: str) -> list[tuple[str, bool]]:
@@ -219,6 +275,10 @@ def _remove_matches(query: str, matches: list[_Match]) -> str:
 
 def _has_unknown_scope(remainder: str, *, allow_vague_modifier: bool = False) -> bool:
     normalized = remainder.casefold()
+    # Do not let the supported generic phrase "当前系统" erase an explicit,
+    # unresolved theme-domain condition.
+    if re.search(r"(?:当前|目前|现有)?系统\s*(?:的\s*)?(?:主题域|业务域)", normalized):
+        return True
     # "某个" is harmless only alongside a recognized catalog dimension (e.g.
     # "某个集市"). Without one, preserve it so "某个主题域" cannot degrade to
     # an unfiltered global count.
@@ -233,6 +293,18 @@ def _has_unknown_scope(remainder: str, *, allow_vague_modifier: bool = False) ->
         normalized = normalized.replace(word.casefold(), " ")
     normalized = re.sub(r"[\s\W_]+", "", normalized, flags=re.UNICODE)
     return bool(normalized)
+
+
+def resolve_report_count_intent(query: str) -> bool:
+    """Return whether a report count is explicitly unfiltered and supported.
+
+    Report filters are not implemented by this intent. Any meaningful residue
+    (for example a domain, type, status, or owner condition) fails closed rather
+    than degrading to an all-reports count.
+    """
+    normalized = " ".join(str(query or "").split()).casefold()
+    remainder = _REPORT_ASSET_REFERENCE_PATTERN.sub(" ", normalized)
+    return not _has_unknown_scope(remainder)
 
 
 def resolve_metadata_count_intent(
@@ -272,6 +344,9 @@ def resolve_metadata_count_intent(
 __all__ = [
     "CountDimension",
     "MetadataCountIntent",
+    "classify_count_query",
     "is_metadata_count_query",
+    "is_report_count_query",
     "resolve_metadata_count_intent",
+    "resolve_report_count_intent",
 ]
