@@ -12,13 +12,20 @@ from backend.app.services.ai_llm_daily_quota import (
     DailyLLMQuotaExceeded,
     DailyLLMQuotaReservation,
     DailyLLMQuotaUnavailable,
+    daily_llm_quota_question_scope,
 )
 from backend.app.services.ai_llm_provider import (
     MAX_LLM_RESPONSE_BYTES,
     LLMProviderError,
     OpenAICompatibleLLMProvider,
 )
-from backend.app.settings import AIAskLLMConfig, get_ai_llm_config
+from backend.app.settings import (
+    AIAskLLMConfig,
+    get_ai_ask_max_concurrency,
+    get_ai_ask_max_queue,
+    get_ai_ask_queue_wait_ms,
+    get_ai_llm_config,
+)
 
 
 def llm_config(*, enabled=True, max_concurrency=2, timeout_ms=1000, disable_thinking=False):
@@ -164,7 +171,7 @@ class OpenAICompatibleLLMProviderTests(unittest.TestCase):
             unconfigured.complete_json(system_prompt="x", user_payload={})
         self.assertEqual("llm_not_configured", raised.exception.reason_code)
 
-    def test_each_provider_http_call_reserves_one_quota_slot(self):
+    def test_each_standalone_provider_call_is_a_separate_question(self):
         quota = _FakeQuotaService()
         provider = self._provider(lambda _request: success_response(), quota_service=quota)
 
@@ -172,6 +179,42 @@ class OpenAICompatibleLLMProviderTests(unittest.TestCase):
         provider.complete_json(system_prompt="second", user_payload={})
 
         self.assertEqual(2, quota.reservations)
+        self.assertEqual([], quota.refunds)
+
+    def test_multiple_provider_attempts_and_dispatched_failure_share_one_question_slot(self):
+        quota = _FakeQuotaService()
+        request_count = 0
+
+        def handler(_request):
+            nonlocal request_count
+            request_count += 1
+            if request_count == 1:
+                return httpx.Response(503, text="provider unavailable")
+            return success_response()
+
+        provider = self._provider(handler, quota_service=quota)
+        with daily_llm_quota_question_scope():
+            with self.assertRaises(LLMProviderError):
+                provider.complete_json(system_prompt="planning", user_payload={})
+            provider.complete_json(system_prompt="answer", user_payload={})
+
+        self.assertEqual(2, request_count)
+        self.assertEqual(1, quota.reservations)
+        self.assertEqual([], quota.refunds)
+
+    def test_quota_denial_is_not_retried_within_the_same_question(self):
+        quota = _FakeQuotaService(exceeded=True)
+        provider = self._provider(
+            lambda _request: self.fail("quota-denied request must not leave DAP"),
+            quota_service=quota,
+        )
+        with daily_llm_quota_question_scope():
+            for prompt in ("planning", "answer"):
+                with self.assertRaises(LLMProviderError) as raised:
+                    provider.complete_json(system_prompt=prompt, user_payload={})
+                self.assertEqual("llm_daily_quota_exceeded", raised.exception.reason_code)
+
+        self.assertEqual(1, quota.reservations)
         self.assertEqual([], quota.refunds)
 
     def test_daily_limit_denies_before_provider_http_request(self):
@@ -308,9 +351,11 @@ class OpenAICompatibleLLMProviderTests(unittest.TestCase):
             calls.append(None)
             return httpx.Response(200, stream=body) if len(calls) == 1 else success_response()
 
+        quota = _FakeQuotaService()
         provider = self._provider(
             handler,
             config=llm_config(max_concurrency=1, timeout_ms=1000),
+            quota_service=quota,
         )
         cancel_event = threading.Event()
         errors = []
@@ -332,6 +377,8 @@ class OpenAICompatibleLLMProviderTests(unittest.TestCase):
         self.assertFalse(thread.is_alive())
         self.assertEqual(["cancelled"], errors)
         self.assertTrue(body.closed.is_set())
+        self.assertEqual(1, quota.reservations)
+        self.assertEqual([], quota.refunds, "a dispatched cancellation counts as one question")
         self.assertEqual(
             '{"answer":"ok","citations":[{"assetId":1}]}',
             provider.complete_json(system_prompt="x", user_payload={}),
@@ -367,6 +414,44 @@ class OpenAICompatibleLLMProviderTests(unittest.TestCase):
         self.assertFalse(thread.is_alive())
         self.assertEqual([], first_errors)
 
+    def test_production_defaults_are_bounded_and_explicit_environment_values_win(self):
+        base_env = {
+            "AI_ASK_ENABLED": "true",
+            "AI_LLM_BASE_URL": "https://llm.example.invalid/v1",
+            "AI_LLM_MODEL": "deepseek-flash",
+            "AI_LLM_API_KEY": "deployment-secret-value",
+        }
+        with patch.dict("os.environ", base_env, clear=True):
+            defaults = get_ai_llm_config()
+            self.assertIsNotNone(defaults)
+            self.assertEqual(30000, defaults.timeout_ms)
+            self.assertEqual(3072, defaults.max_tokens)
+            self.assertEqual(2, defaults.max_concurrency)
+            self.assertFalse(defaults.disable_thinking)
+            self.assertEqual(2, get_ai_ask_max_concurrency())
+            self.assertEqual(4, get_ai_ask_max_queue())
+            self.assertEqual(5000, get_ai_ask_queue_wait_ms())
+
+        with patch.dict("os.environ", {
+            **base_env,
+            "AI_LLM_TIMEOUT_MS": "12000",
+            "AI_LLM_MAX_TOKENS": "1024",
+            "AI_LLM_MAX_CONCURRENCY": "3",
+            "AI_LLM_DISABLE_THINKING": "true",
+            "AI_ASK_MAX_CONCURRENCY": "4",
+            "AI_ASK_MAX_QUEUE": "8",
+            "AI_ASK_QUEUE_WAIT_MS": "2500",
+        }, clear=True):
+            configured = get_ai_llm_config()
+            self.assertIsNotNone(configured)
+            self.assertEqual(12000, configured.timeout_ms)
+            self.assertEqual(1024, configured.max_tokens)
+            self.assertEqual(3, configured.max_concurrency)
+            self.assertTrue(configured.disable_thinking)
+            self.assertEqual(4, get_ai_ask_max_concurrency())
+            self.assertEqual(8, get_ai_ask_max_queue())
+            self.assertEqual(2500, get_ai_ask_queue_wait_ms())
+
     def test_environment_configuration_is_server_only_bounded_and_https_except_loopback(self):
         base_env = {
             "AI_ASK_ENABLED": "true",
@@ -380,8 +465,10 @@ class OpenAICompatibleLLMProviderTests(unittest.TestCase):
         self.assertTrue(config.enabled)
         self.assertTrue(config.configured)
         self.assertEqual("https://llm.example.invalid/v1", config.base_url)
-        self.assertEqual(10000, config.timeout_ms)
+        self.assertEqual(30000, config.timeout_ms)
+        self.assertEqual(3072, config.max_tokens)
         self.assertEqual(2, config.max_concurrency)
+        self.assertFalse(config.disable_thinking)
 
         for invalid in (
             "http://remote.example.invalid",

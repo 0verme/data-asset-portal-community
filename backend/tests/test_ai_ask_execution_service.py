@@ -438,7 +438,7 @@ class AIAskExecutionServiceTests(unittest.TestCase):
                 self.assertEqual("generation_unavailable", response.status)
                 self.assertEqual(reason, response.reason_code)
                 if reason == "llm_daily_quota_exceeded":
-                    self.assertEqual("今日 AI 问答额度已用完，请明日再试。", response.answer)
+                    self.assertEqual("今日 AI 问答次数已用完，请明日再试。", response.answer)
                 elif reason == "llm_quota_unavailable":
                     self.assertEqual("每日 AI 问答额度服务暂不可用，请稍后重试。", response.answer)
 

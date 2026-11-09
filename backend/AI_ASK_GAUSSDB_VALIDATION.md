@@ -7,7 +7,7 @@
 - [ ] 使用专属、可丢弃的测试 DAP Profile / GaussDB 测试对象；不得将故障注入或长查询指向生产/共享业务对象。
 - [ ] 确认部署 JVM、JPype、JayDeBeApi 和目标 GaussDB JDBC JAR 版本兼容；JAR 仅从受信部署位置加载。
 - [ ] 通过部署 Secret 注入凭据，确认 `AI_ASK_ENABLED`、RAG URL / Token 等仅在隔离测试环境启用。
-- [ ] 使用默认限额或经维护者批准的更低值：`AI_ASK_MAX_CONCURRENCY=2`、`AI_ASK_MAX_QUEUE=4`、`AI_ASK_QUEUE_WAIT_MS=2000`、`AI_ASK_DB_TIMEOUT_SECONDS=10`。
+- [ ] 使用默认限额或经维护者批准的更低值：`AI_ASK_MAX_CONCURRENCY=2`、`AI_ASK_MAX_QUEUE=4`、`AI_ASK_QUEUE_WAIT_MS=5000`、`AI_ASK_DB_TIMEOUT_SECONDS=10`。
 - [ ] 准备可在测试 Profile 上执行的资产列表、字段映射、健康检查 API 验证请求；确认记录测试开始时的 worker PID、服务 PID 与日志位置（日志不得包含凭据）。
 
 ## 1. 静态配置确认（无需打印 JDBC URL）

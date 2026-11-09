@@ -58,17 +58,31 @@ index or let the browser access the LLM endpoint.
 | `AI_LLM_BASE_URL` | required when enabled | OpenAI-compatible API base URL. HTTPS is required except HTTP loopback; URL credentials, query strings and fragments are rejected. |
 | `AI_LLM_MODEL` | required when enabled | Server-side provider model identifier. |
 | `AI_LLM_API_KEY` | required when enabled | Provider secret, injected from deployment Secret storage only; never stored in DAP parameter rows or returned to the browser. |
-| `AI_LLM_TIMEOUT_MS` | `10000` (250–60000) | Absolute Provider request/response deadline, including streaming-body delivery (not only per-read inactivity). |
-| `AI_LLM_MAX_TOKENS` | `512` (64–4096) | Output token ceiling. |
+| `AI_LLM_TIMEOUT_MS` | `30000` (250–60000) | Absolute Provider request/response deadline, including streaming-body delivery (not only per-read inactivity). |
+| `AI_LLM_MAX_TOKENS` | `3072` (64–4096) | Output token ceiling; raised to reduce truncated structured answers. |
 | `AI_LLM_MAX_CONCURRENCY` | `2` (1–16) | Non-blocking Provider concurrency bound. |
-| `AI_LLM_DISABLE_THINKING` | `false` | Send `thinking: {"type": "disabled"}` to providers that enable reasoning by default (DeepSeek). Omitted unless enabled, so providers that reject unknown request fields keep working. |
+| `AI_LLM_DISABLE_THINKING` | `false` | Optional explicit Provider-specific `thinking: {"type": "disabled"}` parameter; omitted unless set to true. |
+| `AI_ASK_MAX_CONCURRENCY` | `2` (1–16) | Active AI questions per ASGI worker process. |
+| `AI_ASK_MAX_QUEUE` | `4` (0–128) | Bounded waiting questions per ASGI worker process. |
+| `AI_ASK_QUEUE_WAIT_MS` | `5000` (0–10000) | Maximum admission queue wait before returning `llm_busy`. |
+| `AI_ASK_WORKER_TIMEOUT_SECONDS` | `115` (1–600) | Hard deadline for the isolated worker process. |
+| `AI_ASK_DB_TIMEOUT_SECONDS` | `10` (1–60) | Database connect/socket/statement timeout passed into the isolated worker. |
 
-Some OpenAI-compatible providers (notably DeepSeek) enable a reasoning mode by
-default. Reasoning tokens are billed inside `AI_LLM_MAX_TOKENS` and can consume
-the budget before the strict selection JSON is emitted, which surfaces as
-`invalid_model_output`. Set `AI_LLM_DISABLE_THINKING=true` to add
-`"thinking": {"type": "disabled"}` to the request body. The field is omitted by
-default so providers that reject unknown request fields keep working.
+These defaults apply only when the corresponding variable is unset or blank;
+explicit deployment environment values continue to override them. `AI_LLM_DISABLE_THINKING`
+remains opt-in and the defaults do not depend on a Provider accepting that
+unverified parameter. Reasoning tokens may consume the output-token budget, so
+3072 reduces (but cannot eliminate) `invalid_model_output` truncation.
+
+The 30-second deadline applies to each individual Provider HTTP call. The
+multi-stage execution allows up to 105 seconds overall and the default worker
+hard-stops at 115 seconds; with default settings, the normal planning + answer
+calls fit inside both bounds. Explicitly raised per-call timeouts remain honored
+but may be cut short by the overall execution deadline, so coordinate those
+overrides with the multi-stage budget. Browser AI requests allow at least 125 seconds, covering
+the 5-second admission wait, worker deadline, and bounded cleanup. If a
+deployment explicitly raises the worker timeout, also raise the frontend
+`VITE_API_TIMEOUT` accordingly; the ordinary search timeout is unchanged.
 
 The browser-safe `GET /api/ai/status` exposes only `{"enabled": boolean}`. It
 also requires the existing RAG search configuration to be enabled and its
@@ -89,7 +103,11 @@ Three request transports share one service and one evidence contract:
 | `POST /api/ai/ask` | Single JSON `AiAskResponse` | Compatibility client |
 
 None of them streams model tokens; the answer is delivered as one validated
-payload. The search page exposes these as two result tabs —「搜索结果」(deterministic
+payload. The shared default quota is 50 AI questions per Beijing natural day,
+not 50 internal model HTTP calls: each legal question that initiates one or
+more real Provider HTTP calls consumes at most one slot; database-only counts
+and requests that initiate no model HTTP call consume none. See the quota API
+contract in [the AI Q&A guide](./ai-ask-mvp.md). The search page exposes these as two result tabs —「搜索结果」(deterministic
 `GET /api/search`) and「AI 问答」(the explicit AI action). Ordinary search never
 invokes the model.
 

@@ -276,7 +276,7 @@ function AiAskSection({
       : "资产检索暂不可用，无法确认候选资产；传统搜索不受影响。"
     : !response?.metadataCount && response?.status === "generation_unavailable"
       ? response.reasonCode === "llm_daily_quota_exceeded"
-        ? "今日 AI 问答额度已用完，请明日再试。"
+        ? "今日 AI 问答次数已用完，请明日再试。"
         : response.reasonCode === "llm_quota_unavailable"
           ? "每日 AI 问答额度服务暂不可用，请稍后重试。"
           : response.reasonCode === "llm_timeout"

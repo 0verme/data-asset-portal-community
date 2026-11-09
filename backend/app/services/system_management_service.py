@@ -1085,7 +1085,7 @@ class SystemManagementService(AuditActorMixin):
             module_name="系统配置",
             operation_type=OPERATION_TYPE_UPDATE,
             operation_object=AI_LLM_DAILY_LIMIT_CODE,
-            operation_desc="更新全站每日 LLM Provider 请求上限",
+            operation_desc="更新全站每日 AI 问答上限",
         ) as audit:
             self._core.execute(
                 update(code_item)

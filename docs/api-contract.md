@@ -361,12 +361,12 @@ Base Path: `/api/search`
 - DAP 推荐响应包含 `query`、`status`（`disabled` / `available` / `degraded` / `unavailable`）、`recommendations`、`count`、`elapsedMs` 和安全原因码 `reasonCode`。`available` 且 `count=0` 表示检索成功但没有命中；它与 `disabled`、`unavailable` 有明确区别。字段项返回 DAP 规范 `assetId`、`fieldId` 与同一 `assetId` 的 `relatedTable`；UI 以 canonical ID 打开既有资产详情。
 - RAG 接入仅使用基础后端 HTTPX 依赖；不增加 LanceDB、BGE、PyTorch 等依赖。超时、认证失败、服务不可用或目录验证失败只隐藏/降级推荐，不影响确定性搜索。推荐接口不调用 LLM、不提供“智能解答”，也不写入或修改资产目录；单轮 AI 问答是另一个独立的默认关闭入口（`POST /api/ai/ask`、`/api/ai/ask/progress`、`/api/ai/ask/stream`，当前 UI 使用 `/api/ai/ask/stream`），其契约见 [单轮 AI 数据资产问答](./ai-ask-mvp.md)。
 
-### 全站每日真实 LLM Provider 请求额度（Issue #549）
+### 全站每日 AI 问答次数额度（Issue #549 后续语义修正）
 
-- `GET /api/system/ai-llm-daily-quota` 要求 `system:param:read`，响应 envelope 的 `data` 包含 `parameterCode`、`dailyLimit`、`used`、`remaining`、`businessDate`、`timezone`。
-- `PUT /api/system/ai-llm-daily-quota` 要求 `system:param:write`，body 为 `{"dailyLimit": 50}`；值必须是 1–2,147,483,647 的整数。更新通过必需的 `p_operation_log` 审计事务写入现有 `p_code_item.item_value`。
-- 默认上限 50 次，按 Asia/Shanghai 自然日，全站及跨应用实例共享。三个真实 AI Ask JSON/SSE 路由都在唯一公共 LLM Provider 出站前原子预留额度；每次 Provider HTTP 请求单独计数，不按用户或 IP 拆分。普通搜索、RAG 推荐、前端 Mock 演示均不消耗额度。
-- `0015_ai_llm_daily_quota` 增加共享计数表 `p_ai_llm_daily_usage`，默认参数和计数采用 add-only migration；GaussDB/DWS 有显式 adapter。额度耗尽以 AI Ask 安全错误码 `llm_daily_quota_exceeded` 返回；配额数据库或配置无效时 fail closed 并返回 `llm_quota_unavailable`，不会绕过限制。详细行为及部署迁移步骤见 [单轮 AI 数据资产问答](./ai-ask-mvp.md)。
+- `GET /api/system/ai-llm-daily-quota` 要求 `system:param:read`，响应 envelope 的 `data` 包含 `parameterCode`、`dailyLimit`、`used`、`remaining`、`businessDate`、`timezone`；`used` / `remaining` 的单位是问答次数，不是 LLM HTTP 请求次数。
+- `PUT /api/system/ai-llm-daily-quota` 要求 `system:param:write`，body 为 `{"dailyLimit": 50}`；值必须是 1–2,147,483,647 的整数。更新通过必需的 `p_operation_log` 审计事务写入既有 `p_code_item.item_value`。参数编码 `AI_LLM_DAILY_LIMIT` 不变，管理员界面名称为「每日 AI 问答上限」。
+- 默认上限 50 次，按 Asia/Shanghai 自然日，全站及跨应用实例共享。`/api/ai/ask`、`/api/ai/ask/progress`、`/api/ai/ask/stream` 每个实际发起至少一次真实 Provider HTTP 调用的合法问答最多计一次；内部规划、生成和重试的模型 HTTP 调用次数与配额解耦。没有发起 LLM HTTP 请求的纯目录统计等请求不扣减；已发起调用后失败/超时/取消仍计一次。普通搜索、RAG 推荐、前端 Mock 演示不消耗额度。
+- 既有 `0015_ai_llm_daily_quota` 表结构继续复用，不增加 Migration；计数通过共享用量行的原子条件 UPDATE 实现并发安全和自然日重置。GaussDB/DWS 有既有 adapter。额度耗尽以 `llm_daily_quota_exceeded` 返回；配额数据库或配置无效时 fail closed 并返回 `llm_quota_unavailable`。详细行为及部署迁移注意事项见 [单轮 AI 数据资产问答](./ai-ask-mvp.md)。
 
 ### 接口与查询参数
 

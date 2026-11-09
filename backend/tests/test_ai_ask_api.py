@@ -1,17 +1,28 @@
 from __future__ import annotations
 
+import json
 import os
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
+import httpx
+
 from backend.app.application import Identity
 from backend.app.authorization.core import AuthorizationService
 from backend.app.contracts.ai_ask import AiAskProgressStep, AiAskResponse
+from backend.app.contracts.rag_search import (
+    RagRecommendation,
+    RagRecommendationsResponse,
+    RagRelatedTable,
+)
 from backend.app.core.capabilities import resolve_capabilities
 from backend.app.fastapi_app import create_fastapi_app
-from backend.app.services.ai_ask_service import AIAskCancelled
+from backend.app.services.ai_ask_service import AIAskCancelled, AIAskService
 from backend.app.services.ai_ask_admission import AIAskAdmissionController
+from backend.app.services.ai_llm_daily_quota import DailyLLMQuotaReservation
+from backend.app.services.ai_llm_provider import OpenAICompatibleLLMProvider
+from backend.app.settings import AIAskLLMConfig
 from fastapi.testclient import TestClient
 
 _DEFAULT_IDENTITY = object()
@@ -349,10 +360,230 @@ class AiAskApiTests(unittest.TestCase):
         self.assertIn('"status":"completed"', response.text)
         self.assertEqual("answered", json_response.json()["status"])
 
+    def test_json_progress_and_execution_stream_share_one_slot_per_question(self):
+        recommendation = RagRecommendation(
+            assetId=7,
+            fieldId=11,
+            assetType="field",
+            name="BALANCE_AMT",
+            displayName="余额金额",
+            description="余额的登记字段",
+            domain="账户域",
+            layer="DWS",
+            relatedTable=RagRelatedTable(
+                assetId=7,
+                name="ACCOUNT_BALANCE",
+                displayName="账户余额表",
+                description="账户余额相关元数据",
+                domain="账户域",
+                layer="DWS",
+            ),
+            evidence=["synthetic verified candidate"],
+        )
+
+        class FakeRagService:
+            def __init__(self):
+                self.calls = []
+
+            def is_configured(self):
+                return True
+
+            def recommend(
+                self, query, *, profile, top_k=None, execution_callback=None,
+                search_id=None, **_kwargs,
+            ):
+                self.calls.append(query)
+                if execution_callback is not None:
+                    execution_callback("start", {
+                        "searchId": search_id,
+                        "query": query,
+                        "requestCount": 1,
+                    })
+                    execution_callback("complete", {
+                        "searchId": search_id,
+                        "query": query,
+                        "requestCount": 1,
+                        "resultCount": 1,
+                        "verifiedCount": 1,
+                        "hits": [{
+                            "assetId": 7,
+                            "fieldId": 11,
+                            "entityType": "field",
+                            "name": "BALANCE_AMT",
+                            "matchedTerms": [],
+                            "retrievalChannels": ["lexical"],
+                        }],
+                        "status": "available",
+                        "effectiveMode": "auto",
+                        "channelsUsed": ["lexical"],
+                    })
+                return RagRecommendationsResponse(
+                    query=query,
+                    status="available",
+                    recommendations=[recommendation],
+                    count=1,
+                )
+
+            def load_candidate_catalog(self, _table_ids, _field_ids, **_kwargs):
+                return [{
+                    "assetId": 7,
+                    "name": "ACCOUNT_BALANCE",
+                    "cn": "账户余额表",
+                    "desc": "账户余额相关元数据",
+                    "domain": "账户域",
+                    "layer": "DWS",
+                    "fields": [{
+                        "assetId": 7,
+                        "fieldId": 11,
+                        "name": "BALANCE_AMT",
+                        "cn": "余额金额",
+                        "description": "余额的登记字段",
+                    }],
+                }]
+
+        class CountingQuota:
+            def __init__(self):
+                self.reservations = 0
+                self.refunds = []
+
+            def reserve(self):
+                self.reservations += 1
+                return DailyLLMQuotaReservation("2026-11-08")
+
+            def refund(self, reservation):
+                self.refunds.append(reservation)
+                return True
+
+        rag = FakeRagService()
+        quota = CountingQuota()
+        provider_calls = []
+        planner_calls = []
+
+        def handler(request):
+            payload = json.loads(request.content)
+            system_prompt = payload["messages"][0]["content"]
+            provider_calls.append(system_prompt)
+            if "检索查询规划器" in system_prompt:
+                planner_calls.append(system_prompt)
+                content = json.dumps({
+                    "queryType": "natural_language",
+                    "keyConcepts": ["余额"],
+                    "queries": ["余额相关字段"],
+                    "supplementalQuery": None,
+                }, ensure_ascii=False)
+            else:
+                content = json.dumps({
+                    "questionType": "field_explanation",
+                    "claims": [{"assetId": 7, "fieldId": 11, "relevance": "direct"}],
+                }, ensure_ascii=False)
+            return httpx.Response(200, json={
+                "choices": [{"message": {"content": content}}],
+            })
+
+        provider = OpenAICompatibleLLMProvider(
+            client=httpx.Client(
+                transport=httpx.MockTransport(handler),
+                follow_redirects=False,
+                trust_env=False,
+            ),
+            config_getter=lambda: AIAskLLMConfig(
+                enabled=True,
+                base_url="https://llm.example.invalid/v1",
+                model="synthetic-model",
+                api_key="synthetic-test-key",
+                timeout_ms=30000,
+                max_tokens=3072,
+                max_concurrency=2,
+            ),
+            quota_service=quota,
+        )
+        self.addCleanup(provider.close)
+        service = AIAskService(rag, provider)
+        client, _search = self._client(service=service, rag=rag)
+
+        json_response = client.post("/api/ai/ask", json={"query": "余额字段在哪里？"})
+        progress_response = client.post("/api/ai/ask/progress", json={"query": "余额字段在哪里？"})
+        stream_response = client.post("/api/ai/ask/stream", json={"query": "余额相关字段在哪里？"})
+
+        self.assertEqual(200, json_response.status_code, json_response.text)
+        self.assertEqual("answered", json_response.json()["status"])
+        self.assertEqual(200, progress_response.status_code, progress_response.text)
+        self.assertIn('"status":"answered"', progress_response.text)
+        self.assertEqual(200, stream_response.status_code, stream_response.text)
+        self.assertIn('"status":"completed"', stream_response.text)
+        self.assertEqual(1, len(planner_calls))
+        self.assertEqual(4, len(provider_calls), "the stream question performs planning plus answer generation")
+        self.assertEqual(3, quota.reservations, "one reservation for each of the three API questions")
+        self.assertEqual([], quota.refunds)
+
+    def test_database_only_count_does_not_reserve_an_ai_question(self):
+        class CountRagService:
+            def is_configured(self):
+                return True
+
+            def recommend(self, *_args, **_kwargs):
+                raise AssertionError("database-only count must not call RAG")
+
+        class CountAssetsService:
+            def get_asset_count_filter_catalog(self):
+                return {
+                    "domains": [{"code": "SYNTH", "name": "合成主题域"}],
+                    "layers": [{"code": "DM", "name": "数据集市层"}],
+                }
+
+            def count_asset_tables(self, **_filters):
+                return 73
+
+        class CountingQuota:
+            def __init__(self):
+                self.reservations = 0
+
+            def reserve(self):
+                self.reservations += 1
+                return DailyLLMQuotaReservation("2026-11-08")
+
+            def refund(self, _reservation):
+                return True
+
+        quota = CountingQuota()
+        provider = OpenAICompatibleLLMProvider(
+            client=httpx.Client(
+                transport=httpx.MockTransport(
+                    lambda _request: self.fail("database-only count must not call the model")
+                ),
+                follow_redirects=False,
+                trust_env=False,
+            ),
+            config_getter=lambda: AIAskLLMConfig(
+                enabled=True,
+                base_url="https://llm.example.invalid/v1",
+                model="synthetic-model",
+                api_key="synthetic-test-key",
+                timeout_ms=30000,
+                max_tokens=3072,
+                max_concurrency=2,
+            ),
+            quota_service=quota,
+        )
+        self.addCleanup(provider.close)
+        service = AIAskService(
+            CountRagService(), provider, assets_service=CountAssetsService()
+        )
+        client, _search = self._client(service=service)
+
+        response = client.post(
+            "/api/ai/ask", json={"query": "合成主题域集市有几张表？"}
+        )
+
+        self.assertEqual(200, response.status_code, response.text)
+        self.assertEqual("metadata_count_answered", response.json()["status"])
+        self.assertEqual(73, response.json()["metadataCount"]["value"])
+        self.assertEqual(0, quota.reservations)
+
     def test_daily_quota_errors_survive_json_progress_and_execution_stream_responses(self):
         quota_response = AiAskResponse(
             status="generation_unavailable",
-            answer="今日 AI 问答额度已用完，请明日再试。",
+            answer="今日 AI 问答次数已用完，请明日再试。",
             citations=[],
             candidates=[],
             retrievalStatus="available",
@@ -372,7 +603,7 @@ class AiAskApiTests(unittest.TestCase):
         stream_response = client.post("/api/ai/ask/stream", json={"query": "合成问答"})
 
         self.assertEqual("llm_daily_quota_exceeded", json_response.json()["reasonCode"])
-        self.assertEqual("今日 AI 问答额度已用完，请明日再试。", json_response.json()["answer"])
+        self.assertEqual("今日 AI 问答次数已用完，请明日再试。", json_response.json()["answer"])
         self.assertIn('"reasonCode":"llm_daily_quota_exceeded"', progress_response.text)
         self.assertIn('"reasonCode":"llm_daily_quota_exceeded"', stream_response.text)
 

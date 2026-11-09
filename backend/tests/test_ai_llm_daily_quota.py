@@ -84,7 +84,7 @@ class DailyLLMQuotaServiceTests(unittest.TestCase):
             (
                 "AI_LLM_QUOTA_CONFIG",
                 "AI_LLM_DAILY_LIMIT",
-                "每日 LLM 调用上限",
+                "每日 AI 问答上限",
                 str(limit),
                 "Synthetic test setting",
             ),

@@ -1,4 +1,4 @@
-import { LONG_REQUEST_TIMEOUT } from "../config/request.ts";
+import { AI_ASK_REQUEST_TIMEOUT } from "../config/request.ts";
 import { requestRemoteEventStream, type RemoteServerSentEvent } from "./http.ts";
 import { parseAiAskResponse, type AiAskResponse } from "./aiAsk.ts";
 
@@ -279,7 +279,7 @@ export async function askAiWithExecution(
   await requestRemoteEventStream("/ai/ask/stream", {
     method: "POST",
     body: { query: normalizedQuery, scope, topK },
-    timeout: LONG_REQUEST_TIMEOUT,
+    timeout: AI_ASK_REQUEST_TIMEOUT,
     suppressUnauthorizedEvent: true,
     suppressTimeoutPayloadLogging: true,
     signal,

@@ -24,6 +24,8 @@ function errorLabel(value: unknown): string {
     unavailable: "服务不可用",
     invalid_response: "服务返回数据无效",
     invalid_plan: "查询规划无效，已回退到原问题",
+    invalid_model_output: "模型返回内容无效，无法解析结构化回答",
+    invalid_citation: "模型引用的资产身份未通过 DAP 目录校验",
     visibility_unavailable: "目录权限或可见性校验失败",
     asset_verification_unavailable: "无法读取权威资产明细",
     field_not_found: "字段未能按稳定 ID 核实",
@@ -35,7 +37,8 @@ function errorLabel(value: unknown): string {
     llm_timeout: "模型请求超时",
     llm_busy: "模型服务繁忙",
     llm_unavailable: "模型服务不可用",
-    llm_daily_quota_exceeded: "今日 AI 问答额度已用完，请明日再试",
+    llm_not_configured: "模型服务未完成配置",
+    llm_daily_quota_exceeded: "今日 AI 问答次数已用完，请明日再试",
     llm_quota_unavailable: "每日 AI 问答额度服务暂不可用，请稍后重试",
     ai_disabled: "问答服务未启用",
     ambiguous_scope: "无法唯一确认统计范围",
@@ -176,6 +179,7 @@ function StepDetails({ step }: { step: AiAskRawStep }) {
     return (
       <div className="sp-ai-execution-detail">
         <p>使用已核实 DAP 证据 {numberValue(data["evidenceCount"]) ?? 0} 条；最终答案一次性返回，不传输模型 token。</p>
+        {typeof data["errorCode"] === "string" ? <p className="sp-ai-execution-error">{errorLabel(data["errorCode"])}</p> : null}
       </div>
     );
   }

@@ -141,7 +141,7 @@ function sseResponse(response: ReturnType<typeof answer> | Record<string, unknow
         if (response.status === "generation_unavailable") {
           emit("step_start", "generating", "正在生成回答。", { evidenceCount: hasCandidates ? 1 : 0 });
           emit("step_error", "generating", "模型生成回答失败。", {
-            errorCode: response.reasonCode === "llm_timeout" ? "llm_timeout" : "unavailable",
+            errorCode: response.reasonCode || "unavailable",
           });
         } else {
           stage("generating", "模型已基于已核实证据完成回答。", { evidenceCount: hasCandidates ? 1 : 0 });
@@ -296,6 +296,15 @@ async function mockPortalApis(page: Page, options: {
           citations: [], candidates: [],
           retrievalStatus: "available", generationStatus: "not_run", resultsTruncated: false,
           reasonCode: "insufficient_evidence", elapsedMs: 3,
+        }, payload.query));
+      }
+      if (payload.query.includes("invalid-model-output")) {
+        return route.fulfill(sseResponse({
+          status: "generation_unavailable",
+          answer: "AI 问答暂不可用，请稍后重试。",
+          citations: [], candidates: [],
+          retrievalStatus: "available", generationStatus: "unavailable", resultsTruncated: false,
+          reasonCode: "invalid_model_output", elapsedMs: 400,
         }, payload.query));
       }
       if (payload.query.includes("timeout")) {
@@ -689,6 +698,15 @@ test("AI disabled or failed status hides the action; ordinary search failure is 
   await expect(page.getByRole("button", { name: "问 AI", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "问 AI 找资产" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "没有找到精确匹配的资产" })).toHaveCount(0);
+});
+
+test("invalid model output has a specific execution-step explanation", async ({ page }) => {
+  await openAiPortal(page);
+  const input = page.getByRole("textbox", { name: "搜索数据资产" });
+  await input.fill("invalid-model-output question");
+  await page.getByRole("button", { name: "问 AI", exact: true }).click();
+  await page.locator(".sp-ai-execution-details > summary").click();
+  await expect(page.getByText("模型返回内容无效，无法解析结构化回答")).toBeVisible();
 });
 
 test("model timeout is distinguished and transient ask errors can be retried", async ({ page }) => {

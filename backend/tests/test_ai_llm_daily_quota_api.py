@@ -52,7 +52,7 @@ class AiLlmDailyQuotaApiTests(unittest.TestCase):
             "INSERT INTO dwp.p_code_item "
             "(item_id, category_code, item_code, item_name, item_value, item_desc, "
             "display_order, is_active, created_by, updated_by) "
-            "VALUES (9001, 'AI_LLM_QUOTA_CONFIG', 'AI_LLM_DAILY_LIMIT', '每日 LLM 调用上限', '50', 'Global', 1, 'N', 'system', 'system')"
+            "VALUES (9001, 'AI_LLM_QUOTA_CONFIG', 'AI_LLM_DAILY_LIMIT', '每日 AI 问答上限', '50', 'Global', 1, 'N', 'system', 'system')"
         )
         self.connection.execute(
             "INSERT INTO dwp.p_ai_llm_daily_usage (scope_key, business_date, used_count) "

@@ -1,14 +1,19 @@
-"""Database-backed, process-shared daily LLM request quota."""
+"""Database-backed, process-shared daily AI question quota."""
 
 from __future__ import annotations
 
+import logging
 import os
+import threading
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, timezone
+from functools import wraps
 from typing import Callable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import func, literal_column, select, update
+from sqlalchemy import case, func, or_, select, update
 
 from ..contracts.ai_llm_quota import (
     AI_LLM_DAILY_LIMIT_CODE,
@@ -44,6 +49,124 @@ class DailyLLMQuotaReservation:
     business_date: str
 
 
+class DailyLLMQuotaAttempt:
+    """One provider attempt participating in a single question's quota slot."""
+
+    def __init__(self, question: "DailyLLMQuotaQuestion") -> None:
+        self._question = question
+        self._finished = False
+
+    def mark_dispatched(self) -> None:
+        self._question._mark_dispatched()
+
+    def finish(self) -> None:
+        if self._finished:
+            return
+        self._finished = True
+        self._question._finish_attempt()
+
+
+class DailyLLMQuotaQuestion:
+    """Share one reservation across all provider attempts in one AI question."""
+
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self._quota_service = None
+        self._reservation: DailyLLMQuotaReservation | None = None
+        self._failure: type[Exception] | None = None
+        self._active_attempts = 0
+        self._dispatched = False
+        self._closed = False
+
+    def begin_provider_attempt(self, quota_service) -> DailyLLMQuotaAttempt:
+        with self._lock:
+            if self._closed:
+                raise DailyLLMQuotaUnavailable("AI question quota scope is closed")
+            if self._failure is not None:
+                raise self._failure()
+            if self._reservation is None:
+                try:
+                    reservation = quota_service.reserve()
+                except (DailyLLMQuotaExceeded, DailyLLMQuotaUnavailable) as error:
+                    self._failure = type(error)
+                    raise
+                self._quota_service = quota_service
+                self._reservation = reservation
+            elif self._quota_service is not quota_service:
+                raise DailyLLMQuotaUnavailable("AI question quota service changed")
+            self._active_attempts += 1
+            return DailyLLMQuotaAttempt(self)
+
+    def _mark_dispatched(self) -> None:
+        with self._lock:
+            self._dispatched = True
+
+    def _refund_if_undispatched(self) -> None:
+        if (
+            self._reservation is None
+            or self._dispatched
+            or self._active_attempts
+        ):
+            return
+        reservation = self._reservation
+        quota_service = self._quota_service
+        try:
+            quota_service.refund(reservation)
+        except Exception:
+            # The reservation may have been committed; keep it charged and reuse
+            # it rather than risking a second reservation for this question.
+            self._dispatched = True
+            logging.getLogger(__name__).warning(
+                "LLM quota reservation refund failed; the unused slot remains charged"
+            )
+            return
+        self._reservation = None
+        self._quota_service = None
+
+    def _finish_attempt(self) -> None:
+        with self._lock:
+            if self._active_attempts > 0:
+                self._active_attempts -= 1
+            self._refund_if_undispatched()
+
+    def close(self) -> None:
+        with self._lock:
+            self._closed = True
+            self._refund_if_undispatched()
+
+
+_CURRENT_QUESTION: ContextVar[DailyLLMQuotaQuestion | None] = ContextVar(
+    "ai_llm_daily_quota_question", default=None
+)
+
+
+@contextmanager
+def daily_llm_quota_question_scope():
+    """Reuse a nested question scope or establish one for a standalone call."""
+    current = _CURRENT_QUESTION.get()
+    if current is not None:
+        yield current
+        return
+    question = DailyLLMQuotaQuestion()
+    token = _CURRENT_QUESTION.set(question)
+    try:
+        yield question
+    finally:
+        try:
+            question.close()
+        finally:
+            _CURRENT_QUESTION.reset(token)
+
+
+def quota_scoped_ai_ask(function):
+    """Keep query planning, answer generation, and retries in one scope."""
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        with daily_llm_quota_question_scope():
+            return function(*args, **kwargs)
+    return wrapped
+
+
 @dataclass(frozen=True)
 class DailyLLMQuotaSnapshot:
     daily_limit: int
@@ -71,13 +194,13 @@ def current_business_date(now: datetime | None = None) -> date:
 
 
 class DailyLLMQuotaService:
-    """Reserve one global provider request atomically in the shared asset DB.
+    """Reserve one global AI question atomically in the shared asset DB.
 
     The usage table intentionally keeps one row per scope with the active
-    business date. On the first reservation after midnight its conditional
-    UPDATE changes the date and resets the count; there is no timer or process
-    local state. Older dates are not retained because the product exposes no
-    historical reporting.
+    business date. The conditional usage-row UPDATE is the reservation's
+    linearization point: it atomically increments today's count or starts the
+    new day at one, without a no-op write lock on the settings row. Older dates
+    are not retained because the product exposes no historical reporting.
     """
 
     def __init__(
@@ -175,45 +298,34 @@ class DailyLLMQuotaService:
             raise DailyLLMQuotaUnavailable("Daily LLM quota storage is unavailable") from None
 
     def reserve(self) -> DailyLLMQuotaReservation:
-        """Atomically claim one slot before dispatching a provider request."""
+        """Atomically claim one question slot before the first provider call."""
         today = self._today()
         try:
+            # Validate the persisted row and read the configurable limit before
+            # opening the write transaction. The first transactional statement
+            # below is the atomic usage-row UPDATE, avoiding SQLite read-to-write
+            # lock upgrades while still failing closed on corrupt stored values.
+            daily_limit = self._read_daily_limit()
+            self._read_usage()
             with database_transaction():
-                # This no-op write serializes reservations with administrator
-                # updates to the setting row. Unlike SELECT FOR UPDATE it also
-                # obtains SQLite's write lock before the value is read.
-                self._core.execute(
-                    update(code_item)
-                    .where(
-                        code_item.c.category_code == AI_LLM_QUOTA_CATEGORY_CODE,
-                        code_item.c.item_code == AI_LLM_DAILY_LIMIT_CODE,
-                    )
-                    .values(item_value=literal_column("item_value"))
-                )
-                daily_limit = self._read_daily_limit()
-                stored_date, _stored_count = self._read_usage()
-                self._core.execute(
-                    update(ai_llm_daily_usage)
-                    .where(
-                        ai_llm_daily_usage.c.scope_key == AI_LLM_QUOTA_SCOPE,
-                        ai_llm_daily_usage.c.business_date == stored_date,
-                        ai_llm_daily_usage.c.business_date != today,
-                    )
-                    .values(
-                        business_date=today,
-                        used_count=0,
-                        updated_at=func.current_timestamp(),
-                    )
-                )
                 changed = self._core.execute(
                     update(ai_llm_daily_usage)
                     .where(
                         ai_llm_daily_usage.c.scope_key == AI_LLM_QUOTA_SCOPE,
-                        ai_llm_daily_usage.c.business_date == today,
-                        ai_llm_daily_usage.c.used_count < daily_limit,
+                        or_(
+                            ai_llm_daily_usage.c.business_date != today,
+                            ai_llm_daily_usage.c.used_count < daily_limit,
+                        ),
                     )
                     .values(
-                        used_count=ai_llm_daily_usage.c.used_count + 1,
+                        business_date=today,
+                        used_count=case(
+                            (
+                                ai_llm_daily_usage.c.business_date == today,
+                                ai_llm_daily_usage.c.used_count + 1,
+                            ),
+                            else_=1,
+                        ),
                         updated_at=func.current_timestamp(),
                     )
                 )
