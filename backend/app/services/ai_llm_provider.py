@@ -7,7 +7,6 @@ URLs, response bodies, or upstream exception strings.
 from __future__ import annotations
 
 import json
-import logging
 import threading
 import time
 from typing import Any
@@ -16,14 +15,15 @@ import httpx
 
 from ..settings import AIAskLLMConfig, get_ai_llm_config
 from .ai_llm_daily_quota import (
+    DailyLLMQuotaAttempt,
     DailyLLMQuotaExceeded,
-    DailyLLMQuotaReservation,
     DailyLLMQuotaUnavailable,
+    DailyLLMQuotaQuestion,
+    daily_llm_quota_question_scope,
     daily_llm_quota_service,
 )
 
 MAX_LLM_RESPONSE_BYTES = 256_000
-LOGGER = logging.getLogger(__name__)
 
 
 class LLMProviderError(RuntimeError):
@@ -78,6 +78,22 @@ class OpenAICompatibleLLMProvider:
         user_payload: dict[str, Any],
         cancel_event: threading.Event | None = None,
     ) -> str:
+        with daily_llm_quota_question_scope() as question:
+            return self._complete_json_in_question(
+                system_prompt=system_prompt,
+                user_payload=user_payload,
+                cancel_event=cancel_event,
+                question=question,
+            )
+
+    def _complete_json_in_question(
+        self,
+        *,
+        system_prompt: str,
+        user_payload: dict[str, Any],
+        cancel_event: threading.Event | None,
+        question: DailyLLMQuotaQuestion,
+    ) -> str:
         try:
             settings = self._config_getter()
         except Exception:
@@ -99,8 +115,7 @@ class OpenAICompatibleLLMProvider:
         response_lock = threading.Lock()
         active_response: list[httpx.Response] = []
         deadline_timer: threading.Timer | None = None
-        reservation: DailyLLMQuotaReservation | None = None
-        request_dispatched = False
+        quota_attempt: DailyLLMQuotaAttempt | None = None
         cancel_watch_stop = threading.Event()
         cancel_watcher: threading.Thread | None = None
 
@@ -169,7 +184,7 @@ class OpenAICompatibleLLMProvider:
             if deadline_expired.is_set() or time.monotonic() >= deadline:
                 raise LLMProviderError("llm_timeout")
             try:
-                reservation = self._quota_service.reserve()
+                quota_attempt = question.begin_provider_attempt(self._quota_service)
             except DailyLLMQuotaExceeded:
                 raise LLMProviderError("llm_daily_quota_exceeded") from None
             except DailyLLMQuotaUnavailable:
@@ -178,7 +193,7 @@ class OpenAICompatibleLLMProvider:
                 raise LLMProviderError("cancelled")
             if deadline_expired.is_set() or time.monotonic() >= deadline:
                 raise LLMProviderError("llm_timeout")
-            request_dispatched = True
+            quota_attempt.mark_dispatched()
             try:
                 with self._client.stream(
                     "POST",
@@ -257,11 +272,8 @@ class OpenAICompatibleLLMProvider:
                 deadline_timer.join()
             with response_lock:
                 active_response.clear()
-            if reservation is not None and not request_dispatched:
-                try:
-                    self._quota_service.refund(reservation)
-                except DailyLLMQuotaUnavailable:
-                    LOGGER.warning("LLM quota reservation refund failed; the unused slot remains charged")
+            if quota_attempt is not None:
+                quota_attempt.finish()
             capacity.release()
 
     def close(self) -> None:

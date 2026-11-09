@@ -126,7 +126,7 @@ def get_ai_ask_max_queue() -> int:
 
 
 def get_ai_ask_queue_wait_ms() -> int:
-    return get_int_env("AI_ASK_QUEUE_WAIT_MS", 2000, minimum=0, maximum=10000)
+    return get_int_env("AI_ASK_QUEUE_WAIT_MS", 5000, minimum=0, maximum=10000)
 
 
 def get_ai_ask_worker_timeout_seconds() -> int:
@@ -209,8 +209,8 @@ def get_ai_llm_config() -> AIAskLLMConfig | None:
         return None
 
     raw_limits = (
-        ("AI_LLM_TIMEOUT_MS", 10000, 250, 60000),
-        ("AI_LLM_MAX_TOKENS", 512, 64, 4096),
+        ("AI_LLM_TIMEOUT_MS", 30000, 250, 60000),
+        ("AI_LLM_MAX_TOKENS", 3072, 64, 4096),
         ("AI_LLM_MAX_CONCURRENCY", 2, 1, 16),
     )
     limits: list[int] = []

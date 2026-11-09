@@ -83,6 +83,12 @@ test("progress parser accepts real states and counts but rejects answer/token pa
   }), {
     id: "counting", status: "completed", intent: "report_count", elapsedMs: 0, reportCount: 0,
   });
+  for (const errorCode of ["invalid_model_output", "invalid_citation"] as const) {
+    assert.equal(
+      parseAiAskProgressStep({ id: "generating", status: "failed", errorCode }).errorCode,
+      errorCode,
+    );
+  }
   assert.deepEqual(parseAiAskProgressStep({
     id: "analyzing", status: "running", intent: "metadata_count", elapsedMs: 3,
   }), {

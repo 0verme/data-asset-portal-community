@@ -193,6 +193,30 @@ verified in an isolated environment.
   `GET /api/ai/status` reports `enabled=true`.
 - SSE carries real backend stages plus one complete validated answer. Model
   tokens are never streamed, and no conversation history is persisted.
+- When the optional feature is enabled, defaults apply only to unset/blank
+  environment variables: `AI_LLM_MAX_TOKENS=3072`,
+  `AI_LLM_TIMEOUT_MS=30000` per Provider HTTP call,
+  `AI_LLM_MAX_CONCURRENCY=2`, `AI_ASK_MAX_CONCURRENCY=2`,
+  `AI_ASK_MAX_QUEUE=4`, and `AI_ASK_QUEUE_WAIT_MS=5000`.
+  `AI_LLM_DISABLE_THINKING` remains opt-in (`false` by default); DAP does not
+  depend on a Provider accepting an unverified Thinking-disable parameter.
+- The 105-second multi-stage deadline and 115-second default worker deadline
+  bound cumulative model/RAG/verification work. The browser AI request timeout
+  is at least 125 seconds to include admission wait and worker cleanup. If a
+  deployment raises `AI_ASK_WORKER_TIMEOUT_SECONDS`, configure frontend
+  `VITE_API_TIMEOUT` to a sufficiently larger value as well. Keep proxies
+  configured to allow the SSE response/heartbeats for the chosen deadline.
+- The shared daily limit is 50 AI questions (not 50 model HTTP calls): an ask
+  that starts one or more real LLM HTTP calls consumes at most one global
+  slot; database-only statistics and requests that never start a model call
+  consume none. All users and app instances share it; there is no user/IP
+  counter. The existing `AI_LLM_DAILY_LIMIT` parameter code and table remain;
+  no schema migration is required for the admin label change.
+- Before the first Beijing midnight after upgrading, the existing
+  `p_ai_llm_daily_usage.used_count` still reflects the old per-HTTP-call
+  accounting. The new code conservatively treats that value as used question
+  slots for the remainder of that business day, then naturally resets it at
+  midnight. Do not manually zero the row during rollout.
 - Verify current GitHub `dap-rag-lab` HTTP Search Service status before enabling;
   external issue #14 is not evidence of a completed/live deployment. DAP
   Client Mock tests do not prove a real HTTP service exists.

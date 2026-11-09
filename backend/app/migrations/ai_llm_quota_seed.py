@@ -10,6 +10,7 @@ from ..contracts.ai_llm_quota import (
     AI_LLM_QUOTA_CATEGORY_CODE,
     AI_LLM_QUOTA_CATEGORY_NAME,
     AI_LLM_QUOTA_ITEM_NAME,
+    AI_LLM_QUOTA_LEGACY_ITEM_NAMES,
     DEFAULT_AI_LLM_DAILY_LIMIT,
     parse_daily_limit,
 )
@@ -74,7 +75,8 @@ def plan_ai_llm_quota_seed(
             return AILlmQuotaSeedPlan(error="reserved AI LLM quota category must remain inactive")
     if matching_items:
         item = matching_items[0]
-        if str(_value(item, "item_name", "name", default="") or "") != AI_LLM_QUOTA_ITEM_NAME:
+        item_name = str(_value(item, "item_name", "name", default="") or "")
+        if item_name != AI_LLM_QUOTA_ITEM_NAME and item_name not in AI_LLM_QUOTA_LEGACY_ITEM_NAMES:
             return AILlmQuotaSeedPlan(error="reserved AI LLM quota item conflicts with its contract")
         if str(_value(item, "is_active", "status", default="N") or "N").upper() != "N":
             return AILlmQuotaSeedPlan(error="reserved AI LLM quota item must remain inactive")
@@ -89,7 +91,7 @@ def plan_ai_llm_quota_seed(
             "category_id": _next_id(categories, "category_id", "id"),
             "category_code": AI_LLM_QUOTA_CATEGORY_CODE,
             "category_name": AI_LLM_QUOTA_CATEGORY_NAME,
-            "category_desc": "隐藏的每日 LLM 调用额度配置；通过系统管理页面维护。",
+            "category_desc": "隐藏的全站每日 AI 问答次数配置；通过系统管理页面维护。",
             "display_order": 999,
             "is_active": "N",
             "remark": "保留给 DAP 内部额度配置，不得作为公共参数字典启用。",
@@ -105,7 +107,7 @@ def plan_ai_llm_quota_seed(
             "item_code": AI_LLM_DAILY_LIMIT_CODE,
             "item_name": AI_LLM_QUOTA_ITEM_NAME,
             "item_value": str(DEFAULT_AI_LLM_DAILY_LIMIT),
-            "item_desc": "全站共享的每日实际 LLM Provider HTTP 请求上限。",
+            "item_desc": "全站共享的每日 AI 问答次数上限；每问最多计一次。",
             "display_order": 1,
             "ext_json": None,
             "is_active": "N",

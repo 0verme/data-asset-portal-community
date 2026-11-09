@@ -195,20 +195,22 @@ test('system management tables fetch database pages, reset server search, and re
   expect(api.fullDictionaryCandidates).toBe(0); // Management uses a page; legacy full candidate API remains available independently.
 });
 
-test('daily LLM quota panel reads and saves the shared remote configuration', async ({ page }) => {
+test('daily AI question quota panel reads and saves the shared remote configuration', async ({ page }) => {
   test.skip(!remote, 'Requires VITE_API_MODE=remote and synthetic intercepted API responses.');
   const api = await installFixtures(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/system-management/param-dicts');
   const panel = page.locator('.llm-quota-panel');
   await panel.locator('summary').click();
+  await expect(panel).toContainText('每日 AI 问答上限');
+  await expect(panel).toContainText('每次问答最多计一次');
   await expect(panel).toContainText('今日剩余 46 次');
   await expect(panel.getByText('4 / 46')).toBeVisible();
   const limit = panel.locator('input[type="number"]');
   await expect(limit).toHaveValue('50');
   await limit.fill('75');
   await panel.getByRole('button', { name: '保存每日上限' }).click();
-  await expect(panel).toContainText('全站每日 LLM 请求上限已保存');
+  await expect(panel).toContainText('全站每日 AI 问答上限已保存');
   expect(api.dailyQuotaUpdates).toBe(1);
   expect(api.dailyQuota['dailyLimit']).toBe(75);
   expect(api.dailyQuota['remaining']).toBe(71);

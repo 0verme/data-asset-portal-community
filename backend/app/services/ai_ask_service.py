@@ -30,6 +30,7 @@ from .ai_metadata_count import (
     resolve_metadata_count_intent,
     resolve_report_count_intent,
 )
+from .ai_llm_daily_quota import quota_scoped_ai_ask
 from .ai_llm_provider import LLMProviderError, OpenAICompatibleLLMProvider
 from .assets_service import AssetFilterCatalogChangedError
 
@@ -400,6 +401,7 @@ class AIAskService:
             elapsedMs=max(0.0, (time.monotonic() - started) * 1000),
         )
 
+    @quota_scoped_ai_ask
     def ask(
         self,
         request: AiAskRequest,
@@ -645,7 +647,7 @@ class AIAskService:
             progress.check_cancelled()
             generated, selected, selection_error = self._parse_selection(raw_output, candidates)
             if selection_error:
-                progress.fail("generating", "invalid_response")
+                progress.fail("generating", selection_error)
                 return respond(
                     status="generation_unavailable",
                     answer=_GENERATION_UNAVAILABLE_ANSWER,
@@ -665,7 +667,7 @@ class AIAskService:
                 progress.check_cancelled()
                 generated, selected, selection_error = self._parse_selection(raw_output, candidates)
                 if selection_error:
-                    progress.fail("generating", "invalid_response")
+                    progress.fail("generating", selection_error)
                     return respond(
                         status="generation_unavailable",
                         answer=_GENERATION_UNAVAILABLE_ANSWER,
@@ -683,7 +685,7 @@ class AIAskService:
                 "generating",
                 "timeout" if reason_code == "llm_timeout"
                 else "disabled" if reason_code in {"ai_disabled", "llm_not_configured"}
-                else "invalid_response" if reason_code == "invalid_model_output"
+                else "invalid_model_output" if reason_code == "invalid_model_output"
                 else "unavailable",
             )
             generation_status = (

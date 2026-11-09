@@ -7,7 +7,7 @@
 - `dws.sql`
 - `mysql.sql`（MySQL 8.0、InnoDB、`utf8mb4_0900_ai_ci`）
 
-当前 baseline 包含 shared/system、RBAC、dwm、mapping、root、indicator、apiAsset、upstream、push、report、codeTable、lineage、search 和 AI LLM quota 的 41 张表。`p_search_hot_keyword` 由 search 模块拥有，保存只读公开的推荐词配置；`p_ai_llm_daily_usage` 保存全站共享的每日真实 LLM Provider 请求计数。新库和迁移以“资产、系统、字段”作为可覆盖的最小中性种子。`backend/app/db/tables.py` 是 runtime SQLAlchemy Core 查询子集，不是完整 physical schema；职责详见 [ADR-002](../../docs/adr/002-schema-canonical-source.md)。
+当前 baseline 包含 shared/system、RBAC、dwm、mapping、root、indicator、apiAsset、upstream、push、report、codeTable、lineage、search 和 AI LLM quota 的 41 张表。`p_search_hot_keyword` 由 search 模块拥有，保存只读公开的推荐词配置；`p_ai_llm_daily_usage` 保存全站共享的每日 AI 问答次数（每个实际发起模型 HTTP 调用的问答最多计一次）。新库和迁移以“资产、系统、字段”作为可覆盖的最小中性种子。`backend/app/db/tables.py` 是 runtime SQLAlchemy Core 查询子集，不是完整 physical schema；职责详见 [ADR-002](../../docs/adr/002-schema-canonical-source.md)。
 
 PostgreSQL fresh initialization 要求显式 Profile `schema`。canonical `postgresql.sql` 保留逻辑 `dwp`；受控 renderer 将 schema identifier tokens（包括 `CREATE SCHEMA IF NOT EXISTS` 的目标）映射到 Profile schema，保留当前 `CREATE SCHEMA IF NOT EXISTS` 行为。ledger lookup/stamp、user-table preflight、reflection 与 DDL 使用同一目标，缺失 schema 时在查询/DDL 前拒绝。该变化不改 canonical SQL 文件或历史 Alembic revisions；非 `dwp` 部署仍需独立真实环境验收。
 

@@ -790,7 +790,7 @@ class DwsAiLlmDailyQuotaTests(unittest.TestCase):
             "item_id": 50,
             "category_code": "AI_LLM_QUOTA_CONFIG",
             "item_code": "AI_LLM_DAILY_LIMIT",
-            "item_name": "每日 LLM 调用上限",
+            "item_name": "每日 AI 问答上限",
             "item_value": "73",
             "is_active": "N",
         })
@@ -843,7 +843,7 @@ class DwsAiLlmDailyQuotaTests(unittest.TestCase):
             "item_id": 50,
             "category_code": "AI_LLM_QUOTA_CONFIG",
             "item_code": "AI_LLM_DAILY_LIMIT",
-            "item_name": "每日 LLM 调用上限",
+            "item_name": "每日 AI 问答上限",
             "item_value": "0",
             "is_active": "N",
         })

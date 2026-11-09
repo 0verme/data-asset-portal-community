@@ -72,15 +72,17 @@ test("optional RAG configuration is admin-controlled and never fabricates answer
   assert.doesNotMatch(ragConfigPage + ragConfigApi, /setAnswer|confidenceScore|similarityScore/);
 });
 
-test("daily LLM quota admin is remote-only, permission-aware, and documents shared usage", () => {
+test("daily AI question quota admin is remote-only, permission-aware, and distinguishes model calls", () => {
   assert.match(paramPage, /<AiLlmDailyQuotaPanel canEdit=\{canEdit\} \/>/);
   assert.match(aiLlmQuotaPage, /disabled=\{!canEdit \|\| !supported/);
   assert.match(aiLlmQuotaPage, /Asia\/Shanghai/);
-  assert.match(aiLlmQuotaPage, /Mock \/ Remote/);
+  assert.match(aiLlmQuotaPage, /每日 AI 问答上限/);
+  assert.match(aiLlmQuotaPage, /每次问答最多计一次/);
+  assert.match(aiLlmQuotaPage, /Mock 问答/);
   assert.match(aiLlmQuotaPage, /system:param:write/);
   assert.match(aiLlmQuotaApi, /API_MODE === "remote"/);
   assert.match(aiLlmQuotaApi, /requestRemote\("\/system\/ai-llm-daily-quota"/);
-  assert.match(aiLlmQuotaApi, /模拟模式不支持持久化每日 LLM 额度/);
+  assert.match(aiLlmQuotaApi, /模拟模式不支持持久化每日 AI 问答额度/);
 });
 
 test("operation log surfaces use the frozen DAP adapters", () => {

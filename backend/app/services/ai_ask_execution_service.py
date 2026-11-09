@@ -28,6 +28,7 @@ from ..contracts.ai_ask import (
 )
 from ..contracts.rag_search import RagRecommendationsResponse
 from ..fastapi.public_catalog import project_public_catalog_value
+from .ai_llm_daily_quota import quota_scoped_ai_ask
 from .ai_ask_service import (
     AIAskCancelled,
     AIAskService,
@@ -893,6 +894,7 @@ class AIAskExecutionService(AIAskService):
             return parsed if parsed > 0 else None
         return None
 
+    @quota_scoped_ai_ask
     def ask(
         self,
         request: AiAskRequest,

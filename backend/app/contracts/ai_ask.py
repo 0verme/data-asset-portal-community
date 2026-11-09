@@ -81,7 +81,10 @@ AiAskProgressStepId = Literal[
 ]
 AiAskProgressStatus = Literal["pending", "running", "completed", "failed"]
 AiAskProgressIntent = Literal["metadata_count", "report_count", "ambiguous_count"]
-AiAskProgressError = Literal["timeout", "unavailable", "invalid_response", "disabled", "cancelled"]
+AiAskProgressError = Literal[
+    "timeout", "unavailable", "invalid_response", "invalid_model_output",
+    "invalid_citation", "disabled", "cancelled",
+]
 
 
 class AiAskProgressStep(_AiAskContract):

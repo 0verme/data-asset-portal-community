@@ -639,9 +639,19 @@ class AiAskServiceTests(unittest.TestCase):
         for content, reason in cases:
             with self.subTest(reason=reason, content=content[:16]):
                 service, _rag, _llm = self._service(llm=StubLLMProvider(content=content))
-                response = service.ask(AiAskRequest(query="x"), profile="strict")
+                progress_events = []
+                response = service.ask(
+                    AiAskRequest(query="x"),
+                    profile="strict",
+                    progress_callback=progress_events.append,
+                )
                 self.assertEqual("generation_unavailable", response.status)
                 self.assertEqual(reason, response.reason_code)
+                generating_failure = next(
+                    event for event in progress_events
+                    if event.step_id == "generating" and event.status == "failed"
+                )
+                self.assertEqual(reason, generating_failure.error_code)
                 self.assertEqual([], response.citations)
 
     def test_empty_model_selection_is_rechecked_once_then_becomes_insufficient(self):
@@ -789,11 +799,22 @@ class AiAskServiceTests(unittest.TestCase):
         ):
             with self.subTest(reason=reason):
                 service, _rag, _llm = self._service(llm=StubLLMProvider(error=LLMProviderError(reason)))
-                response = service.ask(AiAskRequest(query="x"), profile="strict")
+                progress_events = []
+                response = service.ask(
+                    AiAskRequest(query="x"),
+                    profile="strict",
+                    progress_callback=progress_events.append,
+                )
                 self.assertEqual("generation_unavailable", response.status)
                 self.assertEqual(reason, response.reason_code)
+                if reason == "invalid_model_output":
+                    generating_failure = next(
+                        event for event in progress_events
+                        if event.step_id == "generating" and event.status == "failed"
+                    )
+                    self.assertEqual("invalid_model_output", generating_failure.error_code)
                 if reason == "llm_daily_quota_exceeded":
-                    self.assertEqual("今日 AI 问答额度已用完，请明日再试。", response.answer)
+                    self.assertEqual("今日 AI 问答次数已用完，请明日再试。", response.answer)
                 elif reason == "llm_quota_unavailable":
                     self.assertEqual("每日 AI 问答额度服务暂不可用，请稍后重试。", response.answer)
                 self.assertNotIn("authorization", response.model_dump_json().lower())

@@ -32,11 +32,11 @@ export function supportsAiLlmDailyQuota(): boolean {
 
 function unwrap(payload: unknown): AiLlmDailyQuota {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    throw new Error("每日 LLM 额度接口返回格式无效。");
+    throw new Error("每日 AI 问答额度接口返回格式无效。");
   }
   const data = (payload as Record<string, unknown>)["data"];
   if (!data || typeof data !== "object" || Array.isArray(data)) {
-    throw new Error("每日 LLM 额度接口缺少 data。");
+    throw new Error("每日 AI 问答额度接口缺少 data。");
   }
   const value = data as Record<string, unknown>;
   if (
@@ -47,7 +47,7 @@ function unwrap(payload: unknown): AiLlmDailyQuota {
     || typeof value["businessDate"] !== "string"
     || value["timezone"] !== "Asia/Shanghai"
   ) {
-    throw new Error("每日 LLM 额度接口字段无效。");
+    throw new Error("每日 AI 问答额度接口字段无效。");
   }
   return value as unknown as AiLlmDailyQuota;
 }
@@ -59,7 +59,7 @@ export async function getAiLlmDailyQuota(): Promise<AiLlmDailyQuota> {
 
 export async function updateAiLlmDailyQuota(dailyLimit: number): Promise<AiLlmDailyQuota> {
   if (!supportsAiLlmDailyQuota()) {
-    throw new Error("模拟模式不支持持久化每日 LLM 额度。");
+    throw new Error("模拟模式不支持持久化每日 AI 问答额度。");
   }
   return unwrap(await requestRemote("/system/ai-llm-daily-quota", {
     method: "PUT",

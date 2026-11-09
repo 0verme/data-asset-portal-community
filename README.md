@@ -111,7 +111,7 @@ DAP 有三条互不影响的检索 / 问答路径。默认只开启第一条：
 - 模型只能返回结构化的候选稳定 ID 与直接 / 相关关系；表名、字段名、中文名、描述和引用卡全部由 DAP 使用当前校验后的元数据生成，模型无法为自由文本「背书」。
 - 回答状态区分 `answered` / `partial_answer` / `insufficient_evidence` / `retrieval_unavailable` / `generation_unavailable`；受控统计意图另有 `metadata_count_answered` / `ambiguous_scope` / `metadata_count_unavailable`。
 - 执行进度通过 SSE 返回后端真实阶段（`step_start` / `step_complete` / `step_error` / `answer` / `done` / `keep_alive`），**不逐 token 流式输出**；浏览器取消会 abort SSE，并在阶段边界停止上游调用，旧响应不会覆盖新请求。
-- 全站真实 Provider 请求默认共享每日 50 次额度（北京时间自然日）；在系统管理 → 参数字典配置，使用既有系统参数表、`system:param:write` 权限和操作审计。额度耗尽或持久化计数不可用时 fail closed；Mock 问答与普通搜索/RAG 不消耗额度。完整契约、状态语义、迁移与尚未验收项见 [单轮 AI 数据资产问答](./docs/ai-ask-mvp.md)；统计意图见 [权威资产目录统计](./docs/ai-metadata-count.md)。
+- 全站每日默认共享 **50 次 AI 问答**（北京时间自然日），不是 50 次模型 HTTP 调用：一次问答内的规划、答案生成和重试最多扣一次；没有发起 LLM HTTP 请求的纯目录统计不扣减。额度不按用户/IP 区分，沿用 `AI_LLM_DAILY_LIMIT` 参数编码及既有系统参数表、`system:param:write` 权限和操作审计。额度耗尽或计数不可用时 fail closed；Mock、普通搜索及 RAG 推荐不消耗额度。模型配置默认 `AI_LLM_MAX_TOKENS=3072`、`AI_LLM_TIMEOUT_MS=30000`；显式部署环境变量值保持优先。完整额度、参数与部署契约见 [单轮 AI 数据资产问答](./docs/ai-ask-mvp.md) 和[配置说明](./docs/configuration.md)；统计意图见 [权威资产目录统计](./docs/ai-metadata-count.md)。
 
 > **不要把 Mock 当成真实能力。** 公开静态 Demo [https://data.overme.cn/](https://data.overme.cn/) 使用
 > `VITE_API_MODE=mock` 的独立构建：问答由前端本地演示适配器按演示目录名称 / 字段匹配生成，

@@ -1,4 +1,4 @@
-import { LONG_REQUEST_TIMEOUT } from "../config/request.ts";
+import { AI_ASK_REQUEST_TIMEOUT } from "../config/request.ts";
 import { requestRemote, requestRemoteEventStream } from "./http.ts";
 
 export type AiAskStatus =
@@ -58,7 +58,7 @@ export interface AiAskProgressStep {
   tableCount?: number | null;
   reportCount?: number | null;
   fieldCount?: number | null;
-  errorCode?: "timeout" | "unavailable" | "invalid_response" | "disabled" | "cancelled" | null;
+  errorCode?: "timeout" | "unavailable" | "invalid_response" | "invalid_model_output" | "invalid_citation" | "disabled" | "cancelled" | null;
 }
 
 export interface AiAskStatisticalFilter {
@@ -116,7 +116,7 @@ const API_MODE = (
     : "mock"
 ).trim().toLowerCase();
 
-const AI_ASK_TIMEOUT_MS = LONG_REQUEST_TIMEOUT;
+const AI_ASK_TIMEOUT_MS = AI_ASK_REQUEST_TIMEOUT;
 const RETRIEVAL_STATUSES = new Set<string>(["available", "degraded", "unavailable", "not_run"]);
 const GENERATION_STATUSES = new Set<string>(["completed", "unavailable", "disabled", "not_run"]);
 const ASK_STATUSES = new Set<string>([
@@ -133,7 +133,10 @@ const PROGRESS_STEP_IDS = new Set<string>([
   "analyzing", "retrieving", "counting", "organizing", "generating", "completed",
 ]);
 const PROGRESS_STATUSES = new Set<string>(["pending", "running", "completed", "failed"]);
-const PROGRESS_ERRORS = new Set<string>(["timeout", "unavailable", "invalid_response", "disabled", "cancelled"]);
+const PROGRESS_ERRORS = new Set<string>([
+  "timeout", "unavailable", "invalid_response", "invalid_model_output",
+  "invalid_citation", "disabled", "cancelled",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

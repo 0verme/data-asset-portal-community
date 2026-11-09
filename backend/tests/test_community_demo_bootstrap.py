@@ -156,6 +156,33 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             with self.assertRaises(BootstrapError):
                 verify_demo_database(database)
 
+    def test_quota_seed_accepts_legacy_hidden_label_without_touching_admin_value(self):
+        from backend.app.ai_llm_quota_contract import (
+            AI_LLM_DAILY_LIMIT_CODE,
+            AI_LLM_QUOTA_CATEGORY_CODE,
+            AI_LLM_QUOTA_CATEGORY_NAME,
+        )
+        from backend.app.migrations.ai_llm_quota_seed import plan_ai_llm_quota_seed
+
+        plan = plan_ai_llm_quota_seed(
+            [{
+                "category_code": AI_LLM_QUOTA_CATEGORY_CODE,
+                "category_name": AI_LLM_QUOTA_CATEGORY_NAME,
+                "is_active": "N",
+            }],
+            [{
+                "category_code": AI_LLM_QUOTA_CATEGORY_CODE,
+                "item_code": AI_LLM_DAILY_LIMIT_CODE,
+                "item_name": "每日 LLM 调用上限",
+                "item_value": "73",
+                "is_active": "N",
+            }],
+        )
+
+        self.assertTrue(plan.safe, plan.error)
+        self.assertEqual((), plan.categories)
+        self.assertEqual((), plan.items)
+
     def test_generated_runtime_is_stable_and_secret_is_reused(self):
         first_secret = prepare_demo_runtime(self.paths)
         first_config = self.paths.database_config.read_text(encoding="utf-8")
