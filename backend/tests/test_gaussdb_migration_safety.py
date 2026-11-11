@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from backend.app.migrations.dws_revisions import DwsMigrationError
 from backend.app.migrations.dws_runner import apply_revisions, repository_head
 from backend.app.migrations.schema import _reflection_metadata_queries
 from backend.tests.dws_fake_database import (
@@ -88,6 +89,27 @@ class GaussDbMigrationSafetyTests(unittest.TestCase):
                     self.assertEqual("dap", params[0])
                     if "from pg_attribute a" in lowered:
                         self.assertEqual(("dap", "dap"), params)
+
+    def test_unregistered_application_table_still_blocks_head_verification(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        unexpected = FakeTable(name="p_unregistered_extension", relation_id=9002)
+        unexpected.columns["record_id"] = FakeColumn(
+            "record_id", "BIGINT", nullable=False
+        )
+        unexpected.rows.append({"record_id": 72})
+        database.tables[unexpected.name] = unexpected
+        rows_before = [dict(row) for row in unexpected.rows]
+
+        with self.assertRaises(DwsMigrationError) as error:
+            apply_revisions(
+                database, CONFIG, "0001_baseline", repository_head()
+            )
+
+        self.assertEqual(repository_head(), error.exception.revision)
+        self.assertIn("p_unregistered_extension", str(error.exception))
+        self.assertEqual("0014_rag_search_config", database.ledger)
+        self.assertIs(unexpected, database.tables["p_unregistered_extension"])
+        self.assertEqual(rows_before, unexpected.rows)
 
 
 if __name__ == "__main__":

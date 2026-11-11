@@ -144,12 +144,18 @@ def main(argv=None):
     from app.db.facade import connect_with_profile, get_db_profile
     from app.migrations.schema import (
         BASELINE_REVISION,
+        EmptyRevisionLedgerError,
         current_revision,
         initialize,
         stamp_existing,
         verify_database,
     )
-    from app.migrations.dws_runner import apply_revisions, plan_revisions, revision_chain
+    from app.migrations.dws_runner import (
+        apply_revisions,
+        plan_revisions,
+        revision_chain,
+        verify_repository_head,
+    )
 
     config = get_db_profile(args.profile)
     try:
@@ -160,7 +166,14 @@ def main(argv=None):
     connection = connect_with_profile(args.profile)
     applied_results = []
     try:
-        revision = current_revision(connection, config)
+        try:
+            revision = current_revision(connection, config)
+        except EmptyRevisionLedgerError:
+            if args.command != "apply" or dialect != "dws":
+                raise
+            # apply/initialize may safely recover an empty DWS ledger only after
+            # verifying the complete current canonical physical baseline.
+            revision = None
         _validate_known_revision(revision)
         head = repository_alembic_head()
         if args.command == "status":
@@ -200,7 +213,12 @@ def main(argv=None):
                 print(f"up-to-date {head}")
             return 0
         if args.command == "verify":
-            verified = verify_database(connection, config, dialect, args.root)
+            if dialect == "dws":
+                verified = verify_repository_head(
+                    connection, config, head, root=args.root
+                )
+            else:
+                verified = verify_database(connection, config, dialect, args.root)
             if verified is None:
                 raise RuntimeError("database schema is present but Alembic baseline is not stamped")
             print(f"verify=ok revision={verified}")
@@ -227,7 +245,7 @@ def main(argv=None):
             )
             # The whole physical schema must match the repository head contract
             # after the last verified revision.
-            verify_database(connection, config, dialect, args.root)
+            verify_repository_head(connection, config, head, root=args.root)
     finally:
         if connection is not None:
             connection.close()
