@@ -145,8 +145,9 @@ test("upstream views consume the frozen DAP adapters without changing legacy cla
     readFile(upstreamEditorPath, "utf8"),
   ]);
 
-  assert.match(listSource, /import \{ Button \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+  assert.match(listSource, /import \{ Button, Select \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.match(listSource, /<Button className="btn primary" variant="primary" type="button" onClick=\{onNew\}>/);
+  assert.match(listSource, /aria-label="上游系统排序"/);
   assert.match(detailSource, /import \{ Button \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.match(detailSource, /<Button className="btn" variant="secondary" type="button" onClick=\{onEdit\}>/);
   assert.match(editorSource, /import \{ Button, IconButton, Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);

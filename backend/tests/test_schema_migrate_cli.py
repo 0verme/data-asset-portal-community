@@ -119,11 +119,25 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 menus = connection.execute(
                     "SELECT menu_code FROM p_menu ORDER BY display_order"
                 ).fetchall()
+                quota_category = connection.execute(
+                    "SELECT category_name, is_active FROM p_code_category "
+                    "WHERE category_code = 'AI_LLM_QUOTA_CONFIG'"
+                ).fetchall()
+                quota_item = connection.execute(
+                    "SELECT item_code, item_value, is_active FROM p_code_item "
+                    "WHERE category_code = 'AI_LLM_QUOTA_CONFIG'"
+                ).fetchall()
+                quota_usage = connection.execute(
+                    "SELECT scope_key, used_count FROM p_ai_llm_daily_usage"
+                ).fetchall()
             finally:
                 connection.close()
             self.assertEqual(("idx_p_asset_table_filter",), row)
             self.assertEqual(("idx_p_indicator_semantic_ref",), semantic_index)
             self.assertEqual(11, len(menus))
+            self.assertEqual([("AI 问答配置", "N")], quota_category)
+            self.assertEqual([("AI_LLM_DAILY_LIMIT", "50", "N")], quota_item)
+            self.assertEqual([("GLOBAL", 0)], quota_usage)
             self.assertTrue(
                 {
                     "source_asset_id",
@@ -161,6 +175,91 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
                 ],
                 demo_departments,
             )
+
+    def test_0015_preserves_a_custom_limit_and_current_usage_on_reapply(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "custom-quota.sqlite"
+            config = root / "database.yaml"
+            config.write_text(
+                "profiles:\n  quota:\n    type: sqlite\n"
+                f"    database: {database.as_posix()}\n",
+                encoding="utf-8",
+            )
+            initial = _run_cli(["apply", "--profile", "quota", "--config", str(config)])
+            self.assertEqual(0, initial.returncode, initial.stderr)
+            connection = sqlite3.connect(database)
+            try:
+                connection.execute(
+                    "UPDATE p_code_item SET item_value = '73' "
+                    "WHERE item_code = 'AI_LLM_DAILY_LIMIT'"
+                )
+                connection.execute(
+                    "UPDATE p_ai_llm_daily_usage SET business_date = '2026-11-07', used_count = 12 "
+                    "WHERE scope_key = 'GLOBAL'"
+                )
+                connection.execute(
+                    "UPDATE alembic_version SET version_num = '0014_rag_search_config'"
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            applied = _run_cli(["apply", "--profile", "quota", "--config", str(config)])
+            self.assertEqual(0, applied.returncode, applied.stderr)
+            connection = sqlite3.connect(database)
+            try:
+                limit = connection.execute(
+                    "SELECT item_value FROM p_code_item WHERE item_code = 'AI_LLM_DAILY_LIMIT'"
+                ).fetchone()
+                usage = connection.execute(
+                    "SELECT business_date, used_count FROM p_ai_llm_daily_usage WHERE scope_key = 'GLOBAL'"
+                ).fetchone()
+                revision = connection.execute("SELECT version_num FROM alembic_version").fetchone()
+            finally:
+                connection.close()
+            self.assertEqual(("73",), limit)
+            self.assertEqual(("2026-11-07", 12), usage)
+            self.assertEqual((repository_alembic_head(),), revision)
+
+    def test_0015_rejects_noncanonical_existing_usage_date_without_advancing_ledger(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "invalid-quota-date.sqlite"
+            config = root / "database.yaml"
+            config.write_text(
+                "profiles:\n  quota:\n    type: sqlite\n"
+                f"    database: {database.as_posix()}\n",
+                encoding="utf-8",
+            )
+            initial = _run_cli(["apply", "--profile", "quota", "--config", str(config)])
+            self.assertEqual(0, initial.returncode, initial.stderr)
+            connection = sqlite3.connect(database)
+            try:
+                connection.execute(
+                    "UPDATE p_ai_llm_daily_usage SET business_date = '20261107' "
+                    "WHERE scope_key = 'GLOBAL'"
+                )
+                connection.execute(
+                    "UPDATE alembic_version SET version_num = '0014_rag_search_config'"
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            failed = _run_cli(["apply", "--profile", "quota", "--config", str(config)])
+            self.assertNotEqual(0, failed.returncode)
+            self.assertIn("usage row is invalid", failed.stderr)
+            connection = sqlite3.connect(database)
+            try:
+                revision = connection.execute("SELECT version_num FROM alembic_version").fetchone()
+                stored_date = connection.execute(
+                    "SELECT business_date FROM p_ai_llm_daily_usage WHERE scope_key = 'GLOBAL'"
+                ).fetchone()
+            finally:
+                connection.close()
+            self.assertEqual(("0014_rag_search_config",), revision)
+            self.assertEqual(("20261107",), stored_date)
 
     def test_mismatched_existing_filter_index_fails_without_advancing_ledger(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -530,7 +629,7 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("verify=ok", proc.stdout)
         self.assertIn("0001_baseline", proc.stdout)
-        self.assertIn("tables=40", proc.stdout)
+        self.assertIn("tables=41", proc.stdout)
 
     def test_offline_verify_includes_mysql_baseline(self):
         proc = _run_cli(["verify", "--offline", "--dialect", "mysql"])

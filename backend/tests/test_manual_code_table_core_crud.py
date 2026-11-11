@@ -52,6 +52,49 @@ class ManualCodeTableCoreCrudTests(unittest.TestCase):
                 self.assertIn("__app__", str(compiled))
                 self.assertNotIn("dwp.", str(compiled))
 
+    def test_paginated_table_list_has_filtered_count_and_global_statistics(self):
+        stats = {"total": 10, "enabled": 7, "disabled": 3, "styleCount": 4}
+        self.service._db.fetch_rows = MagicMock(side_effect=[
+            [{"total": 3}], [self.row], [stats],
+            [{"value": "status", "count": 4}, {"value": "enum", "count": 2}],
+            [{"value": "enabled", "count": 5}, {"value": "disabled", "count": 2}],
+        ])
+
+        result = self.service.get_tables_page(
+            keyword="customer", style="status", status="enabled", page="2", page_size="1"
+        )
+
+        self.assertEqual((3, 2, 1), (result["total"], result["page"], result["pageSize"]))
+        self.assertEqual(stats, result["stats"])
+        self.assertEqual(["CUSTOMER_STATUS"], [item["tableCode"] for item in result["items"]])
+        count_statement, page_statement, stats_statement, style_facet_statement, status_facet_statement = [
+            call.args[0] for call in self.service._db.fetch_rows.call_args_list
+        ]
+        for statement in (count_statement, page_statement, stats_statement, style_facet_statement, status_facet_statement):
+            self._assert_portable(statement)
+        for statement in (count_statement, page_statement):
+            compiled = str(statement.compile(dialect=sqlite.dialect()))
+            self.assertIn("table_style", compiled)
+            self.assertIn("status_code", compiled)
+            self.assertIn("table_name", compiled)
+        page_sql = str(page_statement.compile(dialect=sqlite.dialect())).upper()
+        self.assertIn("LIMIT", page_sql)
+        self.assertIn("OFFSET", page_sql)
+        style_facet_sql = str(style_facet_statement.compile(dialect=sqlite.dialect()))
+        status_facet_sql = str(status_facet_statement.compile(dialect=sqlite.dialect()))
+        self.assertIn("status_code", style_facet_sql)
+        self.assertIn("table_style", status_facet_sql)
+        self.assertEqual({"styleTotal": 6, "styles": {"status": 4, "enum": 2}, "statusTotal": 7,
+                          "statuses": {"enabled": 5, "disabled": 2}}, result["facets"])
+
+    def test_legacy_list_remains_complete_without_database_limit(self):
+        self.service._db.fetch_rows = MagicMock(return_value=[self.row, {**self.row, "table_id": 8, "table_code": "ORDER_STATUS"}])
+
+        self.assertEqual(2, len(self.service.get_tables()))
+        statement = self.service._db.fetch_rows.call_args.args[0]
+        self._assert_portable(statement)
+        self.assertNotIn("LIMIT", str(statement.compile(dialect=sqlite.dialect())).upper())
+
     def test_list_filters_use_bound_core_expression(self):
         self.service._db.fetch_rows = MagicMock(return_value=[self.row])
 

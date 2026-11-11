@@ -7,10 +7,12 @@ const src = fileURLToPath(new URL("..", import.meta.url));
 const read = (relativePath: string) => readFile(`${src}/${relativePath}`, "utf8");
 
 test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog access", async () => {
-  const [app, search, moduleContent] = await Promise.all([
+  const [app, search, moduleContent, moduleSidebar, mappingSidebar] = await Promise.all([
     read("App.tsx"),
     read("components/SearchPortalPage.tsx"),
     read("components/app/ModuleContent.tsx"),
+    read("components/app/ModuleSidebar.tsx"),
+    read("components/sidebar/MappingSidebar.tsx"),
   ]);
 
   assert.match(app, /businessAccessReady = \(!isDbAuthMode\(\) \|\| authReady\) && publicCatalogConfigReady/);
@@ -18,11 +20,36 @@ test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog acce
   assert.match(app, /navMenus = getNavigationMenusForAuth\(navMenuSnapshot, navigationAuthKey\)/);
   assert.match(app, /if \(!catalogDataAccessReady\)\s*\{\s*navMenuRequestRef\.current \+= 1;\s*setNavMenuSnapshot\(\{ authKey: navigationAuthKey, menus: \[\] \}\)/);
   assert.match(app, /loadMenus\(navigationAuthKey\)/);
+  assert.match(app, /catalogDataAccessReady = businessAccessReady && !catalogAccessDisabled/);
+  assert.match(moduleSidebar, /catalogAccessReady=\{catalogDataAccessReady\}/);
+  assert.match(mappingSidebar, /if \(!catalogAccessReady\)\s*\{\s*setSourceSystems\(\[\]\)/);
+  assert.match(mappingSidebar, /\[catalogAccessReady, retryVersion\]/);
   assert.match(search, /publicAccessReady = true/);
   assert.doesNotMatch(search, /请先登录后搜索/);
   assert.doesNotMatch(moduleContent, /AuthenticatedBusinessPrompt/);
   assert.match(moduleContent, /publicAccessReady=\{context\.businessAccessReady\}/);
   assert.match(moduleContent, /匿名目录访问已关闭/);
+});
+
+test("catalog readiness gates API asset and root detail/candidate requests", async () => {
+  const [apiAssetModule, apiAssetView, rootModule, rootView] = await Promise.all([
+    read("hooks/useApiAssetModule.ts"),
+    read("components/views/ApiAssetView.tsx"),
+    read("hooks/useRootModule.ts"),
+    read("components/views/RootView.tsx"),
+  ]);
+
+  assert.match(apiAssetModule, /if \(!active \|\| !\['view', 'edit'\]\.includes\(route\.page\) \|\| !code\)/);
+  assert.match(apiAssetModule, /\[active, route\.code, route\.page\]/);
+  assert.match(apiAssetView, /route\.page === "list" && apiAsset\.loading/);
+  assert.match(apiAssetView, /route\.page === "list" && apiAsset\.error/);
+  assert.match(rootView, /rootRoute\.page === "library" && rootLoading/);
+  assert.match(rootView, /rootRoute\.page === "library" && rootError/);
+  assert.match(rootModule, /if \(!active \|\| rootRoute\.page !== 'edit' \|\| !abbr\)/);
+  assert.match(rootModule, /\[active, rootRoute\.abbr, rootRoute\.page\]/);
+  assert.match(rootModule, /if \(!active\) \{\s*setRootImportCandidates\(\[\]\)/);
+  assert.match(rootModule, /if \(active && rootRoute\.page === 'import'\)/);
+  assert.match(rootModule, /\[active, loadRootImportCandidates, rootRoute\.page\]/);
 });
 
 test("anonymous UI exposes catalog actions only and keeps write controls permission-gated", async () => {
@@ -63,7 +90,9 @@ test("anonymous CSV export stays hidden unless the server explicitly enables it"
   assert.match(codeTables, /canExport \? <(?:button|Button)/);
   assert.match(mappings, /canExport \? <(?:button|Button)/);
   assert.match(codeSidebar, /canExport\s*\?/);
-  assert.match(mappingSidebar, /canExport\s*\?/);
+  assert.match(mappingSidebar, /getFieldMappingSourceSystems/);
+  assert.match(mappingSidebar, /源系统导航/);
+  assert.doesNotMatch(mappingSidebar, /查询说明|筛选建议/);
   assert.match(mappingApi, /field-mappings\/export/);
   assert.match(codeTableApi, /manual-code-tables\/export/);
   assert.match(codeTableHook, /exportManualCodeTablesCsv/);

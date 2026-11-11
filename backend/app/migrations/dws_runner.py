@@ -68,6 +68,12 @@ REPAIR_HINTS: dict[str, tuple[str, ...]] = {
     "0013_field_filter_index": (
         "resolve the existing same-name index definition explicitly, then retry",
     ),
+    "0014_rag_search_config": (
+        "resolve duplicate or conflicting reserved RAG rows explicitly and keep both rows inactive; do not enable them through generic parameter APIs",
+    ),
+    "0015_ai_llm_daily_quota": (
+        "resolve duplicate, invalid or active reserved AI LLM quota rows explicitly; preserve valid configured limits and usage values before retrying",
+    ),
 }
 
 
@@ -279,27 +285,29 @@ def _verify_revision_postconditions(
 ) -> None:
     model = _reflect(connection, config, root)
     for revision in revision_chain(BASELINE_REVISION, head):
-        inspection = inspect_revision(
-            connection, config, revision, model=model, root=root
+        adapter = get_adapter(revision)
+        if adapter is None:
+            raise DwsMigrationError(
+                revision,
+                observed="no DWS adapter is registered for this revision",
+                reason="head verification requires an explicit persistent post-condition",
+            )
+        inspection = adapter.inspect_persistent_postcondition(
+            DwsRevisionContext(
+                connection=connection,
+                config=config,
+                model=model,
+                root=root,
+                revision=revision,
+            )
         )
-        # 0008's reference matching is a one-time migration backfill, not a
-        # permanent invariant: application writes may intentionally leave
-        # source_asset_id/result_field_id NULL after migration.
-        if (
-            revision == "0008_indicator_semantic_contract"
-            and inspection.state is RevisionState.NOT_APPLIED
-            and inspection.summary
-            == "indicator semantic structure exists but the backfill is incomplete"
-            and "rows with NULL semantic_state: 0" in inspection.details
-        ):
-            continue
         if inspection.state is not RevisionState.APPLIED:
             raise DwsMigrationError(
                 revision,
                 observed=inspection.summary,
                 reason=(
                     "DWS head verification requires every registered revision "
-                    "post-condition to be physically present"
+                    "persistent post-condition to be physically present"
                 ),
                 details=inspection.details,
                 repairs=REPAIR_HINTS.get(revision, ()),

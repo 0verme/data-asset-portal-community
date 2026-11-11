@@ -36,6 +36,7 @@ from ..dependencies import (
 from ..errors import _service_error_response
 from ..public_catalog import is_authenticated_request, public_navigation_menus
 from ...settings import get_public_catalog_profile
+from ...utils.pagination import resolve_paging
 
 
 def _system_error_status(error: SystemManagementError) -> int:
@@ -77,7 +78,11 @@ def _system_payload(payload: Any) -> Any:
     return payload
 
 
-def _register_system_management_routes(app: FastAPI, service: Any) -> None:
+def _register_system_management_routes(
+    app: FastAPI,
+    service: Any,
+    rag_search_service: Any | None = None,
+) -> None:
     router = APIRouter(
         prefix="/api/system",
         tags=["system-management-migration"],
@@ -93,6 +98,25 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
     ):
         try:
             payload = {"items": current_service.get_users()}
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract(payload, SystemResponse))
+
+    @router.get("/users/page", response_model=None)
+    def get_users_page(
+        keyword: str = Query(default=""),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        _context: RequestContext = Depends(require_permission("system:user:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        page, page_size = resolve_paging(page, page_size)
+        try:
+            payload = current_service.get_users_page(
+                keyword=keyword,
+                page=page,
+                page_size=page_size,
+            )
         except SystemManagementError as error:
             return _system_error_response(error)
         return JSONResponse(content=validate_contract(payload, SystemResponse))
@@ -223,6 +247,25 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
             return _system_error_response(error)
         return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
 
+    @router.get("/roles/page", response_model=None)
+    def get_roles_page(
+        keyword: str = Query(default=""),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        _context: RequestContext = Depends(require_permission("system:role:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        page, page_size = resolve_paging(page, page_size)
+        try:
+            payload = current_service.get_roles_page(
+                keyword=keyword,
+                page=page,
+                page_size=page_size,
+            )
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract(payload, SystemResponse))
+
     @router.post("/roles", response_model=None, status_code=201)
     def create_role(
         payload: Any = Body(default=None),
@@ -284,6 +327,25 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
         # anonymous callers already receive the explicit public navigation
         # projection above. This endpoint is not an authorization engine.
         return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
+
+    @router.get("/menus/page", response_model=None)
+    def get_menus_page(
+        keyword: str = Query(default=""),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        _context: RequestContext = Depends(require_permission("system:menu:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        page, page_size = resolve_paging(page, page_size)
+        try:
+            payload = current_service.get_menus_page(
+                keyword=keyword,
+                page=page,
+                page_size=page_size,
+            )
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract(payload, SystemResponse))
 
     @router.post("/menus", response_model=None, status_code=201)
     def create_menu(
@@ -369,6 +431,74 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
             content=validate_contract({"message": "Menu deleted"}, SystemResponse)
         )
 
+    @router.get("/rag-search-config", response_model=None)
+    def get_rag_search_config(
+        _context: RequestContext = Depends(require_permission("system:param:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.get_rag_search_config_public()
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract({"data": data}, SystemResponse))
+
+    @router.put("/rag-search-config", response_model=None)
+    def update_rag_search_config(
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_rag_search_config(_system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "RAG search configuration updated", "data": data},
+                SystemResponse,
+            )
+        )
+
+    @router.get("/rag-search-config/diagnostics", response_model=None)
+    def get_rag_search_diagnostics(
+        _context: RequestContext = Depends(require_permission("system:param:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            config = current_service.get_rag_search_config()
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        if rag_search_service is None:
+            diagnostics = {"status": "disabled", "reasonCode": "disabled"}
+        else:
+            diagnostics = rag_search_service.diagnostics(config)
+        return JSONResponse(content=validate_contract({"data": diagnostics}, SystemResponse))
+
+    @router.get("/ai-llm-daily-quota", response_model=None)
+    def get_ai_llm_daily_quota(
+        _context: RequestContext = Depends(require_permission("system:param:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.get_ai_llm_daily_quota()
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract({"data": data}, SystemResponse))
+
+    @router.put("/ai-llm-daily-quota", response_model=None)
+    def update_ai_llm_daily_quota(
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_ai_llm_daily_quota(_system_payload(payload))
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract(
+            {"message": "Daily LLM quota updated", "data": data}, SystemResponse
+        ))
+
     @router.get("/param-dicts/categories", response_model=None)
     def get_param_categories(
         _context: RequestContext = Depends(require_permission("system:param:read")),
@@ -411,6 +541,27 @@ def _register_system_management_routes(app: FastAPI, service: Any) -> None:
         except SystemManagementError as error:
             return _system_error_response(error)
         return JSONResponse(content=validate_contract({"items": items}, SystemResponse))
+
+    @router.get("/param-dicts/page", response_model=None)
+    def get_param_dicts_page(
+        category_code: str = Query(default="", alias="categoryCode"),
+        keyword: str = Query(default=""),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        _context: RequestContext = Depends(require_permission("system:param:read")),
+        current_service: Any = Depends(get_service),
+    ):
+        page, page_size = resolve_paging(page, page_size)
+        try:
+            payload = current_service.get_param_dicts_page(
+                category_code=category_code or None,
+                keyword=keyword,
+                page=page,
+                page_size=page_size,
+            )
+        except SystemManagementError as error:
+            return _system_error_response(error)
+        return JSONResponse(content=validate_contract(payload, SystemResponse))
 
     @router.post("/param-dicts", response_model=None, status_code=201)
     def create_param_dict(

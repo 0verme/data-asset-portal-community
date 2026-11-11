@@ -32,8 +32,9 @@ import {
   RowActions,
   StatusBadge,
   ViewModeSwitcher,
+  WideTableScroll,
 } from "../common/index.ts";
-import { Button, Checkbox, Input, Select, Textarea } from "../../ui/index.ts";
+import { Button, Checkbox, Input, Select, TablePagination, Textarea } from "../../ui/index.ts";
 
 interface NormalizedRelations {
   tables: TableReference[];
@@ -836,8 +837,8 @@ function ApiList({
             <span className="pt-code">API</span>API 资产
           </div>
           <div className="page-sub">
-            共 <b>{items.length}</b> 个
-            API，可按请求方式、下游调用系统和状态筛选。
+            共 <b>{apiAsset.total}</b> 个匹配 API
+            ，可按请求方式、下游调用系统和状态筛选。
           </div>
         </div>
         <div className="head-actions">
@@ -858,7 +859,8 @@ function ApiList({
         <ApiEmptyState query={query} />
       ) : view === "list" ? (
         <div className="tbl-wrap">
-          <table className="dt mobile-card-table">
+          <WideTableScroll ariaLabel="API 资产列表" className="api-assets-wide-scroll">
+            <table className="dt mobile-card-table api-assets-wide-table">
             <thead>
               <tr>
                 <th>API</th>
@@ -910,7 +912,8 @@ function ApiList({
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </WideTableScroll>
         </div>
       ) : view === "card" ? (
         <ApiCards
@@ -924,6 +927,15 @@ function ApiList({
       ) : (
         <ApiGroups items={items} onView={apiAsset.view} />
       )}
+      <TablePagination
+        page={apiAsset.page}
+        pageSize={apiAsset.pageSize}
+        total={apiAsset.total}
+        onPageChange={apiAsset.setPage}
+        onPageSizeChange={apiAsset.setPageSize}
+        loading={apiAsset.loading}
+        ariaLabel="API 资产分页"
+      />
     </>
   );
 }
@@ -945,11 +957,11 @@ export function ApiAssetView({
   onChangeView,
   canEdit = false,
 }: ApiAssetViewProps) {
-  if (apiAsset.loading)
+  if (route.page === "list" && apiAsset.loading)
     return (
       <LoadingState title="加载 API 资产" desc="正在读取 API 元数据台账。" />
     );
-  if (apiAsset.error)
+  if (route.page === "list" && apiAsset.error)
     return (
       <ErrorState
         title="API 资产加载失败"
@@ -965,6 +977,12 @@ export function ApiAssetView({
       />
     );
   }
+  if (["view", "edit"].includes(route.page) && apiAsset.detailLoading)
+    return <LoadingState title="加载 API 资产详情" desc="正在按 API 编码读取记录。" />;
+  if (["view", "edit"].includes(route.page) && apiAsset.detailError)
+    return <ErrorState title="API 资产详情加载失败" desc={apiAsset.detailError} onRetry={apiAsset.loadDetail} />;
+  if (["view", "edit"].includes(route.page) && !apiAsset.current)
+    return <EmptyState title="API 资产不存在" desc="当前 API 编码不存在或已被删除。" actionText="返回 API 列表" onAction={apiAsset.back} />;
   if (route.page === "new" || route.page === "edit")
     return (
       <Editor

@@ -60,7 +60,7 @@ import {
 } from "./fieldMapping/fieldMappingUtils.ts";
 import type { FieldMappingStatsStatus } from "./fieldMapping/fieldMappingStatsState.ts";
 import { Icon } from "./ui.tsx";
-import { Button, Select } from "../ui/index.ts";
+import { Button, TablePagination } from "../ui/index.ts";
 
 type MappingTab = "table" | "field";
 
@@ -320,10 +320,9 @@ export function FieldMappingPage({
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<FieldMappingSortState>({ key: "", direction: "asc" });
   const [sourceSystems, setSourceSystems] = useState<FieldMappingSourceSystemOption[]>([]);
-  const [sourceSystemsError, setSourceSystemsError] = useState("");
-  const [sourceSystemsRetry, setSourceSystemsRetry] = useState(0);
   const [stats, setStats] = useState<FieldMappingStatsData | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [statsRequestKey, setStatsRequestKey] = useState("");
   const [statsError, setStatsError] = useState("");
   const [statsRetryVersion, setStatsRetryVersion] = useState(0);
   const [fieldRows, setFieldRows] = useState<EnrichedFieldMappingRow[]>([]);
@@ -331,11 +330,16 @@ export function FieldMappingPage({
   const [tableRows, setTableRows] = useState<FieldMappingTableSummary[]>([]);
   const [tableTotal, setTableTotal] = useState(0);
   const [listLoading, setListLoading] = useState(false);
+  const [listRequestKey, setListRequestKey] = useState("");
   const [listError, setListError] = useState("");
   const [listRetryVersion, setListRetryVersion] = useState(0);
   const [exportError, setExportError] = useState("");
   const previousKeywordRef = useRef(keyword);
-  const requestPage = previousKeywordRef.current === keyword ? page : 1;
+  const routeSourceSystemId = String(getRouteSourceSystemId(routeFilters) || "");
+  const needsSourceLabel = Boolean(routeFilters.sourceTable || routeFilters.dwfTable || routeFilters.tablePk);
+  const previousSourceSystemRef = useRef(routeSourceSystemId);
+  const sourceSystemChanged = previousSourceSystemRef.current !== routeSourceSystemId;
+  const requestPage = previousKeywordRef.current === keyword && !sourceSystemChanged ? page : 1;
   const requestFilters = useMemo(
     () => buildFieldMappingRequestFilters(filters, routeFilters),
     [filters, routeFilters],
@@ -359,20 +363,25 @@ export function FieldMappingPage({
     }),
     [baseParams, requestPage, pageSize, tab, fieldSortKey, fieldSortDirection],
   );
+  const statsQueryKey = JSON.stringify(baseParams);
+  const listQueryKey = JSON.stringify([tab, listParams]);
 
   useEffect(() => {
     let cancelled = false;
+    if (!needsSourceLabel) {
+      setSourceSystems([]);
+      return () => {
+        cancelled = true;
+      };
+    }
 
     async function loadOptions(): Promise<void> {
-      setSourceSystemsError("");
       try {
         const mappingSystems = await getFieldMappingSourceSystems();
         if (cancelled) return;
         setSourceSystems(mappingSystems);
-      } catch (error: unknown) {
-        if (cancelled) return;
-        setSourceSystems([]);
-        setSourceSystemsError(error instanceof Error ? error.message : "来源系统加载失败");
+      } catch {
+        if (!cancelled) setSourceSystems([]);
       }
     }
 
@@ -380,23 +389,28 @@ export function FieldMappingPage({
     return () => {
       cancelled = true;
     };
-  }, [sourceSystemsRetry]);
+  }, [needsSourceLabel]);
 
   useEffect(() => {
-    const nextFilters = isLinkedRoute(routeFilters)
-      ? buildLinkedFilters(routeFilters)
-      : DEFAULT_FILTERS;
-    setDraftFilters((current) => (
-      areFieldMappingFiltersEqual(current, nextFilters) ? current : nextFilters
-    ));
-    setFilters((current) => (
-      areFieldMappingFiltersEqual(current, nextFilters) ? current : nextFilters
-    ));
+    const nextFilters = buildLinkedFilters(routeFilters);
+    const mergeRouteFilters = (current: FieldMappingFilterState) => {
+      const merged = {
+        ...current,
+        sourceSystemId: nextFilters.sourceSystemId,
+        tablePk: nextFilters.tablePk,
+        ...(nextFilters.srcTable ? { srcTable: nextFilters.srcTable } : {}),
+        ...(nextFilters.targetTable ? { targetTable: nextFilters.targetTable } : {}),
+      };
+      return areFieldMappingFiltersEqual(current, merged) ? current : merged;
+    };
+    setDraftFilters(mergeRouteFilters);
+    setFilters(mergeRouteFilters);
     setPage(1);
   }, [routeFilters]);
 
   useEffect(() => {
     let cancelled = false;
+    setStatsRequestKey(statsQueryKey);
     setStats(null);
     setStatsLoading(true);
     setStatsError("");
@@ -419,10 +433,11 @@ export function FieldMappingPage({
     return () => {
       cancelled = true;
     };
-  }, [baseParams, statsRetryVersion]);
+  }, [baseParams, statsQueryKey, statsRetryVersion]);
 
   useEffect(() => {
     let cancelled = false;
+    setListRequestKey(listQueryKey);
     setListLoading(true);
     setListError("");
     if (tab === "field") {
@@ -440,11 +455,19 @@ export function FieldMappingPage({
           if (cancelled) return;
           setFieldRows(nextRows.items);
           setFieldTotal(nextRows.total);
+          if (nextRows.pageSize !== pageSize) setPageSize(nextRows.pageSize);
+          const lastPage = Math.max(1, Math.ceil(nextRows.total / nextRows.pageSize));
+          const normalizedPage = Math.min(nextRows.page, lastPage);
+          if (normalizedPage !== requestPage) setPage(normalizedPage);
         } else {
           const nextRows = await getFieldMappingTables(listParams);
           if (cancelled) return;
           setTableRows(nextRows.items);
           setTableTotal(nextRows.total);
+          if (nextRows.pageSize !== pageSize) setPageSize(nextRows.pageSize);
+          const lastPage = Math.max(1, Math.ceil(nextRows.total / nextRows.pageSize));
+          const normalizedPage = Math.min(nextRows.page, lastPage);
+          if (normalizedPage !== requestPage) setPage(normalizedPage);
         }
       } catch (loadError: unknown) {
         if (cancelled) return;
@@ -458,28 +481,32 @@ export function FieldMappingPage({
     return () => {
       cancelled = true;
     };
-  }, [listParams, tab, listRetryVersion]);
+  }, [listParams, listQueryKey, pageSize, requestPage, tab, listRetryVersion]);
 
   useEffect(() => {
     previousKeywordRef.current = keyword;
+    previousSourceSystemRef.current = routeSourceSystemId;
     setPage(1);
-  }, [keyword]);
+  }, [keyword, routeSourceSystemId]);
 
+  const linkedView = Boolean(route.sourceTable || route.dwfTable || route.tablePk);
+  const currentSourceLabel = resolveSourceSystemLabel(route, sourceSystems);
+  const currentStats = statsRequestKey === statsQueryKey ? stats : null;
+  const currentStatsError = statsRequestKey === statsQueryKey ? statsError : "";
+  const currentStatsLoading = statsLoading || statsRequestKey !== statsQueryKey;
   const displayStatCount = (value: number | undefined): number | string => {
     if (typeof value === "number") return value;
-    return statsLoading ? "…" : "—";
+    return currentStatsLoading ? "…" : "—";
   };
   const dimensionTabCounts: Record<MappingTab, number | string> = {
-    table: displayStatCount(stats?.sourceTableCount),
-    field: displayStatCount(stats?.fieldCount),
+    table: displayStatCount(currentStats?.sourceTableCount),
+    field: displayStatCount(currentStats?.fieldCount),
   };
-  const linkedView = isLinkedRoute(route);
-  const currentSourceLabel = resolveSourceSystemLabel(route, sourceSystems);
-  const statsStatus: FieldMappingStatsStatus = statsError
+  const statsStatus: FieldMappingStatsStatus = currentStatsError
     ? "error"
-    : statsLoading
+    : currentStatsLoading
       ? "loading"
-      : stats
+      : currentStats
         ? "ready"
         : "unknown";
 
@@ -492,11 +519,12 @@ export function FieldMappingPage({
     [sort, tableRows],
   );
 
-  const totalRows = tab === "field" ? fieldTotal : tableTotal;
-  const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const fieldPageRows = tab === "field" ? sortedFieldRows : [];
-  const tablePageRows = tab === "table" ? sortedTableRows : [];
+  const listIsCurrent = listRequestKey === listQueryKey;
+  const currentListLoading = listLoading || !listIsCurrent;
+  const currentListError = listIsCurrent ? listError : "";
+  const totalRows = listIsCurrent ? (tab === "field" ? fieldTotal : tableTotal) : 0;
+  const fieldPageRows = tab === "field" && listIsCurrent ? sortedFieldRows : [];
+  const tablePageRows = tab === "table" && listIsCurrent ? sortedTableRows : [];
 
   const tableColumns: TableColumn[] = [
     { key: "srcSystem", label: "源系统", width: 260 },
@@ -531,10 +559,6 @@ export function FieldMappingPage({
     setDraftFilters((current) => ({ ...current, [key]: value }));
   };
 
-  const setDraftSourceSystem = (value: string | null) => {
-    setDraftFilters((current) => ({ ...current, sourceSystemId: value ?? "" }));
-  };
-
   const toggleSort = (key: MappingColumnKey) => {
     setPage(1);
     setSort((current) => {
@@ -555,7 +579,7 @@ export function FieldMappingPage({
     setFilters(nextFilters);
     setPageSize(FIELD_MAPPING_DEFAULT_PAGE_SIZE);
     setPage(1);
-    if (linkedView) {
+    if (isLinkedRoute(route)) {
       setRoute((current) => ({ ...DEFAULT_MAPPING_ROUTE, tab: current.tab || tab }));
     }
   };
@@ -742,11 +766,11 @@ export function FieldMappingPage({
         </section>
       ) : null}
 
-      <div aria-busy={statsLoading}>
-        <FieldMappingStats stats={stats} status={statsStatus} />
-        {statsError ? (
+      <div aria-busy={currentStatsLoading}>
+        <FieldMappingStats stats={currentStats} status={statsStatus} />
+        {currentStatsError ? (
           <div className="fm-stats-error">
-            <ActionErrorBanner title="统计加载失败" message={statsError} />
+            <ActionErrorBanner title="统计加载失败" message={currentStatsError} />
             <Button
               className="btn"
               variant="secondary"
@@ -759,21 +783,11 @@ export function FieldMappingPage({
         ) : null}
       </div>
 
-      {sourceSystemsError ? (
-        <div>
-          <ActionErrorBanner title="来源系统加载失败" message={sourceSystemsError} />
-          <Button variant="secondary" type="button" onClick={() => setSourceSystemsRetry((value) => value + 1)}>
-            重试来源系统
-          </Button>
-        </div>
-      ) : null}
       <FieldMappingFilters
         open={filterOpen}
         draftFilters={draftFilters}
-        sourceSystems={sourceSystems}
         onToggle={() => setFilterOpen((current) => !current)}
         onChange={setDraftValue}
-        onSourceSystemChange={setDraftSourceSystem}
         onReset={handleResetFilters}
         onApply={() => {
           setPage(1);
@@ -805,17 +819,17 @@ export function FieldMappingPage({
           </div>
         </div>
 
-        {listLoading ? (
+        {currentListLoading ? (
           <div className="state-card" role="status" aria-live="polite">
             <div className="state-spinner" aria-hidden="true"></div>
             <h4>{tab === "field" ? "加载字段明细" : "加载表维度"}</h4>
             <p>正在根据当前筛选条件准备映射结果。</p>
           </div>
-        ) : listError ? (
+        ) : currentListError ? (
           <div className="state-card state-card-error" role="alert">
             <div className="ec"><Icon name="inbox" size={24} /></div>
             <h4>{tab === "field" ? "字段映射加载失败" : "表维度加载失败"}</h4>
-            <p>{listError}</p>
+            <p>{currentListError}</p>
             <Button
               className="btn"
               variant="secondary"
@@ -884,34 +898,22 @@ export function FieldMappingPage({
               </table>
             </FieldMappingWideTable>
 
-            <div className="fm-pagination">
-              <div>第 {totalRows ? ((currentPage - 1) * pageSize + 1) : 0}-{Math.min(currentPage * pageSize, totalRows)} 条 / 共 {totalRows} 条</div>
-              <div className="fm-pagination-tools">
-                <label>
-                  每页
-                  <Select<string>
-                    aria-label="每页条数"
-                    className="sel fm-page-size"
-                    items={FIELD_MAPPING_PAGE_SIZE_OPTIONS.map((item) => ({ label: String(item), value: String(item) }))}
-                    value={String(pageSize)}
-                    onValueChange={(value) => {
-                      setPage(1);
-                      setPageSize(Number(value));
-                    }}
-                  />
-                  条
-                </label>
-                <Button className="btn" variant="secondary" type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={currentPage <= 1}>
-                  上一页
-                </Button>
-                <span className="mono">{currentPage} / {pageCount}</span>
-                <Button className="btn" variant="secondary" type="button" onClick={() => setPage((current) => Math.min(pageCount, current + 1))} disabled={currentPage >= pageCount}>
-                  下一页
-                </Button>
-              </div>
-            </div>
           </>
         )}
+        <TablePagination
+          ariaLabel="字段映射分页"
+          page={page}
+          pageSize={pageSize}
+          total={totalRows}
+          pageSizeOptions={FIELD_MAPPING_PAGE_SIZE_OPTIONS}
+          loading={currentListLoading}
+          disabled={Boolean(currentListError) || !listIsCurrent}
+          onPageChange={setPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPage(1);
+            setPageSize(nextPageSize);
+          }}
+        />
       </section>
     </div>
   );

@@ -67,7 +67,7 @@ logs, system users/roles/parameters, and all mutations remain protected.
 | system user | `system:user:read/write` |
 | system role | `system:role:read/write` |
 | system menu | `system:menu:write` on mutations; public navigation read is filtered |
-| system param | `system:param:read/write` |
+| system param | `system:param:read/write`, including `GET/PUT /api/system/ai-llm-daily-quota` |
 
 The public read contract is the explicit `PUBLIC_PERMISSION_CODES` registry
 set, not a blanket `*:read` rule. It covers the ordinary catalog projections

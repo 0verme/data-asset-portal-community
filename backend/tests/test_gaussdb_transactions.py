@@ -60,6 +60,33 @@ class GaussDbConnectionTests(unittest.TestCase):
         conn.jconn.getAutoCommit.assert_called_once_with()
         conn.close.assert_not_called()
 
+    def test_connect_applies_server_statement_timeout_and_closes_setup_statement(self):
+        conn = MagicMock()
+        conn.jconn.getAutoCommit.return_value = False
+        config = {**GAUSS_CONFIG, "statement_timeout_ms": 4321}
+
+        with _jaydebeapi_connect_patch(conn):
+            result = _connect_gaussdb(config)
+
+        self.assertIs(result, conn)
+        statement = conn.jconn.createStatement.return_value
+        statement.execute.assert_called_once_with("SET statement_timeout = 4321")
+        statement.close.assert_called_once_with()
+        conn.close.assert_not_called()
+
+    def test_connect_closes_connection_when_statement_timeout_setup_fails(self):
+        conn = MagicMock()
+        conn.jconn.getAutoCommit.return_value = False
+        conn.jconn.createStatement.return_value.execute.side_effect = RuntimeError("timeout setup failed")
+        config = {**GAUSS_CONFIG, "statement_timeout_ms": 4321}
+
+        with _jaydebeapi_connect_patch(conn):
+            with self.assertRaisesRegex(RuntimeError, "timeout setup failed"):
+                _connect_gaussdb(config)
+
+        conn.jconn.createStatement.return_value.close.assert_called_once_with()
+        conn.close.assert_called_once_with()
+
     def test_connect_closes_connection_when_autocommit_cannot_be_disabled(self):
         conn = MagicMock()
         conn.jconn.setAutoCommit.side_effect = RuntimeError("unsupported")
@@ -202,7 +229,7 @@ class DatabaseTransactionTests(unittest.TestCase):
     def test_postgres_placeholder_conversion_keeps_bound_values_separate(self):
         with patch(
             "backend.app.db.facade.get_db_profile",
-            return_value={"type": "postgres"},
+            return_value={"type": "postgres", "schema": "dap"},
         ):
             sql, params = _prepare_execute_args(
                 "primary",

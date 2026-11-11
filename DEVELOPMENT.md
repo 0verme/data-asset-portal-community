@@ -256,7 +256,7 @@ GaussDB / DWS 只有 `backend/schema/dws.sql` 方言 baseline 与离线结构校
 
 `docs/pg/` 与 `docs/dws/` 是 PostgreSQL、GaussDB/DWS 的方言参考、历史兼容 DDL 和 external integration 说明，不是隐藏仓库模块的产品边界，也不是 local 新库的默认入口。需要 vendor-specific DDL 或 external storage/collector 时，确认 profile、依赖和目标数据库后再按 SQL 文件说明执行。
 
-所有仓库模块的 runtime/schema/seed 默认 contract 已统一；persistent lineage 需要 `LINEAGE_DB_PROFILE`，development/test 未配置时使用受控 POC，实例菜单可见性仍由 `p_menu.status` 管理。
+所有仓库模块的 runtime/schema/seed 默认 contract 已统一；血缘与其他 DAP 元数据共用同一个 `ASSET_DB_PROFILE`（含其物理 Schema），不再有 `LINEAGE_DB_PROFILE`、`LINEAGE_STORAGE_MODE` 或开发/测试环境的受控 POC 回退。配置缺失/无效返回 `LINEAGE_CONFIGURATION_ERROR`，库不可达或缺表返回 `LINEAGE_DATA_SOURCE_ERROR`，没有 ACTIVE 快照则返回 `no_active_snapshot` 空状态。实例菜单可见性仍由 `p_menu.status` 管理。
 
 > 🚫 仓库不再包含整库快照（`app-*-init-data.sql` 与 `docs/*/sample/*.sql` 已从公开树移除）。
 > 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。

@@ -31,9 +31,10 @@ import {
   RowActions,
   StatusBadge,
   BinaryStatusToggle,
+  WideTableScroll,
 } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
-import { Button, FormErrorSummary, FormField, focusFirstFormError, Input, Textarea } from "../../ui/index.ts";
+import { Button, FormErrorSummary, FormField, focusFirstFormError, Input, TablePagination, Textarea } from "../../ui/index.ts";
 import { formFieldErrorEntries } from "../../utils/formFieldErrorMapping.ts";
 
 const ROLE_FORM_ID = "system-role-form";
@@ -254,6 +255,11 @@ export function RoleForm({
 
 export interface RoleManagementPageProps {
   roles: readonly SystemRoleItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   permissions?: readonly SystemPermissionItem[] | undefined;
   query: string;
   canEdit: boolean;
@@ -265,6 +271,11 @@ export interface RoleManagementPageProps {
 
 export function RoleManagementPage({
   roles,
+  total,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
   query,
   canEdit,
   onNew,
@@ -289,12 +300,7 @@ export function RoleManagementPage({
             <span className="pt-code">RBAC</span>角色管理
           </div>
           <div className="page-sub">
-            共 <b>{filteredRoles.length}</b> 个角色
-            {filteredRoles.length !== roles.length ? (
-              <>
-                ，总量 <b>{roles.length}</b>
-              </>
-            ) : null}
+            共 <b>{total}</b> 个角色
             {query ? <>，匹配 “{query}”</> : null}
           </div>
         </div>
@@ -317,7 +323,8 @@ export function RoleManagementPage({
         />
       ) : (
         <div className="tbl-wrap">
-          <table className="dt mobile-card-table">
+          <WideTableScroll ariaLabel="角色管理表格" className="system-roles-wide-scroll">
+            <table className="dt mobile-card-table system-roles-table">
             <thead>
               <tr>
                 <th>角色</th>
@@ -387,9 +394,18 @@ export function RoleManagementPage({
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </WideTableScroll>
         </div>
       )}
+      <TablePagination
+        ariaLabel="角色管理分页"
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </div>
   );
 }

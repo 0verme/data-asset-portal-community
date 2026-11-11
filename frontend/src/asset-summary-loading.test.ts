@@ -17,5 +17,6 @@ test("asset home uses paged summaries while detail fields load on navigation", a
   assert.doesNotMatch(hook, /getAssetFields\(/);
   assert.match(hook, /setDetailFields\(asset\.fields \|\| \[\]\)/);
   assert.match(home, /fieldCount\(table\)/);
-  assert.match(view, /第 \{page\} \/ \{pageCount\} 页/);
+  assert.match(hook, /pageSize,/);
+  assert.match(view, /<TablePagination[\s\S]*?ariaLabel="数据仓库资产表分页"/);
 });

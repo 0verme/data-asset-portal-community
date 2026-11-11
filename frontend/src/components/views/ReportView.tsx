@@ -15,6 +15,7 @@
 import type { UseReportModuleResult } from "../../hooks/useReportModule.ts";
 import type { ReportRoute } from "../../routing/types.ts";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
+import { Select, TablePagination } from "../../ui/index.ts";
 import {
     confirmDeleteAction,
     EmptyState,
@@ -47,6 +48,8 @@ export function ReportView({
     const {
         reportLoading,
         reportError,
+        reportTotal, reportPage, setReportPage, reportPageSize, setReportPageSize,
+        reportSort, setReportSort, reportDetailLoading, reportDetailError, retryReportDetail,
         loadReportData,
         reportSaveBusy,
         reportSaveFieldErrors,
@@ -64,21 +67,21 @@ export function ReportView({
         currentReportDetail,
     } = report;
 
-    if (reportLoading) {
+    if (reportDetailLoading || (reportRoute.page === 'list' && reportLoading)) {
         return (
             <LoadingState
-                title="加载报表资产"
+                title={reportDetailLoading ? "加载报表详情" : "加载报表资产"}
                 desc="正在准备报表清单、归属信息和关联引用。"
             />
         );
     }
 
-    if (reportError) {
+    if (reportDetailError || (reportRoute.page === 'list' && reportError)) {
         return (
             <ErrorState
                 title="报表资产加载失败"
-                desc={reportError}
-                onRetry={loadReportData}
+                desc={reportDetailError || reportError}
+                onRetry={reportDetailError ? retryReportDetail : loadReportData}
             />
         );
     }
@@ -147,6 +150,7 @@ export function ReportView({
         <>
             <ReportList
                 reports={filteredReports}
+                total={reportTotal}
                 query={query}
                 view={view}
                 onChangeView={onChangeView}
@@ -155,6 +159,32 @@ export function ReportView({
                 onNew={reportCreate}
                 canEdit={canEdit}
             />
+
+            <div className="catalog-pagination-footer">
+                <label className="catalog-list-sort">
+                    <span>排序</span>
+                    <Select<string>
+                        aria-label="报表排序"
+                        className="table-list-sort"
+                        value={reportSort}
+                        onValueChange={(value) => setReportSort(value || 'code:asc')}
+                        items={[
+                            { label: '编码升序', value: 'code:asc' },
+                            { label: '编码降序', value: 'code:desc' },
+                            { label: '名称升序', value: 'name:asc' },
+                            { label: '名称降序', value: 'name:desc' },
+                        ]}
+                    />
+                </label>
+                <TablePagination
+                    page={reportPage}
+                    pageSize={reportPageSize}
+                    total={reportTotal}
+                    onPageChange={setReportPage}
+                    onPageSizeChange={setReportPageSize}
+                    ariaLabel="报表分页"
+                />
+            </div>
 
             <ReportDetailDrawer
                 open={Boolean(currentReportDetail)}

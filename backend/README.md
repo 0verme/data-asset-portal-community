@@ -13,6 +13,24 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+### Optional RAG recommendation HTTP adapter
+
+RAG recommendations are disabled by default. DAP is only an authenticated HTTP client; it does not import `dap-rag-lab`, install/load BGE or PyTorch, read LanceDB, download a model, or execute a RAG CLI. The optional backend configuration uses the existing protected system-parameter routes and remains hidden from public parameter APIs.
+
+Configure the service URL in the admin panel. Supply `RAG_SEARCH_SERVICE_TOKEN` to the DAP backend through deployment Secret storage; the token is not persisted in the parameter table and is never returned to the browser. Same-host deployments may use a loopback HTTP URL; cross-host deployments must use HTTPS. Diagnostics call `/healthz` and `/readyz` only from the protected admin configuration page or its explicit check action. DAP sends only `query` and `topK` to HTTP Search Service v1; retrieval mode is controlled by the RAG service's `DAP_RAG_SEARCH_MODE`. The legacy DAP `strategy` configuration remains for compatibility and is not sent or applied per request. Responses include structured retrieval metadata and evidence, but every stable ID is revalidated against DAP's current public-catalog projection before display; remote names, descriptions, scores, and evidence are not authoritative.
+
+Anonymous access continues to follow `PUBLIC_CATALOG_PROFILE`: `internal` and `strict` use their existing public projections, while `disabled` continues to block anonymous directory routes. DAP adds no guest shared-catalog approval, login requirement, user-level ACL, or management permission. Any existing global index-approval guard belongs to the RAG service's own deployment configuration, not per-visitor DAP access. Remote timeout, authentication failure, service unavailability, index-not-ready, model mismatch, or catalog mismatch suppresses recommendations and never blocks deterministic keyword search. This configuration uses the existing parameter dictionary; it adds no database table. Do not enable RAG in the internal deployment until migrations `0012`–`0014` (including the RAG config seed) are applied and verified. No internal database operation or real in-network HTTP/BGE readiness test is performed by this code change.
+
+### AI Ask execution limits and JDBC isolation
+
+The native AI endpoints use a process-local active-request limit plus a bounded FIFO admission queue. Requests rejected because the active limit and queue are full (or the queue wait expires) return the existing `generation_unavailable`/`llm_busy` response; they do not submit hidden work to an unbounded executor queue. Defaults are `AI_ASK_MAX_CONCURRENCY=2`, `AI_ASK_MAX_QUEUE=4`, and `AI_ASK_QUEUE_WAIT_MS=5000`; explicit deployment values remain effective. Each ASGI worker process owns an independent limit; size these values with the configured Uvicorn/Gunicorn worker count in mind.
+
+Production AI asks execute in a separate, recyclable OS process. The LLM Provider defaults are `AI_LLM_MAX_TOKENS=3072` and `AI_LLM_TIMEOUT_MS=30000` per HTTP call; configured environment values override these defaults. The multi-stage execution deadline is 105 seconds and `AI_ASK_WORKER_TIMEOUT_SECONDS` defaults to 115 seconds, so bounded planning + answer calls fit below the worker hard stop. The AI browser request timeout is at least 125 seconds to include the default 5-second admission wait and bounded worker cleanup. The child process receives tighter `ASSET_DB_CONNECT_TIMEOUT_SECONDS`, `ASSET_DB_SOCKET_TIMEOUT_SECONDS`, and `ASSET_DB_STATEMENT_TIMEOUT_MS` values from `AI_ASK_DB_TIMEOUT_SECONDS` (default 10 seconds). GaussDB JDBC URLs apply finite `loginTimeout`, `connectTimeout`, and `socketTimeout`; a JDBC connection also sets the server-side `statement_timeout`. If cancellation or a driver/result-read timeout is ignored, the parent terminates and reaps the worker process; it does not claim a Python thread timeout stopped JDBC. Ordinary FastAPI requests remain in the parent process.
+
+Client disconnects do not leak that capacity. `StreamingResponse` finalizers run inside an already-cancelled AnyIO scope, where every `await` re-raises `CancelledError`, so teardown is performed by a bounded cleanup task that terminates/reaps the child and releases the admission lease exactly once; it never awaits inside the cancelled request scope and every wait is bounded. A child that exits normally after queueing its `result`/`__end__` records still returns the real answer instead of `llm_unavailable`: process exit is only treated as a failure after the remaining queue records are drained.
+
+RAG candidates are rebuilt from current DAP active asset rows and only the referenced active field IDs, in a bounded batch (at most 20 remote candidates); neither the RAG index nor historical snapshot metadata is authoritative. The current public-catalog projection and visibility profile are still applied. See [AI Ask GaussDB/JDBC isolated validation checklist](AI_ASK_GAUSSDB_VALIDATION.md) for the independent in-network checks required before deployment sign-off.
+
 ## GaussDB/DWS JDBC compatibility by Java version
 
 本节是 GaussDB/DWS JDBC 依赖与 JVM 版本的 canonical 安装契约。先确认运行后端的 Java 版本，再选择对应 requirements；不要按 GaussDB/DWS 数据库版本推断 Java 版本。
@@ -124,6 +142,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 | `ASSET_DB_STATEMENT_TIMEOUT_MS` | PostgreSQL / GaussDB 查询超时毫秒数 | `120000` |
 | `APP_DEBUG` | Native FastAPI 的 debug 配置（默认关闭；仅 `1`/`true`/`yes`/`on` 为真） | `false` |
 | `APP_SECRET_KEY` | 必填的 application-owned signed-session 密钥（缺失或空白即启动失败） | `<generate-a-strong-random-value>` |
+| `RAG_SEARCH_SERVICE_TOKEN` | 可选的后端到 RAG Search Service Bearer Token；通过部署 Secret 注入，不写入参数表或浏览器 | `<deployment-secret>` |
 | `APP_ENV` | Cookie/security contract 的运行环境（默认安全生产行为；开发必须显式设置） | `production`、`development` |
 | `APP_CORS_ORIGINS` | Native FastAPI 使用的精确跨域来源 allowlist，逗号分隔 | `https://portal.example.com` |
 

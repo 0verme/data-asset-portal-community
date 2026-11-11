@@ -60,25 +60,32 @@ def _register_report_routes(app: FastAPI, service: Any) -> None:
         domain: str | None = Query(default=None),
         status: str | None = Query(default=None),
         owner_dept: str | None = Query(default=None, alias="ownerDept"),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        limit: str | None = Query(default=None),
+        sort_key: str | None = Query(default=None, alias="sortKey"),
+        sort_direction: str | None = Query(default=None, alias="sortDirection"),
         current_service: Any = Depends(get_service),
         context: Any = Depends(get_request_context),
         authorization: Any = Depends(get_authorization_service),
     ):
+        profile = profile_for_request(context, authorization)
         try:
-            items = current_service.get_reports(
-                keyword=keyword,
-                report_type=report_type,
-                domain=domain,
-                status=status,
-                owner_dept=owner_dept,
-            )
+            if any(value is not None for value in (page, page_size, limit)):
+                payload = current_service.get_report_page(
+                    keyword=keyword, report_type=report_type, domain=domain, status=status,
+                    owner_dept=owner_dept, page=page,
+                    page_size=page_size if page_size is not None else limit,
+                    sort_key=sort_key, sort_direction=sort_direction, profile=profile,
+                )
+            else:
+                payload = {"items": current_service.get_reports(
+                    keyword=keyword, report_type=report_type, domain=domain, status=status, owner_dept=owner_dept,
+                )}
         except ReportDataSourceError as error:
             return error_response(error, 500)
-        profile = profile_for_request(context, authorization)
-        items = [redact_public_report(item, profile=profile) for item in items]
-        return JSONResponse(
-            content=validate_contract({"items": items}, ReportListResponse)
-        )
+        payload = redact_public_report(payload, profile=profile)
+        return JSONResponse(content=validate_contract(payload, ReportListResponse))
 
     @router.get("/options", response_model=None)
     def get_report_options(

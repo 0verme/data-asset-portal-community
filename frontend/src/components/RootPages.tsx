@@ -17,7 +17,7 @@ import React from "react";
 import type { RootCategoryItem, SanitizedWordRoot } from "../api/root.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { ROOT_ABBR_RULE_MESSAGE, isValidRootAbbr } from "../utils/rootValidation.ts";
-import { ActionErrorBanner, confirmDeleteAction, DangerZone, EmptyState, FormActionBar, PageHeader, RowActions } from "./common/index.ts";
+import { ActionErrorBanner, confirmDeleteAction, DangerZone, EmptyState, FormActionBar, PageHeader, RowActions, WideTableScroll } from "./common/index.ts";
 import { Highlight, Icon } from "./ui.tsx";
 import {
   Button,
@@ -26,6 +26,7 @@ import {
   focusFirstFormError,
   Input,
   Select,
+  TablePagination,
   Textarea,
   type FormFieldErrors,
 } from "../ui/index.ts";
@@ -42,7 +43,12 @@ function CatBadge({ cat }: CatBadgeProps) {
 
 export interface RootLibraryProps {
   roots: readonly SanitizedWordRoot[];
-  allRoots: readonly SanitizedWordRoot[];
+  total: number;
+  globalTotal: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   query: string;
   activeCategory: string | null;
   categories: readonly RootCategoryItem[];
@@ -56,7 +62,12 @@ export interface RootLibraryProps {
 
 export function RootLibrary({
   roots,
-  allRoots,
+  total,
+  globalTotal,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
   query,
   activeCategory,
   categories,
@@ -67,18 +78,13 @@ export function RootLibrary({
   onClearQuery,
   canEdit = false,
 }: RootLibraryProps) {
-  const counts = allRoots.reduce<Record<string, number>>((acc, item) => {
-    acc[item.cat] = (acc[item.cat] || 0) + 1;
-    return acc;
-  }, {});
-
   return (
     <div className="root-page">
       <div className="page-head">
         <div>
           <div className="page-title"><Icon name="book" size={21} color="var(--ink-2)" />词根库</div>
           <div className="page-sub">
-            数据仓库命名规范词根，用于拼装表名与字段名，共 <b>{roots.length}</b> 个
+            数据仓库命名规范词根，用于拼装表名与字段名，共 <b>{total}</b> 个匹配词根
             {query ? <>，匹配 “{query}”</> : null}
           </div>
         </div>
@@ -90,7 +96,7 @@ export function RootLibrary({
 
       <div className="stat-row">
         <div className="stat-card">
-          <div className="sv">{allRoots.length}</div>
+          <div className="sv">{globalTotal}</div>
           <div className="sl">词根总数</div>
         </div>
         {categories.map((item) => (
@@ -99,7 +105,7 @@ export function RootLibrary({
             className={`stat-card${activeCategory === item.name ? " active" : ""}`}
             onClick={() => onSetCategory(activeCategory === item.name ? null : item.name)}
           >
-            <div className="sv">{counts[item.name] || item.count || 0}</div>
+            <div className="sv">{item.count}</div>
             <div className="sl">{item.name}</div>
           </div>
         ))}
@@ -127,7 +133,8 @@ export function RootLibrary({
         <EmptyState title="未找到匹配的词根" desc="换个关键词，或新增 / 导入词根。" />
       ) : (
         <div className="tbl-wrap root-tbl">
-          <table className="dt mobile-card-table">
+          <WideTableScroll ariaLabel="数据词根列表" className="root-wide-scroll">
+            <table className="dt mobile-card-table root-wide-table">
             <thead>
               <tr>
                 <th style={{ width: 130 }}>词根</th>
@@ -152,9 +159,18 @@ export function RootLibrary({
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </WideTableScroll>
         </div>
       )}
+      <TablePagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        ariaLabel="词根列表分页"
+      />
     </div>
   );
 }
@@ -200,9 +216,14 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
   const [validationFocusRequest, setValidationFocusRequest] = React.useState(0);
   const handledFocusRequestRef = React.useRef(0);
   const initialSnapshotRef = React.useRef(JSON.stringify(form));
+  const previousEditorRef = React.useRef<{ mode: RootEditorProps["mode"]; initial: SanitizedWordRoot | null } | null>(null);
   const isDirty = initialSnapshotRef.current !== JSON.stringify(form);
 
   React.useEffect(() => {
+    const previousEditor = previousEditorRef.current;
+    if (previousEditor?.mode === mode && previousEditor.initial === initial && isDirty) return;
+    previousEditorRef.current = { mode, initial };
+
     const nextForm: RootFormData = initial ? {
       abbr: initial.abbr,
       en: initial.en,
@@ -216,7 +237,7 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
     setForm(nextForm);
     setTouched(false);
     initialSnapshotRef.current = JSON.stringify(nextForm);
-  }, [initial, categories]);
+  }, [initial, mode, categories, isDirty]);
 
   const categoryNames = categories.map((item) => item.name);
   const errors: FormFieldErrors = touched

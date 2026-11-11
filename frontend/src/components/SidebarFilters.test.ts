@@ -137,8 +137,11 @@ test("all entries retain global facet counts rather than current-page lengths", 
 	assert.match(source, /count: Object\.values\(domainCounts\)\.reduce/);
 	assert.match(source, /count: upstreamSystemCount/);
 	assert.doesNotMatch(source, /count: upstreamSystems\.length/);
-	assert.match(source, /count: reports\.length/);
-	assert.match(source, /count: apiAsset\.items\.length/);
+	assert.match(source, /count: reportCount/);
+	assert.match(source, /count: reportFacets\.type\[item\.value\] \|\| 0/);
+	assert.doesNotMatch(source, /count: reports\.length/);
+	assert.match(source, /count: apiAsset\.globalTotal/);
+	assert.doesNotMatch(source, /count: apiAsset\.items\.length/);
 	assert.match(source, /count: pushSystemCount/);
 	assert.doesNotMatch(source, /count: pushSystems\.length/);
 });

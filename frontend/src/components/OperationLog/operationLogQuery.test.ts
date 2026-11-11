@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   createOperationLogQueryState,
+  resolveOperationLogPageSize,
   resolveOperationLogRequestPage,
   withOperationLogFilter,
 } from "./operationLogQuery.ts";
@@ -17,4 +18,11 @@ test("operation log filter changes reset pagination in the same state update", (
 test("operation log keyword changes use page one before the reset effect commits", () => {
   assert.equal(resolveOperationLogRequestPage(4, "new", "old"), 1);
   assert.equal(resolveOperationLogRequestPage(4, "same", "same"), 4);
+});
+
+test("operation log respects returned page size and infers legacy server caps on page one", () => {
+  assert.equal(resolveOperationLogPageSize(1, 100, { items: Array(50), total: 201 }), 50);
+  assert.equal(resolveOperationLogPageSize(2, 100, { items: Array(50), total: 201 }), 100);
+  assert.equal(resolveOperationLogPageSize(1, 100, { items: Array(20), total: 20 }), 100);
+  assert.equal(resolveOperationLogPageSize(1, 100, { items: Array(50), total: 201, pageSize: 40 }), 40);
 });

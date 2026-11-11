@@ -784,12 +784,22 @@ class MetadataIngestionService(AuditActorMixin):
             node_id = (node.external_id or node.qualified_name or "").strip()
             if not node_id:
                 raise MetadataValidationError("lineage node identity is required", details=[{"index": index, "field": "nodes[].externalId"}])
+            attributes = deepcopy(node.attributes)
+            schema_name = (node.schema_name or "").strip()
+            if not schema_name:
+                for schema_key in ("schema", "schemaName", "schema_name"):
+                    candidate = attributes.get(schema_key)
+                    if isinstance(candidate, str) and candidate.strip():
+                        schema_name = candidate.strip()
+                        break
+            if schema_name:
+                attributes["schema"] = schema_name
             normalized = {
                 "id": node_id,
                 "type": node.node_type.strip(),
                 "name": node.name.strip(),
                 "namespace": (node.namespace or "").strip() or (request.source.namespace or "").strip(),
-                "attributes": deepcopy(node.attributes),
+                "attributes": attributes,
             }
             existing = node_map.get(node_id)
             if existing is not None:

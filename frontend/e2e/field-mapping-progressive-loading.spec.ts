@@ -259,9 +259,9 @@ test("source options failure stays visible and can be retried independently", as
       : { json: { items: [] } });
   });
   await page.goto("/field-mapping");
-  await expect(page.getByRole("alert").filter({ hasText: "来源系统加载失败" })).toBeVisible();
-  await page.getByRole("button", { name: "重试来源系统" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "来源系统加载失败" })).toHaveCount(0);
+  await expect(page.getByText("源系统清单加载失败", { exact: true })).toBeVisible();
+  await page.locator(".mapping-system-retry").click();
+  await expect(page.getByText("源系统清单加载失败", { exact: true })).toHaveCount(0);
   expect(attempts).toBe(2);
 });
 
@@ -341,6 +341,40 @@ test("default table results render independently of slow stats and field details
   await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBeNull();
   await expect(page.getByText("TABLE_READY", { exact: true })).toBeVisible();
   expect(requests.fields).toHaveLength(2);
+});
+
+test("field-mapping pagination adopts the server-clamped page size", async ({ page }) => {
+  const requests = await installApiFixtures(page, {
+    onTables: async (route, url) => {
+      const requestedPage = Math.max(1, Number(url.searchParams.get("page") || 1));
+      const pageSize = Math.min(100, Number(url.searchParams.get("pageSize") || 50));
+      const total = 250;
+      const start = (requestedPage - 1) * pageSize;
+      const count = Math.max(0, Math.min(pageSize, total - start));
+      await route.fulfill({
+        json: {
+          items: Array.from({ length: count }, (_, offset) => tableRow(`SERVER_CAP_${start + offset + 1}`)),
+          total,
+          page: requestedPage,
+          pageSize,
+        },
+      });
+    },
+  });
+
+  await page.goto("/field-mapping");
+  await expect(page.getByRole("cell", { name: "SERVER_CAP_1", exact: true })).toBeVisible();
+  const pager = page.getByRole("navigation", { name: "字段映射分页" });
+  const pageSize = pager.getByRole("combobox", { name: "每页条数" });
+  await expect(pageSize).toContainText("50");
+  await pageSize.click();
+  await page.getByRole("option", { name: "150", exact: true }).click();
+  await expect.poll(() => requests.tables.at(-1)?.searchParams.get("pageSize")).toBe("100");
+  await expect(pageSize).toContainText("100");
+  await expect(pager).toContainText("1 / 3");
+  await pager.getByRole("button", { name: "下一页" }).click();
+  await expect.poll(() => requests.tables.at(-1)?.searchParams.get("page")).toBe("2");
+  await expect(page.getByRole("cell", { name: "SERVER_CAP_101", exact: true })).toBeVisible();
 });
 
 test("complete field-mapping export ignores the current page and preserves filter and sort", async ({ page }, testInfo) => {
@@ -526,11 +560,11 @@ test("latest filter response wins for both list and stats", async ({ page }) => 
   await expect(page.getByText("INITIAL_RESULT", { exact: true })).toBeVisible();
   const tableName = page.getByRole("textbox", { name: "源系统表名" });
   await tableName.fill("OLD");
-  await page.getByRole("button", { name: "查询" }).click();
+  await page.getByRole("button", { name: "查询", exact: true }).click();
   await Promise.all([oldStatsStarted, oldTablesStarted]);
 
   await tableName.fill("NEW");
-  await page.getByRole("button", { name: "查询" }).click();
+  await page.getByRole("button", { name: "查询", exact: true }).click();
   await Promise.all([newStatsStarted, newTablesStarted]);
   await expect(page.getByText("NEW_RESULT", { exact: true })).toBeVisible();
   await expect(statCard(page, "字段维度")).toHaveText("3");
@@ -580,7 +614,7 @@ test("late field response cannot replace the latest view after fast tab switches
   await page.getByRole("button", { name: /表维度/ }).click();
   await expect(page.getByText("TABLE_READY", { exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "源系统表名" }).fill("NEW");
-  await page.getByRole("button", { name: "查询" }).click();
+  await page.getByRole("button", { name: "查询", exact: true }).click();
   await expect.poll(() => requests.tables.at(-1)?.searchParams.get("srcTable")).toBe("NEW");
   await page.getByRole("button", { name: /字段维度/ }).click();
   await expect(page).toHaveURL(/tab=field/);

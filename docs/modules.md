@@ -11,9 +11,9 @@
 | 上游卸数 | `UpstreamView.tsx` | `/api/upstreams/*` | canonical baseline/migration + demo seed；实际连接需要外部上游配置 |
 | 数据仓库 | `AssetView.tsx` | `/api/assets/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
 | 字段映射 | `FieldMappingPage.tsx` | `/api/field-mappings/*` | mapping core 表在 baseline；变更日志 DDL 为补充；Community seed |
-| 血缘分析 | `LineagePage.tsx` | `/api/lineage/*` | canonical `p_lineage_*` baseline/migration + demo snapshot；无 storage profile 时使用开发/测试 POC |
+| 血缘分析 | `LineagePage.tsx` | `/api/lineage/*` | canonical `p_lineage_*` baseline/migration + demo snapshot；Remote 始终使用 `ASSET_DB_PROFILE`，无 ACTIVE 快照时为空状态 |
 | 词根管理 | `RootView.tsx` | `/api/roots/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
-| 指标维护 | `IndicatorView.tsx` | `/api/indicators/*` | indicator item/path baseline；Community seed；当前没有独立 `/api/indicator-path/*` route |
+| 指标维护 | `IndicatorView.tsx` | `/api/indicators/*`、`GET /api/indicator-path/tree` | indicator item/path baseline；Community seed |
 | 报表资产 | `ReportView.tsx` | `/api/reports/*` | canonical baseline/migration + demo seed；外部数据集不是本模块 route 前置条件 |
 | API 资产 | `ApiAssetView.tsx` | `/api/api-assets/*` | `backend/schema` baseline；Community seed；remote 与 mock 均可展示 |
 | 下游推送 | `PushView.tsx` | `/api/push/*` | canonical baseline/migration + demo metadata；实际推送执行不在当前职责内 |
@@ -26,6 +26,8 @@
 
 - 门户统计：`/api/portal/stats`
 - 统一搜索：`/api/search`
+- 可选 RAG 相关资产推荐：`/api/search/recommendations`（默认关闭）
+- 可选单轮 AI 资产问答：`/api/ai/status`、`/api/ai/ask`、`/api/ai/ask/progress`、`/api/ai/ask/stream`（默认关闭）
 - Repository module capability contract（兼容 endpoint）：`/api/capabilities`
 
 基础能力：
@@ -65,7 +67,7 @@
 
 **数据表**：`p_lineage_snapshot`、`p_lineage_node`、`p_lineage_edge`。
 
-**说明**：基于当前可用的血缘快照查询表或任务节点，可选择上游、下游或双向关系及 1～5 层深度；图中展示节点、关系、证据和置信度。Community remote Demo 默认使用 POC/in-memory 快照；配置 `LINEAGE_DB_PROFILE` 并准备对应 `p_lineage_*` 表后才进入 persistent 模式，mock 模式使用前端受控演示图。
+**说明**：基于当前可用的血缘快照查询表或任务节点，可选择上游、下游或双向关系及 1～5 层深度；图中展示节点、关系、证据和置信度。Remote 模式始终使用 `ASSET_DB_PROFILE` 指向的参数库持久化快照；没有 ACTIVE 快照时展示空状态，不回退演示图。前端显式 mock 开发模式仍可使用受控演示图。
 
 ## 5. 词根管理
 
@@ -121,7 +123,7 @@
 
 **页面**：用户管理、菜单管理、参数字典管理、操作日志。
 
-**数据表**：用户 `p_admin_user`；菜单 `p_menu`；参数字典 `p_code_category`、`p_code_item`；操作日志 `p_operation_log`。
+**数据表**：用户 `p_admin_user`；菜单 `p_menu`；参数字典 `p_code_category`、`p_code_item`；每日 AI 问答全站共享计数 `p_ai_llm_daily_usage`；操作日志 `p_operation_log`。
 
 **说明**：用户状态为 `enabled` / `disabled`，每个用户当前绑定一个角色；角色通过 Role-Permission 映射获得权限。后端使用 permission code 强制保护用户、菜单、参数字典、业务模块和操作日志，前端菜单/按钮隐藏只是 UX。内置 `admin`、`maintainer` 仍提供默认映射，菜单管理支持启停、排序、主导航 / “更多”区域布局和管理员可见性配置。
 
@@ -135,6 +137,10 @@
 
 资产范围（`scope=asset`）是独立 chip，URL 中的 `?scope=asset` 可分享、刷新和前进/后退；资产分组支持按字段（`p_asset_field` 字段名 / 中文字段名 / 描述）召回，`matchedFields` 说明命中字段；分组 `count` 是实际命中总数，`hasMore` 为 true 时显示“查看全部”，资产组跳转数据仓库资产列表并保留同一关键字（详情语义见 [api-contract.md](./api-contract.md) 统一搜索章节）。
 
+搜索页保留单一关键词入口：确定性资产搜索结果在前，可选的“相关资产推荐”独立成组并以 canonical asset/field ID 导航；两者按资产身份去重。RAG 默认关闭且通过独立 HTTP Service 调用，失败不影响关键词搜索；不展示检索分数。DAP 后端每次按当前目录 profile 复核远端 ID 与父子关系，并仅使用 DAP 权威公开元数据。DAP 不加载 RAG 模型/索引；与 dap-rag-lab #14 的最终契约和真实联调尚未验收。
+
+结果区使用两个 Tab：「搜索结果」与「AI 问答」。传统搜索（Enter /「搜索」）永不自动调用模型；「问 AI」是显式动作，走 `POST /api/ai/ask/stream`（SSE 阶段进度 + 完整最终答案，不逐 token 流式输出），`POST /api/ai/ask` 与 `POST /api/ai/ask/progress` 作为兼容接口保留。AI 默认关闭：`AI_ASK_ENABLED=false` 或 LLM / RAG 配置不完整时，`GET /api/ai/status` 返回 `{"enabled": false}`，前端隐藏入口。全站每日默认共享 50 次 AI 问答额度，按北京时间重置；每个问答最多计一次，与内部模型 HTTP 调用次数无关。回答状态、证据校验与统计意图详见 [单轮 AI 数据资产问答](./ai-ask-mvp.md) 与 [权威资产目录统计](./ai-metadata-count.md)；公网静态 Demo 的问答是前端演示适配器，不调用 RAG 或 LLM。
+
 ## 13. 认证
 
 **数据表**：`p_admin_user`。
@@ -147,7 +153,7 @@
 
 **当前管理入口**：`/api/system/param-dicts*`，由系统管理权限保护；该入口不是 `/api/common-codes/*` 的兼容别名。
 
-**说明**：参数字典页面维护系统级分类及条目。报表类型、上游/推送候选项和二态状态在公共业务页面分别复用当前领域 API、集中本地选项和共享 `enabled` / `disabled` 状态契约；历史 Common Code HTTP route 保持 WAIT_DB，前端不再调用。
+**说明**：参数字典页面维护系统级分类及条目，并折叠展示受管理员权限保护的可选 RAG 搜索配置与全站每日 AI 问答额度。RAG URL/策略等非敏感配置及每日上限使用保持停用、从通用参数字典和公共码值 API 隐藏的保留行；服务 Bearer Token 只从后端部署 Secret `RAG_SEARCH_SERVICE_TOKEN` 读取，浏览器仅获得是否配置的布尔值。额度默认每日共享 50 次 AI 问答，按 Asia/Shanghai 自然日原子计数；同一问答中的规划、生成、重试共享一次额度，不代表模型 HTTP 调用数。读写使用现有 `system:param:read/write` 权限，更新写入操作审计。Mock、纯目录统计、普通搜索和 RAG 推荐不消耗额度。功能默认关闭，不增加 RAG/模型/索引依赖。报表类型、上游/推送候选项和二态状态在公共业务页面分别复用当前领域 API、集中本地选项和共享 `enabled` / `disabled` 状态契约；历史 Common Code HTTP route 保持 WAIT_DB，前端不再调用。
 
 ## 15. 操作日志
 

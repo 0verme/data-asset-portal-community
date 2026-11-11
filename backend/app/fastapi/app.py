@@ -8,6 +8,8 @@ from fastapi import FastAPI  # pyright: ignore[reportAttributeAccessIssue]
 
 from ..authorization.core import AuthorizationService
 from ..core.capabilities import resolve_capabilities
+from ..services.ai_ask_service import AIAskService, ai_ask_service
+from ..services.ai_ask_execution_service import AIAskExecutionService
 from ..services.api_asset_service import api_asset_service
 from ..services.assets_service import assets_service
 from ..services.auth_service import auth_service
@@ -22,6 +24,7 @@ from ..services.operation_log_service import operation_log_service
 from ..services.portal_service import portal_service
 from ..services.push_service import push_service
 from ..services.report_service import report_service
+from ..services.rag_search_service import rag_search_service
 from ..services.root_service import root_service
 from ..services.search_provider import search_provider
 from ..services.search_hot_keyword_service import search_hot_keyword_service
@@ -36,6 +39,7 @@ from ..settings import (
 from .auth import LegacySessionMigrationMiddleware
 from .dependencies import IdentityResolver, RequestContextMiddleware
 from .errors import register_exception_handlers
+from .routers.ai_ask import _register_ai_ask_routes
 from .routers.api_assets import _register_api_asset_routes
 from .routers.assets import _register_asset_routes
 from .routers.auth import _register_auth_routes  # pyright: ignore[reportMissingImports]
@@ -62,6 +66,9 @@ def create_fastapi_app(
     portal_service_instance: Any | None = None,
     search_provider_instance: Any | None = None,
     search_hot_keyword_service_instance: Any | None = None,
+    rag_search_service_instance: Any | None = None,
+    ai_ask_service_instance: Any | None = None,
+    ai_ask_execution_service_instance: Any | None = None,
     indicator_service_instance: Any | None = None,
     indicator_path_service_instance: Any | None = None,
     assets_service_instance: Any | None = None,
@@ -125,9 +132,14 @@ def create_fastapi_app(
     portal_stats = portal_service_instance or portal_service
     search = search_provider_instance or search_provider
     hot_keywords = search_hot_keyword_service_instance or search_hot_keyword_service
+    rag_recommendations = rag_search_service_instance or rag_search_service
+    ai_ask = ai_ask_service_instance or ai_ask_service
     indicator = indicator_service_instance or indicator_service
     indicator_paths = indicator_path_service_instance or indicator_path_service
     assets = assets_service_instance or assets_service
+    ai_ask_execution = ai_ask_execution_service_instance
+    if ai_ask_execution is None and isinstance(ai_ask, AIAskService):
+        ai_ask_execution = AIAskExecutionService(ai_ask, assets)
     field_mapping = field_mapping_service_instance or field_mapping_service
     root = root_service_instance or root_service
     manual_code_table = manual_code_table_service_instance or manual_code_table_service
@@ -154,6 +166,19 @@ def create_fastapi_app(
         portal_stats,
         search,
         hot_keywords,
+        rag_recommendations,
+    )
+    isolate_ai_ask_execution = all(value is None for value in (
+        ai_ask_service_instance,
+        ai_ask_execution_service_instance,
+        assets_service_instance,
+        rag_search_service_instance,
+    ))
+    _register_ai_ask_routes(
+        app,
+        ai_ask,
+        ai_ask_execution,
+        isolate_execution=isolate_ai_ask_execution,
     )
     # Every router shipped in this repository is part of the default runtime.
     # External dependencies report their own diagnostic errors at request time;
@@ -168,7 +193,7 @@ def create_fastapi_app(
     _register_api_asset_routes(app, api_asset)
     _register_lineage_routes(app, lineage)
     _register_metadata_routes(app, metadata_ingestion)
-    _register_system_management_routes(app, system_management)
+    _register_system_management_routes(app, system_management, rag_recommendations)
     app.include_router(operation_log_router)
     _register_upstream_routes(app, upstream)
     _register_push_routes(app, push)

@@ -38,8 +38,9 @@ const isKumoAdapterFixture = fixturePath === "/__kumo-adapters";
 const isKumoOverlayFixture = fixturePath === "/__kumo-overlays";
 const isKumoToastFallbackFixture = fixturePath === "/__kumo-toast-fallback";
 const isFormErrorFixture = fixturePath === "/__form-errors";
+const isTablePaginationFixture = fixturePath === "/__table-pagination";
 
-if (isKumoSpike || isKumoAdapterFixture || isKumoOverlayFixture || isKumoToastFallbackFixture || isFormErrorFixture) {
+if (isKumoSpike || isKumoAdapterFixture || isKumoOverlayFixture || isKumoToastFallbackFixture || isFormErrorFixture || isTablePaginationFixture) {
   const storedTheme = window.localStorage.getItem("dap-theme");
   const theme = storedTheme === "dark" ? "dark" : "light";
   document.documentElement.dataset["theme"] = theme;
@@ -52,7 +53,9 @@ if (isKumoSpike || isKumoAdapterFixture || isKumoOverlayFixture || isKumoToastFa
         ? import("./kumo-overlays/KumoOverlayFixture.tsx")
         : isKumoToastFallbackFixture
           ? import("./kumo-overlays/KumoToastFallbackFixture.tsx")
-          : import("./kumo-overlays/FormErrorPresenterFixture.tsx");
+          : isFormErrorFixture
+            ? import("./kumo-overlays/FormErrorPresenterFixture.tsx")
+            : import("./ui/TablePaginationFixture.tsx");
   void loadFixture.then(({ default: Fixture }) => {
     root.render(
       <React.StrictMode>

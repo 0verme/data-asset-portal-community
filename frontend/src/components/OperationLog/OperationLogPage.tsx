@@ -20,18 +20,20 @@ import {
 } from "../../api/operationLogs.ts";
 import type { MockOperationLogItem } from "../../data/operationLogs.ts";
 import { Icon } from "../ui.tsx";
-import { Button } from "../../ui/index.ts";
+import { Button, TablePagination } from "../../ui/index.ts";
 import { OperationLogDetail } from "./OperationLogDetail.tsx";
 import { OperationLogFilter } from "./OperationLogFilter.tsx";
 import { OperationLogTable } from "./OperationLogTable.tsx";
 import {
   createOperationLogQueryState,
+  resolveOperationLogPageSize,
   resolveOperationLogRequestPage,
   withOperationLogFilter,
   type OperationLogQueryState,
 } from "./operationLogQuery.ts";
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS: readonly number[] = [10, 20, 50, 100];
 
 interface OperationLogDetailState {
   open: boolean;
@@ -59,6 +61,7 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
   const { filter, page } = listQuery;
   const [logs, setLogs] = React.useState<MockOperationLogItem[]>([]);
   const [total, setTotal] = React.useState(0);
+  const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
 
@@ -81,9 +84,9 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
       ...filter,
       keyword: query,
       page: requestPage,
-      pageSize: PAGE_SIZE,
+      pageSize,
     }),
-    [filter, query, requestPage],
+    [filter, pageSize, query, requestPage],
   );
 
   const load = React.useCallback(async () => {
@@ -91,18 +94,25 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
     setLoading(true);
     setError("");
     try {
-      const { items, total: nextTotal } =
-        await getOperationLogList(queryFilter);
+      const result = await getOperationLogList(queryFilter);
       if (seq !== requestSeq.current) return;
+      const { items, total: nextTotal } = result;
       setLogs(items);
       setTotal(nextTotal);
+      const effectivePageSize = resolveOperationLogPageSize(requestPage, pageSize, result);
+      if (effectivePageSize !== pageSize) setPageSize(effectivePageSize);
+      const lastPage = Math.max(1, Math.ceil(nextTotal / effectivePageSize));
+      const normalizedPage = Math.min(result.page ?? requestPage, lastPage);
+      if (normalizedPage !== requestPage) {
+        setListQuery((current) => current.page === normalizedPage ? current : { ...current, page: normalizedPage });
+      }
     } catch (nextError) {
       if (seq !== requestSeq.current) return;
       setError(getErrorMessage(nextError, "加载操作日志失败。"));
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
-  }, [queryFilter]);
+  }, [pageSize, queryFilter, requestPage]);
 
   React.useEffect(() => {
     void load();
@@ -135,7 +145,6 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
     setDetail({ open: false, log: null, loading: false, error: "" });
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="system-page">
@@ -194,47 +203,25 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
           <p>可以调整筛选条件或时间范围后重试。</p>
         </div>
       ) : (
-        <>
-          <OperationLogTable logs={logs} query={query} onView={openDetail} />
-          {totalPages > 1 ? (
-            <div className="oplog-pager">
-              <Button
-                className="btn"
-                variant="secondary"
-                type="button"
-                disabled={page <= 1}
-                onClick={() =>
-                  setListQuery((current) => ({
-                    ...current,
-                    page: Math.max(1, current.page - 1),
-                  }))
-                }
-              >
-                <Icon name="chevron" size={14} />
-                上一页
-              </Button>
-              <span className="oplog-pager-info">
-                第 {page} / {totalPages} 页
-              </span>
-              <Button
-                className="btn"
-                variant="secondary"
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() =>
-                  setListQuery((current) => ({
-                    ...current,
-                    page: Math.min(totalPages, current.page + 1),
-                  }))
-                }
-              >
-                下一页
-                <Icon name="chevron" size={14} />
-              </Button>
-            </div>
-          ) : null}
-        </>
+        <OperationLogTable logs={logs} query={query} onView={openDetail} />
       )}
+
+      <TablePagination
+        ariaLabel="操作日志分页"
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        loading={loading}
+        disabled={Boolean(error)}
+        onPageChange={(nextPage) => {
+          setListQuery((current) => ({ ...current, page: nextPage }));
+        }}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSize(nextPageSize);
+          setListQuery((current) => ({ ...current, page: 1 }));
+        }}
+      />
 
       <OperationLogDetail
         open={detail.open}

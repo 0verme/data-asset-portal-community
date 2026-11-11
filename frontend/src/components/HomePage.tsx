@@ -14,7 +14,7 @@
 
 import type { AssetTableItem } from "../api/assets.ts";
 import { EmptyState } from "../ui/index.ts";
-import { CardGridView, GroupView } from "./common/index.ts";
+import { CardGridView, GroupView, WideTableScroll } from "./common/index.ts";
 import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.tsx";
 
 function fieldCount(table: AssetTableItem): number {
@@ -30,7 +30,8 @@ interface TableLayoutProps {
 function ListLayout({ tables, query, onOpen }: TableLayoutProps) {
   return (
     <div className="tbl-wrap">
-      <table className="dt mobile-card-table">
+      <WideTableScroll ariaLabel="数据仓库资产列表" className="asset-wide-scroll">
+        <table className="dt mobile-card-table asset-wide-table">
         <thead>
           <tr>
             <th style={{ width: "32%" }}>表名</th>
@@ -68,7 +69,8 @@ function ListLayout({ tables, query, onOpen }: TableLayoutProps) {
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </WideTableScroll>
     </div>
   );
 }

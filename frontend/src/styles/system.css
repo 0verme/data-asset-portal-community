@@ -160,12 +160,40 @@
     border-radius: 0 0 var(--radius) var(--radius);
     box-shadow: none;
     max-width: 100%;
-    overflow-x: auto;
-    overflow-y: visible;
+    overflow: hidden;
   }
 
   .system-panel-main {
     min-width: 0;
+  }
+
+  .system-users-table { min-width: 1420px; }
+  .system-roles-table { min-width: 1200px; }
+
+  /* 长名称/长路由在固定列宽内换行，行高由内容决定；操作列随同一行同步伸缩。 */
+  .menu-management-table .menu-name-cell,
+  .menu-management-table .menu-path-cell { overflow-wrap: anywhere; }
+
+  @media (min-width: 769px) {
+    /* 操作列与数据行同属一个表格行：行高随长名称/长路由自适应，操作按钮不会与菜单错位。
+       sticky 只负责横向滚动时保持操作列可见，不参与行高计算。 */
+    .menu-management-table th.menu-actions-head,
+    .menu-management-table td.menu-actions-cell {
+      position: sticky;
+      right: 0;
+      z-index: 1;
+      background: var(--surface);
+      box-shadow: -1px 0 0 var(--line);
+    }
+
+    .menu-management-table th.menu-actions-head {
+      z-index: 2;
+      background: var(--surface-2);
+    }
+
+    .system-page .menu-management-table tbody tr:hover td.menu-actions-cell {
+      background: var(--surface-2);
+    }
   }
 
   .param-dict-table {
@@ -183,21 +211,15 @@
 
   .param-dict-table th.param-col-actions,
   .param-dict-table td.param-col-actions {
-    position: sticky;
-    right: 0;
-    z-index: 1;
     text-align: right;
-    background: var(--surface);
-    box-shadow: -1px 0 0 var(--line);
   }
 
-  .param-dict-table th.param-col-actions {
-    z-index: 2;
-    background: var(--surface-2);
-  }
-
-  .system-page .param-dict-table tbody tr:hover td.param-col-actions {
-    background: var(--surface-2);
+  @media (max-width: 768px) {
+    .system-page table.mobile-card-table.system-users-table,
+    .system-page table.mobile-card-table.system-roles-table,
+    .system-page table.mobile-card-table.param-dict-table {
+      min-width: 0;
+    }
   }
 
   .param-dict-table .row-actions {
@@ -220,6 +242,56 @@
   .system-status-seg {
     width: fit-content;
   }
+
+  .rag-config-panel {
+    margin-bottom: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+  .rag-config-panel > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 50px;
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+  }
+  .rag-config-panel > summary::-webkit-details-marker { display: none; }
+  .rag-config-title { color: var(--ink); font-size: 13px; font-weight: 600; }
+  .rag-config-state {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font-size: 11px;
+  }
+  .rag-config-state-ready { background: var(--accent-soft); color: var(--accent-soft-color); }
+  .rag-config-state-unavailable { background: var(--danger-soft); color: var(--danger); }
+  .rag-config-body { padding: 0 16px 16px; border-top: 1px solid var(--line); }
+  .rag-config-intro, .rag-config-footnote { margin: 12px 0; color: var(--ink-2); font-size: 12px; line-height: 1.6; }
+  .rag-config-footnote { color: var(--ink-3); }
+  .rag-config-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .rag-config-field { display: grid; gap: 6px; min-width: 0; color: var(--ink-2); font-size: 12px; }
+  .rag-config-field-wide { grid-column: 1 / -1; }
+  .rag-config-field input, .rag-config-field select {
+    width: 100%; min-height: 36px; padding: 7px 9px;
+    border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+    background: var(--surface); color: var(--ink); font: inherit;
+  }
+  .rag-config-field input:disabled, .rag-config-field select:disabled { background: var(--surface-2); color: var(--ink-3); }
+  .rag-config-toggle { display: flex; align-items: center; gap: 8px; min-height: 36px; color: var(--ink); font-size: 12px; }
+  .rag-config-toggle input { width: auto; margin: 0; }
+  .rag-config-diagnostic { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 14px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--ink-2); font-size: 12px; line-height: 1.5; }
+  .rag-config-diagnostic strong { color: var(--ink); }
+  .rag-config-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .rag-config-message, .rag-config-error { margin: 10px 0; padding: 9px 11px; border-radius: var(--radius-sm); font-size: 12px; }
+  .rag-config-message { background: var(--surface-2); color: var(--ink-2); }
+  .rag-config-error { background: var(--danger-soft); color: var(--danger); }
 
   .system-cell-inline {
     display: inline-flex;
@@ -409,7 +481,12 @@
     .form-grid,
     .system-modal-body .form-grid,
     .lineage-candidate,
-    .role-permission-grid { grid-template-columns: 1fr; }
+    .role-permission-grid,
+    .rag-config-form { grid-template-columns: 1fr; }
+    .rag-config-field-wide { grid-column: auto; }
+    .rag-config-panel > summary { align-items: flex-start; flex-direction: column; }
+    .rag-config-actions { flex-direction: column; }
+    .rag-config-actions > .btn { width: 100%; min-height: 42px; justify-content: center; }
 
     .system-modal-mask,
     .confirm-mask,

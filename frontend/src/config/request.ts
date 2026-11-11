@@ -18,6 +18,9 @@ export const LONG_REQUEST_TIMEOUT = Math.max(
   DEFAULT_LONG_REQUEST_TIMEOUT,
 );
 
+// Covers AI admission wait, killable worker deadline, and bounded cleanup.
+export const AI_ASK_REQUEST_TIMEOUT = Math.max(LONG_REQUEST_TIMEOUT, 125_000);
+
 export function resolveRequestTimeout(
   value?: unknown,
   fallback = REQUEST_TIMEOUT,

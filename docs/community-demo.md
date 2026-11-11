@@ -11,9 +11,9 @@
 
 本文的 **Repository Community Demo**、前端 **mock mode** 和线上 **static Demo** 不是同一个运行面：
 
-1. **Repository Community/remote Demo**：`scripts/community_demo.py` 使用 Community SQLite baseline + Alembic + seed，通过 `backend/asgi.py` 和 Uvicorn 启动真实 FastAPI API。仓库模块默认按 open repository module contract 注册；数据库驱动、外部依赖、凭据和 persistent storage readiness 可能影响部署能力，但不隐藏源码模块。
-2. **Frontend mock mode**：`VITE_API_MODE=mock` 只读取 `frontend/src/data/` 和 API 文件中的受控数据，不需要后端或数据库；默认 registry 可以展示全部源码模块，因此 mock coverage 不能冒充 remote backend deployment readiness。
-3. **Online static Demo**：[https://data.overme.cn/](https://data.overme.cn/) 是独立发布的静态/mock bundle。当前可见 footer 为 `V1.0.0`，页面 HTML 没有仓库 revision/build metadata；它不自动等同于当前 `origin/main`、Repository Community Demo 或 GitHub published release `v0.2.0`。
+1. **Repository Community/remote Demo**：`scripts/community_demo.py` 使用 Community SQLite baseline + Alembic + seed，通过 `backend/asgi.py` 和 Uvicorn 启动真实 FastAPI API。仓库模块默认按 open repository module contract 注册；数据库驱动、外部依赖、凭据和 persistent storage readiness 可能影响部署能力，但不隐藏源码模块。**该 Demo 不启用 AI 问答与 RAG 推荐**：`AI_ASK_ENABLED` 默认 `false`，RAG 配置 seed 为停用；页面上的「AI 问答」Tab 会显示「暂不可用」。
+2. **Frontend mock mode**：`VITE_API_MODE=mock` 只读取 `frontend/src/data/` 和 API 文件中的受控数据，不需要后端或数据库；默认 registry 可以展示全部源码模块，因此 mock coverage 不能冒充 remote backend deployment readiness。mock 模式下「AI 问答」由本地演示适配器生成，页面会标注“模拟演示 · 非真实 AI 回答”，不会发起任何 `/api/ai/*` 请求。
+3. **Online static Demo**：[https://data.overme.cn/](https://data.overme.cn/) 是独立发布的静态/mock bundle。当前可见 footer 为 `V1.0.0`，页面 HTML 没有仓库 revision/build metadata；它不自动等同于当前 `origin/main`、Repository Community Demo 或最新 GitHub published release `v0.2.4`。该 Demo 的 AI 问答由前端演示适配器（`frontend/src/mock/aiAsk.ts`）按演示目录名称 / 字段匹配生成，**不调用 RAG 服务或 LLM**；详见 [AI 问答静态 Mock 演示](./ai-ask-static-mock.md)。
 
 ## Prerequisites
 
@@ -124,7 +124,7 @@ CI 或只想初始化数据库时，不启动常驻服务：
 
 脚本不会覆盖或 merge 用户已有的 `.env`、`.env.local`、`backend/.env*` 或 `frontend/.env.local`。
 后端 Demo 子进程会显式固定 `community` + `community_sqlite` + 已知本地 SQLite 路径，并隔离继承的
-`LINEAGE_DB_PROFILE`、`DATABASE_URL`、`PG*`、`MYSQL_*`、`DB_*` 和 `ASSET_DB_*` 变量；血缘保持 POC/in-memory 模式，因此不会因为用户 shell 或配置文件中的外部数据库设置而连接生产库。
+`LINEAGE_DB_PROFILE`、`LINEAGE_STORAGE_MODE`、`DATABASE_URL`、`PG*`、`MYSQL_*`、`DB_*` 和 `ASSET_DB_*` 变量；血缘因此与其他 DAP 元数据一样读取同一份 Demo SQLite 参数库，不会因为用户 shell 或配置文件中的外部数据库设置而连接生产库。Demo 库没有 ACTIVE 血缘快照时，血缘页显示 `no_active_snapshot` 空状态，不会生成演示图。
 
 默认不提供 destructive reset。若要重新开始，请在确认路径确实是本 bootstrap 创建的
 `.demo/community-demo/` 后，手工移除该目录，再重新运行命令；不要删除用户 `.env` 或其他 SQLite 文件。
@@ -234,11 +234,13 @@ python demo/seed_postgres.py --dialect postgres --schema dwp
 
 仓库中的 `portal`、`dwm`、`mapping`、`lineage`、`root`、`indicator`、`report`、`apiAsset`、`upstream`、`push`、`codeTable`、`system` 默认使用同一 open module contract：route、menu visibility、repository-module capability contract、schema、seed、search 和 portal statistics 保持一致。Demo seed 会创建这些模块的 canonical tables 和完全虚构的 metadata。
 
-外部 Collector、实际推送、上游连接、数据库驱动、凭据和 persistent lineage storage 是 deployment/integration readiness concerns。它们未配置时，页面/API 展示 metadata、POC 或明确的 not-configured/error state，但不会用 404 隐藏模块。实例管理员仍可通过 `p_menu.status` 配置菜单可见性。
+外部 Collector、实际推送、上游连接、数据库驱动、凭据和 persistent lineage storage 是 deployment/integration readiness concerns。它们未配置时，页面/API 展示已有元数据与明确的 not-configured / error state（血缘无 ACTIVE 快照时为 `no_active_snapshot` 空状态），但不会用 404 隐藏模块，也不会回退到演示图。实例管理员仍可通过 `p_menu.status` 配置菜单可见性。
 
 相关文档：
 
 - [开发指南](../DEVELOPMENT.md)
 - [部署说明](../DEPLOYMENT.md)
+- [后端配置](./configuration.md)
 - [架构说明](./architecture.md)
 - [模块清单](./modules.md)
+- [单轮 AI 数据资产问答](./ai-ask-mvp.md)

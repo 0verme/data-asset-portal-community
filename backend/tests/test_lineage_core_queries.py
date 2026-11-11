@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
-from backend.app.services import lineage_service
 from backend.app.services.lineage_database_reader import (
     LINEAGE_LIKE_ESCAPE_CHAR,
     LineageDatabaseReader,
@@ -72,7 +71,12 @@ class LineageCoreQueryTests(unittest.TestCase):
         db = MagicMock()
         db.fetch_rows.return_value = []
         reader = LineageDatabaseReader(db)
-        reader.search_nodes("S1", "%f!_accr!_day!_sum!_r%", 100)
+        reader.search_nodes(
+            "S1",
+            "%f!_accr!_day!_sum!_r%",
+            100,
+            exact_name="f_accr_day_sum_r",
+        )
         statement = db.fetch_rows.call_args.args[0]
         for dialect in (sqlite.dialect(), postgresql.dialect(), mysql.dialect()):
             compiled = statement.compile(dialect=dialect)
@@ -82,51 +86,46 @@ class LineageCoreQueryTests(unittest.TestCase):
             # The user pattern is bound, never inlined into the SQL text.
             self.assertNotIn("f!_accr", sql)
             self.assertEqual("%f!_accr!_day!_sum!_r%", compiled.params["lower_1"])
+            self.assertIn("%.f!_accr!_day!_sum!_r", compiled.params.values())
+            self.assertNotIn("%.f!_accr", sql)
 
-    def test_database_snapshot_reads_use_bound_core_queries(self):
+    def test_schema_qualified_search_compiles_with_bound_portable_predicates(self):
         db = MagicMock()
-        db.fetch_rows.side_effect = [
-            [{
-                "snapshot_id": "S1",
-                "generated_at": "2026-08-20 00:00:00",
-                "generator_name": "collector",
-                "generator_version": "2.0",
-            }],
-            [{
-                "node_id": "table:dwf:A",
-                "kind_code": "table",
-                "node_name": "DWF.A",
-                "display_name": "A",
-                "namespace_name": "dwf",
-                "attributes_json": "{}",
-            }],
-            [{
-                "edge_id": "E1",
-                "source_node_id": "table:dwf:A",
-                "target_node_id": "table:dwf:B",
-                "kind_code": "table_lineage",
-                "evidence_type": "mapping",
-                "source_record_id": "m:1",
-                "evidence_description": "mapping",
-                "confidence_code": "high",
-                "generated_at": "2026-08-20 00:00:00",
-                "diagnostics_json": "[]",
-            }],
-        ]
-        with patch("backend.app.services.lineage_service.CoreAccess", return_value=db):
-            with patch("backend.app.services.lineage_service.database_transaction") as tx:
-                tx.return_value.__enter__.return_value = None
-                tx.return_value.__exit__.return_value = None
-                snapshot = lineage_service._database_snapshot("lineage_test")
+        db.fetch_rows.return_value = []
+        reader = LineageDatabaseReader(db)
+        reader.search_nodes(
+            "S1",
+            "%m!_jjqd%",
+            7,
+            exact_name="m_jjqd_list",
+            namespace_pattern="%d!_wm%",
+            exact_namespace="d_wm",
+            exact_qualified_name="d_wm.m_jjqd_list",
+        )
+        statement = db.fetch_rows.call_args.args[0]
 
-        for call in db.fetch_rows.call_args_list:
-            for dialect in (sqlite.dialect(), postgresql.dialect(), mysql.dialect()):
-                compiled = call.args[0].compile(dialect=dialect)
-                self.assertIn("p_lineage_", str(compiled))
-                self.assertIn("__app__", str(compiled))
-                self.assertNotIn("dwp.", str(compiled))
-        self.assertEqual(snapshot["snapshotId"], "S1")
-        self.assertEqual(snapshot["nodes"][0]["id"], "table:dwf:A")
+        for dialect in (
+            sqlite.dialect(),
+            postgresql.dialect(),
+            postgresql.dialect(paramstyle="qmark"),
+            mysql.dialect(),
+        ):
+            compiled = statement.compile(dialect=dialect)
+            sql = str(compiled).lower()
+            self.assertIn("namespace_name", sql)
+            self.assertIn("coalesce", sql)
+            self.assertIn("kind_code", sql)
+            self.assertIn("case", sql)
+            self.assertIn('escape', sql)
+            self.assertIn('!', sql)
+            self.assertNotIn(" || ", sql)
+            self.assertNotIn(" concat(", sql)
+            self.assertNotIn("m_jjqd_list", sql)
+            self.assertEqual("%m!_jjqd%", compiled.params["lower_1"])
+            self.assertEqual("%d!_wm%", compiled.params["lower_2"])
+            self.assertIn("m_jjqd_list", compiled.params.values())
+            self.assertIn("d_wm.m_jjqd_list", compiled.params.values())
+            self.assertIn("d_wm", compiled.params.values())
 
 
 if __name__ == "__main__":

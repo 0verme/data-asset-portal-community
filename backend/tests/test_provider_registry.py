@@ -2,6 +2,7 @@
 
 import unittest
 from contextlib import nullcontext
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from backend.app.core.modules import MODULES
@@ -10,6 +11,11 @@ from backend.app.services.search_provider import KeywordSearchProvider
 
 
 class ProviderRegistryTestCase(unittest.TestCase):
+    @staticmethod
+    def _connection_context():
+        connection = SimpleNamespace(jconn=SimpleNamespace(getAutoCommit=lambda: True))
+        return nullcontext(SimpleNamespace(connection=connection))
+
     def test_search_entities_cover_manifest_search_flags(self):
         registered_modules = {item["module"] for item in list_search_entities()}
         for code, meta in MODULES.items():
@@ -36,20 +42,28 @@ class ProviderRegistryTestCase(unittest.TestCase):
 
     def test_search_keeps_open_entities_and_applies_menu_status(self):
         provider = KeywordSearchProvider()
-        with patch(
-            "backend.app.services.search_provider.system_management_service.get_enabled_menu_codes",
-            return_value={"report", "apiAsset", "codeTable", "push"},
-        ), patch.object(provider, "_connection", return_value=nullcontext(object())), patch.object(
-            provider,
-            "_search_one_safe",
-            side_effect=lambda conn, config, query, limit, profile=None: {
-                "type": config["type"],
-                "label": config["label"],
-                "module": config["module"],
-                "count": 1,
-                "items": [{"id": config["type"]}],
-            },
-        ) as mock_search:
+        with (
+            patch(
+                "backend.app.services.search_provider.system_management_service.get_enabled_menu_codes",
+                return_value={"report", "apiAsset", "codeTable", "push"},
+            ),
+            patch.object(
+                provider,
+                "_connection",
+                return_value=self._connection_context(),
+            ),
+            patch.object(
+                provider,
+                "_search_one_safe",
+                side_effect=lambda conn, config, query, limit, profile=None: {
+                    "type": config["type"],
+                    "label": config["label"],
+                    "module": config["module"],
+                    "count": 1,
+                    "items": [{"id": config["type"]}],
+                },
+            ) as mock_search,
+        ):
             result = provider.search("支付", scope="all", limit=5)
 
         searched = [call.args[1]["type"] for call in mock_search.call_args_list]

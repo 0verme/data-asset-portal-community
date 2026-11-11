@@ -1,65 +1,34 @@
-"""Controlled lineage POC data contract.
+"""Lineage graph services backed by the selected DAP metadata database.
 
-The daily collector will replace this in-memory snapshot.  The portal owns the
-contract and graph traversal; renderers only receive the resulting subgraph.
+There is exactly one read path: the `ASSET_DB_PROFILE` metadata database that
+also holds every other DAP asset table. Synthetic in-memory graphs are not part
+of this module, so a missing profile, an unreachable database, a missing
+lineage table and an ACTIVE-snapshot-free database stay distinguishable instead
+of collapsing into demo data.
 """
 
 # pyright: reportMissingImports=false
 
 from __future__ import annotations
 
-from collections import deque
 from copy import deepcopy
 import hashlib
 import json
 import logging
-import os
 
-from sqlalchemy import select
-
-from ..db.facade import database_transaction, get_db_profile
+from ..db.facade import database_transaction, get_db_profile, resolve_db_profile_name
 from ..db.registry import get_provider
 from ..db.service import CoreAccess
-from ..db.tables import lineage_edge, lineage_node, lineage_snapshot
-from ..settings import get_runtime_environment
 from .lineage_database_reader import LineageDatabaseReader, escape_like_operand
 
 
 LOGGER = logging.getLogger(__name__)
-LINEAGE_PROFILE_ENV = "LINEAGE_DB_PROFILE"
-LINEAGE_MODE_ENV = "LINEAGE_STORAGE_MODE"
-LINEAGE_SUPPORTED_MODES = frozenset({"auto", "persistent", "poc"})
-POC_ENVIRONMENTS = {"development", "dev", "test"}
 LINEAGE_SEARCH_DEFAULT_LIMIT = 100
 LINEAGE_SEARCH_MAX_LIMIT = 300
 MAX_LINEAGE_SUBGRAPH_EDGE_ROWS = 10_000
 LINEAGE_SUBGRAPH_EDGE_READS_PER_NODE = 16
 MAX_LINEAGE_TABLE_VIEW_TASKS = 800
 MAX_LINEAGE_TABLE_PROJECTION_PAIRS = 20_000
-
-SNAPSHOT = {
-    "snapshotId": "poc-20260712-001",
-    "generatedAt": "2026-07-12T02:00:00Z",
-    "generator": {"name": "portal-controlled-poc", "version": "1.0"},
-    "nodes": [
-        {"id": "table:core:MEMBER_PROFILE", "kind": "table", "name": "MEMBER_PROFILE", "displayName": "核心会员档案主表", "namespace": "core", "attributes": {"layer": "源系统"}},
-        {"id": "task:load_member", "kind": "task", "name": "JOB_LOAD_MEMBER", "displayName": "会员档案装载任务", "namespace": "scheduler", "attributes": {"plan": "PLAN_DWF_DAY", "status": "enabled"}},
-        {"id": "table:dwf:DWF_MEMBER_PROFILE", "kind": "table", "name": "DWF_MEMBER_PROFILE", "displayName": "会员档案明细表", "namespace": "dwf", "attributes": {"layer": "DWF"}},
-        {"id": "task:build_member_profile", "kind": "task", "name": "JOB_BUILD_MEMBER_PROFILE", "displayName": "会员画像加工任务", "namespace": "scheduler", "attributes": {"plan": "PLAN_DWM_DAY", "status": "enabled"}},
-        {"id": "table:dwm:DWM_MEMBER_PROFILE", "kind": "table", "name": "DWM_MEMBER_PROFILE", "displayName": "会员画像宽表", "namespace": "dwm", "attributes": {"layer": "DWM"}},
-        {"id": "task:push_member_profile", "kind": "task", "name": "JOB_PUSH_MEMBER_PROFILE", "displayName": "会员画像推送任务", "namespace": "scheduler", "attributes": {"plan": "PLAN_PUSH_DAY", "status": "enabled"}},
-        {"id": "push:cdp:MEMBER_PROFILE", "kind": "push_job", "name": "CDP_MEMBER_PROFILE", "displayName": "会员运营工作台推送", "namespace": "cdp", "attributes": {"system": "DEMO_CDP"}},
-    ],
-    "edges": [
-        {"id": "edge:task_reads:load_member:member_profile", "sourceId": "table:core:MEMBER_PROFILE", "targetId": "task:load_member", "kind": "task_reads_table", "evidence": {"type": "field_mapping", "sourceRecordId": "p_field_mapping_table:42", "description": "显式字段映射"}, "confidence": "high", "generatedAt": "2026-07-12T02:00:00Z", "diagnostics": []},
-        {"id": "edge:task_writes:load_member:dwf_member_profile", "sourceId": "task:load_member", "targetId": "table:dwf:DWF_MEMBER_PROFILE", "kind": "task_writes_table", "evidence": {"type": "field_mapping", "sourceRecordId": "p_field_mapping_table:42", "description": "显式字段映射"}, "confidence": "high", "generatedAt": "2026-07-12T02:00:00Z", "diagnostics": []},
-        {"id": "edge:task_reads:profile:dwf_member_profile", "sourceId": "table:dwf:DWF_MEMBER_PROFILE", "targetId": "task:build_member_profile", "kind": "task_reads_table", "evidence": {"type": "controlled_poc", "sourceRecordId": "poc:3", "description": "受控样例任务读表"}, "confidence": "high", "generatedAt": "2026-07-12T02:00:00Z", "diagnostics": []},
-        {"id": "edge:task_writes:profile:dwm_member_profile", "sourceId": "task:build_member_profile", "targetId": "table:dwm:DWM_MEMBER_PROFILE", "kind": "task_writes_table", "evidence": {"type": "controlled_poc", "sourceRecordId": "poc:4", "description": "受控样例任务写表"}, "confidence": "high", "generatedAt": "2026-07-12T02:00:00Z", "diagnostics": []},
-        {"id": "edge:task_reads:push:dwm_member_profile", "sourceId": "table:dwm:DWM_MEMBER_PROFILE", "targetId": "task:push_member_profile", "kind": "task_reads_table", "evidence": {"type": "controlled_poc", "sourceRecordId": "poc:5", "description": "受控样例推送任务读表"}, "confidence": "high", "generatedAt": "2026-07-12T02:00:00Z", "diagnostics": []},
-        {"id": "edge:push_delivery:cdp", "sourceId": "task:push_member_profile", "targetId": "push:cdp:MEMBER_PROFILE", "kind": "push_delivery", "evidence": {"type": "push_metadata", "sourceRecordId": "poc:6", "description": "受控样例推送配置"}, "confidence": "medium", "generatedAt": "2026-07-12T02:00:00Z", "diagnostics": []},
-    ],
-    "diagnostics": [],
-}
 
 
 class LineageValidationError(ValueError):
@@ -92,38 +61,18 @@ class LineageConfigurationError(LineageDataSourceError):
 
 
 def lineage_storage_status():
-    """Return the safe, explicit storage mode selected for this process."""
-    profile = os.getenv(LINEAGE_PROFILE_ENV, "").strip()
-    mode = os.getenv(LINEAGE_MODE_ENV, "auto").strip().lower() or "auto"
-    if mode not in LINEAGE_SUPPORTED_MODES:
-        raise LineageConfigurationError(
-            "invalid LINEAGE_STORAGE_MODE; expected auto, persistent, or poc"
-        )
-    environment = get_runtime_environment()
-    if mode == "poc":
-        if profile:
-            raise LineageConfigurationError(
-                "LINEAGE_STORAGE_MODE=poc conflicts with LINEAGE_DB_PROFILE"
-            )
-        if environment not in POC_ENVIRONMENTS:
-            raise LineageConfigurationError(
-                "LINEAGE_STORAGE_MODE=poc is restricted to development/test"
-            )
-        return {"mode": "poc", "profile": None, "schema": None}
-    if profile:
+    """Resolve lineage storage from the same DB profile as all DAP metadata."""
+    try:
+        profile = resolve_db_profile_name()
         config = get_db_profile(profile)
         provider = get_provider(config["type"])
         schema = provider.physical_schema(config) or config.get("database")
-        return {"mode": "persistent", "profile": profile, "schema": schema}
-    if mode == "persistent":
+    except Exception as error:
+        # Fail closed: a missing/misconfigured DAP DB is never a demo graph.
         raise LineageConfigurationError(
-            "LINEAGE_STORAGE_MODE=persistent requires LINEAGE_DB_PROFILE"
-        )
-    if environment in POC_ENVIRONMENTS:
-        return {"mode": "poc", "profile": None, "schema": None}
-    raise LineageConfigurationError(
-        "lineage data source is not configured; set LINEAGE_DB_PROFILE for non-development environments"
-    )
+            "血缘使用 ASSET_DB_PROFILE 对应的 DAP 参数库，请检查数据库配置。"
+        ) from error
+    return {"mode": "persistent", "profile": profile, "schema": schema}
 
 
 def log_lineage_storage_status():
@@ -133,170 +82,12 @@ def log_lineage_storage_status():
     except LineageConfigurationError as error:
         LOGGER.error("Lineage storage is not configured: %s", error)
         return
-    if status["mode"] == "persistent":
-        LOGGER.info(
-            "Lineage storage mode: persistent; Lineage DB profile: %s; Lineage schema: %s",
-            status["profile"],
-            status["schema"],
-        )
-        return
-    LOGGER.warning("Lineage storage mode: POC; page data is not database lineage")
-
-
-def _database_snapshot(profile):
-    """Load the active snapshot only when explicitly enabled for this service."""
-    db = CoreAccess(
-        profile_getter=lambda: profile,
-        error_factory=LineageDataSourceError,
+    LOGGER.info(
+        "Lineage storage mode: %s; DAP DB profile: %s; DAP schema: %s",
+        status["mode"],
+        status["profile"],
+        status["schema"],
     )
-    try:
-        with database_transaction():
-            snapshot_rows = db.fetch_rows(
-                select(
-                    lineage_snapshot.c.snapshot_id,
-                    lineage_snapshot.c.generated_at,
-                    lineage_snapshot.c.generator_name,
-                    lineage_snapshot.c.generator_version,
-                )
-                .where(lineage_snapshot.c.status_code == "ACTIVE")
-                .order_by(lineage_snapshot.c.generated_at.desc(), lineage_snapshot.c.snapshot_id.desc())
-                .limit(1)
-            )
-            if not snapshot_rows:
-                raise LineageNoActiveSnapshotError("no active lineage snapshot is available")
-            snapshot = snapshot_rows[0]
-            snapshot_id = snapshot["snapshot_id"]
-            node_rows = db.fetch_rows(
-                select(
-                    lineage_node.c.node_id,
-                    lineage_node.c.kind_code,
-                    lineage_node.c.node_name,
-                    lineage_node.c.display_name,
-                    lineage_node.c.namespace_name,
-                    lineage_node.c.attributes_json,
-                )
-                .where(lineage_node.c.snapshot_id == snapshot_id)
-                .order_by(lineage_node.c.node_id)
-            )
-            edge_rows = db.fetch_rows(
-                select(
-                    lineage_edge.c.edge_id,
-                    lineage_edge.c.source_node_id,
-                    lineage_edge.c.target_node_id,
-                    lineage_edge.c.kind_code,
-                    lineage_edge.c.evidence_type,
-                    lineage_edge.c.source_record_id,
-                    lineage_edge.c.evidence_description,
-                    lineage_edge.c.confidence_code,
-                    lineage_edge.c.generated_at,
-                    lineage_edge.c.diagnostics_json,
-                )
-                .where(lineage_edge.c.snapshot_id == snapshot_id)
-                .order_by(lineage_edge.c.edge_id)
-            )
-    except LineageNoActiveSnapshotError:
-        raise
-    except Exception as error:
-        raise LineageDataSourceError("血缘数据图谱暂不可用，请稍后重试") from error
-
-    def decode(value, fallback):
-        try:
-            return json.loads(value) if value else fallback
-        except (TypeError, json.JSONDecodeError):
-            return fallback
-
-    diagnostics = []
-    nodes = []
-    for item in node_rows:
-        attributes = decode(item["attributes_json"], {})
-        diagnostics.extend(attributes.get("diagnostics", []))
-        nodes.append({
-            "id": item["node_id"],
-            "kind": item["kind_code"],
-            "name": item["node_name"],
-            "displayName": item["display_name"],
-            "namespace": item["namespace_name"],
-            "attributes": attributes,
-        })
-    edges = []
-    for item in edge_rows:
-        edge_diagnostics = decode(item["diagnostics_json"], [])
-        diagnostics.extend(edge_diagnostics)
-        edges.append({
-            "id": item["edge_id"],
-            "sourceId": item["source_node_id"],
-            "targetId": item["target_node_id"],
-            "kind": item["kind_code"],
-            "evidence": {
-                "type": item["evidence_type"],
-                "sourceRecordId": item["source_record_id"],
-                "description": item["evidence_description"],
-            },
-            "confidence": item["confidence_code"],
-            "generatedAt": str(item["generated_at"]),
-            "diagnostics": edge_diagnostics,
-        })
-    unique_diagnostics = list({
-        json.dumps(item, ensure_ascii=False, sort_keys=True): item
-        for item in diagnostics
-    }.values())
-    return {
-        "snapshotId": snapshot_id,
-        "generatedAt": str(snapshot["generated_at"]),
-        "generator": {
-            "name": snapshot["generator_name"],
-            "version": snapshot["generator_version"],
-        },
-        "nodes": nodes,
-        "edges": edges,
-        "diagnostics": unique_diagnostics,
-    }
-
-
-def _current_snapshot():
-    status = lineage_storage_status()
-    return _database_snapshot(status["profile"]) if status["mode"] == "persistent" else SNAPSHOT
-
-
-def _default_root_id(snapshot):
-    """Choose a stable, real root node from the current snapshot."""
-    nodes = snapshot["nodes"]
-    if not nodes:
-        return None
-    incoming = {node["id"]: 0 for node in nodes}
-    outgoing = {node["id"]: 0 for node in nodes}
-    for edge in snapshot["edges"]:
-        if edge["sourceId"] in outgoing:
-            outgoing[edge["sourceId"]] += 1
-        if edge["targetId"] in incoming:
-            incoming[edge["targetId"]] += 1
-    layers = {"dwf": 0, "dwm": 1, "dwp": 2, "dim": 3, "ods": 4, "api": 5, "report": 6, "push": 7}
-
-    def rank(node):
-        node_id = node["id"]
-        layer = str(node.get("attributes", {}).get("layer") or node.get("namespace") or "").casefold()
-        return (
-            node.get("kind") != "table",
-            not (incoming[node_id] and outgoing[node_id]),
-            layers.get(layer, len(layers)),
-            -(incoming[node_id] + outgoing[node_id]),
-            node_id,
-        )
-
-    return min(nodes, key=rank)["id"]
-
-
-def _bootstrap_from_snapshot(snapshot, storage_mode):
-    return {
-        "mode": storage_mode,
-        "status": "ready" if snapshot["nodes"] else "empty_snapshot",
-        "snapshotId": snapshot["snapshotId"],
-        "snapshotName": snapshot["generator"]["name"],
-        "snapshotAt": snapshot["generatedAt"],
-        "defaultRootId": _default_root_id(snapshot),
-        "nodeCount": len(snapshot["nodes"]),
-        "edgeCount": len(snapshot["edges"]),
-    }
 
 
 def _missing_snapshot_bootstrap(storage_mode):
@@ -321,6 +112,16 @@ def _decode_json(value, fallback):
     return parsed
 
 
+def _lineage_schema_from_attributes(attributes):
+    if not isinstance(attributes, dict):
+        return None
+    for key in ("schema", "schemaName", "schema_name"):
+        value = attributes.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def _database_node(row, *, joined=False):
     if joined:
         node_id = row.get("node_id")
@@ -337,14 +138,19 @@ def _database_node(row, *, joined=False):
         namespace = row.get("namespace_name")
         attributes_json = row.get("attributes_json")
     attributes = _decode_json(attributes_json, {})
-    return {
+    attributes = attributes if isinstance(attributes, dict) else {}
+    node = {
         "id": node_id,
         "kind": kind,
         "name": name,
         "displayName": display_name,
         "namespace": namespace,
-        "attributes": attributes if isinstance(attributes, dict) else {},
+        "attributes": attributes,
     }
+    schema_name = _lineage_schema_from_attributes(attributes)
+    if schema_name is not None:
+        node["schema"] = schema_name
+    return node
 
 
 def _database_edge(row, *, joined=False):
@@ -419,45 +225,56 @@ def _validate_search_name(name):
     return normalized_name
 
 
+def _split_lineage_search_name(normalized_name):
+    """Return optional business namespace and table-name search fragments."""
+    if "." not in normalized_name:
+        return None, normalized_name
+    namespace, table_name = (part.strip() for part in normalized_name.split(".", 1))
+    if not namespace or not table_name:
+        raise LineageValidationError("schema.table must include both names")
+    return namespace, table_name
+
+
 def get_bootstrap():
     """Return safe page initialization data without exposing storage configuration."""
     status = lineage_storage_status()
-    if status["mode"] == "persistent":
-        return _run_persistent_read(
-            status["profile"],
-            lambda reader, active: _persistent_bootstrap(reader, active, status["mode"]),
-        )
-    try:
-        snapshot = _current_snapshot()
-    except LineageNoActiveSnapshotError:
-        return _missing_snapshot_bootstrap(status["mode"])
-    return _bootstrap_from_snapshot(snapshot, status["mode"])
+    return _run_persistent_read(
+        status["profile"],
+        lambda reader, active: _persistent_bootstrap(reader, active, status["mode"]),
+    )
 
 
 def search_nodes(name, limit=None):
     normalized_name = _validate_search_name(name)
+    namespace, table_name = _split_lineage_search_name(normalized_name)
     result_limit = _search_limit(limit)
+    name_pattern = f"%{escape_like_operand(table_name.casefold())}%"
+    namespace_pattern = (
+        f"%{escape_like_operand(namespace.casefold())}%"
+        if namespace is not None
+        else None
+    )
     status = lineage_storage_status()
-    if status["mode"] == "persistent":
-        escaped = escape_like_operand(normalized_name.casefold())
-        pattern = f"%{escaped}%"
 
-        def search(reader, active):
-            if active is None:
-                raise LineageNoActiveSnapshotError("no active lineage snapshot is available")
-            rows = reader.search_nodes(active["snapshot_id"], pattern, result_limit)
-            return [_database_node(row) for row in rows]
+    def search(reader, active):
+        if active is None:
+            raise LineageNoActiveSnapshotError("no active lineage snapshot is available")
+        rows = reader.search_nodes(
+            active["snapshot_id"],
+            name_pattern,
+            result_limit,
+            exact_name=table_name.casefold(),
+            namespace_pattern=namespace_pattern,
+            exact_namespace=namespace.casefold() if namespace is not None else None,
+            exact_qualified_name=(
+                f"{namespace}.{table_name}".casefold()
+                if namespace is not None
+                else None
+            ),
+        )
+        return [_database_node(row) for row in rows]
 
-        return _run_persistent_read(status["profile"], search)
-
-    searchable_kinds = {"table", "task"}
-    matches = [
-        deepcopy(node)
-        for node in _current_snapshot()["nodes"]
-        if node["kind"] in searchable_kinds
-        and normalized_name.casefold() in node["name"].casefold()
-    ]
-    return matches if limit is None else matches[:result_limit]
+    return _run_persistent_read(status["profile"], search)
 
 
 def _bounded_int(value, default, minimum, maximum, name):
@@ -480,148 +297,6 @@ def _is_dwf_node(node):
     name = str(node.get("name") or "").upper()
     namespace = str(node.get("namespace") or "").upper()
     return name.startswith(("DWF.", "DWS_DWF.")) or namespace in {"DWF", "DWS_DWF"}
-
-
-def _project_table_graph(snapshot):
-    nodes_by_id = {node["id"]: node for node in snapshot["nodes"]}
-    table_nodes = [deepcopy(node) for node in snapshot["nodes"] if node["kind"] == "table"]
-    incoming_by_task = {}
-    outgoing_by_task = {}
-    direct_edges = []
-    for edge in snapshot["edges"]:
-        source = nodes_by_id.get(edge["sourceId"])
-        target = nodes_by_id.get(edge["targetId"])
-        if not source or not target:
-            continue
-        if source["kind"] == "table" and target["kind"] == "task":
-            incoming_by_task.setdefault(target["id"], []).append(edge)
-        elif source["kind"] == "task" and target["kind"] == "table":
-            outgoing_by_task.setdefault(source["id"], []).append(edge)
-        elif source["kind"] == target["kind"] == "table":
-            direct_edges.append(deepcopy(edge))
-
-    projected = {}
-    for task_id in sorted(set(incoming_by_task) | set(outgoing_by_task)):
-        task = nodes_by_id[task_id]
-        for input_edge in incoming_by_task.get(task_id, []):
-            for output_edge in outgoing_by_task.get(task_id, []):
-                source_id = input_edge["sourceId"]
-                target_id = output_edge["targetId"]
-                if source_id == target_id:
-                    continue
-                key = (source_id, target_id)
-                item = projected.setdefault(key, {
-                    "sourceId": source_id,
-                    "targetId": target_id,
-                    "jobs": [],
-                    "evidence": [],
-                    "diagnostics": [],
-                })
-                if task["name"] not in item["jobs"]:
-                    item["jobs"].append(task["name"])
-                item["evidence"].append(input_edge["evidence"])
-                item["diagnostics"].extend(input_edge.get("diagnostics", []))
-                item["diagnostics"].extend(output_edge.get("diagnostics", []))
-
-    edges = direct_edges
-    for (source_id, target_id), item in sorted(projected.items()):
-        digest = hashlib.sha256(f"{source_id}\x1f{target_id}".encode("utf-8")).hexdigest()[:24]
-        jobs = sorted(item["jobs"])
-        evidence = item["evidence"][0]
-        edges.append({
-            "id": f"edge:table_lineage:{digest}",
-            "sourceId": source_id,
-            "targetId": target_id,
-            "kind": "table_lineage",
-            "viaJobs": jobs,
-            "evidence": {
-                "type": "derived_job_path",
-                "sourceRecordId": evidence["sourceRecordId"],
-                "description": f"经过作业：{'、'.join(jobs)}；{evidence['description']}",
-            },
-            "confidence": "high",
-            "generatedAt": snapshot["generatedAt"],
-            "diagnostics": item["diagnostics"],
-        })
-    return {**snapshot, "nodes": table_nodes, "edges": edges}
-
-
-def _traverse(snapshot, root_id, direction, depth, max_nodes):
-    nodes_by_id = {node["id"]: node for node in snapshot["nodes"]}
-    outgoing = {}
-    incoming = {}
-    for edge in snapshot["edges"]:
-        outgoing.setdefault(edge["sourceId"], []).append(edge["targetId"])
-        incoming.setdefault(edge["targetId"], []).append(edge["sourceId"])
-
-    selected = {root_id}
-    truncated = False
-
-    def walk(branch):
-        nonlocal truncated
-        queue = deque([(root_id, 0)])
-        best_cost = {root_id: 0}
-        while queue:
-            current, table_depth = queue.popleft()
-            current_node = nodes_by_id[current]
-            if branch == "upstream" and _is_dwf_node(current_node):
-                continue
-            if current_node["kind"] == "table" and table_depth >= depth:
-                continue
-            neighbors = incoming.get(current, []) if branch == "upstream" else outgoing.get(current, [])
-            for neighbor in neighbors:
-                neighbor_node = nodes_by_id.get(neighbor)
-                if not neighbor_node:
-                    continue
-                next_depth = table_depth + (1 if neighbor_node["kind"] == "table" else 0)
-                if next_depth > depth:
-                    continue
-                previous = best_cost.get(neighbor)
-                if previous is not None and previous <= next_depth:
-                    continue
-                if neighbor not in selected and len(selected) >= max_nodes:
-                    truncated = True
-                    continue
-                best_cost[neighbor] = next_depth
-                selected.add(neighbor)
-                queue.append((neighbor, next_depth))
-
-    if direction in {"upstream", "both"}:
-        walk("upstream")
-    if direction in {"downstream", "both"}:
-        walk("downstream")
-    return selected, truncated
-
-
-def _subgraph_from_snapshot(snapshot, root_id=None, direction="both", depth=None, max_nodes=None, view="table"):
-    direction = direction or "both"
-    if direction not in {"upstream", "downstream", "both"}:
-        raise LineageValidationError("direction must be upstream, downstream, or both")
-    view = view or "table"
-    if view not in {"table", "detail"}:
-        raise LineageValidationError("view must be table or detail")
-    depth = _bounded_int(depth, 2, 0, 5, "depth")
-    max_nodes = _bounded_int(max_nodes, 100, 1, 300, "maxNodes")
-    root_id = root_id or _default_root_id(snapshot)
-    source_nodes_by_id = {node["id"]: node for node in snapshot["nodes"]}
-    if root_id is None:
-        raise LineageNotFoundError("the current snapshot has no available root node")
-    if root_id not in source_nodes_by_id:
-        raise LineageNotFoundError("rootId is not available in the current snapshot")
-    if view == "table" and source_nodes_by_id[root_id]["kind"] != "table":
-        raise LineageValidationError("table view requires a table root node")
-    view_snapshot = _project_table_graph(snapshot) if view == "table" else snapshot
-    selected, truncated = _traverse(view_snapshot, root_id, direction, depth, max_nodes)
-    edges = [edge for edge in view_snapshot["edges"] if edge["sourceId"] in selected and edge["targetId"] in selected]
-    return {
-        "snapshot": {key: deepcopy(view_snapshot[key]) for key in ("snapshotId", "generatedAt", "generator")},
-        "rootId": root_id,
-        "view": view,
-        "nodes": [deepcopy(node) for node in view_snapshot["nodes"] if node["id"] in selected],
-        "edges": deepcopy(edges),
-        "truncated": truncated,
-        "diagnostics": deepcopy(view_snapshot["diagnostics"]),
-    }
 
 
 class _PersistentAdjacencyBudget:
@@ -1077,108 +752,86 @@ def _database_subgraph(
     }
 
 
+def _validated_graph_options(direction, depth, max_nodes, view):
+    """Reject malformed graph options before any storage resolution happens."""
+    direction = direction or "both"
+    if direction not in {"upstream", "downstream", "both"}:
+        raise LineageValidationError("direction must be upstream, downstream, or both")
+    view = view or "table"
+    if view not in {"table", "detail"}:
+        raise LineageValidationError("view must be table or detail")
+    return (
+        direction,
+        _bounded_int(depth, 2, 0, 5, "depth"),
+        _bounded_int(max_nodes, 100, 1, 300, "maxNodes"),
+        view,
+    )
+
+
 def get_subgraph(root_id=None, direction="both", depth=None, max_nodes=None, view="table"):
+    direction, depth, max_nodes, view = _validated_graph_options(
+        direction, depth, max_nodes, view
+    )
     status = lineage_storage_status()
-    if status["mode"] == "persistent":
-        return _run_persistent_read(
-            status["profile"],
-            lambda reader, active: _database_subgraph(
-                reader, active, root_id, direction, depth, max_nodes, view
-            ),
-        )
-    return _subgraph_from_snapshot(_current_snapshot(), root_id, direction, depth, max_nodes, view)
+    return _run_persistent_read(
+        status["profile"],
+        lambda reader, active: _database_subgraph(
+            reader, active, root_id, direction, depth, max_nodes, view
+        ),
+    )
 
 
 def get_initial_view(root_id=None, direction="both", depth=None, max_nodes=None, view="table"):
     """Load bootstrap metadata and the requested graph from one current snapshot."""
+    direction, depth, max_nodes, view = _validated_graph_options(
+        direction, depth, max_nodes, view
+    )
     status = lineage_storage_status()
-    if status["mode"] == "persistent":
-        def initial(reader, active):
-            if active is None:
-                return {
-                    "bootstrap": _missing_snapshot_bootstrap(status["mode"]),
-                    "graph": None,
-                    "noticeCode": None,
-                }
-            bootstrap = _persistent_bootstrap(reader, active, status["mode"])
-            if bootstrap["status"] != "ready" or not bootstrap["defaultRootId"]:
-                return {"bootstrap": bootstrap, "graph": None, "noticeCode": None}
 
-            try:
-                graph = _database_subgraph(
-                    reader, active, root_id, direction, depth, max_nodes, view,
-                    default_root_id=bootstrap["defaultRootId"],
-                )
-                return {"bootstrap": bootstrap, "graph": graph, "noticeCode": None}
-            except LineageNotFoundError:
-                if not root_id or root_id == bootstrap["defaultRootId"]:
-                    raise
-                notice_code = "ROOT_NOT_IN_SNAPSHOT"
-            except LineageValidationError:
-                root_row = reader.node(active["snapshot_id"], root_id) if root_id else None
-                requested_root = _database_node(root_row) if root_row else None
-                can_recover_task_in_table_view = (
-                    view == "table"
-                    and root_id
-                    and root_id != bootstrap["defaultRootId"]
-                    and (requested_root is None or requested_root.get("kind") != "table")
-                )
-                if not can_recover_task_in_table_view:
-                    raise
-                notice_code = "TABLE_VIEW_REQUIRES_TABLE_ROOT"
+    def initial(reader, active):
+        if active is None:
+            return {
+                "bootstrap": _missing_snapshot_bootstrap(status["mode"]),
+                "graph": None,
+                "noticeCode": None,
+            }
+        bootstrap = _persistent_bootstrap(reader, active, status["mode"])
+        if bootstrap["status"] != "ready" or not bootstrap["defaultRootId"]:
+            return {"bootstrap": bootstrap, "graph": None, "noticeCode": None}
 
+        try:
             graph = _database_subgraph(
-                reader,
-                active,
-                bootstrap["defaultRootId"],
-                direction,
-                depth,
-                max_nodes,
-                "table",
+                reader, active, root_id, direction, depth, max_nodes, view,
                 default_root_id=bootstrap["defaultRootId"],
             )
-            return {"bootstrap": bootstrap, "graph": graph, "noticeCode": notice_code}
+            return {"bootstrap": bootstrap, "graph": graph, "noticeCode": None}
+        except LineageNotFoundError:
+            if not root_id or root_id == bootstrap["defaultRootId"]:
+                raise
+            notice_code = "ROOT_NOT_IN_SNAPSHOT"
+        except LineageValidationError:
+            root_row = reader.node(active["snapshot_id"], root_id) if root_id else None
+            requested_root = _database_node(root_row) if root_row else None
+            can_recover_task_in_table_view = (
+                view == "table"
+                and root_id
+                and root_id != bootstrap["defaultRootId"]
+                and (requested_root is None or requested_root.get("kind") != "table")
+            )
+            if not can_recover_task_in_table_view:
+                raise
+            notice_code = "TABLE_VIEW_REQUIRES_TABLE_ROOT"
 
-        return _run_persistent_read(status["profile"], initial)
-
-    try:
-        snapshot = _current_snapshot()
-    except LineageNoActiveSnapshotError:
-        return {
-            "bootstrap": _missing_snapshot_bootstrap(status["mode"]),
-            "graph": None,
-            "noticeCode": None,
-        }
-
-    bootstrap = _bootstrap_from_snapshot(snapshot, status["mode"])
-    if bootstrap["status"] != "ready" or not bootstrap["defaultRootId"]:
-        return {"bootstrap": bootstrap, "graph": None, "noticeCode": None}
-
-    try:
-        graph = _subgraph_from_snapshot(snapshot, root_id, direction, depth, max_nodes, view)
-        return {"bootstrap": bootstrap, "graph": graph, "noticeCode": None}
-    except LineageNotFoundError:
-        if not root_id or root_id == bootstrap["defaultRootId"]:
-            raise
-        notice_code = "ROOT_NOT_IN_SNAPSHOT"
-    except LineageValidationError:
-        nodes_by_id = {node["id"]: node for node in snapshot["nodes"]}
-        can_recover_task_in_table_view = (
-            view == "table"
-            and root_id
-            and root_id != bootstrap["defaultRootId"]
-            and nodes_by_id.get(root_id, {}).get("kind") != "table"
+        graph = _database_subgraph(
+            reader,
+            active,
+            bootstrap["defaultRootId"],
+            direction,
+            depth,
+            max_nodes,
+            "table",
+            default_root_id=bootstrap["defaultRootId"],
         )
-        if not can_recover_task_in_table_view:
-            raise
-        notice_code = "TABLE_VIEW_REQUIRES_TABLE_ROOT"
+        return {"bootstrap": bootstrap, "graph": graph, "noticeCode": notice_code}
 
-    graph = _subgraph_from_snapshot(
-        snapshot,
-        bootstrap["defaultRootId"],
-        direction,
-        depth,
-        max_nodes,
-        "table",
-    )
-    return {"bootstrap": bootstrap, "graph": graph, "noticeCode": notice_code}
+    return _run_persistent_read(status["profile"], initial)

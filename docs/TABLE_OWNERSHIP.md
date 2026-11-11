@@ -4,12 +4,12 @@
 
 ## Canonical baseline
 
-`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0013_field_filter_index` 共同覆盖以下 40 张 canonical tables：
+`backend/schema/{sqlite,postgresql,mysql,dws}.sql` 与 Alembic head `0015_ai_llm_daily_quota` 共同覆盖以下 41 张 canonical tables：
 
 | Owner | Tables |
 | --- | --- |
 | shared/core | `p_system`, `p_data_source` |
-| system | `p_admin_user`, `p_menu`, `p_code_category`, `p_code_item`, `p_operation_log` |
+| system | `p_admin_user`, `p_menu`, `p_code_category`, `p_code_item`, `p_operation_log`, `p_ai_llm_daily_usage` |
 | rbac | `p_role`, `p_permission`, `p_role_permission` |
 | dwm | `p_asset_domain`, `p_asset_layer`, `p_asset_table`, `p_asset_field`, `p_asset_change_log` |
 | mapping | `p_field_mapping_table`, `p_field_mapping_field` |
@@ -30,8 +30,9 @@
 `lineage` 模块、持久化 storage 和外部 collector 是三个不同概念：
 
 - `p_lineage_snapshot`、`p_lineage_node`、`p_lineage_edge` 是仓库自身的 canonical storage，由 baseline 和 forward migration 创建；其 source/content/ingestion bookkeeping 由 `0004_metadata_ingestion_identity` 维护；
-- `LINEAGE_DB_PROFILE` 选择 persistent storage profile；
-- development/test 未配置 profile 时可以使用受控 POC snapshot；
+- `ASSET_DB_PROFILE` 同时为资产元数据与血缘选择 DAP 参数库（含其物理 Schema），不另设 lineage profile；
+- `LINEAGE_DB_PROFILE`、`LINEAGE_STORAGE_MODE` 已废弃并被忽略，任何环境都不再有受控 POC snapshot 回退；
+- 没有 ACTIVE 快照是正常空状态（`no_active_snapshot`），配置缺失/无效与库不可达分别报 `LINEAGE_CONFIGURATION_ERROR` 和 `LINEAGE_DATA_SOURCE_ERROR`；
 - `backend/app/services/lineage_collector.py` 只有在外部 scheduler/source profile 可用时才执行采集，不影响 lineage route 和模块存在性。
 
 缺少 storage/profile/collector 时，API 返回现有 `LINEAGE_CONFIGURATION_ERROR` 或 `LINEAGE_DATA_SOURCE_ERROR`，不使用 Edition 名义返回 404。
@@ -65,7 +66,7 @@
 
 `docs/pg/` 和 `docs/dws/` 保留为方言说明、历史迁移参考和部署 catalog。PostgreSQL supplementary DDL 保留 physical FK；DWS supplementary DDL 不创建 physical FK，并依赖 logical relationship contract 与 application-level delete behavior。它们不能再被解释为某个仓库模块的产品锁或 baseline 排除清单。
 
-`p_field_mapping_change_log` 的旧 DDL 目前没有对应 runtime service/SQLAlchemy declaration，也不在 canonical 40-table inventory；它作为 docs-only historical/reference artifact 保留，待实际 runtime 使用时再按正常 migration 流程纳入，不得作为当前 module availability 判据。
+`p_field_mapping_change_log` 的旧 DDL 目前没有对应 runtime service/SQLAlchemy declaration，也不在 canonical 41-table inventory；它作为 docs-only historical/reference artifact 保留，待实际 runtime 使用时再按正常 migration 流程纳入，不得作为当前 module availability 判据。
 
 ## Instance state versus module availability
 

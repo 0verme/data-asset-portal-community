@@ -61,23 +61,35 @@ def _register_indicator_routes(app: FastAPI, service: Any) -> None:
     def get_indicators(
         keyword: str | None = Query(default=None),
         dimension: str | None = Query(default=None),
+        dimension_unassigned: bool = Query(default=False, alias="dimensionUnassigned"),
         status: str | None = Query(default=None),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        limit: str | None = Query(default=None),
+        sort_key: str | None = Query(default=None, alias="sortKey"),
+        sort_direction: str | None = Query(default=None, alias="sortDirection"),
         current_service: Any = Depends(get_service),
         context: RequestContext = Depends(get_request_context),
         authorization: Any = Depends(get_authorization_service),
     ):
         try:
-            items = current_service.get_indicators(
-                keyword=keyword,
-                dimension=dimension,
-                status=status,
-            )
+            if any(value is not None for value in (page, page_size, limit)):
+                payload = current_service.get_indicator_page(
+                    keyword=keyword, dimension=dimension,
+                    dimension_unassigned=dimension_unassigned, status=status, page=page,
+                    page_size=page_size if page_size is not None else limit,
+                    sort_key=sort_key, sort_direction=sort_direction,
+                    profile=profile_for_request(context, authorization),
+                )
+            else:
+                payload = {"items": current_service.get_indicators(
+                    keyword=keyword, dimension=dimension,
+                    dimension_unassigned=dimension_unassigned, status=status,
+                )}
         except IndicatorDataSourceError as error:
             return _service_error_response(error, 500)
-        items = project_for_request(items, context, authorization)
-        return JSONResponse(
-            content=validate_contract({"items": items}, IndicatorListResponse)
-        )
+        payload = project_for_request(payload, context, authorization)
+        return JSONResponse(content=validate_contract(payload, IndicatorListResponse))
 
     @router.get(
         "/dimensions",

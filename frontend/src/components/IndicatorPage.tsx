@@ -6,7 +6,7 @@ import {
 } from "../data/indicatorDimensions.ts";
 import type { IndicatorFilter } from "../routing/types.ts";
 import { formatDate, formatDateTime } from "../utils/date.ts";
-import { ActionErrorBanner, CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher } from "./common/index.ts";
+import { ActionErrorBanner, CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher, WideTableScroll } from "./common/index.ts";
 import type { ViewMode } from "./common/ViewModeSwitcher.tsx";
 import { Highlight, Icon, initial } from "./ui.tsx";
 import { Button } from "../ui/index.ts";
@@ -288,7 +288,8 @@ function IndicatorTable({ indicators, query, dimensionOptions, pendingIds = [], 
 
   return (
     <div className="tbl-wrap indicator-tbl">
-      <table className="dt mobile-card-table">
+      <WideTableScroll ariaLabel="指标列表" className="indicator-wide-scroll">
+        <table className="dt mobile-card-table indicator-wide-table">
         <thead>
           <tr>
             <th style={{ width: 148 }}>指标 ID</th>
@@ -342,7 +343,8 @@ function IndicatorTable({ indicators, query, dimensionOptions, pendingIds = [], 
             );
           })}
         </tbody>
-      </table>
+        </table>
+      </WideTableScroll>
     </div>
   );
 }
@@ -415,6 +417,8 @@ function IndicatorGroupLayout({ indicators, query, dimensionOptions, onView }: I
 export interface IndicatorPageProps {
   indicators: readonly MockIndicatorItem[];
   allIndicators: readonly MockIndicatorItem[];
+  total?: number | undefined;
+  overallCount?: number | undefined;
   query: string;
   actionError: string;
   filter: IndicatorFilter;
@@ -439,6 +443,8 @@ export interface IndicatorPageProps {
 export function IndicatorPage({
   indicators,
   allIndicators,
+  total = indicators.length,
+  overallCount = allIndicators.length,
   query,
   actionError,
   filter,
@@ -468,10 +474,10 @@ export function IndicatorPage({
         <div>
           <div className="page-title"><span className="pt-code">指标</span>指标管理</div>
           <div className="page-sub">
-            共 <b>{indicators.length}</b> 个口径指标
+            共 <b>{total}</b> 个口径指标
             {dimensionOptions.length ? <>，覆盖 <b>{dimensionOptions.length}</b> 个业务维度</> : null}
             {hasActiveDimension && activeDimension ? <>，当前维度 <b>{activeDimension.label}</b></> : null}
-            {allIndicators.length !== indicators.length ? <>，总量 <b>{allIndicators.length}</b></> : null}
+            {overallCount !== total ? <>，总量 <b>{overallCount}</b></> : null}
           </div>
         </div>
         <div className="head-actions">

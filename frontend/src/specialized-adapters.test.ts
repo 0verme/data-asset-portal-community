@@ -8,27 +8,24 @@ const page = read("./components/FieldMappingPage.tsx");
 const lineage = read("./components/LineagePage.tsx");
 const wideTable = read("./components/fieldMapping/FieldMappingWideTable.tsx");
 
-test("field mapping controls use DAP Select and retain the unrelated native empty-comment filter", () => {
-  assert.match(controls, /import \{ Button, Input, Select, Tooltip \} from "\.\.\/\.\.\/ui\/index\.ts"/);
+test("field mapping query keeps four text filters and the native empty-comment condition", () => {
+  assert.match(controls, /import \{ Button, Input, Tooltip \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((controls.match(/<Input/g) ?? []).length, 4);
   assert.equal((controls.match(/<Button/g) ?? []).length, 2);
-  assert.equal((controls.match(/<Select<string>/g) ?? []).length, 1);
+  assert.equal((controls.match(/<Select/g) ?? []).length, 0);
   assert.equal((controls.match(/<select/g) ?? []).length, 1, "only emptyComment remains native");
-  assert.equal((controls.match(/<button/g) ?? []).length, 1, "fm-toggle stays native");
-  assert.match(controls, /onSourceSystemChange: \(value: string \| null\) => void/);
-  assert.match(controls, /value=\{selectedSourceSystemId \|\| null\}/);
-  assert.match(controls, /trigger=\{<div>\{sourceSystemSelect\}<\/div>\}/);
-  assert.match(controls, /content=\{selectedSourceSystemLabel\}/);
-  assert.match(controls, /value: String\(getSourceSystemId\(item\)\)/);
-  assert.match(controls, /label: formatSystemLabel\(item\)/);
-  assert.match(page, /const setDraftSourceSystem = \(value: string \| null\) =>/);
+  assert.equal((controls.match(/<button/g) ?? []).length, 2, "collapse and help triggers stay native");
+  assert.match(controls, /aria-label="查询帮助"/);
+  assert.match(controls, /源系统表名[\s\S]*源字段名[\s\S]*DWF 表名[\s\S]*DWF 字段名/);
+  assert.doesNotMatch(controls, /aria-label="源系统"/);
+  assert.doesNotMatch(page, /setDraftSourceSystem/);
 });
 
 test("field mapping page uses adapters for actions and pagination", () => {
-  assert.match(page, /import \{ Button, Select \} from "\.\.\/ui\/index\.ts"/);
-  assert.equal((page.match(/<Button/g) ?? []).length, 9);
-  assert.equal((page.match(/<Select<string>/g) ?? []).length, 1);
-  assert.match(page, /className="sel fm-page-size"/);
+  assert.match(page, /import \{ Button, TablePagination \} from "\.\.\/ui\/index\.ts"/);
+  assert.equal((page.match(/<Button/g) ?? []).length, 6);
+  assert.equal((page.match(/<Select<string>/g) ?? []).length, 0);
+  assert.match(page, /<TablePagination[\s\S]*?pageSizeOptions=\{FIELD_MAPPING_PAGE_SIZE_OPTIONS\}/);
   assert.equal((page.match(/<button/g) ?? []).length, 1, "dimension tabs stay native");
 });
 

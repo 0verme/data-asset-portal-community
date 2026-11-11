@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { getAssetTablePage } from "./assets.ts";
-import { buildMockSearchResult, type SearchResult } from "./search.ts";
+import {
+  buildMockSearchResult,
+  disabledRagRecommendations,
+  parseRagRecommendationsResponse,
+  type SearchResult,
+} from "./search.ts";
 
 const ALL_MODULES: ReadonlySet<string> = new Set([
   "dwm",
@@ -25,6 +30,45 @@ function assetGroup(result: SearchResult) {
   assert.ok(group, "asset group is expected");
   return group;
 }
+
+test("RAG-disabled responses are explicit and never fabricate recommendations", () => {
+  assert.deepEqual(disabledRagRecommendations("  业务概念  "), {
+    query: "业务概念",
+    status: "disabled",
+    recommendations: [],
+    count: 0,
+    elapsedMs: 0,
+    reasonCode: "disabled",
+  });
+});
+
+test("RAG response parsing rejects malformed optional payloads", () => {
+  const valid = {
+    query: "业务概念",
+    status: "available",
+    recommendations: [{
+      assetId: 42,
+      assetType: "table",
+      name: "canonical_table",
+      displayName: "规范表名",
+      description: "",
+      domain: "",
+      layer: "",
+      evidence: ["字段语义匹配"],
+    }],
+    count: 1,
+    elapsedMs: 12,
+  };
+  assert.deepEqual(parseRagRecommendationsResponse(valid, "业务概念"), valid);
+  assert.throws(
+    () => parseRagRecommendationsResponse({ ...valid, recommendations: undefined }, "业务概念"),
+    /Invalid RAG recommendations response/,
+  );
+  assert.throws(
+    () => parseRagRecommendationsResponse({ ...valid, query: "other" }, "业务概念"),
+    /Invalid RAG recommendations response/,
+  );
+});
 
 test("mock asset search recalls an asset through a field-only keyword", () => {
   const result = buildMockSearchResult(FIELD_ONLY_KEYWORD, "asset", 5, ALL_MODULES);

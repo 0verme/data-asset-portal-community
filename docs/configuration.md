@@ -44,6 +44,73 @@ separate verification. Limits, expiry, authorization rechecks, disabled behavior
 rollback and remaining integration gates are documented in
 [the catalog snapshot contract](./catalog-snapshot.md).
 
+## Optional single-turn AI asset Q&A
+
+The AI Q&A feature is **disabled by default** and is separate from deterministic
+`GET /api/search` and optional RAG recommendations. It only accepts a single
+metadata question and uses the existing server-side RAG HTTP adapter plus an
+OpenAI-compatible LLM Provider. DAP does not load an embedding model/vector
+index or let the browser access the LLM endpoint.
+
+| Setting | Default / bounds | Purpose |
+|---|---|---|
+| `AI_ASK_ENABLED` | `false` | Explicit feature switch. |
+| `AI_LLM_BASE_URL` | required when enabled | OpenAI-compatible API base URL. HTTPS is required except HTTP loopback; URL credentials, query strings and fragments are rejected. |
+| `AI_LLM_MODEL` | required when enabled | Server-side provider model identifier. |
+| `AI_LLM_API_KEY` | required when enabled | Provider secret, injected from deployment Secret storage only; never stored in DAP parameter rows or returned to the browser. |
+| `AI_LLM_TIMEOUT_MS` | `30000` (250–60000) | Absolute Provider request/response deadline, including streaming-body delivery (not only per-read inactivity). |
+| `AI_LLM_MAX_TOKENS` | `3072` (64–4096) | Output token ceiling; raised to reduce truncated structured answers. |
+| `AI_LLM_MAX_CONCURRENCY` | `2` (1–16) | Non-blocking Provider concurrency bound. |
+| `AI_LLM_DISABLE_THINKING` | `false` | Optional explicit Provider-specific `thinking: {"type": "disabled"}` parameter; omitted unless set to true. |
+| `AI_ASK_MAX_CONCURRENCY` | `2` (1–16) | Active AI questions per ASGI worker process. |
+| `AI_ASK_MAX_QUEUE` | `4` (0–128) | Bounded waiting questions per ASGI worker process. |
+| `AI_ASK_QUEUE_WAIT_MS` | `5000` (0–10000) | Maximum admission queue wait before returning `llm_busy`. |
+| `AI_ASK_WORKER_TIMEOUT_SECONDS` | `115` (1–600) | Hard deadline for the isolated worker process. |
+| `AI_ASK_DB_TIMEOUT_SECONDS` | `10` (1–60) | Database connect/socket/statement timeout passed into the isolated worker. |
+
+These defaults apply only when the corresponding variable is unset or blank;
+explicit deployment environment values continue to override them. `AI_LLM_DISABLE_THINKING`
+remains opt-in and the defaults do not depend on a Provider accepting that
+unverified parameter. Reasoning tokens may consume the output-token budget, so
+3072 reduces (but cannot eliminate) `invalid_model_output` truncation.
+
+The 30-second deadline applies to each individual Provider HTTP call. The
+multi-stage execution allows up to 105 seconds overall and the default worker
+hard-stops at 115 seconds; with default settings, the normal planning + answer
+calls fit inside both bounds. Explicitly raised per-call timeouts remain honored
+but may be cut short by the overall execution deadline, so coordinate those
+overrides with the multi-stage budget. Browser AI requests allow at least 125 seconds, covering
+the 5-second admission wait, worker deadline, and bounded cleanup. If a
+deployment explicitly raises the worker timeout, also raise the frontend
+`VITE_API_TIMEOUT` accordingly; the ordinary search timeout is unchanged.
+
+The browser-safe `GET /api/ai/status` exposes only `{"enabled": boolean}`. It
+also requires the existing RAG search configuration to be enabled and its
+server-to-server token configured; it does not perform a live health probe.
+`POST /api/ai/ask` reuses the current public-catalog profile and existing RAG
+HTTP service, then validates every model citation against the exact DAP-verified
+candidate identities. Missing/invalid configuration fails closed. See
+[the architecture, contract, test and rollback guide](./ai-ask-mvp.md) for the
+API state semantics and isolated-environment handoff. This configuration does
+not claim that an external RAG HTTP service or DeepSeek endpoint is available.
+
+Three request transports share one service and one evidence contract:
+
+| Transport | Shape | Consumer |
+|---|---|---|
+| `POST /api/ai/ask/stream` | SSE `step_start` / `step_complete` / `step_error` / `answer` / `done` / `keep_alive` | Current frontend UI (`frontend/src/api/aiAskExecution.ts`) |
+| `POST /api/ai/ask/progress` | SSE `progress` + single `result` | Compatibility client |
+| `POST /api/ai/ask` | Single JSON `AiAskResponse` | Compatibility client |
+
+None of them streams model tokens; the answer is delivered as one validated
+payload. The shared default quota is 50 AI questions per Beijing natural day,
+not 50 internal model HTTP calls: each legal question that initiates one or
+more real Provider HTTP calls consumes at most one slot; database-only counts
+and requests that initiate no model HTTP call consume none. See the quota API
+contract in [the AI Q&A guide](./ai-ask-mvp.md). The search page exposes these as two result tabs —「搜索结果」(deterministic
+`GET /api/search`) and「AI 问答」(the explicit AI action). Ordinary search never
+invokes the model.
+
 ## Signed-session contract
 
 The application now writes an application-owned signed `session` cookie using
@@ -147,23 +214,23 @@ not control an external proxy or load balancer.
 also supported as provider/profile overrides. `ASSET_DB_PASSWORD` and DSNs/JDBC
 URLs are sensitive and should not be placed in committed files.
 
-## Lineage storage mode (#414)
+## Lineage storage: same DAP metadata database (#536)
 
-`LINEAGE_STORAGE_MODE` supports `auto` (default, backward compatible),
-`persistent` and `poc`. In `persistent` mode, `LINEAGE_DB_PROFILE`
-is required; missing configuration fails closed. In `poc` mode, the
-lineage graph is synthetic and permitted **only** for development/dev/test
-when `LINEAGE_DB_PROFILE` is unset. Production never serves POC data.
-Conflicting or unknown modes fail closed.
+The lineage API always uses the configured `ASSET_DB_PROFILE` and its effective
+physical schema to read the persisted `p_lineage_snapshot`, `p_lineage_node`,
+and `p_lineage_edge` tables. It does **not** select a separate database through
+`LINEAGE_DB_PROFILE`, nor does `LINEAGE_STORAGE_MODE` enable POC data. Both
+legacy lineage-specific variables are ignored and should be removed from
+existing deployment environments. This applies to development, test and
+production backend runtimes; synthetic lineage is only suitable for isolated
+test fixtures or an explicitly separated frontend Mock build.
 
-In legacy `auto` mode an explicitly configured `LINEAGE_DB_PROFILE`
-selects persistent storage; otherwise development/dev/test retains the
-existing labeled in-memory POC, and production fails closed. To prevent
-an accidentally missing profile from appearing as a demo graph in a
-development-like deployed environment, explicitly set
-`LINEAGE_STORAGE_MODE=persistent`. This setting does not change
-`ASSET_DB_*` override precedence; profile override isolation remains
-a separate #414 decision.
+An absent/invalid `ASSET_DB_PROFILE` causes a configuration error; missing
+lineage tables or database access failures are reported as data-source errors.
+A configured database without an ACTIVE snapshot returns the existing
+`no_active_snapshot` empty-state contract, never an in-memory demo graph.
+Do not interpret switching to the shared DB as having collected lineage: a
+real ACTIVE snapshot still needs to be created and published separately.
 
 ## Database files and precedence
 
@@ -182,14 +249,11 @@ Resolution is:
 1. `ASSET_DB_PROFILE` (and optional `ASSET_AUTH_DB_PROFILE`) selects profiles.
 2. YAML `defaults` are merged with the selected profile.
 3. Non-empty `ASSET_DB_*` environment overrides replace YAML/profile values.
-   This is **global to every selected named profile**, including an explicit
-   `LINEAGE_DB_PROFILE` and `ASSET_AUTH_DB_PROFILE`; choosing a distinct profile
-   name does not bypass these overrides. When a dedicated lineage database
-   must retain its own host/credentials, do not set conflicting global
-   `ASSET_DB_HOST`/`ASSET_DB_DATABASE`/`ASSET_DB_USER`/`ASSET_DB_PASSWORD`
-   variables: instead put the connection fields in the per-profile YAML and
-   protect the config file appropriately. Do not assume that a profile switch
-   provides connection isolation.
+   This is **global to every selected named profile**, including the optional
+   authentication profile. The lineage module always consumes the final
+   `ASSET_DB_PROFILE` configuration; it has no independent profile override.
+   A separate authentication profile is not isolated from these environment
+   overrides merely by choosing a distinct profile name.
 4. `ASSET_DB_JAR_PATH` overrides a GaussDB `jar_path`.
 5. A relative GaussDB `jar_path` is resolved against `backend/` (the parent of
    `configs/`); with the default `backend/configs/database.yaml`,

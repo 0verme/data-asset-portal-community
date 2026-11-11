@@ -28,9 +28,10 @@ on:
 permissions:
   contents: read
 
+# PR updates supersede older attempts; every main commit remains independently validated.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   repository-guard:
@@ -597,9 +598,21 @@ jobs:
       - name: Frontend tests
         run: npm test
 
+      - name: Linux static/API proxy and live SSE integration tests
+        run: python3 -m unittest discover -s tests -p 'test_serve_dist_linux.py' -v
+
       - name: Frontend production build
         env:
           VITE_API_MODE: remote
+        run: npm run build:frontend
+
+      - name: Verify Remote bundle excludes Mock AI answers
+        run: node scripts/verify-remote-ai-isolation.mjs
+
+      - name: Explicit static Demo build
+        env:
+          VITE_API_MODE: mock
+          DAP_STATIC_MOCK_BUILD: "1"
         run: npm run build:frontend
 
       - name: Dependency audit gate (Critical/High must be 0)
@@ -638,6 +651,13 @@ jobs:
           VITE_API_MODE: remote
         run: npm run test:browser -- --grep "API asset validation|Remote data trust|strict collection response|indicator path malformed envelope|source options failure|field-mapping column contract"
 
+      - name: Indicator and report database pagination browser regression (Chromium and WebKit)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/catalog-pagination-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/catalog-pagination.spec.ts --workers=2
+
       - name: Report long-form save feedback regression (Chromium and WebKit)
         if: matrix.lane == 'a'
         env:
@@ -673,12 +693,33 @@ jobs:
           VITE_API_MODE: mock
         run: npm run test:browser -- e2e/portal-search.spec.ts --workers=2
 
+      - name: Single-turn AI Q&A browser regression (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/ai-ask-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/ai-ask.spec.ts --workers=2
+
+      - name: Static Mock AI browser regression (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/ai-ask-mock-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- e2e/ai-ask-mock.spec.ts --workers=2
+
       - name: System management form feedback browser regression (Chromium and WebKit)
         if: matrix.lane == 'b'
         env:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/system-form-feedback-playwright
           VITE_API_MODE: remote
         run: npm run test:browser -- e2e/admin-form-errors.spec.ts --workers=2
+
+      - name: Menu management operation column regression (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/menu-management-columns-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/menu-management-columns.spec.ts e2e/wide-table-scroll.spec.ts --workers=2
 
       - name: Manual code table form feedback browser regression (Chromium and WebKit)
         if: matrix.lane == 'b'

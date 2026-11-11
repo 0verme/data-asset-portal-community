@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -52,6 +53,28 @@ def _seed_platform_option_rows(database: FakeDwsDatabase) -> None:
         CONFIG,
         "0008_indicator_semantic_contract",
         "0009_upstream_option_contract",
+    )
+
+
+def _seed_required_rows_through_0012(database: FakeDwsDatabase) -> None:
+    _seed_platform_option_rows(database)
+    database.ledger = "0011_push_job_freq_desc_capacity"
+    apply_revisions(
+        database,
+        CONFIG,
+        "0011_push_job_freq_desc_capacity",
+        "0012_search_hot_keywords",
+    )
+
+
+def _seed_required_rows_through_0014(database: FakeDwsDatabase) -> None:
+    _seed_required_rows_through_0012(database)
+    database.ledger = "0013_field_filter_index"
+    apply_revisions(
+        database,
+        CONFIG,
+        "0013_field_filter_index",
+        "0014_rag_search_config",
     )
 
 
@@ -213,6 +236,8 @@ class DwsFreshAndAdoptionTests(unittest.TestCase):
                     if revision in {
                         "0009_upstream_option_contract",
                         "0012_search_hot_keywords",
+                        "0014_rag_search_config",
+                        "0015_ai_llm_daily_quota",
                     }
                     else "adopt"
                 )
@@ -222,8 +247,25 @@ class DwsFreshAndAdoptionTests(unittest.TestCase):
         )
         self.assertEqual(repository_head(), database.ledger)
         categories = {row["category_code"] for row in database.table("p_code_category").rows}
-        self.assertEqual({"UPSTREAM_DB_TYPE"}, categories)
-        self.assertEqual(8, len(database.table("p_code_item").rows))
+        self.assertEqual(
+            {"UPSTREAM_DB_TYPE", "RAG_SEARCH_CONFIG", "AI_LLM_QUOTA_CONFIG"}, categories
+        )
+        self.assertEqual(10, len(database.table("p_code_item").rows))
+        usage = database.table("p_ai_llm_daily_usage").rows
+        self.assertEqual([("GLOBAL", "1970-01-01", 0)], [
+            (row["scope_key"], row["business_date"], row["used_count"]) for row in usage
+        ])
+        rag_category = next(
+            row for row in database.table("p_code_category").rows
+            if row["category_code"] == "RAG_SEARCH_CONFIG"
+        )
+        rag_item = next(
+            row for row in database.table("p_code_item").rows
+            if row["category_code"] == "RAG_SEARCH_CONFIG"
+        )
+        self.assertEqual("N", rag_category["is_active"])
+        self.assertEqual("N", rag_item["is_active"])
+        self.assertFalse(json.loads(rag_item["ext_json"])["enabled"])
 
     def test_nearly_head_legacy_only_applies_missing_revision_and_seed(self):
         database = FakeDwsDatabase().seed_from_baseline()
@@ -240,15 +282,19 @@ class DwsFreshAndAdoptionTests(unittest.TestCase):
         self.assertEqual("apply", actions["0002_portable_asset_filter"])
         self.assertEqual("apply", actions["0009_upstream_option_contract"])
         self.assertEqual("apply", actions["0012_search_hot_keywords"])
+        self.assertEqual("apply", actions["0014_rag_search_config"])
+        self.assertEqual("apply", actions["0015_ai_llm_daily_quota"])
         for revision in satisfied - {
             "0009_upstream_option_contract",
             "0012_search_hot_keywords",
+            "0014_rag_search_config",
+            "0015_ai_llm_daily_quota",
         }:
             self.assertEqual("adopt", actions[revision], revision)
         self.assertEqual(repository_head(), database.ledger)
 
         # No structural replay: only the missing index and additive option /
-        # recommendation seeds were written; configured values are preserved.
+        # hot-keyword/RAG config seeds were written; configured values are preserved.
         structural_ddl = [
             sql
             for sql, _ in database.executed
@@ -449,7 +495,17 @@ class DwsLegacyUpgradeTests(unittest.TestCase):
         self.assertEqual(original_mapping["table_pk"], database.table("p_field_mapping_table").rows[0]["table_pk"])
         self.assertEqual(original_indicator["indicator_pk"], database.table("p_indicator_item").rows[0]["indicator_pk"])
         self.assertEqual(original_asset["asset_id"], database.table("p_asset_table").rows[0]["asset_id"])
-        self.assertEqual(original_code_items, database.table("p_code_item").rows)
+        all_code_items = database.table("p_code_item").rows
+        self.assertEqual(original_code_items, all_code_items[: len(original_code_items)])
+        self.assertEqual(len(original_code_items) + 2, len(all_code_items))
+        self.assertEqual(
+            1,
+            sum(row.get("category_code") == "RAG_SEARCH_CONFIG" for row in all_code_items),
+        )
+        self.assertEqual(
+            1,
+            sum(row.get("category_code") == "AI_LLM_QUOTA_CONFIG" for row in all_code_items),
+        )
         self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
         self.assertEqual(repository_head(), verify_database(database, CONFIG, "dws"))
 
@@ -689,7 +745,11 @@ class DwsFieldMappingQueryIndexTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            [(self.REVISION, "apply")],
+            [
+                (self.REVISION, "apply"),
+                ("0014_rag_search_config", "apply"),
+                ("0015_ai_llm_daily_quota", "apply"),
+            ],
             [(item.revision, item.action) for item in result],
         )
         index = database.table("p_field_mapping_field").indexes[self.INDEX]
@@ -710,6 +770,247 @@ class DwsFieldMappingQueryIndexTests(unittest.TestCase):
 
         self.assertIs(RevisionState.CONFLICT, inspection.state)
         self.assertIn("unexpected definition", inspection.summary)
+
+
+class DwsRagSearchConfigSeedTests(unittest.TestCase):
+    REVISION = "0014_rag_search_config"
+
+    def test_0014_adds_one_inactive_reserved_config_and_repeat_apply_is_noop(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        _seed_required_rows_through_0012(database)
+        database.ledger = "0013_field_filter_index"
+
+        result = apply_revisions(
+            database, CONFIG, "0013_field_filter_index", repository_head()
+        )
+
+        self.assertEqual(
+            [
+                (self.REVISION, "apply"),
+                ("0015_ai_llm_daily_quota", "apply"),
+            ],
+            [(item.revision, item.action) for item in result],
+        )
+        categories = [
+            row
+            for row in database.table("p_code_category").rows
+            if row.get("category_code") == "RAG_SEARCH_CONFIG"
+        ]
+        items = [
+            row
+            for row in database.table("p_code_item").rows
+            if row.get("category_code") == "RAG_SEARCH_CONFIG"
+        ]
+        self.assertEqual(1, len(categories))
+        self.assertEqual(1, len(items))
+        self.assertEqual("N", categories[0]["is_active"])
+        self.assertEqual("N", items[0]["is_active"])
+        self.assertFalse(json.loads(items[0]["ext_json"])["enabled"])
+        before = (len(categories), len(items))
+
+        self.assertEqual(
+            [], apply_revisions(database, CONFIG, repository_head(), repository_head())
+        )
+        self.assertEqual(
+            before,
+            (
+                sum(
+                    row.get("category_code") == "RAG_SEARCH_CONFIG"
+                    for row in database.table("p_code_category").rows
+                ),
+                sum(
+                    row.get("category_code") == "RAG_SEARCH_CONFIG"
+                    for row in database.table("p_code_item").rows
+                ),
+            ),
+        )
+
+    def test_0014_preserves_an_existing_disabled_configuration(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        _seed_required_rows_through_0012(database)
+        database.table("p_code_category").add_row(
+            {
+                "category_id": 100,
+                "category_code": "RAG_SEARCH_CONFIG",
+                "category_name": "RAG 搜索配置",
+                "is_active": "N",
+            }
+        )
+        custom_json = '{"enabled":false,"strategy":"keyword","serviceUrl":"https://rag.example.invalid"}'
+        database.table("p_code_item").add_row(
+            {
+                "item_id": 100,
+                "category_code": "RAG_SEARCH_CONFIG",
+                "item_code": "DEFAULT",
+                "item_name": "RAG 相关资产推荐",
+                "ext_json": custom_json,
+                "is_active": "N",
+            }
+        )
+        database.ledger = "0013_field_filter_index"
+
+        result = apply_revisions(
+            database, CONFIG, "0013_field_filter_index", repository_head()
+        )
+
+        self.assertEqual(
+            [
+                (self.REVISION, "adopt"),
+                ("0015_ai_llm_daily_quota", "apply"),
+            ],
+            [(item.revision, item.action) for item in result],
+        )
+        item = next(
+            row
+            for row in database.table("p_code_item").rows
+            if row.get("category_code") == "RAG_SEARCH_CONFIG"
+        )
+        self.assertEqual(custom_json, item["ext_json"])
+
+    def test_0014_rejects_active_reserved_category_without_advancing_ledger(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        _seed_required_rows_through_0012(database)
+        database.table("p_code_category").add_row(
+            {
+                "category_id": 100,
+                "category_code": "RAG_SEARCH_CONFIG",
+                "category_name": "RAG 搜索配置",
+                "is_active": "Y",
+            }
+        )
+        database.ledger = "0013_field_filter_index"
+
+        with self.assertRaises(DwsMigrationError) as error:
+            apply_revisions(
+                database, CONFIG, "0013_field_filter_index", repository_head()
+            )
+
+        self.assertEqual(self.REVISION, error.exception.revision)
+        self.assertEqual("0013_field_filter_index", database.ledger)
+        self.assertEqual(
+            [],
+            [
+                row
+                for row in database.table("p_code_item").rows
+                if row.get("category_code") == "RAG_SEARCH_CONFIG"
+            ],
+        )
+
+
+class DwsAiLlmDailyQuotaTests(unittest.TestCase):
+    REVISION = "0015_ai_llm_daily_quota"
+
+    def test_0015_seeds_inactive_config_and_one_global_usage_row(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        _seed_required_rows_through_0014(database)
+        database.ledger = "0014_rag_search_config"
+
+        result = apply_revisions(
+            database, CONFIG, "0014_rag_search_config", repository_head()
+        )
+
+        self.assertEqual([(self.REVISION, "apply")], [
+            (item.revision, item.action) for item in result
+        ])
+        category = next(
+            row for row in database.table("p_code_category").rows
+            if row.get("category_code") == "AI_LLM_QUOTA_CONFIG"
+        )
+        item = next(
+            row for row in database.table("p_code_item").rows
+            if row.get("category_code") == "AI_LLM_QUOTA_CONFIG"
+        )
+        self.assertEqual("N", category["is_active"])
+        self.assertEqual("N", item["is_active"])
+        self.assertEqual("AI_LLM_DAILY_LIMIT", item["item_code"])
+        self.assertEqual("50", item["item_value"])
+        self.assertEqual(
+            [("GLOBAL", "1970-01-01", 0)],
+            [
+                (row["scope_key"], row["business_date"], row["used_count"])
+                for row in database.table("p_ai_llm_daily_usage").rows
+            ],
+        )
+        self.assertEqual(RevisionState.APPLIED, inspect_revision(database, CONFIG, self.REVISION).state)
+
+    def test_0015_preserves_a_valid_existing_daily_limit_and_usage(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        _seed_required_rows_through_0014(database)
+        database.table("p_code_category").add_row({
+            "category_id": 50,
+            "category_code": "AI_LLM_QUOTA_CONFIG",
+            "category_name": "AI 问答配置",
+            "is_active": "N",
+        })
+        database.table("p_code_item").add_row({
+            "item_id": 50,
+            "category_code": "AI_LLM_QUOTA_CONFIG",
+            "item_code": "AI_LLM_DAILY_LIMIT",
+            "item_name": "每日 AI 问答上限",
+            "item_value": "73",
+            "is_active": "N",
+        })
+        database.table("p_ai_llm_daily_usage").add_row({
+            "scope_key": "GLOBAL",
+            "business_date": "2026-11-07",
+            "used_count": 12,
+        })
+        database.ledger = "0014_rag_search_config"
+
+        result = apply_revisions(
+            database, CONFIG, "0014_rag_search_config", repository_head()
+        )
+
+        self.assertEqual([(self.REVISION, "adopt")], [
+            (item.revision, item.action) for item in result
+        ])
+        self.assertEqual("73", next(
+            row["item_value"] for row in database.table("p_code_item").rows
+            if row.get("item_code") == "AI_LLM_DAILY_LIMIT"
+        ))
+        self.assertEqual(12, database.table("p_ai_llm_daily_usage").rows[0]["used_count"])
+
+    def test_0015_rejects_noncanonical_existing_usage_date(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.table("p_ai_llm_daily_usage").add_row({
+            "scope_key": "GLOBAL",
+            "business_date": "20261107",
+            "used_count": 1,
+        })
+        database.ledger = "0014_rag_search_config"
+
+        inspection = inspect_revision(database, CONFIG, self.REVISION)
+
+        self.assertIs(RevisionState.CONFLICT, inspection.state)
+        self.assertIn("usage row is invalid", inspection.summary)
+        with self.assertRaises(DwsMigrationError):
+            apply_revisions(database, CONFIG, "0014_rag_search_config", repository_head())
+        self.assertEqual("0014_rag_search_config", database.ledger)
+
+    def test_0015_fails_closed_for_invalid_existing_setting(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        database.table("p_code_category").add_row({
+            "category_id": 50,
+            "category_code": "AI_LLM_QUOTA_CONFIG",
+            "category_name": "AI 问答配置",
+            "is_active": "N",
+        })
+        database.table("p_code_item").add_row({
+            "item_id": 50,
+            "category_code": "AI_LLM_QUOTA_CONFIG",
+            "item_code": "AI_LLM_DAILY_LIMIT",
+            "item_name": "每日 AI 问答上限",
+            "item_value": "0",
+            "is_active": "N",
+        })
+        database.ledger = "0014_rag_search_config"
+
+        inspection = inspect_revision(database, CONFIG, self.REVISION)
+
+        self.assertIs(RevisionState.CONFLICT, inspection.state)
+        with self.assertRaises(DwsMigrationError):
+            apply_revisions(database, CONFIG, "0014_rag_search_config", repository_head())
+        self.assertEqual("0014_rag_search_config", database.ledger)
 
 
 class DwsFailClosedTests(unittest.TestCase):
@@ -919,7 +1220,7 @@ class DwsFailureRecoveryTests(unittest.TestCase):
 
         self.assertEqual(repository_head(), error.exception.revision)
         self.assertIn("full head schema verification failed", str(error.exception))
-        self.assertEqual("0012_search_hot_keywords", database.ledger)
+        self.assertEqual("0014_rag_search_config", database.ledger)
         self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
 
     def test_head_stamp_waits_for_all_prior_revision_postconditions(self):
@@ -934,7 +1235,7 @@ class DwsFailureRecoveryTests(unittest.TestCase):
 
         self.assertEqual("0009_upstream_option_contract", error.exception.revision)
         self.assertIn("post-condition", str(error.exception))
-        self.assertEqual("0012_search_hot_keywords", database.ledger)
+        self.assertEqual("0014_rag_search_config", database.ledger)
         self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
 
     def test_ledger_update_failure_keeps_prior_revision_and_retry_adopts_ddl(self):
@@ -1192,11 +1493,43 @@ class DwsSchemaMigrateCliTests(unittest.TestCase):
         )
         exit_code, _ = self._run_cli(database, ["verify", "--profile", "dws_test"])
         self.assertEqual(0, exit_code)
+        writes_before = len(database.executed)
         exit_code, output = self._run_cli(database, ["apply", "--profile", "dws_test"])
         self.assertEqual(0, exit_code)
         self.assertIn("applied=-", output)
         self.assertIsNone(indicator["source_asset_id"])
         self.assertIsNone(indicator["result_field_id"])
+        writes = [
+            sql
+            for sql, _ in database.executed[writes_before:]
+            if sql.lstrip().upper().startswith(
+                ("INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP")
+            )
+        ]
+        self.assertEqual([], writes)
+
+    def test_upgrade_from_0011_allows_legitimate_unlinked_indicator_references(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        downgrade_to_prefix(database, set(REVISION_ORDER[:10]))
+        _seed_legacy_business_rows(database, include_upstream=False)
+        _seed_platform_option_rows(database)
+        database.ledger_table = True
+        database.ledger = "0011_push_job_freq_desc_capacity"
+        indicator = database.table("p_indicator_item").rows[-1]
+        indicator["semantic_state"] = "candidate"
+        indicator["source_asset_id"] = None
+        indicator["result_field_id"] = None
+
+        exit_code, output = self._run_cli(
+            database, ["apply", "--profile", "dws_test"]
+        )
+
+        self.assertEqual(0, exit_code)
+        self.assertIn(f"applied={repository_head()}", output)
+        self.assertEqual(repository_head(), database.ledger)
+        self.assertIsNone(indicator["source_asset_id"])
+        self.assertIsNone(indicator["result_field_id"])
+        self.assertEqual(0, self._run_cli(database, ["verify", "--profile", "dws_test"])[0])
 
     def test_cli_plan_lists_adopt_and_apply_actions(self):
         database = FakeDwsDatabase().seed_from_baseline()

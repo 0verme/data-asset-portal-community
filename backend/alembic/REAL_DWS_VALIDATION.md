@@ -1,6 +1,6 @@
 # Real GaussDB/DWS 8.1.3 validation record
 
-**Status: NOT RUN.** The Agent has not connected to a maintainer DWS instance. Do not treat this checklist as evidence of a successful live migration. Execute it only after the DWS JDBC revision runner and adapters in this Issue are merged and the maintainer confirms the target is a disposable validation schema or has an approved backup/recovery window.
+**Status: NOT RUN.** The Agent has not connected to a maintainer DWS instance. Do not treat this checklist as evidence of a successful live migration. This is a separate Issue #313 acceptance gate and must be completed by the maintainer against the finalized PR candidate before merge/closure, using an authorized disposable schema or an approved backup/recovery window.
 
 Record only profile names and results here; never add credentials, JDBC URLs, hostnames, user names, or production data.
 
@@ -40,12 +40,26 @@ Record only profile names and results here; never add credentials, JDBC URLs, ho
 
 `revision = 0001_baseline` does not mean the schema is old. Released `dws.sql` baselines form a prefix of the revision chain, so the runner inspects the physical schema and adopts every satisfied revision before executing anything. When preparing a controlled legacy snapshot, construct it from a known released baseline (for example, the 0001-era schema) and record which structures it contains; do not assume the ledger value alone describes it. See `DWS_MIGRATION_COMPATIBILITY.md` for the per-revision post-conditions.
 
+## `0013` large-table index preflight
+
+When `0013_field_filter_index` must build its non-unique index on a populated `p_field_mapping_field`, treat it as a potentially high-impact operation: index construction reads the table and can consume significant I/O, storage/temporary space and elapsed time. GaussDB 8.1.3 lock duration and write availability have **NOT RUN** in this validation; do not assume online or concurrent index-build semantics.
+
+Before approving the `0013` action, record the table row count/size, available storage, write workload, backup/snapshot and recovery plan, and the approved maintenance window. The maintainer must confirm the unverified lock/write impact is acceptable. If not, stop; do not run the revision or try to drop/replace an existing index. In an authorized isolated validation copy, record build duration, observed lock/write impact, resource use, resulting index definition and ledger before/after.
+
+## GaussDB timestamp default normalization check
+
+1. Use a restorable non-production validation copy with a valid DWS baseline and ledger. Confirm the profile's physical schema is the intended `dap` schema; do not probe other business schemas.
+2. Run `dws_verify_metadata_preflight.py --profile <profile>` and require all five catalog queries plus `SchemaModel normalization` to pass.
+3. Run `schema_migrate.py verify --profile <profile>` and require `verify=ok`. Confirm catalog defaults reported as `pg_systimestamp()` for timestamp columns compare equal to canonical `CURRENT_TIMESTAMP`; the check must not suppress unrelated missing or different defaults.
+4. On a separate disposable copy only, remove the default from `p_system.system_abbr` using the DBA-approved GaussDB procedure. Run `verify` and require a non-zero result identifying `default.system_abbr` as drift. Restore that copy and confirm `verify=ok` again. Never alter the real validation schema for this negative control.
+5. Record the repository SHA, profile name (not connection details), DWS version, schema name only if approved for internal notes, command exit status and redacted mismatch summary.
+
 ## Scenario 1 — fresh install (isolated empty schema)
 
 1. Confirm the target schema exists and contains no application tables; capture the preflight report.
 2. Run `schema_migrate.py status --profile <profile>` and confirm the result is unmanaged (and prints the repository head).
 3. Run `schema_migrate.py plan --profile <profile>` and review the baseline + `after-baseline` actions.
-4. Run `schema_migrate.py apply --profile <profile>`. The CLI executes the canonical baseline, verifies it, records `0001_baseline`, then adopts satisfied structural revisions and applies the additive `UPSTREAM_DB_TYPE` (`0009`) and search recommendation (`0012`) seeds until the ledger reaches the dynamically discovered repository head. Retail `UPSTREAM_DEPT` values are excluded from ordinary migration and require the separate explicit Community Demo seed.
+4. Run `schema_migrate.py apply --profile <profile>`. The CLI executes the canonical baseline, verifies it, records `0001_baseline`, then adopts satisfied structural revisions and applies additive seeds (`0009`, `0012`, `0014`, `0015`) until the ledger reaches the dynamically discovered repository head. `0014` stores only a reserved, inactive RAG settings row in existing parameter tables; `0015` seeds the inactive quota setting and a `GLOBAL` usage row without overwriting existing valid values. Retail `UPSTREAM_DEPT` values are excluded from ordinary migration and require the separate explicit Community Demo seed.
 5. Run `schema_migrate.py status --profile <profile>` and confirm it reports the repository's current logical head, not `0001_baseline`.
 6. Run `schema_migrate.py verify --profile <profile>`; require `verify=ok`. This checks the physical baseline, exact ledger head, and every registered revision post-condition (including data-only seeds and check constraints).
 7. Confirm ordinary migration initialized RBAC/default menus and the platform `UPSTREAM_DB_TYPE` options; a fresh schema migration must not create retail `UPSTREAM_DEPT` Demo rows. If validating Community Demo, apply its separate explicit seed as an opt-in and verify the complete fictional retail department set. Repeat ordinary `apply` and verify it is a no-op for the ledger and adds no duplicate technical seed rows.
@@ -55,16 +69,17 @@ Record only profile names and results here; never add credentials, JDBC URLs, ho
 
 1. Use a restorable copy or a disposable schema created from a released legacy baseline. Do not use a production schema without an approved backup/recovery window.
 2. Capture `status` (likely `0001_baseline`) and the read-only DWS metadata preflight.
-3. Run `plan`; review every action. A nearly-head instance must show `adopt` for satisfied revisions, `apply` for `0002_portable_asset_filter`, and `apply` for `0009_upstream_option_contract` / `0012_search_hot_keywords` / `0013_field_filter_index` when their additive seed rows are absent.
+3. Run `plan`; review every action. A nearly-head instance must show `adopt` for satisfied revisions, `apply` for `0002_portable_asset_filter` / `0013_field_filter_index` when the corresponding index is absent, and `apply` for `0009`, `0012`, `0014` or `0015` only when their additive rows/table are missing.
 4. Capture representative business-row counts and stable primary keys for field mappings, indicators, assets/fields, manual code values, upstream systems and upstream options. Protect or anonymize data in retained evidence.
 5. Run `apply` once. Require each revision to be reflected in the ledger only after its post-condition is confirmed. On any error, stop; capture the failed revision/step and current ledger, and do not blindly rerun or repair the schema. A `CONFLICT` message lists the revision, observed state, why it is unsafe and the possible repairs.
 6. Run `status` and `verify`; require repository head and `verify=ok`.
-7. Recheck representative row counts, primary keys, backfilled `upstream_system_id`/`source_asset_id`/`result_field_id` values, new fields, indexes/constraints, RBAC and menus. Confirm business rows and existing historical `UPSTREAM_DEPT` values were preserved; `0009` adds only missing platform `UPSTREAM_DB_TYPE` values, and `0012` does not duplicate or overwrite customized recommendation rows. No historical department rows may be deleted as part of this audit fix.
+7. Recheck representative row counts, primary keys, backfilled `upstream_system_id`/`source_asset_id`/`result_field_id` values, new fields, indexes/constraints, RBAC and menus. Confirm business rows and existing historical `UPSTREAM_DEPT` values were preserved; `0009` adds only missing platform `UPSTREAM_DB_TYPE` values, `0012` does not duplicate or overwrite customized search-hot-keyword rows, `0014` leaves exactly one inactive reserved RAG config category/item, and `0015` preserves a valid quota setting/count and ensures one `GLOBAL` usage row. If `p_recv_ops_mapping` exists, confirm its records are unchanged and no migration DDL/DML targets it; other unknown application tables must still make head verification fail closed. No historical department rows may be deleted as part of this audit fix.
 8. Confirm the physical metadata that the runner relies on:
    * columns: `p_asset_table` identity columns, `p_lineage_snapshot` ingestion columns, `p_indicator_item` semantic columns, `p_push_job.freq_desc` at `VARCHAR(1000)` (revision `0011`), and `p_search_hot_keyword` with its category-scoped uniqueness (revision `0012`);
    * indexes: `idx_p_asset_table_filter`, `idx_p_indicator_semantic_ref`, `idx_p_field_mapping_table_identity`, and the absence of `idx_p_field_mapping_table_uk_01`;
    * constraints: `UNIQUE(source_key, asset_type, external_id)` on `p_asset_table`, no `UNIQUE(table_name)`, the `status_code IN ('enabled','disabled')` check on `p_manual_code_table`, and `UNIQUE(keyword, category)` on `p_search_hot_keyword`;
    * logical relationships: `p_field_mapping_table.upstream_system_id` references an existing `p_upstream_system.system_pk` (no physical FK on DWS);
+   * parameter settings: one `RAG_SEARCH_CONFIG/DEFAULT` row with category and item both inactive (`N`), absent from generic parameter-list and public common-code responses; one inactive AI quota setting and one valid `GLOBAL` usage row;
    * ledger: exactly one row, equal to the repository head.
 9. Run `apply` a second time, then `status` and `verify`; require no revision changes and no duplicate data (Scenario 5).
 
@@ -72,15 +87,15 @@ Record only profile names and results here; never add credentials, JDBC URLs, ho
 
 1. Restore a disposable copy captured at a known logical `0005_rbac_persistence` state; do not manufacture it by deleting tables from a real instance. Confirm `status` reports `0005_rbac_persistence` and review the read-only plan from `0006` onward.
 2. Capture counts and stable primary keys for field mappings, assets, indicators, manual code rows, upstream systems/options, and RBAC rows. Include at least one unambiguous field mapping suitable for the `0006` backfill.
-3. Apply once. Require strict order `0006` → ... → the dynamically discovered current repository head (currently `0012`); record each result. Stop on any conflict/error.
-4. Verify head and schema. Confirm old PKs/business values remain, `upstream_system_id` backfill matches its upstream system, indicator references match unique assets/fields, old status values are normalized without row loss, and the additive `0009` / `0012` seeds appear once.
+3. Apply once. Require strict order `0006` → ... → the dynamically discovered current repository head; record each result. Stop on any conflict/error.
+4. Verify head and schema. Confirm old PKs/business values remain, `upstream_system_id` backfill matches its upstream system, old status values are normalized without row loss, and the additive `0009` / `0012` seeds appear once. Existing indicators are backfilled only when their exact unique match exists; this one-time backfill is not a permanent requirement for future indicator writes to populate nullable references.
 5. Repeat `apply`; require no duplicate codes/recommendations and unchanged business rows.
 
 ## Scenario 4 — existing revision `0009_upstream_option_contract` upgrade
 
-1. Restore a disposable copy captured at `0009`; confirm `status` reports that exact revision and plan contains only `0010`, `0011`, and `0012`.
+1. Restore a disposable copy captured at `0009`; confirm `status` reports that exact revision and review the plan through the dynamically discovered current head.
 2. Record field-mapping IDs/rows, the `freq_desc` declared type and representative multibyte values, existing search recommendations including custom/disabled rows, and code option rows.
-3. Apply; require order `0010` → `0011` → `0012`, head in the ledger, removal of the obsolete unique index, creation of the five-column identity index, `freq_desc` capacity ≥1000, and only missing search defaults added.
+3. Apply; require ordered revisions from `0010` through the current head, removal of the obsolete unique index, creation of the five-column identity index, `freq_desc` capacity ≥1000, and only missing search/configuration/quota defaults added.
 4. Compare old values, IDs, and counts. Repeat apply and require no new rows or other mutations.
 
 ## Scenario 5 — repeat apply at head
@@ -122,6 +137,14 @@ Never inject a failure into production or an instance with unbacked business dat
 - Record whether DDL was transactionally rolled back, auto-committed, or left partial; whether DML rollback/savepoints work for the tested statements; and whether a failed commit acknowledgement leaves the old or target ledger on a fresh connection. Do not infer PostgreSQL behavior.
 - Restore the disposable copy and run the normal upgrade from its known starting revision. Verify head, repeat-apply no-op, old data/PK preservation, and no duplicate seeds.
 
+## Scenario 8 — `0011` upgrade with valid unlinked indicator references
+
+1. Use an authorized disposable/restorable schema recorded at `0011_push_job_freq_desc_capacity`, with the `0008` structure and one-time migration already complete.
+2. Through the supported application path, create an indicator whose legacy table/field names resolve uniquely, while leaving `source_asset_id` and `result_field_id` NULL. Do not change column nullability or weaken the schema contract.
+3. Capture the indicator row and ledger, run read-only `plan`, then `apply` from `0011` to the exact candidate repository head.
+4. Require head `verify=ok`; confirm the row's two references remain NULL, `semantic_state` remains valid, no other row/seed is duplicated, and the ledger reaches head only after all later revisions pass.
+5. Repeat `apply` and `verify`; require no DDL/DML replay and the same nullable references. Record the repository SHA and all outputs with sensitive data redacted.
+
 ## Evidence
 
 | Scenario | Repository SHA | DWS 8.1.3 confirmed | `status` before → after | `plan` | `apply` | `verify` | Repeat | Data preservation | Result / notes |
@@ -133,3 +156,4 @@ Never inject a failure into production or an instance with unbacked business dat
 | Scenario 5 repeat apply at head | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Pending maintainer validation |
 | Scenario 6 metadata + `0007`/`0012` check queries | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Pending maintainer validation |
 | Scenario 7 unknown revision / partial revision / ledger write failure | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Pending isolated fault-injection validation |
+| Scenario 8 `0011` upgrade with valid unlinked references | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Pending maintainer validation on isolated DWS 8.1.3 |

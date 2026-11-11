@@ -22,8 +22,8 @@ export function resolveFrontendApiMode(env, command) {
   if (mode && !["remote", "mock"].includes(mode)) {
     throw new Error("VITE_API_MODE must be remote or mock");
   }
-  if (command === "build" && mode !== "remote") {
-    throw new Error("Production builds require explicit VITE_API_MODE=remote; use the dev server for Mock");
+  if (command === "build" && mode !== "remote" && !(mode === "mock" && env.DAP_STATIC_MOCK_BUILD === "1")) {
+    throw new Error("Production builds require VITE_API_MODE=remote; static Mock builds additionally require VITE_API_MODE=mock DAP_STATIC_MOCK_BUILD=1");
   }
   return mode || "mock";
 }

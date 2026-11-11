@@ -17,14 +17,21 @@ import type {
   ParamDictItemWithCategoryName,
 } from "../../api/paramDicts.ts";
 import { formatDateTime } from "../../utils/date.ts";
-import { EmptyState, RowActions, StatusBadge } from "../common/index.ts";
+import { EmptyState, RowActions, StatusBadge, WideTableScroll } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
-import { Button } from "../../ui/index.ts";
+import { Button, TablePagination } from "../../ui/index.ts";
 import { PARAM_STATUS_META } from "./constants.ts";
+import { RagSearchConfigPanel } from "./RagSearchConfigPanel.tsx";
+import { AiLlmDailyQuotaPanel } from "./AiLlmDailyQuotaPanel.tsx";
 
 export interface ParamDictPageProps {
   categories: readonly ParamDictCategoryWithCount[];
   items: readonly ParamDictItemWithCategoryName[];
+  total: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   selectedCategoryCode: string;
   query: string;
   canEdit: boolean;
@@ -37,6 +44,11 @@ export interface ParamDictPageProps {
 export function ParamDictPage({
   categories,
   items,
+  total,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
   selectedCategoryCode,
   query,
   canEdit,
@@ -68,6 +80,8 @@ export function ParamDictPage({
 
   return (
     <div className="system-page">
+      <AiLlmDailyQuotaPanel canEdit={canEdit} />
+      <RagSearchConfigPanel canEdit={canEdit} />
       <div className="page-head">
         <div>
           <div className="page-title">
@@ -77,7 +91,7 @@ export function ParamDictPage({
             当前分类 <b>{selectedCategory?.name || "未选择"}</b>
             {selectedCategory ? (
               <>
-                ，共 <b>{filteredItems.length}</b> 条字典项
+                ，共 <b>{total}</b> 条字典项
               </>
             ) : null}
             {query ? <>，匹配 “{query}”</> : null}
@@ -142,7 +156,8 @@ export function ParamDictPage({
             />
           ) : (
             <div className="tbl-wrap system-inner-table param-dict-table-wrap">
-              <table className="dt param-dict-table mobile-card-table">
+              <WideTableScroll ariaLabel="参数字典表格" className="param-dict-wide-scroll">
+                <table className="dt param-dict-table mobile-card-table">
                 <thead>
                   <tr>
                     <th className="param-col-category">参数分类</th>
@@ -220,11 +235,20 @@ export function ParamDictPage({
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </WideTableScroll>
             </div>
           )}
         </div>
       </div>
+      <TablePagination
+        ariaLabel="参数字典明细分页"
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </div>
   );
 }

@@ -282,7 +282,7 @@ POST /api/metadata/lineage/ingestions?dryRun=false
 
 兼容 alias：`POST /api/metadata/lineage:snapshots`。
 
-V1 只支持 `snapshot.mode=replace`。Snapshot 必须 self-contained：edge 的 `sourceId` / `targetId` 必须在当前 `nodes[]` 中。完全重复 node/edge 会 deterministic deduplicate；相同 identity 的不同内容返回 conflict。
+V1 只支持 `snapshot.mode=replace`。Snapshot 必须 self-contained：edge 的 `sourceId` / `targetId` 必须在当前 `nodes[]` 中。完全重复 node/edge 会 deterministic deduplicate；相同 identity 的不同内容返回 conflict。table node 可以附带可选 `schema`（也接受 `schemaName` / `schema_name`）；该值是显式 Schema 元数据，持久化到既有 `attributes_json` 并在 lineage API 中以 `schema` 返回，不需要数据库 Migration。通用 `namespace` 仍保留原语义，可能表示 source 或 processing layer，**不会自动转换成 Schema**；旧快照缺少显式 Schema 时保持未分类。
 
 ```json
 {
@@ -295,8 +295,8 @@ V1 只支持 `snapshot.mode=replace`。Snapshot 必须 self-contained：edge 的
     "mode": "replace"
   },
   "nodes": [
-    {"externalId": "table:public.orders", "type": "table", "name": "public.orders", "namespace": "public"},
-    {"externalId": "table:public.orders_daily", "type": "table", "name": "public.orders_daily", "namespace": "public"}
+    {"externalId": "table:public.orders", "type": "table", "name": "public.orders", "namespace": "public", "schema": "public"},
+    {"externalId": "table:public.orders_daily", "type": "table", "name": "public.orders_daily", "namespace": "public", "schema": "public"}
   ],
   "edges": [
     {

@@ -30,6 +30,8 @@ function clone<T>(value: T): T {
 export interface OperationLogListResult {
   items: MockOperationLogItem[];
   total: number;
+  page?: number | undefined;
+  pageSize?: number | undefined;
 }
 
 function normalizeList(payload: unknown): OperationLogListResult {
@@ -38,7 +40,14 @@ function normalizeList(payload: unknown): OperationLogListResult {
   if (record && Array.isArray(record['items'])) {
     const items = record['items'] as MockOperationLogItem[];
     const total = Number(record['total'] ?? items.length);
-    return { items, total };
+    const page = Number(record['page']);
+    const pageSize = Number(record['pageSize']);
+    return {
+      items,
+      total,
+      ...(Number.isSafeInteger(page) && page > 0 ? { page } : {}),
+      ...(Number.isSafeInteger(pageSize) && pageSize > 0 ? { pageSize } : {}),
+    };
   }
   return { items: [], total: 0 };
 }
@@ -106,7 +115,7 @@ export async function getOperationLogList(filter: OperationLogFilterParams = {})
   const page = Number(filter.page) > 0 ? Number(filter.page) : 1;
   const pageSize = Number(filter.pageSize) > 0 ? Number(filter.pageSize) : total || 1;
   const start = (page - 1) * pageSize;
-  return { items: all.slice(start, start + pageSize), total };
+  return { items: all.slice(start, start + pageSize), total, page, pageSize };
 }
 
 /**

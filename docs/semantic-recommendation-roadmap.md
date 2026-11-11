@@ -1,6 +1,27 @@
 # 智能问数底座与语义推荐路线
 
-> 状态：**Phase 1 — Semantic Contract：已实现基础能力**。本文描述产品定位和后续技术路线；Phase 1 已提供稳定资产引用、最小聚合契约和确定性校验，但不代表 AI 推荐或语义检索已经上线。任何后续能力仍必须完成数据口径与跨数据库方案评审。
+> 状态（`origin/main`，基线 `f7a8450`）：**Phase 1 Semantic Contract 已实现**；**DAP #503 提供默认关闭的 HTTP Client Adapter 与合成契约测试**；**单轮 AI 资产问答（#514 / #516 / #521 / #526 / #534 / #542）已合入 `main` 并默认关闭**。普通关键词搜索仍是主路径。
+>
+> 本节不构成在线能力声明：dap-rag-lab 的最终 HTTP 契约与真实服务联调 **NOT VERIFIED**；真实 LLM 端点的 wire 兼容性与回答质量 **NOT VERIFIED**；经业务验收的语义准确率 **未验收**。
+
+## 0. 真实边界
+
+先把边界说清楚，避免两种相反的误读：
+
+**DAP 不内置以下能力**（这是架构边界，不是能力评级）：
+
+- 不内置向量引擎、Embedding 模型或向量索引存储；DAP 进程不加载 BGE / PyTorch，也不读 LanceDB。
+- 不提供 NL2SQL、可执行语义层或问数执行引擎；AI 问答只回答“元数据在哪里、字段是什么”，不查业务数值。
+- 不自动把关键词搜索改道为模型调用；`/api/search` 永远走确定性路径。
+- 不把向量扩展写进通用初始化 DDL，也不让未启用语义能力的部署承担模型或扩展依赖。
+
+**“不内置”不等于“不支持可选集成”**。`main` 上已经落地的可选集成是：
+
+1. `GET /api/search/recommendations`：默认关闭，通过独立 HTTP Client Adapter 调用外部 RAG 服务（BGE Embedding + LanceDB 由该服务自己持有）。
+2. `POST /api/ai/ask`、`POST /api/ai/ask/progress`、`POST /api/ai/ask/stream`：默认关闭，复用同一个 RAG 适配器，再叠加一个 OpenAI-compatible LLM Provider（当前 UI 使用 `/api/ai/ask/stream`）。
+3. 两者的共同前提：DAP 始终是目录权威，远端和模型只能返回候选稳定 ID。
+
+因此“DAP 没有向量检索”与“DAP 支持可选 RAG / AI 集成”同时成立，二者不矛盾。
 
 ## 1. 产品定位
 
@@ -19,14 +40,19 @@
 - 创建/更新时执行 asset、field、归属关系、聚合、生命周期和状态的 deterministic validation。
 - 既有指标只在表名/字段名精确且唯一匹配时 backfill；歧义或无法匹配保持 NULL，不猜测。
 
-以下能力仍未实现：
+DAP #503 增加了**可选、默认关闭**的 HTTP Client Adapter 与独立推荐 UI：DAP 仅向配置的 RAG Search Service 发送带服务 Bearer Token 的 HTTP 请求；本地只执行合成协议解析与 DAP 权威目录复核，不导入 RAG Python、不加载模型/索引、不执行 CLI。推荐仅使用当前请求可见的共享目录资产；远端服务失败、超时、ID 不存在或目录不可用时 fail closed，不影响确定性关键词搜索。DAP 与 RAG 服务间的最终字段/错误码仍待 Issue #14 对齐，现有 MockTransport 测试不是在线联通证据。
 
-- 向量表、Embedding 生成与增量刷新。
-- LLM 调用、结构化输出组装和推荐结果持久化。
-- Semantic Retrieval 与离线评测集。
-- 跨 PostgreSQL、GaussDB/DWS、Community SQLite 的统一向量检索方案。
+AI 问答层（#514 起）在同一 RAG 适配器上增加了受限的 LLM 结构化选择：模型只能返回 `questionType` 与按稳定 ID 选择的 `claims`，回答文本、表名、字段名、描述与引用卡均由 DAP 用当前校验后的元数据生成。受控统计意图（#521）绕过 RAG/LLM，直接对 DAP 目录做精确 COUNT。
 
-因此不能把关键词搜索无结果直接等同于触发 LLM，也不能把 `candidate` 或现有 `suggestion` 字段表达为已认证指标。
+仍未实现或验收：
+
+- dap-rag-lab #14 最终 HTTP 契约对齐及经授权环境的真实服务联调；DAP 当前只覆盖本地合成 HTTP contract。
+- 在线索引刷新、完整快照/撤权传播契约和跨实例原子切换。
+- 真实 OpenAI-compatible / DeepSeek 端点的 wire 兼容性、回答质量与经业务标注的准确率验收。
+- 有业务标注的 golden query 离线评测，以及不同领域的召回质量验收。
+- PostgreSQL、GaussDB/DWS、Community SQLite 的统一向量存储方案；DAP 本身不读取任何 RAG 索引。
+
+因此不能把关键词搜索无结果直接等同于触发 LLM，也不能把相关资产推荐表达为已认证指标；`candidate` 或现有 `suggestion` 仍不等于已认证口径。
 
 ## 3. 候选推荐链路
 
@@ -66,13 +92,30 @@
 3. 历史数据的唯一精确匹配 migration backfill。
 4. 可复用的 deterministic validator 与 API/维护页适配。
 
-### Next — Phase 2 Deterministic Retrieval + Offline Evaluation
+### Delivered — DAP #503 Optional Related-Asset Retrieval Adapter
 
-1. 建立 golden semantic query dataset。
-2. 基于 keyword / aliases / roots / fields / indicators 做确定性召回。
-3. 输出 Recall@K / Precision@K 等 baseline。
-4. 在没有 Embedding 的情况下评估真实召回质量。
-5. 只有离线评测数据充分后，才决定是否需要 Embedding、Vector DB 或后续 LLM 组装。
+1. 保持现有确定性 `/api/search` 与一个普通用户搜索框。
+2. 增加独立、默认关闭的 `/api/search/recommendations` 契约和业务展示分组。
+3. 仅通过独立 HTTP Client Adapter 调用预期的 RAG Search API；DAP 不依赖 `dap-rag-lab` 包，也不强制安装 LanceDB、PyTorch 或 BGE。
+4. 对每次 HTTP 返回按公共目录 profile 重查 ID 和父子关系，只用 DAP 当前投影重建展示内容；不信任远端名称、描述、URL、证据或分数。
+5. 管理配置有 RBAC 与审计；服务 Token 来自后端部署 Secret，不发给浏览器。管理员可显式请求 health/readiness 诊断；普通搜索失败不阻塞。
+6. 与 dap-rag-lab #14 的最终契约及真实联调仍是待完成前置条件，不将 synthetic tests 描述成真实联通。
+
+### Delivered — Single-turn AI Asset Q&A (#514 / #516 / #521 / #526 / #534 / #542)
+
+1. `GET /api/ai/status` 只暴露浏览器安全布尔开关；`AI_ASK_ENABLED` 默认 `false`，且要求 RAG 已配置。
+2. `POST /api/ai/ask`（JSON）、`POST /api/ai/ask/progress`（SSE 阶段）、`POST /api/ai/ask/stream`（当前 UI 使用的 SSE 执行流）共享同一服务；SSE 只传真实阶段与完整最终结果，不逐 token 输出。
+3. 模型只能返回结构化候选 ID 与直接/相关关系；所有展示文本由 DAP 元数据组装，引用与候选一一对应。
+4. 受控统计意图（表数/字段数）走 DAP 目录精确 COUNT，不复用 RAG 候选计数，也不标记为模型生成成功。
+5. Mock 演示（`VITE_API_MODE=mock`）使用独立前端适配器；Remote 零回退，Remote Bundle 由 CI 校验不含 Mock AI 语料。
+6. 真实 RAG 服务与真实 LLM 端点仍未联调；不得把 Mock / synthetic 测试描述为生产可用。
+
+### Next — Offline Evaluation + Refresh Contract
+
+1. 建立含授权数据边界的 golden query set，覆盖同义词、歧义、无匹配与撤权。
+2. 在获批的非生产环境报告 Recall@K / Precision@K 和当前索引完整性；不可将实验/内网记录当作本仓库测试结果。
+3. 设计完整目录快照、变更检测、撤权和原子更新契约后，再决定是否引入在线刷新或持久化向量服务。
+4. 如未来需要 LLM/智能解答，另立范围；必须将答案来源限制为经过权威校验的候选并经人工治理评审。
 
 ## 7. 验收前置条件
 
@@ -91,3 +134,9 @@
 - 未认证候选不会被表达为正式指标。
 - 模型不可用时关键词搜索无回归。
 - 有离线评测集覆盖同义词、歧义词、无匹配、复合聚合和恶意输入。
+
+### 当前仍未满足的前置条件
+
+- 外部 RAG 服务的最终 HTTP 契约与真实联调证据（当前仅合成契约测试）。
+- 外部 LLM 端点的真实 wire 兼容性、超时行为与回答质量证据。
+- 跨 PostgreSQL / GaussDB-DWS / SQLite 的索引与撤权传播契约。

@@ -151,9 +151,15 @@ export function buildFieldMappingRequestFilters(
   route: FieldMappingRoute | null | undefined,
 ): Partial<FieldMappingFilters> {
   const { srcSystem: _legacySourceSystemName, ...rest } = filters || {};
+  const routeOwnsSourceSystem = Boolean(route && (
+    Object.prototype.hasOwnProperty.call(route, "sourceSystemId")
+    || Object.prototype.hasOwnProperty.call(route, "upstreamSystemId")
+  ));
   return {
     ...rest,
-    sourceSystemId: getRouteSourceSystemId(route) || rest.sourceSystemId || "",
+    sourceSystemId: routeOwnsSourceSystem
+      ? getRouteSourceSystemId(route)
+      : rest.sourceSystemId || "",
   };
 }
 

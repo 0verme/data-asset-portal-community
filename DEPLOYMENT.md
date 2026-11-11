@@ -149,7 +149,88 @@ Public Catalog 的“可搜索字段”和“可展示字段”采用同一 prof
 
 匿名批量导出默认关闭（`PUBLIC_CATALOG_EXPORT_ENABLED=false`）。开启后手工码值表与字段映射 CSV endpoint 均在后端执行该开关，并复用页面相同的 public projection；`disabled` profile 仍禁止匿名业务读取与导出。永久敏感字段（password、token、secret、credential、数据库账号、内部路径/诊断等）不会因 profile 或导出开关而公开。受保护的 `admin-detail`、写操作、系统管理和操作日志边界不随该配置放宽。
 
-### 3.5 API authentication boundary
+### 3.5 Optional RAG Search Service (DAP HTTP client)
+
+RAG 相关资产推荐**默认关闭**。DAP 仅作为受认证的服务端 HTTP Client，不导入 `dap-rag-lab`，不安装/加载 BGE 或 PyTorch，不读取 LanceDB，也不启动 RAG CLI。DAP 不会自动部署或修改 RAG 服务。
+
+匿名搜索继续受 `PUBLIC_CATALOG_PROFILE` 约束：`internal` 和 `strict` 按各自现有公共目录投影允许匿名查询；`disabled` 继续由现有公共目录路由拒绝匿名访问。本轮不新增游客共享目录审批、用户级 ACL，也不放宽系统管理、写操作或凭据管理边界。RAG 服务若有其既有的全局索引准入启动保护，仍由部署方按 RAG 服务契约配置；它不是每位访客的登录或审批前置。
+
+显式启用前，在受保护的系统管理配置页设置服务 URL，并通过部署 Secret 向 DAP 后端注入 `RAG_SEARCH_SERVICE_TOKEN`。Token 不写入参数表、不传给浏览器，也不由配置/诊断接口返回。不要将真实值写入 Git、日志、命令历史或部署示例。没有后端 Secret 时，系统拒绝启用。
+
+- 同机部署使用 loopback 地址，例如 `http://127.0.0.1:<port>`；RAG 服务仍须校验 Bearer Token。
+- 跨机部署使用有效 TLS 的 `https://<RAG_SERVICE_HOST>`；禁止远端明文 HTTP、URL userinfo、query string 和 URL 内嵌凭据。
+- HTTP Search Service v1 请求为 `POST /api/v1/search`，请求体仅包含 `query`、`topK`。检索策略由 RAG 服务端 `DAP_RAG_SEARCH_MODE` 决定；HTTP v1 不支持按请求切换策略。DAP 参数表中为兼容保留的 `strategy` 不会改变实际检索行为，管理界面已明确说明。
+- 响应解析包括 `status`、`indexGeneration`、`retrieval`、`results`，以及每个结果的稳定 ID、检索渠道、评分和结构化 evidence。远端名称、描述、评分和 evidence 不作为 DAP 前端权威数据；DAP 依据 `assetId`/`fieldId` 回查当前资产，并按当前 profile 投影。目录读取失败、未知/失效 ID、父表不匹配均不展示推荐。
+- 管理诊断仅由受保护配置页加载或管理员主动触发时访问 `/healthz` 和 `/readyz`；普通搜索不请求诊断。RAG 调用有界超时，超时、鉴权失败、索引未就绪或服务异常都只降级相关资产推荐，不阻塞普通关键词搜索。
+
+DAP 侧的 RAG 配置使用既有参数字典存储，不新增数据库表。本次**不操作内网数据库**；当前内网部署仍须先完成并验证 migration `0012`–`0014`（包括 RAG 配置 seed）后，才能持久化/启用该功能。迁移未完成时保持 RAG 关闭，不要通过跳过迁移或改动内网数据库来绕过前置条件。自动化 HTTP Mock 测试不等于真实服务联调；真实内网 HTTP、BGE/索引 readiness 与部署验收需另行执行并如实记录。本次不修改或部署 `dap-rag-lab`。
+
+### 3.6 Optional single-turn AI asset Q&A
+
+AI asset Q&A is an opt-in metadata-only capability. It does not change the
+ordinary search API, execute SQL, access business values, persist conversation
+history, or load RAG indexes/models inside DAP. Keep it disabled until the
+independent RAG HTTP Search Service v1 and the target LLM Provider have been
+verified in an isolated environment.
+
+- Leave `AI_ASK_ENABLED` unset or `false` by default. The browser receives only
+  the non-secret `GET /api/ai/status` boolean; incomplete Provider/RAG
+  configuration fails closed and hides the AI action.
+- For an authorized isolated test deployment, inject `AI_LLM_API_KEY` from the
+  deployment Secret store. Set `AI_LLM_BASE_URL`, `AI_LLM_MODEL`, and bounded
+  timeout/token/concurrency settings through protected backend configuration.
+  Never put a real key or private endpoint into Git, the DAP parameter table,
+  frontend build variables, shell history, logs, or screenshots.
+- DAP calls only its server-side OpenAI-compatible adapter. The browser calls
+  DAP `/api/ai/ask/stream` (the transport used by the current search page);
+  `/api/ai/ask/progress` and `/api/ai/ask` remain available as compatibility
+  endpoints. The browser never calls the LLM provider directly. Configure RAG
+  independently using the existing administrator RAG configuration and
+  `RAG_SEARCH_SERVICE_TOKEN` Secret.
+- The search page exposes two result tabs:「搜索结果」(deterministic
+  `GET /api/search`) and「AI 问答」(the explicit AI action). Ordinary search never
+  invokes the model; zero-result guidance to ask the AI only appears when
+  `GET /api/ai/status` reports `enabled=true`.
+- SSE carries real backend stages plus one complete validated answer. Model
+  tokens are never streamed, and no conversation history is persisted.
+- When the optional feature is enabled, defaults apply only to unset/blank
+  environment variables: `AI_LLM_MAX_TOKENS=3072`,
+  `AI_LLM_TIMEOUT_MS=30000` per Provider HTTP call,
+  `AI_LLM_MAX_CONCURRENCY=2`, `AI_ASK_MAX_CONCURRENCY=2`,
+  `AI_ASK_MAX_QUEUE=4`, and `AI_ASK_QUEUE_WAIT_MS=5000`.
+  `AI_LLM_DISABLE_THINKING` remains opt-in (`false` by default); DAP does not
+  depend on a Provider accepting an unverified Thinking-disable parameter.
+- The 105-second multi-stage deadline and 115-second default worker deadline
+  bound cumulative model/RAG/verification work. The browser AI request timeout
+  is at least 125 seconds to include admission wait and worker cleanup. If a
+  deployment raises `AI_ASK_WORKER_TIMEOUT_SECONDS`, configure frontend
+  `VITE_API_TIMEOUT` to a sufficiently larger value as well. Keep proxies
+  configured to allow the SSE response/heartbeats for the chosen deadline.
+- The shared daily limit is 50 AI questions (not 50 model HTTP calls): an ask
+  that starts one or more real LLM HTTP calls consumes at most one global
+  slot; database-only statistics and requests that never start a model call
+  consume none. All users and app instances share it; there is no user/IP
+  counter. The existing `AI_LLM_DAILY_LIMIT` parameter code and table remain;
+  no schema migration is required for the admin label change.
+- Before the first Beijing midnight after upgrading, the existing
+  `p_ai_llm_daily_usage.used_count` still reflects the old per-HTTP-call
+  accounting. The new code conservatively treats that value as used question
+  slots for the remainder of that business day, then naturally resets it at
+  midnight. Do not manually zero the row during rollout.
+- Verify current GitHub `dap-rag-lab` HTTP Search Service status before enabling;
+  external issue #14 is not evidence of a completed/live deployment. DAP
+  Client Mock tests do not prove a real HTTP service exists.
+- Search remains usable when AI is disabled or fails. To disable immediately,
+  set `AI_ASK_ENABLED=false` (or remove the LLM Secret/configuration) and restart
+  the backend; confirm `/api/ai/status` reports `enabled=false`. Code rollback
+  requires no schema rollback or data cleanup.
+
+Detailed request/response states, synthetic tests, inter-service verification,
+known unverified work, and rollback notes are in
+[`docs/ai-ask-mvp.md`](./docs/ai-ask-mvp.md). No real RAG, DeepSeek, GaussDB,
+production database, or production service access is part of this change.
+
+### 3.7 API authentication boundary
 
 Community Edition 使用 `Public Catalog + Authenticated Management`：普通业务目录 GET 可以匿名浏览并按规则脱敏；写操作、管理 API、操作日志、Metadata ingestion、上/下游 `admin-detail`、用户/角色/参数和连接/凭据字段仍由后端 authentication 与 permission-based RBAC 保护。不要用 Nginx、隐藏菜单或关闭 OpenAPI 代替后端授权。完整 route inventory 见 [`docs/rbac/authenticated-read-model.md`](./docs/rbac/authenticated-read-model.md)。
 
@@ -255,7 +336,7 @@ Community Demo 初始化过程中会自动创建演示管理员：
 - 不应作为生产环境凭据
 - 正式部署请使用 `backend/scripts/create_admin.py` 交互创建管理员；生产 bootstrap 不提供默认密码
 
-如果启用了 persistent lineage，先设置 `LINEAGE_DB_PROFILE`，再按 [`血缘快照采集与发布指南`](./docs/lineage_bulk_import_guide.md) 执行 `collect_lineage_snapshot.py --dry-run` 和正式发布；采集失败应保留原 ACTIVE 快照。
+血缘 API 与其他 DAP 元数据模块使用同一个 `ASSET_DB_PROFILE`，不需要单独设置 `LINEAGE_DB_PROFILE` 或 `LINEAGE_STORAGE_MODE`。先确认该参数库的血缘三表和有效快照；如需首次采集，请按 [`血缘快照采集与发布指南`](./docs/lineage_bulk_import_guide.md) 使用同一个 Profile 执行 `collect_lineage_snapshot.py --dry-run`，确认后再单独授权正式发布。无 ACTIVE 快照会显示空状态，采集失败应保留原 ACTIVE 快照。
 
 ### 5.2 Existing database
 
@@ -416,6 +497,46 @@ if (-not (Test-Path "$BackupDir\index.html")) { throw "备份失败，停止部�
 5. 验收失败时按原服务管理方式停用新版本、恢复 `$BackupDir` 的完整静态目录并重新启动/切换，**再次验证** SPA、JS/CSS 和 `/api`。保留构建与访问日志以便排障。
 
 **判定原则：HTTP 200 ≠ 新版已上线。** 必须同时有构建成功的退出码、可追溯的源码版本、新旧产物差异、在线 JS/CSS 与 API 代理验收结果。以上是操作模板，不宣称这些 PowerShell 命令已在本次 PR 对真实内网机器执行。
+
+### 7.4 Linux Python 静态文件与 API 代理入口（Issue #538）
+
+仓库正式维护 [`frontend/serve-dist-linux.py`](./frontend/serve-dist-linux.py)：使用 Python 标准库托管已构建的 `frontend/dist/`，并将同源 API 请求代理到 FastAPI。它是可选的 Linux 静态文件/API 入口，不替换后端、API 契约或现有 Nginx 部署；使用 Nginx 时仍优先按本手册既有 Nginx 配置运行。
+
+从仓库根目录构建前端后，可在**启动进程时**配置入口。下例绑定 loopback，适用于本机验收或同机可信反向代理；需要让局域网客户端直连时，应显式选择受控监听地址、配置防火墙，并由可信 HTTPS 入口承担 TLS，不能把此脚本当作身份认证层：
+
+```bash
+VITE_API_MODE=remote VITE_API_BASE_URL=/api npm --prefix frontend run build
+DAP_BACKEND_URL=http://127.0.0.1:15099 \
+DAP_HOST=127.0.0.1 \
+DAP_PORT=15198 \
+python3 frontend/serve-dist-linux.py
+```
+
+启动后可在服务机本地检查 `http://127.0.0.1:15198/`；绑定 loopback 时，远端用户需经同机反向代理访问。
+
+环境变量契约：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `DAP_FRONTEND_DIST` | `dist/`（相对脚本所在目录） | 静态构建目录。未设置或为空时默认路径不受启动 cwd 影响；显式相对路径按进程启动 cwd 解析。 |
+| `DAP_BACKEND_URL` | `http://127.0.0.1:15099` | 后端 HTTP(S) origin；不接受 URL 凭据、路径、query 或 fragment。按现场后端监听配置显式设置。 |
+| `DAP_HOST` | `0.0.0.0` | 监听地址。建议只让可信入口访问；经 Nginx 暴露时可绑定 loopback。 |
+| `DAP_PORT` | `15198` | 监听 TCP 端口，必须为 1–65535。 |
+
+本代理对 `text/event-stream` 使用 HTTP/1.1 chunked 转发并逐段 flush；若前面还有 Nginx/负载均衡器，应单独确认该层也关闭 SSE 响应缓冲。代理不提供 TLS、身份认证或授权，不应被当作后端安全边界；需要登录/session 的正式环境应继续使用 HTTPS 与受控入口。它会拒绝 chunked 请求体（避免误读），保留 JSON/API 状态与 Cookie 透传，并忽略客户端伪造的 forwarded headers。
+
+响应语义（PR #541 修复后）：
+
+| 场景 | 行为 |
+| --- | --- |
+| SSE `text/event-stream` | chunked 逐段转发并 flush；事件一旦可读即转发，不等待上游后续写入，也不受上游是否关闭连接影响；`Cache-Control` 固定为 `no-cache, no-transform` 并附加 `X-Accel-Buffering: no` |
+| 普通 API | 透传上游状态码、`Cache-Control`（含 `no-store`）、`Set-Cookie`、`Content-Type`/`ETag`/`Vary` 等响应头；上游为 chunked 且无 `Content-Length` 时，按实际长度重新封装 |
+| 静态文件与目录索引 | 目录请求会先解析出实际要返回的索引文件，再与普通文件走同一套 realpath containment 校验；指向 dist 之外的符号链接一律拒绝；支持 `If-Modified-Since` 返回 304，`GET`/`HEAD` 的 `Content-Length` 一致 |
+| 客户端断连 | 由独立看门狗线程检测下游断开并取消上游读取，避免空闲 SSE 连接长期占用后端 |
+
+以上行为已由 `frontend/tests/test_serve_dist_linux.py` 的真实 Socket 集成测试覆盖（含事件到达时间断言），但**测试环境通过不等于内网部署成功**。内网仍需逐项确认：真实反代/网关是否缓冲 SSE、后端 `no-store` 接口在真实浏览器中的缓存表现、真实 dist 目录是否存在越界符号链接、以及升级回滚路径。
+
+**升级既有 Linux 部署时不得盲目覆盖运行文件。** 仓库中的脚本是后续正式维护的版本，但不宣称与既有内网文件逐字相同。操作人员应先记录现有服务命令、owner/mode、环境变量及 backend 监听配置，在服务目录外备份旧脚本；对比本仓库版本与现场版本，保留现场明确需要的配置，通过 `DAP_*` 环境变量迁移配置；先在隔离/预发布实例验证静态资源、JSON API、Cookie、SSE 中间事件和回滚路径，再由维护者按既有服务管理方式人工切换。不要把现场真实地址、凭据、绝对路径写入仓库，也不要在本 PR 中部署或重启。
 
 ## 8. systemd
 

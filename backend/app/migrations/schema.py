@@ -14,6 +14,9 @@ from ..db.write_target import resolve_write_target
 
 BASELINE_REVISION = "0001_baseline"
 SUPPORTED_DIALECTS = ("sqlite", "postgresql", "mysql", "dws")
+# This nonstandard GaussDB/DWS history table is outside the canonical baseline.
+# Preserve it without treating its presence as application-schema drift.
+DWS_PRESERVED_EXTERNAL_TABLES = frozenset({"p_recv_ops_mapping"})
 
 
 class EmptyRevisionLedgerError(RuntimeError):
@@ -336,8 +339,13 @@ def _default_token(rest: str) -> str | None:
     return rest[index:end]
 
 
-def normalize_default(value: Any, type_name: str | None = None) -> str | None:
-    """Normalize only the default forms used by the Community baseline."""
+def normalize_default(
+    value: Any,
+    type_name: str | None = None,
+    *,
+    db_type: str | None = None,
+) -> str | None:
+    """Normalize only known-equivalent default forms for the target dialect."""
     if value is None:
         return None
     expression = str(value).strip()
@@ -349,11 +357,29 @@ def normalize_default(value: Any, type_name: str | None = None) -> str | None:
             break
         expression = expression[1:-1].strip()
     expression = re.sub(r"::[A-Za-z0-9_ .\[\]]+$", "", expression).strip()
+    while expression.startswith("(") and expression.endswith(")"):
+        try:
+            if _find_matching_parenthesis(expression, 0) != len(expression) - 1:
+                break
+        except ValueError:
+            break
+        expression = expression[1:-1].strip()
     upper = expression.upper()
     if upper == "NULL":
         return None
     if upper in {"CURRENT_TIMESTAMP", "CURRENT_TIMESTAMP()", "NOW()", "CURRENT_DATE", "CURRENT_DATE()"}:
         return "CURRENT_TIMESTAMP" if upper.startswith(("CURRENT_TIMESTAMP", "NOW")) else "CURRENT_DATE"
+    if (
+        db_type == "gaussdb"
+        and type_name is not None
+        and type_name.upper().startswith("TIMESTAMP")
+        and re.fullmatch(r"PG_SYSTIMESTAMP\s*\(\s*\)", upper)
+    ):
+        # GaussDB 8.1.3 exposes this equivalent timestamp default through its
+        # catalog even when the canonical DDL uses CURRENT_TIMESTAMP. Keep the
+        # exception dialect- and type-specific; other defaults still compare
+        # strictly.
+        return "CURRENT_TIMESTAMP"
     if len(expression) >= 2 and expression[0] == expression[-1] and expression[0] in "'\"":
         expression = expression[1:-1].replace(expression[0] * 2, expression[0])
     elif type_name and type_name.startswith(("CHAR", "VARCHAR", "TEXT")):
@@ -395,7 +421,7 @@ def _normalize_reflected_column_default(
         and _is_sequence_default(value)
     ):
         return None
-    return normalize_default(value, type_name)
+    return normalize_default(value, type_name, db_type=db_type)
 
 
 def _foreign_key_from_text(text: str) -> ForeignKeySpec | None:
@@ -1617,10 +1643,20 @@ def reflect_schema(connection, config: dict, expected: SchemaModel | None = None
     return _reflect_information_schema(connection, config, expected)
 
 
-def compare_schema(expected: SchemaModel, actual: SchemaModel) -> list[SchemaMismatch]:
+def compare_schema(
+    expected: SchemaModel,
+    actual: SchemaModel,
+    *,
+    ignored_additional_tables: frozenset[str] = frozenset(),
+) -> list[SchemaMismatch]:
+    """Compare canonical objects, optionally preserving known external tables."""
     mismatches: list[SchemaMismatch] = []
     expected_names = set(expected.tables)
-    actual_app_names = {name for name in actual.tables if name.startswith("p_")}
+    actual_app_names = {
+        name
+        for name in actual.tables
+        if name.startswith("p_") and name not in ignored_additional_tables
+    }
     for table_name in sorted(expected_names - set(actual.tables)):
         mismatches.append(SchemaMismatch(table_name, "table", table_name, "present", "missing", "missing table"))
     for table_name in sorted(actual_app_names - expected_names):
@@ -1675,7 +1711,13 @@ def verify_schema(connection, config: dict, dialect: str, root: Path = SCHEMA_RO
     """Verify physical schema shape without making a claim about its ledger."""
     expected = baseline_schema(dialect, root)
     actual = reflect_schema(connection, config, expected)
-    mismatches = compare_schema(expected, actual)
+    mismatches = compare_schema(
+        expected,
+        actual,
+        ignored_additional_tables=(
+            DWS_PRESERVED_EXTERNAL_TABLES if dialect == "dws" else frozenset()
+        ),
+    )
     if mismatches:
         raise RuntimeError(_format_schema_mismatches(mismatches))
 

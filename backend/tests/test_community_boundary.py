@@ -32,7 +32,6 @@ class RepositoryOpenBoundaryTests(unittest.TestCase):
                 "ASSET_DB_DATABASE": str(self.database),
                 "APP_ENV": "production",
                 "APP_SECRET_KEY": "repository-open-boundary-test-only",
-                "LINEAGE_DB_PROFILE": "community_sqlite",
             },
             clear=False,
         )

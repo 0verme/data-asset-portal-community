@@ -69,6 +69,10 @@ export interface ReportQueryParams {
   status?: string | undefined;
   ownerDept?: string | undefined;
   keyword?: string | undefined;
+  page?: number | undefined;
+  pageSize?: number | undefined;
+  sortKey?: string | undefined;
+  sortDirection?: string | undefined;
   [key: string]: unknown;
 }
 
@@ -98,6 +102,78 @@ export async function getReportList(params: ReportQueryParams = {}): Promise<Moc
     return normalizeCollection(payload);
   }
   return filterReports(readStore(), params);
+}
+
+export interface ReportPageResult {
+  items: MockReportItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  facets: { type: Record<string, number>; status: Record<string, number>; ownerDept: Record<string, number> };
+  stats: { reportCount: number };
+}
+
+export function normalizeReportPage(payload: unknown): ReportPageResult {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('报表列表接口返回格式无效');
+  }
+  const record = payload as Record<string, unknown>;
+  const facets = record['facets'];
+  const stats = record['stats'];
+  const validCounts = (value: unknown): value is Record<string, number> =>
+    Boolean(value && typeof value === 'object' && !Array.isArray(value) &&
+      Object.values(value as Record<string, unknown>).every((count) => Number.isSafeInteger(count) && Number(count) >= 0));
+  if (!Array.isArray(record['items']) || !Number.isSafeInteger(record['total']) || Number(record['total']) < 0 ||
+      !Number.isSafeInteger(record['page']) || Number(record['page']) < 1 ||
+      !Number.isSafeInteger(record['pageSize']) || Number(record['pageSize']) < 1 ||
+      !facets || typeof facets !== 'object' || !validCounts((facets as Record<string, unknown>)['type']) ||
+      !validCounts((facets as Record<string, unknown>)['status']) ||
+      !validCounts((facets as Record<string, unknown>)['ownerDept']) ||
+      !stats || typeof stats !== 'object' || !Number.isSafeInteger((stats as Record<string, unknown>)['reportCount']) ||
+      Number((stats as Record<string, unknown>)['reportCount']) < 0) {
+    throw new Error('报表列表接口返回格式无效');
+  }
+  const items = normalizeCollection({ items: record['items'] });
+  return {
+    items,
+    total: Number(record['total']),
+    page: Number(record['page']),
+    pageSize: Number(record['pageSize']),
+    facets: facets as ReportPageResult['facets'],
+    stats: stats as ReportPageResult['stats'],
+  };
+}
+
+/** Explicit server-page API. The legacy list remains unpaged for full consumers. */
+export async function getReportPage(params: ReportQueryParams = {}): Promise<ReportPageResult> {
+  const page = Math.max(1, Number.isSafeInteger(params.page) ? Number(params.page) : 1);
+  const pageSize = Math.max(1, Number.isSafeInteger(params.pageSize) ? Number(params.pageSize) : 20);
+  if (API_MODE === 'remote') {
+    const payload = await requestRemote('/reports', { params: { ...params, page, pageSize } });
+    return normalizeReportPage(payload);
+  }
+  const all = readStore();
+  const items = filterReports(all, params);
+  const columns: Record<string, keyof MockReportItem> = {
+    code: 'code', name: 'name', type: 'type', status: 'status', ownerDept: 'ownerDept', updatedAt: 'updatedAt',
+  };
+  const key = columns[String(params.sortKey || '')] || 'code';
+  const direction = params.sortDirection === 'desc' ? -1 : 1;
+  items.sort((left, right) => String(left[key] || '').localeCompare(String(right[key] || '')) * direction || left.code.localeCompare(right.code));
+  const facets: ReportPageResult['facets'] = { type: {}, status: {}, ownerDept: {} };
+  for (const item of all) {
+    for (const [field, value] of [['type', item.type], ['status', item.status], ['ownerDept', item.ownerDept]] as const) {
+      if (value) facets[field][value] = (facets[field][value] || 0) + 1;
+    }
+  }
+  return {
+    items: items.slice((page - 1) * pageSize, page * pageSize),
+    total: items.length,
+    page,
+    pageSize,
+    facets,
+    stats: { reportCount: all.length },
+  };
 }
 
 export async function getReportDetail(reportCode: string): Promise<MockReportItem> {

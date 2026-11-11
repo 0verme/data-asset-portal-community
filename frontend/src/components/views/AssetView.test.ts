@@ -15,8 +15,8 @@ test("asset read controls use DAP adapters and preserve pressed-button semantics
   assert.match(view, /<AdapterLoadingState[\s\S]*?label="正在加载资产元数据"/);
   assert.match(view, /<AdapterErrorState[\s\S]*?onRetry=\{loadHomeData\}/);
   assert.match(view, /<AssetViewModeSwitcher value=\{layout as ViewMode\} onChange=\{setLayout\} \/>/);
-  assert.match(view, /<Button[\s\S]*?disabled=\{page <= 1\}/);
-  assert.match(view, /<Button[\s\S]*?disabled=\{page >= pageCount\}/);
+  assert.match(view, /<TablePagination[\s\S]*?page=\{page\}[\s\S]*?pageSize=\{pageSize\}[\s\S]*?onPageChange=\{setPage\}/);
+  assert.match(view, /onPageSizeChange=\{\(nextPageSize\) =>/);
 
   assert.match(switcher, /import \{ Button \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.match(switcher, /role="group" aria-label="视图切换"/);

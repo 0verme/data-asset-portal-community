@@ -1,4 +1,4 @@
-"""GaussDB/DWS JDBC revision adapters for revisions ``0002``-``0010``.
+"""GaussDB/DWS JDBC revision adapters for revisions ``0002``-``0015``.
 
 The DWS provider has no SQLAlchemy/Alembic online engine, so every revision
 that can be reached by an existing GaussDB/DWS deployment needs an explicit
@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date
 from enum import Enum
 from pathlib import Path
 from typing import Any, Sequence
@@ -41,6 +42,8 @@ from .revision_logic import (
     plan_upstream_backfill,
 )
 from .search_hot_keyword_seed import plan_search_hot_keyword_seed
+from .rag_search_config_seed import plan_rag_search_config_seed
+from .ai_llm_quota_seed import plan_ai_llm_quota_seed
 from .schema import (
     SCHEMA_ROOT,
     ColumnSpec,
@@ -203,6 +206,17 @@ class DwsRevisionAdapter:
 
     def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
         raise NotImplementedError
+
+    def inspect_persistent_postcondition(
+        self, ctx: DwsRevisionContext
+    ) -> RevisionInspection:
+        """Inspect invariants that must remain true after application writes.
+
+        Most revisions have the same migration and persistent postconditions.
+        A revision with a one-time backfill may override this to exclude
+        transient data transformations while retaining permanent schema checks.
+        """
+        return self.inspect(ctx)
 
     def apply(self, ctx: DwsRevisionContext) -> None:
         raise NotImplementedError
@@ -1020,7 +1034,7 @@ class IndicatorSemanticContract(DwsRevisionAdapter):
         ]
         return plan_indicator_reference_backfill(indicators, assets, fields)
 
-    def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
+    def _inspect_structure(self, ctx: DwsRevisionContext) -> RevisionInspection:
         table = ctx.table(self.table)
         if table is None:
             return RevisionInspection(
@@ -1062,15 +1076,48 @@ class IndicatorSemanticContract(DwsRevisionAdapter):
                 details=(
                     f"expected non-unique index {self.reference_index}{self.reference_columns!r}",
                 ),
-                warnings=(),
             )
+        return RevisionInspection(
+            self.revision,
+            RevisionState.APPLIED,
+            "indicator semantic schema contract already exists",
+        )
 
-        pending_updates = self._data_plan(ctx)
-        null_states = ctx.fetchall(
+    def _null_semantic_state_count(self, ctx: DwsRevisionContext) -> int:
+        rows = ctx.fetchall(
             f"SELECT COUNT(*) FROM {ctx.qualified(self.table)} "
             "WHERE semantic_state IS NULL"
         )
-        null_count = int(null_states[0][0]) if null_states else 0
+        return int(rows[0][0]) if rows else 0
+
+    def inspect_persistent_postcondition(
+        self, ctx: DwsRevisionContext
+    ) -> RevisionInspection:
+        """Keep permanent schema/data invariants separate from the 0008 backfill.
+
+        Reference columns are nullable by contract. Their one-time exact-match
+        backfill is not a permanent invariant because application writes may
+        intentionally leave either reference NULL after 0008 has completed.
+        """
+        structure = self._inspect_structure(ctx)
+        if structure.state is not RevisionState.APPLIED:
+            return structure
+        null_states = self._null_semantic_state_count(ctx)
+        if null_states:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.NOT_APPLIED,
+                "indicator semantic_state contains NULL values",
+                details=(f"rows with NULL semantic_state: {null_states}",),
+            )
+        return structure
+
+    def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
+        structure = self._inspect_structure(ctx)
+        if structure.state is not RevisionState.APPLIED:
+            return structure
+        pending_updates = self._data_plan(ctx)
+        null_count = self._null_semantic_state_count(ctx)
         if pending_updates or null_count:
             return RevisionInspection(
                 self.revision,
@@ -1084,7 +1131,7 @@ class IndicatorSemanticContract(DwsRevisionAdapter):
         return RevisionInspection(
             self.revision,
             RevisionState.APPLIED,
-            "indicator semantic columns, reference index and backfill already exist",
+            "indicator semantic schema and one-time backfill are complete",
         )
 
     def apply(self, ctx: DwsRevisionContext) -> None:
@@ -1588,6 +1635,237 @@ class FieldMappingFieldFilterIndex(DwsRevisionAdapter):
 
 
 # ---------------------------------------------------------------------------
+# 0014_rag_search_config
+# ---------------------------------------------------------------------------
+
+
+class RagSearchConfigSeed(DwsRevisionAdapter):
+    revision = "0014_rag_search_config"
+
+    def _rows(self, ctx: DwsRevisionContext):
+        if not (ctx.has_table("p_code_category") and ctx.has_table("p_code_item")):
+            return None, None
+        category_rows = ctx.fetchall(
+            f"SELECT category_id, category_code, category_name, is_active "
+            f"FROM {ctx.qualified('p_code_category')}"
+        )
+        item_rows = ctx.fetchall(
+            f"SELECT item_id, category_code, item_code, item_name, item_value, ext_json, is_active "
+            f"FROM {ctx.qualified('p_code_item')}"
+        )
+        return (
+            [dict(zip(("category_id", "category_code", "category_name", "is_active"), row)) for row in category_rows],
+            [dict(zip(("item_id", "category_code", "item_code", "item_name", "item_value", "ext_json", "is_active"), row)) for row in item_rows],
+        )
+
+    def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
+        categories, items = self._rows(ctx)
+        if categories is None or items is None:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                "parameter dictionary tables are required for the reserved RAG config seed",
+            )
+        plan = plan_rag_search_config_seed(categories, items)
+        if not plan.safe:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                "reserved RAG configuration storage conflicts with the seed contract",
+                details=(plan.error or "unknown seed conflict",),
+            )
+        if plan.categories or plan.items:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.NOT_APPLIED,
+                "reserved inactive RAG configuration rows are missing",
+                details=(f"missing categories={len(plan.categories)}, items={len(plan.items)}",),
+            )
+        return RevisionInspection(
+            self.revision,
+            RevisionState.APPLIED,
+            "reserved RAG configuration rows exist and remain inactive",
+        )
+
+    def apply(self, ctx: DwsRevisionContext) -> None:
+        categories, items = self._rows(ctx)
+        if categories is None or items is None:
+            raise DwsMigrationError(
+                self.revision,
+                observed="parameter dictionary tables are missing",
+                reason="the RAG settings are stored in the existing parameter dictionary schema",
+            )
+        plan = plan_rag_search_config_seed(categories, items)
+        if not plan.safe:
+            raise DwsMigrationError(
+                self.revision,
+                observed="reserved RAG configuration seed conflict",
+                reason=plan.error or "seed state is ambiguous",
+            )
+        for table, rows in (("p_code_category", plan.categories), ("p_code_item", plan.items)):
+            for values in rows:
+                columns = tuple(values)
+                placeholders = ", ".join("?" for _ in columns)
+                ctx.execute(
+                    f"INSERT INTO {ctx.qualified(table)} ({', '.join(columns)}) "
+                    f"VALUES ({placeholders})",
+                    tuple(values[column] for column in columns),
+                )
+
+
+# ---------------------------------------------------------------------------
+# 0015_ai_llm_daily_quota
+# ---------------------------------------------------------------------------
+
+
+class AILlmDailyQuota(DwsRevisionAdapter):
+    revision = "0015_ai_llm_daily_quota"
+    table = "p_ai_llm_daily_usage"
+
+    def _shape_conflicts(self, ctx: DwsRevisionContext) -> list[str]:
+        actual = ctx.table(self.table)
+        if actual is None:
+            return []
+        expected = baseline_schema("dws", ctx.root).tables.get(self.table)
+        if expected is None:
+            return ["canonical DWS baseline has no daily LLM quota usage table"]
+        conflicts: list[str] = []
+        if actual.primary_key != expected.primary_key:
+            conflicts.append(
+                f"primary key expected={expected.primary_key!r} observed={actual.primary_key!r}"
+            )
+        if set(actual.columns) != set(expected.columns):
+            conflicts.append(
+                f"columns expected={sorted(expected.columns)!r} observed={sorted(actual.columns)!r}"
+            )
+            return conflicts
+        for name, expected_column in expected.columns.items():
+            actual_column = actual.columns[name]
+            if _canonical_column_type(actual_column.type_name) != _canonical_column_type(
+                expected_column.type_name
+            ):
+                conflicts.append(
+                    f"{name} type expected={expected_column.type_name!r} observed={actual_column.type_name!r}"
+                )
+            if actual_column.nullable != expected_column.nullable:
+                conflicts.append(
+                    f"{name} nullable expected={expected_column.nullable!r} observed={actual_column.nullable!r}"
+                )
+        return conflicts
+
+    def _config_rows(self, ctx: DwsRevisionContext):
+        if not (ctx.has_table("p_code_category") and ctx.has_table("p_code_item")):
+            return None, None
+        category_rows = ctx.fetchall(
+            f"SELECT category_id, category_code, category_name, is_active "
+            f"FROM {ctx.qualified('p_code_category')}"
+        )
+        item_rows = ctx.fetchall(
+            f"SELECT item_id, category_code, item_code, item_name, item_value, is_active "
+            f"FROM {ctx.qualified('p_code_item')}"
+        )
+        return (
+            [dict(zip(("category_id", "category_code", "category_name", "is_active"), row)) for row in category_rows],
+            [dict(zip(("item_id", "category_code", "item_code", "item_name", "item_value", "is_active"), row)) for row in item_rows],
+        )
+
+    def _usage_rows(self, ctx: DwsRevisionContext) -> list[dict[str, Any]]:
+        if not ctx.has_table(self.table):
+            return []
+        rows = ctx.fetchall(
+            f"SELECT scope_key, business_date, used_count FROM {ctx.qualified(self.table)}"
+        )
+        return [
+            dict(zip(("scope_key", "business_date", "used_count"), row))
+            for row in rows
+        ]
+
+    def _inspect_state(self, ctx: DwsRevisionContext):
+        categories, items = self._config_rows(ctx)
+        if categories is None or items is None:
+            return "conflict", "parameter dictionary tables are required for the reserved daily quota setting", ()
+        plan = plan_ai_llm_quota_seed(categories, items)
+        if not plan.safe:
+            return "conflict", "reserved daily LLM quota configuration conflicts with its contract", (plan.error or "unknown seed conflict",)
+        conflicts = self._shape_conflicts(ctx)
+        if conflicts:
+            return "conflict", f"{self.table} does not match the canonical quota usage schema", tuple(conflicts)
+        usage_rows = self._usage_rows(ctx)
+        global_rows = [row for row in usage_rows if str(row.get("scope_key")) == "GLOBAL"]
+        if len(global_rows) > 1:
+            return "conflict", "global daily LLM quota usage row is ambiguous", ()
+        if global_rows:
+            try:
+                stored_date = str(global_rows[0]["business_date"])
+                parsed_date = date.fromisoformat(stored_date)
+                raw_count = global_rows[0]["used_count"]
+                used_count = int(raw_count)
+            except (TypeError, ValueError):
+                return "conflict", "global daily LLM quota usage row is invalid", ()
+            if (
+                parsed_date.isoformat() != stored_date
+                or used_count < 0
+                or str(raw_count).strip() != str(used_count)
+            ):
+                return "conflict", "global daily LLM quota usage row is invalid", ()
+        pending = bool(plan.categories or plan.items or not ctx.has_table(self.table) or not global_rows)
+        if pending:
+            return "not-applied", "daily LLM quota table or reserved setting/usage seed is missing", (
+                f"missing categories={len(plan.categories)}, items={len(plan.items)}, usage_table={not ctx.has_table(self.table)}, usage_row={not bool(global_rows)}",
+            )
+        return "applied", "daily LLM quota schema and reserved setting/usage seed are present", ()
+
+    def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
+        state, summary, details = self._inspect_state(ctx)
+        return RevisionInspection(
+            self.revision,
+            {
+                "applied": RevisionState.APPLIED,
+                "not-applied": RevisionState.NOT_APPLIED,
+                "conflict": RevisionState.CONFLICT,
+            }[state],
+            summary,
+            details=details,
+        )
+
+    def apply(self, ctx: DwsRevisionContext) -> None:
+        state, summary, details = self._inspect_state(ctx)
+        if state == "conflict":
+            raise DwsMigrationError(
+                self.revision,
+                observed=summary,
+                reason="the daily LLM quota migration only performs conflict-free additive changes",
+                details=details,
+            )
+        if not ctx.has_table(self.table):
+            for statement in _baseline_statements(ctx, (self.table,)):
+                ctx.execute(statement)
+        categories, items = self._config_rows(ctx)
+        plan = plan_ai_llm_quota_seed(categories or (), items or ())
+        if not plan.safe:
+            raise DwsMigrationError(
+                self.revision,
+                observed="reserved daily LLM quota seed conflict",
+                reason=plan.error or "seed state is ambiguous",
+            )
+        for table, rows in (("p_code_category", plan.categories), ("p_code_item", plan.items)):
+            for values in rows:
+                columns = tuple(values)
+                placeholders = ", ".join("?" for _ in columns)
+                ctx.execute(
+                    f"INSERT INTO {ctx.qualified(table)} ({', '.join(columns)}) "
+                    f"VALUES ({placeholders})",
+                    tuple(values[column] for column in columns),
+                )
+        global_rows = [row for row in self._usage_rows(ctx) if str(row.get("scope_key")) == "GLOBAL"]
+        if not global_rows:
+            ctx.execute(
+                f"INSERT INTO {ctx.qualified(self.table)} "
+                "(scope_key, business_date, used_count) VALUES (?, ?, ?)",
+                ("GLOBAL", "1970-01-01", 0),
+            )
+
+
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -1604,6 +1882,8 @@ ADAPTERS: tuple[DwsRevisionAdapter, ...] = (
     PushJobFreqDescCapacity(),
     SearchHotKeywords(),
     FieldMappingFieldFilterIndex(),
+    RagSearchConfigSeed(),
+    AILlmDailyQuota(),
 )
 
 _ADAPTERS_BY_REVISION: dict[str, DwsRevisionAdapter] = {

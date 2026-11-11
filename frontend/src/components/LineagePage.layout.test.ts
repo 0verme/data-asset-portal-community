@@ -102,6 +102,28 @@ test("lineage search accepts table and task nodes", async () => {
   assert.doesNotMatch(api, /findLineageTables/);
 });
 
+test("lineage search selects exact table matches and labels ambiguous candidates", async () => {
+  const [page, search, api] = await Promise.all([
+    readFile(pagePath, "utf8"),
+    readFile(fileURLToPath(new URL("./lineage/lineageSearch.ts", import.meta.url)), "utf8"),
+    readFile(apiPath, "utf8"),
+  ]);
+
+  assert.match(page, /resolveLineageSearchMatches\(nodeName, matches\)/);
+  assert.match(page, /if \(resolution\.directMatch\)/);
+  assert.match(page, /describeLineageSearchCandidate\(candidate\)/);
+  assert.match(search, /const nodeNamespace = String\(node\.namespace \|\| ""\)\.trim\(\)\.toLowerCase\(\)/);
+  assert.match(search, /nodeName === `\$\{namespace\}\.\$\{tableName\}`/);
+  assert.match(search, /matchesUnqualifiedTableName/);
+  assert.match(search, /exactTables\.length === 1/);
+  assert.match(search, /业务 Schema \/ namespace_name/);
+  assert.match(search, /isTable \? "表名" : "作业名"/);
+  assert.match(search, /terminalTableName\(node\.name\)/);
+  assert.match(search, /lineageSearchQueryForCandidate/);
+  assert.match(search, /node\.name/);
+  assert.match(api, /node\.namespace\.trim\(\)\.toLowerCase\(\)\.includes\(namespace\)/);
+});
+
 test("lineage filters wait for an explicit query", async () => {
   const page = await readFile(pagePath, "utf8");
 
@@ -146,4 +168,29 @@ test("lineage page supports table and detail views with snapshot diagnostics", a
   assert.match(page, /view: nextRoute\.view/);
   assert.match(page, /快照诊断/);
   assert.match(styles, /\.lineage-diagnostics \{[^}]*var\(--warn-line\)/);
+});
+
+test("asset navigation uses only the loaded graph and shares node selection with the viewer", async () => {
+  const [page, sidebar, canvas, app, moduleSidebar] = await Promise.all([
+    readFile(pagePath, "utf8"),
+    readFile(fileURLToPath(new URL("./sidebar/LineageAssetSidebar.tsx", import.meta.url)), "utf8"),
+    readFile(canvasPath, "utf8"),
+    readFile(fileURLToPath(new URL("../App.tsx", import.meta.url)), "utf8"),
+    readFile(fileURLToPath(new URL("./app/ModuleSidebar.tsx", import.meta.url)), "utf8"),
+  ]);
+
+  assert.match(page, /onNodesChange\(data\.nodes\)/);
+  assert.match(page, /selectedNodeId=\{selectedNodeId\}/);
+  assert.match(page, /onFocusRequestHandled=\{onFocusRequestHandled\}/);
+  assert.match(app, /const \[lineageNodes, setLineageNodes\] = useState/);
+  assert.match(moduleSidebar, /<LineageAssetSidebar/);
+  assert.match(sidebar, /aria-expanded=\{tablesVisible\}/);
+  assert.match(sidebar, /aria-pressed=\{selectedNodeId === node\.id\}/);
+  assert.match(sidebar, /selectionSequence/);
+  assert.match(sidebar, /<details className="lineage-snapshot-info">/);
+  assert.doesNotMatch(sidebar, /getLineageInitialView|findLineageNodes|requestRemote/);
+  assert.match(canvas, /viewerRef\.current\?\.selectNode\(selectedNodeId\)/);
+  assert.match(canvas, /viewer\.focusNode\(focusRequest\.nodeId\)/);
+  assert.match(canvas, /onFocusRequestHandled\(focusRequest\.sequence\)/);
+  assert.match(app, /setLineageFocusRequest\(\(current\) => current\?\.sequence === sequence \? null : current\)/);
 });

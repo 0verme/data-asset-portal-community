@@ -1,16 +1,22 @@
 import unittest
 from contextlib import nullcontext
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from backend.app.services.search_provider import KeywordSearchProvider, SearchDataSourceError
 
 
 class SearchPartialFailureTests(unittest.TestCase):
+    @staticmethod
+    def _connection_context():
+        connection = SimpleNamespace(jconn=SimpleNamespace(getAutoCommit=lambda: True))
+        return nullcontext(SimpleNamespace(connection=connection))
+
     def run_search(self, results):
         service = KeywordSearchProvider()
         configs = [{"type": "asset"}, {"type": "indicator"}]
         with patch.object(service, "_visible_configs", return_value=configs), \
-             patch.object(service, "_connection", return_value=nullcontext(None)), \
+             patch.object(service, "_connection", return_value=self._connection_context()), \
              patch.object(service, "_search_one_safe", side_effect=results):
             return service.search("query", profile="internal")
 

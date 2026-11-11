@@ -35,6 +35,8 @@ REVISION_ORDER = (
     "0011_push_job_freq_desc_capacity",
     "0012_search_hot_keywords",
     "0013_field_filter_index",
+    "0014_rag_search_config",
+    "0015_ai_llm_daily_quota",
 )
 
 OPEN_MODULE_TABLES = (
@@ -796,7 +798,30 @@ def downgrade_to_prefix(database: FakeDwsDatabase, satisfied: Iterable[str]) -> 
 def _reverse_revision(
     database: FakeDwsDatabase, revision: str, satisfied: set[str]
 ) -> None:
-    if revision == "0012_search_hot_keywords":
+    if revision == "0015_ai_llm_daily_quota":
+        database.table("p_code_category").rows[:] = [
+            row for row in database.table("p_code_category").rows
+            if row.get("category_code") != "AI_LLM_QUOTA_CONFIG"
+        ]
+        database.table("p_code_item").rows[:] = [
+            row for row in database.table("p_code_item").rows
+            if row.get("category_code") != "AI_LLM_QUOTA_CONFIG"
+        ]
+        database.remove_table("p_ai_llm_daily_usage")
+    elif revision == "0014_rag_search_config":
+        database.table("p_code_category").rows[:] = [
+            row for row in database.table("p_code_category").rows
+            if row.get("category_code") != "RAG_SEARCH_CONFIG"
+        ]
+        database.table("p_code_item").rows[:] = [
+            row for row in database.table("p_code_item").rows
+            if row.get("category_code") != "RAG_SEARCH_CONFIG"
+        ]
+    elif revision == "0013_field_filter_index":
+        database.remove_index(
+            "p_field_mapping_field", "idx_p_field_mapping_field_table_deleted"
+        )
+    elif revision == "0012_search_hot_keywords":
         database.remove_table("p_search_hot_keyword")
     elif revision == "0002_portable_asset_filter":
         database.remove_index("p_asset_table", "idx_p_asset_table_filter")

@@ -8,9 +8,11 @@ A lightweight, intranet-friendly data asset catalog for data warehouse teams.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![CI](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml)
-![Stack](https://img.shields.io/badge/React%2018%20%2B%20Vite%208%20%7C%20FastAPI%20%2B%20Uvicorn?logo=react)
+![Stack](https://img.shields.io/badge/React%2019%20%2B%20Vite%208%20%7C%20FastAPI%20%2B%20Uvicorn?logo=react)
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-22.13%2B-5FA04E?logo=nodedotjs&logoColor=white)
 
-[快速开始](#-快速开始) · [为什么选 DAP](#-为什么选-dap) · [与 OpenMetadata 的差异](#-与-openmetadata-和-datahub-的定位差异) · [功能](#-功能) · [数据库兼容性](#-数据库兼容性) · [文档](#-文档导航)
+[快速开始](#-快速开始) · [为什么选 DAP](#-为什么选-dap) · [与 OpenMetadata 的差异](#-与-openmetadata-和-datahub-的定位差异) · [功能](#-功能) · [搜索与 AI 能力](#-搜索与-ai-能力) · [数据库兼容性](#-数据库兼容性) · [文档](#-文档导航)
 
 </div>
 
@@ -26,6 +28,15 @@ DAP 把这些元数据集中到一个可搜索、可维护的界面里，服务�
 一句话概括它的取舍：
 
 > **DAP 只做「数仓资产目录」这一件事，并且尽量让它能在内网的一台机器上跑起来。**
+
+在「把元数据整理进目录」之外，DAP 提供三条互不影响的检索 / 问答路径：
+
+- **确定性关键词搜索**（默认可用）：完全在 DAP 进程与元数据库内完成，不依赖 RAG，也不依赖 LLM。
+- **可选的相关资产推荐**（默认关闭）：DAP 作为 HTTP Client 调用外部 RAG 服务，失败只降级推荐。
+- **可选的单轮 AI 资产问答**（默认关闭）：在上面的 RAG 服务之上再接入一个 OpenAI-compatible LLM。
+
+后两者是**可选外部集成**，不是 DAP 内置能力。DAP 不内置向量引擎、不加载 Embedding 模型、不做 NL2SQL，
+也不会把关键词搜索自动改道成模型调用。详见 [搜索与 AI 能力](#-搜索与-ai-能力)。
 
 ### 它明确不做
 
@@ -66,17 +77,71 @@ DAP 把这些元数据集中到一个可搜索、可维护的界面里，服务�
 
 更多页面见 [截图画廊](./docs/screenshots.md)。
 
+## 🔎 搜索与 AI 能力
+
+DAP 有三条互不影响的检索 / 问答路径。默认只开启第一条：
+
+| 能力 | 前端入口 | 后端接口 | 默认状态 | 外部依赖 |
+| --- | --- | --- | --- | --- |
+| 传统关键词搜索 | 搜索框 + Enter /「搜索」，结果页「搜索结果」Tab | `GET /api/search` | **默认可用** | 无 |
+| 可选 RAG 相关资产推荐 | 结果页「相关资产推荐」分组 | `GET /api/search/recommendations` | **默认关闭** | 可选外部 RAG HTTP 服务 |
+| 可选单轮 AI 资产问答 | 结果页「AI 问答」Tab、「问 AI 找资产」 | UI 使用 `POST /api/ai/ask/stream`；`POST /api/ai/ask`、`POST /api/ai/ask/progress` 为兼容接口；`GET /api/ai/status` 提供能力开关 | **默认关闭** | 上面的 RAG 服务 + 可选 OpenAI-compatible LLM |
+
+### 传统关键词搜索：不依赖 RAG，也不依赖 LLM
+
+`GET /api/search` 是确定性检索：按已注册的搜索 provider 聚合资产、字段、词根、指标、报表、API 资产、
+上游系统、下游推送和码值表，返回分组结果、`matchedFields`、`total` / `count` / `hasMore`，
+以及部分模块失败时的 `partial` / `failedGroups`。
+
+- 全流程在 DAP 进程与 DAP 元数据库内完成，**不发送任何外部请求**。
+- RAG 关闭、RAG 超时、远端返回无效 ID、LLM 未配置或故障，都不会改变关键词搜索结果，也不会自动改道成「问 AI」。
+- 只有普通搜索成功且零命中时，才出现「问 AI 找资产」入口；且仅当 AI 能力已启用时显示。部分模块失败不会伪装成「无结果」。
+
+### 可选 RAG 相关资产推荐：默认关闭
+
+- 开关与服务 URL 在受保护的系统管理页配置（`GET` / `PUT /api/system/rag-search-config`）；Bearer Token 只来自后端部署 Secret `RAG_SEARCH_SERVICE_TOKEN`，不写参数表、不下发浏览器。
+- DAP 只作为 HTTP Client Adapter：不导入 `dap-rag-lab`，不加载 BGE / PyTorch，不读 LanceDB，不执行 RAG CLI。
+- 远端返回的名称、描述、评分和 evidence 一律不作为权威数据；DAP 按当前 `PUBLIC_CATALOG_PROFILE` 回查 `assetId` / `fieldId` 及父子关系，只用 DAP 元数据重建展示内容。
+- 失败即降级：推荐分组显示不可用提示，关键词结果不受影响；检索分数不展示为可信度或准确率。
+
+### 可选单轮 AI 资产问答：默认关闭
+
+- `AI_ASK_ENABLED` 默认 `false`。只有该开关打开、LLM Provider 配置完整、且 RAG 已启用并配置服务 Token 时，`GET /api/ai/status` 才返回 `{"enabled": true}`；否则前端 fail closed 并隐藏入口。
+- 单轮、无会话、无历史、不持久化；不执行 SQL，不查询业务数值，不调用工具，不使用外部知识。
+- 模型只能返回结构化的候选稳定 ID 与直接 / 相关关系；表名、字段名、中文名、描述和引用卡全部由 DAP 使用当前校验后的元数据生成，模型无法为自由文本「背书」。
+- 回答状态区分 `answered` / `partial_answer` / `insufficient_evidence` / `retrieval_unavailable` / `generation_unavailable`；受控统计意图另有 `metadata_count_answered` / `ambiguous_scope` / `metadata_count_unavailable`。
+- 执行进度通过 SSE 返回后端真实阶段（`step_start` / `step_complete` / `step_error` / `answer` / `done` / `keep_alive`），**不逐 token 流式输出**；浏览器取消会 abort SSE，并在阶段边界停止上游调用，旧响应不会覆盖新请求。
+- 全站每日默认共享 **50 次 AI 问答**（北京时间自然日），不是 50 次模型 HTTP 调用：一次问答内的规划、答案生成和重试最多扣一次；没有发起 LLM HTTP 请求的纯目录统计不扣减。额度不按用户/IP 区分，沿用 `AI_LLM_DAILY_LIMIT` 参数编码及既有系统参数表、`system:param:write` 权限和操作审计。额度耗尽或计数不可用时 fail closed；Mock、普通搜索及 RAG 推荐不消耗额度。模型配置默认 `AI_LLM_MAX_TOKENS=3072`、`AI_LLM_TIMEOUT_MS=30000`；显式部署环境变量值保持优先。完整额度、参数与部署契约见 [单轮 AI 数据资产问答](./docs/ai-ask-mvp.md) 和[配置说明](./docs/configuration.md)；统计意图见 [权威资产目录统计](./docs/ai-metadata-count.md)。
+
+> **不要把 Mock 当成真实能力。** 公开静态 Demo [https://data.overme.cn/](https://data.overme.cn/) 使用
+> `VITE_API_MODE=mock` 的独立构建：问答由前端本地演示适配器按演示目录名称 / 字段匹配生成，
+> **不调用任何 RAG 服务或 LLM，也不是真实 DeepSeek 输出**。Remote 模式不会回退到 Mock，
+> Mock 构建也不会被当作生产 Bundle。详见 [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md)。
+
+### 当前验证状态（不要过度解读）
+
+| 事项 | 状态 |
+| --- | --- |
+| `/api/search`、`/api/search/recommendations`、`/api/ai/status`、`/api/ai/ask`、`/api/ai/ask/progress`、`/api/ai/ask/stream` 的代码与单元 / 契约测试 | 已合入 `main`，CI 覆盖 |
+| 与 `dap-rag-lab` 的最终 HTTP 契约对齐、真实 RAG 服务联调 | **NOT VERIFIED**（外部 issue #14 仍 OPEN） |
+| 真实 OpenAI-compatible / DeepSeek 端点的回答质量与 wire 兼容性 | **NOT VERIFIED** |
+| GaussDB / DWS 上的真实 RAG 检索与模型性能 | **NOT VERIFIED** |
+
+`main` 上的自动化只证明结构化契约、身份校验、降级与 UI 行为，不证明任何外部服务在线可用，
+也不证明回答准确率。
+
 ## 🎯 为什么选 DAP
 
 DAP 面向的是**没有精力、也没有条件部署一整套元数据平台**的团队：
 
 | 场景 | DAP 的适配点 |
 | --- | --- |
-| 小团队 / 独立数仓团队 | 一个 Web 端 + 一个数据库即可上线，不需要消息中间件或独立搜索引擎 |
+| 小团队 / 独立数仓团队 | 一个 Web 端 + 一个数据库即可上线，不需要消息中间件或独立搜索引擎；检索默认就是确定性关键词搜索 |
 | 内网 / 离线环境 | 支持完全离线的内网单机部署（systemd + Nginx，见 [部署说明](./DEPLOYMENT.md)） |
 | 以数仓为中心的元数据 | 表、字段、DDL、指标口径、词根、字段映射、上下游、报表、API 资产都是一等公民 |
 | 中国企业常见数据库环境 | PostgreSQL、MySQL 8.0、GaussDB / DWS 均有适配；SQLite 可用于本地与 CI |
 | 已有整理元数据的程序，只缺一个目录 | 外部系统通过版本化 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 接入，DAP 不侵入你的采集链路 |
+| 已有 RAG 服务或 LLM 网关 | 可选接入：DAP 只做 HTTP Client，不引入向量库或模型依赖；不接也完全可用 |
 
 ## 🪶 与 OpenMetadata 和 DataHub 的定位差异
 
@@ -120,8 +185,10 @@ Apache Atlas 主要面向 Hadoop 生态的元数据与治理（Hive、HDFS 等�
 - **门户首页、数据仓库、字段映射、血缘浏览**：浏览资产、映射关系和已导入的血缘快照。
 - **上游卸数、下游推送、报表资产、码值表维护**：维护外部数据源、推送元数据、报表台账和码值表元数据。
 - **词根、指标、API 资产、系统管理**：维护命名规范、指标口径、API 元数据以及用户/菜单/参数字典/操作日志。
-- **Permission-based RBAC**：后端按 permission code 强制授权，支持角色、权限映射、角色管理和单角色用户绑定。
+- **Permission-based RBAC**：后端按 code 强制授权，支持角色、权限映射、角色管理和单角色用户绑定。
 - **统一搜索与门户统计**：为所有已注册搜索实体和统计 provider 提供聚合入口。
+- **搜索页双 Tab**：「搜索结果」与「AI 问答」并存于同一页面，按 stable `assetId` / `fieldId` 去重并可分别下钻资产详情。
+- **可选 AI 集成**：默认关闭的相关资产推荐与单轮 AI 资产问答，见 [搜索与 AI 能力](#-搜索与-ai-能力)。
 
 完整的页面 / 接口 / 数据表对照见 [模块清单](./docs/modules.md)。
 
@@ -134,8 +201,8 @@ Apache Atlas 主要面向 Hadoop 生态的元数据与治理（Hive、HDFS 等�
 
 | 部件 | 说明 |
 | --- | --- |
-| 前端 | React 19 + Vite 8，`frontend/src/` 主应用与测试已全量采用 TypeScript/TSX，严格模式关闭 JavaScript fallback |
-| 后端 | FastAPI + Uvicorn，入口 `backend/asgi.py` |
+| 前端 | React 19 + Vite 8（`react@^19.3.1`、`vite@^8.3.5`），`frontend/src/` 主应用与测试已全量采用 TypeScript/TSX，严格模式关闭 JavaScript fallback |
+| 后端 | FastAPI + Uvicorn（`fastapi==0.162.0`、`uvicorn==0.54.0`、`pydantic==2.14.2`），入口 `backend/asgi.py` |
 | Production / local entrypoint | `uvicorn backend.asgi:app --host 127.0.0.1 --port 15099` |
 | 健康检查 | `GET /healthz`，只报告进程状态，不查询数据库 |
 | 数据访问 | Service Layer → Database Provider → SQLite / PostgreSQL / MySQL / GaussDB-DWS |
@@ -144,6 +211,22 @@ Apache Atlas 主要面向 Hadoop 生态的元数据与治理（Hive、HDFS 等�
 外部元数据的接入链路是 `外部系统 → 已整理的 Metadata Contract → DAP Metadata API → DAP`：
 DAP 负责接收、校验、归一化、幂等、持久化、审计与展示；**采集、筛选、资产识别、血缘解析、调度和重试由外部系统负责**。
 DAP 不主动连接或扫描你的数据库。详见 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 与 [ADR-001](./docs/adr/001-metadata-ingestion-contract.md)。
+
+### 可选 AI / RAG 集成链路（默认关闭）
+
+```text
+                          ┌───────────────────────────────────┐
+DAP backend ──HTTP(S)────▶│ dap-rag-lab HTTP Search Service v1 │──▶ BGE Embedding + LanceDB 索引
+  Bearer Token            └───────────────────────────────────┘
+      │
+      └──────HTTP(S)─────▶ OpenAI-compatible LLM endpoint（例如 DeepSeek）
+              API Key
+```
+
+- 两条链路都是**外部、可选、默认关闭**的：DAP 不内置向量引擎，不内置模型推理，不加载 Embedding 模型。
+- RAG 服务与 LLM 端点由部署方独立运维；DAP 不部署、不修改它们，也不在普通搜索路径上做健康探测（只有管理员主动触发的诊断会请求 `/healthz` / `/readyz`）。
+- 目录权威始终在 DAP：远端只提供候选 `assetId` / `fieldId`，DAP 按当前 profile 回查并重建响应。
+- 目标 RAG 服务与目标 LLM 端点的真实联调在 `main` 上仍是 **NOT VERIFIED**，见 [语义推荐 roadmap](./docs/semantic-recommendation-roadmap.md) 与 [单轮 AI 数据资产问答](./docs/ai-ask-mvp.md)。
 
 技术栈与架构边界的完整说明见 [架构说明](./docs/architecture.md)。
 
@@ -212,6 +295,12 @@ npm --prefix frontend run dev
 
 [https://data.overme.cn/](https://data.overme.cn/) 是独立部署的静态 mock bundle，用于快速预览界面。
 它的版本、数据和部署 revision 独立于本仓库，不代表当前 `origin/main` 或已发布的 Release。
+它的 AI 问答由前端演示适配器生成，**不连接任何 RAG 服务或 LLM**；详见 [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md)。
+
+### AI 能力需要单独启用
+
+Community Demo 与 mock 模式都不会自动打开真实 AI：`AI_ASK_ENABLED` 默认 `false`，RAG 配置独立且默认停用。
+启用步骤、Secret 注入方式与回滚见 [后端配置](./docs/configuration.md) 与 [部署说明](./DEPLOYMENT.md#36-optional-single-turn-ai-asset-qa)。
 
 ## 🤝 社区入口
 
@@ -275,6 +364,7 @@ V1 血缘只支持 self-contained `replace` snapshot：新快照先以 `INACTIVE
 | 文档 | 内容 |
 | ------ | ------ |
 | [Community Demo 指南](./docs/community-demo.md) | SQLite / PostgreSQL 多步骤演示数据初始化 |
+| [后端配置](./docs/configuration.md) | 配置命名空间、Public Catalog profile、可选 RAG / AI 设置与默认值 |
 | [数据库支持矩阵](./docs/database-support.md) | Verified / Compatible 分层与验证边界 |
 | [部署说明](./DEPLOYMENT.md) | Linux 单机部署、systemd、Nginx、HTTPS 与验收 |
 | [开发指南](./DEVELOPMENT.md) | 环境变量、本地开发与测试矩阵 |
@@ -291,6 +381,9 @@ V1 血缘只支持 self-contained `replace` snapshot：新快照先以 `INACTIVE
 | 文档 | 内容 |
 | ------ | ------ |
 | [资产风险联动设计](./docs/asset-risk-integration-design.md) | 外部审计结果接入边界与提案 |
+| [单轮 AI 数据资产问答](./docs/ai-ask-mvp.md) | AI 问答契约、状态语义、Mock 边界与未验收项 |
+| [权威资产目录统计](./docs/ai-metadata-count.md) | 表数 / 字段数统计意图、歧义与失败状态 |
+| [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md) | 公网静态 Demo 的本地演示适配器与隔离约束 |
 | [智能问数与语义推荐](./docs/semantic-recommendation-roadmap.md) | 问数底座与语义推荐路线 |
 | [待确认事项](./docs/todo.md) | 当前尚未完成或待决策事项 |
 | [更新日志](./CHANGELOG.md) | 阶段性变更 |
@@ -314,7 +407,20 @@ V1 血缘只支持 self-contained `replace` snapshot：新快照先以 `INACTIVE
 - 数据质量、Profiling、数据合约与治理工作流
 - OpenMetadata / DataHub 量级的 connector 生态
 - 多角色绑定、ABAC/ACL、数据范围（row-level/data-scope）授权、SSO/外部 IAM
-- 向量检索、Embedding 与 LLM 语义推荐（路线见 [语义推荐 roadmap](./docs/semantic-recommendation-roadmap.md)）
+- 自然语言转 SQL（NL2SQL）、可执行语义层与问数执行引擎
+
+### AI 相关的真实边界
+
+DAP **不内置**向量引擎、Embedding 模型、向量索引或模型推理，也**不提供** NL2SQL 与问数执行。
+这不等于「不支持可选 RAG / AI 集成」——DAP 已经落地的是：
+
+- 一个默认关闭的 HTTP Client Adapter，把相关资产推荐委托给外部 RAG 服务；
+- 一个默认关闭的单轮 AI 资产问答，复用同一个 RAG 适配器 + 一个 OpenAI-compatible LLM Provider；
+- 一套目录权威校验，保证远端和模型都不能发明表、字段或归属。
+
+以下仍**未实现或未验收**：DAP 内的向量存储方案（`pgvector` 不是 SQLite / GaussDB-DWS 的通用能力）、
+在线索引刷新与撤权传播契约、有业务标注的 golden query 离线评测、以及外部 RAG / LLM 的真实联调。
+路线与前置条件见 [语义推荐 roadmap](./docs/semantic-recommendation-roadmap.md)。
 
 阶段更新见 [CHANGELOG.md](./CHANGELOG.md)，待确认事项见 [docs/todo.md](./docs/todo.md)。
 
@@ -329,6 +435,23 @@ SQLite（本地 / Demo / CI）、PostgreSQL、MySQL 8.0 为 **Verified**；Gauss
 
 `VITE_API_MODE=mock` 只读取前端内置数据，使用公开演示账号 `admin` / `123456` 登录；
 `remote` 通过 `/api` 访问后端真实数据库，需要先按 [Community Demo](./docs/community-demo.md) 或 [开发指南](./DEVELOPMENT.md) 配置。
+mock 模式下的 AI 问答由前端演示适配器生成，不调用 RAG 或 LLM；remote 模式不会回退到 mock。
+
+### AI 问答默认开启吗？需要什么？
+
+默认**关闭**。`AI_ASK_ENABLED` 默认 `false`；启用还需要 LLM Provider 配置（`AI_LLM_BASE_URL` / `AI_LLM_MODEL` /
+`AI_LLM_API_KEY`）以及已启用并配置好服务 Token 的 RAG 搜索。配置不完整时 `/api/ai/status` 返回
+`{"enabled": false}`，前端隐藏入口。传统搜索不受影响。详见 [后端配置](./docs/configuration.md)。
+
+### 公网静态 Demo 用的是真实 DeepSeek 吗？
+
+不是。公网静态 Demo 是 `VITE_API_MODE=mock` 的独立构建，问答由前端本地演示适配器按演示目录匹配生成，
+不发起任何 RAG / LLM 请求。真实链路需要按 [部署说明](./DEPLOYMENT.md) 自行接入并验证。
+
+### DAP 内置向量检索吗？
+
+不内置。DAP 不包含向量引擎、Embedding 模型或索引存储，也没有 NL2SQL。相关资产推荐与 AI 问答都是
+对外部 RAG 服务的可选 HTTP 调用，默认关闭；传统关键词搜索完全不需要它们。
 
 ### 这个项目负责真实数据采集吗？
 

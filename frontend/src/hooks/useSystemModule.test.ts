@@ -15,14 +15,24 @@ test("user validation allows flexible usernames and reset feedback does not disc
   assert.doesNotMatch(source, /临时密码|tempPassword/);
 });
 
-test("system management loads and caches only the current subroute", async () => {
+test("system management loads active server-paged subroutes and rejects superseded dictionary generations", async () => {
   const source = await readFile(hookPath, "utf8");
 
   assert.match(source, /currentPage === "menus"/);
   assert.match(source, /currentPage === "param-dicts"/);
-  assert.match(source, /loadedPagesRef\.current\.has\(currentPage\)/);
-  assert.match(source, /loadedPagesRef\.current\.add\(currentPage\)/);
+  assert.match(source, /const requestedPage = params\.page \?\? userPage;[\s\S]*?const requestedPageSize = params\.pageSize \?\? userPageSize;[\s\S]*?getUserPage\(\{ keyword, page: requestedPage, pageSize: requestedPageSize \}\)/);
+  assert.match(source, /const requestedPage = params\.page \?\? menuPage;[\s\S]*?const requestedPageSize = params\.pageSize \?\? menuPageSize;[\s\S]*?getMenuPage\(\{ keyword, page: requestedPage, pageSize: requestedPageSize \}\)/);
+  assert.match(source, /const reloadUsersForCurrentView = React\.useCallback\(\(\) => loadUsers\(\{[\s\S]*?keyword: queryRef\.current,[\s\S]*?page: userPageRef\.current,[\s\S]*?pageSize: userPageSizeRef\.current/);
+  assert.match(source, /const reloadMenusForCurrentView = React\.useCallback\(\(\) => loadMenus\(\{[\s\S]*?keyword: queryRef\.current,[\s\S]*?page: menuPageRef\.current,[\s\S]*?pageSize: menuPageSizeRef\.current/);
+  assert.match(source, /getParamDictPage\(categoryCode, \{/);
+  assert.match(source, /const loadCategories = React\.useCallback\(async \(parentRequestSeq = pageRequestSeq\.current\)[\s\S]*?const nextCategories = await getParamDictCategories\(\);\s*if \(parentRequestSeq !== pageRequestSeq\.current\) return selectedCategoryCodeRef\.current;\s*setCategories\(nextCategories\)/);
+  assert.match(source, /const result = await getParamDictPage\(categoryCode,\s*\{[\s\S]*?if \(requestSeq !== itemsRequestSeq\.current \|\| parentRequestSeq !== pageRequestSeq\.current\) return/);
+  assert.match(source, /const categoryCode = await loadCategories\(requestSeq\);[\s\S]*?if \(requestSeq !== pageRequestSeq\.current\) return;[\s\S]*?await loadItems\(categoryCode, requestSeq\)/);
+  assert.match(source, /const requestKey = `\$\{categoryCode\}\|\$\{keyword\.trim\(\)\}\|\$\{requestedPage\}\|\$\{requestedPageSize\}`/);
+  assert.match(source, /const reloadCurrentItems = React\.useCallback\(async \(\): Promise<void> => \{\s*const categoryCode = selectedCategoryCodeRef\.current;[\s\S]*?keyword: queryRef\.current,[\s\S]*?page: itemPageRef\.current,[\s\S]*?pageSize: itemPageSizeRef\.current/);
   assert.match(source, /currentPage !== "param-dicts" \|\| !selectedCategoryCode/);
-  assert.match(source, /loadedItemsCategoryRef\.current === selectedCategoryCode/);
+  assert.match(source, /setUserPage\(1\)/);
+  assert.match(source, /setMenuPage\(1\)/);
+  assert.match(source, /setItemPage\(1\)/);
   assert.doesNotMatch(source, /Promise\.all\(\[loadUsers\(\), loadCategories\(\), loadMenus\(\)\]\)/);
 });
