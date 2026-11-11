@@ -1,13 +1,28 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light" data-mode="light">
+<html lang="zh-CN" data-theme="light" data-mode="light" data-accent="green">
 <head>
 <meta charset="UTF-8" />
 <script>
   (() => {
-    const savedTheme = window.localStorage.getItem("dap-theme");
-    const theme = savedTheme === "dark" ? "dark" : "light";
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.dataset.mode = theme;
+    const root = document.documentElement;
+    const configuredDefault = "%VITE_DEFAULT_ACCENT%".trim().toLowerCase();
+    const defaultAccent = configuredDefault === "purple" ? "purple" : "green";
+    let theme = "light";
+    let accent = defaultAccent;
+
+    try {
+      const storage = window.localStorage;
+      const savedTheme = storage.getItem("dap-theme");
+      const savedAccent = storage.getItem("dap-accent");
+      if (savedTheme === "dark") theme = "dark";
+      if (savedAccent === "green" || savedAccent === "purple") accent = savedAccent;
+    } catch {
+      // Fall back to build defaults when local storage is unavailable.
+    }
+
+    root.dataset.theme = theme;
+    root.dataset.mode = theme;
+    root.dataset.accent = accent;
   })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
