@@ -385,6 +385,44 @@
     background: var(--accent-soft);
   }
 
+  .accent-preset-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+  }
+  .accent-preset-button {
+    position: relative;
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+  }
+  .accent-preset-dot { display: block; width: 14px; height: 14px; border-radius: 50%; }
+  .accent-preset-dot-green { background: #10b981; }
+  :root[data-theme="light"] .accent-preset-dot-green { background: #0f9f78; }
+  .accent-preset-dot-purple { background: #A78BFA; }
+  :root[data-theme="light"] .accent-preset-dot-purple { background: #6B5CA5; }
+  .accent-preset-check {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--surface);
+    color: var(--ink);
+    font: 700 9px/1 var(--sans);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .accent-preset-button[aria-pressed="true"] .accent-preset-check { opacity: 1; }
+
   .login-mask {
     position: fixed;
     inset: 0;
@@ -2682,6 +2720,7 @@
     }
 
     .theme-toggle,
+    .accent-preset-button,
     .login-cta,
     .logout-btn,
     .user-chip {
