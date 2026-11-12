@@ -37,7 +37,7 @@
 .sp-search-btn {
   flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px;
   height: 44px; padding: 0 22px; border: none; border-radius: 999px;
-  background: var(--accent); color: #fff;
+  background: var(--accent); color: var(--on-accent);
   font-family: var(--sans); font-size: 15px; font-weight: 600; cursor: pointer;
   transition: background .15s; box-shadow: var(--shadow-sm);
 }

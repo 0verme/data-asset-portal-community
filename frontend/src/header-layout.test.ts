@@ -119,6 +119,18 @@ test("More menu items keep selection and navigation inside the DAP DropdownMenu 
   assert.doesNotMatch(moreNav, /role="menuitem"|<button/);
 });
 
+test("accent preset controls are accessible DAP buttons with a visible selected marker", () => {
+  assert.ok(app.includes('import { useAccent } from "./hooks/useAccent.ts";'));
+  assert.ok(app.includes('const { accent, setAccent } = useAccent();'));
+  assert.match(app, /<div className="accent-preset-group" role="group" aria-label="主题色">/);
+  for (const [preset, label] of [["green", "绿色"], ["purple", "紫色"]]) {
+    assert.ok(app.includes(`aria-label="${label}"`));
+    assert.ok(app.includes(`aria-pressed={accent === "${preset}"}`));
+    assert.ok(app.includes(`onClick={() => setAccent("${preset}")}`));
+  }
+  assert.match(appStyles, /\.accent-preset-button\[aria-pressed="true"\] \.accent-preset-check/);
+});
+
 test("theme trigger uses a DAP IconButton and preserves its dynamic label and title", () => {
   assert.ok(app.includes('const themeToggleLabel = theme === "dark" ? "切换到浅色主题" : "切换到深色主题";'));
   assert.ok(app.includes('<span className="theme-toggle-wrapper" title={themeToggleLabel}>'));

@@ -25,7 +25,11 @@ export function useTheme(): UseThemeResult {
 
   useEffect(() => {
     applyThemeAttributes(theme, document.documentElement);
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // Theme selection still works when storage is disabled.
+    }
   }, [theme]);
 
   const toggleTheme = (): void => {

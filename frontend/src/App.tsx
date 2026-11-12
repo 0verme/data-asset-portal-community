@@ -39,6 +39,7 @@ import {
 import { useAssetModule } from "./hooks/useAssetModule.ts";
 import { useApiAssetModule } from "./hooks/useApiAssetModule.ts";
 import { useAuthSession } from "./hooks/useAuthSession.ts";
+import { useAccent } from "./hooks/useAccent.ts";
 import { useIndicatorModule } from "./hooks/useIndicatorModule.ts";
 import { useManualCodeTableModule } from "./hooks/useManualCodeTableModule.ts";
 import { usePublicCatalogConfig } from "./hooks/usePublicCatalogConfig.ts";
@@ -187,6 +188,7 @@ export default function App(): React.ReactElement {
     setLineageFocusRequest(null);
   }, [module]);
 
+  const { accent, setAccent } = useAccent();
   const { theme, toggleTheme } = useTheme();
   const themeToggleLabel = theme === "dark" ? "切换到浅色主题" : "切换到深色主题";
   const { statusOptions: rawStatusOptions } = useStatusOptions();
@@ -980,6 +982,33 @@ export default function App(): React.ReactElement {
                 icon={<Icon name={theme === "dark" ? "sun" : "moon"} size={16} />}
               />
             </span>
+
+            <div className="accent-preset-group" role="group" aria-label="主题色">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="accent-preset-button"
+                aria-label="绿色"
+                aria-pressed={accent === "green"}
+                onClick={() => setAccent("green")}
+              >
+                <span className="accent-preset-dot accent-preset-dot-green" aria-hidden="true" />
+                <span className="accent-preset-check" aria-hidden="true">{accent === "green" ? "✓" : ""}</span>
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="accent-preset-button"
+                aria-label="紫色"
+                aria-pressed={accent === "purple"}
+                onClick={() => setAccent("purple")}
+              >
+                <span className="accent-preset-dot accent-preset-dot-purple" aria-hidden="true" />
+                <span className="accent-preset-check" aria-hidden="true">{accent === "purple" ? "✓" : ""}</span>
+              </Button>
+            </div>
 
             <AuthBar
               auth={auth}
