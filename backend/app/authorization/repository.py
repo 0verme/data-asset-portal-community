@@ -16,20 +16,12 @@
 
 from __future__ import annotations
 
-import os
 import re
 from collections.abc import Callable, Iterable
 from typing import Any
 
 from ..application.identity import Identity
-from ..db.facade import (
-    AUTH_PROFILE_ENV,
-    DEFAULT_PROFILE_ENV,
-    fetch_all,
-    get_db_profile,
-    load_db_profiles,
-    resolve_db_profile_name,
-)
+from ..db.facade import fetch_all, get_db_profile, resolve_db_profile_name
 from ..db.providers import gaussdb_schema_sql_identifier
 from ..db.registry import get_provider
 from .core import AuthorizationSubject
@@ -39,13 +31,7 @@ _ENABLED_VALUES = frozenset({"Y", "YES", "TRUE", "1", "ACTIVE", "ENABLED"})
 
 
 def _resolve_auth_profile() -> str:
-    profiles = load_db_profiles()
-    for env_name in (AUTH_PROFILE_ENV, DEFAULT_PROFILE_ENV):
-        value = os.getenv(env_name, "").strip()
-        if value and value in profiles:
-            return value
-    if "primary" in profiles:
-        return "primary"
+    """Use the same validated application metadata profile as authentication."""
     return resolve_db_profile_name()
 
 

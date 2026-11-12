@@ -410,6 +410,10 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
                 },
                 clear=False,
             ),
+            patch(
+                "backend.app.db.facade.get_db_profile",
+                return_value={"type": "gaussdb", "schema": "dap"},
+            ),
             patch.object(
                 lineage_service,
                 "get_db_profile",

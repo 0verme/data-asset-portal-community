@@ -52,10 +52,13 @@ DEFAULT_DRIVER = DEFAULT_GAUSS_DRIVER
 DEFAULT_CONFIG_PATH = ROOT_DIR / "configs" / "database.yaml"
 DEFAULT_JAR = ROOT_DIR / "resources" / "jars" / "gaussdb-jdbc.jar"  # placeholder; driver is not bundled
 DEFAULT_PROFILE_ENV = "ASSET_DB_PROFILE"
+# Deprecated compatibility input: it may only corroborate ASSET_DB_PROFILE;
+# it can never select the application metadata database.
 AUTH_PROFILE_ENV = "ASSET_AUTH_DB_PROFILE"
 LOGGER = logging.getLogger(__name__)
 _ACTIVE_TRANSACTION = ContextVar("active_database_transaction", default=None)
 _ENGINE_CACHE = {}
+_LEGACY_AUTH_PROFILE_WARNING_EMITTED = False
 
 
 class _DatabaseTransaction:
@@ -153,7 +156,51 @@ def _resolve_default_jar_path() -> Path:
 
 
 def resolve_db_profile_name(env_var: str = DEFAULT_PROFILE_ENV, fallback: str | None = None) -> str:
+    """Resolve a profile name, validating the single application DB selector.
+
+    The default application path is deliberately strict: ASSET_DB_PROFILE is
+    required, the named profile must exist and validate, and the deprecated
+    ASSET_AUTH_DB_PROFILE may only match it. Explicit ``env_var``/``fallback``
+    arguments remain available to isolated operational tooling and tests.
+    """
     profile = os.getenv(env_var, "").strip()
+    if env_var == DEFAULT_PROFILE_ENV and fallback is None:
+        legacy_auth_profile = os.getenv(AUTH_PROFILE_ENV, "").strip()
+        if legacy_auth_profile:
+            profiles = load_db_profiles()
+            if legacy_auth_profile not in profiles:
+                raise KeyError(
+                    f"database profile not found for deprecated {AUTH_PROFILE_ENV}"
+                )
+            if not profile:
+                raise RuntimeError(
+                    f"Missing required database profile env var: {DEFAULT_PROFILE_ENV}; "
+                    f"{AUTH_PROFILE_ENV} cannot be used as a replacement"
+                )
+            if legacy_auth_profile != profile:
+                raise ValueError(
+                    f"{AUTH_PROFILE_ENV} conflicts with {DEFAULT_PROFILE_ENV}; "
+                    "remove the legacy setting or make it match"
+                )
+            global _LEGACY_AUTH_PROFILE_WARNING_EMITTED
+            if not _LEGACY_AUTH_PROFILE_WARNING_EMITTED:
+                LOGGER.warning(
+                    "%s is deprecated and does not select a database; remove it "
+                    "after confirming it matches %s",
+                    AUTH_PROFILE_ENV,
+                    DEFAULT_PROFILE_ENV,
+                )
+                _LEGACY_AUTH_PROFILE_WARNING_EMITTED = True
+
+        if not profile:
+            raise RuntimeError(
+                f"Missing required database profile env var: {DEFAULT_PROFILE_ENV}"
+            )
+        # Fail before business queries for missing profiles or invalid provider
+        # configuration; this does not establish a connection.
+        get_db_profile(profile)
+        return profile
+
     if profile:
         return profile
     if fallback:
