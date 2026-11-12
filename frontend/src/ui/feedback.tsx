@@ -83,10 +83,10 @@ export function ToastHost({ children }: ToastHostProps) {
         return;
       }
 
-      // Leave a 24px clearance above the bar's actual viewport position. This
-      // accommodates the toast's entry motion while avoiding a fixed offset
-      // that varies with sticky-bar height and scroll.
-      const bottom = Math.max(12, window.innerHeight - actionBar.getBoundingClientRect().top + 24);
+      // Reserve 27px above the bar's actual viewport position. Kumo's toast
+      // surface remains translated during its entry motion, so the extra
+      // clearance keeps the visible surface at least 8px above the sticky bar.
+      const bottom = Math.max(12, window.innerHeight - actionBar.getBoundingClientRect().top + 27);
       region.style.setProperty("--dap-toast-action-bar-bottom", `${bottom}px`);
     };
 

@@ -194,8 +194,9 @@ test("long report save failures keep input, locate field conflicts, and show ord
   const notifications = page.getByRole("region", { name: "Notifications" });
   const serviceError = notifications.getByText("服务暂时不可用，请稍后重试。", { exact: true });
   await expect(serviceError).toBeVisible();
-  const errorToast = serviceError.locator("xpath=ancestor::div[contains(@class, 'ring-kumo-danger')][1]");
-  await expect(errorToast).toBeVisible();
+  const errorToastSurface = serviceError.locator("xpath=ancestor::*[@data-kumo-part='surface'][1]");
+  await expect(errorToastSurface).toBeVisible();
+  await expect(errorToastSurface).toHaveClass(/ring-kumo-danger/);
   await expect.poll(() => saveRequests).toBe(3);
   await expect(code).toHaveValue("RPT_E2E_UNAVAILABLE");
   await expect(page.getByRole("heading", { name: "保存失败" })).toHaveCount(0);
@@ -203,12 +204,13 @@ test("long report save failures keep input, locate field conflicts, and show ord
   const actionBar = page.locator(".form-action-bar");
   expect(Number(await notifications.evaluate((element) => getComputedStyle(element).zIndex)))
     .toBeGreaterThan(Number(await actionBar.evaluate((element) => getComputedStyle(element).zIndex)));
-  const toastBox = await errorToast.boundingBox();
+  const toastBox = await errorToastSurface.boundingBox();
   const actionBarBox = await actionBar.boundingBox();
   expect(toastBox).not.toBeNull();
   expect(actionBarBox).not.toBeNull();
   const toastToActionBarGap = actionBarBox!.y - (toastBox!.y + toastBox!.height);
-  expect(toastToActionBarGap).toBeGreaterThanOrEqual(8);
+  expect(toastToActionBarGap, "the visible Toast surface must stay 8–24px above the mobile action bar")
+    .toBeGreaterThanOrEqual(8);
   expect(toastToActionBarGap).toBeLessThanOrEqual(24);
   expect(toastBox!.y).toBeGreaterThanOrEqual(0);
   expect(toastBox!.y + toastBox!.height).toBeLessThanOrEqual(844);
@@ -220,5 +222,7 @@ test("long report save failures keep input, locate field conflicts, and show ord
   await expect(successToast).toHaveCount(0);
   await successfulSubmit;
   await expect(successToast).toBeVisible();
+  const successToastSurface = successToast.locator("xpath=ancestor::*[@data-kumo-part='surface'][1]");
+  await expect(successToastSurface).toHaveClass(/ring-kumo-success/);
   await expect(page.locator(".page-title")).toContainText("报表资产");
 });
