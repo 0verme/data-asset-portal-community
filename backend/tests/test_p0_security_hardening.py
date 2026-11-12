@@ -166,8 +166,8 @@ class ErrorSanitizationTests(unittest.TestCase):
 
         with (
             patch(
-                "backend.app.services.auth_service.load_db_profiles",
-                return_value={"primary": {"type": "postgres"}},
+                "backend.app.services.auth_service.resolve_db_profile_name",
+                return_value="synthetic-test-profile",
             ),
             patch("backend.app.db.service.fetch_all_core", side_effect=_boom),
             self.assertRaises(AuthError) as ctx,

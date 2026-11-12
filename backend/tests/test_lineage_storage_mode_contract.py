@@ -14,6 +14,7 @@ class LineageStorageModeContractTests(unittest.TestCase):
         selected_config = config or {"type": "postgres", "schema": "custom_metadata"}
         with (
             patch.dict(os.environ, values, clear=True),
+            patch("backend.app.db.facade.get_db_profile", return_value=selected_config),
             patch.object(
                 lineage_service, "get_db_profile", return_value=selected_config
             ) as get_profile,
@@ -59,6 +60,7 @@ class LineageStorageModeContractTests(unittest.TestCase):
     def test_invalid_dap_profile_fails_closed_without_demo_fallback(self):
         with (
             patch.dict(os.environ, {"ASSET_DB_PROFILE": "missing"}, clear=True),
+            patch("backend.app.db.facade.get_db_profile", side_effect=KeyError("missing")),
             patch.object(
                 lineage_service, "get_db_profile", side_effect=KeyError("missing")
             ),

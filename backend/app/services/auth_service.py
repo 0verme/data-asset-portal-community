@@ -17,13 +17,12 @@ from __future__ import annotations
 # pyright: reportMissingImports=false
 
 import logging
-import os
 
 from sqlalchemy import func, select, update
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..db.base import DatabaseConnectionError, redact_sensitive_text
-from ..db.facade import AUTH_PROFILE_ENV, DEFAULT_PROFILE_ENV, load_db_profiles, resolve_db_profile_name
+from ..db.facade import resolve_db_profile_name
 from ..db.service import CoreAccess
 from ..db.tables import admin_user
 from ..settings import get_runtime_debug, get_runtime_environment
@@ -47,8 +46,8 @@ _AUTH_FAILURE_CODES = {
     "execution": "AUTH_DATA_SOURCE_EXECUTION_ERROR",
 }
 _AUTH_FAILURE_HINTS = {
-    "configuration": "检查数据库配置文件路径、认证 profile 及其必填字段。",
-    "unavailable": "检查数据库进程、网络连通性和认证 profile。",
+    "configuration": "检查数据库配置文件路径、ASSET_DB_PROFILE 及所选 Profile 的必填字段。",
+    "unavailable": "检查 DAP 元数据库进程、网络连通性和所选 Profile。",
     "query": "检查认证表结构、迁移状态和数据库权限。",
     "execution": "检查认证表结构、数据库写权限和事务状态。",
 }
@@ -199,19 +198,6 @@ class AuthService:
         )
 
     def _profile(self) -> str:
-        available_profiles = load_db_profiles()
-
-        explicit_profile = os.getenv(AUTH_PROFILE_ENV, "").strip()
-        if explicit_profile and explicit_profile in available_profiles:
-            return explicit_profile
-
-        default_profile = os.getenv(DEFAULT_PROFILE_ENV, "").strip()
-        if default_profile and default_profile in available_profiles:
-            return default_profile
-
-        if "primary" in available_profiles:
-            return "primary"
-
         return resolve_db_profile_name()
 
     @staticmethod
@@ -241,26 +227,14 @@ class AuthService:
 
     def _fetch_rows(self, statement) -> list[dict]:
         try:
-            selected_profile = self._profile()
-            LOGGER.info(
-                "Auth query profile resolved to %s (ASSET_AUTH_DB_PROFILE=%s, ASSET_DB_PROFILE=%s)",
-                selected_profile,
-                os.getenv(AUTH_PROFILE_ENV),
-                os.getenv(DEFAULT_PROFILE_ENV),
-            )
+            # CoreAccess resolves once and passes that exact profile to the DB
+            # facade; do not resolve separately for diagnostics and execution.
             return self._db.fetch_rows(statement)
         except Exception as error:
             raise self._map_data_source_error(error, "query") from error
 
     def _execute(self, statement) -> int:
         try:
-            selected_profile = self._profile()
-            LOGGER.info(
-                "Auth update profile resolved to %s (ASSET_AUTH_DB_PROFILE=%s, ASSET_DB_PROFILE=%s)",
-                selected_profile,
-                os.getenv(AUTH_PROFILE_ENV),
-                os.getenv(DEFAULT_PROFILE_ENV),
-            )
             return self._db.execute(statement)
         except Exception as error:
             raise self._map_data_source_error(error, "execution") from error

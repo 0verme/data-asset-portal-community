@@ -314,6 +314,10 @@ class LineageNoImplicitPocTestCase(unittest.TestCase):
                         },
                         clear=True,
                     ),
+                    patch(
+                        "backend.app.db.facade.get_db_profile",
+                        return_value={"type": "sqlite", "database": ":memory:"},
+                    ),
                     patch.object(
                         lineage_service,
                         "get_db_profile",
