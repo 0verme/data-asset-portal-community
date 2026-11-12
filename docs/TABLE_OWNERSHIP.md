@@ -30,10 +30,10 @@
 `lineage` 模块、持久化 storage 和外部 collector 是三个不同概念：
 
 - `p_lineage_snapshot`、`p_lineage_node`、`p_lineage_edge` 是仓库自身的 canonical storage，由 baseline 和 forward migration 创建；其 source/content/ingestion bookkeeping 由 `0004_metadata_ingestion_identity` 维护；
-- `ASSET_DB_PROFILE` 同时为资产元数据与血缘选择 DAP 参数库（含其物理 Schema），不另设 lineage profile；
+- `ASSET_DB_PROFILE` 为全部 DAP 内部元数据（包括认证/RBAC/血缘）选择数据库（含其物理 Schema），不另设模块 Profile；
 - `LINEAGE_DB_PROFILE`、`LINEAGE_STORAGE_MODE` 已废弃并被忽略，任何环境都不再有受控 POC snapshot 回退；
 - 没有 ACTIVE 快照是正常空状态（`no_active_snapshot`），配置缺失/无效与库不可达分别报 `LINEAGE_CONFIGURATION_ERROR` 和 `LINEAGE_DATA_SOURCE_ERROR`；
-- `backend/app/services/lineage_collector.py` 只有在外部 scheduler/source profile 可用时才执行采集，不影响 lineage route 和模块存在性。
+- `backend/app/services/lineage_collector.py` 读取 scheduler 元数据并写入血缘快照；显式 CLI/Collector Profile 必须与 `ASSET_DB_PROFILE` 一致，外部数据接入适配器不因此改选库。
 
 缺少 storage/profile/collector 时，API 返回现有 `LINEAGE_CONFIGURATION_ERROR` 或 `LINEAGE_DATA_SOURCE_ERROR`，不使用 Edition 名义返回 404。
 

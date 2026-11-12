@@ -12,7 +12,13 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from app.db.facade import database_transaction, execute_sql, fetch_all, get_db_profile
+from app.db.facade import (
+    database_transaction,
+    execute_sql,
+    fetch_all,
+    get_db_profile,
+    resolve_cli_db_profile_name,
+)
 
 
 SEED_OPERATOR = "term_root_seed"
@@ -224,7 +230,10 @@ def _parser():
     command.add_argument("--apply", action="store_true")
     command.add_argument("--cleanup", action="store_true")
     parser.add_argument("--limit", type=int, help="Apply or preview no more than this many corpus rows.")
-    parser.add_argument("--profile", default=os.getenv("ASSET_DB_PROFILE", "primary"), help="Existing named DB profile.")
+    parser.add_argument(
+        "--profile",
+        help="Explicit operational target; defaults to the validated ASSET_DB_PROFILE.",
+    )
     parser.add_argument("--config", help="Existing database profile configuration file.")
     return parser
 
@@ -306,20 +315,21 @@ def main(argv=None):
     args = _parser().parse_args(argv)
     if args.config:
         os.environ["ASSET_DB_CONFIG_PATH"] = args.config
-    config = get_db_profile(args.profile)
-    print(f"target={_safe_target(args.profile, config)} corpus={len(_seed_items())}")
+    profile = resolve_cli_db_profile_name(args.profile)
+    config = get_db_profile(profile)
+    print(f"target={_safe_target(profile, config)} corpus={len(_seed_items())}")
     if args.cleanup:
         if args.limit is not None:
             raise ValueError("--limit cannot be used with --cleanup")
-        print(f"action=cleanup deleted_roots={_cleanup(args.profile)}")
+        print(f"action=cleanup deleted_roots={_cleanup(profile)}")
         return 0
-    items, pending, duplicates = _plan(args.profile, args.limit)
+    items, pending, duplicates = _plan(profile, args.limit)
     print(f"action={'dry-run' if args.dry_run else 'apply'} requested={len(items)} insertable={len(pending)} existing={len(duplicates)}")
     if duplicates:
         print("existing_abbrs=" + ",".join(duplicates))
     if args.dry_run:
         return 0
-    inserted, skipped = _apply(args.profile, items)
+    inserted, skipped = _apply(profile, items)
     print(f"inserted={inserted} skipped_existing={skipped}")
     return 0
 

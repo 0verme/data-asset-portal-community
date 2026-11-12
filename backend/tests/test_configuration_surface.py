@@ -24,7 +24,8 @@ class ConfigurationSurfaceTests(unittest.TestCase):
         self.assertIn("ASSET_DB_PROFILE", template)
         # Relative cwd-dependent path must not be the active default assignment.
         self.assertNotRegex(template, r"(?m)^ASSET_DB_CONFIG_PATH=backend/")
-        self.assertIn("ASSET_AUTH_DB_PROFILE", template)
+        self.assertNotRegex(template, r"(?m)^ASSET_AUTH_DB_PROFILE=")
+        self.assertIn("Remove deprecated ASSET_AUTH_DB_PROFILE", template)
 
     def test_advanced_document_preserves_database_and_runtime_contracts(self):
         documentation = (ROOT / "docs/configuration.md").read_text(encoding="utf-8")

@@ -208,6 +208,26 @@ def resolve_db_profile_name(env_var: str = DEFAULT_PROFILE_ENV, fallback: str | 
     raise RuntimeError(f"Missing required database profile env var: {env_var}")
 
 
+def resolve_cli_db_profile_name(explicit_profile: str | None = None) -> str:
+    """Resolve a maintenance CLI target without an implicit Profile fallback.
+
+    An explicitly supplied target is permitted for operational tools, but is
+    still validated before use. If the deprecated auth selector is present,
+    validate its compatibility with ASSET_DB_PROFILE first so an explicit CLI
+    target cannot hide a broken application configuration.
+    """
+    if explicit_profile is None:
+        return resolve_db_profile_name()
+
+    profile = str(explicit_profile).strip()
+    if not profile:
+        raise RuntimeError("Explicit database profile must not be blank")
+    if os.getenv(AUTH_PROFILE_ENV, "").strip():
+        resolve_db_profile_name()
+    get_db_profile(profile)
+    return profile
+
+
 CONFIG_PATH = _resolve_config_path()
 
 

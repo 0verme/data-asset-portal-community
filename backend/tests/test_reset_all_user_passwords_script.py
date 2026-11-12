@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend.scripts.reset_all_user_passwords import (
+    describe_target,
     preview_password_reset,
     reset_all_user_passwords,
     resolve_profile,
@@ -17,21 +18,22 @@ class ResetAllUserPasswordsScriptUnitTests(unittest.TestCase):
         self._tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self._tempdir.cleanup)
         self.config_path = Path(self._tempdir.name) / "database.yaml"
+        profile_config = {
+            name: {
+                "type": "postgres",
+                "host": "127.0.0.1",
+                "port": 5432,
+                "database": f"asset_portal_{name}",
+                "schema": "dwp",
+                "user": "test",
+                "password": "synthetic_reset_password",
+            }
+            for name in ("auth_test", "asset_test", "primary")
+        }
+        import yaml
+
         self.config_path.write_text(
-            "\n".join(
-                [
-                    "profiles:",
-                    "  auth_test:",
-                    "    type: postgres",
-                    "    host: 127.0.0.1",
-                    "    port: 5432",
-                    "    database: asset_portal_test",
-                    "    user: test",
-                    "    password: test",
-                    "",
-                ]
-            ),
-            encoding="utf-8",
+            yaml.safe_dump({"profiles": profile_config}), encoding="utf-8"
         )
         self._original_env = {
             key: os.getenv(key)
@@ -49,10 +51,48 @@ class ResetAllUserPasswordsScriptUnitTests(unittest.TestCase):
             else:
                 os.environ[key] = value
 
-    def test_resolve_profile_prefers_auth_profile(self):
-        self.assertEqual(resolve_profile(), "auth_test")
+    def _profile_env(self, **values):
+        environment = {"ASSET_DB_CONFIG_PATH": str(self.config_path)}
+        environment.update(values)
+        return patch.dict(os.environ, environment, clear=True)
 
-    def test_preview_does_not_mutate_and_uses_auth_profile(self):
+    def test_legacy_auth_profile_cannot_replace_missing_asset_profile(self):
+        with self.assertRaisesRegex(RuntimeError, "cannot be used as a replacement"):
+            resolve_profile()
+
+    def test_asset_auth_profile_conflict_is_not_silently_selected(self):
+        with self._profile_env(
+            ASSET_DB_PROFILE="asset_test", ASSET_AUTH_DB_PROFILE="auth_test"
+        ), self.assertRaisesRegex(ValueError, "conflicts"):
+            resolve_profile()
+
+    def test_matching_legacy_auth_profile_is_only_a_warning(self):
+        with self._profile_env(
+            ASSET_DB_PROFILE="auth_test", ASSET_AUTH_DB_PROFILE="auth_test"
+        ), patch("app.db.facade._LEGACY_AUTH_PROFILE_WARNING_EMITTED", False):
+            with self.assertLogs("app.db.facade", level="WARNING") as logs:
+                self.assertEqual("auth_test", resolve_profile())
+        self.assertTrue(any("deprecated" in item for item in logs.output))
+
+    def test_explicit_profile_is_validated_and_may_be_selected_as_cli_target(self):
+        with self._profile_env(ASSET_DB_PROFILE="asset_test"):
+            self.assertEqual("auth_test", resolve_profile("auth_test"))
+
+    def test_invalid_explicit_profile_does_not_fall_back(self):
+        with self._profile_env(ASSET_DB_PROFILE="asset_test"):
+            with self.assertRaisesRegex(KeyError, "profile not found"):
+                resolve_profile("missing_profile")
+
+    def test_target_summary_shows_database_and_schema_without_credentials(self):
+        with self._profile_env():
+            summary = describe_target("auth_test")
+        self.assertIn("profile=auth_test", summary)
+        self.assertIn("provider=postgres", summary)
+        self.assertIn("database=asset_portal_auth_test", summary)
+        self.assertIn("schema=dwp", summary)
+        self.assertNotIn("synthetic_reset_password", summary)
+
+    def test_preview_does_not_mutate_with_explicit_profile(self):
         with patch(
             "backend.scripts.reset_all_user_passwords.fetch_all",
             return_value=(["id", "username"], [(1, "admin"), (2, "user")]),

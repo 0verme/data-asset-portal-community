@@ -165,7 +165,6 @@ VITE_BACKEND_URL=http://localhost:15099
 ```env
 # backend/.env.local
 ASSET_DB_PROFILE=primary
-ASSET_AUTH_DB_PROFILE=primary
 APP_SECRET_KEY=<generate-a-strong-random-value>
 # Explicit local-development setting: permits HTTP session cookies locally.
 APP_ENV=development
@@ -174,6 +173,10 @@ PUBLIC_CATALOG_EXPORT_ENABLED=false
 # Vite uses a same-origin /api proxy by default, so normally leave this unset.
 # APP_CORS_ORIGINS=http://localhost:5173
 ```
+
+认证、RBAC、血缘与业务元数据都会使用 `ASSET_DB_PROFILE`。旧环境中的
+`ASSET_AUTH_DB_PROFILE` 仅在与其相同时临时警告兼容；冲突、无效或只设置旧变量均 fail closed，
+请先确认认证表已位于选定 Profile/Schema，再从部署环境移除旧变量。
 
 ### 后端安全运行时配置
 

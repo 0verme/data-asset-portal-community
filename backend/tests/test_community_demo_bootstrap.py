@@ -203,6 +203,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
     def test_redirected_database_path_is_rejected(self):
         outside_database = self.root / "user.sqlite"
         outside_database.write_text("user data", encoding="utf-8")
+        self.paths.database.parent.mkdir(parents=True, exist_ok=True)
         try:
             self.paths.database.symlink_to(outside_database)
         except (OSError, NotImplementedError) as error:
@@ -233,7 +234,12 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
                 "PGSERVICE": "production",
                 "MYSQL_HOST": "example.invalid",
                 "DB_HOST": "example.invalid",
+                "DATABASE_PASSWORD": "synthetic-not-a-real-secret",
+                "PGPASSFILE": "/synthetic/pgpass",
+                "POSTGRES_PASSWORD": "synthetic-not-a-real-secret",
+                "MYSQL_PWD": "synthetic-not-a-real-secret",
                 "ASSET_DB_PROFILE": "primary",
+                "ASSET_AUTH_DB_PROFILE": "production_auth",
                 "ASSET_DB_DATABASE": "production",
                 "VITE_API_MODE": "mock",
                 "KEEP_ME": "unchanged",
@@ -247,7 +253,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         self.assertEqual(
             str(self.paths.database.resolve()), environment["ASSET_DB_DATABASE"]
         )
-        self.assertEqual("community_sqlite", environment["ASSET_AUTH_DB_PROFILE"])
+        self.assertNotIn("ASSET_AUTH_DB_PROFILE", environment)
         self.assertNotIn("BACKEND_RUNTIME", environment)
         # Deprecated lineage selectors must never survive into the demo child env.
         self.assertNotIn("LINEAGE_DB_PROFILE", environment)
@@ -266,6 +272,10 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             "PGSERVICE",
             "MYSQL_HOST",
             "DB_HOST",
+            "DATABASE_PASSWORD",
+            "PGPASSFILE",
+            "POSTGRES_PASSWORD",
+            "MYSQL_PWD",
             "FLASK_ENV",
             "FLASK_DEBUG",
             "FLASK_SECRET_KEY",
@@ -456,6 +466,73 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
                 self.assertEqual("community_sqlite", os.environ["ASSET_DB_PROFILE"])
                 settings.load_runtime_env(overwrite=True)
                 self.assertEqual("primary", os.environ["ASSET_DB_PROFILE"])
+
+    def test_demo_bootstrap_ignores_external_database_settings_from_env_files(self):
+        settings = importlib.import_module("backend.app.settings")
+
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / ".env.local"
+            env_file.write_text(
+                "ASSET_DB_PROFILE=primary\n"
+                "ASSET_AUTH_DB_PROFILE=production_auth\n"
+                "LINEAGE_DB_PROFILE=production_lineage\n"
+                "LINEAGE_STORAGE_MODE=poc\n"
+                "ASSET_DB_PASSWORD=synthetic-not-a-real-secret\n"
+                "DATABASE_URL=postgresql://example.invalid/test\n"
+                "PGHOST=example.invalid\n"
+                "MYSQL_PASSWORD=synthetic-not-a-real-secret\n"
+                "DB_HOST=example.invalid\n"
+                "DATABASE_PASSWORD=synthetic-not-a-real-secret\n"
+                "PGPASSFILE=/synthetic/pgpass\n"
+                "POSTGRES_PASSWORD=synthetic-not-a-real-secret\n"
+                "MYSQL_PWD=synthetic-not-a-real-secret\n",
+                encoding="utf-8",
+            )
+            with (
+                patch.object(settings, "_ENV_FILES", (env_file,)),
+                patch.dict(
+                    os.environ,
+                    {
+                        "COMMUNITY_DEMO_BOOTSTRAP": "1",
+                        "ASSET_DB_PROFILE": "community_sqlite",
+                    },
+                    clear=True,
+                ),
+            ):
+                settings.load_runtime_env(overwrite=False)
+                self.assertEqual("community_sqlite", os.environ["ASSET_DB_PROFILE"])
+                for name in (
+                    "ASSET_AUTH_DB_PROFILE",
+                    "LINEAGE_DB_PROFILE",
+                    "LINEAGE_STORAGE_MODE",
+                    "ASSET_DB_PASSWORD",
+                    "DATABASE_URL",
+                    "PGHOST",
+                    "MYSQL_PASSWORD",
+                    "DB_HOST",
+                    "DATABASE_PASSWORD",
+                    "PGPASSFILE",
+                    "POSTGRES_PASSWORD",
+                    "MYSQL_PWD",
+                ):
+                    self.assertNotIn(name, os.environ)
+                settings.load_runtime_env(overwrite=True)
+                self.assertEqual("community_sqlite", os.environ["ASSET_DB_PROFILE"])
+                for name in (
+                    "ASSET_AUTH_DB_PROFILE",
+                    "LINEAGE_DB_PROFILE",
+                    "LINEAGE_STORAGE_MODE",
+                    "ASSET_DB_PASSWORD",
+                    "DATABASE_URL",
+                    "PGHOST",
+                    "MYSQL_PASSWORD",
+                    "DB_HOST",
+                    "DATABASE_PASSWORD",
+                    "PGPASSFILE",
+                    "POSTGRES_PASSWORD",
+                    "MYSQL_PWD",
+                ):
+                    self.assertNotIn(name, os.environ)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,8 @@ from ..db.facade import (
     execute_many,
     execute_sql,
     fetch_all,
+    resolve_cli_db_profile_name,
+    resolve_db_profile_name,
 )
 from .lineage.scheduler import (
     DEFAULT_JOB_TABLE,
@@ -335,9 +337,26 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         )
 
 
-def collect_and_publish(profile, *, dry_run=False):
+def resolve_collection_profile(profile: str) -> str:
+    """Require the explicit collector target to be the selected DAP profile."""
+    explicit_profile = resolve_cli_db_profile_name(profile)
+    application_profile = resolve_db_profile_name()
+    if explicit_profile != application_profile:
+        raise ValueError(
+            "lineage collection --profile must match ASSET_DB_PROFILE; "
+            "refusing to read or publish against another internal database"
+        )
+    return application_profile
+
+
+def _collect_resolved_profile(profile: str, *, dry_run: bool = False):
     job_rows, table_job_rows = load_source_rows(profile)
     snapshot = build_snapshot(job_rows, table_job_rows)
     if not dry_run:
         publish_snapshot(profile, snapshot)
     return snapshot
+
+
+def collect_and_publish(profile, *, dry_run=False):
+    resolved_profile = resolve_collection_profile(profile)
+    return _collect_resolved_profile(resolved_profile, dry_run=dry_run)

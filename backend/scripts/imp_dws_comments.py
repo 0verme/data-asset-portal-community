@@ -110,7 +110,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--profile",
         default=None,
-        help="Source metadata database profile. Defaults to ASSET_DB_PROFILE or gauss_primary.",
+        help="Explicit source metadata profile. Defaults to the validated ASSET_DB_PROFILE.",
     )
     parser.add_argument(
         "--directory",
@@ -861,13 +861,15 @@ def execute_import(
     return summary
 
 
+def resolve_source_profile(explicit_profile: str | None) -> str:
+    """Keep explicit external-source targets; never guess a built-in Profile."""
+    profile = (explicit_profile or "").strip()
+    return profile or resolve_db_profile_name()
+
+
 def main() -> None:
     args = parse_args()
-    profile = (
-        (args.profile or "").strip()
-        or os.environ.get("ASSET_DB_PROFILE", "").strip()
-        or resolve_db_profile_name(fallback="gauss_primary")
-    )
+    profile = resolve_source_profile(args.profile)
     api_base_url = (args.api_base_url or "").strip()
     if not api_base_url:
         raise SystemExit("--api-base-url or DAP_API_BASE_URL is required")
