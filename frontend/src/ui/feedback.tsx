@@ -83,10 +83,9 @@ export function ToastHost({ children }: ToastHostProps) {
         return;
       }
 
-      // Reserve 27px above the bar's actual viewport position. Kumo's toast
-      // surface remains translated during its entry motion, so the extra
-      // clearance keeps the visible surface at least 8px above the sticky bar.
-      const bottom = Math.max(12, window.innerHeight - actionBar.getBoundingClientRect().top + 27);
+      // Keep the notification region aligned to the bar's actual viewport
+      // position; the visible Kumo surface is verified against the 8–24px gap.
+      const bottom = Math.max(12, window.innerHeight - actionBar.getBoundingClientRect().top + 24);
       region.style.setProperty("--dap-toast-action-bar-bottom", `${bottom}px`);
     };
 
