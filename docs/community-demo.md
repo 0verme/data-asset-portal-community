@@ -124,7 +124,7 @@ CI 或只想初始化数据库时，不启动常驻服务：
 
 脚本不会覆盖或 merge 用户已有的 `.env`、`.env.local`、`backend/.env*` 或 `frontend/.env.local`。
 后端 Demo 子进程会显式固定 `community` + `community_sqlite` + 已知本地 SQLite 路径，并隔离继承的
-`LINEAGE_DB_PROFILE`、`LINEAGE_STORAGE_MODE`、`DATABASE_URL`、`PG*`、`MYSQL_*`、`DB_*` 和 `ASSET_DB_*` 变量；血缘因此与其他 DAP 元数据一样读取同一份 Demo SQLite 参数库，不会因为用户 shell 或配置文件中的外部数据库设置而连接生产库。Demo 库没有 ACTIVE 血缘快照时，血缘页显示 `no_active_snapshot` 空状态，不会生成演示图。
+`ASSET_AUTH_DB_PROFILE`、`LINEAGE_DB_PROFILE`、`LINEAGE_STORAGE_MODE`、`DATABASE_URL`、`PG*`、`MYSQL_*`、`DB_*` 和 `ASSET_DB_*` 变量；Demo 子进程只设置 `ASSET_DB_PROFILE=community_sqlite`。Demo 专用 dotenv 加载也跳过旧 selector 与外部数据库连接变量，且不会修改用户配置文件；认证/RBAC/血缘因此与其他 DAP 元数据一样读取同一份隔离 SQLite 参数库，不会因为 shell 或 `.env*` 中的外部数据库设置而连接生产库。Demo 库没有 ACTIVE 血缘快照时，血缘页显示 `no_active_snapshot` 空状态，不会生成演示图。
 
 默认不提供 destructive reset。若要重新开始，请在确认路径确实是本 bootstrap 创建的
 `.demo/community-demo/` 后，手工移除该目录，再重新运行命令；不要删除用户 `.env` 或其他 SQLite 文件。

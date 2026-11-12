@@ -655,7 +655,7 @@ Base Path: `/api/field-mappings`
 }
 ```
 
-DWS 解析脚本保留源端只读 metadata 查询，但不再连接或写入 Portal 的 mapping business tables。脚本通过现有 signed session cookie 认证，不引入第二套 token 管理；凭据只通过安全运行时变量注入。例如：
+DWS 解析脚本保留源端只读 metadata 查询，但不再连接或写入 Portal 的 mapping business tables。需要连接不同于默认 DAP Profile 的外部源库时，继续使用显式 `--profile <source-profile>`；省略时只采用经校验的 `ASSET_DB_PROFILE`，不再回退到 `gauss_primary`。显式源端 Profile 不改变 Portal API 服务端写入其自身 `ASSET_DB_PROFILE` 的契约。脚本通过现有 signed session cookie 认证，不引入第二套 token 管理；凭据只通过安全运行时变量注入。例如：
 
 ```powershell
 $env:DAP_SESSION_COOKIE = 'session=<signed-cookie-value>'

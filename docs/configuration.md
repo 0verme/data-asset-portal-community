@@ -241,19 +241,30 @@ deployment, copy `backend/configs/database.example.yaml` to
 from the backend package, not process cwd). Set `ASSET_DB_CONFIG_PATH` only when
 you need an absolute, environment-specific YAML. Community runtime
 (`ASSET_RUNTIME_PROFILE=community`) selects `database.community.yaml`.
-`ASSET_AUTH_DB_PROFILE` is optional; when unset, auth falls back to
-`ASSET_DB_PROFILE` (and then to an available `primary` profile when present).
+`ASSET_DB_PROFILE` is the sole internal DAP metadata database selector for
+assets, authentication, RBAC, lineage, and other application metadata.
+`ASSET_AUTH_DB_PROFILE` is deprecated and is never a selector: a matching legacy
+value is temporarily accepted with a warning; a conflict, an invalid value,
+or an auth-only configuration fails closed. Remove it after verifying the
+selected database and physical schema contain the required auth/RBAC tables.
+
+Maintenance CLIs may keep an explicit `--profile` as an operational target;
+this does not create another HTTP/runtime selector. Password reset and Seed
+CLIs without an explicit target default strictly to `ASSET_DB_PROFILE`. The
+lineage collector also requires its explicit target to match `ASSET_DB_PROFILE`.
+External source adapters may retain their own explicit source Profile input.
 
 Resolution is:
 
-1. `ASSET_DB_PROFILE` (and optional `ASSET_AUTH_DB_PROFILE`) selects profiles.
+1. `ASSET_DB_PROFILE` alone selects the application profile; `ASSET_AUTH_DB_PROFILE`
+   cannot select or replace it.
 2. YAML `defaults` are merged with the selected profile.
 3. Non-empty `ASSET_DB_*` environment overrides replace YAML/profile values.
-   This is **global to every selected named profile**, including the optional
-   authentication profile. The lineage module always consumes the final
-   `ASSET_DB_PROFILE` configuration; it has no independent profile override.
-   A separate authentication profile is not isolated from these environment
-   overrides merely by choosing a distinct profile name.
+   This is **global to every selected named profile**, including explicit CLI
+   targets. These variables remain connection/provider overrides, not Profile
+   selectors; preserve the established #414 precedence contract. Lineage reads
+   the final application profile and its effective physical schema; it has no
+   independent profile override.
 4. `ASSET_DB_JAR_PATH` overrides a GaussDB `jar_path`.
 5. A relative GaussDB `jar_path` is resolved against `backend/` (the parent of
    `configs/`); with the default `backend/configs/database.yaml`,

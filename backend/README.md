@@ -134,8 +134,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 
 | 变量 | 说明 | 常见值 |
 | --- | --- | --- |
-| `ASSET_DB_PROFILE` | 资产接口使用的数据库 profile | `primary` |
-| `ASSET_AUTH_DB_PROFILE` | 登录鉴权使用的数据库 profile | `primary` |
+| `ASSET_DB_PROFILE` | 所有 DAP 内部元数据（包括认证、RBAC、血缘）共用的数据库 Profile | `primary` |
 | `ASSET_DB_CONFIG_PATH` | 数据库配置文件路径 | `backend/configs/database.yaml` |
 | `ASSET_DB_JAR_PATH` | GaussDB JDBC jar 的环境特定绝对路径（驱动需自行从官方渠道获取；优先于 profile 的 `jar_path`） | `<absolute path to vendor JDBC jar>` |
 | `ASSET_DB_CONNECT_TIMEOUT_SECONDS` | 数据库连接超时秒数 | `30` |
@@ -145,6 +144,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 | `RAG_SEARCH_SERVICE_TOKEN` | 可选的后端到 RAG Search Service Bearer Token；通过部署 Secret 注入，不写入参数表或浏览器 | `<deployment-secret>` |
 | `APP_ENV` | Cookie/security contract 的运行环境（默认安全生产行为；开发必须显式设置） | `production`、`development` |
 | `APP_CORS_ORIGINS` | Native FastAPI 使用的精确跨域来源 allowlist，逗号分隔 | `https://portal.example.com` |
+
+`ASSET_AUTH_DB_PROFILE` 已废弃，不能再选择认证数据库：仅当其旧值与
+`ASSET_DB_PROFILE` 一致时暂时兼容并发出弃用警告；冲突、无效 Profile 或
+仅设置旧认证变量都会 fail closed。升级时先核验认证表数据位置，再移除旧变量。
 
 Session Cookie 始终使用 `HttpOnly=True` 和 `SameSite=Lax`。默认/生产环境使用 `Secure=True`；只有显式 `APP_ENV=development` 才为本地 HTTP 联调关闭 Secure。新登录写入 application-owned HMAC-SHA256 cookie；旧 cookie 在有限窗口内只读并成功请求后迁移。Nginx 或 Vite 的 `/api` 同源代理不需要 CORS；跨域部署才设置 `APP_CORS_ORIGINS`，不设置就不返回 CORS 允许头，禁止使用 `*`。不要将真实 `APP_SECRET_KEY` 写入仓库、日志或命令历史；可在受控终端本地执行 `python -c "import secrets; print(secrets.token_urlsafe(32))"` 生成后交由 secret store 保存。
 

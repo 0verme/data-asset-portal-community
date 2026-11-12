@@ -11,32 +11,31 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 from app.db.facade import (  # noqa: E402
-    AUTH_PROFILE_ENV,
-    DEFAULT_PROFILE_ENV,
     database_transaction,
     execute_many,
     fetch_all,
-    load_db_profiles,
+    get_db_profile,
+    resolve_cli_db_profile_name,
 )
+from app.db.registry import get_provider  # noqa: E402
 from app.services.auth_service import build_password_hash  # noqa: E402
 
 TABLE_ADMIN_USER = "p_admin_user"
 
 
 def resolve_profile(explicit_profile: str | None = None) -> str:
-    profiles = load_db_profiles()
-    candidates = (
-        explicit_profile,
-        os.getenv(AUTH_PROFILE_ENV),
-        os.getenv(DEFAULT_PROFILE_ENV),
-        "primary",
+    return resolve_cli_db_profile_name(explicit_profile)
+
+
+def describe_target(profile: str) -> str:
+    config = get_db_profile(profile)
+    provider = get_provider(config["type"])
+    database = config.get("database") or "<configured by DSN/JDBC URL>"
+    schema = provider.physical_schema(config) or "<provider default>"
+    return (
+        f"profile={profile} provider={provider.name} "
+        f"database={database} schema={schema}"
     )
-    for candidate in candidates:
-        profile = (candidate or "").strip()
-        if profile and profile in profiles:
-            return profile
-    available = ", ".join(sorted(profiles)) or "(none)"
-    raise RuntimeError(f"No usable database profile found. Available profiles: {available}")
 
 
 def _load_users(profile: str) -> list[tuple[int, str]]:
@@ -75,7 +74,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Reset every portal user's password to their current username.",
     )
-    parser.add_argument("--profile", help="database profile (defaults to auth/default/primary profile)")
+    parser.add_argument(
+        "--profile",
+        help="explicit operational target; defaults to the validated ASSET_DB_PROFILE",
+    )
     parser.add_argument("--config", help="database profile YAML path")
     parser.add_argument(
         "--apply",
@@ -95,8 +97,9 @@ def main(argv: list[str] | None = None) -> int:
         os.environ["ASSET_DB_CONFIG_PATH"] = args.config
 
     profile = resolve_profile(args.profile)
+    print(f"target={describe_target(profile)}")
     users = preview_password_reset(profile)
-    print(f"profile={profile} users={len(users)}")
+    print(f"users={len(users)}")
 
     if not args.apply:
         print("Dry run only. Re-run with --apply to reset all passwords.")

@@ -190,7 +190,9 @@ def _is_database_environment_key(key: str) -> bool:
         "MYSQL_PASSWORD",
     }:
         return True
-    return upper.startswith(("ASSET_DB_", "DB_", "PG_", "MYSQL_"))
+    return upper.startswith(
+        ("ASSET_DB_", "DATABASE_", "DB_", "PG", "POSTGRES", "MYSQL")
+    )
 
 
 def _validate_port(value: int | str, *, option: str = "port") -> int:
@@ -232,6 +234,7 @@ def build_demo_environment(
         and key.upper()
         not in {
             "ASSET_RUNTIME_PROFILE",
+            "ASSET_AUTH_DB_PROFILE",
             "APP_ENV",
             "APP_DEBUG",
             "APP_SECRET_KEY",
@@ -249,7 +252,6 @@ def build_demo_environment(
             "ASSET_RUNTIME_PROFILE": "community",
             "ASSET_DB_CONFIG_PATH": str(paths.database_config.resolve()),
             "ASSET_DB_PROFILE": "community_sqlite",
-            "ASSET_AUTH_DB_PROFILE": "community_sqlite",
             "ASSET_DB_TYPE": "sqlite",
             "ASSET_DB_DATABASE": str(paths.database.resolve()),
             "APP_ENV": "development",

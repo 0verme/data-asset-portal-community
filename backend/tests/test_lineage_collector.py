@@ -1,12 +1,15 @@
 import unittest
 from unittest.mock import patch
 
+from backend.app.services import lineage_collector
 from backend.app.services.lineage_collector import (
     build_snapshot,
+    collect_and_publish,
     is_dwf_table,
     normalize_table_name,
     parse_dependencies,
     publish_snapshot,
+    resolve_collection_profile,
 )
 from backend.tests.db_test_support import skip_without_postgres_integration
 
@@ -62,6 +65,40 @@ class LineageCollectorUnitTests(unittest.TestCase):
             build_snapshot([], TABLE_JOB_ROWS)
         with self.assertRaises(ValueError):
             build_snapshot(JOB_ROWS, [])
+
+    def test_collection_target_must_match_asset_profile_before_source_reads(self):
+        with patch.object(
+            lineage_collector, "resolve_cli_db_profile_name", return_value="other_db"
+        ), patch.object(
+            lineage_collector, "resolve_db_profile_name", return_value="asset_db"
+        ), patch.object(lineage_collector, "load_source_rows") as load_source:
+            with self.assertRaisesRegex(ValueError, "must match ASSET_DB_PROFILE"):
+                collect_and_publish("other_db", dry_run=True)
+        load_source.assert_not_called()
+
+    def test_matching_collection_target_can_run_dry_run_without_publishing(self):
+        with patch.object(
+            lineage_collector, "resolve_cli_db_profile_name", return_value="asset_db"
+        ), patch.object(
+            lineage_collector, "resolve_db_profile_name", return_value="asset_db"
+        ), patch.object(
+            lineage_collector,
+            "load_source_rows",
+            return_value=(JOB_ROWS, TABLE_JOB_ROWS),
+        ), patch.object(lineage_collector, "publish_snapshot") as publish:
+            snapshot = collect_and_publish("asset_db", dry_run=True)
+        self.assertTrue(snapshot["nodes"])
+        publish.assert_not_called()
+
+    def test_collection_profile_helper_returns_the_matching_application_profile(self):
+        with patch.object(
+            lineage_collector,
+            "resolve_cli_db_profile_name",
+            return_value="asset_db",
+        ), patch.object(
+            lineage_collector, "resolve_db_profile_name", return_value="asset_db"
+        ):
+            self.assertEqual("asset_db", resolve_collection_profile("asset_db"))
 
     def test_publish_snapshot_locks_and_writes_in_transaction_protocol(self):
         snapshot = build_snapshot(

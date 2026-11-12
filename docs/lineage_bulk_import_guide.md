@@ -37,8 +37,9 @@
 ## 首次运行
 
 先根据数据库类型核验血缘 DDL，并确保数据库配置中存在 `ASSET_DB_PROFILE` 对应的参数库。
-血缘 API 不支持独立的数据库 Profile；以下 CLI 的 `--profile` 只用于显式核对采集写入目标，
-必须与当前 `ASSET_DB_PROFILE` 一致。采集源表和血缘三表当前要求位于同一个 profile：
+血缘 API 不支持独立的数据库 Profile；以下 CLI 的 `--profile` 是显式运维目标，
+必须与当前有效的 `ASSET_DB_PROFILE` 完全一致。CLI 与 Collector 服务都会在读取源表前拒绝不一致的目标；
+采集源表和血缘三表当前要求位于同一个 profile：
 
 ```bash
 python backend/scripts/collect_lineage_snapshot.py --profile <profile> --dry-run

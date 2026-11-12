@@ -360,6 +360,33 @@ def get_runtime_config() -> dict[str, object]:
     }
 
 
+def _is_demo_database_environment_key(key: str) -> bool:
+    upper = key.upper()
+    if upper in {
+        "DATABASE_URL",
+        "DATABASE_PROFILE",
+        "SQLALCHEMY_DATABASE_URI",
+        "PGHOST",
+        "PGPORT",
+        "PGDATABASE",
+        "PGUSER",
+        "PGPASSWORD",
+        "PGSERVICE",
+        "MYSQL_HOST",
+        "MYSQL_PORT",
+        "MYSQL_DATABASE",
+        "MYSQL_USER",
+        "MYSQL_PASSWORD",
+        "ASSET_AUTH_DB_PROFILE",
+        "LINEAGE_DB_PROFILE",
+        "LINEAGE_STORAGE_MODE",
+    }:
+        return True
+    return upper.startswith(
+        ("ASSET_DB_", "DATABASE_", "DB_", "PG", "POSTGRES", "MYSQL")
+    )
+
+
 def load_runtime_env(*, overwrite: bool = True):
     """Load repository env files, optionally preserving process-owned values.
 
@@ -379,6 +406,11 @@ def load_runtime_env(*, overwrite: bool = True):
             key, value = line.split("=", 1)
             key = key.strip()
             if not key:
+                continue
+            if (
+                os.environ.get("COMMUNITY_DEMO_BOOTSTRAP") == "1"
+                and _is_demo_database_environment_key(key)
+            ):
                 continue
 
             value = value.strip()

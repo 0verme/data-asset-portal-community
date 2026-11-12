@@ -85,7 +85,6 @@ APP_SECRET_KEY=<generate-a-strong-random-value>
 APP_DEBUG=false
 
 ASSET_DB_PROFILE=primary
-ASSET_AUTH_DB_PROFILE=primary
 ASSET_DB_CONFIG_PATH=/opt/data-asset-portal/backend/configs/database.yaml
 
 # 只有后端只监听 127.0.0.1 且只能由可信 Nginx 访问时才开启。
@@ -115,7 +114,7 @@ sudo chmod 600 backend/.env.local backend/configs/database.yaml
 
 如果系统环境或 systemd `Environment=` 设置了同名变量，而上述文件也定义了该变量，应用加载文件时会以最后一个文件的值为准；不要让两处出现不同值。使用 secret store 注入 `APP_SECRET_KEY` 等变量时，先删除 `.env.local` 中同名占位行。`PYTHONUNBUFFERED=1` 这类只由 unit 使用、且不在应用配置文件中的变量可以保留在 systemd 中。
 
-单机部署推荐让 `ASSET_AUTH_DB_PROFILE` 与 `ASSET_DB_PROFILE` 相同。只有在明确设计了分离的用户/授权数据库时才使用不同 profile，并确保认证 profile 对应的用户和授权表已按仓库 schema 初始化；不要只迁移资产 profile 后直接启动。
+所有 DAP 内部元数据（包括用户、角色、权限、血缘）都必须位于 `ASSET_DB_PROFILE` 对应的数据库/物理 Schema。旧 `ASSET_AUTH_DB_PROFILE` 不再选择认证库：同值只会暂时警告，冲突或旧变量单独配置会 fail closed；升级步骤见[单一 Profile 部署验收清单](./docs/deployment/asset-db-profile-checklist.md)。不要仅切换配置或自动复制数据后直接启动。
 
 ### 3.3 生产安全配置
 
