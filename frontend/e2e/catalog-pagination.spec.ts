@@ -331,7 +331,7 @@ test('indicator remote paging retries a failed page request and does not leave a
   await page.goto('/indicator-maintenance?view=list');
   await expect(page.getByRole('heading', { name: '指标维护加载失败' })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('Synthetic indicator page unavailable')).toBeVisible();
-  await page.getByRole('button', { name: '重新加载' }).click();
+  await page.getByRole('button', { name: '重试', exact: true }).click();
   await expect(page.locator('table.dt tbody tr')).toHaveCount(20, { timeout: 20_000 });
   expect(fixture.requests.length).toBeGreaterThan(0);
 });

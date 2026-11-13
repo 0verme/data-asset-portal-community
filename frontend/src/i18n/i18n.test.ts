@@ -103,6 +103,8 @@ test("Phase 2 API asset resources localize labels without changing method values
 
 test("Phase 3 dictionary, integration, and admin copy translates while preserving interpolated values", async () => {
   await i18nReady;
+  assert.equal(i18n.t("action.retry", { lng: "zh-CN", ns: "common" }), "重试");
+  assert.equal(i18n.t("action.retry", { lng: "en-US", ns: "common" }), "Retry");
   assert.equal(i18n.t("词根库", { lng: "en-US", ns: "dictionary" }), "Root Library");
   assert.equal(
     i18n.t("第 {{line}} 行格式错误：{{message}}", {
