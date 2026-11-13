@@ -198,7 +198,7 @@ test("app exposes retry states without using built-in menu fallback data", () =>
   const loaderSource = readFileSync(new URL("./navigationMenus.ts", import.meta.url), "utf8");
 
   assert.match(appSource, /const \[navMenuSnapshot, setNavMenuSnapshot\] = useState/);
-  assert.match(appSource, /菜单加载失败，点击重试/);
+  assert.match(appSource, /navigation\.menuLoadFailed/);
   assert.match(appSource, /onClick=\{\(\) => void loadMenus\(navigationAuthKey\)\}/);
   assert.match(apiSource, /suppressUnauthorizedEvent: true/);
   assert.doesNotMatch(loaderSource, /MENU_ITEMS|getPublicMenuFallback/);

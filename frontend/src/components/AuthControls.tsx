@@ -13,11 +13,11 @@
 // limitations under the License.
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 import type { AuthSession } from "../api/auth.ts";
 import {
   AUTH_MODE,
-  getAuthModeLabel,
   getMockHint,
   GUEST_AUTH,
   type LoginOptions,
@@ -68,6 +68,8 @@ export function LoginModal({
   onClose,
   onSubmit,
 }: LoginModalProps) {
+  const { t } = useTranslation("auth");
+  const { t: tCommon } = useTranslation("common");
   const [user, setUser] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [remember, setRemember] = React.useState(true);
@@ -117,30 +119,29 @@ export function LoginModal({
         onMouseDown={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="auth-dialog-title"
       >
         <button
           className="login-x"
           onClick={onClose}
-          title="关闭"
+          title={t("close")}
           disabled={busy}
         >
           <Icon name="close" size={16} />
         </button>
         <div className="login-brand">
           <div className="brand-mark auth-brand-mark">
-            <img src="/brand-icon.svg?v=20260609" alt="数据资产门户" />
+            <img src="/brand-icon.svg?v=20260609" alt={tCommon("app.brandAlt")} />
           </div>
           <div>
-            <div className="lb-name">数据资产门户</div>
-            <div className="lb-sub">Data Asset Portal</div>
+            <div className="lb-name">{tCommon("app.brandName")}</div>
+            <div className="lb-sub">{tCommon("app.brandTagline")}</div>
           </div>
         </div>
-        <h2 className="login-title">管理员登录</h2>
-        <p className="login-desc">
-          无需登录即可浏览公开目录；登录后可按当前权限新增、编辑与维护数据资产。
-        </p>
+        <h2 className="login-title" id="auth-dialog-title">{t("dialogTitle")}</h2>
+        <p className="login-desc">{t("description")}</p>
         <label className="login-field">
-          <span className="lf-label">账号</span>
+          <span className="lf-label">{t("username")}</span>
           <span className="lf-input">
             <Icon name="user" size={16} />
             <input
@@ -148,13 +149,13 @@ export function LoginModal({
               value={user}
               onChange={(event) => setUser(event.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="请输入管理员账号"
+              placeholder={t("usernamePlaceholder")}
               autoComplete="username"
             />
           </span>
         </label>
         <label className="login-field">
-          <span className="lf-label">密码</span>
+          <span className="lf-label">{t("password")}</span>
           <span className={"lf-input" + (error ? " err" : "")}>
             <Icon name="key" size={16} />
             <input
@@ -162,14 +163,14 @@ export function LoginModal({
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="请输入密码"
+              placeholder={t("passwordPlaceholder")}
               autoComplete="current-password"
             />
             <button
               type="button"
               className="lf-eye"
               onClick={() => setShowPassword((value) => !value)}
-              title={showPassword ? "隐藏密码" : "显示密码"}
+              title={showPassword ? t("hidePassword") : t("showPassword")}
             >
               <Icon name={showPassword ? "eyeoff" : "eye"} size={16} />
             </button>
@@ -185,15 +186,15 @@ export function LoginModal({
             <span className="rm-box">
               <Icon name="check" size={12} />
             </span>
-            记住登录
+            {t("remember")}
           </label>
           <span className="login-demo">
             {AUTH_MODE === "mock" ? (
               <>
-                演示 <code>{getMockHint()}</code>
+                {t("demo")} <code>{getMockHint()}</code>
               </>
             ) : (
-              <code>{getAuthModeLabel()}</code>
+              <code>{t("remoteMode")}</code>
             )}
           </span>
         </div>
@@ -213,10 +214,10 @@ export function LoginModal({
           ) : (
             <Icon name="key" size={16} />
           )}
-          {busy ? "登录中..." : "登录"}
+          {busy ? t("loginBusy") : t("login")}
         </button>
         <button className="login-guest" onClick={onClose} disabled={busy}>
-          暂不登录
+          {t("skipLogin")}
           <Icon name="arrow" size={14} />
         </button>
       </div>
@@ -231,6 +232,7 @@ export interface AuthBarProps {
 }
 
 export function AuthBar({ auth, onLogin, onLogout }: AuthBarProps) {
+  const { t } = useTranslation("auth");
   const displayName = getSafeDisplayName(auth);
 
   if (!auth.user) {
@@ -244,7 +246,7 @@ export function AuthBar({ auth, onLogin, onLogout }: AuthBarProps) {
           onClick={onLogin}
         >
           <Icon name="login" size={15} />
-          登录
+          {t("login")}
         </Button>
       </div>
     );
@@ -261,7 +263,7 @@ export function AuthBar({ auth, onLogin, onLogout }: AuthBarProps) {
         variant="tertiary"
         size="sm"
         className="logout-btn"
-        aria-label="退出登录"
+        aria-label={t("logout")}
         icon={<Icon name="logout" size={15} />}
         onClick={() => void onLogout()}
       />

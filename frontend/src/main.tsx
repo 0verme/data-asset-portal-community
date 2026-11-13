@@ -14,7 +14,9 @@
 
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { I18nextProvider } from "react-i18next";
 import App from "./App.tsx";
+import { i18n, i18nReady } from "./i18n/index.ts";
 import { ToastHost } from "./ui/index.ts";
 import "@cloudflare/kumo/styles/standalone";
 import "./styles/app.css";
@@ -64,11 +66,15 @@ if (isKumoSpike || isKumoAdapterFixture || isKumoOverlayFixture || isKumoToastFa
     );
   });
 } else {
-  root.render(
-    <React.StrictMode>
-      <ToastHost>
-        <App />
-      </ToastHost>
-    </React.StrictMode>,
-  );
+  void i18nReady.then(() => {
+    root.render(
+      <React.StrictMode>
+        <I18nextProvider i18n={i18n}>
+          <ToastHost>
+            <App />
+          </ToastHost>
+        </I18nextProvider>
+      </React.StrictMode>,
+    );
+  });
 }

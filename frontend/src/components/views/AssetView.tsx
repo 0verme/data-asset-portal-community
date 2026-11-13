@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { useTranslation } from "react-i18next";
+
 import type { UseAssetModuleResult } from "../../hooks/useAssetModule.ts";
 import type { AssetRoute } from "../../routing/types.ts";
 import { DOMAIN_ORDER } from "../../config/assets.ts";
@@ -42,6 +44,7 @@ export function AssetView({
   route,
   canEdit = false,
 }: AssetViewProps) {
+  const { t } = useTranslation("warehouse");
   const {
     homeLoading,
     homeError,
@@ -82,8 +85,8 @@ export function AssetView({
   if (!canEdit && ["edit", "new"].includes(route.page)) {
     return (
       <EmptyState
-        title="当前页面需要资产维护权限"
-        desc="数据资产目录可以公开浏览，新增和编辑需要相应写权限。"
+        title={t("permissionTitle")}
+        desc={t("permissionDescription")}
       />
     );
   }
@@ -93,12 +96,12 @@ export function AssetView({
       return (
         <div aria-busy="true">
           <AdapterLoadingState
-            title="加载资产元数据"
-            desc="正在准备表清单、主题域和分层信息。"
-            label="正在加载资产元数据"
+            title={t("loadingTitle")}
+            desc={t("loadingDescription")}
+            label={t("loadingLabel")}
           />
           <TablePagination
-            ariaLabel="数据仓库资产表分页"
+            ariaLabel={t("tablePagination")}
             page={page}
             pageSize={pageSize}
             total={totalTables}
@@ -113,12 +116,12 @@ export function AssetView({
       return (
         <div>
           <AdapterErrorState
-            title="资产列表加载失败"
+            title={t("listErrorTitle")}
             desc={homeError}
             onRetry={loadHomeData}
           />
           <TablePagination
-            ariaLabel="数据仓库资产表分页"
+            ariaLabel={t("tablePagination")}
             page={page}
             pageSize={pageSize}
             total={totalTables}
@@ -134,21 +137,13 @@ export function AssetView({
         <div className="page-head">
           <div>
             <div className="page-title">
-              <span className="pt-code">DATA</span>数据资产
+              <span className="pt-code">DATA</span>{t("pageTitle")}
             </div>
             <div className="page-sub">
-              共 <b>{totalTables}</b> 张表
-              {selectedLayer ? (
-                <>
-                  ，分层 <b>{selectedLayer}</b>
-                </>
-              ) : null}
-              {domain ? (
-                <>
-                  ，主题域 <b>{domain}</b>
-                </>
-              ) : null}
-              {query ? <>，匹配 “{query}”</> : null}
+              {t("tableCountPrefix")}<b>{totalTables}</b>{t("tableCountSuffix", { count: totalTables })}
+              {selectedLayer ? <>{t("layerSummary", { layer: selectedLayer })}</> : null}
+              {domain ? <>{t("domainSummary", { domain })}</> : null}
+              {query ? <>{t("querySummary", { query })}</> : null}
             </div>
           </div>
           <div className="head-actions">
@@ -160,7 +155,7 @@ export function AssetView({
                 onClick={assetCreate}
               >
                 <Icon name="plus" size={15} />
-                新增表
+                {t("addTable")}
               </button>
             ) : null}
           </div>
@@ -172,7 +167,7 @@ export function AssetView({
           onOpen={assetOpen}
         />
         <TablePagination
-          ariaLabel="数据仓库资产表分页"
+          ariaLabel={t("tablePagination")}
           page={page}
           pageSize={pageSize}
           total={totalTables}
@@ -190,23 +185,23 @@ export function AssetView({
     if (detailLoading) {
       return (
         <AdapterLoadingState
-          title="加载表详情"
-          desc={`正在准备 ${routeTable} 的字段与 DDL。`}
-          label="正在加载表详情"
+          title={t("detailLoadingTitle")}
+          desc={t("detailLoadingDescription", { tableName: routeTable })}
+          label={t("detailLoadingLabel")}
         />
       );
     }
     if (detailError) {
       return (
         <AdapterErrorState
-          title="表详情加载失败"
+          title={t("detailErrorTitle")}
           desc={detailError}
           onRetry={() => loadDetailData({ assetId: route.assetId, tableName: routeTable })}
         />
       );
     }
     if (!detailAsset) {
-      return <AdapterEmptyState title="表不存在" />;
+      return <AdapterEmptyState title={t("tableNotFound")} />;
     }
     return (
       <DetailPage
@@ -227,23 +222,23 @@ export function AssetView({
     if (detailLoading && !editingAsset) {
       return (
         <AdapterLoadingState
-          title="加载编辑页"
-          desc={`正在准备 ${routeTable} 的元数据和字段信息。`}
-          label="正在加载编辑页"
+          title={t("editorLoadingTitle")}
+          desc={t("editorLoadingDescription", { tableName: routeTable })}
+          label={t("editorLoadingLabel")}
         />
       );
     }
     if (detailError && !editingAsset) {
       return (
         <AdapterErrorState
-          title="编辑页加载失败"
+          title={t("editorErrorTitle")}
           desc={detailError}
           onRetry={() => loadDetailData({ assetId: route.assetId, tableName: routeTable })}
         />
       );
     }
     if (!editingAsset) {
-      return <AdapterEmptyState title="表不存在" />;
+      return <AdapterEmptyState title={t("tableNotFound")} />;
     }
     return (
       <TableEditor
@@ -276,5 +271,5 @@ export function AssetView({
     );
   }
 
-  return <EmptyState title="页面不存在" />;
+  return <EmptyState title={t("pageNotFound")} />;
 }

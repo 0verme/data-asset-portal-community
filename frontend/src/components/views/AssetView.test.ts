@@ -12,7 +12,7 @@ test("asset read controls use DAP adapters and preserve pressed-button semantics
   ]);
 
   assert.match(view, /from "\.\.\/\.\.\/ui\/index\.ts"/);
-  assert.match(view, /<AdapterLoadingState[\s\S]*?label="正在加载资产元数据"/);
+  assert.match(view, /<AdapterLoadingState[\s\S]*?label=\{t\("loadingLabel"\)\}/);
   assert.match(view, /<AdapterErrorState[\s\S]*?onRetry=\{loadHomeData\}/);
   assert.match(view, /<AssetViewModeSwitcher value=\{layout as ViewMode\} onChange=\{setLayout\} \/>/);
   assert.match(view, /<TablePagination[\s\S]*?page=\{page\}[\s\S]*?pageSize=\{pageSize\}[\s\S]*?onPageChange=\{setPage\}/);
@@ -52,8 +52,8 @@ test("asset detail and editor compose controls only from DAP adapters", async ()
   assert.match(actions, /confirmDeleteAction\(\{/);
   assert.match(actions, /confirmKeyword: name/);
   assert.doesNotMatch(`${detail}\n${editor}\n${actions}`, /@cloudflare\/kumo/);
-  assert.match(view, /<AdapterLoadingState[\s\S]*?title="加载表详情"/);
-  assert.match(view, /<AdapterErrorState[\s\S]*?title="表详情加载失败"/);
+  assert.match(view, /<AdapterLoadingState[\s\S]*?title=\{t\("detailLoadingTitle"\)\}/);
+  assert.match(view, /<AdapterErrorState[\s\S]*?title=\{t\("detailErrorTitle"\)\}/);
 });
 
 test("asset filters use scoped adapters without changing shared module sidebars", async () => {

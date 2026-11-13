@@ -1,0 +1,81 @@
+{
+  "app": {
+    "documentTitle": "Data Asset Management and Lineage Platform",
+    "brandAlt": "Data Asset Portal",
+    "brandName": "Data Asset Portal",
+    "brandTagline": "Data Asset Management & Lineage",
+    "footer": "Data Asset Management and Lineage Platform"
+  },
+  "language": {
+    "switchToEnglish": "Switch language to English",
+    "switchToChinese": "Switch language to Chinese",
+    "targetEnglish": "EN",
+    "targetChinese": "中文"
+  },
+  "formatting": {
+    "number": "{{value, number}}",
+    "date": "{{value, datetime}}"
+  },
+  "navigation": {
+    "more": "More",
+    "loadingMenus": "Loading menu…",
+    "menuLoadFailed": "Could not load menus. Retry",
+    "open": "Open navigation",
+    "close": "Close navigation",
+    "main": "Main navigation",
+    "module": "Module navigation",
+    "moduleAndFilters": "Module navigation and filters",
+    "sidebarErrorTitle": "Could not render the sidebar",
+    "sidebarErrorDescription": "The navigation area encountered an error. Refresh the page and try again.",
+    "moduleErrorTitle": "Could not render the module",
+    "moduleErrorDescription": "This module encountered an error. Please try again later."
+  },
+  "search": {
+    "global": "Global search",
+    "clear": "Clear global search",
+    "openMobile": "Open search",
+    "closeMobile": "Close search",
+    "placeholder": {
+      "push": "Search systems, jobs, filenames, or descriptions",
+      "codeTable": "Search table codes, names, owners, or descriptions",
+      "report": "Search report codes, names, owners, departments, or purposes",
+      "indicator": "Search metric IDs, names, meanings, fields, or definitions",
+      "root": "Search roots, Chinese or English terms, or descriptions",
+      "systemMenus": "Search menu names, codes, paths, or descriptions",
+      "systemParams": "Search parameter categories, codes, names, values, or descriptions",
+      "systemRoles": "Search role codes, names, or descriptions",
+      "systemLogs": "Search users, modules, objects, or actions",
+      "systemUsers": "Search usernames, display names, emails, or status",
+      "upstream": "Search system abbreviations, names, owners, departments, or descriptions",
+      "mapping": "Search source systems, tables, fields, or target fields",
+      "default": "Search table names, Chinese names, owners, or fields"
+    }
+  },
+  "theme": {
+    "switchToLight": "Switch to light theme",
+    "switchToDark": "Switch to dark theme",
+    "palette": "Theme colors",
+    "green": "Green",
+    "purple": "Purple"
+  },
+  "access": {
+    "moduleLoadingTitle": "Loading module",
+    "moduleLoadingDescription": "Preparing this page.",
+    "publicLoadingTitle": "Preparing the public catalog",
+    "publicLoadingDescription": "Checking the session and loading browseable data assets.",
+    "catalogDisabledTitle": "Anonymous catalog access is disabled",
+    "catalogDisabledDescription": "Sign in is required to browse this catalog. Signing in does not change backend authorization.",
+    "loginToContinue": "Sign in to continue"
+  },
+  "action": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "search": "Search",
+    "clear": "Clear",
+    "retry": "Retry",
+    "loading": "Loading…",
+    "noResults": "No results"
+  }
+}
