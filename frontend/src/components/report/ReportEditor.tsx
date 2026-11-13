@@ -2,11 +2,12 @@ import React from "react";
 
 import { getAssetTables, getDomains, type AssetTableItem } from "../../api/assets.ts";
 import { getIndicatorList } from "../../api/indicator.ts";
-import { getReportList, getReportOptions } from "../../api/report.ts";
+import { getReportList, getReportOptions, type RemoteReportOptions } from "../../api/report.ts";
 import type { MockIndicatorItem } from "../../data/indicators.ts";
 import type { MockReportItem, RelatedIndicatorSummary, RelatedTableSummary } from "../../data/reports.ts";
-import { buildReportOptionSets, type ReportOptionSets } from "../../config/reportOptions.ts";
+import { buildReportOptionSets } from "../../config/reportOptions.ts";
 import { getLegacyAwareOptions, normalizeDictOptions, type OptionInputItem } from "../../utils/optionUtils.ts";
+import { getErrorMessage } from "../../utils/ui.ts";
 import { AssetReferencePicker, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader } from "../common/index.ts";
 import { Icon } from "../ui.tsx";
 import {
@@ -208,6 +209,7 @@ export function ReportEditor({
   onClearServerFieldError,
 }: ReportEditorProps) {
   const isEdit = mode === "edit";
+  const isRemoteMode = import.meta.env?.['VITE_API_MODE'] === "remote";
   const [form, setForm] = React.useState<ReportFormData>(() => createFormState(initial));
   const [touched, setTouched] = React.useState(false);
   const formRef = React.useRef<HTMLDivElement>(null);
@@ -223,7 +225,14 @@ export function ReportEditor({
   const [referenceRetryRevision, setReferenceRetryRevision] = React.useState(0);
   const [domains, setDomains] = React.useState<string[]>([]);
   const [people, setPeople] = React.useState<string[]>([]);
-  const [reportOptionSets, setReportOptionSets] = React.useState<ReportOptionSets>(() => buildReportOptionSets());
+  const [reportItems, setReportItems] = React.useState<MockReportItem[]>([]);
+  const [remoteReportOptions, setRemoteReportOptions] = React.useState<RemoteReportOptions | undefined>();
+  const reportOptionSets = React.useMemo(
+    () => buildReportOptionSets(reportItems, remoteReportOptions),
+    [reportItems, remoteReportOptions],
+  );
+  const [reportOptionsLoading, setReportOptionsLoading] = React.useState(isRemoteMode);
+  const [reportOptionsError, setReportOptionsError] = React.useState("");
   const {
     reportTypes: reportTypeOptions,
     periods: periodOptions,
@@ -244,34 +253,56 @@ export function ReportEditor({
   React.useEffect(() => {
     let cancelled = false;
 
-    async function loadReferences(): Promise<void> {
-      setRefLoading(true);
-      setRefError("");
-      try {
-        const [tables, indicators, domainItems, reportItems, remoteOptions] = await Promise.all([getAssetTables(), getIndicatorList(), getDomains(), getReportList(), import.meta.env?.['VITE_API_MODE'] === "remote" ? getReportOptions() : Promise.resolve(undefined)]);
-        if (cancelled) return;
-        setTableCandidates((Array.isArray(tables) ? tables : []).map(normalizeTableCandidate));
-        setIndicatorCandidates((Array.isArray(indicators) ? indicators : []).map(normalizeIndicatorCandidate));
-        setDomains((Array.isArray(domainItems) ? domainItems : []).map((item) => item.name).filter(Boolean));
-        setReportOptionSets(buildReportOptionSets(reportItems, remoteOptions));
-        const peopleValues = [
-          ...(Array.isArray(reportItems) ? reportItems : []).flatMap((item) => [item.ownerName, item.maintainerName]),
-          ...(Array.isArray(tables) ? tables : []).map((item) => item.owner),
-        ].filter((item): item is string => Boolean(item && item.trim()));
-        setPeople([...new Set(peopleValues)].sort((a, b) => a.localeCompare(b, "zh-CN")));
-      } catch (error: unknown) {
-        if (cancelled) return;
-        setRefError(error instanceof Error ? error.message : "关联资产加载失败。");
-      } finally {
-        if (!cancelled) setRefLoading(false);
-      }
-    }
+    setRefLoading(true);
+    setRefError("");
+    setReportOptionsLoading(isRemoteMode);
+    setReportOptionsError("");
 
-    void loadReferences();
+    void Promise.all([
+      getAssetTables(),
+      getIndicatorList(),
+      getDomains(),
+      getReportList(),
+    ] as const).then(([loadedTables, indicators, domainItems, loadedReports]) => {
+      if (cancelled) return;
+      const tables = Array.isArray(loadedTables) ? loadedTables : [];
+      const reports = Array.isArray(loadedReports) ? loadedReports : [];
+      setReportItems(reports);
+      setTableCandidates(tables.map(normalizeTableCandidate));
+      setIndicatorCandidates((Array.isArray(indicators) ? indicators : []).map(normalizeIndicatorCandidate));
+      setDomains((Array.isArray(domainItems) ? domainItems : []).map((item) => item.name).filter(Boolean));
+      const peopleValues = [
+        ...reports.flatMap((item) => [item.ownerName, item.maintainerName]),
+        ...tables.map((item) => item.owner),
+      ].filter((item): item is string => Boolean(item && item.trim()));
+      setPeople([...new Set(peopleValues)].sort((a, b) => a.localeCompare(b, "zh-CN")));
+    }).catch((error: unknown) => {
+      if (!cancelled) setRefError(getErrorMessage(error, "关联资产加载失败。"));
+    }).finally(() => {
+      if (!cancelled) setRefLoading(false);
+    });
+
+    if (isRemoteMode) {
+      // Load the authority independently: a slow/empty report list cannot delay
+      // or erase valid server candidates, and the completion order is irrelevant.
+      void getReportOptions().then((options) => {
+        if (!cancelled) setRemoteReportOptions(options);
+      }).catch((error: unknown) => {
+        if (!cancelled) {
+          setRemoteReportOptions(undefined);
+          setReportOptionsError(getErrorMessage(error, "请检查权限、网络或服务后重试。"));
+        }
+      }).finally(() => {
+        if (!cancelled) setReportOptionsLoading(false);
+      });
+    } else {
+      setRemoteReportOptions(undefined);
+      setReportOptionsLoading(false);
+    }
     return () => {
       cancelled = true;
     };
-  }, [referenceRetryRevision]);
+  }, [isRemoteMode, referenceRetryRevision]);
 
   const errors: FormFieldErrors = React.useMemo(
     () => mergeFormFieldErrors(serverFieldErrors, touched ? validateReportForm(form) : {}),
@@ -423,6 +454,15 @@ export function ReportEditor({
           }
         }}
       />
+      {reportOptionsError ? (
+        <div className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
+          报表候选加载失败；当前不会使用本地演示候选。{` ${reportOptionsError} `}
+          <button className="btn" type="button" onClick={() => setReferenceRetryRevision((revision) => revision + 1)}>
+            重试加载报表候选
+          </button>
+        </div>
+      ) : null}
+      {reportOptionsLoading ? <div className="match-hint" role="status">正在加载服务端报表候选…</div> : null}
 
       <div className="form-card">
         <h3><Icon name="hash" size={14} />基本信息</h3>
@@ -438,14 +478,20 @@ export function ReportEditor({
             <Input aria-label="报表别名" className="inp" value={form.alias} onChange={(event) => setValue("alias", event.target.value)} placeholder="例如：支付日结报表" />
           </div>
           <FormField className="fl" formId={REPORT_FORM_ID} name="type" label="报表类型" error={errors["type"]}>
-            <Select<string>
-              aria-label="报表类型"
-              className={`sel${errors["type"] ? " invalid" : ""}`}
-              placeholder="请选择报表类型"
-              items={[{ label: "请选择报表类型", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(reportTypeOptions), form.type).map((item) => ({ label: item.name, value: item.value }))]}
-              value={form.type || ""}
-              onValueChange={(value) => setValue("type", value || "")}
-            />
+            <>
+              <Select<string>
+                aria-label="报表类型"
+                aria-invalid={Boolean(errors["type"])}
+                className={`sel${errors["type"] ? " invalid" : ""}`}
+                placeholder="请选择报表类型"
+                items={[{ label: "请选择报表类型", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(reportTypeOptions), form.type).map((item) => ({ label: item.name, value: item.value }))]}
+                value={form.type || ""}
+                onValueChange={(value) => setValue("type", value || "")}
+              />
+              {isRemoteMode && !reportOptionsLoading && !reportOptionsError && reportTypeOptions.length === 0 ? (
+                <div className="match-hint" role="status">服务端尚未配置报表类型，请先维护 REPORT_TYPE 参数字典。</div>
+              ) : null}
+            </>
           </FormField>
           <div className="fl">
             <label>状态</label>
@@ -468,14 +514,20 @@ export function ReportEditor({
             />
           </FormField>
           <FormField className="fl" formId={REPORT_FORM_ID} name="ownerDept" label="归属部门" error={errors["ownerDept"]}>
-            <Select<string>
-              aria-label="归属部门"
-              className={`sel${errors["ownerDept"] ? " invalid" : ""}`}
-              placeholder="请选择归属部门"
-              items={[{ label: "请选择归属部门", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(departmentOptions), form.ownerDept).map((item) => ({ label: item.name, value: item.value }))]}
-              value={form.ownerDept || ""}
-              onValueChange={(value) => setValue("ownerDept", value || "")}
-            />
+            <>
+              <Select<string>
+                aria-label="归属部门"
+                aria-invalid={Boolean(errors["ownerDept"])}
+                className={`sel${errors["ownerDept"] ? " invalid" : ""}`}
+                placeholder="请选择归属部门"
+                items={[{ label: "请选择归属部门", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(departmentOptions), form.ownerDept).map((item) => ({ label: item.name, value: item.value }))]}
+                value={form.ownerDept || ""}
+                onValueChange={(value) => setValue("ownerDept", value || "")}
+              />
+              {isRemoteMode && !reportOptionsLoading && !reportOptionsError && departmentOptions.length === 0 ? (
+                <div className="match-hint" role="status">服务端尚未配置归属部门，请先维护 UPSTREAM_DEPT 参数字典。</div>
+              ) : null}
+            </>
           </FormField>
           <FormField className="fl" formId={REPORT_FORM_ID} name="ownerName" label="负责人" error={errors["ownerName"]}>
             <Input aria-label="负责人" className={`inp${errors["ownerName"] ? " invalid" : ""}`} list="report-person-options" value={form.ownerName} onChange={(event) => setValues({ ownerName: event.target.value, ...(form.maintainerSameAsOwner ? { maintainerName: event.target.value } : {}) })} placeholder="搜索已有负责人" />
@@ -499,22 +551,33 @@ export function ReportEditor({
             <Input aria-label="统计对象" className="inp" value={form.statObject} onChange={(event) => setValue("statObject", event.target.value)} placeholder="例如：全行支付交易" />
           </div>
           <FormField className="fl" formId={REPORT_FORM_ID} name="statPeriod" label="统计周期" error={errors["statPeriod"]}>
-            <Select<string>
-              aria-label="统计周期"
-              className={`sel${errors["statPeriod"] ? " invalid" : ""}`}
-              placeholder="请选择统计周期"
-              items={[{ label: "请选择统计周期", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(periodOptions), form.statPeriod).map((item) => ({ label: item.name, value: item.value }))]}
-              value={form.statPeriod || ""}
-              onValueChange={(value) => setValue("statPeriod", value || "")}
-            />
+            <>
+              <Select<string>
+                aria-label="统计周期"
+                aria-invalid={Boolean(errors["statPeriod"])}
+                className={`sel${errors["statPeriod"] ? " invalid" : ""}`}
+                placeholder="请选择统计周期"
+                items={[{ label: "请选择统计周期", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(periodOptions), form.statPeriod).map((item) => ({ label: item.name, value: item.value }))]}
+                value={form.statPeriod || ""}
+                onValueChange={(value) => setValue("statPeriod", value || "")}
+              />
+              {isRemoteMode && !reportOptionsLoading && !reportOptionsError && periodOptions.length === 0 ? (
+                <div className="match-hint" role="status">服务端尚未配置统计周期，请先维护 REPORT_STAT_PERIOD 参数字典。</div>
+              ) : null}
+            </>
           </FormField>
           <FormField className="fl full" formId={REPORT_FORM_ID} name="statCaliber" label="统计口径" error={errors["statCaliber"]}>
-            <DictInput value={form.statCaliber} onChange={(value) => setValue("statCaliber", value)} options={statCaliberOptions} listId="report-stat-caliber-options" invalid={Boolean(errors["statCaliber"])} placeholder="请选择或输入统计口径" />
+            <>
+              <DictInput value={form.statCaliber} onChange={(value) => setValue("statCaliber", value)} options={statCaliberOptions} listId="report-stat-caliber-options" invalid={Boolean(errors["statCaliber"])} aria-invalid={Boolean(errors["statCaliber"])} placeholder="请选择或输入统计口径" />
+              {isRemoteMode && !reportOptionsLoading && !reportOptionsError && statCaliberOptions.length === 0 ? (
+                <div className="match-hint" role="status">服务端尚未配置统计口径候选；此字段仍可按实际业务规则输入。</div>
+              ) : null}
+            </>
           </FormField>
           <details className="fl full">
             <summary>更多设置（数据延迟、业务范围标签）</summary>
             <div className="form-grid" style={{ marginTop: 12 }}>
-              <div className="fl"><label>数据延迟（选填）</label><DictInput value={form.dataDelay} onChange={(value) => setValue("dataDelay", value)} options={dataDelayOptions} listId="report-data-delay-options" placeholder="请选择或输入数据延迟" /></div>
+              <div className="fl"><label>数据延迟（选填）</label><DictInput value={form.dataDelay} onChange={(value) => setValue("dataDelay", value)} options={dataDelayOptions} listId="report-data-delay-options" placeholder="请选择或输入数据延迟" />{isRemoteMode && !reportOptionsLoading && !reportOptionsError && dataDelayOptions.length === 0 ? <div className="match-hint" role="status">服务端尚未配置数据时效候选；此字段可留空。</div> : null}</div>
               <div className="fl full"><label>业务范围标签（选填）</label><Input aria-label="业务范围标签（选填）" className="inp" value={form.businessScopeTags} onChange={(event) => setValue("businessScopeTags", event.target.value)} placeholder="例如：微信、支付宝、银联渠道" /></div>
             </div>
           </details>
