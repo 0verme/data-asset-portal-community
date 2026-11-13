@@ -140,14 +140,16 @@ test("shared Kumo-backed toast host preserves queue, close, timeout, and live-re
   await queuedError.hover();
   await expect(queuedSuccess).toBeVisible();
 
-  const errorToast = queuedError.locator("xpath=ancestor::div[contains(@class, 'ring-kumo-danger')][1]");
-  const closeError = errorToast.locator('[data-kumo-part="close"]');
+  const errorSurface = queuedError.locator("xpath=ancestor::*[@data-kumo-part='surface'][1]");
+  await expect(errorSurface).toHaveClass(/ring-kumo-danger/);
+  const closeError = errorSurface.locator('[data-kumo-part="close"]');
   await expect(closeError).toBeVisible();
   await closeError.click();
   await expect(queuedError).toBeHidden();
   await expect(queuedSuccess).toBeVisible();
-  const successToast = queuedSuccess.locator("xpath=ancestor::div[contains(@class, 'ring-kumo-success')][1]");
-  await successToast.locator('[data-kumo-part="close"]').click();
+  const successSurface = queuedSuccess.locator("xpath=ancestor::*[@data-kumo-part='surface'][1]");
+  await expect(successSurface).toHaveClass(/ring-kumo-success/);
+  await successSurface.locator('[data-kumo-part="close"]').click();
   await expect(queuedSuccess).toBeHidden();
 
   await page.getByTestId("show-toast-timeout").click();
@@ -280,11 +282,12 @@ test("overlay feedback preserves toast close, timeout and queue contracts", asyn
 
   const region = page.getByRole("region", { name: "Notifications" });
   await page.getByTestId("show-toast").click();
-  const successToast = region.locator('[role="dialog"]').filter({ hasText: "字段映射保存成功" });
+  const successToast = region.getByText("字段映射保存成功", { exact: true });
+  const successSurface = successToast.locator("xpath=ancestor::*[@data-kumo-part='surface'][1]");
   await expect(successToast).toBeVisible();
-  await expect(successToast).toHaveClass(/ring-kumo-success/);
-  await successToast.hover();
-  const closeSuccess = successToast.locator('[data-kumo-part="close"]');
+  await expect(successSurface).toHaveClass(/ring-kumo-success/);
+  await successSurface.hover();
+  const closeSuccess = successSurface.locator('[data-kumo-part="close"]');
   await expect(closeSuccess).toBeVisible();
   await closeSuccess.click();
   await expect(region.getByText("字段映射保存成功")).toBeHidden();
@@ -301,14 +304,15 @@ test("overlay feedback preserves toast close, timeout and queue contracts", asyn
   await queuedError.hover();
   await expect(queuedSuccess).toBeVisible();
   await expect(queuedError).toBeVisible();
-  const queuedErrorToast = queuedError.locator("xpath=ancestor::div[contains(@class, 'ring-kumo-danger')][1]");
-  await expect(queuedErrorToast).toHaveClass(/ring-kumo-danger/);
-  await expect(queuedErrorToast.locator('[data-kumo-part="close"]')).toBeVisible();
-  await queuedErrorToast.locator('[data-kumo-part="close"]').click();
+  const queuedErrorSurface = queuedError.locator("xpath=ancestor::*[@data-kumo-part='surface'][1]");
+  await expect(queuedErrorSurface).toHaveClass(/ring-kumo-danger/);
+  await expect(queuedErrorSurface.locator('[data-kumo-part="close"]')).toBeVisible();
+  await queuedErrorSurface.locator('[data-kumo-part="close"]').click();
   await expect(queuedError).toBeHidden();
   await expect(queuedSuccess).toBeVisible();
-  const queuedSuccessToast = queuedSuccess.locator("xpath=ancestor::div[contains(@class, 'ring-kumo-success')][1]");
-  await queuedSuccessToast.locator('[data-kumo-part="close"]').click();
+  const queuedSuccessSurface = queuedSuccess.locator("xpath=ancestor::*[@data-kumo-part='surface'][1]");
+  await expect(queuedSuccessSurface).toHaveClass(/ring-kumo-success/);
+  await queuedSuccessSurface.locator('[data-kumo-part="close"]').click();
   await expect(queuedSuccess).toBeHidden();
   expect(pageErrors).toEqual([]);
 });
