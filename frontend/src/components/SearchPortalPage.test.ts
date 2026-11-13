@@ -19,12 +19,12 @@ test("empty search results expose a clear action that preserves scope and focus"
   ]);
 
   assert.match(source, /groups\.length === 0 \?/);
-  assert.match(source, /<EmptyState[\s\S]*?title=\{result\?\.partial \? "已查询模块暂无匹配" : "没有找到精确匹配的资产"\}/);
+  assert.match(source, /<EmptyState[\s\S]*?title=\{t\(result\?\.partial \? "results\.partialTitle" : "results\.noExactMatchTitle"\)\}/);
   assert.match(source, /!result\?\.partial && aiEnabled/);
-  assert.match(source, /aria-label="问 AI 找资产"/);
+  assert.match(source, /aria-label=\{t\("results\.askAiForAsset"\)\}/);
   assert.match(source, /onClick=\{\(\) => runAiAsk\(searchedTerm\)\}/);
   assert.match(source, /className="sp-empty-action"/);
-  assert.match(source, /aria-label="清空搜索"/);
+  assert.match(source, /aria-label=\{t\("results\.clearSearch"\)\}/);
   assert.match(source, /onClick=\{\(\) => clearSearch\(scope\)\}/);
   assert.match(source, /const clearSearch = \(nextScope = scope\) => \{/);
   assert.match(source, /resetSearchState\(nextScope\);/);
@@ -71,8 +71,8 @@ test("truncated groups render 查看全部 from the formal hasMore flag", async 
     "hasMore must not be inferred from count vs items",
   );
   assert.match(source, /className="sp-group-more"/);
-  assert.match(source, /查看全部 \{group\.count\} 条/);
-  assert.match(source, /已显示 \$\{group\.items\.length\} \/ \$\{group\.count\} 条/);
+  assert.match(source, /t\("results\.seeAll", \{ count: group\.count \}\)/);
+  assert.match(source, /t\("results\.groupShowing", \{ shown: group\.items\.length, total: group\.count \}\)/);
 });
 
 test("查看全部 navigates the group with the searched keyword", async () => {
@@ -80,7 +80,7 @@ test("查看全部 navigates the group with the searched keyword", async () => {
 
   assert.match(source, /onClick=\{\(\) => handleNavigate\(group, searchedTerm\)\}/);
   assert.match(source, /onNavigate\?\.\(itemOrGroup, term\)/);
-  assert.match(source, /aria-label=\{`查看全部\$\{group\.label\}结果`\}/);
+  assert.match(source, /aria-label=\{t\("results\.seeAllAriaLabel", \{ group: resolveSearchGroupLabel\(group, t\) \}\)\}/);
 });
 
 test("portal scope parsing is the shared whitelist parser", async () => {
@@ -153,7 +153,7 @@ test("AI is explicitly enabled, Enter remains traditional search, and model requ
   assert.match(source, /aiResponseFailed = !aiResponse\?\.metadataCount/);
   assert.match(source, /response\.statisticalResult \? <AiAskStatisticalCard/);
   assert.match(source, /!response\?\.metadataCount && response\?\.status === "ambiguous_scope"/);
-  assert.match(source, /相关线索 · 非直接结论/);
+  assert.match(source, /t\(item\.relevance === "direct" \? "section\.directRelevance" : "section\.relatedLead"\)/);
   assert.match(source, /onRetry=\{\(\) => runAiAsk\(aiQuery\)\}/);
   assert.match(source, /onCancel=\{cancelAiAsk\}/);
   assert.match(source, /onNavigate\?\.\(target, query\)/);
@@ -165,7 +165,7 @@ test("submitted search and AI use one mutually exclusive accessible result panel
     readFile(searchPagePath, "utf8"),
     readFile(searchStylesPath, "utf8"),
   ]);
-  assert.match(source, /role="tablist"[\s\S]*?aria-label="搜索与问答结果"/);
+  assert.match(source, /role="tablist"[\s\S]*?aria-label=\{t\("portal\.resultTabsAriaLabel"\)\}/);
   assert.match(source, /role="tab"[\s\S]*?id="sp-search-tab"/);
   assert.match(source, /role="tab"[\s\S]*?id="sp-ai-tab"/);
   assert.match(source, /setActiveResultTab\("search"\)/);
@@ -181,11 +181,11 @@ test("submitted search and AI use one mutually exclusive accessible result panel
 test("statistics cards identify asset type, exact source and the matching catalog entry", async () => {
   const source = await readFile(searchPagePath, "utf8");
   assert.match(source, /result\.metric === "report_count"/);
-  assert.match(source, /资产类型：\{assetType\}/);
-  assert.match(source, /数据来源：\{sourceLabel\}/);
-  assert.match(source, /统计范围：\{filterSummary \|\| "全量目录"\}/);
-  assert.match(source, /查看全部报表资产/);
-  assert.match(source, /查看筛选后的全部资产/);
+  assert.match(source, /t\("statistics\.assetType", \{ type: assetType \}\)/);
+  assert.match(source, /t\("statistics\.dataSource", \{ source: sourceLabel \}\)/);
+  assert.match(source, /t\("statistics\.scope", \{ filters: filterSummary \|\| t\("statistics\.allCatalog"\) \}\)/);
+  assert.match(source, /"statistics\.viewAllReports"/);
+  assert.match(source, /"statistics\.viewAllFilteredAssets"/);
 });
 
 test("AI answers remain explanatory while only DAP candidate cards navigate responsively", async () => {
@@ -195,15 +195,15 @@ test("AI answers remain explanatory while only DAP candidate cards navigate resp
     readFile(fileURLToPath(new URL("../api/aiAsk.ts", import.meta.url)), "utf8"),
   ]);
 
-  assert.match(source, /AI 回答摘要/);
+  assert.match(source, /t\("section\.answerSummaryAriaLabel"\)/);
   assert.match(source, /onNavigate=\{handleNavigate\}/);
-  assert.match(source, /aria-label=\{`查看\$\{isField \? "字段" : "数据表"\}详情：/);
+  assert.match(source, /t\("section\.candidateDetailAriaLabel", \{ type: t\(isField \? "section\.field" : "section\.table"\)/);
   assert.match(source, /ref: item\.tableName,[\s\S]*?assetId: item\.assetId/);
-  assert.match(source, /证据来源：DAP 资产目录/);
-  assert.match(source, /已核实引用来源/);
+  assert.match(source, /t\("section\.evidenceSource", \{ reason: item\.matchReason \}\)/);
+  assert.match(source, /t\("section\.sourcesTitle"\)/);
   assert.match(source, /selectVerifiedCitedCandidates\(response\.candidates, response\.citations\)/);
   assert.match(source, /item\.relevance === "direct"/);
-  assert.match(source, /response\.resultsTruncated[\s\S]*?有界检索结果可能不完整/);
+  assert.match(source, /t\(response\.resultsTruncated \? "section\.partialAnswerTruncated" : "section\.partialAnswerRelated"\)/);
   assert.match(styles, /\.sp-ai-candidate \{[\s\S]*?width: 100%[\s\S]*?min-width: 0/);
   assert.match(styles, /\.sp-ai-candidate-main \{[\s\S]*?overflow-wrap: anywhere/);
   assert.match(styles, /@media \(max-width: 600px\)[\s\S]*?\.sp-ai-candidate \{ padding: 12px/);
@@ -229,10 +229,13 @@ test("AI progress displays real SSE execution, search evidence, authoritative ve
   assert.match(panel, /setExpanded\(true\)/);
   assert.match(panel, /previous === "running" && status === "completed"/);
   assert.match(panel, /setExpanded\(false\)/);
-  assert.match(panel, /formatCompletedSummary\(groupSteps\(displayedSteps\), citationCount\)/);
+  assert.match(panel, /groupSteps\(displayedSteps\)/);
+  assert.match(panel, /t\("execution\.summary\.completedVerified"/);
+  assert.match(panel, /t\("execution\.summary\.completedWithoutCounts"\)/);
+  assert.match(panel, /t\("execution\.summary\.sourcesTraceable"\)/);
   assert.match(panel, /formatSafeAiAskDiagnostics\(events, status, query\)/);
-  assert.match(panel, /AI_ASK_EXECUTION_COPY\.copyDebug/);
-  assert.match(panel, /AI_ASK_EXECUTION_COPY\.details/);
+  assert.match(panel, /t\("execution\.copyDebug"\)/);
+  assert.match(panel, /t\("execution\.details"\)/);
   assert.match(source, /citationCount=\{response\?\.citations\.length \?\? 0\}/);
   assert.match(panel, /<StepSummary steps=\{displayedSteps\}/);
   assert.match(panel, /<StepDetail steps=\{displayedSteps\}/);
@@ -244,9 +247,10 @@ test("AI progress displays real SSE execution, search evidence, authoritative ve
   assert.match(detail, /tableCount/);
   assert.match(detail, /reportCount/);
   assert.match(detail, /dap_authoritative_metadata/);
-  assert.match(detail, /RRF/);
-  assert.match(panel, /取消问答/);
-  assert.match(summary, /AI_ASK_EXECUTION_COPY\.summary/);
+  assert.match(detail, /t\("execution\.detail\.rankingFusion"\)/);
+  assert.match(panel, /t\("execution\.cancel"\)/);
+  assert.match(summary, /t\("execution\.summary\.identifyConcept"/);
+  assert.match(summary, /t\("execution\.summary\.multiRouteRetrieval"/);
   assert.match(summary, /TECHNICAL_TERMS/);
   assert.match(grouping, /export function groupSteps/);
   assert.match(styles, /\.sp-ai-stage-list/);
@@ -273,17 +277,18 @@ test("AI execution panel never reports an unreported request count as zero reque
 
   // 请求次数必须走统一口径，未知不得冒充 0 次。
   assert.match(detail, /from "\.\.\/api\/aiAskExecutionSummary\.ts"/);
-  assert.match(detail, /httpRequestCountLabel\(data\)/);
-  assert.match(detail, /searchRequestNote\(data\)/);
+  assert.match(detail, /requestCountEvidence\(data\)/);
+  assert.match(detail, /requestCountReported/);
+  assert.match(detail, /execution\.detail\.requestCountUnreportedNote/);
   assert.doesNotMatch(detail, /requestCount \?\? 0/);
 
   // 未收到后端 done 时不得直接断言后端检索失败。
   assert.match(panel, /receivedTerminalEvent\(events\)/);
-  assert.match(panel, /不能据此判断后端检索失败/);
+  assert.match(panel, /t\("execution\.missingTerminalEvent"\)/);
 
   // 前端契约解析失败与后端失败必须可区分。
   assert.match(source, /AiAskExecutionContractError/);
-  assert.match(source, /不代表后端检索失败/);
+  assert.match(source, /t\("failures\.contractError", \{ message: error\.message \}\)/);
 });
 
 test("RAG recommendations are a separate business group with asynchronous non-blocking state", async () => {
@@ -297,9 +302,9 @@ test("RAG recommendations are a separate business group with asynchronous non-bl
   assert.match(source, /searchedAssetIds\.has\(item\.assetId\)/);
   assert.match(source, /title: item\.displayName \|\| item\.name/);
   assert.match(source, /assetId: item\.assetId/);
-  assert.match(source, /sp-business-group-title">资产搜索结果/);
+  assert.match(source, /sp-business-group-title">\{t\("results\.assetGroupTitle"\)\}/);
   assert.match(source, /!searchLoading && !searchError \? \([\s\S]*?<RagRecommendationsSection/);
-  assert.match(source, /相关资产推荐/);
+  assert.match(source, /t\("recommendations\.title"\)/);
   assert.doesNotMatch(source, /智能解答|关键词检索|向量检索|混合检索|检索模式/);
   assert.match(api, /status: 'disabled'[\s\S]*recommendations: \[\]/);
   assert.match(api, /suppressUnauthorizedEvent: true/);

@@ -1,8 +1,7 @@
+import { useTranslation } from "react-i18next";
 import type { AiAskRawStep } from "./aiAskStepSummary.ts";
-import {
-  httpRequestCountLabel,
-  searchRequestNote,
-} from "../api/aiAskExecutionSummary.ts";
+import { requestCountEvidence } from "../api/aiAskExecutionSummary.ts";
+import type { TFunction } from "i18next";
 
 function record(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -18,47 +17,53 @@ function numberValue(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function errorLabel(value: unknown): string {
-  const labels: Record<string, string> = {
-    timeout: "请求超时",
-    unavailable: "服务不可用",
-    invalid_response: "服务返回数据无效",
-    invalid_plan: "查询规划无效，已回退到原问题",
-    invalid_model_output: "模型返回内容无效，无法解析结构化回答",
-    invalid_citation: "模型引用的资产身份未通过 DAP 目录校验",
-    visibility_unavailable: "目录权限或可见性校验失败",
-    asset_verification_unavailable: "无法读取权威资产明细",
-    field_not_found: "字段未能按稳定 ID 核实",
-    not_found: "资产不存在",
-    service_auth_not_configured: "检索服务未完成服务端配置",
-    service_unauthorized: "检索服务鉴权失败",
-    busy: "检索服务繁忙",
-    disabled: "检索服务未启用",
-    llm_timeout: "模型请求超时",
-    llm_busy: "模型服务繁忙",
-    llm_unavailable: "模型服务不可用",
-    llm_not_configured: "模型服务未完成配置",
-    llm_daily_quota_exceeded: "今日 AI 问答次数已用完，请明日再试",
-    llm_quota_unavailable: "每日 AI 问答额度服务暂不可用，请稍后重试",
-    ai_disabled: "问答服务未启用",
-    ambiguous_scope: "无法唯一确认统计范围",
-    metadata_count_unavailable: "DAP 目录统计暂不可用",
-  };
-  return typeof value === "string" ? labels[value] || "执行步骤失败" : "执行步骤失败";
+const ERROR_LABEL_KEYS = {
+  timeout: "timeout",
+  unavailable: "unavailable",
+  invalid_response: "invalid_response",
+  invalid_plan: "invalid_plan",
+  invalid_model_output: "invalid_model_output",
+  invalid_citation: "invalid_citation",
+  visibility_unavailable: "visibility_unavailable",
+  asset_verification_unavailable: "asset_verification_unavailable",
+  field_not_found: "field_not_found",
+  not_found: "not_found",
+  service_auth_not_configured: "service_auth_not_configured",
+  service_unauthorized: "service_unauthorized",
+  busy: "busy",
+  disabled: "disabled",
+  llm_timeout: "llm_timeout",
+  llm_busy: "llm_busy",
+  llm_unavailable: "llm_unavailable",
+  llm_not_configured: "llm_not_configured",
+  llm_daily_quota_exceeded: "llm_daily_quota_exceeded",
+  llm_quota_unavailable: "llm_quota_unavailable",
+  ai_disabled: "ai_disabled",
+  ambiguous_scope: "ambiguous_scope",
+  metadata_count_unavailable: "metadata_count_unavailable",
+} as const;
+
+function errorLabel(value: unknown, t: TFunction<"aiAsk">): string {
+  if (typeof value !== "string" || !Object.prototype.hasOwnProperty.call(ERROR_LABEL_KEYS, value)) {
+    return t("execution.detail.genericStepError");
+  }
+  const key = ERROR_LABEL_KEYS[value as keyof typeof ERROR_LABEL_KEYS];
+  return t(`execution.detail.errors.${key}`);
 }
 
-function stepLabel(id: string, message: string): string {
+function stepLabel(id: string, message: string, t: TFunction<"aiAsk">): string {
   if (message) return message;
-  if (id === "metadata-count") return "查询 DAP 元数据精确总数";
-  if (id === "planning") return "分析问题并规划查询";
-  if (id.startsWith("rag-round-")) return "检索数据资产";
-  if (id === "merge") return "合并并去重检索结果";
-  if (id === "verification") return "读取并核实资产明细";
-  if (id === "generating") return "生成回答";
-  return "执行问答步骤";
+  if (id === "metadata-count") return t("execution.detail.stepMetadataCount");
+  if (id === "planning") return t("execution.detail.stepPlanning");
+  if (id.startsWith("rag-round-")) return t("execution.detail.stepRetrieval");
+  if (id === "merge") return t("execution.detail.stepMerge");
+  if (id === "verification") return t("execution.detail.stepVerification");
+  if (id === "generating") return t("execution.detail.stepGenerating");
+  return t("execution.detail.step");
 }
 
 function StepDetails({ step }: { step: AiAskRawStep }) {
+  const { t } = useTranslation("aiAsk");
   const data = step.data || {};
   const queries = displayList(data["queries"]);
   const concepts = displayList(data["keyConcepts"]);
@@ -71,7 +76,15 @@ function StepDetails({ step }: { step: AiAskRawStep }) {
   const requestedMode = typeof data["requestedMode"] === "string" ? data["requestedMode"] : null;
   const retrievedCount = numberValue(data["resultCount"]);
   const verifiedCount = numberValue(data["verifiedCount"]);
-  const searchNote = step.id.startsWith("search-") ? searchRequestNote(data) : null;
+  const { reported: requestCountReported, count: requestCount } = requestCountEvidence(data);
+  const requestCountLabel = requestCountReported && requestCount !== null
+    ? t("execution.detail.httpRequestCount", { count: requestCount })
+    : t("execution.detail.requestCountUnreported");
+  const searchNote = step.id.startsWith("search-")
+    ? !requestCountReported
+      ? t("execution.detail.requestCountUnreportedNote")
+      : requestCount === 0 ? t("execution.detail.noRagRequestNote") : null
+    : null;
   const deduplicatedCount = numberValue(data["deduplicatedCount"]);
   const selectedIds = Array.isArray(data["selectedAssetIds"])
     ? data["selectedAssetIds"].filter((item): item is number => typeof item === "number")
@@ -82,27 +95,27 @@ function StepDetails({ step }: { step: AiAskRawStep }) {
     const reportCount = numberValue(data["reportCount"]);
     const tableCount = numberValue(data["tableCount"]);
     const count = intent === "report_count" ? reportCount : tableCount;
-    const countLabel = intent === "report_count" ? "个报表资产" : "张数据表";
+    const unit = t(intent === "report_count" ? "execution.detail.metadataReportUnit" : "execution.detail.metadataTableUnit", { count: count ?? 0 });
     return (
       <div className="sp-ai-execution-detail">
         {count !== null
-          ? <p>DAP 权威目录精确 COUNT：{count} {countLabel}。</p>
+          ? <p>{t("execution.detail.metadataExactCount", { count, unit })}</p>
           : step.status === "running"
-            ? <p>正在核对资产类型与统计范围；检索候选数不会替代目录 COUNT。</p>
-            : <p>未返回可核实的统计数值；检索候选数不会替代目录 COUNT。</p>}
-        {typeof data["errorCode"] === "string" ? <p className="sp-ai-execution-error">{errorLabel(data["errorCode"])}</p> : null}
+            ? <p>{t("execution.detail.metadataChecking")}</p>
+            : <p>{t("execution.detail.metadataMissing")}</p>}
+        {typeof data["errorCode"] === "string" ? <p className="sp-ai-execution-error">{errorLabel(data["errorCode"], t)}</p> : null}
       </div>
     );
   }
   if (step.id === "planning") {
     return (
       <div className="sp-ai-execution-detail">
-        {concepts.length ? <p><strong>识别概念：</strong>{concepts.join("、")}</p> : null}
+        {concepts.length ? <p><strong>{t("execution.detail.identifiedConcepts")}</strong>{concepts.join(t("listSeparator"))}</p> : null}
         {queries.length ? (
-          <div><strong>实际候选查询：</strong><ol>{queries.map((query, index) => <li key={`${query}-${index}`}>{query}</li>)}</ol></div>
+          <div><strong>{t("execution.detail.candidateQueries")}</strong><ol>{queries.map((query, index) => <li key={`${query}-${index}`}>{query}</li>)}</ol></div>
         ) : null}
-        {fallback ? <p className="sp-ai-execution-note">规划不可用，已回退到原始问题检索（{errorLabel(fallback)}）。</p> : null}
-        {data["planningMode"] === "exact_identifier" ? <p>标识符精确检索：仅执行原始查询。</p> : null}
+        {fallback ? <p className="sp-ai-execution-note">{t("execution.detail.planningFallback", { reason: errorLabel(fallback, t) })}</p> : null}
+        {data["planningMode"] === "exact_identifier" ? <p>{t("execution.detail.exactIdentifier")}</p> : null}
       </div>
     );
   }
@@ -110,44 +123,44 @@ function StepDetails({ step }: { step: AiAskRawStep }) {
     const query = typeof data["query"] === "string" ? data["query"] : "";
     return (
       <div className="sp-ai-execution-detail">
-        {query ? <p><strong>查询：</strong>{query}</p> : null}
-        <p><strong>检索策略：</strong>{effectiveMode || requestedMode || "未返回策略信息"}{requestedMode && effectiveMode && requestedMode !== effectiveMode ? `（请求 ${requestedMode}）` : ""}</p>
-        {channels.length ? <p><strong>实际通道：</strong>{channels.join("、")}</p> : null}
-        <p><strong>结果：</strong>{retrievedCount ?? 0} 条检索结果；{verifiedCount ?? hits.length} 条通过当前目录身份校验</p>
+        {query ? <p><strong>{t("execution.detail.query")}</strong>{query}</p> : null}
+        <p><strong>{t("execution.detail.strategy")}</strong>{effectiveMode || requestedMode || t("execution.detail.noStrategy")}{requestedMode && effectiveMode && requestedMode !== effectiveMode ? t("execution.detail.requestedMode", { mode: requestedMode }) : ""}</p>
+        {channels.length ? <p><strong>{t("execution.detail.channels")}</strong>{channels.join(t("listSeparator"))}</p> : null}
+        <p><strong>{t("execution.detail.results")}</strong>{t("execution.detail.retrievedAndVerified", { retrieved: retrievedCount ?? 0, verified: verifiedCount ?? hits.length, count: retrievedCount ?? 0 })}</p>
         {searchNote ? <p className="sp-ai-execution-note">{searchNote}</p> : null}
         {hits.length ? (
           <details className="sp-ai-execution-nested">
-            <summary>查看命中资产（{hits.length}）</summary>
+            <summary>{t("execution.detail.viewHits", { count: hits.length })}</summary>
             <ul>
               {hits.map((hit, index) => {
-                const entity = hit["entityType"] === "field" ? "字段" : "数据表";
-                const name = typeof hit["name"] === "string" ? hit["name"] : "资产";
+                const entity = hit["entityType"] === "field" ? t("execution.detail.field") : t("execution.detail.table");
+                const name = typeof hit["name"] === "string" ? hit["name"] : t("execution.detail.asset");
                 const assetId = hit["assetId"];
                 const fieldId = hit["fieldId"];
                 const hitTerms = displayList(hit["matchedTerms"]);
                 const hitChannels = displayList(hit["retrievalChannels"]);
                 return (
                   <li key={`${String(assetId)}-${String(fieldId)}-${index}`}>
-                    <span>{entity}：{name}（资产 ID {String(assetId)}{fieldId ? ` · 字段 ID ${String(fieldId)}` : ""}）</span>
-                    {hitChannels.length ? <small>通道：{hitChannels.join("、")}</small> : null}
-                    {hitTerms.length ? <small>命中依据：{hitTerms.slice(0, 4).join("、")}</small> : null}
+                    <span>{entity}: {name} ({t("execution.detail.assetId", { id: String(assetId) })}{fieldId ? ` · ${t("execution.detail.fieldId", { id: String(fieldId) })}` : ""})</span>
+                    {hitChannels.length ? <small>{t("execution.detail.channel")}{hitChannels.join(t("listSeparator"))}</small> : null}
+                    {hitTerms.length ? <small>{t("execution.detail.matchEvidence")}{hitTerms.slice(0, 4).join(t("listSeparator"))}</small> : null}
                   </li>
                 );
               })}
             </ul>
           </details>
         ) : null}
-        {typeof data["errorCode"] === "string" ? <p className="sp-ai-execution-error">{errorLabel(data["errorCode"])}</p> : null}
+        {typeof data["errorCode"] === "string" ? <p className="sp-ai-execution-error">{errorLabel(data["errorCode"], t)}</p> : null}
       </div>
     );
   }
   if (step.id === "merge") {
     return (
       <div className="sp-ai-execution-detail">
-        <p>{httpRequestCountLabel(data)} · 检索轮次 {numberValue(data["retrievalRounds"]) ?? 0}</p>
-        <p>跨查询去重后保留 {deduplicatedCount ?? 0} 个候选资产身份。</p>
-        {selectedIds.length ? <p>候选资产 ID：{selectedIds.join("、")}</p> : null}
-        {typeof data["fusionMethod"] === "string" ? <p>排名融合：RRF（只融合各次查询内排名，不比较原始分数）。</p> : null}
+        <p>{requestCountLabel} · {t("execution.detail.retrievalRounds", { count: numberValue(data["retrievalRounds"]) ?? 0 })}</p>
+        <p>{t("execution.detail.deduplicatedCandidates", { count: deduplicatedCount ?? 0 })}</p>
+        {selectedIds.length ? <p>{t("execution.detail.candidateIds")}{selectedIds.join(t("listSeparator"))}</p> : null}
+        {typeof data["fusionMethod"] === "string" ? <p>{t("execution.detail.rankingFusion")}</p> : null}
       </div>
     );
   }
@@ -155,31 +168,36 @@ function StepDetails({ step }: { step: AiAskRawStep }) {
     const table = typeof data["tableName"] === "string" ? data["tableName"] : null;
     const field = typeof data["fieldName"] === "string" ? data["fieldName"] : null;
     const source = data["source"] === "dap_authoritative_metadata";
+    const verifiedTables = numberValue(data["verifiedTableCount"]);
+    const verifiedFields = numberValue(data["verifiedFieldCount"] ?? 0) ?? 0;
+    const fieldCount = numberValue(data["fieldCount"]);
     return (
       <div className="sp-ai-execution-detail">
-        {table ? <p><strong>资产：</strong>{table}</p> : null}
-        {field ? <p><strong>已核实字段：</strong>{field}</p> : null}
-        {numberValue(data["verifiedTableCount"]) !== null ? <p>已读取 {String(data["verifiedTableCount"])} 张表，核实 {String(data["verifiedFieldCount"] ?? 0)} 个字段。</p> : null}
-        {numberValue(data["fieldCount"]) !== null && step.id.startsWith("asset-") ? <p>资产详情包含 {String(data["fieldCount"])} 个字段；本次答案仅使用已关联的命中字段。</p> : null}
-        {source ? <p>证据来源：DAP 权威资产明细（按稳定 ID 读取）。</p> : null}
-        {data["indexEvidenceOnly"] === true ? <p className="sp-ai-execution-note">仅有索引摘要，未读取到权威资产明细；该摘要不会作为已核实证据生成答案。</p> : null}
-        {typeof data["errorCode"] === "string" ? <p className="sp-ai-execution-error">{errorLabel(data["errorCode"])}</p> : null}
+        {table ? <p><strong>{t("execution.detail.verifiedAsset")}</strong>{table}</p> : null}
+        {field ? <p><strong>{t("execution.detail.verifiedField")}</strong>{field}</p> : null}
+        {verifiedTables !== null ? <p>{t("execution.detail.verifiedDetails", { tables: verifiedTables, fields: verifiedFields, count: verifiedTables })}</p> : null}
+        {fieldCount !== null && step.id.startsWith("asset-") ? <p>{t("execution.detail.assetFieldDetails", { count: fieldCount })}</p> : null}
+        {source ? <p>{t("execution.detail.authoritativeEvidence")}</p> : null}
+        {data["indexEvidenceOnly"] === true ? <p className="sp-ai-execution-note">{t("execution.detail.indexEvidenceOnly")}</p> : null}
+        {typeof data["errorCode"] === "string" ? <p className="sp-ai-execution-error">{errorLabel(data["errorCode"], t)}</p> : null}
       </div>
     );
   }
   if (step.id.startsWith("rag-round-")) {
+    const queryCount = numberValue(data["queryCount"]) ?? 0;
     return (
       <div className="sp-ai-execution-detail">
-        <p>本轮 {numberValue(data["queryCount"]) ?? 0} 个查询 · {httpRequestCountLabel(data)} · 返回 {retrievedCount ?? 0} 条。</p>
-        {typeof data["supplementalQuery"] === "string" ? <p>补充查询：{data["supplementalQuery"]}</p> : null}
+        <p>{t("execution.detail.roundSummary", { queries: queryCount, requestCount: requestCountLabel, results: retrievedCount ?? 0, count: queryCount })}</p>
+        {typeof data["supplementalQuery"] === "string" ? <p>{t("execution.detail.supplementalQuery")}{data["supplementalQuery"]}</p> : null}
       </div>
     );
   }
   if (step.id === "generating") {
+    const evidenceCount = numberValue(data["evidenceCount"]) ?? 0;
     return (
       <div className="sp-ai-execution-detail">
-        <p>使用已核实 DAP 证据 {numberValue(data["evidenceCount"]) ?? 0} 条；最终答案一次性返回，不传输模型 token。</p>
-        {typeof data["errorCode"] === "string" ? <p className="sp-ai-execution-error">{errorLabel(data["errorCode"])}</p> : null}
+        <p>{t("execution.detail.verifiedEvidence", { count: evidenceCount })}</p>
+        {typeof data["errorCode"] === "string" ? <p className="sp-ai-execution-error">{errorLabel(data["errorCode"], t)}</p> : null}
       </div>
     );
   }
@@ -187,6 +205,7 @@ function StepDetails({ step }: { step: AiAskRawStep }) {
 }
 
 export function StepDetail({ steps }: { steps: readonly AiAskRawStep[] }) {
+  const { t } = useTranslation("aiAsk");
   return (
     <ol className="sp-ai-execution-list">
       {steps.map((step) => (
@@ -194,8 +213,8 @@ export function StepDetail({ steps }: { steps: readonly AiAskRawStep[] }) {
           <span className="sp-ai-execution-marker" aria-hidden="true" />
           <div className="sp-ai-execution-step-body">
             <div className="sp-ai-execution-step-head">
-              <strong>{stepLabel(step.id, step.message || "")}</strong>
-              <span>{step.status === "running" ? "进行中" : step.status === "completed" ? "已完成" : "失败"}</span>
+              <strong>{stepLabel(step.id, step.message || "", t)}</strong>
+              <span>{t(step.status === "running" ? "execution.detail.statusRunning" : step.status === "completed" ? "execution.detail.statusCompleted" : "execution.detail.statusFailed")}</span>
             </div>
             <StepDetails step={step} />
           </div>

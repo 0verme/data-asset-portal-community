@@ -637,7 +637,7 @@ test("a new AI question supersedes a slow old response without relabeling", asyn
   await expect.poll(() => fixtures.asked.length).toBe(2);
   await expect(page.getByLabel("AI 回答摘要")).toContainText("new question after old request");
   await page.waitForTimeout(1100);
-  await expect(page.getByText("问答问题：new question after old request")).toBeVisible();
+  await expect(page.getByRole("region", { name: "AI 问答结果" }).getByText("问题：new question after old request", { exact: true })).toBeVisible();
   await expect(page.getByLabel("AI 回答摘要")).toContainText("new question after old request");
   await expect(page.getByLabel("AI 回答摘要")).not.toContainText("slow-old question");
   expect(fixtures.asked.map((item) => item.query)).toEqual([

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import React, { type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { AssetTableField, AssetTableItem } from "../api/assets.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
@@ -119,6 +120,7 @@ interface DDLViewProps {
 }
 
 function DDLView({ asset, ddl, ddlDialectLabel }: DDLViewProps) {
+  const { t } = useTranslation("warehouse");
   const [copied, setCopied] = React.useState(false);
 
   const copy = async () => {
@@ -132,9 +134,9 @@ function DDLView({ asset, ddl, ddlDialectLabel }: DDLViewProps) {
   return (
     <div className="ddl-wrap">
       <div className="ddl-bar">
-        <span className="ddl-lang"><span className="d"></span>{ddlDialectLabel} · 建表语句</span>
+        <span className="ddl-lang"><span className="d"></span>{ddlDialectLabel} · {t("detail.createStatement")}</span>
         <Button className={`btn${copied ? " copied" : ""}`} size="sm" type="button" variant="secondary" onClick={() => void copy()} style={{ height: 30 }}>
-          <Icon name={copied ? "check" : "copy"} size={14} />{copied ? "已复制" : "复制 DDL"}
+          <Icon name={copied ? "check" : "copy"} size={14} />{copied ? t("detail.copied") : t("detail.copyDdl")}
         </Button>
       </div>
       <pre className="ddl" aria-label={`${asset.name} DDL`}>
@@ -163,6 +165,7 @@ interface FieldsViewProps {
 }
 
 function FieldsView({ fields }: FieldsViewProps) {
+  const { t } = useTranslation("warehouse");
   const [fieldQuery, setFieldQuery] = React.useState("");
   const normalizedQuery = fieldQuery.trim().toLowerCase();
   const rows = fields.filter(
@@ -178,15 +181,15 @@ function FieldsView({ fields }: FieldsViewProps) {
         <div className="ft-search">
           <span className="ico-search"><Icon name="search" size={14} /></span>
           <Input
-            aria-label="在当前表内筛选字段"
-            placeholder="在当前表内筛选字段"
+            aria-label={t("detail.filterFields")}
+            placeholder={t("detail.filterFields")}
             value={fieldQuery}
             onChange={(event) => setFieldQuery(event.target.value)}
           />
         </div>
         <span className="ft-info">
-          共 <b style={{ color: "var(--ink-2)" }}>{fields.length}</b> 个字段
-          {normalizedQuery ? ` · 命中 ${rows.length}` : ""}
+          {t("detail.fieldsCount", { count: fields.length })}
+          {normalizedQuery ? ` · ${t("detail.matchedCount", { count: rows.length })}` : ""}
         </span>
       </div>
       <div style={{ overflowX: "auto" }}>
@@ -194,11 +197,11 @@ function FieldsView({ fields }: FieldsViewProps) {
           <thead>
             <tr>
               <th className="c-idx">#</th>
-              <th>字段名</th>
-              <th>中文注释</th>
-              <th style={{ width: 130 }}>数据类型</th>
-              <th style={{ width: 80 }}>可空</th>
-              <th>枚举 / 取值说明</th>
+              <th>{t("detail.fieldName")}</th>
+              <th>{t("detail.fieldMeaning")}</th>
+              <th style={{ width: 130 }}>{t("detail.dataType")}</th>
+              <th style={{ width: 80 }}>{t("detail.nullable")}</th>
+              <th>{t("detail.enumDescription")}</th>
             </tr>
           </thead>
           <tbody>
@@ -210,13 +213,13 @@ function FieldsView({ fields }: FieldsViewProps) {
                   {(field.pk || field.part) ? (
                     <span className="keys">
                       {field.pk ? <span className="key-tag key-pk">PK</span> : null}
-                      {field.part ? <span className="key-tag key-part">分区</span> : null}
+                      {field.part ? <span className="key-tag key-part">{t("detail.partition")}</span> : null}
                     </span>
                   ) : null}
                 </td>
                 <td className="c-cn"><Highlight text={field.cn} q={fieldQuery} /></td>
                 <td className="c-type">{field.type}</td>
-                <td className="c-null">{field.nullable ? <span className="null-yes">可空</span> : <span className="null-no">NOT NULL</span>}</td>
+                <td className="c-null">{field.nullable ? <span className="null-yes">{t("detail.nullable")}</span> : <span className="null-no">NOT NULL</span>}</td>
                 <td className="c-enum"><EnumCell field={field} /></td>
               </tr>
             ))}
@@ -250,6 +253,7 @@ export function DetailPage({
   onBackToList,
   onEdit,
 }: DetailPageProps) {
+  const { t } = useTranslation("warehouse");
   const [copied, setCopied] = React.useState(false);
 
   const copyName = async () => {
@@ -264,7 +268,7 @@ export function DetailPage({
   return (
     <div>
       <PageHeader
-        back={{ onClick: onBack, text: "返回数据仓库列表" }}
+        back={{ onClick: onBack, text: t("detail.backToList") }}
         breadcrumbs={buildModuleBreadcrumbs("dwm", [
           { label: asset.name },
         ], onBackToList)}
@@ -284,29 +288,29 @@ export function DetailPage({
           </div>
           <div className="dh-actions">
             {onEdit ? <Button className="btn" type="button" variant="secondary" onClick={onEdit}>
-              <Icon name="edit" size={15} />编辑表
+              <Icon name="edit" size={15} />{t("detail.editTable")}
             </Button> : null}
             <Button className={`btn${copied ? " copied" : ""}`} type="button" variant="secondary" onClick={() => void copyName()}>
-              <Icon name={copied ? "check" : "copy"} size={15} />{copied ? "已复制" : "复制表名"}
+              <Icon name={copied ? "check" : "copy"} size={15} />{copied ? t("detail.copied") : t("detail.copyTableName")}
             </Button>
             <Button className="btn primary" type="button" variant="primary" onClick={() => onTabChange("ddl")}>
-              <Icon name="code" size={15} />查看 DDL
+              <Icon name="code" size={15} />{t("detail.viewDdl")}
             </Button>
           </div>
         </div>
         <div className="dh-meta">
-          <MetaItem label="负责人" value={<><span className="mini-av" style={{ width: 22, height: 22 }}>{initial(asset.owner)}</span>{asset.owner}</>} />
-          <MetaItem label="数据粒度" value={asset.grain} />
-          <MetaItem label="更新周期" value={<><Icon name="clock" size={14} color="var(--ink-3)" />{asset.cycle}</>} />
-          <MetaItem label="字段数量" value={fields.length} mono />
-          <MetaItem label="存储表" value={`dwm.${asset.name}`} mono />
+          <MetaItem label={t("detail.owner")} value={<><span className="mini-av" style={{ width: 22, height: 22 }}>{initial(asset.owner)}</span>{asset.owner}</>} />
+          <MetaItem label={t("detail.grain")} value={asset.grain} />
+          <MetaItem label={t("detail.updateCycle")} value={<><Icon name="clock" size={14} color="var(--ink-3)" />{asset.cycle}</>} />
+          <MetaItem label={t("detail.fieldCountLabel")} value={fields.length} mono />
+          <MetaItem label={t("detail.storageTable")} value={`dwm.${asset.name}`} mono />
         </div>
       </div>
 
       <AssetRisksPanel assetRisks={Array.isArray(assetRisks) ? assetRisks : []} />
 
       <Tabs
-        aria-label="数据表详情内容"
+        aria-label={t("detail.tabsAriaLabel")}
         appearance="line"
         className="asset-detail-tabs"
         size="md"
@@ -318,8 +322,8 @@ export function DetailPage({
             label: (
               <span className="asset-detail-tab-label">
                 <Icon name="table" size={14} />
-                <span>字段信息</span>
-                <span className="asset-detail-tab-count" aria-label={`${fields.length} 个字段`}>{fields.length}</span>
+                <span>{t("detail.fieldsTab")}</span>
+                <span className="asset-detail-tab-count" aria-label={t("detail.fieldsCount", { count: fields.length })}>{fields.length}</span>
               </span>
             ),
           },
@@ -328,7 +332,7 @@ export function DetailPage({
             label: (
               <span className="asset-detail-tab-label">
                 <Icon name="code" size={14} />
-                <span>建表语句</span>
+                <span>{t("detail.createStatement")}</span>
               </span>
             ),
           },

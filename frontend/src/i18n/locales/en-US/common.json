@@ -51,6 +51,44 @@
       "default": "Search table names, Chinese names, owners, or fields"
     }
   },
+  "pagination": {
+    "ariaLabel": "Table pagination",
+    "range": "{{first}}–{{last}} of {{total}}",
+    "perPage": "Per page",
+    "pageSizeAriaLabel": "Rows per page",
+    "rows": "rows",
+    "controlsAriaLabel": "Pagination controls",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "sidebar": {
+    "maintenance": "Maintenance"
+  },
+  "forms": {
+    "backToPrevious": "Go back",
+    "discardTitle": "Discard unsaved changes?",
+    "discardMessage": "This form has unsaved changes. Discard them and go back?",
+    "discardConfirm": "Discard changes",
+    "continueEditing": "Continue editing"
+  },
+  "accessibility": {
+    "breadcrumb": "Breadcrumb"
+  },
+  "dangerZone": {
+    "title": "Danger zone",
+    "description": "The following actions cannot be undone. Confirm their impact before continuing."
+  },
+  "confirmation": {
+    "defaultTitle": "Confirm deletion?",
+    "defaultContent": "This cannot be undone. Proceed with care.",
+    "defaultDeleteType": "This item",
+    "deleteWarning": "{{typeLabel}} cannot be recovered after deletion. Please proceed with caution.",
+    "deleteWarningNamed": "{{typeLabel}} “{{name}}” cannot be recovered after deletion. Please proceed with caution.",
+    "keywordLabel": "Enter the confirmation text",
+    "keywordHint": "Enter {{keyword}} to confirm deletion.",
+    "confirm": "Delete",
+    "processing": "Processing..."
+  },
   "theme": {
     "switchToLight": "Switch to light theme",
     "switchToDark": "Switch to dark theme",
@@ -76,6 +114,7 @@
     "clear": "Clear",
     "retry": "Retry",
     "loading": "Loading…",
+    "saving": "Saving…",
     "noResults": "No results"
   }
 }

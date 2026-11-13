@@ -58,13 +58,15 @@ if (isKumoSpike || isKumoAdapterFixture || isKumoOverlayFixture || isKumoToastFa
           : isFormErrorFixture
             ? import("./kumo-overlays/FormErrorPresenterFixture.tsx")
             : import("./ui/TablePaginationFixture.tsx");
-  void loadFixture.then(({ default: Fixture }) => {
+  void i18nReady.then(() => loadFixture.then(({ default: Fixture }) => {
     root.render(
       <React.StrictMode>
-        <Fixture />
+        <I18nextProvider i18n={i18n}>
+          <Fixture />
+        </I18nextProvider>
       </React.StrictMode>,
     );
-  });
+  }));
 } else {
   void i18nReady.then(() => {
     root.render(

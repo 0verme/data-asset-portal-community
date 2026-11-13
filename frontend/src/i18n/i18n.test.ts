@@ -10,9 +10,9 @@ function flattenKeys(value: unknown, prefix = ""): string[] {
   return Object.entries(value).flatMap(([key, child]) => flattenKeys(child, prefix ? `${prefix}.${key}` : key));
 }
 
-test("zh-CN and en-US resources have matching keys for Phase 0 namespaces", async () => {
+test("zh-CN and en-US resources have matching keys in every namespace", async () => {
   await i18nReady;
-  for (const namespace of ["common", "navigation", "auth", "warehouse"] as const) {
+  for (const namespace of ["common", "navigation", "auth", "warehouse", "search", "aiAsk"] as const) {
     const zh = i18n.getResourceBundle("zh-CN", namespace);
     const en = i18n.getResourceBundle("en-US", namespace);
     assert.deepEqual(
@@ -38,6 +38,18 @@ test("count and query interpolation is localized without changing the inserted v
   assert.equal(i18n.t("tableCountSuffix", { lng: "en-US", ns: "warehouse", count: 5 }), " tables");
   assert.equal(i18n.t("tableCountPrefix", { lng: "zh-CN", ns: "warehouse" }) + 5 + i18n.t("tableCountSuffix", { lng: "zh-CN", ns: "warehouse", count: 5 }), "共 5 张表");
   assert.equal(i18n.t("querySummary", { lng: "en-US", ns: "warehouse", query: "dwd.orders" }), ", matching “dwd.orders”");
+});
+
+test("Phase 1 search, AI, warehouse, and shared confirmation labels resolve in both locales", async () => {
+  await i18nReady;
+  assert.equal(i18n.t("portal.title", { lng: "en-US", ns: "search" }), "Data Asset Management and Lineage Platform");
+  assert.equal(i18n.t("portal.searchButton", { lng: "zh-CN", ns: "search" }), "搜索");
+  assert.equal(i18n.t("execution.stages.retrieval", { lng: "en-US", ns: "aiAsk" }), "Retrieve assets");
+  assert.equal(i18n.t("execution.detail.noRagRequestNote", { lng: "en-US", ns: "aiAsk" }), "No request was sent to the RAG HTTP Search API.");
+  assert.equal(i18n.t("editor.currentTable", { lng: "en-US", ns: "warehouse", name: "dwm_trade_order_item_di" }), "Current table: dwm.dwm_trade_order_item_di");
+  assert.equal(i18n.t("section.question", { lng: "en-US", ns: "aiAsk", query: "订单金额在哪张表？" }), "Question: 订单金额在哪张表？");
+  assert.equal(i18n.t("confirmation.keywordHint", { lng: "en-US", ns: "common", keyword: "dwm_trade_order_item_di" }), "Enter dwm_trade_order_item_di to confirm deletion.");
+  assert.equal(i18n.t("confirmation.deleteWarningNamed", { lng: "en-US", ns: "common", typeLabel: "Data table", name: "dwm_trade_order_item_di" }), "Data table “dwm_trade_order_item_di” cannot be recovered after deletion. Please proceed with caution.");
 });
 
 test("number and date interpolation use the selected locale's Intl formatting", async () => {

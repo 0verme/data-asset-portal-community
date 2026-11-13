@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "./Button.tsx";
 import { Select } from "./Select.tsx";
 import "./TablePagination.css";
@@ -29,9 +30,10 @@ export function TablePagination({
   pageSizeOptions = DEFAULT_TABLE_PAGE_SIZE_OPTIONS,
   loading = false,
   disabled = false,
-  ariaLabel = "表格分页",
+  ariaLabel,
   className,
 }: TablePaginationProps) {
+  const { t } = useTranslation("common");
   const model = resolveTablePaginationModel(page, pageSize, total);
   const options = resolveTablePageSizeOptions(pageSizeOptions, model.pageSize);
   const controlsDisabled = disabled;
@@ -40,18 +42,18 @@ export function TablePagination({
   return (
     <nav
       className={rootClassName}
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? t("pagination.ariaLabel")}
       aria-busy={loading || undefined}
       data-loading={loading ? "true" : undefined}
     >
       <div className="dap-table-pagination__range" aria-live="polite">
-        第 {model.firstItem}–{model.lastItem} 条 / 共 {model.total} 条
+        {t("pagination.range", { first: model.firstItem, last: model.lastItem, total: model.total })}
       </div>
       <div className="dap-table-pagination__controls">
         <label className="dap-table-pagination__size-group">
-          <span>每页</span>
+          <span>{t("pagination.perPage")}</span>
           <Select<number>
-            aria-label="每页条数"
+            aria-label={t("pagination.pageSizeAriaLabel")}
             className="dap-table-pagination__select"
             size="sm"
             items={options.map((size) => ({ label: String(size), value: size }))}
@@ -63,9 +65,9 @@ export function TablePagination({
               onPageSizeChange(value);
             }}
           />
-          <span>条</span>
+          <span>{t("pagination.rows")}</span>
         </label>
-        <div className="dap-table-pagination__page-controls" role="group" aria-label="翻页">
+        <div className="dap-table-pagination__page-controls" role="group" aria-label={t("pagination.controlsAriaLabel")}>
           <Button
             className="dap-table-pagination__button"
             size="sm"
@@ -74,7 +76,7 @@ export function TablePagination({
             disabled={controlsDisabled || model.total === 0 || model.page <= 1}
             onClick={() => onPageChange(Math.max(1, model.page - 1))}
           >
-            上一页
+            {t("pagination.previous")}
           </Button>
           <span className="dap-table-pagination__page-index">
             {model.page} / {model.pageCount}
@@ -87,7 +89,7 @@ export function TablePagination({
             disabled={controlsDisabled || model.total === 0 || model.page >= model.pageCount}
             onClick={() => onPageChange(Math.min(model.pageCount, model.page + 1))}
           >
-            下一页
+            {t("pagination.next")}
           </Button>
         </div>
       </div>

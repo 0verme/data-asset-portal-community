@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getTableFieldLabel, validateTableForm } from "./tableFormErrors.ts";
+import { i18n, i18nReady } from "../i18n/index.ts";
+import { getTableFieldLabel, validateTableForm, type TableFormTranslator } from "./tableFormErrors.ts";
 
 const validRow = {
   _key: "row-1",
@@ -79,6 +80,27 @@ test("type errors target the editable component that can correct each error", ()
   }, [], "");
   assert.equal(scale.formFields["fields.row-1.typeScale"], "NUMERIC scale 不能大于 precision");
   assert.equal(scale.fields["row-1"]?.typeField, "typeScale");
+});
+
+test("table validation copy and field labels follow the selected locale", async () => {
+  await i18nReady;
+  const fixedWarehouseTranslator = i18n.getFixedT("en-US", "warehouse");
+  const translateWarehouse: TableFormTranslator = (key, values) => values
+    ? fixedWarehouseTranslator(key, values)
+    : fixedWarehouseTranslator(key);
+  const result = validateTableForm({
+    ...validForm,
+    cn: "",
+    domain: "",
+    fields: [{ ...validRow, name: "bad field", typeBase: "NUMERIC", typePrecision: "0" }],
+  }, [validForm.name], "", translateWarehouse);
+
+  assert.equal(result.formFields["name"], "Table name dwm_order_detail already exists.");
+  assert.equal(result.formFields["cn"], "Enter the Chinese table name or business meaning.");
+  assert.equal(result.formFields["domain"], "Select a subject area.");
+  assert.equal(result.formFields["fields.row-1.name"], "The field name format is invalid");
+  assert.equal(result.formFields["fields.row-1.typePrecision"], "NUMERIC precision must be a positive integer");
+  assert.equal(getTableFieldLabel("fields.row-1.cn", [validRow], translateWarehouse), "Field 1 Chinese comment");
 });
 
 test("empty field lists and primary-key nullability expose actionable field paths", () => {

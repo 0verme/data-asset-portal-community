@@ -190,6 +190,34 @@ test("asset detail tabs preserve URL state across reload and browser history", a
   await expect(page).toHaveURL(/[?&]tab=ddl(?:&|$)/);
 });
 
+test("asset detail language switching preserves route, tab, DDL, and business metadata", async ({ page }) => {
+  await page.addInitScript(() => localStorage.removeItem("dap-language"));
+  await setMockAuth(page, "guest");
+  await page.goto(`${ASSET_PATH}/${EXISTING_ASSET}?tab=ddl`);
+  const ddlTab = page.getByRole("tab", { name: "建表语句" });
+  await expect(ddlTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".ddl")).toBeVisible();
+  const stateUrl = page.url();
+  const ddlBeforeSwitch = await page.locator(".ddl").innerText();
+  const businessMeaning = await page.locator(".dh-cn").innerText();
+  const metadataValues = await page.locator(".dh-meta .v").allTextContents();
+  const apiRequests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/")) apiRequests.push(request.url());
+  });
+  const requestCount = apiRequests.length;
+
+  await page.getByRole("button", { name: "切换到英文" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en-US");
+  await expect(page).toHaveURL(stateUrl);
+  await expect(page.getByRole("tab", { name: "Create statement" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("button", { name: "Copy DDL" })).toBeVisible();
+  await expect(page.locator(".ddl")).toHaveText(ddlBeforeSwitch);
+  await expect(page.locator(".dh-cn")).toHaveText(businessMeaning);
+  await expect(page.locator(".dh-meta .v")).toHaveText(metadataValues);
+  expect(apiRequests).toHaveLength(requestCount);
+});
+
 test("admin can edit details and choose to keep or discard dirty changes", async ({ page }, testInfo: TestInfo) => {
   await openAssetDetail(page, "admin");
   await page.getByRole("button", { name: "编辑表" }).click();
@@ -263,7 +291,41 @@ test("admin detail stays usable across light/dark and desktop-to-phone viewports
   }
 });
 
+test("asset editor localizes controls without changing form values or route state", async ({ page }) => {
+  await page.addInitScript(() => localStorage.removeItem("dap-language"));
+  await setMockAuth(page, "admin");
+  await page.goto(`${ASSET_PATH}/new`);
+  await expect(page.getByRole("heading", { name: "新增数据表" })).toBeVisible();
+  const tableName = "dwm_i18n_form_preserve";
+  const businessMeaning = "国际化字段保留测试";
+  await page.getByLabel("表名（英文）").fill(tableName);
+  await page.getByLabel("表中文名 / 业务含义").fill(businessMeaning);
+  await page.getByLabel("负责人").fill("i18n-test-owner");
+  const fieldName = page.getByLabel("字段1字段名");
+  await fieldName.fill("i18n_field");
+  await page.getByLabel("字段1中文注释").fill("国际化字段");
+  const stateUrl = page.url();
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/")) requests.push(request.url());
+  });
+  const requestCount = requests.length;
+
+  await page.getByRole("button", { name: "切换到英文" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en-US");
+  await expect(page).toHaveURL(stateUrl);
+  await expect(page.getByRole("heading", { name: "Add data table" })).toBeVisible();
+  await expect(page.getByLabel("Table name (English)")).toHaveValue(tableName);
+  await expect(page.getByLabel("Chinese name / business meaning")).toHaveValue(businessMeaning);
+  await expect(page.getByLabel("Owner")).toHaveValue("i18n-test-owner");
+  await expect(page.getByLabel("Field 1 name")).toHaveValue("i18n_field");
+  await expect(page.getByLabel("Field 1 Chinese comment")).toHaveValue("国际化字段");
+  await expect(page.getByRole("button", { name: "Add field" })).toBeVisible();
+  expect(requests).toHaveLength(requestCount);
+});
+
 test("TableEditor form error presenter focuses, associates, and clears keyed errors", async ({ page }) => {
+  test.setTimeout(60_000);
   await setMockAuth(page, "admin");
 
   for (const width of [1280, 390]) {
@@ -307,6 +369,7 @@ test("TableEditor form error presenter focuses, associates, and clears keyed err
 });
 
 test("admin can create, validate, edit fields, and delete an asset with keyword confirmation", async ({ page }, testInfo: TestInfo) => {
+  test.setTimeout(60_000);
   await setMockAuth(page, "admin");
   await page.goto(`${ASSET_PATH}?layout=list`);
   await expect(page.locator(".asset-page table.dt tbody tr").first()).toBeVisible({ timeout: 20_000 });

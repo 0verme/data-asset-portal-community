@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { useTranslation } from "react-i18next";
 import type { UseAssetModuleResult } from "../../hooks/useAssetModule.ts";
 import type { AssetRoute } from "../../routing/types.ts";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.tsx";
@@ -25,6 +26,7 @@ export interface AssetSidebarProps {
 }
 
 export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProps) {
+  const { t } = useTranslation("warehouse");
   const {
     domain,
     homeLoading,
@@ -85,10 +87,10 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
   return (
     <>
       <AssetSidebarFilterGroup
-        title="数据分层"
+        title={t("sidebar.layers")}
         allOption={{
           key: "all-layers",
-          label: "全部层级",
+          label: t("sidebar.allLayers"),
           count: Object.values(layerCounts).reduce(
             (total, count) => total + count,
             0,
@@ -103,10 +105,10 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
       />
 
       <AssetSidebarFilterGroup
-        title="主题域"
+        title={t("sidebar.domains")}
         allOption={{
           key: "all-domains",
-          label: "全部主题域",
+          label: t("sidebar.allDomains"),
           count: Object.values(domainCounts).reduce(
             (total, count) => total + count,
             0,
@@ -126,7 +128,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
             ? [
                 {
                   key: "create-asset",
-                  label: "新增表",
+                  label: t("addTable"),
                   onClick: assetCreate,
                 },
               ]

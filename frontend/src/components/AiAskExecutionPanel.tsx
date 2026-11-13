@@ -1,16 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../ui/index.ts";
 import type { AiAskExecutionEvent, AiAskExecutionStatus } from "../api/aiAskExecution.ts";
 import { receivedTerminalEvent } from "../api/aiAskExecutionSummary.ts";
 import { StepDetail } from "./StepDetail.tsx";
 import { StepSummary } from "./StepSummary.tsx";
 import { formatSafeAiAskDiagnostics } from "./aiAskExecutionDiagnostics.ts";
-import {
-  AI_ASK_EXECUTION_COPY,
-  formatCompletedSummary,
-  groupSteps,
-  type AiAskRawStep,
-} from "./aiAskStepSummary.ts";
+import { groupSteps, type AiAskRawStep } from "./aiAskStepSummary.ts";
 import "../styles/aiAskExecution.css";
 
 interface AiAskExecutionPanelProps {
@@ -30,9 +26,10 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 export function AiAskExecutionPanel({ events, status, runId, loading, citationCount, query, onCancel }: AiAskExecutionPanelProps) {
+  const { t } = useTranslation("aiAsk");
   const [expanded, setExpanded] = useState(status === "running");
   const [detailsExpanded, setDetailsExpanded] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState("");
+  const [copyFeedback, setCopyFeedback] = useState<"copied" | "copyFailed" | "">("");
   const previousRun = useRef(runId);
   const previousStatus = useRef(status);
 
@@ -76,17 +73,31 @@ export function AiAskExecutionPanel({ events, status, runId, loading, citationCo
   if (!status && !events.length) return null;
   const terminal = status === "completed" || status === "failed" || status === "cancelled";
   const backendTerminated = receivedTerminalEvent(events);
-  const overallLabel = status === "running" ? "执行中"
-    : status === "completed" ? `已完成 ${steps.filter((step) => step.status === "completed").length} 步`
-      : status === "cancelled" ? "已取消"
-        : backendTerminated ? "执行失败" : "进度中断";
+  const overallLabel = status === "running" ? t("execution.running")
+    : status === "completed" ? t("execution.completed", { count: steps.filter((step) => step.status === "completed").length })
+      : status === "cancelled" ? t("execution.cancelled")
+        : backendTerminated ? t("execution.failed") : t("execution.interrupted");
   const displayedSteps = steps.map((step): AiAskRawStep => ({
     ...step,
     status: terminal && step.status === "running"
       ? status === "completed" ? "completed" : "failed"
       : step.status,
   }));
-  const collapsedSummary = formatCompletedSummary(groupSteps(displayedSteps), citationCount);
+  const groupedStages = groupSteps(displayedSteps);
+  const verification = groupedStages.find((stage) => stage.id === "verification");
+  const verifiedParts: string[] = [];
+  if (verification?.verifiedTableCount !== null && verification?.verifiedTableCount !== undefined) {
+    verifiedParts.push(t("execution.summary.verifiedTables", { count: verification.verifiedTableCount }));
+  }
+  if (verification?.verifiedFieldCount !== null && verification?.verifiedFieldCount !== undefined) {
+    verifiedParts.push(t("execution.summary.verifiedFields", { count: verification.verifiedFieldCount }));
+  }
+  const completedSummary = verifiedParts.length
+    ? t("execution.summary.completedVerified", { parts: verifiedParts.join(" · ") })
+    : t("execution.summary.completedWithoutCounts");
+  const collapsedSummary = citationCount > 0
+    ? `${completedSummary} · ${t("execution.summary.sourcesTraceable")}`
+    : completedSummary;
   const completedAndCollapsed = status === "completed" && !expanded;
 
   const copyDiagnostics = async (): Promise<void> => {
@@ -96,9 +107,9 @@ export function AiAskExecutionPanel({ events, status, runId, loading, citationCo
         throw new Error("Clipboard API unavailable");
       }
       await navigator.clipboard.writeText(formatSafeAiAskDiagnostics(events, status, query));
-      setCopyFeedback(AI_ASK_EXECUTION_COPY.copied);
+      setCopyFeedback("copied");
     } catch {
-      setCopyFeedback(AI_ASK_EXECUTION_COPY.copyFailed);
+      setCopyFeedback("copyFailed");
     }
   };
 
@@ -115,7 +126,7 @@ export function AiAskExecutionPanel({ events, status, runId, loading, citationCo
           }
           setExpanded(event.currentTarget.open);
         }}
-        aria-label="AI 问答执行过程"
+        aria-label={t("execution.ariaLabel")}
       >
         <summary
           className={`sp-ai-execution-summary${completedAndCollapsed ? " is-collapsed" : ""}`}
@@ -126,18 +137,18 @@ export function AiAskExecutionPanel({ events, status, runId, loading, citationCo
           {completedAndCollapsed ? (
             <>
               <span className="sp-ai-execution-collapsed-summary">{collapsedSummary}</span>
-              <span className="sp-ai-execution-details-link">{AI_ASK_EXECUTION_COPY.details}</span>
+              <span className="sp-ai-execution-details-link">{t("execution.details")}</span>
             </>
           ) : (
             <>
-              <span>问答执行过程</span>
+              <span>{t("execution.title")}</span>
               <span className="sp-ai-execution-overall">{overallLabel}</span>
             </>
           )}
         </summary>
         {status === "failed" && !backendTerminated ? (
           <p className="sp-ai-execution-note" role="status">
-            未收到后端结束事件：本次失败可能来自前端事件契约或传输中断，不能据此判断后端检索失败。
+            {t("execution.missingTerminalEvent")}
           </p>
         ) : null}
         {steps.length ? (
@@ -151,22 +162,22 @@ export function AiAskExecutionPanel({ events, status, runId, loading, citationCo
                 if (event.target === event.currentTarget) setDetailsExpanded(event.currentTarget.open);
               }}
             >
-              <summary>{detailsExpanded ? AI_ASK_EXECUTION_COPY.hideFullSteps : AI_ASK_EXECUTION_COPY.fullSteps}</summary>
+              <summary>{detailsExpanded ? t("execution.hideFullSteps") : t("execution.fullSteps")}</summary>
               <StepDetail steps={displayedSteps} />
             </details>
           </>
-        ) : <p className="sp-ai-execution-waiting" role="status">{AI_ASK_EXECUTION_COPY.noSteps}</p>}
+        ) : <p className="sp-ai-execution-waiting" role="status">{t("execution.noSteps")}</p>}
         {loading ? (
           <Button variant="tertiary" type="button" className="sp-ai-execution-cancel" onClick={onCancel}>
-            取消问答
+            {t("execution.cancel")}
           </Button>
         ) : null}
       </details>
       <div className="sp-ai-execution-actions">
         <Button variant="tertiary" type="button" onClick={() => void copyDiagnostics()}>
-          {AI_ASK_EXECUTION_COPY.copyDebug}
+          {t("execution.copyDebug")}
         </Button>
-        {copyFeedback ? <span className="sp-ai-execution-copy-feedback" role="status">{copyFeedback}</span> : null}
+        {copyFeedback ? <span className="sp-ai-execution-copy-feedback" role="status">{t(`execution.${copyFeedback}`)}</span> : null}
       </div>
     </div>
   );

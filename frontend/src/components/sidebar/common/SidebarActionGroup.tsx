@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { SidebarFilterGroup } from "./SidebarFilterGroup.tsx";
 
 export interface SidebarAction {
@@ -13,11 +14,12 @@ export interface SidebarActionGroupProps {
 }
 
 export function SidebarActionGroup({ actions = [] }: SidebarActionGroupProps) {
+      const { t } = useTranslation("common");
       if (!actions.length) return null;
 
       return (
             <SidebarFilterGroup
-                  title="维护"
+                  title={t("sidebar.maintenance")}
                   items={actions.map((action) => ({
                         key: action.key,
                         label: action.label,

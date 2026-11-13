@@ -1,8 +1,10 @@
 import "i18next";
 
+import type aiAsk from "./locales/zh-CN/aiAsk.json" with { "resolution-mode": "import" };
 import type auth from "./locales/zh-CN/auth.json" with { "resolution-mode": "import" };
 import type common from "./locales/zh-CN/common.json" with { "resolution-mode": "import" };
 import type navigation from "./locales/zh-CN/navigation.json" with { "resolution-mode": "import" };
+import type search from "./locales/zh-CN/search.json" with { "resolution-mode": "import" };
 import type warehouse from "./locales/zh-CN/warehouse.json" with { "resolution-mode": "import" };
 
 type DeepStringify<T> = {
@@ -17,6 +19,8 @@ declare module "i18next" {
       navigation: DeepStringify<typeof navigation>;
       auth: DeepStringify<typeof auth>;
       warehouse: DeepStringify<typeof warehouse>;
+      search: DeepStringify<typeof search>;
+      aiAsk: DeepStringify<typeof aiAsk>;
     };
     returnNull: false;
   }
