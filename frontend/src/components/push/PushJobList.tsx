@@ -8,6 +8,7 @@ import { Button } from "../../ui/index.ts";
 import { ProtocolTag } from "./PushSystemList.tsx";
 import { PUSH_JOB_TABLE_COLUMNS, type PushJobTableColumn, type PushJobTableColumnKey, type PushJobTableValues, getPushJobTableValues } from "./pushJobTable.ts";
 import { isRenameJob } from "./pushUtils.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 function renderPushJobCell(
   columnKey: PushJobTableColumnKey,
@@ -73,6 +74,7 @@ export function PushJobList({
   onEditJob = () => undefined,
   canEdit = false,
 }: PushJobListProps) {
+  const tx = useUiCopy("integration");
   const badgeText = getSystemBadgeText(system.abbr);
   const normalizedQuery = (query || "").trim().toLowerCase();
   const jobs = system.jobs.filter((job) => {
@@ -88,7 +90,7 @@ export function PushJobList({
   return (
     <div>
       <div className="crumb">
-        <button type="button" className="crumb-link" onClick={onBack}>系统列表</button>
+        <button type="button" className="crumb-link" onClick={onBack}>{tx("系统列表")}</button>
         <span className="sep"><Icon name="chevron" size={13} /></span>
         <span className="cur">{system.id}</span>
       </div>
@@ -106,48 +108,47 @@ export function PushJobList({
             </div>
           </div>
           <div className="dh-actions">
-            {canEdit && onEditSystem ? <Button className="btn" variant="secondary" type="button" onClick={onEditSystem}><Icon name="edit" size={15} />编辑系统</Button> : null}
+            {canEdit && onEditSystem ? <Button className="btn" variant="secondary" type="button" onClick={onEditSystem}><Icon name="edit" size={15} />{tx("编辑系统")}</Button> : null}
           </div>
         </div>
         <div className="dh-meta">
-          <MetaItem label="连接协议" value={<ProtocolTag protocol={system.protocol} />} />
-          {getSystemText(system, "downstreamContact") ? <MetaItem label="下游对接人" value={getSystemText(system, "downstreamContact")} /> : null}
-          {getSystemText(system, "dataDeveloperContact") ? <MetaItem label="数据开发对接人" value={getSystemText(system, "dataDeveloperContact")} /> : null}
-          <MetaItem label="业务部门" value={system.dept} />
+          <MetaItem label={tx("连接协议")} value={<ProtocolTag protocol={system.protocol} />} />
+          {getSystemText(system, "downstreamContact") ? <MetaItem label={tx("下游对接人")} value={getSystemText(system, "downstreamContact")} /> : null}
+          {getSystemText(system, "dataDeveloperContact") ? <MetaItem label={tx("数据开发对接人")} value={getSystemText(system, "dataDeveloperContact")} /> : null}
+          <MetaItem label={tx("业务部门")} value={system.dept} />
         </div>
       </div>
 
       <div className="page-head" style={{ marginBottom: 16 }}>
         <div className="page-title push-subtitle">
           <Icon name="upload" size={19} color="var(--ink-2)" />
-          推送作业清单
-          <span className="sub-count">{jobs.length} 个</span>
+          {tx("推送作业清单")}<span className="sub-count">{jobs.length} {tx("个")}</span>
         </div>
-        {canEdit && onNewJob ? <Button className="btn primary" variant="primary" type="button" onClick={onNewJob}><Icon name="plus" size={15} />新增接口</Button> : null}
+        {canEdit && onNewJob ? <Button className="btn primary" variant="primary" type="button" onClick={onNewJob}><Icon name="plus" size={15} />{tx("新增接口")}</Button> : null}
       </div>
 
       {!jobs.length ? (
-        <EmptyState title="暂无推送作业" desc="当前系统还没有配置推送文件。" />
+        <EmptyState title={tx("暂无推送作业")} desc={tx("当前系统还没有配置推送文件。")} />
       ) : (
         <div className="tbl-wrap">
-          <WideTableScroll ariaLabel="推送作业列表" className="push-jobs-wide-scroll">
+          <WideTableScroll ariaLabel={tx("推送作业列表")} className="push-jobs-wide-scroll">
             <table className="dt mobile-card-table push-job-table push-jobs-wide-table">
             <thead>
               <tr>
                 {PUSH_JOB_TABLE_COLUMNS.map((column) => (
-                  <th key={column.key} style={getColumnStyle(column)}>{column.label}</th>
+                  <th key={column.key} style={getColumnStyle(column)}>{tx(column.label)}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {jobs.map((job) => {
-                const values = getPushJobTableValues(job);
+                const values = getPushJobTableValues(job, tx);
                 return (
                   <tr key={job.id} onClick={() => onOpen(job.id)}>
                     {PUSH_JOB_TABLE_COLUMNS.map((column) => (
                       <td
                         key={`${job.id}-${column.key}`}
-                        data-label={column.mobileLabel}
+                        data-label={column.mobileLabel ? tx(column.mobileLabel) : ""}
                         className={column.className}
                         style={isTextAlign(column.align) ? { textAlign: column.align } : undefined}
                         onClick={column.key === "action" ? (event) => event.stopPropagation() : undefined}

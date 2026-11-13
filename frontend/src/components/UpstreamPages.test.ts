@@ -70,7 +70,8 @@ test("upstream detail renders one dynamic schedule stepper", async () => {
     readFile(upstreamStylesPath, "utf8"),
   ]);
 
-  assert.match(detailSource, /每日自动执行 · \{unloadTimes\.length\} 次/);
+  assert.match(detailSource, /tx\("每日自动执行 ·"\)/);
+  assert.match(detailSource, /tx\("每日自动执行 ·"\)\}\{" "\}\{unloadTimes\.length\} \{tx\("次"\)\}/);
   assert.match(
     detailSource,
     /<ScheduleStepper times=\{unloadTimes\} muted=\{!enabled\} now=\{scheduleNow\} \/>/,
@@ -116,7 +117,7 @@ test("upstream save failures use one summary, inline field errors, and first-err
   assert.match(source, /const nextErrors = validateUpstreamForm\(form\)/);
   assert.match(source, /if \(nextErrors\.length\)/);
   assert.match(source, /scrollToFirstUpstreamError\(nextErrors\)/);
-  assert.match(source, /toast\.error\(`保存失败，还有 \$\{nextErrors\.length\} 项需要修改`\)/);
+  assert.match(source, /toast\.error\(tx\("保存失败，还有 \{\{count\}\} 项需要修改", \{ count: nextErrors\.length \}\)\)/);
   assert.match(source, /data-form-field="abbr"/);
   assert.match(source, /renderFieldError\("abbr"\)/);
   assert.match(source, /messages=\{errorSummary\}/);
@@ -132,7 +133,7 @@ test("upstream cards render connection metadata only when the profile returns it
 
   assert.match(listSource, /function UpstreamConnectionMeta/);
   assert.match(listSource, /if \(system\.schema\) items\.push\(\["Schema", system\.schema\]\)/);
-  assert.match(listSource, /if \(system\.host\) items\.push\(\["连接", system\.host\]\)/);
+  assert.match(listSource, /if \(system\.host\) items\.push\(\[tx\("连接"\), system\.host\]\)/);
   assert.match(listSource, /if \(!items\.length\) return null/);
   assert.match(listSource, /<UpstreamConnectionMeta system=\{item\} \/>/);
   assert.match(styles, /\.upstream-connection/);
@@ -147,7 +148,7 @@ test("upstream views consume the frozen DAP adapters without changing legacy cla
 
   assert.match(listSource, /import \{ Button, Select \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.match(listSource, /<Button className="btn primary" variant="primary" type="button" onClick=\{onNew\}>/);
-  assert.match(listSource, /aria-label="上游系统排序"/);
+  assert.match(listSource, /aria-label=\{tx\("上游系统排序"\)\}/);
   assert.match(detailSource, /import \{ Button \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.match(detailSource, /<Button className="btn" variant="secondary" type="button" onClick=\{onEdit\}>/);
   assert.match(editorSource, /import \{ Button, IconButton, Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
@@ -158,8 +159,8 @@ test("upstream views consume the frozen DAP adapters without changing legacy cla
   assert.equal((editorSource.match(/<IconButton/g) ?? []).length, 1);
   assert.match(editorSource, /<IconButton[\s\S]*?className="icon-btn danger"/);
   assert.match(editorSource, /<Button[\s\S]*?className="add-field"/);
-  assert.match(editorSource, /placeholder="请选择数据库类型"/);
-  assert.match(editorSource, /placeholder="请选择业务部门"/);
+  assert.match(editorSource, /placeholder=\{tx\("请选择数据库类型"\)\}/);
+  assert.match(editorSource, /placeholder=\{tx\("请选择业务部门"\)\}/);
   assert.doesNotMatch(editorSource, /<input|<select|<textarea/);
   [listSource, detailSource, editorSource].forEach((source) => {
     assert.doesNotMatch(source, /from "@cloudflare\/kumo\//);

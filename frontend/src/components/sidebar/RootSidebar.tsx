@@ -2,6 +2,7 @@ import type { RootRoute } from "../../routing/types.ts";
 import type { UseRootModuleResult } from "../../hooks/useRootModule.ts";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.tsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.tsx";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 export interface RootSidebarProps {
   root: UseRootModuleResult;
@@ -11,15 +12,16 @@ export interface RootSidebarProps {
 }
 
 export function RootSidebar({ root, requireLogin, canEdit = false, setRootRoute }: RootSidebarProps) {
+  const tx = useUiCopy("dictionary");
   const { rootGlobalTotal, rootCategories, rootCategory, setRootCategory } = root;
 
   return (
     <>
       <SidebarFilterGroup
-        title="词根分类"
+        title={tx("词根分类")}
         allOption={{
           key: "all-roots",
-          label: "全部词根",
+          label: tx("全部词根"),
           count: rootGlobalTotal,
           active: !rootCategory,
           onClick: () => setRootCategory(null),
@@ -37,12 +39,12 @@ export function RootSidebar({ root, requireLogin, canEdit = false, setRootRoute 
         actions={canEdit ? [
           {
             key: "create-root",
-            label: "新增词根",
+            label: tx("新增词根"),
             onClick: () => requireLogin(() => setRootRoute({ page: "new", abbr: null })),
           },
           {
             key: "import-root",
-            label: "批量导入",
+            label: tx("批量导入"),
             onClick: () => requireLogin(() => setRootRoute({ page: "import", abbr: null })),
           },
         ] : []}

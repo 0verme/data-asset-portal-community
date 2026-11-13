@@ -33,6 +33,7 @@ import {
 } from "../PushPages.tsx";
 import { Icon } from "../ui.tsx";
 import { Button, Select, TablePagination } from "../../ui/index.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 type RequireLogin = (action?: () => void, permission?: string) => boolean;
 
@@ -53,6 +54,7 @@ export function PushView({
   canEdit,
   pushRoute,
 }: PushViewProps) {
+  const tx = useUiCopy("integration");
   const {
     pushProtocolOptions,
     pushPage,
@@ -116,17 +118,19 @@ export function PushView({
     ? requiredOptionCategories.filter((code) => configuredOptions.categories[code]?.length === 0)
     : [];
   const optionConfigMessage = emptyRequiredCategories.map((code) => (
-    configuredOptions?.missingCategories.includes(code) ? `${code} 分类不存在或未启用` : `${code} 没有启用项`
+    configuredOptions?.missingCategories.includes(code)
+      ? tx("{{code}} 分类不存在或未启用", { code })
+      : tx("{{code}} 没有启用项", { code })
   )).join("；");
 
   if (needsBusinessOptions && (optionLoad.loading || (!configuredOptions && !optionLoad.error))) {
-    return <LoadingState title="加载下游业务候选" desc="正在读取已配置的协议、部门和作业选项。" />;
+    return <LoadingState title={tx("加载下游业务候选")} desc={tx("正在读取已配置的协议、部门和作业选项。")} />;
   }
   if (needsBusinessOptions && optionLoad.error) {
     return (
       <ErrorState
-        title="下游推送业务候选加载失败"
-        desc={optionLoad.error}
+        title={tx("下游推送业务候选加载失败")}
+        desc={tx(optionLoad.error)}
         onRetry={() => { void optionLoad.reload(); }}
       />
     );
@@ -134,8 +138,8 @@ export function PushView({
   if (requiredOptionCategories.length && emptyRequiredCategories.length) {
     return (
       <ErrorState
-        title="下游推送选项尚未配置"
-        desc={`${optionConfigMessage}；请先维护真实码值后重试，不会回退到 Demo 候选。`}
+        title={tx("下游推送选项尚未配置")}
+        desc={tx("{{optionMessage}}；请先维护真实码值后重试，不会回退到 Demo 候选。", { optionMessage: optionConfigMessage })}
         onRetry={() => { void optionLoad.reload(); }}
       />
     );
@@ -145,12 +149,12 @@ export function PushView({
     return (
       <>
         <LoadingState
-          title="加载下游推送配置"
-          desc="正在准备系统清单、作业和筛选信息。"
+          title={tx("加载下游推送配置")}
+          desc={tx("正在准备系统清单、作业和筛选信息。")}
         />
         {pushRoute.page === "systems" ? (
           <TablePagination
-            ariaLabel="下游系统分页"
+            ariaLabel={tx("下游系统分页")}
             page={pushPage}
             pageSize={pushPageSize}
             total={pushTotal}
@@ -166,13 +170,13 @@ export function PushView({
     return (
       <>
         <ErrorState
-          title="下游推送加载失败"
-          desc={pushError}
+          title={tx("下游推送加载失败")}
+          desc={tx(pushError)}
           onRetry={() => { void loadPushData(); void loadPushDetail(); }}
         />
         {pushRoute.page === "systems" ? (
           <TablePagination
-            ariaLabel="下游系统分页"
+            ariaLabel={tx("下游系统分页")}
             page={pushPage}
             pageSize={pushPageSize}
             total={pushTotal}
@@ -190,8 +194,8 @@ export function PushView({
   ) {
     return (
       <EmptyState
-        title="当前页面需要下游推送维护权限"
-        desc="下游推送目录可以公开浏览，新增和编辑需要相应写权限。"
+        title={tx("当前页面需要下游推送维护权限")}
+        desc={tx("下游推送目录可以公开浏览，新增和编辑需要相应写权限。")}
       />
     );
   }
@@ -202,24 +206,22 @@ export function PushView({
           <div>
             <div className="page-title">
               <Icon name="upload" size={21} color="var(--ink-2)" />
-              下游系统推送
-            </div>
+              {tx("下游系统推送")}</div>
             <div className="page-sub">
-              共 <b>{pushTotal}</b> 个系统
-            </div>
+              {tx("共")}{" "}<b>{pushTotal}</b> {tx("个系统")}</div>
           </div>
           <div className="head-actions">
             <Select<string>
-              aria-label="下游系统排序"
+              aria-label={tx("下游系统排序")}
               className="table-list-sort"
               size="sm"
               value={pushSort}
               onValueChange={(value) => setPushSort(value || "importanceLevel:asc")}
               items={[
-                { label: "重要优先", value: "importanceLevel:asc" },
-                { label: "名称升序", value: "name:asc" },
-                { label: "标识升序", value: "id:asc" },
-                { label: "标识降序", value: "id:desc" },
+                { label: tx("重要优先"), value: "importanceLevel:asc" },
+                { label: tx("名称升序"), value: "name:asc" },
+                { label: tx("标识升序"), value: "id:asc" },
+                { label: tx("标识降序"), value: "id:desc" },
               ]}
             />
             <ViewModeSwitcher
@@ -237,8 +239,7 @@ export function PushView({
                 }
               >
                 <Icon name="plus" size={15} />
-                新增系统
-              </Button>
+                {tx("新增系统")}</Button>
             ) : null}
           </div>
         </div>
@@ -249,7 +250,7 @@ export function PushView({
           onOpen={pushOpenSystem}
         />
         <TablePagination
-          ariaLabel="下游系统分页"
+          ariaLabel={tx("下游系统分页")}
           page={pushPage}
           pageSize={pushPageSize}
           total={pushTotal}
@@ -305,8 +306,8 @@ export function PushView({
     if (canEdit && pushAdminDetailLoading) {
       return (
         <LoadingState
-          title="加载作业详情"
-          desc="正在加载文件头信息和字段清单。"
+          title={tx("加载作业详情")}
+          desc={tx("正在加载文件头信息和字段清单。")}
         />
       );
     }
@@ -350,13 +351,13 @@ export function PushView({
   if (pushRoute.page === "sysEdit" && currentSystem) {
     if (pushAdminDetailLoading)
       return (
-        <LoadingState title="加载系统编辑页" desc="正在加载管理员维护信息。" />
+        <LoadingState title={tx("加载系统编辑页")} desc={tx("正在加载管理员维护信息。")} />
       );
     if (!pushAdminDetail)
       return (
         <ErrorState
-          title="系统编辑信息不可用"
-          desc={pushError || "无法加载管理员维护信息。"}
+          title={tx("系统编辑信息不可用")}
+          desc={tx(pushError || "无法加载管理员维护信息。")}
           onRetry={loadPushData}
         />
       );
@@ -395,13 +396,13 @@ export function PushView({
   if (pushRoute.page === "jobEdit" && currentSystem && currentJob) {
     if (pushAdminDetailLoading)
       return (
-        <LoadingState title="加载作业编辑页" desc="正在加载管理员维护信息。" />
+        <LoadingState title={tx("加载作业编辑页")} desc={tx("正在加载管理员维护信息。")} />
       );
     if (!pushAdminDetail)
       return (
         <ErrorState
-          title="作业编辑信息不可用"
-          desc={pushError || "无法加载管理员维护信息。"}
+          title={tx("作业编辑信息不可用")}
+          desc={tx(pushError || "无法加载管理员维护信息。")}
           onRetry={loadPushData}
         />
       );
@@ -411,8 +412,8 @@ export function PushView({
     if (!adminJob)
       return (
         <ErrorState
-          title="作业编辑信息不可用"
-          desc={pushError || "无法加载管理员维护信息。"}
+          title={tx("作业编辑信息不可用")}
+          desc={tx(pushError || "无法加载管理员维护信息。")}
           onRetry={loadPushData}
         />
       );
@@ -433,5 +434,5 @@ export function PushView({
       />
     );
   }
-  return <EmptyState title="页面不存在" />;
+  return <EmptyState title={tx("页面不存在")} />;
 }

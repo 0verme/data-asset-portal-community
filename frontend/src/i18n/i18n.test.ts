@@ -12,7 +12,7 @@ function flattenKeys(value: unknown, prefix = ""): string[] {
 
 test("zh-CN and en-US resources have matching keys in every namespace", async () => {
   await i18nReady;
-  for (const namespace of ["common", "navigation", "auth", "warehouse", "search", "aiAsk", "apiAsset", "fieldMapping", "indicator", "lineage", "report"] as const) {
+  for (const namespace of ["common", "navigation", "auth", "warehouse", "search", "aiAsk", "apiAsset", "fieldMapping", "indicator", "lineage", "report", "integration", "dictionary", "admin"] as const) {
     const zh = i18n.getResourceBundle("zh-CN", namespace);
     const en = i18n.getResourceBundle("en-US", namespace);
     assert.deepEqual(
@@ -99,6 +99,28 @@ test("Phase 2 API asset resources localize labels without changing method values
   assert.equal(i18n.t("editor.create", { lng: "en-US", ns: "apiAsset" }), "Add API");
   assert.equal(i18n.t("fields.method", { lng: "en-US", ns: "apiAsset" }), "HTTP method");
   assert.equal(i18n.t("rows.rowName", { lng: "en-US", ns: "apiAsset", row: 2 }), "Row 2 name");
+});
+
+test("Phase 3 dictionary, integration, and admin copy translates while preserving interpolated values", async () => {
+  await i18nReady;
+  assert.equal(i18n.t("词根库", { lng: "en-US", ns: "dictionary" }), "Root Library");
+  assert.equal(
+    i18n.t("第 {{line}} 行格式错误：{{message}}", {
+      lng: "en-US",
+      ns: "dictionary",
+      line: 4,
+      message: "Unclosed quotation mark",
+    }),
+    "Invalid format on line 4: Unclosed quotation mark",
+  );
+  assert.equal(i18n.t("手工码值表清单.csv", { lng: "en-US", ns: "dictionary" }), "Manual Code Tables.csv");
+  assert.equal(i18n.t("推送频率明细", { lng: "en-US", ns: "integration" }), "Push frequency details");
+  assert.equal(i18n.t("{{param}} 号", { lng: "en-US", ns: "integration", param: 1 }), "Day 1");
+  assert.equal(i18n.t("系统标识", { lng: "en-US", ns: "integration" }), "System ID");
+  assert.equal(
+    i18n.t("角色「{{name}}」已删除", { lng: "en-US", ns: "admin", name: "Custom role" }),
+    "Role “Custom role” was deleted",
+  );
 });
 
 test("number and date interpolation use the selected locale's Intl formatting", async () => {

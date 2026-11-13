@@ -20,6 +20,7 @@ import { ActionErrorBanner, StatusBadge } from "../common/index.ts";
 import { Icon } from "../ui.tsx";
 import { Button } from "../../ui/index.ts";
 import { formatCost } from "./OperationLogTable.tsx";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 interface RowProps {
   label: string;
@@ -57,6 +58,7 @@ export function OperationLogDetail({
   error,
   onClose,
 }: OperationLogDetailProps) {
+  const tx = useUiCopy("admin");
   React.useEffect(() => {
     if (!open) return undefined;
     const onKey = (event: KeyboardEvent) => {
@@ -80,15 +82,14 @@ export function OperationLogDetail({
           <div>
             <div className="editor-title">
               <Icon name="eye" size={18} color="var(--accent)" />
-              <h2>操作日志详情</h2>
+              <h2>{tx("操作日志详情")}</h2>
             </div>
-            {log ? <div className="editor-sub">日志编号 #{log.id}</div> : null}
+            {log ? <div className="editor-sub">{tx("日志编号 #")}{log.id}</div> : null}
           </div>
           <div className="editor-actions">
             <Button className="btn" variant="secondary" type="button" onClick={onClose}>
               <Icon name="close" size={14} />
-              关闭
-            </Button>
+              {tx("关闭")}</Button>
           </div>
         </div>
 
@@ -96,59 +97,59 @@ export function OperationLogDetail({
           {loading ? (
             <div className="state-card" role="status" aria-live="polite">
               <div className="state-spinner" aria-hidden="true"></div>
-              <h4>加载日志详情</h4>
+              <h4>{tx("加载日志详情")}</h4>
             </div>
           ) : error ? (
-            <ActionErrorBanner title="日志详情加载失败" message={error} />
+            <ActionErrorBanner title={tx("日志详情加载失败")} message={tx(error)} />
           ) : log ? (
             <div className="oplog-detail-grid">
-              <Row label="操作时间" mono>
+              <Row label={tx("操作时间")} mono>
                 {formatDateTime(log.createdAt)}
               </Row>
-              <Row label="操作用户">{log.userName}</Row>
-              <Row label="用户 ID" mono>
+              <Row label={tx("操作用户")}>{log.userName}</Row>
+              <Row label={tx("用户 ID")} mono>
                 {log.userId}
               </Row>
-              <Row label="所属部门">{log.deptName}</Row>
-              <Row label="模块名称">{log.moduleName}</Row>
-              <Row label="操作类型">{log.operationType}</Row>
-              <Row label="操作对象" mono full>
+              <Row label={tx("所属部门")}>{log.deptName}</Row>
+              <Row label={tx("模块名称")}>{log.moduleName}</Row>
+              <Row label={tx("操作类型")}>{log.operationType}</Row>
+              <Row label={tx("操作对象")} mono full>
                 {log.operationObject}
               </Row>
-              <Row label="请求方式" mono>
+              <Row label={tx("请求方式")} mono>
                 {log.requestMethod}
               </Row>
-              <Row label="请求地址" mono full>
+              <Row label={tx("请求地址")} mono full>
                 {log.requestUrl}
               </Row>
-              <Row label="请求参数" mono full>
+              <Row label={tx("请求参数")} mono full>
                 <pre className="oplog-detail-pre">
                   {log.requestParams || "-"}
                 </pre>
               </Row>
-              <Row label="操作结果">
+              <Row label={tx("操作结果")}>
                 <StatusBadge
                   on={log.resultStatus === "success"}
-                  label={log.resultStatus === "success" ? "成功" : "失败"}
+                  label={tx(log.resultStatus === "success" ? "成功" : "失败")}
                 />
               </Row>
-              <Row label="耗时" mono>
+              <Row label={tx("耗时")} mono>
                 {formatCost(log.costTimeMs)}
               </Row>
-              <Row label="错误信息" full>
+              <Row label={tx("错误信息")} full>
                 {log.errorMessage ? (
                   <span className="oplog-detail-error">{log.errorMessage}</span>
                 ) : (
                   "-"
                 )}
               </Row>
-              <Row label="IP 地址" mono>
+              <Row label={tx("IP 地址")} mono>
                 {log.ipAddress}
               </Row>
               <Row label="User-Agent" mono full>
                 <pre className="oplog-detail-pre">{log.userAgent || "-"}</pre>
               </Row>
-              <Row label="备注" full>
+              <Row label={tx("备注")} full>
                 {log.remark || "-"}
               </Row>
             </div>

@@ -140,7 +140,7 @@ test("push job table keeps public business columns without connection paths", as
   );
   assert.equal(PUSH_JOB_TABLE_COLUMNS.length, columnKeys.length);
   assert.match(source, /PUSH_JOB_TABLE_COLUMNS\.map/);
-  assert.match(source, /getPushJobTableValues\(job\)/);
+  assert.match(source, /getPushJobTableValues\(job, tx\)/);
   assert.doesNotMatch(source, /job\.sourcePath|job\.targetPath/);
 
   const cells = getPushJobTableValues({
@@ -217,7 +217,7 @@ test("push system list marks important rows with a label and semantic background
   );
   assert.match(
     source,
-    /\{isImportant \? <span className="tag tag-danger">重要<\/span> : null\}/,
+    /\{isImportant \? <span className="tag tag-danger">\{tx\("重要"\)\}<\/span> : null\}/,
   );
 });
 
@@ -225,9 +225,9 @@ test("push sidebar filters systems by importance with counts and a clearable sel
   const source = await readSources(defaultsPath, pushHookPath, pushSidebarPath);
 
   assert.match(source, /importanceLevel: null/);
-  assert.match(source, /title="重要程度"/);
-  assert.match(source, /\{ value: "important", label: "重要" \}/);
-  assert.match(source, /\{ value: "normal", label: "普通" \}/);
+  assert.match(source, /title=\{tx\("重要程度"\)\}/);
+  assert.match(source, /\{ value: "important", label: tx\("重要"\) \}/);
+  assert.match(source, /\{ value: "normal", label: tx\("普通"\) \}/);
   assert.match(source, /pushFacets\.importanceLevel\[item\.value\] \|\| 0/);
   assert.match(
     source,

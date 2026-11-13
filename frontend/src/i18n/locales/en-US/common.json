@@ -128,5 +128,13 @@
     "loading": "Loading…",
     "saving": "Saving…",
     "noResults": "No results"
+  },
+  "status": {
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "unknown": "Unknown",
+    "title": "Status",
+    "all": "All statuses",
+    "selector": "Status selection"
   }
 }

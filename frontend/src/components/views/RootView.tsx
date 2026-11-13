@@ -18,6 +18,7 @@ import { pushModuleNavigationState } from "../../routing/navigation.ts";
 import { RootEditor, RootImport, RootLibrary } from "../RootPages.tsx";
 import { Icon } from "../ui.tsx";
 import { EmptyState, ErrorState, LoadingState } from "../common/index.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 type RequireLogin = (action?: () => void, permission?: string) => boolean;
 
@@ -40,6 +41,7 @@ export function RootView({
   setRootRoute,
   canEdit = false,
 }: RootViewProps) {
+  const tx = useUiCopy("dictionary");
   const {
     rootCategories = [],
     rootTotal,
@@ -71,14 +73,14 @@ export function RootView({
 
   if (rootRoute.page === "library" && rootLoading) {
     return (
-      <LoadingState title="加载词根库" desc="正在准备词根清单和分类统计。" />
+      <LoadingState title={tx("加载词根库")} desc={tx("正在准备词根清单和分类统计。")} />
     );
   }
   if (rootRoute.page === "library" && rootError) {
     return (
       <ErrorState
-        title="词根模块加载失败"
-        desc={rootError}
+        title={tx("词根模块加载失败")}
+        desc={tx(rootError)}
         onRetry={() => loadRootData()}
       />
     );
@@ -86,8 +88,8 @@ export function RootView({
   if (!canEdit && rootRoute.page !== "library") {
     return (
       <div className="state-card" role="status">
-        <h4>当前页面仅对维护权限开放</h4>
-        <p>词根目录仍可公开浏览，新增、编辑、导入和删除需要相应权限。</p>
+        <h4>{tx("当前页面仅对维护权限开放")}</h4>
+        <p>{tx("词根目录仍可公开浏览，新增、编辑、导入和删除需要相应权限。")}</p>
       </div>
     );
   }
@@ -150,16 +152,16 @@ export function RootView({
     );
   }
   if (rootRoute.page === "edit" && rootDetailLoading) {
-    return <LoadingState title="加载词根详情" desc="正在按词根缩写读取记录。" />;
+    return <LoadingState title={tx("加载词根详情")} desc={tx("正在按词根缩写读取记录。")} />;
   }
   if (rootRoute.page === "edit" && rootDetailError) {
-    return <ErrorState title="词根详情加载失败" desc={rootDetailError} onRetry={loadRootDetail} />;
+    return <ErrorState title={tx("词根详情加载失败")} desc={tx(rootDetailError)} onRetry={loadRootDetail} />;
   }
   if (rootRoute.page === "import" && rootImportLoading) {
-    return <LoadingState title="读取导入候选" desc="正在读取完整词根集合用于导入预览。" />;
+    return <LoadingState title={tx("读取导入候选")} desc={tx("正在读取完整词根集合用于导入预览。")} />;
   }
   if (rootRoute.page === "import" && rootImportError) {
-    return <ErrorState title="导入候选读取失败" desc={rootImportError} onRetry={loadRootImportCandidates} />;
+    return <ErrorState title={tx("导入候选读取失败")} desc={tx(rootImportError)} onRetry={loadRootImportCandidates} />;
   }
   if (rootRoute.page === "new") {
     return (
@@ -199,9 +201,9 @@ export function RootView({
   if (rootRoute.page === "edit" && !currentRoot) {
     return (
       <EmptyState
-        title="词根不存在"
-        desc="当前词根不存在、已被删除，或 mock 数据未包含该记录。"
-        actionText="返回词根库"
+        title={tx("词根不存在")}
+        desc={tx("当前词根不存在、已被删除，或 mock 数据未包含该记录。")}
+        actionText={tx("返回词根库")}
         onAction={rootBack}
       />
     );
@@ -211,7 +213,7 @@ export function RootView({
       <div className="ec">
         <Icon name="inbox" size={26} />
       </div>
-      <h4>词根页面不存在</h4>
+      <h4>{tx("词根页面不存在")}</h4>
     </div>
   );
 }

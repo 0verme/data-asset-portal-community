@@ -15,6 +15,7 @@
 import type { SystemRoute } from "../../routing/types.ts";
 import { OperationLogPage } from "../OperationLog/OperationLogPage.tsx";
 import { SystemManagementPage } from "../system/index.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 type RequireLogin = (action?: () => void, permission?: string) => boolean;
 
@@ -45,18 +46,18 @@ export function SystemView({
     systemActionIntent,
     setSystemActionIntent,
 }: SystemViewProps) {
+  const tx = useUiCopy("admin");
     if (!authenticated) {
         return (
             <div className="state-card" role="status" aria-live="polite">
-                <h4>登录后访问系统管理</h4>
-                <p>系统管理、用户、角色、配置和操作日志仅对授权用户开放。</p>
+                <h4>{tx("登录后访问系统管理")}</h4>
+                <p>{tx("系统管理、用户、角色、配置和操作日志仅对授权用户开放。")}</p>
                 <button
                     className="btn primary"
                     type="button"
                     onClick={() => requireLogin(() => undefined)}
                 >
-                    登录
-                </button>
+                    {tx("登录")}</button>
             </div>
         );
     }

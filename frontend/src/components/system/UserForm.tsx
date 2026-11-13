@@ -1,12 +1,14 @@
-import { useLayoutEffect, useMemo, useRef, type Dispatch, type SetStateAction } from "react";
+import { useLayoutEffect, useRef, type Dispatch, type SetStateAction } from "react";
 
 import type { MockSystemUser } from "../../data/systemUsers.ts";
 import type { RoleFormData } from "../../hooks/useRoleModule.ts";
 import type { UserFormData, SystemFormFieldError } from "../../hooks/useSystemModule.ts";
+import { USER_ROLE_META } from "./constants.ts";
 import { BinaryStatusToggle, confirmDeleteAction, DangerZone, FormSection } from "../common/index.ts";
 import { FormErrorSummary, FormField, focusFirstFormError } from "../../ui/index.ts";
 import { Input, Select, Textarea } from "../../ui/index.ts";
 import { formFieldErrorEntries } from "../../utils/formFieldErrorMapping.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 const USER_FORM_ID = "system-user-form";
 const USER_FIELD_LABELS: Readonly<Record<string, string>> = {
@@ -47,8 +49,9 @@ export function UserForm({
   initial = null,
   onDelete,
 }: UserFormProps) {
+  const tx = useUiCopy("admin");
   const isEdit = mode === "edit";
-  const fieldErrors = useMemo(() => formFieldErrorEntries(errors), [errors]);
+  const fieldErrors = Object.fromEntries(Object.entries(formFieldErrorEntries(errors)).map(([field, message]) => [field, tx(message)]));
   const formRef = useRef<HTMLDivElement>(null);
   const previousFocusRevision = useRef(focusRevision);
   useLayoutEffect(() => {
@@ -67,20 +70,20 @@ export function UserForm({
       <FormErrorSummary
         formId={USER_FORM_ID}
         errors={fieldErrors}
-        getFieldLabel={(field) => USER_FIELD_LABELS[field] || "表单内容"}
+        getFieldLabel={(field) => tx(USER_FIELD_LABELS[field] || "表单内容")}
       />
-      <FormSection title="基本信息">
+      <FormSection title={tx("基本信息")}>
         <div className="form-grid">
           <FormField
             className="fl"
             formId={USER_FORM_ID}
             name="username"
-            label="用户名"
+            label={tx("用户名")}
             error={fieldErrors["username"]}
-            description={!isEdit ? "初始密码默认为用户名，可由管理员后续重置。" : undefined}
+            description={!isEdit ? tx("初始密码默认为用户名，可由管理员后续重置。") : undefined}
           >
             <Input
-              aria-label="用户名"
+              aria-label={tx("用户名")}
               className={`inp mono${fieldErrors["username"] ? " invalid" : ""}`}
               value={form.username}
               maxLength={64}
@@ -88,46 +91,49 @@ export function UserForm({
                 clearField("username");
                 setForm((prev) => ({ ...prev, username: event.target.value }));
               }}
-              placeholder="例如：admin"
+              placeholder={tx("例如：admin")}
             />
           </FormField>
-          <FormField className="fl" formId={USER_FORM_ID} name="displayName" label="显示名" error={fieldErrors["displayName"]}>
+          <FormField className="fl" formId={USER_FORM_ID} name="displayName" label={tx("显示名")} error={fieldErrors["displayName"]}>
             <Input
-              aria-label="显示名"
+              aria-label={tx("显示名")}
               className={`inp${fieldErrors["displayName"] ? " invalid" : ""}`}
               value={form.displayName}
               onChange={(event) => {
                 clearField("displayName");
                 setForm((prev) => ({ ...prev, displayName: event.target.value }));
               }}
-              placeholder="例如：系统管理员"
+              placeholder={tx("例如：系统管理员")}
             />
           </FormField>
-          <FormField className="fl" formId={USER_FORM_ID} name="email" label="邮箱" error={fieldErrors["email"]}>
+          <FormField className="fl" formId={USER_FORM_ID} name="email" label={tx("邮箱")} error={fieldErrors["email"]}>
             <Input
-              aria-label="邮箱"
+              aria-label={tx("邮箱")}
               className={`inp${fieldErrors["email"] ? " invalid" : ""}`}
               value={form.email}
               onChange={(event) => {
                 clearField("email");
                 setForm((prev) => ({ ...prev, email: event.target.value }));
               }}
-              placeholder="例如：admin@dataportal.local"
+              placeholder={tx("例如：admin@dataportal.local")}
             />
           </FormField>
-          <FormField className="fl" formId={USER_FORM_ID} name="status" label="账号状态" error={fieldErrors["status"]}>
-            <div role="group" aria-label="账号状态">
+          <FormField className="fl" formId={USER_FORM_ID} name="status" label={tx("账号状态")} error={fieldErrors["status"]}>
+            <div role="group" aria-label={tx("账号状态")}>
               <BinaryStatusToggle mode="status" value={form.status} className="system-status-seg" onChange={(value) => {
                 clearField("status");
                 setForm((prev) => ({ ...prev, status: normalizeStatus(value) }));
               }} />
             </div>
           </FormField>
-          <FormField className="fl" formId={USER_FORM_ID} name="role" label="账号角色" error={fieldErrors["role"]}>
+          <FormField className="fl" formId={USER_FORM_ID} name="role" label={tx("账号角色")} error={fieldErrors["role"]}>
             <Select<string>
-              aria-label="账号角色"
+              aria-label={tx("账号角色")}
               className="sel"
-              items={roleOptions.filter((role) => role.enabled !== "disabled").map((role) => ({ label: role.name || role.roleCode, value: role.roleCode }))}
+              items={roleOptions.filter((role) => role.enabled !== "disabled").map((role) => {
+                const builtInLabel = USER_ROLE_META[role.roleCode];
+                return { label: builtInLabel ? tx(builtInLabel) : role.name || role.roleCode, value: role.roleCode };
+              })}
               value={form.role || null}
               onValueChange={(value) => {
                 clearField("role");
@@ -135,16 +141,16 @@ export function UserForm({
               }}
             />
           </FormField>
-          <FormField className="fl full" formId={USER_FORM_ID} name="remark" label="备注" error={fieldErrors["remark"]}>
+          <FormField className="fl full" formId={USER_FORM_ID} name="remark" label={tx("备注")} error={fieldErrors["remark"]}>
             <Textarea
-              aria-label="备注"
+              aria-label={tx("备注")}
               className="ta"
               value={form.remark}
               onChange={(event) => {
                 clearField("remark");
                 setForm((prev) => ({ ...prev, remark: event.target.value }));
               }}
-              placeholder="补充账号用途、职责范围或禁用原因"
+              placeholder={tx("补充账号用途、职责范围或禁用原因")}
             />
           </FormField>
         </div>
@@ -152,24 +158,24 @@ export function UserForm({
 
       {isEdit && initial ? (
         <DangerZone
-          description="删除用户后将无法恢复，相关历史审计记录仍会保留。若账号不再使用，建议优先禁用。"
+          description={tx("删除用户后将无法恢复，相关历史审计记录仍会保留。若账号不再使用，建议优先禁用。")}
           actions={[
             {
               key: "delete-user",
-              label: "删除用户",
+              label: tx("删除用户"),
               icon: "trash",
               danger: true,
               onClick: async () => {
                 if (await confirmDeleteAction({
                   name: initial.displayName || initial.username,
-                  typeLabel: "用户",
-                  impact: "该用户删除后，可能影响权限追溯、历史任务记录和审计日志。若仅停止使用，建议优先禁用。",
+                  typeLabel: tx("用户"),
+                  impact: tx("该用户删除后，可能影响权限追溯、历史任务记录和审计日志。若仅停止使用，建议优先禁用。"),
                   consequences: [
-                    "删除前应以后端权限和审计规则校验结果为准。",
-                    "若后端返回不可删除原因，页面会直接展示原因。",
+                    tx("删除前应以后端权限和审计规则校验结果为准。"),
+                    tx("若后端返回不可删除原因，页面会直接展示原因。"),
                   ],
                   confirmKeyword: initial.username || "",
-                  confirmKeywordLabel: "请输入用户名二次确认",
+                  confirmKeywordLabel: tx("请输入用户名二次确认"),
                 })) {
                   onDelete?.(initial);
                 }

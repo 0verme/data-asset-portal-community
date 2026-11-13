@@ -23,6 +23,7 @@ import { Button, TablePagination } from "../../ui/index.ts";
 import { PARAM_STATUS_META } from "./constants.ts";
 import { RagSearchConfigPanel } from "./RagSearchConfigPanel.tsx";
 import { AiLlmDailyQuotaPanel } from "./AiLlmDailyQuotaPanel.tsx";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 export interface ParamDictPageProps {
   categories: readonly ParamDictCategoryWithCount[];
@@ -57,6 +58,7 @@ export function ParamDictPage({
   onEdit,
   onChangeStatus,
 }: ParamDictPageProps) {
+  const tx = useUiCopy("admin");
   const selectedCategory =
     categories.find((item) => item.code === selectedCategoryCode) || null;
   const normalizedQuery = query.trim().toLowerCase();
@@ -85,23 +87,20 @@ export function ParamDictPage({
       <div className="page-head">
         <div>
           <div className="page-title">
-            <span className="pt-code">DICT</span>参数字典
-          </div>
+            <span className="pt-code">DICT</span>{tx("参数字典")}</div>
           <div className="page-sub">
-            当前分类 <b>{selectedCategory?.name || "未选择"}</b>
+            {tx("当前分类")}{" "}<b>{selectedCategory?.name || tx("未选择")}</b>
             {selectedCategory ? (
               <>
-                ，共 <b>{total}</b> 条字典项
-              </>
+                {tx("，共")}{" "}<b>{total}</b> {tx("条字典项")}</>
             ) : null}
-            {query ? <>，匹配 “{query}”</> : null}
+            {query ? <>{tx("，匹配 “")}{query}”</> : null}
           </div>
         </div>
         <div className="head-actions">
           <Button className="btn primary" variant="primary" type="button" onClick={onNew}>
             <Icon name="plus" size={15} />
-            新增参数
-          </Button>
+            {tx("新增参数")}</Button>
         </div>
       </div>
 
@@ -110,8 +109,7 @@ export function ParamDictPage({
           <div className="system-panel-head">
             <h3>
               <Icon name="book" size={14} />
-              参数分类
-            </h3>
+              {tx("参数分类")}</h3>
           </div>
           <div className="system-category-list">
             {categories.map((category) => (
@@ -138,36 +136,36 @@ export function ParamDictPage({
         <div className="system-panel system-panel-main">
           <div className="system-panel-head">
             <div>
-              <h3>{selectedCategory?.name || "参数字典"}</h3>
+              <h3>{selectedCategory?.name || tx("参数字典")}</h3>
               <div className="system-panel-sub">
-                {selectedCategory?.desc || "请选择一个分类查看字典项。"}
+                {selectedCategory?.desc || tx("请选择一个分类查看字典项。")}
               </div>
             </div>
           </div>
 
           {!selectedCategory ? (
-            <EmptyState title="暂无参数分类" desc="当前没有可用分类。" />
+            <EmptyState title={tx("暂无参数分类")} desc={tx("当前没有可用分类。")} />
           ) : !filteredItems.length ? (
             <EmptyState
-              title="当前分类暂无字典项"
-              desc="可以新增一条参数，或切换到其他分类。"
-              actionText={canEdit ? "新增参数" : ""}
+              title={tx("当前分类暂无字典项")}
+              desc={tx("可以新增一条参数，或切换到其他分类。")}
+              actionText={canEdit ? tx("新增参数") : ""}
               onAction={canEdit ? onNew : undefined}
             />
           ) : (
             <div className="tbl-wrap system-inner-table param-dict-table-wrap">
-              <WideTableScroll ariaLabel="参数字典表格" className="param-dict-wide-scroll">
+              <WideTableScroll ariaLabel={tx("参数字典表格")} className="param-dict-wide-scroll">
                 <table className="dt param-dict-table mobile-card-table">
                 <thead>
                   <tr>
-                    <th className="param-col-category">参数分类</th>
-                    <th className="param-col-code">参数编码</th>
-                    <th className="param-col-name">参数名称</th>
-                    <th className="param-col-value">参数值</th>
-                    <th className="param-col-status">状态</th>
-                    <th className="param-col-updated">更新时间</th>
-                    <th className="param-col-desc">说明</th>
-                    <th className="param-col-actions">操作</th>
+                    <th className="param-col-category">{tx("参数分类")}</th>
+                    <th className="param-col-code">{tx("参数编码")}</th>
+                    <th className="param-col-name">{tx("参数名称")}</th>
+                    <th className="param-col-value">{tx("参数值")}</th>
+                    <th className="param-col-status">{tx("状态")}</th>
+                    <th className="param-col-updated">{tx("更新时间")}</th>
+                    <th className="param-col-desc">{tx("说明")}</th>
+                    <th className="param-col-actions">{tx("操作")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -181,34 +179,34 @@ export function ParamDictPage({
                           />
                         </span>
                       </td>
-                      <td data-label="参数编码" className="mono">
+                      <td data-label={tx("参数编码")} className="mono">
                         <span className="system-line-clamp">
                           <Highlight text={item.code} q={query} />
                         </span>
                       </td>
-                      <td data-label="参数名称">
+                      <td data-label={tx("参数名称")}>
                         <span className="system-line-clamp">
                           <Highlight text={item.name} q={query} />
                         </span>
                       </td>
-                      <td data-label="参数值" className="mono">
+                      <td data-label={tx("参数值")} className="mono">
                         <span className="system-line-clamp">
                           <Highlight text={item.value} q={query} />
                         </span>
                       </td>
-                      <td data-label="状态">
+                      <td data-label={tx("状态")}>
                         <StatusBadge
                           status={item.status}
                           metaMap={PARAM_STATUS_META}
                         />
                       </td>
                       <td
-                        data-label="更新时间"
+                        data-label={tx("更新时间")}
                         className="mono param-updated-cell"
                       >
                         {formatDateTime(item.updatedAt)}
                       </td>
-                      <td data-label="说明">
+                      <td data-label={tx("说明")}>
                         <span className="system-line-clamp">
                           <Highlight text={item.desc || "-"} q={query} />
                         </span>
@@ -242,7 +240,7 @@ export function ParamDictPage({
         </div>
       </div>
       <TablePagination
-        ariaLabel="参数字典明细分页"
+        ariaLabel={tx("参数字典明细分页")}
         page={page}
         pageSize={pageSize}
         total={total}

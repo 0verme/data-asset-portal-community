@@ -30,6 +30,7 @@ import { clearModuleNavigationState, MODULE_META } from '../routing/navigation.t
 import { useSmartBack } from './useSmartBack.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
 import type { RootRoute } from '../routing/types.ts';
+import { translateUiCopy } from '../i18n/useUiTranslation.ts';
 
 export interface RootNavigationSnapshot {
   query?: string | undefined;
@@ -258,7 +259,7 @@ export function useRootModule({
         setRootRoute(DEFAULT_ROOT_ROUTE);
         scrollMainToTop();
       },
-      '保存词根失败。',
+      translateUiCopy('dictionary', '保存词根失败。'),
       'root:write',
     );
   };
@@ -275,7 +276,7 @@ export function useRootModule({
         setRootRoute(DEFAULT_ROOT_ROUTE);
         scrollMainToTop();
       },
-      '删除词根失败。',
+      translateUiCopy('dictionary', '删除词根失败。'),
       'root:write',
     );
   };
@@ -291,7 +292,7 @@ export function useRootModule({
         await loadRootImportCandidates();
         rootBack();
       },
-      '导入词根失败。',
+      translateUiCopy('dictionary', '导入词根失败。'),
       'root:write',
     );
   };

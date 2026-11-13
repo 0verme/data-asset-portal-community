@@ -13,6 +13,7 @@ import { UserManagementPage } from "./UserManagementPage.tsx";
 import { ParamDictPage } from "./ParamDictPage.tsx";
 import { MenuManagementPage } from "./MenuManagementPage.tsx";
 import { RoleForm, RoleManagementPage } from "./RoleManagementPage.tsx";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 export interface SystemManagementPageProps {
   route: SystemRoute;
@@ -31,6 +32,7 @@ export function SystemManagementPage({
   actionIntent,
   onActionHandled,
 }: SystemManagementPageProps) {
+  const tx = useUiCopy("admin");
   const systemModule: UseSystemModuleResult = useSystemModule({ page: route.page, query, requireLogin, actionIntent, onActionHandled });
   const {
     loading,
@@ -109,8 +111,8 @@ export function SystemManagementPage({
     return (
       <div className="state-card" role="status" aria-live="polite">
         <div className="state-spinner" aria-hidden="true"></div>
-        <h4>加载系统管理模块</h4>
-        <p>正在加载当前子页面所需数据。</p>
+        <h4>{tx("加载系统管理模块")}</h4>
+        <p>{tx("正在加载当前子页面所需数据。")}</p>
       </div>
     );
   }
@@ -119,9 +121,9 @@ export function SystemManagementPage({
     return (
       <div className="state-card state-card-error" role="alert">
         <div className="ec"><Icon name="inbox" size={24} /></div>
-        <h4>系统管理加载失败</h4>
-        <p>{error || roleModule.error}</p>
-        <Button className="btn state-btn" variant="secondary" type="button" onClick={route.page === "roles" ? () => void roleModule.load() : () => void loadAll()}>重新加载</Button>
+        <h4>{tx("系统管理加载失败")}</h4>
+        <p>{tx(error || roleModule.error)}</p>
+        <Button className="btn state-btn" variant="secondary" type="button" onClick={route.page === "roles" ? () => void roleModule.load() : () => void loadAll()}>{tx("重新加载")}</Button>
       </div>
     );
   }
@@ -154,12 +156,12 @@ export function SystemManagementPage({
 
       <FormModal
         open={userModal.open}
-        title={userModal.mode === "edit" ? "编辑用户" : "新增用户"}
-        subtitle={userModal.mode === "edit" ? `正在编辑：${userModal.initial?.username || "-"}` : "创建新的用户账号"}
+        title={tx(userModal.mode === "edit" ? "编辑用户" : "新增用户")}
+        subtitle={userModal.mode === "edit" ? tx("正在编辑：{{name}}", { name: userModal.initial?.username || "-" }) : tx("创建新的用户账号")}
         icon="user"
         onClose={() => !userModal.busy && setUserModal({ open: false, mode: "new", initial: null, busy: false })}
         onSubmit={handleSubmitUser}
-        submitText={userModal.mode === "edit" ? "保存修改" : "创建"}
+        submitText={tx(userModal.mode === "edit" ? "保存修改" : "创建")}
         busy={userModal.busy}
       >
         <UserForm form={userForm} setForm={setUserForm} roles={roleModule.roles} errors={userErrors} focusRevision={userErrorFocusRevision} onFieldChange={clearUserFieldError} mode={userModal.mode} initial={userModal.initial} onDelete={handleDeleteUser} />
@@ -167,12 +169,12 @@ export function SystemManagementPage({
 
       <FormModal
         open={roleModule.modal.open}
-        title={roleModule.modal.mode === "edit" ? "编辑角色" : "新增角色"}
-        subtitle={roleModule.modal.mode === "edit" ? `正在编辑：${roleModule.modal.initial?.roleCode || "-"}` : "创建新的自定义角色"}
+        title={tx(roleModule.modal.mode === "edit" ? "编辑角色" : "新增角色")}
+        subtitle={roleModule.modal.mode === "edit" ? tx("正在编辑：{{name}}", { name: roleModule.modal.initial?.roleCode || "-" }) : tx("创建新的自定义角色")}
         icon="shield"
         onClose={() => !roleModule.modal.busy && roleModule.setModal({ open: false, mode: "new", initial: null, busy: false })}
         onSubmit={roleModule.submit}
-        submitText={roleModule.modal.mode === "edit" ? "保存修改" : "创建"}
+        submitText={tx(roleModule.modal.mode === "edit" ? "保存修改" : "创建")}
         busy={roleModule.modal.busy}
       >
         <RoleForm form={roleModule.form} setForm={roleModule.setForm} permissions={roleModule.permissions} errors={roleModule.errors} focusRevision={roleModule.errorFocusRevision} onFieldChange={roleModule.clearFieldError} mode={roleModule.modal.mode} initial={roleModule.modal.initial} onDelete={roleModule.remove} />
@@ -180,12 +182,12 @@ export function SystemManagementPage({
 
       <FormModal
         open={paramModal.open}
-        title={paramModal.mode === "edit" ? "编辑参数" : "新增参数"}
-        subtitle={paramModal.mode === "edit" ? `正在编辑：${paramModal.initial?.code || "-"}` : "创建新的参数字典"}
+        title={tx(paramModal.mode === "edit" ? "编辑参数" : "新增参数")}
+        subtitle={paramModal.mode === "edit" ? tx("正在编辑：{{name}}", { name: paramModal.initial?.code || "-" }) : tx("创建新的参数字典")}
         icon="book"
         onClose={() => !paramModal.busy && setParamModal({ open: false, mode: "new", initial: null, busy: false })}
         onSubmit={handleSubmitParam}
-        submitText={paramModal.mode === "edit" ? "保存修改" : "创建"}
+        submitText={tx(paramModal.mode === "edit" ? "保存修改" : "创建")}
         busy={paramModal.busy}
       >
         <ParamForm form={paramForm} categories={categories} setForm={setParamForm} errors={paramErrors} focusRevision={paramErrorFocusRevision} onFieldChange={clearParamFieldError} mode={paramModal.mode} initial={paramModal.initial} onDelete={handleDeleteParam} />
@@ -193,12 +195,12 @@ export function SystemManagementPage({
 
       <FormModal
         open={menuModal.open}
-        title={menuModal.mode === "edit" ? "编辑菜单" : "新增菜单"}
-        subtitle={menuModal.mode === "edit" ? `正在编辑：${menuModal.initial?.name || "-"}` : "创建新的菜单配置"}
+        title={tx(menuModal.mode === "edit" ? "编辑菜单" : "新增菜单")}
+        subtitle={menuModal.mode === "edit" ? tx("正在编辑：{{name}}", { name: menuModal.initial?.name || "-" }) : tx("创建新的菜单配置")}
         icon="layers"
         onClose={() => !menuModal.busy && setMenuModal({ open: false, mode: "new", initial: null, busy: false })}
         onSubmit={handleSubmitMenu}
-        submitText={menuModal.mode === "edit" ? "保存修改" : "创建"}
+        submitText={tx(menuModal.mode === "edit" ? "保存修改" : "创建")}
         busy={menuModal.busy}
       >
         <MenuForm form={menuForm} setForm={setMenuForm} errors={menuErrors} focusRevision={menuErrorFocusRevision} onFieldChange={clearMenuFieldError} mode={menuModal.mode} initial={menuModal.initial} onDelete={handleDeleteMenu} />

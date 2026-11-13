@@ -71,8 +71,8 @@ test("table overflow is scoped to the reusable table viewport, not globally over
 });
 
 test("menu navigation position precedes actions and the action cell stays in the same row", () => {
-  const navHeading = menuSource.indexOf(">导航位置</th>");
-  const actionHeading = menuSource.indexOf(">操作</th>");
+  const navHeading = menuSource.indexOf('>{tx("导航位置")}</th>');
+  const actionHeading = menuSource.indexOf('>{tx("操作")}</th>');
   assert.ok(navHeading >= 0 && actionHeading > navHeading);
   assert.match(menuSource, /className="mobile-card-actions menu-actions-cell"/);
   assert.match(systemStyles, /menu-management-table th\.menu-actions-head,[\s\S]*?menu-management-table td\.menu-actions-cell\s*\{[\s\S]*?position:\s*sticky/);

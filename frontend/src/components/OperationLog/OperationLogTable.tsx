@@ -18,6 +18,7 @@ import type { MockOperationLogItem } from "../../data/operationLogs.ts";
 import { formatDateTime } from "../../utils/date.ts";
 import { RowActions, StatusBadge, WideTableScroll } from "../common/index.ts";
 import { Highlight } from "../ui.tsx";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 export function formatCost(ms: unknown): string {
   const value = Number(ms);
@@ -37,25 +38,26 @@ export function OperationLogTable({
   query,
   onView,
 }: OperationLogTableProps) {
+  const tx = useUiCopy("admin");
   const width = (value: number): CSSProperties => ({ width: value });
 
   return (
     <div className="tbl-wrap">
-      <WideTableScroll ariaLabel="系统操作日志列表" className="operation-log-wide-scroll">
+      <WideTableScroll ariaLabel={tx("系统操作日志列表")} className="operation-log-wide-scroll">
         <table className="dt mobile-card-table operation-log-wide-table">
         <thead>
           <tr>
-            <th style={width(168)}>操作时间</th>
-            <th style={width(110)}>操作用户</th>
-            <th style={width(120)}>所属部门</th>
-            <th style={width(96)}>模块</th>
-            <th style={width(80)}>操作类型</th>
-            <th style={width(180)}>操作对象</th>
-            <th>操作内容</th>
-            <th style={width(88)}>结果</th>
-            <th style={width(124)}>IP 地址</th>
-            <th style={width(88)}>耗时</th>
-            <th style={{ width: 96, textAlign: "right" }}>操作</th>
+            <th style={width(168)}>{tx("操作时间")}</th>
+            <th style={width(110)}>{tx("操作用户")}</th>
+            <th style={width(120)}>{tx("所属部门")}</th>
+            <th style={width(96)}>{tx("模块")}</th>
+            <th style={width(80)}>{tx("操作类型")}</th>
+            <th style={width(180)}>{tx("操作对象")}</th>
+            <th>{tx("操作内容")}</th>
+            <th style={width(88)}>{tx("结果")}</th>
+            <th style={width(124)}>{tx("IP 地址")}</th>
+            <th style={width(88)}>{tx("耗时")}</th>
+            <th style={{ width: 96, textAlign: "right" }}>{tx("操作")}</th>
           </tr>
         </thead>
         <tbody>
@@ -64,34 +66,34 @@ export function OperationLogTable({
               <td data-label="" className="mono">
                 {formatDateTime(log.createdAt)}
               </td>
-              <td data-label="操作用户">
+              <td data-label={tx("操作用户")}>
                 <Highlight text={log.userName || "-"} q={query} />
               </td>
-              <td data-label="所属部门">{log.deptName || "-"}</td>
-              <td data-label="模块">
+              <td data-label={tx("所属部门")}>{log.deptName || "-"}</td>
+              <td data-label={tx("模块")}>
                 <Highlight text={log.moduleName || "-"} q={query} />
               </td>
-              <td data-label="操作类型">{log.operationType || "-"}</td>
-              <td data-label="操作对象" className="mono">
+              <td data-label={tx("操作类型")}>{log.operationType || "-"}</td>
+              <td data-label={tx("操作对象")} className="mono">
                 <span className="system-line-clamp">
                   <Highlight text={log.operationObject || "-"} q={query} />
                 </span>
               </td>
-              <td data-label="操作内容">
+              <td data-label={tx("操作内容")}>
                 <span className="system-line-clamp">
                   <Highlight text={log.operationDesc || "-"} q={query} />
                 </span>
               </td>
-              <td data-label="结果">
+              <td data-label={tx("结果")}>
                 <StatusBadge
                   on={log.resultStatus === "success"}
-                  label={log.resultStatus === "success" ? "成功" : "失败"}
+                  label={tx(log.resultStatus === "success" ? "成功" : "失败")}
                 />
               </td>
-              <td data-label="IP 地址" className="mono">
+              <td data-label={tx("IP 地址")} className="mono">
                 {log.ipAddress || "-"}
               </td>
-              <td data-label="耗时" className="mono">
+              <td data-label={tx("耗时")} className="mono">
                 {formatCost(log.costTimeMs)}
               </td>
               <td
@@ -103,7 +105,7 @@ export function OperationLogTable({
                   extraActions={[
                     {
                       key: "view",
-                      label: "详情",
+                      label: tx("详情"),
                       icon: "eye",
                       onClick: () => onView(log),
                     },

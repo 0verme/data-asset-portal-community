@@ -36,6 +36,7 @@ import {
 } from "../UpstreamPages.tsx";
 import { Icon } from "../ui.tsx";
 import { TablePagination } from "../../ui/index.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 type RequireLogin = (action?: () => void, permission?: string) => boolean;
 type UpstreamSystem = PublicUpstreamSystem | MockUpstreamSystem;
@@ -44,21 +45,21 @@ const confirmDeleteUpstream =
   (
     system: UpstreamSystem | null | undefined,
     run: (systemId: string) => void | Promise<unknown>,
+    tx: (source: string, options?: Readonly<Record<string, unknown>>) => string,
   ) =>
   async (): Promise<void> => {
     if (!system) return;
     if (
       await confirmDeleteAction({
         name: system.name || system.id,
-        typeLabel: "上游卸数系统",
-        impact:
-          "该系统删除后，可能影响入仓表清单、卸数计划、字段映射和历史记录。若该系统不再使用，建议优先禁用。",
+        typeLabel: tx("上游卸数系统"),
+        impact: tx("该系统删除后，可能影响入仓表清单、卸数计划、字段映射和历史记录。若该系统不再使用，建议优先禁用。"),
         consequences: [
-          "删除前必须校验是否存在入仓表、字段映射、卸数计划和历史记录。",
-          "存在任一关联时，应由后端拒绝删除并返回明确原因。",
+          tx("删除前必须校验是否存在入仓表、字段映射、卸数计划和历史记录。"),
+          tx("存在任一关联时，应由后端拒绝删除并返回明确原因。"),
         ],
         confirmKeyword: system.id || "",
-        confirmKeywordLabel: "请输入系统标识二次确认",
+        confirmKeywordLabel: tx("请输入系统标识二次确认"),
       })
     ) {
       await run(system.id);
@@ -86,6 +87,7 @@ export function UpstreamView({
   setUpRoute,
   onViewTables,
 }: UpstreamViewProps) {
+  const tx = useUiCopy("integration");
   const {
     upstreamDbTypes,
     upstreamDeptOptions,
@@ -133,13 +135,13 @@ export function UpstreamView({
   const editorDeptOptions = configuredOptions?.categories["UPSTREAM_DEPT"] ?? upstreamDeptOptions;
 
   if (needsBusinessOptions && (optionLoad.loading || (!configuredOptions && !optionLoad.error))) {
-    return <LoadingState title="加载上游业务候选" desc="正在读取已配置的数据库类型和业务部门。" />;
+    return <LoadingState title={tx("加载上游业务候选")} desc={tx("正在读取已配置的数据库类型和业务部门。")} />;
   }
   if (needsBusinessOptions && optionLoad.error) {
     return (
       <ErrorState
-        title="上游业务候选加载失败"
-        desc={optionLoad.error}
+        title={tx("上游业务候选加载失败")}
+        desc={tx(optionLoad.error)}
         onRetry={() => { void optionLoad.reload(); }}
       />
     );
@@ -153,8 +155,8 @@ export function UpstreamView({
       : "数据库类型分类没有启用项";
     return (
       <ErrorState
-        title="上游数据库类型尚未配置"
-        desc={`${categoryState}；请先维护真实码值后重试，不会回退到 Demo 候选。`}
+        title={tx("上游数据库类型尚未配置")}
+        desc={tx("{{categoryState}}；请先维护真实码值后重试，不会回退到 Demo 候选。", { categoryState: tx(categoryState) })}
         onRetry={() => { void optionLoad.reload(); }}
       />
     );
@@ -164,12 +166,12 @@ export function UpstreamView({
     return (
       <>
         <LoadingState
-          title="加载上游卸数配置"
-          desc="正在准备系统清单和卸数计划。"
+          title={tx("加载上游卸数配置")}
+          desc={tx("正在准备系统清单和卸数计划。")}
         />
         {upRoute.page === "list" ? (
           <TablePagination
-            ariaLabel="上游系统分页"
+            ariaLabel={tx("上游系统分页")}
             page={upstreamPage}
             pageSize={upstreamPageSize}
             total={upstreamTotal}
@@ -185,13 +187,13 @@ export function UpstreamView({
     return (
       <>
         <ErrorState
-          title="上游卸数加载失败"
-          desc={upstreamError}
+          title={tx("上游卸数加载失败")}
+          desc={tx(upstreamError)}
           onRetry={loadUpstreamData}
         />
         {upRoute.page === "list" ? (
           <TablePagination
-            ariaLabel="上游系统分页"
+            ariaLabel={tx("上游系统分页")}
             page={upstreamPage}
             pageSize={upstreamPageSize}
             total={upstreamTotal}
@@ -206,8 +208,8 @@ export function UpstreamView({
   if (!canEdit && ["new", "edit"].includes(upRoute.page)) {
     return (
       <EmptyState
-        title="当前页面需要上游系统维护权限"
-        desc="上游系统目录可以公开浏览，新增和编辑需要相应写权限。"
+        title={tx("当前页面需要上游系统维护权限")}
+        desc={tx("上游系统目录可以公开浏览，新增和编辑需要相应写权限。")}
       />
     );
   }
@@ -243,7 +245,7 @@ export function UpstreamView({
         onSortChange={setUpstreamSort}
       />
       <TablePagination
-        ariaLabel="上游系统分页"
+        ariaLabel={tx("上游系统分页")}
         page={upstreamPage}
         pageSize={upstreamPageSize}
         total={upstreamTotal}
@@ -261,16 +263,16 @@ export function UpstreamView({
     if (upstreamDetailLoading) {
       return (
         <LoadingState
-          title="加载上游系统详情"
-          desc="正在准备系统连接和卸数时间点。"
+          title={tx("加载上游系统详情")}
+          desc={tx("正在准备系统连接和卸数时间点。")}
         />
       );
     }
     if (upstreamError) {
       return (
         <ErrorState
-          title="上游系统详情加载失败"
-          desc={upstreamError}
+          title={tx("上游系统详情加载失败")}
+          desc={tx(upstreamError)}
           onRetry={() => loadUpstreamDetail(upRoute.id || "")}
         />
       );
@@ -281,7 +283,7 @@ export function UpstreamView({
           <div className="ec">
             <Icon name="inbox" size={26} />
           </div>
-          <h4>系统不存在</h4>
+          <h4>{tx("系统不存在")}</h4>
         </div>
       );
     }
@@ -324,16 +326,16 @@ export function UpstreamView({
     if (upstreamDetailLoading && !currentUpstreamEdit) {
       return (
         <LoadingState
-          title="加载编辑页"
-          desc="正在准备系统元数据和卸数配置。"
+          title={tx("加载编辑页")}
+          desc={tx("正在准备系统元数据和卸数配置。")}
         />
       );
     }
     if (upstreamError && !currentUpstreamEdit) {
       return (
         <ErrorState
-          title="编辑页加载失败"
-          desc={upstreamError}
+          title={tx("编辑页加载失败")}
+          desc={tx(upstreamError)}
           onRetry={() => loadUpstreamDetail(upRoute.id || "")}
         />
       );
@@ -344,7 +346,7 @@ export function UpstreamView({
           <div className="ec">
             <Icon name="inbox" size={26} />
           </div>
-          <h4>系统不存在</h4>
+          <h4>{tx("系统不存在")}</h4>
         </div>
       );
     }
@@ -362,6 +364,7 @@ export function UpstreamView({
         onDelete={confirmDeleteUpstream(
           currentUpstreamEdit,
           handleDeleteUpstream,
+          tx,
         )}
         saveError={upstreamSaveError}
         saveFieldErrors={upstreamSaveFieldErrors}
@@ -374,7 +377,7 @@ export function UpstreamView({
       <div className="ec">
         <Icon name="inbox" size={26} />
       </div>
-      <h4>页面不存在</h4>
+      <h4>{tx("页面不存在")}</h4>
     </div>
   );
 }

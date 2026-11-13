@@ -19,6 +19,7 @@ import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 import { Icon } from "../ui.tsx";
 import { Button, Select } from "../../ui/index.ts";
 import { DbBadge } from "./UpstreamParts.tsx";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 /**
  * Lightweight connection locator line for the card view. The remote API only
@@ -26,10 +27,11 @@ import { DbBadge } from "./UpstreamParts.tsx";
  * absent and the line is not rendered.
  */
 function UpstreamConnectionMeta({ system }: { system: PublicUpstreamSystem }) {
+  const tx = useUiCopy("integration");
   const items: Array<[string, string]> = [];
   if (system.schema) items.push(["Schema", system.schema]);
-  if (system.host) items.push(["连接", system.host]);
-  else if (system.db) items.push(["数据库", system.db]);
+  if (system.host) items.push([tx("连接"), system.host]);
+  else if (system.db) items.push([tx("数据库"), system.db]);
   if (!items.length) return null;
   return (
     <div className="upstream-connection">
@@ -76,36 +78,37 @@ export function UpstreamList({
   onSortChange,
   canEdit = false,
 }: UpstreamListProps) {
+  const tx = useUiCopy("integration");
   return (
     <div className="upstream-page">
       <div className="page-head">
         <div>
-          <div className="page-title"><Icon name="download" size={21} color="var(--ink-2)" />上游卸数系统</div>
+          <div className="page-title"><Icon name="download" size={21} color="var(--ink-2)" />{tx("上游卸数系统")}</div>
           <div className="page-sub">
-            上游业务系统按计划将数据卸载至数据湖，共 <b>{total}</b> 个{query ? <>，匹配“{query}”</> : null}
+            {tx("上游业务系统按计划将数据卸载至数据湖，共")}{" "}<b>{total}</b> {tx("个")}{query ? <>{tx("，匹配“")}{query}”</> : null}
           </div>
         </div>
         <div className="head-actions">
           <Select<string>
-            aria-label="上游系统排序"
+            aria-label={tx("上游系统排序")}
             className="table-list-sort"
             size="sm"
             value={sort}
             onValueChange={(value) => onSortChange(value || "abbr:asc")}
             items={[
-              { label: "缩写升序", value: "abbr:asc" },
-              { label: "名称升序", value: "name:asc" },
-              { label: "标识升序", value: "id:asc" },
-              { label: "标识降序", value: "id:desc" },
+              { label: tx("缩写升序"), value: "abbr:asc" },
+              { label: tx("名称升序"), value: "name:asc" },
+              { label: tx("标识升序"), value: "id:asc" },
+              { label: tx("标识降序"), value: "id:desc" },
             ]}
           />
           <ViewModeSwitcher value={view} onChange={onChangeView} modes={["card", "list"] as const} />
-          {canEdit && onNew ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增系统</Button> : null}
+          {canEdit && onNew ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}><Icon name="plus" size={15} />{tx("新增系统")}</Button> : null}
         </div>
       </div>
 
       {!systems.length ? (
-        <EmptyState title="未找到匹配的系统" desc="换个关键词试试，或者新增上游系统。" />
+        <EmptyState title={tx("未找到匹配的系统")} desc={tx("换个关键词试试，或者新增上游系统。")} />
       ) : view === "card" ? (
         <CardGridView
           items={systems}
@@ -142,7 +145,7 @@ export function UpstreamList({
                 extraActions={[
                   {
                     key: "view-tables",
-                    label: "查看入仓表",
+                    label: tx("查看入仓表"),
                     icon: "link",
                     onClick: () => onViewTables?.({ sourceSystemId: String(item.upstreamSystemId || ""), tab: "table" }),
                   },
@@ -158,16 +161,16 @@ export function UpstreamList({
         />
       ) : (
         <div className="tbl-wrap">
-          <WideTableScroll ariaLabel="上游卸数系统列表" className="upstream-wide-scroll">
+          <WideTableScroll ariaLabel={tx("上游卸数系统列表")} className="upstream-wide-scroll">
             <table className="dt mobile-card-table upstream-wide-table">
             <thead>
               <tr>
-                <th style={{ width: "24%" }}>系统</th>
-                <th style={{ width: 140 }}>数据库类型</th>
-                <th>卸数时间点</th>
-                <th style={{ width: 150 }}>负责人 / 部门</th>
-                <th style={{ width: 96 }}>状态</th>
-                <th style={{ width: 220, textAlign: "right" }}>操作</th>
+                <th style={{ width: "24%" }}>{tx("系统")}</th>
+                <th style={{ width: 140 }}>{tx("数据库类型")}</th>
+                <th>{tx("卸数时间点")}</th>
+                <th style={{ width: 150 }}>{tx("负责人 / 部门")}</th>
+                <th style={{ width: 96 }}>{tx("状态")}</th>
+                <th style={{ width: 220, textAlign: "right" }}>{tx("操作")}</th>
               </tr>
             </thead>
             <tbody>
@@ -182,14 +185,14 @@ export function UpstreamList({
                         <span className="jf">{item.abbr} / {item.id}</span>
                       </div>
                     </td>
-                    <td data-label="数据库类型"><DbBadge type={item.dbType} /></td>
-                    <td data-label="卸数时间点">
+                    <td data-label={tx("数据库类型")}><DbBadge type={item.dbType} /></td>
+                    <td data-label={tx("卸数时间点")}>
                       <div className="time-chips">
                         {item.unloadTimes.map((time) => <span key={time} className="time-chip">{time}</span>)}
                       </div>
                     </td>
-                    <td data-label="负责人 / 部门">{item.owner} / {item.dept}</td>
-                    <td data-label="状态"><StatusBadge status={item.status} /></td>
+                    <td data-label={tx("负责人 / 部门")}>{item.owner} / {item.dept}</td>
+                    <td data-label={tx("状态")}><StatusBadge status={item.status} /></td>
                     <td data-label="" className="mobile-card-actions" style={{ textAlign: "right" }} onClick={(event) => event.stopPropagation()}>
                       <RowActions
                         disabled={isPending}
@@ -197,7 +200,7 @@ export function UpstreamList({
                         extraActions={[
                           {
                             key: "view-tables",
-                            label: "查看入仓表",
+                            label: tx("查看入仓表"),
                             icon: "link",
                             onClick: () => onViewTables?.({ sourceSystemId: String(item.upstreamSystemId || ""), tab: "table" }),
                           },

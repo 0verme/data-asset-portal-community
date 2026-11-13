@@ -20,6 +20,12 @@ interface ParseFailure {
 type Delimiter = "," | "\t" | "|";
 type FieldState = "start" | "unquoted" | "quoted" | "afterQuote";
 
+const identityCopy = (source: string, options: Readonly<Record<string, unknown>> = {}): string =>
+  Object.entries(options).reduce(
+    (message, [key, value]) => message.split(`{{${key}}}`).join(String(value)),
+    source,
+  );
+
 function detectDelimiter(text: string): Delimiter {
   const counts: Record<Delimiter, number> = { "\t": 0, ",": 0, "|": 0 };
   let quoted = false;
@@ -179,18 +185,24 @@ function parseRecords(text: string, delimiter: Delimiter): { records: DelimitedR
   return { records };
 }
 
-export function parseRootImport(text: string): { items: ParsedRoot[]; error?: string } {
+export function parseRootImport(
+  text: string,
+  translate: (source: string, options?: Readonly<Record<string, unknown>>) => string = identityCopy,
+): { items: ParsedRoot[]; error?: string } {
   const content = text.replace(/^\uFEFF/, "");
-  if (!content.trim()) return { items: [], error: "内容为空" };
+  if (!content.trim()) return { items: [], error: translate("内容为空") };
 
   const { records, failure } = parseRecords(content, detectDelimiter(content));
   if (failure) {
     return {
       items: [],
-      error: `第 ${failure.line} 行格式错误：${failure.message}`,
+      error: translate("第 {{line}} 行格式错误：{{message}}", {
+        line: failure.line,
+        message: translate(failure.message),
+      }),
     };
   }
-  if (!records.length) return { items: [], error: "内容为空" };
+  if (!records.length) return { items: [], error: translate("内容为空") };
 
   const firstRow = (records[0]?.cells ?? []).map((cell) => cell.toLowerCase());
   const hasHeader = firstRow.some((cell) => /abbr|root|词根|缩写/.test(cell));

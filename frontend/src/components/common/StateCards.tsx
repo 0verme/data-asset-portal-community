@@ -13,10 +13,12 @@
 // limitations under the License.
 
 import type { MouseEventHandler, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Status as DAPStatus } from "../../ui/index.ts";
 import { Icon } from "../ui.tsx";
 import { resolveStatusBadgePresentation } from "./statusBadge.ts";
+import { normalizeBinaryStatusValue } from "./status.ts";
 import type { StatusMeta } from "./statusBadge.ts";
 
 export type { StatusMeta } from "./statusBadge.ts";
@@ -43,12 +45,13 @@ export interface ErrorStateProps {
 }
 
 export function ErrorState({ title, desc, onRetry }: ErrorStateProps) {
+  const { t } = useTranslation("common");
   return (
     <div className="state-card state-card-error" role="alert">
       <div className="ec"><Icon name="inbox" size={24} /></div>
       <h4>{title}</h4>
       <p>{desc}</p>
-      <button className="btn state-btn" onClick={onRetry}>重新加载</button>
+      <button className="btn state-btn" onClick={onRetry}>{t("action.retry")}</button>
     </div>
   );
 }
@@ -89,6 +92,11 @@ export interface StatusBadgeProps {
  *   2) on(布尔) + 可选 label：二态启停或操作结果，label 用于保留成功/失败等语义。
  */
 export function StatusBadge({ status, metaMap, on, label }: StatusBadgeProps) {
+  const { t } = useTranslation("common");
   const presentation = resolveStatusBadgePresentation({ status, metaMap, on, label });
-  return <DAPStatus tone={presentation.tone}>{presentation.label}</DAPStatus>;
+  const normalized = normalizeBinaryStatusValue(status !== undefined ? status : on);
+  const displayLabel = label || (normalized
+    ? t(normalized === "enabled" ? "status.enabled" : "status.disabled")
+    : presentation.label);
+  return <DAPStatus tone={presentation.tone}>{displayLabel}</DAPStatus>;
 }

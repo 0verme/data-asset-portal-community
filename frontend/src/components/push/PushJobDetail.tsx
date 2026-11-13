@@ -4,6 +4,7 @@ import { FREQ_PARAM_CONFIG } from "./pushConstants.ts";
 import { StatusBadge } from "../common/index.ts";
 import { Icon } from "../ui.tsx";
 import { Button } from "../../ui/index.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 interface PushJobDisplay extends PushJobLike {
   id: string;
@@ -50,11 +51,12 @@ export interface PushJobDetailProps {
 }
 
 export function PushJobDetail({ system, job, showDetails = false, onBackSystems, onBackJobs, onEdit }: PushJobDetailProps) {
+  const tx = useUiCopy("integration");
   return (
     <div>
-      <div className="crumb"><button type="button" className="crumb-link" onClick={onBackSystems}>系统列表</button><span className="sep"><Icon name="chevron" size={13} /></span><button type="button" className="crumb-link" onClick={onBackJobs}>{system.id}</button><span className="sep"><Icon name="chevron" size={13} /></span><span className="cur">{job.id}</span></div>
-      <div className="detail-head"><div className="dh-top"><div><div className="dh-title"><Icon name="file" size={21} color="var(--ink-2)" /><span className="push-title">{job.cn}</span><StatusBadge on={job.enabled} /></div><div className="dh-cn mono">{job.targetFileName}</div></div>{onEdit ? <div className="dh-actions"><Button className="btn primary" variant="primary" type="button" onClick={onEdit}><Icon name="edit" size={15} />编辑接口</Button></div> : null}</div></div>
-      <div className="file-head-card"><h3 className="file-head-title"><Icon name="info" size={14} />作业摘要</h3><div className="fh-grid"><div className="fh-item"><div className="k">推送频率</div><div className="v">{job.freqType}{FREQ_PARAM_CONFIG[job.freqType] ? ` / ${formatFreq(job)}` : ""}</div></div><div className="fh-item fh-full"><div className="k">业务逻辑说明</div><div className="v file-desc">{job.desc}</div></div></div></div>
+      <div className="crumb"><button type="button" className="crumb-link" onClick={onBackSystems}>{tx("系统列表")}</button><span className="sep"><Icon name="chevron" size={13} /></span><button type="button" className="crumb-link" onClick={onBackJobs}>{system.id}</button><span className="sep"><Icon name="chevron" size={13} /></span><span className="cur">{job.id}</span></div>
+      <div className="detail-head"><div className="dh-top"><div><div className="dh-title"><Icon name="file" size={21} color="var(--ink-2)" /><span className="push-title">{job.cn}</span><StatusBadge on={job.enabled} /></div><div className="dh-cn mono">{job.targetFileName}</div></div>{onEdit ? <div className="dh-actions"><Button className="btn primary" variant="primary" type="button" onClick={onEdit}><Icon name="edit" size={15} />{tx("编辑接口")}</Button></div> : null}</div></div>
+      <div className="file-head-card"><h3 className="file-head-title"><Icon name="info" size={14} />{tx("作业摘要")}</h3><div className="fh-grid"><div className="fh-item"><div className="k">{tx("推送频率")}</div><div className="v">{job.freqType}{FREQ_PARAM_CONFIG[job.freqType] ? ` / ${formatFreq(job, tx)}` : ""}</div></div><div className="fh-item fh-full"><div className="k">{tx("业务逻辑说明")}</div><div className="v file-desc">{job.desc}</div></div></div></div>
       {showDetails && isDetailedJob(job) ? <PushJobDetails system={system} job={job} /> : null}
     </div>
   );
@@ -66,39 +68,40 @@ interface PushJobDetailsProps {
 }
 
 function PushJobDetails({ system, job }: PushJobDetailsProps) {
+  const tx = useUiCopy("integration");
   return (
     <div>
       <div className="file-head-card">
-        <h3 className="file-head-title"><Icon name="info" size={14} />文件头信息</h3>
+        <h3 className="file-head-title"><Icon name="info" size={14} />{tx("文件头信息")}</h3>
         <div className="fh-grid">
-          <div className="fh-item fh-full"><div className="k">推送文件</div><div className="v"></div></div>
-          {job.sourcePath ? <div className="fh-item"><div className="k">湖仓来源路径</div><div className="v mono">{job.sourcePath}</div></div> : null}
-          <div className="fh-item"><div className="k">湖仓来源文件名</div><div className="v mono">{job.sourceFileName}</div></div>
-          {job.targetPath || system.host || system.port ? <div className="fh-item"><div className="k">目标推送路径</div><div className="v mono">{system.protocol} {"->"} {system.host || ""}{system.port ? `:${system.port}` : ""}{job.targetPath || ""}</div></div> : null}
-          <div className="fh-item"><div className="k">目标推送文件名</div><div className="v mono">{job.targetFileName}</div></div>
-          {isRenameJob(job) ? <div className="fh-item fh-full"><div className="k">提示</div><div className="v mono">推送时重命名 {formatRenameHint(job)}</div></div> : null}
-          {job.delimiter ? <div className="fh-item"><div className="k">字段分隔符</div><div className="v mono">{job.delimiter === "\\t" ? "\\t (Tab)" : job.delimiter}</div></div> : null}
-          {job.encoding ? <div className="fh-item"><div className="k">文件编码</div><div className="v mono">{job.encoding}</div></div> : null}
-          <div className="fh-item"><div className="k">推送频率</div><div className="v">{job.freqType}{FREQ_PARAM_CONFIG[job.freqType] ? ` · ${formatFreq(job)}` : ""}</div></div>
-          {job.rowCnt ? <div className="fh-item"><div className="k">预估行数</div><div className="v mono">{job.rowCnt}</div></div> : null}
-          <div className="fh-item fh-full"><div className="k">业务逻辑说明</div><div className="v file-desc">{job.desc}</div></div>
+          <div className="fh-item fh-full"><div className="k">{tx("推送文件")}</div><div className="v"></div></div>
+          {job.sourcePath ? <div className="fh-item"><div className="k">{tx("湖仓来源路径")}</div><div className="v mono">{job.sourcePath}</div></div> : null}
+          <div className="fh-item"><div className="k">{tx("湖仓来源文件名")}</div><div className="v mono">{job.sourceFileName}</div></div>
+          {job.targetPath || system.host || system.port ? <div className="fh-item"><div className="k">{tx("目标推送路径")}</div><div className="v mono">{system.protocol} {"->"} {system.host || ""}{system.port ? `:${system.port}` : ""}{job.targetPath || ""}</div></div> : null}
+          <div className="fh-item"><div className="k">{tx("目标推送文件名")}</div><div className="v mono">{job.targetFileName}</div></div>
+          {isRenameJob(job) ? <div className="fh-item fh-full"><div className="k">{tx("提示")}</div><div className="v mono">{tx("推送时重命名")}{" "}{formatRenameHint(job)}</div></div> : null}
+          {job.delimiter ? <div className="fh-item"><div className="k">{tx("字段分隔符")}</div><div className="v mono">{job.delimiter === "\\t" ? "\\t (Tab)" : job.delimiter}</div></div> : null}
+          {job.encoding ? <div className="fh-item"><div className="k">{tx("文件编码")}</div><div className="v mono">{job.encoding}</div></div> : null}
+          <div className="fh-item"><div className="k">{tx("推送频率")}</div><div className="v">{job.freqType}{FREQ_PARAM_CONFIG[job.freqType] ? ` · ${formatFreq(job, tx)}` : ""}</div></div>
+          {job.rowCnt ? <div className="fh-item"><div className="k">{tx("预估行数")}</div><div className="v mono">{job.rowCnt}</div></div> : null}
+          <div className="fh-item fh-full"><div className="k">{tx("业务逻辑说明")}</div><div className="v file-desc">{job.desc}</div></div>
         </div>
       </div>
 
       <div className="tabs">
-        <div className="tab active"><Icon name="columns" size={15} />字段清单 <span className="tab-n">{job.fields.length}</span></div>
+        <div className="tab active"><Icon name="columns" size={15} />{tx("字段清单")}{" "}<span className="tab-n">{job.fields.length}</span></div>
       </div>
       <div className="panel">
         <div style={{ overflowX: "auto" }}>
           <table className="fields">
             <thead>
               <tr>
-                <th className="c-idx">序号</th>
-                <th style={{ width: 180 }}>字段名</th>
-                <th style={{ width: 160 }}>中文名</th>
-                <th>含义</th>
-                <th style={{ width: 140 }}>来源系统</th>
-                <th style={{ width: 130 }}>数据类型</th>
+                <th className="c-idx">{tx("序号")}</th>
+                <th style={{ width: 180 }}>{tx("字段名")}</th>
+                <th style={{ width: 160 }}>{tx("中文名")}</th>
+                <th>{tx("含义")}</th>
+                <th style={{ width: 140 }}>{tx("来源系统")}</th>
+                <th style={{ width: 130 }}>{tx("数据类型")}</th>
               </tr>
             </thead>
             <tbody>

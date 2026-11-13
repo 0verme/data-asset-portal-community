@@ -34,7 +34,7 @@ test("system forms use the frozen DAP adapters", () => {
   assert.match(paramForm, /import \{ FormErrorSummary, FormField, focusFirstFormError, Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((paramForm.match(/<Input/g) ?? []).length, 3);
   assert.equal((paramForm.match(/<Select<string>/g) ?? []).length, 1);
-  assert.match(paramForm, /placeholder="请选择分类"/);
+  assert.match(paramForm, /placeholder=\{tx\("请选择分类"\)\}/);
 });
 
 test("system pages use the frozen DAP adapters with documented native exceptions", () => {
@@ -49,10 +49,10 @@ test("system pages use the frozen DAP adapters with documented native exceptions
   assert.equal((rolePage.match(/<Input/g) ?? []).length, 2);
   assert.equal((rolePage.match(/<Textarea/g) ?? []).length, 1);
   assert.equal((rolePage.match(/<input/g) ?? []).length, 1, "permission matrix checkbox stays native");
-  assert.match(userPage, /<TablePagination[\s\S]*?ariaLabel="用户管理分页"/);
-  assert.match(rolePage, /<TablePagination[\s\S]*?ariaLabel="角色管理分页"/);
-  assert.match(menuPage, /<TablePagination[\s\S]*?ariaLabel="菜单管理分页"/);
-  assert.match(paramPage, /<TablePagination[\s\S]*?ariaLabel="参数字典明细分页"/);
+  assert.match(userPage, /<TablePagination[\s\S]*?ariaLabel=\{tx\("用户管理分页"\)\}/);
+  assert.match(rolePage, /<TablePagination[\s\S]*?ariaLabel=\{tx\("角色管理分页"\)\}/);
+  assert.match(menuPage, /<TablePagination[\s\S]*?ariaLabel=\{tx\("菜单管理分页"\)\}/);
+  assert.match(paramPage, /<TablePagination[\s\S]*?ariaLabel=\{tx\("参数字典明细分页"\)\}/);
 });
 
 test("optional RAG configuration is admin-controlled and never fabricates answers", () => {
@@ -87,7 +87,7 @@ test("daily AI question quota admin is remote-only, permission-aware, and distin
 
 test("operation log surfaces use the frozen DAP adapters", () => {
   assert.equal((oplogPage.match(/<Button/g) ?? []).length, 1);
-  assert.match(oplogPage, /<TablePagination[\s\S]*?ariaLabel="操作日志分页"/);
+  assert.match(oplogPage, /<TablePagination[\s\S]*?ariaLabel=\{tx\("操作日志分页"\)\}/);
   assert.match(oplogFilter, /import \{ Button, Input, Select \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((oplogFilter.match(/<Select<string>/g) ?? []).length, 3);
   assert.equal((oplogFilter.match(/<Input/g) ?? []).length, 2);

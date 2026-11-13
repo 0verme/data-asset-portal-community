@@ -9,6 +9,7 @@ import {
   type RagSearchDiagnostics,
 } from "../../api/ragSearchConfig.ts";
 import { Button } from "../../ui/index.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 const DIAGNOSTIC_LABELS: Record<RagSearchDiagnostics["status"], string> = {
   disabled: "已关闭",
@@ -16,15 +17,21 @@ const DIAGNOSTIC_LABELS: Record<RagSearchDiagnostics["status"], string> = {
   unavailable: "暂不可用",
 };
 
-function statusDescription(status: RagSearchDiagnostics): string {
-  if (status.status === "disabled") return "推荐功能关闭；普通关键词搜索不受影响。";
+function statusDescription(
+  status: RagSearchDiagnostics,
+  translate: (source: string, options?: Readonly<Record<string, unknown>>) => string,
+): string {
+  if (status.status === "disabled") return translate("推荐功能关闭；普通关键词搜索不受影响。");
   if (status.status === "ready") {
-    return "DAP 已通过 HTTP 完成服务存活与就绪检查；每次返回的资产 ID 仍会按当前共享目录重新校验。";
+    return translate("DAP 已通过 HTTP 完成服务存活与就绪检查；每次返回的资产 ID 仍会按当前共享目录重新校验。");
   }
-  return `RAG HTTP 服务暂不可用（${status.reasonCode || "未知原因"}）；普通关键词搜索不受影响。`;
+  return translate("RAG HTTP 服务暂不可用（{{reason}}）；普通关键词搜索不受影响。", {
+    reason: status.reasonCode || translate("未知原因"),
+  });
 }
 
 export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
+  const tx = useUiCopy("admin");
   const [config, setConfig] = useState<RagSearchConfig>({ ...DEFAULT_RAG_SEARCH_CONFIG });
   const [diagnostics, setDiagnostics] = useState<RagSearchDiagnostics>({
     status: "disabled",
@@ -99,23 +106,21 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
   return (
     <details className="rag-config-panel">
       <summary>
-        <span className="rag-config-title">RAG 相关资产推荐（可选）</span>
+        <span className="rag-config-title">{tx("RAG 相关资产推荐（可选）")}</span>
         <span className={`rag-config-state rag-config-state-${diagnostics.status}`}>
-          {DIAGNOSTIC_LABELS[diagnostics.status]}
+          {tx(DIAGNOSTIC_LABELS[diagnostics.status])}
         </span>
       </summary>
       <div className="rag-config-body">
         <p className="rag-config-intro">
-          默认关闭。DAP 仅通过受认证的 HTTP 调用独立 RAG Search Service；DAP 不加载模型、不读取索引、不调用 RAG CLI 或 LLM，也不生成智能解答。关键词搜索不等待推荐服务。
-        </p>
+          {tx("默认关闭。DAP 仅通过受认证的 HTTP 调用独立 RAG Search Service；DAP 不加载模型、不读取索引、不调用 RAG CLI 或 LLM，也不生成智能解答。关键词搜索不等待推荐服务。")}</p>
         {!supported ? (
           <div className="rag-config-message" role="status">
-            模拟模式仅展示关闭状态；持久化配置与索引诊断需连接后端。
-          </div>
+            {tx("模拟模式仅展示关闭状态；持久化配置与索引诊断需连接后端。")}</div>
         ) : null}
-        {loading ? <div className="rag-config-message" role="status">正在读取配置…</div> : null}
-        {error ? <div className="rag-config-error" role="alert">{error}</div> : null}
-        {notice ? <div className="rag-config-message" role="status">{notice}</div> : null}
+        {loading ? <div className="rag-config-message" role="status">{tx("正在读取配置…")}</div> : null}
+        {error ? <div className="rag-config-error" role="alert">{tx(error)}</div> : null}
+        {notice ? <div className="rag-config-message" role="status">{tx(notice)}</div> : null}
 
         <div className="rag-config-form">
           <label className="rag-config-toggle">
@@ -125,17 +130,16 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
               disabled={!canEdit || !supported || loading || saving}
               onChange={(event) => update("enabled", event.target.checked)}
             />
-            <span>启用相关资产推荐</span>
+            <span>{tx("启用相关资产推荐")}</span>
           </label>
           <div className="rag-config-field" role="note">
-            <span>检索策略</span>
-            <strong>由 RAG 服务端配置决定</strong>
+            <span>{tx("检索策略")}</span>
+            <strong>{tx("由 RAG 服务端配置决定")}</strong>
             <small>
-              HTTP Search Service v1 仅接受 query 和 topK，不接受请求级策略。实际策略由 RAG 服务端的 DAP_RAG_SEARCH_MODE 配置；DAP 已保存的 strategy 字段仅为兼容保留，不会影响检索。
-            </small>
+              {tx("HTTP Search Service v1 仅接受 query 和 topK，不接受请求级策略。实际策略由 RAG 服务端的 DAP_RAG_SEARCH_MODE 配置；DAP 已保存的 strategy 字段仅为兼容保留，不会影响检索。")}</small>
           </div>
           <label className="rag-config-field">
-            <span>最多推荐条数</span>
+            <span>{tx("最多推荐条数")}</span>
             <input
               type="number"
               min={1}
@@ -146,7 +150,7 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
             />
           </label>
           <label className="rag-config-field">
-            <span>请求超时（毫秒）</span>
+            <span>{tx("请求超时（毫秒）")}</span>
             <input
               type="number"
               min={250}
@@ -162,7 +166,7 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
             <input
               type="url"
               value={config.serviceUrl}
-              placeholder="同机可用 http://127.0.0.1:<port>；跨机必须使用 https://<RAG_SERVICE_HOST>"
+              placeholder={tx("同机可用 http://127.0.0.1:<port>；跨机必须使用 https://<RAG_SERVICE_HOST>")}
               disabled={!canEdit || !supported || loading || saving}
               onChange={(event) => update("serviceUrl", event.target.value)}
               autoComplete="off"
@@ -170,16 +174,16 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
             />
           </label>
           <div className="rag-config-field rag-config-field-wide" role="status">
-            <span>服务端认证 Token</span>
-            <strong>{config.tokenConfigured ? "已在后端 Secret 中配置" : "未配置"}</strong>
-            <small>通过部署 Secret 设置 RAG_SEARCH_SERVICE_TOKEN；Token 不写入参数表、不经浏览器传输或返回。</small>
+            <span>{tx("服务端认证 Token")}</span>
+            <strong>{config.tokenConfigured ? tx("已在后端 Secret 中配置") : tx("未配置")}</strong>
+            <small>{tx("通过部署 Secret 设置 RAG_SEARCH_SERVICE_TOKEN；Token 不写入参数表、不经浏览器传输或返回。")}</small>
           </div>
         </div>
 
         <div className="rag-config-diagnostic" role="status">
-          <strong>{DIAGNOSTIC_LABELS[diagnostics.status]}</strong>
-          <span>{statusDescription(diagnostics)}</span>
-          <span>Token：{diagnostics.tokenConfigured ? "已配置" : "未配置"}</span>
+          <strong>{tx(DIAGNOSTIC_LABELS[diagnostics.status])}</strong>
+          <span>{statusDescription(diagnostics, tx)}</span>
+          <span>{tx("Token：{{status}}", { status: tx(diagnostics.tokenConfigured ? "已配置" : "未配置") })}</span>
         </div>
 
         <div className="rag-config-actions">
@@ -189,7 +193,7 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
             disabled={!supported || loading || checking}
             onClick={() => void check()}
           >
-            {checking ? "正在检查…" : "检查 RAG Service"}
+            {checking ? tx("正在检查…") : tx("检查 RAG Service")}
           </Button>
           <Button
             variant="primary"
@@ -197,12 +201,11 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
             disabled={!canEdit || !supported || loading || saving}
             onClick={() => void save()}
           >
-            {saving ? "保存中…" : "保存配置"}
+            {saving ? tx("保存中…") : tx("保存配置")}
           </Button>
         </div>
         <p className="rag-config-footnote">
-          只有受保护的管理配置页加载或管理员手动检查时才请求 /healthz 与 /readyz；普通搜索不请求诊断。推荐请求有超时限制；远端服务错误、令牌缺失或目录校验失败时 fail closed，不影响确定性关键词搜索。DAP 按 HTTP Search Service v1 请求与解析；算法模式在 RAG 服务端配置。
-        </p>
+          {tx("只有受保护的管理配置页加载或管理员手动检查时才请求 /healthz 与 /readyz；普通搜索不请求诊断。推荐请求有超时限制；远端服务错误、令牌缺失或目录校验失败时 fail closed，不影响确定性关键词搜索。DAP 按 HTTP Search Service v1 请求与解析；算法模式在 RAG 服务端配置。")}</p>
       </div>
     </details>
   );

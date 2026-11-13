@@ -4,6 +4,7 @@ import { DEFAULT_PUSH_FILTER } from "../../config/defaults.ts";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.tsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.tsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.tsx";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 export interface PushSidebarProps {
   push: UsePushModuleResult;
@@ -20,6 +21,7 @@ export function PushSidebar({
   canEdit = false,
   pushRoute,
 }: PushSidebarProps) {
+  const tx = useUiCopy("integration");
   const {
     pushSystemCount,
     pushProtocolOptions,
@@ -40,10 +42,10 @@ export function PushSidebar({
   return (
     <>
       <SidebarFilterGroup
-        title="连接协议"
+        title={tx("连接协议")}
         allOption={{
           key: "all-protocols",
-          label: "全部协议",
+          label: tx("全部协议"),
           count: pushSystemCount,
           active: !pushFilter.protocol,
           onClick: () => setPushFilter((prev) => ({ ...prev, protocol: null })),
@@ -75,18 +77,18 @@ export function PushSidebar({
       />
 
       <SidebarFilterGroup
-        title="重要程度"
+        title={tx("重要程度")}
         allOption={{
           key: "all-importance-levels",
-          label: "全部重要程度",
+          label: tx("全部重要程度"),
           count: pushSystemCount,
           active: !pushFilter.importanceLevel,
           onClick: () =>
             setPushFilter((prev) => ({ ...prev, importanceLevel: null })),
         }}
         items={[
-          { value: "important", label: "重要" },
-          { value: "normal", label: "普通" },
+          { value: "important", label: tx("重要") },
+          { value: "normal", label: tx("普通") },
         ].map((item) => ({
           key: item.value,
           label: item.label,
@@ -107,7 +109,7 @@ export function PushSidebar({
             ? [
                 {
                   key: "create-push-system",
-                  label: "新增系统",
+                  label: tx("新增系统"),
                   onClick: () => requireLogin(() => pushGoSystemEdit(null)),
                 },
               ]
@@ -117,7 +119,7 @@ export function PushSidebar({
 
       {recentPushSystems.length ? (
         <SidebarFilterGroup
-          title="最近访问"
+          title={tx("最近访问")}
           items={recentPushSystems.map((system) => ({
             key: system.id,
             active: pushRoute.sys === system.id,

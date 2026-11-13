@@ -4,6 +4,9 @@ import type aiAsk from "./locales/zh-CN/aiAsk.json" with { "resolution-mode": "i
 import type apiAsset from "./locales/zh-CN/apiAsset.json" with { "resolution-mode": "import" };
 import type auth from "./locales/zh-CN/auth.json" with { "resolution-mode": "import" };
 import type common from "./locales/zh-CN/common.json" with { "resolution-mode": "import" };
+import type admin from "./locales/zh-CN/admin.json" with { "resolution-mode": "import" };
+import type dictionary from "./locales/zh-CN/dictionary.json" with { "resolution-mode": "import" };
+import type integration from "./locales/zh-CN/integration.json" with { "resolution-mode": "import" };
 import type fieldMapping from "./locales/zh-CN/fieldMapping.json" with { "resolution-mode": "import" };
 import type indicator from "./locales/zh-CN/indicator.json" with { "resolution-mode": "import" };
 import type lineage from "./locales/zh-CN/lineage.json" with { "resolution-mode": "import" };
@@ -31,6 +34,9 @@ declare module "i18next" {
       search: DeepStringify<typeof search>;
       aiAsk: DeepStringify<typeof aiAsk>;
       apiAsset: DeepStringify<typeof apiAsset>;
+      integration: DeepStringify<typeof integration>;
+      dictionary: DeepStringify<typeof dictionary>;
+      admin: DeepStringify<typeof admin>;
     };
     returnNull: false;
   }

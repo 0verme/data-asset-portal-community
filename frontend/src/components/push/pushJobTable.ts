@@ -38,6 +38,7 @@ export interface PushJobTableValues {
 
 export function getPushJobTableValues(
   job: PushJobLike = {},
+  translate?: (source: string, options?: Readonly<Record<string, unknown>>) => string,
 ): PushJobTableValues {
   return {
     job: {
@@ -45,8 +46,8 @@ export function getPushJobTableValues(
       sourceFileName: job.sourceFileName || job.targetFileName || "",
       targetFileName: job.targetFileName || job.sourceFileName || "",
     },
-    frequency: formatFreq(job),
-    status: job.enabled ? "启用" : "禁用",
-    action: "编辑",
+    frequency: formatFreq(job, translate),
+    status: translate ? translate(job.enabled ? "启用" : "禁用") : (job.enabled ? "启用" : "禁用"),
+    action: translate ? translate("编辑") : "编辑",
   };
 }
