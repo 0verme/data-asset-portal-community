@@ -651,12 +651,12 @@ jobs:
           VITE_API_MODE: mock
         run: npm run test:browser -- e2e/i18n.spec.ts --workers=2
 
-      - name: Remote API validation and data trust browser regression (Chromium and WebKit)
+      - name: Remote API, report-option authority, and data trust browser regression (Chromium and WebKit)
         if: matrix.lane == 'a'
         env:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/api-asset-validation-playwright
           VITE_API_MODE: remote
-        run: npm run test:browser -- --grep "API asset validation|Remote data trust|strict collection response|indicator path malformed envelope|source options failure|field-mapping column contract"
+        run: npm run test:browser -- --grep "API asset validation|Remote data trust|strict collection response|indicator path malformed envelope|source options failure|field-mapping column contract|report-options-authority"
 
       - name: Indicator and report database pagination browser regression (Chromium and WebKit)
         if: matrix.lane == 'a'
