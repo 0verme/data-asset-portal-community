@@ -57,10 +57,10 @@ test("initial lineage view uses the shared root-neighborhood fit", async () => {
 test("viewport controls remain host-owned and accessible", async () => {
   const canvas = await readFile(canvasPath, "utf8");
 
-  assert.match(canvas, /aria-label="缩小"/);
-  assert.match(canvas, /aria-label="放大"/);
-  assert.match(canvas, /aria-label="定位根节点邻域"/);
-  assert.match(canvas, /aria-label="适应全部"/);
+  assert.match(canvas, /aria-label=\{t\("canvas\.zoomOut"\)\}/);
+  assert.match(canvas, /aria-label=\{t\("canvas\.zoomIn"\)\}/);
+  assert.match(canvas, /aria-label=\{t\("canvas\.focusRoot"\)\}/);
+  assert.match(canvas, /aria-label=\{t\("canvas\.fitView"\)\}/);
   assert.match(canvas, /viewerRef\.current\?\.fitView\(\)/);
 });
 
@@ -92,8 +92,8 @@ test("lineage search accepts table and task nodes", async () => {
   ]);
 
   assert.match(page, /findLineageNodes/);
-  assert.match(page, /表或作业名称查询/);
-  assert.match(page, /aria-label="血缘节点候选项"/);
+  assert.match(page, /t\("search\.label"\)/);
+  assert.match(page, /aria-label=\{t\("search\.candidates"\)\}/);
   assert.match(page, /candidate\.kind === "task" \? "detail"/);
   assert.match(
     api,
@@ -111,7 +111,8 @@ test("lineage search selects exact table matches and labels ambiguous candidates
 
   assert.match(page, /resolveLineageSearchMatches\(nodeName, matches\)/);
   assert.match(page, /if \(resolution\.directMatch\)/);
-  assert.match(page, /describeLineageSearchCandidate\(candidate\)/);
+  assert.match(page, /const isTable = candidate\.kind === "table"/);
+  assert.match(page, /t\(isTable \? "search\.tableName" : "search\.jobName"\)/);
   assert.match(search, /const nodeNamespace = String\(node\.namespace \|\| ""\)\.trim\(\)\.toLowerCase\(\)/);
   assert.match(search, /nodeName === `\$\{namespace\}\.\$\{tableName\}`/);
   assert.match(search, /matchesUnqualifiedTableName/);
@@ -163,10 +164,10 @@ test("lineage page supports table and detail views with snapshot diagnostics", a
     readFile(stylesPath, "utf8"),
   ]);
 
-  assert.match(page, /\{ label: "表级简图", value: "table" \}/);
-  assert.match(page, /\{ label: "作业详图", value: "detail" \}/);
+  assert.match(page, /\{ label: t\("filters\.tableView"\), value: "table" \}/);
+  assert.match(page, /\{ label: t\("filters\.detailView"\), value: "detail" \}/);
   assert.match(page, /view: nextRoute\.view/);
-  assert.match(page, /快照诊断/);
+  assert.match(page, /t\("messages\.diagnostics", \{ count: graph\.diagnostics\.length \}\)/);
   assert.match(styles, /\.lineage-diagnostics \{[^}]*var\(--warn-line\)/);
 });
 

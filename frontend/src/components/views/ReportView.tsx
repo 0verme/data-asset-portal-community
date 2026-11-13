@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { useTranslation } from "react-i18next";
+
 import type { UseReportModuleResult } from "../../hooks/useReportModule.ts";
 import type { ReportRoute } from "../../routing/types.ts";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
@@ -45,6 +47,7 @@ export function ReportView({
     onChangeView,
     canEdit = false,
 }: ReportViewProps) {
+    const { t } = useTranslation("report");
     const {
         reportLoading,
         reportError,
@@ -70,8 +73,8 @@ export function ReportView({
     if (reportDetailLoading || (reportRoute.page === 'list' && reportLoading)) {
         return (
             <LoadingState
-                title={reportDetailLoading ? "加载报表详情" : "加载报表资产"}
-                desc="正在准备报表清单、归属信息和关联引用。"
+                title={reportDetailLoading ? t("view.loadingDetail") : t("view.loadingList")}
+                desc={t("view.loadingDescription")}
             />
         );
     }
@@ -79,7 +82,7 @@ export function ReportView({
     if (reportDetailError || (reportRoute.page === 'list' && reportError)) {
         return (
             <ErrorState
-                title="报表资产加载失败"
+                title={t("view.loadError")}
                 desc={reportDetailError || reportError}
                 onRetry={reportDetailError ? retryReportDetail : loadReportData}
             />
@@ -88,8 +91,8 @@ export function ReportView({
     if (!canEdit && ["new", "edit"].includes(reportRoute.page)) {
         return (
             <EmptyState
-                title="当前页面需要报表维护权限"
-                desc="报表目录可以公开浏览，新增和编辑需要相应写权限。"
+                title={t("view.permissionTitle")}
+                desc={t("view.permissionDescription")}
             />
         );
     }
@@ -112,7 +115,7 @@ export function ReportView({
 
     if (reportRoute.page === "edit") {
         if (!currentReportEdit) {
-            return <EmptyState title="报表不存在" />;
+            return <EmptyState title={t("view.missing")} />;
         }
 
         return (
@@ -125,14 +128,14 @@ export function ReportView({
                     if (
                         await confirmDeleteAction({
                             name: currentReportEdit.code,
-                            typeLabel: "报表",
-                            impact: "删除后会从台账中移除，并丢失当前维护的关联表和关联指标引用展示。",
+                            typeLabel: t("deleteConfirm.typeLabel"),
+                            impact: t("deleteConfirm.impact"),
                             consequences: [
-                                "删除前以后端校验结果为准，不会绕过引用存在性检查。",
-                                "若后端返回不可删除原因，页面会直接展示原始原因。",
+                                t("deleteConfirm.serverCheck"),
+                                t("deleteConfirm.serverReason"),
                             ],
                             confirmKeyword: currentReportEdit.code,
-                            confirmKeywordLabel: "请输入报表编码二次确认",
+                            confirmKeywordLabel: t("deleteConfirm.keywordLabel"),
                         })
                     ) {
                         await handleDeleteReport(currentReportEdit.code);
@@ -162,17 +165,17 @@ export function ReportView({
 
             <div className="catalog-pagination-footer">
                 <label className="catalog-list-sort">
-                    <span>排序</span>
+                    <span>{t("view.sort")}</span>
                     <Select<string>
-                        aria-label="报表排序"
+                        aria-label={t("view.sortLabel")}
                         className="table-list-sort"
                         value={reportSort}
                         onValueChange={(value) => setReportSort(value || 'code:asc')}
                         items={[
-                            { label: '编码升序', value: 'code:asc' },
-                            { label: '编码降序', value: 'code:desc' },
-                            { label: '名称升序', value: 'name:asc' },
-                            { label: '名称降序', value: 'name:desc' },
+                            { label: t("view.sortCodeAsc"), value: 'code:asc' },
+                            { label: t("view.sortCodeDesc"), value: 'code:desc' },
+                            { label: t("view.sortNameAsc"), value: 'name:asc' },
+                            { label: t("view.sortNameDesc"), value: 'name:desc' },
                         ]}
                     />
                 </label>
@@ -182,7 +185,7 @@ export function ReportView({
                     total={reportTotal}
                     onPageChange={setReportPage}
                     onPageSizeChange={setReportPageSize}
-                    ariaLabel="报表分页"
+                    ariaLabel={t("view.pagination")}
                 />
             </div>
 
@@ -196,14 +199,14 @@ export function ReportView({
                     if (
                         await confirmDeleteAction({
                             name: reportCode,
-                            typeLabel: "报表",
-                            impact: "删除后会从台账中移除，并丢失当前维护的关联表和关联指标引用展示。",
+                            typeLabel: t("deleteConfirm.typeLabel"),
+                            impact: t("deleteConfirm.impact"),
                             consequences: [
-                                "删除前以后端校验结果为准。",
-                                "若报表已禁用但仍需历史留档，应优先保留而非删除。",
+                                t("deleteConfirm.serverCheckShort"),
+                                t("deleteConfirm.keepHistory"),
                             ],
                             confirmKeyword: reportCode,
-                            confirmKeywordLabel: "请输入报表编码二次确认",
+                            confirmKeywordLabel: t("deleteConfirm.keywordLabel"),
                         })
                     ) {
                         await handleDeleteReport(reportCode);

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { i18n, i18nReady } from "../i18n/index.ts";
 import { validateIndicatorForm } from "./indicatorFormErrors.ts";
 
 const validFields = {
@@ -10,6 +11,15 @@ const validFields = {
   registeredAt: "2025-06-17",
   path: "PRD > 商品运营 > 规模",
 };
+
+test("indicator validation uses the selected locale without changing indicator field paths", async () => {
+  await i18nReady;
+  const t = i18n.getFixedT("en-US", "indicator");
+  assert.deepEqual(validateIndicatorForm({ ...validFields, id: "", path: "" }, t), {
+    id: "Indicator ID is required",
+    path: "Indicator path is required",
+  });
+});
 
 test("indicator validation returns canonical field errors in form order", () => {
   assert.deepEqual(validateIndicatorForm({

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   findLineageNodes,
@@ -12,7 +13,6 @@ import { formatDateTime } from "../utils/date.ts";
 import { ActionErrorBanner, ErrorState, LoadingState } from "./common/index.ts";
 import { LineageCanvas } from "./lineage/LineageCanvas.tsx";
 import {
-  describeLineageSearchCandidate,
   lineageSearchQueryForCandidate,
   resolveLineageSearchMatches,
 } from "./lineage/lineageSearch.ts";
@@ -96,6 +96,9 @@ export function LineagePage({
   onNodesChange,
   onSelectedNodeChange,
 }: LineagePageProps) {
+  const { t } = useTranslation("lineage");
+  const tRef = React.useRef(t);
+  tRef.current = t;
   const [graph, setGraph] = React.useState<LineageSubgraph | null>(null);
   const [pendingFilters, setPendingFilters] = React.useState<PendingLineageFilters>(() => routeFilters(route));
   const [query, setQuery] = React.useState("");
@@ -105,7 +108,7 @@ export function LineagePage({
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
   const [bootstrap, setBootstrap] = React.useState<LineageBootstrap | null>(null);
-  const [notice, setNotice] = React.useState("");
+  const [notice, setNotice] = React.useState<"ROOT_NOT_IN_SNAPSHOT" | "TABLE_VIEW_REQUIRES_TABLE_ROOT" | "">("");
   const appliedRouteRef = React.useRef<string | null>(null);
   const requestSequenceRef = React.useRef(0);
   const routeDirection = route.direction;
@@ -140,9 +143,9 @@ export function LineagePage({
       }
       const data = result.graph;
       if (result.noticeCode === "ROOT_NOT_IN_SNAPSHOT") {
-        setNotice("原根节点不在当前快照中，已切换至可用表节点。");
+        setNotice("ROOT_NOT_IN_SNAPSHOT");
       } else if (result.noticeCode === "TABLE_VIEW_REQUIRES_TABLE_ROOT") {
-        setNotice("表级简图需要表节点，已切换至默认表。");
+        setNotice("TABLE_VIEW_REQUIRES_TABLE_ROOT");
       }
       const resolvedRoute: LineageRoute = {
         ...nextRoute,
@@ -160,7 +163,7 @@ export function LineagePage({
       onRouteChange(resolvedRoute);
     } catch (cause: unknown) {
       if (isAbortError(cause) || requestSequenceRef.current !== sequence) return;
-      setError(getErrorMessage(cause, "血缘子图加载失败"));
+      setError(getErrorMessage(cause, tRef.current("messages.loadErrorDescription")));
     } finally {
       if (requestSequenceRef.current === sequence) setLoading(false);
     }
@@ -207,7 +210,7 @@ export function LineagePage({
       }
       const matches = await findLineageNodes(nodeName);
       if (!matches.length) {
-        setQueryError(`当前快照中未找到表或作业“${nodeName}”。`);
+        setQueryError(t("search.noResults", { name: nodeName }));
       } else {
         const resolution = resolveLineageSearchMatches(nodeName, matches);
         if (resolution.directMatch) {
@@ -217,7 +220,7 @@ export function LineagePage({
         }
       }
     } catch (cause: unknown) {
-      if (!isAbortError(cause)) setQueryError(getErrorMessage(cause, "节点名称查询失败，请稍后重试。"));
+      if (!isAbortError(cause)) setQueryError(getErrorMessage(cause, t("search.error")));
     } finally {
       setQuerying(false);
     }
@@ -229,15 +232,15 @@ export function LineagePage({
     void openCandidate(candidate);
   };
 
-  if (loading && !graph) return <LoadingState title="加载血缘子图" desc="正在读取当前血缘快照。" />;
-  if (error && !graph) return <ErrorState title="血缘子图加载失败" desc={error} onRetry={() => void loadGraph(route)} />;
+  if (loading && !graph) return <LoadingState title={t("messages.loadingTitle")} desc={t("messages.loadingDescription")} />;
+  if (error && !graph) return <ErrorState title={t("messages.loadError")} desc={error} onRetry={() => void loadGraph(route)} />;
   if (!graph) {
     const emptyDescription = bootstrap?.status === "no_active_snapshot"
-      ? "当前没有启用的血缘快照。"
+      ? t("messages.noActiveSnapshot")
       : bootstrap?.status === "empty_snapshot"
-        ? "当前血缘快照暂无节点。"
-        : "当前没有可用的血缘快照数据。";
-    return <ErrorState title="当前没有可用的血缘快照数据" desc={`${emptyDescription}请先采集并发布血缘快照。`} onRetry={() => void loadGraph(route)} />;
+        ? t("messages.emptySnapshot")
+        : t("messages.noSnapshotData");
+    return <ErrorState title={t("messages.noSnapshotTitle")} desc={`${emptyDescription}${t("messages.publishSnapshot")}`} onRetry={() => void loadGraph(route)} />;
   }
 
   const selected = graph.nodes.find((node) => node.id === selectedNodeId)
@@ -246,33 +249,37 @@ export function LineagePage({
   const upstreamCount = graph.edges.filter((edge) => edge.targetId === selected?.id).length;
   const downstreamCount = graph.edges.filter((edge) => edge.sourceId === selected?.id).length;
   const root = graph.nodes.find((node) => node.id === graph.rootId);
-  const sourceLabel = bootstrap?.mode === "persistent" ? "持久化血缘快照" : "演示血缘数据";
+  const sourceLabel = bootstrap?.mode === "persistent" ? t("source.persistent") : t("source.demo");
 
   return (
     <div className="lineage-page">
       <div className="page-head">
         <div>
-          <div className="page-title"><span className="pt-code">LINEAGE</span>血缘分析</div>
-          <div className="page-sub">表级漫游与作业排障 · 当前快照 {graph.snapshot.snapshotId}</div>
+          <div className="page-title"><span className="pt-code">{t("page.code")}</span>{t("page.title")}</div>
+          <div className="page-sub">{t("page.subtitle", { snapshotId: graph.snapshot.snapshotId })}</div>
         </div>
         <div className="lineage-actions">
-          <label>视图<Select<string> aria-label="血缘视图" className="sel" disabled={loading || querying} items={[{ label: "表级简图", value: "table" }, { label: "作业详图", value: "detail" }]} value={pendingFilters.view || null} onValueChange={(value) => setPendingFilters((current) => ({ ...current, view: normalizeView(value || "table") }))} /></label>
-          <label>方向<Select<string> aria-label="血缘方向" className="sel" disabled={loading || querying} items={[{ label: "上下游", value: "both" }, { label: "仅上游", value: "upstream" }, { label: "仅下游", value: "downstream" }]} value={pendingFilters.direction || null} onValueChange={(value) => setPendingFilters((current) => ({ ...current, direction: normalizeDirection(value || "both") }))} /></label>
-          <label>表层级<Select<string> aria-label="血缘层级" className="sel" disabled={loading || querying} items={[1, 2, 3, 4, 5].map((value) => ({ label: `${value} 层`, value: String(value) }))} value={String(pendingFilters.depth)} onValueChange={(value) => setPendingFilters((current) => ({ ...current, depth: Number(value || 1) }))} /></label>
-          <Button className="btn" variant="secondary" type="button" onClick={() => void loadGraph({ ...route, ...pendingFilters })} disabled={loading}><Icon name="refresh" size={15} />{loading ? "加载中…" : "刷新"}</Button>
+          <label>{t("filters.view")}<Select<string> aria-label={t("filters.viewAria")} className="sel" disabled={loading || querying} items={[{ label: t("filters.tableView"), value: "table" }, { label: t("filters.detailView"), value: "detail" }]} value={pendingFilters.view || null} onValueChange={(value) => setPendingFilters((current) => ({ ...current, view: normalizeView(value || "table") }))} /></label>
+          <label>{t("filters.direction")}<Select<string> aria-label={t("filters.directionAria")} className="sel" disabled={loading || querying} items={[{ label: t("filters.bothDirections"), value: "both" }, { label: t("filters.upstreamOnly"), value: "upstream" }, { label: t("filters.downstreamOnly"), value: "downstream" }]} value={pendingFilters.direction || null} onValueChange={(value) => setPendingFilters((current) => ({ ...current, direction: normalizeDirection(value || "both") }))} /></label>
+          <label>{t("filters.depth")}<Select<string> aria-label={t("filters.depthAria")} className="sel" disabled={loading || querying} items={[1, 2, 3, 4, 5].map((value) => ({ label: t("filters.depthOption", { count: value }), value: String(value) }))} value={String(pendingFilters.depth)} onValueChange={(value) => setPendingFilters((current) => ({ ...current, depth: Number(value || 1) }))} /></label>
+          <Button className="btn" variant="secondary" type="button" onClick={() => void loadGraph({ ...route, ...pendingFilters })} disabled={loading}><Icon name="refresh" size={15} />{loading ? t("filters.loading") : t("filters.refresh")}</Button>
         </div>
       </div>
       <form className="lineage-query" onSubmit={(event) => void submitQuery(event)}>
-        <label htmlFor="lineage-node-name">表或作业名称查询</label>
-        <Input id="lineage-node-name" aria-label="血缘节点名称" value={query} onChange={(event) => { setQuery(event.target.value); setQueryError(""); setCandidates([]); }} placeholder="例如：schema.table_name、table_name 或作业名" disabled={querying} aria-describedby="lineage-query-status" />
-        <Button className="btn primary" variant="primary" type="submit" disabled={querying}>{querying ? "查询中…" : "查询"}</Button>
-        <Button className="btn" variant="secondary" type="button" onClick={() => { setQuery(""); setQueryError(""); setCandidates([]); }} disabled={!query || querying}>清空</Button>
+        <label htmlFor="lineage-node-name">{t("search.label")}</label>
+        <Input id="lineage-node-name" aria-label={t("search.ariaLabel")} value={query} onChange={(event) => { setQuery(event.target.value); setQueryError(""); setCandidates([]); }} placeholder={t("search.placeholder")} disabled={querying} aria-describedby="lineage-query-status" />
+        <Button className="btn primary" variant="primary" type="submit" disabled={querying}>{querying ? t("search.querying") : t("search.query")}</Button>
+        <Button className="btn" variant="secondary" type="button" onClick={() => { setQuery(""); setQueryError(""); setCandidates([]); }} disabled={!query || querying}>{t("search.clear")}</Button>
         <span id="lineage-query-status" className="lineage-query-status" role={queryError ? "alert" : "status"} aria-live="polite">{queryError}</span>
       </form>
       {candidates.length ? (
-        <div className="lineage-candidates" role="list" aria-label="血缘节点候选项">
+        <div className="lineage-candidates" role="list" aria-label={t("search.candidates")}>
           {candidates.map((candidate) => {
-            const label = describeLineageSearchCandidate(candidate);
+            const isTable = candidate.kind === "table";
+            const candidateName = isTable
+              ? candidate.name.trim().slice(candidate.name.trim().lastIndexOf(".") + 1)
+              : candidate.name;
+            const namespace = String(candidate.namespace || "").trim() || t("search.namespaceMissing");
             return (
               <button
                 className="lineage-candidate"
@@ -281,10 +288,10 @@ export function LineagePage({
                 key={candidate.id}
                 onClick={() => selectCandidate(candidate)}
               >
-                <b>{label.nameLabel}</b>
-                <span>{label.kindLabel}</span>
+                <b>{t(isTable ? "search.tableName" : "search.jobName")}: {candidateName}</b>
+                <span>{t(isTable ? "search.tableKind" : "search.jobKind")}</span>
                 <small>
-                  {label.namespaceLabel}
+                  {t(isTable ? "search.schemaNamespace" : "search.namespace", { namespace })}
                   {candidate.displayName && candidate.displayName !== candidate.name
                     ? ` · ${candidate.displayName}`
                     : ""}
@@ -294,30 +301,30 @@ export function LineagePage({
           })}
         </div>
       ) : null}
-      {notice ? <p className="lineage-notice" role="status">{notice}</p> : null}
-      <ActionErrorBanner title="血缘图加载失败" message={error} />
-      {graph.truncated ? <p className="lineage-notice" role="status">图谱节点已达到 {MAX_NODES} 个上限，当前结果已截断。</p> : null}
-      {graph.diagnostics?.length ? <details className="lineage-diagnostics"><summary>快照诊断（{graph.diagnostics.length}）</summary><ul>{graph.diagnostics.map((item, index) => { const diagnostic = diagnosticValue(item); return <li key={diagnosticKey(item, index)}><b>{diagnostic.code || "DIAGNOSTIC"}</b>{diagnostic.message || String(item)}</li>; })}</ul></details> : null}
+      {notice ? <p className="lineage-notice" role="status">{t(notice === "ROOT_NOT_IN_SNAPSHOT" ? "messages.rootNotInSnapshot" : "messages.tableRootRequired")}</p> : null}
+      <ActionErrorBanner title={t("messages.errorTitle")} message={error} />
+      {graph.truncated ? <p className="lineage-notice" role="status">{t("messages.truncated", { count: MAX_NODES })}</p> : null}
+      {graph.diagnostics?.length ? <details className="lineage-diagnostics"><summary>{t("messages.diagnostics", { count: graph.diagnostics.length })}</summary><ul>{graph.diagnostics.map((item, index) => { const diagnostic = diagnosticValue(item); return <li key={diagnosticKey(item, index)}><b>{diagnostic.code || "DIAGNOSTIC"}</b>{diagnostic.message || String(item)}</li>; })}</ul></details> : null}
       <div className="lineage-layout">
         <section className="lineage-card" aria-busy={loading}>
-          <div className="lineage-card-head"><span>{sourceLabel}：{root?.name} · {route.view === "table" ? "表级简图" : "作业详图"}</span><span className="tag tag-info">{graph.nodes.length} 节点 / {graph.edges.length} 关系</span></div>
+          <div className="lineage-card-head"><span>{sourceLabel}：{root?.name} · {t(route.view === "table" ? "filters.tableView" : "filters.detailView")}</span><span className="tag tag-info">{t("graph.nodesAndEdges", { nodes: graph.nodes.length, edges: graph.edges.length })}</span></div>
           <LineageCanvas graph={graph} selectedNodeId={selectedNodeId} focusRequest={focusRequest} onFocusRequestHandled={onFocusRequestHandled} onSelect={onSelectedNodeChange} />
         </section>
         <aside className="lineage-detail">
-          <div className="lineage-card-head"><span>节点详情</span><span className="tag tag-neutral">{selected?.kind}</span></div>
+          <div className="lineage-card-head"><span>{t("graph.nodeDetails")}</span><span className="tag tag-neutral">{selected?.kind === "table" ? t("graph.tableKind") : selected?.kind === "task" ? t("graph.taskKind") : selected?.kind}</span></div>
           {selected ? <div className="lineage-detail-content">
             <h2>{selected.name}</h2>
             <p>{selected.displayName}</p>
             <dl>
-              <dt>稳定 ID</dt><dd className="mono">{selected.id}</dd>
-              <dt>命名空间</dt><dd>{selected.namespace}</dd>
-              <dt>直接上游</dt><dd>{upstreamCount}</dd>
-              <dt>直接下游</dt><dd>{downstreamCount}</dd>
-              <dt>DWF 截止</dt><dd>{selected.attributes?.["dwfBoundary"] || ["dwf", "dws_dwf"].includes(selected.namespace) ? "是" : "否"}</dd>
-              <dt>快照时间</dt><dd>{graph.snapshot.generatedAt}</dd>
+              <dt>{t("graph.stableId")}</dt><dd className="mono">{selected.id}</dd>
+              <dt>{t("graph.namespace")}</dt><dd>{selected.namespace}</dd>
+              <dt>{t("graph.upstream")}</dt><dd>{upstreamCount}</dd>
+              <dt>{t("graph.downstream")}</dt><dd>{downstreamCount}</dd>
+              <dt>{t("graph.dwfBoundary")}</dt><dd>{selected.attributes?.["dwfBoundary"] || ["dwf", "dws_dwf"].includes(selected.namespace) ? t("graph.yes") : t("graph.no")}</dd>
+              <dt>{t("graph.snapshotTime")}</dt><dd>{graph.snapshot.generatedAt}</dd>
             </dl>
-            <h3>关系证据</h3>
-            <div className="lineage-evidence-list">{related.map((edge) => <div className="lineage-evidence" key={edge.id}><b>{edge.kind}</b><span>{edge.evidence.type} · {edge.confidence}</span>{edge.viaJobs?.length ? <span>经过作业：{edge.viaJobs.join("、")}</span> : null}<small>{edge.evidence.description}</small></div>)}</div>
+            <h3>{t("graph.relationshipEvidence")}</h3>
+            <div className="lineage-evidence-list">{related.map((edge) => <div className="lineage-evidence" key={edge.id}><b>{edge.kind}</b><span>{edge.evidence.type} · {edge.confidence}</span>{edge.viaJobs?.length ? <span>{t("graph.throughJobs", { jobs: edge.viaJobs.join(", ") })}</span> : null}<small>{edge.evidence.description}</small></div>)}</div>
           </div> : null}
         </aside>
       </div>

@@ -40,7 +40,7 @@ test("API asset editor reuses the binary status toggle for create and edit", asy
   );
   assert.match(
     indicatorEditor,
-    /<BinaryStatusToggle\s+mode="status"\s+value=\{form\.status\}/,
+    /<BinaryStatusToggle\s+mode="status"[\s\S]*?value=\{form\.status\}/,
   );
 });
 
@@ -65,9 +65,9 @@ test("related asset pickers expose stable search accessible names", async () => 
     "utf8",
   );
 
-  assert.match(assetReferenceSelector, /aria-label=\{`搜索\$\{title\}`\}/);
-  assert.match(assetReferenceSelector, /<Picker title="关联表"/);
-  assert.match(assetReferenceSelector, /<Picker title="关联指标"/);
+  assert.match(assetReferenceSelector, /aria-label=\{t\("references\.search", \{ title \}\)\}/);
+  assert.match(assetReferenceSelector, /<Picker title=\{t\("references\.tables"\)\}/);
+  assert.match(assetReferenceSelector, /<Picker title=\{t\("references\.indicators"\)\}/);
   assert.match(
     assetReferenceSelector,
     /const locked = disabled \|\| readonly;/,

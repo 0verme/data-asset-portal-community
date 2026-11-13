@@ -7,6 +7,10 @@ export interface StatusFilterGroupProps {
       enabledCount: number;
       disabledCount: number;
       allValue: string | null;
+      title?: string | undefined;
+      allLabel?: string | undefined;
+      enabledLabel?: string | undefined;
+      disabledLabel?: string | undefined;
       enabledValue?: string | undefined;
       disabledValue?: string | undefined;
 }
@@ -20,13 +24,17 @@ export function StatusFilterGroup({
       allValue,
       enabledValue = "enabled",
       disabledValue = "disabled",
+      title = "状态",
+      allLabel = "全部状态",
+      enabledLabel = "启用",
+      disabledLabel = "禁用",
 }: StatusFilterGroupProps) {
       return (
             <SidebarFilterGroup
-                  title="状态"
+                  title={title}
                   allOption={{
                         key: "all",
-                        label: "全部状态",
+                        label: allLabel,
                         count: totalCount,
                         active: value === allValue,
                         onClick: () => onChange(allValue),
@@ -34,14 +42,14 @@ export function StatusFilterGroup({
                   items={[
                         {
                               key: "enabled",
-                              label: "启用",
+                              label: enabledLabel,
                               count: enabledCount,
                               active: value === enabledValue,
                               onClick: () => onChange(enabledValue),
                         },
                         {
                               key: "disabled",
-                              label: "禁用",
+                              label: disabledLabel,
                               count: disabledCount,
                               active: value === disabledValue,
                               onClick: () => onChange(disabledValue),

@@ -124,8 +124,8 @@ test("observes container/table resize and keeps the field mapping scroll control
 });
 
 test("freezes only the two source context columns and preserves long values behind ellipsis titles", () => {
-  assert.match(pageSource, /key: "srcSystem", label: "源系统", width: 260/);
-  assert.match(pageSource, /key: "srcTable", label: "源系统表", width: 240/);
+  assert.match(pageSource, /key: "srcSystem", label: "columns.sourceSystem", width: 260/);
+  assert.match(pageSource, /key: "srcTable", label: "columns.sourceTable", width: 240/);
   assert.match(pageSource, /<MappingCellText value=\{row\.targetTable\} className="mono" \/>/);
   assert.match(styles, /\.fm-table tbody td:nth-child\(-n\+2\)[\s\S]*?position: sticky/);
   assert.match(styles, /\.fm-cell-ellipsis[\s\S]*?text-overflow: ellipsis/);

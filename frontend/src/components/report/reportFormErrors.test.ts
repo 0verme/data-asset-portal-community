@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { i18n, i18nReady } from "../../i18n/index.ts";
 import { mapReportApiFieldErrors, validateReportForm } from "./reportFormErrors.ts";
 
 const validReport = {
@@ -15,6 +16,22 @@ const validReport = {
   effectiveDate: "",
   expireDate: "",
 };
+
+test("report validation and server conflicts use translated UI messages without changing field names", async () => {
+  await i18nReady;
+  const t = i18n.getFixedT("en-US", "report");
+  assert.deepEqual(validateReportForm({ ...validReport, code: "" }, t), {
+    code: "Report code is required",
+  });
+  const error = Object.assign(new Error("Report already exists"), {
+    status: 409,
+    payload: { error: { code: "REPORT_ALREADY_EXISTS", message: "Report already exists" } },
+  });
+  assert.deepEqual(mapReportApiFieldErrors(error, t), {
+    fieldErrors: { code: "This report code already exists. Change it and try again." },
+    hasUnmappedErrors: false,
+  });
+});
 
 test("report validation maps required errors to their field paths", () => {
   assert.deepEqual(validateReportForm({

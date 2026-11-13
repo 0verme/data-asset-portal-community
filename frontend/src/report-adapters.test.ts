@@ -19,8 +19,9 @@ test("report editor fields use frozen DAP adapters without raw controls", () => 
   assert.match(editor, /FormErrorSummary,[\s\S]*?FormField,[\s\S]*?Input,[\s\S]*?type FormFieldErrors,[\s\S]*?from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.match(editor, /import \{ validateReportForm \} from "\.\/reportFormErrors\.ts"/);
   assert.match(editor, /focusFirstFormError\(formRef\.current, errors, "auto"\)/);
-  assert.match(editor, /const nextErrors = validateReportForm\(form\);[\s\S]*?Object\.keys\(nextErrors\)\.length/);
-  assert.match(editor, /name="expireDate" label="失效日期（选填）" error=\{errors\["expireDate"\]\}/);
+  assert.match(editor, /title=\{t\("editor\.errorSummaryTitle"\)\}/);
+  assert.match(editor, /const nextErrors = validateReportForm\(form, t\);[\s\S]*?Object\.keys\(nextErrors\)\.length/);
+  assert.match(editor, /name="expireDate" label=\{t\("editor\.fields\.expireDate"\)\} error=\{errors\["expireDate"\]\}/);
   assert.match(editor, /onBeforeFocus=\{\(field\) => \{[\s\S]*?field === "effectiveDate" \|\| field === "expireDate"[\s\S]*?lifecycleDetailsRef\.current\.open = true/);
   assert.match(editor, /lifecycleDetailsRef\.current\.open = true/);
   assert.equal((editor.match(/<Input/g) ?? []).length, 10);
@@ -28,10 +29,10 @@ test("report editor fields use frozen DAP adapters without raw controls", () => 
   assert.equal((editor.match(/<Textarea/g) ?? []).length, 4);
   assert.equal((editor.match(/<Checkbox/g) ?? []).length, 1);
   assert.doesNotMatch(editor, /<input|<select|<textarea/);
-  assert.match(editor, /placeholder="请选择报表类型"/);
-  assert.match(editor, /placeholder="请选择归属部门"/);
-  assert.match(editor, /placeholder="请选择统计周期"/);
-  assert.match(editor, /label="维护人不同"/);
+  assert.match(editor, /placeholder=\{t\("editor\.placeholders\.type"\)\}/);
+  assert.match(editor, /placeholder=\{t\("editor\.placeholders\.ownerDept"\)\}/);
+  assert.match(editor, /placeholder=\{t\("editor\.placeholders\.statPeriod"\)\}/);
+  assert.match(editor, /label=\{t\("editor\.fields\.maintainerDifferent"\)\}/);
   assert.match(editor, /type="date"/);
   assert.doesNotMatch(editor, /from "@cloudflare\/kumo\//);
 });

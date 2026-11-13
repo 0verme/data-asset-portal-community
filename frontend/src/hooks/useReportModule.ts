@@ -22,6 +22,7 @@ import { DEFAULT_REPORT_ROUTE } from '../config/defaults.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
 import { clearFormFieldErrors } from '../ui/formErrors.ts';
 import { toast } from '../ui/index.ts';
+import { i18n } from '../i18n/index.ts';
 import { mapReportApiFieldErrors } from '../components/report/reportFormErrors.ts';
 import type { ReportFilter, ReportRoute } from '../routing/types.ts';
 import type { FormFieldErrors } from '../ui/formErrors.ts';
@@ -152,7 +153,7 @@ export function useReportModule({
       setReportLoaded(true);
     } catch (error: unknown) {
       if (sequence === listSequence.current && latestListKey.current === listKey) {
-        setReportError(getErrorMessage(error, '加载报表资产失败。'));
+        setReportError(getErrorMessage(error, i18n.t('messages.listLoadError', { ns: 'report' })));
       }
     } finally {
       if (sequence === listSequence.current && latestListKey.current === listKey) setReportLoading(false);
@@ -179,7 +180,7 @@ export function useReportModule({
       }
     }).catch((error: unknown) => {
       if (!cancelled && latestDetailKey.current === detailKey) {
-        setDetail({ key: detailKey, item: null, error: getErrorMessage(error, '报表详情加载失败。') });
+        setDetail({ key: detailKey, item: null, error: getErrorMessage(error, i18n.t('messages.detailLoadError', { ns: 'report' })) });
       }
     });
     return () => { cancelled = true; };
@@ -241,14 +242,14 @@ export function useReportModule({
         await createReport(payload);
       }
       await reloadRef.current();
-      toast.success(isEditing ? '报表已更新' : '报表已创建');
+      toast.success(i18n.t(isEditing ? 'toast.updated' : 'toast.created', { ns: 'report' }));
       setReportSaveFieldErrors({});
       setReportSaveFieldErrorFocusRequest(null);
       setReportRoute(DEFAULT_REPORT_ROUTE);
       scrollMainToTop();
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
-      const mappedErrors = mapReportApiFieldErrors(error);
+      const mappedErrors = mapReportApiFieldErrors(error, i18n.getFixedT(null, 'report'));
       const hasFieldErrors = Object.keys(mappedErrors.fieldErrors).length > 0;
       if (hasFieldErrors) {
         setReportSaveFieldErrors(mappedErrors.fieldErrors);
@@ -276,7 +277,7 @@ export function useReportModule({
       if (reportRoute.code === reportCode) {
         setReportRoute(DEFAULT_REPORT_ROUTE);
       }
-      toast.success('报表已删除');
+      toast.success(i18n.t('toast.deleted', { ns: 'report' }));
       scrollMainToTop();
     } catch (error: unknown) {
       if (!isUnauthorizedError(error)) toast.error(normalizeApiError(error).safeMessage);

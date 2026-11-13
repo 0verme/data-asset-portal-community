@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { UseApiAssetModuleResult } from "../../hooks/useApiAssetModule.ts";
 import type { ApiAssetFilter } from "../../routing/types.ts";
@@ -29,6 +30,7 @@ export function ApiAssetSidebar({
   requireLogin,
   canEdit = false,
 }: ApiAssetSidebarProps) {
+  const { t } = useTranslation("apiAsset");
   const group = (
     title: string,
     key: keyof ApiAssetFilter,
@@ -64,17 +66,17 @@ export function ApiAssetSidebar({
   return (
     <>
       {group(
-        "请求方式",
+        t("sidebar.methodTitle"),
         "method",
-        "全部请求方式",
+        t("sidebar.allMethods"),
         Object.entries(apiAsset.facets.method)
           .sort()
           .map(([value, count]) => ({ value, count, label: value })),
       )}
       {group(
-        "业务系统",
+        t("sidebar.systemTitle"),
         "downstreamSystemId",
-        "全部业务系统",
+        t("sidebar.allSystems"),
         apiAsset.systems
           .filter((system) => apiAsset.facets.downstreamSystemId[system.id])
           .map((system) => ({
@@ -92,6 +94,10 @@ export function ApiAssetSidebar({
         enabledCount={apiAsset.facets.status["enabled"] || 0}
         disabledCount={apiAsset.facets.status["disabled"] || 0}
         allValue={null}
+        title={t("sidebar.statusTitle")}
+        allLabel={t("sidebar.allStatuses")}
+        enabledLabel={t("status.enabled")}
+        disabledLabel={t("status.disabled")}
       />
       <SidebarActionGroup
         actions={
@@ -99,7 +105,7 @@ export function ApiAssetSidebar({
             ? [
                 {
                   key: "create-api",
-                  label: "新增 API",
+                  label: t("page.create"),
                   onClick: () => requireLogin(apiAsset.create),
                 },
               ]

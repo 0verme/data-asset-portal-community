@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
     getRootNeighborhoodNodeIds,
     type DomainLineageGraph,
@@ -32,6 +33,7 @@ export const LineageCanvas = React.forwardRef<
     LineageCanvasHandle,
     LineageCanvasProps
 >(function LineageCanvas({ graph, selectedNodeId, focusRequest, onFocusRequestHandled, onSelect }, ref) {
+    const { t } = useTranslation("lineage");
     const viewerRef = React.useRef<LineageViewerCanvasHandle | null>(null);
     const viewerGraph = React.useMemo(() => toViewerGraph(graph), [graph]);
     const rootNodeIds = React.useMemo(
@@ -85,14 +87,14 @@ export const LineageCanvas = React.forwardRef<
             <div
                 className="lineage-view-tools"
                 role="group"
-                aria-label="血缘图视图操作"
+                aria-label={t("canvas.tools")}
             >
                 <button
                     type="button"
                     className="lineage-view-tool"
                     onClick={() => viewerRef.current?.zoomBy(1 / 1.2)}
-                    aria-label="缩小"
-                    title="缩小"
+                    aria-label={t("canvas.zoomOut")}
+                    title={t("canvas.zoomOut")}
                 >
                     −
                 </button>
@@ -100,8 +102,8 @@ export const LineageCanvas = React.forwardRef<
                     type="button"
                     className="lineage-view-tool"
                     onClick={() => viewerRef.current?.zoomBy(1.2)}
-                    aria-label="放大"
-                    title="放大"
+                    aria-label={t("canvas.zoomIn")}
+                    title={t("canvas.zoomIn")}
                 >
                     +
                 </button>
@@ -114,25 +116,25 @@ export const LineageCanvas = React.forwardRef<
                             ROOT_NEIGHBORHOOD_FIT_OPTIONS,
                         )
                     }
-                    aria-label="定位根节点邻域"
-                    title="定位根节点邻域"
+                    aria-label={t("canvas.focusRoot")}
+                    title={t("canvas.focusRoot")}
                 >
-                    定位
+                    {t("canvas.focusRootButton")}
                 </button>
                 <button
                     type="button"
                     className="lineage-view-tool"
                     onClick={() => viewerRef.current?.fitView()}
-                    aria-label="适应全部"
-                    title="适应全部"
+                    aria-label={t("canvas.fitView")}
+                    title={t("canvas.fitView")}
                 >
-                    适应画布
+                    {t("canvas.fitViewButton")}
                 </button>
             </div>
             <LineageViewerCanvas
                 ref={viewerRef}
                 className="lineage-canvas"
-                aria-label="任务血缘图"
+                aria-label={t("canvas.diagram")}
                 data={viewerGraph}
                 options={viewerOptions}
                 initialFit={rootNodeIds}

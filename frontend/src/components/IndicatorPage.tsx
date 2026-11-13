@@ -1,3 +1,6 @@
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
+
 import type { IndicatorDimensionOption, MockIndicatorItem } from "../data/indicators.ts";
 import {
   findIndicatorDimensionOption,
@@ -10,6 +13,8 @@ import { ActionErrorBanner, CardGridView, EmptyState, GroupView, RowActions, Sta
 import type { ViewMode } from "./common/ViewModeSwitcher.tsx";
 import { Highlight, Icon, initial } from "./ui.tsx";
 import { Button } from "../ui/index.ts";
+
+type IndicatorT = TFunction<"indicator">;
 
 function isPresent(value: unknown): boolean {
   return value !== undefined && value !== null && String(value).trim() !== "";
@@ -38,6 +43,19 @@ function DimensionBadge({
   );
 }
 
+function IndicatorStatusBadge({ status }: { status: unknown }) {
+  const { t } = useTranslation("indicator");
+  return (
+    <StatusBadge
+      status={status}
+      metaMap={{
+        enabled: { label: t("status.enabled"), className: "st-on" },
+        disabled: { label: t("status.disabled"), className: "st-off" },
+      }}
+    />
+  );
+}
+
 interface DetailItemProps {
   label: string;
   value?: unknown;
@@ -62,7 +80,7 @@ interface AdditionalField {
   value: string;
 }
 
-function getAdditionalFields(indicator: MockIndicatorItem): AdditionalField[] {
+function getAdditionalFields(indicator: MockIndicatorItem, t: IndicatorT): AdditionalField[] {
   const knownKeys = new Set([
     "id",
     "name",
@@ -83,16 +101,16 @@ function getAdditionalFields(indicator: MockIndicatorItem): AdditionalField[] {
     "registeredAt",
   ]);
   const labelMap: Record<string, string> = {
-    englishName: "英文名",
-    enName: "英文名",
-    tags: "标签",
-    tag: "标签",
-    source: "来源",
-    sourceSystem: "来源系统",
-    remark: "备注",
-    remarks: "备注",
-    createdAt: "创建时间",
-    updatedAt: "更新时间",
+    englishName: t("detail.metaLabels.englishName"),
+    enName: t("detail.metaLabels.enName"),
+    tags: t("detail.metaLabels.tags"),
+    tag: t("detail.metaLabels.tag"),
+    source: t("detail.metaLabels.source"),
+    sourceSystem: t("detail.metaLabels.sourceSystem"),
+    remark: t("detail.metaLabels.remark"),
+    remarks: t("detail.metaLabels.remarks"),
+    createdAt: t("detail.metaLabels.createdAt"),
+    updatedAt: t("detail.metaLabels.updatedAt"),
   };
 
   return Object.entries(indicator)
@@ -116,8 +134,9 @@ export interface MetricDetailDrawerProps {
 }
 
 export function MetricDetailDrawer({ indicator, open, onClose, dimensionOptions }: MetricDetailDrawerProps) {
+  const { t } = useTranslation("indicator");
   if (!open || !indicator) return null;
-  const additionalFields = getAdditionalFields(indicator);
+  const additionalFields = getAdditionalFields(indicator, t);
 
   return (
     <div className="indicator-detail-shell" role="presentation" onMouseDown={onClose}>
@@ -132,57 +151,57 @@ export function MetricDetailDrawer({ indicator, open, onClose, dimensionOptions 
           <div>
             <div className="editor-title">
               <Icon name="eye" size={20} color="var(--ink-2)" />
-              <h2 id="indicator-detail-title">指标详情</h2>
+              <h2 id="indicator-detail-title">{t("detail.title")}</h2>
             </div>
-            <div className="editor-sub">查看该指标的完整登记信息</div>
+            <div className="editor-sub">{t("detail.subtitle")}</div>
           </div>
-          <Button className="btn" variant="secondary" type="button" onClick={onClose} aria-label="关闭指标详情">
-            <Icon name="close" size={14} />关闭
+          <Button className="btn" variant="secondary" type="button" onClick={onClose} aria-label={t("detail.close")}>
+            <Icon name="close" size={14} />{t("detail.closeButton")}
           </Button>
         </div>
 
         <div className="indicator-detail-body">
           <div className="form-card">
-            <h3><Icon name="hash" size={14} />基本信息</h3>
+            <h3><Icon name="hash" size={14} />{t("detail.basicInfo")}</h3>
             <div className="indicator-detail-grid">
-              <DetailItem label="指标 ID" value={indicator.id} type="mono" />
-              <DetailItem label="指标中文名" value={indicator.name} />
-              <DetailItem label="登记人" value={indicator.registrar} />
-              <DetailItem label="登记日期" value={formatDate(indicator.registeredAt)} type="mono" />
+              <DetailItem label={t("detail.id")} value={indicator.id} type="mono" />
+              <DetailItem label={t("detail.name")} value={indicator.name} />
+              <DetailItem label={t("detail.registrar")} value={indicator.registrar} />
+              <DetailItem label={t("detail.registeredAt")} value={formatDate(indicator.registeredAt)} type="mono" />
             </div>
           </div>
 
           <div className="form-card">
-            <h3><Icon name="layers" size={14} />维度与状态</h3>
+            <h3><Icon name="layers" size={14} />{t("detail.dimensionStatus")}</h3>
             <div className="indicator-detail-grid">
               <div className="indicator-detail-item">
-                <div className="indicator-detail-label">指标维度</div>
+                <div className="indicator-detail-label">{t("detail.dimension")}</div>
                 <div className="indicator-detail-value"><DimensionBadge dimension={indicator.dimension} dimensionOptions={dimensionOptions} /></div>
               </div>
               <div className="indicator-detail-item">
-                <div className="indicator-detail-label">状态</div>
-                <div className="indicator-detail-value"><StatusBadge status={indicator.status} /></div>
+                <div className="indicator-detail-label">{t("detail.status")}</div>
+                <div className="indicator-detail-value"><IndicatorStatusBadge status={indicator.status} /></div>
               </div>
-              <DetailItem label="语义生命周期" value={indicator.semanticState} />
+              <DetailItem label={t("detail.semanticState")} value={indicator.semanticState} />
             </div>
           </div>
 
           <div className="form-card">
-            <h3><Icon name="info" size={14} />口径信息</h3>
+            <h3><Icon name="info" size={14} />{t("detail.caliberInfo")}</h3>
             <div className="indicator-detail-grid">
-              <DetailItem label="指标含义" value={indicator.meaning} full fallback />
-              <DetailItem label="来源资产" value={indicator.sourceAssetName || indicator.sourceAssetQualifiedName} fallback />
-              <DetailItem label="结果表兼容快照" value={indicator.resultTableName} type="mono" fallback />
-              <DetailItem label="结果字段" value={indicator.resultFieldName} type="mono" fallback />
-              <DetailItem label="聚合方式" value={indicator.aggregation} type="mono" fallback />
-              <DetailItem label="指标口径" value={indicator.caliber} fallback />
-              <DetailItem label="指标路径" value={indicator.path} type="mono" full fallback />
+              <DetailItem label={t("detail.meaning")} value={indicator.meaning} full fallback />
+              <DetailItem label={t("detail.sourceAsset")} value={indicator.sourceAssetName || indicator.sourceAssetQualifiedName} fallback />
+              <DetailItem label={t("detail.resultTableSnapshot")} value={indicator.resultTableName} type="mono" fallback />
+              <DetailItem label={t("detail.resultField")} value={indicator.resultFieldName} type="mono" fallback />
+              <DetailItem label={t("detail.aggregation")} value={indicator.aggregation} type="mono" fallback />
+              <DetailItem label={t("detail.caliber")} value={indicator.caliber} fallback />
+              <DetailItem label={t("detail.path")} value={indicator.path} type="mono" full fallback />
             </div>
           </div>
 
           {additionalFields.length ? (
             <div className="form-card">
-              <h3><Icon name="book" size={14} />扩展信息</h3>
+              <h3><Icon name="book" size={14} />{t("detail.extendedInfo")}</h3>
               <div className="indicator-detail-grid">
                 {additionalFields.map((field) => (
                   <DetailItem
@@ -199,7 +218,7 @@ export function MetricDetailDrawer({ indicator, open, onClose, dimensionOptions 
 
         <div className="indicator-detail-foot">
           <Button className="btn" variant="secondary" type="button" onClick={onClose}>
-            <Icon name="close" size={14} />关闭
+            <Icon name="close" size={14} />{t("detail.closeButton")}
           </Button>
         </div>
       </aside>
@@ -216,18 +235,19 @@ function buildFilterChips(
   filter: IndicatorFilter,
   query: string,
   dimensionOptions: readonly IndicatorDimensionOption[],
+  t: IndicatorT,
 ): IndicatorFilterChip[] {
   const chips: IndicatorFilterChip[] = [];
   const dimensionMeta = findIndicatorDimensionOption(dimensionOptions, filter.dimension);
 
   if (filter.dimension && filter.dimension !== "all" && dimensionMeta) {
-    chips.push({ key: "dimension", label: `维度：${dimensionMeta.label}` });
+    chips.push({ key: "dimension", label: t("filters.dimension", { dimension: dimensionMeta.label }) });
   }
   if (filter.status && filter.status !== "all") {
-    chips.push({ key: "status", label: `状态：${filter.status === "enabled" ? "启用" : "禁用"}` });
+    chips.push({ key: "status", label: t("filters.status", { status: t(filter.status === "enabled" ? "status.enabled" : "status.disabled") }) });
   }
   if (query) {
-    chips.push({ key: "query", label: `搜索：${query}` });
+    chips.push({ key: "query", label: t("filters.query", { query }) });
   }
   return chips;
 }
@@ -243,13 +263,14 @@ interface IndicatorFilterBarProps {
 }
 
 function IndicatorFilterBar({ filter, query, dimensionOptions, onClearDimension, onClearStatus, onClearQuery, onReset }: IndicatorFilterBarProps) {
-  const chips = buildFilterChips(filter, query, dimensionOptions);
+  const { t } = useTranslation("indicator");
+  const chips = buildFilterChips(filter, query, dimensionOptions, t);
 
   if (!chips.length) return null;
 
   return (
     <div className="filter-bar">
-      <span className="fb-label">筛选</span>
+      <span className="fb-label">{t("filters.label")}</span>
       {chips.map((item) => (
         <span key={item.key} className="chip-active">
           {item.label}
@@ -267,7 +288,7 @@ function IndicatorFilterBar({ filter, query, dimensionOptions, onClearDimension,
           </button>
         </span>
       ))}
-      <button className="clear-all" type="button" onClick={onReset}>清除全部</button>
+      <button className="clear-all" type="button" onClick={onReset}>{t("filters.clearAll")}</button>
     </div>
   );
 }
@@ -284,22 +305,23 @@ interface IndicatorTableProps {
 }
 
 function IndicatorTable({ indicators, query, dimensionOptions, pendingIds = [], canEdit, onView, onEdit, onToggleStatus }: IndicatorTableProps) {
-  if (!indicators.length) return <EmptyState title="没有匹配的指标" desc="试着调整搜索词或筛选条件。" />;
+  const { t } = useTranslation("indicator");
+  if (!indicators.length) return <EmptyState title={t("table.emptyTitle")} desc={t("table.emptyDescription")} />;
 
   return (
     <div className="tbl-wrap indicator-tbl">
-      <WideTableScroll ariaLabel="指标列表" className="indicator-wide-scroll">
+      <WideTableScroll ariaLabel={t("table.ariaLabel")} className="indicator-wide-scroll">
         <table className="dt mobile-card-table indicator-wide-table">
         <thead>
           <tr>
-            <th style={{ width: 148 }}>指标 ID</th>
-            <th>指标中文名 / 含义</th>
-            <th style={{ width: 140 }}>维度</th>
-            <th style={{ width: 250 }}>指标口径 / 指标路径</th>
-            <th style={{ width: 96 }}>状态</th>
-            <th style={{ width: 96 }}>登记人</th>
-            <th style={{ width: 118 }}>登记日期</th>
-            <th style={{ width: 220, textAlign: "right" }}>操作</th>
+            <th style={{ width: 148 }}>{t("table.id")}</th>
+            <th>{t("table.nameMeaning")}</th>
+            <th style={{ width: 140 }}>{t("table.dimension")}</th>
+            <th style={{ width: 250 }}>{t("table.caliberPath")}</th>
+            <th style={{ width: 96 }}>{t("table.status")}</th>
+            <th style={{ width: 96 }}>{t("table.registrar")}</th>
+            <th style={{ width: 118 }}>{t("table.registeredAt")}</th>
+            <th style={{ width: 220, textAlign: "right" }}>{t("table.actions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -307,27 +329,27 @@ function IndicatorTable({ indicators, query, dimensionOptions, pendingIds = [], 
             const pending = pendingIds.includes(item.id);
             return (
               <tr key={item.id}>
-                <td data-label="">
+                <td data-label={t("table.id")}>
                   <div className="indicator-id-cell">
                     <Icon name="hash" size={14} color="var(--ink-3)" />
                     <span className="indicator-id mono"><Highlight text={item.id} q={query} /></span>
                   </div>
                 </td>
-                <td data-label="指标含义">
+                <td data-label={t("table.meaning")}>
                   <button className="indicator-summary-btn" type="button" onClick={() => onView(item.id)}>
                     <span className="indicator-name"><Highlight text={item.name} q={query} /></span>
                     <span className="indicator-meaning"><Highlight text={item.meaning} q={query} /></span>
                   </button>
                 </td>
-                <td data-label="维度"><DimensionBadge dimension={item.dimension} dimensionOptions={dimensionOptions} /></td>
-                <td data-label="口径 / 路径">
+                <td data-label={t("table.dimension")}><DimensionBadge dimension={item.dimension} dimensionOptions={dimensionOptions} /></td>
+                <td data-label={t("table.caliberPathMobile")}>
                   <div className="indicator-caliber"><Highlight text={displayValue(item.caliber)} q={query} /></div>
                   <div className="indicator-path mono"><Highlight text={displayValue(item.path)} q={query} /></div>
                 </td>
-                <td data-label="状态"><StatusBadge status={item.status} /></td>
-                <td data-label="登记人">{item.registrar}</td>
-                <td data-label="登记日期" className="mono indicator-date">{formatDate(item.registeredAt)}</td>
-                <td data-label="" className="mobile-card-actions" style={{ textAlign: "right" }}>
+                <td data-label={t("table.status")}><IndicatorStatusBadge status={item.status} /></td>
+                <td data-label={t("table.registrar")}>{item.registrar}</td>
+                <td data-label={t("table.registeredAt")} className="mono indicator-date">{formatDate(item.registeredAt)}</td>
+                <td data-label={t("table.actions")} className="mobile-card-actions" style={{ textAlign: "right" }}>
                   <RowActions
                     disabled={pending}
                     onView={() => onView(item.id)}
@@ -365,7 +387,7 @@ function IndicatorCardLayout({ indicators, query, dimensionOptions, onView }: In
       renderBadges={(item) => (
         <>
           <DimensionBadge dimension={item.dimension} dimensionOptions={dimensionOptions} />
-          <StatusBadge status={item.status} />
+          <IndicatorStatusBadge status={item.status} />
         </>
       )}
       renderTitle={(item) => <Highlight text={item.name} q={query} />}
@@ -392,6 +414,7 @@ interface IndicatorGroupLayoutProps {
 }
 
 function IndicatorGroupLayout({ indicators, query, dimensionOptions, onView }: IndicatorGroupLayoutProps) {
+  const { t } = useTranslation("indicator");
   return (
     <GroupView
       items={indicators}
@@ -402,7 +425,7 @@ function IndicatorGroupLayout({ indicators, query, dimensionOptions, onView }: I
       renderGroupLabel={(dimension) => (
         <DimensionBadge dimension={dimension} dimensionOptions={dimensionOptions} />
       )}
-      renderGroupCount={(count) => `${count} 个指标`}
+      renderGroupCount={(count) => t("table.groupCount", { count })}
       renderCardName={(item) => <Highlight text={item.id} q={query} />}
       renderCardBody={(item) => (
         <>
@@ -465,6 +488,7 @@ export function IndicatorPage({
   onClearQuery,
   onResetFilters,
 }: IndicatorPageProps) {
+  const { t } = useTranslation("indicator");
   const activeDimension = findIndicatorDimensionOption(dimensionOptions, filter.dimension);
   const hasActiveDimension = Boolean(activeDimension && activeDimension.value !== "all");
 
@@ -472,18 +496,18 @@ export function IndicatorPage({
     <div className="indicator-page">
       <div className="page-head">
         <div>
-          <div className="page-title"><span className="pt-code">指标</span>指标管理</div>
+          <div className="page-title"><span className="pt-code">{t("page.code")}</span>{t("page.title")}</div>
           <div className="page-sub">
-            共 <b>{total}</b> 个口径指标
-            {dimensionOptions.length ? <>，覆盖 <b>{dimensionOptions.length}</b> 个业务维度</> : null}
-            {hasActiveDimension && activeDimension ? <>，当前维度 <b>{activeDimension.label}</b></> : null}
-            {overallCount !== total ? <>，总量 <b>{overallCount}</b></> : null}
+            {t("page.summaryTotal", { count: total })}
+            {dimensionOptions.length ? t("page.coverage", { count: dimensionOptions.length }) : null}
+            {hasActiveDimension && activeDimension ? t("page.currentDimension", { dimension: activeDimension.label }) : null}
+            {overallCount !== total ? t("page.overallCount", { count: overallCount }) : null}
           </div>
         </div>
         <div className="head-actions">
           <ViewModeSwitcher value={view} onChange={onChangeView} />
           {canEdit ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}>
-            <Icon name="plus" size={15} />新增指标
+            <Icon name="plus" size={15} />{t("page.create")}
           </Button> : null}
         </div>
       </div>
@@ -512,7 +536,7 @@ export function IndicatorPage({
           onToggleStatus={onToggleStatus}
         />
       ) : !indicators.length ? (
-        <EmptyState title="没有匹配的指标" desc="试着调整搜索词或筛选条件。" />
+        <EmptyState title={t("table.emptyTitle")} desc={t("table.emptyDescription")} />
       ) : view === "card" ? (
         <IndicatorCardLayout
           indicators={indicators}

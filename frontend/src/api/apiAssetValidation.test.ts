@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { i18n, i18nReady } from '../i18n/index.ts';
 import type { ApiAssetFormValues } from './apiAssetValidation.ts';
 import {
   apiAssetFieldLabel,
@@ -47,6 +48,25 @@ function httpError(status: number, code: string, details?: unknown): Error & { s
     payload: { error: { code, message: 'English server message', details } },
   });
 }
+
+test('API asset validation messages follow the selected language without changing field keys or enum values', async () => {
+  await i18nReady;
+  const t = i18n.getFixedT('en-US', 'apiAsset');
+  const errors = validateApiAssetForm({ ...validForm, name: '', status: 'enabled' }, enabledSystems, t);
+  assert.deepEqual(Object.keys(errors), ['name']);
+  assert.equal(errors['name'], 'Enter an API name.');
+  const lengthErrors = validateApiAssetForm({ ...validForm, name: 'x'.repeat(257) }, enabledSystems, t);
+  assert.equal(lengthErrors['name'], 'API name must be no longer than 256 characters.');
+  assert.equal(apiAssetFieldLabel('params.0.name', t), 'request parameter row 1 Name');
+  const failure = normalizeApiAssetSaveFailure(
+    httpError(409, 'API_ASSET_ALREADY_EXISTS'),
+    validForm,
+    t,
+  );
+  assert.equal(failure.fieldErrors['code'], 'This API code already exists. Use another code.');
+  assert.equal(validForm.method, 'GET');
+  assert.equal(validForm.status, 'enabled');
+});
 
 test('client validation mirrors API asset required-field and row contracts', () => {
   const errors = validateApiAssetForm(

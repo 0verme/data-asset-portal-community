@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import { useTranslation } from "react-i18next";
 
 import { DEFAULT_INDICATOR_ROUTE } from "../../config/defaults.ts";
 import type { UseIndicatorModuleResult } from "../../hooks/useIndicatorModule.ts";
@@ -22,15 +23,16 @@ export function IndicatorSidebar({
   setIndicatorRoute,
   canEdit = false,
 }: IndicatorSidebarProps) {
+  const { t } = useTranslation("indicator");
   const { indicatorCount, indicatorFacets, indicatorDimensions, indicatorCreate } = indicator;
 
   return (
     <>
       <SidebarFilterGroup
-        title="指标维度"
+        title={t("sidebar.dimensionTitle")}
         allOption={{
           key: "all",
-          label: "全部指标",
+          label: t("sidebar.allIndicators"),
           count: indicatorCount,
           active: indicatorFilter.dimension === "all",
           onClick: () => {
@@ -66,6 +68,10 @@ export function IndicatorSidebar({
         totalCount={indicatorCount}
         enabledCount={indicatorFacets.status["enabled"] || 0}
         disabledCount={indicatorFacets.status["disabled"] || 0}
+        title={t("sidebar.statusTitle")}
+        allLabel={t("sidebar.allStatuses")}
+        enabledLabel={t("status.enabled")}
+        disabledLabel={t("status.disabled")}
         onChange={(status) => {
           setIndicatorFilter((prev) => ({ ...prev, status: status || "all" }));
           setIndicatorRoute(DEFAULT_INDICATOR_ROUTE);
@@ -78,7 +84,7 @@ export function IndicatorSidebar({
             ? [
                 {
                   key: "create-indicator",
-                  label: "新增指标",
+                  label: t("sidebar.create"),
                   onClick: indicatorCreate,
                 },
               ]

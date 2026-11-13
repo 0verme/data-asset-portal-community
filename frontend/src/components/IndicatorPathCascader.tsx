@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   findIndicatorPathNodes,
@@ -58,7 +59,7 @@ export interface IndicatorPathCascaderProps {
 export function IndicatorPathCascader({
   value = "",
   options = [],
-  placeholder = "请选择指标路径",
+  placeholder,
   disabled = false,
   invalid = false,
   "aria-invalid": ariaInvalid,
@@ -66,9 +67,12 @@ export function IndicatorPathCascader({
   "aria-labelledby": ariaLabelledBy,
   loading = false,
   error = "",
-  emptyText = "暂无可选路径",
+  emptyText,
   onChange,
 }: IndicatorPathCascaderProps) {
+  const { t } = useTranslation("indicator");
+  const placeholderText = placeholder ?? t("editor.path.placeholder");
+  const emptyTextValue = emptyText ?? t("editor.path.empty");
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const selectedValuePath = React.useMemo(
     () => findIndicatorPathValuePath(value, options),
@@ -157,7 +161,7 @@ export function IndicatorPathCascader({
         <span
           className={`indicator-path-trigger-text${displayValue ? "" : " placeholder"} mono`}
         >
-          {displayValue || placeholder}
+          {displayValue || placeholderText}
         </span>
         <span className="indicator-path-trigger-actions">
           {displayValue ? (
@@ -166,7 +170,7 @@ export function IndicatorPathCascader({
               onClick={handleClear}
               role="button"
               tabIndex={-1}
-              aria-label="清空指标路径"
+              aria-label={t("editor.path.clear")}
             >
               <Icon name="close" size={12} />
             </span>
@@ -178,7 +182,7 @@ export function IndicatorPathCascader({
       {open ? (
         <div className="indicator-path-panel">
           <div className="indicator-path-panel-head">
-            <span>请选择指标路径</span>
+            <span>{t("editor.path.placeholder")}</span>
             {selectedNodes.length ? (
               <span className="mono">
                 {formatIndicatorPath(selectedValuePath, options)}
@@ -187,21 +191,21 @@ export function IndicatorPathCascader({
           </div>
           {loading ? (
             <div className="indicator-path-panel-empty">
-              正在加载路径配置...
+              {t("editor.path.loading")}
             </div>
           ) : null}
           {!loading && error ? (
             <div className="indicator-path-panel-empty error">{error}</div>
           ) : null}
           {!loading && !error && !hasOptions ? (
-            <div className="indicator-path-panel-empty">{emptyText}</div>
+            <div className="indicator-path-panel-empty">{emptyTextValue}</div>
           ) : null}
           {!loading && !error && hasOptions ? (
             <div className="indicator-path-columns">
               {columns.map((columnOptions, level) => (
                 <div key={level} className="indicator-path-column">
                   <div className="indicator-path-column-title">
-                    第 {level + 1} 级
+                    {t("editor.path.level", { level: level + 1 })}
                   </div>
                   <div className="indicator-path-option-list">
                     {columnOptions.map((option) => {

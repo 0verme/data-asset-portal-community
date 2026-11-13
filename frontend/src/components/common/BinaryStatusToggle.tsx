@@ -9,6 +9,7 @@ export interface BinaryStatusToggleProps {
   mode?: "status" | "enabled" | undefined;
   value?: unknown;
   options?: readonly BinaryStatusOption[] | undefined;
+  labels?: Partial<Record<BinaryStatusValue, string>> | undefined;
   className?: string | undefined;
   disabled?: boolean | undefined;
   name?: string | undefined;
@@ -20,13 +21,17 @@ export function BinaryStatusToggle({
   mode = "status",
   value,
   options,
+  labels,
   className = "",
   disabled = false,
   name,
   ariaLabel = "状态选择",
   onChange,
 }: BinaryStatusToggleProps) {
-  const items = normalizeBinaryStatusOptions(options);
+  const items = normalizeBinaryStatusOptions(options).map((item) => ({
+    ...item,
+    name: labels?.[item.value] || item.name,
+  }));
   const currentValue = getBinaryStatusValue(value);
   const wrapperClassName = ["seg", className].filter(Boolean).join(" ");
 

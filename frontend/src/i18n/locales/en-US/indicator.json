@@ -1,0 +1,197 @@
+{
+  "moduleTitle": "Indicator Management",
+  "page": {
+    "code": "METRIC",
+    "title": "Indicators",
+    "summaryTotal": "Total: {{count}} metrics",
+    "coverage": ", across {{count}} business dimensions",
+    "currentDimension": ", current dimension: {{dimension}}",
+    "overallCount": ", overall total: {{count}}",
+    "create": "Add indicator"
+  },
+  "status": {
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "messages": {
+    "listLoadError": "Could not load indicator data.",
+    "detailLoadError": "Could not load indicator details.",
+    "saveError": "Could not save indicator.",
+    "deleteError": "Could not delete indicator.",
+    "statusUpdateError": "Could not update indicator status."
+  },
+  "filters": {
+    "label": "Filters",
+    "dimension": "Dimension: {{dimension}}",
+    "status": "Status: {{status}}",
+    "statusEnabled": "Enabled",
+    "statusDisabled": "Disabled",
+    "query": "Search: {{query}}",
+    "clearAll": "Clear all"
+  },
+  "table": {
+    "emptyTitle": "No matching indicators",
+    "emptyDescription": "Try changing the search or filter criteria.",
+    "ariaLabel": "Indicator list",
+    "id": "Indicator ID",
+    "nameMeaning": "Indicator name / meaning",
+    "dimension": "Dimension",
+    "caliberPath": "Definition / path",
+    "status": "Status",
+    "registrar": "Registered by",
+    "registeredAt": "Registration date",
+    "actions": "Actions",
+    "meaning": "Indicator meaning",
+    "caliberPathMobile": "Definition / path",
+    "groupCount": "{{count}} indicators"
+  },
+  "detail": {
+    "title": "Indicator details",
+    "subtitle": "View the complete registration record for this indicator.",
+    "close": "Close indicator details",
+    "closeButton": "Close",
+    "basicInfo": "Basic information",
+    "dimensionStatus": "Dimension and status",
+    "caliberInfo": "Definition",
+    "extendedInfo": "Additional information",
+    "id": "Indicator ID",
+    "name": "Indicator name",
+    "registrar": "Registered by",
+    "registeredAt": "Registration date",
+    "dimension": "Indicator dimension",
+    "status": "Status",
+    "semanticState": "Semantic lifecycle",
+    "meaning": "Indicator meaning",
+    "sourceAsset": "Source asset",
+    "resultTableSnapshot": "Result-table compatibility snapshot",
+    "resultField": "Result field",
+    "aggregation": "Aggregation",
+    "caliber": "Definition",
+    "path": "Indicator path",
+    "metaLabels": {
+      "englishName": "English name",
+      "enName": "English name",
+      "tags": "Tags",
+      "tag": "Tag",
+      "source": "Source",
+      "sourceSystem": "Source system",
+      "remark": "Remark",
+      "remarks": "Remarks",
+      "createdAt": "Created at",
+      "updatedAt": "Updated at"
+    }
+  },
+  "editor": {
+    "backLevel": "Back",
+    "backList": "Back to indicators",
+    "edit": "Edit indicator",
+    "create": "Add indicator",
+    "newSubtitle": "Register a metric and add it to centralized indicator management.",
+    "errorSummaryTitle": "Check these fields",
+    "saveError": "Could not save",
+    "formField": "Form field",
+    "basicInfo": "Basic information",
+    "caliberInfo": "Definition",
+    "fields": {
+      "id": "Indicator ID",
+      "name": "Indicator name",
+      "registrar": "Registered by",
+      "registeredAt": "Registration date",
+      "status": "Status",
+      "meaning": "Indicator meaning",
+      "sourceAsset": "Source asset (stable reference)",
+      "resultField": "Result field (stable reference)",
+      "resultTableSnapshot": "Result-table compatibility snapshot",
+      "resultFieldSnapshot": "Result-field compatibility snapshot",
+      "aggregation": "Aggregation",
+      "semanticState": "Semantic lifecycle",
+      "caliber": "Definition",
+      "path": "Indicator path"
+    },
+    "placeholders": {
+      "id": "Enter an indicator ID",
+      "name": "Enter an indicator name",
+      "registrar": "Enter the registrar's name",
+      "registeredAt": "YYYY-MM-DD",
+      "meaning": "Describe the business meaning, calculation logic, and intended use of this indicator.",
+      "resultTable": "e.g. dws.ads_indicator_result_di",
+      "resultField": "e.g. first_loan_flag",
+      "caliber": "Describe the metric definition",
+      "aggregation": "Unspecified (for legacy indicators)"
+    },
+    "asset": {
+      "unbound": "No stable asset linked (keep compatibility snapshot)",
+      "currentFallback": "Current source asset",
+      "unnamed": "Unnamed asset",
+      "loadError": "Could not load source assets.",
+      "retry": "Retry asset loading",
+      "unavailable": "The current data source does not provide stable asset IDs; compatibility text entry is available."
+    },
+    "field": {
+      "unbound": "No stable field linked (keep compatibility snapshot)",
+      "currentFallback": "Current result field",
+      "unnamed": "Unnamed field",
+      "loadError": "Could not load source asset fields.",
+      "retry": "Retry field loading"
+    },
+    "path": {
+      "placeholder": "Select an indicator path",
+      "empty": "No paths available",
+      "clear": "Clear indicator path",
+      "loading": "Loading path configuration…",
+      "level": "Level {{level}}",
+      "loadError": "Could not load indicator path configuration.",
+      "retry": "Retry path loading",
+      "unmatched": "The original path text is preserved because it does not match the configured hierarchy. You can save it as-is or select a standard path."
+    },
+    "semanticStates": {
+      "candidate": "Candidate",
+      "certified": "Certified",
+      "deprecated": "Deprecated"
+    },
+    "saveNoteEdit": "Saving updates the indicator definition, status, and registration details.",
+    "saveNoteCreate": "Saving adds the indicator to the management list, where it can be enabled or disabled.",
+    "saveEdit": "Save changes",
+    "saveCreate": "Create indicator",
+    "deleteDescription": "Deleting an indicator cannot be undone; historical references remain. If it is temporarily unused, consider disabling it instead.",
+    "delete": "Delete indicator",
+    "missingTitle": "Indicator not found"
+  },
+  "view": {
+    "loadingDetail": "Loading indicator details",
+    "loadingList": "Loading indicator list",
+    "loadingDescription": "Preparing indicator information.",
+    "loadError": "Could not load indicator data",
+    "permissionTitle": "Indicator maintenance permission required",
+    "permissionDescription": "The indicator catalog is publicly viewable. Write access is required to add or edit indicators.",
+    "missingTitle": "Indicator not found",
+    "sort": "Sort",
+    "sortLabel": "Sort indicators",
+    "sortIdAsc": "ID ascending",
+    "sortIdDesc": "ID descending",
+    "sortNameAsc": "Name ascending",
+    "sortNameDesc": "Name descending",
+    "pagination": "Indicator pagination"
+  },
+  "sidebar": {
+    "dimensionTitle": "Indicator dimensions",
+    "allIndicators": "All indicators",
+    "statusTitle": "Status",
+    "allStatuses": "All statuses",
+    "create": "Add indicator"
+  },
+  "validation": {
+    "idRequired": "Indicator ID is required",
+    "nameRequired": "Indicator name is required",
+    "registrarRequired": "Registrar is required",
+    "registeredAtFormat": "Registration date must use yyyy-mm-dd",
+    "pathRequired": "Indicator path is required"
+  },
+  "deleteConfirm": {
+    "typeLabel": "Indicator",
+    "impact": "Deleting this indicator may affect its definition, source and result fields, report references, lineage, and audit records. If it is referenced, disable it instead of deleting it.",
+    "serverCheck": "The server validates references before deletion; this action does not bypass those checks.",
+    "serverReason": "If the server rejects deletion, its reason will be shown here.",
+    "keywordLabel": "Enter the indicator ID to confirm"
+  }
+}

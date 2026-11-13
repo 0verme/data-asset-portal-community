@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 import { getAssetTables, getDomains, type AssetTableItem } from "../../api/assets.ts";
 import { getIndicatorList } from "../../api/indicator.ts";
@@ -24,17 +25,28 @@ import {
 import { validateReportForm } from "./reportFormErrors.ts";
 
 const REPORT_FORM_ID = "report-editor-form";
-const REPORT_FIELD_LABELS: Readonly<Record<string, string>> = {
-  code: "报表编码",
-  name: "报表名称",
-  type: "报表类型",
-  domain: "主题域",
-  ownerDept: "归属部门",
-  ownerName: "负责人",
-  statPeriod: "统计周期",
-  statCaliber: "统计口径",
-  effectiveDate: "生效日期",
-  expireDate: "失效日期",
+type ReportFieldLabelKey =
+  | "editor.fields.code"
+  | "editor.fields.name"
+  | "editor.fields.type"
+  | "editor.fields.domain"
+  | "editor.fields.ownerDept"
+  | "editor.fields.ownerName"
+  | "editor.fields.statPeriod"
+  | "editor.fields.statCaliber"
+  | "editor.fields.effectiveDate"
+  | "editor.fields.expireDate";
+const REPORT_FIELD_LABEL_KEYS: Readonly<Record<string, ReportFieldLabelKey>> = {
+  code: "editor.fields.code",
+  name: "editor.fields.name",
+  type: "editor.fields.type",
+  domain: "editor.fields.domain",
+  ownerDept: "editor.fields.ownerDept",
+  ownerName: "editor.fields.ownerName",
+  statPeriod: "editor.fields.statPeriod",
+  statCaliber: "editor.fields.statCaliber",
+  effectiveDate: "editor.fields.effectiveDate",
+  expireDate: "editor.fields.expireDate",
 };
 
 interface ReportFormData {
@@ -208,6 +220,9 @@ export function ReportEditor({
   serverFieldErrorFocusRequest = null,
   onClearServerFieldError,
 }: ReportEditorProps) {
+  const { t } = useTranslation("report");
+  const tRef = React.useRef(t);
+  tRef.current = t;
   const isEdit = mode === "edit";
   const isRemoteMode = import.meta.env?.['VITE_API_MODE'] === "remote";
   const [form, setForm] = React.useState<ReportFormData>(() => createFormState(initial));
@@ -277,7 +292,7 @@ export function ReportEditor({
       ].filter((item): item is string => Boolean(item && item.trim()));
       setPeople([...new Set(peopleValues)].sort((a, b) => a.localeCompare(b, "zh-CN")));
     }).catch((error: unknown) => {
-      if (!cancelled) setRefError(getErrorMessage(error, "关联资产加载失败。"));
+      if (!cancelled) setRefError(getErrorMessage(error, tRef.current("editor.messages.referenceLoadError")));
     }).finally(() => {
       if (!cancelled) setRefLoading(false);
     });
@@ -290,7 +305,7 @@ export function ReportEditor({
       }).catch((error: unknown) => {
         if (!cancelled) {
           setRemoteReportOptions(undefined);
-          setReportOptionsError(getErrorMessage(error, "请检查权限、网络或服务后重试。"));
+          setReportOptionsError(getErrorMessage(error, tRef.current("editor.messages.reportOptionsRetryError")));
         }
       }).finally(() => {
         if (!cancelled) setReportOptionsLoading(false);
@@ -305,8 +320,8 @@ export function ReportEditor({
   }, [isRemoteMode, referenceRetryRevision]);
 
   const errors: FormFieldErrors = React.useMemo(
-    () => mergeFormFieldErrors(serverFieldErrors, touched ? validateReportForm(form) : {}),
-    [form, serverFieldErrors, touched],
+    () => mergeFormFieldErrors(serverFieldErrors, touched ? validateReportForm(form, t) : {}),
+    [form, serverFieldErrors, t, touched],
   );
   const hasLifecycleErrors = Boolean(errors["effectiveDate"] || errors["expireDate"]);
 
@@ -389,7 +404,7 @@ export function ReportEditor({
   };
 
   const submit = () => {
-    const nextErrors = validateReportForm(form);
+    const nextErrors = validateReportForm(form, t);
     setTouched(true);
     if (saveBusy) return;
     if (Object.keys(nextErrors).length) {
@@ -436,18 +451,19 @@ export function ReportEditor({
     <div id={REPORT_FORM_ID} ref={formRef}>
       <PageHeader
         breadcrumbs={[
-          { label: "报表资产", onClick: onCancel },
-          { label: isEdit ? "编辑报表" : "新增报表" },
+          { label: t("moduleTitle"), onClick: onCancel },
+          { label: isEdit ? t("editor.edit") : t("editor.create") },
         ]}
         icon={isEdit ? "edit" : "plus"}
-        title={isEdit ? "编辑报表" : "新增报表"}
-        subtitle={isEdit ? form.code : "登记新的报表台账并维护归属信息和关联引用。"}
+        title={isEdit ? t("editor.edit") : t("editor.create")}
+        subtitle={isEdit ? form.code : t("editor.newSubtitle")}
       />
 
       <FormErrorSummary
         formId={REPORT_FORM_ID}
         errors={errors}
-        getFieldLabel={(field) => REPORT_FIELD_LABELS[field] || "表单字段"}
+        title={t("editor.errorSummaryTitle")}
+        getFieldLabel={(field) => REPORT_FIELD_LABEL_KEYS[field] ? t(REPORT_FIELD_LABEL_KEYS[field]) : t("editor.formField")}
         onBeforeFocus={(field) => {
           if (field === "effectiveDate" || field === "expireDate") {
             if (lifecycleDetailsRef.current) lifecycleDetailsRef.current.open = true;
@@ -456,141 +472,141 @@ export function ReportEditor({
       />
       {reportOptionsError ? (
         <div className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
-          报表候选加载失败；当前不会使用本地演示候选。{` ${reportOptionsError} `}
+          {t("editor.messages.reportOptionsError", { error: reportOptionsError })}
           <button className="btn" type="button" onClick={() => setReferenceRetryRevision((revision) => revision + 1)}>
-            重试加载报表候选
+            {t("editor.messages.retryReportOptions")}
           </button>
         </div>
       ) : null}
-      {reportOptionsLoading ? <div className="match-hint" role="status">正在加载服务端报表候选…</div> : null}
+      {reportOptionsLoading ? <div className="match-hint" role="status">{t("editor.messages.reportOptionsLoading")}</div> : null}
 
       <div className="form-card">
-        <h3><Icon name="hash" size={14} />基本信息</h3>
+        <h3><Icon name="hash" size={14} />{t("editor.basicInfo")}</h3>
         <div className="form-grid">
-          <FormField className="fl" formId={REPORT_FORM_ID} name="code" label="报表编码" error={errors["code"]}>
-            <Input aria-label="报表编码" className={`inp mono${errors["code"] ? " invalid" : ""}`} value={form.code} onChange={(event) => setValue("code", event.target.value)} placeholder="例如：RPT_PAY_DAILY" />
+          <FormField className="fl" formId={REPORT_FORM_ID} name="code" label={t("editor.fields.code")} error={errors["code"]}>
+            <Input aria-label={t("editor.fields.code")} className={`inp mono${errors["code"] ? " invalid" : ""}`} value={form.code} onChange={(event) => setValue("code", event.target.value)} placeholder={t("editor.placeholders.code")} />
           </FormField>
-          <FormField className="fl" formId={REPORT_FORM_ID} name="name" label="报表名称" error={errors["name"]}>
-            <Input aria-label="报表名称" className={`inp${errors["name"] ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：支付交易日报" />
+          <FormField className="fl" formId={REPORT_FORM_ID} name="name" label={t("editor.fields.name")} error={errors["name"]}>
+            <Input aria-label={t("editor.fields.name")} className={`inp${errors["name"] ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder={t("editor.placeholders.name")} />
           </FormField>
           <div className="fl">
-            <label>报表别名</label>
-            <Input aria-label="报表别名" className="inp" value={form.alias} onChange={(event) => setValue("alias", event.target.value)} placeholder="例如：支付日结报表" />
+            <label>{t("editor.fields.alias")}</label>
+            <Input aria-label={t("editor.fields.alias")} className="inp" value={form.alias} onChange={(event) => setValue("alias", event.target.value)} placeholder={t("editor.placeholders.alias")} />
           </div>
-          <FormField className="fl" formId={REPORT_FORM_ID} name="type" label="报表类型" error={errors["type"]}>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="type" label={t("editor.fields.type")} error={errors["type"]}>
             <>
               <Select<string>
-                aria-label="报表类型"
+                aria-label={t("editor.fields.type")}
                 aria-invalid={Boolean(errors["type"])}
                 className={`sel${errors["type"] ? " invalid" : ""}`}
-                placeholder="请选择报表类型"
-                items={[{ label: "请选择报表类型", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(reportTypeOptions), form.type).map((item) => ({ label: item.name, value: item.value }))]}
+                placeholder={t("editor.placeholders.type")}
+                items={[{ label: t("editor.placeholders.type"), value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(reportTypeOptions), form.type).map((item) => ({ label: item.name, value: item.value }))]}
                 value={form.type || ""}
                 onValueChange={(value) => setValue("type", value || "")}
               />
               {isRemoteMode && !reportOptionsLoading && !reportOptionsError && reportTypeOptions.length === 0 ? (
-                <div className="match-hint" role="status">服务端尚未配置报表类型，请先维护 REPORT_TYPE 参数字典。</div>
+                <div className="match-hint" role="status">{t("editor.messages.typeNotConfigured")}</div>
               ) : null}
             </>
           </FormField>
           <div className="fl">
-            <label>状态</label>
-            <BinaryStatusToggle mode="status" value={form.status} onChange={(value) => setValue("status", normalizeStatus(value))} />
+            <label>{t("editor.fields.status")}</label>
+            <BinaryStatusToggle mode="status" ariaLabel={t("editor.fields.status")} labels={{ enabled: t("status.enabled"), disabled: t("status.disabled") }} value={form.status} onChange={(value) => setValue("status", normalizeStatus(value))} />
           </div>
         </div>
       </div>
 
       <div className="form-card">
-        <h3><Icon name="user" size={14} />业务归属</h3>
+        <h3><Icon name="user" size={14} />{t("editor.ownership")}</h3>
         <div className="form-grid">
-          <FormField className="fl" formId={REPORT_FORM_ID} name="domain" label="主题域" error={errors["domain"]}>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="domain" label={t("editor.fields.domain")} error={errors["domain"]}>
             <Select<string>
-              aria-label="主题域"
+              aria-label={t("editor.fields.domain")}
               className={`sel${errors["domain"] ? " invalid" : ""}`}
-              placeholder="请选择主题域"
-              items={[{ label: "请选择主题域", value: "" }, ...[...new Set([...domains, ...(form.domain ? [form.domain] : [])])].map((name) => ({ label: name, value: name }))]}
+              placeholder={t("editor.placeholders.domain")}
+              items={[{ label: t("editor.placeholders.domain"), value: "" }, ...[...new Set([...domains, ...(form.domain ? [form.domain] : [])])].map((name) => ({ label: name, value: name }))]}
               value={form.domain || ""}
               onValueChange={(value) => setValue("domain", value || "")}
             />
           </FormField>
-          <FormField className="fl" formId={REPORT_FORM_ID} name="ownerDept" label="归属部门" error={errors["ownerDept"]}>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="ownerDept" label={t("editor.fields.ownerDept")} error={errors["ownerDept"]}>
             <>
               <Select<string>
-                aria-label="归属部门"
+                aria-label={t("editor.fields.ownerDept")}
                 aria-invalid={Boolean(errors["ownerDept"])}
                 className={`sel${errors["ownerDept"] ? " invalid" : ""}`}
-                placeholder="请选择归属部门"
-                items={[{ label: "请选择归属部门", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(departmentOptions), form.ownerDept).map((item) => ({ label: item.name, value: item.value }))]}
+                placeholder={t("editor.placeholders.ownerDept")}
+                items={[{ label: t("editor.placeholders.ownerDept"), value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(departmentOptions), form.ownerDept).map((item) => ({ label: item.name, value: item.value }))]}
                 value={form.ownerDept || ""}
                 onValueChange={(value) => setValue("ownerDept", value || "")}
               />
               {isRemoteMode && !reportOptionsLoading && !reportOptionsError && departmentOptions.length === 0 ? (
-                <div className="match-hint" role="status">服务端尚未配置归属部门，请先维护 UPSTREAM_DEPT 参数字典。</div>
+                <div className="match-hint" role="status">{t("editor.messages.departmentNotConfigured")}</div>
               ) : null}
             </>
           </FormField>
-          <FormField className="fl" formId={REPORT_FORM_ID} name="ownerName" label="负责人" error={errors["ownerName"]}>
-            <Input aria-label="负责人" className={`inp${errors["ownerName"] ? " invalid" : ""}`} list="report-person-options" value={form.ownerName} onChange={(event) => setValues({ ownerName: event.target.value, ...(form.maintainerSameAsOwner ? { maintainerName: event.target.value } : {}) })} placeholder="搜索已有负责人" />
+          <FormField className="fl" formId={REPORT_FORM_ID} name="ownerName" label={t("editor.fields.ownerName")} error={errors["ownerName"]}>
+            <Input aria-label={t("editor.fields.ownerName")} className={`inp${errors["ownerName"] ? " invalid" : ""}`} list="report-person-options" value={form.ownerName} onChange={(event) => setValues({ ownerName: event.target.value, ...(form.maintainerSameAsOwner ? { maintainerName: event.target.value } : {}) })} placeholder={t("editor.placeholders.ownerName")} />
           </FormField>
           <div className="fl">
             <Checkbox
-              label="维护人不同"
+              label={t("editor.fields.maintainerDifferent")}
               checked={!form.maintainerSameAsOwner}
               onCheckedChange={(checked) => setValues({ maintainerSameAsOwner: !checked, maintainerName: checked ? form.maintainerName : form.ownerName })}
             />
-            {!form.maintainerSameAsOwner ? <Input aria-label="维护人" className="inp" list="report-person-options" value={form.maintainerName} onChange={(event) => setValue("maintainerName", event.target.value)} placeholder="搜索已有维护人" /> : <div className="match-hint">维护人同负责人</div>}
+            {!form.maintainerSameAsOwner ? <Input aria-label={t("editor.fields.maintainer")} className="inp" list="report-person-options" value={form.maintainerName} onChange={(event) => setValue("maintainerName", event.target.value)} placeholder={t("editor.placeholders.maintainer")} /> : <div className="match-hint">{t("editor.messages.maintainerSameAsOwner")}</div>}
           </div>
         </div>
       </div>
 
       <div className="form-card">
-        <h3><Icon name="book" size={14} />统计口径</h3>
+        <h3><Icon name="book" size={14} />{t("editor.caliber")}</h3>
         <div className="form-grid">
           <div className="fl">
-            <label>统计对象</label>
-            <Input aria-label="统计对象" className="inp" value={form.statObject} onChange={(event) => setValue("statObject", event.target.value)} placeholder="例如：全行支付交易" />
+            <label>{t("editor.fields.statObject")}</label>
+            <Input aria-label={t("editor.fields.statObject")} className="inp" value={form.statObject} onChange={(event) => setValue("statObject", event.target.value)} placeholder={t("editor.placeholders.statObject")} />
           </div>
-          <FormField className="fl" formId={REPORT_FORM_ID} name="statPeriod" label="统计周期" error={errors["statPeriod"]}>
+          <FormField className="fl" formId={REPORT_FORM_ID} name="statPeriod" label={t("editor.fields.statPeriod")} error={errors["statPeriod"]}>
             <>
               <Select<string>
-                aria-label="统计周期"
+                aria-label={t("editor.fields.statPeriod")}
                 aria-invalid={Boolean(errors["statPeriod"])}
                 className={`sel${errors["statPeriod"] ? " invalid" : ""}`}
-                placeholder="请选择统计周期"
-                items={[{ label: "请选择统计周期", value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(periodOptions), form.statPeriod).map((item) => ({ label: item.name, value: item.value }))]}
+                placeholder={t("editor.placeholders.statPeriod")}
+                items={[{ label: t("editor.placeholders.statPeriod"), value: "" }, ...getLegacyAwareOptions(normalizeDictOptions(periodOptions), form.statPeriod).map((item) => ({ label: item.name, value: item.value }))]}
                 value={form.statPeriod || ""}
                 onValueChange={(value) => setValue("statPeriod", value || "")}
               />
               {isRemoteMode && !reportOptionsLoading && !reportOptionsError && periodOptions.length === 0 ? (
-                <div className="match-hint" role="status">服务端尚未配置统计周期，请先维护 REPORT_STAT_PERIOD 参数字典。</div>
+                <div className="match-hint" role="status">{t("editor.messages.periodNotConfigured")}</div>
               ) : null}
             </>
           </FormField>
-          <FormField className="fl full" formId={REPORT_FORM_ID} name="statCaliber" label="统计口径" error={errors["statCaliber"]}>
+          <FormField className="fl full" formId={REPORT_FORM_ID} name="statCaliber" label={t("editor.fields.statCaliber")} error={errors["statCaliber"]}>
             <>
-              <DictInput value={form.statCaliber} onChange={(value) => setValue("statCaliber", value)} options={statCaliberOptions} listId="report-stat-caliber-options" invalid={Boolean(errors["statCaliber"])} aria-invalid={Boolean(errors["statCaliber"])} placeholder="请选择或输入统计口径" />
+              <DictInput value={form.statCaliber} onChange={(value) => setValue("statCaliber", value)} options={statCaliberOptions} listId="report-stat-caliber-options" invalid={Boolean(errors["statCaliber"])} aria-invalid={Boolean(errors["statCaliber"])} placeholder={t("editor.placeholders.statCaliber")} />
               {isRemoteMode && !reportOptionsLoading && !reportOptionsError && statCaliberOptions.length === 0 ? (
-                <div className="match-hint" role="status">服务端尚未配置统计口径候选；此字段仍可按实际业务规则输入。</div>
+                <div className="match-hint" role="status">{t("editor.messages.caliberNotConfigured")}</div>
               ) : null}
             </>
           </FormField>
           <details className="fl full">
-            <summary>更多设置（数据延迟、业务范围标签）</summary>
+            <summary>{t("editor.messages.optionalMore")}</summary>
             <div className="form-grid" style={{ marginTop: 12 }}>
-              <div className="fl"><label>数据延迟（选填）</label><DictInput value={form.dataDelay} onChange={(value) => setValue("dataDelay", value)} options={dataDelayOptions} listId="report-data-delay-options" placeholder="请选择或输入数据延迟" />{isRemoteMode && !reportOptionsLoading && !reportOptionsError && dataDelayOptions.length === 0 ? <div className="match-hint" role="status">服务端尚未配置数据时效候选；此字段可留空。</div> : null}</div>
-              <div className="fl full"><label>业务范围标签（选填）</label><Input aria-label="业务范围标签（选填）" className="inp" value={form.businessScopeTags} onChange={(event) => setValue("businessScopeTags", event.target.value)} placeholder="例如：微信、支付宝、银联渠道" /></div>
+              <div className="fl"><label>{t("editor.fields.dataDelay")}</label><DictInput value={form.dataDelay} onChange={(value) => setValue("dataDelay", value)} options={dataDelayOptions} listId="report-data-delay-options" placeholder={t("editor.placeholders.dataDelay")} />{isRemoteMode && !reportOptionsLoading && !reportOptionsError && dataDelayOptions.length === 0 ? <div className="match-hint" role="status">{t("editor.messages.dataDelayNotConfigured")}</div> : null}</div>
+              <div className="fl full"><label>{t("editor.fields.businessScopeTags")}</label><Input aria-label={t("editor.fields.businessScopeTags")} className="inp" value={form.businessScopeTags} onChange={(event) => setValue("businessScopeTags", event.target.value)} placeholder={t("editor.placeholders.businessScopeTags")} /></div>
             </div>
           </details>
         </div>
       </div>
 
       <div className="form-card">
-        <h3><Icon name="info" size={14} />补充信息</h3>
+        <h3><Icon name="info" size={14} />{t("editor.additional")}</h3>
         <div className="form-grid">
-          <div className="fl full"><label>报表说明</label><Textarea aria-label="报表说明" className="ta" value={form.purpose} onChange={(event) => setValue("purpose", event.target.value)} placeholder="描述报表的业务用途和使用对象。" /></div>
-          <div className="fl full"><label>过滤条件</label><Textarea aria-label="过滤条件" className="ta" value={form.filterCondition} onChange={(event) => setValue("filterCondition", event.target.value)} placeholder="补充取数过滤条件。" /></div>
-          <div className="fl full"><label>特殊规则</label><Textarea aria-label="特殊规则" className="ta" value={form.specialRule} onChange={(event) => setValue("specialRule", event.target.value)} placeholder="补充特殊业务规则或统计说明。" /></div>
-          <div className="fl full"><label>备注</label><Textarea aria-label="备注" className="ta" value={form.remark} onChange={(event) => setValue("remark", event.target.value)} placeholder="补充维护备注。" /></div>
+          <div className="fl full"><label>{t("editor.fields.purpose")}</label><Textarea aria-label={t("editor.fields.purpose")} className="ta" value={form.purpose} onChange={(event) => setValue("purpose", event.target.value)} placeholder={t("editor.placeholders.purpose")} /></div>
+          <div className="fl full"><label>{t("editor.fields.filterCondition")}</label><Textarea aria-label={t("editor.fields.filterCondition")} className="ta" value={form.filterCondition} onChange={(event) => setValue("filterCondition", event.target.value)} placeholder={t("editor.placeholders.filterCondition")} /></div>
+          <div className="fl full"><label>{t("editor.fields.specialRule")}</label><Textarea aria-label={t("editor.fields.specialRule")} className="ta" value={form.specialRule} onChange={(event) => setValue("specialRule", event.target.value)} placeholder={t("editor.placeholders.specialRule")} /></div>
+          <div className="fl full"><label>{t("editor.fields.remark")}</label><Textarea aria-label={t("editor.fields.remark")} className="ta" value={form.remark} onChange={(event) => setValue("remark", event.target.value)} placeholder={t("editor.placeholders.remark")} /></div>
         </div>
       </div>
 
@@ -601,13 +617,13 @@ export function ReportEditor({
           if (hasLifecycleErrors && !event.currentTarget.open) event.currentTarget.open = true;
         }}
       >
-        <summary><Icon name="calendar" size={14} />更多设置 / 生命周期</summary>
+        <summary><Icon name="calendar" size={14} />{t("editor.messages.lifecycle")}</summary>
         <div className="form-grid" style={{ marginTop: 16 }}>
-          <FormField className="fl" formId={REPORT_FORM_ID} name="effectiveDate" label="生效日期（选填）" error={errors["effectiveDate"]}>
-            <Input aria-label="生效日期（选填）" type="date" className={`inp mono${errors["effectiveDate"] ? " invalid" : ""}`} value={form.effectiveDate} onChange={(event) => setValue("effectiveDate", event.target.value)} />
+          <FormField className="fl" formId={REPORT_FORM_ID} name="effectiveDate" label={t("editor.fields.effectiveDate")} error={errors["effectiveDate"]}>
+            <Input aria-label={t("editor.fields.effectiveDate")} type="date" className={`inp mono${errors["effectiveDate"] ? " invalid" : ""}`} value={form.effectiveDate} onChange={(event) => setValue("effectiveDate", event.target.value)} />
           </FormField>
-          <FormField className="fl" formId={REPORT_FORM_ID} name="expireDate" label="失效日期（选填）" error={errors["expireDate"]}>
-            <Input aria-label="失效日期（选填）" type="date" className={`inp mono${errors["expireDate"] ? " invalid" : ""}`} value={form.expireDate} min={form.effectiveDate || undefined} onChange={(event) => setValue("expireDate", event.target.value)} />
+          <FormField className="fl" formId={REPORT_FORM_ID} name="expireDate" label={t("editor.fields.expireDate")} error={errors["expireDate"]}>
+            <Input aria-label={t("editor.fields.expireDate")} type="date" className={`inp mono${errors["expireDate"] ? " invalid" : ""}`} value={form.expireDate} min={form.effectiveDate || undefined} onChange={(event) => setValue("expireDate", event.target.value)} />
           </FormField>
         </div>
       </details>
@@ -615,17 +631,17 @@ export function ReportEditor({
       <datalist id="report-person-options">{people.map((name) => <option key={name} value={name} />)}</datalist>
 
       <div className="form-card">
-        <h3><Icon name="link" size={14} />关联引用</h3>
+        <h3><Icon name="link" size={14} />{t("editor.references")}</h3>
         {refError ? (
           <div className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
             {refError}{" "}
-            <button className="btn" type="button" onClick={() => setReferenceRetryRevision((revision) => revision + 1)}>重试加载关联数据</button>
+            <button className="btn" type="button" onClick={() => setReferenceRetryRevision((revision) => revision + 1)}>{t("editor.messages.retryReferences")}</button>
           </div>
         ) : null}
-        {refLoading ? <div className="match-hint">正在加载可关联资产…</div> : null}
+        {refLoading ? <div className="match-hint">{t("editor.messages.referencesLoading")}</div> : null}
         <div className="report-picker-grid">
           <AssetReferencePicker
-            title="关联表"
+            title={t("editor.messages.tableReference")}
             searchValue={tableSearch}
             onSearchChange={setTableSearch}
             candidates={tableOptions}
@@ -635,10 +651,10 @@ export function ReportEditor({
             subtitleBuilder={(item) => [item.layer, item.domain, item.tableCn].filter(Boolean).join(" / ")}
             onAdd={addRelatedTable}
             onRemove={removeRelatedTable}
-            emptyText="未找到可添加的表"
+            emptyText={t("editor.messages.noTableCandidate")}
           />
           <AssetReferencePicker
-            title="关联指标"
+            title={t("editor.messages.indicatorReference")}
             searchValue={indicatorSearch}
             onSearchChange={setIndicatorSearch}
             candidates={indicatorOptions}
@@ -648,26 +664,26 @@ export function ReportEditor({
             subtitleBuilder={(item) => [item.indicatorName, item.path].filter(Boolean).join(" / ")}
             onAdd={addRelatedIndicator}
             onRemove={removeRelatedIndicator}
-            emptyText="未找到可添加的指标"
+            emptyText={t("editor.messages.noIndicatorCandidate")}
           />
         </div>
       </div>
 
       <FormActionBar
-        note={isEdit ? "保存后会更新报表台账、归属信息和关联引用。" : "保存后会加入报表资产清单，可继续维护详情。"}
+        note={isEdit ? t("editor.saveNoteEdit") : t("editor.saveNoteCreate")}
         onCancel={onCancel}
         onSave={submit}
         saving={saveBusy}
         isDirty={isDirty}
-        saveText={isEdit ? "保存修改" : "创建报表"}
+        saveText={isEdit ? t("editor.saveEdit") : t("editor.saveCreate")}
       />
       {isEdit && initial ? (
         <DangerZone
-          description="删除报表后将无法恢复，相关历史引用仍会保留。若报表暂时不再使用，建议优先禁用。"
+          description={t("editor.deleteDescription")}
           actions={[
             {
               key: "delete-report",
-              label: "删除报表",
+              label: t("editor.delete"),
               icon: "trash",
               danger: true,
               onClick: () => onDelete(initial.code),
