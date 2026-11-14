@@ -1,0 +1,81 @@
+{
+  "app": {
+    "documentTitle": "数据资产管理与血缘分析平台",
+    "brandAlt": "数据资产门户",
+    "brandName": "数据资产门户",
+    "brandTagline": "Data Asset Portal",
+    "footer": "数据资产管理与血缘分析平台"
+  },
+  "language": {
+    "switchToEnglish": "切换到英文",
+    "switchToChinese": "切换到简体中文",
+    "targetEnglish": "EN",
+    "targetChinese": "中文"
+  },
+  "formatting": {
+    "number": "{{value, number}}",
+    "date": "{{value, datetime}}"
+  },
+  "navigation": {
+    "more": "更多",
+    "loadingMenus": "菜单加载中…",
+    "menuLoadFailed": "菜单加载失败，点击重试",
+    "open": "打开导航",
+    "close": "关闭导航",
+    "main": "主导航",
+    "module": "模块导航",
+    "moduleAndFilters": "模块导航与筛选",
+    "sidebarErrorTitle": "侧边栏渲染失败",
+    "sidebarErrorDescription": "导航区域渲染异常，请刷新后重试。",
+    "moduleErrorTitle": "模块渲染失败",
+    "moduleErrorDescription": "当前模块渲染异常，请稍后重试。"
+  },
+  "search": {
+    "global": "全局搜索",
+    "clear": "清除全局搜索",
+    "openMobile": "打开搜索",
+    "closeMobile": "关闭搜索",
+    "placeholder": {
+      "push": "搜索系统、作业、文件名或说明",
+      "codeTable": "搜索表编码、表名称、负责人或说明",
+      "report": "搜索报表编码、名称、负责人、归属部门或用途",
+      "indicator": "搜索指标 ID、中文名、含义或字段/口径关键字",
+      "root": "搜索词根、中文、英文或说明",
+      "systemMenus": "搜索菜单名称、编码、路径或说明",
+      "systemParams": "搜索参数分类、编码、名称、取值或说明",
+      "systemRoles": "搜索角色编码、名称或说明",
+      "systemLogs": "搜索操作用户、模块、对象或操作内容",
+      "systemUsers": "搜索用户名、显示名、邮箱或状态",
+      "upstream": "搜索系统简称、名称、负责人、部门或说明",
+      "mapping": "搜索源系统、源表、字段或目标字段",
+      "default": "搜索表名、中文名、负责人或字段"
+    }
+  },
+  "theme": {
+    "switchToLight": "切换到浅色主题",
+    "switchToDark": "切换到深色主题",
+    "palette": "主题色",
+    "green": "绿色",
+    "purple": "紫色"
+  },
+  "access": {
+    "moduleLoadingTitle": "加载业务模块",
+    "moduleLoadingDescription": "正在准备当前页面。",
+    "publicLoadingTitle": "准备公开目录",
+    "publicLoadingDescription": "正在确认会话状态并加载可浏览的数据资产。",
+    "catalogDisabledTitle": "匿名目录访问已关闭",
+    "catalogDisabledDescription": "此站点需要登录后才能浏览业务目录。登录不会改变后端的权限控制。",
+    "loginToContinue": "登录后继续"
+  },
+  "action": {
+    "close": "关闭",
+    "cancel": "取消",
+    "confirm": "确认",
+    "save": "保存",
+    "search": "搜索",
+    "clear": "清除",
+    "retry": "重试",
+    "loading": "加载中…",
+    "noResults": "暂无结果"
+  }
+}

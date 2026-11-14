@@ -1,0 +1,16 @@
+{
+  "menus": {
+    "upstream": "上游卸数",
+    "dwm": "数据仓库",
+    "mapping": "字段映射",
+    "lineage": "血缘分析",
+    "root": "词根管理",
+    "indicator": "指标维护",
+    "report": "报表资产",
+    "apiAsset": "API 资产",
+    "push": "下游推送",
+    "codeTable": "码值表维护",
+    "system": "系统管理",
+    "operationLogs": "操作日志"
+  }
+}

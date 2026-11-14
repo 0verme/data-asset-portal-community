@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { LineageBootstrap, LineageNode } from "./api/lineage.ts";
 import { getMenus, MENUS_CHANGED_EVENT } from "./api/menus.ts";
@@ -25,6 +26,8 @@ import { ModuleSidebar } from "./components/app/ModuleSidebar.tsx";
 import type { AppModuleContext } from "./components/app/appTypes.ts";
 import { ConfirmDialogHost, ModuleErrorBoundary } from "./components/common/index.ts";
 import { Icon } from "./components/ui.tsx";
+import { LanguageSwitcher } from "./i18n/LanguageSwitcher.tsx";
+import { resolveMenuDisplayName } from "./routing/menuLabels.ts";
 import { Button, DropdownMenu, IconButton, Input } from "./ui/index.ts";
 import {
   APP_VERSION,
@@ -92,6 +95,12 @@ type NavigationMenuStatus = "loading" | "ready" | "error";
 type NavigationFitSnapshot = NavigationMenuFitMetrics & { menuKey: string };
 
 export default function App(): React.ReactElement {
+  const { t: tCommon } = useTranslation("common");
+  const { t: tNavigation } = useTranslation("navigation");
+  const displayMenuName = (item: MenuItem): string => resolveMenuDisplayName(
+    item,
+    (key, defaultValue) => tNavigation(key, { defaultValue }),
+  );
   const hamburgerRef = React.useRef<HTMLButtonElement | null>(null);
   const sidebarRef = React.useRef<HTMLElement | null>(null);
   const searchToggleRef = React.useRef<HTMLButtonElement | null>(null);
@@ -190,7 +199,7 @@ export default function App(): React.ReactElement {
 
   const { accent, setAccent } = useAccent();
   const { theme, toggleTheme } = useTheme();
-  const themeToggleLabel = theme === "dark" ? "切换到浅色主题" : "切换到深色主题";
+  const themeToggleLabel = theme === "dark" ? tCommon("theme.switchToLight") : tCommon("theme.switchToDark");
   const { statusOptions: rawStatusOptions } = useStatusOptions();
   const statusOptions = useMemo<DictOption[]>(
     () => rawStatusOptions.map((item) => ({ code: item.value, ...item })),
@@ -334,7 +343,7 @@ export default function App(): React.ReactElement {
   );
   const navigationPrimaryMenus = visibleNavMenus.filter((item) => item.navPlacement === "primary");
   const navigationPrimaryMenuCount = navigationPrimaryMenus.length;
-  const navigationMenuKey = JSON.stringify(navigationPrimaryMenus.map(({ code, name, icon }) => [code, name, icon]));
+  const navigationMenuKey = JSON.stringify(navigationPrimaryMenus.map((item) => [item.code, displayMenuName(item), item.icon]));
 
   useLayoutEffect(() => {
     const measureNavigation = (): void => {
@@ -665,30 +674,30 @@ export default function App(): React.ReactElement {
   }, [isPortal]);
 
   const searchPlaceholder = isPush
-    ? "搜索系统、作业、文件名或说明"
+    ? tCommon("search.placeholder.push")
     : isCodeTable
-      ? "搜索表编码、表名称、负责人或说明"
+      ? tCommon("search.placeholder.codeTable")
       : isReport
-      ? "搜索报表编码、名称、负责人、归属部门或用途"
-      : isIndicator
-        ? "搜索指标 ID、中文名、含义或字段/口径关键字"
-        : isRoot
-          ? "搜索词根、中文、英文或说明"
-          : isSystem
-            ? systemRoute.page === "menus"
-              ? "搜索菜单名称、编码、路径或说明"
-              : systemRoute.page === "param-dicts"
-                ? "搜索参数分类、编码、名称、取值或说明"
-                : systemRoute.page === "roles"
-                ? "搜索角色编码、名称或说明"
-                : systemRoute.page === "operation-logs"
-                  ? "搜索操作用户、模块、对象或操作内容"
-                  : "搜索用户名、显示名、邮箱或状态"
-            : isUpstream
-              ? "搜索系统简称、名称、负责人、部门或说明"
-              : isMapping
-                ? "搜索源系统、源表、字段或目标字段"
-                : "搜索表名、中文名、负责人或字段";
+        ? tCommon("search.placeholder.report")
+        : isIndicator
+          ? tCommon("search.placeholder.indicator")
+          : isRoot
+            ? tCommon("search.placeholder.root")
+            : isSystem
+              ? systemRoute.page === "menus"
+                ? tCommon("search.placeholder.systemMenus")
+                : systemRoute.page === "param-dicts"
+                  ? tCommon("search.placeholder.systemParams")
+                  : systemRoute.page === "roles"
+                    ? tCommon("search.placeholder.systemRoles")
+                    : systemRoute.page === "operation-logs"
+                      ? tCommon("search.placeholder.systemLogs")
+                      : tCommon("search.placeholder.systemUsers")
+              : isUpstream
+                ? tCommon("search.placeholder.upstream")
+                : isMapping
+                  ? tCommon("search.placeholder.mapping")
+                  : tCommon("search.placeholder.default");
 
   const sidebarResetKey = `${module}:${root.rootCategory || ""}:${systemRoute.page}:${manualCodeTable.styleFilter}`;
   const mainResetKey = [
@@ -817,23 +826,23 @@ export default function App(): React.ReactElement {
                 }}
                 aria-controls="mobile-sidebar"
                 aria-expanded={sidebarOpen}
-                aria-label={sidebarOpen ? "关闭导航" : "打开导航"}
+                aria-label={sidebarOpen ? tCommon("navigation.close") : tCommon("navigation.open")}
                 icon={<Icon name="menu" size={18} />}
               />
             ) : null}
 
             <div className="brand" onClick={() => switchModule("portal")}>
               <div className="brand-mark">
-                <img src="/brand-icon.svg?v=20260609" alt="数据资产门户" />
+                <img src="/brand-icon.svg?v=20260609" alt={tCommon("app.brandAlt")} />
               </div>
-              <div className="brand-name">数据资产门户<small>Data Asset Portal</small></div>
+              <div className="brand-name">{tCommon("app.brandName")}<small>{tCommon("app.brandTagline")}</small></div>
             </div>
           </div>
 
           <div className="topbar-nav-slot" ref={navSlotRef}>
-            <nav className="mainnav" aria-label="主导航">
+            <nav className="mainnav" aria-label={tCommon("navigation.main")}>
               {currentNavMenuStatus === "loading" ? (
-                <Button type="button" variant="tertiary" size="sm" disabled>菜单加载中…</Button>
+                <Button type="button" variant="tertiary" size="sm" disabled>{tCommon("navigation.loadingMenus")}</Button>
               ) : currentNavMenuStatus === "error" ? (
                 <Button
                   type="button"
@@ -841,7 +850,7 @@ export default function App(): React.ReactElement {
                   size="sm"
                   onClick={() => void loadMenus(navigationAuthKey)}
                 >
-                  菜单加载失败，点击重试
+                  {tCommon("navigation.menuLoadFailed")}
                 </Button>
               ) : null}
               {primaryNavMenus.map((item) => (
@@ -853,7 +862,7 @@ export default function App(): React.ReactElement {
                   className={module === item.code ? "active" : ""}
                   onClick={() => switchModuleFromMenu(item.code)}
                 >
-                  <Icon name={item.icon} size={15} />{item.name}
+                  <Icon name={item.icon} size={15} />{displayMenuName(item)}
                 </Button>
               ))}
               {moreNavMenus.length ? (
@@ -871,7 +880,7 @@ export default function App(): React.ReactElement {
                         />
                       )}
                     >
-                      更多<Icon name="chevron" size={13} />
+                      {tCommon("navigation.more")}<Icon name="chevron" size={13} />
                     </DropdownMenu.Trigger>
                     <DropdownMenu.Content id="more-nav-menu" className="more-nav-menu" align="end" side="bottom">
                       {moreNavMenus.map((item) => (
@@ -886,7 +895,7 @@ export default function App(): React.ReactElement {
                             switchModuleFromMenu(item.code);
                           }}
                         >
-                          {item.name}
+                          {displayMenuName(item)}
                         </DropdownMenu.Item>
                       ))}
                     </DropdownMenu.Content>
@@ -905,7 +914,7 @@ export default function App(): React.ReactElement {
                   className={module === item.code ? "active" : ""}
                   data-nav-measure-item={item.code}
                 >
-                  <Icon name={item.icon} size={15} />{item.name}
+                  <Icon name={item.icon} size={15} />{displayMenuName(item)}
                 </Button>
               ))}
               <div className="more-nav">
@@ -916,7 +925,7 @@ export default function App(): React.ReactElement {
                   className="more-nav-trigger active"
                   data-nav-measure-more=""
                 >
-                  更多<Icon name="chevron" size={13} />
+                  {tCommon("navigation.more")}<Icon name="chevron" size={13} />
                 </Button>
               </div>
             </nav>
@@ -934,7 +943,7 @@ export default function App(): React.ReactElement {
                 }}
                 aria-controls="global-search"
                 aria-expanded={mobileSearchOpen}
-                aria-label={mobileSearchOpen ? "关闭搜索" : "打开搜索"}
+                aria-label={mobileSearchOpen ? tCommon("search.closeMobile") : tCommon("search.openMobile")}
               >
                 <Icon name={mobileSearchOpen ? "close" : "search"} size={17} />
               </button>
@@ -944,7 +953,7 @@ export default function App(): React.ReactElement {
                 <span className="ico-search"><Icon name="search" size={16} /></span>
                 <Input
                   ref={searchInputRef}
-                  aria-label="全局搜索"
+                  aria-label={tCommon("search.global")}
                   className="search-input"
                   placeholder={searchPlaceholder}
                   value={query}
@@ -963,7 +972,7 @@ export default function App(): React.ReactElement {
                   variant="tertiary"
                   size="sm"
                   className="clear"
-                  aria-label="清除全局搜索"
+                  aria-label={tCommon("search.clear")}
                   onClick={() => setQuery("")}
                 >
                   <Icon name="close" size={13} />
@@ -971,6 +980,7 @@ export default function App(): React.ReactElement {
               </div>
             ) : null}
 
+            <LanguageSwitcher />
             <span className="theme-toggle-wrapper" title={themeToggleLabel}>
               <IconButton
                 type="button"
@@ -983,13 +993,13 @@ export default function App(): React.ReactElement {
               />
             </span>
 
-            <div className="accent-preset-group" role="group" aria-label="主题色">
+            <div className="accent-preset-group" role="group" aria-label={tCommon("theme.palette")}>
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
                 className="accent-preset-button"
-                aria-label="绿色"
+                aria-label={tCommon("theme.green")}
                 aria-pressed={accent === "green"}
                 onClick={() => setAccent("green")}
               >
@@ -1001,7 +1011,7 @@ export default function App(): React.ReactElement {
                 variant="secondary"
                 size="sm"
                 className="accent-preset-button"
-                aria-label="紫色"
+                aria-label={tCommon("theme.purple")}
                 aria-pressed={accent === "purple"}
                 onClick={() => setAccent("purple")}
               >
@@ -1036,7 +1046,7 @@ export default function App(): React.ReactElement {
                 ref={sidebarRef}
                 id="mobile-sidebar"
                 className={`sidebar${sidebarOpen ? " open" : ""}`}
-                aria-label="模块导航与筛选"
+                aria-label={tCommon("navigation.moduleAndFilters")}
                 tabIndex={-1}
                 onClick={(event) => {
                   if (event.target instanceof Element && event.target.closest(".side-item")) {
@@ -1044,13 +1054,14 @@ export default function App(): React.ReactElement {
                   }
                 }}
               >
-                <nav className="mobile-module-nav" aria-label="模块导航">
-                  <div className="side-title">模块导航</div>
+                <div className="sidebar-language-switcher"><LanguageSwitcher /></div>
+                <nav className="mobile-module-nav" aria-label={tCommon("navigation.module")}>
+                  <div className="side-title">{tCommon("navigation.module")}</div>
                   {currentNavMenuStatus === "loading" ? (
-                    <Button className="mobile-module-link" type="button" variant="tertiary" size="sm" disabled>菜单加载中…</Button>
+                    <Button className="mobile-module-link" type="button" variant="tertiary" size="sm" disabled>{tCommon("navigation.loadingMenus")}</Button>
                   ) : currentNavMenuStatus === "error" ? (
                     <Button className="mobile-module-link" type="button" variant="tertiary" size="sm" onClick={() => void loadMenus(navigationAuthKey)}>
-                      菜单加载失败，点击重试
+                      {tCommon("navigation.menuLoadFailed")}
                     </Button>
                   ) : null}
                   {visibleNavMenus.map((item) => (
@@ -1062,14 +1073,14 @@ export default function App(): React.ReactElement {
                       size="sm"
                       onClick={() => switchModuleFromMenu(item.code)}
                     >
-                      <Icon name={item.icon} size={16} />{item.name}
+                      <Icon name={item.icon} size={16} />{displayMenuName(item)}
                     </Button>
                   ))}
                 </nav>
                 <ModuleErrorBoundary
                   resetKey={sidebarResetKey}
-                  title="侧边栏渲染失败"
-                  desc="导航区域渲染异常，请刷新后重试。"
+                  title={tCommon("navigation.sidebarErrorTitle")}
+                  desc={tCommon("navigation.sidebarErrorDescription")}
                   onRetry={() => window.location.reload()}
                 >
                   {moduleSidebar}
@@ -1082,8 +1093,8 @@ export default function App(): React.ReactElement {
             <div className="main-inner">
               <ModuleErrorBoundary
                 resetKey={mainResetKey}
-                title="模块渲染失败"
-                desc="当前模块渲染异常，请稍后重试。"
+                title={tCommon("navigation.moduleErrorTitle")}
+                desc={tCommon("navigation.moduleErrorDescription")}
                 onRetry={() => window.location.reload()}
               >
                 {moduleContent}
@@ -1094,7 +1105,7 @@ export default function App(): React.ReactElement {
 
         <footer className="app-footer-shell">
           <div className="app-footer">
-            <span className="app-footer-copy">数据资产管理与血缘分析平台 {APP_VERSION}</span>
+            <span className="app-footer-copy">{tCommon("app.footer")} {APP_VERSION}</span>
             <span className="app-footer-separator" aria-hidden="true">·</span>
             <a
               className="app-footer-link"

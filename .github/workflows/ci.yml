@@ -644,6 +644,13 @@ jobs:
       - name: Install Playwright browsers for API asset validation
         run: npx playwright install --with-deps chromium webkit
 
+      - name: Internationalization language switching and state preservation (Chromium and WebKit)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/i18n-language-switch-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- e2e/i18n.spec.ts --workers=2
+
       - name: Remote API, report-option authority, and data trust browser regression (Chromium and WebKit)
         if: matrix.lane == 'a'
         env:

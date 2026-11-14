@@ -28,7 +28,7 @@ test("remote auth bootstrap treats /auth/me 401 as anonymous public-catalog acce
   assert.doesNotMatch(search, /请先登录后搜索/);
   assert.doesNotMatch(moduleContent, /AuthenticatedBusinessPrompt/);
   assert.match(moduleContent, /publicAccessReady=\{context\.businessAccessReady\}/);
-  assert.match(moduleContent, /匿名目录访问已关闭/);
+  assert.match(moduleContent, /access\.catalogDisabledTitle/);
 });
 
 test("catalog readiness gates API asset and root detail/candidate requests", async () => {

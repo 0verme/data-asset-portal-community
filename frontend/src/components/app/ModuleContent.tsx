@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 import type { SearchResultGroup, SearchResultItem } from "../../api/search.ts";
 import type { NavigationActions } from "../../hooks/useNavigationController.ts";
@@ -230,32 +231,35 @@ const MODULE_RENDERERS: Record<ModuleId, ModuleRenderer> = {
 };
 
 function ModuleLoadingState(): React.ReactElement {
+  const { t } = useTranslation("common");
   return (
     <div className="state-card" role="status" aria-live="polite">
       <div className="state-spinner" aria-hidden="true"></div>
-      <h4>加载业务模块</h4>
-      <p>正在准备当前页面。</p>
+      <h4>{t("access.moduleLoadingTitle")}</h4>
+      <p>{t("access.moduleLoadingDescription")}</p>
     </div>
   );
 }
 
 function PublicAccessLoadingState(): React.ReactElement {
+  const { t } = useTranslation("common");
   return (
     <div className="state-card" role="status" aria-live="polite">
       <div className="state-spinner" aria-hidden="true"></div>
-      <h4>准备公开目录</h4>
-      <p>正在确认会话状态并加载可浏览的数据资产。</p>
+      <h4>{t("access.publicLoadingTitle")}</h4>
+      <p>{t("access.publicLoadingDescription")}</p>
     </div>
   );
 }
 
 function DisabledAnonymousCatalogState({ context }: { context: AppModuleContext }): React.ReactElement {
+  const { t } = useTranslation("common");
   return (
     <div className="state-card">
-      <h4>匿名目录访问已关闭</h4>
-      <p>此站点需要登录后才能浏览业务目录。登录不会改变后端的权限控制。</p>
+      <h4>{t("access.catalogDisabledTitle")}</h4>
+      <p>{t("access.catalogDisabledDescription")}</p>
       <button className="btn primary" type="button" onClick={() => context.requireLogin()}>
-        登录后继续
+        {t("access.loginToContinue")}
       </button>
     </div>
   );

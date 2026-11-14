@@ -1,0 +1,16 @@
+{
+  "menus": {
+    "upstream": "Upstream Ingestion",
+    "dwm": "Data Warehouse",
+    "mapping": "Field Mapping",
+    "lineage": "Data Lineage",
+    "root": "Root Management",
+    "indicator": "Metrics",
+    "report": "Report Assets",
+    "apiAsset": "API Assets",
+    "push": "Downstream Delivery",
+    "codeTable": "Code Table Management",
+    "system": "System Administration",
+    "operationLogs": "Operation Logs"
+  }
+}

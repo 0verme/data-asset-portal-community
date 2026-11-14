@@ -9,7 +9,7 @@ test("sidebar shell trigger uses the frozen DAP IconButton adapter", () => {
   assert.match(app, /import \{ Button, DropdownMenu, IconButton, Input \} from "\.\/ui\/index\.ts"/);
   assert.match(
     app,
-    /<IconButton[\s\S]*?ref=\{hamburgerRef\}[\s\S]*?className="hamburger"[\s\S]*?variant="tertiary"[\s\S]*?size="sm"[\s\S]*?aria-controls="mobile-sidebar"[\s\S]*?aria-expanded=\{sidebarOpen\}[\s\S]*?aria-label=\{sidebarOpen \? "关闭导航" : "打开导航"\}[\s\S]*?icon=\{<Icon name="menu" size=\{18\} \/>\}/,
+    /<IconButton[\s\S]*?ref=\{hamburgerRef\}[\s\S]*?className="hamburger"[\s\S]*?variant="tertiary"[\s\S]*?size="sm"[\s\S]*?aria-controls="mobile-sidebar"[\s\S]*?aria-expanded=\{sidebarOpen\}[\s\S]*?aria-label=\{sidebarOpen \? tCommon\("navigation\.close"\) : tCommon\("navigation\.open"\)\}[\s\S]*?icon=\{<Icon name="menu" size=\{18\} \/>\}/,
   );
   assert.doesNotMatch(app, /<button[\s\S]{0,80}?ref=\{hamburgerRef\}/);
 });
@@ -37,7 +37,7 @@ test("responsive sidebar shell keeps overlay, scroll-lock, focus and aria contra
   assert.match(app, /requestAnimationFrame\(\(\) => hamburgerRef\.current\?\.focus\(\)\)/);
   assert.match(app, /requestAnimationFrame\(\(\) => sidebarRef\.current\?\.focus\(\)\)/);
   assert.match(app, /id="mobile-sidebar"/);
-  assert.match(app, /aria-label="模块导航与筛选"/);
+  assert.match(app, /aria-label=\{tCommon\("navigation\.moduleAndFilters"\)\}/);
   assert.match(app, /tabIndex=\{-1\}/);
   assert.match(app, /closest\("\.side-item"\)/);
   assert.match(app, /className=\{`sidebar-overlay\$\{sidebarOpen \? " open" : ""\}`\}/);

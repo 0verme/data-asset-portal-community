@@ -15,7 +15,7 @@ test("header auth actions omit persistent guest and role badges", () => {
   assert.match(authBar, /className="user-chip"/);
   assert.match(
     authBar,
-    /<IconButton[\s\S]*?className="logout-btn"[\s\S]*?aria-label="退出登录"[\s\S]*?onClick=\{\(\) => void onLogout\(\)\}/,
+    /<IconButton[\s\S]*?className="logout-btn"[\s\S]*?aria-label=\{t\("logout"\)\}[\s\S]*?onClick=\{\(\) => void onLogout\(\)\}/,
   );
   assert.doesNotMatch(authBar, /<button|role-pill|roleLabel|未登录|业务维护员|系统管理员/);
 });
@@ -59,11 +59,11 @@ test("middle-width navigation derives its visible prefix from measured available
   assert.match(appStyles, /@media \(max-width: 768px\)[\s\S]*?\.topbar-nav-slot \{\s*display: none;\s*\}/);
   assert.match(appStyles, /@media \(max-width: 768px\)[\s\S]*?\.search\.mobile-open \{ display: block; \}/);
   assert.match(app, /id="global-search"/);
-  assert.match(app, /aria-label="全局搜索"/);
+  assert.match(app, /aria-label=\{tCommon\("search\.global"\)\}/);
   assert.match(app, /<Input[\s\S]*?className="search-input"[\s\S]*?value=\{query\}/);
   assert.match(
     app,
-    /<Button[\s\S]*?className="clear"[\s\S]*?aria-label="清除全局搜索"[\s\S]*?onClick=\{\(\) => setQuery\(""\)\}/,
+    /<Button[\s\S]*?className="clear"[\s\S]*?aria-label=\{tCommon\("search\.clear"\)\}[\s\S]*?onClick=\{\(\) => setQuery\(""\)\}/,
   );
 });
 
@@ -122,9 +122,9 @@ test("More menu items keep selection and navigation inside the DAP DropdownMenu 
 test("accent preset controls are accessible DAP buttons with a visible selected marker", () => {
   assert.ok(app.includes('import { useAccent } from "./hooks/useAccent.ts";'));
   assert.ok(app.includes('const { accent, setAccent } = useAccent();'));
-  assert.match(app, /<div className="accent-preset-group" role="group" aria-label="主题色">/);
-  for (const [preset, label] of [["green", "绿色"], ["purple", "紫色"]]) {
-    assert.ok(app.includes(`aria-label="${label}"`));
+  assert.match(app, /<div className="accent-preset-group" role="group" aria-label=\{tCommon\("theme\.palette"\)\}>/);
+  for (const [preset, label] of [["green", "theme.green"], ["purple", "theme.purple"]]) {
+    assert.ok(app.includes(`aria-label={tCommon("${label}")}`));
     assert.ok(app.includes(`aria-pressed={accent === "${preset}"}`));
     assert.ok(app.includes(`onClick={() => setAccent("${preset}")}`));
   }
@@ -132,7 +132,7 @@ test("accent preset controls are accessible DAP buttons with a visible selected 
 });
 
 test("theme trigger uses a DAP IconButton and preserves its dynamic label and title", () => {
-  assert.ok(app.includes('const themeToggleLabel = theme === "dark" ? "切换到浅色主题" : "切换到深色主题";'));
+  assert.ok(app.includes('const themeToggleLabel = theme === "dark" ? tCommon("theme.switchToLight") : tCommon("theme.switchToDark");'));
   assert.ok(app.includes('<span className="theme-toggle-wrapper" title={themeToggleLabel}>'));
   assert.match(app, /<IconButton[\s\S]*?type="button"[\s\S]*?variant="secondary"[\s\S]*?size="sm"[\s\S]*?className="theme-toggle"/);
   assert.ok(app.includes("onClick={toggleTheme}"));
