@@ -19,7 +19,7 @@ test("asset read controls use DAP adapters and preserve pressed-button semantics
   assert.match(view, /onPageSizeChange=\{\(nextPageSize\) =>/);
 
   assert.match(switcher, /import \{ Button \} from "\.\.\/\.\.\/ui\/index\.ts"/);
-  assert.match(switcher, /role="group" aria-label="视图切换"/);
+  assert.match(switcher, /role="group" aria-label=\{t\("viewMode\.ariaLabel"\)\}/);
   assert.match(switcher, /aria-pressed=\{value === mode\.value\}/);
   assert.match(switcher, /onClick=\{\(\) => onChange\(mode\.value\)\}/);
   assert.doesNotMatch(switcher, /@cloudflare\/kumo/);
@@ -38,7 +38,7 @@ test("asset detail and editor compose controls only from DAP adapters", async ()
   assert.match(detail, /<Tabs[\s\S]*?appearance="line"[\s\S]*?value=\{tab\}[\s\S]*?onValueChange=\{onTabChange\}/);
   assert.match(detail, /className="asset-detail-tab-count"[\s\S]*?\{fields\.length\}/);
   assert.doesNotMatch(detail, /appearance="segmented"|<Badge/);
-  assert.match(detail, /<Input[\s\S]*?aria-label="在当前表内筛选字段"/);
+  assert.match(detail, /<Input[\s\S]*?aria-label=\{t\("detail\.filterFields"\)\}/);
   assert.doesNotMatch(detail, /<(?:button|input|select|textarea)\b/);
 
   assert.match(editor, /import \{[\s\S]*FormErrorSummary,[\s\S]*FormField,[\s\S]*focusFirstFormError,[\s\S]*IconButton,[\s\S]*Input,[\s\S]*Select,[\s\S]*Textarea,[\s\S]*\} from "\.\.\/ui\/index\.ts"/);

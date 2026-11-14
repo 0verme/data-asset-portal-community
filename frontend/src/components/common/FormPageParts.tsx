@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Icon } from "../ui.tsx";
 import { confirmAction } from "./confirmService.tsx";
@@ -32,6 +33,7 @@ export function PageHeader({
   status,
   back,
 }: PageHeaderProps) {
+  const { t } = useTranslation("common");
   const hasHeading = Boolean(title || subtitle || status);
   const derivedBack: BackLink | null = back?.onClick
     ? back
@@ -40,7 +42,7 @@ export function PageHeader({
         if (!firstClickable?.onClick) return null;
         return {
           onClick: firstClickable.onClick,
-          text: back?.text || "返回上一层",
+          text: back?.text || t("forms.backToPrevious"),
         };
       })();
 
@@ -49,12 +51,12 @@ export function PageHeader({
       {derivedBack?.onClick ? (
         <button type="button" className="page-back" onClick={derivedBack.onClick}>
           <Icon name="chevron" size={14} />
-          {derivedBack.text || "返回上一层"}
+          {derivedBack.text || t("forms.backToPrevious")}
         </button>
       ) : null}
 
       {breadcrumbs.length ? (
-        <nav className="crumb" aria-label="面包屑">
+        <nav className="crumb" aria-label={t("accessibility.breadcrumb")}>
           {breadcrumbs.map((item, index) => (
             <Fragment key={`${item.label}-${index}`}>
               {index ? <span className="sep"><Icon name="chevron" size={13} /></span> : null}
@@ -106,23 +108,27 @@ export function FormActionBar({
   note,
   onCancel,
   onSave,
-  cancelText = "取消",
-  saveText = "保存",
-  savingText = "保存中...",
+  cancelText,
+  saveText,
+  savingText,
   saveDisabled = false,
   cancelDisabled = false,
   saving = false,
   isDirty = false,
   cancelConfirmOptions,
 }: FormActionBarProps) {
+  const { t } = useTranslation("common");
+  const cancelLabel = cancelText ?? t("action.cancel");
+  const saveLabel = saveText ?? t("action.save");
+  const savingLabel = savingText ?? t("action.saving");
   const handleCancel = async () => {
     if (saving || !onCancel) return;
     if (isDirty) {
       const confirmed = await confirmAction({
-        title: "放弃未保存修改？",
-        content: "当前表单存在未保存内容，确认放弃并返回吗？",
-        confirmText: "放弃修改",
-        cancelText: "继续编辑",
+        title: t("forms.discardTitle"),
+        content: t("forms.discardMessage"),
+        confirmText: t("forms.discardConfirm"),
+        cancelText: t("forms.continueEditing"),
         ...cancelConfirmOptions,
       });
       if (!confirmed) return;
@@ -136,10 +142,10 @@ export function FormActionBar({
       <div className="fab-main">
         <div className="fab-actions">
           <button className="btn" onClick={handleCancel} disabled={saving || cancelDisabled}>
-            <Icon name="close" size={14} />{cancelText}
+            <Icon name="close" size={14} />{cancelLabel}
           </button>
           <button className="btn primary" onClick={onSave} disabled={saving || saveDisabled}>
-            <Icon name="save" size={14} />{saving ? savingText : saveText}
+            <Icon name="save" size={14} />{saving ? savingLabel : saveLabel}
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Icon } from "../ui.tsx";
 
@@ -19,23 +20,26 @@ export interface DangerZoneProps {
 }
 
 export function DangerZone({
-  title = "危险操作",
-  description = "以下操作不可逆，请确认影响范围后再继续。",
+  title,
+  description,
   actions = [],
 }: DangerZoneProps) {
+  const { t } = useTranslation("common");
+  const titleText = title ?? t("dangerZone.title");
+  const descriptionText = description ?? t("dangerZone.description");
   const visibleActions = actions.filter(
     (action): action is DangerZoneAction => Boolean(action),
   );
   if (!visibleActions.length) return null;
 
   return (
-    <section className="danger-zone" aria-label={title}>
+    <section className="danger-zone" aria-label={titleText}>
       <div className="danger-zone-head">
         <div className="danger-zone-title">
           <Icon name="shield" size={16} color="var(--danger)" />
-          <h3>{title}</h3>
+          <h3>{titleText}</h3>
         </div>
-        {description ? <div className="danger-zone-desc">{description}</div> : null}
+        {descriptionText ? <div className="danger-zone-desc">{descriptionText}</div> : null}
       </div>
       <div className="danger-zone-actions">
         {visibleActions.map((action) => (

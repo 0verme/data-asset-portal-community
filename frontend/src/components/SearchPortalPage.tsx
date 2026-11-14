@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "./ui.tsx";
 import { Button, EmptyState, ErrorState, Input, LoadingState } from "../ui/index.ts";
 import { ActionErrorBanner } from "./common/ActionErrorBanner.tsx";
@@ -33,6 +34,11 @@ import {
 import { receivedTerminalEvent } from "../api/aiAskExecutionSummary.ts";
 import { AiAskExecutionPanel } from "./AiAskExecutionPanel.tsx";
 import { selectVerifiedCitedCandidates } from "./aiAskSources.ts";
+import {
+  resolvePortalScopeLabel,
+  resolvePortalStatLabel,
+  resolveSearchGroupLabel,
+} from "./portalSearchLabels.ts";
 import {
   getRagRecommendations,
   unifiedSearch,
@@ -65,12 +71,12 @@ export interface SearchPortalPageProps {
 
 const MAX_MATCHED_FIELD_LABELS = 2;
 
-function formatMatchedField(item: SearchResultItem): string {
+function formatMatchedField(item: SearchResultItem, matchedPrefix: string): string {
   const parts = (item.matchedFields || [])
     .filter((match) => match?.label && match?.value)
     .slice(0, MAX_MATCHED_FIELD_LABELS)
     .map((match) => `${match.label} ${match.value}`);
-  return parts.length ? `命中：${parts.join(" / ")}` : "";
+  return parts.length ? `${matchedPrefix}${parts.join(" / ")}` : "";
 }
 
 function recommendationKey(item: RagRecommendation): string {
@@ -132,6 +138,7 @@ function RagRecommendationsSection({
   term,
   onNavigate,
 }: RagRecommendationsSectionProps) {
+  const { t } = useTranslation("search");
   if (response?.status === "disabled") return null;
 
   if (
@@ -141,14 +148,14 @@ function RagRecommendationsSection({
   ) {
     return (
       <div className="sp-rag-unavailable" role="status">
-        相关资产推荐暂不可用，关键词搜索不受影响。
+        {t("recommendations.unavailable")}
       </div>
     );
   }
 
   if (loading && !response) {
     return (
-      <div className="sp-rag-loading" role="status" aria-label="正在加载相关资产推荐">
+      <div className="sp-rag-loading" role="status" aria-label={t("recommendations.loadingAriaLabel")}>
         <span className="sp-rag-skeleton sp-rag-skeleton-title" />
         <span className="sp-rag-skeleton" />
         <span className="sp-rag-skeleton" />
@@ -167,14 +174,14 @@ function RagRecommendationsSection({
   if (!recommendations.length) return null;
 
   return (
-    <section className="sp-rag-group" aria-label="相关资产推荐">
+    <section className="sp-rag-group" aria-label={t("recommendations.ariaLabel")}>
       <div className="sp-group-head">
-        <span className="sp-group-title">相关资产推荐</span>
-        <span className="sp-group-count">{recommendations.length} 条</span>
+        <span className="sp-group-title">{t("recommendations.title")}</span>
+        <span className="sp-group-count">{t("recommendations.count", { count: recommendations.length })}</span>
       </div>
       {response.status === "degraded" ? (
         <div className="sp-rag-unavailable" role="status">
-          部分推荐暂不可用，以下结果已通过目录校验。
+          {t("recommendations.degraded")}
         </div>
       ) : null}
       <div className="sp-rag-list">
@@ -191,17 +198,17 @@ function RagRecommendationsSection({
               <span className="sp-rag-hit-main">
                 <span className="sp-rag-hit-heading">
                   <span className="sp-rag-hit-title">{item.displayName || item.name}</span>
-                  <span className="sp-rag-hit-type">{item.assetType === "field" ? "字段" : "数据表"}</span>
+                  <span className="sp-rag-hit-type">{t(item.assetType === "field" ? "recommendations.field" : "recommendations.table")}</span>
                 </span>
                 {item.displayName && item.displayName !== item.name ? (
                   <span className="sp-rag-hit-name">{item.name}</span>
                 ) : null}
                 {item.description ? <span className="sp-rag-hit-desc">{item.description}</span> : null}
                 {item.relatedTable ? (
-                  <span className="sp-rag-hit-table">所属表：{item.relatedTable.displayName || item.relatedTable.name}</span>
+                  <span className="sp-rag-hit-table">{t("recommendations.relatedTable", { table: item.relatedTable.displayName || item.relatedTable.name })}</span>
                 ) : null}
                 {item.evidence.length ? (
-                  <span className="sp-rag-hit-evidence">匹配依据：{item.evidence.join("、")}</span>
+                  <span className="sp-rag-hit-evidence">{t("recommendations.evidence", { evidence: item.evidence.join(t("results.listSeparator")) })}</span>
                 ) : null}
               </span>
               <span className="sp-hit-go" aria-hidden="true">
@@ -222,32 +229,39 @@ function safeCatalogLink(value: string | null | undefined): string | null {
 }
 
 function AiAskStatisticalCard({ result }: { result: AiAskStatisticalResult }) {
+  const { t } = useTranslation("aiAsk");
   const link = safeCatalogLink(result.sourceLink);
   const isReportCount = result.metric === "report_count";
-  const assetType = isReportCount ? "报表资产" : "数据表";
-  const metricLabel = isReportCount ? "个报表资产" : "张表";
-  const sourceLabel = isReportCount ? "DAP 报表资产目录" : "DAP 数据资产目录";
-  const linkLabel = isReportCount ? "查看全部报表资产" : "查看筛选后的全部资产";
+  const assetType = t(isReportCount ? "statistics.reportAssets" : "statistics.tables");
+  const unit = t(isReportCount ? "statistics.reportAssetUnit" : "statistics.tableUnit", { count: result.value });
+  const sourceLabel = t(isReportCount ? "statistics.reportCatalog" : "statistics.assetCatalog");
+  const linkLabel = t(isReportCount ? "statistics.viewAllReports" : "statistics.viewAllFilteredAssets");
   const filterSummary = result.filters.map((filter) =>
     `${filter.displayName || filter.dimension}=${filter.value}`,
-  ).join("；");
+  ).join(t("statistics.filterSeparator"));
   return (
-    <section className="sp-ai-statistic" aria-label="确定性统计结果">
+    <section className="sp-ai-statistic" aria-label={t("statistics.ariaLabel")}>
       <div className="sp-ai-statistic-head">
-        <strong>{result.value} {metricLabel}</strong>
-        <span>{result.complete ? "完整统计" : "部分统计"}</span>
+        <strong>{result.value} {unit}</strong>
+        <span>{t(result.complete ? "statistics.complete" : "statistics.partial")}</span>
       </div>
-      <p>资产类型：{assetType}</p>
-      <p>数据来源：{sourceLabel}</p>
-      <p>统计范围：{filterSummary || "全量目录"}</p>
+      <p>{t("statistics.assetType", { type: assetType })}</p>
+      <p>{t("statistics.dataSource", { source: sourceLabel })}</p>
+      <p>{t("statistics.scope", { filters: filterSummary || t("statistics.allCatalog") })}</p>
       {link ? <a className="sp-ai-statistic-link" href={link}>{linkLabel}</a> : null}
     </section>
   );
 }
+type AiAskUiError =
+  | { kind: "cancelled" }
+  | { kind: "unavailable" }
+  | { kind: "contract"; message: string }
+  | { kind: "message"; message: string };
+
 interface AiAskSectionProps {
   query: string;
   loading: boolean;
-  error: string;
+  error: AiAskUiError | null;
   response: AiAskResponse | null;
   executionEvents: AiAskExecutionEvent[];
   executionStatus: AiAskExecutionStatus | null;
@@ -269,43 +283,51 @@ function AiAskSection({
   onCancel,
   onNavigate,
 }: AiAskSectionProps) {
+  const { t } = useTranslation("aiAsk");
   if (!query) return null;
+  const errorMessage = error?.kind === "cancelled"
+    ? t("failures.cancelled")
+    : error?.kind === "unavailable"
+      ? t("failures.unavailable")
+      : error?.kind === "contract"
+        ? t("failures.contractError", { message: error.message })
+        : error?.kind === "message" ? error.message : "";
   const responseFailure = !response?.metadataCount && response?.status === "retrieval_unavailable"
     ? response.reasonCode === "retrieval_timeout"
-      ? "资产检索超时，无法基于目录回答；传统搜索不受影响。"
-      : "资产检索暂不可用，无法确认候选资产；传统搜索不受影响。"
+      ? t("failures.retrievalTimeout")
+      : t("failures.retrievalUnavailable")
     : !response?.metadataCount && response?.status === "generation_unavailable"
       ? response.reasonCode === "llm_daily_quota_exceeded"
-        ? "今日 AI 问答次数已用完，请明日再试。"
+        ? t("failures.quotaExceeded")
         : response.reasonCode === "llm_quota_unavailable"
-          ? "每日 AI 问答额度服务暂不可用，请稍后重试。"
+          ? t("failures.quotaUnavailable")
           : response.reasonCode === "llm_timeout"
-            ? "模型生成超时，未生成回答；不会把未筛选候选当作答案。"
-            : "模型暂不可用，未生成回答；不会把未筛选候选当作答案。"
+            ? t("failures.generationTimeout")
+            : t("failures.generationUnavailable")
       : !response?.metadataCount && response?.status === "ambiguous_scope"
-        ? response.answer || "无法从当前目录唯一确认统计范围，请明确主题域或数据分层后重试。"
+        ? response.answer || t("failures.ambiguousScope")
         : !response?.metadataCount && response?.status === "metadata_count_unavailable"
-          ? response.answer || "当前 DAP 目录统计暂不可用，未返回统计值；请稍后重试。"
+          ? response.answer || t("failures.metadataCountUnavailable")
           : "";
-  const failureMessage = error || responseFailure;
+  const failureMessage = errorMessage || responseFailure;
   const sourceCandidates = response
     ? selectVerifiedCitedCandidates(response.candidates, response.citations)
     : [];
   return (
-    <section className="sp-ai-group" aria-label="AI 问答结果">
+    <section className="sp-ai-group" aria-label={t("section.resultAriaLabel")}>
       <div className="sp-group-head">
-        <span className="sp-group-title">AI 回答</span>
+        <span className="sp-group-title">{t("section.answerTitle")}</span>
         <span className="sp-group-count">{import.meta.env.VITE_API_MODE === "mock"
-          ? "模拟演示 · 非真实 AI 回答" : "单轮问答 · 基于已校验资产元数据"}</span>
+          ? t("section.mockMode") : t("section.remoteMode")}</span>
       </div>
       {loading ? null : failureMessage ? (
         <div className="sp-ai-state sp-ai-error" role="alert">
-          <span>{error
-            ? executionStatus === "cancelled" ? error : `AI 问答请求失败：${error}`
+          <span>{errorMessage
+            ? error?.kind === "cancelled" ? errorMessage : t("section.requestFailed", { message: errorMessage })
             : failureMessage}</span>
           {executionStatus !== "cancelled" ? (
             <Button variant="tertiary" type="button" className="sp-ai-retry" onClick={onRetry}>
-              重试
+              {t("section.retry")}
             </Button>
           ) : null}
         </div>
@@ -319,11 +341,11 @@ function AiAskSection({
         query={query}
         onCancel={onCancel}
       />
-      <div className="sp-ai-question">问题：{query}</div>
+      <div className="sp-ai-question">{t("section.question", { query })}</div>
       {loading || failureMessage ? null : response ? (
         <>
           {response.retrievalStatus === "degraded" ? (
-            <div className="sp-ai-state" role="status">检索部分降级；下方仅展示通过当前 DAP 目录校验的候选资产。</div>
+            <div className="sp-ai-state" role="status">{t("section.retrievalDegraded")}</div>
           ) : null}
           {response.statisticalResult ? <AiAskStatisticalCard result={response.statisticalResult} /> : null}
           {response.status === "insufficient_evidence" ? (
@@ -331,20 +353,18 @@ function AiAskSection({
           ) : response.status === "partial_answer" ? (
             <>
               <div className="sp-ai-state" role="status">
-                {response.resultsTruncated
-                  ? "部分回答：本次有界检索结果可能不完整；请核对下方已验证候选。"
-                  : "部分回答：仅找到相关线索，尚不足以直接确认问题结论。"}
+                {t(response.resultsTruncated ? "section.partialAnswerTruncated" : "section.partialAnswerRelated")}
               </div>
-              <div className="sp-ai-summary" aria-label="AI 部分回答">{response.answer}</div>
+              <div className="sp-ai-summary" aria-label={t("section.partialAnswerAriaLabel")}>{response.answer}</div>
             </>
           ) : !response.metadataCount && response.answer.trim() ? (
-            <div className="sp-ai-summary" aria-label="AI 回答摘要">{response.answer}</div>
+            <div className="sp-ai-summary" aria-label={t("section.answerSummaryAriaLabel")}>{response.answer}</div>
           ) : null}
           {sourceCandidates.length ? (
-            <section className="sp-ai-candidates" aria-label="已核实引用来源">
+            <section className="sp-ai-candidates" aria-label={t("section.sourcesAriaLabel")}>
               <div className="sp-group-head">
-                <span className="sp-group-title">已核实引用来源</span>
-                <span className="sp-group-count">{sourceCandidates.length} 条</span>
+                <span className="sp-group-title">{t("section.sourcesTitle")}</span>
+                <span className="sp-group-count">{t("section.sourceCount", { count: sourceCandidates.length })}</span>
               </div>
               <div className="sp-ai-list">
                 {sourceCandidates.map((item) => {
@@ -356,25 +376,25 @@ function AiAskSection({
                       variant="tertiary"
                       type="button"
                       className="sp-ai-candidate"
-                      aria-label={`查看${isField ? "字段" : "数据表"}详情：${isField ? item.fieldName : item.tableName}`}
+                      aria-label={t("section.candidateDetailAriaLabel", { type: t(isField ? "section.field" : "section.table"), name: isField ? item.fieldName : item.tableName })}
                       onClick={() => onNavigate?.(target, query)}
                     >
                       <span className="sp-ai-candidate-main">
                         <span className="sp-ai-candidate-heading">
                           <span className="sp-ai-candidate-title">{isField ? item.fieldDisplayName || item.fieldName : item.tableDisplayName || item.tableName}</span>
-                          <span className="sp-ai-candidate-type">{isField ? "字段" : "数据表"}</span>
+                          <span className="sp-ai-candidate-type">{t(isField ? "section.field" : "section.table")}</span>
                           <span className={`sp-ai-candidate-relevance ${item.relevance === "direct" ? "direct" : "related"}`}>
-                            {item.relevance === "direct" ? "直接相关" : "相关线索 · 非直接结论"}
+                            {t(item.relevance === "direct" ? "section.directRelevance" : "section.relatedLead")}
                           </span>
-                          <span className="sp-ai-candidate-verified">已核实引用</span>
+                          <span className="sp-ai-candidate-verified">{t("section.verifiedCitation")}</span>
                         </span>
                         <span className="sp-ai-candidate-name mono">{isField ? item.fieldName : item.tableName}</span>
-                        {isField ? <span className="sp-ai-candidate-meta">所属表：{item.tableDisplayName || item.tableName}（{item.tableName}）</span> : null}
+                        {isField ? <span className="sp-ai-candidate-meta">{t("section.owningTable", { displayName: item.tableDisplayName || item.tableName, name: item.tableName })}</span> : null}
                         {(isField ? item.fieldDescription : item.tableDescription) ? (
-                          <span className="sp-ai-candidate-desc">中文含义：{isField ? item.fieldDescription : item.tableDescription}</span>
+                          <span className="sp-ai-candidate-desc">{t("section.businessMeaning", { value: isField ? item.fieldDescription : item.tableDescription })}</span>
                         ) : null}
-                        <span className="sp-ai-candidate-meta">主题域/分层：{[item.domain, item.layer].filter(Boolean).join(" / ") || "未登记"}</span>
-                        <span className="sp-ai-candidate-evidence">证据来源：DAP 资产目录 · {item.matchReason}</span>
+                        <span className="sp-ai-candidate-meta">{t("section.subjectAreaLayer", { value: [item.domain, item.layer].filter(Boolean).join(" / ") || t("section.notRegistered") })}</span>
+                        <span className="sp-ai-candidate-evidence">{t("section.evidenceSource", { reason: item.matchReason })}</span>
                       </span>
                       <span className="sp-hit-go" aria-hidden="true"><Icon name="arrow" size={14} /></span>
                     </Button>
@@ -394,6 +414,8 @@ export function SearchPortalPage({
   availableModules = [],
   publicAccessReady = true,
 }: SearchPortalPageProps) {
+  const { t } = useTranslation("search");
+  const { t: tAi } = useTranslation("aiAsk");
   const scopeOptions = useMemo(
     () => filterPortalScopesByModules(availableModules),
     [availableModules],
@@ -425,7 +447,7 @@ export function SearchPortalPage({
   const [aiQuery, setAiQuery] = useState("");
   const [aiResponse, setAiResponse] = useState<AiAskResponse | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState("");
+  const [aiError, setAiError] = useState<AiAskUiError | null>(null);
   const [aiExecutionEvents, setAiExecutionEvents] = useState<AiAskExecutionEvent[]>([]);
   const [aiExecutionStatus, setAiExecutionStatus] = useState<AiAskExecutionStatus | null>(null);
   const [aiExecutionRunId, setAiExecutionRunId] = useState(0);
@@ -519,7 +541,7 @@ export function SearchPortalPage({
     setAiQuery("");
     setAiResponse(null);
     setAiLoading(false);
-    setAiError("");
+    setAiError(null);
     setAiExecutionEvents([]);
     setAiExecutionStatus(null);
     syncSearchUrl("", preservedScope);
@@ -554,7 +576,7 @@ export function SearchPortalPage({
       setAiQuery("");
       setAiResponse(null);
       setAiLoading(false);
-      setAiError("");
+      setAiError(null);
       setAiExecutionEvents([]);
       setAiExecutionStatus(null);
     }
@@ -579,7 +601,7 @@ export function SearchPortalPage({
       .catch((error: unknown) => {
         if (seq !== requestSeq.current) return;
         setSearchError(
-          error instanceof Error ? error.message : "搜索失败，请稍后再试。",
+          error instanceof Error ? error.message : t("results.searchFailedFallback"),
         );
         setResult(null);
         setSearchLoading(false);
@@ -615,7 +637,7 @@ export function SearchPortalPage({
     setAiQuery(question);
     setAiResponse(null);
     setAiLoading(true);
-    setAiError("");
+    setAiError(null);
     setAiExecutionEvents([]);
     setAiExecutionRunId((current) => current + 1);
     setAiExecutionStatus("running");
@@ -663,16 +685,17 @@ export function SearchPortalPage({
         aiAbortController.current = null;
         setAiLoading(false);
         if (controller.signal.aborted) {
-          setAiError("问答已取消。");
+          setAiError({ kind: "cancelled" });
           setAiExecutionStatus("cancelled");
           return;
         }
-        const message = error instanceof Error ? error.message : "AI 问答暂不可用，请重试。";
-        setAiError(
-          error instanceof AiAskExecutionContractError
-            ? `问答进度事件解析失败（前端事件契约，不代表后端检索失败）：${message}`
-            : message,
-        );
+        if (error instanceof AiAskExecutionContractError) {
+          setAiError({ kind: "contract", message: error.message });
+        } else if (error instanceof Error) {
+          setAiError({ kind: "message", message: error.message });
+        } else {
+          setAiError({ kind: "unavailable" });
+        }
         setAiExecutionStatus("failed");
         requestResultScroll();
       });
@@ -684,7 +707,7 @@ export function SearchPortalPage({
     aiAbortController.current.abort();
     aiAbortController.current = null;
     setAiLoading(false);
-    setAiError("问答已取消。");
+    setAiError({ kind: "cancelled" });
     setAiExecutionStatus("cancelled");
     requestResultScroll();
   };
@@ -709,7 +732,7 @@ export function SearchPortalPage({
           setAiQuery("");
           setAiResponse(null);
           setAiLoading(false);
-          setAiError("");
+          setAiError(null);
           setAiExecutionEvents([]);
           setAiExecutionStatus(null);
         }
@@ -745,7 +768,7 @@ export function SearchPortalPage({
       .catch((error: unknown) => {
         if (cancelled) return;
         setStatsError(
-          error instanceof Error ? error.message : "资产统计加载失败",
+          error instanceof Error ? error.message : t("statistics.loadError"),
         );
         setStatsLoading(false);
       });
@@ -841,11 +864,11 @@ export function SearchPortalPage({
     || aiResponse?.status === "ambiguous_scope"
     || aiResponse?.status === "metadata_count_unavailable"
   );
-  const searchTabStatus = searchLoading ? "搜索中" : searchError ? "搜索失败" : searchedTerm ? "已搜索" : "未搜索";
-  const aiProgressInterrupted = Boolean(aiError)
+  const searchTabStatus = searchLoading ? t("status.searching") : searchError ? t("status.searchFailed") : searchedTerm ? t("status.searched") : t("status.notSearched");
+  const aiProgressInterrupted = aiError !== null
     && aiExecutionStatus !== "cancelled"
     && !receivedTerminalEvent(aiExecutionEvents);
-  const aiTabStatus = aiLoading ? "问答中" : aiProgressInterrupted ? "进度中断" : aiError || aiResponseFailed ? "执行失败" : aiResponse ? "已完成" : "未提问";
+  const aiTabStatus = aiLoading ? tAi("status.asking") : aiProgressInterrupted ? tAi("status.interrupted") : aiError || aiResponseFailed ? tAi("status.failed") : aiResponse ? tAi("status.completed") : tAi("status.notAsked");
   const searchedAssetIds = new Set(
     groups
       .flatMap((group) => group.items.map((item) => item.assetId))
@@ -855,10 +878,8 @@ export function SearchPortalPage({
   return (
     <div className={`search-portal${searchedTerm || aiQuery ? " has-search-results" : ""}`}>
       <div className="sp-hero">
-        <h1>数据资产管理与血缘分析平台</h1>
-        <p>
-          一个入口，搜索系统、字段、词根、指标、报表、API、资产、下游推送和码值表。
-        </p>
+        <h1>{t("portal.title")}</h1>
+        <p>{t("portal.description")}</p>
       </div>
 
       <div className="sp-search-wrap">
@@ -877,31 +898,31 @@ export function SearchPortalPage({
             onKeyDown={(event) => {
               if (event.key === "Enter") doSearch();
             }}
-            placeholder="搜索资产、系统、字段、指标、报表、API、码值表、负责人或下游推送"
-            aria-label="搜索数据资产"
+            placeholder={t("portal.searchPlaceholder")}
+            aria-label={t("portal.searchAriaLabel")}
             autoFocus
           />
-          <Button variant="primary" type="button" className="sp-search-btn" aria-label="搜索" onClick={doSearch}>
+          <Button variant="primary" type="button" className="sp-search-btn" aria-label={t("portal.searchButton")} onClick={doSearch}>
             <Icon name="search" size={17} />
-            <span className="sp-btn-text">搜索</span>
+            <span className="sp-btn-text">{t("portal.searchButton")}</span>
           </Button>
           {aiEnabled ? (
             <Button
               variant="tertiary"
               type="button"
               className="sp-ask-btn"
-              aria-label="问 AI"
+              aria-label={t("portal.askAiButton")}
               disabled={!query.trim() || (aiLoading && query.trim() === aiQuery)}
               onClick={() => runAiAsk(query)}
             >
               <span className="sp-ask-mark" aria-hidden="true">✦</span>
-              <span>问 AI</span>
+              <span>{t("portal.askAiButton")}</span>
             </Button>
           ) : null}
         </div>
       </div>
 
-      <div className="sp-scopes" role="group" aria-label="搜索范围">
+      <div className="sp-scopes" role="group" aria-label={t("portal.scopeAriaLabel")}>
         {scopeOptions.map((item) => (
           <Button
             key={item.key}
@@ -911,14 +932,14 @@ export function SearchPortalPage({
             aria-pressed={scope === item.key}
             onClick={() => pickScope(item.key)}
           >
-            {item.label}
+            {resolvePortalScopeLabel(item, t)}
           </Button>
         ))}
       </div>
 
       {hotTags.length > 0 ? (
         <div className="sp-hot">
-          <span className="sp-hot-label">热门</span>
+          <span className="sp-hot-label">{t("portal.popular")}</span>
           {hotTags.map((item) => (
             <Button
               type="button"
@@ -940,7 +961,7 @@ export function SearchPortalPage({
           <div
             className="sp-result-tabs"
             role="tablist"
-            aria-label="搜索与问答结果"
+            aria-label={t("portal.resultTabsAriaLabel")}
             onKeyDown={(event) => {
               const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)'));
               const currentTab = event.target instanceof HTMLElement
@@ -973,7 +994,7 @@ export function SearchPortalPage({
               className={`sp-result-tab${activeResultTab === "search" ? " active" : ""}`}
               onClick={() => setActiveResultTab("search")}
             >
-              <span>搜索结果</span><span className="sp-result-tab-status">{searchTabStatus}</span>
+              <span>{t("portal.searchTab")}</span><span className="sp-result-tab-status">{searchTabStatus}</span>
             </Button>
             <Button
               variant="tertiary"
@@ -987,21 +1008,21 @@ export function SearchPortalPage({
               className={`sp-result-tab${activeResultTab === "ai" ? " active" : ""}`}
               onClick={() => setActiveResultTab("ai")}
             >
-              <span>AI 问答</span><span className="sp-result-tab-status">{aiEnabled || aiQuery ? aiTabStatus : "暂不可用"}</span>
+              <span>{t("portal.aiTab")}</span><span className="sp-result-tab-status">{aiEnabled || aiQuery ? aiTabStatus : tAi("status.unavailable")}</span>
             </Button>
           </div>
           <div className="sp-result-panel sp-search-panel" role="tabpanel" id="sp-search-panel" aria-labelledby="sp-search-tab" hidden={activeResultTab !== "search"}>
             {searchedTerm ? (
               <>
-                <div className="sp-panel-query">搜索问题：{searchedTerm}</div>
+                <div className="sp-panel-query">{t("portal.searchQuestion", { query: searchedTerm })}</div>
           {!searchLoading && !searchError && result?.partial ? (
-            <ActionErrorBanner title="搜索结果不完整" message="部分模块暂时不可用，以下仅展示已成功查询的结果，请重新搜索。" />
+            <ActionErrorBanner title={t("results.searchPartialTitle")} message={t("results.searchPartialMessage")} />
           ) : null}
           {searchLoading ? (
             <LoadingState
-              title={`正在搜索 “${searchedTerm}”...`}
+              title={t("results.searchingTitle", { query: searchedTerm })}
               desc=""
-              label="正在搜索"
+              label={t("results.searchingLabel")}
               className="sp-result-loading"
             />
           ) : searchError ? (
@@ -1012,8 +1033,8 @@ export function SearchPortalPage({
                 <Icon name="inbox" size={26} />
               </div>
               <EmptyState
-                title={result?.partial ? "已查询模块暂无匹配" : "没有找到精确匹配的资产"}
-                desc={result?.partial ? "部分模块加载失败，当前无法确认完整搜索结果。" : `没有与 “${searchedTerm}” 相关的资产、系统、字段、词根、指标、报表、API、码值表或下游推送。`}
+                title={t(result?.partial ? "results.partialTitle" : "results.noExactMatchTitle")}
+                desc={t(result?.partial ? "results.partialDescription" : "results.noResultsDescription", { query: searchedTerm })}
                 className="sp-empty-adapter"
               />
               {!result?.partial && aiEnabled ? (
@@ -1021,37 +1042,37 @@ export function SearchPortalPage({
                   variant="primary"
                   className="sp-empty-ai-action"
                   type="button"
-                  aria-label="问 AI 找资产"
+                  aria-label={t("results.askAiForAsset")}
                   disabled={aiLoading}
                   onClick={() => runAiAsk(searchedTerm)}
                 >
-                  问 AI 找资产
+                  {t("results.askAiForAsset")}
                 </Button>
               ) : null}
               <Button
                 variant="primary"
                 className="sp-empty-action"
                 type="button"
-                aria-label="清空搜索"
+                aria-label={t("results.clearSearch")}
                 onClick={() => clearSearch(scope)}
               >
-                清空搜索
+                {t("results.clearSearch")}
               </Button>
             </div>
           ) : (
             <>
-              <div className="sp-business-group-title">资产搜索结果</div>
+              <div className="sp-business-group-title">{t("results.assetGroupTitle")}</div>
               <div className="sp-result-summary">
-                {result?.partial ? "已加载" : "共"} <b>{result?.total}</b> 条结果，匹配 “{searchedTerm}”
+                {t(result?.partial ? "results.loadedPrefix" : "results.totalPrefix")} <b>{result?.total}</b> {t("results.summarySuffix", { query: searchedTerm })}
               </div>
               {groups.map((group) => (
                 <div key={group.type} className="sp-group">
                   <div className="sp-group-head">
-                    <span className="sp-group-title">{group.label}</span>
+                    <span className="sp-group-title">{resolveSearchGroupLabel(group, t)}</span>
                     <span className="sp-group-count">
                       {group.hasMore
-                        ? `已显示 ${group.items.length} / ${group.count} 条`
-                        : `${group.count} 条`}
+                        ? t("results.groupShowing", { shown: group.items.length, total: group.count })
+                        : t("results.groupCount", { count: group.count })}
                     </span>
                   </div>
                   <div className="sp-group-list">
@@ -1072,14 +1093,14 @@ export function SearchPortalPage({
                             {item.category ? ` · ${item.category}` : ""}
                           </span>
                         </span>
-                        {item.meta || formatMatchedField(item) ? (
+                        {item.meta || formatMatchedField(item, t("results.matchedPrefix")) ? (
                           <span className="sp-hit-facts">
                             {item.meta ? (
                               <span className="sp-hit-meta">{item.meta}</span>
                             ) : null}
-                            {formatMatchedField(item) ? (
+                            {formatMatchedField(item, t("results.matchedPrefix")) ? (
                               <span className="sp-hit-match">
-                                {formatMatchedField(item)}
+                                {formatMatchedField(item, t("results.matchedPrefix"))}
                               </span>
                             ) : null}
                           </span>
@@ -1095,10 +1116,10 @@ export function SearchPortalPage({
                       variant="tertiary"
                       type="button"
                       className="sp-group-more"
-                      aria-label={`查看全部${group.label}结果`}
+                      aria-label={t("results.seeAllAriaLabel", { group: resolveSearchGroupLabel(group, t) })}
                       onClick={() => handleNavigate(group, searchedTerm)}
                     >
-                      查看全部 {group.count} 条
+                      {t("results.seeAll", { count: group.count })}
                       <Icon name="arrow" size={13} />
                     </Button>
                   ) : null}
@@ -1119,9 +1140,9 @@ export function SearchPortalPage({
               </>
             ) : (
               <div className="sp-tab-empty">
-                <p>{query.trim() ? `尚未对“${query.trim()}”执行传统搜索。` : "尚未输入要搜索的问题。"}</p>
+                <p>{query.trim() ? t("results.queryNotSearched", { query: query.trim() }) : t("results.emptyQueryNotSearched")}</p>
                 <Button variant="tertiary" type="button" className="sp-panel-action" disabled={!query.trim()} onClick={doSearch}>
-                  搜索当前问题
+                  {t("results.searchCurrentQuestion")}
                 </Button>
               </div>
             )}
@@ -1129,7 +1150,7 @@ export function SearchPortalPage({
           <div className="sp-result-panel sp-ai-panel" role="tabpanel" id="sp-ai-panel" aria-labelledby="sp-ai-tab" hidden={activeResultTab !== "ai"}>
             {aiQuery ? (
               <>
-                <div className="sp-panel-query">问答问题：{aiQuery}</div>
+                <div className="sp-panel-query">{tAi("section.question", { query: aiQuery })}</div>
                 <AiAskSection
                   query={aiQuery}
                   loading={aiLoading}
@@ -1147,12 +1168,12 @@ export function SearchPortalPage({
               <div className="sp-tab-empty">
                 {aiEnabled ? (
                   <>
-                    <p>{query.trim() ? `尚未对“${query.trim()}”发起 AI 问答。` : "尚未输入要问的问题。"}</p>
+                    <p>{query.trim() ? t("results.queryNotAsked", { query: query.trim() }) : t("results.emptyQuestion")}</p>
                     <Button variant="tertiary" type="button" className="sp-panel-action" disabled={!query.trim()} onClick={() => runAiAsk(query)}>
-                      开始问 AI
+                      {t("results.startAiAsk")}
                     </Button>
                   </>
-                ) : <p>AI 问答暂不可用，传统搜索仍可使用。</p>}
+                ) : <p>{tAi("failures.aiUnavailableSearchAvailable")}</p>}
               </div>
             )}
           </div>
@@ -1161,16 +1182,16 @@ export function SearchPortalPage({
         <div className="sp-stats">
           {!publicAccessReady ? (
             <LoadingState
-              title="正在准备公开资产目录..."
+              title={t("statistics.prepareTitle")}
               desc=""
-              label="正在准备公开资产目录"
+              label={t("statistics.prepareLabel")}
               className="sp-stats-hint"
             />
           ) : statsLoading ? (
             <LoadingState
-              title="正在加载资产统计..."
+              title={t("statistics.loadingTitle")}
               desc=""
-              label="正在加载资产统计"
+              label={t("statistics.loadingLabel")}
               className="sp-stats-hint"
             />
           ) : statsError ? (
@@ -1180,7 +1201,7 @@ export function SearchPortalPage({
               {stats.map((item) => (
                 <div key={item.label} className="sp-stat-card">
                   <div className="sp-stat-num">{item.value}</div>
-                  <div className="sp-stat-label">{item.label}</div>
+                  <div className="sp-stat-label">{resolvePortalStatLabel(item.label, t)}</div>
                 </div>
               ))}
             </div>

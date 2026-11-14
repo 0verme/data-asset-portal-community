@@ -246,6 +246,59 @@ test("search result rows expand to their content without overlapping across view
   }
 });
 
+test("portal search results and query state survive an in-place language switch", async ({ page }) => {
+  await page.addInitScript(() => localStorage.removeItem("dap-language"));
+  await openPortal(page);
+  const apiRequests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/")) apiRequests.push(request.url());
+  });
+  const search = page.getByRole("textbox", { name: "搜索数据资产" });
+  await search.fill(ASSET_NAME);
+  await search.press("Enter");
+  const hit = page.locator(".sp-hit-title").filter({ hasText: ASSET_NAME }).first();
+  await expect(hit).toBeVisible();
+  const stateUrl = page.url();
+  const requestCount = apiRequests.length;
+  await page.getByRole("button", { name: "切换到英文" }).click();
+
+  await expect(page.locator("html")).toHaveAttribute("lang", "en-US");
+  await expect(page.getByRole("textbox", { name: "Search data assets" })).toHaveValue(ASSET_NAME);
+  await expect(page.getByRole("tab", { name: /Search results/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".sp-hit-title").filter({ hasText: ASSET_NAME }).first()).toBeVisible();
+  await expect(page).toHaveURL(stateUrl);
+  expect(apiRequests).toHaveLength(requestCount);
+});
+
+test("portal AI answer and both result tabs survive an in-place language switch", async ({ page }) => {
+  await page.addInitScript(() => localStorage.removeItem("dap-language"));
+  await openPortal(page);
+  const query = "订单金额在哪张表？";
+  const search = page.getByRole("textbox", { name: "搜索数据资产" });
+  await search.fill(query);
+  await search.press("Enter");
+  await expect(page.getByRole("heading", { name: "没有找到精确匹配的资产" })).toBeVisible();
+  const stateUrl = page.url();
+
+  await page.getByRole("button", { name: "问 AI", exact: true }).click();
+  await expect(page.locator(".sp-ai-summary")).toContainText("【模拟演示】");
+  const answerBeforeSwitch = await page.locator(".sp-ai-summary").innerText();
+  await expect(page.getByRole("tab", { name: /AI 问答/ })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("button", { name: "切换到英文" }).click();
+
+  await expect(page.locator("html")).toHaveAttribute("lang", "en-US");
+  await expect(page.getByRole("textbox", { name: "Search data assets" })).toHaveValue(query);
+  await expect(page.getByRole("tab", { name: /AI Q&A/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".sp-ai-summary")).toHaveText(answerBeforeSwitch);
+  await expect(page).toHaveURL(stateUrl);
+
+  await page.getByRole("tab", { name: /Search results/ }).click();
+  await expect(page.getByRole("heading", { name: "No exact asset matches found" })).toBeVisible();
+  await expect(page.locator("#sp-search-panel")).toContainText(query);
+  await page.getByRole("tab", { name: /AI Q&A/ }).click();
+  await expect(page.locator(".sp-ai-summary")).toHaveText(answerBeforeSwitch);
+});
+
 test("portal search remains within light/dark and desktop-to-phone viewport bounds", async ({ page }, testInfo: TestInfo) => {
   await openPortal(page);
   const html = page.locator("html");

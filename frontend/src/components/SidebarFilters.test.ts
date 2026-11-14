@@ -67,8 +67,8 @@ test("all target asset sidebar dimensions have an explicit reset entry", async (
 		readFile(pushSidebarPath, "utf8"),
 	]);
 
-	assertAllOption(asset, "全部层级");
-	assertAllOption(asset, "全部主题域");
+	assert.match(asset, /label: t\("sidebar\.allLayers"\)/);
+	assert.match(asset, /label: t\("sidebar\.allDomains"\)/);
 	assertAllOption(upstream, "全部类型");
 	assertAllOption(report, "全部报表类型");
 	assertAllOption(report, "全部归属部门");
