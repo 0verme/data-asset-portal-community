@@ -70,12 +70,12 @@ test("all target asset sidebar dimensions have an explicit reset entry", async (
 	assert.match(asset, /label: t\("sidebar\.allLayers"\)/);
 	assert.match(asset, /label: t\("sidebar\.allDomains"\)/);
 	assertAllOption(upstream, "全部类型");
-	assertAllOption(report, "全部报表类型");
-	assertAllOption(report, "全部归属部门");
-	assert.match(api, /group\(\s*"请求方式",\s*"method",\s*"全部请求方式"/);
+	assert.match(report, /allOption=\{[\s\S]*?label: t\("sidebar\.allTypes"\)/);
+	assert.match(report, /allOption=\{[\s\S]*?label: t\("sidebar\.allDepartments"\)/);
+	assert.match(api, /group\(\s*t\("sidebar\.methodTitle"\),\s*"method",\s*t\("sidebar\.allMethods"\)/);
 	assert.match(
 		api,
-		/group\(\s*"业务系统",\s*"downstreamSystemId",\s*"全部业务系统"/,
+		/group\(\s*t\("sidebar\.systemTitle"\),\s*"downstreamSystemId",\s*t\("sidebar\.allSystems"\)/,
 	);
 	assertAllOption(push, "全部协议");
 	assertAllOption(push, "全部重要程度");

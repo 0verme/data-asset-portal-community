@@ -7,6 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   calculateScrollbarThumbMetrics,
@@ -93,6 +94,7 @@ function readColumnWidths(table: HTMLTableElement): number[] {
 }
 
 export function FieldMappingWideTable({ children, renderStickyHeader }: FieldMappingWideTableProps) {
+  const { t } = useTranslation("fieldMapping");
   const wrapperRef = useRef<HTMLDivElement>(null);
   const scrollbarRef = useRef<HTMLDivElement>(null);
   const scrollbarTrackRef = useRef<HTMLDivElement>(null);
@@ -362,13 +364,13 @@ export function FieldMappingWideTable({ children, renderStickyHeader }: FieldMap
           className="fm-sticky-horizontal-scrollbar"
           style={fixedScrollbarStyle}
           role="scrollbar"
-          aria-label="字段映射表格横向滚动"
+          aria-label={t("scrollbar.label")}
           aria-controls="field-mapping-results-table"
           aria-orientation="horizontal"
           aria-valuemin={0}
           aria-valuemax={Math.round(maxScroll)}
           aria-valuenow={Math.round(scrollLeft)}
-          aria-valuetext={`已滚动 ${Math.round(scrollLeft)}，可滚动 ${Math.round(maxScroll)} 像素`}
+          aria-valuetext={t("scrollbar.valueText", { current: Math.round(scrollLeft), max: Math.round(maxScroll) })}
           tabIndex={0}
           onPointerDown={handleScrollbarPointerDown}
           onPointerMove={handleScrollbarPointerMove}

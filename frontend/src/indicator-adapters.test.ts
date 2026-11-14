@@ -10,7 +10,7 @@ const cascader = read("./components/IndicatorPathCascader.tsx");
 test("indicator page buttons use the frozen DAP Button adapter", () => {
   assert.match(page, /import \{ Button \} from "\.\.\/ui\/index\.ts"/);
   assert.ok((page.match(/<Button/g) ?? []).length >= 3);
-  assert.match(page, /<Button className="btn" variant="secondary" type="button" onClick=\{onClose\} aria-label="关闭指标详情">/);
+  assert.match(page, /<Button className="btn" variant="secondary" type="button" onClick=\{onClose\} aria-label=\{t\("detail\.close"\)\}>/);
   assert.match(page, /<Button className="btn" variant="secondary" type="button" onClick=\{onClose\}>/);
   assert.match(page, /<Button className="btn primary" variant="primary" type="button" onClick=\{onNew\}>/);
   assert.doesNotMatch(page, /from "@cloudflare\/kumo\//);
@@ -20,7 +20,8 @@ test("indicator editor fields use frozen DAP adapters", () => {
   assert.match(editor, /FormErrorSummary,[\s\S]*?FormField,[\s\S]*?Input,[\s\S]*?type FormFieldErrors,[\s\S]*?from "\.\.\/ui\/index\.ts"/);
   assert.match(editor, /import \{ validateIndicatorForm \} from "\.\/indicatorFormErrors\.ts"/);
   assert.match(editor, /focusFirstFormError\(formRef\.current, errors, "auto"\)/);
-  assert.match(editor, /const nextErrors = validateIndicatorForm\(form\);[\s\S]*?Object\.keys\(nextErrors\)\.length/);
+  assert.match(editor, /title=\{t\("editor\.errorSummaryTitle"\)\}/);
+  assert.match(editor, /const nextErrors = validateIndicatorForm\(form, t\);[\s\S]*?Object\.keys\(nextErrors\)\.length/);
   assert.match(cascader, /aria-describedby=\{ariaDescribedBy\}/);
   assert.match(cascader, /aria-labelledby=\{ariaLabelledBy\}/);
   assert.equal((editor.match(/<Input/g) ?? []).length, 7);
@@ -30,8 +31,8 @@ test("indicator editor fields use frozen DAP adapters", () => {
   assert.match(editor, /<Select<string \| number>/);
   assert.match(editor, /value=\{form\.sourceAssetId \|\| ""\}/);
   assert.match(editor, /value=\{form\.resultFieldId \|\| ""\}/);
-  assert.match(editor, /placeholder="未指定（兼容历史指标）"/);
-  assert.match(editor, /aria-label="语义生命周期"[\s\S]*?items=\{SEMANTIC_STATE_OPTIONS/);
+  assert.match(editor, /placeholder=\{t\("editor\.placeholders\.aggregation"\)\}/);
+  assert.match(editor, /aria-label=\{t\("editor\.fields\.semanticState"\)\}[\s\S]*?items=\{SEMANTIC_STATE_VALUES/);
   assert.doesNotMatch(editor, /from "@cloudflare\/kumo\//);
 });
 

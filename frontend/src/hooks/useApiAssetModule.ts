@@ -18,6 +18,7 @@ import { DEFAULT_API_ASSET_ROUTE } from '../config/defaults.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
 import { toast } from '../components/common/index.ts';
 import { runOptimisticStatusMutation } from '../utils/statusMutation.ts';
+import { i18n } from '../i18n/index.ts';
 import type { ApiAssetFilter, ApiAssetRoute } from '../routing/types.ts';
 
 export interface UseApiAssetModuleProps {
@@ -134,7 +135,7 @@ export function useApiAssetModule({
       setError('');
     } catch (e: unknown) {
       if (sequence === requestSequence.current) {
-        setError(e instanceof Error && e.message ? e.message : '加载 API 资产失败');
+        setError(e instanceof Error && e.message ? e.message : i18n.t('errors.listLoad', { ns: 'apiAsset' }));
       }
     } finally {
       if (sequence === requestSequence.current) setLoading(false);
@@ -170,7 +171,7 @@ export function useApiAssetModule({
       const item = await getApiAsset(code);
       if (sequence === detailSequence.current) setCurrentRecord({ code, item });
     } catch (e: unknown) {
-      if (sequence === detailSequence.current) setDetailError(e instanceof Error && e.message ? e.message : '加载 API 资产详情失败');
+      if (sequence === detailSequence.current) setDetailError(e instanceof Error && e.message ? e.message : i18n.t('errors.detailLoad', { ns: 'apiAsset' }));
     } finally {
       if (sequence === detailSequence.current) setDetailLoading(false);
     }
@@ -201,7 +202,7 @@ export function useApiAssetModule({
       setRoute(DEFAULT_API_ASSET_ROUTE);
       scrollMainToTop();
     } catch (e: unknown) {
-      const failure = normalizeApiAssetSaveFailure(e, payload);
+      const failure = normalizeApiAssetSaveFailure(e, payload, i18n.getFixedT(null, 'apiAsset'));
       setSaveError(failure.summary);
       setSaveFieldErrors(failure.fieldErrors);
       setSaveFailureRevision((revision) => revision + 1);
@@ -231,7 +232,7 @@ export function useApiAssetModule({
       },
       rollback: () =>
         setItems((currentItems) => currentItems.map((row) => (row.code === item.code ? item : row))),
-      onError: (e) => toast.error(getErrorMessage(e, '更新 API 资产状态失败。')),
+      onError: (e) => toast.error(getErrorMessage(e, i18n.t('errors.toggleStatus', { ns: 'apiAsset' }))),
     });
     pendingRef.current.delete(item.code);
     setPendingIds((currentIds) => currentIds.filter((code) => code !== item.code));

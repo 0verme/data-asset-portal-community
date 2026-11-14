@@ -25,7 +25,10 @@ export function resolveLineageNodeSchema(node: LineageNode): string | null {
   return null;
 }
 
-export function buildLineageSchemaGroups(nodes: readonly LineageNode[]): LineageSchemaGroup[] {
+export function buildLineageSchemaGroups(
+  nodes: readonly LineageNode[],
+  unclassifiedLabel = UNCLASSIFIED_SCHEMA_LABEL,
+): LineageSchemaGroup[] {
   const candidates = nodes
     .filter((node) => node.kind === "table" && Boolean(node.id) && Boolean(node.name))
     .map((node) => ({ node, schemaName: resolveLineageNodeSchema(node) }))
@@ -55,7 +58,7 @@ export function buildLineageSchemaGroups(nodes: readonly LineageNode[]): Lineage
         schemaName,
         // Normalize presentation only; keep exact identity in schemaName and
         // the group key so case-sensitive schemas remain distinct.
-        displayName: schemaName === null ? UNCLASSIFIED_SCHEMA_LABEL : schemaName.toUpperCase(),
+        displayName: schemaName === null ? unclassifiedLabel : schemaName.toUpperCase(),
         tables: [],
       };
       groups.set(key, group);

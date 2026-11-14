@@ -1,0 +1,122 @@
+{
+  "page": {
+    "title": "Field Mapping",
+    "subtitle": "Explore mappings between source and target fields in field-level or table-level views."
+  },
+  "context": {
+    "currentOnly": "Viewing only: {{source}}",
+    "defaultSource": "the selected source system",
+    "tableRedirect": "Showing table-level results for the selected source system.",
+    "fieldRedirect": "Showing field-level results for the selected source system and table.",
+    "back": "Back to Upstream Loads",
+    "clear": "Clear filters"
+  },
+  "stats": {
+    "labels": {
+      "sourceSystems": "Source systems",
+      "tables": "Tables",
+      "fields": "Fields",
+      "mapped": "Mapped",
+      "pending": "Needs mapping",
+      "emptyComments": "Empty comments"
+    },
+    "hints": {
+      "sourceSystems": "Managed mapping sources",
+      "tables": "All tables included in mappings",
+      "fields": "Total field mapping rows",
+      "pending": "Target fields are not assigned yet",
+      "emptyComments": "Source field comments are missing"
+    },
+    "coverage": "Coverage: {{value}}%",
+    "loading": "Loading statistics",
+    "error": "Statistics could not be loaded",
+    "waiting": "Waiting for statistics"
+  },
+  "filters": {
+    "title": "Filters",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "sourceTable": "Source table",
+    "sourceTablePlaceholder": "e.g. MEMBER_PROFILE",
+    "sourceField": "Source field",
+    "sourceFieldPlaceholder": "e.g. ACCT_NO",
+    "targetTable": "DWF table",
+    "targetTablePlaceholder": "e.g. DWD_TRADE_ORDER",
+    "targetField": "DWF field",
+    "targetFieldPlaceholder": "e.g. account_no",
+    "emptyComment": "Comment status",
+    "all": "All",
+    "commentEmpty": "Comment is empty",
+    "commentPresent": "Comment is present",
+    "helpLabel": "Search help",
+    "help": "Enter a source table, source field, DWF table, or DWF field and select Search. You can also select a source system on the left to filter immediately. Use the comment filter to find rows with or without a source-field comment. Reset clears the filters and restores all source systems.",
+    "reset": "Reset",
+    "apply": "Search"
+  },
+  "tabs": {
+    "table": "Tables",
+    "field": "Fields"
+  },
+  "groups": {
+    "source": "Source system",
+    "target": "Data warehouse (DWF)"
+  },
+  "columns": {
+    "sourceSystem": "Source system",
+    "sourceTable": "Source table",
+    "sourceTableChineseName": "Table display name",
+    "sourceField": "Source field",
+    "fieldType": "Field type",
+    "fieldComment": "Field comment",
+    "targetLayer": "Target layer",
+    "targetTable": "Target table",
+    "loadMode": "Load mode",
+    "targetField": "Target field",
+    "mappingRule": "Mapping rule",
+    "mappedCount": "Mapped",
+    "emptyCommentRate": "Empty comment rate",
+    "actions": "Actions"
+  },
+  "cells": {
+    "mappingDirection": "Mapping direction",
+    "notFilled": "Not provided",
+    "notSet": "Not set",
+    "pending": "Pending",
+    "directMapping": "Direct mapping",
+    "transformRequired": "Transformation required: {{rule}}"
+  },
+  "loadModes": {
+    "full": "Full",
+    "incr": "Incremental",
+    "incr_zip": "Incremental with history",
+    "full_zip": "Full with history"
+  },
+  "results": {
+    "count": "Total: {{count}}",
+    "export": "Export CSV",
+    "viewFieldMapping": "View field mappings",
+    "loadingFields": "Loading field mappings",
+    "loadingTables": "Loading table mappings",
+    "loadingDescription": "Preparing mapping results for the current filters.",
+    "fieldError": "Field mappings could not be loaded",
+    "tableError": "Table mappings could not be loaded",
+    "retryList": "Retry list",
+    "emptyTitle": "No matching records",
+    "emptyDescription": "Adjust the filters or clear the search keyword at the top and try again.",
+    "statsError": "Statistics could not be loaded",
+    "retryStats": "Retry statistics",
+    "paginationLabel": "Field mapping pagination"
+  },
+  "export": {
+    "fieldFilename": "field-mapping-fields.csv",
+    "tableFilename": "field-mapping-tables.csv"
+  },
+  "exportError": {
+    "prefix": "Export failed: {{message}}",
+    "retry": "Please try again later."
+  },
+  "scrollbar": {
+    "label": "Field mapping table horizontal scrolling",
+    "valueText": "Scrolled {{current}} pixels; the scroll range is {{max}} pixels"
+  }
+}

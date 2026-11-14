@@ -31,6 +31,7 @@ import {
 import { isUnauthorizedError } from '../api/http.ts';
 import { DEFAULT_INDICATOR_ROUTE } from '../config/defaults.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
+import { i18n } from '../i18n/index.ts';
 import type { IndicatorFilter, IndicatorRoute } from '../routing/types.ts';
 
 export interface IndicatorFacets {
@@ -164,7 +165,7 @@ export function useIndicatorModule({
       setIndicatorLoaded(true);
     } catch (error: unknown) {
       if (sequence === listSequence.current && latestListKey.current === listKey) {
-        setIndicatorError(getErrorMessage(error, '指标数据加载失败。'));
+        setIndicatorError(getErrorMessage(error, i18n.t('messages.listLoadError', { ns: 'indicator' })));
       }
     } finally {
       if (sequence === listSequence.current && latestListKey.current === listKey) setIndicatorLoading(false);
@@ -191,7 +192,7 @@ export function useIndicatorModule({
       }
     }).catch((error: unknown) => {
       if (!cancelled && latestDetailKey.current === detailKey) {
-        setDetail({ key: detailKey, item: null, error: getErrorMessage(error, '指标详情加载失败。') });
+        setDetail({ key: detailKey, item: null, error: getErrorMessage(error, i18n.t('messages.detailLoadError', { ns: 'indicator' })) });
       }
     });
     return () => { cancelled = true; };
@@ -246,7 +247,7 @@ export function useIndicatorModule({
       scrollMainToTop();
     } catch (error: unknown) {
       if (!isUnauthorizedError(error)) {
-        setIndicatorSaveError(getErrorMessage(error, '保存指标失败。'));
+        setIndicatorSaveError(getErrorMessage(error, i18n.t('messages.saveError', { ns: 'indicator' })));
       }
     } finally {
       setIndicatorSaveBusy(false);
@@ -270,7 +271,7 @@ export function useIndicatorModule({
       scrollMainToTop();
     } catch (error: unknown) {
       if (!isUnauthorizedError(error)) {
-        setIndicatorActionError(getErrorMessage(error, '删除指标失败。'));
+        setIndicatorActionError(getErrorMessage(error, i18n.t('messages.deleteError', { ns: 'indicator' })));
       }
     }
   };
@@ -292,7 +293,7 @@ export function useIndicatorModule({
       await reloadRef.current();
     } catch (error: unknown) {
       if (!isUnauthorizedError(error)) {
-        setIndicatorActionError(getErrorMessage(error, '更新指标状态失败。'));
+        setIndicatorActionError(getErrorMessage(error, i18n.t('messages.statusUpdateError', { ns: 'indicator' })));
       }
       setIndicators((prev) => prev.map((item) => (item.id === indicator.id ? indicator : item)));
     } finally {

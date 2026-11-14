@@ -70,6 +70,13 @@ test("puts tables without schema metadata in the unclassified group", () => {
   assert.equal(groups[0]?.key, UNCLASSIFIED_SCHEMA_KEY);
   assert.equal(groups[0]?.displayName, "未分类");
   assert.equal(groups[0]?.tables.length, 2);
+
+  const localized = buildLineageSchemaGroups([
+    node("missing", "TABLE_WITHOUT_SCHEMA", "source-finance"),
+  ], "Unclassified");
+  assert.equal(localized[0]?.key, groups[0]?.key, "localized labels must not alter schema identity");
+  assert.equal(localized[0]?.schemaName, null);
+  assert.equal(localized[0]?.displayName, "Unclassified");
 });
 
 test("deduplicates by stable node ID and preserves same-name tables in distinct schemas", () => {

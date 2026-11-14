@@ -1,0 +1,197 @@
+{
+  "moduleTitle": "指标维护",
+  "page": {
+    "code": "指标",
+    "title": "指标管理",
+    "summaryTotal": "共 {{count}} 个口径指标",
+    "coverage": "，覆盖 {{count}} 个业务维度",
+    "currentDimension": "，当前维度 {{dimension}}",
+    "overallCount": "，总量 {{count}}",
+    "create": "新增指标"
+  },
+  "status": {
+    "enabled": "启用",
+    "disabled": "禁用"
+  },
+  "messages": {
+    "listLoadError": "指标数据加载失败。",
+    "detailLoadError": "指标详情加载失败。",
+    "saveError": "保存指标失败。",
+    "deleteError": "删除指标失败。",
+    "statusUpdateError": "更新指标状态失败。"
+  },
+  "filters": {
+    "label": "筛选",
+    "dimension": "维度：{{dimension}}",
+    "status": "状态：{{status}}",
+    "statusEnabled": "启用",
+    "statusDisabled": "禁用",
+    "query": "搜索：{{query}}",
+    "clearAll": "清除全部"
+  },
+  "table": {
+    "emptyTitle": "没有匹配的指标",
+    "emptyDescription": "试着调整搜索词或筛选条件。",
+    "ariaLabel": "指标列表",
+    "id": "指标 ID",
+    "nameMeaning": "指标中文名 / 含义",
+    "dimension": "维度",
+    "caliberPath": "指标口径 / 指标路径",
+    "status": "状态",
+    "registrar": "登记人",
+    "registeredAt": "登记日期",
+    "actions": "操作",
+    "meaning": "指标含义",
+    "caliberPathMobile": "口径 / 路径",
+    "groupCount": "{{count}} 个指标"
+  },
+  "detail": {
+    "title": "指标详情",
+    "subtitle": "查看该指标的完整登记信息",
+    "close": "关闭指标详情",
+    "closeButton": "关闭",
+    "basicInfo": "基本信息",
+    "dimensionStatus": "维度与状态",
+    "caliberInfo": "口径信息",
+    "extendedInfo": "扩展信息",
+    "id": "指标 ID",
+    "name": "指标中文名",
+    "registrar": "登记人",
+    "registeredAt": "登记日期",
+    "dimension": "指标维度",
+    "status": "状态",
+    "semanticState": "语义生命周期",
+    "meaning": "指标含义",
+    "sourceAsset": "来源资产",
+    "resultTableSnapshot": "结果表兼容快照",
+    "resultField": "结果字段",
+    "aggregation": "聚合方式",
+    "caliber": "指标口径",
+    "path": "指标路径",
+    "metaLabels": {
+      "englishName": "英文名",
+      "enName": "英文名",
+      "tags": "标签",
+      "tag": "标签",
+      "source": "来源",
+      "sourceSystem": "来源系统",
+      "remark": "备注",
+      "remarks": "备注",
+      "createdAt": "创建时间",
+      "updatedAt": "更新时间"
+    }
+  },
+  "editor": {
+    "backLevel": "返回上一层",
+    "backList": "返回指标列表",
+    "edit": "编辑指标",
+    "create": "新增指标",
+    "newSubtitle": "登记新的口径指标并纳入统一指标管理。",
+    "errorSummaryTitle": "请检查以下字段",
+    "saveError": "保存失败",
+    "formField": "表单字段",
+    "basicInfo": "基本信息",
+    "caliberInfo": "口径信息",
+    "fields": {
+      "id": "指标 ID",
+      "name": "指标中文名",
+      "registrar": "登记人",
+      "registeredAt": "登记日期",
+      "status": "状态",
+      "meaning": "指标含义",
+      "sourceAsset": "来源资产（稳定引用）",
+      "resultField": "结果字段（稳定引用）",
+      "resultTableSnapshot": "结果表兼容快照",
+      "resultFieldSnapshot": "结果字段兼容快照",
+      "aggregation": "聚合方式",
+      "semanticState": "语义生命周期",
+      "caliber": "指标口径",
+      "path": "指标路径"
+    },
+    "placeholders": {
+      "id": "输入指标 ID",
+      "name": "输入指标名称",
+      "registrar": "输入登记人",
+      "registeredAt": "YYYY-MM-DD",
+      "meaning": "描述该指标的业务含义、取值逻辑和适用范围。",
+      "resultTable": "例如：dws.ads_indicator_result_di",
+      "resultField": "例如：first_loan_flag",
+      "caliber": "描述指标的统计口径",
+      "aggregation": "未指定（兼容历史指标）"
+    },
+    "asset": {
+      "unbound": "未绑定稳定资产（保留兼容快照）",
+      "currentFallback": "当前来源资产",
+      "unnamed": "未命名资产",
+      "loadError": "来源资产加载失败。",
+      "retry": "重试加载资产",
+      "unavailable": "当前数据源未提供稳定资产 ID，保留兼容文本录入。"
+    },
+    "field": {
+      "unbound": "未绑定稳定字段（保留兼容快照）",
+      "currentFallback": "当前结果字段",
+      "unnamed": "未命名字段",
+      "loadError": "来源资产字段加载失败。",
+      "retry": "重试加载字段"
+    },
+    "path": {
+      "placeholder": "请选择指标路径",
+      "empty": "暂无可选路径",
+      "clear": "清空指标路径",
+      "loading": "正在加载路径配置...",
+      "level": "第 {{level}} 级",
+      "loadError": "指标路径配置加载失败。",
+      "retry": "重试加载路径",
+      "unmatched": "当前保留原始路径文本，未匹配到级联配置；可直接保存，或重新选择规范路径。"
+    },
+    "semanticStates": {
+      "candidate": "候选",
+      "certified": "已认证",
+      "deprecated": "已废弃"
+    },
+    "saveNoteEdit": "保存后会更新指标口径、状态和登记信息。",
+    "saveNoteCreate": "保存后会加入指标维护清单并可立即启用或禁用。",
+    "saveEdit": "保存修改",
+    "saveCreate": "创建指标",
+    "deleteDescription": "删除指标后将无法恢复，相关历史引用仍会保留。若指标暂时不再使用，建议优先禁用。",
+    "delete": "删除指标",
+    "missingTitle": "指标不存在"
+  },
+  "view": {
+    "loadingDetail": "加载指标详情",
+    "loadingList": "加载指标维护清单",
+    "loadingDescription": "正在准备指标信息。",
+    "loadError": "指标维护加载失败",
+    "permissionTitle": "当前页面需要指标维护权限",
+    "permissionDescription": "指标目录可以公开浏览，新增和编辑需要相应写权限。",
+    "missingTitle": "指标不存在",
+    "sort": "排序",
+    "sortLabel": "指标排序",
+    "sortIdAsc": "标识升序",
+    "sortIdDesc": "标识降序",
+    "sortNameAsc": "名称升序",
+    "sortNameDesc": "名称降序",
+    "pagination": "指标维护分页"
+  },
+  "sidebar": {
+    "dimensionTitle": "指标维度",
+    "allIndicators": "全部指标",
+    "statusTitle": "状态",
+    "allStatuses": "全部状态",
+    "create": "新增指标"
+  },
+  "validation": {
+    "idRequired": "指标 ID 不能为空",
+    "nameRequired": "指标中文名不能为空",
+    "registrarRequired": "登记人不能为空",
+    "registeredAtFormat": "登记日期必须使用 yyyy-mm-dd",
+    "pathRequired": "指标路径不能为空"
+  },
+  "deleteConfirm": {
+    "typeLabel": "指标",
+    "impact": "该指标删除后，可能影响指标口径、指标来源字段、指标结果表字段、报表引用、血缘关系和审计记录。若指标已被引用，应优先禁用，而不是删除。",
+    "serverCheck": "删除前会以服务端校验结果为准，不会绕过引用关系检查。",
+    "serverReason": "若后端返回不可删除原因，页面会直接展示原因。",
+    "keywordLabel": "请输入指标 ID 二次确认"
+  }
+}

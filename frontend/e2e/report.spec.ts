@@ -110,7 +110,7 @@ for (const width of [1440, 390]) {
     const expireDescription = await expireDate.getAttribute("aria-describedby");
     expect(expireDescription).toBeTruthy();
     await expect(page.locator(`#${expireDescription!.split(/\s+/)[0]}`)).toContainText("失效日期不能早于生效日期");
-    await expect(page.locator("#report-editor-form [role='alert']").first()).toContainText("失效日期：失效日期不能早于生效日期");
+    await expect(page.locator("#report-editor-form [role='alert']").first()).toContainText("失效日期（选填）：失效日期不能早于生效日期");
     await expect(page.getByRole("heading", { name: "新增报表" })).toBeVisible();
   });
 }
@@ -143,7 +143,7 @@ test("form error presenter summary links reveal collapsed lifecycle fields befor
   await expect(codeInput).toBeFocused();
   await expect(lifecycle).not.toHaveAttribute("open", "");
 
-  const expiryError = page.getByRole("button", { name: "失效日期：失效日期不能早于生效日期" });
+  const expiryError = page.getByRole("button", { name: "失效日期（选填）：失效日期不能早于生效日期" });
   await expiryError.click();
   await expect(lifecycle).toHaveAttribute("open", "");
   await expect(expireDate).toBeFocused();

@@ -105,6 +105,18 @@
     "catalogDisabledDescription": "Sign in is required to browse this catalog. Signing in does not change backend authorization.",
     "loginToContinue": "Sign in to continue"
   },
+  "references": {
+    "selectedCount": "{{count}} selected",
+    "noneSelected": "No {{title}} selected",
+    "search": "Search {{title}}",
+    "remove": "Remove {{label}}",
+    "loadError": "Could not load related assets.",
+    "retry": "Retry loading related assets",
+    "loading": "Loading available assets…",
+    "tables": "Related tables",
+    "indicators": "Related indicators",
+    "noCandidates": "No {{title}} found"
+  },
   "action": {
     "close": "Close",
     "cancel": "Cancel",

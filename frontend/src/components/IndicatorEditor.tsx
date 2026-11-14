@@ -1,4 +1,6 @@
 import React from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 
 import { getAssetFields, getAssetTables, type AssetTableField, type AssetTableItem } from "../api/assets.ts";
 import { getIndicatorPathTree } from "../api/indicator.ts";
@@ -25,19 +27,22 @@ import {
 import { validateIndicatorForm } from "./indicatorFormErrors.ts";
 
 const INDICATOR_FORM_ID = "indicator-editor-form";
-const INDICATOR_FIELD_LABELS: Readonly<Record<string, string>> = {
-  id: "指标 ID",
-  name: "指标中文名",
-  registrar: "登记人",
-  registeredAt: "登记日期",
-  path: "指标路径",
+type IndicatorT = TFunction<"indicator">;
+type IndicatorFieldLabelKey =
+  | "editor.fields.id"
+  | "editor.fields.name"
+  | "editor.fields.registrar"
+  | "editor.fields.registeredAt"
+  | "editor.fields.path";
+const INDICATOR_FIELD_LABEL_KEYS: Readonly<Record<string, IndicatorFieldLabelKey>> = {
+  id: "editor.fields.id",
+  name: "editor.fields.name",
+  registrar: "editor.fields.registrar",
+  registeredAt: "editor.fields.registeredAt",
+  path: "editor.fields.path",
 };
 const AGGREGATION_OPTIONS = ["SUM", "COUNT", "COUNT_DISTINCT", "AVG", "MIN", "MAX", "NONE"] as const;
-const SEMANTIC_STATE_OPTIONS = [
-  { value: "candidate", label: "候选" },
-  { value: "certified", label: "已认证" },
-  { value: "deprecated", label: "已废弃" },
-] as const;
+const SEMANTIC_STATE_VALUES = ["candidate", "certified", "deprecated"] as const;
 
 type AggregationValue = typeof AGGREGATION_OPTIONS[number];
 
@@ -75,12 +80,12 @@ function getFieldOptionId(field: AssetTableField): number | null {
   return normalizeOptionalId(field.fieldId);
 }
 
-function assetLabel(asset: AssetTableItem): string {
-  return [asset.cn, asset.name].filter(Boolean).join(" · ") || "未命名资产";
+function assetLabel(asset: AssetTableItem, t: IndicatorT): string {
+  return [asset.cn, asset.name].filter(Boolean).join(" · ") || t("editor.asset.unnamed");
 }
 
-function fieldLabel(field: AssetTableField): string {
-  return [field.cn, field.name].filter(Boolean).join(" · ") || "未命名字段";
+function fieldLabel(field: AssetTableField, t: IndicatorT): string {
+  return [field.cn, field.name].filter(Boolean).join(" · ") || t("editor.field.unnamed");
 }
 
 function createDefaultForm(): IndicatorFormData {
@@ -175,6 +180,9 @@ export function IndicatorEditor({
   saveError = "",
   onClearSaveError,
 }: IndicatorEditorProps) {
+  const { t } = useTranslation("indicator");
+  const tRef = React.useRef(t);
+  tRef.current = t;
   const isEdit = mode === "edit";
   const [form, setForm] = React.useState<IndicatorFormData>(() => createFormState(initial));
   const [touched, setTouched] = React.useState(false);
@@ -218,7 +226,7 @@ export function IndicatorEditor({
         }
       } catch (error: unknown) {
         if (!cancelled) {
-          setAssetError(error instanceof Error ? error.message : "来源资产加载失败。");
+          setAssetError(error instanceof Error ? error.message : tRef.current("editor.asset.loadError"));
         }
       } finally {
         if (!cancelled) setAssetLoading(false);
@@ -254,7 +262,7 @@ export function IndicatorEditor({
         }
       } catch (error: unknown) {
         if (!cancelled) {
-          setFieldError(error instanceof Error ? error.message : "来源资产字段加载失败。");
+          setFieldError(error instanceof Error ? error.message : tRef.current("editor.field.loadError"));
         }
       } finally {
         if (!cancelled) setFieldLoading(false);
@@ -278,7 +286,7 @@ export function IndicatorEditor({
         if (!cancelled) setPathOptions(parseIndicatorPathOptions(items));
       } catch (error: unknown) {
         if (!cancelled) {
-          setPathError(error instanceof Error ? error.message : "指标路径配置加载失败。");
+          setPathError(error instanceof Error ? error.message : tRef.current("editor.path.loadError"));
         }
       } finally {
         if (!cancelled) setPathLoading(false);
@@ -292,8 +300,8 @@ export function IndicatorEditor({
   }, [pathRetryRevision]);
 
   const errors: FormFieldErrors = React.useMemo(
-    () => touched ? validateIndicatorForm(form) : {},
-    [form, touched],
+    () => touched ? validateIndicatorForm(form, t) : {},
+    [form, t, touched],
   );
 
   React.useLayoutEffect(() => {
@@ -348,7 +356,7 @@ export function IndicatorEditor({
   ].filter(Boolean).join(" ") || undefined;
 
   const submit = () => {
-    const nextErrors = validateIndicatorForm(form);
+    const nextErrors = validateIndicatorForm(form, t);
     setTouched(true);
     if (saveBusy) return;
     if (Object.keys(nextErrors).length) {
@@ -386,139 +394,140 @@ export function IndicatorEditor({
   return (
     <div id={INDICATOR_FORM_ID} ref={formRef}>
       <PageHeader
-        back={{ onClick: onCancel, text: isEdit ? "返回上一层" : "返回指标列表" }}
+        back={{ onClick: onCancel, text: isEdit ? t("editor.backLevel") : t("editor.backList") }}
         breadcrumbs={buildModuleBreadcrumbs("indicator", [
-          { label: isEdit ? "编辑指标" : "新增指标" },
-        ], onCancel)}
+          { label: isEdit ? t("editor.edit") : t("editor.create") },
+        ], onCancel).map((item, index) => index === 0 ? { ...item, label: t("moduleTitle") } : item)}
         icon={isEdit ? "edit" : "plus"}
-        title={isEdit ? "编辑指标" : "新增指标"}
-        subtitle={isEdit ? form.id : "登记新的口径指标并纳入统一指标管理。"}
+        title={isEdit ? t("editor.edit") : t("editor.create")}
+        subtitle={isEdit ? form.id : t("editor.newSubtitle")}
       />
 
-      <ActionErrorBanner title="保存失败" message={saveError} />
+      <ActionErrorBanner title={t("editor.saveError")} message={saveError} />
       <FormErrorSummary
         formId={INDICATOR_FORM_ID}
         errors={errors}
-        getFieldLabel={(field) => INDICATOR_FIELD_LABELS[field] || "表单字段"}
+        title={t("editor.errorSummaryTitle")}
+        getFieldLabel={(field) => INDICATOR_FIELD_LABEL_KEYS[field] ? t(INDICATOR_FIELD_LABEL_KEYS[field]) : t("editor.formField")}
       />
 
       <div className="form-card">
-        <h3><Icon name="hash" size={14} />基本信息</h3>
+        <h3><Icon name="hash" size={14} />{t("editor.basicInfo")}</h3>
         <div className="form-grid">
-          <FormField className="fl" formId={INDICATOR_FORM_ID} name="id" label="指标 ID" error={errors["id"]}>
-            <Input aria-label="指标 ID" className={`inp mono${errors["id"] ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder="例如：CUST00001" />
+          <FormField className="fl" formId={INDICATOR_FORM_ID} name="id" label={t("editor.fields.id")} error={errors["id"]}>
+            <Input aria-label={t("editor.fields.id")} className={`inp mono${errors["id"] ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder={t("editor.placeholders.id")} />
           </FormField>
-          <FormField className="fl" formId={INDICATOR_FORM_ID} name="name" label="指标中文名" error={errors["name"]}>
-            <Input aria-label="指标中文名" className={`inp${errors["name"] ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：会员复购率" />
+          <FormField className="fl" formId={INDICATOR_FORM_ID} name="name" label={t("editor.fields.name")} error={errors["name"]}>
+            <Input aria-label={t("editor.fields.name")} className={`inp${errors["name"] ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder={t("editor.placeholders.name")} />
           </FormField>
-          <FormField className="fl" formId={INDICATOR_FORM_ID} name="registrar" label="登记人" error={errors["registrar"]}>
-            <Input aria-label="登记人" className={`inp${errors["registrar"] ? " invalid" : ""}`} value={form.registrar} onChange={(event) => setValue("registrar", event.target.value)} placeholder="例如：何嘉佳" />
+          <FormField className="fl" formId={INDICATOR_FORM_ID} name="registrar" label={t("editor.fields.registrar")} error={errors["registrar"]}>
+            <Input aria-label={t("editor.fields.registrar")} className={`inp${errors["registrar"] ? " invalid" : ""}`} value={form.registrar} onChange={(event) => setValue("registrar", event.target.value)} placeholder={t("editor.placeholders.registrar")} />
           </FormField>
-          <FormField className="fl" formId={INDICATOR_FORM_ID} name="registeredAt" label="登记日期" error={errors["registeredAt"]}>
-            <Input aria-label="登记日期" className={`inp mono${errors["registeredAt"] ? " invalid" : ""}`} value={form.registeredAt} onChange={(event) => setValue("registeredAt", event.target.value)} placeholder="例如：2025-06-17" />
+          <FormField className="fl" formId={INDICATOR_FORM_ID} name="registeredAt" label={t("editor.fields.registeredAt")} error={errors["registeredAt"]}>
+            <Input aria-label={t("editor.fields.registeredAt")} className={`inp mono${errors["registeredAt"] ? " invalid" : ""}`} value={form.registeredAt} onChange={(event) => setValue("registeredAt", event.target.value)} placeholder={t("editor.placeholders.registeredAt")} />
           </FormField>
           <div className="fl">
-            <label>状态</label>
-            <BinaryStatusToggle mode="status" value={form.status} onChange={(value) => setValue("status", normalizeStatus(value))} />
+            <label>{t("editor.fields.status")}</label>
+            <BinaryStatusToggle mode="status" ariaLabel={t("editor.fields.status")} labels={{ enabled: t("status.enabled"), disabled: t("status.disabled") }} value={form.status} onChange={(value) => setValue("status", normalizeStatus(value))} />
           </div>
         </div>
       </div>
 
       <div className="form-card">
-        <h3><Icon name="info" size={14} />口径信息</h3>
+        <h3><Icon name="info" size={14} />{t("editor.caliberInfo")}</h3>
         <div className="form-grid">
           <div className="fl full">
-            <label>指标含义</label>
-            <Textarea aria-label="指标含义" className="ta" value={form.meaning} onChange={(event) => setValue("meaning", event.target.value)} placeholder="描述该指标的业务含义、取值逻辑和使用范围。" />
+            <label>{t("editor.fields.meaning")}</label>
+            <Textarea aria-label={t("editor.fields.meaning")} className="ta" value={form.meaning} onChange={(event) => setValue("meaning", event.target.value)} placeholder={t("editor.placeholders.meaning")} />
           </div>
           <div className="fl">
-            <label>来源资产（稳定引用）</label>
+            <label>{t("editor.fields.sourceAsset")}</label>
             <Select<string | number>
-              aria-label="来源资产（稳定引用）"
+              aria-label={t("editor.fields.sourceAsset")}
               className="inp"
               disabled={assetLoading}
               items={[
-                { label: "未绑定稳定资产（保留兼容快照）", value: "" },
+                { label: t("editor.asset.unbound"), value: "" },
                 ...(form.sourceAssetId && !assetOptions.some((item) => getAssetOptionId(item) === form.sourceAssetId)
-                  ? [{ label: form.sourceAssetName || form.resultTableName || "当前来源资产", value: form.sourceAssetId }]
+                  ? [{ label: form.sourceAssetName || form.resultTableName || t("editor.asset.currentFallback"), value: form.sourceAssetId }]
                   : []),
                 ...assetOptions.flatMap((asset) => {
                   const assetId = getAssetOptionId(asset);
-                  return assetId === null ? [] : [{ label: assetLabel(asset), value: assetId }];
+                  return assetId === null ? [] : [{ label: assetLabel(asset, t), value: assetId }];
                 }),
               ]}
               value={form.sourceAssetId || ""}
-              placeholder="未绑定稳定资产（保留兼容快照）"
+              placeholder={t("editor.asset.unbound")}
               onValueChange={(value) => handleAssetChange(value === null ? "" : String(value))}
             />
             {assetError ? (
               <div className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
                 {assetError}{" "}
-                <button className="btn" type="button" onClick={() => setAssetRetryRevision((revision) => revision + 1)}>重试加载资产</button>
+                <button className="btn" type="button" onClick={() => setAssetRetryRevision((revision) => revision + 1)}>{t("editor.asset.retry")}</button>
               </div>
             ) : null}
-            {!assetLoading && !assetError && !assetOptions.length ? <div className="match-hint">当前数据源未提供稳定资产 ID，保留兼容文本录入。</div> : null}
+            {!assetLoading && !assetError && !assetOptions.length ? <div className="match-hint">{t("editor.asset.unavailable")}</div> : null}
           </div>
           <div className="fl">
-            <label>结果字段（稳定引用）</label>
+            <label>{t("editor.fields.resultField")}</label>
             <Select<string | number>
-              aria-label="结果字段（稳定引用）"
+              aria-label={t("editor.fields.resultField")}
               className="inp"
               disabled={!form.sourceAssetId || fieldLoading}
               items={[
-                { label: "未绑定稳定字段（保留兼容快照）", value: "" },
+                { label: t("editor.field.unbound"), value: "" },
                 ...(form.resultFieldId && !currentFieldOptions.some((item) => getFieldOptionId(item) === form.resultFieldId)
-                  ? [{ label: form.resultFieldName || "当前结果字段", value: form.resultFieldId }]
+                  ? [{ label: form.resultFieldName || t("editor.field.currentFallback"), value: form.resultFieldId }]
                   : []),
                 ...currentFieldOptions.flatMap((field) => {
                   const fieldId = getFieldOptionId(field);
-                  return fieldId === null ? [] : [{ label: fieldLabel(field), value: fieldId }];
+                  return fieldId === null ? [] : [{ label: fieldLabel(field, t), value: fieldId }];
                 }),
               ]}
               value={form.resultFieldId || ""}
-              placeholder="未绑定稳定字段（保留兼容快照）"
+              placeholder={t("editor.field.unbound")}
               onValueChange={(value) => handleFieldChange(value === null ? "" : String(value))}
             />
             {fieldError ? (
               <div className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
                 {fieldError}{" "}
-                <button className="btn" type="button" onClick={() => setFieldRetryRevision((revision) => revision + 1)}>重试加载字段</button>
+                <button className="btn" type="button" onClick={() => setFieldRetryRevision((revision) => revision + 1)}>{t("editor.field.retry")}</button>
               </div>
             ) : null}
           </div>
           <div className="fl">
-            <label>结果表兼容快照</label>
+            <label>{t("editor.fields.resultTableSnapshot")}</label>
             <Input
-              aria-label="结果表兼容快照"
+              aria-label={t("editor.fields.resultTableSnapshot")}
               className="inp mono"
               value={form.resultTableName}
               readOnly={Boolean(form.sourceAssetId)}
               onChange={(event) => setValue("resultTableName", event.target.value)}
-              placeholder="例如：dws.ads_indicator_result_di"
+              placeholder={t("editor.placeholders.resultTable")}
             />
           </div>
           <div className="fl">
-            <label>结果字段兼容快照</label>
+            <label>{t("editor.fields.resultFieldSnapshot")}</label>
             <Input
-              aria-label="结果字段兼容快照"
+              aria-label={t("editor.fields.resultFieldSnapshot")}
               className="inp mono"
               value={form.resultFieldName}
               readOnly={Boolean(form.resultFieldId)}
               onChange={(event) => setValue("resultFieldName", event.target.value)}
-              placeholder="例如：first_loan_flag"
+              placeholder={t("editor.placeholders.resultField")}
             />
           </div>
           <div className="fl">
-            <label>聚合方式</label>
-            <Select<string> aria-label="聚合方式" className="inp mono" placeholder="未指定（兼容历史指标）" items={[{ label: "未指定（兼容历史指标）", value: "" }, ...AGGREGATION_OPTIONS.map((value) => ({ label: value, value }))]} value={form.aggregation || ""} onValueChange={(value) => setValue("aggregation", value || "")} />
+            <label>{t("editor.fields.aggregation")}</label>
+            <Select<string> aria-label={t("editor.fields.aggregation")} className="inp mono" placeholder={t("editor.placeholders.aggregation")} items={[{ label: t("editor.placeholders.aggregation"), value: "" }, ...AGGREGATION_OPTIONS.map((value) => ({ label: value, value }))]} value={form.aggregation || ""} onValueChange={(value) => setValue("aggregation", value || "")} />
           </div>
           <div className="fl">
-            <label>语义生命周期</label>
-            <Select<string> aria-label="语义生命周期" className="inp" items={SEMANTIC_STATE_OPTIONS.map((option) => ({ label: option.label, value: option.value }))} value={form.semanticState || null} onValueChange={(value) => setValue("semanticState", value || form.semanticState)} />
+            <label>{t("editor.fields.semanticState")}</label>
+            <Select<string> aria-label={t("editor.fields.semanticState")} className="inp" items={SEMANTIC_STATE_VALUES.map((value) => ({ label: t(`editor.semanticStates.${value}`), value }))} value={form.semanticState || null} onValueChange={(value) => setValue("semanticState", value || form.semanticState)} />
           </div>
           <div className="fl">
-            <label>指标口径</label>
-            <Input aria-label="指标口径" className="inp" value={form.caliber} onChange={(event) => setValue("caliber", event.target.value)} placeholder="例如：一表通口径" />
+            <label>{t("editor.fields.caliber")}</label>
+            <Input aria-label={t("editor.fields.caliber")} className="inp" value={form.caliber} onChange={(event) => setValue("caliber", event.target.value)} placeholder={t("editor.placeholders.caliber")} />
           </div>
           <div
             id={pathFieldMarkerId}
@@ -526,7 +535,7 @@ export function IndicatorEditor({
             data-form-field="path"
             tabIndex={-1}
           >
-            <label id={`${pathFieldMarkerId}-label`}>指标路径</label>
+            <label id={`${pathFieldMarkerId}-label`}>{t("editor.fields.path")}</label>
             <IndicatorPathCascader
               value={form.path}
               options={pathOptions}
@@ -546,12 +555,12 @@ export function IndicatorEditor({
             {pathError ? (
               <div id={pathConfigErrorId} className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
                 {pathError}{" "}
-                <button className="btn" type="button" onClick={() => setPathRetryRevision((revision) => revision + 1)}>重试加载路径</button>
+                <button className="btn" type="button" onClick={() => setPathRetryRevision((revision) => revision + 1)}>{t("editor.path.retry")}</button>
               </div>
             ) : null}
             {!pathLoading && !pathError && form.path.trim() && !getIndicatorDimensionFromPath(form.path) ? (
               <div className="match-hint">
-                当前保留原始路径文本，未匹配到级联配置；可直接保存，或重新选择规范路径。
+                {t("editor.path.unmatched")}
               </div>
             ) : null}
           </div>
@@ -559,21 +568,21 @@ export function IndicatorEditor({
       </div>
 
       <FormActionBar
-        note={isEdit ? "保存后会更新指标口径、状态和登记信息。" : "保存后会加入指标维护清单并可立即启用或禁用。"}
+        note={isEdit ? t("editor.saveNoteEdit") : t("editor.saveNoteCreate")}
         onCancel={onCancel}
         onSave={submit}
         saving={saveBusy}
         isDirty={isDirty}
-        saveText={isEdit ? "保存修改" : "创建指标"}
+        saveText={isEdit ? t("editor.saveEdit") : t("editor.saveCreate")}
       />
 
       {isEdit && initial ? (
         <DangerZone
-          description="删除指标后将无法恢复，相关历史引用仍会保留。若指标暂时不再使用，建议优先禁用。"
+          description={t("editor.deleteDescription")}
           actions={[
             {
               key: "delete-indicator",
-              label: "删除指标",
+              label: t("editor.delete"),
               icon: "trash",
               danger: true,
               onClick: () => onDelete(initial.id),

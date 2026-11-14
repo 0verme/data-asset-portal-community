@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { Dispatch, SetStateAction } from "react";
+import { useTranslation } from "react-i18next";
 import type { ReportFilter, ReportRoute } from "../../routing/types.ts";
 import type { UseReportModuleResult } from "../../hooks/useReportModule.ts";
 import { DEFAULT_REPORT_FILTER } from "../../config/defaults.ts";
@@ -31,6 +32,7 @@ export interface ReportSidebarProps {
 }
 
 export function ReportSidebar({ report, requireLogin, canEdit = false, setReportRoute }: ReportSidebarProps) {
+  const { t } = useTranslation("report");
   const { reportCount, reportFilter, setReportFilter, reportFacets } = report;
   // Report type is a facet of the current report-asset response, not a
   // common-code endpoint. This also preserves types added in the database.
@@ -40,10 +42,10 @@ export function ReportSidebar({ report, requireLogin, canEdit = false, setReport
   return (
     <>
       <SidebarFilterGroup
-        title="报表类型"
+        title={t("sidebar.typeTitle")}
         allOption={{
           key: "all-report-types",
-          label: "全部报表类型",
+          label: t("sidebar.allTypes"),
           count: reportCount,
           active: !reportFilter.type,
           onClick: () => setReportFilter((prev) => ({ ...prev, type: null })),
@@ -67,14 +69,18 @@ export function ReportSidebar({ report, requireLogin, canEdit = false, setReport
         totalCount={reportCount}
         enabledCount={reportFacets.status["enabled"] || 0}
         disabledCount={reportFacets.status["disabled"] || 0}
+        title={t("sidebar.statusTitle")}
+        allLabel={t("sidebar.allStatuses")}
+        enabledLabel={t("status.enabled")}
+        disabledLabel={t("status.disabled")}
         onChange={(status) => setReportFilter((prev: ReportFilter) => ({ ...prev, status }))}
       />
 
       <SidebarFilterGroup
-        title="归属部门"
+        title={t("sidebar.departmentTitle")}
         allOption={{
           key: "all-owner-depts",
-          label: "全部归属部门",
+          label: t("sidebar.allDepartments"),
           count: reportCount,
           active: !reportFilter.ownerDept,
           onClick: () => setReportFilter((prev) => ({ ...prev, ownerDept: null })),
@@ -93,7 +99,7 @@ export function ReportSidebar({ report, requireLogin, canEdit = false, setReport
       <SidebarActionGroup
         actions={canEdit ? [{
           key: "create-report",
-          label: "新增报表",
+          label: t("sidebar.create"),
           onClick: () => requireLogin(() => setReportRoute({ page: "new", code: null })),
         }] : []}
       />

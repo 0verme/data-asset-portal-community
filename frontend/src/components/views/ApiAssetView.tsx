@@ -1,4 +1,6 @@
 import React from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 
 import type {
   ApiAssetParam,
@@ -112,6 +114,8 @@ function relationRows(
   ];
 }
 
+type ApiAssetT = TFunction<"apiAsset">;
+
 type RowKind = "params" | "responseFields";
 type RowItem = ApiAssetParam | ApiAssetResponseField;
 
@@ -163,6 +167,7 @@ function Rows<T extends RowItem>({
   fieldErrors,
   clearErrors,
 }: RowsProps<T>) {
+  const { t } = useTranslation("apiAsset");
   const add = (): void => {
     const row: RowItem =
       kind === "params"
@@ -193,13 +198,13 @@ function Rows<T extends RowItem>({
         <table className="dt mobile-edit-table">
           <thead>
             <tr>
-              <th>名称</th>
-              {kind === "params" ? <th>位置</th> : null}
-              <th>类型</th>
-              <th>说明</th>
-              {kind === "params" ? <th>必填</th> : null}
-              <th>示例</th>
-              <th>操作</th>
+              <th>{t("rows.name")}</th>
+              {kind === "params" ? <th>{t("rows.location")}</th> : null}
+              <th>{t("rows.type")}</th>
+              <th>{t("rows.description")}</th>
+              {kind === "params" ? <th>{t("rows.required")}</th> : null}
+              <th>{t("rows.example")}</th>
+              <th>{t("rows.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -215,9 +220,9 @@ function Rows<T extends RowItem>({
               return (
                 <React.Fragment key={index}>
                   <tr>
-                    <td data-label="名称">
+                    <td data-label={t("rows.name")}>
                       <Input
-                        aria-label={`第 ${index + 1} 行名称`}
+                        aria-label={t("rows.rowName", { row: index + 1 })}
                         aria-invalid={Boolean(nameError || rowError) || undefined}
                         aria-describedby={[
                           nameError ? apiAssetErrorId(nameField) : "",
@@ -231,9 +236,9 @@ function Rows<T extends RowItem>({
                       {nameError ? <small id={apiAssetErrorId(nameField)} className="api-asset-field-error">{nameError}</small> : null}
                     </td>
                     {kind === "params" ? (
-                      <td data-label="位置">
+                      <td data-label={t("rows.location")}>
                         <Select<string>
-                          aria-label={`第 ${index + 1} 行位置`}
+                          aria-label={t("rows.rowLocation", { row: index + 1 })}
                           aria-invalid={Boolean(locationError) || undefined}
                           aria-describedby={locationError ? apiAssetErrorId(locationField) : undefined}
                           data-api-asset-field={locationField}
@@ -245,9 +250,9 @@ function Rows<T extends RowItem>({
                         {locationError ? <small id={apiAssetErrorId(locationField)} className="api-asset-field-error">{locationError}</small> : null}
                       </td>
                     ) : null}
-                    <td data-label="类型">
+                    <td data-label={t("rows.type")}>
                       <Input
-                        aria-label={`第 ${index + 1} 行类型`}
+                        aria-label={t("rows.rowType", { row: index + 1 })}
                         aria-invalid={Boolean(typeError) || undefined}
                         aria-describedby={typeError ? apiAssetErrorId(typeField) : undefined}
                         data-api-asset-field={typeField}
@@ -257,26 +262,26 @@ function Rows<T extends RowItem>({
                       />
                       {typeError ? <small id={apiAssetErrorId(typeField)} className="api-asset-field-error">{typeError}</small> : null}
                     </td>
-                    <td data-label="说明">
+                    <td data-label={t("rows.description")}>
                       <Input
-                        aria-label={`第 ${index + 1} 行说明`}
+                        aria-label={t("rows.rowDescription", { row: index + 1 })}
                         className="inp"
                         value={row.description || ""}
                         onChange={(event) => update(index, { description: event.target.value })}
                       />
                     </td>
                     {kind === "params" ? (
-                      <td data-label="必填">
+                      <td data-label={t("rows.required")}>
                         <Checkbox
-                          aria-label={`第 ${index + 1} 行必填`}
+                          aria-label={t("rows.rowRequired", { row: index + 1 })}
                           checked={(row as ApiAssetParam).required}
                           onCheckedChange={(required) => update(index, { required })}
                         />
                       </td>
                     ) : null}
-                    <td data-label="示例">
+                    <td data-label={t("rows.example")}>
                       <Input
-                        aria-label={`第 ${index + 1} 行示例`}
+                        aria-label={t("rows.rowExample", { row: index + 1 })}
                         value={row.example || ""}
                         onChange={(event) => update(index, { example: event.target.value })}
                       />
@@ -291,7 +296,7 @@ function Rows<T extends RowItem>({
                           onChange(items.filter((_, current) => current !== index));
                         }}
                       >
-                        删除
+                        {t("rows.delete")}
                       </Button>
                     </td>
                   </tr>
@@ -314,10 +319,18 @@ function Rows<T extends RowItem>({
         </table>
       </div>
       <Button className="btn" variant="secondary" type="button" onClick={add}>
-        + 添加
+        {t("rows.add")}
       </Button>
     </div>
   );
+}
+
+function ApiAssetStatusBadge({ status }: { status: unknown }) {
+  const { t } = useTranslation("apiAsset");
+  return <StatusBadge status={status} metaMap={{
+    enabled: { label: t("status.enabled"), className: "st-on" },
+    disabled: { label: t("status.disabled"), className: "st-off" },
+  }} />;
 }
 
 interface SystemPickerProps {
@@ -328,6 +341,7 @@ interface SystemPickerProps {
 }
 
 function SystemPicker({ systems, value, error, onChange }: SystemPickerProps) {
+  const { t } = useTranslation("apiAsset");
   const [query, setQuery] = React.useState("");
   const options = systems.filter(
     (system) =>
@@ -341,15 +355,15 @@ function SystemPicker({ systems, value, error, onChange }: SystemPickerProps) {
   return (
     <div className="system-picker">
       <Input
-        aria-label="搜索系统名称或简称"
+        aria-label={t("system.search")}
         className="inp"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="搜索系统名称或简称"
+        placeholder={t("system.search")}
       />
       {/* System <select> intentionally remains native: per-option disabled semantics are not expressible in the frozen DAP Select items API. */}
       <select
-        aria-label="下游调用系统"
+        aria-label={t("system.downstream")}
         aria-invalid={Boolean(error) || undefined}
         aria-describedby={error ? apiAssetErrorId("systemId") : undefined}
         data-api-asset-field="systemId"
@@ -358,7 +372,7 @@ function SystemPicker({ systems, value, error, onChange }: SystemPickerProps) {
         onChange={(event) => onChange(event.target.value)}
         required
       >
-        <option value="">请选择业务系统</option>
+        <option value="">{t("system.placeholder")}</option>
         {options.map((system) => (
           <option
             key={system.id}
@@ -366,7 +380,7 @@ function SystemPicker({ systems, value, error, onChange }: SystemPickerProps) {
             disabled={system.status !== "enabled"}
           >
             {system.name}（{system.short_name}）
-            {system.status !== "enabled" ? "（已禁用）" : ""}
+            {system.status !== "enabled" ? t("system.disabledSuffix") : ""}
           </option>
         ))}
       </select>
@@ -386,15 +400,15 @@ type ApiTextFieldKey =
   | "ownerDept"
   | "ownerName"
   | "maintainerName";
-const API_TEXT_FIELDS: readonly [ApiTextFieldKey, string][] = [
-  ["code", "API 编码"],
-  ["name", "API 名称"],
-  ["path", "请求路径"],
-  ["version", "版本"],
-  ["type", "API 类型"],
-  ["ownerDept", "归属部门"],
-  ["ownerName", "负责人"],
-  ["maintainerName", "维护人"],
+const API_TEXT_FIELDS: readonly [ApiTextFieldKey, `fields.${ApiTextFieldKey}`][] = [
+  ["code", "fields.code"],
+  ["name", "fields.name"],
+  ["path", "fields.path"],
+  ["version", "fields.version"],
+  ["type", "fields.type"],
+  ["ownerDept", "fields.ownerDept"],
+  ["ownerName", "fields.ownerName"],
+  ["maintainerName", "fields.maintainerName"],
 ];
 
 function toFormData(item: MockApiAsset | null | undefined): ApiAssetFormData {
@@ -423,6 +437,7 @@ function Editor({
   saveFailureRevision,
   clearSaveErrors: clearServerErrors,
 }: EditorProps) {
+  const { t } = useTranslation("apiAsset");
   const [form, setForm] = React.useState<ApiAssetFormData>(() =>
     toFormData(item),
   );
@@ -465,6 +480,7 @@ function Editor({
     const validationErrors = validateApiAssetForm(
       { ...payload, downstreamSystemId: form.downstreamSystemId },
       systems,
+      t,
     );
     setLocalFieldErrors(validationErrors);
     if (Object.keys(validationErrors).length) {
@@ -485,7 +501,7 @@ function Editor({
   );
   const firstRelationError = relationErrors[0];
   const fieldSummary = Object.keys(fieldErrors).length
-    ? `请检查以下字段：${Object.keys(fieldErrors).map(apiAssetFieldLabel).join("、")}`
+    ? t("editor.checkFields", { fields: Object.keys(fieldErrors).map((field) => apiAssetFieldLabel(field, t)).join(t("editor.fieldSeparator")) })
     : "";
   const bannerMessages = [
     ...(error ? [error] : []),
@@ -495,21 +511,22 @@ function Editor({
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "API 资产", onClick: onCancel },
-          { label: item ? "编辑 API" : "新增 API" },
+          { label: t("moduleTitle"), onClick: onCancel },
+          { label: item ? t("editor.edit") : t("editor.create") },
         ]}
         icon={item ? "edit" : "plus"}
-        title={item ? "编辑 API" : "新增 API"}
-        subtitle="维护 API 元数据、请求参数、响应字段与资产关联。"
+        title={item ? t("editor.edit") : t("editor.create")}
+        subtitle={t("editor.subtitle")}
       />
       <ActionErrorBanner
-        title={error ? "API 资产保存失败" : "请检查 API 资产表单"}
+        title={error ? t("editor.saveError") : t("editor.formError")}
         messages={bannerMessages}
       />
       <div className="form-card">
-        <h3>基本信息</h3>
+        <h3>{t("editor.basicInfo")}</h3>
         <div className="form-grid">
-          {API_TEXT_FIELDS.map(([key, label]) => {
+          {API_TEXT_FIELDS.map(([key, labelKey]) => {
+            const label = t(labelKey);
             const fieldError = fieldErrors[key];
             return (
               <div className="fl" key={key}>
@@ -529,7 +546,7 @@ function Editor({
             );
           })}
           <div className="fl">
-            <label>下游调用系统</label>
+            <label>{t("system.downstream")}</label>
             <SystemPicker
               systems={systems}
               value={form.downstreamSystemId}
@@ -539,9 +556,9 @@ function Editor({
             {fieldErrors["systemId"] ? <small id={apiAssetErrorId("systemId")} className="api-asset-field-error">{fieldErrors["systemId"]}</small> : null}
           </div>
           <div className="fl">
-            <label>请求方式</label>
+            <label>{t("editor.method")}</label>
             <Select<string>
-              aria-label="请求方式"
+              aria-label={t("editor.method")}
               aria-invalid={Boolean(fieldErrors["method"]) || undefined}
               aria-describedby={fieldErrors["method"] ? apiAssetErrorId("method") : undefined}
               data-api-asset-field="method"
@@ -553,10 +570,10 @@ function Editor({
             {fieldErrors["method"] ? <small id={apiAssetErrorId("method")} className="api-asset-field-error">{fieldErrors["method"]}</small> : null}
           </div>
           <div className="fl">
-            <label>状态</label>
+            <label>{t("fields.status")}</label>
             <div
               role="group"
-              aria-label="状态"
+              aria-label={t("fields.status")}
               aria-invalid={Boolean(fieldErrors["status"]) || undefined}
               data-api-asset-field="status"
               tabIndex={fieldErrors["status"] ? -1 : undefined}
@@ -564,14 +581,14 @@ function Editor({
             >
               {!["enabled", "disabled"].includes(form.status) ? (
                 <>
-                  <p role="status">未知历史状态：{form.status || "空值"}，请选择启用或禁用。</p>
+                  <p role="status">{t("editor.unknownHistoricalStatus", { status: form.status || t("editor.emptyValue") })}</p>
                   <Select<string>
-                    aria-label="选择有效的 API 状态"
+                    aria-label={t("editor.chooseStatus")}
                     value={form.status}
                     items={[
-                      { value: form.status, label: `未知状态：${form.status || "空值"}` },
-                      { value: "enabled", label: "启用" },
-                      { value: "disabled", label: "禁用" },
+                      { value: form.status, label: t("editor.unknownStatus", { status: form.status || t("editor.emptyValue") }) },
+                      { value: "enabled", label: t("status.enabled") },
+                      { value: "disabled", label: t("status.disabled") },
                     ]}
                     onValueChange={(value) => { if (value) set("status", value); }}
                   />
@@ -581,6 +598,8 @@ function Editor({
                 name="status"
                 value={form.status}
                 className={fieldErrors["status"] ? "invalid" : ""}
+                ariaLabel={t("fields.status")}
+                labels={{ enabled: t("status.enabled"), disabled: t("status.disabled") }}
                 onChange={(value) =>
                   set(
                     "status",
@@ -596,9 +615,9 @@ function Editor({
             {fieldErrors["status"] ? <small id={apiAssetErrorId("status")} className="api-asset-field-error">{fieldErrors["status"]}</small> : null}
           </div>
           <div className="fl full">
-            <label>说明</label>
+            <label>{t("fields.description")}</label>
             <Textarea
-              aria-label="说明"
+              aria-label={t("fields.description")}
               data-api-asset-field="description"
               aria-invalid={Boolean(fieldErrors["description"]) || undefined}
               aria-describedby={fieldErrors["description"] ? apiAssetErrorId("description") : undefined}
@@ -609,9 +628,9 @@ function Editor({
             {fieldErrors["description"] ? <small id={apiAssetErrorId("description")} className="api-asset-field-error">{fieldErrors["description"]}</small> : null}
           </div>
           <div className="fl full">
-            <label>备注</label>
+            <label>{t("fields.remark")}</label>
             <Textarea
-              aria-label="备注"
+              aria-label={t("fields.remark")}
               data-api-asset-field="remark"
               aria-invalid={Boolean(fieldErrors["remark"]) || undefined}
               aria-describedby={fieldErrors["remark"] ? apiAssetErrorId("remark") : undefined}
@@ -624,7 +643,7 @@ function Editor({
         </div>
       </div>
       <Rows<ApiAssetParam>
-        title="请求参数"
+        title={t("fields.params")}
         items={form.params}
         onChange={(value) => set("params", value)}
         kind="params"
@@ -632,7 +651,7 @@ function Editor({
         clearErrors={clearErrors}
       />
       <Rows<ApiAssetResponseField>
-        title="响应字段"
+        title={t("fields.responseFields")}
         items={form.responseFields}
         onChange={(value) => set("responseFields", value)}
         kind="responseFields"
@@ -640,10 +659,10 @@ function Editor({
         clearErrors={clearErrors}
       />
       <div className="form-card">
-        <h3>关联资产</h3>
+        <h3>{t("editor.relatedAssets")}</h3>
         <div
           role="group"
-          aria-label="关联资产"
+          aria-label={t("fields.relations")}
           aria-invalid={relationErrors.length ? true : undefined}
           aria-describedby={firstRelationError ? apiAssetErrorId(firstRelationError[0]) : undefined}
           data-api-asset-field={firstRelationError?.[0]}
@@ -670,7 +689,7 @@ function Editor({
       </div>
       <div className="form-actions">
         <Button className="btn" variant="secondary" type="button" onClick={onCancel} disabled={saving}>
-          取消
+          {t("editor.cancel")}
         </Button>
         <Button
           className="btn primary"
@@ -679,7 +698,7 @@ function Editor({
           onClick={submit}
           disabled={saving}
         >
-          {saving ? "保存中..." : "保存"}
+          {saving ? t("editor.saving") : t("editor.save")}
         </Button>
       </div>
     </>
@@ -690,12 +709,13 @@ interface ApiEmptyStateProps {
   query: string;
 }
 function ApiEmptyState({ query }: ApiEmptyStateProps) {
+  const { t } = useTranslation("apiAsset");
   return (
-    <EmptyState title={query ? "未找到符合条件的 API 资产" : "暂无 API 资产"} />
+    <EmptyState title={query ? t("list.emptyQuery") : t("list.empty")} />
   );
 }
-function systemLabel(item: MockApiAsset): string {
-  return item.downstreamSystemName || "未关联";
+function systemLabel(item: MockApiAsset, t: ApiAssetT): string {
+  return item.downstreamSystemName || t("system.unlinked");
 }
 function systemCode(item: MockApiAsset): string {
   return item.downstreamSystemShortName
@@ -720,6 +740,7 @@ function ApiCards({
   pendingIds,
   canEdit,
 }: ApiCardsProps) {
+  const { t } = useTranslation("apiAsset");
   return (
     <CardGridView
       items={items}
@@ -728,7 +749,7 @@ function ApiCards({
       renderBadges={(item) => (
         <>
           <span className="tag tag-neutral">{item.method}</span>
-          <StatusBadge status={item.status} />
+          <ApiAssetStatusBadge status={item.status} />
         </>
       )}
       renderTitle={(item) => item.name}
@@ -740,13 +761,13 @@ function ApiCards({
       )}
       renderFootLeft={(item) => (
         <span className="t-owner">
-          {systemLabel(item)}
+          {systemLabel(item, t)}
           {systemCode(item)}
         </span>
       )}
       renderFootMeta={(item) => (
         <span className="m">
-          负责人 <b>{item.ownerName || "未设置"}</b>
+          {t("system.owner")} <b>{item.ownerName || t("system.notSet")}</b>
         </span>
       )}
       renderFootActions={(item) => (
@@ -774,6 +795,7 @@ interface ApiGroupsProps {
   onView: (code: string) => void;
 }
 function ApiGroups({ items, onView }: ApiGroupsProps) {
+  const { t } = useTranslation("apiAsset");
   const groupKey = (item: MockApiAsset): string =>
     item.downstreamSystemId == null || !item.downstreamSystemName
       ? "__unlinked__"
@@ -788,7 +810,7 @@ function ApiGroups({ items, onView }: ApiGroupsProps) {
       renderGroupLabel={(key) => {
         const item = items.find((entry) => groupKey(entry) === key);
         return key === "__unlinked__" ? (
-          "未关联"
+          t("list.unlinkedGroup")
         ) : (
           <>
             {item?.downstreamSystemName}
@@ -798,7 +820,7 @@ function ApiGroups({ items, onView }: ApiGroupsProps) {
           </>
         );
       }}
-      renderGroupCount={(count) => `${count} 个 API`}
+      renderGroupCount={(count) => t("list.groupCount", { count })}
       renderCardName={(item) => item.code}
       renderCardBody={(item) => (
         <>
@@ -829,16 +851,16 @@ function ApiList({
   apiAsset,
   canEdit,
 }: ApiListProps) {
+  const { t } = useTranslation("apiAsset");
   return (
     <>
       <div className="page-head">
         <div>
           <div className="page-title">
-            <span className="pt-code">API</span>API 资产
+            <span className="pt-code">{t("page.code")}</span>{t("page.title")}
           </div>
           <div className="page-sub">
-            共 <b>{apiAsset.total}</b> 个匹配 API
-            ，可按请求方式、下游调用系统和状态筛选。
+            {t("page.summary", { count: apiAsset.total })}
           </div>
         </div>
         <div className="head-actions">
@@ -850,7 +872,7 @@ function ApiList({
               type="button"
               onClick={apiAsset.create}
             >
-              新增 API
+              {t("page.create")}
             </Button>
           ) : null}
         </div>
@@ -859,39 +881,39 @@ function ApiList({
         <ApiEmptyState query={query} />
       ) : view === "list" ? (
         <div className="tbl-wrap">
-          <WideTableScroll ariaLabel="API 资产列表" className="api-assets-wide-scroll">
+          <WideTableScroll ariaLabel={t("list.ariaLabel")} className="api-assets-wide-scroll">
             <table className="dt mobile-card-table api-assets-wide-table">
             <thead>
               <tr>
-                <th>API</th>
-                <th>请求</th>
-                <th>下游调用系统</th>
-                <th>负责人</th>
-                <th>状态</th>
-                <th>操作</th>
+                <th>{t("list.api")}</th>
+                <th>{t("list.request")}</th>
+                <th>{t("list.downstream")}</th>
+                <th>{t("list.owner")}</th>
+                <th>{t("list.status")}</th>
+                <th>{t("list.actions")}</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item) => (
                 <tr key={item.code}>
-                  <td data-label="">
+                  <td data-label={t("list.api")}>
                     <b>{item.name}</b>
                     <div className="mono">{item.code}</div>
                   </td>
-                  <td data-label="请求">
+                  <td data-label={t("list.request")}>
                     <span className="mono">
                       {item.method} {item.path}
                     </span>
                   </td>
-                  <td data-label="下游系统">
-                    {systemLabel(item)}
+                  <td data-label={t("list.downstream")}>
+                    {systemLabel(item, t)}
                     {systemCode(item)}
                   </td>
-                  <td data-label="负责人">{item.ownerName}</td>
-                  <td data-label="状态">
-                    <StatusBadge status={item.status} />
+                  <td data-label={t("list.owner")}>{item.ownerName}</td>
+                  <td data-label={t("list.status")}>
+                    <ApiAssetStatusBadge status={item.status} />
                   </td>
-                  <td data-label="" className="mobile-card-actions">
+                  <td data-label={t("list.actions")} className="mobile-card-actions">
                     <RowActions
                       disabled={apiAsset.pendingIds.includes(item.code)}
                       onView={() => apiAsset.view(item.code)}
@@ -934,7 +956,7 @@ function ApiList({
         onPageChange={apiAsset.setPage}
         onPageSizeChange={apiAsset.setPageSize}
         loading={apiAsset.loading}
-        ariaLabel="API 资产分页"
+        ariaLabel={t("list.pagination")}
       />
     </>
   );
@@ -957,14 +979,15 @@ export function ApiAssetView({
   onChangeView,
   canEdit = false,
 }: ApiAssetViewProps) {
+  const { t } = useTranslation("apiAsset");
   if (route.page === "list" && apiAsset.loading)
     return (
-      <LoadingState title="加载 API 资产" desc="正在读取 API 元数据台账。" />
+      <LoadingState title={t("view.loading")} desc={t("view.loadingDescription")} />
     );
   if (route.page === "list" && apiAsset.error)
     return (
       <ErrorState
-        title="API 资产加载失败"
+        title={t("view.loadError")}
         desc={apiAsset.error}
         onRetry={apiAsset.load}
       />
@@ -972,17 +995,17 @@ export function ApiAssetView({
   if (!canEdit && ["new", "edit"].includes(route.page)) {
     return (
       <EmptyState
-        title="当前页面需要 API 资产维护权限"
-        desc="API 目录可以公开浏览，新增和编辑需要相应写权限。"
+        title={t("view.permissionTitle")}
+        desc={t("view.permissionDescription")}
       />
     );
   }
   if (["view", "edit"].includes(route.page) && apiAsset.detailLoading)
-    return <LoadingState title="加载 API 资产详情" desc="正在按 API 编码读取记录。" />;
+    return <LoadingState title={t("view.loadingDetail")} desc={t("view.loadingDetailDescription")} />;
   if (["view", "edit"].includes(route.page) && apiAsset.detailError)
-    return <ErrorState title="API 资产详情加载失败" desc={apiAsset.detailError} onRetry={apiAsset.loadDetail} />;
+    return <ErrorState title={t("view.detailError")} desc={apiAsset.detailError} onRetry={apiAsset.loadDetail} />;
   if (["view", "edit"].includes(route.page) && !apiAsset.current)
-    return <EmptyState title="API 资产不存在" desc="当前 API 编码不存在或已被删除。" actionText="返回 API 列表" onAction={apiAsset.back} />;
+    return <EmptyState title={t("view.missingTitle")} desc={t("view.missingDescription")} actionText={t("view.backToList")} onAction={apiAsset.back} />;
   if (route.page === "new" || route.page === "edit")
     return (
       <Editor
@@ -1003,7 +1026,7 @@ export function ApiAssetView({
       <>
         <PageHeader
           breadcrumbs={[
-            { label: "API 资产", onClick: apiAsset.back },
+            { label: t("moduleTitle"), onClick: apiAsset.back },
             { label: item.name },
           ]}
           icon="api"
@@ -1013,32 +1036,32 @@ export function ApiAssetView({
         <div className="detail-head">
           <div className="indicator-detail-grid">
             <div className="indicator-detail-item">
-              <div className="indicator-detail-label">请求</div>
+              <div className="indicator-detail-label">{t("detail.request")}</div>
               <div className="indicator-detail-value mono">
                 {item.method} {item.path}
               </div>
             </div>
             <div className="indicator-detail-item">
-              <div className="indicator-detail-label">下游调用系统</div>
+              <div className="indicator-detail-label">{t("detail.downstream")}</div>
               <div className="indicator-detail-value">
-                {systemLabel(item)}
+                {systemLabel(item, t)}
                 {systemCode(item)}
               </div>
             </div>
             <div className="indicator-detail-item">
-              <div className="indicator-detail-label">状态</div>
+              <div className="indicator-detail-label">{t("detail.status")}</div>
               <div className="indicator-detail-value">
-                <StatusBadge status={item.status} />
+                <ApiAssetStatusBadge status={item.status} />
               </div>
             </div>
             <div className="indicator-detail-item">
-              <div className="indicator-detail-label">归属</div>
+              <div className="indicator-detail-label">{t("detail.ownership")}</div>
               <div className="indicator-detail-value">
                 {item.ownerDept} / {item.ownerName}
               </div>
             </div>
             <div className="indicator-detail-item full">
-              <div className="indicator-detail-label">说明</div>
+              <div className="indicator-detail-label">{t("detail.description")}</div>
               <div className="indicator-detail-value">
                 {item.description || "-"}
               </div>
@@ -1046,7 +1069,7 @@ export function ApiAssetView({
           </div>
         </div>
         <div className="form-card">
-          <h3>关联资产</h3>
+          <h3>{t("detail.relatedAssets")}</h3>
           <AssetReferenceSelector
             selectedTables={relations.tables}
             selectedIndicators={relations.indicators}
@@ -1062,7 +1085,7 @@ export function ApiAssetView({
             type="button"
             onClick={() => apiAsset.edit(item.code)}
           >
-            编辑
+            {t("view.edit")}
           </Button>
         ) : null}
       </>

@@ -105,6 +105,18 @@
     "catalogDisabledDescription": "此站点需要登录后才能浏览业务目录。登录不会改变后端的权限控制。",
     "loginToContinue": "登录后继续"
   },
+  "references": {
+    "selectedCount": "已选 {{count}}",
+    "noneSelected": "暂无{{title}}",
+    "search": "搜索{{title}}",
+    "remove": "移除 {{label}}",
+    "loadError": "关联资产加载失败。",
+    "retry": "重试加载关联资产",
+    "loading": "正在加载可关联资产…",
+    "tables": "关联表",
+    "indicators": "关联指标",
+    "noCandidates": "未找到{{title}}"
+  },
   "action": {
     "close": "关闭",
     "cancel": "取消",

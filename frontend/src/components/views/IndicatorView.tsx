@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { UseIndicatorModuleResult } from "../../hooks/useIndicatorModule.ts";
 import type { IndicatorFilter, IndicatorRoute } from "../../routing/types.ts";
@@ -36,6 +37,7 @@ export function IndicatorView({
   indicatorView,
   setIndicatorView,
 }: IndicatorViewProps) {
+  const { t } = useTranslation("indicator");
   const {
     indicators,
     indicatorLoading,
@@ -68,15 +70,15 @@ export function IndicatorView({
   if (indicatorDetailLoading || (indicatorRoute.page === 'list' && indicatorLoading)) {
     return (
       <LoadingState
-        title={indicatorDetailLoading ? "加载指标详情" : "加载指标维护清单"}
-        desc="正在准备指标信息。"
+        title={indicatorDetailLoading ? t("view.loadingDetail") : t("view.loadingList")}
+        desc={t("view.loadingDescription")}
       />
     );
   }
   if (indicatorDetailError || (indicatorRoute.page === 'list' && indicatorError)) {
     return (
       <ErrorState
-        title="指标维护加载失败"
+        title={t("view.loadError")}
         desc={indicatorDetailError || indicatorError}
         onRetry={indicatorDetailError ? retryIndicatorDetail : loadIndicatorData}
       />
@@ -85,8 +87,8 @@ export function IndicatorView({
   if (!canEdit && ["new", "edit"].includes(indicatorRoute.page)) {
     return (
       <EmptyState
-        title="当前页面需要指标维护权限"
-        desc="指标目录可以公开浏览，新增和编辑需要相应写权限。"
+        title={t("view.permissionTitle")}
+        desc={t("view.permissionDescription")}
       />
     );
   }
@@ -111,7 +113,7 @@ export function IndicatorView({
           <div className="ec">
             <Icon name="inbox" size={26} />
           </div>
-          <h4>指标不存在</h4>
+          <h4>{t("view.missingTitle")}</h4>
         </div>
       );
     }
@@ -125,15 +127,14 @@ export function IndicatorView({
           if (
             await confirmDeleteAction({
               name: currentIndicatorEdit.id,
-              typeLabel: "指标",
-              impact:
-                "该指标删除后，可能影响指标口径、指标来源字段、指标结果表字段、报表引用、血缘关系和审计记录。若指标已被引用，应优先禁用，而不是删除。",
+              typeLabel: t("deleteConfirm.typeLabel"),
+              impact: t("deleteConfirm.impact"),
               consequences: [
-                "删除前会以服务端校验结果为准，不会绕过引用关系检查。",
-                "若后端返回不可删除原因，页面会直接展示原因。",
+                t("deleteConfirm.serverCheck"),
+                t("deleteConfirm.serverReason"),
               ],
               confirmKeyword: currentIndicatorEdit.id,
-              confirmKeywordLabel: "请输入指标 ID 二次确认",
+              confirmKeywordLabel: t("deleteConfirm.keywordLabel"),
             })
           ) {
             await handleDeleteIndicator(currentIndicatorEdit.id);
@@ -181,17 +182,17 @@ export function IndicatorView({
     />
     <div className="catalog-pagination-footer">
       <label className="catalog-list-sort">
-        <span>排序</span>
+        <span>{t("view.sort")}</span>
         <Select<string>
-          aria-label="指标排序"
+          aria-label={t("view.sortLabel")}
           className="table-list-sort"
           value={indicatorSort}
           onValueChange={(value) => setIndicatorSort(value || 'id:asc')}
           items={[
-            { label: '标识升序', value: 'id:asc' },
-            { label: '标识降序', value: 'id:desc' },
-            { label: '名称升序', value: 'name:asc' },
-            { label: '名称降序', value: 'name:desc' },
+            { label: t("view.sortIdAsc"), value: 'id:asc' },
+            { label: t("view.sortIdDesc"), value: 'id:desc' },
+            { label: t("view.sortNameAsc"), value: 'name:asc' },
+            { label: t("view.sortNameDesc"), value: 'name:desc' },
           ]}
         />
       </label>
@@ -201,7 +202,7 @@ export function IndicatorView({
         total={indicatorTotal}
         onPageChange={setIndicatorPage}
         onPageSizeChange={setIndicatorPageSize}
-        ariaLabel="指标维护分页"
+        ariaLabel={t("view.pagination")}
       />
     </div>
     </>

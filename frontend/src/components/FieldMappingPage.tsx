@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 
 import {
   FIELD_MAPPING_DEFAULT_PAGE_SIZE,
@@ -91,6 +93,47 @@ type TableColumnKey =
   | "emptyCommentRate";
 type MappingColumnKey = FieldColumnKey | TableColumnKey;
 type FieldMappingSortState = Omit<FieldMappingSort, "key"> & { key: MappingColumnKey | "" };
+type FieldMappingT = TFunction<"fieldMapping">;
+type FieldMappingColumnLabelKey =
+  | "columns.sourceSystem"
+  | "columns.sourceTable"
+  | "columns.sourceTableChineseName"
+  | "columns.sourceField"
+  | "columns.fieldType"
+  | "columns.fieldComment"
+  | "columns.targetLayer"
+  | "columns.targetTable"
+  | "columns.loadMode"
+  | "columns.targetField"
+  | "columns.mappingRule"
+  | "columns.mappedCount"
+  | "columns.emptyCommentRate"
+  | "columns.actions";
+type FieldMappingLoadModeKey = "loadModes.full" | "loadModes.incr" | "loadModes.incr_zip" | "loadModes.full_zip";
+
+const COLUMN_LABEL_KEYS: Record<Exclude<MappingColumnKey, "__arrow">, FieldMappingColumnLabelKey> = {
+  srcSystem: "columns.sourceSystem",
+  srcTable: "columns.sourceTable",
+  srcTableCn: "columns.sourceTableChineseName",
+  srcField: "columns.sourceField",
+  srcType: "columns.fieldType",
+  srcComment: "columns.fieldComment",
+  targetLayer: "columns.targetLayer",
+  targetTable: "columns.targetTable",
+  loadMode: "columns.loadMode",
+  targetField: "columns.targetField",
+  mappingRule: "columns.mappingRule",
+  mappedCount: "columns.mappedCount",
+  emptyCommentRate: "columns.emptyCommentRate",
+  __actions: "columns.actions",
+};
+
+const LOAD_MODE_LABEL_KEYS: Record<string, FieldMappingLoadModeKey> = {
+  full: "loadModes.full",
+  incr: "loadModes.incr",
+  incr_zip: "loadModes.incr_zip",
+  full_zip: "loadModes.full_zip",
+};
 
 interface MappingColumn {
   key: MappingColumnKey;
@@ -104,7 +147,7 @@ interface FieldColumn extends MappingColumn {
   key: FieldColumnKey;
   group: "source" | "arrow" | "target";
   cellClassName?: string | undefined;
-  title?: ((row: EnrichedFieldMappingRow) => string) | undefined;
+  title?: ((row: EnrichedFieldMappingRow, t: FieldMappingT) => string) | undefined;
 }
 
 interface TableColumn extends MappingColumn {
@@ -131,6 +174,10 @@ function MappingTableHeader({
   sort,
   onSort,
 }: MappingTableHeaderProps) {
+  const { t } = useTranslation("fieldMapping");
+  const labelForColumn = (column: MappingColumn) => column.key === "__arrow"
+    ? t("cells.mappingDirection")
+    : t(COLUMN_LABEL_KEYS[column.key]);
   const fieldGroups = fieldColumns.reduce<Array<{ group: FieldColumn["group"]; columns: FieldColumn[] }>>((groups, column) => {
     const currentGroup = groups.at(-1);
     if (currentGroup?.group === column.group) {
@@ -145,14 +192,14 @@ function MappingTableHeader({
       {tab === "field" ? (
         <tr className="fm-group-head">
           {fieldGroups.map(({ group, columns }) => group === "arrow" ? columns.map((column) => (
-            <th key={column.key} rowSpan={2} className="fm-arrow-col" aria-label={column.label || "映射方向"}></th>
+            <th key={column.key} rowSpan={2} className="fm-arrow-col" aria-label={labelForColumn(column)}></th>
           )) : (
             <th
               key={`${group}-${columns[0]?.key ?? "empty"}`}
               colSpan={columns.length}
               className={group === "source" ? "fm-group-source" : "fm-group-target"}
             >
-              {group === "source" ? "源系统侧 / SOURCE" : "数据仓库 DWF 侧 / TARGET"}
+              {group === "source" ? t("groups.source") : t("groups.target")}
             </th>
           ))}
         </tr>
@@ -163,7 +210,7 @@ function MappingTableHeader({
             key={column.key}
             onClick={column.sortable === false ? undefined : () => onSort(column.key)}
           >
-            <span>{column.label}{column.sortable === false ? "" : sortMarker(sort, column.key)}</span>
+            <span>{labelForColumn(column)}{column.sortable === false ? "" : sortMarker(sort, column.key)}</span>
           </th>
         )) : orderedTableColumns.map((column) => (
           <th
@@ -171,7 +218,7 @@ function MappingTableHeader({
             className={column.align === "right" ? "is-right" : ""}
             onClick={column.sortable === false ? undefined : () => onSort(column.key)}
           >
-            <span>{column.label}{column.sortable === false ? "" : sortMarker(sort, column.key)}</span>
+            <span>{labelForColumn(column)}{column.sortable === false ? "" : sortMarker(sort, column.key)}</span>
           </th>
         ))}
       </tr>
@@ -187,7 +234,7 @@ function MappingCellText({ value, className = "" }: { value: string; className?:
   );
 }
 
-function renderFieldCell(row: EnrichedFieldMappingRow, key: FieldColumnKey): ReactNode {
+function renderFieldCell(row: EnrichedFieldMappingRow, key: FieldColumnKey, t: FieldMappingT): ReactNode {
   switch (key) {
     case "srcSystem": {
       const systemLabel = formatSystemLabel(row);
@@ -207,12 +254,12 @@ function renderFieldCell(row: EnrichedFieldMappingRow, key: FieldColumnKey): Rea
     case "srcComment":
       return row.srcComment
         ? <MappingCellText value={row.srcComment} />
-        : <span className="fm-empty">未填写</span>;
+        : <span className="fm-empty">{t("cells.notFilled")}</span>;
     case "__arrow":
       return (
         <span
           className={isTransformRule(row.mappingRule || "") ? "fm-arrow is-transform" : "fm-arrow"}
-          title={isTransformRule(row.mappingRule || "") ? `需要转换：${row.mappingRule}` : "直接映射"}
+          title={isTransformRule(row.mappingRule || "") ? t("cells.transformRequired", { rule: row.mappingRule }) : t("cells.directMapping")}
         >
           →
         </span>
@@ -223,16 +270,17 @@ function renderFieldCell(row: EnrichedFieldMappingRow, key: FieldColumnKey): Rea
       return <MappingCellText value={String(row.targetTable || "")} className="mono" />;
     case "loadMode": {
       const loadMode = LOAD_MODE_META[row.loadMode || ""];
+      const loadModeKey = LOAD_MODE_LABEL_KEYS[row.loadMode || ""];
       return loadMode ? (
-        <span className={`tag ${loadMode.tone}`}>{loadMode.label}</span>
+        <span className={`tag ${loadMode.tone}`}>{loadModeKey ? t(loadModeKey) : loadMode.label}</span>
       ) : (
-        <span className="fm-empty">未设置</span>
+        <span className="fm-empty">{t("cells.notSet")}</span>
       );
     }
     case "targetField":
       return row.targetField
         ? <MappingCellText value={row.targetField} className="mono" />
-        : <span className="fm-empty">待补充</span>;
+        : <span className="fm-empty">{t("cells.pending")}</span>;
     case "mappingRule":
       return (
         <span className={`tag ${RULE_TAGS[row.mappingRule || ""] || "tag-neutral"}`} title={row.mappingRule}>
@@ -245,17 +293,17 @@ function renderFieldCell(row: EnrichedFieldMappingRow, key: FieldColumnKey): Rea
 }
 
 const FIELD_COLUMNS: readonly FieldColumn[] = [
-  { key: "srcSystem", label: "源系统", width: 260, group: "source" },
-  { key: "srcTable", label: "源系统表", width: 240, group: "source", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => String(row.srcTable || "") },
-  { key: "srcField", label: "源字段", width: 180, group: "source", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => String(row.srcField || "") },
-  { key: "srcType", label: "字段类型", width: 120, group: "source", cellClassName: "fm-muted mono fm-cell-ellipsis-cell", title: (row) => String(row.srcType || "") },
-  { key: "srcComment", label: "字段注释", width: 280, group: "source", cellClassName: "fm-cell-ellipsis-cell", title: (row) => row.srcComment || "未填写" },
+  { key: "srcSystem", label: "columns.sourceSystem", width: 260, group: "source" },
+  { key: "srcTable", label: "columns.sourceTable", width: 240, group: "source", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => String(row.srcTable || "") },
+  { key: "srcField", label: "columns.sourceField", width: 180, group: "source", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => String(row.srcField || "") },
+  { key: "srcType", label: "columns.fieldType", width: 120, group: "source", cellClassName: "fm-muted mono fm-cell-ellipsis-cell", title: (row) => String(row.srcType || "") },
+  { key: "srcComment", label: "columns.fieldComment", width: 280, group: "source", cellClassName: "fm-cell-ellipsis-cell", title: (row, t) => row.srcComment || t("cells.notFilled") },
   { key: "__arrow", label: "", width: 48, group: "arrow", sortable: false, cellClassName: "fm-arrow-cell" },
-  { key: "targetLayer", label: "目标层", width: 90, group: "target", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => row.targetLayer || "-" },
-  { key: "targetTable", label: "目标表名", width: 280, group: "target", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => String(row.targetTable || "") },
-  { key: "loadMode", label: "入仓方式", width: 110, group: "target" },
-  { key: "targetField", label: "目标字段", width: 180, group: "target", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => row.targetField || "待补充" },
-  { key: "mappingRule", label: "映射规则", width: 180, group: "target" },
+  { key: "targetLayer", label: "columns.targetLayer", width: 90, group: "target", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => row.targetLayer || "-" },
+  { key: "targetTable", label: "columns.targetTable", width: 280, group: "target", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => String(row.targetTable || "") },
+  { key: "loadMode", label: "columns.loadMode", width: 110, group: "target" },
+  { key: "targetField", label: "columns.targetField", width: 180, group: "target", cellClassName: "mono fm-cell-ellipsis-cell", title: (row, t) => row.targetField || t("cells.pending") },
+  { key: "mappingRule", label: "columns.mappingRule", width: 180, group: "target" },
 ];
 
 type FieldBusinessColumn = FieldColumn & { key: FieldBusinessColumnKey };
@@ -299,6 +347,9 @@ export function FieldMappingPage({
   onBackToUpstream,
   canExport,
 }: FieldMappingPageProps) {
+  const { t } = useTranslation("fieldMapping");
+  const tRef = useRef(t);
+  tRef.current = t;
   const routeFilters = useMemo(
     () => ({
       sourceSystemId: route.sourceSystemId,
@@ -423,7 +474,7 @@ export function FieldMappingPage({
       } catch (loadError: unknown) {
         if (cancelled) return;
         setStats(null);
-        setStatsError(loadError instanceof Error ? loadError.message : "字段映射统计加载失败");
+        setStatsError(loadError instanceof Error ? loadError.message : tRef.current("results.statsError"));
       } finally {
         if (!cancelled) setStatsLoading(false);
       }
@@ -471,7 +522,7 @@ export function FieldMappingPage({
         }
       } catch (loadError: unknown) {
         if (cancelled) return;
-        setListError(loadError instanceof Error ? loadError.message : "字段映射列表加载失败");
+        setListError(loadError instanceof Error ? loadError.message : tRef.current(tab === "field" ? "results.fieldError" : "results.tableError"));
       } finally {
         if (!cancelled) setListLoading(false);
       }
@@ -527,15 +578,15 @@ export function FieldMappingPage({
   const tablePageRows = tab === "table" && listIsCurrent ? sortedTableRows : [];
 
   const tableColumns: TableColumn[] = [
-    { key: "srcSystem", label: "源系统", width: 260 },
-    { key: "srcTable", label: "源系统表", width: 240 },
-    { key: "srcTableCn", label: "表中文名", width: 220 },
-    { key: "targetLayer", label: "目标层", width: 90 },
-    { key: "targetTable", label: "目标表名", width: 370 },
-    { key: "mappedCount", label: "已映射", align: "right", width: 100 },
-    { key: "loadMode", label: "入仓方式", width: 110 },
-    { key: "emptyCommentRate", label: "空注释率", align: "right", width: 140 },
-    { key: "__actions", label: "操作", align: "right", sortable: false, width: 150 },
+    { key: "srcSystem", label: "columns.sourceSystem", width: 260 },
+    { key: "srcTable", label: "columns.sourceTable", width: 240 },
+    { key: "srcTableCn", label: "columns.sourceTableChineseName", width: 220 },
+    { key: "targetLayer", label: "columns.targetLayer", width: 90 },
+    { key: "targetTable", label: "columns.targetTable", width: 370 },
+    { key: "mappedCount", label: "columns.mappedCount", align: "right", width: 100 },
+    { key: "loadMode", label: "columns.loadMode", width: 110 },
+    { key: "emptyCommentRate", label: "columns.emptyCommentRate", align: "right", width: 140 },
+    { key: "__actions", label: "columns.actions", align: "right", sortable: false, width: 150 },
   ];
   // Keep complete CSV columns even when a redundant column is hidden in the table UI.
   const tableCsvColumns = tableColumns.filter((column) => column.key !== "__actions");
@@ -618,19 +669,20 @@ export function FieldMappingPage({
     if (column.key === "targetTable") return <MappingCellText value={row.targetTable} className="mono" />;
     if (column.key === "loadMode") {
       const loadMode = LOAD_MODE_META[row.loadMode];
+      const loadModeKey = LOAD_MODE_LABEL_KEYS[row.loadMode];
       return loadMode ? (
         <span className={`tag ${loadMode.tone}`}>
-          {loadMode.label}
+          {loadModeKey ? t(loadModeKey) : loadMode.label}
         </span>
       ) : (
-        <span className="fm-empty">未设置</span>
+        <span className="fm-empty">{t("cells.notSet")}</span>
       );
     }
     if (column.key === "__actions") {
       return (
         <Button className="btn" variant="secondary" type="button" onClick={() => handleViewFieldMapping(row)}>
           <Icon name="link" size={14} />
-          查看字段映射
+          {t("results.viewFieldMapping")}
         </Button>
       );
     }
@@ -650,7 +702,8 @@ export function FieldMappingPage({
     if (column.key === "srcSystem") return formatSystemLabel(row);
     if (column.key === "loadMode") {
       const loadMode = readMappingValue(row, "loadMode");
-      return typeof loadMode === "string" ? LOAD_MODE_META[loadMode]?.label ?? "" : "";
+      const loadModeKey = typeof loadMode === "string" ? LOAD_MODE_LABEL_KEYS[loadMode] : undefined;
+      return loadModeKey ? t(loadModeKey) : typeof loadMode === "string" ? LOAD_MODE_META[loadMode]?.label ?? "" : "";
     }
     return readMappingValue(row, column.key) ?? "";
   };
@@ -704,7 +757,7 @@ export function FieldMappingPage({
       const csv = await exportFieldMappingCsv(tab, exportParams);
       if (csv !== null) {
         downloadCsvContent(
-          tab === "field" ? "字段映射_字段视图.csv" : "字段映射_表视图.csv",
+          tab === "field" ? t("export.fieldFilename") : t("export.tableFilename"),
           csv,
         );
         return;
@@ -714,19 +767,19 @@ export function FieldMappingPage({
         sort,
       );
       if (tab === "field") {
-        downloadCsv("字段映射_字段视图.csv", [
-          FIELD_CSV_COLUMNS.map((item) => item.label),
+        downloadCsv(t("export.fieldFilename"), [
+          FIELD_CSV_COLUMNS.map((item) => t(COLUMN_LABEL_KEYS[item.key])),
           ...exportRows.map((row) => FIELD_CSV_COLUMNS.map((item) => displayCellValue(row, item))),
         ]);
         return;
       }
-      downloadCsv("字段映射_表视图.csv", [
-        tableCsvColumns.map((item) => item.label),
+      downloadCsv(t("export.tableFilename"), [
+        tableCsvColumns.map((item) => t(COLUMN_LABEL_KEYS[item.key])),
         ...exportRows.map((row) => tableCsvColumns.map((item) => displayCellValue(row, item))),
       ]);
     } catch (exportError: unknown) {
       setExportError(
-        `导出失败：${exportError instanceof Error ? exportError.message : "请稍后重试。"}`,
+        t("exportError.prefix", { message: exportError instanceof Error ? exportError.message : t("exportError.retry") }),
       );
     }
   };
@@ -735,8 +788,8 @@ export function FieldMappingPage({
     <div className="fm-page">
       <div className="page-head">
         <div>
-          <div className="page-title"><Icon name="link" size={20} color="var(--ink-2)" />字段映射查询</div>
-          <div className="page-sub">查询源字段与目标字段之间的映射关系，支持字段维度和表维度查看。</div>
+          <div className="page-title"><Icon name="link" size={20} color="var(--ink-2)" />{t("page.title")}</div>
+          <div className="page-sub">{t("page.subtitle")}</div>
         </div>
       </div>
       {exportError ? (
@@ -746,21 +799,21 @@ export function FieldMappingPage({
       {linkedView ? (
         <section className="fm-context-bar">
           <div className="fm-context-copy">
-            <div className="fm-context-title">当前仅查看：{currentSourceLabel || "指定源系统"}</div>
+            <div className="fm-context-title">{t("context.currentOnly", { source: currentSourceLabel || t("context.defaultSource") })}</div>
             <div className="fm-context-sub">
               {tab === "table"
-                ? "已按源系统跳转到表维度结果。"
-                : "已按源系统及表范围跳转到字段维度结果。"}
+                ? t("context.tableRedirect")
+                : t("context.fieldRedirect")}
             </div>
           </div>
           <div className="fm-context-actions">
             <Button className="btn" variant="secondary" type="button" onClick={onBackToUpstream}>
               <Icon name="chevron" size={14} />
-              返回上游卸数
+              {t("context.back")}
             </Button>
             <Button className="btn" variant="secondary" type="button" onClick={handleClearLinkedFilters}>
               <Icon name="close" size={14} />
-              清除筛选
+              {t("context.clear")}
             </Button>
           </div>
         </section>
@@ -770,14 +823,14 @@ export function FieldMappingPage({
         <FieldMappingStats stats={currentStats} status={statsStatus} />
         {currentStatsError ? (
           <div className="fm-stats-error">
-            <ActionErrorBanner title="统计加载失败" message={currentStatsError} />
+            <ActionErrorBanner title={t("results.statsError")} message={currentStatsError} />
             <Button
               className="btn"
               variant="secondary"
               type="button"
               onClick={() => setStatsRetryVersion((current) => current + 1)}
             >
-              重试统计
+              {t("results.retryStats")}
             </Button>
           </div>
         ) : null}
@@ -805,16 +858,16 @@ export function FieldMappingPage({
                 type="button"
                 onClick={() => handleTabChange(item.key)}
               >
-                {item.label}
+                {t(item.key === "table" ? "tabs.table" : "tabs.field")}
                 <span>{dimensionTabCounts[item.key]}</span>
               </button>
             ))}
           </div>
           <div className="fm-result-tools">
-            <span>共 <b>{totalRows}</b> 条</span>
+            <span>{t("results.count", { count: totalRows })}</span>
             {canExport ? <Button className="btn" variant="secondary" type="button" onClick={exportCurrentTab}>
               <Icon name="download" size={15} />
-              导出 CSV
+              {t("results.export")}
             </Button> : null}
           </div>
         </div>
@@ -822,13 +875,13 @@ export function FieldMappingPage({
         {currentListLoading ? (
           <div className="state-card" role="status" aria-live="polite">
             <div className="state-spinner" aria-hidden="true"></div>
-            <h4>{tab === "field" ? "加载字段明细" : "加载表维度"}</h4>
-            <p>正在根据当前筛选条件准备映射结果。</p>
+            <h4>{tab === "field" ? t("results.loadingFields") : t("results.loadingTables")}</h4>
+            <p>{t("results.loadingDescription")}</p>
           </div>
         ) : currentListError ? (
           <div className="state-card state-card-error" role="alert">
             <div className="ec"><Icon name="inbox" size={24} /></div>
-            <h4>{tab === "field" ? "字段映射加载失败" : "表维度加载失败"}</h4>
+            <h4>{tab === "field" ? t("results.fieldError") : t("results.tableError")}</h4>
             <p>{currentListError}</p>
             <Button
               className="btn"
@@ -836,11 +889,11 @@ export function FieldMappingPage({
               type="button"
               onClick={() => setListRetryVersion((current) => current + 1)}
             >
-              重试列表
+              {t("results.retryList")}
             </Button>
           </div>
         ) : !(tab === "field" ? fieldPageRows : tablePageRows).length ? (
-          <EmptyState title="暂无匹配记录" desc="可以调整查询条件，或者清空顶部搜索关键字后重试。" />
+          <EmptyState title={t("results.emptyTitle")} desc={t("results.emptyDescription")} />
         ) : (
           <>
             <FieldMappingWideTable renderStickyHeader={renderStickyHeader}>
@@ -872,9 +925,9 @@ export function FieldMappingPage({
                         <td
                           key={column.key}
                           className={column.cellClassName ?? ""}
-                          title={column.title?.(row)}
+                          title={column.title?.(row, t)}
                         >
-                          {renderFieldCell(row, column.key)}
+                          {renderFieldCell(row, column.key, t)}
                         </td>
                       ))}
                     </tr>
@@ -901,7 +954,7 @@ export function FieldMappingPage({
           </>
         )}
         <TablePagination
-          ariaLabel="字段映射分页"
+          ariaLabel={t("results.paginationLabel")}
           page={page}
           pageSize={pageSize}
           total={totalRows}

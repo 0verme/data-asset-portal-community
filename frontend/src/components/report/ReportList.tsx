@@ -1,8 +1,18 @@
+import { useTranslation } from "react-i18next";
+
 import type { EnrichedReportItem } from "../../hooks/useReportModule.ts";
 import { CardGridView, EmptyState, GroupView, RowActions, StatusBadge, ViewModeSwitcher, WideTableScroll } from "../common/index.ts";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 import { Highlight, Icon } from "../ui.tsx";
 import { Button } from "../../ui/index.ts";
+
+function ReportStatusBadge({ status }: { status: unknown }) {
+  const { t } = useTranslation("report");
+  return <StatusBadge status={status} metaMap={{
+    enabled: { label: t("status.enabled"), className: "st-on" },
+    disabled: { label: t("status.disabled"), className: "st-off" },
+  }} />;
+}
 
 interface ReportCardLayoutProps {
   reports: readonly EnrichedReportItem[];
@@ -13,16 +23,17 @@ interface ReportCardLayoutProps {
 }
 
 function ReportCardLayout({ reports, query, onView, onEdit, canEdit }: ReportCardLayoutProps) {
+  const { t } = useTranslation("report");
   return <CardGridView
     items={reports}
     getKey={(item) => item.code}
     onItemClick={(item) => onView(item.code)}
-    renderBadges={(item) => <><span className="tag tag-neutral">{item.type || "未分类"}</span><StatusBadge status={item.status} /></>}
+    renderBadges={(item) => <><span className="tag tag-neutral">{item.type || t("list.uncategorized")}</span><ReportStatusBadge status={item.status} /></>}
     renderTitle={(item) => <Highlight text={item.name} q={query} />}
     renderSubtitle={(item) => <Highlight text={item.code} q={query} />}
-    renderDesc={(item) => item.purpose || "暂无用途说明"}
-    renderFootLeft={(item) => <span className="t-owner">{item.ownerDept || "未归属部门"}</span>}
-    renderFootMeta={(item) => <><span className="m"><Icon name="table" size={13} /><b>{item.relatedTableCount}</b> 表</span><span className="m"><Icon name="info" size={13} /><b>{item.relatedIndicatorCount}</b> 指标</span></>}
+    renderDesc={(item) => item.purpose || t("list.noPurpose")}
+    renderFootLeft={(item) => <span className="t-owner">{item.ownerDept || t("list.unassignedDepartment")}</span>}
+    renderFootMeta={(item) => <><span className="m"><Icon name="table" size={13} />{t("list.tableCount", { count: item.relatedTableCount })}</span><span className="m"><Icon name="info" size={13} />{t("list.indicatorCount", { count: item.relatedIndicatorCount })}</span></>}
     renderFootActions={(item) => <RowActions onView={() => onView(item.code)} onEdit={canEdit ? () => onEdit(item.code) : undefined} />}
   />;
 }
@@ -34,15 +45,16 @@ interface ReportGroupLayoutProps {
 }
 
 function ReportGroupLayout({ reports, query, onView }: ReportGroupLayoutProps) {
+  const { t } = useTranslation("report");
   return <GroupView
     items={reports}
     getKey={(item) => item.code}
     onItemClick={(item) => onView(item.code)}
-    groupBy={(item) => item.type || "未分类"}
+    groupBy={(item) => item.type || t("list.uncategorized")}
     renderGroupLabel={(type) => <span className="tag tag-neutral">{type}</span>}
-    renderGroupCount={(count) => `${count} 个报表`}
+    renderGroupCount={(count) => t("list.groupCount", { count })}
     renderCardName={(item) => <Highlight text={item.code} q={query} />}
-    renderCardBody={(item) => <><span><Highlight text={item.name} q={query} /></span><span className="gc-owner">{item.ownerDept || "未归属部门"}</span></>}
+    renderCardBody={(item) => <><span><Highlight text={item.name} q={query} /></span><span className="gc-owner">{item.ownerDept || t("list.unassignedDepartment")}</span></>}
   />;
 }
 
@@ -59,51 +71,52 @@ export interface ReportListProps {
 }
 
 export function ReportList({ reports, total = reports.length, query, view, onChangeView, onView, onEdit, onNew, canEdit = false }: ReportListProps) {
+  const { t } = useTranslation("report");
   return (
     <div className="indicator-page">
       <div className="page-head">
         <div>
-          <div className="page-title"><span className="pt-code">报表</span>报表资产</div>
+          <div className="page-title"><span className="pt-code">{t("page.code")}</span>{t("page.title")}</div>
           <div className="page-sub">
-            共 <b>{total}</b> 个报表资产{query ? <>，匹配 “{query}”</> : null}
+            {t("page.summary", { count: total })}{query ? t("page.summaryQuery", { query }) : null}
           </div>
         </div>
-        <div className="head-actions"><ViewModeSwitcher value={view} onChange={onChangeView} />{canEdit ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增报表</Button> : null}</div>
+        <div className="head-actions"><ViewModeSwitcher value={view} onChange={onChangeView} />{canEdit ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}><Icon name="plus" size={15} />{t("page.create")}</Button> : null}</div>
       </div>
 
-      {!reports.length ? <EmptyState title={query ? "未找到符合条件的报表资产" : "暂无报表资产"} /> : view === "list" ? <div className="tbl-wrap indicator-tbl">
-        <WideTableScroll ariaLabel="报表资产列表" className="report-wide-scroll">
+      {!reports.length ? <EmptyState title={query ? t("list.emptyQuery") : t("list.empty")} /> : view === "list" ? <div className="tbl-wrap indicator-tbl">
+        <WideTableScroll ariaLabel={t("list.ariaLabel")} className="report-wide-scroll">
           <table className="dt mobile-card-table report-wide-table">
           <thead>
             <tr>
-              <th style={{ width: 150 }}>报表编码</th>
-              <th>报表名称 / 用途</th>
-              <th style={{ width: 120 }}>类型</th>
-              <th style={{ width: 120 }}>归属部门</th>
-              <th style={{ width: 92 }}>状态</th>
-              <th style={{ width: 130 }}>关联引用</th>
-              <th style={{ width: 190, textAlign: "right" }}>操作</th>
+              <th style={{ width: 150 }}>{t("list.code")}</th>
+              <th>{t("list.namePurpose")}</th>
+              <th style={{ width: 120 }}>{t("list.type")}</th>
+              <th style={{ width: 120 }}>{t("list.ownerDepartment")}</th>
+              <th style={{ width: 92 }}>{t("list.status")}</th>
+              <th style={{ width: 130 }}>{t("list.references")}</th>
+              <th style={{ width: 190, textAlign: "right" }}>{t("list.actions")}</th>
             </tr>
           </thead>
           <tbody>
             {reports.map((item) => (
               <tr key={item.code}>
-                <td data-label="">
+                <td data-label={t("list.code")}>
                   <button className="indicator-summary-btn" type="button" onClick={() => onView(item.code)}>
                     <span className="indicator-id mono"><Highlight text={item.code} q={query} /></span>
                   </button>
                 </td>
-                <td data-label="名称 / 用途">
+                <td data-label={t("list.namePurposeMobile")}>
                   <button className="indicator-summary-btn" type="button" onClick={() => onView(item.code)}>
                     <span className="indicator-name"><Highlight text={item.name} q={query} /></span>
-                    <span className="indicator-meaning"><Highlight text={item.purpose || "暂无用途说明"} q={query} /></span>
+                    <span className="indicator-meaning"><Highlight text={item.purpose || t("list.noPurpose")} q={query} /></span>
                   </button>
                 </td>
-                <td data-label="类型">{item.type}</td>
-                <td data-label="归属部门">{item.ownerDept}</td>
-                <td data-label="状态"><StatusBadge status={item.status} /></td>
-                <td data-label="关联引用" className="mono indicator-date">{item.relatedTableCount} 表 / {item.relatedIndicatorCount} 指标</td>
-                <td data-label="" className="mobile-card-actions" style={{ textAlign: "right" }}>
+                <td data-label={t("list.type")}>{item.type || t("list.uncategorized")}</td>
+                <td data-label={t("list.ownerDepartment")}>{item.ownerDept || t("list.unassignedDepartment")}</td>
+                <td data-label={t("list.status")}><ReportStatusBadge status={item.status} /></td>
+                <td data-label={t("list.references")} className="mono indicator-date">{t("list.referenceCounts", { tables: item.relatedTableCount, indicators: item.relatedIndicatorCount })}</td>
+                <td data-label={t("list.actions")} className="mobile-card-actions" style={{ textAlign: "right" }}>
                   <RowActions onView={() => onView(item.code)} onEdit={canEdit ? () => onEdit(item.code) : undefined} />
                 </td>
               </tr>

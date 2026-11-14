@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { MockReportItem, RelatedIndicatorSummary, RelatedTableSummary } from "../../data/reports.ts";
 import { formatDate, formatDateTime } from "../../utils/date.ts";
@@ -21,6 +22,14 @@ function MetaItem({ label, value, mono = false }: MetaItemProps) {
   );
 }
 
+function ReportStatusBadge({ status }: { status: unknown }) {
+  const { t } = useTranslation("report");
+  return <StatusBadge status={status} metaMap={{
+    enabled: { label: t("status.enabled"), className: "st-on" },
+    disabled: { label: t("status.disabled"), className: "st-off" },
+  }} />;
+}
+
 function referenceText(value: unknown): string {
   return String(value ?? "");
 }
@@ -39,11 +48,12 @@ function ReferenceChips<T extends Record<string, unknown>>({
   itemKey,
   labelKey,
   mono = false,
-  empty = "暂无引用",
+  empty,
   onRemove,
 }: ReferenceChipsProps<T>) {
+  const { t } = useTranslation("report");
   if (!items.length) {
-    return <div className="report-ref-empty">{empty}</div>;
+    return <div className="report-ref-empty">{empty || t("detail.noReferences")}</div>;
   }
 
   return (
@@ -59,7 +69,7 @@ function ReferenceChips<T extends Record<string, unknown>>({
                 type="button"
                 className="report-ref-chip-remove"
                 onClick={() => onRemove(key)}
-                aria-label={`移除 ${label}`}
+                aria-label={t("detail.removeReference", { label })}
               >
                 <Icon name="close" size={11} />
               </button>
@@ -81,6 +91,7 @@ export interface ReportDetailDrawerProps {
 }
 
 export function ReportDetailDrawer({ report, open, onClose, onEdit, onDelete, canEdit = false }: ReportDetailDrawerProps) {
+  const { t } = useTranslation("report");
   if (!open || !report) return null;
 
   return (
@@ -96,47 +107,47 @@ export function ReportDetailDrawer({ report, open, onClose, onEdit, onDelete, ca
           <div>
             <div className="editor-title">
               <Icon name="file" size={20} color="var(--ink-2)" />
-              <h2 id="report-detail-title">报表详情</h2>
+              <h2 id="report-detail-title">{t("detail.title")}</h2>
             </div>
             <div className="editor-sub">{report.code}</div>
           </div>
           <Button className="btn" variant="secondary" type="button" onClick={onClose}>
-            <Icon name="close" size={14} />关闭
+            <Icon name="close" size={14} />{t("detail.close")}
           </Button>
         </div>
 
         <div className="indicator-detail-body">
           <div className="form-card">
-            <h3><Icon name="info" size={14} />基本信息</h3>
+            <h3><Icon name="info" size={14} />{t("detail.basicInfo")}</h3>
             <div className="indicator-detail-grid">
-              <MetaItem label="报表名称" value={report.name} />
-              <MetaItem label="报表别名" value={report.alias} />
-              <MetaItem label="报表类型" value={report.type} />
-              <MetaItem label="统计周期" value={report.statPeriod || (report.legacyFreq ? `待补充（原值：${report.legacyFreq}）` : "")} />
-              <MetaItem label="主题域" value={report.domain} />
-              <MetaItem label="统计口径" value={report.statCaliber || report.dateCaliberOther || report.dateCaliber || report.legacyTimeCaliber} />
-              <MetaItem label="数据延迟" value={report.dataDelay || report.dataTimelinessCustom || report.dataTimeliness || "未设置"} />
-              <MetaItem label="状态" value={<StatusBadge status={report.status} />} />
-              <MetaItem label="生效日期" value={formatDate(report.effectiveDate)} mono />
-              <MetaItem label="失效日期" value={report.expireDate ? formatDate(report.expireDate) : "长期有效"} mono />
+              <MetaItem label={t("detail.name")} value={report.name} />
+              <MetaItem label={t("detail.alias")} value={report.alias} />
+              <MetaItem label={t("detail.type")} value={report.type} />
+              <MetaItem label={t("detail.period")} value={report.statPeriod || (report.legacyFreq ? t("detail.legacyPeriod", { value: report.legacyFreq }) : "")} />
+              <MetaItem label={t("detail.domain")} value={report.domain} />
+              <MetaItem label={t("detail.caliber")} value={report.statCaliber || report.dateCaliberOther || report.dateCaliber || report.legacyTimeCaliber} />
+              <MetaItem label={t("detail.dataDelay")} value={report.dataDelay || report.dataTimelinessCustom || report.dataTimeliness || t("detail.notSet")} />
+              <MetaItem label={t("detail.status")} value={<ReportStatusBadge status={report.status} />} />
+              <MetaItem label={t("detail.effectiveDate")} value={formatDate(report.effectiveDate)} mono />
+              <MetaItem label={t("detail.expireDate")} value={report.expireDate ? formatDate(report.expireDate) : t("detail.longTerm")} mono />
             </div>
           </div>
 
           <div className="form-card">
-            <h3><Icon name="book" size={14} />统计口径</h3>
+            <h3><Icon name="book" size={14} />{t("detail.caliberInfo")}</h3>
             <div className="indicator-detail-grid">
-              <MetaItem label="报表说明" value={report.purpose} />
-              <MetaItem label="统计对象" value={report.statObject} />
-              <MetaItem label="业务范围标签" value={report.businessScopeTags || report.statScope} />
-              <MetaItem label="过滤条件" value={report.filterCondition} mono />
-              <MetaItem label="特殊规则" value={report.specialRule} />
+              <MetaItem label={t("detail.purpose")} value={report.purpose} />
+              <MetaItem label={t("detail.statObject")} value={report.statObject} />
+              <MetaItem label={t("detail.businessScopeTags")} value={report.businessScopeTags || report.statScope} />
+              <MetaItem label={t("detail.filterCondition")} value={report.filterCondition} mono />
+              <MetaItem label={t("detail.specialRule")} value={report.specialRule} />
             </div>
           </div>
 
           <div className="form-card">
-            <h3><Icon name="link" size={14} />关联引用</h3>
+            <h3><Icon name="link" size={14} />{t("detail.references")}</h3>
             <div className="report-detail-section">
-              <div className="report-detail-subtitle">关联表</div>
+              <div className="report-detail-subtitle">{t("detail.tables")}</div>
               <ReferenceChips<RelatedTableSummary>
                 items={(report.relatedTables || []).map((item) => ({
                   ...item,
@@ -147,24 +158,24 @@ export function ReportDetailDrawer({ report, open, onClose, onEdit, onDelete, ca
                 itemKey="refKey"
                 labelKey="tableName"
                 mono
-                empty="暂无关联表"
+                empty={t("detail.noTables")}
               />
             </div>
             <div className="report-detail-section">
-              <div className="report-detail-subtitle">关联指标</div>
-              <ReferenceChips<RelatedIndicatorSummary> items={report.relatedIndicators || []} itemKey="indicatorId" labelKey="indicatorId" mono empty="暂无关联指标" />
+              <div className="report-detail-subtitle">{t("detail.indicators")}</div>
+              <ReferenceChips<RelatedIndicatorSummary> items={report.relatedIndicators || []} itemKey="indicatorId" labelKey="indicatorId" mono empty={t("detail.noIndicators")} />
             </div>
           </div>
 
           <div className="form-card">
-            <h3><Icon name="user" size={14} />归属信息</h3>
+            <h3><Icon name="user" size={14} />{t("detail.ownership")}</h3>
             <div className="indicator-detail-grid">
-              <MetaItem label="归属部门" value={report.ownerDept} />
-              <MetaItem label="负责人" value={report.ownerName} />
-              <MetaItem label="维护人" value={report.maintainerName} />
-              <MetaItem label="备注" value={report.remark} />
-              <MetaItem label="更新人" value={report.updatedBy} />
-              <MetaItem label="更新时间" value={formatDateTime(report.updatedAt)} mono />
+              <MetaItem label={t("detail.ownerDepartment")} value={report.ownerDept} />
+              <MetaItem label={t("detail.owner")} value={report.ownerName} />
+              <MetaItem label={t("detail.maintainer")} value={report.maintainerName} />
+              <MetaItem label={t("detail.remark")} value={report.remark} />
+              <MetaItem label={t("detail.updatedBy")} value={report.updatedBy} />
+              <MetaItem label={t("detail.updatedAt")} value={formatDateTime(report.updatedAt)} mono />
             </div>
           </div>
         </div>
@@ -172,7 +183,7 @@ export function ReportDetailDrawer({ report, open, onClose, onEdit, onDelete, ca
         {canEdit ? <div className="indicator-detail-foot">
           <RowActions onEdit={() => onEdit(report.code)} />
           <Button className="btn ghost-danger" variant="danger" type="button" onClick={() => void onDelete(report.code)}>
-            <Icon name="trash" size={14} />删除
+            <Icon name="trash" size={14} />{t("detail.delete")}
           </Button>
         </div> : null}
       </aside>
