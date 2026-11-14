@@ -90,6 +90,7 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
                 "count": 0,
                 "elapsedMs": 0.0,
                 "reasonCode": "disabled",
+                "resultsTruncated": False,
             },
             response.json(),
         )
@@ -176,6 +177,7 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
         system = MagicMock()
         config = {
             "enabled": False,
+            "retrievalMode": "local",
             "serviceUrl": "",
             "strategy": "auto",
             "topK": 5,

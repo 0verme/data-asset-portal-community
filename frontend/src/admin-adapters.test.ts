@@ -58,13 +58,19 @@ test("system pages use the frozen DAP adapters with documented native exceptions
 test("optional RAG configuration is admin-controlled and never fabricates answers", () => {
   assert.match(paramPage, /<RagSearchConfigPanel canEdit=\{canEdit\} \/>/);
   assert.match(ragConfigPage, /默认关闭/);
-  assert.match(ragConfigPage, /普通关键词搜索不受影响/);
+  assert.match(ragConfigPage, /普通关键词搜索.*不受影响/);
   assert.match(ragConfigPage, /LLM/);
   assert.match(ragConfigPage, /checked=\{config\.enabled\}/);
+  assert.match(ragConfigPage, /AI 问答检索模式/);
+  assert.match(ragConfigPage, /aria-label="AI 问答检索模式"/);
+  assert.match(ragConfigPage, /调用失败不会回退到本地/);
   assert.match(ragConfigPage, /disabled=\{!canEdit \|\| !supported/);
+  assert.match(ragConfigApi, /retrievalMode: "local"/);
+  assert.match(ragConfigApi, /retrievalMode: config\.retrievalMode/);
+  assert.match(ragConfigApi, /config\.serviceUrl \? \{ serviceUrl: config\.serviceUrl \} : \{\}/);
   assert.match(ragConfigApi, /\/system\/rag-search-config/);
   assert.match(ragConfigApi, /模拟模式不支持持久化 RAG 配置/);
-  assert.match(ragConfigPage, /不生成智能解答/);
+  assert.match(ragConfigPage, /不调用 RAG CLI/);
   assert.match(ragConfigPage, /HTTP Search Service v1/);
   assert.match(ragConfigPage, /DAP_RAG_SEARCH_MODE/);
   assert.match(ragConfigPage, /strategy 字段仅为兼容保留/);

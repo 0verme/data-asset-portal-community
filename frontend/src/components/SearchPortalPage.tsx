@@ -382,7 +382,7 @@ function AiAskSection({
                       variant="tertiary"
                       type="button"
                       className="sp-ai-candidate"
-                      aria-label={`查看${typeLabel}详情：${title}`}
+                      aria-label={`查看${typeLabel}详情：${stableName}`}
                       onClick={() => onNavigate?.(target, query)}
                     >
                       <span className="sp-ai-candidate-main">

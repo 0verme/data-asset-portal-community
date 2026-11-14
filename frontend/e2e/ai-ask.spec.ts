@@ -41,7 +41,27 @@ function answer(query: string) {
   };
 }
 
-function sseResponse(response: ReturnType<typeof answer> | Record<string, unknown>, query: string) {
+function typedAnswer(assetType: "report" | "indicator" | "api") {
+  const assetId = `SYNTH_${assetType.toUpperCase()}_001`;
+  const label = assetType === "report" ? "报表" : assetType === "indicator" ? "指标" : "API";
+  return {
+    status: "answered",
+    answer: `已核实合成${label}引用。`,
+    citations: [{ assetId, assetType, fieldId: null, source: "dap_catalog" }],
+    candidates: [{
+      assetId, assetType, name: assetId, displayName: `合成${label}资产`,
+      description: "仅用于验证类型化引用导航。", domain: "合成主题域", layer: "",
+      source: "dap_catalog", matchReason: "合成权威目录 fixture。", relevance: "direct",
+    }],
+    retrievalStatus: "available",
+    generationStatus: "completed",
+    resultsTruncated: false,
+    reasonCode: null,
+    elapsedMs: 12,
+  };
+}
+
+function sseResponse(response: ReturnType<typeof answer> | ReturnType<typeof typedAnswer> | Record<string, unknown>, query: string) {
   const events: string[] = [];
   const requestId = "0123456789abcdef0123456789abcdef";
   const emit = (event: string, stepId: string, message: string, data: Record<string, unknown> = {}) => {
@@ -165,6 +185,7 @@ async function mockPortalApis(page: Page, options: {
   holdFirstAsk?: boolean;
   recommendationCount?: number;
   holdMenus?: boolean;
+  typedAssetModules?: boolean;
 } = {}) {
   const asked: Array<{ query: string; scope: string; topK: number }> = [];
   const searches: Array<{ query: string; scope: string }> = [];
@@ -192,11 +213,19 @@ async function mockPortalApis(page: Page, options: {
     if (path === "/api/system/menus") {
       notifyMenuRequest();
       if (options.holdMenus) await menuResponseGate;
-      return json({ items: [{
+      const menuItems = [{
         id: "1", code: "dwm", name: "数据仓库", path: "/data-warehouse",
         icon: "database", order: 1, status: "enabled", adminOnly: false,
         desc: "合成浏览器测试菜单", navPlacement: "primary",
-      }] });
+      }];
+      if (options.typedAssetModules) {
+        menuItems.push(
+          { id: "2", code: "report", name: "报表资产", path: "/report-assets", icon: "chart", order: 2, status: "enabled", adminOnly: false, desc: "合成浏览器测试菜单", navPlacement: "primary" },
+          { id: "3", code: "indicator", name: "指标维护", path: "/indicator-maintenance", icon: "chart", order: 3, status: "enabled", adminOnly: false, desc: "合成浏览器测试菜单", navPlacement: "primary" },
+          { id: "4", code: "apiAsset", name: "API资产", path: "/api-assets", icon: "api", order: 4, status: "enabled", adminOnly: false, desc: "合成浏览器测试菜单", navPlacement: "primary" },
+        );
+      }
+      return json({ items: menuItems });
     }
     if (path === "/api/portal/stats") return json({ items: [] });
     if (path === "/api/search/hot-keywords") return json({ items: [] });
@@ -257,6 +286,10 @@ async function mockPortalApis(page: Page, options: {
             sourceLink: "/data-warehouse?domain=%E5%90%88%E6%88%90%E4%B8%BB%E9%A2%98%E5%9F%9F&layer=DM",
           },
         }));
+      }
+      const typedAssetType = payload.query.match(/^typed-citation:(report|indicator|api)$/)?.[1];
+      if (typedAssetType === "report" || typedAssetType === "indicator" || typedAssetType === "api") {
+        return route.fulfill(sseResponse(typedAnswer(typedAssetType), payload.query));
       }
       if (payload.query.includes("ambiguous-metadata-count")) {
         return route.fulfill(sseResponse({
@@ -360,7 +393,7 @@ async function mockPortalApis(page: Page, options: {
   };
 }
 
-async function openAiPortal(page: Page, options?: { aiEnabled?: boolean; askFailureCount?: number; delayFirstAsk?: boolean; holdFirstAsk?: boolean; recommendationCount?: number; holdMenus?: boolean }, path = "/") {
+async function openAiPortal(page: Page, options?: { aiEnabled?: boolean; askFailureCount?: number; delayFirstAsk?: boolean; holdFirstAsk?: boolean; recommendationCount?: number; holdMenus?: boolean; typedAssetModules?: boolean }, path = "/") {
   const fixtures = await mockPortalApis(page, options);
   await page.addInitScript(() => {
     localStorage.removeItem("dap_auth");
@@ -493,6 +526,26 @@ test("list answer is explicitly partial and keeps verified table/field reference
   await expect(sources).toContainText("已核实引用");
   await expect(page.getByRole("button", { name: `查看字段详情：${longField}` })).toBeVisible();
 });
+
+for (const { assetType, label, path } of [
+  { assetType: "report", label: "报表", path: "report-assets" },
+  { assetType: "indicator", label: "指标", path: "indicator-maintenance" },
+  { assetType: "api", label: "API", path: "api-assets" },
+] as const) {
+  test(`typed ${assetType} citation opens its existing detail route`, async ({ page }) => {
+    await openAiPortal(page, { typedAssetModules: true });
+    const code = `SYNTH_${assetType.toUpperCase()}_001`;
+    await page.getByRole("textbox", { name: "搜索数据资产" }).fill(`typed-citation:${assetType}`);
+    await page.getByRole("button", { name: "问 AI", exact: true }).click();
+
+    const sources = page.getByRole("region", { name: "已核实引用来源" });
+    await expect(sources).toContainText(`合成${label}资产`);
+    const source = page.getByRole("button", { name: `查看${label}详情：${code}` });
+    await expect(source).toBeVisible();
+    await source.click();
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${path}/${code}`);
+  });
+}
 
 test("safe diagnostics copy excludes user text, asset names, and arbitrary event data", async ({ page }) => {
   await page.addInitScript(() => {

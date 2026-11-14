@@ -8,20 +8,22 @@ import {
   type RagSearchConfig,
   type RagSearchDiagnostics,
 } from "../../api/ragSearchConfig.ts";
-import { Button } from "../../ui/index.ts";
+import { Button, Select } from "../../ui/index.ts";
 
 const DIAGNOSTIC_LABELS: Record<RagSearchDiagnostics["status"], string> = {
-  disabled: "已关闭",
-  ready: "服务就绪",
-  unavailable: "暂不可用",
+  disabled: "外部服务未启用",
+  ready: "外部服务就绪",
+  unavailable: "外部服务暂不可用",
 };
 
 function statusDescription(status: RagSearchDiagnostics): string {
-  if (status.status === "disabled") return "推荐功能关闭；普通关键词搜索不受影响。";
-  if (status.status === "ready") {
-    return "DAP 已通过 HTTP 完成服务存活与就绪检查；每次返回的资产 ID 仍会按当前共享目录重新校验。";
+  if (status.status === "disabled") {
+    return "外部 RAG 服务未启用；普通关键词搜索和 AI 本地检索不受影响。";
   }
-  return `RAG HTTP 服务暂不可用（${status.reasonCode || "未知原因"}）；普通关键词搜索不受影响。`;
+  if (status.status === "ready") {
+    return "DAP 已通过 HTTP 完成外部服务存活与就绪检查；返回的资产仍会按当前目录重新验证。";
+  }
+  return `外部 RAG HTTP 服务暂不可用（${status.reasonCode || "未知原因"}）；普通关键词搜索和 AI 本地检索不受影响，外部模式不会回退到本地。`;
 }
 
 export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
@@ -74,7 +76,7 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
     try {
       const saved = await updateRagSearchConfig(config);
       setConfig(saved);
-      setNotice("RAG 推荐配置已保存。普通关键词搜索保持不变。");
+      setNotice("AI 问答检索与 RAG 推荐配置已保存。普通关键词搜索保持不变。");
       const nextDiagnostics = await getRagSearchDiagnostics();
       setDiagnostics(nextDiagnostics);
     } catch (reason) {
@@ -99,14 +101,14 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
   return (
     <details className="rag-config-panel">
       <summary>
-        <span className="rag-config-title">RAG 相关资产推荐（可选）</span>
+        <span className="rag-config-title">AI 问答检索与 RAG 推荐配置</span>
         <span className={`rag-config-state rag-config-state-${diagnostics.status}`}>
           {DIAGNOSTIC_LABELS[diagnostics.status]}
         </span>
       </summary>
       <div className="rag-config-body">
         <p className="rag-config-intro">
-          默认关闭。DAP 仅通过受认证的 HTTP 调用独立 RAG Search Service；DAP 不加载模型、不读取索引、不调用 RAG CLI 或 LLM，也不生成智能解答。关键词搜索不等待推荐服务。
+          AI 问答可使用 DAP 内置目录检索或外部 RAG Search Service；不论检索模式，回答和引用都必须通过当前 DAP 元数据验证。搜索页的相关资产推荐默认关闭，启用外部服务后才可使用；它不影响普通关键词搜索。DAP 不加载索引、不调用 RAG CLI 或代替 AI 问答配置 LLM。
         </p>
         {!supported ? (
           <div className="rag-config-message" role="status">
@@ -118,6 +120,25 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
         {notice ? <div className="rag-config-message" role="status">{notice}</div> : null}
 
         <div className="rag-config-form">
+          <label className="rag-config-field rag-config-field-wide">
+            <span>AI 问答检索模式</span>
+            <Select<string>
+              aria-label="AI 问答检索模式"
+              className="inp"
+              items={[
+                { label: "内置本地检索（DAP 目录）", value: "local" },
+                { label: "外部 RAG Search Service", value: "external" },
+              ]}
+              value={config.retrievalMode}
+              disabled={!canEdit || !supported || loading || saving}
+              onValueChange={(value) => {
+                if (value === "local" || value === "external") update("retrievalMode", value);
+              }}
+            />
+            <small>
+              本地模式直接使用 DAP 当前目录检索，不需要外部服务 URL 或 Token。外部模式只使用下方已启用且配置完成的 RAG Search Service；调用失败不会回退到本地。此项仅控制 AI 问答检索，普通关键词搜索及可选的搜索页推荐由下方开关分别控制。本地模式会隐藏已存的外部 URL；若没有已有 URL，切到外部模式并启用前请填写服务地址。
+            </small>
+          </label>
           <label className="rag-config-toggle">
             <input
               type="checkbox"
@@ -125,8 +146,13 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
               disabled={!canEdit || !supported || loading || saving}
               onChange={(event) => update("enabled", event.target.checked)}
             />
-            <span>启用相关资产推荐</span>
+            <span>启用外部 RAG Search Service</span>
           </label>
+          <div className="rag-config-field rag-config-field-wide" role="note">
+            <small>
+              外部模式需要启用此服务并配置 URL/Token；该服务也用于搜索页的可选相关资产推荐。本地 AI 检索不依赖此开关。
+            </small>
+          </div>
           <div className="rag-config-field" role="note">
             <span>检索策略</span>
             <strong>由 RAG 服务端配置决定</strong>

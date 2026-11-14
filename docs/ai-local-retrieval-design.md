@@ -105,6 +105,21 @@ Candidate, model-claim, citation, SSE, and browser identities now include `asset
 
 Phase 2 regression evidence includes mixed typed-ID collisions, invalid/mismatched references, public projection, final detail refresh, typed claims/citations, frontend parser/source selection and route contracts, and existing exact/ambiguous COUNT tests. The combined AI/RAG/search/visibility/backend regression run passed **178 tests**; the frontend run passed **501 unit tests plus 2 API-mode contract tests**. Full frontend typecheck, ESLint, and the `VITE_API_MODE=remote npm run build` production build passed. Live database and external LLM integration are not implied by these local tests.
 
+## Phase 3 admin configuration
+
+The existing Remote-only, permission-gated System Parameters panel now exposes `retrievalMode` as a Local/External selector and sends it through the existing `RAG_SEARCH_CONFIG/DEFAULT` endpoint. The selected mode is separate from the optional search-page recommendation toggle. Local mode requires no External URL/token; External mode requires the existing service to be enabled/configured and has no Local fallback. The Local browser-safe view hides the stored External URL; blank URLs are omitted from updates so unrelated saves do not erase a hidden legacy endpoint. The admin is prompted to re-enter the URL if switching from Local to External while the field is blank. The selector stays read-only in Mock mode and is disabled when `canEdit` is false. No new endpoint, parameter row, schema, or migration is introduced. Existing route RBAC remains `system:param:write` for updates.
+
 ## Phase 3 acceptance
 
-Before preparing the reviewable PR, rerun the agreed AI/RAG/search/backend and frontend gates on the exact Phase 2 commit; inspect the complete diff against Phase 1; verify no database/schema/migration/service expansion, secret, private-edition route, or remote repository-setting change; and record any build advisories and live integrations not run. Phase 3 does not authorize push, merge, or deployment.
+Before preparing the reviewable PR, rerun the agreed AI/RAG/search/backend and frontend gates on the final Phase 3 diff; inspect the complete change set; verify no database/schema/migration/service expansion, secret, private-edition route, or remote repository-setting change; and record any build advisories and live integrations not run. Phase 3 does not authorize push, merge, or deployment.
+
+## Phase 3 frontend acceptance
+
+AI Ask Remote-fixture browser regressions passed **42/42** across Chromium and WebKit, including new typed report/indicator/API citation-card route tests (**6/6**) and existing table/field source navigation, SSE/progress, cancellation, error, and exact/ambiguous COUNT scenarios. Static Mock AI E2E passed **4/4** and made no remote AI request. These browser tests use fixtures; they do not establish live backend, database, External RAG, or LLM integration. One invocation initially omitted `VITE_API_MODE=remote` and therefore exercised Mock instead of the intended intercepted Remote fixture; the explicit Remote rerun passed all 42 tests. A first rerun also caught that the new source-card accessible label used a display name instead of the pre-existing stable table/field name; the label now preserves the stable identity. A typed-route assertion was corrected to permit the intentionally preserved search query while checking the route pathname and asset code.
+
+## Phase 3 final local verification
+
+- Backend AI/RAG/search/config/typed-detail regression selection: **233 tests PASS**. This includes the existing admin config API round-trip updated with `retrievalMode`, config persistence/legacy inference, and route RBAC. Community boundary plus FastAPI residual-boundary tests: **6 PASS**; Repository Public Data Guard scanner tests: **18 PASS**.
+- Frontend unit/API-mode: **501 + 2 PASS**; ESLint, full typecheck, and `VITE_API_MODE=remote npm run build`: **PASS**. Build retains the non-blocking `%VITE_DEFAULT_ACCENT%` missing-value warning and >500 kB bundle advisory. No dependency manifest changed.
+- `demo/validate_demo_data.py --strict`: **PASS**, 394 files scanned, BLOCKER=0 and SUSPICIOUS=0. `git diff --check`: **PASS**.
+- Live database, production data, External RAG Service, and LLM integrations: **NOT RUN**. No schema/migration, new service, private route, remote repository-setting change, push, PR creation, merge, or deployment is part of this local verification.

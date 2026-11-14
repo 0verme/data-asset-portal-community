@@ -9,6 +9,8 @@ const API_MODE = (
 ).trim().toLowerCase();
 
 export interface RagSearchConfig {
+  /** AI Ask retrieval backend; independent of optional search-page recommendations. */
+  retrievalMode: "local" | "external";
   enabled: boolean;
   serviceUrl: string;
   strategy: "auto" | "keyword" | "vector" | "hybrid";
@@ -27,6 +29,7 @@ export interface RagSearchDiagnostics {
 }
 
 export const DEFAULT_RAG_SEARCH_CONFIG: RagSearchConfig = {
+  retrievalMode: "local",
   enabled: false,
   serviceUrl: "",
   strategy: "auto",
@@ -65,8 +68,9 @@ export async function updateRagSearchConfig(
     await requestRemote("/system/rag-search-config", {
       method: "PUT",
       body: {
+        retrievalMode: config.retrievalMode,
         enabled: config.enabled,
-        serviceUrl: config.serviceUrl,
+        ...(config.serviceUrl ? { serviceUrl: config.serviceUrl } : {}),
         strategy: config.strategy,
         topK: config.topK,
         timeoutMs: config.timeoutMs,
