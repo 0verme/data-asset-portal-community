@@ -42,6 +42,8 @@ AiAskReason = Literal[
 ]
 
 StableAssetId = Annotated[int, Field(strict=True, gt=0)]
+StableTypedAssetId = Annotated[str, Field(strict=True, min_length=1, max_length=128)]
+CandidateAssetId = StableAssetId | StableTypedAssetId
 StableFieldId = Annotated[int, Field(strict=True, gt=0)]
 CandidateEvidenceTerm = Annotated[str, Field(max_length=256)]
 
@@ -102,11 +104,25 @@ class AiAskProgressStep(_AiAskContract):
 
 
 class AiAskCitation(_AiAskContract):
-    """A generated citation bound to a DAP stable identity."""
+    """A generated citation bound to a type-qualified DAP stable identity."""
 
-    asset_id: StableAssetId = Field(alias="assetId")
+    asset_id: CandidateAssetId = Field(alias="assetId")
+    asset_type: Literal["table", "field", "report", "indicator", "api"] = Field(default="table", alias="assetType")
     field_id: StableFieldId | None = Field(default=None, alias="fieldId")
     source: Literal["dap_catalog"] = "dap_catalog"
+
+    @model_validator(mode="after")
+    def validate_typed_identity(self) -> AiAskCitation:
+        if isinstance(self.asset_id, int):
+            if self.field_id is not None and self.asset_type == "table":
+                self.asset_type = "field"
+            if self.asset_type not in {"table", "field"}:
+                raise ValueError("数字 assetId 只能用于表或字段引用")
+            if (self.asset_type == "field") != (self.field_id is not None):
+                raise ValueError("字段引用必须提供 fieldId，表引用不得提供 fieldId")
+        elif self.asset_type not in {"report", "indicator", "api"} or self.field_id is not None:
+            raise ValueError("字符串 assetId 必须与报表/指标/API 类型绑定")
+        return self
 
 
 class AiMetadataCountFilter(_AiAskContract):
@@ -162,11 +178,14 @@ class AiMetadataCount(_AiAskContract):
 class AiAskCandidate(_AiAskContract):
     """Display metadata copied from the current, authorized DAP catalog only."""
 
-    asset_id: StableAssetId = Field(alias="assetId")
+    asset_id: CandidateAssetId = Field(alias="assetId")
     field_id: StableFieldId | None = Field(default=None, alias="fieldId")
-    asset_type: Literal["table", "field"] = Field(alias="assetType")
-    table_name: str = Field(alias="tableName", min_length=1, max_length=256)
-    table_display_name: str = Field(alias="tableDisplayName", max_length=256)
+    asset_type: Literal["table", "field", "report", "indicator", "api"] = Field(alias="assetType")
+    name: str = Field(default="", max_length=256)
+    display_name: str = Field(default="", alias="displayName", max_length=256)
+    description: str = Field(default="", max_length=2000)
+    table_name: str | None = Field(default=None, alias="tableName", min_length=1, max_length=256)
+    table_display_name: str = Field(default="", alias="tableDisplayName", max_length=256)
     table_description: str = Field(default="", alias="tableDescription", max_length=2000)
     field_name: str | None = Field(default=None, alias="fieldName", max_length=256)
     field_display_name: str | None = Field(default=None, alias="fieldDisplayName", max_length=256)
@@ -181,11 +200,29 @@ class AiAskCandidate(_AiAskContract):
 
     @model_validator(mode="after")
     def validate_candidate_identity(self) -> AiAskCandidate:
-        if self.asset_type == "field":
-            if self.field_id is None or not self.field_name:
-                raise ValueError("字段候选必须绑定 fieldId 和字段名")
-        elif self.field_id is not None or self.field_name is not None:
-            raise ValueError("表候选不得包含字段身份")
+        if self.asset_type in {"table", "field"}:
+            if not isinstance(self.asset_id, int) or isinstance(self.asset_id, bool):
+                raise ValueError("表/字段候选必须使用数字 assetId")
+            if not self.table_name:
+                raise ValueError("表/字段候选必须绑定所属表名")
+            if not self.name:
+                self.name = self.field_name if self.asset_type == "field" else self.table_name
+            if not self.display_name:
+                self.display_name = self.field_display_name if self.asset_type == "field" else self.table_display_name
+            if not self.description:
+                self.description = self.field_description if self.asset_type == "field" else self.table_description
+            if self.asset_type == "field":
+                if self.field_id is None or not self.field_name:
+                    raise ValueError("字段候选必须绑定 fieldId 和字段名")
+            elif self.field_id is not None or self.field_name is not None:
+                raise ValueError("表候选不得包含字段身份")
+        else:
+            if not isinstance(self.asset_id, str) or not self.asset_id or self.field_id is not None:
+                raise ValueError("报表/指标/API 候选必须使用类型化字符串 ID")
+            if self.table_name is not None or self.field_name is not None:
+                raise ValueError("非表资产候选不得包含表/字段身份")
+            if not self.name or not self.display_name:
+                raise ValueError("类型化资产候选必须含稳定名称和展示名称")
         return self
 
 
@@ -237,10 +274,12 @@ class AiAskResponse(_AiAskContract):
             ):
                 raise ValueError("answered/partial_answer 响应必须含有效引用与完成状态")
             candidate_ids = {
-                (candidate.asset_id, candidate.field_id) for candidate in self.candidates
+                (candidate.asset_type, candidate.asset_id, candidate.field_id)
+                for candidate in self.candidates
             }
             citation_ids = {
-                (citation.asset_id, citation.field_id) for citation in self.citations
+                (citation.asset_type, citation.asset_id, citation.field_id)
+                for citation in self.citations
             }
             if (
                 candidate_ids != citation_ids
@@ -266,7 +305,8 @@ class AiAskResponse(_AiAskContract):
         if self.status == "insufficient_evidence" and (self.citations or self.candidates):
             raise ValueError("insufficient_evidence 不得包含答案候选或模型引用")
         identities = [
-            (citation.asset_id, citation.field_id) for citation in self.citations
+            (citation.asset_type, citation.asset_id, citation.field_id)
+            for citation in self.citations
         ]
         if len(identities) != len(set(identities)):
             raise ValueError("citations 不得包含重复身份")
@@ -274,11 +314,25 @@ class AiAskResponse(_AiAskContract):
 
 
 class AiGeneratedClaim(_AiAskContract):
-    """One model-selected candidate; relevance is validated against DAP IDs."""
+    """One model-selected candidate; relevance is validated against typed DAP IDs."""
 
-    asset_id: StableAssetId = Field(alias="assetId")
+    asset_id: CandidateAssetId = Field(alias="assetId")
+    asset_type: Literal["table", "field", "report", "indicator", "api"] | None = Field(default=None, alias="assetType")
     field_id: StableFieldId | None = Field(default=None, alias="fieldId")
     relevance: Literal["direct", "related", "context_only"]
+
+    @model_validator(mode="after")
+    def validate_typed_identity(self) -> AiGeneratedClaim:
+        if isinstance(self.asset_id, int):
+            if self.asset_type not in {None, "table", "field"}:
+                raise ValueError("数字 assetId 只能用于表或字段候选")
+            if self.asset_type == "table" and self.field_id is not None:
+                raise ValueError("表 claim 不得提供 fieldId")
+            if self.asset_type == "field" and self.field_id is None:
+                raise ValueError("字段 claim 必须提供 fieldId")
+        elif self.asset_type not in {"report", "indicator", "api"} or self.field_id is not None:
+            raise ValueError("字符串 assetId 必须使用报表/指标/API 类型且不得提供 fieldId")
+        return self
 
 
 class AiGeneratedAnswer(_AiAskContract):

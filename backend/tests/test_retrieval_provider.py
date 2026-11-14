@@ -115,6 +115,103 @@ class LocalSearchProviderTests(unittest.TestCase):
         self.assertEqual([], result.recommendations)
         self.catalog_loader.assert_not_called()
 
+    def test_verifies_mixed_typed_assets_with_noncolliding_identity_and_public_projection(self):
+        shared_code = "ASSET-001"
+        self.search_provider.search.return_value = {
+            "groups": [
+                {"type": "report", "items": [{"ref": shared_code, "title": "untrusted report"}]},
+                {"type": "indicator", "items": [{"ref": shared_code, "title": "untrusted indicator"}]},
+                {"type": "api", "items": [{"ref": shared_code, "title": "untrusted API"}]},
+            ],
+        }
+        details = {
+            "report": {"code": shared_code, "name": "权威报表", "type": "财务", "purpose": "余额核对", "domain": "资金域"},
+            "indicator": {"id": shared_code, "name": "权威指标", "meaning": "余额口径", "dimension": "财务", "caliber": "月末"},
+            "api": {
+                "code": shared_code, "name": "权威接口", "method": "GET", "path": "/v1/balance",
+                "version": "v1", "description": "查询余额", "system": {"name": "资金系统"},
+                "params": [{"name": "accountId", "description": "账户编码", "example": "must-not-leak"}],
+                "responseFields": [{"name": "balance", "dataType": "decimal"}],
+            },
+        }
+        loaders = {asset_type: MagicMock(return_value=detail) for asset_type, detail in details.items()}
+        projected = []
+        projectors = {
+            asset_type: (lambda value, profile, kind=asset_type: projected.append((kind, profile)) or value)
+            for asset_type in details
+        }
+        provider = LocalSearchProvider(
+            self.search_provider,
+            self.catalog_loader,
+            detail_loaders=loaders,
+            detail_projectors=projectors,
+        )
+
+        result = provider.recommend("余额资产", profile="strict")
+
+        self.assertEqual("available", result.status)
+        self.assertEqual({"report", "indicator", "api"}, {item.asset_type for item in result.recommendations})
+        self.assertEqual({(asset_type, shared_code) for asset_type in details}, {
+            (item.asset_type, item.asset_id) for item in result.recommendations
+        })
+        self.assertEqual({"权威报表", "权威指标", "权威接口"}, {item.display_name for item in result.recommendations})
+        api = next(item for item in result.recommendations if item.asset_type == "api")
+        self.assertIn("GET", api.description)
+        self.assertIn("/v1/balance", api.description)
+        self.assertNotIn("must-not-leak", api.description)
+        self.assertEqual({("report", "strict"), ("indicator", "strict"), ("api", "strict")}, set(projected))
+        for loader in loaders.values():
+            loader.assert_called_once_with(shared_code)
+        self.catalog_loader.assert_not_called()
+
+    def test_typed_detail_cap_keeps_database_call_progress_accurate(self):
+        codes = [f"REPORT-{index}" for index in range(5)]
+        self.search_provider.search.return_value = {
+            "groups": [{"type": "report", "items": [{"ref": code} for code in codes]}],
+        }
+        report_loader = MagicMock(side_effect=lambda code: {"code": code, "name": f"报表 {code}"})
+        provider = LocalSearchProvider(
+            self.search_provider,
+            self.catalog_loader,
+            detail_loaders={"report": report_loader},
+        )
+        events = []
+
+        result = provider.recommend(
+            "report", profile="internal", execution_callback=lambda event, data: events.append((event, data))
+        )
+
+        self.assertEqual("degraded", result.status)
+        self.assertTrue(result.results_truncated)
+        self.assertEqual(3, len(result.recommendations))
+        self.assertEqual(3, report_loader.call_count)
+        for event_name in ("catalog_start", "catalog_complete"):
+            event_data = next(data for name, data in events if name == event_name)
+            self.assertEqual(3, event_data["databaseCallCount"])
+
+    def test_invalid_typed_references_are_not_returned_as_candidates(self):
+        self.search_provider.search.return_value = {
+            "groups": [
+                {"type": "report", "items": [{"ref": "MISSING"}]},
+                {"type": "api", "items": [{"ref": "API-001"}]},
+            ],
+        }
+        report_loader = MagicMock(side_effect=LookupError("not found"))
+        api_loader = MagicMock(return_value={"code": "API-OTHER", "name": "mismatched API"})
+        provider = LocalSearchProvider(
+            self.search_provider,
+            self.catalog_loader,
+            detail_loaders={"report": report_loader, "api": api_loader},
+        )
+
+        result = provider.recommend("assets", profile="internal")
+
+        self.assertEqual("degraded", result.status)
+        self.assertEqual("partial_search_failure", result.reason_code)
+        self.assertEqual([], result.recommendations)
+        report_loader.assert_called_once_with("MISSING")
+        api_loader.assert_called_once_with("API-001")
+
     def test_caps_authoritative_candidates_and_marks_truncation(self):
         items = []
         details = []
@@ -287,6 +384,141 @@ class LocalAIAskIntegrationTests(unittest.TestCase):
         external.is_configured.assert_not_called()
         external.recommend.assert_not_called()
         external.load_candidate_catalog.assert_not_called()
+
+    def test_executor_rejects_a_typed_id_that_changes_before_authoritative_reverification(self):
+        code = "REPORT-001"
+        search_provider = MagicMock()
+        search_provider.search.return_value = {
+            "groups": [{"type": "report", "items": [{"ref": code}]}],
+        }
+        report_loader = MagicMock(side_effect=[
+            {"code": code, "name": "检索时的报表"},
+            {"code": "REPORT-STALE", "name": "已变更的报表"},
+        ])
+        local = LocalSearchProvider(
+            search_provider,
+            MagicMock(return_value=[]),
+            detail_loaders={"report": report_loader},
+        )
+        external = self._external_that_must_not_be_used()
+        retrieval = ModeAwareRetrievalProvider(
+            local, external, lambda: {"enabled": False, "retrievalMode": "local"}
+        )
+
+        class PlanningLLM:
+            def __init__(self):
+                self.calls = []
+
+            @staticmethod
+            def is_enabled():
+                return True
+
+            def complete_json(self, *, system_prompt, user_payload, cancel_event=None):
+                self.calls.append(user_payload)
+                return json.dumps({
+                    "queryType": "natural_language",
+                    "keyConcepts": ["余额"],
+                    "queries": ["余额报表在哪里？"],
+                    "supplementalQuery": None,
+                })
+
+        llm = PlanningLLM()
+        executor = AIAskExecutionService(AIAskService(retrieval, llm), assets_service=MagicMock())
+        response = executor.ask(
+            AiAskRequest(query="余额报表在哪里？"),
+            profile="strict",
+            request_id="stale-typed-identity-test",
+        )
+
+        self.assertEqual("retrieval_unavailable", response.status)
+        self.assertEqual("asset_verification_unavailable", response.reason_code)
+        self.assertEqual([], response.citations)
+        self.assertEqual(2, report_loader.call_count)
+        self.assertEqual(1, len(llm.calls))
+        external.is_configured.assert_not_called()
+        external.recommend.assert_not_called()
+
+    def test_multiround_executor_verifies_type_qualified_report_indicator_and_api_citations(self):
+        shared_code = "ASSET-001"
+        search_provider = MagicMock()
+        search_provider.search.return_value = {
+            "groups": [
+                {"type": "report", "items": [{"ref": shared_code, "title": "untrusted"}]},
+                {"type": "indicator", "items": [{"ref": shared_code, "title": "untrusted"}]},
+                {"type": "api", "items": [{"ref": shared_code, "title": "untrusted"}]},
+            ],
+        }
+        details = {
+            "report": {"code": shared_code, "name": "权威报表", "purpose": "月度余额核对"},
+            "indicator": {"id": shared_code, "name": "权威指标", "meaning": "余额口径"},
+            "api": {"code": shared_code, "name": "权威接口", "method": "GET", "path": "/v1/balance", "description": "查询账户余额"},
+        }
+        loaders = {
+            asset_type: MagicMock(return_value=value)
+            for asset_type, value in details.items()
+        }
+        local = LocalSearchProvider(
+            search_provider,
+            MagicMock(return_value=[]),
+            detail_loaders=loaders,
+            detail_projectors={asset_type: (lambda value, _profile: value) for asset_type in details},
+        )
+        external = self._external_that_must_not_be_used()
+        retrieval = ModeAwareRetrievalProvider(
+            local,
+            external,
+            lambda: {"enabled": False, "retrievalMode": "local"},
+        )
+
+        class PlanningAndAnswerLLM:
+            def __init__(self):
+                self.calls = []
+
+            @staticmethod
+            def is_enabled():
+                return True
+
+            def complete_json(self, *, system_prompt, user_payload, cancel_event=None):
+                self.calls.append((system_prompt, user_payload))
+                if len(self.calls) == 1:
+                    return json.dumps({
+                        "queryType": "natural_language",
+                        "keyConcepts": ["余额", shared_code],
+                        "queries": ["查询 ASSET-001 API接口路径"],
+                        "supplementalQuery": None,
+                    })
+                return json.dumps({
+                    "questionType": "asset_location",
+                    "claims": [{
+                        "assetType": "api", "assetId": shared_code,
+                        "fieldId": None, "relevance": "direct",
+                    }],
+                })
+
+        llm = PlanningAndAnswerLLM()
+        base = AIAskService(retrieval, llm)
+        executor = AIAskExecutionService(base, assets_service=MagicMock())
+        response = executor.ask(
+            AiAskRequest(query="查询 ASSET-001 API 接口路径"),
+            profile="strict",
+            request_id="typed-assets-test",
+        )
+
+        self.assertEqual("answered", response.status)
+        self.assertEqual(["api"], [candidate.asset_type for candidate in response.candidates])
+        self.assertEqual([("api", shared_code, None)], [
+            (citation.asset_type, citation.asset_id, citation.field_id)
+            for citation in response.citations
+        ])
+        self.assertIn("GET", response.answer)
+        self.assertIn("/v1/balance", response.answer)
+        prompt_candidates = llm.calls[-1][1]["candidates"]
+        self.assertEqual({"report", "indicator", "api"}, {item["assetType"] for item in prompt_candidates})
+        self.assertTrue(all(item["assetId"] == shared_code for item in prompt_candidates))
+        for loader in loaders.values():
+            self.assertEqual(2, loader.call_count)  # retrieval plus final citation verification
+        external.is_configured.assert_not_called()
+        external.recommend.assert_not_called()
 
 
 class ModeAwareRetrievalProviderTests(unittest.TestCase):

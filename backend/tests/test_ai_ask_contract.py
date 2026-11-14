@@ -137,6 +137,48 @@ class AiAskContractTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             AiAskCitation.model_validate({"assetId": True, "source": "dap_catalog"})
 
+    def test_typed_asset_ids_allow_same_code_without_cross_type_citation_collision(self):
+        candidates = [
+            {
+                "assetId": "SHARED-001",
+                "assetType": asset_type,
+                "name": "SHARED-001",
+                "displayName": f"权威{label}",
+                "description": "已核实详情",
+                "source": "dap_catalog",
+                "retrievalSource": "local",
+                "matchReason": "按类型化稳定 ID 核实",
+                "relevance": "direct",
+            }
+            for asset_type, label in (("report", "报表"), ("indicator", "指标"), ("api", "接口"))
+        ]
+        citations = [
+            {"assetId": "SHARED-001", "assetType": candidate["assetType"], "fieldId": None}
+            for candidate in candidates
+        ]
+        response = AiAskResponse.model_validate({
+            "status": "answered",
+            "answer": "相同编码分别属于不同类型资产。",
+            "candidates": candidates,
+            "citations": citations,
+            "retrievalStatus": "available",
+            "generationStatus": "completed",
+        })
+        self.assertEqual(3, len(response.citations))
+        self.assertEqual({"report", "indicator", "api"}, {item.asset_type for item in response.citations})
+        with self.assertRaises(ValidationError):
+            AiAskResponse.model_validate({
+                **response.model_dump(by_alias=True),
+                "citations": [{**citations[0], "assetType": "api"}, *citations[1:]],
+            })
+        with self.assertRaises(ValidationError):
+            AiAskCitation.model_validate({"assetId": "SHARED-001", "fieldId": None})
+        with self.assertRaises(ValidationError):
+            AiGeneratedAnswer.model_validate({
+                "questionType": "general",
+                "claims": [{"assetId": "SHARED-001", "fieldId": None, "relevance": "direct"}],
+            })
+
     def test_metadata_count_contract_is_exact_complete_and_separate_from_rag_citations(self):
         evidence = {
             "metric": "table_count",

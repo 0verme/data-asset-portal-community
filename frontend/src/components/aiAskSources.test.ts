@@ -9,6 +9,9 @@ function candidate(assetId: number, fieldId: number | null = null): AiAskCandida
     assetId,
     fieldId,
     assetType: fieldId === null ? "table" : "field",
+    name: fieldId === null ? `table_${assetId}` : `field_${fieldId}`,
+    displayName: fieldId === null ? `表 ${assetId}` : `字段 ${fieldId}`,
+    description: "",
     tableName: `table_${assetId}`,
     tableDisplayName: `表 ${assetId}`,
     tableDescription: "",
@@ -24,7 +27,7 @@ function candidate(assetId: number, fieldId: number | null = null): AiAskCandida
 }
 
 function citation(assetId: number, fieldId: number | null = null): AiAskCitation {
-  return { assetId, fieldId, source: "dap_catalog" };
+  return { assetId, assetType: fieldId === null ? "table" : "field", fieldId, source: "dap_catalog" };
 }
 
 test("source section includes only DAP catalog candidates explicitly cited by the answer", () => {
@@ -36,10 +39,21 @@ test("source section includes only DAP catalog candidates explicitly cited by th
   assert.deepEqual(
     selectVerifiedCitedCandidates(
       [citedTable, citedField, uncited, untrustedSource],
-      [citation(12), citation(12, 34), { assetId: 88, fieldId: null, source: "dap_catalog" }],
+      [citation(12), citation(12, 34), { assetId: 88, assetType: "table", fieldId: null, source: "dap_catalog" }],
     ),
     [citedTable, citedField],
   );
+});
+
+test("type-qualified citations do not collide when catalog codes are equal", () => {
+  const report: AiAskCandidate = { ...candidate(1), assetId: "SHARED-001", assetType: "report" };
+  const indicator: AiAskCandidate = { ...report, assetType: "indicator" };
+  const api: AiAskCandidate = { ...report, assetType: "api" };
+  const citations: AiAskCitation[] = [
+    { assetId: "SHARED-001", assetType: "indicator", fieldId: null, source: "dap_catalog" },
+    { assetId: "SHARED-001", assetType: "api", fieldId: null, source: "dap_catalog" },
+  ];
+  assert.deepEqual(selectVerifiedCitedCandidates([report, indicator, api], citations), [indicator, api]);
 });
 
 test("field citations do not accidentally cite their containing table", () => {

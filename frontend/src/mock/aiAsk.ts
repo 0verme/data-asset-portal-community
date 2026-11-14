@@ -81,6 +81,9 @@ function toCandidate(table: AssetTableItem, query: string, reasons: string[], fi
     assetId: Number(table.assetId),
     ...(chosen ? { fieldId: Number(chosen.fieldId) } : {}),
     assetType: chosen ? "field" : "table",
+    name: chosen ? chosen.name : table.name,
+    displayName: chosen ? chosen.cn : table.cn,
+    description: chosen ? chosen.cn : table.desc,
     tableName: table.name,
     tableDisplayName: table.cn,
     tableDescription: table.desc,
@@ -129,6 +132,7 @@ export async function createMockAiAnswer(query: string, topK = 10, signal?: Abor
     candidates,
     citations: candidates.map((item) => ({
       assetId: item.assetId,
+      assetType: item.assetType,
       ...(item.fieldId ? { fieldId: item.fieldId } : {}),
       source: "dap_catalog",
     })),

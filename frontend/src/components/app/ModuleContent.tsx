@@ -92,6 +92,11 @@ function toNavigationTarget(target: SearchNavigationTarget): PortalNavigationTar
   if (target.type === "asset" && "ref" in target && typeof target.ref === "string" && target.ref) {
     navigationTarget.assetName = target.ref;
   }
+  if ("ref" in target && typeof target.ref === "string" && target.ref) {
+    if (target.type === "report") navigationTarget.reportRoute = { page: "view", code: target.ref };
+    if (target.type === "indicator") navigationTarget.indicatorRoute = { page: "view", id: target.ref };
+    if (target.type === "api") navigationTarget.apiAssetRoute = { page: "view", code: target.ref };
+  }
   return navigationTarget;
 }
 

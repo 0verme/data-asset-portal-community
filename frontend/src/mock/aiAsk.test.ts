@@ -10,9 +10,13 @@ test("Mock AI uses verified catalog IDs and never creates free-form citations", 
   assert.ok(response.candidates.length > 0);
   const tables = await getAssetTables();
   for (const item of response.candidates) {
-    const table = tables.find((row) => row.name === item.tableName);
+    assert.ok(item.assetType === "table" || item.assetType === "field");
+    assert.equal(typeof item.assetId, "number");
+    const tableName = item.tableName;
+    assert.ok(tableName);
+    const table = tables.find((row) => row.name === tableName);
     assert.equal(item.assetId, table?.assetId);
-    assert.equal((await getAssetDetail({ assetId: item.assetId })).name, item.tableName);
+    assert.equal((await getAssetDetail({ assetId: item.assetId })).name, tableName);
     if (item.fieldId != null) {
       assert.ok(table?.fields.some((field) => field.fieldId === item.fieldId && field.name === item.fieldName));
     }
@@ -24,7 +28,7 @@ test("Mock AI supports paraphrases, list queries and unknown fields without fals
   const queries = ["订单金额在哪张表？", "我想找订单的金额字段", "订单金额数据在哪里"];
   for (const question of queries) {
     const result = await createMockAiAnswer(question);
-    assert.ok(result.candidates.some((item) => item.tableName.includes("trade_order")), question);
+    assert.ok(result.candidates.some((item) => item.tableName?.includes("trade_order")), question);
   }
   const list = await createMockAiAnswer("有哪些会员相关的表？");
   assert.equal(list.status, "partial_answer");

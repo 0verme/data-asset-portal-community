@@ -173,6 +173,48 @@ test("AI ask parser rejects independent statistical results without authoritativ
   }), /statisticalResult is a presentation adapter/);
 });
 
+test("AI ask parser keeps equal string IDs distinct across report indicator and API citations", () => {
+  const candidates = (["report", "indicator", "api"] as const).map((assetType) => ({
+    assetId: "SHARED-001",
+    fieldId: null,
+    assetType,
+    name: "SHARED-001",
+    displayName: `权威${assetType}`,
+    description: "已核实的目录详情",
+    tableName: null,
+    fieldName: null,
+    domain: "资产域",
+    layer: "",
+    source: "dap_catalog",
+    retrievalSource: "local",
+    matchReason: "类型化稳定 ID 已核实",
+    relevance: "direct",
+  }));
+  const parsed = parseAiAskResponse({
+    ...validResponse,
+    citations: candidates.map(({ assetType, assetId }) => ({
+      assetType, assetId, fieldId: null, source: "dap_catalog",
+    })),
+    candidates,
+  });
+  assert.equal(parsed.candidates.length, 3);
+  assert.deepEqual(new Set(parsed.citations.map((item) => item.assetType)), new Set(["report", "indicator", "api"]));
+  assert.throws(() => parseAiAskResponse({
+    ...validResponse,
+    citations: [
+      { assetType: "api", assetId: "SHARED-001", fieldId: null, source: "dap_catalog" },
+      { assetType: "indicator", assetId: "SHARED-001", fieldId: null, source: "dap_catalog" },
+      { assetType: "api", assetId: "SHARED-001", fieldId: null, source: "dap_catalog" },
+    ],
+    candidates,
+  }), /Duplicate AI ask citation/);
+  assert.throws(() => parseAiAskResponse({
+    ...validResponse,
+    citations: [{ assetId: "SHARED-001", fieldId: null, source: "dap_catalog" }],
+    candidates: [candidates[0]],
+  }), /Invalid AI ask citation/);
+});
+
 test("AI ask parser adapts the authoritative metadata count contract and keeps it separate from RAG", () => {
   const parsed = parseAiAskResponse(validMetadataCountResponse);
   assert.equal(parsed.status, "metadata_count_answered");

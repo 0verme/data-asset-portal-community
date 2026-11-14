@@ -197,12 +197,16 @@ test("AI answers remain explanatory while only DAP candidate cards navigate resp
 
   assert.match(source, /AI 回答摘要/);
   assert.match(source, /onNavigate=\{handleNavigate\}/);
-  assert.match(source, /aria-label=\{`查看\$\{isField \? "字段" : "数据表"\}详情：/);
-  assert.match(source, /ref: item\.tableName,[\s\S]*?assetId: item\.assetId/);
+  assert.match(source, /aria-label=\{`查看\$\{typeLabel\}详情：/);
+  assert.match(source, /ref: isTableOrField \? item\.tableName : item\.assetId/);
+  assert.match(source, /type: isTableOrField \? "asset" : item\.assetType/);
+  assert.match(source, /module,\s*ref:/);
   assert.match(source, /证据来源：DAP 资产目录/);
   assert.match(source, /已核实引用来源/);
   assert.match(source, /selectVerifiedCitedCandidates\(response\.candidates, response\.citations\)/);
   assert.match(source, /item\.relevance === "direct"/);
+  assert.match(source, /item\.assetType === "report" \? "报表"/);
+  assert.match(source, /item\.assetType === "indicator" \? "指标"/);
   assert.match(source, /response\.resultsTruncated[\s\S]*?有界检索结果可能不完整/);
   assert.match(styles, /\.sp-ai-candidate \{[\s\S]*?width: 100%[\s\S]*?min-width: 0/);
   assert.match(styles, /\.sp-ai-candidate-main \{[\s\S]*?overflow-wrap: anywhere/);

@@ -46,6 +46,7 @@ _MAX_INITIAL_QUERIES = 3
 _MAX_TOTAL_SEARCHES = 4
 _MAX_PARALLEL_SEARCHES = 2
 _MAX_DETAIL_TABLES = 5
+_MAX_DETAIL_TYPED_PER_TYPE = 3
 _QUERY_ROUND_TIMEOUT_SECONDS = 12.0
 _OVERALL_TIMEOUT_SECONDS = 105.0
 _RRF_K = 60
@@ -623,18 +624,22 @@ class AIAskExecutionService(AIAskService):
     def _merge_results(
         results: list[tuple[str, RagRecommendationsResponse, dict[str, Any] | None]],
     ) -> list[dict[str, Any]]:
-        merged: dict[tuple[int, int | None], dict[str, Any]] = {}
+        merged: dict[tuple[str, int | str, int | None], dict[str, Any]] = {}
         first_order = 0
         for query, response, report in results:
             if response.status not in {"available", "degraded"}:
                 continue
-            report_hits = {
-                (item.get("assetId"), item.get("fieldId")): item
-                for item in (report or {}).get("hits", [])
-                if isinstance(item, dict)
-            }
+            report_hits = {}
+            for hit in (report or {}).get("hits", []):
+                if not isinstance(hit, dict):
+                    continue
+                hit_type = hit.get("entityType") or (
+                    "field" if hit.get("fieldId") is not None else "table"
+                )
+                report_hits[(hit_type, hit.get("assetId"), hit.get("fieldId"))] = hit
             for rank, recommendation in enumerate(response.recommendations, start=1):
                 identity = (
+                    recommendation.asset_type,
                     recommendation.asset_id,
                     recommendation.field_id if recommendation.asset_type == "field" else None,
                 )
@@ -671,7 +676,8 @@ class AIAskExecutionService(AIAskService):
             key=lambda item: (
                 -item["rrfScore"],
                 item["firstOrder"],
-                item["recommendation"].asset_id,
+                item["recommendation"].asset_type,
+                str(item["recommendation"].asset_id),
                 item["recommendation"].field_id or 0,
             ),
         )[:_MAX_CANDIDATES]
@@ -686,11 +692,33 @@ class AIAskExecutionService(AIAskService):
     ) -> tuple[list[AiAskCandidate], list[int], list[dict[str, Any]], bool]:
         table_ids: list[int] = []
         for item in merged:
-            asset_id = item["recommendation"].asset_id
+            recommendation = item["recommendation"]
+            if recommendation.asset_type not in {"table", "field"}:
+                continue
+            asset_id = self._positive_id(recommendation.asset_id)
+            if asset_id is None:
+                continue
             if asset_id not in table_ids:
                 table_ids.append(asset_id)
             if len(table_ids) >= _MAX_DETAIL_TABLES:
                 break
+        typed_items_by_type: dict[str, list[dict[str, Any]]] = {
+            asset_type: [] for asset_type in ("report", "indicator", "api")
+        }
+        for item in merged:
+            asset_type = item["recommendation"].asset_type
+            if asset_type in typed_items_by_type and len(typed_items_by_type[asset_type]) < _MAX_DETAIL_TYPED_PER_TYPE:
+                typed_items_by_type[asset_type].append(item)
+        typed_items = [
+            item
+            for asset_type in ("report", "indicator", "api")
+            for item in typed_items_by_type[asset_type]
+        ]
+        typed_truncated = any(
+            sum(entry["recommendation"].asset_type == asset_type for entry in merged)
+            > len(typed_items_by_type[asset_type])
+            for asset_type in typed_items_by_type
+        )
         verified: list[AiAskCandidate] = []
         verified_table_ids: list[int] = []
         errors: list[dict[str, Any]] = []
@@ -698,7 +726,8 @@ class AIAskExecutionService(AIAskService):
             (item["recommendation"].asset_id,
              item["recommendation"].field_id if item["recommendation"].asset_type == "field" else None): item
             for item in merged
-            if item["recommendation"].asset_id in table_ids
+            if item["recommendation"].asset_type in {"table", "field"}
+            and item["recommendation"].asset_id in table_ids
         }
         field_ids_by_asset: dict[int, set[int]] = {}
         for (asset_id, field_id), _item in source_items.items():
@@ -734,7 +763,9 @@ class AIAskExecutionService(AIAskService):
             if cancel_signal._deadline.is_set():
                 raise _DeadlineExceeded("overall_timeout")
             candidate_loader = getattr(self._rag_service, "load_candidate_catalog", None)
-            if callable(candidate_loader):
+            if not table_ids:
+                raw_details = []
+            elif callable(candidate_loader):
                 raw_details = candidate_loader(
                     table_ids,
                     field_ids_by_asset,
@@ -878,13 +909,70 @@ class AIAskExecutionService(AIAskService):
                     "source": "dap_authoritative_metadata",
                 },
             )
+        for index, item in enumerate(typed_items):
+            recommendation = item["recommendation"]
+            asset_type = recommendation.asset_type
+            asset_id = recommendation.asset_id
+            step_id = f"asset-{asset_type}-{index}"
+            if cancel_signal._caller is not None and cancel_signal._caller.is_set():
+                raise AIAskCancelled("request_cancelled")
+            if cancel_signal._deadline.is_set():
+                raise _DeadlineExceeded("overall_timeout")
+            events.start(
+                step_id,
+                f"读取并核实{ {'report': '报表', 'indicator': '指标', 'api': 'API'}[asset_type] }目录详情：{recommendation.display_name or recommendation.name}",
+                {"source": "dap_catalog", "phase": "database", "databaseCallCount": 1},
+            )
+            try:
+                verifier = getattr(self._rag_service, "verify_candidate_detail", None)
+                if not callable(verifier):
+                    raise ValueError("typed_detail_verifier_unavailable")
+                refreshed = verifier(
+                    asset_type,
+                    asset_id,
+                    profile=profile,
+                    match_evidence=recommendation.match_evidence,
+                )
+                if (
+                    refreshed is None
+                    or refreshed.asset_type != asset_type
+                    or refreshed.asset_id != asset_id
+                    or refreshed.field_id is not None
+                ):
+                    raise ValueError("typed_identity_not_verified")
+                candidate = self._candidate(refreshed)
+            except AIAskCancelled:
+                raise
+            except _DeadlineExceeded:
+                raise
+            except Exception:
+                errors.append({"assetType": asset_type, "assetId": asset_id, "errorCode": "not_found"})
+                events.error(
+                    step_id,
+                    f"无法核实{ {'report': '报表', 'indicator': '指标', 'api': 'API'}[asset_type] }目录详情。",
+                    {"errorCode": "not_found", "source": "dap_authoritative_metadata"},
+                )
+                continue
+            verified.append(candidate)
+            events.complete(
+                step_id,
+                f"已核实{ {'report': '报表', 'indicator': '指标', 'api': 'API'}[asset_type] }：{candidate.display_name}",
+                {"source": "dap_authoritative_metadata"},
+            )
+
         verified.sort(key=lambda candidate: next(
             (index for index, item in enumerate(merged)
-             if item["recommendation"].asset_id == candidate.asset_id
+             if item["recommendation"].asset_type == candidate.asset_type
+             and item["recommendation"].asset_id == candidate.asset_id
              and (item["recommendation"].field_id if item["recommendation"].asset_type == "field" else None) == candidate.field_id),
             len(merged),
         ))
-        was_truncated = len({item["recommendation"].asset_id for item in merged}) > len(table_ids)
+        table_candidate_ids = {
+            item["recommendation"].asset_id
+            for item in merged
+            if item["recommendation"].asset_type in {"table", "field"}
+        }
+        was_truncated = len(table_candidate_ids) > len(table_ids) or typed_truncated
         return verified[:_MAX_CANDIDATES], verified_table_ids, errors, was_truncated
 
     @staticmethod
@@ -1146,7 +1234,11 @@ class AIAskExecutionService(AIAskService):
                     "retrievalRounds": rounds,
                     "resultCount": sum(response.count for _, response, _ in combined),
                     "deduplicatedCount": len(merged),
-                    "selectedAssetIds": list(dict.fromkeys(item["recommendation"].asset_id for item in merged))[:_MAX_CANDIDATES],
+                    "selectedAssetIds": list(dict.fromkeys(
+                        item["recommendation"].asset_id for item in merged
+                        if item["recommendation"].asset_type in {"table", "field"}
+                        and isinstance(item["recommendation"].asset_id, int)
+                    ))[:_MAX_CANDIDATES],
                     "fusionMethod": "reciprocal_rank_fusion",
                 },
             )
@@ -1196,7 +1288,9 @@ class AIAskExecutionService(AIAskService):
             events.start(
                 "generating",
                 "正在基于已核实的 DAP 资产证据生成完整回答。",
-                {"evidenceCount": len(verified), "assetIds": list(dict.fromkeys(item.asset_id for item in verified))},
+                {"evidenceCount": len(verified), "assetIds": list(dict.fromkeys(
+                    item.asset_id for item in verified if isinstance(item.asset_id, int)
+                ))},
             )
             # RAG evidence and scores are intentionally excluded from the model
             # payload; only refreshed, authorized DAP details are supplied.
@@ -1293,6 +1387,7 @@ class AIAskExecutionService(AIAskService):
             ]
             citations = [AiAskCitation(
                 assetId=candidate.asset_id,
+                assetType=candidate.asset_type,
                 fieldId=candidate.field_id,
                 source="dap_catalog",
             ) for candidate, _relation in selected]
@@ -1310,7 +1405,7 @@ class AIAskExecutionService(AIAskService):
                 "generating",
                 "模型已基于已核实证据完成回答。",
                 {"selectedEvidenceCount": len(selected), "citationIds": [
-                    {"assetId": item.asset_id, "fieldId": item.field_id} for item, _ in selected
+                    {"assetType": item.asset_type, "assetId": item.asset_id, "fieldId": item.field_id} for item, _ in selected
                 ]},
             )
             return emit_answer(AiAskResponse(

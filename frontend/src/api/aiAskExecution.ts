@@ -1,6 +1,6 @@
 import { AI_ASK_REQUEST_TIMEOUT } from "../config/request.ts";
 import { requestRemoteEventStream, type RemoteServerSentEvent } from "./http.ts";
-import { parseAiAskResponse, type AiAskResponse } from "./aiAsk.ts";
+import { containsControlCharacters, parseAiAskResponse, type AiAskResponse } from "./aiAsk.ts";
 
 export type AiAskExecutionEventName = "step_start" | "step_complete" | "step_error" | "answer" | "done" | "keep_alive";
 export type AiAskExecutionStatus = "running" | "completed" | "failed" | "cancelled";
@@ -144,15 +144,27 @@ function assertCitationIds(data: Record<string, unknown>): void {
   if (
     !Array.isArray(citations)
     || citations.length > 20
-    || citations.some((item) =>
-      !isRecord(item)
-      || Object.keys(item).some((key) => key !== "assetId" && key !== "fieldId")
-      || !Number.isSafeInteger(item["assetId"])
-      || Number(item["assetId"]) <= 0
-      || (item["fieldId"] !== null && item["fieldId"] !== undefined && (
-        !Number.isSafeInteger(item["fieldId"]) || Number(item["fieldId"]) <= 0
-      ))
-    )
+    || citations.some((item) => {
+      if (!isRecord(item) || Object.keys(item).some((key) => !["assetType", "assetId", "fieldId"].includes(key))) {
+        return true;
+      }
+      const assetId = item["assetId"];
+      const fieldId = item["fieldId"];
+      const assetType = item["assetType"] ?? (
+        typeof assetId === "number" ? fieldId == null ? "table" : "field" : undefined
+      );
+      const validType = assetType === "table" || assetType === "field"
+        || assetType === "report" || assetType === "indicator" || assetType === "api";
+      const typedStringId = typeof assetId === "string"
+        && assetId.trim().length > 0 && assetId.length <= 128
+        && !containsControlCharacters(assetId);
+      const validAssetId = assetType === "table" || assetType === "field"
+        ? isNonNegativeCount(assetId) && Number(assetId) > 0
+        : typedStringId;
+      const validFieldId = fieldId == null || (isNonNegativeCount(fieldId) && Number(fieldId) > 0);
+      return !validType || !validAssetId || !validFieldId
+        || (assetType === "field" ? fieldId == null : fieldId != null);
+    })
   ) {
     contractError("AI 问答证据引用事件格式无效。");
   }

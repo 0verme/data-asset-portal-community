@@ -96,21 +96,33 @@ function recommendationTarget(item: RagRecommendation): SearchResultItem {
 }
 
 function askCandidateKey(item: AiAskCandidate): string {
-  return item.fieldId ? `field:${item.assetId}:${item.fieldId}` : `table:${item.assetId}`;
+  return `${item.assetType}:${typeof item.assetId}:${item.assetId}:${item.fieldId ?? "none"}`;
 }
 
 function askCandidateTarget(item: AiAskCandidate): SearchResultItem {
   const isField = item.assetType === "field";
+  const isTableOrField = item.assetType === "table" || isField;
+  const module = item.assetType === "report" ? "report"
+    : item.assetType === "indicator" ? "indicator"
+      : item.assetType === "api" ? "apiAsset" : "dwm";
+  const category = item.assetType === "report" ? "报表"
+    : item.assetType === "indicator" ? "指标"
+      : item.assetType === "api" ? "API"
+        : isField ? "字段" : "数据表";
   return {
     id: askCandidateKey(item),
-    title: isField ? item.fieldDisplayName || item.fieldName || "" : item.tableDisplayName || item.tableName,
-    subtitle: isField ? item.fieldDescription || "" : item.tableDescription,
-    meta: [item.tableName, item.domain, item.layer].filter(Boolean).join(" / "),
-    module: "dwm",
-    ref: item.tableName,
-    type: "asset",
-    category: isField ? "字段" : "数据表",
-    assetId: item.assetId,
+    title: isTableOrField
+      ? isField ? item.fieldDisplayName || item.fieldName || "" : item.tableDisplayName || item.tableName || ""
+      : item.displayName,
+    subtitle: isTableOrField
+      ? isField ? item.fieldDescription || "" : item.tableDescription || ""
+      : item.description,
+    meta: [isTableOrField ? item.tableName : item.name, item.domain, item.layer].filter(Boolean).join(" / "),
+    module,
+    ref: isTableOrField ? item.tableName : item.assetId,
+    type: isTableOrField ? "asset" : item.assetType,
+    category,
+    ...(isTableOrField && typeof item.assetId === "number" ? { assetId: item.assetId } : {}),
     matchedFields: [{ label: "匹配依据", value: item.matchReason }],
   };
 }
@@ -349,6 +361,20 @@ function AiAskSection({
               <div className="sp-ai-list">
                 {sourceCandidates.map((item) => {
                   const isField = item.assetType === "field";
+                  const isTableOrField = item.assetType === "table" || isField;
+                  const typeLabel = item.assetType === "report" ? "报表"
+                    : item.assetType === "indicator" ? "指标"
+                      : item.assetType === "api" ? "API"
+                        : isField ? "字段" : "数据表";
+                  const title = isTableOrField
+                    ? isField ? item.fieldDisplayName || item.fieldName || "" : item.tableDisplayName || item.tableName || ""
+                    : item.displayName;
+                  const stableName = isTableOrField
+                    ? isField ? item.fieldName || item.name : item.tableName || item.name
+                    : item.name;
+                  const description = isTableOrField
+                    ? isField ? item.fieldDescription || "" : item.tableDescription || ""
+                    : item.description;
                   const target = askCandidateTarget(item);
                   return (
                     <Button
@@ -356,24 +382,22 @@ function AiAskSection({
                       variant="tertiary"
                       type="button"
                       className="sp-ai-candidate"
-                      aria-label={`查看${isField ? "字段" : "数据表"}详情：${isField ? item.fieldName : item.tableName}`}
+                      aria-label={`查看${typeLabel}详情：${title}`}
                       onClick={() => onNavigate?.(target, query)}
                     >
                       <span className="sp-ai-candidate-main">
                         <span className="sp-ai-candidate-heading">
-                          <span className="sp-ai-candidate-title">{isField ? item.fieldDisplayName || item.fieldName : item.tableDisplayName || item.tableName}</span>
-                          <span className="sp-ai-candidate-type">{isField ? "字段" : "数据表"}</span>
+                          <span className="sp-ai-candidate-title">{title}</span>
+                          <span className="sp-ai-candidate-type">{typeLabel}</span>
                           <span className={`sp-ai-candidate-relevance ${item.relevance === "direct" ? "direct" : "related"}`}>
                             {item.relevance === "direct" ? "直接相关" : "相关线索 · 非直接结论"}
                           </span>
                           <span className="sp-ai-candidate-verified">已核实引用</span>
                         </span>
-                        <span className="sp-ai-candidate-name mono">{isField ? item.fieldName : item.tableName}</span>
+                        <span className="sp-ai-candidate-name mono">{stableName}</span>
                         {isField ? <span className="sp-ai-candidate-meta">所属表：{item.tableDisplayName || item.tableName}（{item.tableName}）</span> : null}
-                        {(isField ? item.fieldDescription : item.tableDescription) ? (
-                          <span className="sp-ai-candidate-desc">中文含义：{isField ? item.fieldDescription : item.tableDescription}</span>
-                        ) : null}
-                        <span className="sp-ai-candidate-meta">主题域/分层：{[item.domain, item.layer].filter(Boolean).join(" / ") || "未登记"}</span>
+                        {description ? <span className="sp-ai-candidate-desc">目录信息：{description}</span> : null}
+                        <span className="sp-ai-candidate-meta">目录范围：{[item.domain, item.layer].filter(Boolean).join(" / ") || "未登记"}</span>
                         <span className="sp-ai-candidate-evidence">证据来源：DAP 资产目录 · {item.matchReason}</span>
                       </span>
                       <span className="sp-hit-go" aria-hidden="true"><Icon name="arrow" size={14} /></span>

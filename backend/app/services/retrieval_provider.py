@@ -19,6 +19,8 @@ LOGGER = logging.getLogger(__name__)
 _MAX_LOCAL_CANDIDATES = 20
 _MAX_LOCAL_FIELD_IDS = 20
 _MAX_LOCAL_TABLE_IDS = 20
+_MAX_LOCAL_TYPED_IDS_PER_TYPE = 3
+_TYPED_LOCAL_ASSET_TYPES = ("report", "indicator", "api")
 
 
 def _positive_id(value: Any) -> int | None:
@@ -57,9 +59,14 @@ class LocalSearchProvider:
         self,
         search_provider: Any,
         candidate_catalog_loader: Callable[..., list[dict[str, Any]]],
+        *,
+        detail_loaders: dict[str, Callable[[str], dict[str, Any]]] | None = None,
+        detail_projectors: dict[str, Callable[[Any, str], Any]] | None = None,
     ) -> None:
         self._search_provider = search_provider
         self._candidate_catalog_loader = candidate_catalog_loader
+        self._detail_loaders = dict(detail_loaders or {})
+        self._detail_projectors = dict(detail_projectors or {})
 
     def is_configured(self) -> bool:
         # This is a configuration check, matching the existing External status
@@ -71,6 +78,32 @@ class LocalSearchProvider:
 
     def load_candidate_catalog(self, *args, **kwargs):
         return self._candidate_catalog_loader(*args, **kwargs)
+
+    def load_candidate_detail(self, asset_type: str, asset_id: str, *, profile: str) -> dict[str, Any]:
+        loader = self._detail_loaders.get(asset_type)
+        if asset_type not in _TYPED_LOCAL_ASSET_TYPES or not callable(loader):
+            raise ValueError("unsupported_candidate_type")
+        detail = loader(asset_id)
+        projector = self._detail_projectors.get(asset_type)
+        if callable(projector):
+            detail = projector(detail, profile)
+        if not isinstance(detail, dict):
+            raise ValueError("invalid_candidate_detail")
+        return detail
+
+    def verify_candidate_detail(
+        self,
+        asset_type: str,
+        asset_id: str,
+        *,
+        profile: str,
+        match_evidence: list[str] | None = None,
+    ) -> RagRecommendation | None:
+        if asset_type not in _TYPED_LOCAL_ASSET_TYPES:
+            raise ValueError("unsupported_candidate_type")
+        return self._typed_recommendation(
+            asset_type, asset_id, match_evidence or [], profile=profile
+        )
 
     @staticmethod
     def _unavailable(query: str, reason: str, elapsed_ms: float) -> RagRecommendationsResponse:
@@ -96,6 +129,97 @@ class LocalSearchProvider:
         except Exception:
             # Progress reporting never changes retrieval behavior.
             return
+
+    @staticmethod
+    def _stable_code(value: Any) -> str:
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            return ""
+        code = str(value).strip()
+        if not code or len(code) > 128 or any(ord(char) < 32 for char in code):
+            return ""
+        return code
+
+    @staticmethod
+    def _metadata_summary(parts: list[tuple[str, Any]], *, limit: int = 2000) -> str:
+        values = []
+        for label, raw_value in parts:
+            text = _safe_text(raw_value, 500)
+            if text:
+                values.append(f"{label}：{text}")
+        return _safe_text("；".join(values), limit)
+
+    def _typed_recommendation(
+        self,
+        asset_type: str,
+        hint_id: str,
+        match_evidence: list[str],
+        *,
+        profile: str,
+    ) -> RagRecommendation | None:
+        detail = self.load_candidate_detail(asset_type, hint_id, profile=profile)
+        identity_key = {"report": "code", "indicator": "id", "api": "code"}[asset_type]
+        canonical_id = self._stable_code(detail.get(identity_key))
+        if not canonical_id or canonical_id.casefold() != hint_id.casefold():
+            return None
+        display_name = _safe_text(detail.get("name"), 256) or canonical_id
+        domain = ""
+        if asset_type == "report":
+            domain = _safe_text(detail.get("domain"), 256)
+            description = self._metadata_summary([
+                ("报表类型", detail.get("type")),
+                ("主题域", detail.get("domain")),
+                ("统计周期", detail.get("freq")),
+                ("统计对象", detail.get("statObject")),
+                ("用途", detail.get("purpose")),
+                ("业务范围", detail.get("businessScopeTags")),
+                ("统计口径", detail.get("statCaliber")),
+                ("筛选条件", detail.get("filterCondition")),
+            ])
+        elif asset_type == "indicator":
+            domain = _safe_text(detail.get("dimension"), 256)
+            description = self._metadata_summary([
+                ("业务含义", detail.get("meaning")),
+                ("维度", detail.get("dimension")),
+                ("口径", detail.get("caliber")),
+                ("计算路径", detail.get("path")),
+                ("聚合方式", detail.get("aggregation")),
+            ])
+        else:
+            system = detail.get("system") if isinstance(detail.get("system"), dict) else {}
+            params = detail.get("params") if isinstance(detail.get("params"), list) else []
+            response_fields = detail.get("responseFields") if isinstance(detail.get("responseFields"), list) else []
+            param_summary = ", ".join(
+                _safe_text(param.get("name"), 96)
+                for param in params[:8]
+                if isinstance(param, dict) and _safe_text(param.get("name"), 96)
+            )
+            response_summary = ", ".join(
+                _safe_text(field.get("name"), 96)
+                for field in response_fields[:8]
+                if isinstance(field, dict) and _safe_text(field.get("name"), 96)
+            )
+            domain = _safe_text(system.get("name"), 256) or _safe_text(detail.get("ownerDept"), 256)
+            description = self._metadata_summary([
+                ("请求方法", detail.get("method")),
+                ("路径", detail.get("path")),
+                ("版本", detail.get("version")),
+                ("所属系统", system.get("name")),
+                ("说明", detail.get("description")),
+                ("参数", param_summary),
+                ("响应字段", response_summary),
+            ])
+        return RagRecommendation(
+            assetId=canonical_id,
+            assetType=asset_type,
+            name=canonical_id,
+            displayName=display_name,
+            description=description,
+            domain=domain,
+            layer="",
+            retrievalSource="local",
+            matchEvidence=match_evidence[:8],
+            evidence=["已按类型化稳定 ID 读取并核实当前 DAP 权威详情"],
+        )
 
     def recommend(
         self,
@@ -191,11 +315,16 @@ class LocalSearchProvider:
         table_order: list[int] = []
         fields_by_table: dict[int, set[int]] = {}
         evidence_by_identity: dict[tuple[int, int | None], list[str]] = {}
+        typed_hints: dict[str, list[tuple[str, list[str]]]] = {
+            asset_type: [] for asset_type in _TYPED_LOCAL_ASSET_TYPES
+        }
         has_more = False
         relevant_partial_failure = False
+        relevant_group_types = {"asset", *_TYPED_LOCAL_ASSET_TYPES}
         for group in search_result["groups"]:
-            if not isinstance(group, dict) or group.get("type") != "asset":
+            if not isinstance(group, dict) or group.get("type") not in relevant_group_types:
                 continue
+            group_type = group["type"]
             has_more = has_more or bool(group.get("hasMore"))
             items = group.get("items")
             if not isinstance(items, list):
@@ -205,13 +334,31 @@ class LocalSearchProvider:
                 if not isinstance(item, dict):
                     relevant_partial_failure = True
                     continue
+                matches = item.get("matchedFields")
+                evidence = [
+                    value for match in (matches if isinstance(matches, list) else [])
+                    if isinstance(match, dict)
+                    if (value := _safe_text(match.get("value"), 256))
+                ]
+                if group_type in _TYPED_LOCAL_ASSET_TYPES:
+                    raw_id = item.get("ref")
+                    if isinstance(raw_id, bool) or not isinstance(raw_id, (str, int)):
+                        relevant_partial_failure = True
+                        continue
+                    stable_id = str(raw_id).strip()
+                    if not stable_id or len(stable_id) > 128 or any(ord(char) < 32 for char in stable_id):
+                        relevant_partial_failure = True
+                        continue
+                    if all(existing_id != stable_id for existing_id, _ in typed_hints[group_type]):
+                        typed_hints[group_type].append((stable_id, evidence[:8]))
+                    continue
+
                 asset_id = _positive_id(item.get("assetId"))
                 if asset_id is None:
                     relevant_partial_failure = True
                     continue
                 if asset_id not in table_order:
                     table_order.append(asset_id)
-                matches = item.get("matchedFields")
                 if not isinstance(matches, list):
                     continue
                 for match in matches:
@@ -225,22 +372,16 @@ class LocalSearchProvider:
                     evidence_by_identity.setdefault((asset_id, field_id), [])
                     if value not in evidence_by_identity[(asset_id, field_id)]:
                         evidence_by_identity[(asset_id, field_id)].append(value)
-                # Table-match evidence remains useful even when there is no
-                # field-level match; it is never treated as authoritative text.
-                table_evidence = [
-                    _safe_text(match.get("value"), 256)
-                    for match in matches
-                    if isinstance(match, dict) and _safe_text(match.get("value"), 256)
-                ]
                 evidence_by_identity.setdefault((asset_id, None), [])
-                for value in table_evidence:
+                for value in evidence:
                     if value not in evidence_by_identity[(asset_id, None)]:
                         evidence_by_identity[(asset_id, None)].append(value)
 
         failed_groups = search_result.get("failedGroups")
         if search_result.get("partial"):
             relevant_partial_failure = relevant_partial_failure or (
-                not isinstance(failed_groups, list) or "asset" in failed_groups
+                not isinstance(failed_groups, list)
+                or bool(relevant_group_types.intersection(failed_groups))
             )
         if len(table_order) > _MAX_LOCAL_TABLE_IDS:
             table_order = table_order[:_MAX_LOCAL_TABLE_IDS]
@@ -264,13 +405,17 @@ class LocalSearchProvider:
             return self._unavailable(
                 normalized_query, "service_unavailable", (time.monotonic() - started) * 1000
             )
+        typed_detail_count = sum(
+            min(len(items), _MAX_LOCAL_TYPED_IDS_PER_TYPE)
+            for items in typed_hints.values()
+        )
         self._report(execution_callback, "catalog_start", {
             "searchId": active_search_id,
             "startedAt": _timestamp(),
             "phase": "database",
-            "candidateAssetCount": len(table_order),
+            "candidateAssetCount": len(table_order) + sum(len(items) for items in typed_hints.values()),
             "candidateFieldCount": sum(len(values) for values in fields_by_table.values()),
-            "databaseCallCount": int(bool(table_order)) + int(bool(fields_by_table)),
+            "databaseCallCount": int(bool(table_order)) + typed_detail_count,
         })
 
         details_by_asset: dict[int, dict[str, Any]] = {}
@@ -308,20 +453,16 @@ class LocalSearchProvider:
                 LOGGER.warning("Local authoritative metadata lookup failed without exposing catalog details")
                 batch_error = True
 
-        self._report(execution_callback, "catalog_complete" if not batch_error else "catalog_error", {
-            "searchId": active_search_id,
-            "finishedAt": _timestamp(),
-            "phase": "database",
-            "databaseCallCount": int(bool(table_order)) + int(bool(fields_by_table)),
-            "verifiedAssetCount": len(details_by_asset),
-            "verifiedFieldCount": sum(
-                len(detail.get("fields", []))
-                for detail in details_by_asset.values()
-                if isinstance(detail.get("fields"), list)
-            ),
-            **({"errorCode": "visibility_unavailable"} if batch_error else {}),
-        })
         if batch_error:
+            self._report(execution_callback, "catalog_error", {
+                "searchId": active_search_id,
+                "finishedAt": _timestamp(),
+                "phase": "database",
+                "databaseCallCount": int(bool(table_order)),
+                "verifiedAssetCount": 0,
+                "verifiedFieldCount": 0,
+                "errorCode": "visibility_unavailable",
+            })
             response = self._unavailable(
                 normalized_query, "visibility_unavailable", (time.monotonic() - started) * 1000
             )
@@ -331,7 +472,7 @@ class LocalSearchProvider:
                 "finishedAt": _timestamp(),
                 "retrievalMode": "local",
                 "requestCount": 0,
-                "resultCount": len(table_order),
+                "resultCount": len(table_order) + sum(len(items) for items in typed_hints.values()),
                 "verifiedCount": 0,
                 "hits": [],
                 "status": "unavailable",
@@ -339,8 +480,10 @@ class LocalSearchProvider:
             })
             return response
 
-        recommendations: list[RagRecommendation] = []
-        seen: set[tuple[int, int | None]] = set()
+        recommendations_by_type: dict[str, list[RagRecommendation]] = {
+            asset_type: [] for asset_type in ("table", "field", *_TYPED_LOCAL_ASSET_TYPES)
+        }
+        seen: set[tuple[str, int | str, int | None]] = set()
         for asset_id in table_order:
             detail = details_by_asset.get(asset_id)
             if detail is None:
@@ -361,14 +504,14 @@ class LocalSearchProvider:
                 "retrievalSource": "local",
                 "evidence": ["已由当前 DAP 目录核实"],
             }
-            identity = (asset_id, None)
+            identity = ("table", asset_id, None)
             if identity not in seen:
                 seen.add(identity)
-                recommendations.append(RagRecommendation(
+                recommendations_by_type["table"].append(RagRecommendation(
                     **common,
                     assetType="table",
                     name=table_name,
-                    matchEvidence=evidence_by_identity.get(identity, [])[:8],
+                    matchEvidence=evidence_by_identity.get((asset_id, None), [])[:8],
                 ))
             requested_fields = fields_by_table.get(asset_id, set())
             verified_fields: set[int] = set()
@@ -401,12 +544,12 @@ class LocalSearchProvider:
                     relevant_partial_failure = True
                     continue
                 verified_fields.add(field_id)
-                identity = (asset_id, field_id)
+                identity = ("field", asset_id, field_id)
                 if identity in seen:
                     relevant_partial_failure = True
                     continue
                 seen.add(identity)
-                recommendations.append(RagRecommendation(
+                recommendations_by_type["field"].append(RagRecommendation(
                     assetId=asset_id,
                     fieldId=field_id,
                     assetType="field",
@@ -424,15 +567,69 @@ class LocalSearchProvider:
                         "layer": common["layer"],
                     },
                     retrievalSource="local",
-                    matchEvidence=evidence_by_identity.get(identity, [])[:8],
+                    matchEvidence=evidence_by_identity.get((asset_id, field_id), [])[:8],
                     evidence=["字段、fieldId 和所属表已由当前 DAP 目录核实"],
                 ))
             if requested_fields - verified_fields:
                 relevant_partial_failure = True
 
-        was_candidate_truncated = len(recommendations) > _MAX_LOCAL_CANDIDATES
-        if was_candidate_truncated:
-            recommendations = recommendations[:_MAX_LOCAL_CANDIDATES]
+        for asset_type in _TYPED_LOCAL_ASSET_TYPES:
+            hints = typed_hints[asset_type]
+            if len(hints) > _MAX_LOCAL_TYPED_IDS_PER_TYPE:
+                has_more = True
+            for hint_id, match_evidence in hints[:_MAX_LOCAL_TYPED_IDS_PER_TYPE]:
+                if cancel_event is not None and cancel_event.is_set():
+                    return self._unavailable(
+                        normalized_query, "service_unavailable", (time.monotonic() - started) * 1000
+                    )
+                identity = (asset_type, hint_id, None)
+                try:
+                    candidate = self._typed_recommendation(
+                        asset_type, hint_id, match_evidence, profile=profile
+                    )
+                except Exception:
+                    candidate = None
+                    LOGGER.warning(
+                        "Local typed asset verification failed asset_type=%s",
+                        asset_type,
+                    )
+                if candidate is None:
+                    relevant_partial_failure = True
+                    continue
+                if identity in seen:
+                    relevant_partial_failure = True
+                    continue
+                seen.add(identity)
+                recommendations_by_type[asset_type].append(candidate)
+
+        self._report(execution_callback, "catalog_complete", {
+            "searchId": active_search_id,
+            "finishedAt": _timestamp(),
+            "phase": "database",
+            "databaseCallCount": int(bool(table_order)) + typed_detail_count,
+            "verifiedAssetCount": len(details_by_asset) + sum(
+                len(recommendations_by_type[asset_type])
+                for asset_type in _TYPED_LOCAL_ASSET_TYPES
+            ),
+            "verifiedFieldCount": sum(
+                len(detail.get("fields", []))
+                for detail in details_by_asset.values()
+                if isinstance(detail.get("fields"), list)
+            ),
+        })
+        recommendations: list[RagRecommendation] = []
+        recommendation_order = ("table", "field", *_TYPED_LOCAL_ASSET_TYPES)
+        max_per_type = max((len(items) for items in recommendations_by_type.values()), default=0)
+        for rank in range(max_per_type):
+            for asset_type in recommendation_order:
+                candidates_for_type = recommendations_by_type[asset_type]
+                if rank < len(candidates_for_type):
+                    recommendations.append(candidates_for_type[rank])
+                    if len(recommendations) >= _MAX_LOCAL_CANDIDATES:
+                        break
+            if len(recommendations) >= _MAX_LOCAL_CANDIDATES:
+                break
+        was_candidate_truncated = sum(map(len, recommendations_by_type.values())) > len(recommendations)
         results_truncated = has_more or was_candidate_truncated
         status = "degraded" if relevant_partial_failure or results_truncated else "available"
         reason_code = (
@@ -470,7 +667,7 @@ class LocalSearchProvider:
             "effectiveMode": "local",
             "channelsUsed": ["local_keyword"],
             "requestCount": 0,
-            "resultCount": len(table_order),
+            "resultCount": len(table_order) + sum(len(items) for items in typed_hints.values()),
             "verifiedCount": len(recommendations),
             "hits": hits,
             "status": status,
@@ -518,6 +715,14 @@ class ModeAwareRetrievalProvider:
         # The local catalog reader is a DAP service call, not an External adapter
         # operation. The executor reuses it for its final identity check.
         return self._local_provider.load_candidate_catalog(*args, **kwargs)
+
+    def load_candidate_detail(self, *args, **kwargs):
+        # Typed detail reads are in-process DAP authority checks, never External
+        # retrieval calls, and can therefore be reused by the final verifier.
+        return self._local_provider.load_candidate_detail(*args, **kwargs)
+
+    def verify_candidate_detail(self, *args, **kwargs):
+        return self._local_provider.verify_candidate_detail(*args, **kwargs)
 
 
 __all__ = ["LocalSearchProvider", "ModeAwareRetrievalProvider"]

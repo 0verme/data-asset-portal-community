@@ -89,6 +89,9 @@ export interface UseNavigationControllerOptions {
 export interface ModuleNavigationTarget extends PortalTarget {
   module?: ModuleId;
   mappingRoute?: MappingRoute;
+  indicatorRoute?: IndicatorRoute;
+  reportRoute?: ReportRoute;
+  apiAssetRoute?: ApiAssetRoute;
   assetId?: number | null;
   assetName?: string | null;
 }
@@ -245,13 +248,13 @@ export function useNavigationController({
             assetId,
           } as AssetRoute;
         }
-        if (nextModule === 'indicator') next.indicatorRoute = DEFAULT_INDICATOR_ROUTE;
+        if (nextModule === 'indicator') next.indicatorRoute = pushTarget?.indicatorRoute || DEFAULT_INDICATOR_ROUTE;
         if (nextModule === 'report') {
-          next.reportRoute = DEFAULT_REPORT_ROUTE;
+          next.reportRoute = pushTarget?.reportRoute || DEFAULT_REPORT_ROUTE;
           next.reportFilter = DEFAULT_REPORT_FILTER;
         }
         if (nextModule === 'apiAsset') {
-          next.apiAssetRoute = DEFAULT_API_ASSET_ROUTE;
+          next.apiAssetRoute = pushTarget?.apiAssetRoute || DEFAULT_API_ASSET_ROUTE;
           next.apiAssetFilter = DEFAULT_API_ASSET_FILTER;
         }
         if (nextModule === 'mapping') {

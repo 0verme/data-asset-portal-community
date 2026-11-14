@@ -272,6 +272,31 @@ test("真实样本仍然拒绝未知字段、非法 stageTimings 与非法 phase
   );
 });
 
+test("SSE citation identities accept type-qualified string IDs and reject ambiguous or malformed types", () => {
+  const frame = (citationIds: unknown[]) => ({
+    event: "step_complete",
+    data: JSON.stringify({
+      request_id: "12345678-abcd",
+      step_id: "generating",
+      timestamp: new Date().toISOString(),
+      message: "verified",
+      data: { citationIds },
+    }),
+  });
+  const parsed = parseAiAskExecutionEvent(frame([
+    { assetType: "report", assetId: "SHARED-001", fieldId: null },
+    { assetType: "indicator", assetId: "SHARED-001", fieldId: null },
+    { assetType: "api", assetId: "SHARED-001", fieldId: null },
+  ]));
+  assert.equal(parsed.event, "step_complete");
+  assert.throws(() => parseAiAskExecutionEvent(frame([
+    { assetType: "table", assetId: "SHARED-001", fieldId: null },
+  ])), /证据引用事件格式无效/);
+  assert.throws(() => parseAiAskExecutionEvent(frame([
+    { assetId: "SHARED-001", fieldId: null },
+  ])), /证据引用事件格式无效/);
+});
+
 test("请求次数展示口径：未知不等于 0", async () => {
   const { events: frames } = await scenario("multi_query_rag");
   const events = await replay(frames);
