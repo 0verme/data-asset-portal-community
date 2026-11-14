@@ -20,6 +20,7 @@ import {
 import type { OperationLogFilter as OperationLogFilterState } from "./operationLogQuery.ts";
 import { Icon } from "../ui.tsx";
 import { Button, Input, Select } from "../../ui/index.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 /**
  * 操作日志查询筛选组件。
@@ -49,6 +50,7 @@ export function OperationLogFilter({
   onChange,
   onReset,
 }: OperationLogFilterProps) {
+  const tx = useUiCopy("admin");
   const update = (patch: Partial<OperationLogFilterState>) =>
     onChange({ ...filter, ...patch });
 
@@ -65,13 +67,12 @@ export function OperationLogFilter({
       <div className="oplog-filter-field">
         <label>
           <Icon name="layers" size={13} />
-          模块
-        </label>
+          {tx("模块")}</label>
         <Select<string>
-          aria-label="模块"
+          aria-label={tx("模块")}
           className="inp"
-          placeholder="全部模块"
-          items={[{ label: "全部模块", value: "" }, ...OPERATION_MODULES.map((item) => ({ label: item, value: item }))]}
+          placeholder={tx("全部模块")}
+          items={[{ label: tx("全部模块"), value: "" }, ...OPERATION_MODULES.map((item) => ({ label: tx(item), value: item }))]}
           value={filter.module || ""}
           onValueChange={(value) => update({ module: value || "" })}
         />
@@ -80,13 +81,12 @@ export function OperationLogFilter({
       <div className="oplog-filter-field">
         <label>
           <Icon name="filter" size={13} />
-          操作类型
-        </label>
+          {tx("操作类型")}</label>
         <Select<string>
-          aria-label="操作类型"
+          aria-label={tx("操作类型")}
           className="inp"
-          placeholder="全部类型"
-          items={[{ label: "全部类型", value: "" }, ...OPERATION_TYPES.map((item) => ({ label: item, value: item }))]}
+          placeholder={tx("全部类型")}
+          items={[{ label: tx("全部类型"), value: "" }, ...OPERATION_TYPES.map((item) => ({ label: tx(item), value: item }))]}
           value={filter.operationType || ""}
           onValueChange={(value) => update({ operationType: value || "" })}
         />
@@ -95,13 +95,12 @@ export function OperationLogFilter({
       <div className="oplog-filter-field">
         <label>
           <Icon name="check" size={13} />
-          操作结果
-        </label>
+          {tx("操作结果")}</label>
         <Select<string>
-          aria-label="操作结果"
+          aria-label={tx("操作结果")}
           className="inp"
-          placeholder="全部"
-          items={[{ label: "全部", value: "all" }, ...OPERATION_RESULTS.map((item) => ({ label: item.name, value: item.value }))]}
+          placeholder={tx("全部")}
+          items={[{ label: tx("全部"), value: "all" }, ...OPERATION_RESULTS.map((item) => ({ label: tx(item.name), value: item.value }))]}
           value={filter.result || "all"}
           onValueChange={(value) => update({ result: value || "all" })}
         />
@@ -110,10 +109,9 @@ export function OperationLogFilter({
       <div className="oplog-filter-field">
         <label>
           <Icon name="clock" size={13} />
-          开始时间
-        </label>
+          {tx("开始时间")}</label>
         <Input
-          aria-label="开始时间"
+          aria-label={tx("开始时间")}
           className="inp"
           type="datetime-local"
           value={toLocalInput(filter.startTime)}
@@ -126,10 +124,9 @@ export function OperationLogFilter({
       <div className="oplog-filter-field">
         <label>
           <Icon name="clock" size={13} />
-          结束时间
-        </label>
+          {tx("结束时间")}</label>
         <Input
-          aria-label="结束时间"
+          aria-label={tx("结束时间")}
           className="inp"
           type="datetime-local"
           value={toLocalInput(filter.endTime)}
@@ -147,8 +144,7 @@ export function OperationLogFilter({
           onClick={onReset}
         >
           <Icon name="refresh" size={14} />
-          重置筛选
-        </Button>
+          {tx("重置筛选")}</Button>
       ) : null}
     </div>
   );

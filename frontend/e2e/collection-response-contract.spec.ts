@@ -33,7 +33,7 @@ test("Remote strict collection response rejects malformed report envelopes and r
   await page.waitForLoadState("networkidle");
   expect(reportRequests).toBe(failedReportRequests);
   allowReportRecovery = true;
-  await page.getByRole("button", { name: "重新加载" }).click();
+  await page.getByRole("button", { name: "重试", exact: true }).click();
   await expect(page.getByText("暂无报表资产", { exact: true })).toBeVisible({ timeout: 20_000 });
   expect(reportRequests).toBeGreaterThan(failedReportRequests);
 });

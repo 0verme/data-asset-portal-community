@@ -15,6 +15,7 @@
 import type { ReactNode } from "react";
 
 import { getScheduleSteps, type ScheduleStatus } from "./scheduleStepper.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 export { getScheduleSteps, nextUnload } from "./scheduleStepper.ts";
 
@@ -39,24 +40,25 @@ export interface ScheduleStepperProps {
 }
 
 export function ScheduleStepper({ times, muted = false, now = new Date() }: ScheduleStepperProps) {
+  const tx = useUiCopy("integration");
   const steps = getScheduleSteps(times, now);
   if (!steps.length) return null;
 
   return (
     <div className={`schedule-stepper${muted ? " muted" : ""}`}>
       <div className="schedule-stepper-scroll">
-        <ol className="schedule-steps" aria-label="卸数计划执行状态">
+        <ol className="schedule-steps" aria-label={tx("卸数计划执行状态")}>
           {steps.map((step, index) => (
             <li
               key={`${step.label}-${index}`}
               className={`schedule-step schedule-step-${step.status}`}
-              aria-label={`${step.label}，${step.statusLabel}`}
+              aria-label={`${step.label}，${tx(step.statusLabel)}`}
               aria-current={step.status === "next" ? "step" : undefined}
             >
               <div className="schedule-step-content">
                 <span className="schedule-step-node" aria-hidden="true">{STATUS_SYMBOLS[step.status]}</span>
                 <span className="schedule-step-time mono">{step.label}</span>
-                <span className="schedule-step-status">{step.statusLabel}</span>
+                <span className="schedule-step-status">{tx(step.statusLabel)}</span>
               </div>
               {index < steps.length - 1 ? <span className="schedule-step-connector" aria-hidden="true" /> : null}
             </li>

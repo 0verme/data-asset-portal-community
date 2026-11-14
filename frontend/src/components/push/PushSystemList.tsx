@@ -2,6 +2,7 @@ import type { PublicPushSystem } from "../../api/push.ts";
 import { getSystemBadgeText } from "../../utils/push.ts";
 import { EmptyState, StatusBadge, WideTableScroll } from "../common/index.ts";
 import { Highlight, Icon } from "../ui.tsx";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 export interface ProtocolTagProps {
   protocol: string;
@@ -26,29 +27,30 @@ export interface PushSystemListProps {
 }
 
 export function PushSystemList({ systems, query, view, onOpen }: PushSystemListProps) {
+  const tx = useUiCopy("integration");
   const showContactDetails = systems.some((system) => (
     getSystemText(system, "downstreamContact") || getSystemText(system, "dataDeveloperContact")
   ));
 
   if (!systems.length) {
-    return <EmptyState title="未找到匹配的系统" desc="没有符合当前筛选条件的下游系统，试试调整搜索词或清空筛选。" />;
+    return <EmptyState title={tx("未找到匹配的系统")} desc={tx("没有符合当前筛选条件的下游系统，试试调整搜索词或清空筛选。")} />;
   }
 
   if (view === "list") {
     return (
       <div className="tbl-wrap">
-        <WideTableScroll ariaLabel="下游推送系统列表" className="push-systems-wide-scroll">
+        <WideTableScroll ariaLabel={tx("下游推送系统列表")} className="push-systems-wide-scroll">
           <table className="dt mobile-card-table push-systems-wide-table">
           <thead>
             <tr>
-              <th style={{ width: "26%" }}>系统</th>
-              <th>连接协议</th>
+              <th style={{ width: "26%" }}>{tx("系统")}</th>
+              <th>{tx("连接协议")}</th>
               {showContactDetails ? <>
-                <th style={{ width: 140 }}>下游对接人</th>
-                <th style={{ width: 140 }}>数据开发对接人</th>
+                <th style={{ width: 140 }}>{tx("下游对接人")}</th>
+                <th style={{ width: 140 }}>{tx("数据开发对接人")}</th>
               </> : null}
-              <th style={{ width: 96, textAlign: "center" }}>作业数</th>
-              <th style={{ width: 96 }}>状态</th>
+              <th style={{ width: 96, textAlign: "center" }}>{tx("作业数")}</th>
+              <th style={{ width: 96 }}>{tx("状态")}</th>
             </tr>
           </thead>
           <tbody>
@@ -65,19 +67,19 @@ export function PushSystemList({ systems, query, view, onOpen }: PushSystemListP
                       <div>
                         <div className="sys-name-line">
                           <div className="sys-name"><Highlight text={system.name} q={query} /></div>
-                          {isImportant ? <span className="tag tag-danger">重要</span> : null}
+                          {isImportant ? <span className="tag tag-danger">{tx("重要")}</span> : null}
                         </div>
                         <div className="sys-id"><Highlight text={system.id} q={query} /></div>
                       </div>
                     </div>
                   </td>
-                  <td data-label="连接"><span className="path-txt"><ProtocolTag protocol={system.protocol} /></span></td>
+                  <td data-label={tx("连接")}><span className="path-txt"><ProtocolTag protocol={system.protocol} /></span></td>
                   {showContactDetails ? <>
-                    <td data-label="下游对接人" style={{ color: "var(--ink-2)" }}>{downstreamContact || "未指定"}</td>
-                    <td data-label="数据开发对接人" style={{ color: "var(--ink-2)" }}>{dataDeveloperContact || "未指定"}</td>
+                    <td data-label={tx("下游对接人")} style={{ color: "var(--ink-2)" }}>{downstreamContact || tx("未指定")}</td>
+                    <td data-label={tx("数据开发对接人")} style={{ color: "var(--ink-2)" }}>{dataDeveloperContact || tx("未指定")}</td>
                   </> : null}
-                  <td data-label="作业数" style={{ textAlign: "center" }}><span className="t-num">{system.jobCount ?? system.jobs.length}</span></td>
-                  <td data-label="状态"><StatusBadge status={system.status} /></td>
+                  <td data-label={tx("作业数")} style={{ textAlign: "center" }}><span className="t-num">{system.jobCount ?? system.jobs.length}</span></td>
+                  <td data-label={tx("状态")}><StatusBadge status={system.status} /></td>
                 </tr>
               );
             })}
@@ -110,28 +112,28 @@ export function PushSystemList({ systems, query, view, onOpen }: PushSystemListP
                 </div>
               </div>
               <div className="sys-card-statuses">
-                {isImportant ? <span className="tag tag-danger">重要</span> : null}
+                {isImportant ? <span className="tag tag-danger">{tx("重要")}</span> : null}
                 <StatusBadge status={system.status} />
               </div>
             </div>
             <div className="sys-desc">{system.desc}</div>
             {isImportant ? (
               <div className="sys-conn sys-deadline">
-                <span className="ck">最晚出数时间</span>
-                <span className="cv mono">{system.latestOutputTime || "未配置"}</span>
+                <span className="ck">{tx("最晚出数时间")}</span>
+                <span className="cv mono">{system.latestOutputTime || tx("未配置")}</span>
               </div>
             ) : null}
             {downstreamContact ? <div className="sys-conn">
-              <span className="ck">下游对接人</span>
+              <span className="ck">{tx("下游对接人")}</span>
               <span className="cv">{downstreamContact}</span>
             </div> : null}
             {dataDeveloperContact ? <div className="sys-conn">
-              <span className="ck">数据开发对接</span>
+              <span className="ck">{tx("数据开发对接")}</span>
               <span className="cv">{dataDeveloperContact}</span>
             </div> : null}
             <div className="sys-card-foot">
-              <span className="jobs-n"><Icon name="push" size={14} color="var(--ink-3)" /><b>{system.jobCount ?? system.jobs.length}</b> 个推送作业</span>
-              <span className="enter-link">进入 <Icon name="arrow" size={14} /></span>
+              <span className="jobs-n"><Icon name="push" size={14} color="var(--ink-3)" /><b>{system.jobCount ?? system.jobs.length}</b> {tx("个推送作业")}</span>
+              <span className="enter-link">{tx("进入")}{" "}<Icon name="arrow" size={14} /></span>
             </div>
           </div>
         );

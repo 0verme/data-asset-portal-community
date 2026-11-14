@@ -42,12 +42,12 @@ import { optionLabel } from "../../utils/ui.ts";
 
 import { getUpstreamFieldLabel } from "./upstreamFieldContract.ts";
 import {
-  getUpstreamErrorSummary,
   mergeUpstreamFieldErrors,
   scrollToFirstUpstreamError,
   validateUpstreamForm,
   type UpstreamFormError,
 } from "./upstreamFormErrors.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 export type UpstreamEditorMode = "new" | "edit";
 export type UpstreamEditorInitial =
@@ -119,6 +119,7 @@ export function UpstreamEditor({
   saveFieldErrors = [],
   onClearSaveError,
 }: UpstreamEditorProps) {
+  const tx = useUiCopy("integration");
   const isEdit = mode === "edit";
   const oldId = initial?.id || "";
   const normalizedStatusOptions = normalizeBinaryStatusOptions(statusOptions);
@@ -169,18 +170,42 @@ export function UpstreamEditor({
     fieldErrors.find((item) => item.field === field);
   const fieldErrorId = (field: string): string =>
     `upstream-error-${field.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const translateFieldError = (error: UpstreamFormError): string => {
+    const direct = tx(error.message);
+    if (direct !== error.message) return direct;
+
+    const label = tx(error.label);
+    if (error.message === `${error.label}不能为空`) return tx("{{label}}不能为空", { label });
+    if (error.message === `${error.label}格式不正确`) return tx("{{label}}格式不正确", { label });
+    if (error.message === `${error.label}当前值不可用，请重新选择`) {
+      return tx("{{label}}当前值不可用，请重新选择", { label });
+    }
+    if (error.message === `${error.label}填写内容不符合要求`) {
+      return tx("{{label}}填写内容不符合要求", { label });
+    }
+    const unavailablePrefix = `${error.label}“`;
+    const unavailableSuffix = "”当前不可用，请重新选择";
+    if (error.message.startsWith(unavailablePrefix) && error.message.endsWith(unavailableSuffix)) {
+      const value = error.message.slice(unavailablePrefix.length, -unavailableSuffix.length);
+      return tx("{{label}}“{{value}}”当前不可用，请重新选择", { label, value });
+    }
+    return direct;
+  };
   const renderFieldError = (field: string): React.ReactNode => {
     const error = getFieldError(field);
     return error ? (
       <div id={fieldErrorId(field)} className="upstream-field-error" role="alert">
-        {error.message}
+        {translateFieldError(error)}
       </div>
     ) : null;
   };
   const errorSummary = fieldErrors.length
-    ? getUpstreamErrorSummary(fieldErrors)
+    ? [
+        tx("还有 {{count}} 项需要修改", { count: fieldErrors.length }),
+        ...Array.from(new Set(fieldErrors.map((error) => tx(error.label)))),
+      ]
     : saveError
-      ? [saveError]
+      ? [tx(saveError)]
       : [];
 
   React.useEffect(() => {
@@ -228,7 +253,7 @@ export function UpstreamEditor({
     onClearSaveError?.();
     if (nextErrors.length) {
       scrollToFirstUpstreamError(nextErrors);
-      toast.error(`保存失败，还有 ${nextErrors.length} 项需要修改`);
+      toast.error(tx("保存失败，还有 {{count}} 项需要修改", { count: nextErrors.length }));
       return;
     }
     const normalizedAbbr = form.abbr.trim().toUpperCase();
@@ -264,7 +289,7 @@ export function UpstreamEditor({
       <PageHeader
         back={{
           onClick: onCancel,
-          text: isEdit ? "返回上一层" : "返回上游卸数列表",
+          text: isEdit ? tx("返回上一层") : tx("返回上游卸数列表"),
         }}
         breadcrumbs={buildModuleBreadcrumbs(
           "upstream",
@@ -272,31 +297,30 @@ export function UpstreamEditor({
             ...(isEdit
               ? [{ label: form.abbr || oldId, onClick: onBackToDetail }]
               : []),
-            { label: isEdit ? "编辑系统" : "新增系统" },
+            { label: tx(isEdit ? "编辑系统" : "新增系统") },
           ],
           onBackToList,
         )}
         icon={isEdit ? "edit" : "plus"}
-        title={isEdit ? "编辑上游卸数系统" : "新增上游卸数系统"}
-        subtitle={isEdit ? oldId : "配置上游系统连接和卸数时间点"}
+        title={tx(isEdit ? "编辑上游卸数系统" : "新增上游卸数系统")}
+        subtitle={isEdit ? oldId : tx("配置上游系统连接和卸数时间点")}
       />
 
-      <ActionErrorBanner title="保存失败" messages={errorSummary} />
+      <ActionErrorBanner title={tx("保存失败")} messages={errorSummary} />
 
       <div className="form-card">
         <h3>
           <Icon name="server" size={14} />
-          基本信息
-        </h3>
+          {tx("基本信息")}</h3>
         <div className="form-grid">
           <div className="fl upstream-field" data-form-field="id">
-            <label>{getUpstreamFieldLabel("id")}</label>
+            <label>{tx(getUpstreamFieldLabel("id"))}</label>
             <Input
-              aria-label={getUpstreamFieldLabel("id")}
+              aria-label={tx(getUpstreamFieldLabel("id"))}
               className={`inp mono${getFieldError("id") ? " invalid" : ""}`}
               value={form.id}
               onChange={(event) => setValue("id", event.target.value)}
-              placeholder="例如：up_cbs"
+              placeholder={tx("例如：up_cbs")}
               data-form-control
               aria-invalid={Boolean(getFieldError("id")) || undefined}
               aria-describedby={getFieldError("id") ? fieldErrorId("id") : undefined}
@@ -304,13 +328,13 @@ export function UpstreamEditor({
             {renderFieldError("id")}
           </div>
           <div className="fl upstream-field" data-form-field="abbr">
-            <label>{getUpstreamFieldLabel("abbr")}</label>
+            <label>{tx(getUpstreamFieldLabel("abbr"))}</label>
             <Input
-              aria-label={getUpstreamFieldLabel("abbr")}
+              aria-label={tx(getUpstreamFieldLabel("abbr"))}
               className={`inp mono${getFieldError("abbr") ? " invalid" : ""}`}
               value={form.abbr}
               onChange={(event) => setValue("abbr", event.target.value)}
-              placeholder="例如：CBS"
+              placeholder={tx("例如：CBS")}
               data-form-control
               aria-invalid={Boolean(getFieldError("abbr")) || undefined}
               aria-describedby={getFieldError("abbr") ? fieldErrorId("abbr") : undefined}
@@ -318,13 +342,13 @@ export function UpstreamEditor({
             {renderFieldError("abbr")}
           </div>
           <div className="fl upstream-field" data-form-field="name">
-            <label>{getUpstreamFieldLabel("name")}</label>
+            <label>{tx(getUpstreamFieldLabel("name"))}</label>
             <Input
-              aria-label={getUpstreamFieldLabel("name")}
+              aria-label={tx(getUpstreamFieldLabel("name"))}
               className={`inp${getFieldError("name") ? " invalid" : ""}`}
               value={form.name}
               onChange={(event) => setValue("name", event.target.value)}
-              placeholder="例如：商品中心"
+              placeholder={tx("例如：商品中心")}
               data-form-control
               aria-invalid={Boolean(getFieldError("name")) || undefined}
               aria-describedby={getFieldError("name") ? fieldErrorId("name") : undefined}
@@ -332,18 +356,18 @@ export function UpstreamEditor({
             {renderFieldError("name")}
           </div>
           <div className="fl upstream-field" data-form-field="dbType">
-            <label>{getUpstreamFieldLabel("dbType")}</label>
+            <label>{tx(getUpstreamFieldLabel("dbType"))}</label>
             <Select<string>
-              aria-label={getUpstreamFieldLabel("dbType")}
+              aria-label={tx(getUpstreamFieldLabel("dbType"))}
               className={`sel${getFieldError("dbType") ? " invalid" : ""}`}
-              placeholder="请选择数据库类型"
+              placeholder={tx("请选择数据库类型")}
               value={form.dbType || null}
               onValueChange={(value) => setValue("dbType", value || "")}
               data-form-control
               aria-invalid={Boolean(getFieldError("dbType")) || undefined}
               aria-describedby={getFieldError("dbType") ? fieldErrorId("dbType") : undefined}
             >
-              <Select.Option value="">请选择数据库类型</Select.Option>
+              <Select.Option value="">{tx("请选择数据库类型")}</Select.Option>
               {dbTypeSelectOptions.map((item) => (
                 <Select.Option key={item.value} value={item.value}>
                   {optionLabel(item)}
@@ -355,34 +379,33 @@ export function UpstreamEditor({
                 className="editor-sub"
                 style={{ marginTop: 6, color: "var(--warn)" }}
               >
-                当前值未在码值中维护，请补充码值或重新选择。
-              </div>
+                {tx("当前值未在码值中维护，请补充码值或重新选择。")}</div>
             ) : null}
             {renderFieldError("dbType")}
           </div>
           <div className="fl">
-            <label>{getUpstreamFieldLabel("owner")}</label>
+            <label>{tx(getUpstreamFieldLabel("owner"))}</label>
             <Input
-              aria-label={getUpstreamFieldLabel("owner")}
+              aria-label={tx(getUpstreamFieldLabel("owner"))}
               className="inp"
               value={form.owner}
               onChange={(event) => setValue("owner", event.target.value)}
-              placeholder="例如：王芳"
+              placeholder={tx("例如：王芳")}
             />
           </div>
           <div className="fl upstream-field" data-form-field="dept">
-            <label>{getUpstreamFieldLabel("dept")}</label>
+            <label>{tx(getUpstreamFieldLabel("dept"))}</label>
             <Select<string>
-              aria-label={getUpstreamFieldLabel("dept")}
+              aria-label={tx(getUpstreamFieldLabel("dept"))}
               className={`sel${getFieldError("dept") ? " invalid" : ""}`}
-              placeholder="请选择业务部门"
+              placeholder={tx("请选择业务部门")}
               value={form.dept || null}
               onValueChange={(value) => setValue("dept", value || "")}
               data-form-control
               aria-invalid={Boolean(getFieldError("dept")) || undefined}
               aria-describedby={getFieldError("dept") ? fieldErrorId("dept") : undefined}
             >
-              <Select.Option value="">请选择业务部门</Select.Option>
+              <Select.Option value="">{tx("请选择业务部门")}</Select.Option>
               {deptSelectOptions.map((item) => (
                 <Select.Option key={item.value} value={item.value}>
                   {optionLabel(item)}
@@ -394,13 +417,12 @@ export function UpstreamEditor({
                 className="editor-sub"
                 style={{ marginTop: 6, color: "var(--warn)" }}
               >
-                当前值未在码值中维护，请补充码值或重新选择。
-              </div>
+                {tx("当前值未在码值中维护，请补充码值或重新选择。")}</div>
             ) : null}
             {renderFieldError("dept")}
           </div>
           <div className="fl upstream-field" data-form-field="status">
-            <label>{getUpstreamFieldLabel("status")}</label>
+            <label>{tx(getUpstreamFieldLabel("status"))}</label>
             <div data-form-control>
               <BinaryStatusToggle
                 mode="status"
@@ -421,13 +443,13 @@ export function UpstreamEditor({
             {renderFieldError("status")}
           </div>
           <div className="fl full">
-            <label>{getUpstreamFieldLabel("desc")}</label>
+            <label>{tx(getUpstreamFieldLabel("desc"))}</label>
             <Textarea
-              aria-label={getUpstreamFieldLabel("desc")}
+              aria-label={tx(getUpstreamFieldLabel("desc"))}
               className="ta"
               value={form.desc}
               onChange={(event) => setValue("desc", event.target.value)}
-              placeholder="描述该系统提供哪些数据，以及卸数用途。"
+              placeholder={tx("描述该系统提供哪些数据，以及卸数用途。")}
             />
           </div>
         </div>
@@ -436,17 +458,16 @@ export function UpstreamEditor({
       <div className="form-card">
         <h3>
           <Icon name="db" size={14} />
-          数据库连接
-        </h3>
+          {tx("数据库连接")}</h3>
         <div className="form-grid">
           <div className="fl upstream-field" data-form-field="host">
-            <label>{getUpstreamFieldLabel("host")}</label>
+            <label>{tx(getUpstreamFieldLabel("host"))}</label>
             <Input
-              aria-label={getUpstreamFieldLabel("host")}
+              aria-label={tx(getUpstreamFieldLabel("host"))}
               className={`inp mono${getFieldError("host") ? " invalid" : ""}`}
               value={form.host}
               onChange={(event) => setValue("host", event.target.value)}
-              placeholder="例如：product.source.demo.invalid"
+              placeholder={tx("例如：product.source.demo.invalid")}
               data-form-control
               aria-invalid={Boolean(getFieldError("host")) || undefined}
               aria-describedby={getFieldError("host") ? fieldErrorId("host") : undefined}
@@ -454,13 +475,13 @@ export function UpstreamEditor({
             {renderFieldError("host")}
           </div>
           <div className="fl">
-            <label>{getUpstreamFieldLabel("schema")}</label>
+            <label>{tx(getUpstreamFieldLabel("schema"))}</label>
             <Input
-              aria-label={getUpstreamFieldLabel("schema")}
+              aria-label={tx(getUpstreamFieldLabel("schema"))}
               className="inp mono"
               value={form.schema}
               onChange={(event) => setValue("schema", event.target.value)}
-              placeholder="例如：CBS_OWNER"
+              placeholder={tx("例如：CBS_OWNER")}
             />
           </div>
         </div>
@@ -470,9 +491,8 @@ export function UpstreamEditor({
         <div className="form-card-head">
           <h3>
             <Icon name="clock" size={14} />
-            卸数时间点
-          </h3>
-          <span className="form-card-meta">{unloadTimes.length} 个</span>
+            {tx("卸数时间点")}</h3>
+          <span className="form-card-meta">{unloadTimes.length} {tx("个")}</span>
         </div>
         <div className="time-rows">
           {unloadTimes.map((item, index) => {
@@ -489,7 +509,7 @@ export function UpstreamEditor({
                     value={item}
                     invalid={Boolean(timeError)}
                     onChange={(event) => setTime(index, event.target.value)}
-                    aria-label={`卸数时间点 ${index + 1}`}
+                    aria-label={tx("卸数时间点 {{index}}", { index: index + 1 })}
                     data-form-control
                     aria-invalid={Boolean(timeError) || undefined}
                     aria-describedby={
@@ -501,7 +521,7 @@ export function UpstreamEditor({
                   {renderFieldError(`unloadTimes[${index}]`)}
                 </div>
                 <IconButton
-                  aria-label={`删除时间点 ${index + 1}`}
+                  aria-label={tx("删除时间点 {{index}}", { index: index + 1 })}
                   className="icon-btn danger"
                   disabled={unloadTimes.length === 1}
                   icon={<Icon name="trash" size={14} />}
@@ -536,14 +556,13 @@ export function UpstreamEditor({
           }}
         >
           <Icon name="plus" size={14} />
-          新增时间点
-        </Button>
+          {tx("新增时间点")}</Button>
         {renderFieldError("unloadTimes")}
       </div>
 
       <FormActionBar
         note={
-          isEdit ? "保存后将更新该系统配置" : "保存后将加入上游卸数系统清单"
+          tx(isEdit ? "保存后将更新该系统配置" : "保存后将加入上游卸数系统清单")
         }
         onCancel={onCancel}
         onSave={save}
@@ -552,15 +571,15 @@ export function UpstreamEditor({
       />
       {isEdit && onDelete ? (
         <DangerZone
-          description="删除上游系统前，应优先评估禁用是否足够。存在关联入仓表、字段映射、卸数计划或历史记录时，不应允许删除。"
+          description={tx("删除上游系统前，应优先评估禁用是否足够。存在关联入仓表、字段映射、卸数计划或历史记录时，不应允许删除。")}
           actions={[
             {
               key: "delete-upstream",
-              label: "删除上游系统",
+              label: tx("删除上游系统"),
               icon: "trash",
               danger: true,
               onClick: onDelete,
-              hint: "删除失败时应直接展示后端返回的不可删除原因。",
+              hint: tx("删除失败时应直接展示后端返回的不可删除原因。"),
             },
           ]}
         />

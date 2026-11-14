@@ -32,17 +32,17 @@ test("role management consumes role and permission APIs", async () => {
 test("role form hides public permissions and explains inherited read access", async () => {
   const source = await readSource("RoleManagementPage.tsx");
   assert.match(source, /isPublicPermission/);
-  assert.match(source, /已选 \$\{selected\.size\} 项/);
+  assert.match(source, /tx\("权限映射（已选 \{\{count\}\} 项）", \{ count: selected\.size \}\)/);
   assert.match(source, /公共只读权限已默认开放/);
 });
 
 test("custom role rows expose a confirmed delete action while builtin rows do not", async () => {
   const page = await readSource("RoleManagementPage.tsx");
   assert.match(page, /function requestRoleDeletion/);
-  assert.match(page, /title: "删除角色"/);
+  assert.match(page, /title: translateUiCopy\("admin", "删除角色"\)/);
   assert.match(page, /仍绑定用户的角色必须先解除用户关联/);
   assert.match(page, /extraActions=\{\s*canEdit && !role\.builtin\s*\?/);
-  assert.match(page, /label: "删除"/);
+  assert.match(page, /label: tx\("删除"\)/);
   assert.match(
     page,
     /onClick:\s*\(\)\s*=>\s*requestRoleDeletion\(role, onDelete\)/,
@@ -65,7 +65,7 @@ test("role deletion refreshes state, reports success, and preserves backend erro
   assert.match(hook, /const requestedPageSize = pageSizeRef\.current/);
   assert.match(hook, /\[active, load, page, pageSize, paged, query\]/);
   assert.match(hook, /await load\(\)/);
-  assert.match(hook, /toast\.success\(`角色/);
+  assert.match(hook, /toast\.success\(translateUiCopy\(['"]admin['"], ['"]角色「\{\{name\}\}」已删除['"], \{ name: role\?\.name \|\| code \}\)\)/);
   assert.match(hook, /toast\.error\(getErrorMessage\(nextError/);
   assert.match(hook, /throw nextError/);
   assert.match(systemPage, /onDelete=\{roleModule\.remove\}/);

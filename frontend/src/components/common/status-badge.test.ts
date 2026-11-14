@@ -83,6 +83,6 @@ test("explicit operation-result labels retain success and failure semantics", ()
 test("StatusBadge delegates rendering to the DAP Status adapter", async () => {
   const source = await readFile(stateCardsPath, "utf8");
   assert.match(source, /import \{ Status as DAPStatus \} from "\.\.\/\.\.\/ui\/index\.ts"/);
-  assert.match(source, /<DAPStatus tone=\{presentation\.tone\}>\{presentation\.label\}<\/DAPStatus>/);
+  assert.match(source, /<DAPStatus tone=\{presentation\.tone\}>\{displayLabel\}<\/DAPStatus>/);
   assert.doesNotMatch(source, /className=\{`tag \$\{tone\.tag\}`\}/);
 });

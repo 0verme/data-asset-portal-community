@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, type Dispatch, type SetStateAction } from "react";
+import { useLayoutEffect, useRef, type Dispatch, type SetStateAction } from "react";
 
 import type { MenuItem } from "../../data/menus.ts";
 import type { MenuFormData, SystemFormFieldError } from "../../hooks/useSystemModule.ts";
@@ -6,6 +6,7 @@ import { BinaryStatusToggle, confirmDeleteAction, DangerZone, FormSection } from
 import { MENU_ICON_OPTIONS } from "./constants.ts";
 import { Checkbox, FormErrorSummary, FormField, focusFirstFormError, Input, Select, Textarea } from "../../ui/index.ts";
 import { formFieldErrorEntries } from "../../utils/formFieldErrorMapping.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 const MENU_FORM_ID = "system-menu-form";
 const MENU_FIELD_LABELS: Readonly<Record<string, string>> = {
@@ -45,8 +46,9 @@ export function MenuForm({
   initial = null,
   onDelete,
 }: MenuFormProps) {
+  const tx = useUiCopy("admin");
   const isEdit = mode === "edit";
-  const fieldErrors = useMemo(() => formFieldErrorEntries(errors), [errors]);
+  const fieldErrors = Object.fromEntries(Object.entries(formFieldErrorEntries(errors)).map(([field, message]) => [field, tx(message)]));
   const formRef = useRef<HTMLDivElement>(null);
   const previousFocusRevision = useRef(focusRevision);
   useLayoutEffect(() => {
@@ -61,89 +63,89 @@ export function MenuForm({
       <FormErrorSummary
         formId={MENU_FORM_ID}
         errors={fieldErrors}
-        getFieldLabel={(field) => MENU_FIELD_LABELS[field] || "表单内容"}
+        getFieldLabel={(field) => tx(MENU_FIELD_LABELS[field] || "表单内容")}
       />
-      <FormSection title="菜单信息">
+      <FormSection title={tx("菜单信息")}>
         <div className="form-grid">
-          <FormField className="fl" formId={MENU_FORM_ID} name="code" label="菜单编码" error={fieldErrors["code"]}>
-            <Input aria-label="菜单编码" className={`inp mono${fieldErrors["code"] ? " invalid" : ""}`} value={form.code} onChange={(event) => {
+          <FormField className="fl" formId={MENU_FORM_ID} name="code" label={tx("菜单编码")} error={fieldErrors["code"]}>
+            <Input aria-label={tx("菜单编码")} className={`inp mono${fieldErrors["code"] ? " invalid" : ""}`} value={form.code} onChange={(event) => {
               clearField("code");
               setForm((prev) => ({ ...prev, code: event.target.value }));
-            }} placeholder="例如：indicator" />
+            }} placeholder={tx("例如：indicator")} />
           </FormField>
-          <FormField className="fl" formId={MENU_FORM_ID} name="name" label="菜单名称" error={fieldErrors["name"]}>
-            <Input aria-label="菜单名称" className={`inp${fieldErrors["name"] ? " invalid" : ""}`} value={form.name} onChange={(event) => {
+          <FormField className="fl" formId={MENU_FORM_ID} name="name" label={tx("菜单名称")} error={fieldErrors["name"]}>
+            <Input aria-label={tx("菜单名称")} className={`inp${fieldErrors["name"] ? " invalid" : ""}`} value={form.name} onChange={(event) => {
               clearField("name");
               setForm((prev) => ({ ...prev, name: event.target.value }));
-            }} placeholder="例如：指标维护" />
+            }} placeholder={tx("例如：指标维护")} />
           </FormField>
-          <FormField className="fl" formId={MENU_FORM_ID} name="icon" label="菜单图标" error={fieldErrors["icon"]}>
-            <Select<string> aria-label="菜单图标" className="inp" items={MENU_ICON_OPTIONS.map((item) => ({ label: item.name, value: item.value }))} value={form.icon || null} onValueChange={(value) => {
+          <FormField className="fl" formId={MENU_FORM_ID} name="icon" label={tx("菜单图标")} error={fieldErrors["icon"]}>
+            <Select<string> aria-label={tx("菜单图标")} className="inp" items={MENU_ICON_OPTIONS.map((item) => ({ label: tx(item.name), value: item.value }))} value={form.icon || null} onValueChange={(value) => {
               clearField("icon");
               setForm((prev) => ({ ...prev, icon: value || "" }));
             }} />
           </FormField>
-          <FormField className="fl" formId={MENU_FORM_ID} name="path" label="路由路径" error={fieldErrors["path"]}>
-            <Input aria-label="路由路径" className={`inp mono${fieldErrors["path"] ? " invalid" : ""}`} value={form.path} onChange={(event) => {
+          <FormField className="fl" formId={MENU_FORM_ID} name="path" label={tx("路由路径")} error={fieldErrors["path"]}>
+            <Input aria-label={tx("路由路径")} className={`inp mono${fieldErrors["path"] ? " invalid" : ""}`} value={form.path} onChange={(event) => {
               clearField("path");
               setForm((prev) => ({ ...prev, path: event.target.value }));
-            }} placeholder="例如：/indicator-maintenance" />
+            }} placeholder={tx("例如：/indicator-maintenance")} />
           </FormField>
-          <FormField className="fl" formId={MENU_FORM_ID} name="order" label="排序号" error={fieldErrors["order"]}>
-            <Input aria-label="排序号" className={`inp mono${fieldErrors["order"] ? " invalid" : ""}`} value={form.order} onChange={(event) => {
+          <FormField className="fl" formId={MENU_FORM_ID} name="order" label={tx("排序号")} error={fieldErrors["order"]}>
+            <Input aria-label={tx("排序号")} className={`inp mono${fieldErrors["order"] ? " invalid" : ""}`} value={form.order} onChange={(event) => {
               clearField("order");
               setForm((prev) => ({ ...prev, order: event.target.value }));
-            }} placeholder="数字越小越靠前，例如 10" />
+            }} placeholder={tx("数字越小越靠前，例如 10")} />
           </FormField>
-          <FormField className="fl" formId={MENU_FORM_ID} name="status" label="状态" error={fieldErrors["status"]}>
-            <div role="group" aria-label="状态">
+          <FormField className="fl" formId={MENU_FORM_ID} name="status" label={tx("状态")} error={fieldErrors["status"]}>
+            <div role="group" aria-label={tx("状态")}>
               <BinaryStatusToggle mode="status" value={form.status} className="system-status-seg" onChange={(value) => {
                 clearField("status");
                 setForm((prev) => ({ ...prev, status: normalizeStatus(value) }));
               }} />
             </div>
           </FormField>
-          <FormField className="fl" formId={MENU_FORM_ID} name="navPlacement" label="导航位置" error={fieldErrors["navPlacement"]}>
-            <Select<string> aria-label="导航位置" className="inp" items={[{ label: "顶栏", value: "primary" }, { label: "更多", value: "more" }]} value={form.navPlacement || null} onValueChange={(value) => {
+          <FormField className="fl" formId={MENU_FORM_ID} name="navPlacement" label={tx("导航位置")} error={fieldErrors["navPlacement"]}>
+            <Select<string> aria-label={tx("导航位置")} className="inp" items={[{ label: tx("顶栏"), value: "primary" }, { label: tx("更多"), value: "more" }]} value={form.navPlacement || null} onValueChange={(value) => {
               clearField("navPlacement");
               setForm((prev) => ({ ...prev, navPlacement: value || "primary" }));
             }} />
           </FormField>
-          <FormField className="fl full" formId={MENU_FORM_ID} name="adminOnly" label="可见范围" error={fieldErrors["adminOnly"]}>
-            <Checkbox label="仅管理员可见" checked={form.adminOnly} onCheckedChange={(checked) => {
+          <FormField className="fl full" formId={MENU_FORM_ID} name="adminOnly" label={tx("可见范围")} error={fieldErrors["adminOnly"]}>
+            <Checkbox label={tx("仅管理员可见")} checked={form.adminOnly} onCheckedChange={(checked) => {
               clearField("adminOnly");
               setForm((prev) => ({ ...prev, adminOnly: checked }));
             }} />
           </FormField>
-          <FormField className="fl full" formId={MENU_FORM_ID} name="desc" label="说明" error={fieldErrors["desc"]}>
-            <Textarea aria-label="说明" className="ta" value={form.desc} onChange={(event) => {
+          <FormField className="fl full" formId={MENU_FORM_ID} name="desc" label={tx("说明")} error={fieldErrors["desc"]}>
+            <Textarea aria-label={tx("说明")} className="ta" value={form.desc} onChange={(event) => {
               clearField("desc");
               setForm((prev) => ({ ...prev, desc: event.target.value }));
-            }} placeholder="补充菜单用途或权限说明" />
+            }} placeholder={tx("补充菜单用途或权限说明")} />
           </FormField>
         </div>
       </FormSection>
 
       {isEdit && initial ? (
         <DangerZone
-          description="删除菜单会影响导航和权限配置。若菜单暂时不再使用，建议优先禁用。"
+          description={tx("删除菜单会影响导航和权限配置。若菜单暂时不再使用，建议优先禁用。")}
           actions={[
             {
               key: "delete-menu",
-              label: "删除菜单",
+              label: tx("删除菜单"),
               icon: "trash",
               danger: true,
               onClick: async () => {
                 if (await confirmDeleteAction({
                   name: initial.name,
-                  typeLabel: "菜单",
-                  impact: "该菜单删除后，可能影响系统导航、权限配置和历史访问追溯。建议优先禁用，而不是删除。",
+                  typeLabel: tx("菜单"),
+                  impact: tx("该菜单删除后，可能影响系统导航、权限配置和历史访问追溯。建议优先禁用，而不是删除。"),
                   consequences: [
-                    "删除前应以后端权限与依赖校验结果为准。",
-                    "若后端返回不可删除原因，页面会直接展示原因。",
+                    tx("删除前应以后端权限与依赖校验结果为准。"),
+                    tx("若后端返回不可删除原因，页面会直接展示原因。"),
                   ],
                   confirmKeyword: initial.code || "",
-                  confirmKeywordLabel: "请输入菜单编码二次确认",
+                  confirmKeywordLabel: tx("请输入菜单编码二次确认"),
                 })) {
                   onDelete?.(initial);
                 }

@@ -14,6 +14,7 @@ import {
 import { validateSystem, type PushSystemForm } from "./pushUtils.ts";
 import { Icon } from "../ui.tsx";
 import { Input, Select, Textarea } from "../../ui/index.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 type SystemFormData = PushSystemForm & {
   desc: string;
@@ -84,6 +85,7 @@ export function SystemEditor({
   onBackToDetail,
   onDelete,
 }: SystemEditorProps) {
+  const tx = useUiCopy("integration");
   const isEdit = mode === "edit";
   const normalizedProtocolOptions = normalizeDictOptions(protocolOptions);
   const normalizedAuthOptions = normalizeDictOptions(authOptions);
@@ -108,7 +110,7 @@ export function SystemEditor({
     initialSnapshotRef.current = JSON.stringify(nextForm);
   }, [initial, defaultProtocol, defaultAuth, defaultStatus]);
 
-  const errors = touched ? validateSystem(form, existingIds, oldId) : [];
+  const errors = touched ? validateSystem(form, existingIds, oldId, tx) : [];
   const protocolSelectOptions = normalizeSelectOptions(protocolOptions, form.protocol);
   const authSelectOptions = normalizeSelectOptions(authOptions, form.auth);
   const deptSelectOptions = normalizeSelectOptions(depts, form.dept);
@@ -129,7 +131,7 @@ export function SystemEditor({
 
   const save = async (): Promise<void> => {
     setTouched(true);
-    const nextErrors = validateSystem(form, existingIds, oldId);
+    const nextErrors = validateSystem(form, existingIds, oldId, tx);
     if (nextErrors.length || saving) return;
 
     setSaving(true);
@@ -161,58 +163,58 @@ export function SystemEditor({
   return (
     <div className="push-system-editor">
       <PageHeader
-        back={{ onClick: onCancel, text: isEdit ? "返回上一层" : "返回下游推送" }}
+        back={{ onClick: onCancel, text: isEdit ? tx("返回上一层") : tx("返回下游推送")}}
         breadcrumbs={[
-          { label: "系统列表", onClick: onBackToList },
+          { label: tx("系统列表"), onClick: onBackToList },
           ...(isEdit ? [{ label: oldId, onClick: onBackToDetail }] : []),
-          { label: isEdit ? "编辑系统" : "新增系统" },
+          { label: tx(isEdit ? "编辑系统" : "新增系统") },
         ]}
         icon={isEdit ? "edit" : "plus"}
-        title={isEdit ? "编辑下游系统" : "新增下游系统"}
-        subtitle={isEdit ? oldId : "配置系统连接与对接信息。"}
+        title={tx(isEdit ? "编辑下游系统" : "新增下游系统")}
+        subtitle={isEdit ? oldId : tx("配置系统连接与对接信息。")}
       />
 
-      <ActionErrorBanner title="请先修正以下问题" messages={errors} />
+      <ActionErrorBanner title={tx("请先修正以下问题")} messages={errors} />
 
       <div className="form-card">
-        <h3><Icon name="server" size={14} />基本信息</h3>
+        <h3><Icon name="server" size={14} />{tx("基本信息")}</h3>
         <div className="form-grid">
           <div className="fl">
-            <label>系统名称</label>
-            <Input aria-label="系统名称" className={`inp${touched && !form.name.trim() ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder="例如：零售经营看板" />
+            <label>{tx("系统名称")}</label>
+            <Input aria-label={tx("系统名称")} className={`inp${touched && !form.name.trim() ? " invalid" : ""}`} value={form.name} onChange={(event) => setValue("name", event.target.value)} placeholder={tx("例如：零售经营看板")} />
           </div>
           <div className="fl">
-            <label>系统编号</label>
-            <Input aria-label="系统编号" className={`inp mono${touched && (!form.id.trim() || !SYSTEM_ID_RE.test(form.id.trim())) ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder="例如：SYS_XXX" />
+            <label>{tx("系统编号")}</label>
+            <Input aria-label={tx("系统编号")} className={`inp mono${touched && (!form.id.trim() || !SYSTEM_ID_RE.test(form.id.trim())) ? " invalid" : ""}`} value={form.id} onChange={(event) => setValue("id", event.target.value)} placeholder={tx("例如：SYS_XXX")} />
           </div>
           <div className="fl">
-            <label>系统缩写</label>
-            <Input aria-label="系统缩写" className={`inp mono${touched && !form.abbr.trim() ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setValue("abbr", event.target.value)} placeholder="例如：CBS" />
+            <label>{tx("系统缩写")}</label>
+            <Input aria-label={tx("系统缩写")} className={`inp mono${touched && !form.abbr.trim() ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setValue("abbr", event.target.value)} placeholder={tx("例如：CBS")} />
           </div>
           <div className="fl">
-            <label>归属部门</label>
+            <label>{tx("归属部门")}</label>
             <Select<string>
-              aria-label="归属部门"
+              aria-label={tx("归属部门")}
               className="sel"
-              placeholder="请选择归属部门"
-              items={[{ label: "请选择归属部门", value: "" }, ...deptSelectOptions.map((dept) => ({ label: optionLabel(dept), value: dept.value }))]}
+              placeholder={tx("请选择归属部门")}
+              items={[{ label: tx("请选择归属部门"), value: "" }, ...deptSelectOptions.map((dept) => ({ label: optionLabel(dept), value: dept.value }))]}
               value={form.dept || ""}
               onValueChange={(value) => setValue("dept", value || "")}
             />
-            {deptLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>业务部门当前值未在码值中维护，请补充码值或重新选择。</div> : null}
+            {deptLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>{tx("业务部门当前值未在码值中维护，请补充码值或重新选择。")}</div> : null}
           </div>
           <div className="fl">
-            <label>重要程度</label>
+            <label>{tx("重要程度")}</label>
             <Select<string>
-              aria-label="重要程度"
+              aria-label={tx("重要程度")}
               className="sel"
-              items={[{ label: "普通", value: "normal" }, { label: "重要", value: "important" }]}
+              items={[{ label: tx("普通"), value: "normal" }, { label: tx("重要"), value: "important" }]}
               value={form.importanceLevel}
               onValueChange={(value) => setImportanceLevel(value || "normal")}
             />
           </div>
           <div className="fl">
-            <label>最晚出数时间</label>
+            <label>{tx("最晚出数时间")}</label>
             <Input
               type="time"
               step={60}
@@ -221,67 +223,67 @@ export function SystemEditor({
               onChange={(event) => setValue("latestOutputTime", event.target.value)}
               aria-invalid={touched && !isValidLatestOutputTime(form.importanceLevel, form.latestOutputTime) || undefined}
               disabled={form.importanceLevel !== "important"}
-              aria-label="最晚出数时间"
+              aria-label={tx("最晚出数时间")}
               aria-describedby="latest-output-time-hint"
             />
             <div id="latest-output-time-hint" className="editor-sub">
-              {form.importanceLevel === "important" ? "使用 24 小时制，可暂不配置。" : "仅重要系统可以配置。"}
+              {form.importanceLevel === "important" ? tx("使用 24 小时制，可暂不配置。") : tx("仅重要系统可以配置。")}
             </div>
           </div>
           <div className="fl full">
-            <label>系统说明</label>
-            <Textarea aria-label="系统说明" className="ta" value={form.desc} onChange={(event) => setValue("desc", event.target.value)} placeholder="描述系统用途，以及它消费哪些数据文件。" />
+            <label>{tx("系统说明")}</label>
+            <Textarea aria-label={tx("系统说明")} className="ta" value={form.desc} onChange={(event) => setValue("desc", event.target.value)} placeholder={tx("描述系统用途，以及它消费哪些数据文件。")} />
           </div>
         </div>
       </div>
 
       <div className="form-card">
-        <h3><Icon name="push" size={14} />连接配置</h3>
+        <h3><Icon name="push" size={14} />{tx("连接配置")}</h3>
         <div className="form-grid">
           <div className="fl">
-            <label>连接协议</label>
+            <label>{tx("连接协议")}</label>
             <Select<string>
-              aria-label="连接协议"
+              aria-label={tx("连接协议")}
               className="sel"
-              items={protocolSelectOptions.map((item) => ({ label: optionLabel(item), value: item.value }))}
+              items={protocolSelectOptions.map((item) => ({ label: tx(optionLabel(item)), value: item.value }))}
               value={form.protocol || null}
               onValueChange={(value) => setValue("protocol", value || "")}
             />
-            {protocolLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>连接协议当前值未在码值中维护，请补充码值或重新选择。</div> : null}
+            {protocolLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>{tx("连接协议当前值未在码值中维护，请补充码值或重新选择。")}</div> : null}
           </div>
           <div className="fl">
-            <label>认证方式</label>
+            <label>{tx("认证方式")}</label>
             <Select<string>
-              aria-label="认证方式"
+              aria-label={tx("认证方式")}
               className="sel"
-              items={authSelectOptions.map((item) => ({ label: optionLabel(item), value: item.value }))}
+              items={authSelectOptions.map((item) => ({ label: tx(optionLabel(item)), value: item.value }))}
               value={form.auth || null}
               onValueChange={(value) => setValue("auth", value || "")}
             />
-            {authLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>认证方式当前值未在码值中维护，请补充码值或重新选择。</div> : null}
+            {authLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>{tx("认证方式当前值未在码值中维护，请补充码值或重新选择。")}</div> : null}
           </div>
           <div className="fl">
-            <label>服务器地址</label>
-            <Input aria-label="服务器地址" className={`inp mono${touched && !form.host.trim() ? " invalid" : ""}`} value={form.host} onChange={(event) => setValue("host", event.target.value)} placeholder="例如：bi.consumer.demo.invalid" />
+            <label>{tx("服务器地址")}</label>
+            <Input aria-label={tx("服务器地址")} className={`inp mono${touched && !form.host.trim() ? " invalid" : ""}`} value={form.host} onChange={(event) => setValue("host", event.target.value)} placeholder={tx("例如：bi.consumer.demo.invalid")} />
           </div>
           <div className="fl">
-            <label>端口</label>
-            <Input aria-label="端口" className={`inp mono${touched && (!String(form.port).trim() || Number.isNaN(Number(form.port))) ? " invalid" : ""}`} value={form.port} onChange={(event) => setValue("port", event.target.value)} placeholder="例如：22" />
+            <label>{tx("端口")}</label>
+            <Input aria-label={tx("端口")} className={`inp mono${touched && (!String(form.port).trim() || Number.isNaN(Number(form.port))) ? " invalid" : ""}`} value={form.port} onChange={(event) => setValue("port", event.target.value)} placeholder={tx("例如：22")} />
           </div>
           <div className="fl">
-            <label>登录账号</label>
-            <Input aria-label="登录账号" className="inp mono" value={form.account} onChange={(event) => setValue("account", event.target.value)} placeholder="例如：dw_push_xxx" />
+            <label>{tx("登录账号")}</label>
+            <Input aria-label={tx("登录账号")} className="inp mono" value={form.account} onChange={(event) => setValue("account", event.target.value)} placeholder={tx("例如：dw_push_xxx")} />
           </div>
           <div className="fl">
-            <label>下游对接人</label>
-            <Input aria-label="下游对接人" className="inp" value={form.downstreamContact} onChange={(event) => setValue("downstreamContact", event.target.value)} placeholder="例如：何嘉佳" />
+            <label>{tx("下游对接人")}</label>
+            <Input aria-label={tx("下游对接人")} className="inp" value={form.downstreamContact} onChange={(event) => setValue("downstreamContact", event.target.value)} placeholder={tx("例如：何嘉佳")} />
           </div>
           <div className="fl">
-            <label>数据开发对接人</label>
-            <Input aria-label="数据开发对接人" className="inp" value={form.dataDeveloperContact} onChange={(event) => setValue("dataDeveloperContact", event.target.value)} placeholder="例如：何嘉佳" />
+            <label>{tx("数据开发对接人")}</label>
+            <Input aria-label={tx("数据开发对接人")} className="inp" value={form.dataDeveloperContact} onChange={(event) => setValue("dataDeveloperContact", event.target.value)} placeholder={tx("例如：何嘉佳")} />
           </div>
           <div className="fl">
-            <label>启用状态</label>
+            <label>{tx("启用状态")}</label>
             <BinaryStatusToggle
               mode="status"
               value={form.status}
@@ -293,7 +295,7 @@ export function SystemEditor({
       </div>
 
       <FormActionBar
-        note={isEdit ? "保存后会更新系统连接信息。" : "保存后可继续为该系统新增推送作业。"}
+        note={tx(isEdit ? "保存后会更新系统连接信息。" : "保存后可继续为该系统新增推送作业。")}
         onCancel={onCancel}
         onSave={save}
         saving={saving}
@@ -301,24 +303,24 @@ export function SystemEditor({
       />
       {deleteInitial ? (
         <DangerZone
-          description="删除下游系统会影响其下所有推送作业、历史推送关系和审计追溯。若系统仅禁用即可满足需求，应优先禁用。"
+          description={tx("删除下游系统会影响其下所有推送作业、历史推送关系和审计追溯。若系统仅禁用即可满足需求，应优先禁用。")}
           actions={[
             {
               key: "delete-push-system",
-              label: "删除下游系统",
+              label: tx("删除下游系统"),
               icon: "trash",
               danger: true,
               onClick: async () => {
                 if (await confirmDeleteAction({
                   name: deleteInitial.name,
-                  typeLabel: "下游系统",
-                  impact: `该系统删除后，可能影响下游推送关系、历史任务记录和审计追溯。其下 ${deleteInitial.jobs.length} 个作业也会一并删除。`,
+                  typeLabel: tx("下游系统"),
+                  impact: tx("该系统删除后，可能影响下游推送关系、历史任务记录和审计追溯。其下 {{count}} 个作业也会一并删除。", { count: deleteInitial.jobs.length }),
                   consequences: [
-                    "删除前应校验是否存在历史推送任务和依赖关系。",
-                    "若后端拒绝删除，页面应展示具体原因。",
+                    tx("删除前应校验是否存在历史推送任务和依赖关系。"),
+                    tx("若后端拒绝删除，页面应展示具体原因。"),
                   ],
                   confirmKeyword: oldId,
-                  confirmKeywordLabel: "请输入系统标识二次确认",
+                  confirmKeywordLabel: tx("请输入系统标识二次确认"),
                 })) {
                   await onDelete?.(oldId);
                 }

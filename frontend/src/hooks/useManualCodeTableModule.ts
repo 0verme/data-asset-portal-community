@@ -14,6 +14,7 @@ import { getBinaryStatusValue, toast } from '../components/common/index.ts';
 import { downloadCsvRows, downloadCsvContent } from '../utils/csv.ts';
 import { getErrorMessage } from '../utils/ui.ts';
 import { clearFormFieldErrorEntry, mapApiFormFieldErrors } from '../utils/formFieldErrorMapping.ts';
+import { translateUiCopy } from '../i18n/useUiTranslation.ts';
 
 export interface ManualCodeTableStyleOption {
   value: string;
@@ -246,7 +247,7 @@ export function useManualCodeTableModule({
         await load(1);
       }
       setFormModal({ open: false, mode: 'new', initial: null, busy: false });
-      toast.success(formModal.mode === 'edit' ? '码值表已更新' : '码值表已新增');
+      toast.success(translateUiCopy('dictionary', formModal.mode === 'edit' ? '码值表已更新' : '码值表已新增'));
     } catch (nextError: unknown) {
       setFormErrors(mapApiFormFieldErrors(nextError, ['tableCode', 'tableName', 'style', 'owner', 'status', 'remark']));
       setErrorFocusRevision((revision) => revision + 1);
@@ -261,9 +262,12 @@ export function useManualCodeTableModule({
       try {
         await updateManualCodeTableStatus(item.id, status);
         await load();
-        toast.success(`已${status === 'enabled' ? '启用' : '禁用'} ${item.tableName}`);
+        toast.success(translateUiCopy('dictionary', '已{{status}} {{name}}', {
+          status: translateUiCopy('dictionary', status === 'enabled' ? '启用' : '禁用'),
+          name: item.tableName,
+        }));
       } catch (nextError: unknown) {
-        toast.error(getErrorMessage(nextError, '更新码值表状态失败。'));
+        toast.error(getErrorMessage(nextError, translateUiCopy('dictionary', '更新码值表状态失败。')));
       }
     }, 'code_table:write');
   };
@@ -274,14 +278,15 @@ export function useManualCodeTableModule({
         await deleteManualCodeTable(item.id);
         await load();
         setFormModal({ open: false, mode: 'new', initial: null, busy: false });
-        toast.success(`已删除 ${item.tableName}`);
+        toast.success(translateUiCopy('dictionary', '已删除 {{name}}', { name: item.tableName }));
       } catch (nextError: unknown) {
-        toast.error(getErrorMessage(nextError, '删除码值表失败。'));
+        toast.error(getErrorMessage(nextError, translateUiCopy('dictionary', '删除码值表失败。')));
       }
     }, 'code_table:write');
   };
 
   const exportCsv = async (): Promise<void> => {
+    const filename = translateUiCopy('dictionary', '手工码值表清单.csv');
     try {
       const csv = await exportManualCodeTablesCsv({
         keyword: query || '',
@@ -289,7 +294,7 @@ export function useManualCodeTableModule({
         status: statusFilter,
       });
       if (csv !== null) {
-        downloadCsvContent('手工码值表清单.csv', csv);
+        downloadCsvContent(filename, csv);
         return;
       }
 
@@ -303,20 +308,20 @@ export function useManualCodeTableModule({
         status: statusFilter,
       });
       const rows = [
-        ['表编码', '表名称', '表样式', '负责人', '状态', '说明', '更新时间'],
+        ['表编码', '表名称', '表样式', '负责人', '状态', '说明', '更新时间'].map((label) => translateUiCopy('dictionary', label)),
         ...exportItems.map((item) => [
           item.tableCode,
           item.tableName,
-          styleMap[item.style] || item.style,
+          styleMap[item.style] ? translateUiCopy('dictionary', styleMap[item.style] || '') : item.style,
           item.owner,
-          statusMap[item.status] || item.status,
+          statusMap[item.status] ? translateUiCopy('dictionary', statusMap[item.status] || '') : item.status,
           item.remark,
           item.updatedAt,
         ]),
       ];
-      downloadCsvRows('手工码值表清单.csv', rows);
+      downloadCsvRows(filename, rows);
     } catch (exportError: unknown) {
-      toast.error(getErrorMessage(exportError, '导出码值表失败。'));
+      toast.error(getErrorMessage(exportError, translateUiCopy('dictionary', '导出码值表失败。')));
     }
   };
 

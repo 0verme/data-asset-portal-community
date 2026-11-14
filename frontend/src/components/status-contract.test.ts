@@ -102,8 +102,8 @@ test("manual code table surfaces only expose the binary status contract", async 
     /status:\s*"active"|status\s*===\s*"active"|\bdraft\b|草稿|停用/,
   );
   assert.doesNotMatch(page, /value="active"|value="draft"|草稿|停用/);
-  assert.match(page, /\{ label: "启用", value: "enabled" \}/);
-  assert.match(page, /\{ label: "禁用", value: "disabled" \}/);
+  assert.match(page, /\{ label: tx\("启用"\), value: "enabled" \}/);
+  assert.match(page, /\{ label: tx\("禁用"\), value: "disabled" \}/);
   assert.doesNotMatch(api, /\b(active|draft|inactive)\b|停用|草稿/);
   assert.doesNotMatch(data, /status:\s*"active"|status:\s*"draft"|停用|草稿/);
   assert.match(data, /status: "enabled"/);

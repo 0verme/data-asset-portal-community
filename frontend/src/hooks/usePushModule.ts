@@ -48,6 +48,7 @@ import {
 import { UPSTREAM_DEPT_OPTIONS } from '../data/commonCodes.ts';
 import { normalizeDictOptions, type DictOption } from '../utils/optionUtils.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
+import { translateUiCopy } from '../i18n/useUiTranslation.ts';
 import type { PushFilter, PushRoute } from '../routing/types.ts';
 
 function fallbackOptions(values: readonly unknown[]): DictOption[] {
@@ -365,7 +366,7 @@ export function usePushModule({
         rememberSystem(system.id);
         scrollMainToTop();
       },
-      '保存下游系统失败。',
+      translateUiCopy('integration', '保存下游系统失败。'),
       'push:write',
     );
   };
@@ -379,7 +380,7 @@ export function usePushModule({
         setPushRoute(getModuleListRoute('push') as PushRoute);
         scrollMainToTop();
       },
-      '删除下游系统失败。',
+      translateUiCopy('integration', '删除下游系统失败。'),
       'push:write',
     );
   };
@@ -394,7 +395,7 @@ export function usePushModule({
         setPushRoute(getPushInterfaceDetailRoute(pushRoute.sys!, job.id) as PushRoute);
         scrollMainToTop();
       },
-      '保存推送作业失败。',
+      translateUiCopy('integration', '保存推送作业失败。'),
       'push:write',
     );
   };
@@ -408,7 +409,7 @@ export function usePushModule({
         setPushRoute(getPushSystemDetailRoute(pushRoute.sys!) as PushRoute);
         scrollMainToTop();
       },
-      '删除推送作业失败。',
+      translateUiCopy('integration', '删除推送作业失败。'),
       'push:write',
     );
   };

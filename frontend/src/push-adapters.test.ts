@@ -12,15 +12,15 @@ const jobDetail = read("./components/push/PushJobDetail.tsx");
 test("push views use the frozen DAP adapters", () => {
   assert.match(view, /import \{ Button, Select, TablePagination \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((view.match(/<Select<string>/g) ?? []).length, 1);
-  assert.match(view, /<TablePagination[\s\S]*?ariaLabel="下游系统分页"/);
-  assert.match(view, /aria-label="下游系统排序"/);
+  assert.match(view, /<TablePagination[\s\S]*?ariaLabel=\{tx\("下游系统分页"\)\}/);
+  assert.match(view, /aria-label=\{tx\("下游系统排序"\)\}/);
   assert.match(view, /<Button[\s\S]*?className="btn primary"[\s\S]*?variant="primary"/);
   assert.match(systemEditor, /import \{ Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((systemEditor.match(/<Input/g) ?? []).length, 9);
   assert.match(systemEditor, /<Input\s+type="time"\s+step=\{60\}/);
   assert.equal((systemEditor.match(/<Select<string>/g) ?? []).length, 4);
   assert.equal((systemEditor.match(/<Textarea/g) ?? []).length, 1);
-  assert.match(systemEditor, /placeholder="请选择归属部门"/);
+  assert.match(systemEditor, /placeholder=\{tx\("请选择归属部门"\)\}/);
   assert.match(jobEditor, /import \{[\s\S]*?FormErrorSummary[\s\S]*?FormField[\s\S]*?focusFirstFormError[\s\S]*?IconButton[\s\S]*?Input[\s\S]*?Select[\s\S]*?Textarea[\s\S]*?\} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((jobEditor.match(/<Input/g) ?? []).length, 11);
   assert.equal((jobEditor.match(/<Select<string>/g) ?? []).length, 5);

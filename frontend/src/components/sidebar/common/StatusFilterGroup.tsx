@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { SidebarFilterGroup } from "./SidebarFilterGroup.tsx";
 
 export interface StatusFilterGroupProps {
@@ -24,17 +26,22 @@ export function StatusFilterGroup({
       allValue,
       enabledValue = "enabled",
       disabledValue = "disabled",
-      title = "状态",
-      allLabel = "全部状态",
-      enabledLabel = "启用",
-      disabledLabel = "禁用",
+      title,
+      allLabel,
+      enabledLabel,
+      disabledLabel,
 }: StatusFilterGroupProps) {
+      const { t } = useTranslation("common");
+      const resolvedTitle = title || t("status.title");
+      const resolvedAllLabel = allLabel || t("status.all");
+      const resolvedEnabledLabel = enabledLabel || t("status.enabled");
+      const resolvedDisabledLabel = disabledLabel || t("status.disabled");
       return (
             <SidebarFilterGroup
-                  title={title}
+                  title={resolvedTitle}
                   allOption={{
                         key: "all",
-                        label: allLabel,
+                        label: resolvedAllLabel,
                         count: totalCount,
                         active: value === allValue,
                         onClick: () => onChange(allValue),
@@ -42,14 +49,14 @@ export function StatusFilterGroup({
                   items={[
                         {
                               key: "enabled",
-                              label: enabledLabel,
+                              label: resolvedEnabledLabel,
                               count: enabledCount,
                               active: value === enabledValue,
                               onClick: () => onChange(enabledValue),
                         },
                         {
                               key: "disabled",
-                              label: disabledLabel,
+                              label: resolvedDisabledLabel,
                               count: disabledCount,
                               active: value === disabledValue,
                               onClick: () => onChange(disabledValue),

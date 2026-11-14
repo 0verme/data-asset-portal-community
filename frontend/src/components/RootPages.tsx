@@ -32,6 +32,7 @@ import {
 } from "../ui/index.ts";
 import { validateRootForm } from "./rootFormErrors.ts";
 import { parseRootImport, type ParsedRoot } from "./rootImportParser.ts";
+import { useUiCopy } from "../i18n/useUiTranslation.ts";
 
 interface CatBadgeProps {
   cat: string;
@@ -78,26 +79,26 @@ export function RootLibrary({
   onClearQuery,
   canEdit = false,
 }: RootLibraryProps) {
+  const tx = useUiCopy("dictionary");
   return (
     <div className="root-page">
       <div className="page-head">
         <div>
-          <div className="page-title"><Icon name="book" size={21} color="var(--ink-2)" />词根库</div>
+          <div className="page-title"><Icon name="book" size={21} color="var(--ink-2)" />{tx("词根库")}</div>
           <div className="page-sub">
-            数据仓库命名规范词根，用于拼装表名与字段名，共 <b>{total}</b> 个匹配词根
-            {query ? <>，匹配 “{query}”</> : null}
+            {tx("数据仓库命名规范词根，用于拼装表名与字段名，共")}{" "}<b>{total}</b> {tx("个匹配词根")}{query ? <>{tx("，匹配 “")}{query}”</> : null}
           </div>
         </div>
         <div className="head-actions">
-          {canEdit ? <Button className="btn" variant="secondary" type="button" onClick={onImport}><Icon name="upload" size={15} />批量导入</Button> : null}
-          {canEdit ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}><Icon name="plus" size={15} />新增词根</Button> : null}
+          {canEdit ? <Button className="btn" variant="secondary" type="button" onClick={onImport}><Icon name="upload" size={15} />{tx("批量导入")}</Button> : null}
+          {canEdit ? <Button className="btn primary" variant="primary" type="button" onClick={onNew}><Icon name="plus" size={15} />{tx("新增词根")}</Button> : null}
         </div>
       </div>
 
       <div className="stat-row">
         <div className="stat-card">
           <div className="sv">{globalTotal}</div>
-          <div className="sl">词根总数</div>
+          <div className="sl">{tx("词根总数")}</div>
         </div>
         {categories.map((item) => (
           <div
@@ -113,7 +114,7 @@ export function RootLibrary({
 
       {(activeCategory || query) ? (
         <div className="filter-bar">
-          <span className="fb-label">筛选:</span>
+          <span className="fb-label">{tx("筛选:")}</span>
           {activeCategory ? (
             <span className="chip-active">
               {activeCategory}
@@ -130,29 +131,29 @@ export function RootLibrary({
       ) : null}
 
       {!roots.length ? (
-        <EmptyState title="未找到匹配的词根" desc="换个关键词，或新增 / 导入词根。" />
+        <EmptyState title={tx("未找到匹配的词根")} desc={tx("换个关键词，或新增 / 导入词根。")} />
       ) : (
         <div className="tbl-wrap root-tbl">
-          <WideTableScroll ariaLabel="数据词根列表" className="root-wide-scroll">
+          <WideTableScroll ariaLabel={tx("数据词根列表")} className="root-wide-scroll">
             <table className="dt mobile-card-table root-wide-table">
             <thead>
               <tr>
-                <th style={{ width: 130 }}>词根</th>
-                <th style={{ width: 180 }}>英文全称</th>
-                <th style={{ width: 140 }}>中文名</th>
-                <th style={{ width: 120 }}>分类</th>
-                <th>说明 / 示例</th>
-                <th style={{ width: 100, textAlign: "right" }}>操作</th>
+                <th style={{ width: 130 }}>{tx("词根")}</th>
+                <th style={{ width: 180 }}>{tx("英文全称")}</th>
+                <th style={{ width: 140 }}>{tx("中文名")}</th>
+                <th style={{ width: 120 }}>{tx("分类")}</th>
+                <th>{tx("说明 / 示例")}</th>
+                <th style={{ width: 100, textAlign: "right" }}>{tx("操作")}</th>
               </tr>
             </thead>
             <tbody>
               {roots.map((item) => (
                 <tr key={item.abbr} onClick={canEdit ? () => onEdit(item.abbr) : undefined}>
                   <td data-label=""><span className="root-abbr"><Highlight text={item.abbr} q={query} /></span></td>
-                  <td data-label="英文全称"><span className="root-en"><Highlight text={item.en} q={query} /></span></td>
-                  <td data-label="中文名"><Highlight text={item.cn} q={query} /></td>
-                  <td data-label="分类"><CatBadge cat={item.cat} /></td>
-                  <td data-label="说明">{item.desc || "-"}</td>
+                  <td data-label={tx("英文全称")}><span className="root-en"><Highlight text={item.en} q={query} /></span></td>
+                  <td data-label={tx("中文名")}><Highlight text={item.cn} q={query} /></td>
+                  <td data-label={tx("分类")}><CatBadge cat={item.cat} /></td>
+                  <td data-label={tx("说明")}>{item.desc || "-"}</td>
                   <td data-label="" className="mobile-card-actions" style={{ textAlign: "right" }} onClick={(event) => event.stopPropagation()}>
                     <RowActions onEdit={canEdit ? () => onEdit(item.abbr) : undefined} />
                   </td>
@@ -169,7 +170,7 @@ export function RootLibrary({
         total={total}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
-        ariaLabel="词根列表分页"
+        ariaLabel={tx("词根列表分页")}
       />
     </div>
   );
@@ -193,6 +194,7 @@ export interface RootEditorProps {
 }
 
 export function RootEditor({ mode, initial = null, categories, existingAbbrs, onSave, onCancel, onDelete }: RootEditorProps) {
+  const tx = useUiCopy("dictionary");
   const isEdit = mode === "edit";
   const oldAbbr = initial?.abbr || "";
   const defaultForm: RootFormData = {
@@ -241,7 +243,7 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
 
   const categoryNames = categories.map((item) => item.name);
   const errors: FormFieldErrors = touched
-    ? validateRootForm(form, existingAbbrs, oldAbbr)
+    ? validateRootForm(form, existingAbbrs, oldAbbr, tx)
     : {};
 
   React.useLayoutEffect(() => {
@@ -251,7 +253,7 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
   }, [errors, validationFocusRequest]);
 
   const save = async (): Promise<void> => {
-    const nextErrors = validateRootForm(form, existingAbbrs, oldAbbr);
+    const nextErrors = validateRootForm(form, existingAbbrs, oldAbbr, tx);
     setTouched(true);
     if (saving) return;
     if (Object.keys(nextErrors).length) {
@@ -275,49 +277,49 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
   return (
     <div id={formId} ref={formRef}>
       <PageHeader
-        back={{ onClick: onCancel, text: isEdit ? "返回上一层" : "返回词根列表" }}
+        back={{ onClick: onCancel, text: isEdit ? tx("返回上一层") : tx("返回词根列表") }}
         breadcrumbs={buildModuleBreadcrumbs("root", [
-          { label: isEdit ? "编辑词根" : "新增词根" },
+          { label: tx(isEdit ? "编辑词根" : "新增词根") },
         ], onCancel)}
         icon={isEdit ? "edit" : "plus"}
-        title={isEdit ? "编辑词根" : "新增词根"}
-        subtitle={isEdit ? oldAbbr : "添加一个命名词根"}
+        title={tx(isEdit ? "编辑词根" : "新增词根")}
+        subtitle={isEdit ? oldAbbr : tx("添加一个命名词根")}
       />
 
       <FormErrorSummary
         formId={formId}
         errors={errors}
-        getFieldLabel={(field) => ROOT_FIELD_LABELS[field] || "表单字段"}
+        getFieldLabel={(field) => tx(ROOT_FIELD_LABELS[field] || "表单字段")}
       />
 
       <div className="form-card">
-        <h3><Icon name="book" size={14} />词根信息</h3>
+        <h3><Icon name="book" size={14} />{tx("词根信息")}</h3>
         <div className="form-grid">
-          <FormField className="fl" formId={formId} name="abbr" label="词根缩写" error={errors["abbr"]}>
-            <Input aria-label="词根缩写" className={`inp mono${errors["abbr"] ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setForm((prev) => ({ ...prev, abbr: event.target.value }))} placeholder="例如：trans" />
+          <FormField className="fl" formId={formId} name="abbr" label={tx("词根缩写")} error={errors["abbr"]}>
+            <Input aria-label={tx("词根缩写")} className={`inp mono${errors["abbr"] ? " invalid" : ""}`} value={form.abbr} onChange={(event) => setForm((prev) => ({ ...prev, abbr: event.target.value }))} placeholder={tx("例如：trans")} />
           </FormField>
           <div className="fl">
-            <label>英文全称</label>
-            <Input aria-label="英文全称" className="inp mono" value={form.en} onChange={(event) => setForm((prev) => ({ ...prev, en: event.target.value }))} placeholder="例如：transaction" />
+            <label>{tx("英文全称")}</label>
+            <Input aria-label={tx("英文全称")} className="inp mono" value={form.en} onChange={(event) => setForm((prev) => ({ ...prev, en: event.target.value }))} placeholder={tx("例如：transaction")} />
           </div>
-          <FormField className="fl" formId={formId} name="cn" label="中文名" error={errors["cn"]}>
-            <Input aria-label="中文名" className={`inp${errors["cn"] ? " invalid" : ""}`} value={form.cn} onChange={(event) => setForm((prev) => ({ ...prev, cn: event.target.value }))} placeholder="例如：交易流水" />
+          <FormField className="fl" formId={formId} name="cn" label={tx("中文名")} error={errors["cn"]}>
+            <Input aria-label={tx("中文名")} className={`inp${errors["cn"] ? " invalid" : ""}`} value={form.cn} onChange={(event) => setForm((prev) => ({ ...prev, cn: event.target.value }))} placeholder={tx("例如：交易流水")} />
           </FormField>
           <div className="fl">
-            <label>分类</label>
-            <Select<string> aria-label="分类" className="sel" value={form.cat || null} onValueChange={(value) => setForm((prev) => ({ ...prev, cat: value || prev.cat }))}>
+            <label>{tx("分类")}</label>
+            <Select<string> aria-label={tx("分类")} className="sel" value={form.cat || null} onValueChange={(value) => setForm((prev) => ({ ...prev, cat: value || prev.cat }))}>
               {categoryNames.map((item) => <Select.Option key={item} value={item}>{item}</Select.Option>)}
             </Select>
           </div>
           <div className="fl full">
-            <label>说明 / 示例</label>
-            <Textarea aria-label="说明 / 示例" className="ta" value={form.desc} onChange={(event) => setForm((prev) => ({ ...prev, desc: event.target.value }))} placeholder="例如：trans_id 交易流水号 / trans_status 交易状态" />
+            <label>{tx("说明 / 示例")}</label>
+            <Textarea aria-label={tx("说明 / 示例")} className="ta" value={form.desc} onChange={(event) => setForm((prev) => ({ ...prev, desc: event.target.value }))} placeholder={tx("例如：trans_id 交易流水号 / trans_status 交易状态")} />
           </div>
         </div>
       </div>
 
       <FormActionBar
-        note={isEdit ? "保存后将更新该词根" : "保存后将加入词根库"}
+        note={tx(isEdit ? "保存后将更新该词根" : "保存后将加入词根库")}
         onCancel={onCancel}
         onSave={save}
         saving={saving}
@@ -325,24 +327,24 @@ export function RootEditor({ mode, initial = null, categories, existingAbbrs, on
       />
       {isEdit ? (
         <DangerZone
-          description="删除词根可能影响字段命名规范、字段映射和历史命名追溯，建议谨慎操作。"
+          description={tx("删除词根可能影响字段命名规范、字段映射和历史命名追溯，建议谨慎操作。")}
           actions={[
             {
               key: "delete-root",
-              label: "删除词根",
+              label: tx("删除词根"),
               icon: "trash",
               danger: true,
               onClick: async () => {
                 if (await confirmDeleteAction({
                   name: oldAbbr,
-                  typeLabel: "词根",
-                  impact: "该词根删除后，可能影响字段命名规范、字段映射和历史命名追溯。建议谨慎操作。",
+                  typeLabel: tx("词根"),
+                  impact: tx("该词根删除后，可能影响字段命名规范、字段映射和历史命名追溯。建议谨慎操作。"),
                   consequences: [
-                    "删除前应以服务端依赖校验结果为准。",
-                    "若后端返回不可删除原因，页面会直接展示原因。",
+                    tx("删除前应以服务端依赖校验结果为准。"),
+                    tx("若后端返回不可删除原因，页面会直接展示原因。"),
                   ],
                   confirmKeyword: oldAbbr,
-                  confirmKeywordLabel: "请输入词根缩写二次确认",
+                  confirmKeywordLabel: tx("请输入词根缩写二次确认"),
                 })) await onDelete?.(oldAbbr);
               },
             },
@@ -375,14 +377,30 @@ export interface RootImportProps {
 }
 
 export function RootImport({ roots, categories, onBack, onCommit }: RootImportProps) {
+  const tx = useUiCopy("dictionary");
   const [text, setText] = React.useState("");
   const [preview, setPreview] = React.useState<ImportPreview | null>(null);
   const fileRef = React.useRef<HTMLInputElement | null>(null);
   const categoryNames = categories.map((item) => item.name);
   const existingMap = React.useMemo(() => new Map(roots.map((item) => [item.abbr, item])), [roots]);
+  const translateImportMessage = (message: string): string => {
+    const lineFailure = /^第 (\d+) 行格式错误：(.*)$/.exec(message);
+    if (lineFailure) {
+      return tx("第 {{line}} 行格式错误：{{message}}", {
+        line: lineFailure[1],
+        message: tx(lineFailure[2] || ""),
+      });
+    }
+    return tx(message);
+  };
 
   const analyze = React.useCallback((value: string) => {
-    const parsed = parseRootImport(value);
+    const parsed = parseRootImport(value, (source, options = {}) =>
+      Object.entries(options).reduce(
+        (message, [key, item]) => message.split(`{{${key}}}`).join(String(item)),
+        source,
+      ),
+    );
     if (parsed.error) {
       setPreview({ error: parsed.error, items: [] });
       return;
@@ -433,9 +451,9 @@ export function RootImport({ roots, categories, onBack, onCommit }: RootImportPr
   return (
     <div>
       <PageHeader
-        back={{ onClick: onBack, text: "返回词根列表" }}
+        back={{ onClick: onBack, text: tx("返回词根列表") }}
         breadcrumbs={buildModuleBreadcrumbs("root", [
-          { label: "批量导入" },
+          { label: tx("批量导入") },
         ], onBack)}
       />
 
@@ -443,20 +461,20 @@ export function RootImport({ roots, categories, onBack, onCommit }: RootImportPr
         <div>
           <div className="editor-title">
             <Icon name="upload" size={20} color="var(--ink-2)" />
-            <h2>批量导入词根</h2>
+            <h2>{tx("批量导入词根")}</h2>
           </div>
-          <div className="editor-sub">支持 Excel 粘贴、CSV / TSV 文件导入，预览后执行 upsert。</div>
+          <div className="editor-sub">{tx("支持 Excel 粘贴、CSV / TSV 文件导入，预览后执行 upsert。")}</div>
         </div>
         <div className="editor-actions">
-          <Button className="btn" variant="secondary" type="button" onClick={onBack}><Icon name="close" size={14} />返回</Button>
+          <Button className="btn" variant="secondary" type="button" onClick={onBack}><Icon name="close" size={14} />{tx("返回")}</Button>
         </div>
       </div>
 
       <div className="import-zone">
         <div className="drop-area" onClick={() => fileRef.current?.click()}>
           <div className="di"><Icon name="file" size={26} /></div>
-          <h4>选择 CSV / TSV 文件，或直接粘贴 Excel 内容</h4>
-          <p>列顺序建议: abbr, en, cn, cat, desc。首行支持表头自动识别。</p>
+          <h4>{tx("选择 CSV / TSV 文件，或直接粘贴 Excel 内容")}</h4>
+          <p>{tx("列顺序建议: abbr, en, cn, cat, desc。首行支持表头自动识别。")}</p>
           <input
             ref={fileRef}
             type="file"
@@ -477,7 +495,7 @@ export function RootImport({ roots, categories, onBack, onCommit }: RootImportPr
         </div>
 
         <Textarea
-          aria-label="批量导入内容"
+          aria-label={tx("批量导入内容")}
           className="paste-ta"
           value={text}
           onChange={(event) => {
@@ -489,20 +507,20 @@ export function RootImport({ roots, categories, onBack, onCommit }: RootImportPr
             }
             analyze(value);
           }}
-          placeholder={"abbr,en,cn,cat,desc\ntrans,transaction,交易流水,业务对象,交易明细类命名词根"}
+          placeholder={tx("abbr,en,cn,cat,desc\ntrans,transaction,交易流水,业务对象,交易明细类命名词根")}
         />
       </div>
 
       {preview ? (
         preview.error ? (
-          <ActionErrorBanner title="导入预览失败" message={preview.error} />
+          <ActionErrorBanner title={tx("导入预览失败")} message={translateImportMessage(preview.error)} />
         ) : (
           <>
             <div className="imp-summary">
-              <span className="imp-chip new">新增 {summary.new}</span>
-              <span className="imp-chip upd">更新 {summary.update}</span>
-              <span className="imp-chip same">不变 {summary.same}</span>
-              <span className="imp-chip err">错误 {summary.error}</span>
+              <span className="imp-chip new">{tx("新增")}{" "}{summary.new}</span>
+              <span className="imp-chip upd">{tx("更新")}{" "}{summary.update}</span>
+              <span className="imp-chip same">{tx("不变")}{" "}{summary.same}</span>
+              <span className="imp-chip err">{tx("错误")}{" "}{summary.error}</span>
             </div>
 
             <div className="panel">
@@ -510,23 +528,23 @@ export function RootImport({ roots, categories, onBack, onCommit }: RootImportPr
                 <table className="fields">
                   <thead>
                     <tr>
-                      <th className="c-idx">行</th>
-                      <th style={{ width: 90 }}>动作</th>
-                      <th style={{ width: 120 }}>词根</th>
-                      <th style={{ width: 140 }}>中文名</th>
-                      <th style={{ width: 120 }}>分类</th>
-                      <th>说明</th>
+                      <th className="c-idx">{tx("行")}</th>
+                      <th style={{ width: 90 }}>{tx("动作")}</th>
+                      <th style={{ width: 120 }}>{tx("词根")}</th>
+                      <th style={{ width: 140 }}>{tx("中文名")}</th>
+                      <th style={{ width: 120 }}>{tx("分类")}</th>
+                      <th>{tx("说明")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {preview.items.map((item) => (
                       <tr key={`${item.row.abbr}_${item.row._line}`}>
                         <td className="c-idx">{item.row._line}</td>
-                        <td>{item.action}</td>
+                        <td>{tx(item.action === "error" ? "错误" : item.action === "new" ? "新增" : item.action === "same" ? "不变" : "更新")}</td>
                         <td className="c-name">{item.row.abbr || "-"}</td>
                         <td>{item.row.cn || "-"}</td>
                         <td>{item.row.cat || "-"}</td>
-                        <td>{item.message || item.row.desc || "-"}</td>
+                        <td>{item.message ? translateImportMessage(item.message) : item.row.desc || "-"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -535,12 +553,11 @@ export function RootImport({ roots, categories, onBack, onCommit }: RootImportPr
             </div>
 
             <div className="ed-foot">
-              <span className="ef-note">仅会提交新增与更新项，错误项会被跳过。</span>
+              <span className="ef-note">{tx("仅会提交新增与更新项，错误项会被跳过。")}</span>
               <div className="ed-foot-actions">
-                <Button className="btn" variant="secondary" type="button" onClick={() => { setText(""); setPreview(null); }}>清空</Button>
+                <Button className="btn" variant="secondary" type="button" onClick={() => { setText(""); setPreview(null); }}>{tx("清空")}</Button>
                 <Button className="btn primary" variant="primary" type="button" disabled={!summary.new && !summary.update} onClick={commit}>
-                  <Icon name="check" size={14} />确认导入
-                </Button>
+                  <Icon name="check" size={14} />{tx("确认导入")}</Button>
               </div>
             </div>
           </>

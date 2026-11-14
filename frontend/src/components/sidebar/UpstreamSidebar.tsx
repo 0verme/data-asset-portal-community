@@ -5,6 +5,7 @@ import { DEFAULT_UP_FILTER } from "../../config/defaults.ts";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.tsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.tsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.tsx";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 export interface UpstreamSidebarProps {
   upstream: UseUpstreamModuleResult;
@@ -15,6 +16,7 @@ export interface UpstreamSidebarProps {
 }
 
 export function UpstreamSidebar({ upstream, statusOptions, requireLogin, canEdit = false, setUpRoute }: UpstreamSidebarProps) {
+  const tx = useUiCopy("integration");
   const { upstreamSystemCount, upstreamFacets, upstreamDbTypes, upFilter, setUpFilter } = upstream;
   const dbTypeCounts = upstreamFacets.dbType;
 
@@ -28,10 +30,10 @@ export function UpstreamSidebar({ upstream, statusOptions, requireLogin, canEdit
   return (
     <>
       <SidebarFilterGroup
-        title="数据库类型"
+        title={tx("数据库类型")}
         allOption={{
           key: "all-db-types",
-          label: "全部类型",
+          label: tx("全部类型"),
           count: upstreamSystemCount,
           active: !upFilter.dbType,
           onClick: () => setUpFilter((prev) => ({ ...prev, dbType: null })),
@@ -64,7 +66,7 @@ export function UpstreamSidebar({ upstream, statusOptions, requireLogin, canEdit
       <SidebarActionGroup
         actions={canEdit ? [{
           key: "create-upstream",
-          label: "新增系统",
+          label: tx("新增系统"),
           onClick: () => requireLogin(() => setUpRoute({ page: "new", id: null })),
         }] : []}
       />

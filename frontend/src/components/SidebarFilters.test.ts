@@ -30,7 +30,7 @@ const readSources = async (...paths: string[]) =>
 	(await Promise.all(paths.map((path) => readFile(path, "utf8")))).join("\n");
 
 function assertAllOption(source: string, label: string) {
-	assert.match(source, new RegExp(`allOption=\\{[\\s\\S]*?label: "${label}"`));
+	assert.match(source, new RegExp(`allOption=\\{[\\s\\S]*?label: (?:tx\\("${label}"\\)|"${label}")`));
 }
 
 test("shared sidebar groups prepend an all option and expose accessible button semantics", async () => {

@@ -28,6 +28,7 @@ import {
   displayUpstreamValue,
   getUpstreamDetailMetadata,
 } from "./upstreamFieldContract.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 type UpstreamDetailSystem = PublicUpstreamSystem | MockUpstreamSystem;
 
@@ -41,6 +42,7 @@ export interface UpstreamDetailProps {
 }
 
 export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], onBack, onBackToList, onEdit }: UpstreamDetailProps) {
+  const tx = useUiCopy("integration");
   const status = system.status || "";
   const enabled = status === "enabled";
   const unloadTimes = Array.isArray(system.unloadTimes) ? system.unloadTimes : [];
@@ -60,7 +62,7 @@ export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], o
   return (
     <div>
       <PageHeader
-        back={{ onClick: onBack, text: "返回上游卸数列表" }}
+        back={{ onClick: onBack, text: tx("返回上游卸数列表") }}
         breadcrumbs={buildModuleBreadcrumbs("upstream", [{ label: systemAbbr }], onBackToList)}
       />
 
@@ -76,17 +78,16 @@ export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], o
             <div className="dh-desc">{displayUpstreamValue(system.desc)}</div>
             {dbTypeLegacy || deptLegacy ? (
               <div className="editor-sub" style={{ marginTop: 8, color: "var(--warn)" }}>
-                {(dbTypeLegacy ? "数据库类型" : "业务部门")}当前值未在码值中维护。
-              </div>
+                {tx(dbTypeLegacy ? "数据库类型" : "业务部门")}{tx("当前值未在码值中维护。")}</div>
             ) : null}
           </div>
           {onEdit ? <div className="dh-actions">
-            <Button className="btn" variant="secondary" type="button" onClick={onEdit}><Icon name="edit" size={15} />编辑</Button>
+            <Button className="btn" variant="secondary" type="button" onClick={onEdit}><Icon name="edit" size={15} />{tx("编辑")}</Button>
           </div> : null}
         </div>
         <div className="dh-meta upstream-detail-meta" data-field-contract="upstream-system">
           {detailMetadata.map(({ key, label, value, mono }) => (
-            <MetaItem key={key} label={label} value={value} mono={mono} />
+            <MetaItem key={key} label={tx(label)} value={value} mono={mono} />
           ))}
         </div>
       </div>
@@ -95,19 +96,19 @@ export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], o
         <div className="flow-node">
           <span className="fn-abbr">{systemAbbr}</span>
           <div className="fn-txt">
-            <div className="fn-k">上游业务库</div>
+            <div className="fn-k">{tx("上游业务库")}</div>
             <div className="fn-v mono">{displayUpstreamValue(displaySystem.dbType)}</div>
           </div>
         </div>
         <div className="flow-arrow">
-          <span className="fa-label">定时卸数</span>
+          <span className="fa-label">{tx("定时卸数")}</span>
           <Icon name="chevron" size={16} color="var(--ink-3)" />
         </div>
         <div className="flow-node">
           <span className="fn-abbr lake"><Icon name="db" size={14} color="#fff" /></span>
           <div className="fn-txt">
-            <div className="fn-k">数据湖</div>
-            <div className="fn-v mono">ODS 贴源层</div>
+            <div className="fn-k">{tx("数据湖")}</div>
+            <div className="fn-v mono">{tx("ODS 贴源层")}</div>
           </div>
         </div>
       </div>
@@ -115,20 +116,20 @@ export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], o
       <div className="file-head-card schedule-card">
         <div className="schedule-card-header">
           <div className="schedule-card-heading">
-            <h3 className="schedule-card-title"><Icon name="clock" size={14} color="var(--ink-3)" />卸数计划</h3>
-            <div className="schedule-card-subtitle">每日自动执行 · {unloadTimes.length} 次</div>
+            <h3 className="schedule-card-title"><Icon name="clock" size={14} color="var(--ink-3)" />{tx("卸数计划")}</h3>
+            <div className="schedule-card-subtitle">{tx("每日自动执行 ·")}{" "}{unloadTimes.length} {tx("次")}</div>
           </div>
           <div className={`schedule-next${!enabled ? " is-muted" : ""}`}>
-            <span className="schedule-next-label">下一次卸数</span>
+            <span className="schedule-next-label">{tx("下一次卸数")}</span>
             <span className="schedule-next-value">
-              {!enabled ? "已暂停" : next ? `${next.nextDay ? "明日 " : ""}${next.label}` : "暂无计划"}
+              {!enabled ? tx("已暂停") : next ? `${next.nextDay ? tx("明日 ") : ""}${next.label}` : tx("暂无计划")}
             </span>
           </div>
         </div>
         {unloadTimes.length ? (
           <ScheduleStepper times={unloadTimes} muted={!enabled} now={scheduleNow} />
         ) : (
-          <div className="schedule-empty" role="status">暂无卸数计划</div>
+          <div className="schedule-empty" role="status">{tx("暂无卸数计划")}</div>
         )}
       </div>
     </div>

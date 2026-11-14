@@ -391,7 +391,7 @@ test('configured upstream options show a visible retry and never substitute Demo
   await page.goto('/upstream/new');
   await expect(page.getByRole('heading', { name: '上游业务候选加载失败' })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('Synthetic dictionary unavailable')).toBeVisible();
-  await page.getByRole('button', { name: '重新加载' }).click();
+  await page.getByRole('button', { name: '重试', exact: true }).click();
   await expect(page.getByRole('heading', { name: '新增上游卸数系统' })).toBeVisible();
   expect(api.optionRequests).toHaveLength(2);
   const dbType = page.getByRole('combobox', { name: '数据库类型' });
@@ -406,7 +406,7 @@ test('configured push options accept cross-industry protocol, delimiter, encodin
   const api = await fixture(page, 'push', { failOptionsFirst: true });
   await page.goto('/push/new');
   await expect(page.getByRole('heading', { name: '下游推送业务候选加载失败' })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole('button', { name: '重新加载' }).click();
+  await page.getByRole('button', { name: '重试', exact: true }).click();
   await expect(page.getByRole('heading', { name: '新增下游系统' })).toBeVisible();
   expect(api.optionRequests).toHaveLength(2);
   await expect(page.getByRole('combobox', { name: '连接协议', exact: true })).toContainText('Custom HTTPS');

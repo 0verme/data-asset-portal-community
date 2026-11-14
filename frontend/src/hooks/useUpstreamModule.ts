@@ -45,6 +45,7 @@ import {
 } from '../data/commonCodes.ts';
 import { normalizeDictOptions, type DictOption } from '../utils/optionUtils.ts';
 import { getErrorMessage, scrollMainToTop } from '../utils/ui.ts';
+import { translateUiCopy } from '../i18n/useUiTranslation.ts';
 import {
   isSameUpstreamField,
   normalizeUpstreamApiError,
@@ -360,8 +361,8 @@ export function useUpstreamModule({
       setUpstreamSaveError(normalizedError.message);
       setUpstreamSaveFieldErrors(normalizedError.fieldErrors);
       toast.error(normalizedError.fieldErrors.length
-        ? `保存失败，还有 ${normalizedError.fieldErrors.length} 项需要修改`
-        : normalizedError.message);
+        ? translateUiCopy('integration', '保存失败，还有 {{count}} 项需要修改', { count: normalizedError.fieldErrors.length })
+        : translateUiCopy('integration', normalizedError.message));
       return false;
     }
   };
@@ -377,7 +378,7 @@ export function useUpstreamModule({
         setUpRoute(getModuleListRoute('upstream') as UpstreamRoute);
         scrollMainToTop();
       },
-      '删除上游系统失败。',
+      translateUiCopy('integration', '删除上游系统失败。'),
       'upstream:write',
     );
   };
@@ -404,7 +405,7 @@ export function useUpstreamModule({
       }
     } catch (error: unknown) {
       if (!isUnauthorizedError(error)) {
-        toast.error(getErrorMessage(error, '更新上游系统状态失败。'));
+        toast.error(getErrorMessage(error, translateUiCopy('integration', '更新上游系统状态失败。')));
       }
       setUpstreamSystems((prev) => prev.map((item) => (item.id === systemId ? previousSystem : item)));
       setCurrentUpstream((prev) => (prev?.id === systemId ? previousSystem : prev));

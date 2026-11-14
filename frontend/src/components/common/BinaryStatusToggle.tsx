@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import {
   getBinaryStatusValue,
   normalizeBinaryStatusOptions,
@@ -25,13 +27,15 @@ export function BinaryStatusToggle({
   className = "",
   disabled = false,
   name,
-  ariaLabel = "状态选择",
+  ariaLabel,
   onChange,
 }: BinaryStatusToggleProps) {
+  const { t } = useTranslation("common");
   const items = normalizeBinaryStatusOptions(options).map((item) => ({
     ...item,
-    name: labels?.[item.value] || item.name,
+    name: labels?.[item.value] || t(item.value === "enabled" ? "status.enabled" : "status.disabled"),
   }));
+  const resolvedAriaLabel = ariaLabel || t("status.selector");
   const currentValue = getBinaryStatusValue(value);
   const wrapperClassName = ["seg", className].filter(Boolean).join(" ");
 
@@ -41,7 +45,7 @@ export function BinaryStatusToggle({
   };
 
   return (
-    <div className={wrapperClassName} role="group" aria-label={ariaLabel}>
+    <div className={wrapperClassName} role="group" aria-label={resolvedAriaLabel}>
       {items.map((item) => (
         <button
           key={item.value}

@@ -31,6 +31,7 @@ import {
   withOperationLogFilter,
   type OperationLogQueryState,
 } from "./operationLogQuery.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS: readonly number[] = [10, 20, 50, 100];
@@ -55,6 +56,7 @@ export interface OperationLogPageProps {
 }
 
 export function OperationLogPage({ query }: OperationLogPageProps) {
+  const tx = useUiCopy("admin");
   const [listQuery, setListQuery] = React.useState<OperationLogQueryState>(
     createOperationLogQueryState,
   );
@@ -151,11 +153,9 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
       <div className="page-head">
         <div>
           <div className="page-title">
-            <span className="pt-code">LOG</span>操作日志
-          </div>
+            <span className="pt-code">LOG</span>{tx("操作日志")}</div>
           <div className="page-sub">
-            共 <b>{total}</b> 条操作记录
-            {query ? <>，匹配 “{query}”</> : null}
+            {tx("共")}{" "}<b>{total}</b> {tx("条操作记录")}{query ? <>{tx("，匹配 “")}{query}”</> : null}
           </div>
         </div>
       </div>
@@ -175,39 +175,38 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
       {loading ? (
         <div className="state-card" role="status" aria-live="polite">
           <div className="state-spinner" aria-hidden="true"></div>
-          <h4>加载操作日志</h4>
-          <p>正在准备审计日志记录。</p>
+          <h4>{tx("加载操作日志")}</h4>
+          <p>{tx("正在准备审计日志记录。")}</p>
         </div>
       ) : error ? (
         <div className="state-card state-card-error" role="alert">
           <div className="ec">
             <Icon name="inbox" size={24} />
           </div>
-          <h4>操作日志加载失败</h4>
-          <p>{error}</p>
+          <h4>{tx("操作日志加载失败")}</h4>
+          <p>{tx(error)}</p>
           <Button
             className="btn state-btn"
             variant="secondary"
             type="button"
             onClick={() => void load()}
           >
-            重新加载
-          </Button>
+            {tx("重新加载")}</Button>
         </div>
       ) : !logs.length ? (
         <div className="empty">
           <div className="ec">
             <Icon name="inbox" size={26} />
           </div>
-          <h4>未找到匹配的操作日志</h4>
-          <p>可以调整筛选条件或时间范围后重试。</p>
+          <h4>{tx("未找到匹配的操作日志")}</h4>
+          <p>{tx("可以调整筛选条件或时间范围后重试。")}</p>
         </div>
       ) : (
         <OperationLogTable logs={logs} query={query} onView={openDetail} />
       )}
 
       <TablePagination
-        ariaLabel="操作日志分页"
+        ariaLabel={tx("操作日志分页")}
         page={page}
         pageSize={pageSize}
         total={total}

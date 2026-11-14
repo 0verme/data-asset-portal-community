@@ -19,37 +19,42 @@ import { EmptyState, RowActions, StatusBadge, WideTableScroll } from "../common/
 import { Highlight, Icon, initial } from "../ui.tsx";
 import { Button, TablePagination } from "../../ui/index.ts";
 import { USER_ROLE_META, USER_STATUS_META } from "./constants.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 // 用户账号状态统一为启用/禁用，重置密码和状态切换作为业务动作展示。
 export function buildUserStatusActions(
   user: MockSystemUser,
   onResetPassword: (user: MockSystemUser) => void,
   onChangeStatus: (user: MockSystemUser, status: string) => void,
+  translate: (source: string, options?: Readonly<Record<string, unknown>>) => string = (source) => source,
 ): RowAction[] {
   const label = user.displayName || user.username;
   return [
     {
       key: "reset",
-      label: "重置密码",
+      label: translate("重置密码"),
       icon: "key",
       onClick: () => onResetPassword(user),
       confirm: {
-        title: "确认重置密码？",
-        content: "重置后，该用户的密码将恢复为当前用户名。",
-        details: [`用户名：${user.username}`, `显示名：${user.displayName || "-"}`],
-        confirmText: "确认重置",
-        cancelText: "取消",
+        title: translate("确认重置密码？"),
+        content: translate("重置后，该用户的密码将恢复为当前用户名。"),
+        details: [
+          translate("用户名：{{username}}", { username: user.username }),
+          translate("显示名：{{displayName}}", { displayName: user.displayName || "-" }),
+        ],
+        confirmText: translate("确认重置"),
+        cancelText: translate("取消"),
       },
     },
     user.status === "enabled"
       ? {
           key: "disable",
-          label: "禁用",
+          label: translate("禁用"),
           icon: "close",
           onClick: () => onChangeStatus(user, "disabled"),
-          confirm: { title: "禁用", content: `确定禁用 ${label} 吗？`, confirmText: "禁用" },
+          confirm: { title: translate("禁用"), content: translate("确定禁用 {{label}} 吗？", { label }), confirmText: translate("禁用") },
         }
-      : { key: "enable", label: "启用", icon: "check", onClick: () => onChangeStatus(user, "enabled") },
+      : { key: "enable", label: translate("启用"), icon: "check", onClick: () => onChangeStatus(user, "enabled") },
   ];
 }
 
@@ -82,45 +87,44 @@ export function UserManagementPage({
   onResetPassword,
   onChangeStatus,
 }: UserManagementPageProps) {
+  const tx = useUiCopy("admin");
   const filteredUsers = users;
 
   return (
     <div className="system-page">
       <div className="page-head">
         <div>
-          <div className="page-title"><span className="pt-code">SYS</span>用户管理</div>
+          <div className="page-title"><span className="pt-code">SYS</span>{tx("用户管理")}</div>
           <div className="page-sub">
-            共 <b>{total}</b> 个账号
-            {query ? <>，匹配 “{query}”</> : null}
+            {tx("共")}{" "}<b>{total}</b> {tx("个账号")}{query ? <>{tx("，匹配 “")}{query}”</> : null}
           </div>
         </div>
         <div className="head-actions">
           <Button className="btn primary" variant="primary" type="button" onClick={onNew}>
-            <Icon name="plus" size={15} />新增用户
-          </Button>
+            <Icon name="plus" size={15} />{tx("新增用户")}</Button>
         </div>
       </div>
 
       {!filteredUsers.length ? (
         <EmptyState
-          title="未找到匹配的用户"
-          desc="可以调整搜索条件，或直接新增一个系统账号。"
-          actionText={canEdit ? "新增用户" : ""}
+          title={tx("未找到匹配的用户")}
+          desc={tx("可以调整搜索条件，或直接新增一个系统账号。")}
+          actionText={canEdit ? tx("新增用户") : ""}
           onAction={canEdit ? onNew : undefined}
         />
       ) : (
         <div className="tbl-wrap">
-          <WideTableScroll ariaLabel="用户管理表格" className="system-users-wide-scroll">
+          <WideTableScroll ariaLabel={tx("用户管理表格")} className="system-users-wide-scroll">
             <table className="dt mobile-card-table system-users-table">
             <thead>
               <tr>
-                <th style={{ width: 180 }}>用户名</th>
-                <th style={{ width: 160 }}>显示名</th>
-                <th style={{ width: 96 }}>状态</th>
-                <th style={{ width: 176 }}>最后登录时间</th>
-                <th style={{ width: 176 }}>创建时间</th>
-                <th>备注</th>
-                <th style={{ width: 280, textAlign: "right" }}>操作</th>
+                <th style={{ width: 180 }}>{tx("用户名")}</th>
+                <th style={{ width: 160 }}>{tx("显示名")}</th>
+                <th style={{ width: 96 }}>{tx("状态")}</th>
+                <th style={{ width: 176 }}>{tx("最后登录时间")}</th>
+                <th style={{ width: 176 }}>{tx("创建时间")}</th>
+                <th>{tx("备注")}</th>
+                <th style={{ width: 280, textAlign: "right" }}>{tx("操作")}</th>
               </tr>
             </thead>
             <tbody>
@@ -134,19 +138,19 @@ export function UserManagementPage({
                         {user.email.trim() ? (
                           <div className="system-user-sub"><Highlight text={user.email} q={query} /></div>
                         ) : null}
-                        <div className="system-user-sub">{USER_ROLE_META[user.role] || "系统管理员"}</div>
+                        <div className="system-user-sub">{tx(USER_ROLE_META[user.role] || "系统管理员")}</div>
                       </div>
                     </div>
                   </td>
-                  <td data-label="显示名"><Highlight text={user.displayName || "-"} q={query} /></td>
-                  <td data-label="状态"><StatusBadge status={user.status} metaMap={USER_STATUS_META} /></td>
-                  <td data-label="最后登录" className="mono">{formatDateTime(user.lastLoginAt)}</td>
-                  <td data-label="创建时间" className="mono">{formatDateTime(user.createdAt)}</td>
-                  <td data-label="备注"><span className="system-line-clamp"><Highlight text={user.remark || "-"} q={query} /></span></td>
+                  <td data-label={tx("显示名")}><Highlight text={user.displayName || "-"} q={query} /></td>
+                  <td data-label={tx("状态")}><StatusBadge status={user.status} metaMap={USER_STATUS_META} /></td>
+                  <td data-label={tx("最后登录")} className="mono">{formatDateTime(user.lastLoginAt)}</td>
+                  <td data-label={tx("创建时间")} className="mono">{formatDateTime(user.createdAt)}</td>
+                  <td data-label={tx("备注")}><span className="system-line-clamp"><Highlight text={user.remark || "-"} q={query} /></span></td>
                   <td data-label="" className="mobile-card-actions" style={{ textAlign: "right" }}>
                     <RowActions
                       onEdit={() => onEdit(user)}
-                      extraActions={buildUserStatusActions(user, onResetPassword, onChangeStatus)}
+                      extraActions={buildUserStatusActions(user, onResetPassword, onChangeStatus, tx)}
                     />
                   </td>
                 </tr>
@@ -157,7 +161,7 @@ export function UserManagementPage({
         </div>
       )}
       <TablePagination
-        ariaLabel="用户管理分页"
+        ariaLabel={tx("用户管理分页")}
         page={page}
         pageSize={pageSize}
         total={total}

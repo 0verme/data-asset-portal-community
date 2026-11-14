@@ -1,4 +1,5 @@
 import { useEffect, type MouseEventHandler, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Banner as KumoBanner } from "@cloudflare/kumo/components/banner";
 import { Empty as KumoEmpty } from "@cloudflare/kumo/components/empty";
 import { Loader as KumoLoader } from "@cloudflare/kumo/components/loader";
@@ -208,13 +209,15 @@ export interface ErrorStateProps {
   retryText?: string | undefined;
 }
 
-export function ErrorState({ title, desc, onRetry, className, retryText = "重新加载" }: ErrorStateProps) {
+export function ErrorState({ title, desc, onRetry, className, retryText }: ErrorStateProps) {
+  const { t } = useTranslation("common");
+  const retryLabel = retryText ?? t("action.retry");
   return (
     <Banner
       tone="error"
       title={title}
       description={desc}
-      action={onRetry ? <Button variant="secondary" type="button" onClick={onRetry}>{retryText}</Button> : undefined}
+      action={onRetry ? <Button variant="secondary" type="button" onClick={onRetry}>{retryLabel}</Button> : undefined}
       className={joinClassNames("dap-ui-error-state", className)}
     />
   );

@@ -35,6 +35,7 @@ import {
   Select,
   Textarea,
 } from "../../ui/index.ts";
+import { useUiCopy } from "../../i18n/useUiTranslation.ts";
 
 interface JobFormData extends PushJobForm {
   id: string;
@@ -113,6 +114,7 @@ export function JobEditor({
   onBackToJob,
   onDelete,
 }: JobEditorProps) {
+  const tx = useUiCopy("integration");
   const isEdit = mode === "edit";
   const normalizedDelimiterOptions = normalizeDictOptions(delimiterOptions);
   const normalizedEncodingOptions = normalizeDictOptions(encodingOptions);
@@ -146,7 +148,7 @@ export function JobEditor({
     initialSnapshotRef.current = JSON.stringify({ form: nextForm, fields: nextFields });
   }, [initial, defaultDelimiter, defaultEncoding, defaultFreqType]);
 
-  const validation = touched ? validateJob(form, fields) : EMPTY_JOB_VALIDATION;
+  const validation = touched ? validateJob(form, fields, tx) : EMPTY_JOB_VALIDATION;
   React.useLayoutEffect(() => {
     if (validationFocusRequest <= handledValidationFocusRequestRef.current) return;
     handledValidationFocusRequestRef.current = validationFocusRequest;
@@ -195,7 +197,7 @@ export function JobEditor({
 
   const save = async (): Promise<void> => {
     setTouched(true);
-    const nextValidation = validateJob(form, fields);
+    const nextValidation = validateJob(form, fields, tx);
     if (nextValidation.errors.length || saving) {
       if (nextValidation.errors.length) {
         setValidationFocusRequest((request) => request + 1);
@@ -236,124 +238,129 @@ export function JobEditor({
   return (
     <div id={JOB_FORM_ID} ref={formRef}>
       <PageHeader
-        back={{ onClick: onCancel, text: isEdit ? "返回上一层" : "返回系统详情" }}
+        back={{ onClick: onCancel, text: isEdit ? tx("返回上一层") : tx("返回系统详情") }}
         breadcrumbs={[
-          { label: "系统列表", onClick: onBackToList },
+          { label: tx("系统列表"), onClick: onBackToList },
           { label: system.id, onClick: onBackToSystem },
           ...(isEdit ? [{ label: oldId, onClick: onBackToJob }] : []),
-          { label: isEdit ? "编辑接口" : "新增接口" },
+          { label: tx(isEdit ? "编辑接口" : "新增接口") },
         ]}
         icon={isEdit ? "edit" : "plus"}
-        title={isEdit ? "编辑推送接口" : "新增推送接口"}
+        title={tx(isEdit ? "编辑推送接口" : "新增推送接口")}
         subtitle={`${system.name} / ${system.id}`}
       />
 
       <FormErrorSummary
         formId={JOB_FORM_ID}
         errors={validation.formFields}
-        getFieldLabel={(field) => getJobFormFieldLabel(field, fields, form.freqType)}
-        title="请先修正以下问题"
+        getFieldLabel={(field) => getJobFormFieldLabel(field, fields, form.freqType, tx)}
+        title={tx("请先修正以下问题")}
       />
 
       <div className="form-card">
-        <h3><Icon name="file" size={14} />文件头信息</h3>
+        <h3><Icon name="file" size={14} />{tx("文件头信息")}</h3>
         <div className="form-grid">
           <FormField
             className="fl"
             formId={JOB_FORM_ID}
             name="cn"
-            label="作业名称"
+            label={tx("作业名称")}
             error={validation.formFields["cn"]}
           >
-            <Input aria-label="作业名称" className={`inp${validation.formFields["cn"] ? " invalid" : ""}`} value={form.cn} onChange={(event) => setValue("cn", event.target.value)} placeholder="例如：会员画像日终快照推送" />
+            <Input aria-label={tx("作业名称")} className={`inp${validation.formFields["cn"] ? " invalid" : ""}`} value={form.cn} onChange={(event) => setValue("cn", event.target.value)} placeholder={tx("例如：会员画像日终快照推送")} />
           </FormField>
           <div className="fl">
-            <label>湖仓来源路径</label>
-            <Input aria-label="湖仓来源路径" className="inp mono" value={form.sourcePath} onChange={(event) => setValue("sourcePath", event.target.value)} placeholder="例如：/dw/dwm/xxx/dt=${yyyy-MM-dd}" />
+            <label>{tx("湖仓来源路径")}</label>
+            <Input aria-label={tx("湖仓来源路径")} className="inp mono" value={form.sourcePath} onChange={(event) => setValue("sourcePath", event.target.value)} placeholder={tx("例如：/dw/dwm/xxx/dt=${yyyy-MM-dd}")} />
           </div>
           <FormField
             className="fl"
             formId={JOB_FORM_ID}
             name="sourceFileName"
-            label="湖仓来源文件名"
+            label={tx("湖仓来源文件名")}
             error={validation.formFields["sourceFileName"]}
           >
-            <Input aria-label="湖仓来源文件名" className={`inp mono${validation.formFields["sourceFileName"] ? " invalid" : ""}`} value={form.sourceFileName} onChange={(event) => setSourceFileName(event.target.value)} placeholder="例如：ACCT_BAL_${yyyyMMdd}.dat" />
+            <Input aria-label={tx("湖仓来源文件名")} className={`inp mono${validation.formFields["sourceFileName"] ? " invalid" : ""}`} value={form.sourceFileName} onChange={(event) => setSourceFileName(event.target.value)} placeholder={tx("例如：ACCT_BAL_${yyyyMMdd}.dat")} />
           </FormField>
           <div className="fl">
-            <label>目标推送路径</label>
-            <Input aria-label="目标推送路径" className="inp mono" value={form.targetPath} onChange={(event) => setValue("targetPath", event.target.value)} placeholder="例如：/incoming/xxx/" />
+            <label>{tx("目标推送路径")}</label>
+            <Input aria-label={tx("目标推送路径")} className="inp mono" value={form.targetPath} onChange={(event) => setValue("targetPath", event.target.value)} placeholder={tx("例如：/incoming/xxx/")} />
           </div>
           <div className="fl">
-            <label>目标推送文件名</label>
-            <Input aria-label="目标推送文件名" className="inp mono" value={form.targetFileName} onChange={(event) => setValue("targetFileName", event.target.value)} placeholder="默认同湖仓来源文件名" />
+            <label>{tx("目标推送文件名")}</label>
+            <Input aria-label={tx("目标推送文件名")} className="inp mono" value={form.targetFileName} onChange={(event) => setValue("targetFileName", event.target.value)} placeholder={tx("默认同湖仓来源文件名")} />
           </div>
-          {isRenameJob(form) ? <div className="fl full"><div className="editor-sub mono">推送时重命名：{formatRenameHint(form)}</div></div> : null}
+          {isRenameJob(form) ? <div className="fl full"><div className="editor-sub mono">{tx("推送时重命名：")}{formatRenameHint(form)}</div></div> : null}
           <div className="fl">
-            <label>字段分隔符</label>
+            <label>{tx("字段分隔符")}</label>
             <Select<string>
-              aria-label="字段分隔符"
+              aria-label={tx("字段分隔符")}
               className="sel mono"
-              items={delimiterSelectOptions.map((item) => ({ label: optionLabel(item), value: item.value }))}
+              items={delimiterSelectOptions.map((item) => ({ label: tx(optionLabel(item)), value: item.value }))}
               value={form.delimiter || null}
               onValueChange={(value) => setValue("delimiter", value || "")}
             />
-            {delimiterLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>字段分隔符当前值未在码值中维护，请补充码值或重新选择。</div> : null}
+            {delimiterLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>{tx("字段分隔符当前值未在码值中维护，请补充码值或重新选择。")}</div> : null}
           </div>
           <div className="fl">
-            <label>文件编码</label>
+            <label>{tx("文件编码")}</label>
             <Select<string>
-              aria-label="文件编码"
+              aria-label={tx("文件编码")}
               className="sel mono"
-              items={encodingSelectOptions.map((item) => ({ label: optionLabel(item), value: item.value }))}
+              items={encodingSelectOptions.map((item) => ({ label: tx(optionLabel(item)), value: item.value }))}
               value={form.encoding || null}
               onValueChange={(value) => setValue("encoding", value || "")}
             />
-            {encodingLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>文件编码当前值未在码值中维护，请补充码值或重新选择。</div> : null}
+            {encodingLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>{tx("文件编码当前值未在码值中维护，请补充码值或重新选择。")}</div> : null}
           </div>
           <div className="fl">
-            <label>推送频率</label>
+            <label>{tx("推送频率")}</label>
             <Select<string>
-              aria-label="推送频率"
+              aria-label={tx("推送频率")}
               className="sel"
-              items={freqTypeSelectOptions.map((item) => ({ label: optionLabel(item), value: item.value }))}
+              items={freqTypeSelectOptions.map((item) => ({ label: tx(optionLabel(item)), value: item.value }))}
               value={form.freqType || null}
               onValueChange={(value) => setFreqType(value || "")}
             />
-            {freqTypeLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>推送频率当前值未在码值中维护，请补充码值或重新选择。</div> : null}
+            {freqTypeLegacy ? <div className="editor-sub" style={{ marginTop: 6, color: "var(--warn)" }}>{tx("推送频率当前值未在码值中维护，请补充码值或重新选择。")}</div> : null}
           </div>
           {freqParamConfig ? (
             <FormField
               className="fl"
               formId={JOB_FORM_ID}
               name="freq"
-              label={freqParamConfig.label}
+              label={tx(freqParamConfig.label)}
               error={validation.formFields["freq"]}
             >
               <Select<string>
-                aria-label={freqParamConfig.label}
+                aria-label={tx(freqParamConfig.label)}
                 className={`sel${validation.formFields["freq"] ? " invalid" : ""}`}
-                items={freqParamConfig.options.map((item) => ({ label: item.name, value: item.value }))}
+                items={freqParamConfig.options.map((item) => ({
+                  label: form.freqType === "每月" && item.value !== "LAST"
+                    ? tx("{{param}} 号", { param: item.value })
+                    : tx(item.name),
+                  value: item.value,
+                }))}
                 value={form.freq || null}
                 onValueChange={(value) => setValue("freq", value || "")}
               />
             </FormField>
           ) : (
             <div className="fl">
-              <label>频率明细</label>
-              <Input aria-label="频率明细" className="inp" value="无需配置（出数时间取决于上游）" disabled readOnly />
+              <label>{tx("频率明细")}</label>
+              <Input aria-label={tx("频率明细")} className="inp" value={tx("无需配置（出数时间取决于上游）")} disabled readOnly />
             </div>
           )}
           <div className="fl">
-            <label>预估行数</label>
-            <Input aria-label="预估行数" className="inp" value={form.rowCnt} onChange={(event) => setValue("rowCnt", event.target.value)} placeholder="例如：约 12 万行" />
+            <label>{tx("预估行数")}</label>
+            <Input aria-label={tx("预估行数")} className="inp" value={form.rowCnt} onChange={(event) => setValue("rowCnt", event.target.value)} placeholder={tx("例如：约 12 万行")} />
           </div>
           <div className="fl full">
-            <label>业务逻辑说明</label>
-            <Textarea aria-label="业务逻辑说明" className="ta" value={form.desc} onChange={(event) => setValue("desc", event.target.value)} placeholder="描述推送内容、加工逻辑和注意事项。" />
+            <label>{tx("业务逻辑说明")}</label>
+            <Textarea aria-label={tx("业务逻辑说明")} className="ta" value={form.desc} onChange={(event) => setValue("desc", event.target.value)} placeholder={tx("描述推送内容、加工逻辑和注意事项。")} />
           </div>
           <div className="fl">
-            <label>启用状态</label>
+            <label>{tx("启用状态")}</label>
             <BinaryStatusToggle mode="enabled" value={form.enabled} onChange={(nextValue) => setValue("enabled", normalizeEnabled(nextValue))} />
           </div>
         </div>
@@ -361,19 +368,19 @@ export function JobEditor({
 
       <div className="form-card">
         <div className="form-card-head">
-          <h3><Icon name="columns" size={14} />字段清单</h3>
-          <span className="form-card-meta">共 {fields.length} 个字段</span>
+          <h3><Icon name="columns" size={14} />{tx("字段清单")}</h3>
+          <span className="form-card-meta">{tx("共")}{" "}{fields.length} {tx("个字段")}</span>
         </div>
         <div className="fe-scroll">
           <table className="fields-edit mobile-edit-table">
             <thead>
               <tr>
                 <th style={{ width: 34 }}>#</th>
-                <th style={{ minWidth: 170 }}>字段名</th>
-                <th style={{ minWidth: 140 }}>中文名</th>
-                <th style={{ minWidth: 200 }}>含义</th>
-                <th style={{ minWidth: 130 }}>来源系统</th>
-                <th style={{ width: 150 }}>数据类型</th>
+                <th style={{ minWidth: 170 }}>{tx("字段名")}</th>
+                <th style={{ minWidth: 140 }}>{tx("中文名")}</th>
+                <th style={{ minWidth: 200 }}>{tx("含义")}</th>
+                <th style={{ minWidth: 130 }}>{tx("来源系统")}</th>
+                <th style={{ width: 150 }}>{tx("数据类型")}</th>
                 <th style={{ width: 110 }}></th>
               </tr>
             </thead>
@@ -383,38 +390,38 @@ export function JobEditor({
 
                 return (
                   <tr key={field._key}>
-                    <td data-label="字段序号" className="idx-cell">{index + 1}</td>
-                    <td data-label="字段名">
+                    <td data-label={tx("字段序号")} className="idx-cell">{index + 1}</td>
+                    <td data-label={tx("字段名")}>
                       <FormField
                         formId={JOB_FORM_ID}
                         name={`fields.${field._key}.name`}
-                        label={`字段${index + 1}字段名`}
+                        label={tx("字段{{index}}字段名", { index: index + 1 })}
                         hideLabel
                         error={validation.formFields[`fields.${field._key}.name`]}
                       >
-                        <Input aria-label={`字段${index + 1}字段名`} className={`cell-inp mono${rowErrors.name ? " invalid" : ""}`} value={field.name} onChange={(event) => setField(field._key, { name: event.target.value })} placeholder="field_name" />
+                        <Input aria-label={tx("字段{{index}}字段名", { index: index + 1 })} className={`cell-inp mono${rowErrors.name ? " invalid" : ""}`} value={field.name} onChange={(event) => setField(field._key, { name: event.target.value })} placeholder="field_name" />
                       </FormField>
                     </td>
-                    <td data-label="中文名">
+                    <td data-label={tx("中文名")}>
                       <FormField
                         formId={JOB_FORM_ID}
                         name={`fields.${field._key}.cn`}
-                        label={`字段${index + 1}中文名`}
+                        label={tx("字段{{index}}中文名", { index: index + 1 })}
                         hideLabel
                         error={validation.formFields[`fields.${field._key}.cn`]}
                       >
-                        <Input aria-label={`字段${index + 1}中文名`} className={`cell-inp${rowErrors.cn ? " invalid" : ""}`} value={field.cn} onChange={(event) => setField(field._key, { cn: event.target.value })} placeholder="中文名" />
+                        <Input aria-label={tx("字段{{index}}中文名", { index: index + 1 })} className={`cell-inp${rowErrors.cn ? " invalid" : ""}`} value={field.cn} onChange={(event) => setField(field._key, { cn: event.target.value })} placeholder={tx("中文名")} />
                       </FormField>
                     </td>
-                    <td data-label="含义">
-                      <Input aria-label="含义" className="cell-inp" value={field.meaning} onChange={(event) => setField(field._key, { meaning: event.target.value })} placeholder="字段含义说明" />
+                    <td data-label={tx("含义")}>
+                      <Input aria-label={tx("含义")} className="cell-inp" value={field.meaning} onChange={(event) => setField(field._key, { meaning: event.target.value })} placeholder={tx("字段含义说明")} />
                     </td>
-                    <td data-label="来源系统">
-                      <Input aria-label="来源系统" className="cell-inp" value={field.src} onChange={(event) => setField(field._key, { src: event.target.value })} placeholder="来源系统" />
+                    <td data-label={tx("来源系统")}>
+                      <Input aria-label={tx("来源系统")} className="cell-inp" value={field.src} onChange={(event) => setField(field._key, { src: event.target.value })} placeholder={tx("来源系统")} />
                     </td>
-                    <td data-label="数据类型">
+                    <td data-label={tx("数据类型")}>
                       <Select<string>
-                        aria-label="数据类型"
+                        aria-label={tx("数据类型")}
                         className="cell-inp mono"
                         items={FIELD_TYPE_OPTIONS.map((item) => ({ label: item, value: item }))}
                         value={field.type || null}
@@ -423,9 +430,9 @@ export function JobEditor({
                     </td>
                     <td data-label="">
                       <div className="row-tools">
-                        <IconButton aria-label={`上移字段 ${field.name || index + 1}`} className="icon-btn" disabled={index === 0} icon={<Icon name="up" size={14} />} onClick={() => moveField(index, -1)} size="sm" type="button" variant="tertiary" />
-                        <IconButton aria-label={`下移字段 ${field.name || index + 1}`} className="icon-btn" disabled={index === fields.length - 1} icon={<Icon name="down" size={14} />} onClick={() => moveField(index, 1)} size="sm" type="button" variant="tertiary" />
-                        <IconButton aria-label={`删除字段 ${field.name || index + 1}`} className="icon-btn danger" disabled={fields.length === 1} icon={<Icon name="trash" size={14} />} onClick={() => deleteField(field._key)} size="sm" type="button" variant="danger" />
+                        <IconButton aria-label={tx("上移字段 {{field}}", { field: field.name || index + 1 })} className="icon-btn" disabled={index === 0} icon={<Icon name="up" size={14} />} onClick={() => moveField(index, -1)} size="sm" type="button" variant="tertiary" />
+                        <IconButton aria-label={tx("下移字段 {{field}}", { field: field.name || index + 1 })} className="icon-btn" disabled={index === fields.length - 1} icon={<Icon name="down" size={14} />} onClick={() => moveField(index, 1)} size="sm" type="button" variant="tertiary" />
+                        <IconButton aria-label={tx("删除字段 {{field}}", { field: field.name || index + 1 })} className="icon-btn danger" disabled={fields.length === 1} icon={<Icon name="trash" size={14} />} onClick={() => deleteField(field._key)} size="sm" type="button" variant="danger" />
                       </div>
                     </td>
                   </tr>
@@ -437,16 +444,16 @@ export function JobEditor({
         <FormField
           formId={JOB_FORM_ID}
           name="fields"
-          label="字段清单"
+          label={tx("字段清单")}
           hideLabel
           error={validation.formFields["fields"]}
         >
-          <Button className="add-field" size="sm" type="button" variant="tertiary" onClick={addField}><Icon name="plus" size={14} />新增字段</Button>
+          <Button className="add-field" size="sm" type="button" variant="tertiary" onClick={addField}><Icon name="plus" size={14} />{tx("新增字段")}</Button>
         </FormField>
       </div>
 
       <FormActionBar
-        note={isEdit ? "保存后会更新该接口的文件头和字段清单。" : "保存后会加入当前系统的推送作业列表。"}
+        note={tx(isEdit ? "保存后会更新该接口的文件头和字段清单。" : "保存后会加入当前系统的推送作业列表。")}
         onCancel={onCancel}
         onSave={save}
         saving={saving}
@@ -454,24 +461,24 @@ export function JobEditor({
       />
       {deleteInitial ? (
         <DangerZone
-          description="删除推送接口会影响上下游文件关系追溯和历史任务记录，请确认没有在用依赖。"
+          description={tx("删除推送接口会影响上下游文件关系追溯和历史任务记录，请确认没有在用依赖。")}
           actions={[
             {
               key: "delete-push-job",
-              label: "删除推送接口",
+              label: tx("删除推送接口"),
               icon: "trash",
               danger: true,
               onClick: async () => {
                 if (await confirmDeleteAction({
                   name: deleteInitial.cn,
-                  typeLabel: "推送接口",
-                  impact: "该接口删除后，可能影响上下游文件关系追溯、历史任务记录和审计追踪。请确认没有下游依赖。",
+                  typeLabel: tx("推送接口"),
+                  impact: tx("该接口删除后，可能影响上下游文件关系追溯、历史任务记录和审计追踪。请确认没有下游依赖。"),
                   consequences: [
-                    "删除前应以后端依赖校验结果为准。",
-                    "若后端返回不可删除原因，页面会展示具体原因。",
+                    tx("删除前应以后端依赖校验结果为准。"),
+                    tx("若后端返回不可删除原因，页面会展示具体原因。"),
                   ],
                   confirmKeyword: oldId,
-                  confirmKeywordLabel: "请输入接口标识二次确认",
+                  confirmKeywordLabel: tx("请输入接口标识二次确认"),
                 })) {
                   await onDelete?.(oldId);
                 }

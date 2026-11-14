@@ -27,6 +27,7 @@ import { toast } from '../components/common/index.ts';
 import { getErrorMessage } from '../utils/ui.ts';
 import { clearFormFieldErrorEntry, mapApiFormFieldErrors } from '../utils/formFieldErrorMapping.ts';
 import { normalizeRolePermissionCodes } from '../auth/permissions.ts';
+import { translateUiCopy } from '../i18n/useUiTranslation.ts';
 
 export interface RoleFormData {
   roleCode: string;
@@ -278,9 +279,9 @@ export function useRoleModule({
         await load();
         setModal({ open: false, mode: 'new', initial: null, busy: false });
         setForm(DEFAULT_FORM);
-        toast.success(`角色「${role?.name || code}」已删除`);
+        toast.success(translateUiCopy('admin', '角色「{{name}}」已删除', { name: role?.name || code }));
       } catch (nextError: unknown) {
-        toast.error(getErrorMessage(nextError, '删除角色失败。'));
+        toast.error(getErrorMessage(nextError, translateUiCopy('admin', '删除角色失败。')));
         setModal((previous) => ({ ...previous, busy: false }));
         throw nextError;
       } finally {

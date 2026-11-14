@@ -14,7 +14,7 @@ test("root pages use frozen DAP adapters and keep legacy classes", () => {
   assert.equal((rootPages.match(/<Input/g) ?? []).length, 3);
   assert.equal((rootPages.match(/<Select<string>/g) ?? []).length, 1);
   assert.equal((rootPages.match(/<Textarea/g) ?? []).length, 2);
-  assert.match(rootPages, /<Select<string> aria-label="分类" className="sel"/);
+  assert.match(rootPages, /<Select<string> aria-label=\{tx\("分类"\)\} className="sel"/);
   assert.match(rootPages, /<Textarea[\s\S]*?className="paste-ta"/);
   assert.match(rootPages, /<Button className="btn primary" variant="primary" type="button" disabled=\{!summary\.new && !summary\.update\}/);
 });
@@ -37,7 +37,7 @@ test("code-table page uses frozen DAP adapters without raw controls", () => {
   assert.equal((codeTablePage.match(/<Textarea/g) ?? []).length, 1);
   assert.equal((codeTablePage.match(/<Button/g) ?? []).length, 2);
   assert.doesNotMatch(codeTablePage, /aria-label="状态筛选"|code-table-status-filter/);
-  assert.match(codeTablePage, /<Select<string> aria-label="表样式" placeholder="请选择表样式" className=\{`inp\$\{fieldErrors\["style"\]/);
+  assert.match(codeTablePage, /<Select<string> aria-label=\{tx\("表样式"\)\} placeholder=\{tx\("请选择表样式"\)\} className=\{`inp\$\{fieldErrors\["style"\]/);
   assert.doesNotMatch(codeTablePage, /<input|<select|<textarea/);
   assert.doesNotMatch(codeTablePage, /<input|<select|<textarea|<button/);
   assert.equal((codeTablePage.match(/<IconButton\b/g) ?? []).length, 2);

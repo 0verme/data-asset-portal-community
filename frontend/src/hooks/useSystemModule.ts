@@ -46,6 +46,7 @@ import { getErrorMessage } from '../utils/ui.ts';
 import { clearFormFieldErrorEntry, mapApiFormFieldErrors } from '../utils/formFieldErrorMapping.ts';
 import { toast } from '../components/common/index.ts';
 import { DEFAULT_MENU_FORM, DEFAULT_PARAM_FORM, DEFAULT_USER_FORM } from '../components/system/constants.ts';
+import { translateUiCopy } from '../i18n/useUiTranslation.ts';
 
 export interface UserFormData {
   username: string;
@@ -684,7 +685,7 @@ export function useSystemModule({
         await updateMenuStatus(menu.id, status);
         await reloadMenusForCurrentView();
       } catch (nextError: unknown) {
-        toast.error(getErrorMessage(nextError, '更新菜单状态失败。'));
+        toast.error(getErrorMessage(nextError, translateUiCopy('admin', '更新菜单状态失败。')));
       }
     });
 
@@ -694,7 +695,7 @@ export function useSystemModule({
         await moveMenu(menu.id, direction);
         await reloadMenusForCurrentView();
       } catch (nextError: unknown) {
-        toast.error(getErrorMessage(nextError, '调整菜单排序失败。'));
+        toast.error(getErrorMessage(nextError, translateUiCopy('admin', '调整菜单排序失败。')));
       }
     });
 
@@ -705,7 +706,7 @@ export function useSystemModule({
         await deleteMenu(menu.id);
         await reloadMenusForCurrentView();
       } catch (nextError: unknown) {
-        toast.error(getErrorMessage(nextError, '删除菜单失败。'));
+        toast.error(getErrorMessage(nextError, translateUiCopy('admin', '删除菜单失败。')));
       }
     });
 
@@ -713,9 +714,9 @@ export function useSystemModule({
     guarded(async () => {
       try {
         await resetUserPassword(user.username);
-        toast.success('密码已重置为当前用户名');
+        toast.success(translateUiCopy('admin', '密码已重置为当前用户名'));
       } catch (nextError: unknown) {
-        toast.error(getErrorMessage(nextError, '重置密码失败。'));
+        toast.error(getErrorMessage(nextError, translateUiCopy('admin', '重置密码失败。')));
       }
     });
 
@@ -725,7 +726,7 @@ export function useSystemModule({
         await updateUserStatus(user.username, status);
         await reloadUsersForCurrentView();
       } catch (nextError: unknown) {
-        toast.error(getErrorMessage(nextError, '更新用户状态失败。'));
+        toast.error(getErrorMessage(nextError, translateUiCopy('admin', '更新用户状态失败。')));
       }
     });
 
@@ -736,7 +737,7 @@ export function useSystemModule({
         await loadCategories();
         await reloadCurrentItems();
       } catch (nextError: unknown) {
-        toast.error(getErrorMessage(nextError, '更新参数状态失败。'));
+        toast.error(getErrorMessage(nextError, translateUiCopy('admin', '更新参数状态失败。')));
       }
     });
 
@@ -746,7 +747,7 @@ export function useSystemModule({
         await deleteUser(user.username);
         await reloadUsersForCurrentView();
       } catch (nextError: unknown) {
-        toast.error(getErrorMessage(nextError, '删除用户失败。'));
+        toast.error(getErrorMessage(nextError, translateUiCopy('admin', '删除用户失败。')));
       }
     });
 
@@ -757,7 +758,7 @@ export function useSystemModule({
         await loadCategories();
         await reloadCurrentItems();
       } catch (nextError: unknown) {
-        toast.error(getErrorMessage(nextError, '删除参数失败。'));
+        toast.error(getErrorMessage(nextError, translateUiCopy('admin', '删除参数失败。')));
       }
     });
 

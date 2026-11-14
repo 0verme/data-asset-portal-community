@@ -128,5 +128,13 @@
     "loading": "加载中…",
     "saving": "保存中...",
     "noResults": "暂无结果"
+  },
+  "status": {
+    "enabled": "启用",
+    "disabled": "禁用",
+    "unknown": "未知",
+    "title": "状态",
+    "all": "全部状态",
+    "selector": "状态选择"
   }
 }
