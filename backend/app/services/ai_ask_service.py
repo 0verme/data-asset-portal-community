@@ -187,7 +187,9 @@ class AIAskService:
                 domain=item.domain,
                 layer=item.layer,
                 source="dap_catalog",
-                matchReason="RAG 检索候选；字段、父表和稳定 ID 已由当前 DAP 目录校验。",
+                retrievalSource=item.retrieval_source,
+                matchEvidence=item.match_evidence,
+                matchReason="检索候选字段、父表和稳定 ID 已由当前 DAP 目录校验。",
             )
         if item.asset_type != "table" or item.field_id is not None:
             raise ValueError("unsupported candidate identity")
@@ -200,7 +202,9 @@ class AIAskService:
             domain=item.domain,
             layer=item.layer,
             source="dap_catalog",
-            matchReason="RAG 检索候选；表和稳定 ID 已由当前 DAP 目录校验。",
+            retrievalSource=item.retrieval_source,
+            matchEvidence=item.match_evidence,
+            matchReason="检索候选表和稳定 ID 已由当前 DAP 目录校验。",
         )
 
     @staticmethod
@@ -601,7 +605,19 @@ class AIAskService:
             user_payload = {
                 "query": query,
                 "scope": request.scope,
-                "candidates": [item.model_dump(by_alias=True) for item in candidates],
+                "candidates": [
+                    item.model_dump(
+                        by_alias=True,
+                        exclude={
+                            "source",
+                            "retrieval_source",
+                            "match_evidence",
+                            "match_reason",
+                            "relevance",
+                        },
+                    )
+                    for item in candidates
+                ],
             }
         except Exception:
             progress.fail("organizing", "invalid_response")
@@ -741,7 +757,12 @@ class AIAskService:
 
         list_answer = is_list_query or generated.question_type == "asset_list"
         has_direct = any(relevance == "direct" for _, relevance in selected)
-        is_partial = list_answer or retrieval_status == "degraded" or not has_direct
+        is_partial = (
+            list_answer
+            or retrieval_status == "degraded"
+            or bool(getattr(retrieval, "results_truncated", False))
+            or not has_direct
+        )
         answer = self._render_answer(
             selected,
             question_type=generated.question_type,
@@ -756,7 +777,11 @@ class AIAskService:
             reason_code="partial_results" if is_partial else None,
             candidates=selected_candidates,
             citations=citations,
-            results_truncated=list_answer or retrieval_status == "degraded",
+            results_truncated=(
+                list_answer
+                or retrieval_status == "degraded"
+                or bool(getattr(retrieval, "results_truncated", False))
+            ),
             completed=True,
         )
 
@@ -969,15 +994,27 @@ class AIAskService:
             return self._metadata_count_unavailable(respond=respond)
 
 
-# The global runtime composes the existing HTTP RAG adapter, current authoritative
-# asset catalog service, and optional provider. Neither a model nor an index is
-# loaded into the DAP process.
-from .assets_service import assets_service
+# The global runtime composes the mode-aware adapter with the existing DAP
+# search/metadata services. Local calls the in-process SearchProvider; External
+# keeps the established HTTP-only RAG implementation and contract.
 from .rag_search_service import rag_search_service
+from .search_provider import search_provider
+from .system_management_service import system_management_service
+from .retrieval_provider import LocalSearchProvider, ModeAwareRetrievalProvider
+from .assets_service import assets_service
 from .report_service import report_service
 
+local_retrieval_provider = LocalSearchProvider(
+    search_provider=search_provider,
+    candidate_catalog_loader=rag_search_service.load_candidate_catalog,
+)
+ai_retrieval_provider = ModeAwareRetrievalProvider(
+    local_provider=local_retrieval_provider,
+    external_provider=rag_search_service,
+    config_getter=system_management_service.get_rag_search_config,
+)
 ai_ask_service = AIAskService(
-    rag_service=rag_search_service,
+    rag_service=ai_retrieval_provider,
     llm_provider=OpenAICompatibleLLMProvider(),
     assets_service=assets_service,
     reports_service=report_service,

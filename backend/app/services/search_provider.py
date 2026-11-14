@@ -80,6 +80,7 @@ class SearchProvider(ABC):
         limit: int = 5,
         *,
         profile: str | None = None,
+        include_field_ids: bool = False,
     ) -> dict:
         raise NotImplementedError
 
@@ -410,8 +411,14 @@ class KeywordSearchProvider(SearchProvider):
             "items": [],
         }
 
-    def _search_one_safe(self, conn, config, query, limit, profile=None):
+    def _search_one_safe(
+        self, conn, config, query, limit, profile=None, *, include_field_ids=False
+    ):
         try:
+            if include_field_ids:
+                return self._search_one(
+                    conn, config, query, limit, profile, include_field_ids=True
+                )
             return self._search_one(conn, config, query, limit, profile)
         except SearchDataSourceError as error:
             LOGGER.warning("search degraded for type=%s: %s", config["type"], error.message)
@@ -436,7 +443,9 @@ class KeywordSearchProvider(SearchProvider):
             return 0
         return int(rows[0].get("matched_total") or 0)
 
-    def _load_field_matches(self, conn, config, rows, pattern, profile=None):
+    def _load_field_matches(
+        self, conn, config, rows, pattern, profile=None, *, include_field_ids=False
+    ):
         """Batch matched child fields for the current page (one query, no N+1)."""
         field_match = self._field_match_spec(config)
         if not field_match or not rows:
@@ -455,8 +464,13 @@ class KeywordSearchProvider(SearchProvider):
         inner = "(" + " OR ".join(conditions) + ")"
         placeholders = ", ".join("?" for _ in keys)
         select_columns = ", ".join(field_match["display"])
+        field_id_select = (
+            f", {field_match['field_id']} AS matched_field_id"
+            if include_field_ids and field_match.get("field_id")
+            else ""
+        )
         sql = (
-            f"SELECT {field_match['field_key']}, {select_columns} "
+            f"SELECT {field_match['field_key']}{field_id_select}, {select_columns} "
             f"FROM {field_match['table']} "
             f"WHERE {field_match['active_where']} "
             f"AND {field_match['field_key']} IN ({placeholders}) "
@@ -474,10 +488,13 @@ class KeywordSearchProvider(SearchProvider):
             value = asset_field_match_value(row)
             if not value:
                 continue
-            bucket.append({"label": field_match["label"], "value": value})
+            matched_field = {"label": field_match["label"], "value": value}
+            if include_field_ids and field_match.get("field_id"):
+                matched_field["fieldId"] = row.get("matched_field_id")
+            bucket.append(matched_field)
         return matches
 
-    def _search_one(self, conn, config, query, limit, profile=None):
+    def _search_one(self, conn, config, query, limit, profile=None, *, include_field_ids=False):
         started_at = time.perf_counter()
         pattern = self._like_pattern(query)
         where = self._build_where(config, profile)
@@ -500,7 +517,10 @@ class KeywordSearchProvider(SearchProvider):
         rows = self._fetch_rows_with_conn(conn, list_sql, params=list_params)
         total_matches = self._count_matches(conn, config, query, profile)
         field_match = self._field_match_spec(config)
-        field_matches = self._load_field_matches(conn, config, rows, pattern, profile)
+        field_matches = self._load_field_matches(
+            conn, config, rows, pattern, profile,
+            include_field_ids=include_field_ids,
+        )
         row_key = field_match["row_key"] if field_match else None
         items = [
             self._map_item(
@@ -541,6 +561,7 @@ class KeywordSearchProvider(SearchProvider):
         limit: int = 5,
         *,
         profile: str | None = None,
+        include_field_ids: bool = False,
     ) -> dict:
         selected_profile = profile or get_public_catalog_profile()
         normalized_scope = self._normalize_scope(scope)
@@ -561,8 +582,10 @@ class KeywordSearchProvider(SearchProvider):
                     failed_groups.append(config["type"])
                     continue
                 try:
+                    search_options = {"include_field_ids": True} if include_field_ids else {}
                     group = self._search_one_safe(
-                        conn, config, keyword, normalized_limit, selected_profile
+                        conn, config, keyword, normalized_limit, selected_profile,
+                        **search_options,
                     )
                 except SearchDataSourceError:
                     failed_groups.append(config["type"])

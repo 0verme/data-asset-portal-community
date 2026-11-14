@@ -30,6 +30,8 @@ export interface AiAskCandidate {
   domain: string;
   layer: string;
   source: "dap_catalog";
+  retrievalSource?: "local" | "external";
+  matchEvidence?: string[];
   matchReason: string;
   relevance: "direct" | "related";
 }
@@ -279,6 +281,8 @@ function parseCandidate(value: unknown): AiAskCandidate {
   const fieldId = value["fieldId"];
   const assetType = value["assetType"];
   const relevance = value["relevance"];
+  const retrievalSource = value["retrievalSource"];
+  const rawMatchEvidence = value["matchEvidence"];
   const optionalFieldId = fieldId === undefined ? null : fieldId;
   if (
     !isStableId(assetId)
@@ -291,6 +295,12 @@ function parseCandidate(value: unknown): AiAskCandidate {
     || !isText(value["domain"])
     || !isText(value["layer"])
     || value["source"] !== "dap_catalog"
+    || (retrievalSource !== undefined && retrievalSource !== "local" && retrievalSource !== "external")
+    || (rawMatchEvidence !== undefined && (
+      !Array.isArray(rawMatchEvidence)
+      || rawMatchEvidence.length > 8
+      || rawMatchEvidence.some((item) => !isText(item) || item.length > 256)
+    ))
     || (relevance !== "direct" && relevance !== "related")
     || !isText(value["matchReason"])
     || !value["matchReason"].trim()
@@ -326,6 +336,8 @@ function parseCandidate(value: unknown): AiAskCandidate {
     domain: value["domain"],
     layer: value["layer"],
     source: "dap_catalog",
+    ...(retrievalSource === undefined ? {} : { retrievalSource }),
+    ...(rawMatchEvidence === undefined ? {} : { matchEvidence: rawMatchEvidence as string[] }),
     matchReason: value["matchReason"],
     relevance,
   };

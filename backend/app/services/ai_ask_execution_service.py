@@ -2,9 +2,9 @@
 
 The legacy JSON ask service remains the source of the response contract and
 citation-selection rules. This adapter plans a bounded set of queries, invokes
-only the existing RAG HTTP adapter, then refreshes a small number of authorized
-asset details by stable DAP IDs before asking the existing LLM provider to
-select evidence.
+the configured Local/External retrieval adapter, then refreshes a small number
+of authorized asset details by stable DAP IDs before asking the existing LLM
+provider to select evidence.
 """
 
 from __future__ import annotations
@@ -496,7 +496,7 @@ class AIAskExecutionService(AIAskService):
                             error_code = result.reason_code or result.status
                             events.error(
                                 f"search-{search_id}",
-                                f"未发起 HTTP 检索：{query}",
+                                f"未发起检索：{query}",
                                 {
                                     "searchId": search_id,
                                     "query": query,
@@ -821,7 +821,9 @@ class AIAskExecutionService(AIAskService):
                     domain=(detail.get("domain") or "")[:256],
                     layer=(detail.get("layer") or "")[:32],
                     source="dap_catalog",
-                    matchReason="表详情已按 RAG 稳定 assetId 通过 DAP 权威目录读取。",
+                    retrievalSource=recommendation.retrieval_source,
+                    matchEvidence=recommendation.match_evidence,
+                    matchReason="表详情已按稳定 assetId 通过 DAP 权威目录读取。",
                 )
                 verified.append(candidate)
                 continue
@@ -861,6 +863,8 @@ class AIAskExecutionService(AIAskService):
                 domain=(detail.get("domain") or "")[:256],
                 layer=(detail.get("layer") or "")[:32],
                 source="dap_catalog",
+                retrievalSource=recommendation.retrieval_source,
+                matchEvidence=recommendation.match_evidence,
                 matchReason="字段详情已按稳定 assetId + fieldId 核实，并确认所属表身份。",
             ))
             events.complete(
@@ -1199,7 +1203,19 @@ class AIAskExecutionService(AIAskService):
             user_payload = {
                 "query": query,
                 "scope": request.scope,
-                "candidates": [candidate.model_dump(by_alias=True) for candidate in verified],
+                "candidates": [
+                    candidate.model_dump(
+                        by_alias=True,
+                        exclude={
+                            "source",
+                            "retrieval_source",
+                            "match_evidence",
+                            "match_reason",
+                            "relevance",
+                        },
+                    )
+                    for candidate in verified
+                ],
             }
             try:
                 raw_output = self._llm_provider.complete_json(

@@ -43,6 +43,7 @@ AiAskReason = Literal[
 
 StableAssetId = Annotated[int, Field(strict=True, gt=0)]
 StableFieldId = Annotated[int, Field(strict=True, gt=0)]
+CandidateEvidenceTerm = Annotated[str, Field(max_length=256)]
 
 
 class _AiAskContract(ContractModel):
@@ -173,6 +174,8 @@ class AiAskCandidate(_AiAskContract):
     domain: str = Field(default="", max_length=256)
     layer: str = Field(default="", max_length=32)
     source: Literal["dap_catalog"] = "dap_catalog"
+    retrieval_source: Literal["local", "external"] = Field(default="external", alias="retrievalSource")
+    match_evidence: list[CandidateEvidenceTerm] = Field(default_factory=list, alias="matchEvidence", max_length=8)
     match_reason: str = Field(alias="matchReason", min_length=1, max_length=300)
     relevance: Literal["direct", "related"] | None = None
 

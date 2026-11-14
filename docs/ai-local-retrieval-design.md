@@ -80,6 +80,14 @@ PYTHONPATH="<isolated-python-site-packages>:$PWD" python3 -m unittest \
 
 The raw command output is retained as local task evidence outside the repository. The tests intentionally log mocked timeouts, search failures, and visibility errors; the final suite summary was `OK`.
 
+## Phase 1 implementation notes
+
+The Local table/field provider now calls the registered `SearchProvider.search()` directly with the per-request public-catalog profile. Stable field IDs are opt-in in the existing asset-field query, leaving ordinary `/api/search` output unchanged. The result is only a recall hint: table names, field names, descriptions, domain/layer, and parent relationships are rebuilt from `AssetsService.get_rag_candidate_catalog()` before AI prompting; malformed, missing, duplicate, or mismatched identities are discarded and reported as degraded. Search match evidence is retained for bounded response diagnostics but omitted from the LLM payload. Search errors fail closed, and caps/partial asset-group failures are surfaced rather than described as complete results.
+
+`retrievalMode` is resolved without writing defaults. Legacy enabled External configuration remains External; disabled/no-mode defaults to Local; explicit mode wins; invalid configuration fails closed. Local mode does not require or use the External URL/token, hides the legacy URL from the browser-safe view, and never calls the External HTTP adapter. External mode still uses the existing adapter and never falls back to Local. Admin config updates preserve omitted legacy mode and other omitted settings; enabling Local requires neither an External URL nor token. No new parameter row/table/migration was added. The existing AI executor and outer SSE event lifecycle remain in place; additive candidate retrieval-source/match-evidence fields are accepted by the browser parser.
+
+Phase 1 regression evidence is in the isolated local log `dap-568-test/logs/phase1-ai-retrieval-regression.log`; it includes the baseline AI/RAG/search/visibility modules and Local mode/identity/config tests. The frontend parser and frozen SSE sample are updated for the additive candidate metadata.
+
 ## Risks to verify in Phases 1–3
 
 - A Local result must not turn a display match into a `fieldId`; only a real field ID returned by the existing active-field query and confirmed by the authoritative catalog read is referenceable.

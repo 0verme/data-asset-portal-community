@@ -22,6 +22,8 @@ const validCandidate = {
   domain: "合成域",
   layer: "DWS",
   source: "dap_catalog",
+  retrievalSource: "local",
+  matchEvidence: ["BALANCE_AMT 余额金额"],
   matchReason: "字段、父表和稳定 ID 已由当前 DAP 目录校验。",
   relevance: "direct",
 };
@@ -121,6 +123,8 @@ test("AI ask response preserves DAP stable IDs and validates citations against c
   assert.equal(parsed.status, "answered");
   assert.equal(parsed.citations[0]?.assetId, 42);
   assert.equal(parsed.candidates[0]?.fieldId, 99);
+  assert.equal(parsed.candidates[0]?.retrievalSource, "local");
+  assert.deepEqual(parsed.candidates[0]?.matchEvidence, ["BALANCE_AMT 余额金额"]);
   assert.equal(parsed.resultsTruncated, false);
 
   assert.throws(
@@ -131,6 +135,14 @@ test("AI ask response preserves DAP stable IDs and validates citations against c
     /Invalid AI ask citation/,
   );
   assert.throws(() => parseAiAskResponse({ ...validResponse, internalReasoning: "must-not-be-exposed" }), /Unexpected data in AI ask response/);
+  assert.throws(() => parseAiAskResponse({
+    ...validResponse,
+    candidates: [{ ...validCandidate, retrievalSource: "fallback" }],
+  }), /Invalid AI ask candidate/);
+  assert.throws(() => parseAiAskResponse({
+    ...validResponse,
+    candidates: [{ ...validCandidate, matchEvidence: Array.from({ length: 9 }, () => "term") }],
+  }), /Invalid AI ask candidate/);
   assert.throws(
     () => parseAiAskResponse({
       ...validResponse,

@@ -175,6 +175,7 @@ register_search_entity({
         "active_where": f"f.is_deleted = '{ASSET_FIELD_ACTIVE_VALUE}'",
         "row_key": "asset_id",
         "field_key": "f.asset_id",
+        "field_id": "f.field_id",
         "label": "字段",
         "matchers": [
             {"expr": f"f.{column}", "label": label}
