@@ -14,7 +14,7 @@ A lightweight, intranet-friendly data asset catalog for data warehouse teams.
 
 [快速开始](#-快速开始) · [为什么选 DAP](#-为什么选-dap) · [与 OpenMetadata 的差异](#-与-openmetadata-和-datahub-的定位差异) · [功能](#-功能) · [搜索与 AI 能力](#-搜索与-ai-能力) · [数据库兼容性](#-数据库兼容性) · [文档](#-文档导航)
 
-[官网](https://0verme.github.io/data-asset-portal-community/)
+[官网](https://dap.overme.cn)
 
 </div>
 
