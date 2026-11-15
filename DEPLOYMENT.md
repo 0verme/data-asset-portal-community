@@ -1,6 +1,15 @@
 # 部署说明 · Deployment
 
 本说明面向 Linux 内网单机部署，覆盖前端构建、Python 环境、数据库迁移、管理员初始化、FastAPI/Uvicorn、systemd、Nginx、HTTP Demo、HTTPS Production 和部署验收。
+
+| 目标 | 建议入口 |
+| --- | --- |
+| 想先体验 | 运行 [`./scripts/demo.sh`](./scripts/demo.sh)，参见 [Community Demo 指南](docs/community-demo.md)。 |
+| 内网单机生产部署 | 从[第 1 节](#1-部署架构)起顺序阅读。 |
+| 升级 | 查看[第 12 节：升级](#12-升级)。 |
+| 部署后验证 | 查看[第 10 节：Verification](#10-verification)。 |
+| 遇到问题 | 查看[第 13 节：Troubleshooting](#13-troubleshooting)。 |
+
 本地开发请参见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
 
 > 文中的 `/opt/data-asset-portal`、`dataasset`、`data-asset.example` 和证书路径均为示例，请按实际服务器替换。不要把真实密码、`APP_SECRET_KEY`、证书或 TLS private key 提交到仓库。
