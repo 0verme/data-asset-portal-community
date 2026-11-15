@@ -94,7 +94,6 @@ jobs:
           expected_triggers = {
               "ci.yml": {"pull_request"},
               "community-metadata.yml": {"issues", "pull_request_target"},
-              "pages.yml": {"push", "workflow_dispatch"},
               "release-drafter.yml": {"push"},
           }
           metadata_actions = {
