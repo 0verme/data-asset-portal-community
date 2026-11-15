@@ -2,15 +2,15 @@ const RECORDINGS = {
   "asset-search": {
     title: "data.overme.cn / 资产搜索",
     step: "产品录屏 01 / 03",
-    src: "./public/media/01-asset-search.mp4",
-    poster: "./public/media/01-asset-search.jpg",
+    src: "./assets/media/01-asset-search.mp4",
+    poster: "./assets/media/01-asset-search.jpg",
     ariaLabel: "资产搜索录屏：在搜索框输入检索词，结果列表收敛，命中资产并展开字段含义与口径来源"
   },
   "ai-rag": {
     title: "data.overme.cn / AI 问答",
     step: "产品录屏 02 / 03",
-    src: "./public/media/02-ai-rag.mp4",
-    poster: "./public/media/02-ai-rag.jpg",
+    src: "./assets/media/02-ai-rag.mp4",
+    poster: "./assets/media/02-ai-rag.jpg",
     ariaLabel: "问资产录屏：输入业务问题，执行步骤逐行出现，随后展示命中的资产与证据来源"
   },
   readiness: {

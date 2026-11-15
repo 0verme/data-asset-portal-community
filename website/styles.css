@@ -11,7 +11,7 @@
   --white: #FFFFFF;
   --font-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --font-serif: "Noto Serif SC", "Songti SC", "STSong", serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Noto Sans SC", monospace;
+  --font-mono: "JetBrains Mono", "Noto Sans SC", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 html[data-palette="green"] {
