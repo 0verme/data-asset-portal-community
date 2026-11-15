@@ -22,6 +22,8 @@ const validCandidate = {
   domain: "合成域",
   layer: "DWS",
   source: "dap_catalog",
+  retrievalSource: "local",
+  matchEvidence: ["BALANCE_AMT 余额金额"],
   matchReason: "字段、父表和稳定 ID 已由当前 DAP 目录校验。",
   relevance: "direct",
 };
@@ -121,6 +123,8 @@ test("AI ask response preserves DAP stable IDs and validates citations against c
   assert.equal(parsed.status, "answered");
   assert.equal(parsed.citations[0]?.assetId, 42);
   assert.equal(parsed.candidates[0]?.fieldId, 99);
+  assert.equal(parsed.candidates[0]?.retrievalSource, "local");
+  assert.deepEqual(parsed.candidates[0]?.matchEvidence, ["BALANCE_AMT 余额金额"]);
   assert.equal(parsed.resultsTruncated, false);
 
   assert.throws(
@@ -131,6 +135,14 @@ test("AI ask response preserves DAP stable IDs and validates citations against c
     /Invalid AI ask citation/,
   );
   assert.throws(() => parseAiAskResponse({ ...validResponse, internalReasoning: "must-not-be-exposed" }), /Unexpected data in AI ask response/);
+  assert.throws(() => parseAiAskResponse({
+    ...validResponse,
+    candidates: [{ ...validCandidate, retrievalSource: "fallback" }],
+  }), /Invalid AI ask candidate/);
+  assert.throws(() => parseAiAskResponse({
+    ...validResponse,
+    candidates: [{ ...validCandidate, matchEvidence: Array.from({ length: 9 }, () => "term") }],
+  }), /Invalid AI ask candidate/);
   assert.throws(
     () => parseAiAskResponse({
       ...validResponse,
@@ -159,6 +171,48 @@ test("AI ask parser rejects independent statistical results without authoritativ
       sourceLink: "/data-warehouse?domain=%E5%9B%BD%E4%B8%9A&layer=DM",
     },
   }), /statisticalResult is a presentation adapter/);
+});
+
+test("AI ask parser keeps equal string IDs distinct across report indicator and API citations", () => {
+  const candidates = (["report", "indicator", "api"] as const).map((assetType) => ({
+    assetId: "SHARED-001",
+    fieldId: null,
+    assetType,
+    name: "SHARED-001",
+    displayName: `权威${assetType}`,
+    description: "已核实的目录详情",
+    tableName: null,
+    fieldName: null,
+    domain: "资产域",
+    layer: "",
+    source: "dap_catalog",
+    retrievalSource: "local",
+    matchReason: "类型化稳定 ID 已核实",
+    relevance: "direct",
+  }));
+  const parsed = parseAiAskResponse({
+    ...validResponse,
+    citations: candidates.map(({ assetType, assetId }) => ({
+      assetType, assetId, fieldId: null, source: "dap_catalog",
+    })),
+    candidates,
+  });
+  assert.equal(parsed.candidates.length, 3);
+  assert.deepEqual(new Set(parsed.citations.map((item) => item.assetType)), new Set(["report", "indicator", "api"]));
+  assert.throws(() => parseAiAskResponse({
+    ...validResponse,
+    citations: [
+      { assetType: "api", assetId: "SHARED-001", fieldId: null, source: "dap_catalog" },
+      { assetType: "indicator", assetId: "SHARED-001", fieldId: null, source: "dap_catalog" },
+      { assetType: "api", assetId: "SHARED-001", fieldId: null, source: "dap_catalog" },
+    ],
+    candidates,
+  }), /Duplicate AI ask citation/);
+  assert.throws(() => parseAiAskResponse({
+    ...validResponse,
+    citations: [{ assetId: "SHARED-001", fieldId: null, source: "dap_catalog" }],
+    candidates: [candidates[0]],
+  }), /Invalid AI ask citation/);
 });
 
 test("AI ask parser adapts the authoritative metadata count contract and keeps it separate from RAG", () => {

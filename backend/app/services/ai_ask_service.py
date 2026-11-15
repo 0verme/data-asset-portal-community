@@ -41,12 +41,12 @@ _RETRIEVAL_TIMEOUT_ANSWER = "资产检索超时，无法基于目录回答；请
 _MAX_CANDIDATES = 20
 _MAX_ANSWER_LENGTH = 1800
 _LIST_QUERY_PATTERNS = (
-    re.compile(r"(?:有哪些|都有哪些|有些什么|列出|全部|所有).{0,20}(?:数据资产|数据表|表|字段|资产)"),
-    re.compile(r"有什么.{0,20}(?:数据资产|数据表|表|字段|资产)"),
-    re.compile(r"(?:数据资产|数据表|表|字段|资产).{0,20}(?:有哪些|都有哪些|清单|列表|全部|所有)"),
+    re.compile(r"(?:有哪些|都有哪些|有些什么|列出|全部|所有).{0,20}(?:数据资产|数据表|表|字段|资产|报表|指标|API|接口)"),
+    re.compile(r"有什么.{0,20}(?:数据资产|数据表|表|字段|资产|报表|指标|API|接口)"),
+    re.compile(r"(?:数据资产|数据表|表|字段|资产|报表|指标|API|接口).{0,20}(?:有哪些|都有哪些|清单|列表|全部|所有)"),
     re.compile(
-        r"\b(?:list|all)\b.{0,30}\b(?:tables?|fields?|assets?)\b"
-        r"|\b(?:what\s+are|which)\s+(?:all\s+)?(?:data\s+)?(?:tables|fields|assets)\b",
+        r"\b(?:list|all)\b.{0,30}\b(?:tables?|fields?|assets?|reports?|indicators?|apis?)\b"
+        r"|\b(?:what\s+are|which)\s+(?:all\s+)?(?:data\s+)?(?:tables|fields|assets|reports|indicators|apis)\b",
         re.IGNORECASE,
     ),
 )
@@ -58,11 +58,11 @@ _SYSTEM_PROMPT = """你是企业数据资产目录的专业 AI 助手，擅长�
 请区分直接回答问题的资产、业务相关但不能直接回答的资产，以及仅因父表出现的上下文资产。字段属于某张相关表，不等于它就是问题询问的核心字段；例如备注、开户行号不能仅因存款表匹配就当作存款余额字段。清单问题可以只选择能确认的部分，不要声称已找全。
 
 只输出一个严格 JSON object，字段仅为 questionType 和 claims：
-{"questionType":"asset_location|field_explanation|asset_list|general","claims":[{"assetId":正整数,"fieldId":正整数或 null,"relevance":"direct|related|context_only"}]}
-claims 中只能使用输入 candidates 的精确稳定 ID；只选直接回答或有明确业务相关性的候选。纯上下文候选标为 context_only。没有足够证据时 claims 返回空数组。不得在 JSON 中输出自由文本答案、资产名、ID 以外的事实、Markdown、SQL、秘密、会话标识或追问内容；最终文字由 DAP 使用已校验元数据生成。"""
+{"questionType":"asset_location|field_explanation|asset_list|general","claims":[{"assetType":"table|field|report|indicator|api","assetId":"非表资产的精确字符串 ID 或表/字段的正整数 ID","fieldId":正整数或 null,"relevance":"direct|related|context_only"}]}
+claims 中只能使用输入 candidates 的精确类型和稳定 ID；table/field 使用数字 assetId，report/indicator/api 使用字符串 assetId，字段必须同时提供 fieldId。只选直接回答或有明确业务相关性的候选。纯上下文候选标为 context_only。没有足够证据时 claims 返回空数组。不得在 JSON 中输出自由文本答案、资产名、ID 以外的事实、Markdown、SQL、秘密、会话标识或追问内容；最终文字由 DAP 使用已校验元数据生成。"""
 _REPAIR_SYSTEM_PROMPT = _SYSTEM_PROMPT + """
 
-这是一次有界的证据复核：上一轮没有给出任何可直接支持问题的候选。重新比较原问题与每个已验证候选的表名、字段名及目录描述；如果至少有一项直接回答问题，或有明确相关性但不能直接回答，请用精确 ID 标记 direct/related。若所有候选都只是上下文或无关线索，claims 仍返回空数组。不得为了凑答案引用候选，也不得生成自由文本。"""
+这是一次有界的证据复核：上一轮没有给出任何可直接支持问题的候选。重新比较原问题与每个已验证候选的类型、稳定 ID、名称及目录描述；如果至少有一项直接回答问题，或有明确相关性但不能直接回答，请用精确类型和 ID 标记 direct/related。若所有候选都只是上下文或无关线索，claims 仍返回空数组。不得为了凑答案引用候选，也不得生成自由文本。"""
 
 
 class AIAskCancelled(RuntimeError):
@@ -178,6 +178,9 @@ class AIAskService:
                 assetId=item.asset_id,
                 fieldId=item.field_id,
                 assetType="field",
+                name=item.name,
+                displayName=item.display_name or item.name,
+                description=item.description,
                 tableName=parent.name,
                 tableDisplayName=parent.display_name or parent.name,
                 tableDescription=parent.description,
@@ -187,21 +190,42 @@ class AIAskService:
                 domain=item.domain,
                 layer=item.layer,
                 source="dap_catalog",
-                matchReason="RAG 检索候选；字段、父表和稳定 ID 已由当前 DAP 目录校验。",
+                retrievalSource=item.retrieval_source,
+                matchEvidence=item.match_evidence,
+                matchReason="检索候选字段、父表和稳定 ID 已由当前 DAP 目录校验。",
             )
-        if item.asset_type != "table" or item.field_id is not None:
-            raise ValueError("unsupported candidate identity")
-        return AiAskCandidate(
-            assetId=item.asset_id,
-            assetType="table",
-            tableName=item.name,
-            tableDisplayName=item.display_name or item.name,
-            tableDescription=item.description,
-            domain=item.domain,
-            layer=item.layer,
-            source="dap_catalog",
-            matchReason="RAG 检索候选；表和稳定 ID 已由当前 DAP 目录校验。",
-        )
+        if item.asset_type == "table" and item.field_id is None:
+            return AiAskCandidate(
+                assetId=item.asset_id,
+                assetType="table",
+                name=item.name,
+                displayName=item.display_name or item.name,
+                description=item.description,
+                tableName=item.name,
+                tableDisplayName=item.display_name or item.name,
+                tableDescription=item.description,
+                domain=item.domain,
+                layer=item.layer,
+                source="dap_catalog",
+                retrievalSource=item.retrieval_source,
+                matchEvidence=item.match_evidence,
+                matchReason="检索候选表和稳定 ID 已由当前 DAP 目录校验。",
+            )
+        if item.asset_type in {"report", "indicator", "api"} and item.field_id is None:
+            return AiAskCandidate(
+                assetId=item.asset_id,
+                assetType=item.asset_type,
+                name=item.name,
+                displayName=item.display_name or item.name,
+                description=item.description,
+                domain=item.domain,
+                layer=item.layer,
+                source="dap_catalog",
+                retrievalSource=item.retrieval_source,
+                matchEvidence=item.match_evidence,
+                matchReason=f"检索候选{item.asset_type}及其类型化稳定 ID 已由当前 DAP 目录核实。",
+            )
+        raise ValueError("unsupported candidate identity")
 
     @staticmethod
     def _validate_claims(
@@ -209,13 +233,14 @@ class AIAskService:
         candidates: list[AiAskCandidate],
     ) -> list[tuple[AiAskCandidate, str]]:
         candidate_by_id = {
-            (candidate.asset_id, candidate.field_id): candidate
+            (candidate.asset_type, candidate.asset_id, candidate.field_id): candidate
             for candidate in candidates
         }
-        selected: OrderedDict[tuple[int, int | None], tuple[AiAskCandidate, str]] = OrderedDict()
-        seen: set[tuple[int, int | None]] = set()
+        selected: OrderedDict[tuple[str, int | str, int | None], tuple[AiAskCandidate, str]] = OrderedDict()
+        seen: set[tuple[str, int | str, int | None]] = set()
         for claim in generated.claims:
-            identity = (claim.asset_id, claim.field_id)
+            asset_type = claim.asset_type or ("field" if claim.field_id is not None else "table")
+            identity = (asset_type, claim.asset_id, claim.field_id)
             candidate = candidate_by_id.get(identity)
             if candidate is None:
                 raise ValueError("model selected an unknown candidate identity")
@@ -241,9 +266,26 @@ class AIAskService:
         *,
         include_descriptions: bool,
     ) -> list[str]:
+        typed = [
+            candidate for candidate, relation in selected
+            if relation == relevance and candidate.asset_type not in {"table", "field"}
+        ]
+        lines: list[str] = []
+        type_labels = {"report": "报表", "indicator": "指标", "api": "API"}
+        for candidate in typed:
+            display = cls._clean_metadata_text(candidate.display_name or candidate.name, limit=256)
+            stable_id = cls._clean_metadata_text(str(candidate.asset_id), limit=128)
+            label = display if display == stable_id else f"{display}（{stable_id}）"
+            line = f"- {type_labels[candidate.asset_type]}：{label}"
+            if candidate.domain:
+                line += f"；主题域/所属范围：{cls._clean_metadata_text(candidate.domain, limit=256)}"
+            if candidate.description:
+                line += f"；目录信息：{cls._clean_metadata_text(candidate.description, limit=700)}"
+            lines.append(line)
+
         groups: OrderedDict[int, dict[str, Any]] = OrderedDict()
         for candidate, relation in selected:
-            if relation != relevance:
+            if relation != relevance or candidate.asset_type not in {"table", "field"}:
                 continue
             group = groups.setdefault(
                 candidate.asset_id,
@@ -260,7 +302,6 @@ class AIAskService:
                 continue
             group["fields"].append(candidate)
 
-        lines: list[str] = []
         for group in groups.values():
             table_name = cls._clean_metadata_text(group["table_name"], limit=256)
             table_display = cls._clean_metadata_text(group["table_display_name"], limit=256)
@@ -298,10 +339,11 @@ class AIAskService:
         related = [item for item in selected if item[1] == "related"]
         list_answer = is_list_query or question_type == "asset_list"
 
-        if question_type == "field_explanation":
+        has_field_evidence = any(candidate.asset_type == "field" for candidate, _ in selected)
+        if question_type == "field_explanation" and has_field_evidence:
             opening = "根据当前 DAP 目录元数据，字段信息如下："
         elif list_answer:
-            opening = "本次检索确认的部分资产（字段按所属表归组）："
+            opening = "本次检索确认的部分资产（表字段按所属表归组）："
         elif direct:
             opening = "根据当前 DAP 目录，以下资产可直接支持回答："
         else:
@@ -572,7 +614,9 @@ class AIAskService:
         progress.start("counting")
         try:
             recommendations = list(retrieval.recommendations)
-            table_ids = {item.asset_id for item in recommendations}
+            table_ids = {
+                item.asset_id for item in recommendations if item.asset_type == "table"
+            }
             field_ids = {
                 (item.asset_id, item.field_id)
                 for item in recommendations
@@ -601,7 +645,19 @@ class AIAskService:
             user_payload = {
                 "query": query,
                 "scope": request.scope,
-                "candidates": [item.model_dump(by_alias=True) for item in candidates],
+                "candidates": [
+                    item.model_dump(
+                        by_alias=True,
+                        exclude={
+                            "source",
+                            "retrieval_source",
+                            "match_evidence",
+                            "match_reason",
+                            "relevance",
+                        },
+                    )
+                    for item in candidates
+                ],
             }
         except Exception:
             progress.fail("organizing", "invalid_response")
@@ -732,6 +788,7 @@ class AIAskService:
         citations = [
             AiAskCitation(
                 assetId=candidate.asset_id,
+                assetType=candidate.asset_type,
                 fieldId=candidate.field_id,
                 source="dap_catalog",
             )
@@ -741,7 +798,12 @@ class AIAskService:
 
         list_answer = is_list_query or generated.question_type == "asset_list"
         has_direct = any(relevance == "direct" for _, relevance in selected)
-        is_partial = list_answer or retrieval_status == "degraded" or not has_direct
+        is_partial = (
+            list_answer
+            or retrieval_status == "degraded"
+            or bool(getattr(retrieval, "results_truncated", False))
+            or not has_direct
+        )
         answer = self._render_answer(
             selected,
             question_type=generated.question_type,
@@ -756,7 +818,11 @@ class AIAskService:
             reason_code="partial_results" if is_partial else None,
             candidates=selected_candidates,
             citations=citations,
-            results_truncated=list_answer or retrieval_status == "degraded",
+            results_truncated=(
+                list_answer
+                or retrieval_status == "degraded"
+                or bool(getattr(retrieval, "results_truncated", False))
+            ),
             completed=True,
         )
 
@@ -969,15 +1035,44 @@ class AIAskService:
             return self._metadata_count_unavailable(respond=respond)
 
 
-# The global runtime composes the existing HTTP RAG adapter, current authoritative
-# asset catalog service, and optional provider. Neither a model nor an index is
-# loaded into the DAP process.
-from .assets_service import assets_service
+# The global runtime composes the mode-aware adapter with the existing DAP
+# search/metadata services. Local calls the in-process SearchProvider; External
+# keeps the established HTTP-only RAG implementation and contract.
 from .rag_search_service import rag_search_service
+from .search_provider import search_provider
+from .system_management_service import system_management_service
+from .retrieval_provider import LocalSearchProvider, ModeAwareRetrievalProvider
+from .assets_service import assets_service
 from .report_service import report_service
+from .indicator_service import indicator_service
+from .api_asset_service import api_asset_service
+from ..fastapi.public_catalog import (
+    project_public_catalog_value,
+    redact_public_api_asset,
+    redact_public_report,
+)
 
+local_retrieval_provider = LocalSearchProvider(
+    search_provider=search_provider,
+    candidate_catalog_loader=rag_search_service.load_candidate_catalog,
+    detail_loaders={
+        "report": report_service.get_report_detail,
+        "indicator": indicator_service.get_indicator_detail,
+        "api": api_asset_service.get_asset,
+    },
+    detail_projectors={
+        "report": lambda value, profile: redact_public_report(value, profile=profile),
+        "indicator": lambda value, profile: project_public_catalog_value(value, profile=profile),
+        "api": lambda value, profile: redact_public_api_asset(value, profile=profile),
+    },
+)
+ai_retrieval_provider = ModeAwareRetrievalProvider(
+    local_provider=local_retrieval_provider,
+    external_provider=rag_search_service,
+    config_getter=system_management_service.get_rag_search_config,
+)
 ai_ask_service = AIAskService(
-    rag_service=rag_search_service,
+    rag_service=ai_retrieval_provider,
     llm_provider=OpenAICompatibleLLMProvider(),
     assets_service=assets_service,
     reports_service=report_service,

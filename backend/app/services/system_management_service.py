@@ -32,6 +32,7 @@ from ..contracts.rag_search import (
     RagSearchConfig,
     RagSearchConfigUpdate,
     RagSearchConfigView,
+    resolve_retrieval_mode,
 )
 from ..contracts.ai_llm_quota import (
     AI_LLM_DAILY_LIMIT_CODE,
@@ -1157,8 +1158,12 @@ class SystemManagementService(AuditActorMixin):
 
     def get_rag_search_config_public(self):
         """Return browser-safe config; never include the server-side token."""
+        config = self.get_rag_search_config()
+        retrieval_mode = resolve_retrieval_mode(config)
         payload = {
-            **self.get_rag_search_config(),
+            **config,
+            "retrievalMode": retrieval_mode,
+            "serviceUrl": config.get("serviceUrl", "") if retrieval_mode == "external" else "",
             "tokenConfigured": bool(get_rag_search_service_token()),
         }
         return RagSearchConfigView.model_validate(payload).model_dump(by_alias=True)
@@ -1177,10 +1182,35 @@ class SystemManagementService(AuditActorMixin):
                 for issue in errors
             ]
             raise SystemValidationError("RAG configuration validation failed", details or None) from None
-        if config.enabled and not get_rag_search_service_token():
-            raise SystemValidationError(
-                "启用 RAG 推荐前必须在后端部署 Secret 中配置 RAG_SEARCH_SERVICE_TOKEN"
-            )
+        before = self.get_rag_search_config()
+        supplied_fields = config.model_fields_set
+        effective_enabled = (
+            config.enabled if "enabled" in supplied_fields else bool(before.get("enabled"))
+        )
+        explicit_mode = "retrieval_mode" in supplied_fields
+        stored_mode = config.retrieval_mode if explicit_mode else before.get("retrievalMode")
+        effective_mode = (
+            stored_mode
+            if stored_mode in {"local", "external"}
+            else ("external" if effective_enabled else "local")
+        )
+        effective_service_url = (
+            config.service_url if "service_url" in supplied_fields
+            else str(before.get("serviceUrl") or "")
+        )
+        if effective_enabled and effective_mode == "external":
+            try:
+                RagSearchConfig.model_validate({
+                    "enabled": True,
+                    "retrievalMode": "external",
+                    "serviceUrl": effective_service_url,
+                })
+            except ValidationError:
+                raise SystemValidationError("启用 External 检索前必须配置有效的 RAG Service URL") from None
+            if not get_rag_search_service_token():
+                raise SystemValidationError(
+                    "启用 External 检索前必须在后端部署 Secret 中配置 RAG_SEARCH_SERVICE_TOKEN"
+                )
 
         rows = self._core_fetch(
             select(
@@ -1206,8 +1236,26 @@ class SystemManagementService(AuditActorMixin):
         ):
             raise SystemDataSourceError("RAG configuration storage is unavailable")
         item_id = int(rows[0]["item_id"])
-        before = self.get_rag_search_config()
         after = config.model_dump(by_alias=True)
+        aliases = {
+            "enabled": "enabled",
+            "retrieval_mode": "retrievalMode",
+            "service_url": "serviceUrl",
+            "strategy": "strategy",
+            "top_k": "topK",
+            "timeout_ms": "timeoutMs",
+        }
+        for field, alias in aliases.items():
+            if field in supplied_fields:
+                continue
+            if alias == "retrievalMode" and before.get(alias) is None:
+                after.pop(alias, None)
+            else:
+                after[alias] = before.get(alias, after.get(alias))
+        if explicit_mode or stored_mode is not None:
+            after["retrievalMode"] = stored_mode
+        else:
+            after.pop("retrievalMode", None)
         safe_fields = ("enabled", "strategy", "topK", "timeoutMs")
         with operation_log_service.audit(
             module_name="系统配置",
@@ -1231,10 +1279,12 @@ class SystemManagementService(AuditActorMixin):
             ])
             audit.before = {
                 **{key: before[key] for key in safe_fields},
+                "retrievalMode": resolve_retrieval_mode(before),
                 "serviceUrlConfigured": bool(before.get("serviceUrl")),
             }
             audit.after = {
                 **{key: after[key] for key in safe_fields},
+                "retrievalMode": effective_mode,
                 "serviceUrlConfigured": bool(after.get("serviceUrl")),
             }
         common_code_service.invalidate(["RAG_SEARCH_CONFIG"])

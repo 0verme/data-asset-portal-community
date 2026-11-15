@@ -11,7 +11,7 @@ import ipaddress
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
-from pydantic import ConfigDict, Field, field_validator, model_validator
+from pydantic import ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from .models import ContractModel
 
@@ -28,9 +28,13 @@ RagRecommendationReason = Literal[
     "model_mismatch",
     "invalid_response",
     "busy",
+    "partial_search_failure",
+    "results_truncated",
+    "candidate_not_found",
 ]
 RagSearchStrategy = Literal["keyword", "vector", "hybrid", "auto"]
-RemoteStableId = Annotated[int, Field(strict=True, gt=0)] | Annotated[str, Field(min_length=1, max_length=32)]
+RetrievalMode = Literal["local", "external"]
+RemoteStableId = Annotated[int, Field(strict=True, gt=0)] | Annotated[str, Field(strict=True, min_length=1, max_length=128)]
 RemoteLabel = Annotated[str, Field(max_length=128)]
 RemoteEvidenceTerm = Annotated[str, Field(max_length=256)]
 RagHttpSearchMode = Literal["keyword", "vector", "hybrid", "auto"]
@@ -41,9 +45,14 @@ class _RagContractModel(ContractModel):
 
 
 class RagSearchConfig(_RagContractModel):
-    """Non-secret administrator configuration persisted by DAP."""
+    """Non-secret administrator configuration persisted by DAP.
+
+    A missing retrieval mode is intentionally preserved for legacy-mode
+    inference; it is not eagerly defaulted in stored configuration.
+    """
 
     enabled: bool = False
+    retrieval_mode: RetrievalMode | None = Field(default=None, alias="retrievalMode")
     service_url: str = Field(default="", alias="serviceUrl", max_length=2048)
     strategy: RagSearchStrategy = "auto"
     top_k: int = Field(default=5, alias="topK", ge=1, le=20)
@@ -51,10 +60,12 @@ class RagSearchConfig(_RagContractModel):
 
     @field_validator("service_url")
     @classmethod
-    def validate_service_url(cls, value: str) -> str:
+    def validate_service_url(cls, value: str, info: ValidationInfo) -> str:
         value = value.strip()
-        if not value:
-            return ""
+        if not value or info.data.get("retrieval_mode") == "local":
+            # Preserve an unused legacy URL in Local mode without making Local
+            # depend on the External endpoint's syntax or availability.
+            return value
         try:
             parsed = urlsplit(value)
             hostname = parsed.hostname
@@ -84,8 +95,8 @@ class RagSearchConfig(_RagContractModel):
 
     @model_validator(mode="after")
     def validate_enabled_service(self) -> RagSearchConfig:
-        if self.enabled and not self.service_url:
-            raise ValueError("启用推荐前必须配置 RAG Service URL")
+        if self.enabled and self.retrieval_mode in {None, "external"} and not self.service_url:
+            raise ValueError("启用 External 检索前必须配置 RAG Service URL")
         return self
 
 
@@ -93,6 +104,7 @@ class RagSearchConfigView(_RagContractModel):
     """Browser-safe configuration; the service token is never serialized."""
 
     enabled: bool = False
+    retrieval_mode: RetrievalMode = Field(default="local", alias="retrievalMode")
     service_url: str = Field(default="", alias="serviceUrl")
     strategy: RagSearchStrategy = "auto"
     top_k: int = Field(default=5, alias="topK", ge=1, le=20)
@@ -165,28 +177,36 @@ class RagRelatedTable(_RagContractModel):
 
 
 class RagRecommendation(_RagContractModel):
-    """One table/field identity rebuilt from DAP's authoritative public catalog."""
+    """One typed, bounded asset identity rebuilt from authoritative DAP data."""
 
-    asset_id: int = Field(alias="assetId", gt=0)
+    asset_id: RemoteStableId = Field(alias="assetId")
     field_id: int | None = Field(default=None, alias="fieldId", gt=0)
-    asset_type: Literal["table", "field"] = Field(alias="assetType")
+    asset_type: Literal["table", "field", "report", "indicator", "api"] = Field(alias="assetType")
     name: str = Field(max_length=256)
     display_name: str = Field(default="", alias="displayName", max_length=256)
     description: str = Field(default="", max_length=2000)
     domain: str = Field(default="", max_length=256)
     layer: str = Field(default="", max_length=32)
     related_table: RagRelatedTable | None = Field(default=None, alias="relatedTable")
+    retrieval_source: Literal["local", "external"] = Field(default="external", alias="retrievalSource")
+    match_evidence: list[RemoteEvidenceTerm] = Field(default_factory=list, alias="matchEvidence", max_length=8)
     evidence: list[str] = Field(default_factory=list, max_length=4)
 
     @model_validator(mode="after")
     def validate_identity(self) -> RagRecommendation:
-        if self.asset_type == "field":
-            if self.field_id is None or self.related_table is None:
-                raise ValueError("字段推荐必须提供 fieldId 和 relatedTable")
-            if self.related_table.asset_id != self.asset_id:
-                raise ValueError("relatedTable.assetId 必须与字段父表 assetId 一致")
-        elif self.field_id is not None:
-            raise ValueError("表推荐不得包含 fieldId")
+        if self.asset_type in {"table", "field"}:
+            if isinstance(self.asset_id, bool) or not isinstance(self.asset_id, int):
+                raise ValueError("表/字段候选必须使用数字 assetId")
+            if self.asset_type == "field":
+                if self.field_id is None or self.related_table is None:
+                    raise ValueError("字段推荐必须提供 fieldId 和 relatedTable")
+                if self.related_table.asset_id != self.asset_id:
+                    raise ValueError("relatedTable.assetId 必须与字段父表 assetId 一致")
+            elif self.field_id is not None or self.related_table is not None:
+                raise ValueError("表推荐不得包含 fieldId 或 relatedTable")
+        else:
+            if not isinstance(self.asset_id, str) or self.field_id is not None or self.related_table is not None:
+                raise ValueError("报表/指标/API 候选必须使用类型化字符串 ID")
         return self
 
 
@@ -199,6 +219,7 @@ class RagRecommendationsResponse(_RagContractModel):
     count: int = Field(ge=0, le=20)
     elapsed_ms: float = Field(default=0, alias="elapsedMs", ge=0)
     reason_code: RagRecommendationReason | None = Field(default=None, alias="reasonCode")
+    results_truncated: bool = Field(default=False, alias="resultsTruncated")
 
     @model_validator(mode="after")
     def validate_response_state(self) -> RagRecommendationsResponse:
@@ -216,10 +237,28 @@ class RagRecommendationsResponse(_RagContractModel):
 DEFAULT_RAG_SEARCH_CONFIG = RagSearchConfig()
 
 
+def resolve_retrieval_mode(config: RagSearchConfig | dict) -> RetrievalMode:
+    """Resolve an explicit mode or infer legacy behavior without mutation."""
+    parsed = config if isinstance(config, RagSearchConfig) else RagSearchConfig.model_validate(config)
+    if parsed.retrieval_mode is not None:
+        return parsed.retrieval_mode
+    return "external" if parsed.enabled else "local"
+
+
 class RagSearchConfigUpdate(_RagContractModel):
     """Explicit admin update payload. Secrets are supplied by deployment only."""
 
     enabled: bool = False
+    retrieval_mode: RetrievalMode | None = Field(default=None, alias="retrievalMode")
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_null_explicit_retrieval_mode(cls, value):
+        if isinstance(value, dict) and any(
+            key in value and value[key] is None for key in ("retrievalMode", "retrieval_mode")
+        ):
+            raise ValueError("retrievalMode must be local or external when supplied")
+        return value
     service_url: str = Field(default="", alias="serviceUrl", max_length=2048)
     strategy: RagSearchStrategy = "auto"
     top_k: int = Field(default=5, alias="topK", ge=1, le=20)
@@ -236,6 +275,11 @@ class RagSearchConfigUpdate(_RagContractModel):
 
     @model_validator(mode="after")
     def validate_config(self) -> RagSearchConfigUpdate:
-        # Reuse URL validation and enabled-state requirements from the stored model.
-        RagSearchConfig.model_validate(self.model_dump(by_alias=True))
+        # Validate URL syntax here; enabled-mode requirements depend on the
+        # stored legacy configuration and are enforced by the update service.
+        payload = self.model_dump(by_alias=True)
+        payload["enabled"] = False
+        RagSearchConfig.model_validate(payload)
+        if self.enabled and self.retrieval_mode == "external" and not self.service_url:
+            raise ValueError("启用 External 检索前必须配置 RAG Service URL")
         return self

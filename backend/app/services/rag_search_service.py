@@ -364,6 +364,7 @@ class RagSearchService:
                         description=item["description"],
                         domain=item["domain"],
                         layer=item["layer"],
+                        retrievalSource="external",
                         evidence=["已通过当前共享目录校验"],
                     )
                 )
@@ -389,6 +390,7 @@ class RagSearchService:
                             domain=parent["domain"],
                             layer=parent["layer"],
                         ),
+                        retrievalSource="external",
                         evidence=["已通过当前共享目录校验"],
                     )
                 )

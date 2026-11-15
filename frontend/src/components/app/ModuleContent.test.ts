@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 const moduleContentPath = fileURLToPath(
   new URL("./ModuleContent.tsx", import.meta.url),
 );
+const navigationControllerPath = fileURLToPath(
+  new URL("../../hooks/useNavigationController.ts", import.meta.url),
+);
 
 test("business modules are lazy-loaded while the portal remains in the app shell", async () => {
   const source = await readFile(moduleContentPath, "utf8");
@@ -45,10 +48,19 @@ test("module dispatch uses registry map instead of long switch chain", async () 
   assert.match(source, /MODULE_RENDERERS\[module\]/);
 });
 
-test("asset search results keep canonical assetId navigation", async () => {
-  const source = await readFile(moduleContentPath, "utf8");
+test("asset search results keep stable table IDs and open typed citations on their detail routes", async () => {
+  const [source, navigation] = await Promise.all([
+    readFile(moduleContentPath, "utf8"),
+    readFile(navigationControllerPath, "utf8"),
+  ]);
 
   assert.match(source, /if \("assetId" in target && target\.assetId != null\)/);
   assert.match(source, /navigationTarget\.assetId = assetId;/);
   assert.match(source, /navigationTarget\.assetName = target\.ref;/);
+  assert.match(source, /navigationTarget\.reportRoute = \{ page: "view", code: target\.ref \}/);
+  assert.match(source, /navigationTarget\.indicatorRoute = \{ page: "view", id: target\.ref \}/);
+  assert.match(source, /navigationTarget\.apiAssetRoute = \{ page: "view", code: target\.ref \}/);
+  assert.match(navigation, /next\.indicatorRoute = pushTarget\?\.indicatorRoute \|\| DEFAULT_INDICATOR_ROUTE/);
+  assert.match(navigation, /next\.reportRoute = pushTarget\?\.reportRoute \|\| DEFAULT_REPORT_ROUTE/);
+  assert.match(navigation, /next\.apiAssetRoute = pushTarget\?\.apiAssetRoute \|\| DEFAULT_API_ASSET_ROUTE/);
 });

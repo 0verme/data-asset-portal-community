@@ -1,7 +1,11 @@
 import type { AiAskCandidate, AiAskCitation } from "../api/aiAsk.ts";
 
-function citationIdentity(assetId: number, fieldId: number | null | undefined): string {
-  return `${assetId}:${fieldId ?? "table"}`;
+function citationIdentity(
+  assetType: AiAskCandidate["assetType"],
+  assetId: AiAskCandidate["assetId"],
+  fieldId: number | null | undefined,
+): string {
+  return `${assetType}:${typeof assetId}:${assetId}:${fieldId ?? "none"}`;
 }
 
 /**
@@ -15,10 +19,10 @@ export function selectVerifiedCitedCandidates(
   const cited = new Set(
     citations
       .filter((citation) => citation.source === "dap_catalog")
-      .map((citation) => citationIdentity(citation.assetId, citation.fieldId)),
+      .map((citation) => citationIdentity(citation.assetType, citation.assetId, citation.fieldId)),
   );
   return candidates.filter((candidate) =>
     candidate.source === "dap_catalog"
-    && cited.has(citationIdentity(candidate.assetId, candidate.fieldId)),
+    && cited.has(citationIdentity(candidate.assetType, candidate.assetId, candidate.fieldId)),
   );
 }

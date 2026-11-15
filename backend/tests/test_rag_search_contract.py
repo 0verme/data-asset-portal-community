@@ -14,6 +14,7 @@ from backend.app.contracts.rag_search import (
     RagSearchConfig,
     RagSearchConfigUpdate,
     RagSearchConfigView,
+    resolve_retrieval_mode,
 )
 
 
@@ -36,6 +37,37 @@ class RagRecommendationsContractTests(unittest.TestCase):
         self.assertEqual("http://localhost", local.service_url)
         self.assertEqual("http://127.0.0.1", local_ip.service_url)
         self.assertEqual("https://rag.example.invalid", remote.service_url)
+
+    def test_retrieval_mode_precedence_and_local_needs_no_external_url(self):
+        local = RagSearchConfig(enabled=True, retrievalMode="local")
+        local_with_stale_url = RagSearchConfig(
+            enabled=True,
+            retrievalMode="local",
+            serviceUrl="http://stale-external.example.invalid/path",
+        )
+        legacy_external = RagSearchConfig(
+            enabled=True, serviceUrl="https://rag.example.invalid"
+        )
+        legacy_local = RagSearchConfig(enabled=False)
+
+        self.assertEqual("local", resolve_retrieval_mode(local))
+        self.assertEqual("local", resolve_retrieval_mode(local_with_stale_url))
+        self.assertEqual("external", resolve_retrieval_mode(legacy_external))
+        self.assertEqual("local", resolve_retrieval_mode(legacy_local))
+        self.assertEqual(
+            "local",
+            resolve_retrieval_mode({
+                "enabled": True,
+                "retrievalMode": "local",
+            }),
+        )
+        with self.assertRaises(ValidationError):
+            RagSearchConfig(enabled=True, retrievalMode="external")
+        local_update = RagSearchConfigUpdate.model_validate({
+            "enabled": True,
+            "retrievalMode": "local",
+        })
+        self.assertEqual("local", local_update.retrieval_mode)
 
     def test_url_rejects_remote_http_credentials_query_and_path(self):
         credentials = ":".join(("demo-user", "demo-pass"))

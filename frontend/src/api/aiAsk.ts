@@ -17,25 +17,34 @@ export interface AiAskAvailability {
   enabled: boolean;
 }
 
+export type AiAskAssetType = "table" | "field" | "report" | "indicator" | "api";
+export type AiAskAssetId = number | string;
+
 export interface AiAskCandidate {
-  assetId: number;
+  assetId: AiAskAssetId;
   fieldId?: number | null;
-  assetType: "table" | "field";
-  tableName: string;
-  tableDisplayName: string;
-  tableDescription: string;
+  assetType: AiAskAssetType;
+  name: string;
+  displayName: string;
+  description: string;
+  tableName?: string | null;
+  tableDisplayName?: string;
+  tableDescription?: string;
   fieldName?: string | null;
   fieldDisplayName?: string | null;
   fieldDescription?: string | null;
   domain: string;
   layer: string;
   source: "dap_catalog";
+  retrievalSource?: "local" | "external";
+  matchEvidence?: string[];
   matchReason: string;
   relevance: "direct" | "related";
 }
 
 export interface AiAskCitation {
-  assetId: number;
+  assetId: AiAskAssetId;
+  assetType: AiAskAssetType;
   fieldId?: number | null;
   source: "dap_catalog";
 }
@@ -146,12 +155,27 @@ function isStableId(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) > 0;
 }
 
+export function containsControlCharacters(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
+function isStableTypedId(value: unknown): value is string {
+  return typeof value === "string"
+    && value.trim().length > 0
+    && value.length <= 128
+    && !containsControlCharacters(value);
+}
+
 function isText(value: unknown): value is string {
   return typeof value === "string";
 }
 
-function citationKey(assetId: number, fieldId?: number | null): string {
-  return `${assetId}:${fieldId ?? "table"}`;
+function citationKey(assetType: AiAskAssetType, assetId: AiAskAssetId, fieldId?: number | null): string {
+  return `${assetType}:${typeof assetId}:${assetId}:${fieldId ?? "none"}`;
 }
 
 function parseStatisticalResult(value: unknown): AiAskStatisticalResult | null {
@@ -279,53 +303,93 @@ function parseCandidate(value: unknown): AiAskCandidate {
   const fieldId = value["fieldId"];
   const assetType = value["assetType"];
   const relevance = value["relevance"];
+  const retrievalSource = value["retrievalSource"];
+  const rawMatchEvidence = value["matchEvidence"];
   const optionalFieldId = fieldId === undefined ? null : fieldId;
+  const validType = assetType === "table" || assetType === "field"
+    || assetType === "report" || assetType === "indicator" || assetType === "api";
+  const isTableOrField = assetType === "table" || assetType === "field";
   if (
-    !isStableId(assetId)
+    !validType
+    || (isTableOrField ? !isStableId(assetId) : !isStableTypedId(assetId))
     || (optionalFieldId !== null && !isStableId(optionalFieldId))
-    || (assetType !== "table" && assetType !== "field")
-    || !isText(value["tableName"])
-    || !value["tableName"].trim()
-    || !isText(value["tableDisplayName"])
-    || !isText(value["tableDescription"])
     || !isText(value["domain"])
     || !isText(value["layer"])
     || value["source"] !== "dap_catalog"
+    || (retrievalSource !== undefined && retrievalSource !== "local" && retrievalSource !== "external")
+    || (rawMatchEvidence !== undefined && (
+      !Array.isArray(rawMatchEvidence)
+      || rawMatchEvidence.length > 8
+      || rawMatchEvidence.some((item) => !isText(item) || item.length > 256)
+    ))
     || (relevance !== "direct" && relevance !== "related")
     || !isText(value["matchReason"])
     || !value["matchReason"].trim()
   ) {
     throw new Error("Invalid AI ask candidate.");
   }
-  if (assetType === "field") {
-    if (
-      !isStableId(optionalFieldId)
-      || !isText(value["fieldName"])
-      || !value["fieldName"].trim()
-      || !isText(value["fieldDisplayName"])
-      || !isText(value["fieldDescription"])
-    ) {
-      throw new Error("Invalid AI ask field candidate.");
+  let name: string;
+  let displayName: string;
+  let description: string;
+  if (isTableOrField) {
+    if (!isText(value["tableName"]) || !value["tableName"].trim()
+      || !isText(value["tableDisplayName"]) || !isText(value["tableDescription"])) {
+      throw new Error("Invalid AI ask table identity.");
     }
-  } else if (
-    optionalFieldId !== null
-    || (value["fieldName"] !== undefined && value["fieldName"] !== null)
-  ) {
-    throw new Error("Invalid AI ask table candidate.");
+    if (assetType === "field") {
+      if (
+        !isStableId(optionalFieldId)
+        || !isText(value["fieldName"])
+        || !value["fieldName"].trim()
+        || !isText(value["fieldDisplayName"])
+        || !isText(value["fieldDescription"])
+      ) {
+        throw new Error("Invalid AI ask field candidate.");
+      }
+      name = isText(value["name"]) ? value["name"] : value["fieldName"];
+      displayName = isText(value["displayName"]) ? value["displayName"] : value["fieldDisplayName"];
+      description = isText(value["description"]) ? value["description"] : value["fieldDescription"];
+    } else {
+      if (optionalFieldId !== null || (value["fieldName"] !== undefined && value["fieldName"] !== null)) {
+        throw new Error("Invalid AI ask table candidate.");
+      }
+      name = isText(value["name"]) ? value["name"] : value["tableName"];
+      displayName = isText(value["displayName"]) ? value["displayName"] : value["tableDisplayName"];
+      description = isText(value["description"]) ? value["description"] : value["tableDescription"];
+    }
+  } else {
+    if (
+      optionalFieldId !== null
+      || !isText(value["name"]) || !value["name"].trim()
+      || !isText(value["displayName"]) || !value["displayName"].trim()
+      || !isText(value["description"])
+      || (value["tableName"] !== undefined && value["tableName"] !== null)
+      || (value["fieldName"] !== undefined && value["fieldName"] !== null)
+    ) {
+      throw new Error("Invalid typed AI ask candidate.");
+    }
+    name = value["name"];
+    displayName = value["displayName"];
+    description = value["description"];
   }
   return {
-    assetId,
-    fieldId: optionalFieldId,
-    assetType,
-    tableName: value["tableName"],
-    tableDisplayName: value["tableDisplayName"],
-    tableDescription: value["tableDescription"],
+    assetId: assetId as AiAskAssetId,
+    fieldId: optionalFieldId as number | null,
+    assetType: assetType as AiAskAssetType,
+    name,
+    displayName,
+    description,
+    tableName: isText(value["tableName"]) ? value["tableName"] : null,
+    tableDisplayName: isText(value["tableDisplayName"]) ? value["tableDisplayName"] : "",
+    tableDescription: isText(value["tableDescription"]) ? value["tableDescription"] : "",
     fieldName: isText(value["fieldName"]) ? value["fieldName"] : null,
     fieldDisplayName: isText(value["fieldDisplayName"]) ? value["fieldDisplayName"] : null,
     fieldDescription: isText(value["fieldDescription"]) ? value["fieldDescription"] : null,
     domain: value["domain"],
     layer: value["layer"],
     source: "dap_catalog",
+    ...(retrievalSource === undefined ? {} : { retrievalSource }),
+    ...(rawMatchEvidence === undefined ? {} : { matchEvidence: rawMatchEvidence as string[] }),
     matchReason: value["matchReason"],
     relevance,
   };
@@ -386,22 +450,35 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     throw new Error("Invalid AI ask response.");
   }
   const candidates = rawCandidates.map(parseCandidate);
-  const candidateIds = new Set(candidates.map((item) => citationKey(item.assetId, item.fieldId)));
+  const candidateIds = new Set(candidates.map((item) => citationKey(item.assetType, item.assetId, item.fieldId)));
   const citations = rawCitations.map((citation): AiAskCitation => {
     if (!isRecord(citation)) throw new Error("Invalid AI ask citation.");
     const assetId = citation["assetId"];
     const fieldId = citation["fieldId"] === undefined ? null : citation["fieldId"];
+    const assetType = citation["assetType"] ?? (
+      typeof assetId === "string" ? undefined : fieldId === null ? "table" : "field"
+    );
+    const validType = assetType === "table" || assetType === "field"
+      || assetType === "report" || assetType === "indicator" || assetType === "api";
+    const isTableOrField = assetType === "table" || assetType === "field";
     if (
-      !isStableId(assetId)
+      !validType
+      || (isTableOrField ? !isStableId(assetId) : !isStableTypedId(assetId))
       || (fieldId !== null && !isStableId(fieldId))
+      || (assetType === "field" ? fieldId === null : fieldId !== null)
       || citation["source"] !== "dap_catalog"
-      || !candidateIds.has(citationKey(assetId, fieldId as number | null))
+      || !candidateIds.has(citationKey(assetType as AiAskAssetType, assetId as AiAskAssetId, fieldId as number | null))
     ) {
       throw new Error("Invalid AI ask citation.");
     }
-    return { assetId, fieldId: fieldId as number | null, source: "dap_catalog" };
+    return {
+      assetId: assetId as AiAskAssetId,
+      assetType: assetType as AiAskAssetType,
+      fieldId: fieldId as number | null,
+      source: "dap_catalog",
+    };
   });
-  const citationIds = citations.map((item) => citationKey(item.assetId, item.fieldId));
+  const citationIds = citations.map((item) => citationKey(item.assetType, item.assetId, item.fieldId));
   if (new Set(citationIds).size !== citationIds.length) {
     throw new Error("Duplicate AI ask citation.");
   }
@@ -435,7 +512,7 @@ export function parseAiAskResponse(value: unknown): AiAskResponse {
     throw new Error("Unanswered AI response must not contain answer candidates or citations.");
   }
   if (citations.length || candidates.length) {
-    const citationIds = new Set(citations.map((item) => citationKey(item.assetId, item.fieldId)));
+    const citationIds = new Set(citations.map((item) => citationKey(item.assetType, item.assetId, item.fieldId)));
     if (
       candidateIds.size !== candidates.length
       || candidateIds.size !== citationIds.size

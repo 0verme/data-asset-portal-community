@@ -113,7 +113,7 @@ class AiAskApiTests(unittest.TestCase):
         self.assertNotIn("apiKey", status.json())
         self.assertEqual(200, response.status_code)
         self.assertEqual("answered", response.json()["status"])
-        self.assertEqual({"assetId": 7, "fieldId": 11, "source": "dap_catalog"}, response.json()["citations"][0])
+        self.assertEqual({"assetId": 7, "assetType": "field", "fieldId": 11, "source": "dap_catalog"}, response.json()["citations"][0])
         request, profile = service.calls[0]
         self.assertEqual("贷款余额在哪个表？", request.query)
         self.assertEqual(4, request.top_k)
