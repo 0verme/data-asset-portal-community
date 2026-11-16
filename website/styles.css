@@ -1731,3 +1731,8 @@ a.entry-link:hover .entry-url {
     font-size: 16px;
   }
 }
+
+.deployment-section .code-block code {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
