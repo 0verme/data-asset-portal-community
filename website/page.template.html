@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="{{@seo.htmlLang}}" data-palette="purple">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="{{@seo.description}}">
+    <title>{{seo.title}}</title>
+    <link rel="canonical" href="{{@seo.canonical}}">
+    <meta property="og:title" content="{{@seo.title}}">
+    <meta property="og:description" content="{{@seo.description}}">
+    <meta property="og:url" content="{{@seo.ogUrl}}">
+    <meta property="og:image" content="https://dap.overme.cn/assets/media/01-asset-search.jpg">
+    <meta property="og:image:alt" content="{{@seo.ogImageAlt}}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{@site.assetPrefix}}styles.css">
+    <script src="{{@site.assetPrefix}}app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">{{skip.label}}</a>
+    <header class="site-header" id="top">
+      <div class="container header-inner">
+        <a class="brand" href="#top" aria-label="{{@brand.homeLabel}}">
+          <span class="brand-mark" aria-hidden="true">DAP</span>
+          <span class="brand-name">{{brand.name}}</span>
+        </a>
+        <nav class="primary-nav" aria-label="{{@nav.label}}">
+          <a href="https://github.com/0verme/data-asset-portal-community/tree/main/docs">{{nav.docs}}</a>
+          <a href="https://github.com/0verme/data-asset-portal-community">{{entry.githubLabel}}</a>
+          <a href="https://data.overme.cn/">{{nav.demo}}</a>
+        </nav>
+        <div class="language-switch" aria-label="{{@language.label}}">
+          <span aria-current="page">{{language.current}}</span>
+          <button type="button" disabled aria-label="{{@language.englishDisabled}}">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero container" aria-labelledby="hero-title">
+        <div class="hero-intro">
+          <div class="hero-copy">
+            <p class="eyebrow"><span class="eyebrow-rule" aria-hidden="true"></span>{{hero.eyebrow}}</p>
+            <h1 id="hero-title">
+              <span>{{hero.title.line1}}</span>
+              <span>{{hero.title.line2}}</span>
+              <span class="accent-text">{{hero.title.line3}}</span>
+            </h1>
+            <p class="hero-description">{{hero.description.lead}}<strong>{{hero.description.emphasis}}</strong></p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="https://data.overme.cn/">{{hero.action.demo}}</a>
+              <a class="button button-secondary" href="https://github.com/0verme/data-asset-portal-community">{{hero.action.github}}</a>
+            </div>
+          </div>
+
+          <aside class="spec-panel" aria-labelledby="spec-title">
+            <h2 id="spec-title" class="spec-heading">{{spec.title}}</h2>
+            <dl class="spec-list">
+              <div class="spec-item">
+                <dt>{{spec.license}}</dt>
+                <dd>Apache-2.0</dd>
+              </div>
+              <div class="spec-item">
+                <dt>{{spec.deployment}}</dt>
+                <dd>{{spec.deployment.value}}</dd>
+              </div>
+              <div class="spec-item">
+                <dt>{{spec.dependencies}}</dt>
+                <dd class="tag-list"><span>{{spec.dependency.messaging}}</span><span>{{spec.dependency.search}}</span></dd>
+              </div>
+              <div class="spec-item">
+                <dt>Verified</dt>
+                <dd class="database-list"><span>PostgreSQL</span><span>MySQL 8.0</span><span>SQLite</span></dd>
+              </div>
+              <div class="spec-item">
+                <dt>{{spec.version}}</dt>
+                <dd>v0.2.5</dd>
+              </div>
+            </dl>
+          </aside>
+        </div>
+
+        <dap-recording name="asset-search" class="hero-recording"></dap-recording>
+      </section>
+
+      <section class="section container current-section" id="current" aria-labelledby="current-title">
+        <div class="section-lead">
+          <p class="section-index">{{current.index}}</p>
+          <h2 id="current-title">{{current.title}}</h2>
+          <p class="draft-label">{{current.draft}}</p>
+        </div>
+        <ol class="pain-list">
+          <li><span class="list-number">1</span><p><strong>{{current.pain1.lead}}</strong>{{current.pain1.body}}</p></li>
+          <li><span class="list-number">2</span><p><strong>{{current.pain2.lead}}</strong>{{current.pain2.body}}</p></li>
+          <li><span class="list-number">3</span><p><strong>{{current.pain3.lead}}</strong>{{current.pain3.body}}</p></li>
+          <li><span class="list-number">4</span><p><strong>{{current.pain4.lead}}</strong>{{current.pain4.body}}</p></li>
+        </ol>
+      </section>
+
+      <section class="tinted-section" id="ask" aria-labelledby="ask-title">
+        <div class="container section ask-section">
+          <div class="ask-intro">
+            <div class="ask-copy">
+              <p class="section-index">{{ask.index}}</p>
+              <h2 id="ask-title">{{ask.title.line1}}<br>{{ask.title.line2}}</h2>
+              <p class="section-description">{{ask.description}}</p>
+              <ul class="principle-list">
+                <li>{{ask.principle.steps}}</li>
+                <li>{{ask.principle.reasoning}}</li>
+                <li>{{ask.principle.optional}}</li>
+              </ul>
+            </div>
+            <dap-recording name="ai-rag"></dap-recording>
+          </div>
+
+          <div class="evidence-grid">
+            <article class="sample-panel" aria-labelledby="evidence-title">
+              <div class="panel-heading">
+                <div>
+                  <h3 id="evidence-title">{{ask.evidence.title}}</h3>
+                  <p>{{ask.evidence.subtitle}}</p>
+                </div>
+                <span class="sample-label">{{sample.label}}</span>
+              </div>
+              <ol class="evidence-steps">
+                <li class="evidence-step">
+                  <span class="step-index">{{ask.evidence.step1}}</span>
+                  <p class="question-sample">{{ask.evidence.question}}</p>
+                  <p class="secondary-label">{{ask.evidence.keywords}}</p>
+                  <div class="keyword-list"><code>{{ask.keyword.users}}</code><code>{{ask.keyword.days}}</code><code>{{ask.keyword.definition}}</code></div>
+                </li>
+                <li class="evidence-step">
+                  <span class="step-index">{{ask.evidence.step2}}</span>
+                  <div class="round-list">
+                    <p><b>R1</b><code>exact</code><span>{{ask.evidence.round1}}</span></p>
+                    <p><b>R2</b><code>keyword</code><span>{{ask.evidence.round2}}</span></p>
+                    <p><b>R3</b><code>hybrid</code><span>{{ask.evidence.round3}}</span></p>
+                  </div>
+                </li>
+                <li class="evidence-step">
+                  <span class="step-index">{{ask.evidence.step3}}</span>
+                  <dl class="asset-list">
+                    <div><dt>{{ask.asset.metric}}</dt><dd><code>order_user_cnt_30d</code></dd></div>
+                    <div><dt>{{ask.asset.table}}</dt><dd><code>dws.trade_user_stat_d</code></dd></div>
+                    <div><dt>{{ask.asset.field}}</dt><dd><code>dws.trade_user_stat_d.order_user_cnt</code></dd></div>
+                  </dl>
+                </li>
+                <li class="evidence-step">
+                  <span class="step-index">{{ask.evidence.step4}}</span>
+                  <dl class="asset-list evidence-sources">
+                    <div><dt>{{ask.evidence.metricDefinition}}</dt><dd><code>order_user_cnt_30d</code></dd></div>
+                    <div><dt>{{ask.evidence.fieldComment}}</dt><dd><code>order_user_cnt</code></dd></div>
+                    <div><dt>{{ask.evidence.lineagePrefix}} <span class="placeholder">{{placeholder.date}}</span>）</dt><dd><code>dwd.trade_order_d → dws.trade_user_stat_d</code></dd></div>
+                  </dl>
+                </li>
+              </ol>
+              <p class="sample-note">{{ask.evidence.note.lead}} <span class="placeholder">{{placeholder.verify}}</span>{{ask.evidence.note.tail}}</p>
+            </article>
+
+            <article class="code-panel" aria-labelledby="api-title">
+              <div class="panel-heading">
+                <div>
+                  <h3 id="api-title">{{ask.api.title}}</h3>
+                </div>
+                <span class="sample-label">{{sample.label}}</span>
+              </div>
+              <pre class="code-block"><code>{
+  "question": "{{ask.api.question}}",
+  "rounds": [
+    { "n": 1, "mode": "exact",   "query": "{{ask.api.query.users}}",        "hits": 1 },
+    { "n": 2, "mode": "keyword", "query": "{{ask.api.query.usersDays}}",     "hits": 3 },
+    { "n": 3, "mode": "hybrid",  "query": "{{ask.api.query.deduplicated}}", "hits": 1 }
+  ],
+  "assets": [
+    { "type": "metric", "id": "order_user_cnt_30d" },
+    { "type": "table",  "id": "dws.trade_user_stat_d" },
+    { "type": "field",  "id": "dws.trade_user_stat_d.order_user_cnt" }
+  ],
+  "evidence": [
+    { "asset": "order_user_cnt_30d", "source": "metric_definition",
+      "text": "{{ask.api.evidence.metricText}}" },
+    { "asset": "dws.trade_user_stat_d.order_user_cnt", "source": "field_comment" },
+    { "asset": "dws.trade_user_stat_d", "source": "lineage_snapshot",
+      "path": "dwd.trade_order_d -> dws.trade_user_stat_d",
+      "imported_at": "<span class=\"placeholder\">{{placeholder.date}}</span>" }
+  ]
+}</code></pre>
+              <div class="api-explainer">
+                <h4>{{ask.api.explainer.title}}</h4>
+                <p>{{ask.api.explainer.body}}</p>
+                <p class="api-path">{{ask.api.pathLabel}}<span class="placeholder">{{placeholder.pending}}</span></p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section container readiness-section" id="readiness" aria-labelledby="readiness-title">
+        <div class="readiness-intro">
+          <div class="readiness-copy">
+            <p class="section-index">{{readiness.index}}</p>
+            <h2 id="readiness-title">{{readiness.title.line1}}<br>{{readiness.title.line2}}</h2>
+            <p class="section-description">{{readiness.description}}</p>
+            <dap-recording name="readiness"></dap-recording>
+          </div>
+          <div class="readiness-panel">
+            <div class="panel-heading">
+              <h3>{{readiness.panel.title}}</h3>
+              <span class="sample-label">{{sample.label}}</span>
+            </div>
+            <ul class="readiness-list">
+              <li class="readiness-row">
+                <div class="readiness-meta"><span id="ready-table">{{readiness.assetTables}}</span><span>82%</span></div>
+                <div class="readiness-track" role="progressbar" aria-labelledby="ready-table" aria-valuemin="0" aria-valuemax="100" aria-valuenow="82" aria-valuetext="{{@readiness.assetTables.aria}}"><span style="width: 82%"></span></div>
+                <p>{{readiness.assetTables.rule}}</p>
+              </li>
+              <li class="readiness-row">
+                <div class="readiness-meta"><span id="ready-field">{{readiness.fieldMeaning}}</span><span>64%</span></div>
+                <div class="readiness-track" role="progressbar" aria-labelledby="ready-field" aria-valuemin="0" aria-valuemax="100" aria-valuenow="64" aria-valuetext="{{@readiness.fieldMeaning.aria}}"><span style="width: 64%"></span></div>
+                <p>{{readiness.fieldMeaning.rule}}</p>
+              </li>
+              <li class="readiness-row">
+                <div class="readiness-meta"><span id="ready-metric">{{readiness.metricDefinition}}</span><span>71%</span></div>
+                <div class="readiness-track" role="progressbar" aria-labelledby="ready-metric" aria-valuemin="0" aria-valuemax="100" aria-valuenow="71" aria-valuetext="{{@readiness.metricDefinition.aria}}"><span style="width: 71%"></span></div>
+                <p>{{readiness.metricDefinition.rule}}</p>
+              </li>
+              <li class="readiness-row">
+                <div class="readiness-meta"><span id="ready-code">{{readiness.codeValues}}</span><span>90%</span></div>
+                <div class="readiness-track" role="progressbar" aria-labelledby="ready-code" aria-valuemin="0" aria-valuemax="100" aria-valuenow="90" aria-valuetext="{{@readiness.codeValues.aria}}"><span style="width: 90%"></span></div>
+                <p>{{readiness.codeValues.rule}}</p>
+              </li>
+              <li class="readiness-row">
+                <div class="readiness-meta"><span id="ready-report">{{readiness.reportsApi}}</span><span>55%</span></div>
+                <div class="readiness-track is-low" role="progressbar" aria-labelledby="ready-report" aria-valuemin="0" aria-valuemax="100" aria-valuenow="55" aria-valuetext="{{@readiness.reportsApi.aria}}"><span style="width: 55%"></span></div>
+                <p>{{readiness.reportsApi.rule}} <span class="status-pending">{{readiness.pending}}</span></p>
+              </li>
+              <li class="readiness-row">
+                <div class="readiness-meta"><span id="ready-lineage">{{readiness.lineage}}</span><span>38%</span></div>
+                <div class="readiness-track is-low" role="progressbar" aria-labelledby="ready-lineage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="38" aria-valuetext="{{@readiness.lineage.aria}}"><span style="width: 38%"></span></div>
+                <p>{{readiness.lineage.rule}} <span class="status-pending">{{readiness.pending}}</span></p>
+              </li>
+            </ul>
+            <p class="chart-note">{{readiness.note.lead}} <span class="placeholder">{{placeholder.readinessBasis}}</span>。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="tinted-section boundary-section" id="boundaries" aria-labelledby="boundary-title">
+        <div class="section container">
+          <div class="boundary-heading">
+            <p class="section-index">{{boundary.index}}</p>
+            <h2 id="boundary-title">{{boundary.title.line1}}<br>{{boundary.title.line2}}</h2>
+            <span class="not-mark" aria-hidden="true">{{boundary.mark}}</span>
+            <p class="section-description">{{boundary.description}}</p>
+          </div>
+          <div class="boundary-grid">
+            <article class="boundary-item">
+              <span class="boundary-index">{{boundary.item1.index}}</span>
+              <h3>{{boundary.item1.title}}</h3>
+              <p>{{boundary.item1.body}}</p>
+            </article>
+            <article class="boundary-item">
+              <span class="boundary-index">{{boundary.item2.index}}</span>
+              <h3>{{boundary.item2.title}}</h3>
+              <p>{{boundary.item2.body}}</p>
+            </article>
+            <article class="boundary-item">
+              <span class="boundary-index">{{boundary.item3.index}}</span>
+              <h3>{{boundary.item3.title}}</h3>
+              <p>{{boundary.item3.body}}</p>
+            </article>
+            <article class="boundary-item">
+              <span class="boundary-index">{{boundary.item4.index}}</span>
+              <h3>{{boundary.item4.title}}</h3>
+              <p>{{boundary.item4.body}}</p>
+            </article>
+          </div>
+          <p class="boundary-note"><strong>{{boundary.note.lead}}</strong><span>{{boundary.note.tail}}</span></p>
+        </div>
+      </section>
+
+      <section class="section container deployment-section" id="deployment" aria-labelledby="deployment-title">
+        <div class="deployment-intro">
+          <div>
+            <p class="section-index">{{deployment.index}}</p>
+            <h2 id="deployment-title">{{deployment.title.line1}}<br>{{deployment.title.line2}}</h2>
+          </div>
+          <dl class="trust-list">
+            <div><dt>{{spec.deployment}}</dt><dd>{{trust.deployment.value}}</dd></div>
+            <div><dt>{{trust.dependencies}}</dt><dd>{{trust.dependencies.value}}</dd></div>
+            <div><dt>{{trust.accessAudit}}</dt><dd>{{trust.accessAudit.value}}<br><span class="placeholder">{{placeholder.roles}}</span></dd></div>
+            <div><dt>{{trust.security}}</dt><dd>{{trust.security.value}}<br><span class="placeholder">{{placeholder.security}}</span></dd></div>
+            <div><dt>{{spec.license}}</dt><dd>Apache-2.0</dd></div>
+            <div><dt>{{trust.minimumConfig}}</dt><dd><span class="placeholder">{{placeholder.minimumConfig}}</span></dd></div>
+            <div><dt>{{trust.rolloutTime}}</dt><dd><span class="placeholder">{{placeholder.rolloutTime}}</span></dd></div>
+          </dl>
+        </div>
+
+        <div class="code-panel" aria-labelledby="demo-run-title">
+          <h3 id="demo-run-title">{{deployment.runTitle}}</h3>
+          <pre class="code-block"><code>git clone https://github.com/0verme/data-asset-portal-community.git
+cd data-asset-portal-community
+./scripts/demo.sh</code></pre>
+          <p>{{deployment.runIntro}} <a href="https://github.com/0verme/data-asset-portal-community/blob/main/DEPLOYMENT.md">DEPLOYMENT.md</a>。</p>
+        </div>
+
+        <div class="compatibility">
+          <div class="compatibility-heading">
+            <h3>{{compatibility.title}}</h3>
+            <p>{{compatibility.description}}</p>
+          </div>
+          <div class="table-scroll" tabindex="0" role="region" aria-label="{{@compatibility.tableLabel}}">
+            <table>
+              <thead>
+                <tr><th scope="col">{{compatibility.column.database}}</th><th scope="col">{{compatibility.column.tier}}</th><th scope="col">{{compatibility.column.evidence}}</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row"><code>PostgreSQL</code></th><td><span class="badge-verified">Verified</span></td><td>{{compatibility.postgres}}</td></tr>
+                <tr><th scope="row"><code>MySQL 8.0</code></th><td><span class="badge-verified">Verified</span></td><td>{{compatibility.mysql}}</td></tr>
+                <tr><th scope="row"><code>SQLite</code></th><td><span class="badge-verified">Verified</span></td><td>{{compatibility.sqlite}}</td></tr>
+                <tr><th scope="row"><code>GaussDB / DWS</code></th><td><span class="badge-compatible">Compatible</span></td><td>{{compatibility.gaussdb}}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="tinted-section onboarding-section" id="onboarding" aria-labelledby="onboarding-title">
+        <div class="section container">
+          <div class="onboarding-heading">
+            <p class="section-index">{{onboarding.index}}</p>
+            <h2 id="onboarding-title">{{onboarding.title.line1}}<br>{{onboarding.title.line2}}</h2>
+            <p class="section-description">{{onboarding.description}}</p>
+          </div>
+          <ol class="flow-list" aria-label="{{@onboarding.flowLabel}}">
+            <li class="flow-node"><h3>{{onboarding.externalSystem}}</h3><p>{{onboarding.externalSystem.detail}}</p></li>
+            <li class="flow-arrow" aria-hidden="true"></li>
+            <li class="flow-node"><h3>{{onboarding.metadata}}</h3><p>{{onboarding.metadata.detail}}</p></li>
+            <li class="flow-arrow" aria-hidden="true"></li>
+            <li class="flow-node"><h3>Metadata Contract</h3><p>{{onboarding.contract.detail}}</p><span class="placeholder flow-placeholder">{{placeholder.schema}}</span></li>
+            <li class="flow-arrow" aria-hidden="true"></li>
+            <li class="flow-node"><h3>Metadata API</h3><p>{{onboarding.api.detail}}</p><span class="placeholder flow-placeholder">{{placeholder.apiDocs}}</span></li>
+            <li class="flow-arrow" aria-hidden="true"></li>
+            <li class="flow-node"><h3>DAP</h3><p>{{onboarding.dap.detail}}</p></li>
+          </ol>
+
+          <div class="contract-grid" id="contract-sample">
+            <article class="code-panel contract-panel" aria-labelledby="contract-title">
+              <div class="panel-heading">
+                <h3 id="contract-title">{{onboarding.contract.title}}</h3>
+                <span class="sample-label">{{sample.label}}</span>
+              </div>
+              <pre class="code-block"><code>{
+  "contract_version": "<span class="placeholder">{{placeholder.version}}</span>",
+  "source_system": "etl-demo",
+  "tables": [
+    {
+      "name": "dws.trade_user_stat_d",
+      "comment": "{{onboarding.contract.comment.table}}",
+      "columns": [
+        { "name": "order_user_cnt", "type": "bigint",
+          "comment": "{{onboarding.contract.comment.field}}" }
+      ]
+    }
+  ]
+}</code></pre>
+              <p class="sample-note">{{onboarding.contract.note.lead}} <span class="placeholder">{{placeholder.verify}}</span>。</p>
+            </article>
+            <div class="responsibility-list">
+              <div>
+                <h3>{{onboarding.external.responsibility}}</h3>
+                <p>{{onboarding.external.responsibility.body}}</p>
+              </div>
+              <div>
+                <h3>{{onboarding.dap.responsibility}}</h3>
+                <p>{{onboarding.dap.responsibility.body}}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section container open-source-section" id="opensource" aria-labelledby="opensource-title">
+        <p class="section-index">{{opensource.index}}</p>
+        <h2 id="opensource-title">{{opensource.title}}</h2>
+        <div class="entry-grid">
+          <a class="entry-link" href="https://github.com/0verme/data-asset-portal-community">
+            <span class="entry-label">{{entry.githubLabel}}</span>
+            <span class="entry-url">github.com/0verme/data-asset-portal-community <span aria-hidden="true">→</span></span>
+          </a>
+          <a class="entry-link" href="https://data.overme.cn/">
+            <span class="entry-label">{{nav.demo}}</span>
+            <span class="entry-url">{{entry.demo.value}} <span aria-hidden="true">→</span></span>
+          </a>
+          <a class="entry-link" href="https://github.com/0verme/data-asset-portal-community/blob/main/docs/README.md">
+            <span class="entry-label">{{nav.docs}}</span>
+            <span class="entry-url">…/data-asset-portal-community/blob/main/docs/README.md <span aria-hidden="true">→</span></span>
+          </a>
+          <div class="entry-link entry-link-placeholder">
+            <span class="entry-label">{{entry.discussions}}</span>
+            <span class="entry-url"><span class="placeholder">{{placeholder.discussions}}</span></span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <p>{{footer.title}}</p>
+        <p>{{footer.description}} <span class="placeholder">{{placeholder.contact}}</span></p>
+      </div>
+    </footer>
+
+    <template id="recording-window-template">
+      <figure class="recording-window">
+        <figcaption class="window-bar">
+          <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="window-title"></span>
+          <span class="window-step"></span>
+        </figcaption>
+        <div class="window-screen"></div>
+      </figure>
+    </template>
+  </body>
+</html>
