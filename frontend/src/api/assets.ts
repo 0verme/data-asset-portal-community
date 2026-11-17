@@ -18,6 +18,7 @@ import { DOMAIN_ORDER, LAYER_OPTIONS, type LayerOption } from '../config/assets.
 import { LONG_REQUEST_TIMEOUT } from '../config/request.ts';
 import { normalizeAssetDataTypes, normalizeFieldList } from '../constants/dataTypes.ts';
 import { getAssetLayerValue, normalizeAssetLayerFields } from '../utils/assetFilters.ts';
+import { getAssetFieldCount } from '../utils/assetFieldCount.ts';
 import { generateDDLByDialect, getDDLDialectLabel, normalizeDDLResponse, type DDLNormalizedResult } from '../utils/ddlDialect.ts';
 import { requestRemote } from './http.ts';
 import { parseCollectionResponse } from './collectionResponse.ts';
@@ -100,9 +101,9 @@ export interface AssetTableItem {
   tier?: string | undefined;
   schemaLayer?: string | undefined;
   dataLayer?: string | undefined;
-  schema?: string | undefined;
+  schema?: string | null | undefined;
   fields: AssetTableField[];
-  fieldCount?: number | undefined;
+  fieldCount?: number | null | undefined;
   _fieldMatch?: string | null | undefined;
   [key: string]: unknown;
 }
@@ -115,7 +116,6 @@ function createLayerVariants(tables: readonly MockDwmTable[], layerCode: string)
     tier: layerCode,
     schemaLayer: layerCode,
     dataLayer: layerCode,
-    schema: `DWS_${layerCode}`,
     fields: clone(table.fields) as AssetTableField[],
   }));
 }
@@ -208,10 +208,13 @@ function normalizeTable(table: unknown): AssetTableItem {
       assetId: fieldAssetId,
     } as AssetTableField;
   });
+  const fieldCount = getAssetFieldCount(normalized.fieldCount)
+    ?? (API_MODE === 'mock' && Array.isArray(normalized.fields) ? fields.length : null);
 
   return {
     ...normalized,
     assetId: assetId || null,
+    fieldCount,
     fields,
   };
 }

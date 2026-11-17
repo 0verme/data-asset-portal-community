@@ -16,13 +16,13 @@ class RagCandidateCatalogTests(unittest.TestCase):
                 "asset_id": 1, "table_name": "CUSTOMER", "table_cn_name": "客户表",
                 "schema_name": "DWS", "layer_code": "DWS", "domain_code": "SYNTH",
                 "owner_name": "", "grain_desc": "", "cycle_desc": "", "table_desc": "说明",
-                "field_count": 1, "domain_name": "合成域",
+                "field_count": 0, "active_field_count": 1, "domain_name": "合成域",
             },
             {
                 "asset_id": 2, "table_name": "ACCOUNT", "table_cn_name": "账户表",
                 "schema_name": "DWS", "layer_code": "DWS", "domain_code": "SYNTH",
                 "owner_name": "", "grain_desc": "", "cycle_desc": "", "table_desc": "说明",
-                "field_count": 2, "domain_name": "合成域",
+                "field_count": 0, "active_field_count": 2, "domain_name": "合成域",
             },
         ]
         field_rows = [
@@ -71,6 +71,7 @@ class RagCandidateCatalogTests(unittest.TestCase):
         self.assertIn("p_asset_field.field_id IN", calls[1][2])
         self.assertIn("p_asset_field.is_deleted =", calls[1][2])
         self.assertEqual([1, 2], [table["assetId"] for table in result])
+        self.assertEqual([1, 2], [table["fieldCount"] for table in result])
         self.assertEqual([10], [field["fieldId"] for field in result[0]["fields"]])
         self.assertEqual([20], [field["fieldId"] for field in result[1]["fields"]])
         self.assertNotIn(99, [field["fieldId"] for table in result for field in table["fields"]])

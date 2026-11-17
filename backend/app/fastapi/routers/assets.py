@@ -44,6 +44,25 @@ def _asset_payload(payload: AssetTableRequest | None) -> dict[str, Any] | None:
     return payload.model_dump(by_alias=True, exclude_unset=True)
 
 
+def _preserve_asset_field_counts(source: Any, projected: Any) -> Any:
+    """Keep asset column counts while preserving the shared public redactions."""
+    if isinstance(source, dict) and isinstance(projected, dict):
+        result = dict(projected)
+        if "fieldCount" in source:
+            # This is the number of catalog field rows, not a business row count.
+            result["fieldCount"] = source["fieldCount"]
+        for key in ("data", "items"):
+            if key in source and key in result:
+                result[key] = _preserve_asset_field_counts(source[key], result[key])
+        return result
+    if isinstance(source, list) and isinstance(projected, list):
+        return [
+            _preserve_asset_field_counts(original, public)
+            for original, public in zip(source, projected)
+        ]
+    return projected
+
+
 def _register_asset_routes(app: FastAPI, service: Any, *, snapshot_service: Any = None) -> None:
     from .catalog_snapshots import _register_catalog_snapshot_routes
 
@@ -58,9 +77,11 @@ def _register_asset_routes(app: FastAPI, service: Any, *, snapshot_service: Any 
         return service
 
     def project_for_request(value: Any, context: RequestContext, authorization: Any) -> Any:
-        return project_public_catalog_value(
-            value, profile=profile_for_request(context, authorization)
+        profile = profile_for_request(context, authorization)
+        projected = project_public_catalog_value(
+            value, profile=profile
         )
+        return _preserve_asset_field_counts(value, projected)
 
     @router.get("/tables", response_model=None)
     def get_asset_tables(

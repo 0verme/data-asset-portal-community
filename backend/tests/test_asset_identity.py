@@ -35,9 +35,22 @@ def orders_request(
     source_name: str = "source-a",
     external_id: str = "public.orders",
     name: str = "orders",
+    schema: str = "public",
     description: str = "订单表",
     field_name: str = "order_id",
+    field_count: int = 1,
 ):
+    fields = [
+        {
+            "name": field_name if index == 1 else f"{field_name}_{index}",
+            "data_type": "integer",
+            "nullable": index != 1,
+            "primary_key": index == 1,
+            "ordinal_position": index,
+            "description": "identifier" if index == 1 else f"field {index}",
+        }
+        for index in range(1, field_count + 1)
+    ]
     return AssetMetadataIngestionRequest.model_validate(
         {
             "contract_version": "1.0",
@@ -46,21 +59,12 @@ def orders_request(
             "assets": [
                 {
                     "external_id": external_id,
-                    "qualified_name": f"public.{name}",
+                    "qualified_name": f"{schema}.{name}",
                     "asset_type": "table",
-                    "schema": "public",
+                    "schema": schema,
                     "name": name,
                     "description": description,
-                    "fields": [
-                        {
-                            "name": field_name,
-                            "data_type": "integer",
-                            "nullable": False,
-                            "primary_key": True,
-                            "ordinal_position": 1,
-                            "description": "identifier",
-                        }
-                    ],
+                    "fields": fields,
                 }
             ],
         }
@@ -244,6 +248,85 @@ class AssetIdentityApiTests(unittest.TestCase):
         first = by_asset_id[rows[0]["asset_id"]]
         second = by_asset_id[rows[1]["asset_id"]]
         self.assertNotEqual(first["source_key"], second["source_key"])
+
+    def test_cross_schema_list_search_and_detail_share_asset_identity_and_metadata(self):
+        table_name = "DWD_TRADE_ORDER"
+        self._ingest(
+            source_name="warehouse-a",
+            external_id="dw_a.DWD_TRADE_ORDER",
+            name=table_name,
+            schema="dw_a",
+            description="按交易单聚合的订单明细。",
+            field_count=12,
+        )
+        self._ingest(
+            source_name="warehouse-b",
+            external_id="dw_b.DWD_TRADE_ORDER",
+            name=table_name,
+            schema="dw_b",
+            description="按订单行聚合的交易明细。",
+            field_name="order_line_id",
+            field_count=4,
+        )
+
+        asset_a = self._asset_id(table_name=table_name, source_name="warehouse-a")
+        asset_b = self._asset_id(table_name=table_name, source_name="warehouse-b")
+        self.assertNotEqual(asset_a, asset_b)
+        connection = connect({"type": "sqlite", "database": str(self.database)})
+        try:
+            connection.execute(
+                "UPDATE dwp.p_asset_table SET table_cn_name = ?, grain_desc = ? WHERE asset_id = ?",
+                ("交易订单明细", "一行一张订单", asset_a),
+            )
+            connection.execute(
+                "UPDATE dwp.p_asset_table SET table_cn_name = ?, grain_desc = ? WHERE asset_id = ?",
+                ("交易订单明细", "一行一个订单行", asset_b),
+            )
+            # Simulate stale denormalized counts: reads must use active field rows.
+            connection.execute(
+                "UPDATE dwp.p_asset_table SET field_count = 0 WHERE asset_id IN (?, ?)",
+                (asset_a, asset_b),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        page = self.client.get(
+            "/api/assets/tables?summary=true&page=1&pageSize=20&keyword=DWD_TRADE_ORDER"
+        )
+        self.assertEqual(200, page.status_code, page.text)
+        listed = {item["assetId"]: item for item in page.json()["items"]}
+        self.assertEqual({asset_a, asset_b}, set(listed))
+        self.assertEqual(("dw_a", 12), (listed[asset_a]["schema"], listed[asset_a]["fieldCount"]))
+        self.assertEqual(("dw_b", 4), (listed[asset_b]["schema"], listed[asset_b]["fieldCount"]))
+        self.assertEqual("交易订单明细", listed[asset_a]["cn"])
+        self.assertEqual("交易订单明细", listed[asset_b]["cn"])
+
+        details = {asset_id: self.client.get(f"/api/assets/{asset_id}") for asset_id in (asset_a, asset_b)}
+        for asset_id, expected_count, expected_schema, expected_grain in (
+            (asset_a, 12, "dw_a", "一行一张订单"),
+            (asset_b, 4, "dw_b", "一行一个订单行"),
+        ):
+            response = details[asset_id]
+            self.assertEqual(200, response.status_code, response.text)
+            detail = response.json()["data"]
+            self.assertEqual(asset_id, detail["assetId"])
+            self.assertEqual(expected_count, detail["fieldCount"])
+            self.assertEqual(expected_count, len(detail["fields"]))
+            self.assertEqual(expected_schema, detail["schema"])
+            self.assertEqual(expected_grain, detail["grain"])
+            self.assertEqual(listed[asset_id]["fieldCount"], detail["fieldCount"])
+
+        provider = KeywordSearchProvider()
+        with patch.object(provider, "_enabled_menu_codes", return_value={"dwm"}):
+            result = provider.search("DWD_TRADE_ORDER", scope="asset", limit=20, profile="internal")
+        group = next(group for group in result["groups"] if group["type"] == "asset")
+        searched = {item["assetId"]: item for item in group["items"]}
+        self.assertEqual({asset_a, asset_b}, set(searched))
+        self.assertIn("一行一张订单", searched[asset_a]["meta"])
+        self.assertIn("按交易单聚合的订单明细。", searched[asset_a]["meta"])
+        self.assertIn("一行一个订单行", searched[asset_b]["meta"])
+        self.assertIn("按订单行聚合的交易明细。", searched[asset_b]["meta"])
 
     # -- Case 2: legacy table_name lookup --------------------------------
 

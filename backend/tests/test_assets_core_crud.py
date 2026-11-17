@@ -49,18 +49,63 @@ class AssetsCoreCrudTests(unittest.TestCase):
                 "asset_id": 7,
                 "table_name": "orders",
                 "table_cn_name": "订单表",
+                "schema_name": "warehouse_a",
                 "layer_code": "DWM",
                 "owner_name": None,
                 "grain_desc": None,
                 "cycle_desc": None,
                 "table_desc": None,
-                "field_count": 1,
+                "field_count": 0,
+                "active_field_count": 1,
             },
             [{"fieldId": 8, "assetId": 7, "name": "amount"}],
         )
         self.assertEqual(7, table["assetId"])
         self.assertEqual(8, table["fields"][0]["fieldId"])
         self.assertEqual(7, table["fields"][0]["assetId"])
+        self.assertEqual(1, table["fieldCount"])
+        self.assertEqual("warehouse_a", table["schema"])
+
+    def test_asset_projection_distinguishes_zero_and_unknown_counts(self):
+        row = {
+            "asset_id": 7,
+            "table_name": "orders",
+            "table_cn_name": "订单表",
+            "schema_name": "",
+            "layer_code": "DWD",
+            "field_count": 12,
+        }
+        self.service._default_schema_prefix = ""
+
+        zero = self.service._to_asset_table({**row, "active_field_count": 0}, [])
+        unknown = self.service._to_asset_table(row, [])
+
+        self.assertEqual(0, zero["fieldCount"])
+        self.assertIsNone(unknown["fieldCount"])
+        self.assertEqual("", unknown["schema"])
+
+    def test_asset_creation_does_not_infer_schema_without_explicit_configuration(self):
+        self.service._default_schema_prefix = ""
+        with (
+            patch.object(self.service, "_load_domain_mappings", return_value=({}, {"交易": "D01"})),
+            patch.object(self.service, "get_layers", return_value=[{"code": "DWD"}]),
+        ):
+            table = self.service._validate_table_payload({
+                "name": "DWD_TRADE_ORDER",
+                "cn": "订单表",
+                "domain": "交易",
+                "layer": "DWD",
+                "fields": [{
+                    "name": "order_id", "cn": "订单号", "type": "integer",
+                    "nullable": False, "pk": True, "part": False,
+                }],
+            })
+
+        self.assertEqual("", table["schema"])
+
+    def test_configured_schema_prefix_remains_an_explicit_fallback(self):
+        self.service._default_schema_prefix = "warehouse_"
+        self.assertEqual("warehouse_DWD", self.service._normalize_layer_schema("DWD"))
 
     def test_create_field_and_change_log_use_core_insert_statements(self):
         fields = [
@@ -101,14 +146,28 @@ class AssetsCoreCrudTests(unittest.TestCase):
                     self.assertEqual(extra["field_desc"], field["description"])
 
     def test_queries_compile_for_supported_sqlalchemy_dialects(self):
-        statement = select(asset_table).where(asset_table.c.table_name == "orders").limit(10)
+        statement = (
+            select(asset_table, self.service._active_field_count_expression())
+            .select_from(asset_table)
+            .where(asset_table.c.table_name == "orders")
+            .limit(10)
+        )
 
-        for dialect in (sqlite.dialect(), postgresql.dialect(), mysql.dialect()):
-            with self.subTest(dialect=dialect.name):
+        dialects = (
+            ("sqlite", sqlite.dialect()),
+            ("postgresql", postgresql.dialect()),
+            ("mysql", mysql.dialect()),
+            ("dws", postgresql.dialect(paramstyle="qmark")),
+        )
+        for name, dialect in dialects:
+            with self.subTest(dialect=name):
                 compiled = statement.compile(dialect=dialect)
                 self.assertIn("p_asset_table", str(compiled))
+                self.assertIn("p_asset_field", str(compiled))
+                self.assertIn("is_deleted", str(compiled))
                 self.assertNotIn("dwp.", str(compiled))
                 self.assertIn("orders", compiled.params.values())
+                self.assertIn("N", compiled.params.values())
 
     def test_ordering_and_pagination_are_core_expressions(self):
         ordering = self.service._normalize_asset_order("updated_at desc")
