@@ -157,7 +157,7 @@ class PublicCatalogApiTests(unittest.TestCase):
 
     def test_anonymous_code_value_page_and_detail_redact_connection_credentials(self):
         connection_text = (
-            "jdbc:postgresql://db_user:top-secret@db.example:5432/catalog"
+            "jdbc:postgresql://db_user:top-secret@127.0.0.1:5432/catalog"
             "?user=db_user&password=top-secret&sslmode=require"
         )
         code_value = {
