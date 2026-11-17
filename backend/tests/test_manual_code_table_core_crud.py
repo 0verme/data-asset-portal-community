@@ -6,8 +6,10 @@ from unittest.mock import MagicMock, patch
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
 from backend.app.services.manual_code_table_service import (
+    ManualCodeTableNotFoundError,
     ManualCodeTableService,
     ManualCodeTableValidationError,
+    ManualCodeValueNotFoundError,
     TABLE_STATUSES,
 )
 
@@ -44,11 +46,11 @@ class ManualCodeTableCoreCrudTests(unittest.TestCase):
             with self.subTest(status=status), self.assertRaises(ManualCodeTableValidationError):
                 self.service._normalize_payload({**self.item, "status": status})
 
-    def _assert_portable(self, statement):
+    def _assert_portable(self, statement, expected_table="p_manual_code_table"):
         for dialect in (sqlite.dialect(), postgresql.dialect(), mysql.dialect()):
             with self.subTest(dialect=dialect.name):
                 compiled = statement.compile(dialect=dialect)
-                self.assertIn("p_manual_code_table", str(compiled))
+                self.assertIn(expected_table, str(compiled))
                 self.assertIn("__app__", str(compiled))
                 self.assertNotIn("dwp.", str(compiled))
 
@@ -143,6 +145,115 @@ class ManualCodeTableCoreCrudTests(unittest.TestCase):
         delete_statement = self.service._db.execute_statements.call_args.args[0][0]
         self._assert_portable(delete_statement)
         self.assertIn("DELETE", str(delete_statement.compile(dialect=sqlite.dialect())))
+
+    def test_code_value_page_uses_filtered_database_count_and_bounded_page(self):
+        value = {
+            "item_id": 31,
+            "item_code": "PAID",
+            "item_name": "已支付",
+            "item_desc": "支付完成",
+            "is_active": "Y",
+            "updated_at": "2026-11-17 10:00:00",
+        }
+        self.service._db.fetch_rows = MagicMock(side_effect=[
+            [self.row],
+            [{"total": 3}],
+            [value],
+            [{"total": 9}],
+        ])
+
+        result = self.service.get_code_values_page(
+            "7", keyword="PAID", status="enabled", page="2", page_size="1"
+        )
+
+        self.assertEqual((3, 2, 1), (result["total"], result["page"], result["pageSize"]))
+        self.assertEqual(9, result["stats"]["total"])
+        self.assertEqual({
+            "id": "31", "code": "PAID", "label": "已支付", "description": "支付完成",
+            "status": "enabled", "updatedAt": "2026-11-17 10:00:00",
+        }, result["items"][0])
+        table_statement, count_statement, page_statement, stats_statement = [
+            call.args[0] for call in self.service._db.fetch_rows.call_args_list
+        ]
+        self._assert_portable(table_statement)
+        for statement in (count_statement, page_statement, stats_statement):
+            self._assert_portable(statement, "p_code_item")
+        page_sql = str(page_statement.compile(dialect=sqlite.dialect())).upper()
+        self.assertIn("LIMIT", page_sql)
+        self.assertIn("OFFSET", page_sql)
+        self.assertIn("ITEM_CODE", page_sql)
+        self.assertIn("IS_ACTIVE", page_sql)
+        self.assertIn("CATEGORY_CODE", page_sql)
+
+    def test_code_value_detail_is_scoped_to_selected_table(self):
+        self.service._db.fetch_rows = MagicMock(side_effect=[
+            [self.row],
+            [{
+                "item_id": 31,
+                "item_code": "PAID",
+                "item_name": "已支付",
+                "item_desc": None,
+                "is_active": "N",
+                "updated_at": None,
+            }],
+        ])
+
+        value = self.service.get_code_value("7", "31")
+
+        self.assertEqual(("PAID", "disabled", ""), (value["code"], value["status"], value["description"]))
+        statement = self.service._db.fetch_rows.call_args_list[1].args[0]
+        self._assert_portable(statement, "p_code_item")
+        sql = str(statement.compile(dialect=sqlite.dialect()))
+        self.assertIn("category_code", sql)
+        self.assertIn("item_id", sql)
+
+    @patch("backend.app.services.manual_code_table_service.operation_log_service.audit")
+    def test_code_value_update_preserves_existing_item_value(self, audit):
+        audit.return_value.__enter__.return_value = MagicMock()
+        value = {
+            "item_id": 31,
+            "item_code": "PAID",
+            "item_name": "已支付",
+            "item_value": "legacy-value",
+            "item_desc": "支付完成",
+            "is_active": "Y",
+            "updated_at": "2026-11-17 10:00:00",
+        }
+        self.service._db.fetch_rows = MagicMock(side_effect=[
+            [self.row], [self.row], [value], [], [self.row], [value],
+        ])
+        self.service._db.execute_statements = MagicMock()
+
+        self.service.update_code_value("7", "31", {
+            "code": "PAID", "label": "已支付", "description": "支付成功", "status": "enabled",
+        })
+
+        statement = self.service._db.execute_statements.call_args.args[0][0]
+        sql = str(statement.compile(dialect=sqlite.dialect())).lower()
+        self.assertIn("update", sql)
+        self.assertNotIn("item_value", sql)
+
+    @patch("backend.app.services.manual_code_table_service.operation_log_service.audit")
+    def test_code_table_cannot_be_renamed_or_deleted_with_entries(self, audit):
+        audit.return_value.__enter__.return_value = MagicMock()
+        self.service._db.fetch_rows = MagicMock(side_effect=[
+            [self.row], [{"total": 1}],
+            [self.row], [{"total": 1}],
+        ])
+        self.service._db.execute_statements = MagicMock()
+
+        with self.assertRaises(ManualCodeTableValidationError):
+            self.service.update_table("7", {**self.item, "tableCode": "RENAMED"})
+        with self.assertRaises(ManualCodeTableValidationError):
+            self.service.delete_table("7")
+        self.service._db.execute_statements.assert_not_called()
+
+    def test_code_value_missing_table_or_item_is_reported(self):
+        self.service._db.fetch_rows = MagicMock(side_effect=[[], [self.row], []])
+        with self.assertRaises(ManualCodeTableNotFoundError):
+            self.service.get_code_values_page("99")
+        with self.assertRaises(ManualCodeValueNotFoundError):
+            self.service.get_code_value("7", "99")
 
 
 if __name__ == "__main__":

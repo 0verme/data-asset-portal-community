@@ -7,8 +7,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0016_indicator_source_lineage"
-down_revision = "0015_ai_llm_daily_quota"
+revision = "0017_indicator_source_lineage"
+down_revision = "0016_root_example"
 branch_labels = None
 depends_on = None
 

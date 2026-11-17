@@ -23,7 +23,7 @@ import {
 
 test("accepts lowercase letters and numbers", () => {
   assert.equal(isValidRootAbbr("trans"), true);
-  assert.equal(isValidRootAbbr("amt2"), true);
+  assert.equal(isValidRootAbbr("abc2"), true);
 });
 
 test("rejects underscore and other unsupported forms", () => {

@@ -26,7 +26,7 @@ type ApiAsset = {
   updatedAt: string;
 };
 
-type Root = { abbr: string; en: string; cn: string; cat: string; desc: string; status: string };
+type Root = { abbr: string; en: string; cn: string; cat: string; desc: string; example: string; status: string };
 type ManualCodeTable = {
   id: string;
   tableCode: string;
@@ -35,6 +35,14 @@ type ManualCodeTable = {
   owner: string;
   status: string;
   remark: string;
+  updatedAt: string;
+};
+type ManualCodeValue = {
+  id: string;
+  code: string;
+  label: string;
+  description: string;
+  status: string;
   updatedAt: string;
 };
 
@@ -72,6 +80,7 @@ function root(index: number): Root {
     cn: `分页词根 ${index}`,
     cat: '业务对象',
     desc: 'Synthetic root pagination fixture',
+    example: `root${index}_id`,
     status: 'enabled',
   };
 }
@@ -100,14 +109,24 @@ function pagePayload<T>(items: readonly T[], url: URL, pageItems: (item: T) => b
   return { items: matches.slice((page - 1) * pageSize, page * pageSize), total: matches.length, page, pageSize };
 }
 
-async function installRemoteApiFixtures(page: Page, options: { apiAssetPageSizeLimit?: number; apiAssetTotal?: number } = {}) {
+async function installRemoteApiFixtures(page: Page, options: { apiAssetPageSizeLimit?: number; apiAssetTotal?: number; permissions?: string[] } = {}) {
   const apis = Array.from({ length: options.apiAssetTotal ?? 23 }, (_, index) => apiAsset(index + 1));
   const roots = Array.from({ length: 23 }, (_, index) => root(index + 1));
   const codeTables = Array.from({ length: 23 }, (_, index) => codeTable(index + 1));
+  const codeValues: ManualCodeValue[] = Array.from({ length: 25 }, (_, index) => ({
+    id: String(index + 1),
+    code: `VALUE_${String(index + 1).padStart(3, '0')}`,
+    label: `合成条目 ${index + 1}`,
+    description: 'Synthetic code-value pagination fixture',
+    status: index % 2 ? 'disabled' : 'enabled',
+    updatedAt: `2026-11-${String((index % 27) + 1).padStart(2, '0')} 00:00:00`,
+  }));
   const requests: URL[] = [];
   const details: string[] = [];
   const fullRootListCalls: number[] = [];
   const exports: URL[] = [];
+  const codeValuePageRequests: URL[] = [];
+  const codeValueDetails: string[] = [];
 
   await page.addInitScript(() => {
     localStorage.setItem('dap_auth', JSON.stringify({ role: 'admin', user: 'pagination-test', name: '分页测试管理员' }));
@@ -120,7 +139,7 @@ async function installRemoteApiFixtures(page: Page, options: { apiAssetPageSizeL
     if (path === '/api/auth/me') {
       await route.fulfill({ json: { data: {
         role: 'admin', user: 'pagination-test', name: '分页测试管理员',
-        permissions: ['api_asset:read', 'api_asset:write', 'root:read', 'root:write', 'code_table:read', 'code_table:write', 'code_table:export', 'system:menu:read'],
+        permissions: options.permissions ?? ['api_asset:read', 'api_asset:write', 'root:read', 'root:write', 'code_table:read', 'code_table:write', 'code_table:export', 'system:menu:read'],
       } } });
       return;
     }
@@ -236,13 +255,35 @@ async function installRemoteApiFixtures(page: Page, options: { apiAssetPageSizeL
       await route.fulfill({ headers: { 'content-type': 'text/csv; charset=utf-8' }, body: 'table_code,table_name\nPAGE_CODE_001,fixture\n' });
       return;
     }
+    const codeValuesPageMatch = path.match(/^\/api\/manual-code-tables\/(\d+)\/items\/page$/);
+    if (codeValuesPageMatch && request.method() === 'GET') {
+      codeValuePageRequests.push(url);
+      const values = codeValues.filter((item) => codeValuesPageMatch[1] === '23');
+      const status = url.searchParams.get('status');
+      const keyword = (url.searchParams.get('keyword') || '').trim().toLowerCase();
+      const result = pagePayload(values, url, (item) =>
+        (!status || item.status === status) &&
+        (!keyword || `${item.code} ${item.label} ${item.description}`.toLowerCase().includes(keyword)),
+      (item) => item.code);
+      await route.fulfill({ json: { ...result, stats: { total: values.length } } });
+      return;
+    }
+    const codeValueDetailMatch = path.match(/^\/api\/manual-code-tables\/(\d+)\/items\/(\d+)$/);
+    if (codeValueDetailMatch && request.method() === 'GET') {
+      const item = codeValueDetailMatch[1] === '23'
+        ? codeValues.find((value) => value.id === codeValueDetailMatch[2])
+        : undefined;
+      if (item) codeValueDetails.push(item.id);
+      await route.fulfill({ status: item ? 200 : 404, json: item ? { data: item } : { error: { message: 'Fixture code value not found' } } });
+      return;
+    }
     if (path === '/api/manual-code-tables' && request.method() === 'GET') {
       await route.fulfill({ json: { items: codeTables } });
       return;
     }
     await route.fulfill({ status: 404, json: { error: { message: `Unexpected pagination fixture request: ${path}` } } });
   });
-  return { apis, roots, codeTables, requests, details, fullRootListCalls, exports };
+  return { apis, roots, codeTables, codeValues, requests, details, fullRootListCalls, exports, codeValuePageRequests, codeValueDetails };
 }
 
 test.skip(!remote, 'requires VITE_API_MODE=remote and synthetic intercepted API responses');
@@ -311,6 +352,8 @@ test('root library pages table rows while keeping complete abbreviations and imp
   await expect(lastRow).toBeVisible();
   await expect.poll(() => fixture.requests.some((url) => url.pathname === '/api/roots/_page' && url.searchParams.get('page') === '2')).toBe(true);
   await lastRow.click();
+  await expect(page.getByRole('heading', { name: '词根详情' })).toBeVisible();
+  await page.getByRole('button', { name: '编辑词根' }).click();
   await expect(page.getByRole('heading', { name: '编辑词根' })).toBeVisible();
   await expect.poll(() => fixture.details.includes('root023')).toBe(true);
   await page.goto('/root-management');
@@ -348,6 +391,8 @@ test('root editor retains unsaved drafts during category-triggered list refreshe
   await expect(page.locator('.root-page .page-title')).toContainText('词根库', { timeout: 20_000 });
   const row = page.locator('.root-page table.dt tbody tr').filter({ hasText: 'root020' });
   await row.click();
+  await expect(page.getByRole('heading', { name: '词根详情' })).toBeVisible();
+  await page.getByRole('button', { name: '编辑词根' }).click();
   await expect(page.getByRole('heading', { name: '编辑词根' })).toBeVisible();
   const englishName = page.getByLabel('英文全称');
   await englishName.fill('Unsaved root editor draft');
@@ -419,4 +464,37 @@ test('manual code tables page through database results but export all matching r
   expect(fixture.exports).toHaveLength(1);
   expect(fixture.exports[0]?.searchParams.has('page')).toBe(false);
   expect(fixture.exports[0]?.searchParams.has('pageSize')).toBe(false);
+});
+
+test('code values are database-paged, searchable, detailed, and read-only without write permission', async ({ page }) => {
+  const fixture = await installRemoteApiFixtures(page, { permissions: ['code_table:read', 'system:menu:read'] });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/code-table-maintenance');
+  await expect(page.locator('.code-table-page .page-title')).toContainText('码值表维护', { timeout: 20_000 });
+  const tableRow = page.locator('.code-table-page table.dt tbody tr').filter({ hasText: 'PAGE_CODE_023' });
+  await tableRow.getByRole('button', { name: '查看' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Pagination code table 23' })).toBeVisible();
+  await expect(page.getByText('条目总数')).toBeVisible();
+  await expect(page.getByText('25', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '新增条目' })).toHaveCount(0);
+  const pager = page.locator('.dap-table-pagination[aria-label="码值条目分页"]');
+  await expect(pager.locator('.dap-table-pagination__page-index')).toHaveText('1 / 2');
+  await expect(page.locator('.code-table-list table.dt tbody tr')).toHaveCount(20);
+  await page.getByRole('button', { name: '下一页' }).click();
+  await expect(pager.locator('.dap-table-pagination__page-index')).toHaveText('2 / 2');
+  await expect(page.locator('.code-table-list table.dt tbody tr')).toHaveCount(5);
+
+  await page.getByLabel('搜索码值条目').fill('VALUE_025');
+  await expect(page.locator('.code-table-list table.dt tbody tr')).toHaveCount(1);
+  await expect(page.getByText('VALUE_025')).toBeVisible();
+  expect(fixture.codeValuePageRequests.some((url) => url.searchParams.get('page') === '2')).toBe(true);
+  expect(fixture.codeValuePageRequests.some((url) => url.searchParams.get('keyword') === 'VALUE_025')).toBe(true);
+
+  await page.locator('.code-table-list table.dt tbody tr').getByRole('button', { name: '查看' }).click();
+  await expect(page.getByRole('heading', { name: '码值条目详情' })).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('合成条目 25', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '编辑', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '删除码值条目' })).toHaveCount(0);
+  expect(fixture.codeValueDetails).toContain('25');
 });

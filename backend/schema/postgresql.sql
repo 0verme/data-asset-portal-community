@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_root_category (
 CREATE TABLE IF NOT EXISTS dwp.p_root_item (
   root_id BIGINT PRIMARY KEY, root_abbr VARCHAR(64) NOT NULL UNIQUE,
   root_en_name VARCHAR(256), root_cn_name VARCHAR(256) NOT NULL,
-  category_name VARCHAR(64) NOT NULL, root_desc VARCHAR(2000),
+  category_name VARCHAR(64) NOT NULL, root_desc VARCHAR(2000), root_example VARCHAR(2000),
   is_deleted CHAR(1) NOT NULL DEFAULT 'N', created_by VARCHAR(64) NOT NULL DEFAULT 'system',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) NOT NULL DEFAULT 'system',

@@ -289,7 +289,7 @@ class AssetItem(ContractModel):
     cycle: str = ""
     desc: str = ""
     schema_name: str = Field(default="", alias="schema")
-    fieldCount: int = 0
+    fieldCount: int | None = None
     fields: list[AssetField] = Field(default_factory=list)
     assetRisks: list[Any] = Field(default_factory=list)
 
@@ -369,14 +369,17 @@ class FieldMappingTableItem(ContractModel):
 
 
 class MappingStats(ContractModel):
-    sourceSystemCount: int = 0
-    sourceTableCount: int = 0
+    sourceSystemCount: int = Field(ge=0)
+    sourceTableCount: int = Field(ge=0)
     fieldCount: int = Field(ge=0)
-    mappedFieldCount: int = 0
-    unmappedFieldCount: int = 0
-    emptyCommentCount: int = 0
-    emptyCommentRate: int = 0
-    coverage: int = 0
+    mappedFieldCount: int = Field(ge=0)
+    unmappedFieldCount: int = Field(ge=0)
+    configuredTableCount: int = Field(ge=0)
+    incompleteTableCount: int = Field(ge=0)
+    emptyCommentCount: int = Field(ge=0)
+    emptyCommentRate: int = Field(ge=0, le=100)
+    coverage: int | None = Field(ge=0, le=100)
+    tableConfigCoverage: int | None = Field(ge=0, le=100)
 
 
 class FieldMappingListResponse(ItemsResponse[FieldMappingItem]):
@@ -397,6 +400,7 @@ class RootItem(ContractModel):
     cn: str
     cat: str
     desc: str = ""
+    example: str = ""
 
 
 class RootRequest(ContractModel):
@@ -405,6 +409,7 @@ class RootRequest(ContractModel):
     cn: str | None = None
     cat: str | None = None
     desc: str | None = None
+    example: str | None = None
     items: list[dict[str, Any]] | None = None
 
 
@@ -442,6 +447,34 @@ class ManualCodeTableRequest(ContractModel):
     owner: str | None = None
     status: str | None = None
     remark: str | None = None
+
+
+class ManualCodeValueItem(ContractModel):
+    id: str
+    code: str
+    label: str
+    description: str = ""
+    status: str
+    updatedAt: str = ""
+
+
+class ManualCodeValueStats(ContractModel):
+    total: int = 0
+
+
+class ManualCodeValuePageResponse(ContractModel):
+    items: list[ManualCodeValueItem]
+    total: int
+    page: int
+    pageSize: int
+    stats: ManualCodeValueStats
+
+
+class ManualCodeValueRequest(ContractModel):
+    code: str | None = None
+    label: str | None = None
+    description: str | None = None
+    status: str | None = None
 
 
 class ManualCodeTableListResponse(ItemsResponse[ManualCodeTableItem]):

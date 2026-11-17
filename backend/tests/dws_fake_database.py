@@ -37,7 +37,8 @@ REVISION_ORDER = (
     "0013_field_filter_index",
     "0014_rag_search_config",
     "0015_ai_llm_daily_quota",
-    "0016_indicator_source_lineage",
+    "0016_root_example",
+    "0017_indicator_source_lineage",
 )
 
 OPEN_MODULE_TABLES = (
@@ -259,6 +260,8 @@ class FakeDwsDatabase:
         self.table(table_name).columns[column] = FakeColumn(
             column, type_name, nullable=nullable, default=default
         )
+        for row in self.table(table_name).rows:
+            row.setdefault(column, None)
 
     def add_unique(self, table_name: str, columns: tuple[str, ...], name: str) -> None:
         self.table(table_name).unique_constraints[tuple(columns)] = name
@@ -561,6 +564,8 @@ class FakeDwsDatabase:
                 nullable=nullable,
                 default=default,
             )
+            for row in table.rows:
+                row.setdefault(add_column.group("name"), None)
             return True
         alter_column = re.match(
             r"ALTER TABLE (?:[\w\"]+\.)?(?P<table>\w+) ALTER COLUMN (?P<name>\w+) "
@@ -799,10 +804,12 @@ def downgrade_to_prefix(database: FakeDwsDatabase, satisfied: Iterable[str]) -> 
 def _reverse_revision(
     database: FakeDwsDatabase, revision: str, satisfied: set[str]
 ) -> None:
-    if revision == "0016_indicator_source_lineage":
+    if revision == "0017_indicator_source_lineage":
         database.remove_table("p_indicator_source")
         for column in ("caliber_formula", "caliber_sql"):
             database.remove_column("p_indicator_item", column)
+    elif revision == "0016_root_example":
+        database.remove_column("p_root_item", "root_example")
     elif revision == "0015_ai_llm_daily_quota":
         database.table("p_code_category").rows[:] = [
             row for row in database.table("p_code_category").rows

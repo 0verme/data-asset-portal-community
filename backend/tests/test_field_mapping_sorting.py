@@ -143,6 +143,7 @@ class FieldMappingSortingTests(unittest.TestCase):
         system_abbr,
         source_table,
         target_table,
+        load_mode=None,
         fields,
     ):
         connection.execute(
@@ -172,9 +173,9 @@ class FieldMappingSortingTests(unittest.TestCase):
             """
             INSERT INTO p_field_mapping_table
                 (table_pk, data_source_id, upstream_system_id, source_table_name,
-                 source_table_cn, target_layer_code, target_table_name,
+                 source_table_cn, target_layer_code, target_table_name, load_mode,
                  field_total_count, mapped_field_count)
-            VALUES (?, ?, ?, ?, ?, 'DWF', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, 'DWF', ?, ?, ?, ?)
             """,
             (
                 table_pk,
@@ -183,6 +184,7 @@ class FieldMappingSortingTests(unittest.TestCase):
                 source_table,
                 source_table,
                 target_table,
+                load_mode,
                 len(fields),
                 len(fields),
             ),
@@ -552,6 +554,46 @@ class FieldMappingSortingTests(unittest.TestCase):
             [row[field_index] for row in rows[1:]],
         )
         self.assertEqual("'=CMD()", rows[3][formula_index])
+
+    def test_field_and_table_exports_distinguish_missing_and_unknown_load_modes(self):
+        for source_id, system_id, table_pk, source_table, target_table, load_mode in (
+            (5, 105, 205, "missing_mode", "TARGET_MISSING_MODE", None),
+            (6, 106, 206, "unknown_mode", "TARGET_UNKNOWN_MODE", "future_mode"),
+        ):
+            self._insert_extra_mapping(
+                source_id=source_id,
+                system_id=system_id,
+                table_pk=table_pk,
+                system_name=f"System-{source_id}",
+                system_abbr=f"SYS_{source_id}",
+                source_table=source_table,
+                target_table=target_table,
+                load_mode=load_mode,
+                fields=[{
+                    "field_pk": table_pk * 10,
+                    "source_field": "field_1",
+                    "source_type": "text",
+                    "source_comment": "export fixture",
+                    "target_field": "target_1",
+                    "mapping_rule": "direct",
+                    "field_order": 1,
+                }],
+            )
+
+        with patch.dict(
+            os.environ,
+            {"PUBLIC_CATALOG_PROFILE": "internal", "PUBLIC_CATALOG_EXPORT_ENABLED": "true"},
+            clear=False,
+        ):
+            for view, mode_column in (("field", 7), ("table", 5)):
+                response = self.client.get(
+                    "/api/field-mappings/export", params={"view": view}
+                )
+                self.assertEqual(200, response.status_code, response.text)
+                rows = list(csv.reader(io.StringIO(response.content.decode("utf-8-sig"), newline="")))
+                exported = {row[1]: row[mode_column] for row in rows[1:]}
+                self.assertEqual("未设置", exported["missing_mode"])
+                self.assertEqual("未知（future_mode）", exported["unknown_mode"])
 
     def test_table_export_streams_all_filtered_tables_in_stable_order_across_batches(self):
         self._seed_export_mapping()

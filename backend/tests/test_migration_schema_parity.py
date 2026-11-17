@@ -363,6 +363,7 @@ class MigrationSchemaParityTests(unittest.TestCase):
             "p_push_job": {"job_id", "system_id", "job_code", "target_file_name"},
             "p_report_asset": {"report_pk", "report_code", "related_tables_json"},
             "p_manual_code_table": {"table_id", "table_code", "table_style"},
+            "p_root_item": {"root_abbr", "root_en_name", "root_cn_name", "root_desc", "root_example"},
             "p_lineage_snapshot": {"snapshot_id", "import_batch_id", "status_code"},
             "p_lineage_node": {"snapshot_id", "node_id", "attributes_json"},
             "p_lineage_edge": {"snapshot_id", "edge_id", "source_node_id", "target_node_id"},

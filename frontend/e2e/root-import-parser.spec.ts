@@ -6,12 +6,13 @@ interface RootRecord {
   cn: string;
   cat: string;
   desc: string;
+  example: string;
 }
 
 async function installRootApiFixtures(page: Page): Promise<RootRecord[][]> {
   const imports: RootRecord[][] = [];
   let roots: RootRecord[] = [
-    { abbr: "base", en: "base", cn: "基础词根", cat: "公共词根", desc: "fixture" },
+    { abbr: "base", en: "base", cn: "基础词根", cat: "公共词根", desc: "fixture", example: "base_id" },
   ];
 
   await page.addInitScript(() => {
@@ -92,7 +93,7 @@ test("root CSV/TSV import previews and submits the same parsed records, excludin
   const imports = await installRootApiFixtures(page);
   await openRootImport(page);
 
-  const csv = '\uFEFFabbr,en,cn,cat,desc\r\nsku,"English, complete","中文\r\n名称","公共词根","Line one\r\nLine two with ""quoted"" text"\r\ninvalid,invalid,,公共词根,should not be submitted\r\n';
+  const csv = '\uFEFFabbr,en,cn,cat,desc,example\r\nsku,"English, complete","中文\r\n名称","公共词根","Line one\r\nLine two with ""quoted"" text","sku_id / sku_name"\r\ninvalid,invalid,,公共词根,should not be submitted,invalid_id\r\n';
   await page.getByLabel("批量导入内容").fill(csv);
 
   const rows = page.locator(".fields tbody tr");
@@ -114,6 +115,7 @@ test("root CSV/TSV import previews and submits the same parsed records, excludin
     cn: `中文${newline}名称`,
     cat: "公共词根",
     desc: `Line one${newline}Line two with "quoted" text`,
+    example: "sku_id / sku_name",
   };
   const requestPromise = page.waitForRequest((request) =>
     request.method() === "POST" && new URL(request.url()).pathname === "/api/roots/import",

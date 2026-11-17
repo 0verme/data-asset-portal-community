@@ -36,6 +36,12 @@ test("empty search results expose a clear action that preserves scope and focus"
   assert.match(styles, /\.sp-empty-action \{ margin: 16px auto 0; \}/);
 });
 
+test("asset search results use stable asset IDs for their rendered keys", async () => {
+  const source = await readFile(searchPagePath, "utf8");
+
+  assert.match(source, /key=\{item\.assetId \?\? item\.id\}/);
+});
+
 test("Portal Search uses only DAP UI adapters for controls and feedback", async () => {
   const source = await readFile(searchPagePath, "utf8");
 

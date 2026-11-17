@@ -13,6 +13,7 @@ from backend.app.db.tables import (
     api_param,
     api_relation,
     api_response_field,
+    code_item,
     manual_code_table,
     root_category,
     root_item,
@@ -44,6 +45,7 @@ class ManagementPaginationSqliteTests(unittest.TestCase):
             api_response_field,
             system_table,
             manual_code_table,
+            code_item,
             root_category,
             root_item,
         ):
@@ -77,6 +79,12 @@ class ManagementPaginationSqliteTests(unittest.TestCase):
             {"table_id": 1, "table_code": "TABLE_A", "table_name": "表 A", "table_style": "status", "status_code": "enabled", "created_by": "test", "created_at": now, "updated_by": "test", "updated_at": datetime(2026, 11, 1)},
             {"table_id": 2, "table_code": "TABLE_B", "table_name": "表 B", "table_style": "enum", "status_code": "disabled", "created_by": "test", "created_at": now, "updated_by": "test", "updated_at": datetime(2026, 11, 2)},
             {"table_id": 3, "table_code": "TABLE_C", "table_name": "表 C", "table_style": "status", "status_code": "enabled", "created_by": "test", "created_at": now, "updated_by": "test", "updated_at": datetime(2026, 11, 3)},
+        ])
+        self.connection.execute(insert(code_item), [
+            {"item_id": 1, "category_code": "TABLE_A", "item_code": "PAID", "item_name": "已支付", "item_value": "paid", "item_desc": "支付完成", "display_order": 1, "is_active": "Y", "created_by": "test", "updated_by": "test"},
+            {"item_id": 2, "category_code": "TABLE_A", "item_code": "UNPAID", "item_name": "待支付", "item_value": "unpaid", "item_desc": "订单支付中", "display_order": 2, "is_active": "Y", "created_by": "test", "updated_by": "test"},
+            {"item_id": 3, "category_code": "TABLE_A", "item_code": "VOID", "item_name": "已取消", "item_value": "void", "item_desc": "订单关闭", "display_order": 3, "is_active": "N", "created_by": "test", "updated_by": "test"},
+            {"item_id": 4, "category_code": "TABLE_B", "item_code": "OTHER", "item_name": "其他组", "item_value": "other", "item_desc": "隔离数据", "display_order": 1, "is_active": "Y", "created_by": "test", "updated_by": "test"},
         ])
         self.connection.execute(insert(root_category), [
             {"category_id": 1, "category_name": "业务对象", "display_order": 1, "is_deleted": "N"},
@@ -117,6 +125,25 @@ class ManagementPaginationSqliteTests(unittest.TestCase):
             "statuses": {"enabled": 2, "disabled": 0},
         }, result["facets"])
         self.assertEqual(3, len(self.manual.get_tables()))
+
+    def test_manual_code_value_page_and_detail_are_group_scoped_database_queries(self):
+        from backend.app.services.manual_code_table_service import ManualCodeValueNotFoundError
+
+        result = self.manual.get_code_values_page(
+            "1", keyword="支付", status="enabled", page=2, page_size=1
+        )
+
+        self.assertEqual(2, result["total"])
+        self.assertEqual((2, 1), (result["page"], result["pageSize"]))
+        self.assertEqual(3, result["stats"]["total"])
+        self.assertEqual(["UNPAID"], [item["code"] for item in result["items"]])
+        self.assertEqual({
+            "id": "2", "code": "UNPAID", "label": "待支付", "description": "订单支付中",
+            "status": "enabled", "updatedAt": "",
+        }, result["items"][0])
+        self.assertEqual("PAID", self.manual.get_code_value("1", "1")["code"])
+        with self.assertRaises(ManualCodeValueNotFoundError):
+            self.manual.get_code_value("2", "1")
 
     def test_root_page_is_database_backed_and_keeps_full_category_and_candidate_sets(self):
         result = self.root.get_roots_page(cat="业务对象", page=2, page_size=1)

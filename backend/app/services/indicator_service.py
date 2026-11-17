@@ -269,7 +269,17 @@ class IndicatorService(AuditActorMixin):
         registered_at = str(payload.get("registeredAt") or "").strip()
         source_asset_id = _payload_value(payload, defaults, "sourceAssetId", "source_asset_id")
         result_field_id = _payload_value(payload, defaults, "resultFieldId", "result_field_id")
-        raw_sources = _payload_value(payload, defaults, "sources", default=None)
+        if "sources" in payload:
+            raw_sources = payload["sources"]
+        elif any(
+            key in payload
+            for key in ("sourceAssetId", "source_asset_id", "resultFieldId", "result_field_id")
+        ):
+            # A legacy stable-ID update is authoritative. Do not let the
+            # current multi-source detail array mask those explicit fields.
+            raw_sources = None
+        else:
+            raw_sources = _payload_value(payload, defaults, "sources", default=None)
         aggregation = _payload_value(payload, defaults, "aggregation", "aggregationCode", "aggregation_code")
         semantic_state = _payload_value(payload, defaults, "semanticState", "semantic_state", "certificationStatus")
         allowed_status = self._allowed_status_values()
@@ -389,10 +399,6 @@ class IndicatorService(AuditActorMixin):
                 raw_sources.append({"assetId": source_asset_id, "fieldId": result_field_id})
         if not isinstance(raw_sources, list):
             raise IndicatorValidationError([{"field": "sources", "message": "sources must be an array"}])
-        old_sources = {
-            (str(item.get("assetId") or ""), str(item.get("fieldId") or "")): item
-            for item in defaults.get("sources", []) if isinstance(item, dict)
-        }
         normalized = []
         seen = set()
         errors = []
@@ -409,7 +415,7 @@ class IndicatorService(AuditActorMixin):
             if errors and (asset_error or field_error):
                 continue
             field_row = self._resolve_semantic_field(field_id) if field_id is not None else None
-            if asset_id is None and field_row and str(field_row.get("is_deleted") or "N") == "N":
+            if asset_id is None and field_row:
                 asset_id = _optional_int(field_row.get("asset_id"))
             key = (str(asset_id or ""), str(field_id or ""))
             if key in seen:
@@ -420,24 +426,29 @@ class IndicatorService(AuditActorMixin):
             active_field = field_row and str(field_row.get("is_deleted") or "N").upper() == "N"
             valid_field_owner = field_row and _optional_int(field_row.get("asset_id")) == asset_id
             if not active_asset or (field_id is not None and (not active_field or not valid_field_owner)):
-                if key in old_sources:
-                    old = old_sources[key]
-                    normalized.append({
-                        "assetId": asset_id,
-                        "fieldId": field_id,
-                        "availability": "unknown",
-                        "tableName": old.get("tableName") or "",
-                        "qualifiedName": old.get("qualifiedName") or "",
-                        "schemaName": old.get("schemaName") or "",
-                        "fieldName": old.get("fieldName") or "",
-                    })
+                if legacy_single_source:
+                    if not active_asset:
+                        message = (
+                            f"asset is deleted: {asset_id}"
+                            if asset_row is not None
+                            else f"asset does not exist: {asset_id}"
+                        )
+                        errors.append({"field": "sourceAssetId", "message": message})
+                    if field_id is not None and not active_field:
+                        message = (
+                            f"result field is deleted: {field_id}"
+                            if field_row is not None
+                            else f"result field does not exist: {field_id}"
+                        )
+                        errors.append({"field": "resultFieldId", "message": message})
+                    elif field_id is not None and not valid_field_owner:
+                        errors.append({
+                            "field": "resultFieldId",
+                            "message": "result field does not exist or does not belong to source asset: "
+                            f"{field_id}",
+                        })
                 else:
-                    if legacy_single_source and not active_asset:
-                        errors.append({"field": "sourceAssetId", "message": f"asset does not exist: {asset_id}"})
-                    elif legacy_single_source and field_id is not None:
-                        errors.append({"field": "resultFieldId", "message": f"result field does not exist or does not belong to source asset: {field_id}"})
-                    else:
-                        errors.append({"field": f"sources[{index}]", "message": "source table or field does not exist or does not belong to the selected table"})
+                    errors.append({"field": f"sources[{index}]", "message": "source table or field does not exist or does not belong to the selected table"})
                 continue
             normalized.append({
                 "assetId": asset_id,
@@ -558,6 +569,13 @@ class IndicatorService(AuditActorMixin):
                 indicator_item.c.caliber_sql,
                 indicator_item.c.path_desc,
             ]
+            if not paged:
+                # Keep the legacy collection endpoint's snapshot search
+                # contract while the paged editor searches current relations.
+                searchable.extend((
+                    indicator_item.c.result_table_name,
+                    indicator_item.c.result_field_name,
+                ))
             if not paged or public_field_class_visible(FIELD_CLASS_PERSON, profile):
                 searchable.append(indicator_item.c.registrar_name)
             source_match = exists(

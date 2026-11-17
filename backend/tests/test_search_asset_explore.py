@@ -305,6 +305,24 @@ class AssetExploreSearchTestCase(unittest.TestCase):
                 any(match["label"] != "字段" for match in item["matchedFields"])
             )
 
+    def test_asset_search_meta_includes_grain_and_business_description(self):
+        group = self._group(self._search("全渠道", scope="asset", limit=50))
+
+        self.assertTrue(group["items"])
+        for item in group["items"]:
+            self.assertTrue(item["assetId"])
+            connection = self._sqlite()
+            try:
+                row = connection.execute(
+                    "SELECT grain_desc, table_desc FROM p_asset_table WHERE asset_id = ?",
+                    (item["assetId"],),
+                ).fetchone()
+            finally:
+                connection.close()
+            self.assertIsNotNone(row)
+            self.assertIn(row[0], item["meta"])
+            self.assertIn(row[1], item["meta"])
+
 
 class AssetFieldMatchContractTestCase(unittest.TestCase):
     """Both asset read entries must share the same field-match declaration."""
@@ -328,6 +346,14 @@ class AssetFieldMatchContractTestCase(unittest.TestCase):
         )
         self.assertIn(ASSET_FIELD_ACTIVE_VALUE, spec["active_where"])
         self.assertEqual("asset_id", spec["row_key"])
+
+    def test_indicator_search_selects_the_primary_key_used_for_field_matches(self):
+        config = next(
+            item for item in list_search_entities() if item["type"] == "indicator"
+        )
+        self.assertIn(config["field_match"]["row_key"], {
+            column.strip() for column in config["select"].split(",")
+        })
 
     def test_degraded_group_keeps_the_group_contract(self):
         """Degradation must not change the group shape the frontend consumes."""

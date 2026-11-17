@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseRootImport } from "./rootImportParser.ts";
+import {
+  parseRootImport,
+  preserveOmittedRootImportFields,
+} from "./rootImportParser.ts";
 
-test("CSV import parses BOM, CRLF, quoted delimiters, doubled quotes, and embedded newlines", () => {
+test("CSV import parses separate root meaning and example fields with quoted delimiters and newlines", () => {
   const result = parseRootImport(
-    '\uFEFFabbr,en,cn,cat,desc\r\nSKU,"English, complete","中文\r\n名称","公共词根","Line one\r\nLine two with ""quoted"" text"\r\nNEXT,Next,下一个,公共词根,plain\r\n',
+    '\uFEFFabbr,en,cn,cat,desc,example\r\nSKU,"English, complete","中文\r\n名称","公共词根","Line one\r\nLine two with ""quoted"" text","sku_id / sku_name"\r\nNEXT,Next,下一个,公共词根,plain,next_id\r\n',
   );
 
   assert.equal(result.error, undefined);
@@ -16,6 +19,7 @@ test("CSV import parses BOM, CRLF, quoted delimiters, doubled quotes, and embedd
       cn: "中文\r\n名称",
       cat: "公共词根",
       desc: 'Line one\r\nLine two with "quoted" text',
+      example: "sku_id / sku_name",
       _line: 2,
     },
     {
@@ -24,9 +28,32 @@ test("CSV import parses BOM, CRLF, quoted delimiters, doubled quotes, and embedd
       cn: "下一个",
       cat: "公共词根",
       desc: "plain",
+      example: "next_id",
       _line: 5,
     },
   ]);
+});
+
+test("header-based imports leave missing columns unmapped and preserve their existing values", () => {
+  const result = parseRootImport(
+    "abbr,en,cn,cat,extra,desc\nSKU,Stock keeping unit,库存单位,公共词根,ignored,sku用途说明\n",
+  );
+
+  assert.equal(result.error, undefined);
+  const parsed = result.items[0];
+  assert.equal(parsed?.desc, "sku用途说明");
+  assert.equal(parsed?.example, "");
+  assert.deepEqual(parsed?.missingFields, ["example"]);
+
+  const preserved = preserveOmittedRootImportFields(parsed!, {
+    en: "Stock keeping unit",
+    cn: "库存单位",
+    cat: "公共词根",
+    desc: "原用途说明",
+    example: "sku_id",
+  });
+  assert.equal(preserved.desc, "sku用途说明");
+  assert.equal(preserved.example, "sku_id");
 });
 
 test("quoted fields preserve inner whitespace while unquoted cells are trimmed", () => {
@@ -39,6 +66,8 @@ test("quoted fields preserve inner whitespace while unquoted cells are trimmed",
       cn: " 中文 ",
       cat: "",
       desc: "",
+      example: "",
+      missingFields: ["cat", "desc", "example"],
       _line: 2,
     },
   ]);
@@ -54,6 +83,8 @@ test("delimiter detection skips leading blank records and preserves physical sou
       cn: "库存单位",
       cat: "",
       desc: "",
+      example: "",
+      missingFields: ["cat", "desc", "example"],
       _line: 3,
     },
   ]);
@@ -69,6 +100,7 @@ test("TSV detection wins over commas in unquoted headerless descriptions", () =>
       cn: "库存单位",
       cat: "业务对象",
       desc: "One, two, three, four, five, six",
+      example: "",
       _line: 1,
     },
   ]);
@@ -87,6 +119,8 @@ test("TSV import permits quoted tabs and multiline cells while preserving source
       cn: "中文",
       cat: "公共词根",
       desc: "first line\r\nsecond line",
+      example: "",
+      missingFields: ["example"],
       _line: 2,
     },
   ]);
@@ -103,6 +137,8 @@ test("pipe-delimited legacy imports remain supported and empty physical lines ar
       cn: "管道",
       cat: "公共词根",
       desc: "说明",
+      example: "",
+      missingFields: ["example"],
       _line: 3,
     },
   ]);

@@ -529,6 +529,7 @@ export interface MockDwmTable {
   cn: string;
   domain: string;
   layer: string;
+  schema?: string | undefined;
   owner: string;
   grain: string;
   cycle: string;

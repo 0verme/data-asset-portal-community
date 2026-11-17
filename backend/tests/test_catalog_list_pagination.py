@@ -21,7 +21,7 @@ from sqlalchemy import delete, event, insert, select, update
 from backend.app.authorization.core import AuthorizationService
 from backend.app.db.core import execute_statements_core, fetch_all_core, next_pk
 from backend.app.db.facade import clear_engine_cache, connect_with_profile, database_transaction, get_db_profile, get_engine
-from backend.app.db.tables import asset_field, asset_table, indicator_item, report_asset
+from backend.app.db.tables import asset_field, asset_table, indicator_item, indicator_source, report_asset
 from backend.app.fastapi_app import create_fastapi_app
 from backend.app.migrations.schema import initialize
 from backend.app.services.indicator_service import IndicatorNotFoundError, IndicatorService
@@ -72,6 +72,7 @@ class _CatalogPaginationContract:
         self.indicator_codes = [f"{self.prefix}I{index:02}" for index in range(1, 9)]
         self.report_codes = [f"{self.prefix}R{index:02}" for index in range(1, 9)]
         indicator_start = next_pk(self.profile, indicator_item, indicator_item.c.indicator_pk)
+        source_start = next_pk(self.profile, indicator_source, indicator_source.c.source_pk)
         report_start = next_pk(self.profile, report_asset, report_asset.c.report_pk)
         asset_start = next_pk(self.profile, asset_table, asset_table.c.asset_id)
         field_start = next_pk(self.profile, asset_field, asset_field.c.field_id)
@@ -94,8 +95,25 @@ class _CatalogPaginationContract:
                 field_order=index + 1, nullable_flag="Y", pk_flag="N", partition_flag="N",
                 is_deleted="N", created_by="dap464", updated_by="dap464",
             ))
-        self.related_tables = [{"assetId": value, "tableName": self.live_name} for value in self.asset_ids]
-        self.related_indicators = [{"indicatorId": value} for value in self.indicator_codes[:3]]
+        self.related_table_snapshots = [
+            {"assetId": value, "tableName": self.live_name} for value in self.asset_ids
+        ]
+        self.related_tables = [
+            {
+                "assetId": value,
+                "tableName": self.live_name,
+                "tableCn": "Synthetic table",
+                "schemaName": f"fixture_{offset}",
+                "qualifiedName": f"fixture_{offset}.{self.live_name}",
+                "layer": "",
+                "domain": "",
+                "availability": "available",
+            }
+            for offset, value in enumerate(self.asset_ids)
+        ]
+        self.related_indicator_snapshots = [
+            {"indicatorId": value} for value in self.indicator_codes[:3]
+        ]
         for offset in range(8):
             index = offset + 1
             status = "enabled" if index % 2 else "disabled"
@@ -111,12 +129,25 @@ class _CatalogPaginationContract:
                     registrar_name=self.prefix + f"person-{index}", registered_date="2026-01-01",
                     is_deleted=deleted, created_by="dap464", updated_by="dap464",
                 ),
+                *(
+                    [insert(indicator_source).values(
+                        source_pk=source_start + offset,
+                        indicator_pk=self.indicator_ids[offset],
+                        source_asset_id=self.asset_ids[0],
+                        source_field_id=self.field_ids[0],
+                        source_order=0,
+                        is_deleted="N",
+                        created_by="dap464",
+                        updated_by="dap464",
+                    )]
+                    if deleted == "N" else []
+                ),
                 insert(report_asset).values(
                     report_pk=self.report_ids[offset], report_code=self.report_codes[offset], report_name=self.prefix + "same",
                     report_type=self.prefix + ("typeA" if index % 2 else "typeB"), domain_name="Synthetic domain",
                     freq_code="日", status_code=status, owner_dept_name=self.prefix + ("deptA" if index % 2 else "deptB"),
-                    owner_name=self.prefix + f"person-{index}", related_tables_json=json.dumps(self.related_tables),
-                    related_indicators_json=json.dumps(self.related_indicators), is_deleted=deleted,
+                    owner_name=self.prefix + f"person-{index}", related_tables_json=json.dumps(self.related_table_snapshots),
+                    related_indicators_json=json.dumps(self.related_indicator_snapshots), is_deleted=deleted,
                     created_by="dap464", updated_by="dap464",
                 ),
             ])
@@ -149,6 +180,7 @@ class _CatalogPaginationContract:
         with database_transaction():
             execute_statements_core(self.profile, [
                 delete(report_asset).where(report_asset.c.report_pk.in_(self.report_ids), report_asset.c.report_code.in_(self.report_codes)),
+                delete(indicator_source).where(indicator_source.c.indicator_pk.in_(self.indicator_ids)),
                 delete(indicator_item).where(indicator_item.c.indicator_pk.in_(self.indicator_ids), indicator_item.c.indicator_id.in_(self.indicator_codes)),
                 delete(asset_field).where(asset_field.c.field_id.in_(self.field_ids), asset_field.c.asset_id.in_(self.asset_ids)),
                 delete(asset_table).where(asset_table.c.asset_id.in_(self.asset_ids), asset_table.c.table_name == self.live_name),
@@ -235,7 +267,17 @@ class _CatalogPaginationContract:
             for item in result["items"]:
                 self.assertEqual((2, 3), (item["relatedTableCount"], item["relatedIndicatorCount"]))
                 self.assertEqual(self.related_tables, item["relatedTables"])
-                self.assertEqual(self.related_indicators, item["relatedIndicators"])
+                self.assertEqual(
+                    [snapshot["indicatorId"] for snapshot in self.related_indicator_snapshots],
+                    [metric["indicatorId"] for metric in item["relatedIndicators"]],
+                )
+                for metric in item["relatedIndicators"]:
+                    self.assertEqual("available", metric["availability"])
+                    self.assertEqual(1, metric["sourceCount"])
+                    source = metric["sources"][0]
+                    self.assertEqual(self.asset_ids[0], source["assetId"])
+                    self.assertEqual(self.field_ids[0], source["fieldId"])
+                    self.assertEqual("available", source["availability"])
             codes.extend(item["code"] for item in result["items"])
         self.assertEqual(self.report_codes[:7], codes)
         result = self.report.get_report_page(keyword=self.prefix, report_type=self.prefix + "typeA", domain="Synthetic domain",
@@ -256,8 +298,15 @@ class _CatalogPaginationContract:
                 self.indicator.get_indicator_detail(self.indicator_codes[7])
             with self.assertRaises(ReportNotFoundError):
                 self.report.get_report_detail(self.report_codes[7])
-        self.assertEqual(4, len(self.executed_sql))
-        for sql, params, _ms in self.executed_sql:
+        detail_queries = [
+            (sql, params)
+            for sql, params, _ms in self.executed_sql
+            if "LIMIT" in sql.upper()
+            and ("indicator_id =" in sql or "report_code =" in sql)
+        ]
+        self.assertEqual(4, len(detail_queries))
+        self.assertTrue(any("p_indicator_source" in sql for sql, _params, _ms in self.executed_sql))
+        for sql, params in detail_queries:
             self.assertIn("WHERE", sql)
             self.assertIn("LIMIT", sql)
             self.assertNotIn("count(", sql.lower())

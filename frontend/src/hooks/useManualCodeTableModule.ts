@@ -2,13 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createManualCodeTable,
   deleteManualCodeTable,
+  createManualCodeValue,
+  deleteManualCodeValue,
   exportManualCodeTablesCsv,
+  getManualCodeValue,
+  getManualCodeValuePage,
   getManualCodeTables,
   getManualCodeTablePage,
   updateManualCodeTable,
   updateManualCodeTableStatus,
+  updateManualCodeValue,
+  updateManualCodeValueStatus,
 } from '../api/manualCodeTables.ts';
-import type { ManualCodeTablePage } from '../api/manualCodeTables.ts';
+import type { ManualCodeTablePage, ManualCodeValue } from '../api/manualCodeTables.ts';
 import type { MockManualCodeTable } from '../data/manualCodeTables.ts';
 import { getBinaryStatusValue, toast } from '../components/common/index.ts';
 import { downloadCsvRows, downloadCsvContent } from '../utils/csv.ts';
@@ -57,6 +63,13 @@ const EMPTY_FORM: ManualCodeTableFormData = {
   remark: '',
 };
 
+const EMPTY_CODE_VALUE_FORM: ManualCodeValueFormData = {
+  code: '',
+  label: '',
+  description: '',
+  status: 'enabled',
+};
+
 export interface ManualCodeTableFormFieldError {
   field: string;
   message: string;
@@ -66,6 +79,20 @@ export interface ManualCodeTableModalState {
   open: boolean;
   mode: 'new' | 'edit';
   initial: MockManualCodeTable | null;
+  busy: boolean;
+}
+
+export interface ManualCodeValueFormData {
+  code: string;
+  label: string;
+  description: string;
+  status: string;
+}
+
+export interface ManualCodeValueFormModalState {
+  open: boolean;
+  mode: 'new' | 'edit';
+  initial: ManualCodeValue | null;
   busy: boolean;
 }
 
@@ -104,6 +131,37 @@ export interface UseManualCodeTableModuleResult {
   submit: () => Promise<void>;
   detailItem: MockManualCodeTable | null;
   setDetailItem: React.Dispatch<React.SetStateAction<MockManualCodeTable | null>>;
+  openDetail: (item: MockManualCodeTable) => void;
+  closeDetail: () => void;
+  codeItems: ManualCodeValue[];
+  codeItemTotal: number;
+  codeItemGroupTotal: number;
+  codeItemPage: number;
+  codeItemPageSize: number;
+  setCodeItemPage: React.Dispatch<React.SetStateAction<number>>;
+  setCodeItemPageSize: React.Dispatch<React.SetStateAction<number>>;
+  codeItemLoading: boolean;
+  codeItemError: string;
+  codeItemQuery: string;
+  setCodeItemQuery: React.Dispatch<React.SetStateAction<string>>;
+  codeItemStatus: string;
+  setCodeItemStatus: React.Dispatch<React.SetStateAction<string>>;
+  loadCodeItems: () => Promise<void>;
+  codeItemDetail: ManualCodeValue | null;
+  setCodeItemDetail: React.Dispatch<React.SetStateAction<ManualCodeValue | null>>;
+  openCodeItemDetail: (item: ManualCodeValue) => Promise<void>;
+  codeItemFormModal: ManualCodeValueFormModalState;
+  codeItemForm: ManualCodeValueFormData;
+  setCodeItemForm: React.Dispatch<React.SetStateAction<ManualCodeValueFormData>>;
+  codeItemFormErrors: ManualCodeTableFormFieldError[];
+  codeItemErrorFocusRevision: number;
+  clearCodeItemFormError: (field: string) => void;
+  openNewCodeItem: () => void;
+  openEditCodeItem: (item: ManualCodeValue) => void;
+  closeCodeItemForm: () => void;
+  submitCodeItem: () => Promise<void>;
+  changeCodeItemStatus: (item: ManualCodeValue, status: string) => void;
+  removeCodeItem: (item: ManualCodeValue) => void;
   changeStatus: (item: MockManualCodeTable, status: string) => void;
   remove: (item: MockManualCodeTable) => void;
   exportCsv: () => Promise<void>;
@@ -124,7 +182,10 @@ export function useManualCodeTableModule({
   const [pageSize, setPageSize] = useState(20);
   const [loading, setLoading] = useState(true);
   const requestSequence = useRef(0);
+  const codeItemRequestSequence = useRef(0);
+  const codeItemDetailRequestSequence = useRef(0);
   const previousFilterKey = useRef<string | null>(null);
+  const previousCodeItemFilterKey = useRef<string | null>(null);
   const [error, setError] = useState('');
   const [styleFilter, setStyleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -135,12 +196,35 @@ export function useManualCodeTableModule({
     busy: false,
   });
   const [detailItem, setDetailItem] = useState<MockManualCodeTable | null>(null);
+  const [codeItems, setCodeItems] = useState<ManualCodeValue[]>([]);
+  const [codeItemTotal, setCodeItemTotal] = useState(0);
+  const [codeItemGroupTotal, setCodeItemGroupTotal] = useState(0);
+  const [codeItemPage, setCodeItemPage] = useState(1);
+  const [codeItemPageSize, setCodeItemPageSize] = useState(20);
+  const [codeItemLoading, setCodeItemLoading] = useState(false);
+  const [codeItemError, setCodeItemError] = useState('');
+  const [codeItemQuery, setCodeItemQuery] = useState('');
+  const [codeItemStatus, setCodeItemStatus] = useState('');
+  const [codeItemDetail, setCodeItemDetail] = useState<ManualCodeValue | null>(null);
+  const [codeItemFormModal, setCodeItemFormModal] = useState<ManualCodeValueFormModalState>({
+    open: false,
+    mode: 'new',
+    initial: null,
+    busy: false,
+  });
+  const [codeItemForm, setCodeItemForm] = useState<ManualCodeValueFormData>(EMPTY_CODE_VALUE_FORM);
+  const [codeItemFormErrors, setCodeItemFormErrors] = useState<ManualCodeTableFormFieldError[]>([]);
+  const [codeItemErrorFocusRevision, setCodeItemErrorFocusRevision] = useState(0);
   const [form, setForm] = useState<ManualCodeTableFormData>(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState<ManualCodeTableFormFieldError[]>([]);
   const [errorFocusRevision, setErrorFocusRevision] = useState(0);
   const submitInFlight = useRef(false);
+  const codeItemSubmitInFlight = useRef(false);
   const clearFieldError = useCallback((field: string) => {
     setFormErrors((current) => clearFormFieldErrorEntry(current, field));
+  }, []);
+  const clearCodeItemFormError = useCallback((field: string) => {
+    setCodeItemFormErrors((current) => clearFormFieldErrorEntry(current, field));
   }, []);
 
   const load = useCallback(async (requestedPage = page): Promise<void> => {
@@ -182,6 +266,84 @@ export function useManualCodeTableModule({
 
   const filteredItems = items;
 
+  const loadCodeItems = useCallback(async (requestedPage = codeItemPage): Promise<void> => {
+    const sequence = ++codeItemRequestSequence.current;
+    if (!detailItem) {
+      setCodeItems([]);
+      setCodeItemTotal(0);
+      setCodeItemGroupTotal(0);
+      setCodeItemLoading(false);
+      setCodeItemError('');
+      return;
+    }
+    setCodeItemLoading(true);
+    setCodeItemError('');
+    try {
+      const result = await getManualCodeValuePage(
+        detailItem.id,
+        { keyword: codeItemQuery, status: codeItemStatus || undefined },
+        requestedPage,
+        codeItemPageSize,
+      );
+      if (sequence !== codeItemRequestSequence.current) return;
+      setCodeItems(result.items);
+      setCodeItemTotal(result.total);
+      setCodeItemGroupTotal(result.stats.total);
+      if (result.page !== codeItemPage) setCodeItemPage(result.page);
+      if (result.pageSize !== codeItemPageSize) setCodeItemPageSize(result.pageSize);
+    } catch (nextError: unknown) {
+      if (sequence === codeItemRequestSequence.current) {
+        setCodeItemError(getErrorMessage(nextError, '读取码值条目失败。'));
+      }
+    } finally {
+      if (sequence === codeItemRequestSequence.current) setCodeItemLoading(false);
+    }
+  }, [codeItemPage, codeItemPageSize, codeItemQuery, codeItemStatus, detailItem]);
+
+  const openDetail = (item: MockManualCodeTable): void => {
+    setCodeItemPage(1);
+    setCodeItemQuery('');
+    setCodeItemStatus('');
+    setCodeItemDetail(null);
+    setDetailItem(item);
+  };
+
+  const closeDetail = (): void => {
+    codeItemRequestSequence.current += 1;
+    codeItemDetailRequestSequence.current += 1;
+    setDetailItem(null);
+    setCodeItemDetail(null);
+    setCodeItems([]);
+    setCodeItemError('');
+    setCodeItemLoading(false);
+  };
+
+  const openCodeItemDetail = async (item: ManualCodeValue): Promise<void> => {
+    if (!detailItem) return;
+    const sequence = ++codeItemDetailRequestSequence.current;
+    try {
+      const result = await getManualCodeValue(detailItem.id, item.id);
+      if (sequence === codeItemDetailRequestSequence.current) setCodeItemDetail(result);
+    } catch (nextError: unknown) {
+      if (sequence === codeItemDetailRequestSequence.current) {
+        toast.error(getErrorMessage(nextError, '读取码值条目详情失败。'));
+      }
+    }
+  };
+
+  const codeItemFilterKey = JSON.stringify([codeItemQuery.trim(), codeItemStatus]);
+  useEffect(() => {
+    if (!active || !detailItem) return;
+    if (previousCodeItemFilterKey.current !== codeItemFilterKey) {
+      previousCodeItemFilterKey.current = codeItemFilterKey;
+      if (codeItemPage !== 1) {
+        setCodeItemPage(1);
+        return;
+      }
+    }
+    void loadCodeItems();
+  }, [active, codeItemFilterKey, codeItemPage, detailItem, loadCodeItems]);
+
   const openNew = (): void => {
     requireLogin(() => {
       setFormErrors([]);
@@ -192,7 +354,7 @@ export function useManualCodeTableModule({
 
   const openEdit = (item: MockManualCodeTable): void => {
     requireLogin(() => {
-      setDetailItem(null);
+      closeDetail();
       setFormErrors([]);
       setForm({
         tableCode: item.tableCode,
@@ -208,6 +370,105 @@ export function useManualCodeTableModule({
 
   const closeForm = (): void => {
     if (!formModal.busy) setFormModal({ open: false, mode: 'new', initial: null, busy: false });
+  };
+
+  const openNewCodeItem = (): void => {
+    requireLogin(() => {
+      setCodeItemFormErrors([]);
+      setCodeItemForm(EMPTY_CODE_VALUE_FORM);
+      setCodeItemDetail(null);
+      setCodeItemFormModal({ open: true, mode: 'new', initial: null, busy: false });
+    }, 'code_table:write');
+  };
+
+  const openEditCodeItem = (item: ManualCodeValue): void => {
+    requireLogin(() => {
+      setCodeItemFormErrors([]);
+      setCodeItemDetail(null);
+      setCodeItemForm({
+        code: item.code,
+        label: item.label,
+        description: item.description || '',
+        status: item.status,
+      });
+      setCodeItemFormModal({ open: true, mode: 'edit', initial: item, busy: false });
+    }, 'code_table:write');
+  };
+
+  const closeCodeItemForm = (): void => {
+    if (!codeItemFormModal.busy) {
+      setCodeItemFormModal({ open: false, mode: 'new', initial: null, busy: false });
+    }
+  };
+
+  const submitCodeItem = async (): Promise<void> => {
+    if (!detailItem || codeItemSubmitInFlight.current || codeItemFormModal.busy) return;
+    const payload = {
+      code: codeItemForm.code.trim().toUpperCase(),
+      label: codeItemForm.label.trim(),
+      description: codeItemForm.description.trim(),
+      status: codeItemForm.status,
+    };
+    const errors: ManualCodeTableFormFieldError[] = [];
+    if (!/^[A-Z][A-Z0-9_]{0,63}$/.test(payload.code)) {
+      errors.push({ field: 'code', message: '条目编码须以英文字母开头，只能包含字母、数字和下划线，长度为 1–64 位' });
+    }
+    if (!payload.label) errors.push({ field: 'label', message: '条目名称不能为空' });
+    if (payload.label.length > 128) errors.push({ field: 'label', message: '条目名称不能超过 128 个字符' });
+    if (payload.description.length > 512) errors.push({ field: 'description', message: '条目说明不能超过 512 个字符' });
+    if (!['enabled', 'disabled'].includes(payload.status)) errors.push({ field: 'status', message: '状态无效' });
+    if (errors.length) {
+      setCodeItemFormErrors(errors);
+      setCodeItemErrorFocusRevision((revision) => revision + 1);
+      return;
+    }
+    codeItemSubmitInFlight.current = true;
+    setCodeItemFormModal((current) => ({ ...current, busy: true }));
+    try {
+      if (codeItemFormModal.mode === 'edit' && codeItemFormModal.initial) {
+        await updateManualCodeValue(detailItem.id, codeItemFormModal.initial.id, payload);
+        await loadCodeItems();
+      } else {
+        await createManualCodeValue(detailItem.id, payload);
+        setCodeItemPage(1);
+        await loadCodeItems(1);
+      }
+      setCodeItemFormModal({ open: false, mode: 'new', initial: null, busy: false });
+      toast.success(codeItemFormModal.mode === 'edit' ? '码值条目已更新' : '码值条目已新增');
+    } catch (nextError: unknown) {
+      setCodeItemFormErrors(mapApiFormFieldErrors(nextError, ['code', 'label', 'description', 'status']));
+      setCodeItemErrorFocusRevision((revision) => revision + 1);
+      setCodeItemFormModal((current) => ({ ...current, busy: false }));
+    } finally {
+      codeItemSubmitInFlight.current = false;
+    }
+  };
+
+  const changeCodeItemStatus = (item: ManualCodeValue, status: string): void => {
+    if (!detailItem) return;
+    requireLogin(async () => {
+      try {
+        await updateManualCodeValueStatus(detailItem.id, item.id, status);
+        await loadCodeItems();
+        toast.success(`已${status === 'enabled' ? '启用' : '禁用'} ${item.code}`);
+      } catch (nextError: unknown) {
+        toast.error(getErrorMessage(nextError, '更新码值条目状态失败。'));
+      }
+    }, 'code_table:write');
+  };
+
+  const removeCodeItem = (item: ManualCodeValue): void => {
+    if (!detailItem) return;
+    requireLogin(async () => {
+      try {
+        await deleteManualCodeValue(detailItem.id, item.id);
+        setCodeItemDetail(null);
+        await loadCodeItems();
+        toast.success(`已删除 ${item.code}`);
+      } catch (nextError: unknown) {
+        toast.error(getErrorMessage(nextError, '删除码值条目失败。'));
+      }
+    }, 'code_table:write');
   };
 
   const submit = async (): Promise<void> => {
@@ -349,6 +610,37 @@ export function useManualCodeTableModule({
     submit,
     detailItem,
     setDetailItem,
+    openDetail,
+    closeDetail,
+    codeItems,
+    codeItemTotal,
+    codeItemGroupTotal,
+    codeItemPage,
+    codeItemPageSize,
+    setCodeItemPage,
+    setCodeItemPageSize,
+    codeItemLoading,
+    codeItemError,
+    codeItemQuery,
+    setCodeItemQuery,
+    codeItemStatus,
+    setCodeItemStatus,
+    loadCodeItems,
+    codeItemDetail,
+    setCodeItemDetail,
+    openCodeItemDetail,
+    codeItemFormModal,
+    codeItemForm,
+    setCodeItemForm,
+    codeItemFormErrors,
+    codeItemErrorFocusRevision,
+    clearCodeItemFormError,
+    openNewCodeItem,
+    openEditCodeItem,
+    closeCodeItemForm,
+    submitCodeItem,
+    changeCodeItemStatus,
+    removeCodeItem,
     changeStatus,
     remove,
     exportCsv,

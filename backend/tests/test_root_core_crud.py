@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
-from backend.app.services.root_service import RootService
+from backend.app.services.root_service import RootService, RootValidationError
 
 
 class RootCoreCrudTests(unittest.TestCase):
@@ -18,6 +18,7 @@ class RootCoreCrudTests(unittest.TestCase):
             "root_cn_name": "客户",
             "category_name": "business",
             "root_desc": "Customer-related fields",
+            "root_example": "customer_id",
             "is_deleted": "N",
         }
         self.item = {
@@ -26,6 +27,7 @@ class RootCoreCrudTests(unittest.TestCase):
             "cn": "客户",
             "cat": "business",
             "desc": "Customer-related fields",
+            "example": "customer_id",
         }
 
     def _assert_portable(self, statement):
@@ -48,6 +50,7 @@ class RootCoreCrudTests(unittest.TestCase):
         self.assertEqual((5, 2, 1), (result["total"], result["page"], result["pageSize"]))
         self.assertEqual(12, result["stats"]["total"])
         self.assertEqual(["customer"], [item["abbr"] for item in result["items"]])
+        self.assertEqual("customer_id", result["items"][0]["example"])
         count_statement, page_statement = [
             call.args[0] for call in self.service._db.fetch_rows.call_args_list[:2]
         ]
@@ -67,6 +70,12 @@ class RootCoreCrudTests(unittest.TestCase):
         full_list_statement = self.service._db.fetch_rows.call_args_list[0].args[0]
         self.assertNotIn("LIMIT", str(full_list_statement.compile(dialect=sqlite.dialect())).upper())
         self.assertEqual(["customer", "order"], self.service.get_root_abbreviations())
+
+    def test_root_text_fields_are_bounded_to_schema_lengths(self):
+        with self.assertRaises(RootValidationError) as error:
+            self.service._normalize_payload({**self.item, "example": "x" * 2001})
+
+        self.assertEqual("example", error.exception.details[0]["field"])
 
     def test_list_and_category_queries_use_bound_core_expressions(self):
         self.service._db.fetch_rows = MagicMock(return_value=[self.row])
@@ -97,6 +106,7 @@ class RootCoreCrudTests(unittest.TestCase):
         self.assertEqual(created["abbr"], "customer")
         statements = self.service._db.execute_statements.call_args.args[0]
         self.assertEqual(len(statements), 2)
+        self.assertIn("root_example", str(statements[0].compile(dialect=sqlite.dialect())))
         for statement in statements:
             self._assert_portable(statement)
         self.assertIn("INSERT", str(statements[0].compile(dialect=sqlite.dialect())))

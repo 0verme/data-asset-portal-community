@@ -11,7 +11,7 @@ import { SYSTEMS } from "./data/systems.ts";
 import { DWM_TABLES } from "./data/tables.ts";
 import { UPSTREAM_SYSTEMS } from "./data/upstreamSystems.ts";
 
-test("retail demo exposes the planned deterministic data volume", () => {
+test("retail demo keeps root records database-backed instead of hardcoding business terms", () => {
   assert.equal(SYSTEMS.length, 8);
   assert.equal(DWM_TABLES.length, 32);
   assert.equal(INDICATORS.length, 36);
@@ -38,7 +38,7 @@ test("retail demo exposes the planned deterministic data volume", () => {
   assert.equal(PUSH_SYSTEMS.length, 6);
   assert.equal(REPORTS.length, 8);
   assert.equal(API_ASSETS.length, 10);
-  assert.equal(WORD_ROOTS.length, 40);
+  assert.equal(WORD_ROOTS.length, 0);
 });
 
 test("retail assets have unique names and complete field metadata", () => {

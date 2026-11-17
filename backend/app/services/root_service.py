@@ -108,6 +108,7 @@ class RootService(AuditActorMixin):
             root_item.c.root_cn_name,
             root_item.c.category_name,
             root_item.c.root_desc,
+            root_item.c.root_example,
         )
 
     @staticmethod
@@ -118,6 +119,7 @@ class RootService(AuditActorMixin):
             "cn": row["root_cn_name"],
             "cat": row["category_name"],
             "desc": row.get("root_desc") or "",
+            "example": row.get("root_example") or "",
         }
 
     @staticmethod
@@ -133,6 +135,7 @@ class RootService(AuditActorMixin):
                 root_item.c.root_en_name,
                 root_item.c.root_cn_name,
                 root_item.c.root_desc,
+                root_item.c.root_example,
             )
             clauses.append(
                 or_(
@@ -152,27 +155,43 @@ class RootService(AuditActorMixin):
             raise RootValidationError([{"field": "body", "message": "Request body must be a JSON object"}])
 
         abbr = str(payload.get("abbr") or "").strip()
+        en = str(payload.get("en") or "").strip()
         cn = str(payload.get("cn") or "").strip()
         cat = str(payload.get("cat") or "").strip()
+        desc = str(payload.get("desc") or "").strip()
+        example = str(payload.get("example") or "").strip()
 
         if not abbr:
             details.append({"field": "abbr", "message": "abbr is required"})
         elif not ROOT_ABBR_RE.fullmatch(abbr):
             details.append({"field": "abbr", "message": "abbr must contain only lowercase letters and numbers; underscore is not allowed"})
+        elif len(abbr) > 64:
+            details.append({"field": "abbr", "message": "abbr cannot exceed 64 characters"})
+        if len(en) > 256:
+            details.append({"field": "en", "message": "英文全称不能超过 256 个字符"})
         if not cn:
             details.append({"field": "cn", "message": "cn is required"})
+        elif len(cn) > 256:
+            details.append({"field": "cn", "message": "中文含义不能超过 256 个字符"})
         if not cat:
             details.append({"field": "cat", "message": "cat is required"})
+        elif len(cat) > 64:
+            details.append({"field": "cat", "message": "分类不能超过 64 个字符"})
+        if len(desc) > 2000:
+            details.append({"field": "desc", "message": "用途说明不能超过 2000 个字符"})
+        if len(example) > 2000:
+            details.append({"field": "example", "message": "示例字段名不能超过 2000 个字符"})
 
         if details:
             raise RootValidationError(details)
 
         return {
             "abbr": abbr,
-            "en": str(payload.get("en") or "").strip(),
+            "en": en,
             "cn": cn,
             "cat": cat,
-            "desc": str(payload.get("desc") or "").strip(),
+            "desc": desc,
+            "example": example,
         }
 
     def _normalize_items(self, items):
@@ -274,6 +293,7 @@ class RootService(AuditActorMixin):
             root_cn_name=item["cn"],
             category_name=item["cat"],
             root_desc=item["desc"],
+            root_example=item["example"],
             is_deleted="N",
             created_by=self._default_operator,
             updated_by=self._default_operator,
@@ -368,6 +388,7 @@ class RootService(AuditActorMixin):
                     root_cn_name=item["cn"],
                     category_name=item["cat"],
                     root_desc=item["desc"],
+                    root_example=item["example"],
                     updated_by=self._default_operator,
                     updated_at=func.current_timestamp(),
                 ),

@@ -58,8 +58,11 @@ const statsPayload = (fieldCount = 7, sourceTableCount = 4) => ({
   fieldCount,
   mappedFieldCount: fieldCount,
   unmappedFieldCount: 0,
+  configuredTableCount: sourceTableCount,
+  incompleteTableCount: 0,
   emptyCommentCount: 0,
-  coverage: fieldCount ? 100 : 0,
+  coverage: fieldCount ? 100 : null,
+  tableConfigCoverage: sourceTableCount ? 100 : null,
 });
 
 async function installApiFixtures(
@@ -217,13 +220,14 @@ async function exportAndAssertColumns(
   testInfo: TestInfo,
   view: "field" | "table",
   expectedHeaders: string[],
+  expectedDataRows = 1,
 ): Promise<string[][]> {
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出 CSV" }).click();
   const download = await downloadPromise;
   expect(await download.failure()).toBeNull();
   const rows = parseCsv(await downloadText(download, testInfo, `${view}-view.csv`));
-  expect(rows).toHaveLength(2);
+  expect(rows).toHaveLength(expectedDataRows + 1);
   for (const row of rows) expect(row).toHaveLength(expectedHeaders.length);
   expect(rows[0]).toEqual(expectedHeaders);
   return rows;
@@ -494,11 +498,16 @@ test("stats failure and retry do not clear or refetch the active table list", as
   await page.goto("/field-mapping");
   await expect(page.getByText("TABLE_READY", { exact: true })).toBeVisible();
   await expect(page.getByRole("alert").filter({ hasText: "统计加载失败" })).toBeVisible();
+  await expect(statCard(page, "有效映射字段")).toHaveText("—");
+  await expect(statCard(page, "入仓配置完整")).toHaveText("—");
   await expect(page.getByText("TABLE_READY", { exact: true })).toBeVisible();
   expect(requests.tables).toHaveLength(1);
 
   await page.getByRole("button", { name: "重试统计" }).click();
   await expect(statCard(page, "字段维度")).toHaveText("0");
+  await expect(statCard(page, "入仓配置完整")).toHaveText("—");
+  await expect(page.locator(".fm-stat-card").filter({ hasText: "有效映射字段" })).toContainText("没有已登记字段，无法计算覆盖率");
+  await expect(page.locator(".fm-stat-card").filter({ hasText: "入仓配置完整" })).toContainText("没有可统计的表映射");
   await expect(page.getByRole("alert").filter({ hasText: "统计加载失败" })).toHaveCount(0);
   await expect(page.getByText("TABLE_READY", { exact: true })).toBeVisible();
   expect(requests.tables).toHaveLength(1);
@@ -671,7 +680,7 @@ test("direct linked field URL loads only field details with its route filters", 
   await expect(page).toHaveURL(/tab=field/);
 });
 
-test("field-mapping column contract aligns field/table cells and preserves CSV columns", async ({ page }, testInfo) => {
+test("field-mapping column contract aligns target values, distinguishes load modes and preserves CSV columns", async ({ page }, testInfo) => {
   const rows = [
     {
       ...fieldRow,
@@ -688,9 +697,9 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
       ...fieldRow,
       tablePk: "pk-empty",
       srcField: "EMPTY_LAYER",
-      srcComment: "空目标层及未知入仓方式",
-      targetLayer: "",
-      targetTable: "DWF_EMPTY_LAYER",
+      srcComment: "未知入仓方式",
+      targetLayer: "DWD",
+      targetTable: "DWD_UNKNOWN_MODE",
       loadMode: "future_mode",
       targetField: "EMPTY_LAYER_VALUE",
     },
@@ -698,22 +707,57 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
       ...fieldRow,
       tablePk: "pk-missing",
       srcField: "MISSING_METADATA",
-      srcComment: "缺少目标层及入仓方式",
-      targetLayer: undefined,
-      targetTable: "DWF_MISSING_METADATA",
+      srcComment: "缺少入仓方式",
+      targetLayer: "DWS",
+      targetTable: "DWS_MISSING_MODE",
       loadMode: undefined,
       targetField: "MISSING_METADATA_VALUE",
     },
+    {
+      ...fieldRow,
+      tablePk: "pk-empty-target",
+      srcField: "EMPTY_TARGET",
+      srcComment: "目标字段为空但表配置完整",
+      targetLayer: "DWM",
+      targetTable: "DWM_EMPTY_TARGET",
+      loadMode: "full_zip",
+      targetField: "   ",
+    },
+    {
+      ...fieldRow,
+      tablePk: "pk-missing-layer",
+      srcField: "MISSING_LAYER",
+      srcComment: "缺少目标层时不推断默认 Schema",
+      targetLayer: "",
+      targetTable: "TARGET_NO_LAYER",
+      loadMode: "full",
+      targetField: "TARGET_FIELD",
+    },
   ];
   const fieldCsv = [
-    "源系统,源系统表,源字段,字段类型,字段注释,目标层,目标表名,入仓方式,目标字段,映射规则",
-    "测试源系统 · SYS-1,SRC_SALES,AMOUNT,DECIMAL,销售金额,DWF,DWF_SALES,incr,AMOUNT_VALUE,日期格式化",
+    "源系统,源系统表,源字段,字段类型,字段注释,目标层,目标表,入仓方式,目标字段,映射规则",
+    "测试源系统 · SYS-1,SRC_SALES,AMOUNT,DECIMAL,销售金额,DWF,DWF_SALES,增量,AMOUNT_VALUE,日期格式化",
+    "测试源系统 · SYS-1,FIELD_ON_DEMAND,EMPTY_LAYER,VARCHAR,未知入仓方式,DWD,DWD_UNKNOWN_MODE,未知（future_mode）,EMPTY_LAYER_VALUE,直接映射",
+    "测试源系统 · SYS-1,FIELD_ON_DEMAND,MISSING_METADATA,VARCHAR,缺少入仓方式,DWS,DWS_MISSING_MODE,未设置,MISSING_METADATA_VALUE,直接映射",
+    "测试源系统 · SYS-1,FIELD_ON_DEMAND,EMPTY_TARGET,VARCHAR,目标字段为空但表配置完整,DWM,DWM_EMPTY_TARGET,全量拉链,   ,直接映射",
+    "测试源系统 · SYS-1,FIELD_ON_DEMAND,MISSING_LAYER,VARCHAR,缺少目标层时不推断默认 Schema,,TARGET_NO_LAYER,全量,TARGET_FIELD,直接映射",
   ].join("\r\n");
   const tableCsv = [
-    "源系统,源系统表,表中文名,目标层,目标表名,入仓方式,已映射,空注释率",
+    "源系统,源系统表,表中文名,目标层,目标表,入仓方式,已映射,空注释率",
     "测试源系统 · SYS-1,SRC_SALES,销售表,DWF,DWF_SALES,增量,3,0",
   ].join("\r\n");
   const requests = await installApiFixtures(page, {
+    onStats: async (route) => {
+      await route.fulfill({ json: {
+        ...statsPayload(5, 5),
+        mappedFieldCount: 4,
+        unmappedFieldCount: 1,
+        configuredTableCount: 2,
+        incompleteTableCount: 3,
+        coverage: 80,
+        tableConfigCoverage: 40,
+      } });
+    },
     onFields: async (route, url) => {
       const pageSize = Number(url.searchParams.get("pageSize") || 50);
       const pageNumber = Number(url.searchParams.get("page") || 1);
@@ -728,6 +772,10 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
     },
   });
   await page.goto("/field-mapping");
+  await expect(statCard(page, "有效映射字段")).toHaveText("4 / 5");
+  await expect(page.locator(".fm-stat-card").filter({ hasText: "有效映射字段" })).toContainText("字段映射覆盖率 80% · 目标字段非空 / 已登记字段");
+  await expect(statCard(page, "入仓配置完整")).toHaveText("2 / 5");
+  await expect(page.locator(".fm-stat-card").filter({ hasText: "入仓配置完整" })).toContainText("完整率 40%");
 
   const table = page.locator("#field-mapping-results-table");
   await expect(table.locator("tbody tr")).toHaveCount(1);
@@ -736,7 +784,7 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
   await expect(table.locator("tbody tr").first().locator("td")).toHaveCount(8);
   await expect(table.locator("thead")).not.toContainText("目标层");
   const tableCsvRows = await exportAndAssertColumns(page, testInfo, "table", [
-    "源系统", "源系统表", "表中文名", "目标层", "目标表名", "入仓方式", "已映射", "空注释率",
+    "源系统", "源系统表", "表中文名", "目标层", "目标表", "入仓方式", "已映射", "空注释率",
   ]);
   expect(tableCsvRows[1]).toEqual([
     "测试源系统 · SYS-1", "SRC_SALES", "销售表", "DWF", "DWF_SALES", "增量", "3", "0",
@@ -744,14 +792,14 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
   expect(requests.exports.at(-1)?.searchParams.get("view")).toBe("table");
 
   await page.getByRole("button", { name: /字段维度/ }).click();
-  await expect(table.locator("tbody tr")).toHaveCount(3);
+  await expect(table.locator("tbody tr")).toHaveCount(5);
   await expect(table.locator("colgroup col")).toHaveCount(11);
   expect(await countEffectiveHeaderColumns(table)).toEqual([11, 11]);
   const fieldHeaders = (await table.locator("thead tr").last().locator("th").allInnerTexts())
     .map((label) => label.trim());
   expect(fieldHeaders).toEqual([
     "源系统", "源系统表", "源字段", "字段类型", "字段注释",
-    "目标层", "目标表名", "入仓方式", "目标字段", "映射规则",
+    "目标层", "目标表", "入仓方式", "目标字段", "映射规则",
   ]);
   await expect(table.locator("thead .fm-arrow-col")).toHaveAttribute("rowspan", "2");
 
@@ -772,7 +820,7 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
   });
   expect(Object.fromEntries(fieldHeaders.slice(5).map((header, index) => [header, populatedCells[index + 6]]))).toEqual({
     "目标层": "DWF",
-    "目标表名": "DWF_SALES",
+    "目标表": "DWF_SALES",
     "入仓方式": "增量",
     "目标字段": "AMOUNT_VALUE",
     "映射规则": "日期格式化",
@@ -780,18 +828,30 @@ test("field-mapping column contract aligns field/table cells and preserves CSV c
   await expect(fieldRows[0]!.locator("td").nth(8).locator(".tag")).toHaveClass(/tag-ok/);
   for (const rowIndex of [1, 2]) {
     const targetCells = (await fieldRows[rowIndex]!.locator("td").allInnerTexts()).slice(6).map((value) => value.trim());
-    expect(targetCells[0]).toBe("-");
-    expect(targetCells[2]).toBe("未设置");
-    await expect(fieldRows[rowIndex]!.locator("td").nth(8).locator(".fm-empty")).toHaveText("未设置");
+    expect(targetCells[0]).toBe(rowIndex === 1 ? "DWD" : "DWS");
+    expect(targetCells[2]).toBe(rowIndex === 1 ? "未知（future_mode）" : "未设置");
+    await expect(fieldRows[rowIndex]!.locator("td").nth(8).locator(".fm-empty")).toHaveText(targetCells[2]!);
   }
+  const emptyTargetCells = (await fieldRows[3]!.locator("td").allInnerTexts()).map((value) => value.trim());
+  expect(emptyTargetCells[6]).toBe("DWM");
+  expect(emptyTargetCells[7]).toBe("DWM_EMPTY_TARGET");
+  expect(emptyTargetCells[8]).toBe("全量拉链");
+  expect(emptyTargetCells[9]).toBe("待补充");
+  const missingLayerCells = (await fieldRows[4]!.locator("td").allInnerTexts()).map((value) => value.trim());
+  expect(missingLayerCells[6]).toBe("-");
+  expect(missingLayerCells[7]).toBe("TARGET_NO_LAYER");
+  expect(missingLayerCells[8]).toBe("全量");
 
   const fieldCsvRows = await exportAndAssertColumns(page, testInfo, "field", [
     "源系统", "源系统表", "源字段", "字段类型", "字段注释",
-    "目标层", "目标表名", "入仓方式", "目标字段", "映射规则",
-  ]);
+    "目标层", "目标表", "入仓方式", "目标字段", "映射规则",
+  ], 5);
   expect(fieldCsvRows[1]).toEqual([
     "测试源系统 · SYS-1", "SRC_SALES", "AMOUNT", "DECIMAL", "销售金额",
-    "DWF", "DWF_SALES", "incr", "AMOUNT_VALUE", "日期格式化",
+    "DWF", "DWF_SALES", "增量", "AMOUNT_VALUE", "日期格式化",
+  ]);
+  expect(fieldCsvRows.slice(1).map((row) => row[7])).toEqual([
+    "增量", "未知（future_mode）", "未设置", "全量拉链", "全量",
   ]);
   expect(requests.exports.at(-1)?.searchParams.get("view")).toBe("field");
 
@@ -871,7 +931,7 @@ test("field-mapping mock CSV contract keeps ten business fields and excludes the
   const csvRows = parseCsv(await downloadText(download, testInfo, "mock-field-view.csv"));
   expect(csvRows[0]).toEqual([
     "源系统", "源系统表", "源字段", "字段类型", "字段注释",
-    "目标层", "目标表名", "入仓方式", "目标字段", "映射规则",
+    "目标层", "目标表", "入仓方式", "目标字段", "映射规则",
   ]);
   expect(csvRows.length).toBeGreaterThan(1);
   for (const row of csvRows) expect(row).toHaveLength(10);

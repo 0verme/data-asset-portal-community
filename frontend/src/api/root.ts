@@ -45,6 +45,7 @@ export interface SanitizedWordRoot {
   cn: string;
   cat: string;
   desc: string;
+  example: string;
 }
 
 export interface RootCategoryItem {
@@ -111,6 +112,7 @@ function sanitizeRootItem(item: unknown): SanitizedWordRoot | null {
     cn,
     cat: String(record['cat'] || '').trim() || DEFAULT_ROOT_CATEGORY,
     desc: String(record['desc'] || '').trim(),
+    example: String(record['example'] || '').trim(),
   };
 }
 
@@ -135,7 +137,7 @@ export async function getRoots(params: RootQueryParams = {}): Promise<SanitizedW
     if (params.cat && item.cat !== params.cat) return false;
     if (!params.keyword) return true;
     const q = params.keyword.trim().toLowerCase();
-    return [item.abbr, item.en, item.cn, item.desc].some((value) =>
+    return [item.abbr, item.en, item.cn, item.desc, item.example].some((value) =>
       String(value || '').toLowerCase().includes(q),
     );
   });

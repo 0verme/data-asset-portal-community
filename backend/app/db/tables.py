@@ -639,6 +639,7 @@ root_item = _table(
     Column("root_cn_name", String(256), nullable=False),
     Column("category_name", String(64), nullable=False),
     Column("root_desc", String(2000)),
+    Column("root_example", String(2000)),
     Column("is_deleted", String(1), nullable=False),
     Column("created_by", String(64), nullable=False),
     Column("created_at", DateTime),

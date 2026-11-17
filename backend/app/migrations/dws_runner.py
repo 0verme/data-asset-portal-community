@@ -74,7 +74,7 @@ REPAIR_HINTS: dict[str, tuple[str, ...]] = {
     "0015_ai_llm_daily_quota": (
         "resolve duplicate, invalid or active reserved AI LLM quota rows explicitly; preserve valid configured limits and usage values before retrying",
     ),
-    "0016_indicator_source_lineage": (
+    "0017_indicator_source_lineage": (
         "complete the nullable caliber documentation columns and the canonical p_indicator_source table/index; preserve all existing source IDs and rows before retrying",
     ),
 }

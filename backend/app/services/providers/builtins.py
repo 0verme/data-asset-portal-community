@@ -40,7 +40,14 @@ def _build_asset(row: dict[str, Any], matched_fields: list[dict[str, str]]) -> d
         "id": row.get("table_name"),
         "title": row.get("table_name") or "",
         "subtitle": row.get("table_cn_name") or "",
-        "meta": _join_meta(row.get("domain_name"), row.get("layer_code"), row.get("owner_name")),
+        "meta": _join_meta(
+            row.get("domain_name"),
+            row.get("layer_code"),
+            row.get("schema_name"),
+            row.get("owner_name"),
+            row.get("grain_desc"),
+            row.get("table_desc"),
+        ),
         # ``assetId`` is the canonical asset identity. ``id`` / ``ref`` stay
         # table_name for display and legacy consumers.
         "assetId": row.get("asset_id"),
@@ -189,9 +196,12 @@ register_search_entity({
         "t.asset_id, "
         "t.table_name, "
         "t.table_cn_name, "
+        "t.schema_name, "
         "t.layer_code, "
         "COALESCE(d.domain_name, t.domain_code, '') AS domain_name, "
-        "t.owner_name"
+        "t.owner_name, "
+        "t.grain_desc, "
+        "t.table_desc"
     ),
     "order": "t.layer_code, t.table_name",
     "build_item": _build_asset,
@@ -308,6 +318,7 @@ register_search_entity({
         "max_fields": 3,
     },
     "select": (
+        "indicator_pk, "
         "indicator_id, "
         "indicator_name, "
         "meaning_desc, "

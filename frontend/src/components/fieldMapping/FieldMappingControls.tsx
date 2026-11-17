@@ -39,6 +39,24 @@ export function FieldMappingStats({
     fieldMappingStatDisplayValue(count, status);
   const hint = (readyHint: string) =>
     fieldMappingStatsDisplayHint(status, readyHint);
+  const mappingCoverageHint = !stats
+    ? hint("")
+    : stats.coverage === null
+      ? "没有已登记字段，无法计算覆盖率"
+      : `字段映射覆盖率 ${stats.coverage}% · 目标字段非空 / 已登记字段`;
+  const mappingCoverageValue = stats
+    ? `${stats.mappedFieldCount} / ${stats.fieldCount}`
+    : value(undefined);
+  const tableConfigValue = stats?.sourceTableCount
+    ? `${stats.configuredTableCount} / ${stats.sourceTableCount}`
+    : value(undefined);
+  const tableConfigHint = !stats
+    ? hint("")
+    : stats.sourceTableCount === 0
+      ? "没有可统计的表映射"
+      : stats.tableConfigCoverage === null
+        ? "入仓配置完整率未知"
+        : `完整率 ${stats.tableConfigCoverage}% · 目标层、目标表及有效入仓方式均已配置`;
 
   return (
     <div className="fm-stats">
@@ -58,14 +76,19 @@ export function FieldMappingStats({
         hint={hint("字段映射明细总数")}
       />
       <StatCard
-        label="已映射"
-        value={value(stats?.mappedFieldCount)}
-        hint={stats ? `覆盖率 ${stats.coverage}%` : hint("")}
+        label="有效映射字段"
+        value={mappingCoverageValue}
+        hint={mappingCoverageHint}
       />
       <StatCard
         label="待补充"
         value={value(stats?.unmappedFieldCount)}
-        hint={hint("目标字段尚未落位")}
+        hint={hint("已登记字段中目标字段尚未落位")}
+      />
+      <StatCard
+        label="入仓配置完整"
+        value={tableConfigValue}
+        hint={tableConfigHint}
       />
       <StatCard
         label="空注释"
@@ -135,23 +158,23 @@ export function FieldMappingFilters({
               />
             </label>
             <label className="fm-field">
-              <span>DWF 表名</span>
+              <span>目标表</span>
               <Input
-                aria-label="DWF 表名"
+                aria-label="目标表"
                 className="inp mono"
                 value={draftFilters.targetTable}
                 onChange={onChange("targetTable")}
-                placeholder="例如：DWD_TRADE_ORDER"
+                placeholder="例如：SALES_ORDER"
               />
             </label>
             <label className="fm-field">
-              <span>DWF 字段名</span>
+              <span>目标字段</span>
               <Input
-                aria-label="DWF 字段名"
+                aria-label="目标字段"
                 className="inp mono"
                 value={draftFilters.targetField}
                 onChange={onChange("targetField")}
-                placeholder="例如：account_no"
+                placeholder="例如：ACCOUNT_NO"
               />
             </label>
           </div>
@@ -174,7 +197,7 @@ export function FieldMappingFilters({
                   <Icon name="info" size={15} />
                 </button>
               )}
-              content="输入源系统表名、源字段名、DWF 表名或 DWF 字段名后点击查询；也可在左侧选择源系统即时筛选。注释条件用于定位源字段注释为空或不为空的记录。重置会清空查询条件并恢复全部源系统。"
+              content="输入源系统表名、源字段名、目标表或目标字段后点击查询；也可在左侧选择源系统即时筛选。注释条件用于定位源字段注释为空或不为空的记录。重置会清空查询条件并恢复全部源系统。"
             />
             <Button className="btn" variant="secondary" type="button" onClick={onReset}>
               重置

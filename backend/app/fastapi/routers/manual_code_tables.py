@@ -18,6 +18,9 @@ from ...contracts import (
     ManualCodeTableItem,
     ManualCodeTableListResponse,
     ManualCodeTableRequest,
+    ManualCodeValueItem,
+    ManualCodeValuePageResponse,
+    ManualCodeValueRequest,
     MessageDataResponse,
     validate_contract,
 )
@@ -26,6 +29,8 @@ from ...services.manual_code_table_service import (
     ManualCodeTableDataSourceError,
     ManualCodeTableNotFoundError,
     ManualCodeTableValidationError,
+    ManualCodeValueAlreadyExistsError,
+    ManualCodeValueNotFoundError,
 )
 from ..dependencies import (
     get_authorization_service,
@@ -37,6 +42,7 @@ from ..dependencies import (
 from ..errors import _service_error_response
 from ..public_catalog import (
     profile_for_request,
+    project_public_catalog_value,
     redact_public_manual_code_table,
 )
 
@@ -64,10 +70,15 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
             return None
         return payload.model_dump(exclude_unset=True)
 
+    def manual_code_value_payload(payload: ManualCodeValueRequest | None) -> dict[str, Any] | None:
+        if payload is None:
+            return None
+        return payload.model_dump(exclude_unset=True)
+
     def error_response(error: Any) -> JSONResponse:
-        if isinstance(error, ManualCodeTableNotFoundError):
+        if isinstance(error, (ManualCodeTableNotFoundError, ManualCodeValueNotFoundError)):
             status = 404
-        elif isinstance(error, ManualCodeTableAlreadyExistsError):
+        elif isinstance(error, (ManualCodeTableAlreadyExistsError, ManualCodeValueAlreadyExistsError)):
             status = 409
         elif isinstance(error, ManualCodeTableValidationError):
             status = 422
@@ -199,6 +210,160 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
             content=validate_contract({"data": data}, DataEnvelope[ManualCodeTableItem])
         )
 
+    @router.get("/{table_id}/items/page", response_model=None)
+    def page_manual_code_values(
+        table_id: str,
+        keyword: str | None = Query(default=None),
+        status: str | None = Query(default=None),
+        page: str | None = Query(default=None),
+        page_size: str | None = Query(default=None, alias="pageSize"),
+        current_service: Any = Depends(get_service),
+        context: Any = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
+    ):
+        try:
+            payload = current_service.get_code_values_page(
+                table_id,
+                keyword=keyword,
+                status=status,
+                page=page,
+                page_size=page_size,
+            )
+        except (
+            ManualCodeTableNotFoundError,
+            ManualCodeTableValidationError,
+            ManualCodeTableDataSourceError,
+        ) as error:
+            return error_response(error)
+        profile = profile_for_request(context, authorization)
+        payload = {
+            **payload,
+            "items": [
+                project_public_catalog_value(item, profile=profile)
+                for item in payload["items"]
+            ],
+        }
+        return JSONResponse(content=validate_contract(payload, ManualCodeValuePageResponse))
+
+    @router.get("/{table_id}/items/{item_id}", response_model=None)
+    def get_manual_code_value(
+        table_id: str,
+        item_id: str,
+        current_service: Any = Depends(get_service),
+        context: Any = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
+    ):
+        try:
+            data = current_service.get_code_value(table_id, item_id)
+        except (
+            ManualCodeTableNotFoundError,
+            ManualCodeValueNotFoundError,
+            ManualCodeTableDataSourceError,
+        ) as error:
+            return error_response(error)
+        profile = profile_for_request(context, authorization)
+        data = project_public_catalog_value(data, profile=profile)
+        return JSONResponse(
+            content=validate_contract({"data": data}, DataEnvelope[ManualCodeValueItem])
+        )
+
+    @router.post("/{table_id}/items", response_model=None, status_code=201)
+    def create_manual_code_value(
+        table_id: str,
+        payload: ManualCodeValueRequest | None = Body(default=None),
+        _context: RequestContext = Depends(require_permission("code_table:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.create_code_value(
+                table_id, manual_code_value_payload(payload)
+            )
+        except (
+            ManualCodeTableNotFoundError,
+            ManualCodeValueAlreadyExistsError,
+            ManualCodeTableValidationError,
+            ManualCodeTableDataSourceError,
+        ) as error:
+            return error_response(error)
+        return JSONResponse(
+            status_code=201,
+            content=validate_contract(
+                {"message": "Manual code value created", "data": data},
+                MessageDataResponse[ManualCodeValueItem],
+            ),
+        )
+
+    @router.put("/{table_id}/items/{item_id}", response_model=None)
+    def update_manual_code_value(
+        table_id: str,
+        item_id: str,
+        payload: ManualCodeValueRequest | None = Body(default=None),
+        _context: RequestContext = Depends(require_permission("code_table:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            data = current_service.update_code_value(
+                table_id, item_id, manual_code_value_payload(payload)
+            )
+        except (
+            ManualCodeTableNotFoundError,
+            ManualCodeValueNotFoundError,
+            ManualCodeValueAlreadyExistsError,
+            ManualCodeTableValidationError,
+            ManualCodeTableDataSourceError,
+        ) as error:
+            return error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "Manual code value updated", "data": data},
+                MessageDataResponse[ManualCodeValueItem],
+            )
+        )
+
+    @router.patch("/{table_id}/items/{item_id}/status", response_model=None)
+    def patch_manual_code_value_status(
+        table_id: str,
+        item_id: str,
+        payload: ManualCodeValueRequest | None = Body(default=None),
+        _context: RequestContext = Depends(require_permission("code_table:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        body = manual_code_value_payload(payload) or {}
+        try:
+            data = current_service.update_code_value_status(
+                table_id, item_id, body.get("status")
+            )
+        except (
+            ManualCodeTableNotFoundError,
+            ManualCodeValueNotFoundError,
+            ManualCodeTableValidationError,
+            ManualCodeTableDataSourceError,
+        ) as error:
+            return error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "Manual code value status updated", "data": data},
+                MessageDataResponse[ManualCodeValueItem],
+            )
+        )
+
+    @router.delete("/{table_id}/items/{item_id}", response_model=None, status_code=204)
+    def delete_manual_code_value(
+        table_id: str,
+        item_id: str,
+        _context: RequestContext = Depends(require_permission("code_table:write")),
+        current_service: Any = Depends(get_service),
+    ):
+        try:
+            current_service.delete_code_value(table_id, item_id)
+        except (
+            ManualCodeTableNotFoundError,
+            ManualCodeValueNotFoundError,
+            ManualCodeTableDataSourceError,
+        ) as error:
+            return error_response(error)
+        return Response(status_code=204)
+
     @router.post("", response_model=None, status_code=201)
     def create_manual_code_table(
         payload: ManualCodeTableRequest | None = Body(default=None),
@@ -275,7 +440,11 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
     ):
         try:
             current_service.delete_table(table_id)
-        except (ManualCodeTableNotFoundError, ManualCodeTableDataSourceError) as error:
+        except (
+            ManualCodeTableNotFoundError,
+            ManualCodeTableValidationError,
+            ManualCodeTableDataSourceError,
+        ) as error:
             return error_response(error)
         return Response(status_code=204)
 

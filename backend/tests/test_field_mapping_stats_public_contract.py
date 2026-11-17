@@ -25,10 +25,13 @@ class FieldMappingStatsPublicContractTests(unittest.TestCase):
             "sourceTableCount": 0,
             "fieldCount": field_count,
             "mappedFieldCount": 0,
-            "unmappedFieldCount": 0,
+            "unmappedFieldCount": field_count,
+            "configuredTableCount": 0,
+            "incompleteTableCount": 0,
             "emptyCommentCount": 0,
             "emptyCommentRate": 0,
-            "coverage": 0,
+            "coverage": None if field_count == 0 else 0,
+            "tableConfigCoverage": None,
             "password": "must-not-be-returned",
             "updatedBy": "must-not-be-returned",
             "diagnostics": {"trace": "must-not-be-returned"},
@@ -69,6 +72,8 @@ class FieldMappingStatsPublicContractTests(unittest.TestCase):
 
                 self.assertEqual(200, response.status_code, response.text)
                 self.assertEqual(0, response.json()["data"]["fieldCount"])
+                self.assertEqual(0, response.json()["data"]["configuredTableCount"])
+                self.assertIsNone(response.json()["data"]["tableConfigCoverage"])
                 for hidden_key in ("password", "updatedBy", "diagnostics"):
                     self.assertNotIn(hidden_key, response.json()["data"])
                 self.assertFalse(
@@ -108,6 +113,7 @@ class FieldMappingStatsPublicContractTests(unittest.TestCase):
             ).get("/api/field-mappings/stats")
             self.assertEqual(200, authenticated_response.status_code)
             self.assertEqual(3, authenticated_response.json()["data"]["fieldCount"])
+            self.assertEqual(0, authenticated_response.json()["data"]["configuredTableCount"])
             service.get_stats.assert_called_once()
 
             service.reset_mock()
@@ -123,6 +129,12 @@ class FieldMappingStatsPublicContractTests(unittest.TestCase):
                 {"data": {"sourceSystemCount": 1}},
                 DataEnvelope[MappingStats],
             )
+
+    def test_mapping_stats_contract_rejects_missing_configuration_counts(self):
+        stats = self._stats(1)
+        stats.pop("configuredTableCount")
+        with self.assertRaises(ValidationError):
+            validate_contract({"data": stats}, DataEnvelope[MappingStats])
 
 
 if __name__ == "__main__":
