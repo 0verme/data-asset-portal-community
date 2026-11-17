@@ -205,7 +205,11 @@ function FieldsView({ fields }: FieldsViewProps) {
           </thead>
           <tbody>
             {rows.map((field) => (
-              <tr key={field.name}>
+              <tr
+                key={field.fieldId != null ? `field:${field.fieldId}` : field.name}
+                id={field.fieldId != null ? `asset-field-${field.fieldId}` : undefined}
+                tabIndex={field.fieldId != null ? -1 : undefined}
+              >
                 <td className="c-idx">{fields.findIndex((item) => item.name === field.name) + 1}</td>
                 <td className="c-name">
                   <Highlight text={field.name} q={fieldQuery} />

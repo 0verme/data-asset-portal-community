@@ -154,8 +154,9 @@ test("Remote strict collection response keeps indicator fields scoped to the sel
 
   await page.goto("/indicator-maintenance/new");
   await expect(page.getByRole("heading", { name: "新增指标" })).toBeVisible({ timeout: 20_000 });
-  const sourceAsset = page.getByRole("combobox", { name: "来源资产（稳定引用）" });
-  const resultField = page.getByRole("combobox", { name: "结果字段（稳定引用）" });
+  await page.getByRole("button", { name: "添加来源表" }).click();
+  const sourceAsset = page.getByRole("combobox", { name: "来源表 1" });
+  const resultField = page.getByRole("combobox", { name: "来源字段 1" });
   await sourceAsset.click();
   await page.getByRole("option", { name: "资产 A · ASSET_A" }).click();
   await resultField.click();

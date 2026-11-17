@@ -20,7 +20,7 @@ import re
 from copy import deepcopy
 from datetime import date
 
-from sqlalchemy import and_, case, false, func, insert, or_, select, update
+from sqlalchemy import and_, exists, false, func, insert, or_, select, update
 
 from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
@@ -30,6 +30,7 @@ from ..db.tables import (
     indicator_change_log,
     indicator_item,
     indicator_path_config,
+    indicator_source,
 )
 from ..db.facade import database_transaction
 from ..security.public_field_policy import FIELD_CLASS_PERSON, public_field_class_visible
@@ -268,6 +269,17 @@ class IndicatorService(AuditActorMixin):
         registered_at = str(payload.get("registeredAt") or "").strip()
         source_asset_id = _payload_value(payload, defaults, "sourceAssetId", "source_asset_id")
         result_field_id = _payload_value(payload, defaults, "resultFieldId", "result_field_id")
+        if "sources" in payload:
+            raw_sources = payload["sources"]
+        elif any(
+            key in payload
+            for key in ("sourceAssetId", "source_asset_id", "resultFieldId", "result_field_id")
+        ):
+            # A legacy stable-ID update is authoritative. Do not let the
+            # current multi-source detail array mask those explicit fields.
+            raw_sources = None
+        else:
+            raw_sources = _payload_value(payload, defaults, "sources", default=None)
         aggregation = _payload_value(payload, defaults, "aggregation", "aggregationCode", "aggregation_code")
         semantic_state = _payload_value(payload, defaults, "semanticState", "semantic_state", "certificationStatus")
         allowed_status = self._allowed_status_values()
@@ -306,6 +318,30 @@ class IndicatorService(AuditActorMixin):
         if details:
             raise IndicatorValidationError(details)
 
+        legacy_single_source = raw_sources is None
+        sources = self._normalize_sources(
+            raw_sources,
+            source_asset_id=source_asset_id,
+            result_field_id=result_field_id,
+            defaults=defaults,
+            legacy_single_source=legacy_single_source,
+        )
+        if sources:
+            source_asset_id = sources[0]["assetId"]
+            result_field_id = sources[0]["fieldId"]
+        elif raw_sources is not None:
+            source_asset_id = None
+            result_field_id = None
+
+        caliber_formula = str(_payload_value(payload, defaults, "caliberFormula", "caliber_formula", default="") or "").strip()
+        caliber_sql = str(_payload_value(payload, defaults, "caliberSql", "caliber_sql", default="") or "").strip()
+        if len(caliber_formula) > 4000:
+            details.append({"field": "caliberFormula", "message": "caliberFormula must not exceed 4000 characters"})
+        if len(caliber_sql) > 20000:
+            details.append({"field": "caliberSql", "message": "caliberSql must not exceed 20000 characters"})
+        if details:
+            raise IndicatorValidationError(details)
+
         item = {
             "id": indicator_id.upper(),
             "name": name,
@@ -314,16 +350,121 @@ class IndicatorService(AuditActorMixin):
             "resultFieldName": result_field_name,
             "sourceAssetId": source_asset_id,
             "resultFieldId": result_field_id,
+            "sources": sources,
             "aggregation": aggregation,
             "semanticState": semantic_state,
             "dimension": dimension,
             "caliber": caliber,
+            "caliberFormula": caliber_formula,
+            "caliberSql": caliber_sql,
             "path": path,
             "status": status,
             "registrar": registrar,
             "registeredAt": registered_at,
         }
-        return self._validate_semantic_contract(item, allowed_status)
+        validation_source = next((source for source in sources if source.get("availability") == "available"), None)
+        if validation_source:
+            item["sourceAssetId"] = validation_source.get("assetId")
+            item["resultFieldId"] = validation_source.get("fieldId")
+        elif sources:
+            item["sourceAssetId"] = None
+            item["resultFieldId"] = None
+        if validation_source:
+            validated = self._validate_semantic_contract(
+                item,
+                allowed_status,
+                resolved_asset=validation_source.get("_validationAsset"),
+                resolved_field=validation_source.get("_validationField"),
+            )
+        else:
+            validated = self._validate_semantic_contract(item, allowed_status)
+        for source in sources:
+            source.pop("_validationAsset", None)
+            source.pop("_validationField", None)
+        if sources:
+            first = sources[0]
+            validated["sourceAssetId"] = first.get("assetId")
+            validated["resultFieldId"] = first.get("fieldId")
+            validated["sourceAssetName"] = first.get("tableName") or None
+            validated["sourceAssetQualifiedName"] = first.get("qualifiedName") or None
+            validated["resultTableName"] = first.get("tableName") or ""
+            validated["resultFieldName"] = first.get("fieldName") or ""
+        return validated
+
+    def _normalize_sources(self, raw_sources, *, source_asset_id, result_field_id, defaults, legacy_single_source=False):
+        defaults = defaults if isinstance(defaults, dict) else {}
+        if raw_sources is None:
+            raw_sources = []
+            if source_asset_id is not None or result_field_id is not None:
+                raw_sources.append({"assetId": source_asset_id, "fieldId": result_field_id})
+        if not isinstance(raw_sources, list):
+            raise IndicatorValidationError([{"field": "sources", "message": "sources must be an array"}])
+        normalized = []
+        seen = set()
+        errors = []
+        for index, raw in enumerate(raw_sources):
+            value = raw if isinstance(raw, dict) else {}
+            asset_value = value.get("assetId", value.get("sourceAssetId"))
+            field_value = value.get("fieldId", value.get("sourceFieldId", value.get("resultFieldId")))
+            asset_id, asset_error = normalize_reference_id(asset_value, f"sources[{index}].assetId")
+            field_id, field_error = normalize_reference_id(field_value, f"sources[{index}].fieldId")
+            if asset_error:
+                errors.append(asset_error)
+            if field_error:
+                errors.append(field_error)
+            if errors and (asset_error or field_error):
+                continue
+            field_row = self._resolve_semantic_field(field_id) if field_id is not None else None
+            if asset_id is None and field_row:
+                asset_id = _optional_int(field_row.get("asset_id"))
+            key = (str(asset_id or ""), str(field_id or ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            asset_row = self._resolve_semantic_asset(asset_id) if asset_id is not None else None
+            active_asset = asset_row and str(asset_row.get("is_deleted") or "N").upper() == "N"
+            active_field = field_row and str(field_row.get("is_deleted") or "N").upper() == "N"
+            valid_field_owner = field_row and _optional_int(field_row.get("asset_id")) == asset_id
+            if not active_asset or (field_id is not None and (not active_field or not valid_field_owner)):
+                if legacy_single_source:
+                    if not active_asset:
+                        message = (
+                            f"asset is deleted: {asset_id}"
+                            if asset_row is not None
+                            else f"asset does not exist: {asset_id}"
+                        )
+                        errors.append({"field": "sourceAssetId", "message": message})
+                    if field_id is not None and not active_field:
+                        message = (
+                            f"result field is deleted: {field_id}"
+                            if field_row is not None
+                            else f"result field does not exist: {field_id}"
+                        )
+                        errors.append({"field": "resultFieldId", "message": message})
+                    elif field_id is not None and not valid_field_owner:
+                        errors.append({
+                            "field": "resultFieldId",
+                            "message": "result field does not exist or does not belong to source asset: "
+                            f"{field_id}",
+                        })
+                else:
+                    errors.append({"field": f"sources[{index}]", "message": "source table or field does not exist or does not belong to the selected table"})
+                continue
+            normalized.append({
+                "assetId": asset_id,
+                "fieldId": field_id,
+                "availability": "available",
+                "tableName": asset_row.get("table_name") or "",
+                "qualifiedName": asset_row.get("qualified_name") or "",
+                "schemaName": asset_row.get("schema_name") or "",
+                "fieldName": field_row.get("field_name") if field_row else "",
+                "fieldCn": field_row.get("field_cn_name") if field_row else "",
+                "_validationAsset": asset_row,
+                "_validationField": field_row,
+            })
+        if errors:
+            raise IndicatorValidationError(errors)
+        return normalized
 
     def _resolve_semantic_asset(self, asset_id):
         rows = self._fetch_rows(
@@ -331,6 +472,7 @@ class IndicatorService(AuditActorMixin):
                 asset_table.c.asset_id,
                 asset_table.c.table_name,
                 asset_table.c.qualified_name,
+                asset_table.c.schema_name,
                 asset_table.c.is_deleted,
             ).where(asset_table.c.asset_id == asset_id)
         )
@@ -342,12 +484,13 @@ class IndicatorService(AuditActorMixin):
                 asset_field.c.field_id,
                 asset_field.c.asset_id,
                 asset_field.c.field_name,
+                asset_field.c.field_cn_name,
                 asset_field.c.is_deleted,
             ).where(asset_field.c.field_id == field_id)
         )
         return rows[0] if rows else None
 
-    def _validate_semantic_contract(self, item, allowed_status):
+    def _validate_semantic_contract(self, item, allowed_status, *, resolved_asset=None, resolved_field=None):
         source_asset_id, source_error = normalize_reference_id(
             item.get("sourceAssetId"), "sourceAssetId"
         )
@@ -355,10 +498,18 @@ class IndicatorService(AuditActorMixin):
             item.get("resultFieldId"), "resultFieldId"
         )
         details = [error for error in (source_error, field_error) if error]
-        field_row = self._resolve_semantic_field(result_field_id) if result_field_id is not None else None
+        field_row = (
+            resolved_field if resolved_field is not None
+            else self._resolve_semantic_field(result_field_id) if result_field_id is not None
+            else None
+        )
         if source_asset_id is None and field_row is not None:
             source_asset_id = _optional_int(field_row.get("asset_id"))
-        asset_row = self._resolve_semantic_asset(source_asset_id) if source_asset_id is not None else None
+        asset_row = (
+            resolved_asset if resolved_asset is not None
+            else self._resolve_semantic_asset(source_asset_id) if source_asset_id is not None
+            else None
+        )
         validation = validate_indicator_semantics(
             source_asset_id=source_asset_id,
             result_field_id=result_field_id,
@@ -409,33 +560,58 @@ class IndicatorService(AuditActorMixin):
             query = str(keyword).strip().lower()
             escaped_query = escape_like_keyword(query)
             pattern = f"%{escaped_query}%"
-            # Page search follows displayed, resolved names, not stale snapshots.
-            table_name = indicator_item.c.result_table_name
-            field_name = indicator_item.c.result_field_name
-            if paged:
-                table_name = func.coalesce(func.nullif(asset_table.c.table_name, ""), table_name)
-                field_name = case(
-                    (or_(asset_field.c.asset_id.is_(None), asset_field.c.asset_id == indicator_item.c.source_asset_id),
-                     func.coalesce(func.nullif(asset_field.c.field_name, ""), field_name)),
-                    else_=field_name,
-                )
             searchable = [
                 indicator_item.c.indicator_id,
                 indicator_item.c.indicator_name,
                 indicator_item.c.meaning_desc,
-                table_name,
-                field_name,
                 indicator_item.c.caliber_desc,
+                indicator_item.c.caliber_formula,
+                indicator_item.c.caliber_sql,
                 indicator_item.c.path_desc,
             ]
+            if not paged:
+                # Keep the legacy collection endpoint's snapshot search
+                # contract while the paged editor searches current relations.
+                searchable.extend((
+                    indicator_item.c.result_table_name,
+                    indicator_item.c.result_field_name,
+                ))
             if not paged or public_field_class_visible(FIELD_CLASS_PERSON, profile):
                 searchable.append(indicator_item.c.registrar_name)
+            source_match = exists(
+                select(1)
+                .select_from(
+                    indicator_source.join(
+                        asset_table,
+                        and_(
+                            indicator_source.c.source_asset_id == asset_table.c.asset_id,
+                            asset_table.c.is_deleted == "N",
+                        ),
+                    ).outerjoin(
+                        asset_field,
+                        and_(
+                            indicator_source.c.source_field_id == asset_field.c.field_id,
+                            asset_field.c.asset_id == indicator_source.c.source_asset_id,
+                            asset_field.c.is_deleted == "N",
+                        ),
+                    )
+                )
+                .where(
+                    indicator_source.c.indicator_pk == indicator_item.c.indicator_pk,
+                    indicator_source.c.is_deleted == "N",
+                    or_(
+                        func.lower(func.coalesce(asset_table.c.table_name, "")).like(pattern, escape=LIKE_ESCAPE_CHAR),
+                        func.lower(func.coalesce(asset_field.c.field_name, "")).like(pattern, escape=LIKE_ESCAPE_CHAR),
+                        func.lower(func.coalesce(asset_field.c.field_cn_name, "")).like(pattern, escape=LIKE_ESCAPE_CHAR),
+                    ),
+                )
+            )
             clauses.append(or_(*(
                 func.lower(func.coalesce(column, "")).like(
                     pattern, escape=LIKE_ESCAPE_CHAR
                 )
                 for column in searchable
-            )))
+            ), source_match))
         return clauses
 
     def _row_to_item(self, row):
@@ -454,6 +630,7 @@ class IndicatorService(AuditActorMixin):
         ):
             result_field_name = resolved_field_name
         return {
+            "_indicatorPk": _optional_int(row.get("indicator_pk")),
             "id": row["indicator_id"],
             "name": row["indicator_name"],
             "meaning": row.get("meaning_desc") or "",
@@ -467,6 +644,12 @@ class IndicatorService(AuditActorMixin):
             "semanticState": row.get("semantic_state") or DEFAULT_SEMANTIC_STATE,
             "dimension": self._normalize_dimension(row["dimension_code"]),
             "caliber": row.get("caliber_desc") or "",
+            "caliberFormula": row.get("caliber_formula") or "",
+            "caliberSql": row.get("caliber_sql") or "",
+            "sources": [],
+            "sourceRelationsStatus": "unknown" if source_asset_id is not None or result_field_id is not None else "unconfigured",
+            "sourceCount": 0,
+            "sourceUnknownCount": 1 if source_asset_id is not None or result_field_id is not None else 0,
             "path": row.get("path_desc") or "",
             "status": row["status_code"],
             "registrar": row["registrar_name"],
@@ -487,6 +670,8 @@ class IndicatorService(AuditActorMixin):
             indicator_item.c.semantic_state,
             indicator_item.c.dimension_code,
             indicator_item.c.caliber_desc,
+            indicator_item.c.caliber_formula,
+            indicator_item.c.caliber_sql,
             indicator_item.c.path_desc,
             indicator_item.c.status_code,
             indicator_item.c.registrar_name,
@@ -499,15 +684,128 @@ class IndicatorService(AuditActorMixin):
         ).select_from(
             indicator_item.outerjoin(
                 asset_table,
-                indicator_item.c.source_asset_id == asset_table.c.asset_id,
+                and_(
+                    indicator_item.c.source_asset_id == asset_table.c.asset_id,
+                    asset_table.c.is_deleted == "N",
+                ),
             ).outerjoin(
                 asset_field,
                 and_(
                     indicator_item.c.result_field_id == asset_field.c.field_id,
+                    asset_field.c.asset_id == indicator_item.c.source_asset_id,
                     asset_field.c.is_deleted == "N",
                 ),
             )
         )
+
+    def _resolve_item_sources(self, items):
+        if not items:
+            return items
+        by_pk = {item["_indicatorPk"]: item for item in items if item.get("_indicatorPk") is not None}
+        if by_pk:
+            source_rows = self._fetch_rows(
+                select(
+                    indicator_source.c.indicator_pk,
+                    indicator_source.c.source_pk,
+                    indicator_source.c.source_asset_id,
+                    indicator_source.c.source_field_id,
+                    indicator_source.c.source_order,
+                    asset_table.c.table_name.label("source_table_name"),
+                    asset_table.c.qualified_name.label("source_qualified_name"),
+                    asset_table.c.schema_name.label("source_schema_name"),
+                    asset_field.c.field_name.label("source_field_name"),
+                    asset_field.c.field_cn_name.label("source_field_cn"),
+                )
+                .select_from(
+                    indicator_source.outerjoin(
+                        asset_table,
+                        and_(
+                            indicator_source.c.source_asset_id == asset_table.c.asset_id,
+                            asset_table.c.is_deleted == "N",
+                        ),
+                    ).outerjoin(
+                        asset_field,
+                        and_(
+                            indicator_source.c.source_field_id == asset_field.c.field_id,
+                            asset_field.c.asset_id == indicator_source.c.source_asset_id,
+                            asset_field.c.is_deleted == "N",
+                        ),
+                    )
+                )
+                .where(
+                    indicator_source.c.indicator_pk.in_(sorted(by_pk)),
+                    indicator_source.c.is_deleted == "N",
+                )
+                .order_by(
+                    indicator_source.c.indicator_pk,
+                    indicator_source.c.source_order,
+                    indicator_source.c.source_pk,
+                )
+            )
+        else:
+            source_rows = []
+        grouped = {}
+        for row in source_rows:
+            grouped.setdefault(_optional_int(row.get("indicator_pk")), []).append(row)
+        for indicator_pk, item in by_pk.items():
+            sources = []
+            unknown_count = 0
+            for row in grouped.get(indicator_pk, []):
+                asset_id = _optional_int(row.get("source_asset_id"))
+                field_id = _optional_int(row.get("source_field_id"))
+                table_name = row.get("source_table_name") or ""
+                field_name = row.get("source_field_name") or ""
+                available = bool(table_name) and (field_id is None or bool(field_name))
+                if not available:
+                    unknown_count += 1
+                    if asset_id == item.get("sourceAssetId"):
+                        table_name = table_name or item.get("resultTableName") or ""
+                    if field_id == item.get("resultFieldId"):
+                        field_name = field_name or item.get("resultFieldName") or ""
+                sources.append({
+                    "relationId": _optional_int(row.get("source_pk")),
+                    "assetId": asset_id,
+                    "fieldId": field_id,
+                    "tableName": table_name,
+                    "qualifiedName": row.get("source_qualified_name") or "",
+                    "schemaName": row.get("source_schema_name") or "",
+                    "fieldName": field_name,
+                    "fieldCn": row.get("source_field_cn") or "",
+                    "availability": "available" if available else "unknown",
+                })
+            if not sources and (item.get("sourceAssetId") is not None or item.get("resultFieldId") is not None):
+                active = bool(item.get("sourceAssetName")) and (
+                    item.get("resultFieldId") is None or bool(item.get("resultFieldName"))
+                )
+                sources.append({
+                    "assetId": item.get("sourceAssetId"),
+                    "fieldId": item.get("resultFieldId"),
+                    "tableName": item.get("resultTableName") or "",
+                    "qualifiedName": item.get("sourceAssetQualifiedName") or "",
+                    "fieldName": item.get("resultFieldName") or "",
+                    "availability": "available" if active else "unknown",
+                })
+                if not active:
+                    unknown_count += 1
+            active_count = sum(1 for source in sources if source["availability"] == "available")
+            item["sources"] = sources
+            item["sourceCount"] = active_count
+            item["sourceUnknownCount"] = unknown_count
+            item["sourceRelationsStatus"] = (
+                "unconfigured" if not sources else
+                "partial" if active_count and unknown_count else
+                "configured" if active_count else "unknown"
+            )
+            if sources:
+                first = sources[0]
+                item["sourceAssetId"] = first.get("assetId")
+                item["resultFieldId"] = first.get("fieldId")
+                item["sourceAssetName"] = first.get("tableName") or None
+                item["sourceAssetQualifiedName"] = first.get("qualifiedName") or None
+                item["resultTableName"] = first.get("tableName") or ""
+                item["resultFieldName"] = first.get("fieldName") or ""
+            item.pop("_indicatorPk", None)
+        return items
 
     def _db_items(self, keyword=None, dimension=None, status=None, dimension_unassigned=False):
         statement = self._item_statement().where(
@@ -515,7 +813,7 @@ class IndicatorService(AuditActorMixin):
                 keyword, dimension, status, dimension_unassigned=dimension_unassigned
             )
         ).order_by(indicator_item.c.indicator_id)
-        return [self._row_to_item(row) for row in self._fetch_rows(statement)]
+        return self._resolve_item_sources([self._row_to_item(row) for row in self._fetch_rows(statement)])
 
     def get_indicator_page(self, keyword=None, dimension=None, status=None, page=None, page_size=None,
                            sort_key=None, sort_direction=None, profile=None,
@@ -554,7 +852,8 @@ class IndicatorService(AuditActorMixin):
                 facets["dimension"][dimension] = facets["dimension"].get(dimension, 0) + size
                 if status:
                     facets["status"][status] = facets["status"].get(status, 0) + size
-            return {"items": [self._row_to_item(row) for row in rows], "total": int(count[0]["total"]),
+            items = self._resolve_item_sources([self._row_to_item(row) for row in rows])
+            return {"items": items, "total": int(count[0]["total"]),
                     "page": page, "pageSize": page_size, "facets": facets, "stats": {"indicatorCount": total}}
 
     def get_indicators(self, keyword=None, dimension=None, status=None, dimension_unassigned=False):
@@ -569,7 +868,7 @@ class IndicatorService(AuditActorMixin):
         ).limit(1))
         if not rows:
             raise IndicatorNotFoundError(indicator_id)
-        return deepcopy(self._row_to_item(rows[0]))
+        return deepcopy(self._resolve_item_sources([self._row_to_item(rows[0])])[0])
 
     def _insert_item(self, item, indicator_pk):
         return insert(indicator_item).values(
@@ -585,6 +884,8 @@ class IndicatorService(AuditActorMixin):
             semantic_state=item["semanticState"],
             dimension_code=item["dimension"],
             caliber_desc=item["caliber"],
+            caliber_formula=item["caliberFormula"],
+            caliber_sql=item["caliberSql"],
             path_desc=item["path"],
             status_code=item["status"],
             registrar_name=item["registrar"],
@@ -593,6 +894,21 @@ class IndicatorService(AuditActorMixin):
             created_by=self._default_operator,
             updated_by=self._default_operator,
         )
+
+    def _insert_source_rows(self, item, indicator_pk, first_source_pk):
+        statements = []
+        for index, source in enumerate(item.get("sources") or []):
+            statements.append(insert(indicator_source).values(
+                source_pk=first_source_pk + index,
+                indicator_pk=indicator_pk,
+                source_asset_id=source.get("assetId"),
+                source_field_id=source.get("fieldId"),
+                source_order=index,
+                is_deleted="N",
+                created_by=self._default_operator,
+                updated_by=self._default_operator,
+            ))
+        return statements
 
     def _insert_change_log(self, *, change_id, indicator_pk, indicator_id, change_type, before=None, after=None):
         return insert(indicator_change_log).values(
@@ -631,7 +947,7 @@ class IndicatorService(AuditActorMixin):
 
         indicator_pk = self._next_id(indicator_item, indicator_item.c.indicator_pk)
         change_id = self._next_id(indicator_change_log, indicator_change_log.c.change_id)
-        self._execute([
+        statements = [
             self._insert_item(item, indicator_pk),
             self._insert_change_log(
                 change_id=change_id,
@@ -640,7 +956,11 @@ class IndicatorService(AuditActorMixin):
                 change_type="CREATE_INDICATOR",
                 after=item,
             ),
-        ])
+        ]
+        if item.get("sources"):
+            source_pk = self._next_id(indicator_source, indicator_source.c.source_pk)
+            statements[1:1] = self._insert_source_rows(item, indicator_pk, source_pk)
+        self._execute(statements)
         return item
 
     @actor_aware
@@ -673,7 +993,7 @@ class IndicatorService(AuditActorMixin):
 
         indicator_pk = self._row_int(rows, "indicator_pk")
         change_id = self._next_id(indicator_change_log, indicator_change_log.c.change_id)
-        self._execute([
+        statements = [
             update(indicator_item).where(indicator_item.c.indicator_pk == indicator_pk).values(
                 indicator_id=item["id"],
                 indicator_name=item["name"],
@@ -686,6 +1006,8 @@ class IndicatorService(AuditActorMixin):
                 semantic_state=item["semanticState"],
                 dimension_code=item["dimension"],
                 caliber_desc=item["caliber"],
+                caliber_formula=item["caliberFormula"],
+                caliber_sql=item["caliberSql"],
                 path_desc=item["path"],
                 status_code=item["status"],
                 registrar_name=item["registrar"],
@@ -701,7 +1023,19 @@ class IndicatorService(AuditActorMixin):
                 before=current,
                 after=item,
             ),
-        ])
+        ]
+        if current.get("sources") or item.get("sources"):
+            statements.insert(1, update(indicator_source).where(
+                and_(indicator_source.c.indicator_pk == indicator_pk, indicator_source.c.is_deleted == "N")
+            ).values(
+                is_deleted="Y",
+                updated_by=self._default_operator,
+                updated_at=func.current_timestamp(),
+            ))
+            if item.get("sources"):
+                source_pk = self._next_id(indicator_source, indicator_source.c.source_pk)
+                statements[2:2] = self._insert_source_rows(item, indicator_pk, source_pk)
+        self._execute(statements)
         return current, item
 
     @actor_aware

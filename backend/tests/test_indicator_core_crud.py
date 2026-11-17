@@ -28,6 +28,7 @@ class IndicatorCoreCrudTests(unittest.TestCase):
             "registeredAt": "2026-07-12",
         }
         self.service._allowed_status_values = MagicMock(return_value={"enabled", "disabled"})
+        self.service._resolve_item_sources = MagicMock(side_effect=lambda items: items)
         self.row = {
             "indicator_pk": 7,
             "indicator_id": "CUST001",

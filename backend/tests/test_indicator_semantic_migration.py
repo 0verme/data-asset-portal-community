@@ -195,6 +195,25 @@ class IndicatorSemanticMigrationTests(unittest.TestCase):
             self.assertEqual(("unique_table", "amount", 3, None, "enabled", "candidate"), rows["WRONG_OWNER"])
             self.assertEqual(("missing_table", "amount", None, None, "enabled", "candidate"), rows["UNKNOWN"])
             self.assertEqual(("unique_table", "unique_value", 3, 301, "disabled", "candidate"), rows["DISABLED"])
+            connection = sqlite3.connect(database)
+            try:
+                relations = connection.execute(
+                    "SELECT i.indicator_id, s.source_asset_id, s.source_field_id "
+                    "FROM p_indicator_source s JOIN p_indicator_item i USING(indicator_pk) "
+                    "ORDER BY i.indicator_id"
+                ).fetchall()
+            finally:
+                connection.close()
+            self.assertEqual(
+                [
+                    ("DISABLED", 3, 301),
+                    ("MISSING_FIELD", 4, None),
+                    ("QUALIFIED", 1, 101),
+                    ("UNIQUE", 3, 301),
+                    ("WRONG_OWNER", 3, None),
+                ],
+                relations,
+            )
 
     def test_existing_stable_ids_are_not_overwritten_and_revision_is_idempotent(self):
         with tempfile.TemporaryDirectory(prefix="indicator-semantic-existing-") as directory:
@@ -220,6 +239,9 @@ class IndicatorSemanticMigrationTests(unittest.TestCase):
                 columns = {
                     row[1] for row in connection.execute("PRAGMA table_info(p_indicator_item)")
                 }
+                relations = connection.execute(
+                    "SELECT indicator_pk, source_asset_id, source_field_id FROM p_indicator_source"
+                ).fetchall()
             finally:
                 connection.close()
             self.assertTrue(
@@ -228,8 +250,11 @@ class IndicatorSemanticMigrationTests(unittest.TestCase):
                     "result_field_id",
                     "aggregation_code",
                     "semantic_state",
+                    "caliber_formula",
+                    "caliber_sql",
                 } <= columns
             )
+            self.assertEqual([(1, 3, 301)], relations)
 
 
 if __name__ == "__main__":

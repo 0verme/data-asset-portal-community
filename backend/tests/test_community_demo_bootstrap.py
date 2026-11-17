@@ -6,7 +6,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import closing, redirect_stdout
 from pathlib import Path
 from unittest.mock import call, patch
 
@@ -58,7 +58,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             "p_code_category": {"rows": [{"category_code": "DEMO"}]},
             "p_code_item": {"rows": [{"category_code": "DEMO"}]},
         })
-        with sqlite3.connect(database) as connection:
+        with closing(sqlite3.connect(database)) as connection:
             for table in tables:
                 connection.execute(f"CREATE TABLE {table} (id INTEGER)")
             connection.execute(
@@ -102,6 +102,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             )
             connection.execute("CREATE TABLE p_admin_user (username TEXT)")
             connection.execute("INSERT INTO p_admin_user VALUES ('admin')")
+            connection.commit()
 
         with (
             patch("demo.seed_loader.community_seed_plan", return_value=plan),
@@ -110,22 +111,24 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             counts = verify_demo_database(database)
             self.assertEqual(3, counts["p_code_category"])
             self.assertEqual(3, counts["p_code_item"])
-            with sqlite3.connect(database) as connection:
+            with closing(sqlite3.connect(database)) as connection:
                 connection.execute(
                     "UPDATE p_code_item SET item_value = '75' "
                     "WHERE category_code = ? AND item_code = ?",
                     (AI_LLM_QUOTA_CATEGORY_CODE, AI_LLM_DAILY_LIMIT_CODE),
                 )
+                connection.commit()
             verify_demo_database(database)
-            with sqlite3.connect(database) as connection:
+            with closing(sqlite3.connect(database)) as connection:
                 connection.execute(
                     "UPDATE p_code_item SET item_value = '0' "
                     "WHERE category_code = ? AND item_code = ?",
                     (AI_LLM_QUOTA_CATEGORY_CODE, AI_LLM_DAILY_LIMIT_CODE),
                 )
+                connection.commit()
             with self.assertRaises(BootstrapError):
                 verify_demo_database(database)
-            with sqlite3.connect(database) as connection:
+            with closing(sqlite3.connect(database)) as connection:
                 connection.execute(
                     "UPDATE p_code_item SET item_value = ? "
                     "WHERE category_code = ? AND item_code = ?",
@@ -140,9 +143,10 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
                     "WHERE category_code = ?",
                     (AI_LLM_QUOTA_CATEGORY_CODE,),
                 )
+                connection.commit()
             with self.assertRaises(BootstrapError):
                 verify_demo_database(database)
-            with sqlite3.connect(database) as connection:
+            with closing(sqlite3.connect(database)) as connection:
                 connection.execute(
                     "UPDATE p_code_category SET is_active = 'N' "
                     "WHERE category_code = ?",
@@ -153,6 +157,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
                     "WHERE category_code = ?",
                     (RAG_CONFIG_CATEGORY_CODE,),
                 )
+                connection.commit()
             with self.assertRaises(BootstrapError):
                 verify_demo_database(database)
 

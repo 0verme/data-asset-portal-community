@@ -1867,6 +1867,152 @@ class AILlmDailyQuota(DwsRevisionAdapter):
 
 
 # ---------------------------------------------------------------------------
+# 0017_indicator_source_lineage
+# ---------------------------------------------------------------------------
+
+
+class IndicatorSourceLineage(DwsRevisionAdapter):
+    revision = "0017_indicator_source_lineage"
+    source_table = "p_indicator_source"
+    source_index = "idx_p_indicator_source_lookup"
+    source_index_columns = ("indicator_pk", "is_deleted", "source_order")
+    formula_columns = ("caliber_formula", "caliber_sql")
+
+    def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
+        indicator = ctx.table("p_indicator_item")
+        if indicator is None:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                "p_indicator_item is missing",
+            )
+        missing = []
+        conflicts = []
+        for name in self.formula_columns:
+            column = indicator.columns.get(name)
+            if column is None:
+                missing.append(f"p_indicator_item.{name}")
+            elif _canonical_column_type(column.type_name) != "TEXT" or not column.nullable:
+                conflicts.append(
+                    f"p_indicator_item.{name} must be nullable TEXT; "
+                    f"observed {column.type_name!r}, nullable={column.nullable!r}"
+                )
+
+        source = ctx.table(self.source_table)
+        if source is None:
+            missing.append(self.source_table)
+        else:
+            expected = baseline_schema("dws", ctx.root).tables.get(self.source_table)
+            if expected is None:
+                conflicts.append("canonical DWS baseline has no indicator source table")
+            else:
+                if source.primary_key != ("source_pk",):
+                    conflicts.append(
+                        f"{self.source_table} primary key must be source_pk; observed {source.primary_key!r}"
+                    )
+                if set(source.columns) != set(expected.columns):
+                    conflicts.append(
+                        f"{self.source_table} columns differ from the canonical additive contract"
+                    )
+                else:
+                    for name, expected_column in expected.columns.items():
+                        actual = source.columns[name]
+                        if (
+                            _canonical_column_type(actual.type_name)
+                            != _canonical_column_type(expected_column.type_name)
+                            or actual.nullable != expected_column.nullable
+                        ):
+                            conflicts.append(
+                                f"{self.source_table}.{name} conflicts with the canonical contract"
+                            )
+                index = source.indexes.get(self.source_index)
+                if index is None:
+                    missing.append(self.source_index)
+                elif index.unique or index.columns != self.source_index_columns:
+                    conflicts.append(f"{self.source_index} has an incompatible definition")
+
+        if conflicts:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.CONFLICT,
+                "indicator source lineage has an incompatible partial schema",
+                details=tuple(conflicts),
+            )
+        if missing:
+            return RevisionInspection(
+                self.revision,
+                RevisionState.NOT_APPLIED,
+                "indicator source lineage schema is incomplete",
+                details=tuple(missing),
+            )
+        return RevisionInspection(
+            self.revision,
+            RevisionState.APPLIED,
+            "indicator source lineage schema is present",
+        )
+
+    def _backfill_legacy_sources(self, ctx: DwsRevisionContext) -> None:
+        fields = ctx.fetchall(
+            f"SELECT field_id, asset_id FROM {ctx.qualified('p_asset_field')}"
+        )
+        field_assets = {row[0]: row[1] for row in fields}
+        indicators = ctx.fetchall(
+            f"SELECT indicator_pk, source_asset_id, result_field_id, is_deleted "
+            f"FROM {ctx.qualified('p_indicator_item')}"
+        )
+        existing_rows = ctx.fetchall(
+            f"SELECT indicator_pk, source_asset_id, source_field_id, is_deleted "
+            f"FROM {ctx.qualified(self.source_table)}",
+        )
+        existing = {tuple(row[:3]) for row in existing_rows}
+        source_ids = ctx.fetchall(f"SELECT source_pk FROM {ctx.qualified(self.source_table)}")
+        next_id = max((int(row[0] or 0) for row in source_ids), default=0) + 1
+        for indicator_pk, asset_id, field_id, is_deleted in indicators:
+            if str(is_deleted or "N").upper() != "N":
+                continue
+            if asset_id is None and field_id is None:
+                continue
+            if asset_id is None and field_id is not None:
+                asset_id = field_assets.get(field_id)
+            key = (indicator_pk, asset_id, field_id)
+            if key in existing:
+                continue
+            ctx.execute(
+                f"INSERT INTO {ctx.qualified(self.source_table)} "
+                "(source_pk, indicator_pk, source_asset_id, source_field_id, source_order, is_deleted) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (next_id, indicator_pk, asset_id, field_id, 0, "N"),
+            )
+            existing.add(key)
+            next_id += 1
+
+    def apply(self, ctx: DwsRevisionContext) -> None:
+        inspection = self.inspect(ctx)
+        if inspection.state is RevisionState.CONFLICT:
+            raise DwsMigrationError(
+                self.revision,
+                observed=inspection.summary,
+                reason="the adapter only completes absent, additive lineage schema objects",
+                details=inspection.details,
+            )
+        indicator = ctx.table("p_indicator_item")
+        for name in self.formula_columns:
+            if name not in indicator.columns:
+                ctx.execute(
+                    f"ALTER TABLE {ctx.qualified('p_indicator_item')} ADD COLUMN {name} TEXT"
+                )
+        source_missing = not ctx.has_table(self.source_table)
+        if source_missing:
+            for statement in _baseline_statements(ctx, (self.source_table,)):
+                ctx.execute(statement)
+        source = ctx.table(self.source_table)
+        index = source.indexes.get(self.source_index) if source is not None else None
+        if not source_missing and index is None:
+            ctx.execute(
+                f"CREATE INDEX {self.source_index} ON {ctx.qualified(self.source_table)} "
+                f"({', '.join(self.source_index_columns)})"
+            )
+        self._backfill_legacy_sources(ctx)
 # 0016_root_example
 # ---------------------------------------------------------------------------
 
@@ -1946,6 +2092,7 @@ ADAPTERS: tuple[DwsRevisionAdapter, ...] = (
     RagSearchConfigSeed(),
     AILlmDailyQuota(),
     RootExampleColumn(),
+    IndicatorSourceLineage(),
 )
 
 _ADAPTERS_BY_REVISION: dict[str, DwsRevisionAdapter] = {

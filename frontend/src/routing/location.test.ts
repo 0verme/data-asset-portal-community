@@ -327,6 +327,22 @@ test("asset deep links carry the canonical assetId without changing the legacy t
   assert.equal(built.url, "/data-warehouse/orders?assetId=42");
 });
 
+test("source field deep links preserve both stable asset and field identity", () => {
+  const parsed = parseLocation("/data-warehouse/orders?assetId=42&fieldId=99");
+  assert.deepEqual(parsed.assetRoute, {
+    page: "detail",
+    table: "orders",
+    assetId: 42,
+    fieldId: 99,
+  });
+
+  const built = buildNavigationLocation({
+    module: "dwm",
+    routes: { ...emptyRoutes, asset: parsed.assetRoute },
+  });
+  assert.equal(built.url, "/data-warehouse/orders?assetId=42&fieldId=99");
+});
+
 test("legacy asset URLs stay valid and never invent an assetId", () => {
   const parsed = parseLocation("/data-warehouse/orders");
   assert.deepEqual(parsed.assetRoute, { page: "detail", table: "orders" });

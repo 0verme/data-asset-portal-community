@@ -12,6 +12,18 @@ export interface IndicatorStatusOption {
   label: string;
 }
 
+export interface IndicatorSource {
+  relationId?: number | null;
+  assetId: number | null;
+  fieldId: number | null;
+  tableName: string;
+  schemaName?: string;
+  qualifiedName?: string;
+  fieldName: string;
+  fieldCn?: string;
+  availability: "available" | "unknown";
+}
+
 export interface MockIndicatorItem {
   id: string;
   name: string;
@@ -22,10 +34,16 @@ export interface MockIndicatorItem {
   sourceAssetName?: string | null;
   sourceAssetQualifiedName?: string | null;
   resultFieldId?: number | null;
+  sources?: IndicatorSource[];
+  sourceRelationsStatus?: "unconfigured" | "configured" | "partial" | "unknown";
+  sourceCount?: number;
+  sourceUnknownCount?: number;
   aggregation?: string | null;
   semanticState?: string;
   dimension: string;
   caliber: string;
+  caliberFormula?: string;
+  caliberSql?: string;
   path: string;
   registrar: string;
   registeredAt: string;

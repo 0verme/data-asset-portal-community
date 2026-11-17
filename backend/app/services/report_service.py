@@ -28,7 +28,7 @@ from ..application import AuditActorMixin, actor_aware
 # pyright: reportMissingImports=false
 
 from ..db.service import CoreAccess
-from ..db.tables import asset_domain, asset_table, indicator_item, report_asset
+from ..db.tables import asset_domain, asset_field, asset_table, indicator_item, indicator_source, report_asset
 from ..db.facade import database_transaction
 from ..security.public_field_policy import FIELD_CLASS_PERSON, public_field_class_visible
 from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
@@ -204,24 +204,32 @@ class ReportService(AuditActorMixin):
                 return payload
         raise ReportDataSourceError("报表关联数据格式无效，请联系管理员核查。")
 
-    def _asset_lookup(self):
+    def _asset_lookup(self, asset_ids=None):
         """Return ``(by_asset_id, by_table_name)`` indexes for related tables.
 
         ``table_name`` is intentionally kept as a list per name: reviews of
         stored report payloads must see ambiguity instead of silently keeping
         the latest row.
         """
-        rows = self._fetch_rows(
+        statement = (
             select(
                 asset_table.c.asset_id,
                 asset_table.c.table_name,
                 asset_table.c.table_cn_name,
+                asset_table.c.schema_name,
+                asset_table.c.qualified_name,
                 asset_table.c.layer_code,
                 asset_table.c.domain_code,
             )
             .where(asset_table.c.is_deleted == "N")
             .order_by(asset_table.c.table_name, asset_table.c.asset_id)
         )
+        if asset_ids is not None:
+            ids = sorted({int(value) for value in asset_ids if value is not None})
+            if not ids:
+                return {}, {}
+            statement = statement.where(asset_table.c.asset_id.in_(ids))
+        rows = self._fetch_rows(statement)
         by_asset_id = {}
         by_table_name = {}
         for row in rows:
@@ -236,6 +244,8 @@ class ReportService(AuditActorMixin):
                 "assetId": asset_id,
                 "tableName": table_name,
                 "tableCn": row.get("table_cn_name") or table_name,
+                "schemaName": row.get("schema_name") or "",
+                "qualifiedName": row.get("qualified_name") or "",
                 "layer": row.get("layer_code") or "",
                 "domain": row.get("domain_code") or "",
             }
@@ -243,8 +253,8 @@ class ReportService(AuditActorMixin):
             by_table_name.setdefault(table_name, []).append(entry)
         return by_asset_id, by_table_name
 
-    def _indicator_lookup(self):
-        rows = self._fetch_rows(
+    def _indicator_lookup(self, indicator_ids=None):
+        statement = (
             select(
                 indicator_item.c.indicator_id,
                 indicator_item.c.indicator_name,
@@ -254,6 +264,12 @@ class ReportService(AuditActorMixin):
             .where(indicator_item.c.is_deleted == "N")
             .order_by(indicator_item.c.indicator_id)
         )
+        if indicator_ids is not None:
+            ids = sorted({str(value).strip().upper() for value in indicator_ids if value})
+            if not ids:
+                return {}
+            statement = statement.where(indicator_item.c.indicator_id.in_(ids))
+        rows = self._fetch_rows(statement)
         return {
             str(row["indicator_id"]): {
                 "indicatorId": str(row["indicator_id"]),
@@ -265,7 +281,78 @@ class ReportService(AuditActorMixin):
             if row.get("indicator_id")
         }
 
-    def _normalize_payload(self, payload):
+    def _indicator_source_rows(self, indicator_ids):
+        """Read active source relations and legacy stable IDs for linked metrics."""
+        ids = sorted({str(value).strip().upper() for value in indicator_ids if value})
+        if not ids:
+            return {}
+        source_rows = self._fetch_rows(
+            select(
+                indicator_item.c.indicator_id,
+                indicator_item.c.source_asset_id.label("legacy_asset_id"),
+                indicator_item.c.result_field_id.label("legacy_field_id"),
+                indicator_item.c.result_table_name.label("legacy_table_name"),
+                indicator_item.c.result_field_name.label("legacy_field_name"),
+                indicator_source.c.source_pk,
+                indicator_source.c.source_asset_id,
+                indicator_source.c.source_field_id,
+                indicator_source.c.source_order,
+            )
+            .select_from(indicator_item.outerjoin(
+                indicator_source,
+                and_(
+                    indicator_source.c.indicator_pk == indicator_item.c.indicator_pk,
+                    indicator_source.c.is_deleted == "N",
+                ),
+            ))
+            .where(
+                indicator_item.c.indicator_id.in_(ids),
+                indicator_item.c.is_deleted == "N",
+            )
+            .order_by(
+                indicator_item.c.indicator_id,
+                indicator_source.c.source_order,
+                indicator_source.c.source_pk,
+            )
+        )
+        grouped = {}
+        for row in source_rows:
+            indicator_id = str(row.get("indicator_id") or "").upper()
+            if not indicator_id:
+                continue
+            has_relation = row.get("source_pk") is not None
+            asset_id = row.get("source_asset_id") if has_relation else row.get("legacy_asset_id")
+            field_id = row.get("source_field_id") if has_relation else row.get("legacy_field_id")
+            if not has_relation and asset_id is None and field_id is None:
+                continue
+            grouped.setdefault(indicator_id, []).append({
+                "relationId": row.get("source_pk"),
+                "assetId": asset_id,
+                "fieldId": field_id,
+                "sourceOrder": row.get("source_order") or 0,
+                "legacyTableName": row.get("legacy_table_name") or "",
+                "legacyFieldName": row.get("legacy_field_name") or "",
+            })
+        return grouped
+
+    def _field_lookup(self, field_ids):
+        ids = sorted({int(value) for value in field_ids if value is not None})
+        if not ids:
+            return {}
+        rows = self._fetch_rows(select(
+            asset_field.c.field_id,
+            asset_field.c.asset_id,
+            asset_field.c.field_name,
+            asset_field.c.field_cn_name,
+            asset_field.c.is_deleted,
+        ).where(asset_field.c.field_id.in_(ids)))
+        return {
+            int(row["field_id"]): row
+            for row in rows
+            if row.get("field_id") is not None
+        }
+
+    def _normalize_payload(self, payload, *, defaults=None):
         if not isinstance(payload, dict):
             raise ReportValidationError([{"field": "body", "message": "Request body must be a JSON object"}])
 
@@ -284,8 +371,9 @@ class ReportService(AuditActorMixin):
         maintainer_name = str(payload.get("maintainerName") or "").strip() or owner_name
         effective_date = str(payload.get("effectiveDate") or "").strip()
         expire_date = str(payload.get("expireDate") or "").strip()
-        related_tables = payload.get("relatedTables")
-        related_indicators = payload.get("relatedIndicators")
+        defaults = defaults if isinstance(defaults, dict) else {}
+        related_tables = payload.get("relatedTables", defaults.get("relatedTables"))
+        related_indicators = payload.get("relatedIndicators", defaults.get("relatedIndicators"))
 
         if not report_code:
             details.append({"field": "code", "message": "code is required"})
@@ -332,6 +420,19 @@ class ReportService(AuditActorMixin):
         related_indicators = cast(list[dict[str, Any]], related_indicators)
         asset_by_id, asset_by_name = self._asset_lookup()
         indicator_lookup = self._indicator_lookup()
+        old_tables = {
+            str(item.get("assetId")): item for item in defaults.get("relatedTables", [])
+            if isinstance(item, dict) and item.get("assetId") is not None
+        }
+        old_legacy_tables = {
+            str(item.get("tableName") or "").strip(): item
+            for item in defaults.get("relatedTables", [])
+            if isinstance(item, dict) and item.get("assetId") is None and item.get("tableName")
+        }
+        old_indicators = {
+            str(item.get("indicatorId") or "").upper(): item
+            for item in defaults.get("relatedIndicators", []) if isinstance(item, dict)
+        }
         normalized_tables = []
         normalized_indicators = []
         seen_table_keys = set()
@@ -348,8 +449,11 @@ class ReportService(AuditActorMixin):
                     continue
                 match = asset_by_id.get(asset_id)
                 if not match:
-                    details.append({"field": f"relatedTables[{index}].assetId", "message": f"related asset does not exist: {asset_id}"})
-                    continue
+                    prior = old_tables.get(str(asset_id))
+                    if prior is None:
+                        details.append({"field": f"relatedTables[{index}].assetId", "message": f"related asset does not exist: {asset_id}"})
+                        continue
+                    match = {**prior, "assetId": asset_id, "availability": "unknown"}
                 dedupe_key = f"asset:{asset_id}"
             else:
                 table_name = str(raw.get("tableName") or "").strip()
@@ -358,7 +462,16 @@ class ReportService(AuditActorMixin):
                     continue
                 matches = asset_by_name.get(table_name, [])
                 if not matches:
-                    details.append({"field": f"relatedTables[{index}].tableName", "message": f"related table does not exist: {table_name}"})
+                    prior = old_legacy_tables.get(table_name)
+                    if prior is None:
+                        details.append({"field": f"relatedTables[{index}].tableName", "message": f"related table does not exist: {table_name}"})
+                        continue
+                    match = {**prior, "availability": "unknown"}
+                    dedupe_key = f"legacy:{table_name}"
+                    if dedupe_key in seen_table_keys:
+                        continue
+                    seen_table_keys.add(dedupe_key)
+                    normalized_tables.append(match)
                     continue
                 if len(matches) > 1:
                     details.append({
@@ -382,8 +495,11 @@ class ReportService(AuditActorMixin):
                 continue
             match = indicator_lookup.get(indicator_id)
             if not match:
-                details.append({"field": f"relatedIndicators[{index}].indicatorId", "message": f"related indicator does not exist: {indicator_id}"})
-                continue
+                prior = old_indicators.get(indicator_id)
+                if prior is None:
+                    details.append({"field": f"relatedIndicators[{index}].indicatorId", "message": f"related indicator does not exist: {indicator_id}"})
+                    continue
+                match = {**prior, "indicatorId": indicator_id, "availability": "unknown"}
             seen_indicator_ids.add(indicator_id)
             normalized_indicators.append(match)
 
@@ -491,8 +607,12 @@ class ReportService(AuditActorMixin):
             "maintainerName": row.get("maintainer_name") or "",
             "relatedTables": related_tables,
             "relatedIndicators": related_indicators,
-            "relatedTableCount": len(related_tables),
-            "relatedIndicatorCount": len(related_indicators),
+            "relatedTableCount": 0,
+            "relatedIndicatorCount": 0,
+            "relatedTablesStatus": "unknown" if related_tables else "unconfigured",
+            "relatedIndicatorsStatus": "unknown" if related_indicators else "unconfigured",
+            "relatedTableUnknownCount": len(related_tables),
+            "relatedIndicatorUnknownCount": len(related_indicators),
             "remark": row.get("remark_desc") or "",
             "updatedBy": row.get("updated_by") or "",
             "updatedAt": str(row.get("updated_at") or ""),
@@ -505,6 +625,136 @@ class ReportService(AuditActorMixin):
         item["statScope"] = item["businessScopeTags"]
         item["timeCaliber"] = row.get("time_caliber_desc") or ""
         return item
+
+    def _resolve_item_relations(self, items):
+        """Resolve report snapshots against active stable identities in one batch."""
+        asset_ids = {
+            int(ref["assetId"])
+            for item in items for ref in item["relatedTables"]
+            if isinstance(ref, dict) and ref.get("assetId") is not None
+            and str(ref.get("assetId")).strip().isdigit()
+        }
+        indicator_ids = {
+            str(ref.get("indicatorId") or "").strip().upper()
+            for item in items for ref in item["relatedIndicators"]
+            if isinstance(ref, dict) and ref.get("indicatorId")
+        }
+        indicators = self._indicator_lookup(indicator_ids)
+        sources_by_indicator = self._indicator_source_rows(indicators)
+        source_rows = [source for rows in sources_by_indicator.values() for source in rows]
+        field_ids = {
+            int(source["fieldId"])
+            for source in source_rows
+            if source.get("fieldId") is not None and str(source["fieldId"]).isdigit()
+        }
+        fields = self._field_lookup(field_ids)
+        all_asset_ids = set(asset_ids)
+        for source in source_rows:
+            asset_id = source.get("assetId")
+            field_id = source.get("fieldId")
+            field = fields.get(int(field_id)) if field_id is not None and str(field_id).isdigit() else None
+            if asset_id is None and field and str(field.get("is_deleted") or "N").upper() == "N":
+                asset_id = field.get("asset_id")
+                source["assetId"] = asset_id
+            if asset_id is not None and str(asset_id).isdigit():
+                all_asset_ids.add(int(asset_id))
+        assets, _ = self._asset_lookup(all_asset_ids)
+
+        def status(active, unknown, configured):
+            if not configured:
+                return "unconfigured"
+            if active and unknown:
+                return "partial"
+            return "configured" if active else "unknown"
+
+        for item in items:
+            tables = []
+            seen_tables = set()
+            active_tables = 0
+            unknown_tables = 0
+            for raw in item["relatedTables"]:
+                snapshot = raw if isinstance(raw, dict) else {}
+                raw_id = snapshot.get("assetId")
+                asset_id = int(raw_id) if raw_id is not None and str(raw_id).strip().isdigit() else None
+                key = f"asset:{asset_id}" if asset_id is not None else f"legacy:{snapshot.get('tableName', '')}"
+                if key in seen_tables:
+                    continue
+                seen_tables.add(key)
+                current = assets.get(asset_id) if asset_id is not None else None
+                if current:
+                    tables.append({**snapshot, **current, "availability": "available"})
+                    active_tables += 1
+                else:
+                    tables.append({**snapshot, "assetId": asset_id, "availability": "unknown"})
+                    unknown_tables += 1
+            metrics = []
+            seen_metrics = set()
+            active_metrics = 0
+            unknown_metrics = 0
+            for raw in item["relatedIndicators"]:
+                snapshot = raw if isinstance(raw, dict) else {}
+                indicator_id = str(snapshot.get("indicatorId") or "").strip().upper()
+                key = indicator_id or f"legacy:{snapshot.get('indicatorName', '')}"
+                if key in seen_metrics:
+                    continue
+                seen_metrics.add(key)
+                current = indicators.get(indicator_id) if indicator_id else None
+                if current:
+                    metrics.append({**snapshot, **current, "availability": "available"})
+                    active_metrics += 1
+                else:
+                    metrics.append({**snapshot, "indicatorId": indicator_id, "availability": "unknown"})
+                    unknown_metrics += 1
+                source_items = []
+                source_unknown = 0
+                for source in sources_by_indicator.get(indicator_id, []) if current else []:
+                    asset_id = source.get("assetId")
+                    field_id = source.get("fieldId")
+                    asset_id = int(asset_id) if asset_id is not None and str(asset_id).isdigit() else None
+                    field_id = int(field_id) if field_id is not None and str(field_id).isdigit() else None
+                    table = assets.get(asset_id) if asset_id is not None else None
+                    field = fields.get(field_id) if field_id is not None else None
+                    field_matches_asset = field is None or (
+                        asset_id is not None and int(field.get("asset_id") or 0) == asset_id
+                    )
+                    field_available = field_id is None or (
+                        field is not None
+                        and str(field.get("is_deleted") or "N").upper() == "N"
+                        and field_matches_asset
+                    )
+                    available = bool(table) and field_available
+                    if not available:
+                        source_unknown += 1
+                    source_items.append({
+                        "relationId": source.get("relationId"),
+                        "assetId": asset_id,
+                        "fieldId": field_id,
+                        "tableName": table.get("tableName") if table else source.get("legacyTableName", ""),
+                        "schemaName": table.get("schemaName", "") if table else "",
+                        "qualifiedName": table.get("qualifiedName", "") if table else "",
+                        "fieldName": field.get("field_name") if field and field_available else source.get("legacyFieldName", ""),
+                        "fieldCn": field.get("field_cn_name") if field and field_available else "",
+                        "availability": "available" if available else "unknown",
+                    })
+                active_source_count = sum(1 for source in source_items if source["availability"] == "available")
+                if current:
+                    metrics[-1]["sources"] = source_items
+                    metrics[-1]["sourceCount"] = active_source_count
+                    metrics[-1]["sourceUnknownCount"] = source_unknown
+                    metrics[-1]["sourceRelationsStatus"] = (
+                        "unconfigured" if not source_items else
+                        "partial" if active_source_count and source_unknown else
+                        "configured" if active_source_count else "unknown"
+                    )
+            item["relatedTables"] = tables
+            item["relatedIndicators"] = metrics
+            item["relatedTableCount"] = active_tables
+            item["relatedIndicatorCount"] = active_metrics
+            item["relatedTableUnknownCount"] = unknown_tables
+            item["relatedIndicatorUnknownCount"] = unknown_metrics
+            item["relatedTablesStatus"] = status(active_tables, unknown_tables, bool(tables))
+            item["relatedIndicatorsStatus"] = status(active_metrics, unknown_metrics, bool(metrics))
+        return items
 
     def _report_statement(self):
         columns = (
@@ -579,12 +829,15 @@ class ReportService(AuditActorMixin):
                         facets[key][value] = facets[key].get(value, 0) + size
             # Only selected reports are decoded; their full reference arrays/counts
             # remain compatible with details, editors and legacy export consumers.
-            return {"items": [self._row_to_item(row) for row in rows], "total": filtered_total,
+            items = self._resolve_item_relations([self._row_to_item(row) for row in rows])
+            return {"items": items, "total": filtered_total,
                     "page": page, "pageSize": page_size, "facets": facets,
                     "stats": {"reportCount": all_report_count}}
 
     def get_reports(self, keyword=None, report_type=None, domain=None, status=None, owner_dept=None):
-        return self._db_reports(keyword=keyword, report_type=report_type, domain=domain, status=status, owner_dept=owner_dept)
+        return self._resolve_item_relations(
+            self._db_reports(keyword=keyword, report_type=report_type, domain=domain, status=status, owner_dept=owner_dept)
+        )
 
     def get_report_detail(self, report_code):
         normalized_code = str(report_code or "").strip().upper()
@@ -593,7 +846,7 @@ class ReportService(AuditActorMixin):
         ).limit(1))
         if not rows:
             raise ReportNotFoundError(report_code)
-        return deepcopy(self._row_to_item(rows[0]))
+        return deepcopy(self._resolve_item_relations([self._row_to_item(rows[0])])[0])
 
     @actor_aware
     def create_report(self, payload):
@@ -667,7 +920,7 @@ class ReportService(AuditActorMixin):
     def _update_report(self, report_code, payload):
         normalized_code = str(report_code or "").strip().upper()
         current = self.get_report_detail(normalized_code)
-        item = self._normalize_payload(payload)
+        item = self._normalize_payload(payload, defaults=current)
         rows = self._fetch_rows(
             select(report_asset.c.report_pk).where(
                 and_(report_asset.c.report_code == normalized_code, report_asset.c.is_deleted == "N")

@@ -14,6 +14,7 @@ from backend.app.db.tables import (
     asset_field,
     asset_table,
     indicator_item,
+    indicator_source,
     indicator_path_config,
 )
 from backend.app.fastapi_app import create_fastapi_app
@@ -121,7 +122,7 @@ class IndicatorDimensionCatalogSqliteTests(unittest.TestCase):
             poolclass=StaticPool,
         ).execution_options(schema_translate_map={"__app__": None})
         self.addCleanup(engine.dispose)
-        for table in (indicator_item, indicator_path_config, asset_table, asset_field):
+        for table in (indicator_item, indicator_path_config, asset_table, asset_field, indicator_source):
             table.create(engine)
         with engine.begin() as connection:
             if indicator_rows:
@@ -429,6 +430,7 @@ class IndicatorDimensionWriteBoundaryTests(unittest.TestCase):
                         "registered_date": "2026-07-01",
                     }
                 ],
+                [],
             ]
         )
         self.service._db.next_pk = MagicMock(return_value=2)

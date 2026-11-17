@@ -242,6 +242,25 @@ class IndicatorSemanticServiceTests(unittest.TestCase):
         self.assertIsNone(cleared["resultFieldId"])
         self.assertIsNone(cleared["aggregation"])
 
+    def test_explicit_legacy_ids_replace_inherited_source_array(self):
+        current = {
+            **BASE_PAYLOAD,
+            "sourceAssetId": 10,
+            "resultFieldId": 20,
+            "sources": [
+                {"assetId": 10, "fieldId": 20, "availability": "available"},
+                {"assetId": 11, "fieldId": 21, "availability": "available"},
+            ],
+        }
+        updated = self.service._normalize_payload(
+            {**BASE_PAYLOAD, "sourceAssetId": 10, "resultFieldId": 20},
+            defaults=current,
+        )
+        self.assertEqual(
+            [(10, 20)],
+            [(source["assetId"], source["fieldId"]) for source in updated["sources"]],
+        )
+
     def test_insert_statement_contains_portable_semantic_columns(self):
         item = self.service._normalize_payload(
             {

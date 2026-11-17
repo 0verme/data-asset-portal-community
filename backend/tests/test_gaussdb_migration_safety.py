@@ -107,7 +107,7 @@ class GaussDbMigrationSafetyTests(unittest.TestCase):
 
         self.assertEqual(repository_head(), error.exception.revision)
         self.assertIn("p_unregistered_extension", str(error.exception))
-        self.assertEqual("0015_ai_llm_daily_quota", database.ledger)
+        self.assertEqual("0016_root_example", database.ledger)
         self.assertIs(unexpected, database.tables["p_unregistered_extension"])
         self.assertEqual(rows_before, unexpected.rows)
 

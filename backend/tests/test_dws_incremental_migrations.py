@@ -325,6 +325,78 @@ class DwsFreshAndAdoptionTests(unittest.TestCase):
         )
         self.assertEqual(repository_head(), verify_database(database, CONFIG, "dws"))
 
+
+class DwsIndicatorSourceLineageTests(unittest.TestCase):
+    REVISION = "0017_indicator_source_lineage"
+
+    def test_additive_lineage_migration_copies_only_stable_ids_and_is_adoptable(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        downgrade_to_prefix(database, set(REVISION_ORDER[:-1]))
+        _seed_legacy_business_rows(database)
+        _seed_required_rows_through_0014(database)
+        database.ledger = "0014_rag_search_config"
+        apply_revisions(database, CONFIG, "0014_rag_search_config", "0015_ai_llm_daily_quota")
+        indicator = database.table("p_indicator_item").rows[0]
+        indicator.update(
+            source_asset_id=1,
+            result_field_id=11,
+            semantic_state="candidate",
+        )
+        database.table("p_indicator_item").add_row({
+            "indicator_pk": 2,
+            "indicator_id": "NO_SOURCE",
+            "indicator_name": "No source",
+            "result_table_name": "snapshot_only",
+            "result_field_name": "field_only",
+            "dimension_code": "ord",
+            "semantic_state": "candidate",
+            "aggregation_code": "SUM",
+            "status_code": "enabled",
+            "registrar_name": "migration-test",
+            "registered_date": "2026-01-01",
+            "is_deleted": "N",
+        })
+        database.ledger = "0015_ai_llm_daily_quota"
+
+        result = apply_revisions(
+            database, CONFIG, "0015_ai_llm_daily_quota", repository_head()
+        )
+
+        self.assertEqual(
+            [("0016_root_example", "adopt"), (self.REVISION, "apply")],
+            [(item.revision, item.action) for item in result],
+        )
+        source_rows = database.table("p_indicator_source").rows
+        self.assertEqual(1, len(source_rows))
+        self.assertEqual((1, 1, 11), (
+            source_rows[0]["source_pk"],
+            source_rows[0]["indicator_pk"],
+            source_rows[0]["source_field_id"],
+        ))
+        self.assertEqual("candidate", indicator["semantic_state"])
+        self.assertIsNone(indicator.get("caliber_formula"))
+        self.assertIsNone(indicator.get("caliber_sql"))
+
+        database.ledger = "0015_ai_llm_daily_quota"
+        adopted = apply_revisions(
+            database, CONFIG, "0015_ai_llm_daily_quota", repository_head()
+        )
+        self.assertEqual(
+            [("0016_root_example", "adopt"), (self.REVISION, "adopt")],
+            [(item.revision, item.action) for item in adopted],
+        )
+        self.assertEqual(1, len(database.table("p_indicator_source").rows))
+
+    def test_incompatible_formula_column_fails_closed(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        downgrade_to_prefix(database, set(REVISION_ORDER[:-1]))
+        database.add_column("p_indicator_item", "caliber_formula", "VARCHAR(512)")
+
+        inspection = inspect_revision(database, CONFIG, self.REVISION)
+
+        self.assertIs(RevisionState.CONFLICT, inspection.state)
+        self.assertIn("caliber_formula", " ".join(inspection.details))
+
     def test_head_apply_is_a_no_op(self):
         database = FakeDwsDatabase().seed_from_baseline()
         apply_revisions(database, CONFIG, "0001_baseline", repository_head())
@@ -750,6 +822,7 @@ class DwsFieldMappingQueryIndexTests(unittest.TestCase):
                 ("0014_rag_search_config", "apply"),
                 ("0015_ai_llm_daily_quota", "apply"),
                 ("0016_root_example", "adopt"),
+                ("0017_indicator_source_lineage", "adopt"),
             ],
             [(item.revision, item.action) for item in result],
         )
@@ -790,6 +863,7 @@ class DwsRagSearchConfigSeedTests(unittest.TestCase):
                 (self.REVISION, "apply"),
                 ("0015_ai_llm_daily_quota", "apply"),
                 ("0016_root_example", "adopt"),
+                ("0017_indicator_source_lineage", "adopt"),
             ],
             [(item.revision, item.action) for item in result],
         )
@@ -860,6 +934,7 @@ class DwsRagSearchConfigSeedTests(unittest.TestCase):
                 (self.REVISION, "adopt"),
                 ("0015_ai_llm_daily_quota", "apply"),
                 ("0016_root_example", "adopt"),
+                ("0017_indicator_source_lineage", "adopt"),
             ],
             [(item.revision, item.action) for item in result],
         )
@@ -912,7 +987,7 @@ class DwsAiLlmDailyQuotaTests(unittest.TestCase):
             database, CONFIG, "0014_rag_search_config", repository_head()
         )
 
-        self.assertEqual([(self.REVISION, "apply"), ("0016_root_example", "adopt")], [
+        self.assertEqual([(self.REVISION, "apply"), ("0016_root_example", "adopt"), ("0017_indicator_source_lineage", "adopt")], [
             (item.revision, item.action) for item in result
         ])
         category = next(
@@ -964,7 +1039,7 @@ class DwsAiLlmDailyQuotaTests(unittest.TestCase):
             database, CONFIG, "0014_rag_search_config", repository_head()
         )
 
-        self.assertEqual([(self.REVISION, "adopt"), ("0016_root_example", "adopt")], [
+        self.assertEqual([(self.REVISION, "adopt"), ("0016_root_example", "adopt"), ("0017_indicator_source_lineage", "adopt")], [
             (item.revision, item.action) for item in result
         ])
         self.assertEqual("73", next(
@@ -1039,7 +1114,7 @@ class DwsRootExampleColumnTests(unittest.TestCase):
             database, CONFIG, "0015_ai_llm_daily_quota", repository_head()
         )
 
-        self.assertEqual([(self.REVISION, "apply")], [
+        self.assertEqual([(self.REVISION, "apply"), ("0017_indicator_source_lineage", "adopt")], [
             (item.revision, item.action) for item in result
         ])
         self.assertEqual("VARCHAR(2000)", database.table("p_root_item").columns["root_example"].type_name)
@@ -1058,7 +1133,7 @@ class DwsRootExampleColumnTests(unittest.TestCase):
             database, CONFIG, "0015_ai_llm_daily_quota", repository_head()
         )
 
-        self.assertEqual([(self.REVISION, "adopt")], [
+        self.assertEqual([(self.REVISION, "adopt"), ("0017_indicator_source_lineage", "adopt")], [
             (item.revision, item.action) for item in adopted
         ])
         self.assertFalse(any("ADD COLUMN root_example" in sql for sql, _ in database.executed))
@@ -1279,7 +1354,7 @@ class DwsFailureRecoveryTests(unittest.TestCase):
 
         self.assertEqual(repository_head(), error.exception.revision)
         self.assertIn("full head schema verification failed", str(error.exception))
-        self.assertEqual("0015_ai_llm_daily_quota", database.ledger)
+        self.assertEqual("0016_root_example", database.ledger)
         self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
 
     def test_head_stamp_waits_for_all_prior_revision_postconditions(self):
@@ -1294,7 +1369,7 @@ class DwsFailureRecoveryTests(unittest.TestCase):
 
         self.assertEqual("0009_upstream_option_contract", error.exception.revision)
         self.assertIn("post-condition", str(error.exception))
-        self.assertEqual("0015_ai_llm_daily_quota", database.ledger)
+        self.assertEqual("0016_root_example", database.ledger)
         self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
 
     def test_ledger_update_failure_keeps_prior_revision_and_retry_adopts_ddl(self):

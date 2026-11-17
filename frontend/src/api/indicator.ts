@@ -18,6 +18,7 @@ import { parseCollectionResponse } from './collectionResponse.ts';
 import {
   INDICATOR_DIMENSIONS,
   INDICATORS,
+  type IndicatorSource,
   type MockIndicatorItem,
 } from '../data/indicators.ts';
 import {
@@ -107,6 +108,23 @@ function normalizeIndicator(item: unknown): MockIndicatorItem {
   const resultFieldId = normalizeOptionalId(firstPresentNullable(record, ['resultFieldId', 'result_field_id'], null));
   const aggregation = firstPresentNullable(record, ['aggregation', 'aggregationCode', 'aggregation_code'], null);
   const semanticState = firstPresent(record, ['semanticState', 'semantic_state', 'certificationStatus'], 'candidate');
+  const sources: IndicatorSource[] = Array.isArray(record['sources'])
+    ? record['sources'].flatMap((value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+      const source = value as Record<string, unknown>;
+      return [{
+        relationId: normalizeOptionalId(source['relationId']),
+        assetId: normalizeOptionalId(source['assetId'] ?? source['sourceAssetId']),
+        fieldId: normalizeOptionalId(source['fieldId'] ?? source['sourceFieldId'] ?? source['resultFieldId']),
+        tableName: firstPresent(source, ['tableName', 'table_name'], ''),
+        schemaName: firstPresent(source, ['schemaName', 'schema_name'], ''),
+        qualifiedName: firstPresent(source, ['qualifiedName', 'qualified_name'], ''),
+        fieldName: firstPresent(source, ['fieldName', 'field_name'], ''),
+        fieldCn: firstPresent(source, ['fieldCn', 'field_cn_name'], ''),
+        availability: source['availability'] === 'available' ? 'available' as const : 'unknown' as const,
+      }];
+    })
+    : [];
 
   return {
     id: String(record['id'] || ''),
@@ -118,10 +136,16 @@ function normalizeIndicator(item: unknown): MockIndicatorItem {
     sourceAssetName: firstPresentNullable(record, ['sourceAssetName', 'source_asset_name'], null),
     sourceAssetQualifiedName: firstPresentNullable(record, ['sourceAssetQualifiedName', 'source_asset_qualified_name'], null),
     resultFieldId,
+    sources,
+    sourceRelationsStatus: firstPresent(record, ['sourceRelationsStatus'], sources.length ? 'configured' : 'unconfigured') as NonNullable<MockIndicatorItem['sourceRelationsStatus']>,
+    sourceCount: Number.isSafeInteger(record['sourceCount']) ? Number(record['sourceCount']) : sources.filter((source) => source.availability === 'available').length,
+    sourceUnknownCount: Number.isSafeInteger(record['sourceUnknownCount']) ? Number(record['sourceUnknownCount']) : sources.filter((source) => source.availability === 'unknown').length,
     aggregation,
     semanticState,
     dimension,
     caliber: String(record['caliber'] || ''),
+    caliberFormula: firstPresent(record, ['caliberFormula', 'caliber_formula'], ''),
+    caliberSql: firstPresent(record, ['caliberSql', 'caliber_sql'], ''),
     path,
     registrar: String(record['registrar'] || ''),
     registeredAt: String(record['registeredAt'] || ''),
@@ -158,6 +182,9 @@ function filterIndicators(items: readonly MockIndicatorItem[], params: Indicator
       item.resultTableName,
       item.resultFieldName,
       item.caliber,
+      item.caliberFormula,
+      item.caliberSql,
+      ...(item.sources || []).flatMap((source) => [source.tableName, source.qualifiedName, source.fieldName, source.fieldCn]),
       item.path,
       item.registrar,
     ].some((value) => String(value || '').toLowerCase().includes(keyword));

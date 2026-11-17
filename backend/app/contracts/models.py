@@ -71,8 +71,11 @@ class ReportRelatedTable(ContractModel):
     assetId: int | None = None
     tableName: str
     tableCn: str | None = None
+    schemaName: str | None = None
+    qualifiedName: str | None = None
     layer: str | None = None
     domain: str | None = None
+    availability: str | None = None
 
 
 class ReportRelatedIndicator(ContractModel):
@@ -80,6 +83,11 @@ class ReportRelatedIndicator(ContractModel):
     indicatorName: str | None = None
     dimension: str | None = None
     path: str | None = None
+    availability: str | None = None
+    sources: list[dict[str, Any]] = Field(default_factory=list)
+    sourceRelationsStatus: str = "unconfigured"
+    sourceCount: int = 0
+    sourceUnknownCount: int = 0
 
 
 class ReportItem(ContractModel):
@@ -109,6 +117,10 @@ class ReportItem(ContractModel):
     relatedIndicators: list[ReportRelatedIndicator] = Field(default_factory=list)
     relatedTableCount: int = 0
     relatedIndicatorCount: int = 0
+    relatedTablesStatus: str = "unconfigured"
+    relatedIndicatorsStatus: str = "unconfigured"
+    relatedTableUnknownCount: int = 0
+    relatedIndicatorUnknownCount: int = 0
     remark: str | None = ""
     updatedBy: str = ""
     updatedAt: str = ""
@@ -165,10 +177,16 @@ class IndicatorItem(ContractModel):
     sourceAssetName: str | None = None
     sourceAssetQualifiedName: str | None = None
     resultFieldId: int | None = None
+    sources: list[dict[str, Any]] = Field(default_factory=list)
+    sourceRelationsStatus: str = "unconfigured"
+    sourceCount: int = 0
+    sourceUnknownCount: int = 0
     aggregation: str | None = None
     semanticState: str = "candidate"
     dimension: str = ""
     caliber: str = ""
+    caliberFormula: str = ""
+    caliberSql: str = ""
     path: str = ""
     status: str = ""
     registrar: str = ""
@@ -206,6 +224,9 @@ class IndicatorRequest(ContractModel):
             "aggregation", "aggregationCode", "aggregation_code"
         ),
     )
+    sources: list[dict[str, Any]] | None = None
+    caliberFormula: str | None = None
+    caliberSql: str | None = None
     semanticState: str | None = Field(
         default=None,
         validation_alias=AliasChoices(

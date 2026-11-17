@@ -17,6 +17,7 @@ import os
 import re
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
@@ -193,14 +194,13 @@ class SeedInsertCanonicalSchemaGuardTests(unittest.TestCase):
     def test_seed_insert_statements_execute_against_the_canonical_sqlite_baseline(self):
         with tempfile.TemporaryDirectory(prefix="dap-265-seed-") as temp_dir:
             config = {"type": "sqlite", "database": str(Path(temp_dir) / "canonical.sqlite")}
-            connection = connect(config)
-            self.addCleanup(connection.close)
-            self.assertTrue(initialize(connection, config, "sqlite"))
-            for table, sql in seed.INSERT_STATEMENTS.items():
-                placeholders = sql.count("?")
-                with self.subTest(table=table):
-                    self.assertGreater(placeholders, 0)
-                    connection.execute(sql, tuple(range(1, placeholders + 1)))
+            with closing(connect(config)) as connection:
+                self.assertTrue(initialize(connection, config, "sqlite"))
+                for table, sql in seed.INSERT_STATEMENTS.items():
+                    placeholders = sql.count("?")
+                    with self.subTest(table=table):
+                        self.assertGreater(placeholders, 0)
+                        connection.execute(sql, tuple(range(1, placeholders + 1)))
 
 
 @skip_without_postgres_integration()

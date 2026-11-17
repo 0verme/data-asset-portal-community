@@ -198,6 +198,8 @@ PUBLIC_CONNECTION_METADATA_KEYS = frozenset(
         "dbhost",
         "schema",
         "schemaname",
+        "qualifiedname",
+        "sourceassetqualifiedname",
         "jdbcurl",
         "endpoint",
     }

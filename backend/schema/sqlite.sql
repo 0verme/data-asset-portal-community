@@ -211,6 +211,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_indicator_item (
   result_field_name TEXT, source_asset_id INTEGER, result_field_id INTEGER,
   aggregation_code TEXT, semantic_state TEXT NOT NULL DEFAULT 'candidate',
   dimension_code TEXT NOT NULL, caliber_desc TEXT,
+  caliber_formula TEXT, caliber_sql TEXT,
   path_desc TEXT, status_code TEXT NOT NULL, registrar_name TEXT NOT NULL,
   registered_date TEXT NOT NULL, is_deleted TEXT NOT NULL DEFAULT 'N',
   created_by TEXT NOT NULL DEFAULT 'system', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -218,6 +219,15 @@ CREATE TABLE IF NOT EXISTS dwp.p_indicator_item (
 );
 CREATE INDEX IF NOT EXISTS dwp.idx_p_indicator_semantic_ref
   ON p_indicator_item (source_asset_id, result_field_id);
+CREATE TABLE IF NOT EXISTS dwp.p_indicator_source (
+  source_pk INTEGER PRIMARY KEY, indicator_pk INTEGER NOT NULL,
+  source_asset_id INTEGER, source_field_id INTEGER,
+  source_order INTEGER NOT NULL DEFAULT 0, is_deleted TEXT NOT NULL DEFAULT 'N',
+  created_by TEXT NOT NULL DEFAULT 'system', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by TEXT NOT NULL DEFAULT 'system', updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS dwp.idx_p_indicator_source_lookup
+  ON p_indicator_source (indicator_pk, is_deleted, source_order);
 CREATE TABLE IF NOT EXISTS dwp.p_indicator_path_config (
   id INTEGER PRIMARY KEY, parent_id INTEGER, path_code TEXT NOT NULL UNIQUE,
   path_name TEXT NOT NULL, dimension_code TEXT NOT NULL, path_level INTEGER NOT NULL,

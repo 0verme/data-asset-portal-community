@@ -77,5 +77,20 @@
     "retry": "重试",
     "loading": "加载中…",
     "noResults": "暂无结果"
+  },
+  "catalog": {
+    "indicator": {
+      "lifecycle": {
+        "candidate": "候选",
+        "certified": "已认证",
+        "deprecated": "已废弃"
+      },
+      "sourceStatus": {
+        "unconfigured": "未配置来源",
+        "configured": "来源已解析",
+        "partial": "部分来源无法解析",
+        "unknown": "来源未知"
+      }
+    }
   }
 }

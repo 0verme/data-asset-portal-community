@@ -347,6 +347,14 @@ class AssetFieldMatchContractTestCase(unittest.TestCase):
         self.assertIn(ASSET_FIELD_ACTIVE_VALUE, spec["active_where"])
         self.assertEqual("asset_id", spec["row_key"])
 
+    def test_indicator_search_selects_the_primary_key_used_for_field_matches(self):
+        config = next(
+            item for item in list_search_entities() if item["type"] == "indicator"
+        )
+        self.assertIn(config["field_match"]["row_key"], {
+            column.strip() for column in config["select"].split(",")
+        })
+
     def test_degraded_group_keeps_the_group_contract(self):
         """Degradation must not change the group shape the frontend consumes."""
         config = next(

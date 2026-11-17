@@ -155,6 +155,8 @@ function normalizeTableCandidate(item: AssetTableItem): RelatedTableSummary {
     assetId: Number.isInteger(assetId) && assetId > 0 ? assetId : null,
     tableName: item.name,
     tableCn: readText(item, "labelCn") || readText(item, "cnName") || item.cn || item.desc || "",
+    schemaName: readText(item, "schemaName") || readText(item, "schema_name") || readText(item, "schema") || "",
+    qualifiedName: readText(item, "qualifiedName") || readText(item, "qualified_name") || "",
     domain: item.domain || "",
     layer: item.layer || item.dataLayer || item.schemaLayer || "",
   };
@@ -351,7 +353,7 @@ export function ReportEditor({
     return tableCandidates.map(withReferenceKey).filter((item) => {
       if (selected.has(tableReferenceKey(item))) return false;
       if (!keyword) return true;
-      return [item.tableName, item.tableCn, item.domain, item.layer]
+      return [item.tableName, item.schemaName, item.qualifiedName, item.tableCn, item.domain, item.layer]
         .some((value) => String(value || "").toLowerCase().includes(keyword));
     }).slice(0, 20);
   }, [form.relatedTables, tableCandidates, tableSearch]);
@@ -632,7 +634,7 @@ export function ReportEditor({
             selectedItems={selectedTableReferences}
             itemKey="refKey"
             titleKey="tableName"
-            subtitleBuilder={(item) => [item.layer, item.domain, item.tableCn].filter(Boolean).join(" / ")}
+            subtitleBuilder={(item) => [item.qualifiedName || item.schemaName, item.layer, item.domain, item.tableCn].filter(Boolean).join(" / ")}
             onAdd={addRelatedTable}
             onRemove={removeRelatedTable}
             emptyText="未找到可添加的表"

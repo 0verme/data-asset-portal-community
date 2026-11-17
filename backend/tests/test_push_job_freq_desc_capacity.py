@@ -111,7 +111,7 @@ class PushJobFreqDescContractTests(unittest.TestCase):
 
     def test_capacity_revision_precedes_latest_head(self):
         self.assertEqual(
-            "0016_root_example", repository_alembic_head()
+            "0017_indicator_source_lineage", repository_alembic_head()
         )
         script = ScriptDirectory.from_config(Config(str(REPO_ROOT / "backend" / "alembic.ini")))
         revision = script.get_revision(CAPACITY_REVISION)

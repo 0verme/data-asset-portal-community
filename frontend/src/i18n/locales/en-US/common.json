@@ -77,5 +77,20 @@
     "retry": "Retry",
     "loading": "Loading…",
     "noResults": "No results"
+  },
+  "catalog": {
+    "indicator": {
+      "lifecycle": {
+        "candidate": "Candidate",
+        "certified": "Certified",
+        "deprecated": "Deprecated"
+      },
+      "sourceStatus": {
+        "unconfigured": "Sources not configured",
+        "configured": "Sources resolved",
+        "partial": "Some sources are unresolved",
+        "unknown": "Sources unknown"
+      }
+    }
   }
 }

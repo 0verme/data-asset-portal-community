@@ -45,6 +45,8 @@ export interface AssetRoute extends Route {
   table: string | null;
   /** Canonical asset identity carried in the URL as ``?assetId=``. */
   assetId?: number | null;
+  /** Stable field identity used to focus a lineage target within the table. */
+  fieldId?: number | null;
 }
 
 export interface PushRoute extends Route {
