@@ -181,7 +181,7 @@ class AssetFilterCatalogChangedError(ValueError):
 class AssetsService(AuditActorMixin):
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
-        self._default_schema_prefix = os.getenv("ASSET_SCHEMA_PREFIX", "DWS_").strip() or "DWS_"
+        self._default_schema_prefix = os.getenv("ASSET_SCHEMA_PREFIX", "").strip()
         self._db = CoreAccess(
             profile_getter=lambda: self._db_profile,
             error_factory=AssetDataSourceError,
@@ -213,7 +213,24 @@ class AssetsService(AuditActorMixin):
         return "Y" if value else "N"
 
     def _normalize_layer_schema(self, layer):
-        return f"{self._default_schema_prefix}{layer.upper()}"
+        layer_code = str(layer or "").strip().upper()
+        if not self._default_schema_prefix or not layer_code:
+            return ""
+        return f"{self._default_schema_prefix}{layer_code}"
+
+    @staticmethod
+    def _active_field_count_expression():
+        """Count active field rows, the source used by asset details."""
+        return (
+            select(func.count(asset_field.c.field_id))
+            .where(
+                asset_field.c.asset_id == asset_table.c.asset_id,
+                asset_field.c.is_deleted == ASSET_FIELD_ACTIVE_VALUE,
+            )
+            .correlate(asset_table)
+            .scalar_subquery()
+            .label("active_field_count")
+        )
 
     def _normalize_field_type(self, raw_type):
         return normalize_data_type(raw_type)
@@ -456,7 +473,7 @@ class AssetsService(AuditActorMixin):
             asset_table.c.grain_desc,
             asset_table.c.cycle_desc,
             asset_table.c.table_desc,
-            asset_table.c.field_count,
+            self._active_field_count_expression(),
             asset_table.c.created_at,
             asset_table.c.updated_at,
             func.count().over().label("total_count"),
@@ -583,7 +600,7 @@ class AssetsService(AuditActorMixin):
             asset_table.c.grain_desc,
             asset_table.c.cycle_desc,
             asset_table.c.table_desc,
-            asset_table.c.field_count,
+            self._active_field_count_expression(),
             asset_table.c.created_at,
             asset_table.c.updated_at,
         ).select_from(
@@ -907,6 +924,13 @@ class AssetsService(AuditActorMixin):
         return statements, len(active) - len(plan.deleted) + len(plan.inserted)
 
     def _to_asset_table(self, row, fields):
+        active_field_count = row.get("active_field_count")
+        schema_name = row.get("schema_name")
+        schema_name = (
+            str(schema_name).strip()
+            if isinstance(schema_name, str) and schema_name.strip()
+            else self._normalize_layer_schema(row.get("layer_code"))
+        )
         return {
             "assetId": int(row["asset_id"]),
             "name": row["table_name"],
@@ -919,8 +943,8 @@ class AssetsService(AuditActorMixin):
             "grain": row.get("grain_desc") or "",
             "cycle": row.get("cycle_desc") or "",
             "desc": row.get("table_desc") or "",
-            "schema": row.get("schema_name") or self._normalize_layer_schema(row["layer_code"]),
-            "fieldCount": int(row.get("field_count") or len(fields)),
+            "schema": schema_name,
+            "fieldCount": int(active_field_count) if active_field_count is not None else None,
             "_fieldMatch": row.get("field_match") or None,
             "fields": deepcopy(fields),
         }
@@ -954,7 +978,7 @@ class AssetsService(AuditActorMixin):
             asset_table.c.grain_desc,
             asset_table.c.cycle_desc,
             asset_table.c.table_desc,
-            asset_table.c.field_count,
+            self._active_field_count_expression(),
             asset_table.c.created_at,
             asset_table.c.updated_at,
         )
@@ -1330,7 +1354,7 @@ class AssetsService(AuditActorMixin):
                         asset_table.c.grain_desc,
                         asset_table.c.cycle_desc,
                         asset_table.c.table_desc,
-                        asset_table.c.field_count,
+                        self._active_field_count_expression(),
                         asset_domain.c.domain_name.label("domain_name"),
                     )
                     .select_from(

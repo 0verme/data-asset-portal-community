@@ -31,14 +31,17 @@
   "layer": "Layer",
   "owner": "Owner",
   "fieldCount": "Fields",
+  "fieldCountUnknown": "Field count unknown",
   "fieldCountSuffix_one": " field",
   "fieldCountSuffix_other": " fields",
   "matchedField": "Matched field",
+  "grain": "Grain",
   "fieldCountValue_one": "{{count}} field",
   "fieldCountValue_other": "{{count}} fields",
   "groupTableCount_one": "{{count}} table",
   "groupTableCount_other": "{{count}} tables",
   "groupOwner": "{{owner}} · {{count}} fields",
+  "groupOwnerUnknown": "{{owner}} · field count unknown",
   "emptyTitle": "No matching tables found",
   "emptyDescription": "No table names or fields match “{{query}}”. Try another keyword or clear the filters."
 }

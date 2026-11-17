@@ -49,7 +49,7 @@ export interface DDLField {
 export interface DDLTable {
   name: string;
   cn?: string | undefined;
-  schema?: string | undefined;
+  schema?: string | null | undefined;
   layer?: string | undefined;
   fields?: DDLField[] | undefined;
 }
@@ -82,10 +82,9 @@ export function generateDDLByDialect(
     .trim()
     .toLowerCase();
   const fields = Array.isArray(table?.fields) ? table.fields : [];
-  const schemaName = String(
-    table?.schema || `dws_${table?.layer || "dwm"}`,
-  ).toLowerCase();
-  const qualifiedName = `${schemaName}.${table.name}`;
+  const schemaName = typeof table?.schema === "string" ? table.schema.trim() : "";
+  const tableName = String(table?.name || "").trim();
+  const qualifiedName = schemaName ? `${schemaName}.${tableName}` : tableName;
   const pad =
     Math.max(...fields.map((field) => String(field.name || "").length), 0) + 2;
 

@@ -268,7 +268,7 @@ class AssetItem(ContractModel):
     cycle: str = ""
     desc: str = ""
     schema_name: str = Field(default="", alias="schema")
-    fieldCount: int = 0
+    fieldCount: int | None = None
     fields: list[AssetField] = Field(default_factory=list)
     assetRisks: list[Any] = Field(default_factory=list)
 

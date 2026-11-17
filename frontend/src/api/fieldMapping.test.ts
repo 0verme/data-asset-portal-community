@@ -151,6 +151,39 @@ test("field mapping stats keep mapping coverage separate from table configuratio
   assert.equal(stats.incompleteTableCount, 1);
 });
 
+test("field mapping stats use the backend's ties-to-even coverage rounding", () => {
+  const stats = normalizeFieldMappingStats({
+    data: validStats({
+      sourceTableCount: 8,
+      fieldCount: 8,
+      mappedFieldCount: 1,
+      unmappedFieldCount: 7,
+      configuredTableCount: 1,
+      incompleteTableCount: 7,
+      coverage: 12,
+      tableConfigCoverage: 12,
+    }),
+  });
+
+  assert.equal(stats.coverage, 12);
+  assert.equal(stats.tableConfigCoverage, 12);
+  assert.throws(
+    () => normalizeFieldMappingStats({
+      data: validStats({
+        sourceTableCount: 8,
+        fieldCount: 8,
+        mappedFieldCount: 1,
+        unmappedFieldCount: 7,
+        configuredTableCount: 1,
+        incompleteTableCount: 7,
+        coverage: 13,
+        tableConfigCoverage: 12,
+      }),
+    }),
+    /字段映射覆盖率/,
+  );
+});
+
 test("field mapping stats reject missing or invalid counts instead of defaulting to zero", () => {
   for (const fieldCount of [undefined, null, -1, 1.5, "0"]) {
     assert.throws(

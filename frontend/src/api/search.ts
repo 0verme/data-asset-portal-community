@@ -350,7 +350,7 @@ const ASSET_TABLE_FIELDS: readonly EntityField<MockDwmTable>[] = [
   { label: '资产表', getValue: (row) => row.name },
   { label: '资产中文名', getValue: (row) => row.cn },
   { label: '主题域', getValue: (row) => row.domain },
-  { label: 'Schema', getValue: (row) => `DWS_${row.layer}` },
+  { label: 'Schema', getValue: (row) => row.schema },
   { label: '分层', getValue: (row) => row.layer },
   { label: '负责人', getValue: (row) => row.owner },
   { label: '描述', getValue: (row) => row.desc },
@@ -369,7 +369,7 @@ function mapAssetItem(
     row.name,
     row.name || '',
     row.cn || '',
-    [row.domain, row.layer, row.owner].filter(Boolean).join(' / '),
+    [row.domain, row.layer, row.schema, row.owner, row.grain, row.desc].filter(Boolean).join(' / '),
     row.name,
     matchedFields,
   );

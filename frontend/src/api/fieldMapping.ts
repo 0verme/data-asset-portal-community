@@ -348,7 +348,14 @@ function readStatsCoverage(
 ): number | null {
   const value = detail[key];
   if (denominator === 0 && value === null) return null;
-  const expected = denominator > 0 ? Math.round((numerator / denominator) * 100) : null;
+  const percentage = denominator > 0 ? (numerator / denominator) * 100 : null;
+  let expected: number | null = null;
+  if (percentage !== null) {
+    const lower = Math.floor(percentage);
+    expected = percentage - lower === 0.5
+      ? lower % 2 === 0 ? lower : lower + 1
+      : Math.round(percentage);
+  }
   if (value === expected) {
     return expected;
   }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { getAssetTablePage } from "./assets.ts";
+import { DWM_TABLES } from "../data/tables.ts";
 import {
   buildMockSearchResult,
   disabledRagRecommendations,
@@ -216,14 +217,21 @@ test("mock system search mirrors the remote internal locator fields", () => {
   }
 });
 
-test("mock asset search recalls an asset by its derived schema", () => {
+test("mock asset search does not infer a schema from its layer", () => {
   const result = buildMockSearchResult("DWS_DWM", "asset", 5, ALL_MODULES);
   const group = assetGroup(result);
 
-  assert.ok(group.count > 0);
-  assert.ok(
-    group.items.some((item) =>
-      item.matchedFields.some((match) => match.label === "Schema" && match.value === "DWS_DWM"),
-    ),
-  );
+  assert.equal(group.count, 0);
+});
+
+test("asset search results retain the row grain and description", () => {
+  const table = DWM_TABLES[0];
+  assert.ok(table);
+  const result = buildMockSearchResult(table.name, "asset", 5, ALL_MODULES);
+  const group = assetGroup(result);
+  const item = group.items.find((entry) => entry.id === table.name);
+
+  assert.ok(item);
+  assert.match(item.meta, new RegExp(table.grain));
+  assert.match(item.meta, new RegExp(table.desc));
 });
