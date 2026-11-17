@@ -10,6 +10,24 @@ import {
   summarizeTables,
 } from "./fieldMapping.ts";
 import { formatSystemLabel } from "../components/fieldMapping/fieldMappingUtils.ts";
+import {
+  formatFieldMappingLoadMode,
+  isCompleteFieldMappingTableConfig,
+} from "./fieldMappingModel.ts";
+
+const validStats = (overrides: Record<string, unknown> = {}) => ({
+  sourceSystemCount: 0,
+  sourceTableCount: 0,
+  fieldCount: 0,
+  mappedFieldCount: 0,
+  unmappedFieldCount: 0,
+  configuredTableCount: 0,
+  incompleteTableCount: 0,
+  emptyCommentCount: 0,
+  coverage: null,
+  tableConfigCoverage: null,
+  ...overrides,
+});
 
 test("same-name mock systems are filtered by stable source system id", () => {
   const rows = [
@@ -107,18 +125,114 @@ test("mock field export includes every filtered row regardless of current page a
   }
 });
 
-test("field mapping stats preserve a true zero count from the data envelope", () => {
-  const stats = normalizeFieldMappingStats({ data: { fieldCount: 0 } });
+test("field mapping stats preserve zero counts without inventing percentages", () => {
+  const stats = normalizeFieldMappingStats({ data: validStats() });
   assert.equal(stats.fieldCount, 0);
+  assert.equal(stats.coverage, null);
+  assert.equal(stats.tableConfigCoverage, null);
 });
 
-test("field mapping stats reject missing or invalid fieldCount instead of defaulting to zero", () => {
+test("field mapping stats keep mapping coverage separate from table configuration coverage", () => {
+  const stats = normalizeFieldMappingStats({
+    data: validStats({
+      sourceTableCount: 2,
+      fieldCount: 3,
+      mappedFieldCount: 2,
+      unmappedFieldCount: 1,
+      configuredTableCount: 1,
+      incompleteTableCount: 1,
+      coverage: 67,
+      tableConfigCoverage: 50,
+    }),
+  });
+  assert.equal(stats.coverage, 67);
+  assert.equal(stats.tableConfigCoverage, 50);
+  assert.equal(stats.mappedFieldCount, 2);
+  assert.equal(stats.incompleteTableCount, 1);
+});
+
+test("field mapping stats use the backend's ties-to-even coverage rounding", () => {
+  const stats = normalizeFieldMappingStats({
+    data: validStats({
+      sourceTableCount: 8,
+      fieldCount: 8,
+      mappedFieldCount: 1,
+      unmappedFieldCount: 7,
+      configuredTableCount: 1,
+      incompleteTableCount: 7,
+      coverage: 12,
+      tableConfigCoverage: 12,
+    }),
+  });
+
+  assert.equal(stats.coverage, 12);
+  assert.equal(stats.tableConfigCoverage, 12);
+  assert.throws(
+    () => normalizeFieldMappingStats({
+      data: validStats({
+        sourceTableCount: 8,
+        fieldCount: 8,
+        mappedFieldCount: 1,
+        unmappedFieldCount: 7,
+        configuredTableCount: 1,
+        incompleteTableCount: 7,
+        coverage: 13,
+        tableConfigCoverage: 12,
+      }),
+    }),
+    /字段映射覆盖率/,
+  );
+});
+
+test("field mapping stats reject missing or invalid counts instead of defaulting to zero", () => {
   for (const fieldCount of [undefined, null, -1, 1.5, "0"]) {
     assert.throws(
-      () => normalizeFieldMappingStats({ data: { fieldCount } }),
+      () => normalizeFieldMappingStats({ data: validStats({ fieldCount }) }),
       /有效的字段计数/,
     );
   }
+  assert.throws(
+    () => normalizeFieldMappingStats({ data: validStats({ configuredTableCount: undefined }) }),
+    /入仓配置完整表计数/,
+  );
+  assert.throws(
+    () => normalizeFieldMappingStats({ data: validStats({ fieldCount: 1, unmappedFieldCount: 1, coverage: null }) }),
+    /字段映射覆盖率/,
+  );
+  assert.throws(
+    () => normalizeFieldMappingStats({ data: validStats({
+      sourceTableCount: 2,
+      configuredTableCount: 1,
+      incompleteTableCount: 1,
+      tableConfigCoverage: 100,
+    }) }),
+    /入仓配置完整率/,
+  );
+});
+
+test("field mapping statistics do not treat missing targets or unknown modes as complete", () => {
+  assert.equal(formatFieldMappingLoadMode(""), "未设置");
+  assert.equal(formatFieldMappingLoadMode("future_mode"), "未知（future_mode）");
+  assert.equal(formatFieldMappingLoadMode("incr"), "增量");
+  assert.equal(isCompleteFieldMappingTableConfig({
+    targetLayer: "DWD",
+    targetTable: "DWD_EXAMPLE",
+    loadMode: "incr",
+  }), true);
+  assert.equal(isCompleteFieldMappingTableConfig({
+    targetLayer: "DWF",
+    targetTable: "DWF_EXAMPLE",
+    loadMode: "future_mode",
+  }), false);
+  const summary = summarizeTables([{
+    sourceSystemId: 1,
+    srcTable: "source",
+    targetLayer: "DWS",
+    targetTable: "DWS_EXAMPLE",
+    loadMode: "full",
+    targetField: "   ",
+  }]);
+  assert.equal(summary[0]?.mappedCount, 0);
 });
 
 test("source-system options retain duplicate names and expose name/code labels", async () => {

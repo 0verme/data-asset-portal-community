@@ -1083,7 +1083,7 @@ export function SearchPortalPage({
                       <Button
                         variant="tertiary"
                         type="button"
-                        key={item.id}
+                        key={item.assetId ?? item.id}
                         className="sp-hit"
                         onClick={() => handleNavigate(item, searchedTerm)}
                       >

@@ -17,6 +17,8 @@ import React, { type ReactNode } from "react";
 import type { AssetTableField, AssetTableItem } from "../api/assets.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { Button, Input, Tabs } from "../ui/index.ts";
+import { getAssetFieldCount } from "../utils/assetFieldCount.ts";
+import { getQualifiedAssetTableName } from "../utils/assetTableName.ts";
 import { AssetRisksPanel } from "./AssetRisksPanel.tsx";
 import { MetaItem, PageHeader } from "./common/index.ts";
 import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.tsx";
@@ -251,10 +253,12 @@ export function DetailPage({
   onEdit,
 }: DetailPageProps) {
   const [copied, setCopied] = React.useState(false);
+  const storageTableName = getQualifiedAssetTableName(asset.name, asset.schema);
+  const fieldCount = getAssetFieldCount(asset.fieldCount);
 
   const copyName = async () => {
     if (navigator.clipboard) {
-      await navigator.clipboard.writeText(`dwm.${asset.name}`);
+      await navigator.clipboard.writeText(storageTableName);
     }
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
@@ -298,8 +302,8 @@ export function DetailPage({
           <MetaItem label="负责人" value={<><span className="mini-av" style={{ width: 22, height: 22 }}>{initial(asset.owner)}</span>{asset.owner}</>} />
           <MetaItem label="数据粒度" value={asset.grain} />
           <MetaItem label="更新周期" value={<><Icon name="clock" size={14} color="var(--ink-3)" />{asset.cycle}</>} />
-          <MetaItem label="字段数量" value={fields.length} mono />
-          <MetaItem label="存储表" value={`dwm.${asset.name}`} mono />
+          <MetaItem label="字段数量" value={fieldCount ?? "未知"} mono />
+          <MetaItem label="存储表" value={storageTableName} mono />
         </div>
       </div>
 

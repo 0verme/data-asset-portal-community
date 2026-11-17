@@ -16,7 +16,7 @@ test("field mapping query keeps four text filters and the native empty-comment c
   assert.equal((controls.match(/<select/g) ?? []).length, 1, "only emptyComment remains native");
   assert.equal((controls.match(/<button/g) ?? []).length, 2, "collapse and help triggers stay native");
   assert.match(controls, /aria-label="查询帮助"/);
-  assert.match(controls, /源系统表名[\s\S]*源字段名[\s\S]*DWF 表名[\s\S]*DWF 字段名/);
+  assert.match(controls, /源系统表名[\s\S]*源字段名[\s\S]*目标表[\s\S]*目标字段/);
   assert.doesNotMatch(controls, /aria-label="源系统"/);
   assert.doesNotMatch(page, /setDraftSourceSystem/);
 });

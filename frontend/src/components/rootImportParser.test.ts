@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseRootImport } from "./rootImportParser.ts";
+import {
+  parseRootImport,
+  preserveOmittedRootImportFields,
+} from "./rootImportParser.ts";
 
 test("CSV import parses separate root meaning and example fields with quoted delimiters and newlines", () => {
   const result = parseRootImport(
@@ -31,6 +34,28 @@ test("CSV import parses separate root meaning and example fields with quoted del
   ]);
 });
 
+test("header-based imports leave missing columns unmapped and preserve their existing values", () => {
+  const result = parseRootImport(
+    "abbr,en,cn,cat,extra,desc\nSKU,Stock keeping unit,库存单位,公共词根,ignored,sku用途说明\n",
+  );
+
+  assert.equal(result.error, undefined);
+  const parsed = result.items[0];
+  assert.equal(parsed?.desc, "sku用途说明");
+  assert.equal(parsed?.example, "");
+  assert.deepEqual(parsed?.missingFields, ["example"]);
+
+  const preserved = preserveOmittedRootImportFields(parsed!, {
+    en: "Stock keeping unit",
+    cn: "库存单位",
+    cat: "公共词根",
+    desc: "原用途说明",
+    example: "sku_id",
+  });
+  assert.equal(preserved.desc, "sku用途说明");
+  assert.equal(preserved.example, "sku_id");
+});
+
 test("quoted fields preserve inner whitespace while unquoted cells are trimmed", () => {
   const result = parseRootImport('abbr,en,cn\n  ROOT  , " English " , " 中文 " \n');
 
@@ -42,6 +67,7 @@ test("quoted fields preserve inner whitespace while unquoted cells are trimmed",
       cat: "",
       desc: "",
       example: "",
+      missingFields: ["cat", "desc", "example"],
       _line: 2,
     },
   ]);
@@ -58,6 +84,7 @@ test("delimiter detection skips leading blank records and preserves physical sou
       cat: "",
       desc: "",
       example: "",
+      missingFields: ["cat", "desc", "example"],
       _line: 3,
     },
   ]);
@@ -93,6 +120,7 @@ test("TSV import permits quoted tabs and multiline cells while preserving source
       cat: "公共词根",
       desc: "first line\r\nsecond line",
       example: "",
+      missingFields: ["example"],
       _line: 2,
     },
   ]);
@@ -110,6 +138,7 @@ test("pipe-delimited legacy imports remain supported and empty physical lines ar
       cat: "公共词根",
       desc: "说明",
       example: "",
+      missingFields: ["example"],
       _line: 3,
     },
   ]);

@@ -69,6 +69,7 @@ FIELD_SORT_COLUMNS = {
     "mappingRule": mapping_field.c.mapping_rule,
 }
 FIELD_MAPPING_EXPORT_BATCH_SIZE = 200
+_SUPPORTED_LOAD_MODES = ("full", "incr", "incr_zip", "full_zip")
 
 
 class FieldMappingDataSourceError(Exception):
@@ -1094,7 +1095,7 @@ class FieldMappingService(AuditActorMixin):
             upstream_system.c.system_abbr.label("system_abbr"),
             mapping_table.c.source_table_name,
             mapping_table.c.source_table_cn,
-            func.coalesce(mapping_table.c.target_layer_code, "DWF").label(
+            func.coalesce(mapping_table.c.target_layer_code, "").label(
                 "target_layer_code"
             ),
             func.coalesce(mapping_table.c.target_table_name, "").label(
@@ -1196,6 +1197,33 @@ class FieldMappingService(AuditActorMixin):
                 func.count(distinct(mapping_table.c.table_pk)).label(
                     "source_table_count"
                 ),
+                func.count(
+                    distinct(
+                        case(
+                            (
+                                and_(
+                                    func.coalesce(
+                                        func.length(
+                                            func.trim(mapping_table.c.target_layer_code)
+                                        ),
+                                        0,
+                                    )
+                                    > 0,
+                                    func.coalesce(
+                                        func.length(
+                                            func.trim(mapping_table.c.target_table_name)
+                                        ),
+                                        0,
+                                    )
+                                    > 0,
+                                    mapping_table.c.load_mode.in_(_SUPPORTED_LOAD_MODES),
+                                ),
+                                mapping_table.c.table_pk,
+                            ),
+                            else_=None,
+                        )
+                    )
+                ).label("configured_table_count"),
                 # Each active field joins to exactly one mapping table and one
                 # upstream system; data_source is a PK lookup. These field
                 # aggregates therefore need no DISTINCT temporary sets.
@@ -1242,19 +1270,28 @@ class FieldMappingService(AuditActorMixin):
             or [{}]
         )[0]
         total_count = self._safe_int(row.get("field_count"))
+        table_count = self._safe_int(row.get("source_table_count"))
         mapped_count = self._safe_int(row.get("mapped_field_count"))
+        configured_table_count = self._safe_int(row.get("configured_table_count"))
         empty_comment_count = self._safe_int(row.get("empty_comment_count"))
         result = {
             "sourceSystemCount": self._safe_int(row.get("source_system_count")),
-            "sourceTableCount": self._safe_int(row.get("source_table_count")),
+            "sourceTableCount": table_count,
             "fieldCount": total_count,
             "mappedFieldCount": mapped_count,
             "unmappedFieldCount": total_count - mapped_count,
+            "configuredTableCount": configured_table_count,
+            "incompleteTableCount": table_count - configured_table_count,
             "emptyCommentCount": empty_comment_count,
             "emptyCommentRate": round(empty_comment_count * 100 / total_count)
             if total_count
             else 0,
-            "coverage": round(mapped_count * 100 / total_count) if total_count else 0,
+            "coverage": round(mapped_count * 100 / total_count)
+            if total_count
+            else None,
+            "tableConfigCoverage": round(configured_table_count * 100 / table_count)
+            if table_count
+            else None,
         }
         return result
 
@@ -1426,7 +1463,7 @@ class FieldMappingService(AuditActorMixin):
             "srcSystem": func.coalesce(upstream_system.c.system_name, ""),
             "srcTable": func.coalesce(mapping_table.c.source_table_name, ""),
             "srcTableCn": source_table_cn,
-            "targetLayer": func.coalesce(mapping_table.c.target_layer_code, "DWF"),
+            "targetLayer": func.coalesce(mapping_table.c.target_layer_code, ""),
             "targetTable": func.coalesce(mapping_table.c.target_table_name, ""),
             "loadMode": func.coalesce(mapping_table.c.load_mode, ""),
             "mappedCount": mapped_count_expression,
@@ -1448,7 +1485,7 @@ class FieldMappingService(AuditActorMixin):
                 upstream_system.c.system_abbr.label("system_abbr"),
                 mapping_table.c.source_table_name,
                 source_table_cn,
-                func.coalesce(mapping_table.c.target_layer_code, "DWF").label(
+                func.coalesce(mapping_table.c.target_layer_code, "").label(
                     "target_layer_code"
                 ),
                 func.coalesce(mapping_table.c.target_table_name, "").label(

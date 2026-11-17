@@ -42,6 +42,7 @@ from ..dependencies import (
 from ..errors import _service_error_response
 from ..public_catalog import (
     profile_for_request,
+    project_public_catalog_value,
     redact_public_manual_code_table,
 )
 
@@ -217,6 +218,8 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
         page: str | None = Query(default=None),
         page_size: str | None = Query(default=None, alias="pageSize"),
         current_service: Any = Depends(get_service),
+        context: Any = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             payload = current_service.get_code_values_page(
@@ -232,6 +235,14 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
             ManualCodeTableDataSourceError,
         ) as error:
             return error_response(error)
+        profile = profile_for_request(context, authorization)
+        payload = {
+            **payload,
+            "items": [
+                project_public_catalog_value(item, profile=profile)
+                for item in payload["items"]
+            ],
+        }
         return JSONResponse(content=validate_contract(payload, ManualCodeValuePageResponse))
 
     @router.get("/{table_id}/items/{item_id}", response_model=None)
@@ -239,6 +250,8 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
         table_id: str,
         item_id: str,
         current_service: Any = Depends(get_service),
+        context: Any = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
     ):
         try:
             data = current_service.get_code_value(table_id, item_id)
@@ -248,6 +261,8 @@ def _register_manual_code_table_routes(app: FastAPI, service: Any) -> None:
             ManualCodeTableDataSourceError,
         ) as error:
             return error_response(error)
+        profile = profile_for_request(context, authorization)
+        data = project_public_catalog_value(data, profile=profile)
         return JSONResponse(
             content=validate_contract({"data": data}, DataEnvelope[ManualCodeValueItem])
         )

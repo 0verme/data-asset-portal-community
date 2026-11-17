@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -153,6 +154,43 @@ class PublicCatalogApiTests(unittest.TestCase):
         self.manual_code_table.get_tables.assert_called_once()
         self.upstream.get_systems.assert_called_once()
         self.push.get_push_systems.assert_called_once()
+
+    def test_anonymous_code_value_page_and_detail_redact_connection_credentials(self):
+        connection_text = (
+            "jdbc:postgresql://db_user:top-secret@db.example:5432/catalog"
+            "?user=db_user&password=top-secret&sslmode=require"
+        )
+        code_value = {
+            "id": "1",
+            "code": "CONNECTION",
+            "label": "Catalog connection",
+            "description": f"Read from {connection_text}",
+            "status": "enabled",
+            "updatedAt": "",
+        }
+        self.manual_code_table.get_code_values_page.return_value = {
+            "items": [code_value],
+            "total": 1,
+            "page": 1,
+            "pageSize": 20,
+            "stats": {"total": 1},
+        }
+        self.manual_code_table.get_code_value.return_value = code_value
+
+        for profile in ("internal", "strict"):
+            with self.subTest(profile=profile), patch.dict(
+                os.environ, {"PUBLIC_CATALOG_PROFILE": profile}
+            ):
+                page = self.client.get(
+                    "/api/manual-code-tables/1/items/page?page=1&pageSize=20"
+                )
+                detail = self.client.get("/api/manual-code-tables/1/items/1")
+
+            for response in (page, detail):
+                self.assertEqual(200, response.status_code, response.text)
+                self.assertNotIn("top-secret", response.text)
+                self.assertNotIn("db_user", response.text)
+                self.assertNotIn("password", response.text.lower())
 
     def test_root_page_routes_do_not_shadow_valid_abbreviations(self):
         self.root.get_root_detail.side_effect = lambda abbr: {

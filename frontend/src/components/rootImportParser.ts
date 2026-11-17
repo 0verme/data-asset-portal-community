@@ -5,6 +5,7 @@ export interface ParsedRoot {
   cat: string;
   desc: string;
   example: string;
+  missingFields?: readonly ("en" | "cn" | "cat" | "desc" | "example")[];
   _line: number;
 }
 
@@ -197,14 +198,9 @@ export function parseRootImport(text: string): { items: ParsedRoot[]; error?: st
   const hasHeader = firstRow.some((cell) => /abbr|root|词根|缩写/.test(cell));
   const startIndex = hasHeader ? 1 : 0;
   const header = hasHeader ? firstRow : [];
-  const indexMap: Record<"abbr" | "en" | "cn" | "cat" | "desc" | "example", number> = {
-    abbr: 0,
-    en: 1,
-    cn: 2,
-    cat: 3,
-    desc: 4,
-    example: 5,
-  };
+  const indexMap: Record<"abbr" | "en" | "cn" | "cat" | "desc" | "example", number> = hasHeader
+    ? { abbr: -1, en: -1, cn: -1, cat: -1, desc: -1, example: -1 }
+    : { abbr: 0, en: 1, cn: 2, cat: 3, desc: 4, example: 5 };
 
   header.forEach((cell, index) => {
     if (/abbr|root|词根|缩写/.test(cell)) indexMap.abbr = index;
@@ -215,15 +211,38 @@ export function parseRootImport(text: string): { items: ParsedRoot[]; error?: st
     if (/desc|说明|用途|备注/.test(cell)) indexMap.desc = index;
   });
 
+  const missingFields = hasHeader
+    ? (["en", "cn", "cat", "desc", "example"] as const).filter(
+      (field) => indexMap[field] < 0,
+    )
+    : [];
+
   return {
     items: records.slice(startIndex).map(({ cells: row, line: sourceLine }) => ({
-      abbr: row[indexMap.abbr] || "",
-      en: row[indexMap.en] || "",
-      cn: row[indexMap.cn] || "",
-      cat: row[indexMap.cat] || "",
-      desc: row[indexMap.desc] || "",
-      example: row[indexMap.example] || "",
+      abbr: indexMap.abbr >= 0 ? row[indexMap.abbr] || "" : "",
+      en: indexMap.en >= 0 ? row[indexMap.en] || "" : "",
+      cn: indexMap.cn >= 0 ? row[indexMap.cn] || "" : "",
+      cat: indexMap.cat >= 0 ? row[indexMap.cat] || "" : "",
+      desc: indexMap.desc >= 0 ? row[indexMap.desc] || "" : "",
+      example: indexMap.example >= 0 ? row[indexMap.example] || "" : "",
+      ...(missingFields.length ? { missingFields } : {}),
       _line: sourceLine,
     })),
+  };
+}
+
+export function preserveOmittedRootImportFields(
+  item: ParsedRoot,
+  existing?: Pick<ParsedRoot, "en" | "cn" | "cat" | "desc" | "example">,
+): ParsedRoot {
+  if (!existing || !item.missingFields?.length) return item;
+  const missing = new Set(item.missingFields);
+  return {
+    ...item,
+    en: missing.has("en") ? existing.en : item.en,
+    cn: missing.has("cn") ? existing.cn : item.cn,
+    cat: missing.has("cat") ? existing.cat : item.cat,
+    desc: missing.has("desc") ? existing.desc : item.desc,
+    example: missing.has("example") ? existing.example : item.example,
   };
 }

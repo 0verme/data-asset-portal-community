@@ -95,8 +95,11 @@ async function installRemoteFixtures(
           fieldCount: 250,
           mappedFieldCount: 225,
           unmappedFieldCount: 25,
+          configuredTableCount: 250,
+          incompleteTableCount: 0,
           emptyCommentCount: 12,
           coverage: 90,
+          tableConfigCoverage: 100,
         },
       });
       return;
@@ -207,8 +210,8 @@ test("source-system navigator searches locally and filters table/field queries, 
 
   await page.getByLabel("源系统表名").fill("MEMBER_PROFILE");
   await page.getByLabel("源字段名").fill("ACCOUNT_NO");
-  await page.getByLabel("DWF 表名").fill("DWD_MEMBER_PROFILE");
-  await page.getByLabel("DWF 字段名").fill("member_id");
+  await page.getByLabel("目标表").fill("DWD_MEMBER_PROFILE");
+  await page.getByLabel("目标字段").fill("member_id");
   await page.locator(".fm-optional-filter select").selectOption("yes");
   const applyStart = requests.tables.length;
   await page.getByRole("button", { name: "查询", exact: true }).click();
@@ -299,8 +302,8 @@ test("source-system navigator searches locally and filters table/field queries, 
   expect(resetQuery.searchParams.has("targetField")).toBe(false);
   await expect(page.getByLabel("源系统表名")).toHaveValue("");
   await expect(page.getByLabel("源字段名")).toHaveValue("");
-  await expect(page.getByLabel("DWF 表名")).toHaveValue("");
-  await expect(page.getByLabel("DWF 字段名")).toHaveValue("");
+  await expect(page.getByLabel("目标表")).toHaveValue("");
+  await expect(page.getByLabel("目标字段")).toHaveValue("");
   await expect(allSystems).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "查询帮助" })).toBeVisible();
 
@@ -376,7 +379,19 @@ test("disabled anonymous catalog defers source-system loading until login", asyn
         : route.fulfill({ status: 403, json: { error: { message: "catalog access disabled" } } });
     }
     if (path === "/api/field-mappings/stats") {
-      return route.fulfill({ json: { sourceSystemCount: 1, sourceTableCount: 0, fieldCount: 0, coverage: 0 } });
+      return route.fulfill({ json: {
+        sourceSystemCount: 1,
+        sourceTableCount: 0,
+        fieldCount: 0,
+        mappedFieldCount: 0,
+        unmappedFieldCount: 0,
+        configuredTableCount: 0,
+        incompleteTableCount: 0,
+        emptyCommentCount: 0,
+        emptyCommentRate: 0,
+        coverage: null,
+        tableConfigCoverage: null,
+      } });
     }
     if (path === "/api/field-mappings/tables" || path === "/api/field-mappings/fields") {
       return route.fulfill({ json: { items: [], total: 0, page: 1, pageSize: 50 } });

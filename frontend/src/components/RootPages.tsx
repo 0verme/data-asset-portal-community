@@ -31,7 +31,11 @@ import {
   type FormFieldErrors,
 } from "../ui/index.ts";
 import { validateRootForm } from "./rootFormErrors.ts";
-import { parseRootImport, type ParsedRoot } from "./rootImportParser.ts";
+import {
+  parseRootImport,
+  preserveOmittedRootImportFields,
+  type ParsedRoot,
+} from "./rootImportParser.ts";
 
 interface CatBadgeProps {
   cat: string;
@@ -472,15 +476,18 @@ export function RootImport({ roots, categories, onBack, onCommit }: RootImportPr
     const items: ImportPreviewItem[] = parsed.items.map((item) => {
       if (!item.abbr) return { row: item, action: "error", message: "缺少词根缩写" };
       if (!isValidRootAbbr(item.abbr)) return { row: item, action: "error", message: ROOT_ABBR_RULE_MESSAGE };
-      if (!item.cn) return { row: item, action: "error", message: "缺少中文名" };
       if (seen.has(item.abbr)) return { row: item, action: "error", message: "导入文件内词根重复" };
       seen.add(item.abbr);
 
-      const normalized: ParsedRoot = {
-        ...item,
-        cat: categoryNames.includes(item.cat) ? item.cat : "公共词根",
-      };
       const oldItem = existingMap.get(item.abbr);
+      const preserved = preserveOmittedRootImportFields(item, oldItem);
+      const normalized: ParsedRoot = {
+        ...preserved,
+        cat: item.missingFields?.includes("cat") && oldItem
+          ? oldItem.cat
+          : categoryNames.includes(preserved.cat) ? preserved.cat : "公共词根",
+      };
+      if (!normalized.cn) return { row: normalized, action: "error", message: "缺少中文名" };
       if (!oldItem) return { row: normalized, action: "new" };
       const editableKeys: Array<keyof Pick<SanitizedWordRoot, "en" | "cn" | "cat" | "desc" | "example">> = ["en", "cn", "cat", "desc", "example"];
       const changed = editableKeys.filter((key) => (oldItem[key] || "") !== (normalized[key] || ""));
