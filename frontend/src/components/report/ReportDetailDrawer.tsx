@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { MockReportItem, RelatedIndicatorSummary, RelatedTableSummary } from "../../data/reports.ts";
+import type { MockReportItem, RelatedIndicatorSource, RelatedIndicatorSummary, RelatedTableSummary } from "../../data/reports.ts";
 import { formatDate, formatDateTime } from "../../utils/date.ts";
 import { RowActions, StatusBadge } from "../common/index.ts";
 import { Icon } from "../ui.tsx";
@@ -32,6 +32,7 @@ interface ReferenceChipsProps<T extends Record<string, unknown>> {
   mono?: boolean | undefined;
   empty?: string | undefined;
   onRemove?: ((key: string) => void) | undefined;
+  getHref?: ((item: T) => string | null) | undefined;
 }
 
 function ReferenceChips<T extends Record<string, unknown>>({
@@ -41,6 +42,7 @@ function ReferenceChips<T extends Record<string, unknown>>({
   mono = false,
   empty = "暂无引用",
   onRemove,
+  getHref,
 }: ReferenceChipsProps<T>) {
   if (!items.length) {
     return <div className="report-ref-empty">{empty}</div>;
@@ -51,9 +53,10 @@ function ReferenceChips<T extends Record<string, unknown>>({
       {items.map((item) => {
         const key = referenceText(item[itemKey]);
         const label = referenceText(item[labelKey]);
+        const href = getHref?.(item);
         return (
           <span key={key} className={`tag tag-neutral${mono ? " mono" : ""}`}>
-            <span className="report-ref-chip-text">{label}</span>
+            {href ? <a className="report-ref-chip-text" href={href} style={{ color: "var(--ink)", textDecoration: "underline" }}>{label}</a> : <span className="report-ref-chip-text">{label}</span>}
             {onRemove ? (
               <button
                 type="button"
@@ -82,6 +85,12 @@ export interface ReportDetailDrawerProps {
 
 export function ReportDetailDrawer({ report, open, onClose, onEdit, onDelete, canEdit = false }: ReportDetailDrawerProps) {
   if (!open || !report) return null;
+  const tableStatus = report.relatedTablesStatus || ((report.relatedTables || []).length ? "configured" : "unconfigured");
+  const indicatorStatus = report.relatedIndicatorsStatus || ((report.relatedIndicators || []).length ? "configured" : "unconfigured");
+  const tableUnknownCount = Number(report.relatedTableUnknownCount || 0);
+  const indicatorUnknownCount = Number(report.relatedIndicatorUnknownCount || 0);
+  const tableSummary = tableStatus === "unconfigured" ? "未配置" : `${report.relatedTableCount || 0} 个可用${tableUnknownCount ? ` / ${tableUnknownCount} 个未知` : ""}`;
+  const indicatorSummary = indicatorStatus === "unconfigured" ? "未配置" : `${report.relatedIndicatorCount || 0} 个可用${indicatorUnknownCount ? ` / ${indicatorUnknownCount} 个未知` : ""}`;
 
   return (
     <div className="indicator-detail-shell" role="presentation" onMouseDown={onClose}>
@@ -136,23 +145,65 @@ export function ReportDetailDrawer({ report, open, onClose, onEdit, onDelete, ca
           <div className="form-card">
             <h3><Icon name="link" size={14} />关联引用</h3>
             <div className="report-detail-section">
-              <div className="report-detail-subtitle">关联表</div>
+              <div className="report-detail-subtitle">关联表 · {tableSummary}</div>
               <ReferenceChips<RelatedTableSummary>
                 items={(report.relatedTables || []).map((item) => ({
                   ...item,
                   refKey: Number(item.assetId) > 0
                     ? `asset:${item.assetId}`
                     : `table:${String(item.tableName || "")}`,
+                  displayName: item.qualifiedName || [item.schemaName, item.tableName].filter(Boolean).join(".") || item.tableName,
                 }))}
                 itemKey="refKey"
-                labelKey="tableName"
+                labelKey="displayName"
                 mono
-                empty="暂无关联表"
+                empty={tableStatus === "unconfigured" ? "未配置关联表" : "暂无可展示关联表"}
+                getHref={(item) => item.availability === "unknown" || !item.assetId || !item.tableName
+                  ? null
+                  : `/data-warehouse/${encodeURIComponent(item.tableName)}?assetId=${item.assetId}`}
               />
             </div>
             <div className="report-detail-section">
-              <div className="report-detail-subtitle">关联指标</div>
-              <ReferenceChips<RelatedIndicatorSummary> items={report.relatedIndicators || []} itemKey="indicatorId" labelKey="indicatorId" mono empty="暂无关联指标" />
+              <div className="report-detail-subtitle">关联指标 · {indicatorSummary}</div>
+              <ReferenceChips<RelatedIndicatorSummary>
+                items={report.relatedIndicators || []}
+                itemKey="indicatorId"
+                labelKey="indicatorId"
+                mono
+                empty={indicatorStatus === "unconfigured" ? "未配置关联指标" : "暂无可展示关联指标"}
+                getHref={(item) => item.availability === "unknown" || !item.indicatorId
+                  ? null
+                  : `/indicator-maintenance/${encodeURIComponent(item.indicatorId)}`}
+              />
+              {(report.relatedIndicators || []).map((indicator) => {
+                const sources = indicator.sources || [];
+                const sourceStatus = indicator.sourceRelationsStatus || (sources.length ? "configured" : "unconfigured");
+                const sourceSummary = sourceStatus === "unconfigured"
+                  ? "未配置来源"
+                  : `${indicator.sourceCount || 0} 个可用${indicator.sourceUnknownCount ? ` / ${indicator.sourceUnknownCount} 个未知` : ""}`;
+                const chips = sources.map((source, index) => ({
+                  ...source,
+                  refKey: source.relationId != null
+                    ? `source:${source.relationId}`
+                    : `source:${source.assetId || "?"}:${source.fieldId || index}`,
+                  displayName: [source.qualifiedName || source.tableName, source.fieldName].filter(Boolean).join("."),
+                }));
+                return (
+                  <div className="report-detail-section" key={indicator.indicatorId}>
+                    <div className="report-detail-subtitle">{indicator.indicatorId} 来源表 / 字段 · {sourceSummary}</div>
+                    <ReferenceChips<RelatedIndicatorSource & { refKey: string; displayName: string }>
+                      items={chips}
+                      itemKey="refKey"
+                      labelKey="displayName"
+                      mono
+                      empty={sourceStatus === "unconfigured" ? "该指标未配置来源关系" : "来源资产不可用或已删除"}
+                      getHref={(item) => item.availability === "unknown" || !item.assetId || !item.tableName
+                        ? null
+                        : `/data-warehouse/${encodeURIComponent(item.tableName)}?assetId=${item.assetId}${item.fieldId ? `&fieldId=${item.fieldId}` : ""}`}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
 

@@ -278,12 +278,35 @@ register_search_entity({
         {"expr": "indicator_id", "label": "指标ID"},
         {"expr": "indicator_name", "label": "指标名称"},
         {"expr": "meaning_desc", "label": "业务含义"},
-        {"expr": "result_table_name", "label": "结果表"},
-        {"expr": "result_field_name", "label": "结果字段"},
         {"expr": "caliber_desc", "label": "口径"},
+        {"expr": "caliber_formula", "label": "口径公式"},
+        {"expr": "caliber_sql", "label": "口径SQL"},
         {"expr": "path_desc", "label": "路径"},
         {"expr": "registrar_name", "label": "维护人", "class": "person"},
     ],
+    "field_match": {
+        "table": (
+            "p_indicator_source s "
+            "JOIN p_asset_table a ON a.asset_id = s.source_asset_id "
+            "LEFT JOIN p_asset_field f ON f.field_id = s.source_field_id "
+            "AND f.asset_id = s.source_asset_id AND f.is_deleted = 'N'"
+        ),
+        "asset_ref": "s.indicator_pk = p_indicator_item.indicator_pk",
+        "active_where": "s.is_deleted = 'N' AND a.is_deleted = 'N'",
+        "row_key": "indicator_pk",
+        "field_key": "s.indicator_pk",
+        "field_id": "f.field_id",
+        "label": "来源表/字段",
+        "matchers": [
+            {"expr": "a.table_name", "label": "来源表"},
+            {"expr": "f.field_name", "label": "来源字段"},
+            {"expr": "f.field_cn_name", "label": "来源字段中文名"},
+            {"expr": "f.field_desc", "label": "来源字段说明"},
+        ],
+        "display": ("f.field_name", "f.field_cn_name", "f.field_desc"),
+        "order": "s.source_order, f.field_name",
+        "max_fields": 3,
+    },
     "select": (
         "indicator_id, "
         "indicator_name, "

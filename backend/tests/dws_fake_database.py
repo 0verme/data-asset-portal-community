@@ -37,6 +37,7 @@ REVISION_ORDER = (
     "0013_field_filter_index",
     "0014_rag_search_config",
     "0015_ai_llm_daily_quota",
+    "0016_indicator_source_lineage",
 )
 
 OPEN_MODULE_TABLES = (
@@ -798,7 +799,11 @@ def downgrade_to_prefix(database: FakeDwsDatabase, satisfied: Iterable[str]) -> 
 def _reverse_revision(
     database: FakeDwsDatabase, revision: str, satisfied: set[str]
 ) -> None:
-    if revision == "0015_ai_llm_daily_quota":
+    if revision == "0016_indicator_source_lineage":
+        database.remove_table("p_indicator_source")
+        for column in ("caliber_formula", "caliber_sql"):
+            database.remove_column("p_indicator_item", column)
+    elif revision == "0015_ai_llm_daily_quota":
         database.table("p_code_category").rows[:] = [
             row for row in database.table("p_code_category").rows
             if row.get("category_code") != "AI_LLM_QUOTA_CONFIG"

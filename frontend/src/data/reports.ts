@@ -6,6 +6,9 @@ export interface RelatedTableSummary {
   refKey?: string | undefined;
   tableName: string;
   tableCn?: string | undefined;
+  schemaName?: string | undefined;
+  qualifiedName?: string | undefined;
+  availability?: "available" | "unknown" | undefined;
   domain?: string | undefined;
   layer?: string | undefined;
   [key: string]: unknown;
@@ -16,6 +19,24 @@ export interface RelatedIndicatorSummary {
   indicatorName?: string | undefined;
   dimension?: string | undefined;
   path?: string | undefined;
+  availability?: "available" | "unknown" | undefined;
+  sources?: RelatedIndicatorSource[] | undefined;
+  sourceRelationsStatus?: "unconfigured" | "configured" | "partial" | "unknown" | undefined;
+  sourceCount?: number | undefined;
+  sourceUnknownCount?: number | undefined;
+  [key: string]: unknown;
+}
+
+export interface RelatedIndicatorSource {
+  relationId?: number | null | undefined;
+  assetId?: number | null | undefined;
+  fieldId?: number | null | undefined;
+  tableName?: string | undefined;
+  schemaName?: string | undefined;
+  qualifiedName?: string | undefined;
+  fieldName?: string | undefined;
+  fieldCn?: string | undefined;
+  availability?: "available" | "unknown" | undefined;
   [key: string]: unknown;
 }
 
@@ -50,6 +71,12 @@ export interface MockReportItem {
   maintainerName: string;
   relatedTables: RelatedTableSummary[];
   relatedIndicators: RelatedIndicatorSummary[];
+  relatedTableCount?: number | undefined;
+  relatedIndicatorCount?: number | undefined;
+  relatedTablesStatus?: "unconfigured" | "configured" | "partial" | "unknown" | undefined;
+  relatedIndicatorsStatus?: "unconfigured" | "configured" | "partial" | "unknown" | undefined;
+  relatedTableUnknownCount?: number | undefined;
+  relatedIndicatorUnknownCount?: number | undefined;
   remark: string;
   updatedBy: string;
   updatedAt: string;

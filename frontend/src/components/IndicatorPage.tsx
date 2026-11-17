@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { IndicatorDimensionOption, MockIndicatorItem } from "../data/indicators.ts";
 import {
   findIndicatorDimensionOption,
@@ -73,10 +74,16 @@ function getAdditionalFields(indicator: MockIndicatorItem): AdditionalField[] {
     "sourceAssetName",
     "sourceAssetQualifiedName",
     "resultFieldId",
+    "sources",
+    "sourceRelationsStatus",
+    "sourceCount",
+    "sourceUnknownCount",
     "aggregation",
     "semanticState",
     "dimension",
     "caliber",
+    "caliberFormula",
+    "caliberSql",
     "path",
     "status",
     "registrar",
@@ -116,8 +123,16 @@ export interface MetricDetailDrawerProps {
 }
 
 export function MetricDetailDrawer({ indicator, open, onClose, dimensionOptions }: MetricDetailDrawerProps) {
+  const { t } = useTranslation("common");
   if (!open || !indicator) return null;
   const additionalFields = getAdditionalFields(indicator);
+  const sourceStatus = indicator.sourceRelationsStatus || (indicator.sources?.length ? "configured" : "unconfigured");
+  const lifecycle = indicator.semanticState || "candidate";
+  const lifecycleLabels = {
+    candidate: t("catalog.indicator.lifecycle.candidate"),
+    certified: t("catalog.indicator.lifecycle.certified"),
+    deprecated: t("catalog.indicator.lifecycle.deprecated"),
+  };
 
   return (
     <div className="indicator-detail-shell" role="presentation" onMouseDown={onClose}>
@@ -163,7 +178,7 @@ export function MetricDetailDrawer({ indicator, open, onClose, dimensionOptions 
                 <div className="indicator-detail-label">状态</div>
                 <div className="indicator-detail-value"><StatusBadge status={indicator.status} /></div>
               </div>
-              <DetailItem label="语义生命周期" value={indicator.semanticState} />
+              <DetailItem label="语义生命周期" value={lifecycleLabels[lifecycle as keyof typeof lifecycleLabels] || lifecycle} />
             </div>
           </div>
 
@@ -171,11 +186,30 @@ export function MetricDetailDrawer({ indicator, open, onClose, dimensionOptions 
             <h3><Icon name="info" size={14} />口径信息</h3>
             <div className="indicator-detail-grid">
               <DetailItem label="指标含义" value={indicator.meaning} full fallback />
-              <DetailItem label="来源资产" value={indicator.sourceAssetName || indicator.sourceAssetQualifiedName} fallback />
-              <DetailItem label="结果表兼容快照" value={indicator.resultTableName} type="mono" fallback />
-              <DetailItem label="结果字段" value={indicator.resultFieldName} type="mono" fallback />
+              <div className="indicator-detail-item full">
+                <div className="indicator-detail-label">来源表 / 字段</div>
+                <div className="indicator-detail-value">
+                  <div>{t(`catalog.indicator.sourceStatus.${sourceStatus}`)}{indicator.sourceUnknownCount ? `（${indicator.sourceUnknownCount}）` : ""}</div>
+                  {(indicator.sources || []).map((source, index) => {
+                    const available = source.availability === "available" && source.assetId != null && Boolean(source.tableName);
+                    const label = [source.qualifiedName || [source.schemaName, source.tableName].filter(Boolean).join("."), source.fieldName].filter(Boolean).join(" · ") || "未知来源";
+                    const href = available
+                      ? `/data-warehouse/${encodeURIComponent(source.tableName)}?assetId=${source.assetId}${source.fieldId ? `&fieldId=${source.fieldId}` : ""}`
+                      : "";
+                    return (
+                      <div key={`${source.relationId || source.assetId || "unknown"}-${source.fieldId || "table"}-${index}`}>
+                        {href ? <a href={href} className="crumb-link" style={{ color: "var(--ink)", textDecoration: "underline" }}>{label}</a> : <span>{label}（关系未知）</span>}
+                      </div>
+                    );
+                  })}
+                  {!indicator.sources?.length ? <span>—</span> : null}
+                </div>
+              </div>
+              {!indicator.sources?.length ? <DetailItem label="旧版来源快照（非权威关系）" value={[indicator.resultTableName, indicator.resultFieldName].filter(Boolean).join(" · ")} type="mono" fallback /> : null}
               <DetailItem label="聚合方式" value={indicator.aggregation} type="mono" fallback />
               <DetailItem label="指标口径" value={indicator.caliber} fallback />
+              <DetailItem label="口径公式" value={indicator.caliberFormula} type="mono" full fallback />
+              <DetailItem label="口径 SQL" value={indicator.caliberSql} type="mono" full fallback />
               <DetailItem label="指标路径" value={indicator.path} type="mono" full fallback />
             </div>
           </div>

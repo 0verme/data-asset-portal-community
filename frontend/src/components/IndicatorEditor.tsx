@@ -2,12 +2,13 @@ import React from "react";
 
 import { getAssetFields, getAssetTables, type AssetTableField, type AssetTableItem } from "../api/assets.ts";
 import { getIndicatorPathTree } from "../api/indicator.ts";
+import { useTranslation } from "react-i18next";
 import {
   getIndicatorDimensionFromPath,
   normalizeIndicatorDimension,
   type IndicatorPathOptionNode,
 } from "../data/indicatorPathOptions.ts";
-import type { MockIndicatorItem } from "../data/indicators.ts";
+import type { IndicatorSource, MockIndicatorItem } from "../data/indicators.ts";
 import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { ActionErrorBanner, BinaryStatusToggle, DangerZone, FormActionBar, PageHeader } from "./common/index.ts";
 import IndicatorPathCascader, { type IndicatorPathChangeMeta } from "./IndicatorPathCascader.tsx";
@@ -51,10 +52,13 @@ interface IndicatorFormData {
   sourceAssetName: string;
   sourceAssetQualifiedName: string;
   resultFieldId: number | null;
+  sources: IndicatorSource[];
   aggregation: string;
   semanticState: string;
   dimension: string;
   caliber: string;
+  caliberFormula: string;
+  caliberSql: string;
   path: string;
   status: string;
   registrar: string;
@@ -76,7 +80,9 @@ function getFieldOptionId(field: AssetTableField): number | null {
 }
 
 function assetLabel(asset: AssetTableItem): string {
-  return [asset.cn, asset.name].filter(Boolean).join(" · ") || "未命名资产";
+  const qualifiedName = String(asset["qualifiedName"] || asset["qualified_name"] || "");
+  const schema = String(asset["schemaName"] || asset["schema_name"] || asset.schema || qualifiedName.split(".").slice(0, -1).join("."));
+  return [asset.cn, schema, asset.name].filter(Boolean).join(" · ") || "未命名资产";
 }
 
 function fieldLabel(field: AssetTableField): string {
@@ -94,10 +100,13 @@ function createDefaultForm(): IndicatorFormData {
     sourceAssetName: "",
     sourceAssetQualifiedName: "",
     resultFieldId: null,
+    sources: [],
     aggregation: "",
     semanticState: "candidate",
     dimension: "",
     caliber: "",
+    caliberFormula: "",
+    caliberSql: "",
     path: "",
     status: "enabled",
     registrar: "",
@@ -106,6 +115,19 @@ function createDefaultForm(): IndicatorFormData {
 }
 
 function createFormState(initial: MockIndicatorItem | null | undefined): IndicatorFormData {
+  const initialSources = Array.isArray(initial?.sources) && initial.sources.length
+    ? initial.sources
+    : initial?.sourceAssetId != null || initial?.resultFieldId != null
+      ? [{
+        assetId: normalizeOptionalId(initial.sourceAssetId),
+        fieldId: normalizeOptionalId(initial.resultFieldId),
+        tableName: String(initial.resultTableName || ""),
+        schemaName: "",
+        qualifiedName: String(initial.sourceAssetQualifiedName || ""),
+        fieldName: String(initial.resultFieldName || ""),
+        availability: "unknown" as const,
+      }]
+      : [];
   const next: IndicatorFormData = {
     ...createDefaultForm(),
     ...(initial || {}),
@@ -113,6 +135,7 @@ function createFormState(initial: MockIndicatorItem | null | undefined): Indicat
     sourceAssetName: String(initial?.sourceAssetName || ""),
     sourceAssetQualifiedName: String(initial?.sourceAssetQualifiedName || ""),
     resultFieldId: normalizeOptionalId(initial?.resultFieldId),
+    sources: initialSources.map((source) => ({ ...source })),
     aggregation: String(initial?.aggregation || "").trim().toUpperCase(),
     semanticState: String(initial?.semanticState || "candidate").trim().toLowerCase() || "candidate",
   };
@@ -175,6 +198,7 @@ export function IndicatorEditor({
   saveError = "",
   onClearSaveError,
 }: IndicatorEditorProps) {
+  const { t } = useTranslation("common");
   const isEdit = mode === "edit";
   const [form, setForm] = React.useState<IndicatorFormData>(() => createFormState(initial));
   const [touched, setTouched] = React.useState(false);
@@ -187,8 +211,7 @@ export function IndicatorEditor({
   const [assetOptions, setAssetOptions] = React.useState<AssetTableItem[]>([]);
   const [assetLoading, setAssetLoading] = React.useState(false);
   const [assetError, setAssetError] = React.useState("");
-  const [fieldOptions, setFieldOptions] = React.useState<AssetTableField[]>([]);
-  const [fieldOptionsAssetId, setFieldOptionsAssetId] = React.useState<number | null>(null);
+  const [fieldOptions, setFieldOptions] = React.useState<Record<number, AssetTableField[]>>({});
   const [fieldLoading, setFieldLoading] = React.useState(false);
   const [fieldError, setFieldError] = React.useState("");
   const [assetRetryRevision, setAssetRetryRevision] = React.useState(0);
@@ -196,7 +219,7 @@ export function IndicatorEditor({
   const [pathRetryRevision, setPathRetryRevision] = React.useState(0);
   const initialSnapshotRef = React.useRef(JSON.stringify(form));
   const isDirty = initialSnapshotRef.current !== JSON.stringify(form);
-  const currentFieldOptions = fieldOptionsAssetId === form.sourceAssetId ? fieldOptions : [];
+  const sourceAssetIdKey = Array.from(new Set(form.sources.map((source) => source.assetId).filter((id): id is number => id !== null))).sort((a, b) => a - b).join(",");
 
   React.useEffect(() => {
     const nextForm = createFormState(initial);
@@ -233,11 +256,9 @@ export function IndicatorEditor({
 
   React.useEffect(() => {
     let cancelled = false;
-    const selectedAsset = assetOptions.find((item) => getAssetOptionId(item) === form.sourceAssetId);
-    const selectedAssetName = selectedAsset?.name || "";
-    if (!selectedAssetName && !selectedAsset?.assetId) {
-      setFieldOptions([]);
-      setFieldOptionsAssetId(null);
+    const assetIds = sourceAssetIdKey ? sourceAssetIdKey.split(",").map(Number) : [];
+    if (!assetIds.length) {
+      setFieldOptions({});
       setFieldError("");
       setFieldLoading(false);
       return undefined;
@@ -247,10 +268,12 @@ export function IndicatorEditor({
       setFieldLoading(true);
       setFieldError("");
       try {
-        const items = await getAssetFields({ assetId: selectedAsset?.assetId, tableName: selectedAssetName });
+        const entries = await Promise.all(assetIds.map(async (assetId) => [
+          assetId,
+          await getAssetFields({ assetId }),
+        ] as const));
         if (!cancelled) {
-          setFieldOptions(Array.isArray(items) ? items : []);
-          setFieldOptionsAssetId(form.sourceAssetId);
+          setFieldOptions(Object.fromEntries(entries.map(([assetId, items]) => [assetId, Array.isArray(items) ? items : []])));
         }
       } catch (error: unknown) {
         if (!cancelled) {
@@ -265,7 +288,7 @@ export function IndicatorEditor({
     return () => {
       cancelled = true;
     };
-  }, [assetOptions, form.sourceAssetId, fieldRetryRevision]);
+  }, [sourceAssetIdKey, fieldRetryRevision]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -311,6 +334,8 @@ export function IndicatorEditor({
     setValues({ [key]: value });
   };
 
+  const fieldOptionsFor = (assetId: number | null) => assetId === null ? [] : fieldOptions[assetId] || [];
+
   const handlePathChange = (path: string, meta: IndicatorPathChangeMeta) => {
     setValues({
       path,
@@ -318,24 +343,53 @@ export function IndicatorEditor({
     });
   };
 
-  const handleAssetChange = (value: string) => {
-    const sourceAssetId = normalizeOptionalId(value);
-    const selectedAsset = assetOptions.find((item) => getAssetOptionId(item) === sourceAssetId);
+  const handleSourceAssetChange = (index: number, value: string) => {
+    const assetId = normalizeOptionalId(value);
+    const selectedAsset = assetOptions.find((item) => getAssetOptionId(item) === assetId);
+    const sources = form.sources.map((source, sourceIndex) => sourceIndex === index ? {
+      ...source,
+      assetId,
+      fieldId: null,
+      tableName: selectedAsset?.name || "",
+      schemaName: String(selectedAsset?.["schemaName"] || selectedAsset?.["schema_name"] || ""),
+      qualifiedName: String(selectedAsset?.["qualifiedName"] || selectedAsset?.["qualified_name"] || ""),
+      fieldName: "",
+      availability: "available" as const,
+    } : source);
+    const first = sources[0];
     setValues({
-      sourceAssetId,
-      resultFieldId: null,
-      resultTableName: selectedAsset?.name || form.resultTableName,
-      resultFieldName: selectedAsset ? "" : form.resultFieldName,
-      sourceAssetName: selectedAsset?.cn || selectedAsset?.name || "",
+      sources,
+      ...(index === 0 ? {
+        sourceAssetId: first?.assetId || null,
+        resultFieldId: first?.fieldId || null,
+        resultTableName: first?.tableName || form.resultTableName,
+        resultFieldName: first?.fieldName || "",
+        sourceAssetName: first?.tableName || "",
+        sourceAssetQualifiedName: first?.qualifiedName || "",
+      } : {}),
     });
   };
 
-  const handleFieldChange = (value: string) => {
-    const resultFieldId = normalizeOptionalId(value);
-    const selectedField = currentFieldOptions.find((item) => getFieldOptionId(item) === resultFieldId);
+  const handleSourceFieldChange = (index: number, value: string) => {
+    const fieldId = normalizeOptionalId(value);
+    const current = form.sources[index];
+    const selectedField = fieldOptionsFor(current?.assetId || null).find((item) => getFieldOptionId(item) === fieldId);
+    const sources = form.sources.map((source, sourceIndex) => sourceIndex === index ? {
+      ...source,
+      fieldId,
+      fieldName: selectedField?.name || "",
+      fieldCn: selectedField?.cn || "",
+      availability: source.assetId ? "available" as const : "unknown" as const,
+    } : source);
+    const first = sources[0];
     setValues({
-      resultFieldId,
-      resultFieldName: selectedField?.name || form.resultFieldName,
+      sources,
+      ...(index === 0 ? {
+        sourceAssetId: first?.assetId || null,
+        resultFieldId: first?.fieldId || null,
+        resultTableName: first?.tableName || form.resultTableName,
+        resultFieldName: first?.fieldName || "",
+      } : {}),
     });
   };
 
@@ -372,10 +426,13 @@ export function IndicatorEditor({
       sourceAssetName: form.sourceAssetName || null,
       sourceAssetQualifiedName: form.sourceAssetQualifiedName || null,
       resultFieldId: form.resultFieldId,
+      sources: form.sources,
       aggregation,
       semanticState: form.semanticState || "candidate",
       dimension: derivedDimension,
       caliber: form.caliber.trim(),
+      caliberFormula: form.caliberFormula.trim(),
+      caliberSql: form.caliberSql.trim(),
       path: normalizedPath,
       status: form.status,
       registrar: form.registrar.trim(),
@@ -431,94 +488,134 @@ export function IndicatorEditor({
             <label>指标含义</label>
             <Textarea aria-label="指标含义" className="ta" value={form.meaning} onChange={(event) => setValue("meaning", event.target.value)} placeholder="描述该指标的业务含义、取值逻辑和使用范围。" />
           </div>
-          <div className="fl">
-            <label>来源资产（稳定引用）</label>
-            <Select<string | number>
-              aria-label="来源资产（稳定引用）"
-              className="inp"
-              disabled={assetLoading}
-              items={[
-                { label: "未绑定稳定资产（保留兼容快照）", value: "" },
-                ...(form.sourceAssetId && !assetOptions.some((item) => getAssetOptionId(item) === form.sourceAssetId)
-                  ? [{ label: form.sourceAssetName || form.resultTableName || "当前来源资产", value: form.sourceAssetId }]
-                  : []),
-                ...assetOptions.flatMap((asset) => {
-                  const assetId = getAssetOptionId(asset);
-                  return assetId === null ? [] : [{ label: assetLabel(asset), value: assetId }];
-                }),
-              ]}
-              value={form.sourceAssetId || ""}
-              placeholder="未绑定稳定资产（保留兼容快照）"
-              onValueChange={(value) => handleAssetChange(value === null ? "" : String(value))}
-            />
+          <div className="fl full">
+            <label>来源表与字段（稳定引用）</label>
+            {form.sources.map((source, index) => {
+              const currentFields = fieldOptionsFor(source.assetId);
+              const extraAsset = source.assetId !== null && !assetOptions.some((item) => getAssetOptionId(item) === source.assetId)
+                ? [{ label: `${source.qualifiedName || [source.schemaName, source.tableName].filter(Boolean).join(".") || source.tableName}（当前关系不可解析）`, value: source.assetId }]
+                : [];
+              const extraField = source.fieldId !== null && !currentFields.some((item) => getFieldOptionId(item) === source.fieldId)
+                ? [{ label: `${source.fieldName || "当前来源字段"}（当前关系不可解析）`, value: source.fieldId }]
+                : [];
+              return (
+                <div className="form-grid" key={`${source.assetId || "new"}-${source.fieldId || "table"}-${index}`}>
+                  <div className="fl">
+                    <label htmlFor={`indicator-source-table-${index}`}>来源表 {index + 1}</label>
+                    <Select<string | number>
+                      aria-label={`来源表 ${index + 1}`}
+                      className="inp"
+                      disabled={assetLoading}
+                      items={[
+                        { label: "请选择来源表", value: "" },
+                        ...extraAsset,
+                        ...assetOptions.flatMap((asset) => {
+                          const assetId = getAssetOptionId(asset);
+                          return assetId === null ? [] : [{ label: assetLabel(asset), value: assetId }];
+                        }),
+                      ]}
+                      value={source.assetId || ""}
+                      placeholder="请选择来源表"
+                      onValueChange={(value) => handleSourceAssetChange(index, value === null ? "" : String(value))}
+                    />
+                  </div>
+                  <div className="fl">
+                    <label htmlFor={`indicator-source-field-${index}`}>来源字段（可选）</label>
+                    <Select<string | number>
+                      aria-label={`来源字段 ${index + 1}`}
+                      className="inp"
+                      disabled={!source.assetId || fieldLoading}
+                      items={[
+                        { label: "整表来源 / 未指定字段", value: "" },
+                        ...extraField,
+                        ...currentFields.flatMap((field) => {
+                          const fieldId = getFieldOptionId(field);
+                          return fieldId === null ? [] : [{ label: fieldLabel(field), value: fieldId }];
+                        }),
+                      ]}
+                      value={source.fieldId || ""}
+                      placeholder="整表来源 / 未指定字段"
+                      onValueChange={(value) => handleSourceFieldChange(index, value === null ? "" : String(value))}
+                    />
+                  </div>
+                  <div className="fl full">
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={() => {
+                        const sources = form.sources.filter((_, sourceIndex) => sourceIndex !== index);
+                        const first = sources[0];
+                        setValues({
+                          sources,
+                          sourceAssetId: first?.assetId || null,
+                          resultFieldId: first?.fieldId || null,
+                          resultTableName: first?.tableName || (sources.length ? "" : form.resultTableName),
+                          resultFieldName: first?.fieldName || (sources.length ? "" : form.resultFieldName),
+                          sourceAssetName: first?.tableName || "",
+                          sourceAssetQualifiedName: first?.qualifiedName || "",
+                        });
+                      }}
+                    >移除来源</button>
+                  </div>
+                </div>
+              );
+            })}
+            <button
+              className="btn"
+              type="button"
+              onClick={() => setValues({ sources: [...form.sources, {
+                assetId: null,
+                fieldId: null,
+                tableName: "",
+                schemaName: "",
+                qualifiedName: "",
+                fieldName: "",
+                availability: "unknown",
+              }] })}
+            >添加来源表</button>
             {assetError ? (
               <div className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
                 {assetError}{" "}
                 <button className="btn" type="button" onClick={() => setAssetRetryRevision((revision) => revision + 1)}>重试加载资产</button>
               </div>
             ) : null}
-            {!assetLoading && !assetError && !assetOptions.length ? <div className="match-hint">当前数据源未提供稳定资产 ID，保留兼容文本录入。</div> : null}
-          </div>
-          <div className="fl">
-            <label>结果字段（稳定引用）</label>
-            <Select<string | number>
-              aria-label="结果字段（稳定引用）"
-              className="inp"
-              disabled={!form.sourceAssetId || fieldLoading}
-              items={[
-                { label: "未绑定稳定字段（保留兼容快照）", value: "" },
-                ...(form.resultFieldId && !currentFieldOptions.some((item) => getFieldOptionId(item) === form.resultFieldId)
-                  ? [{ label: form.resultFieldName || "当前结果字段", value: form.resultFieldId }]
-                  : []),
-                ...currentFieldOptions.flatMap((field) => {
-                  const fieldId = getFieldOptionId(field);
-                  return fieldId === null ? [] : [{ label: fieldLabel(field), value: fieldId }];
-                }),
-              ]}
-              value={form.resultFieldId || ""}
-              placeholder="未绑定稳定字段（保留兼容快照）"
-              onValueChange={(value) => handleFieldChange(value === null ? "" : String(value))}
-            />
             {fieldError ? (
               <div className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
                 {fieldError}{" "}
                 <button className="btn" type="button" onClick={() => setFieldRetryRevision((revision) => revision + 1)}>重试加载字段</button>
               </div>
             ) : null}
+            {!assetLoading && !assetError && !assetOptions.length ? <div className="match-hint">当前数据源未提供稳定资产 ID，保留兼容文本录入。</div> : null}
           </div>
-          <div className="fl">
-            <label>结果表兼容快照</label>
-            <Input
-              aria-label="结果表兼容快照"
-              className="inp mono"
-              value={form.resultTableName}
-              readOnly={Boolean(form.sourceAssetId)}
-              onChange={(event) => setValue("resultTableName", event.target.value)}
-              placeholder="例如：dws.ads_indicator_result_di"
-            />
-          </div>
-          <div className="fl">
-            <label>结果字段兼容快照</label>
-            <Input
-              aria-label="结果字段兼容快照"
-              className="inp mono"
-              value={form.resultFieldName}
-              readOnly={Boolean(form.resultFieldId)}
-              onChange={(event) => setValue("resultFieldName", event.target.value)}
-              placeholder="例如：first_loan_flag"
-            />
-          </div>
+          {!form.sources.length ? <>
+            <div className="fl">
+              <label>结果表兼容快照</label>
+              <Input aria-label="结果表兼容快照" className="inp mono" value={form.resultTableName} onChange={(event) => setValue("resultTableName", event.target.value)} placeholder="例如：dws.ads_indicator_result_di" />
+            </div>
+            <div className="fl">
+              <label>结果字段兼容快照</label>
+              <Input aria-label="结果字段兼容快照" className="inp mono" value={form.resultFieldName} onChange={(event) => setValue("resultFieldName", event.target.value)} placeholder="例如：first_loan_flag" />
+            </div>
+          </> : null}
           <div className="fl">
             <label>聚合方式</label>
             <Select<string> aria-label="聚合方式" className="inp mono" placeholder="未指定（兼容历史指标）" items={[{ label: "未指定（兼容历史指标）", value: "" }, ...AGGREGATION_OPTIONS.map((value) => ({ label: value, value }))]} value={form.aggregation || ""} onValueChange={(value) => setValue("aggregation", value || "")} />
           </div>
           <div className="fl">
             <label>语义生命周期</label>
-            <Select<string> aria-label="语义生命周期" className="inp" items={SEMANTIC_STATE_OPTIONS.map((option) => ({ label: option.label, value: option.value }))} value={form.semanticState || null} onValueChange={(value) => setValue("semanticState", value || form.semanticState)} />
+            <Select<string> aria-label="语义生命周期" className="inp" items={SEMANTIC_STATE_OPTIONS.map((option) => ({ label: t(`catalog.indicator.lifecycle.${option.value}`), value: option.value }))} value={form.semanticState || null} onValueChange={(value) => setValue("semanticState", value || form.semanticState)} />
           </div>
           <div className="fl">
             <label>指标口径</label>
             <Input aria-label="指标口径" className="inp" value={form.caliber} onChange={(event) => setValue("caliber", event.target.value)} placeholder="例如：一表通口径" />
+          </div>
+          <div className="fl full">
+            <label>口径公式</label>
+            <Textarea aria-label="口径公式" className="ta mono" value={form.caliberFormula} onChange={(event) => setValue("caliberFormula", event.target.value)} placeholder="补充已确认的计算公式；未知时留空" />
+          </div>
+          <div className="fl full">
+            <label>口径 SQL</label>
+            <Textarea aria-label="口径 SQL" className="ta mono" value={form.caliberSql} onChange={(event) => setValue("caliberSql", event.target.value)} placeholder="补充已验证的查询 SQL；未知时留空" />
           </div>
           <div
             id={pathFieldMarkerId}

@@ -192,6 +192,10 @@ export function parseInitialLocation(): LocationSnapshot {
   const assetId = Number.isInteger(requestedAssetId) && requestedAssetId > 0
     ? requestedAssetId
     : null;
+  const requestedFieldId = Number(searchParams.get("fieldId"));
+  const fieldId = Number.isInteger(requestedFieldId) && requestedFieldId > 0
+    ? requestedFieldId
+    : null;
   // Layer codes are supplied by the live asset catalog; do not reject a valid
   // deep-link filter merely because it is absent from this bundle's static UI options.
   const requestedLayer = searchParams.get("layer")?.trim() || "";
@@ -303,7 +307,7 @@ export function parseInitialLocation(): LocationSnapshot {
         ...base,
         module: "dwm",
         assetRoute: assetId !== null
-          ? { page: "detail", table: decodeURIComponent(segments[1]), assetId }
+          ? { page: "detail", table: decodeURIComponent(segments[1]), assetId, ...(fieldId !== null ? { fieldId } : {}) }
           : { page: "detail", table: decodeURIComponent(segments[1]) },
       };
     }
@@ -517,6 +521,7 @@ export function buildNavigationLocation({
     if (asset.selectedLayer) params.set("layer", asset.selectedLayer);
     if (assetLayout !== DEFAULT_LAYOUT) params.set("layout", assetLayout);
     if (routes.asset?.assetId) params.set("assetId", String(routes.asset.assetId));
+    if (routes.asset?.page === "detail" && routes.asset.fieldId) params.set("fieldId", String(routes.asset.fieldId));
     if (routes.asset?.page === "detail" && assetDetailTab !== DEFAULT_DETAIL_TAB) {
       params.set("tab", assetDetailTab);
     }

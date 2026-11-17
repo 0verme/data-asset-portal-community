@@ -4,6 +4,12 @@ import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 import { Highlight, Icon } from "../ui.tsx";
 import { Button } from "../../ui/index.ts";
 
+function relationCountLabel(active: number, unknown: number, status: string | undefined): string {
+  if (status === "unconfigured") return "未配置";
+  if (active === 0 && unknown > 0) return `未知 ${unknown}`;
+  return `${active}${unknown > 0 ? `（另有 ${unknown} 未知）` : ""}`;
+}
+
 interface ReportCardLayoutProps {
   reports: readonly EnrichedReportItem[];
   query: string;
@@ -22,7 +28,7 @@ function ReportCardLayout({ reports, query, onView, onEdit, canEdit }: ReportCar
     renderSubtitle={(item) => <Highlight text={item.code} q={query} />}
     renderDesc={(item) => item.purpose || "暂无用途说明"}
     renderFootLeft={(item) => <span className="t-owner">{item.ownerDept || "未归属部门"}</span>}
-    renderFootMeta={(item) => <><span className="m"><Icon name="table" size={13} /><b>{item.relatedTableCount}</b> 表</span><span className="m"><Icon name="info" size={13} /><b>{item.relatedIndicatorCount}</b> 指标</span></>}
+    renderFootMeta={(item) => <><span className="m"><Icon name="table" size={13} /><b>{relationCountLabel(item.relatedTableCount, item.relatedTableUnknownCount, item.relatedTablesStatus)}</b> 表</span><span className="m"><Icon name="info" size={13} /><b>{relationCountLabel(item.relatedIndicatorCount, item.relatedIndicatorUnknownCount, item.relatedIndicatorsStatus)}</b> 指标</span></>}
     renderFootActions={(item) => <RowActions onView={() => onView(item.code)} onEdit={canEdit ? () => onEdit(item.code) : undefined} />}
   />;
 }
@@ -102,7 +108,7 @@ export function ReportList({ reports, total = reports.length, query, view, onCha
                 <td data-label="类型">{item.type}</td>
                 <td data-label="归属部门">{item.ownerDept}</td>
                 <td data-label="状态"><StatusBadge status={item.status} /></td>
-                <td data-label="关联引用" className="mono indicator-date">{item.relatedTableCount} 表 / {item.relatedIndicatorCount} 指标</td>
+                <td data-label="关联引用" className="mono indicator-date">{relationCountLabel(item.relatedTableCount, item.relatedTableUnknownCount, item.relatedTablesStatus)} 表 / {relationCountLabel(item.relatedIndicatorCount, item.relatedIndicatorUnknownCount, item.relatedIndicatorsStatus)} 指标</td>
                 <td data-label="" className="mobile-card-actions" style={{ textAlign: "right" }}>
                   <RowActions onView={() => onView(item.code)} onEdit={canEdit ? () => onEdit(item.code) : undefined} />
                 </td>

@@ -29,6 +29,8 @@ import type { FormFieldErrors } from '../ui/formErrors.ts';
 export interface EnrichedReportItem extends MockReportItem {
   relatedTableCount: number;
   relatedIndicatorCount: number;
+  relatedTableUnknownCount: number;
+  relatedIndicatorUnknownCount: number;
 }
 
 function getRelatedTableCount(item: MockReportItem & { relatedTableCount?: number | undefined }): number {
@@ -39,6 +41,10 @@ function getRelatedTableCount(item: MockReportItem & { relatedTableCount?: numbe
 function getRelatedIndicatorCount(item: MockReportItem & { relatedIndicatorCount?: number | undefined }): number {
   if (typeof item.relatedIndicatorCount === 'number') return item.relatedIndicatorCount;
   return Array.isArray(item.relatedIndicators) ? item.relatedIndicators.length : 0;
+}
+
+function getUnknownCount(value: number | undefined): number {
+  return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : 0;
 }
 
 export interface ReportFacets {
@@ -285,12 +291,20 @@ export function useReportModule({
 
   const reportFacets = pageData?.facets || { type: {}, status: {}, ownerDept: {} };
   const filteredReports = useMemo<EnrichedReportItem[]>(() => reports.map((item) => ({
-    ...item, relatedTableCount: getRelatedTableCount(item), relatedIndicatorCount: getRelatedIndicatorCount(item),
+    ...item,
+    relatedTableCount: getRelatedTableCount(item),
+    relatedIndicatorCount: getRelatedIndicatorCount(item),
+    relatedTableUnknownCount: getUnknownCount(item.relatedTableUnknownCount),
+    relatedIndicatorUnknownCount: getUnknownCount(item.relatedIndicatorUnknownCount),
   })), [reports]);
   const current = detail.key === detailKey ? detail.item : null;
   const currentReportEdit = reportRoute.page === 'edit' ? current : null;
   const currentReportDetail: EnrichedReportItem | null = reportRoute.page === 'view' && current ? {
-    ...current, relatedTableCount: getRelatedTableCount(current), relatedIndicatorCount: getRelatedIndicatorCount(current),
+    ...current,
+    relatedTableCount: getRelatedTableCount(current),
+    relatedIndicatorCount: getRelatedIndicatorCount(current),
+    relatedTableUnknownCount: getUnknownCount(current.relatedTableUnknownCount),
+    relatedIndicatorUnknownCount: getUnknownCount(current.relatedIndicatorUnknownCount),
   } : null;
 
   return {

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { useTranslation } from "react-i18next";
+import React from "react";
 
 import type { UseAssetModuleResult } from "../../hooks/useAssetModule.ts";
 import type { AssetRoute } from "../../routing/types.ts";
@@ -81,6 +82,17 @@ export function AssetView({
     existingNames,
   } = asset;
   const routeTable = route.table || "";
+
+  React.useEffect(() => {
+    if (route.page !== "detail" || route.fieldId == null || detailLoading) return;
+    const field = detailFields.find((item) => Number(item.fieldId) === route.fieldId);
+    if (!field) return;
+    window.requestAnimationFrame(() => {
+      const row = document.getElementById(`asset-field-${route.fieldId}`);
+      row?.scrollIntoView({ block: "center" });
+      row?.focus({ preventScroll: true });
+    });
+  }, [route.page, route.fieldId, detailLoading, detailFields]);
 
   if (!canEdit && ["edit", "new"].includes(route.page)) {
     return (
