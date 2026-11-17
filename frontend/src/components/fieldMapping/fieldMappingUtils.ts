@@ -42,12 +42,7 @@ export const RULE_TAGS: Record<string, string> = {
   待补充: "tag-warn",
 };
 
-export const LOAD_MODE_META: Record<string, { label: string; tone: string }> = {
-  full: { label: "全量", tone: "tag-neutral" },
-  incr: { label: "增量", tone: "tag-ok" },
-  incr_zip: { label: "增量拉链", tone: "tag-info" },
-  full_zip: { label: "全量拉链", tone: "tag-warn" },
-};
+export { LOAD_MODE_META, formatFieldMappingLoadMode } from "../../api/fieldMappingModel.ts";
 
 const DIRECT_RULES = new Set(["直接映射"]);
 const TRANSFORM_RULES = new Set([

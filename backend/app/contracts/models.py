@@ -348,14 +348,17 @@ class FieldMappingTableItem(ContractModel):
 
 
 class MappingStats(ContractModel):
-    sourceSystemCount: int = 0
-    sourceTableCount: int = 0
+    sourceSystemCount: int = Field(ge=0)
+    sourceTableCount: int = Field(ge=0)
     fieldCount: int = Field(ge=0)
-    mappedFieldCount: int = 0
-    unmappedFieldCount: int = 0
-    emptyCommentCount: int = 0
-    emptyCommentRate: int = 0
-    coverage: int = 0
+    mappedFieldCount: int = Field(ge=0)
+    unmappedFieldCount: int = Field(ge=0)
+    configuredTableCount: int = Field(ge=0)
+    incompleteTableCount: int = Field(ge=0)
+    emptyCommentCount: int = Field(ge=0)
+    emptyCommentRate: int = Field(ge=0, le=100)
+    coverage: int | None = Field(ge=0, le=100)
+    tableConfigCoverage: int | None = Field(ge=0, le=100)
 
 
 class FieldMappingListResponse(ItemsResponse[FieldMappingItem]):

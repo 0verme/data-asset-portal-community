@@ -38,6 +38,19 @@ from ..errors import _service_error_response
 
 CSV_EXPORT_SPOOL_MAX_MEMORY = 1024 * 1024
 CSV_EXPORT_CHUNK_SIZE = 64 * 1024
+LOAD_MODE_LABELS = {
+    "full": "全量",
+    "incr": "增量",
+    "incr_zip": "增量拉链",
+    "full_zip": "全量拉链",
+}
+
+
+def _load_mode_export_label(value: Any) -> str:
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return "未设置"
+    return LOAD_MODE_LABELS.get(raw_value, f"未知（{raw_value}）")
 
 
 def _iter_spooled_csv(spool):
@@ -236,7 +249,7 @@ def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
             ("字段类型", "srcType"),
             ("字段注释", "srcComment"),
             ("目标层", "targetLayer"),
-            ("目标表名", "targetTable"),
+            ("目标表", "targetTable"),
             ("入仓方式", "loadMode"),
             ("目标字段", "targetField"),
             ("映射规则", "mappingRule"),
@@ -246,18 +259,12 @@ def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
             ("源系统表", "srcTable"),
             ("表中文名", "srcTableCn"),
             ("目标层", "targetLayer"),
-            ("目标表名", "targetTable"),
+            ("目标表", "targetTable"),
             ("入仓方式", "loadMode"),
             ("已映射", "mappedCount"),
             ("空注释率", "emptyCommentRate"),
         )
         columns = field_columns if view == "field" else table_columns
-        load_mode_labels = {
-            "full": "全量",
-            "incr": "增量",
-            "incr_zip": "增量拉链",
-            "full_zip": "全量拉链",
-        }
         spool = tempfile.SpooledTemporaryFile(
             max_size=CSV_EXPORT_SPOOL_MAX_MEMORY,
             mode="w+",
@@ -278,8 +285,9 @@ def _register_field_mapping_routes(app: FastAPI, service: Any) -> None:
                         **item,
                         "srcSystem": f"{name} · {code}" if name and code else name or code,
                     }
-                    if view == "table":
-                        item_values["loadMode"] = load_mode_labels.get(item_values.get("loadMode"), "")
+                    item_values["loadMode"] = _load_mode_export_label(
+                        item_values.get("loadMode")
+                    )
                     cells = []
                     for _label, key in columns:
                         value = item_values.get(key, "")

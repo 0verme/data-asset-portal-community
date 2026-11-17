@@ -16,6 +16,10 @@
 import { requestRemote } from './http.ts';
 import { LONG_REQUEST_TIMEOUT } from '../config/request.ts';
 import { FIELD_MAPPING_ROWS, type FieldMappingRow } from '../data/fieldMappings.ts';
+import {
+  hasConfiguredFieldMappingValue,
+  isCompleteFieldMappingTableConfig,
+} from './fieldMappingModel.ts';
 
 const API_MODE = (
   typeof import.meta !== 'undefined' && import.meta.env?.['VITE_API_MODE']
@@ -300,7 +304,7 @@ export function summarizeTables(rows: readonly EnrichedFieldMappingRow[]): Field
       updatedAt: String(row.updatedAt || ''),
     };
     current.fieldCount += 1;
-    if (row.targetField) current.mappedCount += 1;
+    if (hasConfiguredFieldMappingValue(row.targetField)) current.mappedCount += 1;
     if (!String(row.srcComment || '').trim()) current.emptyCommentCount += 1;
     if (String(row.updatedAt || '') > current.updatedAt) current.updatedAt = String(row.updatedAt || '');
     groups.set(key, current);
@@ -320,34 +324,77 @@ export interface FieldMappingStats {
   fieldCount: number;
   mappedFieldCount: number;
   unmappedFieldCount: number;
+  configuredTableCount: number;
+  incompleteTableCount: number;
   emptyCommentCount: number;
-  coverage: number;
+  coverage: number | null;
+  tableConfigCoverage: number | null;
+}
+
+function readStatsCount(detail: Record<string, unknown>, key: string, label: string): number {
+  const value = detail[key];
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new Error(`字段映射统计接口缺少有效的${label}`);
+  }
+  return value;
+}
+
+function readStatsCoverage(
+  detail: Record<string, unknown>,
+  key: string,
+  numerator: number,
+  denominator: number,
+  label: string,
+): number | null {
+  const value = detail[key];
+  if (denominator === 0 && value === null) return null;
+  const expected = denominator > 0 ? Math.round((numerator / denominator) * 100) : null;
+  if (value === expected) {
+    return expected;
+  }
+  throw new Error(`字段映射统计接口缺少有效的${label}`);
 }
 
 export function normalizeFieldMappingStats(payload: unknown): FieldMappingStats {
   const detail = normalizeDetail(payload);
-  const fieldCount = detail['fieldCount'];
-  if (
-    typeof fieldCount !== 'number' ||
-    !Number.isInteger(fieldCount) ||
-    fieldCount < 0
-  ) {
-    throw new Error('字段映射统计接口缺少有效的字段计数');
+  const sourceSystemCount = readStatsCount(detail, 'sourceSystemCount', '源系统计数');
+  const sourceTableCount = readStatsCount(detail, 'sourceTableCount', '表映射计数');
+  const fieldCount = readStatsCount(detail, 'fieldCount', '字段计数');
+  const mappedFieldCount = readStatsCount(detail, 'mappedFieldCount', '已映射字段计数');
+  const unmappedFieldCount = readStatsCount(detail, 'unmappedFieldCount', '待补充字段计数');
+  const configuredTableCount = readStatsCount(detail, 'configuredTableCount', '入仓配置完整表计数');
+  const incompleteTableCount = readStatsCount(detail, 'incompleteTableCount', '入仓配置不完整表计数');
+  const emptyCommentCount = readStatsCount(detail, 'emptyCommentCount', '空注释计数');
+  if (mappedFieldCount + unmappedFieldCount !== fieldCount) {
+    throw new Error('字段映射统计接口中的映射字段计数不一致');
+  }
+  if (configuredTableCount + incompleteTableCount !== sourceTableCount) {
+    throw new Error('字段映射统计接口中的入仓配置计数不一致');
   }
   return {
-    sourceSystemCount: Number(detail['sourceSystemCount'] || 0),
-    sourceTableCount: Number(detail['sourceTableCount'] || 0),
+    sourceSystemCount,
+    sourceTableCount,
     fieldCount,
-    mappedFieldCount: Number(detail['mappedFieldCount'] || 0),
-    unmappedFieldCount: Number(detail['unmappedFieldCount'] || 0),
-    emptyCommentCount: Number(detail['emptyCommentCount'] || 0),
-    coverage: Number(detail['coverage'] || 0),
+    mappedFieldCount,
+    unmappedFieldCount,
+    configuredTableCount,
+    incompleteTableCount,
+    emptyCommentCount,
+    coverage: readStatsCoverage(detail, 'coverage', mappedFieldCount, fieldCount, '字段映射覆盖率'),
+    tableConfigCoverage: readStatsCoverage(
+      detail,
+      'tableConfigCoverage',
+      configuredTableCount,
+      sourceTableCount,
+      '入仓配置完整率',
+    ),
   };
 }
 
 function buildStats(rows: readonly EnrichedFieldMappingRow[]): FieldMappingStats {
   const tables = summarizeTables(rows);
-  const mappedFields = rows.filter((row) => row.targetField).length;
+  const mappedFields = rows.filter((row) => hasConfiguredFieldMappingValue(row.targetField)).length;
+  const configuredTables = tables.filter(isCompleteFieldMappingTableConfig).length;
   return {
     sourceSystemCount: new Set(
       rows
@@ -358,8 +405,11 @@ function buildStats(rows: readonly EnrichedFieldMappingRow[]): FieldMappingStats
     fieldCount: rows.length,
     mappedFieldCount: mappedFields,
     unmappedFieldCount: rows.length - mappedFields,
+    configuredTableCount: configuredTables,
+    incompleteTableCount: tables.length - configuredTables,
     emptyCommentCount: rows.filter((row) => !String(row.srcComment || '').trim()).length,
-    coverage: rows.length ? Math.round((mappedFields / rows.length) * 100) : 0,
+    coverage: rows.length ? Math.round((mappedFields / rows.length) * 100) : null,
+    tableConfigCoverage: tables.length ? Math.round((configuredTables / tables.length) * 100) : null,
   };
 }
 

@@ -80,6 +80,7 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
         self.service._db.fetch_rows = MagicMock(return_value=[{
             "source_system_count": 1,
             "source_table_count": 1,
+            "configured_table_count": 1,
             "field_count": 1,
             "mapped_field_count": 1,
             "empty_comment_count": 0,
@@ -95,6 +96,7 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
         self.service._db.fetch_rows = MagicMock(return_value=[{
             "source_system_count": 1,
             "source_table_count": 1,
+            "configured_table_count": 1,
             "field_count": 2,
             "mapped_field_count": 1,
             "empty_comment_count": 1,
@@ -103,6 +105,8 @@ class FieldMappingCoreQueryTests(unittest.TestCase):
         stats_statement = self.service._db.fetch_rows.call_args.args[0]
         self._assert_portable(stats_statement)
         self.assertEqual(stats["coverage"], 50)
+        self.assertEqual(stats["configuredTableCount"], 1)
+        self.assertEqual(stats["tableConfigCoverage"], 100)
         stats_sql = str(stats_statement.compile(dialect=sqlite.dialect())).lower()
         self.assertIn("coalesce(length(trim(", stats_sql)
         self.assertIn("count(__app__.p_field_mapping_field.field_pk)", stats_sql)

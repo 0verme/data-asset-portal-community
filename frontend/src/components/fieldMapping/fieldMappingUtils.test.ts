@@ -12,11 +12,19 @@ import {
   isTransformRule,
   sortMarker,
 } from "./fieldMappingUtils.ts";
+import { formatFieldMappingLoadMode } from "../../api/fieldMappingModel.ts";
 
 test("field mapping rules identify only known transformations", () => {
   assert.equal(isTransformRule("直接映射"), false);
   assert.equal(isTransformRule("日期格式化"), true);
   assert.equal(isTransformRule("未知规则"), false);
+});
+
+test("load mode rendering distinguishes missing values from unknown values", () => {
+  assert.equal(formatFieldMappingLoadMode(undefined), "未设置");
+  assert.equal(formatFieldMappingLoadMode("  "), "未设置");
+  assert.equal(formatFieldMappingLoadMode("incr"), "增量");
+  assert.equal(formatFieldMappingLoadMode("future_mode"), "未知（future_mode）");
 });
 
 test("linked field mapping routes build stable filters", () => {
