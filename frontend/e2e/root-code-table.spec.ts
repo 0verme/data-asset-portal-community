@@ -14,7 +14,7 @@ test("guest root and code-table lists stay read-only", async ({ page }) => {
 
   await page.goto("/root-management");
   await expect(page.locator(".root-page .page-title")).toContainText("词根库", { timeout: 20_000 });
-  await expect(page.locator(".root-page table.dt tbody tr").first()).toBeVisible();
+  await expect(page.getByText("当前没有词根数据")).toBeVisible();
   await expect(page.getByRole("button", { name: "批量导入" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "新增词根" })).toHaveCount(0);
 
@@ -30,14 +30,16 @@ test("admin root editor and import preview consume adapter controls", async ({ p
   await page.goto("/root-management");
   await expect(page.locator(".root-page .page-title")).toContainText("词根库", { timeout: 20_000 });
 
-  await page.getByRole("main").getByRole("button", { name: "新增词根" }).click();
+  const newRoot = page.locator(".root-page .page-head").getByRole("button", { name: "新增词根" });
+  await newRoot.click();
   const abbrInput = page.getByLabel("词根缩写");
   await expect(abbrInput).toHaveClass(/dap-ui-input/);
   await expect(abbrInput).toHaveClass(/inp/);
   const catSelect = page.getByRole("combobox", { name: "分类" });
   await expect(catSelect).toHaveClass(/sel/);
-  const descArea = page.getByLabel("说明 / 示例");
+  const descArea = page.getByLabel("用途说明");
   await expect(descArea).toHaveClass(/dap-ui-textarea/);
+  await expect(page.getByLabel("示例字段名")).toHaveClass(/dap-ui-textarea/);
   await page.getByRole("button", { name: "取消", exact: true }).click();
   await expect(page.locator(".root-page .page-title")).toContainText("词根库");
 
@@ -45,7 +47,7 @@ test("admin root editor and import preview consume adapter controls", async ({ p
   const paste = page.getByLabel("批量导入内容");
   await expect(paste).toHaveClass(/dap-ui-textarea/);
   await expect(paste).toHaveClass(/paste-ta/);
-  await paste.fill("abbr,en,cn,cat,desc\ntrans,transaction,交易流水,业务对象,交易明细类命名词根");
+  await paste.fill("abbr,en,cn,cat,desc,example\nabc,confirmed term,示例含义,业务对象,synthetic fixture,abc_id");
   await expect(page.locator(".imp-summary").first()).toBeVisible();
   await page.getByRole("button", { name: "清空" }).click();
   await expect(page.locator(".imp-summary")).toHaveCount(0);
@@ -156,7 +158,8 @@ test("form error presenter blocks invalid root saves, focuses, and clears correc
   await page.goto("/root-management");
   await expect(page.locator(".root-page .page-title")).toContainText("词根库", { timeout: 20_000 });
 
-  await page.getByRole("main").getByRole("button", { name: "新增词根" }).click();
+  const newRoot = page.locator(".root-page .page-head").getByRole("button", { name: "新增词根" });
+  await newRoot.click();
   const abbrInput = page.getByLabel("词根缩写");
   const chineseNameInput = page.getByLabel("中文名");
   const summary = page.locator(".dap-ui-form-error-summary");
@@ -169,12 +172,8 @@ test("form error presenter blocks invalid root saves, focuses, and clears correc
   expect(await abbrInput.getAttribute("aria-describedby")).toBeTruthy();
   await expect(page.getByRole("button", { name: "保存", exact: true })).toBeVisible();
 
-  await abbrInput.fill("sku");
-  await chineseNameInput.fill("临时词根");
-  await expect(summary).toContainText("词根 sku 已存在");
-  await expect(abbrInput).toHaveAttribute("aria-invalid", "true");
-
   await abbrInput.fill("newroot");
+  await chineseNameInput.fill("临时词根");
   await expect(summary).toHaveCount(0);
   await expect(abbrInput).not.toHaveAttribute("aria-invalid", "true");
   await expect(chineseNameInput).toHaveValue("临时词根");

@@ -13,7 +13,7 @@ test("root pages use frozen DAP adapters and keep legacy classes", () => {
   assert.match(rootPages, /<Button className="btn" variant="secondary" type="button" onClick=\{onBack\}>/);
   assert.equal((rootPages.match(/<Input/g) ?? []).length, 3);
   assert.equal((rootPages.match(/<Select<string>/g) ?? []).length, 1);
-  assert.equal((rootPages.match(/<Textarea/g) ?? []).length, 2);
+  assert.equal((rootPages.match(/<Textarea/g) ?? []).length, 3);
   assert.match(rootPages, /<Select<string> aria-label="分类" className="sel"/);
   assert.match(rootPages, /<Textarea[\s\S]*?className="paste-ta"/);
   assert.match(rootPages, /<Button className="btn primary" variant="primary" type="button" disabled=\{!summary\.new && !summary\.update\}/);
@@ -32,10 +32,10 @@ test("code-table page uses frozen DAP adapters without raw controls", () => {
   assert.match(codeTablePage, /import \{ Button, IconButton, Input, Select, TablePagination, Textarea \} from "\.\.\/ui\/index\.ts"/);
   assert.match(codeTablePage, /import \{ FormErrorSummary, FormField \} from "\.\.\/ui\/FormErrors\.tsx"/);
   assert.match(codeTablePage, /import \{ focusFirstFormError \} from "\.\.\/ui\/formErrors\.ts"/);
-  assert.equal((codeTablePage.match(/<Input/g) ?? []).length, 3);
-  assert.equal((codeTablePage.match(/<Select<string>/g) ?? []).length, 2);
-  assert.equal((codeTablePage.match(/<Textarea/g) ?? []).length, 1);
-  assert.equal((codeTablePage.match(/<Button/g) ?? []).length, 2);
+  assert.equal((codeTablePage.match(/<Input/g) ?? []).length, 6);
+  assert.equal((codeTablePage.match(/<Select<string>/g) ?? []).length, 4);
+  assert.equal((codeTablePage.match(/<Textarea/g) ?? []).length, 2);
+  assert.equal((codeTablePage.match(/<Button/g) ?? []).length, 3);
   assert.doesNotMatch(codeTablePage, /aria-label="状态筛选"|code-table-status-filter/);
   assert.match(codeTablePage, /<Select<string> aria-label="表样式" placeholder="请选择表样式" className=\{`inp\$\{fieldErrors\["style"\]/);
   assert.doesNotMatch(codeTablePage, /<input|<select|<textarea/);

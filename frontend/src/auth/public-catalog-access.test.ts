@@ -45,7 +45,7 @@ test("catalog readiness gates API asset and root detail/candidate requests", asy
   assert.match(apiAssetView, /route\.page === "list" && apiAsset\.error/);
   assert.match(rootView, /rootRoute\.page === "library" && rootLoading/);
   assert.match(rootView, /rootRoute\.page === "library" && rootError/);
-  assert.match(rootModule, /if \(!active \|\| rootRoute\.page !== 'edit' \|\| !abbr\)/);
+  assert.match(rootModule, /if \(!active \|\| !\['edit', 'detail'\]\.includes\(rootRoute\.page\) \|\| !abbr\)/);
   assert.match(rootModule, /\[active, rootRoute\.abbr, rootRoute\.page\]/);
   assert.match(rootModule, /if \(!active\) \{\s*setRootImportCandidates\(\[\]\)/);
   assert.match(rootModule, /if \(active && rootRoute\.page === 'import'\)/);

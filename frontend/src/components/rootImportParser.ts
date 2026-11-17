@@ -4,6 +4,7 @@ export interface ParsedRoot {
   cn: string;
   cat: string;
   desc: string;
+  example: string;
   _line: number;
 }
 
@@ -196,12 +197,13 @@ export function parseRootImport(text: string): { items: ParsedRoot[]; error?: st
   const hasHeader = firstRow.some((cell) => /abbr|root|词根|缩写/.test(cell));
   const startIndex = hasHeader ? 1 : 0;
   const header = hasHeader ? firstRow : [];
-  const indexMap: Record<"abbr" | "en" | "cn" | "cat" | "desc", number> = {
+  const indexMap: Record<"abbr" | "en" | "cn" | "cat" | "desc" | "example", number> = {
     abbr: 0,
     en: 1,
     cn: 2,
     cat: 3,
     desc: 4,
+    example: 5,
   };
 
   header.forEach((cell, index) => {
@@ -209,7 +211,8 @@ export function parseRootImport(text: string): { items: ParsedRoot[]; error?: st
     if (/en|english|全称/.test(cell)) indexMap.en = index;
     if (/cn|中文|名称/.test(cell)) indexMap.cn = index;
     if (/cat|分类|类别/.test(cell)) indexMap.cat = index;
-    if (/desc|说明|备注|示例/.test(cell)) indexMap.desc = index;
+    if (/example|示例字段|示例/.test(cell)) indexMap.example = index;
+    if (/desc|说明|用途|备注/.test(cell)) indexMap.desc = index;
   });
 
   return {
@@ -219,6 +222,7 @@ export function parseRootImport(text: string): { items: ParsedRoot[]; error?: st
       cn: row[indexMap.cn] || "",
       cat: row[indexMap.cat] || "",
       desc: row[indexMap.desc] || "",
+      example: row[indexMap.example] || "",
       _line: sourceLine,
     })),
   };
