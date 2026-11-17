@@ -30,11 +30,14 @@
   "layer": "分层",
   "owner": "负责人",
   "fieldCount": "字段数",
+  "fieldCountUnknown": "字段数未知",
   "fieldCountSuffix_other": " 字段",
   "matchedField": "匹配字段",
+  "grain": "粒度",
   "fieldCountValue_other": "{{count}} 个字段",
   "groupTableCount_other": "{{count}} 张表",
   "groupOwner": "{{owner}} · {{count}} 个字段",
+  "groupOwnerUnknown": "{{owner}} · 字段数未知",
   "emptyTitle": "未找到匹配的数据表",
   "emptyDescription": "没有和“{{query}}”相关的表名或字段，试试其他关键词，或清除筛选条件。"
 }

@@ -16,11 +16,26 @@ import { useTranslation } from "react-i18next";
 
 import type { AssetTableItem } from "../api/assets.ts";
 import { EmptyState } from "../ui/index.ts";
+import { getAssetFieldCount } from "../utils/assetFieldCount.ts";
 import { CardGridView, GroupView, WideTableScroll } from "./common/index.ts";
 import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.tsx";
 
-function fieldCount(table: AssetTableItem): number {
-  return Number.isFinite(Number(table.fieldCount)) ? Number(table.fieldCount) : table.fields.length;
+function fieldCount(table: AssetTableItem): number | null {
+  return getAssetFieldCount(table.fieldCount);
+}
+
+function assetKey(table: AssetTableItem): number | string {
+  return table.assetId ?? table.name;
+}
+
+function AssetBusinessMeaning({ table }: { table: AssetTableItem }) {
+  const { t } = useTranslation("warehouse");
+  const details = [
+    table.grain ? `${t("grain")}: ${table.grain}` : "",
+    table.desc,
+  ].filter(Boolean);
+  if (!details.length) return null;
+  return <div className="asset-meaning-context">{details.join(" · ")}</div>;
 }
 
 interface TableLayoutProps {
@@ -47,7 +62,7 @@ function ListLayout({ tables, query, onOpen }: TableLayoutProps) {
         </thead>
         <tbody>
           {tables.map((table) => (
-            <tr key={table.name} onClick={() => onOpen(table)}>
+            <tr key={assetKey(table)} onClick={() => onOpen(table)}>
               <td data-label="">
                 <div className="t-name">
                   <Icon name="table" size={15} color="var(--ink-3)" />
@@ -60,7 +75,10 @@ function ListLayout({ tables, query, onOpen }: TableLayoutProps) {
                   </div>
                 ) : null}
               </td>
-              <td data-label={t("businessMeaning")}><span className="t-cn"><Highlight text={table.cn} q={query} /></span></td>
+              <td data-label={t("businessMeaning")}>
+                <span className="t-cn"><Highlight text={table.cn} q={query} /></span>
+                <AssetBusinessMeaning table={table} />
+              </td>
               <td data-label={t("domain")}><DomainBadge domain={table.domain} /></td>
               <td data-label={t("layer")}><LayerBadge layer={table.layer} /></td>
               <td data-label={t("owner")}>
@@ -68,7 +86,14 @@ function ListLayout({ tables, query, onOpen }: TableLayoutProps) {
                   <span className="mini-av">{initial(table.owner)}</span>{table.owner}
                 </div>
               </td>
-              <td data-label={t("fieldCount")} style={{ textAlign: "right" }}><span className="t-num">{fieldCount(table)}</span></td>
+              <td data-label={t("fieldCount")} style={{ textAlign: "right" }}>
+                <span
+                  className="t-num"
+                  aria-label={fieldCount(table) === null ? t("fieldCountUnknown") : undefined}
+                >
+                  {fieldCount(table) ?? "—"}
+                </span>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -83,7 +108,7 @@ function CardLayout({ tables, query, onOpen }: TableLayoutProps) {
   return (
     <CardGridView
       items={tables}
-      getKey={(table) => table.name}
+      getKey={assetKey}
       onItemClick={(table) => onOpen(table)}
       renderBadges={(table) => (
         <>
@@ -93,16 +118,22 @@ function CardLayout({ tables, query, onOpen }: TableLayoutProps) {
       )}
       renderTitle={(table) => <Highlight text={table.cn} q={query} />}
       renderSubtitle={(table) => <Highlight text={table.name} q={query} />}
-      renderDesc={(table) => table.desc}
+      renderDesc={(table) => <AssetBusinessMeaning table={table} />}
       renderFootLeft={(table) => (
         <div className="t-owner" style={{ fontSize: 12.5 }}>
           <span className="mini-av" style={{ width: 22, height: 22 }}>{initial(table.owner)}</span>
           <span style={{ color: "var(--ink-2)" }}>{table.owner}</span>
         </div>
       )}
-      renderFootMeta={(table) => (
-        <span className="m"><Icon name="columns" size={13} /><b>{fieldCount(table)}</b>{t("fieldCountSuffix", { count: fieldCount(table) })}</span>
-      )}
+      renderFootMeta={(table) => {
+        const count = fieldCount(table);
+        return (
+          <span className="m" aria-label={count === null ? t("fieldCountUnknown") : undefined}>
+            <Icon name="columns" size={13} />
+            {count === null ? "—" : <><b>{count}</b>{t("fieldCountSuffix", { count })}</>}
+          </span>
+        );
+      }}
     />
   );
 }
@@ -113,19 +144,29 @@ function GroupLayout({ tables, query, onOpen }: TableLayoutProps) {
   return (
     <GroupView
       items={tables}
-      getKey={(table) => table.name}
+      getKey={assetKey}
       onItemClick={(table) => onOpen(table)}
       groupBy={(table) => table.domain}
       groupOrder={order}
       renderGroupLabel={(domain) => <span className="tag tag-neutral">{domain}</span>}
       renderGroupCount={(count) => t("groupTableCount", { count })}
       renderCardName={(table) => <Highlight text={table.name} q={query} />}
-      renderCardBody={(table) => (
-        <>
-          <span><Highlight text={table.cn} q={query} /></span>
-          <span className="gc-owner">{t("groupOwner", { owner: table.owner, count: fieldCount(table) })}</span>
-        </>
-      )}
+      renderCardBody={(table) => {
+        const count = fieldCount(table);
+        return (
+          <>
+            <div className="asset-group-meaning">
+              <span><Highlight text={table.cn} q={query} /></span>
+              <AssetBusinessMeaning table={table} />
+            </div>
+            <span className="gc-owner">
+              {count === null
+                ? t("groupOwnerUnknown", { owner: table.owner })
+                : t("groupOwner", { owner: table.owner, count })}
+            </span>
+          </>
+        );
+      }}
     />
   );
 }
