@@ -30,6 +30,7 @@ import {
   type FieldMappingStats as FieldMappingStatsData,
   type FieldMappingTableSummary,
 } from "../api/fieldMapping.ts";
+import { formatFieldMappingLoadMode, hasConfiguredFieldMappingValue, LOAD_MODE_META } from "../api/fieldMappingModel.ts";
 import { DEFAULT_MAPPING_ROUTE } from "../config/defaults.ts";
 import type { MappingRoute } from "../routing/types.ts";
 import { ActionErrorBanner, EmptyState } from "./common/index.ts";
@@ -41,7 +42,6 @@ import {
 import {
   DEFAULT_FILTERS,
   DIMENSION_TABS,
-  LOAD_MODE_META,
   RULE_TAGS,
   areFieldMappingFiltersEqual,
   buildFieldMappingRequestFilters,
@@ -152,7 +152,7 @@ function MappingTableHeader({
               colSpan={columns.length}
               className={group === "source" ? "fm-group-source" : "fm-group-target"}
             >
-              {group === "source" ? "源系统侧 / SOURCE" : "数据仓库 DWF 侧 / TARGET"}
+              {group === "source" ? "源系统侧 / SOURCE" : "目标侧 / TARGET"}
             </th>
           ))}
         </tr>
@@ -222,16 +222,19 @@ function renderFieldCell(row: EnrichedFieldMappingRow, key: FieldColumnKey): Rea
     case "targetTable":
       return <MappingCellText value={String(row.targetTable || "")} className="mono" />;
     case "loadMode": {
-      const loadMode = LOAD_MODE_META[row.loadMode || ""];
+      const loadModeKey = String(row.loadMode || "").trim();
+      const loadMode = LOAD_MODE_META[loadModeKey];
       return loadMode ? (
         <span className={`tag ${loadMode.tone}`}>{loadMode.label}</span>
       ) : (
-        <span className="fm-empty">未设置</span>
+        <span className="fm-empty" title={loadModeKey ? `未知入仓方式：${loadModeKey}` : undefined}>
+          {formatFieldMappingLoadMode(loadModeKey)}
+        </span>
       );
     }
     case "targetField":
-      return row.targetField
-        ? <MappingCellText value={row.targetField} className="mono" />
+      return hasConfiguredFieldMappingValue(row.targetField)
+        ? <MappingCellText value={String(row.targetField || "").trim()} className="mono" />
         : <span className="fm-empty">待补充</span>;
     case "mappingRule":
       return (
@@ -252,7 +255,7 @@ const FIELD_COLUMNS: readonly FieldColumn[] = [
   { key: "srcComment", label: "字段注释", width: 280, group: "source", cellClassName: "fm-cell-ellipsis-cell", title: (row) => row.srcComment || "未填写" },
   { key: "__arrow", label: "", width: 48, group: "arrow", sortable: false, cellClassName: "fm-arrow-cell" },
   { key: "targetLayer", label: "目标层", width: 90, group: "target", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => row.targetLayer || "-" },
-  { key: "targetTable", label: "目标表名", width: 280, group: "target", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => String(row.targetTable || "") },
+  { key: "targetTable", label: "目标表", width: 280, group: "target", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => String(row.targetTable || "") },
   { key: "loadMode", label: "入仓方式", width: 110, group: "target" },
   { key: "targetField", label: "目标字段", width: 180, group: "target", cellClassName: "mono fm-cell-ellipsis-cell", title: (row) => row.targetField || "待补充" },
   { key: "mappingRule", label: "映射规则", width: 180, group: "target" },
@@ -531,7 +534,7 @@ export function FieldMappingPage({
     { key: "srcTable", label: "源系统表", width: 240 },
     { key: "srcTableCn", label: "表中文名", width: 220 },
     { key: "targetLayer", label: "目标层", width: 90 },
-    { key: "targetTable", label: "目标表名", width: 370 },
+    { key: "targetTable", label: "目标表", width: 370 },
     { key: "mappedCount", label: "已映射", align: "right", width: 100 },
     { key: "loadMode", label: "入仓方式", width: 110 },
     { key: "emptyCommentRate", label: "空注释率", align: "right", width: 140 },
@@ -617,13 +620,16 @@ export function FieldMappingPage({
     if (column.key === "srcTableCn") return <MappingCellText value={row.srcTableCn} />;
     if (column.key === "targetTable") return <MappingCellText value={row.targetTable} className="mono" />;
     if (column.key === "loadMode") {
-      const loadMode = LOAD_MODE_META[row.loadMode];
+      const loadModeKey = String(row.loadMode || "").trim();
+      const loadMode = LOAD_MODE_META[loadModeKey];
       return loadMode ? (
         <span className={`tag ${loadMode.tone}`}>
           {loadMode.label}
         </span>
       ) : (
-        <span className="fm-empty">未设置</span>
+        <span className="fm-empty" title={loadModeKey ? `未知入仓方式：${loadModeKey}` : undefined}>
+          {formatFieldMappingLoadMode(loadModeKey)}
+        </span>
       );
     }
     if (column.key === "__actions") {
@@ -650,7 +656,7 @@ export function FieldMappingPage({
     if (column.key === "srcSystem") return formatSystemLabel(row);
     if (column.key === "loadMode") {
       const loadMode = readMappingValue(row, "loadMode");
-      return typeof loadMode === "string" ? LOAD_MODE_META[loadMode]?.label ?? "" : "";
+      return formatFieldMappingLoadMode(loadMode);
     }
     return readMappingValue(row, column.key) ?? "";
   };

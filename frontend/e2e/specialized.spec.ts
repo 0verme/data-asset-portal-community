@@ -20,7 +20,7 @@ test("field mapping filters and pagination use adapter controls", async ({ page 
     await toggle.click();
   }
   await expect(srcTable).toHaveClass(/dap-ui-input/);
-  await expect(page.getByLabel("DWF 字段名")).toHaveClass(/dap-ui-input/);
+  await expect(page.getByLabel("目标字段")).toHaveClass(/dap-ui-input/);
   await expect(page.getByRole("button", { name: "查询", exact: true })).toHaveClass(/dap-ui-button/);
   await expect(page.getByRole("button", { name: "重置" })).toHaveClass(/dap-ui-button/);
 

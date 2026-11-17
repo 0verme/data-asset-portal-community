@@ -109,6 +109,73 @@ class FieldMappingStatsConsistencyTests(unittest.TestCase):
                     service.get_table_mappings({"pageSize": 50})["items"][0]["fieldCount"],
                 )
 
+    def test_field_mapping_and_table_configuration_coverage_are_independent(self):
+        connection = connect({"type": "sqlite", "database": str(self.database)})
+        try:
+            connection.execute(
+                "INSERT INTO dwp.p_field_mapping_table "
+                "(table_pk, data_source_id, upstream_system_id, source_table_name, "
+                "target_layer_code, target_table_name, load_mode, field_total_count, mapped_field_count) "
+                "VALUES (202, 1, 101, 'dwd_table', 'DWD', 'DWD_TARGET', 'incr', 1, 0)"
+            )
+            connection.execute(
+                "INSERT INTO dwp.p_field_mapping_field "
+                "(field_pk, table_pk, source_field_name, source_field_type, "
+                "source_field_comment, target_field_name, mapping_rule, field_order) "
+                "VALUES (302, 202, 'field_2', 'TEXT', '', '   ', 'pending', 1)"
+            )
+            connection.execute(
+                "INSERT INTO dwp.p_field_mapping_table "
+                "(table_pk, data_source_id, upstream_system_id, source_table_name, "
+                "target_layer_code, target_table_name, load_mode, field_total_count, mapped_field_count) "
+                "VALUES (203, 1, 101, 'dws_table', 'DWS', 'DWS_TARGET', 'future_mode', 1, 1)"
+            )
+            connection.execute(
+                "INSERT INTO dwp.p_field_mapping_field "
+                "(field_pk, table_pk, source_field_name, source_field_type, "
+                "source_field_comment, target_field_name, mapping_rule, field_order) "
+                "VALUES (303, 203, 'field_3', 'TEXT', '', 'target_3', 'direct', 1)"
+            )
+            connection.execute(
+                "INSERT INTO dwp.p_field_mapping_table "
+                "(table_pk, data_source_id, upstream_system_id, source_table_name, "
+                "target_layer_code, target_table_name, load_mode, field_total_count, mapped_field_count) "
+                "VALUES (204, 1, 101, 'missing_layer_table', '', 'TARGET_NO_LAYER', 'full', 1, 1)"
+            )
+            connection.execute(
+                "INSERT INTO dwp.p_field_mapping_field "
+                "(field_pk, table_pk, source_field_name, source_field_type, "
+                "source_field_comment, target_field_name, mapping_rule, field_order) "
+                "VALUES (304, 204, 'field_4', 'TEXT', '', 'target_4', 'direct', 1)"
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        stats = self.service_a.get_stats()
+        self.assertEqual(4, stats["fieldCount"])
+        self.assertEqual(3, stats["mappedFieldCount"])
+        self.assertEqual(1, stats["unmappedFieldCount"])
+        self.assertEqual(75, stats["coverage"])
+        self.assertEqual(4, stats["sourceTableCount"])
+        self.assertEqual(1, stats["configuredTableCount"])
+        self.assertEqual(3, stats["incompleteTableCount"])
+        self.assertEqual(25, stats["tableConfigCoverage"])
+
+        rows = self.service_a.get_field_mappings({"sourceSystemId": "101"})["items"]
+        configured_rows = {row["srcTable"]: row for row in rows}
+        self.assertEqual("DWD", configured_rows["dwd_table"]["targetLayer"])
+        self.assertEqual("DWS", configured_rows["dws_table"]["targetLayer"])
+        self.assertEqual("", configured_rows["missing_layer_table"]["targetLayer"])
+        self.assertEqual("future_mode", configured_rows["dws_table"]["loadMode"])
+
+    def test_empty_result_has_no_coverage_percentage(self):
+        stats = self.service_a.get_stats({"srcTable": "not_registered"})
+        self.assertEqual(0, stats["fieldCount"])
+        self.assertIsNone(stats["coverage"])
+        self.assertEqual(0, stats["sourceTableCount"])
+        self.assertIsNone(stats["tableConfigCoverage"])
+
     def test_high_cardinality_searches_do_not_reuse_or_retain_cached_stats(self):
         calls = 0
         fetch_rows = self.service_a._fetch_rows
