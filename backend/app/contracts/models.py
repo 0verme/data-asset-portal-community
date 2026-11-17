@@ -379,6 +379,7 @@ class RootItem(ContractModel):
     cn: str
     cat: str
     desc: str = ""
+    example: str = ""
 
 
 class RootRequest(ContractModel):
@@ -387,6 +388,7 @@ class RootRequest(ContractModel):
     cn: str | None = None
     cat: str | None = None
     desc: str | None = None
+    example: str | None = None
     items: list[dict[str, Any]] | None = None
 
 
@@ -424,6 +426,34 @@ class ManualCodeTableRequest(ContractModel):
     owner: str | None = None
     status: str | None = None
     remark: str | None = None
+
+
+class ManualCodeValueItem(ContractModel):
+    id: str
+    code: str
+    label: str
+    description: str = ""
+    status: str
+    updatedAt: str = ""
+
+
+class ManualCodeValueStats(ContractModel):
+    total: int = 0
+
+
+class ManualCodeValuePageResponse(ContractModel):
+    items: list[ManualCodeValueItem]
+    total: int
+    page: int
+    pageSize: int
+    stats: ManualCodeValueStats
+
+
+class ManualCodeValueRequest(ContractModel):
+    code: str | None = None
+    label: str | None = None
+    description: str | None = None
+    status: str | None = None
 
 
 class ManualCodeTableListResponse(ItemsResponse[ManualCodeTableItem]):

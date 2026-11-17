@@ -12,7 +12,7 @@ from sqlalchemy import case, delete, func, insert, or_, select, update
 
 from ..application import AuditActorMixin, actor_aware
 from ..db.service import CoreAccess
-from ..db.tables import manual_code_table
+from ..db.tables import code_item, manual_code_table
 from ..utils.like_utils import LIKE_ESCAPE_CHAR, escape_like_keyword
 from ..utils.pagination import resolve_paging
 from .operation_log_service import (
@@ -23,11 +23,15 @@ from .operation_log_service import (
     OPERATION_TYPE_UPDATE,
     operation_log_service,
 )
+from .common_code_service import common_code_service
+from .system_management_service import RESERVED_PARAM_CATEGORY_CODES
 
 
 TABLE_CODE_RE = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
+CODE_VALUE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
 TABLE_STYLES = {"enum", "dim", "status", "map", "custom"}
 TABLE_STATUSES = {"enabled", "disabled"}
+CODE_VALUE_STATUSES = {"enabled", "disabled"}
 
 
 class ManualCodeTableNotFoundError(Exception):
@@ -46,6 +50,24 @@ class ManualCodeTableAlreadyExistsError(Exception):
 
     def to_dict(self):
         return {"code": "MANUAL_CODE_TABLE_ALREADY_EXISTS", "message": str(self)}
+
+
+class ManualCodeValueNotFoundError(Exception):
+    def __init__(self, item_id):
+        self.item_id = str(item_id)
+        super().__init__(f"Manual code value not found: {self.item_id}")
+
+    def to_dict(self):
+        return {"code": "MANUAL_CODE_VALUE_NOT_FOUND", "message": str(self)}
+
+
+class ManualCodeValueAlreadyExistsError(Exception):
+    def __init__(self, code):
+        self.code_value = code
+        super().__init__(f"Manual code value already exists: {code}")
+
+    def to_dict(self):
+        return {"code": "MANUAL_CODE_VALUE_ALREADY_EXISTS", "message": str(self)}
 
 
 class ManualCodeTableValidationError(Exception):
@@ -93,6 +115,16 @@ class ManualCodeTableService(AuditActorMixin):
 
     def _next_id(self):
         return self._db.next_pk(manual_code_table, manual_code_table.c.table_id)
+
+    def _next_code_value_id(self):
+        return self._db.next_pk(code_item, code_item.c.item_id)
+
+    @staticmethod
+    def _parse_code_value_id(item_id):
+        value = str(item_id or "").strip()
+        if not value.isdigit():
+            raise ManualCodeValueNotFoundError(item_id)
+        return int(value)
 
     @staticmethod
     def _normalize_payload(payload):
@@ -148,6 +180,143 @@ class ManualCodeTableService(AuditActorMixin):
             "updatedBy": row.get("updated_by") or "",
             "updatedAt": str(row.get("updated_at") or ""),
         }
+
+    @staticmethod
+    def _row_to_code_value(row):
+        return {
+            "id": str(row["item_id"]),
+            "code": row["item_code"],
+            "label": row["item_name"],
+            "description": row.get("item_desc") or "",
+            "status": "enabled" if str(row.get("is_active") or "").upper() == "Y" else "disabled",
+            "updatedAt": str(row.get("updated_at") or ""),
+        }
+
+    @staticmethod
+    def _normalize_code_value_payload(payload):
+        if not isinstance(payload, dict):
+            raise ManualCodeTableValidationError(
+                [{"field": "body", "message": "请求体必须是 JSON 对象"}]
+            )
+        item = {
+            "code": str(payload.get("code") or "").strip().upper(),
+            "label": str(payload.get("label") or "").strip(),
+            "description": str(payload.get("description") or "").strip(),
+            "status": str(payload.get("status") or "enabled").strip().lower(),
+        }
+        details = []
+        if not CODE_VALUE_RE.fullmatch(item["code"]):
+            details.append({"field": "code", "message": "条目编码须以英文字母开头，只能包含字母、数字和下划线，长度为 1–64 位"})
+        if not item["label"]:
+            details.append({"field": "label", "message": "条目名称不能为空"})
+        elif len(item["label"]) > 128:
+            details.append({"field": "label", "message": "条目名称不能超过 128 个字符"})
+        if len(item["description"]) > 512:
+            details.append({"field": "description", "message": "条目说明不能超过 512 个字符"})
+        if item["status"] not in CODE_VALUE_STATUSES:
+            details.append({"field": "status", "message": "状态无效"})
+        if details:
+            raise ManualCodeTableValidationError(details)
+        return item
+
+    @staticmethod
+    def _code_value_columns():
+        return (
+            code_item.c.item_id,
+            code_item.c.item_code,
+            code_item.c.item_name,
+            code_item.c.item_desc,
+            code_item.c.is_active,
+            code_item.c.updated_at,
+        )
+
+    @staticmethod
+    def _code_value_filters(table_code, keyword=None, status=None):
+        clauses = [code_item.c.category_code == table_code]
+        if status:
+            clauses.append(code_item.c.is_active == ("Y" if status == "enabled" else "N"))
+        if keyword:
+            escaped = escape_like_keyword(str(keyword).strip().lower())
+            pattern = f"%{escaped}%"
+            searchable = (code_item.c.item_code, code_item.c.item_name, code_item.c.item_desc)
+            clauses.append(
+                or_(
+                    *(
+                        func.lower(func.coalesce(column, "")).like(
+                            pattern, escape=LIKE_ESCAPE_CHAR
+                        )
+                        for column in searchable
+                    )
+                )
+            )
+        return clauses
+
+    @staticmethod
+    def _normalize_code_value_filters(keyword=None, status=None):
+        normalized_status = str(status or "").strip().lower()
+        if normalized_status and normalized_status not in CODE_VALUE_STATUSES:
+            raise ManualCodeTableValidationError(
+                [{"field": "status", "message": "状态无效"}]
+            )
+        return str(keyword or "").strip(), normalized_status
+
+    def _code_value_group(self, table_id):
+        table = self.get_table(table_id)
+        table_code = table["tableCode"].strip().upper()
+        if table_code in RESERVED_PARAM_CATEGORY_CODES:
+            raise ManualCodeTableValidationError(
+                [{"field": "tableCode", "message": "系统保留码值组不能通过手工码值表维护"}]
+            )
+        return table_code
+
+    def _count_code_values(self, table_code):
+        rows = self._fetch_rows(
+            select(func.count().label("total"))
+            .select_from(code_item)
+            .where(code_item.c.category_code == table_code)
+        )
+        return int(rows[0].get("total") or 0) if rows else 0
+
+    def get_code_values_page(
+        self, table_id, *, keyword=None, status=None, page=None, page_size=None
+    ):
+        table_code = self._code_value_group(table_id)
+        keyword, normalized_status = self._normalize_code_value_filters(keyword, status)
+        page, page_size = resolve_paging(page, page_size)
+        filters = self._code_value_filters(table_code, keyword, normalized_status)
+        total_rows = self._fetch_rows(
+            select(func.count().label("total")).select_from(code_item).where(*filters)
+        )
+        total = int(total_rows[0].get("total") or 0) if total_rows else 0
+        last_page = max(1, (total + page_size - 1) // page_size)
+        page = min(page, last_page)
+        rows = self._fetch_rows(
+            select(*self._code_value_columns())
+            .where(*filters)
+            .order_by(code_item.c.display_order, code_item.c.item_code, code_item.c.item_id)
+            .limit(page_size)
+            .offset((page - 1) * page_size)
+        )
+        return {
+            "items": [self._row_to_code_value(row) for row in rows],
+            "total": total,
+            "page": page,
+            "pageSize": page_size,
+            "stats": {"total": self._count_code_values(table_code)},
+        }
+
+    def get_code_value(self, table_id, item_id):
+        table_code = self._code_value_group(table_id)
+        normalized_id = self._parse_code_value_id(item_id)
+        rows = self._fetch_rows(
+            select(*self._code_value_columns()).where(
+                code_item.c.category_code == table_code,
+                code_item.c.item_id == normalized_id,
+            )
+        )
+        if not rows:
+            raise ManualCodeValueNotFoundError(item_id)
+        return self._row_to_code_value(rows[0])
 
     @staticmethod
     def _columns():
@@ -313,6 +482,156 @@ class ManualCodeTableService(AuditActorMixin):
         return self._row_to_item(rows[0])
 
     @actor_aware
+    def create_code_value(self, table_id, payload):
+        item = self._normalize_code_value_payload(payload)
+        table_code = self._code_value_group(table_id)
+        with operation_log_service.audit(
+            module_name="码值条目维护",
+            operation_type=OPERATION_TYPE_CREATE,
+            operation_object=f"{table_code}/{item['code']}",
+            operation_desc="新增码值条目",
+        ) as audit:
+            duplicate = self._fetch_rows(
+                select(code_item.c.item_id).where(
+                    code_item.c.category_code == table_code,
+                    code_item.c.item_code == item["code"],
+                )
+            )
+            if duplicate:
+                raise ManualCodeValueAlreadyExistsError(item["code"])
+            item_id = self._next_code_value_id()
+            self._execute(
+                [
+                    insert(code_item).values(
+                        item_id=item_id,
+                        category_code=table_code,
+                        item_code=item["code"],
+                        item_name=item["label"],
+                        item_desc=item["description"],
+                        display_order=999,
+                        is_active="Y" if item["status"] == "enabled" else "N",
+                        created_by=self._default_operator,
+                        updated_by=self._default_operator,
+                    )
+                ]
+            )
+            common_code_service.invalidate([table_code])
+            created = self.get_code_value(table_id, item_id)
+            audit.after = created
+            return created
+
+    @actor_aware
+    def update_code_value(self, table_id, item_id, payload):
+        item = self._normalize_code_value_payload(payload)
+        table_code = self._code_value_group(table_id)
+        normalized_id = self._parse_code_value_id(item_id)
+        with operation_log_service.audit(
+            module_name="码值条目维护",
+            operation_type=OPERATION_TYPE_UPDATE,
+            operation_object=f"{table_code}/{normalized_id}",
+            operation_desc="编辑码值条目",
+        ) as audit:
+            before = self.get_code_value(table_id, normalized_id)
+            duplicate = self._fetch_rows(
+                select(code_item.c.item_id).where(
+                    code_item.c.category_code == table_code,
+                    code_item.c.item_code == item["code"],
+                    code_item.c.item_id != normalized_id,
+                )
+            )
+            if duplicate:
+                raise ManualCodeValueAlreadyExistsError(item["code"])
+            self._execute(
+                [
+                    update(code_item)
+                    .where(
+                        code_item.c.category_code == table_code,
+                        code_item.c.item_id == normalized_id,
+                    )
+                    .values(
+                        item_code=item["code"],
+                        item_name=item["label"],
+                        item_desc=item["description"],
+                        is_active="Y" if item["status"] == "enabled" else "N",
+                        updated_by=self._default_operator,
+                        updated_at=func.current_timestamp(),
+                    )
+                ]
+            )
+            common_code_service.invalidate([table_code])
+            after = self.get_code_value(table_id, normalized_id)
+            audit.operation_object = f"{table_code}/{after['code']}"
+            audit.before = before
+            audit.after = after
+            return after
+
+    @actor_aware
+    def update_code_value_status(self, table_id, item_id, status):
+        normalized_status = str(status or "").strip().lower()
+        if normalized_status not in CODE_VALUE_STATUSES:
+            raise ManualCodeTableValidationError(
+                [{"field": "status", "message": "状态无效"}]
+            )
+        operation_type = (
+            OPERATION_TYPE_ENABLE
+            if normalized_status == "enabled"
+            else OPERATION_TYPE_DISABLE
+        )
+        table_code = self._code_value_group(table_id)
+        normalized_id = self._parse_code_value_id(item_id)
+        with operation_log_service.audit(
+            module_name="码值条目维护",
+            operation_type=operation_type,
+            operation_object=f"{table_code}/{normalized_id}",
+            operation_desc="更新码值条目状态",
+        ) as audit:
+            before = self.get_code_value(table_id, normalized_id)
+            self._execute(
+                [
+                    update(code_item)
+                    .where(
+                        code_item.c.category_code == table_code,
+                        code_item.c.item_id == normalized_id,
+                    )
+                    .values(
+                        is_active="Y" if normalized_status == "enabled" else "N",
+                        updated_by=self._default_operator,
+                        updated_at=func.current_timestamp(),
+                    )
+                ]
+            )
+            common_code_service.invalidate([table_code])
+            after = self.get_code_value(table_id, normalized_id)
+            audit.operation_object = f"{table_code}/{after['code']}"
+            audit.before = before
+            audit.after = after
+            return after
+
+    @actor_aware
+    def delete_code_value(self, table_id, item_id):
+        table_code = self._code_value_group(table_id)
+        normalized_id = self._parse_code_value_id(item_id)
+        with operation_log_service.audit(
+            module_name="码值条目维护",
+            operation_type=OPERATION_TYPE_DELETE,
+            operation_object=f"{table_code}/{normalized_id}",
+            operation_desc="删除码值条目",
+        ) as audit:
+            before = self.get_code_value(table_id, normalized_id)
+            self._execute(
+                [
+                    delete(code_item).where(
+                        code_item.c.category_code == table_code,
+                        code_item.c.item_id == normalized_id,
+                    )
+                ]
+            )
+            common_code_service.invalidate([table_code])
+            audit.operation_object = f"{table_code}/{before['code']}"
+            audit.before = before
+            return before
+
+    @actor_aware
     def create_table(self, payload):
         with operation_log_service.audit(
             module_name="码值表维护",
@@ -354,6 +673,10 @@ class ManualCodeTableService(AuditActorMixin):
             normalized_id = self._parse_id(table_id)
             before = self.get_table(normalized_id)
             item = self._normalize_payload(payload)
+            if item["tableCode"] != before["tableCode"] and self._count_code_values(before["tableCode"]):
+                raise ManualCodeTableValidationError(
+                    [{"field": "tableCode", "message": "该码值表已有条目，不能修改表编码"}]
+                )
             if any(
                 current["id"] != str(normalized_id)
                 and current["tableCode"] == item["tableCode"]
@@ -429,6 +752,10 @@ class ManualCodeTableService(AuditActorMixin):
         ) as audit:
             normalized_id = self._parse_id(table_id)
             before = self.get_table(normalized_id)
+            if self._count_code_values(before["tableCode"]):
+                raise ManualCodeTableValidationError(
+                    [{"field": "tableCode", "message": "请先处理该表的码值条目，再删除码值表"}]
+                )
             self._execute(
                 [delete(manual_code_table).where(manual_code_table.c.table_id == normalized_id)]
             )

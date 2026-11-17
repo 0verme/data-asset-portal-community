@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -30,6 +31,8 @@ PUBLIC_READS = (
     "/api/api-assets/page?page=1&pageSize=20",
     "/api/manual-code-tables",
     "/api/manual-code-tables/page?page=1&pageSize=20",
+    "/api/manual-code-tables/1/items/page?page=1&pageSize=20",
+    "/api/manual-code-tables/1/items/1",
     "/api/upstreams/systems",
     "/api/push/systems",
 )
@@ -85,6 +88,13 @@ class PublicCatalogApiTests(unittest.TestCase):
             "stats": {"total": 0, "enabled": 0, "disabled": 0, "styleCount": 0},
             "facets": {"styleTotal": 0, "styles": {}, "statusTotal": 0, "statuses": {"enabled": 0, "disabled": 0}},
         }
+        self.manual_code_table.get_code_values_page.return_value = {
+            "items": [], "total": 0, "page": 1, "pageSize": 20, "stats": {"total": 0},
+        }
+        self.manual_code_table.get_code_value.return_value = {
+            "id": "1", "code": "PAID", "label": "已支付", "description": "支付完成",
+            "status": "enabled", "updatedAt": "",
+        }
         self.upstream = MagicMock()
         self.upstream.get_systems.return_value = []
         self.push = MagicMock()
@@ -137,11 +147,50 @@ class PublicCatalogApiTests(unittest.TestCase):
         self.root.get_root_abbreviations.assert_called_once()
         self.api_asset.get_assets_page.assert_called_once()
         self.manual_code_table.get_tables_page.assert_called_once()
+        self.manual_code_table.get_code_values_page.assert_called_once()
+        self.manual_code_table.get_code_value.assert_called_once()
         self.report.get_reports.assert_called_once()
         self.api_asset.get_assets.assert_called_once()
         self.manual_code_table.get_tables.assert_called_once()
         self.upstream.get_systems.assert_called_once()
         self.push.get_push_systems.assert_called_once()
+
+    def test_anonymous_code_value_page_and_detail_redact_connection_credentials(self):
+        connection_text = (
+            "jdbc:postgresql://db_user:top-secret@127.0.0.1:5432/catalog"
+            "?user=db_user&password=top-secret&sslmode=require"
+        )
+        code_value = {
+            "id": "1",
+            "code": "CONNECTION",
+            "label": "Catalog connection",
+            "description": f"Read from {connection_text}",
+            "status": "enabled",
+            "updatedAt": "",
+        }
+        self.manual_code_table.get_code_values_page.return_value = {
+            "items": [code_value],
+            "total": 1,
+            "page": 1,
+            "pageSize": 20,
+            "stats": {"total": 1},
+        }
+        self.manual_code_table.get_code_value.return_value = code_value
+
+        for profile in ("internal", "strict"):
+            with self.subTest(profile=profile), patch.dict(
+                os.environ, {"PUBLIC_CATALOG_PROFILE": profile}
+            ):
+                page = self.client.get(
+                    "/api/manual-code-tables/1/items/page?page=1&pageSize=20"
+                )
+                detail = self.client.get("/api/manual-code-tables/1/items/1")
+
+            for response in (page, detail):
+                self.assertEqual(200, response.status_code, response.text)
+                self.assertNotIn("top-secret", response.text)
+                self.assertNotIn("db_user", response.text)
+                self.assertNotIn("password", response.text.lower())
 
     def test_root_page_routes_do_not_shadow_valid_abbreviations(self):
         self.root.get_root_detail.side_effect = lambda abbr: {

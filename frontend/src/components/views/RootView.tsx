@@ -15,7 +15,7 @@
 import type { UseRootModuleResult } from "../../hooks/useRootModule.ts";
 import type { RootRoute } from "../../routing/types.ts";
 import { pushModuleNavigationState } from "../../routing/navigation.ts";
-import { RootEditor, RootImport, RootLibrary } from "../RootPages.tsx";
+import { RootDetail, RootEditor, RootImport, RootLibrary } from "../RootPages.tsx";
 import { Icon } from "../ui.tsx";
 import { EmptyState, ErrorState, LoadingState } from "../common/index.ts";
 
@@ -83,7 +83,7 @@ export function RootView({
       />
     );
   }
-  if (!canEdit && rootRoute.page !== "library") {
+  if (!canEdit && rootRoute.page !== "library" && rootRoute.page !== "detail") {
     return (
       <div className="state-card" role="status">
         <h4>当前页面仅对维护权限开放</h4>
@@ -106,6 +106,14 @@ export function RootView({
         categories={rootCategories}
         onSetCategory={setRootCategory}
         canEdit={canEdit}
+        onView={(abbr) => {
+          pushModuleNavigationState("root", {
+            query,
+            rootRoute,
+            rootCategory,
+          });
+          setRootRoute({ page: "detail", abbr });
+        }}
         onEdit={
           canEdit
             ? (abbr) =>
@@ -149,10 +157,10 @@ export function RootView({
       />
     );
   }
-  if (rootRoute.page === "edit" && rootDetailLoading) {
+  if ((rootRoute.page === "edit" || rootRoute.page === "detail") && rootDetailLoading) {
     return <LoadingState title="加载词根详情" desc="正在按词根缩写读取记录。" />;
   }
-  if (rootRoute.page === "edit" && rootDetailError) {
+  if ((rootRoute.page === "edit" || rootRoute.page === "detail") && rootDetailError) {
     return <ErrorState title="词根详情加载失败" desc={rootDetailError} onRetry={loadRootDetail} />;
   }
   if (rootRoute.page === "import" && rootImportLoading) {
@@ -186,6 +194,19 @@ export function RootView({
       />
     );
   }
+  if (rootRoute.page === "detail" && currentRoot) {
+    return (
+      <RootDetail
+        item={currentRoot}
+        canEdit={canEdit}
+        onBack={rootBack}
+        onEdit={() => requireLogin(
+          () => setRootRoute({ page: "edit", abbr: currentRoot.abbr }),
+          "root:write",
+        )}
+      />
+    );
+  }
   if (rootRoute.page === "import") {
     return (
       <RootImport
@@ -196,11 +217,11 @@ export function RootView({
       />
     );
   }
-  if (rootRoute.page === "edit" && !currentRoot) {
+  if ((rootRoute.page === "edit" || rootRoute.page === "detail") && !currentRoot) {
     return (
       <EmptyState
         title="词根不存在"
-        desc="当前词根不存在、已被删除，或 mock 数据未包含该记录。"
+        desc="当前词根不存在、已被删除，或当前数据源中不包含该记录。"
         actionText="返回词根库"
         onAction={rootBack}
       />

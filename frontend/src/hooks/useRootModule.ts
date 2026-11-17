@@ -160,7 +160,7 @@ export function useRootModule({
   const loadRootDetail = useCallback(async (): Promise<void> => {
     const sequence = ++detailSequence.current;
     const abbr = rootRoute.abbr;
-    if (!active || rootRoute.page !== 'edit' || !abbr) {
+    if (!active || !['edit', 'detail'].includes(rootRoute.page) || !abbr) {
       setCurrentRoot(null);
       setRootDetailError('');
       setRootDetailLoading(false);

@@ -65,6 +65,89 @@ export interface ManualCodeTablePage {
   facets: ManualCodeTableFacets;
 }
 
+export interface ManualCodeValue {
+  id: string;
+  code: string;
+  label: string;
+  description: string;
+  status: string;
+  updatedAt: string;
+}
+
+export interface ManualCodeValuePayload {
+  code: string;
+  label: string;
+  description: string;
+  status: string;
+}
+
+export interface ManualCodeValuePage {
+  items: ManualCodeValue[];
+  total: number;
+  page: number;
+  pageSize: number;
+  stats: { total: number };
+}
+
+export interface ManualCodeValueFilterParams {
+  keyword?: string | undefined;
+  status?: string | undefined;
+}
+
+const mockCodeValues: Record<string, ManualCodeValue[]> = {};
+const MANUAL_CODE_VALUE_STATUS_VALUES: ReadonlySet<string> = new Set(['enabled', 'disabled']);
+const MANUAL_CODE_VALUE_CODE_RE = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+
+function normalizeManualCodeValuePayload(payload: ManualCodeValuePayload): ManualCodeValuePayload {
+  const normalized: ManualCodeValuePayload = {
+    code: String(payload?.code || '').trim().toUpperCase(),
+    label: String(payload?.label || '').trim(),
+    description: String(payload?.description || '').trim(),
+    status: String(payload?.status || 'enabled').trim().toLowerCase(),
+  };
+  if (!MANUAL_CODE_VALUE_CODE_RE.test(normalized.code)) throw new Error('条目编码格式无效');
+  if (!normalized.label) throw new Error('条目名称不能为空');
+  if (normalized.label.length > 128) throw new Error('条目名称不能超过 128 个字符');
+  if (normalized.description.length > 512) throw new Error('条目说明不能超过 512 个字符');
+  if (!MANUAL_CODE_VALUE_STATUS_VALUES.has(normalized.status)) throw new Error('条目状态仅支持启用或禁用');
+  return normalized;
+}
+
+function normalizeManualCodeValue(payload: unknown): ManualCodeValue {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('码值条目接口返回格式无效');
+  const record = payload as Record<string, unknown>;
+  const status = String(record['status'] || '').trim().toLowerCase();
+  if (!MANUAL_CODE_VALUE_STATUS_VALUES.has(status)) throw new Error('码值条目状态无效');
+  const id = String(record['id'] || '').trim();
+  const code = String(record['code'] || '').trim();
+  const label = String(record['label'] || '').trim();
+  if (!id || !code || !label) throw new Error('码值条目接口缺少必要字段');
+  return {
+    id,
+    code,
+    label,
+    description: String(record['description'] || '').trim(),
+    status,
+    updatedAt: String(record['updatedAt'] || '').trim(),
+  };
+}
+
+function normalizeManualCodeValueDetail(payload: unknown): ManualCodeValue {
+  const record = payload as Record<string, unknown> | null | undefined;
+  return normalizeManualCodeValue(record?.['data'] || payload);
+}
+
+function requireMockTable(tableId: string): MockManualCodeTable {
+  const item = mockItems.find((current) => current.id === String(tableId));
+  if (!item) throw new Error(`码值表不存在：${tableId}`);
+  return item;
+}
+
+function mockValuesForTable(tableId: string): ManualCodeValue[] {
+  requireMockTable(tableId);
+  return mockCodeValues[String(tableId)] || [];
+}
+
 export function normalizeCollection(payload: unknown): MockManualCodeTable[] {
   return parseCollectionResponse<MockManualCodeTable>(payload, '码值表列表');
 }
@@ -265,4 +348,127 @@ export async function deleteManualCodeTable(id: string): Promise<void> {
     return;
   }
   mockItems = mockItems.filter((item) => item.id !== id);
+}
+
+export async function getManualCodeValuePage(
+  tableId: string,
+  filters: ManualCodeValueFilterParams = {},
+  page = 1,
+  pageSize = 20,
+): Promise<ManualCodeValuePage> {
+  const normalizedPage = Math.max(1, Number(page) || 1);
+  const normalizedPageSize = Math.max(1, Number(pageSize) || 20);
+  if (API_MODE === 'remote') {
+    const payload = await requestRemote<unknown>(`/manual-code-tables/${encodeURIComponent(tableId)}/items/page`, {
+      params: { ...filters, page: normalizedPage, pageSize: normalizedPageSize },
+    });
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('码值条目分页接口返回格式无效');
+    const record = payload as Record<string, unknown>;
+    const stats = record['stats'];
+    if (!Array.isArray(record['items']) || !Number.isSafeInteger(record['total']) || Number(record['total']) < 0 ||
+      !Number.isSafeInteger(record['page']) || Number(record['page']) < 1 ||
+      !Number.isSafeInteger(record['pageSize']) || Number(record['pageSize']) < 1 ||
+      !stats || typeof stats !== 'object' || Array.isArray(stats) ||
+      !Number.isSafeInteger((stats as Record<string, unknown>)['total']) || Number((stats as Record<string, unknown>)['total']) < 0) {
+      throw new Error('码值条目分页接口返回格式无效');
+    }
+    return {
+      items: record['items'].map(normalizeManualCodeValue),
+      total: Number(record['total']),
+      page: Number(record['page']),
+      pageSize: Number(record['pageSize']),
+      stats: { total: Number((stats as Record<string, unknown>)['total']) },
+    };
+  }
+  const all = mockValuesForTable(tableId);
+  const keyword = String(filters.keyword || '').trim().toLowerCase();
+  const filtered = all.filter((item) => {
+    if (filters.status && item.status !== filters.status) return false;
+    if (!keyword) return true;
+    return [item.code, item.label, item.description].some((value) => value.toLowerCase().includes(keyword));
+  }).sort((left, right) => left.code.localeCompare(right.code) || left.id.localeCompare(right.id));
+  const lastPage = Math.max(1, Math.ceil(filtered.length / normalizedPageSize));
+  const currentPage = Math.min(normalizedPage, lastPage);
+  return {
+    items: clone(filtered.slice((currentPage - 1) * normalizedPageSize, currentPage * normalizedPageSize)),
+    total: filtered.length,
+    page: currentPage,
+    pageSize: normalizedPageSize,
+    stats: { total: all.length },
+  };
+}
+
+export async function getManualCodeValue(tableId: string, itemId: string): Promise<ManualCodeValue> {
+  if (API_MODE === 'remote') {
+    return normalizeManualCodeValueDetail(await requestRemote(
+      `/manual-code-tables/${encodeURIComponent(tableId)}/items/${encodeURIComponent(itemId)}`,
+    ));
+  }
+  const item = mockValuesForTable(tableId).find((current) => current.id === itemId);
+  if (!item) throw new Error(`码值条目不存在：${itemId}`);
+  return clone(item);
+}
+
+export async function createManualCodeValue(tableId: string, payload: ManualCodeValuePayload): Promise<ManualCodeValue> {
+  const normalized = normalizeManualCodeValuePayload(payload);
+  if (API_MODE === 'remote') {
+    return normalizeManualCodeValueDetail(await requestRemote(
+      `/manual-code-tables/${encodeURIComponent(tableId)}/items`,
+      { method: 'POST', body: normalized },
+    ));
+  }
+  const all = mockValuesForTable(tableId);
+  if (all.some((item) => item.code === normalized.code)) throw new Error(`码值条目已存在：${normalized.code}`);
+  const id = String(Math.max(0, ...Object.values(mockCodeValues).flat().map((item) => Number(item.id) || 0)) + 1);
+  const item: ManualCodeValue = { ...normalized, id, updatedAt: nowText() };
+  mockCodeValues[String(tableId)] = [...all, item];
+  return clone(item);
+}
+
+export async function updateManualCodeValue(
+  tableId: string,
+  itemId: string,
+  payload: ManualCodeValuePayload,
+): Promise<ManualCodeValue> {
+  const normalized = normalizeManualCodeValuePayload(payload);
+  if (API_MODE === 'remote') {
+    return normalizeManualCodeValueDetail(await requestRemote(
+      `/manual-code-tables/${encodeURIComponent(tableId)}/items/${encodeURIComponent(itemId)}`,
+      { method: 'PUT', body: normalized },
+    ));
+  }
+  const all = mockValuesForTable(tableId);
+  if (all.some((item) => item.id !== itemId && item.code === normalized.code)) throw new Error(`码值条目已存在：${normalized.code}`);
+  const current = all.find((item) => item.id === itemId);
+  if (!current) throw new Error(`码值条目不存在：${itemId}`);
+  const updated: ManualCodeValue = { ...normalized, id: current.id, updatedAt: nowText() };
+  mockCodeValues[String(tableId)] = all.map((item) => item.id === itemId ? updated : item);
+  return clone(updated);
+}
+
+export async function updateManualCodeValueStatus(tableId: string, itemId: string, status: unknown): Promise<ManualCodeValue> {
+  const normalizedStatus = String(status || '').trim().toLowerCase();
+  if (!MANUAL_CODE_VALUE_STATUS_VALUES.has(normalizedStatus)) throw new Error('码值条目状态仅支持启用或禁用');
+  if (API_MODE === 'remote') {
+    return normalizeManualCodeValueDetail(await requestRemote(
+      `/manual-code-tables/${encodeURIComponent(tableId)}/items/${encodeURIComponent(itemId)}/status`,
+      { method: 'PATCH', body: { status: normalizedStatus } },
+    ));
+  }
+  const all = mockValuesForTable(tableId);
+  const current = all.find((item) => item.id === itemId);
+  if (!current) throw new Error(`码值条目不存在：${itemId}`);
+  const updated = { ...current, status: normalizedStatus, updatedAt: nowText() };
+  mockCodeValues[String(tableId)] = all.map((item) => item.id === itemId ? updated : item);
+  return clone(updated);
+}
+
+export async function deleteManualCodeValue(tableId: string, itemId: string): Promise<void> {
+  if (API_MODE === 'remote') {
+    await requestRemote(`/manual-code-tables/${encodeURIComponent(tableId)}/items/${encodeURIComponent(itemId)}`, { method: 'DELETE' });
+    return;
+  }
+  const all = mockValuesForTable(tableId);
+  if (!all.some((item) => item.id === itemId)) throw new Error(`码值条目不存在：${itemId}`);
+  mockCodeValues[String(tableId)] = all.filter((item) => item.id !== itemId);
 }

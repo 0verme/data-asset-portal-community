@@ -1866,6 +1866,67 @@ class AILlmDailyQuota(DwsRevisionAdapter):
             )
 
 
+# ---------------------------------------------------------------------------
+# 0016_root_example
+# ---------------------------------------------------------------------------
+
+
+class RootExampleColumn(DwsRevisionAdapter):
+    revision = "0016_root_example"
+    table = "p_root_item"
+    column = "root_example"
+
+    def _inspect_state(self, ctx: DwsRevisionContext):
+        actual = ctx.table(self.table)
+        if actual is None:
+            return "conflict", "the word root table is missing", ()
+        column = actual.columns.get(self.column)
+        if column is None:
+            return "not-applied", "the dedicated example-field column is missing", ()
+
+        expected_table = baseline_schema("dws", ctx.root).tables.get(self.table)
+        expected = expected_table.columns.get(self.column) if expected_table else None
+        if expected is None:
+            return "conflict", "canonical DWS baseline has no word root example column", ()
+        if _canonical_column_type(column.type_name) != _canonical_column_type(expected.type_name):
+            return "conflict", "the word root example column has an incompatible type", (
+                f"type expected={expected.type_name!r} observed={column.type_name!r}",
+            )
+        if column.nullable != expected.nullable:
+            return "conflict", "the word root example column has incompatible nullability", (
+                f"nullable expected={expected.nullable!r} observed={column.nullable!r}",
+            )
+        return "applied", "the dedicated word root example column is present", ()
+
+    def inspect(self, ctx: DwsRevisionContext) -> RevisionInspection:
+        state, summary, details = self._inspect_state(ctx)
+        return RevisionInspection(
+            self.revision,
+            {
+                "applied": RevisionState.APPLIED,
+                "not-applied": RevisionState.NOT_APPLIED,
+                "conflict": RevisionState.CONFLICT,
+            }[state],
+            summary,
+            details=details,
+        )
+
+    def apply(self, ctx: DwsRevisionContext) -> None:
+        state, summary, details = self._inspect_state(ctx)
+        if state == "conflict":
+            raise DwsMigrationError(
+                self.revision,
+                observed=summary,
+                reason="the word root example migration only performs a nullable additive change",
+                details=details,
+            )
+        if state == "not-applied":
+            ctx.execute(
+                f"ALTER TABLE {ctx.qualified(self.table)} "
+                f"ADD COLUMN {self.column} VARCHAR(2000)"
+            )
+
+
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -1884,6 +1945,7 @@ ADAPTERS: tuple[DwsRevisionAdapter, ...] = (
     FieldMappingFieldFilterIndex(),
     RagSearchConfigSeed(),
     AILlmDailyQuota(),
+    RootExampleColumn(),
 )
 
 _ADAPTERS_BY_REVISION: dict[str, DwsRevisionAdapter] = {

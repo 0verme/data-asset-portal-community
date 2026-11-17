@@ -199,7 +199,7 @@ CREATE TABLE IF NOT EXISTS dwp.p_root_category (
 );
 CREATE TABLE IF NOT EXISTS dwp.p_root_item (
   root_id INTEGER PRIMARY KEY, root_abbr TEXT NOT NULL UNIQUE, root_en_name TEXT,
-  root_cn_name TEXT NOT NULL, category_name TEXT NOT NULL, root_desc TEXT,
+  root_cn_name TEXT NOT NULL, category_name TEXT NOT NULL, root_desc TEXT, root_example TEXT,
   is_deleted TEXT NOT NULL DEFAULT 'N', created_by TEXT NOT NULL DEFAULT 'system',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by TEXT NOT NULL DEFAULT 'system',

@@ -749,6 +749,7 @@ class DwsFieldMappingQueryIndexTests(unittest.TestCase):
                 (self.REVISION, "apply"),
                 ("0014_rag_search_config", "apply"),
                 ("0015_ai_llm_daily_quota", "apply"),
+                ("0016_root_example", "adopt"),
             ],
             [(item.revision, item.action) for item in result],
         )
@@ -788,6 +789,7 @@ class DwsRagSearchConfigSeedTests(unittest.TestCase):
             [
                 (self.REVISION, "apply"),
                 ("0015_ai_llm_daily_quota", "apply"),
+                ("0016_root_example", "adopt"),
             ],
             [(item.revision, item.action) for item in result],
         )
@@ -857,6 +859,7 @@ class DwsRagSearchConfigSeedTests(unittest.TestCase):
             [
                 (self.REVISION, "adopt"),
                 ("0015_ai_llm_daily_quota", "apply"),
+                ("0016_root_example", "adopt"),
             ],
             [(item.revision, item.action) for item in result],
         )
@@ -909,7 +912,7 @@ class DwsAiLlmDailyQuotaTests(unittest.TestCase):
             database, CONFIG, "0014_rag_search_config", repository_head()
         )
 
-        self.assertEqual([(self.REVISION, "apply")], [
+        self.assertEqual([(self.REVISION, "apply"), ("0016_root_example", "adopt")], [
             (item.revision, item.action) for item in result
         ])
         category = next(
@@ -961,7 +964,7 @@ class DwsAiLlmDailyQuotaTests(unittest.TestCase):
             database, CONFIG, "0014_rag_search_config", repository_head()
         )
 
-        self.assertEqual([(self.REVISION, "adopt")], [
+        self.assertEqual([(self.REVISION, "adopt"), ("0016_root_example", "adopt")], [
             (item.revision, item.action) for item in result
         ])
         self.assertEqual("73", next(
@@ -1011,6 +1014,62 @@ class DwsAiLlmDailyQuotaTests(unittest.TestCase):
         with self.assertRaises(DwsMigrationError):
             apply_revisions(database, CONFIG, "0014_rag_search_config", repository_head())
         self.assertEqual("0014_rag_search_config", database.ledger)
+
+
+class DwsRootExampleColumnTests(unittest.TestCase):
+    REVISION = "0016_root_example"
+
+    def test_0016_adds_nullable_column_without_changing_existing_roots(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        _seed_required_rows_through_0014(database)
+        apply_revisions(database, CONFIG, "0014_rag_search_config", "0015_ai_llm_daily_quota")
+        database.remove_column("p_root_item", "root_example")
+        database.table("p_root_item").add_row({
+            "root_id": 5,
+            "root_abbr": "ord",
+            "root_en_name": "order",
+            "root_cn_name": "订单",
+            "category_name": "business",
+            "root_desc": "订单相关字段",
+            "is_deleted": "N",
+        })
+        database.ledger = "0015_ai_llm_daily_quota"
+
+        result = apply_revisions(
+            database, CONFIG, "0015_ai_llm_daily_quota", repository_head()
+        )
+
+        self.assertEqual([(self.REVISION, "apply")], [
+            (item.revision, item.action) for item in result
+        ])
+        self.assertEqual("VARCHAR(2000)", database.table("p_root_item").columns["root_example"].type_name)
+        self.assertTrue(database.table("p_root_item").columns["root_example"].nullable)
+        row = database.table("p_root_item").rows[0]
+        self.assertEqual(("ord", "订单相关字段", None), (
+            row["root_abbr"], row["root_desc"], row["root_example"]
+        ))
+
+    def test_0016_adopts_an_existing_column_and_rejects_incompatible_shape(self):
+        database = FakeDwsDatabase().seed_from_baseline()
+        _seed_required_rows_through_0014(database)
+        apply_revisions(database, CONFIG, "0014_rag_search_config", "0015_ai_llm_daily_quota")
+
+        adopted = apply_revisions(
+            database, CONFIG, "0015_ai_llm_daily_quota", repository_head()
+        )
+
+        self.assertEqual([(self.REVISION, "adopt")], [
+            (item.revision, item.action) for item in adopted
+        ])
+        self.assertFalse(any("ADD COLUMN root_example" in sql for sql, _ in database.executed))
+
+        database.ledger = "0015_ai_llm_daily_quota"
+        database.table("p_root_item").columns["root_example"].type_name = "TEXT"
+        inspection = inspect_revision(database, CONFIG, self.REVISION)
+        self.assertIs(RevisionState.CONFLICT, inspection.state)
+        with self.assertRaises(DwsMigrationError):
+            apply_revisions(database, CONFIG, "0015_ai_llm_daily_quota", repository_head())
+        self.assertEqual("0015_ai_llm_daily_quota", database.ledger)
 
 
 class DwsFailClosedTests(unittest.TestCase):
@@ -1220,7 +1279,7 @@ class DwsFailureRecoveryTests(unittest.TestCase):
 
         self.assertEqual(repository_head(), error.exception.revision)
         self.assertIn("full head schema verification failed", str(error.exception))
-        self.assertEqual("0014_rag_search_config", database.ledger)
+        self.assertEqual("0015_ai_llm_daily_quota", database.ledger)
         self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
 
     def test_head_stamp_waits_for_all_prior_revision_postconditions(self):
@@ -1235,7 +1294,7 @@ class DwsFailureRecoveryTests(unittest.TestCase):
 
         self.assertEqual("0009_upstream_option_contract", error.exception.revision)
         self.assertIn("post-condition", str(error.exception))
-        self.assertEqual("0014_rag_search_config", database.ledger)
+        self.assertEqual("0015_ai_llm_daily_quota", database.ledger)
         self.assertEqual(3, len(database.table("p_search_hot_keyword").rows))
 
     def test_ledger_update_failure_keeps_prior_revision_and_retry_adopts_ddl(self):

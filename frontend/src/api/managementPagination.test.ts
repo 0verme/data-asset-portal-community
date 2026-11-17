@@ -2,7 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { getApiAssetPage, getApiAssets, getApiAsset } from './apiAssets.ts';
-import { getManualCodeTablePage, getManualCodeTables } from './manualCodeTables.ts';
+import {
+  createManualCodeValue,
+  deleteManualCodeValue,
+  getManualCodeTablePage,
+  getManualCodeTables,
+  getManualCodeValue,
+  getManualCodeValuePage,
+  updateManualCodeValue,
+  updateManualCodeValueStatus,
+} from './manualCodeTables.ts';
 import { getRootAbbreviations, getRootCategories, getRootPage, getRoots } from './root.ts';
 
 test('API asset page is ordered, filtered before mock slicing, and retains complete legacy list/detail', async () => {
@@ -31,20 +40,18 @@ test('API asset page is ordered, filtered before mock slicing, and retains compl
   assert.equal((await getApiAsset(target.code)).code, target.code);
 });
 
-test('root management page keeps category counts, all abbreviation candidates and full import candidates independent', async () => {
+test('root mock mode stays empty until confirmed database content is available', async () => {
   const all = await getRoots();
-  assert.ok(all.length > 1);
+  assert.deepEqual(all, []);
   const first = await getRootPage({ page: 1, pageSize: 2, cat: '业务对象' });
-  const expected = all.filter((item) => item.cat === '业务对象').sort((left, right) => left.abbr.localeCompare(right.abbr));
-  assert.equal(first.total, expected.length);
-  assert.deepEqual(first.items.map((item) => item.abbr), expected.slice(0, 2).map((item) => item.abbr));
-  assert.equal(first.stats.total, all.length);
+  assert.deepEqual(first.items, []);
+  assert.equal(first.total, 0);
+  assert.equal(first.stats.total, 0);
   const categories = await getRootCategories();
-  assert.ok(categories.some((category) => category.count > 0));
+  assert.ok(categories.length > 0);
+  assert.ok(categories.every((category) => category.count === 0));
   const abbreviations = await getRootAbbreviations();
-  assert.deepEqual(abbreviations, all.map((item) => item.abbr).sort((left, right) => left.localeCompare(right)));
-  const second = await getRootPage({ page: 2, pageSize: 2, cat: '业务对象' });
-  assert.deepEqual(second.items.map((item) => item.abbr), expected.slice(2, 4).map((item) => item.abbr));
+  assert.deepEqual(abbreviations, []);
 });
 
 test('manual code-table management page keeps global status/style stats and legacy list complete', async () => {
@@ -71,4 +78,38 @@ test('manual code-table management page keeps global status/style stats and lega
   assert.equal(filtered.facets.statuses.enabled, target.status === 'enabled' ? 1 : 0);
   assert.equal(filtered.facets.statuses.disabled, target.status === 'disabled' ? 1 : 0);
   assert.equal((await getManualCodeTables()).length, all.length);
+});
+
+test('manual code values page filters, paginates, opens details, and manages only stored values', async () => {
+  const tables = await getManualCodeTablePage({}, 1, 1);
+  assert.ok(tables.items[0]);
+  const tableId = tables.items[0].id;
+  const empty = await getManualCodeValuePage(tableId, {}, 1, 5);
+  assert.equal(empty.total, 0);
+  assert.equal(empty.stats.total, 0);
+  assert.deepEqual(empty.items, []);
+
+  const created = await createManualCodeValue(tableId, {
+    code: 'PENDING', label: '待处理', description: '等待业务处理', status: 'enabled',
+  });
+  assert.equal(created.code, 'PENDING');
+  assert.equal((await getManualCodeValue(tableId, created.id)).label, '待处理');
+
+  const firstPage = await getManualCodeValuePage(tableId, {}, 1, 1);
+  assert.equal(firstPage.total, 1);
+  assert.equal(firstPage.stats.total, 1);
+  assert.equal(firstPage.items[0]?.id, created.id);
+  const filtered = await getManualCodeValuePage(tableId, { keyword: '业务', status: 'enabled' }, 1, 5);
+  assert.equal(filtered.total, 1);
+  assert.equal(filtered.items[0]?.code, 'PENDING');
+
+  await updateManualCodeValue(tableId, created.id, {
+    code: 'PENDING', label: '等待中', description: '等待业务处理', status: 'enabled',
+  });
+  await updateManualCodeValueStatus(tableId, created.id, 'disabled');
+  const disabled = await getManualCodeValuePage(tableId, { status: 'disabled' }, 1, 5);
+  assert.equal(disabled.total, 1);
+  assert.equal(disabled.items[0]?.label, '等待中');
+  await deleteManualCodeValue(tableId, created.id);
+  assert.equal((await getManualCodeValuePage(tableId)).stats.total, 0);
 });
