@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   deleteRoot,
   getRootAbbreviations,
@@ -203,7 +203,7 @@ export function useRootModule({
     }
   }, [active]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return;
     const filterKey = JSON.stringify([query.trim(), rootCategory || '']);
     if (previousFilterKey.current !== filterKey) {
@@ -214,14 +214,15 @@ export function useRootModule({
       }
     }
     void loadRootData();
+    return () => { requestSequence.current += 1; };
   }, [active, loadRootData, query, rootCategory, rootPage]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     void loadRootDetail();
     return () => { detailSequence.current += 1; };
   }, [loadRootDetail]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (active && rootRoute.page === 'import') void loadRootImportCandidates();
     return () => { importSequence.current += 1; };
   }, [active, loadRootImportCandidates, rootRoute.page]);

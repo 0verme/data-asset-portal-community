@@ -776,7 +776,7 @@ export function SearchPortalPage({
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        setStatsError(error instanceof Error ? error.message : "");
+        setStatsError(error instanceof Error && "status" in error ? error.message : "");
         setStatsLoading(false);
       });
 
