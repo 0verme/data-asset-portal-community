@@ -15,6 +15,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
+import { AppearanceProvider } from "./appearance/AppearanceProvider.tsx";
 import App from "./App.tsx";
 import { i18n, i18nReady } from "./i18n/index.ts";
 import { ToastHost } from "./ui/index.ts";
@@ -42,11 +43,11 @@ const isKumoToastFallbackFixture = fixturePath === "/__kumo-toast-fallback";
 const isFormErrorFixture = fixturePath === "/__form-errors";
 const isTablePaginationFixture = fixturePath === "/__table-pagination";
 
-if (isKumoSpike || isKumoAdapterFixture || isKumoOverlayFixture || isKumoToastFallbackFixture || isFormErrorFixture || isTablePaginationFixture) {
-  const storedTheme = window.localStorage.getItem("dap-theme");
-  const theme = storedTheme === "dark" ? "dark" : "light";
-  document.documentElement.dataset["theme"] = theme;
-  document.documentElement.dataset["mode"] = theme === "dark" ? "dark" : "light";
+if (fixturePath === "/__appearance") {
+  void import("./appearance/AppearanceFixture.tsx").then(({ default: Fixture }) => {
+    root.render(<React.StrictMode><Fixture /></React.StrictMode>);
+  });
+} else if (isKumoSpike || isKumoAdapterFixture || isKumoOverlayFixture || isKumoToastFallbackFixture || isFormErrorFixture || isTablePaginationFixture) {
   const loadFixture = isKumoSpike
     ? import("./kumo-spike/KumoCompatibilityFixture.tsx")
     : isKumoAdapterFixture
@@ -61,7 +62,9 @@ if (isKumoSpike || isKumoAdapterFixture || isKumoOverlayFixture || isKumoToastFa
   void loadFixture.then(({ default: Fixture }) => {
     root.render(
       <React.StrictMode>
-        <Fixture />
+        <AppearanceProvider>
+          <Fixture />
+        </AppearanceProvider>
       </React.StrictMode>,
     );
   });
@@ -70,9 +73,11 @@ if (isKumoSpike || isKumoAdapterFixture || isKumoOverlayFixture || isKumoToastFa
     root.render(
       <React.StrictMode>
         <I18nextProvider i18n={i18n}>
-          <ToastHost>
-            <App />
-          </ToastHost>
+          <AppearanceProvider>
+            <ToastHost>
+              <App />
+            </ToastHost>
+          </AppearanceProvider>
         </I18nextProvider>
       </React.StrictMode>,
     );

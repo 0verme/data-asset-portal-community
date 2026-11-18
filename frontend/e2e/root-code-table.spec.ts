@@ -189,7 +189,12 @@ test("mobile status drawer leaves a keyboard-accessible summary and clear action
   for (const [width, theme] of [[768, "light"], [390, "dark"]] as const) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/code-table-maintenance");
-    await page.evaluate((mode) => localStorage.setItem("dap-theme", mode), theme);
+    await page.evaluate((themeMode) => {
+      localStorage.setItem("dap-appearance:v1:%2F", JSON.stringify({
+        version: 1, themeMode, accent: { kind: "preset", preset: "green" },
+        effects: "subtle", density: "comfortable",
+      }));
+    }, theme);
     await page.reload();
     await expect(page.locator(".code-table-page .page-title")).toContainText("码值表维护", { timeout: 20_000 });
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);

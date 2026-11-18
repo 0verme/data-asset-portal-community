@@ -12,30 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useEffect, useState } from 'react';
-import {
-  ACCENT_STORAGE_KEY,
-  applyAccentAttributes,
-  getInitialAccent,
-  type AccentPreset,
-} from '../utils/ui.ts';
+import { useAppearance } from '../appearance/AppearanceProvider.tsx';
+import type { AccentPreset } from '../appearance/preferences.ts';
 
 export interface UseAccentResult {
-  accent: AccentPreset;
+  accent: AccentPreset | 'custom';
   setAccent: (accent: AccentPreset) => void;
 }
 
+/** Compatibility facade. Prefer useAppearance for new consumers. */
 export function useAccent(): UseAccentResult {
-  const [accent, setAccent] = useState<AccentPreset>(getInitialAccent);
-
-  useEffect(() => {
-    applyAccentAttributes(accent, document.documentElement);
-    try {
-      window.localStorage.setItem(ACCENT_STORAGE_KEY, accent);
-    } catch {
-      // Theme selection still works when storage is disabled.
-    }
-  }, [accent]);
-
-  return { accent, setAccent };
+  const { preference, setAccent } = useAppearance();
+  return {
+    accent: preference.accent.kind === 'preset' ? preference.accent.preset : 'custom',
+    setAccent: (preset) => setAccent({ kind: 'preset', preset }),
+  };
 }

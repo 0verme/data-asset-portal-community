@@ -228,14 +228,14 @@ test("Kumo Dialog and DAP modal hosts share an accessible modal root", async ({ 
 test("DAP light/dark theme bridge persists and is present before fixture render", async ({ page }) => {
   await openFixture(page);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect(page.locator("html")).toHaveAttribute("data-mode", "light");
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("dap-theme"))).toBe("light");
+  await expect(page.locator("html")).toHaveAttribute("data-mode", "system");
+  expect(await page.evaluate(() => localStorage.getItem("dap-appearance:v1:%2F"))).toBeNull();
 
   const lightSurface = await page.locator(".kumo-spike-section").first().evaluate((element) => getComputedStyle(element).backgroundColor);
   await page.getByTestId("theme-toggle").click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(page.locator("html")).toHaveAttribute("data-mode", "dark");
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("dap-theme"))).toBe("dark");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("dap-appearance:v1:%2F") ?? "{}").themeMode)).toBe("dark");
   const darkSurface = await page.locator(".kumo-spike-section").first().evaluate((element) => getComputedStyle(element).backgroundColor);
   expect(darkSurface).not.toBe(lightSurface);
 
@@ -278,7 +278,7 @@ test("DAP application theme maps persisted DAP tokens to Kumo mode and tokens", 
   await page.getByRole("button", { name: "切换到浅色主题" }).click();
   await expect(html).toHaveAttribute("data-theme", "light");
   await expect(html).toHaveAttribute("data-mode", "light");
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("dap-theme"))).toBe("light");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("dap-appearance:v1:%2F") ?? "{}").themeMode)).toBe("light");
   const lightTokens = await readTokens();
   expect(lightTokens.brand).toBe(lightTokens.dapBrand);
   expect(lightTokens.brand).not.toBe(darkTokens.brand);

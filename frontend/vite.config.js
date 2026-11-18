@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig, loadEnv, searchForWorkspaceRoot } from "vite";
 import react from "@vitejs/plugin-react";
+import { appearanceBootstrap } from "./appearance-bootstrap.js";
 
 export function resolveFrontendApiMode(env, command) {
   const mode = env.VITE_API_MODE?.trim().toLowerCase();
@@ -45,6 +46,19 @@ function buildBrandingProxyKey() {
   return "^/static/branding/[0-9a-f]{64}\\.(?:png|svg)$";
 }
 
+// Kumo uses data-mode for its resolved color scheme. Map DAP's resolved
+// root attribute while preserving Kumo's own nested mode selectors.
+function kumoResolvedTheme() {
+  return {
+    name: "dap-kumo-resolved-theme",
+    enforce: "pre",
+    transform(source, id) {
+      if (!id.endsWith("/@cloudflare/kumo/dist/styles/kumo-standalone.css")) return;
+      return source.replaceAll("[data-mode=dark]", ":is([data-mode=dark], :where(html)[data-theme=dark])");
+    },
+  };
+}
+
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiMode = resolveFrontendApiMode(env, command);
@@ -52,7 +66,7 @@ export default defineConfig(({ mode, command }) => {
   const backendTarget = resolveBackendTarget(env);
 
   return {
-    plugins: [react()],
+    plugins: [react(), appearanceBootstrap(), kumoResolvedTheme()],
     server: {
       fs: {
         allow: [

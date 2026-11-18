@@ -202,7 +202,7 @@ test("theme trigger DAP IconButton preserves labels, persistence, and mobile siz
   await expect(lightToggle).toHaveClass(/theme-toggle/);
   await expect(wrapper).toHaveAttribute("title", "切换到深色主题");
   await expect(root).toHaveAttribute("data-theme", "light");
-  await expect(root).toHaveAttribute("data-mode", "light");
+  await expect(root).toHaveAttribute("data-mode", "system");
   const desktopBounds = await lightToggle.boundingBox();
   expect(desktopBounds?.width).toBe(36);
   expect(desktopBounds?.height).toBe(36);
@@ -213,7 +213,7 @@ test("theme trigger DAP IconButton preserves labels, persistence, and mobile siz
   await expect(wrapper).toHaveAttribute("title", "切换到浅色主题");
   await expect(root).toHaveAttribute("data-theme", "dark");
   await expect(root).toHaveAttribute("data-mode", "dark");
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("dap-theme"))).toBe("dark");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("dap-appearance:v1:%2F") ?? "{}").themeMode)).toBe("dark");
 
   await page.reload();
   await expect(root).toHaveAttribute("data-theme", "dark");
@@ -230,7 +230,7 @@ test("theme trigger DAP IconButton preserves labels, persistence, and mobile siz
   await persistedDarkToggle.click();
   await expect(root).toHaveAttribute("data-theme", "light");
   await expect(root).toHaveAttribute("data-mode", "light");
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("dap-theme"))).toBe("light");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("dap-appearance:v1:%2F") ?? "{}").themeMode)).toBe("light");
 });
 
 test("More DropdownMenu preserves the current item, keyboard close, and route selection", async ({ page }, testInfo) => {

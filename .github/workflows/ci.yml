@@ -785,7 +785,20 @@ jobs:
           VITE_API_MODE: mock
         run: npm run test:browser -- e2e/kumo-overlays.spec.ts --workers=2
 
+      - name: Appearance preferences and theme browser regression (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/appearance-playwright
+          VITE_API_MODE: mock
+          VITE_DEFAULT_ACCENT: purple
+        run: npm run test:browser -- e2e/appearance.spec.ts e2e/accent-presets.spec.ts --workers=2
 
+      - name: Upload Appearance screenshots
+        if: always() && matrix.lane == 'b'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: appearance-screenshots
+          path: ${{ runner.temp }}/appearance-playwright/**/appearance-*.png
 
   frontend-gate:
     # Keep the original required check context. It must fail if EITHER

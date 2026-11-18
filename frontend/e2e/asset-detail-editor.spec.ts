@@ -228,11 +228,11 @@ test("admin detail stays usable across light/dark and desktop-to-phone viewports
   const mode = page.locator("html");
 
   for (const theme of ["light", "dark"] as const) {
-    const currentMode = await mode.getAttribute("data-mode");
+    const currentMode = await mode.getAttribute("data-theme");
     if (currentMode !== theme) {
       await page.getByRole("button", { name: currentMode === "dark" ? "切换到浅色主题" : "切换到深色主题" }).click();
     }
-    await expect(mode).toHaveAttribute("data-mode", theme);
+    await expect(mode).toHaveAttribute("data-theme", theme);
     await expect(page.getByRole("tab", { name: /字段信息/ })).toHaveCSS(
       "color",
       theme === "light" ? "rgb(15, 159, 120)" : "rgb(16, 185, 129)",
@@ -400,11 +400,11 @@ test("admin can create, validate, edit fields, and delete an asset with keyword 
     await page.screenshot({ path: testInfo.outputPath("asset-editor-1280.png"), fullPage: true });
     const mode = page.locator("html");
     for (const theme of ["light", "dark"] as const) {
-      const currentMode = await mode.getAttribute("data-mode");
+      const currentMode = await mode.getAttribute("data-theme");
       if (currentMode !== theme) {
         await page.getByRole("button", { name: currentMode === "dark" ? "切换到浅色主题" : "切换到深色主题" }).click();
       }
-      await expect(mode).toHaveAttribute("data-mode", theme);
+      await expect(mode).toHaveAttribute("data-theme", theme);
 
       for (const width of [960, 768, 480, 390]) {
         await page.setViewportSize({ width, height: 844 });
@@ -424,7 +424,7 @@ test("admin can create, validate, edit fields, and delete an asset with keyword 
         }
       }
     }
-    if (await mode.getAttribute("data-mode") !== "light") {
+    if (await mode.getAttribute("data-theme") !== "light") {
       await page.getByRole("button", { name: "切换到浅色主题" }).click();
     }
     await page.setViewportSize({ width: 1280, height: 900 });

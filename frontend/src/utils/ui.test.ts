@@ -1,33 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  ACCENT_STORAGE_KEY,
-  applyAccentAttributes,
-  applyThemeAttributes,
-  getErrorMessage,
-  getInitialAccent,
-  getInitialTheme,
-  optionLabel,
-  resolveDefaultAccent,
-} from "./ui.ts";
-
-function withWindow(windowValue: unknown, run: () => void): void {
-  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
-  Object.defineProperty(globalThis, "window", {
-    configurable: true,
-    value: windowValue,
-  });
-  try {
-    run();
-  } finally {
-    if (previousWindow) {
-      Object.defineProperty(globalThis, "window", previousWindow);
-    } else {
-      Reflect.deleteProperty(globalThis, "window");
-    }
-  }
-}
+import { getErrorMessage, optionLabel } from "./ui.ts";
 
 interface TestErrorDetail {
   field: string;
@@ -42,64 +16,6 @@ class TestApiError extends Error {
     this.payload = { error: { details } };
   }
 }
-
-test("applyAccentAttributes sets the root accent preset", () => {
-  const root = { dataset: {} } as Pick<HTMLElement, "dataset">;
-
-  applyAccentAttributes("purple", root);
-  assert.deepEqual(root.dataset, { accent: "purple" });
-
-  applyAccentAttributes("green", root);
-  assert.deepEqual(root.dataset, { accent: "green" });
-});
-
-test("configured accent defaults accept green/purple and reject invalid values", () => {
-  assert.equal(resolveDefaultAccent("green"), "green");
-  assert.equal(resolveDefaultAccent("purple"), "purple");
-  assert.equal(resolveDefaultAccent(" PURPLE "), "purple");
-  assert.equal(resolveDefaultAccent("blue"), "green");
-  assert.equal(resolveDefaultAccent(undefined), "green");
-});
-
-test("getInitialAccent prioritizes a valid local preference over the deployment default", () => {
-  withWindow(
-    { localStorage: { getItem: (key: string) => key === ACCENT_STORAGE_KEY ? "green" : null } },
-    () => assert.equal(getInitialAccent("purple"), "green"),
-  );
-});
-
-test("getInitialAccent falls back to the configured default for invalid or unavailable storage", () => {
-  withWindow(
-    { localStorage: { getItem: () => "blue" } },
-    () => assert.equal(getInitialAccent("purple"), "purple"),
-  );
-  withWindow(
-    { localStorage: { getItem: () => { throw new Error("storage blocked"); } } },
-    () => assert.doesNotThrow(() => assert.equal(getInitialAccent("purple"), "purple")),
-  );
-  const unavailableWindow = Object.defineProperty({}, "localStorage", {
-    configurable: true,
-    get() { throw new Error("storage blocked"); },
-  });
-  withWindow(unavailableWindow, () => assert.equal(getInitialAccent("purple"), "purple"));
-});
-
-test("getInitialTheme falls back when local storage is unavailable", () => {
-  withWindow(
-    { localStorage: { getItem: () => { throw new Error("storage blocked"); } } },
-    () => assert.equal(getInitialTheme(), "light"),
-  );
-});
-
-test("applyThemeAttributes synchronizes DAP theme and Kumo mode", () => {
-  const root = { dataset: {} } as Pick<HTMLElement, "dataset">;
-
-  applyThemeAttributes("dark", root);
-  assert.deepEqual(root.dataset, { theme: "dark", mode: "dark" });
-
-  applyThemeAttributes("light", root);
-  assert.deepEqual(root.dataset, { theme: "light", mode: "light" });
-});
 
 test("optionLabel supports string and dictionary options", () => {
   assert.equal(optionLabel("PostgreSQL"), "PostgreSQL");
