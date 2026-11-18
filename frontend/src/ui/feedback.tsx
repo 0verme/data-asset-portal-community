@@ -80,14 +80,14 @@ export function ToastHost({ children }: ToastHostProps) {
         if (actionBar) resizeObserver.observe(actionBar);
       }
 
-      if (!window.matchMedia("(max-width: 480px)").matches || !actionBar) {
+      region.toggleAttribute("data-dap-toast-above-action-bar", actionBar !== null);
+      if (!actionBar) {
         region.style.removeProperty("--dap-toast-action-bar-bottom");
         return;
       }
 
-      // Keep the notification region aligned to the bar's actual viewport
-      // position; the visible Kumo surface is verified against the 8–24px gap.
-      const bottom = Math.max(12, window.innerHeight - actionBar.getBoundingClientRect().top + 24);
+      // The bar's viewport position already includes any bottom inset.
+      const bottom = window.innerHeight - actionBar.getBoundingClientRect().top + 16;
       region.style.setProperty("--dap-toast-action-bar-bottom", `${bottom}px`);
     };
 
@@ -117,9 +117,9 @@ export function ToastHost({ children }: ToastHostProps) {
       window.removeEventListener("scroll", scheduleSync, true);
       visualViewport?.removeEventListener("resize", scheduleSync);
       visualViewport?.removeEventListener("scroll", scheduleSync);
-      overlayRoot
-        .querySelector<HTMLElement>('[role="region"][aria-label="Notifications"]')
-        ?.style.removeProperty("--dap-toast-action-bar-bottom");
+      const region = overlayRoot.querySelector<HTMLElement>('[role="region"][aria-label="Notifications"]');
+      region?.removeAttribute("data-dap-toast-above-action-bar");
+      region?.style.removeProperty("--dap-toast-action-bar-bottom");
       mountedToastHosts = Math.max(0, mountedToastHosts - 1);
       if (mountedToastHosts === 0) toastManager.close();
     };

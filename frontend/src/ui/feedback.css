@@ -44,8 +44,16 @@
     width: auto;
     max-width: none;
   }
+}
 
-  body:has(.form-action-bar) #dap-ui-overlay-root [role="region"][aria-label="Notifications"] {
-    bottom: calc(var(--dap-toast-action-bar-bottom, 240px) + env(safe-area-inset-bottom, 0px));
-  }
+#dap-ui-overlay-root [role="region"][data-dap-toast-above-action-bar] {
+  bottom: max(var(--dap-toast-action-bar-bottom), env(safe-area-inset-bottom, 0px));
+}
+
+/* Kumo's default entry and passive dismissal slide through the sticky bar.
+ * Fade at the measured position, while keeping deliberate swipe gestures. */
+#dap-ui-overlay-root [data-dap-toast-above-action-bar] >
+  :is([data-starting-style], [data-ending-style]:not([data-swipe-direction])) {
+  transform: none;
+  opacity: 0;
 }
