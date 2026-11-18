@@ -6,7 +6,8 @@ const advisoryUrl = "https://github.com/advisories/GHSA-fc5q-39xc-vjpf";
 const severities = ["info", "low", "moderate", "high", "critical"];
 
 // Temporary exception for the ReDoS in the locked, dev-only picomatch 4.0.7.
-// Upstream fix: https://github.com/micromatch/picomatch/pull/194
+// Release tracking: https://github.com/micromatch/picomatch/issues/247
+// Proposed fix: https://github.com/micromatch/picomatch/pull/267
 // When a fixed version is officially published on npm, upgrade the lockfile,
 // remove this exception and its tests, and restore the direct npm audit gate.
 // npm also reports affected dependents as metavulnerabilities via these edges.
