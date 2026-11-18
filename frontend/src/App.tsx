@@ -20,6 +20,7 @@ import { getMenus, MENUS_CHANGED_EVENT } from "./api/menus.ts";
 import type { MenuItem } from "./data/menus.ts";
 import { isDbAuthMode } from "./auth.ts";
 import { AuthBar, AuthContext, LoginModal } from "./components/AuthControls.tsx";
+import { BrandLogo } from "./components/BrandLogo.tsx";
 import { AppShell } from "./components/app/AppShell.tsx";
 import { ModuleContent } from "./components/app/ModuleContent.tsx";
 import { ModuleSidebar } from "./components/app/ModuleSidebar.tsx";
@@ -46,6 +47,7 @@ import { useAccent } from "./hooks/useAccent.ts";
 import { useIndicatorModule } from "./hooks/useIndicatorModule.ts";
 import { useManualCodeTableModule } from "./hooks/useManualCodeTableModule.ts";
 import { usePublicCatalogConfig } from "./hooks/usePublicCatalogConfig.ts";
+import { usePublicBrandingConfig } from "./hooks/usePublicBrandingConfig.ts";
 import { usePushModule } from "./hooks/usePushModule.ts";
 import { useReportModule } from "./hooks/useReportModule.ts";
 import { useRootModule } from "./hooks/useRootModule.ts";
@@ -95,7 +97,7 @@ type NavigationMenuStatus = "loading" | "ready" | "error";
 type NavigationFitSnapshot = NavigationMenuFitMetrics & { menuKey: string };
 
 export default function App(): React.ReactElement {
-  const { t: tCommon } = useTranslation("common");
+  const { t: tCommon, i18n: i18nInstance } = useTranslation("common");
   const { t: tNavigation } = useTranslation("navigation");
   const displayMenuName = (item: MenuItem): string => resolveMenuDisplayName(
     item,
@@ -110,6 +112,7 @@ export default function App(): React.ReactElement {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [dismissedAnnouncementVersion, setDismissedAnnouncementVersion] = useState<string | null>(null);
   const [moreNavOpen, setMoreNavOpen] = useState(false);
   const [navigationFitSnapshot, setNavigationFitSnapshot] = useState<NavigationFitSnapshot | null>(null);
   const [lineageBootstrap, setLineageBootstrap] = useState<LineageBootstrap | null>(null);
@@ -227,9 +230,32 @@ export default function App(): React.ReactElement {
     handleLoginSubmit,
     handleLogout,
   } = useAuthSession();
+  const { config: branding } = usePublicBrandingConfig(
+    i18nInstance.resolvedLanguage || i18nInstance.language,
+  );
   // `/auth/me` is an identity probe; wait for both identity and public policy
   // before issuing business-data requests.
   const { config: publicCatalogConfig, ready: publicCatalogConfigReady } = usePublicCatalogConfig();
+
+  useEffect(() => {
+    document.title = branding.site.title || tCommon("app.documentTitle");
+    const favicon = branding.site.favicon_url || "/favicon.ico";
+    const faviconUrl = new URL(favicon, window.location.origin);
+    faviconUrl.searchParams.set("v", branding.version);
+    const existingIcons = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]'));
+    const icon = existingIcons[0] || document.createElement("link");
+    icon.rel = "icon";
+    icon.href = `${faviconUrl.pathname}${faviconUrl.search}`;
+    icon.type = favicon.toLowerCase().endsWith(".svg")
+      ? "image/svg+xml"
+      : favicon.toLowerCase().endsWith(".png") ? "image/png" : "image/x-icon";
+    icon.removeAttribute("sizes");
+    if (!icon.isConnected) document.head.appendChild(icon);
+    existingIcons.slice(1).forEach((item) => item.remove());
+  }, [branding.site.favicon_url, branding.site.title, branding.version, tCommon]);
+
+  const showAnnouncement = Boolean(branding.site.announcement)
+    && dismissedAnnouncementVersion !== branding.version;
   const businessAccessReady = (!isDbAuthMode() || authReady) && publicCatalogConfigReady;
   const catalogAccessDisabled = publicCatalogConfig.profile === "disabled" && !auth.user;
   const catalogDataAccessReady = businessAccessReady && !catalogAccessDisabled;
@@ -725,6 +751,7 @@ export default function App(): React.ReactElement {
   }), [auth, can, canEdit, requireLogin, handleLogout]);
 
   const moduleContext: AppModuleContext = {
+    branding,
     apiAsset,
     apiAssetFilter,
     apiAssetRoute,
@@ -833,9 +860,9 @@ export default function App(): React.ReactElement {
 
             <div className="brand" onClick={() => switchModule("portal")}>
               <div className="brand-mark">
-                <img src="/brand-icon.svg?v=20260609" alt={tCommon("app.brandAlt")} />
+                <BrandLogo src={branding.site.logo_url} alt={branding.site.display_name} />
               </div>
-              <div className="brand-name">{tCommon("app.brandName")}<small>{tCommon("app.brandTagline")}</small></div>
+              <div className="brand-name">{branding.site.display_name}<small>{tCommon("app.brandTagline")}</small></div>
             </div>
           </div>
 
@@ -1031,6 +1058,20 @@ export default function App(): React.ReactElement {
           </div>
         </header>
 
+        {showAnnouncement ? (
+          <aside className="app-announcement" role="status">
+            <span className="app-announcement-text">{branding.site.announcement}</span>
+            <button
+              className="app-announcement-close"
+              type="button"
+              aria-label={tCommon("branding.closeAnnouncement")}
+              onClick={() => setDismissedAnnouncementVersion(branding.version)}
+            >
+              <Icon name="close" size={15} />
+            </button>
+          </aside>
+        ) : null}
+
         <div className="body">
           {!isPortal ? (
             <>
@@ -1105,7 +1146,7 @@ export default function App(): React.ReactElement {
 
         <footer className="app-footer-shell">
           <div className="app-footer">
-            <span className="app-footer-copy">{tCommon("app.footer")} {APP_VERSION}</span>
+            <span className="app-footer-copy">{branding.site.title} {APP_VERSION}</span>
             <span className="app-footer-separator" aria-hidden="true">·</span>
             <a
               className="app-footer-link"
@@ -1122,6 +1163,11 @@ export default function App(): React.ReactElement {
           open={loginOpen}
           busy={authBusy}
           error={authError}
+          branding={{
+            logoUrl: branding.site.logo_url,
+            displayName: branding.site.display_name,
+            hint: branding.login.hint,
+          }}
           onClose={() => {
             if (authBusy) return;
             setLoginOpen(false);

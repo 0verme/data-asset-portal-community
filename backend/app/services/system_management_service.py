@@ -66,7 +66,11 @@ from .operation_log_service import (
 USER_STATUSES = {"enabled", "disabled"}
 ROLE_STATUSES = {"enabled", "disabled"}
 DICT_STATUSES = {"enabled", "disabled"}
-RESERVED_PARAM_CATEGORY_CODES = frozenset({"RAG_SEARCH_CONFIG", AI_LLM_QUOTA_CATEGORY_CODE})
+RESERVED_PARAM_CATEGORY_CODES = frozenset({
+    "RAG_SEARCH_CONFIG",
+    AI_LLM_QUOTA_CATEGORY_CODE,
+    "SITE_BRANDING_CONFIG",
+})
 MENU_STATUSES = {"enabled", "disabled"}
 MENU_NAV_PLACEMENTS = {"primary", "more"}
 MAX_USERNAME_LENGTH = 64

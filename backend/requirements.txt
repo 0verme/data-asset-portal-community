@@ -5,6 +5,7 @@ psycopg[binary]==3.3.9
 PyYAML==6.0.3
 pydantic==2.14.3
 fastapi==0.162.5
+python-multipart==0.0.34
 uvicorn==0.54.0
 httpx==0.28.1
 alembic==1.20.1

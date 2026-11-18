@@ -84,3 +84,25 @@ test("request timeout redacts AI question payloads from timeout diagnostics", as
     console.warn = originalWarn;
   }
 });
+
+test('requestRemote sends FormData without overriding the multipart boundary', async () => {
+  const originalFetch = globalThis.fetch;
+  const form = new FormData();
+  form.set('file', new Blob(['synthetic image']), 'brand.png');
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    assert.match(String(input), /\/api\/system\/branding-config\/assets\/logo$/);
+    assert.equal(init?.method, 'POST');
+    assert.equal(init?.body, form);
+    assert.equal(new Headers(init?.headers).has('content-type'), false);
+    return Promise.resolve(new Response(JSON.stringify({ data: { url: '/static/branding/asset.png' } }), {
+      headers: { 'Content-Type': 'application/json' },
+    }));
+  }) as typeof fetch;
+
+  try {
+    const payload = await requestRemote('/system/branding-config/assets/logo', { method: 'POST', body: form });
+    assert.deepEqual(payload, { data: { url: '/static/branding/asset.png' } });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

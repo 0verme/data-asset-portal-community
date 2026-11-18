@@ -40,6 +40,7 @@ export interface RemoteRequestOptions {
   suppressTimeoutPayloadLogging?: boolean | undefined;
   signal?: AbortSignal | null | undefined;
   headers?: Record<string, string> | undefined;
+  cache?: RequestCache | undefined;
 }
 
 export interface ApiHttpError extends Error {
@@ -214,18 +215,20 @@ export async function requestRemote<T = unknown>(path: string, options: RemoteRe
       }, timeoutMs);
 
       try {
+        const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
         const fetchInit: RequestInit = {
           method,
           credentials,
           headers: {
             Accept: 'application/json, text/plain;q=0.9, */*;q=0.8',
-            ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+            ...(options.body !== undefined && !isFormData ? { 'Content-Type': 'application/json' } : {}),
             ...(options.headers || {}),
           },
           signal: controller.signal,
+          ...(options.cache ? { cache: options.cache } : {}),
         };
         if (options.body !== undefined) {
-          fetchInit.body = JSON.stringify(options.body);
+          fetchInit.body = isFormData ? options.body as FormData : JSON.stringify(options.body);
         }
         const response = await fetch(requestUrl, fetchInit);
 

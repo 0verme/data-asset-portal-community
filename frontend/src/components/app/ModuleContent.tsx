@@ -110,6 +110,9 @@ const MODULE_RENDERERS: Record<ModuleId, ModuleRenderer> = {
       onNavigate={(target, term) => context.goToModuleWithQuery(toNavigationTarget(target), term)}
       availableModules={context.visibleModuleKeys}
       publicAccessReady={context.businessAccessReady}
+      heroTitle={context.branding.hero.title}
+      heroSubtitle={context.branding.hero.subtitle}
+      searchPlaceholder={context.branding.hero.search_placeholder}
     />
   ),
   codeTable: ({ context }) => (

@@ -11,6 +11,10 @@ User=dataasset
 Group=dataasset
 WorkingDirectory=/opt/data-asset-portal
 
+# Keep this directory on persistent, writable storage and include it in the
+# instance backup. Branding uploads are stored in uploads/branding/ relative
+# to WorkingDirectory and are served through /static/branding/.
+
 Environment=PYTHONUNBUFFERED=1
 
 # backend.asgi loads the repository .env/.env.local files itself.  Keep the

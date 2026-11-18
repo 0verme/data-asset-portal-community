@@ -61,6 +61,9 @@ export interface SearchPortalPageProps {
     | undefined;
   availableModules?: readonly string[] | undefined;
   publicAccessReady?: boolean | undefined;
+  heroTitle: string;
+  heroSubtitle: string;
+  searchPlaceholder: string;
 }
 
 const MAX_MATCHED_FIELD_LABELS = 2;
@@ -417,6 +420,9 @@ export function SearchPortalPage({
   onNavigate,
   availableModules = [],
   publicAccessReady = true,
+  heroTitle,
+  heroSubtitle,
+  searchPlaceholder,
 }: SearchPortalPageProps) {
   const scopeOptions = useMemo(
     () => filterPortalScopesByModules(availableModules),
@@ -879,10 +885,8 @@ export function SearchPortalPage({
   return (
     <div className={`search-portal${searchedTerm || aiQuery ? " has-search-results" : ""}`}>
       <div className="sp-hero">
-        <h1>数据资产管理与血缘分析平台</h1>
-        <p>
-          一个入口，搜索系统、字段、词根、指标、报表、API、资产、下游推送和码值表。
-        </p>
+        <h1>{heroTitle}</h1>
+        {heroSubtitle ? <p>{heroSubtitle}</p> : null}
       </div>
 
       <div className="sp-search-wrap">
@@ -901,7 +905,7 @@ export function SearchPortalPage({
             onKeyDown={(event) => {
               if (event.key === "Enter") doSearch();
             }}
-            placeholder="搜索资产、系统、字段、指标、报表、API、码值表、负责人或下游推送"
+            placeholder={searchPlaceholder}
             aria-label="搜索数据资产"
             autoFocus
           />

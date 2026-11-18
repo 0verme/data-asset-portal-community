@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from fastapi import FastAPI  # pyright: ignore[reportAttributeAccessIssue]
+from fastapi.responses import Response
+from starlette.staticfiles import StaticFiles
 
 from ..authorization.core import AuthorizationService
 from ..core.capabilities import resolve_capabilities
@@ -13,6 +16,7 @@ from ..services.ai_ask_execution_service import AIAskExecutionService
 from ..services.api_asset_service import api_asset_service
 from ..services.assets_service import assets_service
 from ..services.auth_service import auth_service
+from ..services.branding_service import BrandingService, branding_service
 from ..services.field_mapping_service import field_mapping_service
 from ..services.indicator_service import indicator_service
 from ..services.indicator_path_service import indicator_path_service
@@ -58,6 +62,21 @@ from .routers.system import _register_system_management_routes
 from .routers.upstream import _register_upstream_routes
 
 
+class BrandingStaticFiles(StaticFiles):
+    """Serve only immutable, content-addressed branding assets."""
+
+    async def get_response(self, path: str, scope):
+        if not re.fullmatch(r"[0-9a-f]{64}\.(?:png|svg)", path):
+            return Response(status_code=404)
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            if path.endswith(".svg"):
+                response.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+        return response
+
+
 def create_fastapi_app(
     *,
     capabilities: dict[str, Any] | None = None,
@@ -80,6 +99,7 @@ def create_fastapi_app(
     api_asset_service_instance: Any | None = None,
     lineage_service_instance: Any | None = None,
     system_management_service_instance: Any | None = None,
+    branding_service_instance: BrandingService | Any | None = None,
     operation_log_service_instance: Any | None = None,
     metadata_ingestion_service_instance: Any | None = None,
     upstream_service_instance: Any | None = None,
@@ -147,6 +167,8 @@ def create_fastapi_app(
     api_asset = api_asset_service_instance or api_asset_service
     lineage = lineage_service_instance or lineage_service
     system_management = system_management_service_instance or system_management_service
+    branding = branding_service_instance or branding_service
+    app.state.branding_service = branding
     operation_logs = operation_log_service_instance or operation_log_service
     app.state.operation_log_service = operation_logs
     metadata_ingestion = metadata_ingestion_service_instance or metadata_ingestion_service
@@ -193,8 +215,18 @@ def create_fastapi_app(
     _register_api_asset_routes(app, api_asset)
     _register_lineage_routes(app, lineage)
     _register_metadata_routes(app, metadata_ingestion)
-    _register_system_management_routes(app, system_management, rag_recommendations)
+    _register_system_management_routes(
+        app,
+        system_management,
+        rag_recommendations,
+        branding_service_instance=branding,
+    )
     app.include_router(operation_log_router)
     _register_upstream_routes(app, upstream)
     _register_push_routes(app, push)
+    app.mount(
+        "/static/branding",
+        BrandingStaticFiles(directory=str(branding.upload_directory), check_dir=False),
+        name="branding-assets",
+    )
     return app
