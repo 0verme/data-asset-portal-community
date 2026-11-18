@@ -10,7 +10,12 @@ async function openControls(page: Page) {
   await expect(page.getByTestId("saved-effects")).toBeVisible();
 }
 
-const click = (page: Page, name: string) => page.getByRole("button", { name, exact: true }).click();
+async function click(page: Page, name: string) {
+  // WebKit can suspend animation frames in background tabs. Switch tabs
+  // before user input so Playwright can check that the control is stable.
+  await page.bringToFront();
+  await page.getByRole("button", { name, exact: true }).click();
+}
 const stored = (page: Page) => page.evaluate((name) => JSON.parse(localStorage.getItem(name) ?? "null"), key);
 
 test("blocking bootstrap applies the same legacy and v1 preferences before React", async ({ page }) => {
@@ -249,8 +254,10 @@ test("open Kumo portals inherit updated accent and readable primary action color
     await expect.poll(() => brand(popup)).not.toBe(previous);
     expect(await brand(popup)).toBe(await brand(page.locator("html")));
     await expect(popup).toBeVisible();
+    await page.bringToFront();
   };
 
+  await page.bringToFront();
   await page.getByTestId("open-kumo-dialog").click();
   const dialog = page.getByRole("dialog", { name: "字段映射确认" });
   await checkActivePortal(dialog, "blue");
@@ -288,6 +295,7 @@ for (const width of [390, 1440]) {
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme!);
       await expect(page.locator("html")).toHaveAttribute("data-accent", accent!);
       await expect(page.getByRole("button", { name: theme === "dark" ? "切换到浅色主题" : "切换到深色主题" })).toBeVisible();
+      await page.bringToFront();
       await page.screenshot({ path: testInfo.outputPath(`appearance-${theme}-${accent}-${width}.png`) });
     }
   });

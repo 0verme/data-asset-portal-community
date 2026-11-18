@@ -71,6 +71,7 @@ test("Select, Combobox, Tabs, Checkbox, and Switch preserve keyboard and control
   const production = page.getByRole("option", { name: /生产数仓/ });
   const staging = page.getByRole("option", { name: /预发布/ });
   await expect(production).toHaveAttribute("data-highlighted", "");
+  await expect(page.getByRole("listbox").locator("xpath=..")).not.toHaveAttribute("data-starting-style", "");
   await page.keyboard.press("ArrowDown");
   await expect(staging).toHaveAttribute("data-highlighted", "");
   await page.keyboard.press("Enter");
