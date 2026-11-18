@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import type { DataOrbProps } from "../src/components/portal/orb/DataOrb";
 
 type Failure = "missing-api" | "policy-null" | "context-null" | "throw" | "precision" | "compile" | "link";
-type Draw = { time: number; width: number; center?: number[] };
+type Draw = { time: number; width: number; body?: number[]; haloAlpha?: number };
 
 declare global {
   interface Window {
@@ -66,10 +66,17 @@ async function instrument(page: Page, mode: "native" | "mock", failure?: Failure
     WebGLRenderingContext.prototype.drawArrays = function (this: WebGLRenderingContext, ...args) {
       drawArrays.apply(this, args);
       if (this.canvas !== activeCanvas) return;
-      const sample = new Uint8Array(4);
       const width = this.drawingBufferWidth;
-      this.readPixels(width >> 1, this.drawingBufferHeight >> 1, 1, 1, this.RGBA, this.UNSIGNED_BYTE, sample);
-      probe.draws.push({ time: performance.now(), width, center: Array.from(sample) });
+      const row = new Uint8Array(width * 4);
+      this.readPixels(0, this.drawingBufferHeight >> 1, width, 1, this.RGBA, this.UNSIGNED_BYTE, row);
+      // Sample across the fluid surface. A single pixel in the specular
+      // highlight can stay saturated even while the surrounding colors move.
+      const body = [0.28, 0.38, 0.5, 0.62, 0.72].flatMap((ratio) => {
+        const start = Math.floor(width * ratio) * 4;
+        return Array.from(row.subarray(start, start + 4));
+      });
+      const haloAlpha = row[Math.floor(width * 0.88) * 4 + 3];
+      probe.draws.push({ time: performance.now(), width, body, haloAlpha });
     };
 
     Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
@@ -183,8 +190,10 @@ for (const [width, theme] of [[390, "dark"], [1440, "light"]] as const) {
         const draws = await page.evaluate((start) => window.orbProbe.draws.slice(start), start);
         const elapsedMs = draws.at(-1)!.time - draws[0]!.time;
         const fps = (draws.length - 1) * 1000 / elapsedMs;
-        expect(draws.every((draw) => draw.center?.[3] === 255)).toBe(true);
-        expect(new Set(draws.map((draw) => draw.center?.join(","))).size).toBeGreaterThan(1);
+        expect(draws.every(({ body }) => body?.length === 20 &&
+          body.every((value, index) => index % 4 !== 3 || value === 255))).toBe(true);
+        expect(draws.every(({ haloAlpha }) => haloAlpha !== undefined && haloAlpha > 0 && haloAlpha < 255)).toBe(true);
+        expect(new Set(draws.map(({ body }) => body?.join(","))).size).toBeGreaterThan(1);
         expect(fps).toBeLessThanOrEqual(target + 2);
         const measurement = { effects, target, fps, elapsedMs, draws: draws.length, cssWidth: size, drawingBufferWidth: draws[0]!.width };
         await info.attach(`orb-${effects}-measurements`, {
