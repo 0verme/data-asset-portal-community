@@ -36,7 +36,7 @@ import {
 } from "./config/defaults.ts";
 import { useAssetModule } from "./hooks/useAssetModule.ts";
 import { useApiAssetModule } from "./hooks/useApiAssetModule.ts";
-import { useAuthSession } from "./hooks/useAuthSession.ts";
+import { useAuthSession, type UseAuthSessionResult } from "./hooks/useAuthSession.ts";
 import { useAccent } from "./hooks/useAccent.ts";
 import { useIndicatorModule } from "./hooks/useIndicatorModule.ts";
 import { useManualCodeTableModule } from "./hooks/useManualCodeTableModule.ts";
@@ -91,7 +91,31 @@ type NavigationMenuStatus = "loading" | "ready" | "error";
 type NavigationFitSnapshot = NavigationMenuFitMetrics & { menuKey: string };
 
 export default function App(): React.ReactElement {
-  const { t: tCommon, i18n: i18nInstance } = useTranslation("common");
+  const { i18n } = useTranslation("common");
+  const authSession = useAuthSession();
+  const { config: branding } = usePublicBrandingConfig(i18n.resolvedLanguage || i18n.language);
+  const publicCatalog = usePublicCatalogConfig();
+
+  // Even publicly reachable URLs can return additional fields to a signed-in user.
+  // Discard the old route's in-memory data when the identity or permissions change.
+  return (
+    <AppSession
+      key={getNavigationAuthKey(authSession.auth)}
+      authSession={authSession}
+      branding={branding}
+      publicCatalog={publicCatalog}
+    />
+  );
+}
+
+interface AppSessionProps {
+  authSession: UseAuthSessionResult;
+  branding: AppModuleContext["branding"];
+  publicCatalog: ReturnType<typeof usePublicCatalogConfig>;
+}
+
+function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): React.ReactElement {
+  const { t: tCommon } = useTranslation("common");
   const { t: tNavigation } = useTranslation("navigation");
   const displayMenuName = (item: MenuItem): string => resolveMenuDisplayName(
     item,
@@ -223,13 +247,9 @@ export default function App(): React.ReactElement {
     runProtectedMutation,
     handleLoginSubmit,
     handleLogout,
-  } = useAuthSession();
-  const { config: branding } = usePublicBrandingConfig(
-    i18nInstance.resolvedLanguage || i18nInstance.language,
-  );
-  // `/auth/me` is an identity probe; wait for both identity and public policy
-  // before issuing business-data requests.
-  const { config: publicCatalogConfig, ready: publicCatalogConfigReady } = usePublicCatalogConfig();
+  } = authSession;
+  // Wait for both identity and public policy before issuing business-data requests.
+  const { config: publicCatalogConfig, ready: publicCatalogConfigReady } = publicCatalog;
 
   useEffect(() => {
     document.title = branding.site.title || tCommon("app.documentTitle");

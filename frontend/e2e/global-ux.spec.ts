@@ -105,6 +105,46 @@ test.describe("Remote UX states", () => {
     }
   });
 
+  test("sign-out reloads public catalog data under the anonymous projection", async ({ page }) => {
+    const host = "private-metadata.fixture.invalid";
+    let signedIn = true;
+    let guestCatalogRequests = 0;
+    await page.addInitScript(() => localStorage.setItem("dap-language", "en-US"));
+    await page.route((url) => url.pathname.startsWith("/api/"), async (route) => {
+      switch (new URL(route.request().url()).pathname) {
+        case "/api/auth/me":
+          return route.fulfill({ json: { user: "qa-reader", role: "reader", permissions: ["upstream:read"] } });
+        case "/api/auth/logout":
+          signedIn = false;
+          return route.fulfill({ status: 204 });
+        case "/api/public-catalog/config":
+          return route.fulfill({ json: { profile: "strict", exportEnabled: false } });
+        case "/api/upstreams/systems":
+          if (!signedIn) guestCatalogRequests += 1;
+          return route.fulfill({ json: {
+            items: [{
+              id: "qa-source", abbr: "QA", name: "Fixture source", status: "enabled",
+              dbType: "PostgreSQL", unloadTimes: [], ...(signedIn ? { host } : {}),
+            }],
+            total: 1, page: 1, pageSize: 20,
+            facets: { status: {}, dbType: {}, dept: {} },
+            options: { dbTypes: [], depts: [] },
+            stats: { systemCount: 1 },
+          } });
+        default:
+          return route.fulfill({ json: { items: [] } });
+      }
+    });
+    await page.goto("/upstream");
+    await expect(page.getByText(host, { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Sign out", exact: true }).click();
+    await expect(page.getByText(host, { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Fixture source", { exact: true })).toBeVisible();
+    await expect(page).toHaveURL("/upstream");
+    expect(guestCatalogRequests).toBeGreaterThan(0);
+  });
+
   test("logout confirmation preserves the session on cancel and clears it across history", async ({ page }) => {
     let signedIn = true;
     let logoutRequests = 0;
