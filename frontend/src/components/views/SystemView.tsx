@@ -13,8 +13,9 @@
 // limitations under the License.
 
 import type { SystemRoute } from "../../routing/types.ts";
+import { useTranslation } from "react-i18next";
 import { OperationLogPage } from "../OperationLog/OperationLogPage.tsx";
-import { SystemManagementPage } from "../system/index.ts";
+import { AiManagementPage, SiteBrandingPage, SystemManagementPage } from "../system/index.ts";
 
 type RequireLogin = (action?: () => void, permission?: string) => boolean;
 
@@ -27,6 +28,8 @@ export interface SystemViewProps {
     canManageRoles?: boolean | undefined;
     canManageUsers?: boolean | undefined;
     canManageSystem?: boolean | undefined;
+    canViewParams?: boolean | undefined;
+    canViewOperationLog?: boolean | undefined;
     requireLogin: RequireLogin;
     systemActionIntent?: string | undefined;
     setSystemActionIntent: (intent: string) => void;
@@ -41,27 +44,60 @@ export function SystemView({
     canManageRoles = false,
     canManageUsers = false,
     canManageSystem = false,
+    canViewParams = false,
+    canViewOperationLog = false,
     requireLogin,
     systemActionIntent,
     setSystemActionIntent,
 }: SystemViewProps) {
+    const { t } = useTranslation("common");
     if (!authenticated) {
         return (
             <div className="state-card" role="status" aria-live="polite">
-                <h4>登录后访问系统管理</h4>
-                <p>系统管理、用户、角色、配置和操作日志仅对授权用户开放。</p>
+                <h4>{t("systemManagement.loginRequiredTitle")}</h4>
+                <p>{t("systemManagement.loginRequiredDescription")}</p>
                 <button
                     className="btn primary"
                     type="button"
                     onClick={() => requireLogin(() => undefined)}
                 >
-                    登录
+                    {t("systemManagement.login")}
                 </button>
             </div>
         );
     }
-    if (systemRoute.page === "operation-logs" || !canManageSystem) {
-        return <OperationLogPage query={query} />;
+    if (systemRoute.page === "ai" || systemRoute.page === "branding") {
+        if (!canViewParams) {
+            return (
+                <div className="state-card state-card-error" role="alert">
+                    <h4>{t("systemManagement.accessDeniedTitle")}</h4>
+                    <p>{t("systemManagement.accessDeniedDescription")}</p>
+                </div>
+            );
+        }
+        return systemRoute.page === "ai"
+            ? <AiManagementPage canEdit={canManageParams} />
+            : <SiteBrandingPage canEdit={canManageParams} />;
+    }
+    if (systemRoute.page === "operation-logs") {
+        return canViewOperationLog
+            ? <OperationLogPage query={query} />
+            : (
+                <div className="state-card state-card-error" role="alert">
+                    <h4>{t("systemManagement.noPageAccessTitle")}</h4>
+                    <p>{t("systemManagement.noPageAccessDescription")}</p>
+                </div>
+            );
+    }
+    if (!canManageSystem) {
+        return canViewOperationLog
+            ? <OperationLogPage query={query} />
+            : (
+                <div className="state-card state-card-error" role="alert">
+                    <h4>{t("systemManagement.noPageAccessTitle")}</h4>
+                    <p>{t("systemManagement.noPageAccessDescription")}</p>
+                </div>
+            );
     }
     const canEditCurrentPage =
         systemRoute.page === "roles"

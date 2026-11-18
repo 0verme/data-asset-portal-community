@@ -71,6 +71,7 @@ class RoutePermissionInventoryTests(unittest.TestCase):
         "/api/push/systems",
         "/api/push/systems/{system_id}",
         "/api/system/menus",
+        "/api/system/public-config",
     }
 
     EXPECTED = {
@@ -138,6 +139,10 @@ class RoutePermissionInventoryTests(unittest.TestCase):
         ("GET", "/api/system/param-dicts"): "system:param:read",
         ("GET", "/api/system/param-dicts/page"): "system:param:read",
         ("POST", "/api/system/param-dicts"): "system:param:write",
+        ("GET", "/api/system/branding-config"): "system:param:read",
+        ("PUT", "/api/system/branding-config"): "system:param:write",
+        ("POST", "/api/system/branding-config/reset"): "system:param:write",
+        ("POST", "/api/system/branding-config/assets/{kind}"): "system:param:write",
         ("GET", "/api/system/ai-llm-daily-quota"): "system:param:read",
         ("PUT", "/api/system/ai-llm-daily-quota"): "system:param:write",
         ("GET", "/api/system/rag-search-config"): "system:param:read",

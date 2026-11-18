@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, FastAPI, Query
+from fastapi import APIRouter, Body, Depends, FastAPI, File, Query, UploadFile
 from fastapi.responses import JSONResponse
 
 from ...application import RequestContext
@@ -27,6 +27,12 @@ from ...services.system_management_service import (
     SystemUserAlreadyExistsError,
     SystemUserNotFoundError,
     SystemValidationError,
+)
+from ...services.branding_service import (
+    BrandingManagementError,
+    BrandingNotFoundError,
+    BrandingValidationError,
+    default_public_branding,
 )
 from ..dependencies import (
     get_authorization_service,
@@ -74,6 +80,11 @@ def _system_error_response(error: SystemManagementError) -> JSONResponse:
     return _service_error_response(error, _system_error_status(error))
 
 
+def _branding_error_response(error: BrandingManagementError) -> JSONResponse:
+    status = 404 if isinstance(error, BrandingNotFoundError) else 422 if isinstance(error, BrandingValidationError) else 500
+    return _service_error_response(error, status)
+
+
 def _system_payload(payload: Any) -> Any:
     return payload
 
@@ -82,6 +93,7 @@ def _register_system_management_routes(
     app: FastAPI,
     service: Any,
     rag_search_service: Any | None = None,
+    branding_service_instance: Any | None = None,
 ) -> None:
     router = APIRouter(
         prefix="/api/system",
@@ -90,6 +102,104 @@ def _register_system_management_routes(
 
     def get_service() -> Any:
         return service
+
+    def get_branding_service() -> Any:
+        if branding_service_instance is not None:
+            return branding_service_instance
+        from ...services.branding_service import branding_service
+
+        return branding_service
+
+    @router.get("/public-config", response_model=None)
+    def get_public_site_config(
+        lang: str = Query(default="zh-CN", max_length=5),
+        current_branding_service: Any = Depends(get_branding_service),
+    ):
+        locale = lang if lang in {"zh-CN", "en-US"} else "zh-CN"
+        try:
+            data = current_branding_service.get_public_config(locale)
+        except BrandingManagementError:
+            # A broken/missing parameter row must never prevent the public SPA
+            # from booting. The frontend retains its last good in-memory value
+            # when the request itself fails.
+            data = default_public_branding(locale)
+        version = str(data.get("version") or "")
+        return JSONResponse(
+            content={"data": data},
+            headers={
+                "Cache-Control": "no-cache, must-revalidate",
+                "ETag": f'W/"{version}"',
+                "Vary": "Accept-Language",
+            },
+        )
+
+    @router.get("/branding-config", response_model=None)
+    def get_branding_config(
+        _context: RequestContext = Depends(require_permission("system:param:read")),
+        current_branding_service: Any = Depends(get_branding_service),
+    ):
+        try:
+            data = current_branding_service.get_admin_config()
+        except BrandingManagementError as error:
+            return _branding_error_response(error)
+        return JSONResponse(
+            content={"data": data},
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @router.put("/branding-config", response_model=None)
+    def update_branding_config(
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
+        current_branding_service: Any = Depends(get_branding_service),
+    ):
+        try:
+            data = current_branding_service.update_admin_config(_system_payload(payload))
+        except BrandingManagementError as error:
+            return _branding_error_response(error)
+        return JSONResponse(
+            content={"message": "Branding configuration updated", "data": data},
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @router.post("/branding-config/reset", response_model=None)
+    def reset_branding_config(
+        _context: RequestContext = Depends(require_permission("system:param:write")),
+        current_branding_service: Any = Depends(get_branding_service),
+    ):
+        try:
+            data = current_branding_service.reset_admin_config()
+        except BrandingManagementError as error:
+            return _branding_error_response(error)
+        return JSONResponse(
+            content={"message": "Branding defaults restored", "data": data},
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @router.post("/branding-config/assets/{kind}", response_model=None, status_code=201)
+    async def upload_branding_asset(
+        kind: str,
+        file: UploadFile = File(...),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
+        current_branding_service: Any = Depends(get_branding_service),
+    ):
+        try:
+            data = await file.read(200 * 1024 + 1)
+            result = current_branding_service.upload_asset(
+                kind,
+                file.filename,
+                file.content_type,
+                data,
+            )
+        except BrandingManagementError as error:
+            return _branding_error_response(error)
+        finally:
+            await file.close()
+        return JSONResponse(
+            status_code=201,
+            content={"message": "Branding asset uploaded", "data": result},
+            headers={"Cache-Control": "no-store"},
+        )
 
     @router.get("/users", response_model=None)
     def get_users(

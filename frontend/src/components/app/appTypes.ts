@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 
 import type { AuthSession } from '../../api/auth.ts';
+import type { PublicBrandingConfig } from '../../api/branding.ts';
 import type { LineageBootstrap, LineageNode } from '../../api/lineage.ts';
 import type { UseApiAssetModuleResult } from '../../hooks/useApiAssetModule.ts';
 import type { UseAssetModuleResult } from '../../hooks/useAssetModule.ts';
@@ -33,6 +34,7 @@ import type {
 } from '../../routing/types.ts';
 
 export interface AppModuleContext {
+  branding: PublicBrandingConfig;
   apiAsset: UseApiAssetModuleResult;
   apiAssetFilter: ApiAssetFilter;
   apiAssetRoute: ApiAssetRoute;

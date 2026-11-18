@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+
 import {
   DEFAULT_RAG_SEARCH_CONFIG,
   getRagSearchConfig,
@@ -10,23 +12,8 @@ import {
 } from "../../api/ragSearchConfig.ts";
 import { Button, Select } from "../../ui/index.ts";
 
-const DIAGNOSTIC_LABELS: Record<RagSearchDiagnostics["status"], string> = {
-  disabled: "外部服务未启用",
-  ready: "外部服务就绪",
-  unavailable: "外部服务暂不可用",
-};
-
-function statusDescription(status: RagSearchDiagnostics): string {
-  if (status.status === "disabled") {
-    return "外部 RAG 服务未启用；普通关键词搜索和 AI 本地检索不受影响。";
-  }
-  if (status.status === "ready") {
-    return "DAP 已通过 HTTP 完成外部服务存活与就绪检查；返回的资产仍会按当前目录重新验证。";
-  }
-  return `外部 RAG HTTP 服务暂不可用（${status.reasonCode || "未知原因"}）；普通关键词搜索和 AI 本地检索不受影响，外部模式不会回退到本地。`;
-}
-
 export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
+  const { t } = useTranslation("common");
   const [config, setConfig] = useState<RagSearchConfig>({ ...DEFAULT_RAG_SEARCH_CONFIG });
   const [diagnostics, setDiagnostics] = useState<RagSearchDiagnostics>({
     status: "disabled",
@@ -42,6 +29,14 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
   const [notice, setNotice] = useState("");
   const supported = supportsRagSearchConfig();
 
+  const statusLabel = (status: RagSearchDiagnostics["status"]): string =>
+    t(`aiManagement.rag.status.${status}`);
+  const statusDescription = (status: RagSearchDiagnostics): string => {
+    if (status.status === "disabled") return t("aiManagement.rag.statusDescription.disabled");
+    if (status.status === "ready") return t("aiManagement.rag.statusDescription.ready");
+    return t("aiManagement.rag.statusDescription.unavailable", { reason: status.reasonCode || t("aiManagement.rag.unknownReason") });
+  };
+
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -54,7 +49,7 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
       })
       .catch((reason: unknown) => {
         if (!active) return;
-        setError(reason instanceof Error ? reason.message : "读取 RAG 配置失败。");
+        setError(reason instanceof Error ? reason.message : t("aiManagement.rag.readFailed"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -62,7 +57,7 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [t]);
 
   const update = <K extends keyof RagSearchConfig>(key: K, value: RagSearchConfig[K]): void => {
     setConfig((current) => ({ ...current, [key]: value }));
@@ -76,11 +71,10 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
     try {
       const saved = await updateRagSearchConfig(config);
       setConfig(saved);
-      setNotice("AI 问答检索与 RAG 推荐配置已保存。普通关键词搜索保持不变。");
-      const nextDiagnostics = await getRagSearchDiagnostics();
-      setDiagnostics(nextDiagnostics);
+      setNotice(t("aiManagement.rag.saved"));
+      setDiagnostics(await getRagSearchDiagnostics());
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "保存 RAG 配置失败。");
+      setError(reason instanceof Error ? reason.message : t("aiManagement.rag.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -92,42 +86,38 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
     try {
       setDiagnostics(await getRagSearchDiagnostics());
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "索引诊断失败。");
+      setError(reason instanceof Error ? reason.message : t("aiManagement.rag.checkFailed"));
     } finally {
       setChecking(false);
     }
   };
 
   return (
-    <details className="rag-config-panel">
+    <details className="rag-config-panel" open>
       <summary>
-        <span className="rag-config-title">AI 问答检索与 RAG 推荐配置</span>
+        <span className="rag-config-title">{t("aiManagement.rag.title")}</span>
         <span className={`rag-config-state rag-config-state-${diagnostics.status}`}>
-          {DIAGNOSTIC_LABELS[diagnostics.status]}
+          {statusLabel(diagnostics.status)}
         </span>
       </summary>
       <div className="rag-config-body">
-        <p className="rag-config-intro">
-          AI 问答可使用 DAP 内置目录检索或外部 RAG Search Service；不论检索模式，回答和引用都必须通过当前 DAP 元数据验证。搜索页的相关资产推荐默认关闭，启用外部服务后才可使用；它不影响普通关键词搜索。DAP 不加载索引、不调用 RAG CLI 或代替 AI 问答配置 LLM。
-        </p>
+        <p className="rag-config-intro">{t("aiManagement.rag.description")}</p>
         {!supported ? (
-          <div className="rag-config-message" role="status">
-            模拟模式仅展示关闭状态；持久化配置与索引诊断需连接后端。
-          </div>
+          <div className="rag-config-message" role="status">{t("aiManagement.rag.mockNotice")}</div>
         ) : null}
-        {loading ? <div className="rag-config-message" role="status">正在读取配置…</div> : null}
+        {loading ? <div className="rag-config-message" role="status">{t("aiManagement.rag.reading")}</div> : null}
         {error ? <div className="rag-config-error" role="alert">{error}</div> : null}
         {notice ? <div className="rag-config-message" role="status">{notice}</div> : null}
 
         <div className="rag-config-form">
           <label className="rag-config-field rag-config-field-wide">
-            <span>AI 问答检索模式</span>
+            <span>{t("aiManagement.rag.retrievalMode")}</span>
             <Select<string>
-              aria-label="AI 问答检索模式"
+              aria-label={t("aiManagement.rag.retrievalMode")}
               className="inp"
               items={[
-                { label: "内置本地检索（DAP 目录）", value: "local" },
-                { label: "外部 RAG Search Service", value: "external" },
+                { label: t("aiManagement.rag.retrievalModes.local"), value: "local" },
+                { label: t("aiManagement.rag.retrievalModes.external"), value: "external" },
               ]}
               value={config.retrievalMode}
               disabled={!canEdit || !supported || loading || saving}
@@ -135,10 +125,9 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
                 if (value === "local" || value === "external") update("retrievalMode", value);
               }}
             />
-            <small>
-              本地模式直接使用 DAP 当前目录检索，不需要外部服务 URL 或 Token。外部模式只使用下方已启用且配置完成的 RAG Search Service；调用失败不会回退到本地。此项仅控制 AI 问答检索，普通关键词搜索及可选的搜索页推荐由下方开关分别控制。本地模式会隐藏已存的外部 URL；若没有已有 URL，切到外部模式并启用前请填写服务地址。
-            </small>
+            <small>{t("aiManagement.rag.retrievalModeDescription")}</small>
           </label>
+
           <label className="rag-config-toggle">
             <input
               type="checkbox"
@@ -146,66 +135,75 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
               disabled={!canEdit || !supported || loading || saving}
               onChange={(event) => update("enabled", event.target.checked)}
             />
-            <span>启用外部 RAG Search Service</span>
+            <span>{t("aiManagement.rag.enabled")}</span>
           </label>
           <div className="rag-config-field rag-config-field-wide" role="note">
-            <small>
-              外部模式需要启用此服务并配置 URL/Token；该服务也用于搜索页的可选相关资产推荐。本地 AI 检索不依赖此开关。
-            </small>
+            <span>{t("aiManagement.rag.enabledDescription")}</span>
+            <small>{t("aiManagement.rag.enabledValues")}</small>
           </div>
+
           <div className="rag-config-field" role="note">
-            <span>检索策略</span>
-            <strong>由 RAG 服务端配置决定</strong>
-            <small>
-              HTTP Search Service v1 仅接受 query 和 topK，不接受请求级策略。实际策略由 RAG 服务端的 DAP_RAG_SEARCH_MODE 配置；DAP 已保存的 strategy 字段仅为兼容保留，不会影响检索。
-            </small>
+            <span>{t("aiManagement.rag.strategy")}</span>
+            <strong>{t(`aiManagement.rag.strategyValues.${config.strategy}`)}</strong>
+            <small>{t("aiManagement.rag.strategyDescription")}</small>
+            <small>{t("aiManagement.rag.strategyValuesDescription")}</small>
           </div>
+
           <label className="rag-config-field">
-            <span>最多推荐条数</span>
+            <span>{t("aiManagement.rag.topK")}</span>
             <input
               type="number"
               min={1}
               max={20}
+              step={1}
               value={config.topK}
               disabled={!canEdit || !supported || loading || saving}
               onChange={(event) => update("topK", Number(event.target.value))}
             />
+            <small>{t("aiManagement.rag.topKDescription")}</small>
+            <small>{t("aiManagement.rag.topKRange")}</small>
           </label>
+
           <label className="rag-config-field">
-            <span>请求超时（毫秒）</span>
+            <span>{t("aiManagement.rag.timeoutMs")}</span>
             <input
               type="number"
               min={250}
               max={10000}
-              step={250}
+              step={1}
               value={config.timeoutMs}
               disabled={!canEdit || !supported || loading || saving}
               onChange={(event) => update("timeoutMs", Number(event.target.value))}
             />
+            <small>{t("aiManagement.rag.timeoutDescription")}</small>
+            <small>{t("aiManagement.rag.timeoutRange")}</small>
           </label>
+
           <label className="rag-config-field rag-config-field-wide">
-            <span>RAG Service URL</span>
+            <span>{t("aiManagement.rag.serviceUrl")}</span>
             <input
               type="url"
               value={config.serviceUrl}
-              placeholder="同机可用 http://127.0.0.1:<port>；跨机必须使用 https://<RAG_SERVICE_HOST>"
+              placeholder={t("aiManagement.rag.serviceUrlPlaceholder")}
               disabled={!canEdit || !supported || loading || saving}
               onChange={(event) => update("serviceUrl", event.target.value)}
               autoComplete="off"
               spellCheck={false}
             />
+            <small>{t("aiManagement.rag.serviceUrlDescription")}</small>
           </label>
+
           <div className="rag-config-field rag-config-field-wide" role="status">
-            <span>服务端认证 Token</span>
-            <strong>{config.tokenConfigured ? "已在后端 Secret 中配置" : "未配置"}</strong>
-            <small>通过部署 Secret 设置 RAG_SEARCH_SERVICE_TOKEN；Token 不写入参数表、不经浏览器传输或返回。</small>
+            <span>{t("aiManagement.rag.tokenConfigured")}</span>
+            <strong>{config.tokenConfigured ? t("aiManagement.rag.configured") : t("aiManagement.rag.notConfigured")}</strong>
+            <small>{t("aiManagement.rag.tokenDescription")}</small>
           </div>
         </div>
 
         <div className="rag-config-diagnostic" role="status">
-          <strong>{DIAGNOSTIC_LABELS[diagnostics.status]}</strong>
+          <strong>{statusLabel(diagnostics.status)}</strong>
           <span>{statusDescription(diagnostics)}</span>
-          <span>Token：{diagnostics.tokenConfigured ? "已配置" : "未配置"}</span>
+          <span>{t("aiManagement.rag.tokenStatus", { status: diagnostics.tokenConfigured ? t("aiManagement.rag.configured") : t("aiManagement.rag.notConfigured") })}</span>
         </div>
 
         <div className="rag-config-actions">
@@ -215,7 +213,7 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
             disabled={!supported || loading || checking}
             onClick={() => void check()}
           >
-            {checking ? "正在检查…" : "检查 RAG Service"}
+            {checking ? t("aiManagement.rag.checking") : t("aiManagement.rag.check")}
           </Button>
           <Button
             variant="primary"
@@ -223,12 +221,10 @@ export function RagSearchConfigPanel({ canEdit }: { canEdit: boolean }) {
             disabled={!canEdit || !supported || loading || saving}
             onClick={() => void save()}
           >
-            {saving ? "保存中…" : "保存配置"}
+            {saving ? t("aiManagement.rag.saving") : t("aiManagement.rag.save")}
           </Button>
         </div>
-        <p className="rag-config-footnote">
-          只有受保护的管理配置页加载或管理员手动检查时才请求 /healthz 与 /readyz；普通搜索不请求诊断。推荐请求有超时限制；远端服务错误、令牌缺失或目录校验失败时 fail closed，不影响确定性关键词搜索。DAP 按 HTTP Search Service v1 请求与解析；算法模式在 RAG 服务端配置。
-        </p>
+        <p className="rag-config-footnote">{t("aiManagement.rag.footnote")}</p>
       </div>
     </details>
   );

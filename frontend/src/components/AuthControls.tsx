@@ -23,6 +23,7 @@ import {
   type LoginOptions,
 } from "../auth.ts";
 import { Icon, initial } from "./ui.tsx";
+import { BrandLogo } from "./BrandLogo.tsx";
 import { Button, IconButton } from "../ui/index.ts";
 
 function getSafeDisplayName(auth: AuthSession): string {
@@ -57,6 +58,7 @@ export interface LoginModalProps {
   open: boolean;
   busy: boolean;
   error: string;
+  branding: { logoUrl: string; displayName: string; hint: string };
   onClose: () => void;
   onSubmit: (credentials: LoginOptions) => void | Promise<unknown>;
 }
@@ -65,6 +67,7 @@ export function LoginModal({
   open,
   busy,
   error,
+  branding,
   onClose,
   onSubmit,
 }: LoginModalProps) {
@@ -131,15 +134,15 @@ export function LoginModal({
         </button>
         <div className="login-brand">
           <div className="brand-mark auth-brand-mark">
-            <img src="/brand-icon.svg?v=20260609" alt={tCommon("app.brandAlt")} />
+            <BrandLogo src={branding.logoUrl} alt={branding.displayName} />
           </div>
           <div>
-            <div className="lb-name">{tCommon("app.brandName")}</div>
+            <div className="lb-name">{branding.displayName}</div>
             <div className="lb-sub">{tCommon("app.brandTagline")}</div>
           </div>
         </div>
         <h2 className="login-title" id="auth-dialog-title">{t("dialogTitle")}</h2>
-        <p className="login-desc">{t("description")}</p>
+        <p className="login-desc">{branding.hint}</p>
         <label className="login-field">
           <span className="lf-label">{t("username")}</span>
           <span className="lf-input">

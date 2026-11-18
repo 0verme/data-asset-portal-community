@@ -657,6 +657,35 @@
   }
 
   /* ===== Body: sidebar + main ===== */
+  .app-announcement {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    padding: 10px max(20px, calc((100vw - 1200px) / 2));
+    border-bottom: 1px solid var(--accent-line);
+    background: var(--accent-soft);
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .app-announcement-text { flex: 1 1 auto; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .app-announcement-close {
+    display: grid;
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    margin: -3px -5px 0 0;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+  .app-announcement-close:hover { background: var(--surface-2); color: var(--ink); }
+  .app-announcement-close:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; }
   .body { display: flex; flex: 1; min-height: 0; }
   .app-footer-shell {
     flex: 0 0 auto;

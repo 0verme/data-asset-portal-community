@@ -383,6 +383,12 @@ export function parseInitialLocation(): LocationSnapshot {
     if (segments[1] === "param-dicts") {
       return { ...base, module: "system", systemRoute: { page: "param-dicts" } };
     }
+    if (segments[1] === "ai") {
+      return { ...base, module: "system", systemRoute: { page: "ai" } };
+    }
+    if (segments[1] === "branding") {
+      return { ...base, module: "system", systemRoute: { page: "branding" } };
+    }
     if (segments[1] === "roles") {
       return { ...base, module: "system", systemRoute: { page: "roles" } };
     }
@@ -473,6 +479,8 @@ export function buildPathname(
   if (module === "system") {
     if (systemRoute.page === "menus") return "/system-management/menus";
     if (systemRoute.page === "param-dicts") return "/system-management/param-dicts";
+    if (systemRoute.page === "ai") return "/system-management/ai";
+    if (systemRoute.page === "branding") return "/system-management/branding";
     if (systemRoute.page === "roles") return "/system-management/roles";
     if (systemRoute.page === "operation-logs") return "/system-management/operation-logs";
     return "/system-management/users";

@@ -199,13 +199,12 @@ test('daily AI question quota panel reads and saves the shared remote configurat
   test.skip(!remote, 'Requires VITE_API_MODE=remote and synthetic intercepted API responses.');
   const api = await installFixtures(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto('/system-management/param-dicts');
+  await page.goto('/system-management/ai');
   const panel = page.locator('.llm-quota-panel');
-  await panel.locator('summary').click();
   await expect(panel).toContainText('每日 AI 问答上限');
   await expect(panel).toContainText('每次问答最多计一次');
   await expect(panel).toContainText('今日剩余 46 次');
-  await expect(panel.getByText('4 / 46')).toBeVisible();
+  await expect(panel.getByText('已用 4 / 剩余 46 次')).toBeVisible();
   const limit = panel.locator('input[type="number"]');
   await expect(limit).toHaveValue('50');
   await limit.fill('75');

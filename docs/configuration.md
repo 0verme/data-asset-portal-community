@@ -28,6 +28,40 @@ The secret is required and must come from a secret manager or equivalent secure
 store. Debug must remain disabled in production. An old `FLASK_*` value does not
 satisfy a missing `APP_*` setting and is never logged or echoed by the runtime.
 
+## Site branding and persistent uploads
+
+Site branding is stored as JSON in the existing `p_code_category` and
+`p_code_item.ext_json` parameter tables under the reserved inactive category
+`SITE_BRANDING_CONFIG`. No new database, schema migration, or environment
+variable is required. Defaults are applied when no saved value exists. The
+administrator page uses the existing `system:param:read` and
+`system:param:write` permissions; changes are audited.
+
+`GET /api/system/public-config?lang=zh-CN|en-US` is anonymous and returns only
+the title, display name, announcement, logo/Favicon URLs, home title/subtitle/
+search hint, sign-in hint, a disabled quick-demo flag, and a revision. It does
+not serialize the parameter table. Public responses revalidate in the browser;
+the frontend also refreshes after an administrator save and every 60 seconds.
+English and Chinese copy are independent administrator fields and are never
+machine translated.
+
+Logo and Favicon uploads accept PNG and a strict static SVG subset under 200 KB.
+Files are content-addressed in `uploads/branding/` relative to the backend's
+working directory and are served from `/static/branding/`. Mount this directory
+on persistent writable storage in container deployments and include it in
+instance backups; the database stores URLs, not file bytes. The example systemd
+unit uses `/opt/data-asset-portal` as `WorkingDirectory`, so persist
+`/opt/data-asset-portal/uploads/branding/`. Nginx deployments must proxy
+`/static/branding/` to the backend as shown in
+[`deploy/nginx/data-asset-portal.conf.example`](../deploy/nginx/data-asset-portal.conf.example).
+Do not place uploads in `frontend/dist`, which is replaced during frontend
+releases. Restoring defaults switches back to repository assets and leaves
+uploaded files untouched.
+
+The #575 Demo Profile can provide different branding through this same
+administrator interface. Branding support alone does not implement or claim a
+daily demo database/data reset.
+
 ## Optional catalog snapshot composition
 
 The authorized read-only catalog snapshot exporter is **not enabled by default**.

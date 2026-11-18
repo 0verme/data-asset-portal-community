@@ -651,6 +651,27 @@ jobs:
           VITE_API_MODE: mock
         run: npm run test:browser -- e2e/i18n.spec.ts --workers=2
 
+      - name: Public branding configuration and responsive portal (Chromium and WebKit)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/public-branding-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/branding.spec.ts --workers=2
+
+      - name: Independent AI and site branding management pages (Chromium and WebKit)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/system-ai-management-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/system-ai-management.spec.ts --workers=2
+
+      - name: Remote branding asset uploads through the Vite dev proxy (Chromium and WebKit)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/branding-proxy-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/branding-proxy.spec.ts --workers=2
+
       - name: Remote API, report-option authority, and data trust browser regression (Chromium and WebKit)
         if: matrix.lane == 'a'
         env:

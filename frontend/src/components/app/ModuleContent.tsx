@@ -110,6 +110,9 @@ const MODULE_RENDERERS: Record<ModuleId, ModuleRenderer> = {
       onNavigate={(target, term) => context.goToModuleWithQuery(toNavigationTarget(target), term)}
       availableModules={context.visibleModuleKeys}
       publicAccessReady={context.businessAccessReady}
+      heroTitle={context.branding.hero.title}
+      heroSubtitle={context.branding.hero.subtitle}
+      searchPlaceholder={context.branding.hero.search_placeholder}
     />
   ),
   codeTable: ({ context }) => (
@@ -185,6 +188,8 @@ const MODULE_RENDERERS: Record<ModuleId, ModuleRenderer> = {
       canManageRoles={context.canManageRoles}
       canManageUsers={context.canManageUsers}
       canManageSystem={context.canManageSystem}
+      canViewParams={context.can("system:param:read")}
+      canViewOperationLog={context.canViewOperationLog}
       requireLogin={context.requireLogin}
       systemActionIntent={context.systemActionIntent}
       setSystemActionIntent={context.setSystemActionIntent}
