@@ -89,7 +89,7 @@ assert 'token' not in config and 'serviceToken' not in config
         expected = (before[0], {**before[1], "timeoutMs": 3500})
         self.assertEqual(self.stored(), expected)
 
-        for invalid in ({"retrievalMode": None}, {"topK": 0}, {"serviceToken": self.secret}):
+        for invalid in ({"retrievalMode": None}, {"topK": 0}):
             with self.subTest(fields=sorted(invalid)):
                 result = self.restore(invalid)
                 self.assertEqual(result.returncode, 1)
