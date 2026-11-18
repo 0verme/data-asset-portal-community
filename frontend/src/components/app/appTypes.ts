@@ -51,7 +51,7 @@ export interface AppModuleContext {
   canManageMenus: boolean;
   canManageParams: boolean;
   canManageRoles: boolean;
-  canManageSystem: boolean;
+  editorAccessDenied: boolean;
   canManageUsers: boolean;
   canViewMenus: boolean;
   canViewOperationLog: boolean;

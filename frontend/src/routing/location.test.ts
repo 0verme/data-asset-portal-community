@@ -185,10 +185,10 @@ test("invalid push and upstream query values use their existing defaults", () =>
   assert.deepEqual(upstream.upFilter, { status: null, dbType: null });
 });
 
-test("unknown pathnames retain the portal fallback contract", () => {
+test("unknown pathnames retain their query in the not-found state", () => {
   const location = parseLocation("/not-a-module?q=ignored");
 
-  assert.equal(location.module, "portal");
+  assert.equal(location.module, "notFound");
   assert.equal(location.query, "ignored");
 });
 
@@ -401,4 +401,21 @@ test("history policy distinguishes initial replace, pathname push, query replace
   assert.equal(resolveHistoryAction({ ...common, nextUrl: "/data-warehouse?q=orders", nextPathname: "/data-warehouse", historyReady: true }), "replace");
   assert.equal(resolveHistoryAction({ ...common, nextUrl: "/data-warehouse", nextPathname: "/data-warehouse", historyReady: true }), "noop");
   assert.equal(resolveHistoryAction({ ...common, nextUrl: "/portal", nextPathname: "/portal", historyReady: true, isPopstate: true }), "replace");
+});
+
+test("legacy paths resolve explicitly and unsupported paths do not become the portal", () => {
+  assert.equal(parseLocation("/downstream-push").module, "push");
+  assert.equal(parseLocation("/system-management/logs").systemRoute.page, "operation-logs");
+  assert.equal(parseLocation("/system-management").systemRoute.page, "landing");
+  for (const path of [
+    "/unknown",
+    "/portal/unknown",
+    "/system-management/unknown",
+    "/system-management/branding/extra",
+    "/data-warehouse/table/unknown",
+    "/data-warehouse/%FF",
+    "/push/system/job/unknown",
+  ]) {
+    assert.equal(parseLocation(path).module, "notFound", path);
+  }
 });

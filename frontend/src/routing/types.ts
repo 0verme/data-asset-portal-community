@@ -1,4 +1,5 @@
 export type ModuleId =
+  | "notFound"
   | "portal"
   | "dwm"
   | "upstream"
@@ -12,7 +13,7 @@ export type ModuleId =
   | "codeTable"
   | "system";
 
-export type ModuleMetaKey = Exclude<ModuleId, "portal" | "lineage">;
+export type ModuleMetaKey = Exclude<ModuleId, "portal" | "lineage" | "notFound">;
 
 /**
  * The route objects predate TypeScript and intentionally remain structurally

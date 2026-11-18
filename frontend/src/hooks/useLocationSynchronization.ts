@@ -136,6 +136,11 @@ export function useLocationSynchronization({
     if (typeof window === 'undefined') return;
 
     const isPopstate = lastPopstateRevisionRef.current !== navigation.locationRevision;
+    if (navigation.module === 'notFound') {
+      lastPopstateRevisionRef.current = navigation.locationRevision;
+      historyReadyRef.current = true;
+      return;
+    }
     const nextLocation = buildNavigationLocation({
       module: navigation.module as ModuleId,
       routes: getRoutes(navigation),

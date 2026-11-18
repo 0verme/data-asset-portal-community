@@ -59,7 +59,18 @@
     "accessDeniedTitle": "无权查看系统参数配置",
     "accessDeniedDescription": "需要 system:param:read 权限。",
     "noPageAccessTitle": "无权访问系统管理页面",
-    "noPageAccessDescription": "当前账号没有可访问的系统管理页面。"
+    "noPageAccessDescription": "当前账号没有访问此系统管理页面的权限。",
+    "navigation": "系统管理",
+    "users": "用户管理",
+    "roles": "角色管理",
+    "menus": "菜单管理",
+    "params": "参数字典",
+    "operationLogs": "操作日志",
+    "maintenance": "维护",
+    "newUser": "新增用户",
+    "newRole": "新增角色",
+    "newMenu": "新增菜单",
+    "newParam": "新增参数"
   },
   "aiManagement": {
     "title": "AI 管理",
@@ -173,7 +184,13 @@
     "sidebarErrorTitle": "侧边栏渲染失败",
     "sidebarErrorDescription": "导航区域渲染异常，请刷新后重试。",
     "moduleErrorTitle": "模块渲染失败",
-    "moduleErrorDescription": "当前模块渲染异常，请稍后重试。"
+    "moduleErrorDescription": "当前模块渲染异常，请稍后重试。",
+    "notFoundTitle": "404 · 页面不存在",
+    "notFoundDescription": "请检查网址，或返回首页。",
+    "backHome": "返回首页",
+    "noMenus": "暂无可用菜单",
+    "loadingPageCount": "正在加载总数…",
+    "pageCountUnavailable": "总数不可用"
   },
   "search": {
     "global": "全局搜索",
@@ -212,7 +229,10 @@
     "publicLoadingDescription": "正在确认会话状态并加载可浏览的数据资产。",
     "catalogDisabledTitle": "匿名目录访问已关闭",
     "catalogDisabledDescription": "此站点需要登录后才能浏览业务目录。登录不会改变后端的权限控制。",
-    "loginToContinue": "登录后继续"
+    "loginToContinue": "登录后继续",
+    "editorLoginRequired": "登录后才能访问此编辑页面",
+    "editorDenied": "无权访问此编辑页面",
+    "editorDeniedDescription": "当前账号缺少此页面所需的写入权限。"
   },
   "action": {
     "close": "关闭",
@@ -239,5 +259,10 @@
         "unknown": "来源未知"
       }
     }
+  },
+  "portalStats": {
+    "loading": "正在加载资产统计…",
+    "empty": "暂无资产统计",
+    "error": "资产统计加载失败"
   }
 }

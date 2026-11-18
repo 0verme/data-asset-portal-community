@@ -53,9 +53,11 @@ function normalizeStats(payload: unknown): PortalStatItem[] {
       ? (record['items'] as Array<Record<string, unknown>>)
       : record && Array.isArray(record['stats'])
         ? (record['stats'] as Array<Record<string, unknown>>)
-        : [];
+        : null;
+  if (!rows || rows.some((row) => !row || typeof row['label'] !== 'string')) {
+    throw new Error('Invalid portal statistics payload');
+  }
   return rows
-    .filter((row) => row && row['label'] != null)
     .map((row) => ({ label: String(row['label']), value: String(row['value'] ?? '-') }));
 }
 

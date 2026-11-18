@@ -93,6 +93,9 @@
   background: var(--surface-2); border: 1px solid var(--line-2);
   border-radius: var(--radius); padding: 16px 14px; text-align: center;
 }
+.sp-stat-placeholder { min-height: 89px; display: grid; justify-items: center; align-content: center; gap: 8px; }
+.sp-stat-placeholder > :first-child { width: 36%; height: 23px; }
+.sp-stat-placeholder > :last-child { width: 65%; height: 12px; }
 .sp-stat-num {
   font-family: var(--mono); font-size: 26px; font-weight: 600;
   color: var(--ink); letter-spacing: 0.5px; font-variant-numeric: tabular-nums;

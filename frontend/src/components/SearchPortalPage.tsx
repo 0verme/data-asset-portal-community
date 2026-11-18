@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./ui.tsx";
-import { Button, EmptyState, ErrorState, Input, LoadingState } from "../ui/index.ts";
+import { Button, EmptyState, ErrorState, Input, LoadingState, SkeletonLine } from "../ui/index.ts";
 import { ActionErrorBanner } from "./common/ActionErrorBanner.tsx";
 import { getPortalStats, type PortalStatItem } from "../api/portal.ts";
 import { getHotKeywords } from "../api/hotKeywords.ts";
@@ -424,6 +425,7 @@ export function SearchPortalPage({
   heroSubtitle,
   searchPlaceholder,
 }: SearchPortalPageProps) {
+  const { t } = useTranslation("common");
   const scopeOptions = useMemo(
     () => filterPortalScopesByModules(availableModules),
     [availableModules],
@@ -441,7 +443,7 @@ export function SearchPortalPage({
   const [hotKeywords, setHotKeywords] = useState<PortalHotKeyword[]>([]);
   const [stats, setStats] = useState<PortalStatItem[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [statsError, setStatsError] = useState("");
+  const [statsError, setStatsError] = useState<string | null>(null);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [recommendations, setRecommendations] = useState<RagRecommendationsResponse | null>(null);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
@@ -764,7 +766,7 @@ export function SearchPortalPage({
       };
     }
     setStatsLoading(true);
-    setStatsError("");
+    setStatsError(null);
 
     getPortalStats()
       .then((rows) => {
@@ -774,9 +776,7 @@ export function SearchPortalPage({
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        setStatsError(
-          error instanceof Error ? error.message : "资产统计加载失败",
-        );
+        setStatsError(error instanceof Error ? error.message : "");
         setStatsLoading(false);
       });
 
@@ -1187,22 +1187,19 @@ export function SearchPortalPage({
         </div>
       ) : (
         <div className="sp-stats">
-          {!publicAccessReady ? (
-            <LoadingState
-              title="正在准备公开资产目录..."
-              desc=""
-              label="正在准备公开资产目录"
-              className="sp-stats-hint"
-            />
-          ) : statsLoading ? (
-            <LoadingState
-              title="正在加载资产统计..."
-              desc=""
-              label="正在加载资产统计"
-              className="sp-stats-hint"
-            />
-          ) : statsError ? (
-            <ErrorState title={statsError} desc="" className="sp-stats-hint sp-stats-error" />
+          {!publicAccessReady || statsLoading ? (
+            <div className="sp-stats-grid" role="status" aria-label={t("portalStats.loading")}>
+              {Array.from({ length: 12 }, (_, index) => (
+                <div className="sp-stat-card sp-stat-placeholder" key={index} aria-hidden="true">
+                  <SkeletonLine />
+                  <SkeletonLine />
+                </div>
+              ))}
+            </div>
+          ) : statsError !== null ? (
+            <ErrorState title={t("portalStats.error")} desc={statsError} className="sp-stats-hint sp-stats-error" />
+          ) : stats.length === 0 ? (
+            <EmptyState title={t("portalStats.empty")} desc="" className="sp-stats-hint" />
           ) : (
             <div className="sp-stats-grid">
               {stats.map((item) => (

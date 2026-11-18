@@ -32,13 +32,7 @@ import { resolveMenuDisplayName } from "./routing/menuLabels.ts";
 import { Button, DropdownMenu, IconButton, Input } from "./ui/index.ts";
 import {
   APP_VERSION,
-  DEFAULT_ASSET_ROUTE,
-  DEFAULT_API_ASSET_ROUTE,
-  DEFAULT_INDICATOR_ROUTE,
-  DEFAULT_REPORT_ROUTE,
-  DEFAULT_ROOT_ROUTE,
   DEFAULT_SYSTEM_ROUTE,
-  DEFAULT_UP_ROUTE,
 } from "./config/defaults.ts";
 import { useAssetModule } from "./hooks/useAssetModule.ts";
 import { useApiAssetModule } from "./hooks/useApiAssetModule.ts";
@@ -443,8 +437,21 @@ export default function App(): React.ReactElement {
     [visibleNavMenus],
   );
 
+  const writeRoutes: Partial<Record<ModuleId, { page: string; pages: string[]; permission: string }>> = {
+    dwm: { page: route.page, pages: ["new", "edit"], permission: "asset:write" },
+    push: { page: pushRoute.page, pages: ["sysNew", "sysEdit", "jobNew", "jobEdit"], permission: "push:write" },
+    root: { page: rootRoute.page, pages: ["new", "edit", "import"], permission: "root:write" },
+    upstream: { page: upRoute.page, pages: ["new", "edit"], permission: "upstream:write" },
+    indicator: { page: indicatorRoute.page, pages: ["new", "edit"], permission: "indicator:write" },
+    report: { page: reportRoute.page, pages: ["new", "edit"], permission: "report:write" },
+    apiAsset: { page: apiAssetRoute.page, pages: ["new", "edit"], permission: "api_asset:write" },
+  };
+  const writeRoute = writeRoutes[module];
+  const editorAccessDenied = Boolean(writeRoute?.pages.includes(writeRoute.page) && !can(writeRoute.permission));
+  const activeCatalogModule = catalogDataAccessReady && !editorAccessDenied ? module : null;
+
   const asset = useAssetModule({
-    active: catalogDataAccessReady && module === "dwm",
+    active: activeCatalogModule === "dwm",
     query,
     setQuery,
     route,
@@ -458,7 +465,7 @@ export default function App(): React.ReactElement {
   });
 
   const root = useRootModule({
-    active: catalogDataAccessReady && module === "root",
+    active: activeCatalogModule === "root",
     query,
     setQuery,
     rootRoute,
@@ -467,7 +474,7 @@ export default function App(): React.ReactElement {
   });
 
   const indicator = useIndicatorModule({
-    active: catalogDataAccessReady && module === "indicator",
+    active: activeCatalogModule === "indicator",
     query,
     indicatorRoute,
     setIndicatorRoute,
@@ -479,7 +486,7 @@ export default function App(): React.ReactElement {
   });
 
   const report = useReportModule({
-    active: catalogDataAccessReady && module === "report",
+    active: activeCatalogModule === "report",
     query,
     reportRoute,
     setReportRoute,
@@ -490,12 +497,12 @@ export default function App(): React.ReactElement {
     setLoginOpen,
   });
   const apiAsset = useApiAssetModule({
-    active: catalogDataAccessReady && module === "apiAsset", query, route: apiAssetRoute, setRoute: setApiAssetRoute,
+    active: activeCatalogModule === "apiAsset", query, route: apiAssetRoute, setRoute: setApiAssetRoute,
     filter: apiAssetFilter, canEdit: can("api_asset:write"), requireLogin, setAuthError, setLoginOpen,
   });
 
   const push = usePushModule({
-    active: catalogDataAccessReady && module === "push",
+    active: activeCatalogModule === "push",
     query,
     setQuery,
     pushRoute,
@@ -508,7 +515,7 @@ export default function App(): React.ReactElement {
   });
 
   const upstream = useUpstreamModule({
-    active: catalogDataAccessReady && module === "upstream",
+    active: activeCatalogModule === "upstream",
     query,
     setQuery,
     upRoute,
@@ -523,7 +530,7 @@ export default function App(): React.ReactElement {
   });
 
   const manualCodeTable = useManualCodeTableModule({
-    active: catalogDataAccessReady && module === "codeTable",
+    active: activeCatalogModule === "codeTable",
     query,
     requireLogin,
   });
@@ -538,71 +545,6 @@ export default function App(): React.ReactElement {
 
   useLocationSynchronization({ navigation, asset, push, upstream });
 
-  const canEditAsset = can("asset:write");
-  const canEditPush = can("push:write");
-  const canEditRoot = can("root:write");
-  const canEditUpstream = can("upstream:write");
-  const canEditIndicator = can("indicator:write");
-  const canEditReport = can("report:write");
-  const canEditApiAsset = can("api_asset:write");
-
-  useEffect(() => {
-    if (!authReady) return;
-    if (!canEditAsset) {
-      setRoute((current) => (
-        current.page === "edit" || current.page === "new" ? DEFAULT_ASSET_ROUTE : current
-      ));
-    }
-    if (!canEditPush) {
-      setPushRoute((current) => (
-        ["sysNew", "sysEdit", "jobNew", "jobEdit"].includes(current.page)
-          ? { page: current.sys ? "jobs" : "systems", sys: current.sys, job: null }
-          : current
-      ));
-    }
-    if (!canEditRoot) {
-      setRootRoute((current) => (
-        ["new", "edit", "import"].includes(current.page) ? DEFAULT_ROOT_ROUTE : current
-      ));
-    }
-    if (!canEditUpstream) {
-      setUpRoute((current) => (
-        ["new", "edit"].includes(current.page)
-          ? (current.id ? { page: "detail", id: current.id } : DEFAULT_UP_ROUTE)
-          : current
-      ));
-    }
-    if (!canEditIndicator) {
-      setIndicatorRoute((current) => (
-        ["new", "edit"].includes(current.page) ? DEFAULT_INDICATOR_ROUTE : current
-      ));
-    }
-    if (!canEditReport) {
-      setReportRoute((current) => (
-        ["new", "edit"].includes(current.page) ? DEFAULT_REPORT_ROUTE : current
-      ));
-    }
-    if (!canEditApiAsset) {
-      setApiAssetRoute((current) => (["new", "edit"].includes(current.page) ? DEFAULT_API_ASSET_ROUTE : current));
-    }
-  }, [
-    authReady,
-    canEditApiAsset,
-    canEditAsset,
-    canEditIndicator,
-    canEditPush,
-    canEditReport,
-    canEditRoot,
-    canEditUpstream,
-    setApiAssetRoute,
-    setIndicatorRoute,
-    setPushRoute,
-    setReportRoute,
-    setRootRoute,
-    setRoute,
-    setUpRoute,
-  ]);
-
   const systemLandingRoute = useMemo<SystemRoute>(() => {
     if (canViewUsers) return { page: "users" };
     if (canViewRoles) return { page: "roles" };
@@ -612,30 +554,7 @@ export default function App(): React.ReactElement {
     return DEFAULT_SYSTEM_ROUTE;
   }, [canViewMenus, canViewOperationLog, canViewParams, canViewRoles, canViewUsers]);
 
-  useEffect(() => {
-    if (!authReady || module !== "system") return;
-    const accessible: Record<string, boolean> = {
-      users: canViewUsers,
-      roles: canViewRoles,
-      menus: canViewMenus,
-      "param-dicts": canViewParams,
-      ai: canViewParams,
-      branding: canViewParams,
-      "operation-logs": canViewOperationLog,
-    };
-    if (!accessible[systemRoute.page]) setSystemRoute(systemLandingRoute);
-  }, [
-    authReady,
-    canViewMenus,
-    canViewOperationLog,
-    canViewParams,
-    canViewRoles,
-    canViewUsers,
-    module,
-    setSystemRoute,
-    systemLandingRoute,
-    systemRoute.page,
-  ]);
+  const currentSystemRoute = systemRoute.page === "landing" ? systemLandingRoute : systemRoute;
 
   const {
     switchModule: switchNavigationModule,
@@ -689,7 +608,7 @@ export default function App(): React.ReactElement {
   const isUpstream = module === "upstream";
   const isMapping = module === "mapping";
   const isCodeTable = module === "codeTable";
-  const isPortal = module === "portal";
+  const isPortal = module === "portal" || module === "notFound";
 
   useEffect(() => {
     const hiddenNavigation = window.matchMedia(isPortal ? "(max-width: 768px)" : "(max-width: 959px)");
@@ -712,17 +631,17 @@ export default function App(): React.ReactElement {
           : isRoot
             ? tCommon("search.placeholder.root")
             : isSystem
-              ? systemRoute.page === "menus"
+              ? currentSystemRoute.page === "menus"
                 ? tCommon("search.placeholder.systemMenus")
-                : systemRoute.page === "param-dicts"
+                : currentSystemRoute.page === "param-dicts"
                   ? tCommon("search.placeholder.systemParams")
-                    : systemRoute.page === "ai"
+                    : currentSystemRoute.page === "ai"
                       ? tCommon("search.placeholder.systemAi")
-                      : systemRoute.page === "branding"
+                      : currentSystemRoute.page === "branding"
                         ? tCommon("search.placeholder.systemBranding")
-                  : systemRoute.page === "roles"
+                  : currentSystemRoute.page === "roles"
                     ? tCommon("search.placeholder.systemRoles")
-                    : systemRoute.page === "operation-logs"
+                    : currentSystemRoute.page === "operation-logs"
                       ? tCommon("search.placeholder.systemLogs")
                       : tCommon("search.placeholder.systemUsers")
               : isUpstream
@@ -774,13 +693,13 @@ export default function App(): React.ReactElement {
     canManageMenus,
     canManageParams,
     canManageRoles,
-    canManageSystem,
     canManageUsers,
     canViewMenus,
     canViewOperationLog,
     canViewParams,
     canViewRoles,
     canViewUsers,
+    editorAccessDenied,
     goToMapping,
     goToModuleWithQuery,
     indicator,
@@ -833,13 +752,13 @@ export default function App(): React.ReactElement {
     setUpRoute,
     statusOptions,
     systemActionIntent,
-    systemRoute,
+    systemRoute: currentSystemRoute,
     upRoute,
     upstream,
     visibleModuleKeys,
   };
   const moduleContent = <ModuleContent module={module} context={moduleContext} />;
-  const moduleSidebar = <ModuleSidebar module={module} context={moduleContext} />;
+  const moduleSidebar = editorAccessDenied ? null : <ModuleSidebar module={module} context={moduleContext} />;
 
   return (
     <AuthContext.Provider value={authContextValue}>
@@ -885,6 +804,8 @@ export default function App(): React.ReactElement {
                 >
                   {tCommon("navigation.menuLoadFailed")}
                 </Button>
+              ) : catalogDataAccessReady && visibleNavMenus.length === 0 ? (
+                <span className="navigation-status" role="status">{tCommon("navigation.noMenus")}</span>
               ) : null}
               {primaryNavMenus.map((item) => (
                 <Button
@@ -1110,6 +1031,8 @@ export default function App(): React.ReactElement {
                     <Button className="mobile-module-link" type="button" variant="tertiary" size="sm" onClick={() => void loadMenus(navigationAuthKey)}>
                       {tCommon("navigation.menuLoadFailed")}
                     </Button>
+                  ) : catalogDataAccessReady && visibleNavMenus.length === 0 ? (
+                    <span className="navigation-status" role="status">{tCommon("navigation.noMenus")}</span>
                   ) : null}
                   {visibleNavMenus.map((item) => (
                     <Button

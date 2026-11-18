@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   deleteAssetTable,
   getAssetDDL,
@@ -248,15 +248,19 @@ export function useAssetModule({
     }
   }, [domain, page, pageSize, query, selectedLayer]);
 
+  const detailRequestRef = useRef(0);
   const loadDetailData = useCallback(async (identity: AssetIdentity): Promise<void> => {
+    const requestId = ++detailRequestRef.current;
     setDetailLoading(true);
     setDetailError('');
     try {
       const [asset, ddlData] = await Promise.all([getAssetDetail(identity), getAssetDDL(identity)]);
+      if (requestId !== detailRequestRef.current) return;
       setDetailAsset(asset);
       setDetailFields(asset.fields || []);
       setDetailDDL(ddlData);
     } catch (error: unknown) {
+      if (requestId !== detailRequestRef.current) return;
       setDetailAsset(null);
       setDetailFields([]);
       setDetailDDL({
@@ -266,7 +270,7 @@ export function useAssetModule({
       });
       setDetailError(getErrorMessage(error, '资产详情加载失败。'));
     } finally {
-      setDetailLoading(false);
+      if (requestId === detailRequestRef.current) setDetailLoading(false);
     }
   }, []);
 
@@ -274,13 +278,18 @@ export function useAssetModule({
     setPage(1);
   }, [domain, query, selectedLayer]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return undefined;
+    setHomeLoading(true);
+    setHomeError('');
     const timer = setTimeout(loadHomeData, query.trim() ? 250 : 0);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      homeRequestRef.current += 1;
+    };
   }, [active, loadHomeData, query]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (active && (route.page === 'detail' || route.page === 'edit') && (route.table || route.assetId)) {
       loadDetailData({ assetId: route.assetId, tableName: route.table });
     } else {
@@ -294,6 +303,7 @@ export function useAssetModule({
       setDetailError('');
       setDetailLoading(false);
     }
+    return () => { detailRequestRef.current += 1; };
   }, [active, route, loadDetailData]);
 
   const assetBack = useSmartBack<AssetNavigationSnapshot>({

@@ -71,6 +71,7 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
     loading: false,
     error: "",
   });
+  const detailRequestSeq = React.useRef(0);
   const requestSeq = React.useRef(0);
   const previousQueryRef = React.useRef(query);
   const requestPage = resolveOperationLogRequestPage(
@@ -114,8 +115,9 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
     }
   }, [pageSize, queryFilter, requestPage]);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     void load();
+    return () => { requestSeq.current += 1; };
   }, [load]);
 
   // 筛选或关键词变化时回到第一页
@@ -127,11 +129,14 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
   }, [query]);
 
   const openDetail = React.useCallback(async (log: MockOperationLogItem) => {
+    const seq = ++detailRequestSeq.current;
     setDetail({ open: true, log, loading: true, error: "" });
     try {
       const full = await getOperationLogDetail(log.id);
+      if (seq !== detailRequestSeq.current) return;
       setDetail({ open: true, log: full, loading: false, error: "" });
     } catch (nextError) {
+      if (seq !== detailRequestSeq.current) return;
       setDetail({
         open: true,
         log,
@@ -142,6 +147,7 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
   }, []);
 
   const closeDetail = React.useCallback(() => {
+    detailRequestSeq.current += 1;
     setDetail({ open: false, log: null, loading: false, error: "" });
   }, []);
 
@@ -153,10 +159,12 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
           <div className="page-title">
             <span className="pt-code">LOG</span>操作日志
           </div>
-          <div className="page-sub">
-            共 <b>{total}</b> 条操作记录
-            {query ? <>，匹配 “{query}”</> : null}
-          </div>
+          {!loading && !error ? (
+            <div className="page-sub">
+              共 <b>{total}</b> 条操作记录
+              {query ? <>，匹配 “{query}”</> : null}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -210,7 +218,7 @@ export function OperationLogPage({ query }: OperationLogPageProps) {
         ariaLabel="操作日志分页"
         page={page}
         pageSize={pageSize}
-        total={total}
+        total={error ? null : total}
         pageSizeOptions={PAGE_SIZE_OPTIONS}
         loading={loading}
         disabled={Boolean(error)}

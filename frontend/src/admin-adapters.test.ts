@@ -67,7 +67,8 @@ test("AI management is an independent system page and reuses the existing panels
   assert.match(aiManagementPage, /<RagSearchConfigPanel canEdit=\{canEdit\} \/>/);
   assert.match(aiManagementPage, /aiManagement\.title/);
   assert.match(systemView, /<AiManagementPage canEdit=\{canManageParams\} \/>/);
-  assert.match(systemSidebar, /setSystemRoute\(\{ page: "ai" \}\)/);
+  assert.match(systemSidebar, /page: "ai", label: t\("systemManagement\.ai"\), visible: canViewParams/);
+  assert.match(systemSidebar, /onClick=\{\(\) => setSystemRoute\(\{ page \}\)\}/);
   assert.match(systemSidebar, /systemManagement\.ai/);
   assert.match(systemView, /canViewParams/);
   assert.match(aiManagementPage, /aiManagement\.readOnly/);
@@ -76,7 +77,8 @@ test("AI management is an independent system page and reuses the existing panels
 test("site branding has an independent system page", () => {
   assert.match(siteBrandingPage, /<BrandingConfigPanel canEdit=\{canEdit\} \/>/);
   assert.match(systemView, /<SiteBrandingPage canEdit=\{canManageParams\} \/>/);
-  assert.match(systemSidebar, /setSystemRoute\(\{ page: "branding" \}\)/);
+  assert.match(systemSidebar, /page: "branding", label: t\("systemManagement\.branding"\), visible: canViewParams/);
+  assert.match(systemSidebar, /onClick=\{\(\) => setSystemRoute\(\{ page \}\)\}/);
   assert.match(systemSidebar, /systemManagement\.branding/);
   assert.doesNotMatch(paramPage, /branding|Branding/i);
 });

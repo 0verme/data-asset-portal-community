@@ -59,7 +59,18 @@
     "accessDeniedTitle": "Cannot view system parameter settings",
     "accessDeniedDescription": "The system:param:read permission is required.",
     "noPageAccessTitle": "No access to system management",
-    "noPageAccessDescription": "This account does not have access to any system management page."
+    "noPageAccessDescription": "This account does not have permission to view this system management page.",
+    "navigation": "System management",
+    "users": "Users",
+    "roles": "Roles",
+    "menus": "Menus",
+    "params": "Parameter dictionary",
+    "operationLogs": "Operation logs",
+    "maintenance": "Maintenance",
+    "newUser": "New user",
+    "newRole": "New role",
+    "newMenu": "New menu",
+    "newParam": "New parameter"
   },
   "aiManagement": {
     "title": "AI management",
@@ -173,7 +184,13 @@
     "sidebarErrorTitle": "Could not render the sidebar",
     "sidebarErrorDescription": "The navigation area encountered an error. Refresh the page and try again.",
     "moduleErrorTitle": "Could not render the module",
-    "moduleErrorDescription": "This module encountered an error. Please try again later."
+    "moduleErrorDescription": "This module encountered an error. Please try again later.",
+    "notFoundTitle": "404 · Page not found",
+    "notFoundDescription": "Check the URL or return to the home page.",
+    "backHome": "Back to home",
+    "noMenus": "No available menus",
+    "loadingPageCount": "Loading total…",
+    "pageCountUnavailable": "Total unavailable"
   },
   "search": {
     "global": "Global search",
@@ -212,7 +229,10 @@
     "publicLoadingDescription": "Checking the session and loading browseable data assets.",
     "catalogDisabledTitle": "Anonymous catalog access is disabled",
     "catalogDisabledDescription": "Sign in is required to browse this catalog. Signing in does not change backend authorization.",
-    "loginToContinue": "Sign in to continue"
+    "loginToContinue": "Sign in to continue",
+    "editorLoginRequired": "Sign in to access this editor",
+    "editorDenied": "No access to this editor",
+    "editorDeniedDescription": "This account lacks the write permission required for this page."
   },
   "action": {
     "close": "Close",
@@ -239,5 +259,10 @@
         "unknown": "Sources unknown"
       }
     }
+  },
+  "portalStats": {
+    "loading": "Loading asset statistics…",
+    "empty": "No asset statistics available",
+    "error": "Could not load asset statistics"
   }
 }

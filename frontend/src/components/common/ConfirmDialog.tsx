@@ -42,6 +42,17 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const titleId = React.useId();
+  const cancelRef = React.useRef<HTMLButtonElement>(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const opener = document.activeElement;
+    cancelRef.current?.focus();
+    return () => {
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+    };
+  }, [open]);
+
   const [internalBusy, setInternalBusy] = React.useState(false);
   const [keywordValue, setKeywordValue] = React.useState("");
   const pending = busy || internalBusy;
@@ -87,12 +98,13 @@ export function ConfirmDialog({
         onMouseDown={(event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation()}
         role="alertdialog"
         aria-modal="true"
+        aria-labelledby={titleId}
       >
         <div className="confirm-head">
           <span className="confirm-icon" aria-hidden="true">
             <Icon name={danger ? "trash" : "key"} size={20} color={danger ? "var(--danger)" : "var(--accent)"} />
           </span>
-          <div className="confirm-title">{title}</div>
+          <div id={titleId} className="confirm-title">{title}</div>
         </div>
         {body ? <div className="confirm-desc">{body}</div> : null}
         {details.length ? (
@@ -117,7 +129,7 @@ export function ConfirmDialog({
           </div>
         ) : null}
         <div className="confirm-actions">
-          <button className="btn" type="button" onClick={onCancel} disabled={pending}>
+          <button ref={cancelRef} className="btn" type="button" onClick={onCancel} disabled={pending}>
             {cancelText}
           </button>
           <button className={danger ? "btn ghost-danger" : "btn primary"} type="button" onClick={handleConfirm} disabled={pending || !keywordMatched}>

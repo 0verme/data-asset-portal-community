@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { createReport, deleteReport, getReportDetail, getReportPage, updateReport, type ReportPageResult } from '../api/report.ts';
 import type { MockReportItem } from '../data/reports.ts';
@@ -167,7 +167,7 @@ export function useReportModule({
   const reloadRef = useRef(loadReportData);
   reloadRef.current = loadReportData;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (active) void loadReportData();
     return () => { listSequence.current += 1; };
   }, [active, loadReportData]);

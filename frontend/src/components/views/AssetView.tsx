@@ -136,7 +136,7 @@ export function AssetView({
             ariaLabel={t("tablePagination")}
             page={page}
             pageSize={pageSize}
-            total={totalTables}
+            total={null}
             disabled
             onPageChange={setPage}
             onPageSizeChange={setPageSize}

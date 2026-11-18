@@ -185,6 +185,7 @@ test("authenticated AuthBar DAP IconButton preserves logout behavior", async ({ 
   await expect(logout).toHaveClass(/dap-ui-icon-button/);
   await expect(page.locator(".user-chip")).toContainText("admin");
   await logout.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "退出登录" }).click();
   await expect(page.getByRole("button", { name: "登录", exact: true })).toBeVisible();
   await expect(page.locator(".user-chip")).toHaveCount(0);
 });
