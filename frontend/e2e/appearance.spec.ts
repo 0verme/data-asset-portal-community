@@ -10,11 +10,13 @@ async function openControls(page: Page) {
   await expect(page.getByTestId("saved-effects")).toBeVisible();
 }
 
-async function click(page: Page, name: string) {
-  // WebKit can suspend animation frames in background tabs. Switch tabs
-  // before user input so Playwright can check that the control is stable.
-  await page.bringToFront();
-  await page.getByRole("button", { name, exact: true }).click();
+// Keyboard activation uses the same controls without pointer hit testing,
+// which waits for animation frames even when a WebKit tab is throttled.
+async function activate(page: Page, name: string) {
+  const button = page.getByRole("button", { name, exact: true });
+  await expect(button).toBeVisible();
+  await expect(button).toBeEnabled();
+  await button.press("Enter");
 }
 const stored = (page: Page) => page.evaluate((name) => JSON.parse(localStorage.getItem(name) ?? "null"), key);
 
@@ -74,16 +76,16 @@ test("system modes track media and retain explicit choices and the deployment de
   await expect(html).toHaveAttribute("data-theme", "dark");
   const vendorMode = () => html.evaluate((root) => getComputedStyle(root).getPropertyValue("--text-color-kumo-inverse"));
   const systemDark = await vendorMode();
-  await click(page, "dark");
+  await activate(page, "dark");
   expect(await vendorMode()).toBe(systemDark);
-  await click(page, "light");
+  await activate(page, "light");
   await expect(html).toHaveAttribute("data-theme", "light");
   expect(await vendorMode()).not.toBe(systemDark);
   await page.emulateMedia({ colorScheme: "light" });
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(html).toHaveAttribute("data-theme", "light");
 
-  await click(page, "full effects");
+  await activate(page, "full effects");
   await expect(html).toHaveAttribute("data-effects", "full");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(html).toHaveAttribute("data-effects", "off");
@@ -92,9 +94,9 @@ test("system modes track media and retain explicit choices and the deployment de
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(html).toHaveAttribute("data-effects", "full");
 
-  await click(page, "blue");
-  await click(page, "compact");
-  await click(page, "restore defaults");
+  await activate(page, "blue");
+  await activate(page, "compact");
+  await activate(page, "restore defaults");
   expect(await stored(page)).toEqual(configuredDefault);
   await expect(html).toHaveAttribute("data-mode", "system");
   await expect(html).toHaveAttribute("data-theme", "dark");
@@ -116,18 +118,18 @@ test("tabs sync all fields without echo writes and reject invalid records", asyn
   const other = await context.newPage();
   await openControls(page);
   await openControls(other);
-  await click(page, "dark");
+  await activate(page, "dark");
   await expect(other.locator("html")).toHaveAttribute("data-theme", "dark");
-  await click(other, "light");
+  await activate(other, "light");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await click(other, "compact");
-  await click(other, "full effects");
-  await click(other, "custom");
+  await activate(other, "compact");
+  await activate(other, "full effects");
+  await activate(other, "custom");
   const html = page.locator("html");
   await expect(html).toHaveAttribute("data-density", "compact");
   await expect(html).toHaveAttribute("data-effects", "full");
   await expect(html).toHaveAttribute("data-accent", "custom");
-  await click(other, "invalid custom");
+  await activate(other, "invalid custom");
   expect((await stored(other)).accent).toEqual({ kind: "custom", hex: "#ffffff" });
   async function writes(tab: Page) {
     return tab.evaluate(() => {
@@ -152,9 +154,9 @@ test("tabs sync all fields without echo writes and reject invalid records", asyn
   await delivered;
   await expect(html).toHaveAttribute("data-accent", "custom");
   expect(await writes(page)).toBe(1);
-  await click(other, "restore defaults");
+  await activate(other, "restore defaults");
   await expect(html).toHaveAttribute("data-mode", "system");
-  await click(other, "dark");
+  await activate(other, "dark");
   await expect(html).toHaveAttribute("data-mode", "dark");
   await other.evaluate((key) => {
     localStorage.setItem("dap-theme", "dark");
@@ -218,10 +220,10 @@ test("StrictMode migration writes once and subscriptions are released on unmount
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(page.locator("html")).toHaveAttribute("data-accent", "purple");
   expect(await snapshot()).toEqual([1, 1, 1, 1]);
-  await click(page, "toggle provider");
+  await activate(page, "toggle provider");
   await expect(page.getByTestId("saved-effects")).toHaveCount(0);
   expect(await snapshot()).toEqual([1, 0, 0, 0]);
-  await click(page, "toggle provider");
+  await activate(page, "toggle provider");
   await expect(page.getByTestId("saved-effects")).toBeVisible();
   expect(await snapshot()).toEqual([1, 1, 1, 1]);
 });
@@ -233,7 +235,7 @@ test("blocked localStorage still allows the real app to mount and switch theme",
   });
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await click(page, "切换到浅色主题");
+  await activate(page, "切换到浅色主题");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 });
 
@@ -242,7 +244,7 @@ test("open Kumo portals inherit updated accent and readable primary action color
   await openControls(writer);
   await openControls(page);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await click(writer, "dark");
+  await activate(writer, "dark");
   const brand = (target: ReturnType<Page["locator"]>) => target.evaluate((element) => {
     return getComputedStyle(element).getPropertyValue("--color-kumo-brand").trim();
   });
@@ -250,15 +252,13 @@ test("open Kumo portals inherit updated accent and readable primary action color
     await expect(popup).toBeVisible();
     expect(await popup.evaluate((element) => element.closest("#root"))).toBeNull();
     const previous = await brand(popup);
-    await click(writer, nextAccent);
+    await activate(writer, nextAccent);
     await expect.poll(() => brand(popup)).not.toBe(previous);
     expect(await brand(popup)).toBe(await brand(page.locator("html")));
     await expect(popup).toBeVisible();
-    await page.bringToFront();
   };
 
-  await page.bringToFront();
-  await page.getByTestId("open-kumo-dialog").click();
+  await page.getByTestId("open-kumo-dialog").press("Enter");
   const dialog = page.getByRole("dialog", { name: "字段映射确认" });
   await checkActivePortal(dialog, "blue");
   const action = dialog.getByTestId("close-kumo-dialog");
@@ -267,18 +267,18 @@ test("open Kumo portals inherit updated accent and readable primary action color
     return getComputedStyle(element).getPropertyValue("--accent-strong").replaceAll(",", ", ");
   }));
   await page.screenshot({ path: testInfo.outputPath("appearance-dark-blue-dialog-1440.png") });
-  await action.click();
+  await action.press("Enter");
   await expect(dialog).toBeHidden();
-  await page.getByRole("combobox", { name: "上游系统" }).click();
+  await page.getByRole("combobox", { name: "上游系统" }).press("ArrowDown");
   const select = page.getByRole("listbox");
   await checkActivePortal(select, "orange");
   await page.keyboard.press("Escape");
   await expect(select).toBeHidden();
-  await page.getByTestId("open-kumo-menu").click();
+  await page.getByTestId("open-kumo-menu").press("Enter");
   await checkActivePortal(page.getByRole("menu"), "custom");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
-  await click(writer, "green");
+  await activate(writer, "green");
   await expect(page.locator("html")).toHaveAttribute("data-accent", "green");
   expect(await page.locator("html").evaluate((root) => root.style.getPropertyValue("--accent"))).toBe("");
 });
@@ -290,12 +290,11 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
     for (const [theme, accent] of [["light", "green"], ["dark", "purple"], ["light", "orange"], ["dark", "blue"]]) {
-      await click(writer, theme!);
-      await click(writer, accent!);
+      await activate(writer, theme!);
+      await activate(writer, accent!);
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme!);
       await expect(page.locator("html")).toHaveAttribute("data-accent", accent!);
       await expect(page.getByRole("button", { name: theme === "dark" ? "切换到浅色主题" : "切换到深色主题" })).toBeVisible();
-      await page.bringToFront();
       await page.screenshot({ path: testInfo.outputPath(`appearance-${theme}-${accent}-${width}.png`) });
     }
   });
