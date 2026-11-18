@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   deleteApiAsset,
   getApiAsset,
@@ -142,7 +142,7 @@ export function useApiAssetModule({
   }, [filter.downstreamSystemId, filter.method, filter.status, page, pageSize, query]);
 
   const filterKey = JSON.stringify([query.trim(), filter.status || '', filter.method || '', filter.downstreamSystemId || '']);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return;
     if (previousFilterKey.current !== filterKey) {
       previousFilterKey.current = filterKey;
@@ -152,6 +152,7 @@ export function useApiAssetModule({
       }
     }
     void load();
+    return () => { requestSequence.current += 1; };
   }, [active, filterKey, load, page]);
 
   const loadDetail = useCallback(async (): Promise<void> => {
@@ -176,7 +177,7 @@ export function useApiAssetModule({
     }
   }, [active, route.code, route.page]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     void loadDetail();
     return () => { detailSequence.current += 1; };
   }, [loadDetail]);

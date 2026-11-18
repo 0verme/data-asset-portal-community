@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   createIndicator,
   deleteIndicator,
@@ -173,7 +173,7 @@ export function useIndicatorModule({
   const reloadRef = useRef(loadIndicatorData);
   reloadRef.current = loadIndicatorData;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (active) void loadIndicatorData();
     return () => { listSequence.current += 1; };
   }, [active, loadIndicatorData]);

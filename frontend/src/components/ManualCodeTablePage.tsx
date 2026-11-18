@@ -199,24 +199,25 @@ function CodeValueDetailModal({ item, module, canEdit }: CodeValueDetailModalPro
 function CodeTableDetailPage({ module, canEdit }: { module: UseManualCodeTableModuleResult; canEdit: boolean }) {
   const item = module.detailItem;
   if (!item) return null;
+  const countsReady = !module.codeItemLoading && !module.codeItemError;
   return (
     <div className="asset-page code-table-page">
       <PageHeader back={{ onClick: module.closeDetail, text: "返回码值表列表" }} title={item.tableName} subtitle={item.tableCode} icon="table" />
       <div className="indicator-detail-grid">
         <div className="indicator-detail-item"><div className="indicator-detail-label">码值组 / 表编码</div><div className="indicator-detail-value mono">{item.tableCode}</div></div>
         <div className="indicator-detail-item"><div className="indicator-detail-label">表状态</div><div className="indicator-detail-value"><StatusBadge status={item.status} metaMap={MANUAL_CODE_TABLE_STATUS_META} /></div></div>
-        <div className="indicator-detail-item"><div className="indicator-detail-label">条目总数</div><div className="indicator-detail-value">{module.codeItemGroupTotal}</div></div>
+        <div className="indicator-detail-item"><div className="indicator-detail-label">条目总数</div><div className="indicator-detail-value">{countsReady ? module.codeItemGroupTotal : "—"}</div></div>
         <div className="indicator-detail-item"><div className="indicator-detail-label">表样式</div><div className="indicator-detail-value"><span className="tag tag-neutral">{STYLE_LABELS[item.style] || item.style}</span></div></div>
       </div>
       <div className="page-head">
-        <div><div className="page-title">码值条目</div><div className="page-sub">条目按需分页读取；筛选结果 {module.codeItemTotal} 条 / 当前组共 {module.codeItemGroupTotal} 条。</div></div>
+        <div><div className="page-title">码值条目</div>{countsReady ? <div className="page-sub">条目按需分页读取；筛选结果 {module.codeItemTotal} 条 / 当前组共 {module.codeItemGroupTotal} 条。</div> : null}</div>
         {canEdit ? <div className="head-actions"><Button className="btn primary" variant="primary" type="button" onClick={module.openNewCodeItem}><Icon name="plus" size={15} />新增条目</Button></div> : null}
       </div>
       <div className="tbl-wrap code-table-list">
         <div className="field-toolbar">
           <Input aria-label="搜索码值条目" className="inp" value={module.codeItemQuery} onChange={(event) => module.setCodeItemQuery(event.target.value)} placeholder="搜索编码、名称或说明" />
           <Select<string> aria-label="码值条目状态筛选" className="inp" items={[{ label: "全部状态", value: "" }, { label: "启用", value: "enabled" }, { label: "禁用", value: "disabled" }]} value={module.codeItemStatus} onValueChange={(value) => module.setCodeItemStatus(value || "")} />
-          <div className="ft-info" aria-live="polite">共 {module.codeItemTotal} 条匹配码值</div>
+          {countsReady ? <div className="ft-info" aria-live="polite">共 {module.codeItemTotal} 条匹配码值</div> : null}
         </div>
         {module.codeItemLoading ? <LoadingState title="读取码值条目" desc="正在从码值库分页查询当前组的条目。" /> : null}
         {!module.codeItemLoading && module.codeItemError ? <ErrorState title="码值条目读取失败" desc={module.codeItemError} onRetry={module.loadCodeItems} /> : null}
@@ -248,7 +249,7 @@ function CodeTableDetailPage({ module, canEdit }: { module: UseManualCodeTableMo
             </table>
           </WideTableScroll>
         ) : null}
-        <TablePagination page={module.codeItemPage} pageSize={module.codeItemPageSize} total={module.codeItemTotal} onPageChange={module.setCodeItemPage} onPageSizeChange={module.setCodeItemPageSize} loading={module.codeItemLoading} ariaLabel="码值条目分页" />
+        <TablePagination page={module.codeItemPage} pageSize={module.codeItemPageSize} total={module.codeItemError ? null : module.codeItemTotal} disabled={Boolean(module.codeItemError)} onPageChange={module.setCodeItemPage} onPageSizeChange={module.setCodeItemPageSize} loading={module.codeItemLoading} ariaLabel="码值条目分页" />
       </div>
       <CodeValueDetailModal item={module.codeItemDetail} module={module} canEdit={canEdit} />
       <FormModal open={module.codeItemFormModal.open} title={module.codeItemFormModal.mode === "edit" ? "编辑码值条目" : "新增码值条目"} subtitle={item.tableCode} icon="table" onClose={module.closeCodeItemForm} onSubmit={module.submitCodeItem} submitText={module.codeItemFormModal.mode === "edit" ? "保存修改" : "创建条目"} cancelText="取消" busy={module.codeItemFormModal.busy}>

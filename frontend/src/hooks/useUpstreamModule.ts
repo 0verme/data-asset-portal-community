@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   deleteUpstreamSystem,
   getUpstreamSystem,
@@ -258,7 +258,7 @@ export function useUpstreamModule({
     [upRoute.page],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (active) void loadUpstreamData();
     return () => { upstreamListSequence.current += 1; };
   }, [active, loadUpstreamData]);
@@ -275,7 +275,7 @@ export function useUpstreamModule({
     setUpFilter(initialFilter || DEFAULT_UP_FILTER);
   }, [initialFilter]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (active && (upRoute.page === 'detail' || upRoute.page === 'edit') && upRoute.id) {
       loadUpstreamDetail(upRoute.id);
     } else {

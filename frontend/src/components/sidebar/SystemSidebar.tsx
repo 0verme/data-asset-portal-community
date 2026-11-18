@@ -31,29 +31,44 @@ export function SystemSidebar({
   canManageParams,
 }: SystemSidebarProps) {
   const { t } = useTranslation("common");
-  const hasManagementPage = canViewUsers || canViewRoles || canViewMenus || canViewParams;
-  if (!hasManagementPage && canViewOperationLog) {
-    return <div className="side-group"><div className="side-title">操作日志</div></div>;
-  }
-  if (!hasManagementPage) return null;
+  const sections = [
+    { page: "users", label: t("systemManagement.users"), visible: canViewUsers, action: "new-user", actionLabel: t("systemManagement.newUser"), canManage: canManageUsers },
+    { page: "roles", label: t("systemManagement.roles"), visible: canViewRoles, action: "new-role", actionLabel: t("systemManagement.newRole"), canManage: canManageRoles },
+    { page: "menus", label: t("systemManagement.menus"), visible: canViewMenus, action: "new-menu", actionLabel: t("systemManagement.newMenu"), canManage: canManageMenus },
+    { page: "param-dicts", label: t("systemManagement.params"), visible: canViewParams, action: "new-param", actionLabel: t("systemManagement.newParam"), canManage: canManageParams },
+    { page: "branding", label: t("systemManagement.branding"), visible: canViewParams },
+    { page: "ai", label: t("systemManagement.ai"), visible: canViewParams },
+    { page: "operation-logs", label: t("systemManagement.operationLogs"), visible: canViewOperationLog },
+  ].filter((item) => item.visible);
+  if (!sections.length) return null;
+
+  const current = sections.find((item) => item.page === systemRoute.page);
+  const action = current?.canManage ? current.action : undefined;
 
   return (
     <>
-      <div className="side-group">
-        <div className="side-title">系统管理</div>
-        {canViewUsers ? <div className={`side-item${systemRoute.page === "users" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "users" })}>用户管理</div> : null}
-        {canViewRoles ? <div className={`side-item${systemRoute.page === "roles" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "roles" })}>角色管理</div> : null}
-        {canViewMenus ? <div className={`side-item${systemRoute.page === "menus" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "menus" })}>菜单管理</div> : null}
-        {canViewParams ? <div className={`side-item${systemRoute.page === "param-dicts" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "param-dicts" })}>参数字典</div> : null}
-        {canViewParams ? <div className={`side-item${systemRoute.page === "branding" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "branding" })}>{t("systemManagement.branding")}</div> : null}
-        {canViewParams ? <div className={`side-item${systemRoute.page === "ai" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "ai" })}>{t("systemManagement.ai")}</div> : null}
-        {canViewOperationLog ? <div className={`side-item${systemRoute.page === "operation-logs" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "operation-logs" })}>操作日志</div> : null}
-      </div>
-
-      {systemRoute.page === "users" && canManageUsers ? <div className="side-group"><div className="side-title">维护</div><div className="side-item" onClick={() => setSystemActionIntent("new-user")}>新增用户</div></div> : null}
-      {systemRoute.page === "roles" && canManageRoles ? <div className="side-group"><div className="side-title">维护</div><div className="side-item" onClick={() => setSystemActionIntent("new-role")}>新增角色</div></div> : null}
-      {systemRoute.page === "menus" && canManageMenus ? <div className="side-group"><div className="side-title">维护</div><div className="side-item" onClick={() => setSystemActionIntent("new-menu")}>新增菜单</div></div> : null}
-      {systemRoute.page === "param-dicts" && canManageParams ? <div className="side-group"><div className="side-title">维护</div><div className="side-item" onClick={() => setSystemActionIntent("new-param")}>新增参数</div></div> : null}
+      <nav className="side-group" aria-label={t("systemManagement.navigation")}>
+        <div className="side-title">{t("systemManagement.navigation")}</div>
+        {sections.map(({ page, label }) => (
+          <button
+            key={page}
+            className={`side-item${page === systemRoute.page ? " active" : ""}`}
+            type="button"
+            aria-current={page === systemRoute.page ? "page" : undefined}
+            onClick={() => setSystemRoute({ page })}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      {action ? (
+        <div className="side-group">
+          <div className="side-title">{t("systemManagement.maintenance")}</div>
+          <button className="side-item" type="button" onClick={() => setSystemActionIntent(action)}>
+            {current?.actionLabel}
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }

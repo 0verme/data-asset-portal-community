@@ -55,15 +55,18 @@ test("permission refresh fails closed after revocation and ignores unknown codes
 });
 
 test("frontend security boundary keeps API authorization server-owned", async () => {
-  const [app, sidebar, auth, moduleContent, searchPortal] = await Promise.all([
+  const [app, sidebar, auth, moduleContent, searchPortal, systemView] = await Promise.all([
     readFile(`${here}/App.tsx`, "utf8"),
     readFile(`${here}/components/sidebar/SystemSidebar.tsx`, "utf8"),
     readFile(`${here}/hooks/useAuthSession.ts`, "utf8"),
     readFile(`${here}/components/app/ModuleContent.tsx`, "utf8"),
     readFile(`${here}/components/SearchPortalPage.tsx`, "utf8"),
+    readFile(`${here}/components/views/SystemView.tsx`, "utf8"),
   ]);
   assert.match(app, /systemLandingRoute/);
-  assert.match(app, /accessible\[systemRoute\.page\]/);
+  assert.match(systemView, /canViewPage\[systemRoute\.page\] !== true/);
+  assert.match(systemView, /branding: canViewParams/);
+  assert.match(systemView, /"operation-logs": canViewOperationLog/);
   assert.match(sidebar, /canViewRoles/);
   assert.match(auth, /system:role:write/);
   assert.match(app, /businessAccessReady/);

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "./Button.tsx";
 import { Select } from "./Select.tsx";
 import "./TablePagination.css";
@@ -10,7 +11,7 @@ import {
 export interface TablePaginationProps {
   page: number;
   pageSize: number;
-  total: number;
+  total: number | null;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   pageSizeOptions?: readonly number[] | undefined;
@@ -32,7 +33,8 @@ export function TablePagination({
   ariaLabel = "表格分页",
   className,
 }: TablePaginationProps) {
-  const model = resolveTablePaginationModel(page, pageSize, total);
+  const { t } = useTranslation("common");
+  const model = resolveTablePaginationModel(page, pageSize, total ?? 0);
   const options = resolveTablePageSizeOptions(pageSizeOptions, model.pageSize);
   const controlsDisabled = disabled;
   const rootClassName = ["dap-table-pagination", className].filter(Boolean).join(" ");
@@ -45,7 +47,9 @@ export function TablePagination({
       data-loading={loading ? "true" : undefined}
     >
       <div className="dap-table-pagination__range" aria-live="polite">
-        第 {model.firstItem}–{model.lastItem} 条 / 共 {model.total} 条
+        {loading ? t("navigation.loadingPageCount") : total === null
+          ? t("navigation.pageCountUnavailable")
+          : `第 ${model.firstItem}–${model.lastItem} 条 / 共 ${model.total} 条`}
       </div>
       <div className="dap-table-pagination__controls">
         <label className="dap-table-pagination__size-group">
@@ -77,7 +81,7 @@ export function TablePagination({
             上一页
           </Button>
           <span className="dap-table-pagination__page-index">
-            {model.page} / {model.pageCount}
+            {!loading && total !== null ? `${model.page} / ${model.pageCount}` : "—"}
           </span>
           <Button
             className="dap-table-pagination__button"

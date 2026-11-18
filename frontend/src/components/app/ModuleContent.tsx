@@ -105,6 +105,7 @@ function canAccess(context: AppModuleContext, permission: string): boolean {
 }
 
 const MODULE_RENDERERS: Record<ModuleId, ModuleRenderer> = {
+  notFound: ({ context }) => <NotFoundState onHome={() => context.goToModuleWithQuery("portal")} />,
   portal: ({ context }) => (
     <SearchPortalPage
       onNavigate={(target, term) => context.goToModuleWithQuery(toNavigationTarget(target), term)}
@@ -187,8 +188,10 @@ const MODULE_RENDERERS: Record<ModuleId, ModuleRenderer> = {
       canManageParams={context.canManageParams}
       canManageRoles={context.canManageRoles}
       canManageUsers={context.canManageUsers}
-      canManageSystem={context.canManageSystem}
-      canViewParams={context.can("system:param:read")}
+      canViewUsers={context.canViewUsers}
+      canViewRoles={context.canViewRoles}
+      canViewMenus={context.canViewMenus}
+      canViewParams={context.canViewParams}
       canViewOperationLog={context.canViewOperationLog}
       requireLogin={context.requireLogin}
       systemActionIntent={context.systemActionIntent}
@@ -240,6 +243,17 @@ const MODULE_RENDERERS: Record<ModuleId, ModuleRenderer> = {
   ),
 };
 
+function NotFoundState({ onHome }: { onHome: () => void }): React.ReactElement {
+  const { t } = useTranslation("common");
+  return (
+    <div className="state-card">
+      <h1>{t("navigation.notFoundTitle")}</h1>
+      <p>{t("navigation.notFoundDescription")}</p>
+      <button className="btn primary" type="button" onClick={onHome}>{t("navigation.backHome")}</button>
+    </div>
+  );
+}
+
 function ModuleLoadingState(): React.ReactElement {
   const { t } = useTranslation("common");
   return (
@@ -275,6 +289,26 @@ function DisabledAnonymousCatalogState({ context }: { context: AppModuleContext 
   );
 }
 
+function EditorAccessState({ context }: { context: AppModuleContext }): React.ReactElement {
+  const { t } = useTranslation("common");
+  if (!context.auth.user) {
+    return (
+      <div className="state-card">
+        <h4>{t("access.editorLoginRequired")}</h4>
+        <button className="btn primary" type="button" onClick={() => context.requireLogin()}>
+          {t("access.loginToContinue")}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="state-card state-card-error" role="alert">
+      <h4>{t("access.editorDenied")}</h4>
+      <p>{t("access.editorDeniedDescription")}</p>
+    </div>
+  );
+}
+
 export interface ModuleContentProps {
   module: ModuleId;
   context: AppModuleContext;
@@ -282,10 +316,12 @@ export interface ModuleContentProps {
 
 export function ModuleContent({ module, context }: ModuleContentProps): React.ReactElement {
   const renderer = MODULE_RENDERERS[module] || MODULE_RENDERERS.dwm;
+  if (module === "notFound") return renderer({ context });
   if (context.businessAccessReady === false) {
     return <PublicAccessLoadingState />;
   }
-  if (context.catalogAccessDisabled) {
+  if (context.editorAccessDenied) return <EditorAccessState context={context} />;
+  if (context.catalogAccessDisabled && module !== "system") {
     return <DisabledAnonymousCatalogState context={context} />;
   }
   if (module === "portal") {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   clearAuthStorage,
   GUEST_AUTH,
@@ -27,7 +27,8 @@ import type { AuthSession } from '../api/auth.ts';
 import { hasAnyPermission } from '../auth/permissions.ts';
 import { isUnauthorizedError } from '../api/http.ts';
 import { getErrorMessage } from '../utils/ui.ts';
-import { toast } from '../components/common/index.ts';
+import { useTranslation } from 'react-i18next';
+import { confirmAction, toast } from '../components/common/index.ts';
 
 export interface UseAuthSessionResult {
   auth: AuthSession;
@@ -57,6 +58,8 @@ export interface UseAuthSessionResult {
 }
 
 export function useAuthSession(): UseAuthSessionResult {
+  const { t } = useTranslation('auth');
+  const logoutInProgress = useRef(false);
   const [auth, setAuth] = useState<AuthSession>(getInitialAuth);
   const [authReady, setAuthReady] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -153,13 +156,13 @@ export function useAuthSession(): UseAuthSessionResult {
       clearAuthStorage();
       setAuth({ ...GUEST_AUTH });
       setAuthBusy(false);
-      setAuthError('登录状态已失效，请重新登录。');
+      setAuthError(t('sessionExpired'));
       setLoginOpen(true);
     };
 
     window.addEventListener('app:unauthorized', handleUnauthorized);
     return () => window.removeEventListener('app:unauthorized', handleUnauthorized);
-  }, []);
+  }, [t]);
 
   const handleLoginSubmit = async (credentials: LoginOptions): Promise<void> => {
     if (authBusy) return;
@@ -177,17 +180,32 @@ export function useAuthSession(): UseAuthSessionResult {
   };
 
   const handleLogout = async (): Promise<void> => {
+    if (!auth.user || logoutInProgress.current) return;
+    logoutInProgress.current = true;
     try {
-      await logout();
-    } catch (error: unknown) {
-      if (!isUnauthorizedError(error)) {
-        toast.error(getErrorMessage(error, '退出登录失败，请稍后重试。'));
+      const confirmed = await confirmAction({
+        title: t('logoutTitle'),
+        content: t('logoutDescription'),
+        confirmText: t('logout'),
+        cancelText: t('cancel'),
+      });
+      if (!confirmed) return;
+      setAuthBusy(true);
+      try {
+        await logout();
+      } catch (error: unknown) {
+        if (!isUnauthorizedError(error)) {
+          toast.error(getErrorMessage(error, t('logoutFailed')));
+          return;
+        }
       }
-    } finally {
       clearAuthStorage();
       setAuth({ ...GUEST_AUTH });
       setAuthError('');
       setLoginOpen(false);
+    } finally {
+      logoutInProgress.current = false;
+      setAuthBusy(false);
     }
   };
 

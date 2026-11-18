@@ -27,7 +27,9 @@ export interface SystemViewProps {
     canManageParams?: boolean | undefined;
     canManageRoles?: boolean | undefined;
     canManageUsers?: boolean | undefined;
-    canManageSystem?: boolean | undefined;
+    canViewUsers?: boolean | undefined;
+    canViewRoles?: boolean | undefined;
+    canViewMenus?: boolean | undefined;
     canViewParams?: boolean | undefined;
     canViewOperationLog?: boolean | undefined;
     requireLogin: RequireLogin;
@@ -43,7 +45,9 @@ export function SystemView({
     canManageParams = false,
     canManageRoles = false,
     canManageUsers = false,
-    canManageSystem = false,
+    canViewUsers = false,
+    canViewRoles = false,
+    canViewMenus = false,
     canViewParams = false,
     canViewOperationLog = false,
     requireLogin,
@@ -66,39 +70,27 @@ export function SystemView({
             </div>
         );
     }
-    if (systemRoute.page === "ai" || systemRoute.page === "branding") {
-        if (!canViewParams) {
-            return (
-                <div className="state-card state-card-error" role="alert">
-                    <h4>{t("systemManagement.accessDeniedTitle")}</h4>
-                    <p>{t("systemManagement.accessDeniedDescription")}</p>
-                </div>
-            );
-        }
-        return systemRoute.page === "ai"
-            ? <AiManagementPage canEdit={canManageParams} />
-            : <SiteBrandingPage canEdit={canManageParams} />;
+    const canViewPage: Record<string, boolean> = {
+        users: canViewUsers,
+        roles: canViewRoles,
+        menus: canViewMenus,
+        "param-dicts": canViewParams,
+        ai: canViewParams,
+        branding: canViewParams,
+        "operation-logs": canViewOperationLog,
+    };
+    if (canViewPage[systemRoute.page] !== true) {
+        return (
+            <div className="state-card state-card-error" role="alert">
+                <h4>{t("systemManagement.noPageAccessTitle")}</h4>
+                <p>{t("systemManagement.noPageAccessDescription")}</p>
+            </div>
+        );
     }
-    if (systemRoute.page === "operation-logs") {
-        return canViewOperationLog
-            ? <OperationLogPage query={query} />
-            : (
-                <div className="state-card state-card-error" role="alert">
-                    <h4>{t("systemManagement.noPageAccessTitle")}</h4>
-                    <p>{t("systemManagement.noPageAccessDescription")}</p>
-                </div>
-            );
-    }
-    if (!canManageSystem) {
-        return canViewOperationLog
-            ? <OperationLogPage query={query} />
-            : (
-                <div className="state-card state-card-error" role="alert">
-                    <h4>{t("systemManagement.noPageAccessTitle")}</h4>
-                    <p>{t("systemManagement.noPageAccessDescription")}</p>
-                </div>
-            );
-    }
+    if (systemRoute.page === "ai") return <AiManagementPage canEdit={canManageParams} />;
+    if (systemRoute.page === "branding") return <SiteBrandingPage canEdit={canManageParams} />;
+    if (systemRoute.page === "operation-logs") return <OperationLogPage query={query} />;
+
     const canEditCurrentPage =
         systemRoute.page === "roles"
             ? canManageRoles

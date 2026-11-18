@@ -240,7 +240,20 @@ export function parseInitialLocation(): LocationSnapshot {
     systemRoute: DEFAULT_SYSTEM_ROUTE,
   };
 
+  // Reject malformed URL encoding before decoding detail identifiers.
+  try {
+    segments.forEach((segment) => decodeURIComponent(segment));
+  } catch {
+    return { ...base, module: "notFound" };
+  }
+
+  const [, id, action, jobAction] = segments;
+  const invalidDetailPath = segments.length > 3
+    || (segments.length === 3 && (id === "new" || action !== "edit"));
+  const notFound = { ...base, module: "notFound" as const };
+
   if (top === "indicator-maintenance") {
+    if (invalidDetailPath) return notFound;
     if (segments[1] === "new") {
       return { ...base, module: "indicator", indicatorRoute: { page: "new", id: null } };
     }
@@ -253,6 +266,7 @@ export function parseInitialLocation(): LocationSnapshot {
     return { ...base, module: "indicator" };
   }
   if (top === "report-assets") {
+    if (invalidDetailPath) return notFound;
     if (segments[1] === "new") {
       return { ...base, module: "report", reportRoute: { page: "new", code: null } };
     }
@@ -265,11 +279,13 @@ export function parseInitialLocation(): LocationSnapshot {
     return { ...base, module: "report" };
   }
   if (top === "api-assets") {
+    if (invalidDetailPath) return notFound;
     if (segments[1] === "new") return { ...base, module: "apiAsset", apiAssetRoute: { page: "new", code: null } };
     if (segments[1] && segments[2] === "edit") return { ...base, module: "apiAsset", apiAssetRoute: { page: "edit", code: decodeURIComponent(segments[1]) } };
     if (segments[1]) return { ...base, module: "apiAsset", apiAssetRoute: { page: "view", code: decodeURIComponent(segments[1]) } };
     return { ...base, module: "apiAsset" };
   }
+  if (top === "field-mapping" && segments.length > 1) return notFound;
   if (top === "field-mapping") {
     return {
       ...base,
@@ -288,8 +304,10 @@ export function parseInitialLocation(): LocationSnapshot {
       },
     };
   }
+  if (top === "lineage" && segments.length > 1) return notFound;
   if (top === "lineage") return { ...base, module: "lineage", lineageRoute };
   if (top === "data-warehouse") {
+    if (invalidDetailPath) return notFound;
     if (segments[1] === "new") {
       return { ...base, module: "dwm", assetRoute: { page: "new", table: null } };
     }
@@ -314,6 +332,7 @@ export function parseInitialLocation(): LocationSnapshot {
     return { ...base, module: "dwm" };
   }
   if (top === "upstream") {
+    if (invalidDetailPath) return notFound;
     if (segments[1] === "new") {
       return { ...base, module: "upstream", upRoute: { page: "new", id: null } };
     }
@@ -333,7 +352,9 @@ export function parseInitialLocation(): LocationSnapshot {
     }
     return { ...base, module: "upstream" };
   }
-  if (top === "push") {
+  if (top === "push" || top === "downstream-push") {
+    if (segments.length > 4 || (id === "new" && action)
+      || (jobAction && (jobAction !== "edit" || action === "new" || action === "edit"))) return notFound;
     if (segments[1] === "new") {
       return { ...base, module: "push", pushRoute: { page: "sysNew", sys: null, job: null } };
     }
@@ -374,9 +395,13 @@ export function parseInitialLocation(): LocationSnapshot {
     }
     return { ...base, module: "push" };
   }
+  if (top === "root-management" && segments.length > 1) return notFound;
   if (top === "root-management") return { ...base, module: "root" };
+  if (top === "code-table-maintenance" && segments.length > 1) return notFound;
   if (top === "code-table-maintenance") return { ...base, module: "codeTable" };
   if (top === "system-management") {
+    if (segments.length > 2) return notFound;
+    if (!id) return { ...base, module: "system", systemRoute: { page: "landing" } };
     if (segments[1] === "menus") {
       return { ...base, module: "system", systemRoute: { page: "menus" } };
     }
@@ -392,13 +417,14 @@ export function parseInitialLocation(): LocationSnapshot {
     if (segments[1] === "roles") {
       return { ...base, module: "system", systemRoute: { page: "roles" } };
     }
-    if (segments[1] === "operation-logs") {
+    if (id === "operation-logs" || id === "logs") {
       return { ...base, module: "system", systemRoute: { page: "operation-logs" } };
     }
-    return { ...base, module: "system", systemRoute: DEFAULT_SYSTEM_ROUTE };
+    if (id === "users") return { ...base, module: "system", systemRoute: DEFAULT_SYSTEM_ROUTE };
+    return notFound;
   }
-  if (top === "" || top === "portal") return { ...base, module: "portal" };
-  return { ...base, module: "portal" };
+  if (pathname === "/" || pathname === "/portal") return { ...base, module: "portal" };
+  return notFound;
 }
 
 export function buildPathname(
@@ -477,6 +503,7 @@ export function buildPathname(
     return "/push";
   }
   if (module === "system") {
+    if (systemRoute.page === "landing") return "/system-management";
     if (systemRoute.page === "menus") return "/system-management/menus";
     if (systemRoute.page === "param-dicts") return "/system-management/param-dicts";
     if (systemRoute.page === "ai") return "/system-management/ai";

@@ -74,5 +74,6 @@ export async function getCurrentRemoteUser(): Promise<AuthSession> {
 export async function logoutRemote(): Promise<void> {
   await requestRemote<void>('/auth/logout', {
     method: 'POST',
+    suppressUnauthorizedEvent: true,
   });
 }

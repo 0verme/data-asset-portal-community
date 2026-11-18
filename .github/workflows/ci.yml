@@ -651,6 +651,14 @@ jobs:
           VITE_API_MODE: mock
         run: npm run test:browser -- e2e/i18n.spec.ts --workers=2
 
+      - name: Global UX regression in Mock and Remote (Chromium and WebKit)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/global-ux-playwright
+        run: |
+          VITE_API_MODE=mock npm run test:browser -- e2e/global-ux.spec.ts --grep "Mock UX" --workers=2
+          VITE_API_MODE=remote npm run test:browser -- e2e/global-ux.spec.ts --grep "Remote UX" --workers=2
+
       - name: Public branding configuration and responsive portal (Chromium and WebKit)
         if: matrix.lane == 'a'
         env:

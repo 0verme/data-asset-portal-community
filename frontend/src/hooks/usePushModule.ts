@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   deletePushJob,
   deletePushSystem,
@@ -226,7 +226,7 @@ export function usePushModule({
     setDetailReloadVersion((version) => version + 1);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (active) void loadPushData();
     return () => { listSequence.current += 1; };
   }, [active, loadPushData]);
@@ -259,7 +259,7 @@ export function usePushModule({
     }
   }, [active, pushRoute.sys, pushRoute.page]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     void loadPushDetail();
     return () => { detailSequence.current += 1; };
   }, [loadPushDetail, canEdit, detailReloadVersion]);

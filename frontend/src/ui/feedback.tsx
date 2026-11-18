@@ -1,7 +1,7 @@
 import { useEffect, type MouseEventHandler, type ReactNode } from "react";
 import { Banner as KumoBanner } from "@cloudflare/kumo/components/banner";
 import { Empty as KumoEmpty } from "@cloudflare/kumo/components/empty";
-import { Loader as KumoLoader } from "@cloudflare/kumo/components/loader";
+import { Loader as KumoLoader, SkeletonLine } from "@cloudflare/kumo/components/loader";
 import { Toasty, createKumoToastManager } from "@cloudflare/kumo/components/toast";
 import type { ComponentProps } from "react";
 import { Button } from "./Button.tsx";
@@ -12,6 +12,8 @@ import {
   useOverlayPortalRoot,
 } from "./overlayPortal.ts";
 import "./feedback.css";
+
+export { SkeletonLine };
 
 export type ToastTone = "success" | "error" | "warning" | "info";
 

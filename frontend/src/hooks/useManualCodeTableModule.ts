@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   createManualCodeTable,
   deleteManualCodeTable,
@@ -252,7 +252,7 @@ export function useManualCodeTableModule({
   }, [page, pageSize, query, statusFilter, styleFilter]);
 
   const filterKey = JSON.stringify([String(query || '').trim(), styleFilter, statusFilter]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return;
     if (previousFilterKey.current !== filterKey) {
       previousFilterKey.current = filterKey;
@@ -262,6 +262,7 @@ export function useManualCodeTableModule({
       }
     }
     void load();
+    return () => { requestSequence.current += 1; };
   }, [active, filterKey, load, page]);
 
   const filteredItems = items;
@@ -332,7 +333,7 @@ export function useManualCodeTableModule({
   };
 
   const codeItemFilterKey = JSON.stringify([codeItemQuery.trim(), codeItemStatus]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active || !detailItem) return;
     if (previousCodeItemFilterKey.current !== codeItemFilterKey) {
       previousCodeItemFilterKey.current = codeItemFilterKey;
@@ -342,6 +343,7 @@ export function useManualCodeTableModule({
       }
     }
     void loadCodeItems();
+    return () => { codeItemRequestSequence.current += 1; };
   }, [active, codeItemFilterKey, codeItemPage, detailItem, loadCodeItems]);
 
   const openNew = (): void => {

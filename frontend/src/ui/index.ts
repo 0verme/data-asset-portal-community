@@ -23,6 +23,7 @@ export {
   EmptyState,
   ErrorState,
   LoadingState,
+  SkeletonLine,
   ToastHost,
   toast,
   DEFAULT_TOAST_DURATION,

@@ -67,6 +67,9 @@ export function ConfirmDialogHost() {
       });
     return () => {
       openConfirm = null;
+      const resolve = resolverRef.current;
+      resolverRef.current = null;
+      resolve?.(false);
     };
   }, []);
 

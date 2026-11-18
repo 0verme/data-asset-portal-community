@@ -154,6 +154,7 @@
     z-index: 20;
   }
   .topbar-brand { display: flex; align-items: center; gap: 12px; min-width: max-content; flex: 0 0 auto; }
+  .navigation-status { color: var(--ink-3); font-size: 13px; }
   .topbar-nav-slot { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; width: 100%; }
   .topbar-actions { display: flex; align-items: center; justify-self: end; gap: 8px; min-width: max-content; flex: 0 0 auto; white-space: nowrap; }
   .language-switcher { min-width: 40px; padding-left: 8px; padding-right: 8px; flex: 0 0 auto; }
@@ -165,7 +166,7 @@
     display: grid; place-items: center; flex: 0 0 auto;
   }
   .brand-mark img { display: block; width: 100%; height: 100%; object-fit: cover; }
-  .brand-name { min-width: max-content; font-size: 15.5px; font-weight: 600; letter-spacing: 0.3px; color: var(--ink); white-space: nowrap; }
+  .brand-name { max-width: clamp(100px, 23vw, 300px); overflow: hidden; text-overflow: ellipsis; font-size: 15.5px; font-weight: 600; letter-spacing: 0.3px; color: var(--ink); white-space: nowrap; }
   .brand-name small { color: var(--ink-3); font-weight: 400; margin-left: 7px; font-size: 12.5px; letter-spacing: 0; }
 
   .mainnav {
@@ -438,6 +439,9 @@
   .login-card {
     position: relative;
     width: min(420px, 100%);
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
+    overflow-wrap: anywhere;
     padding: 28px;
     border-radius: 20px;
     border: 1px solid var(--line-strong);
@@ -742,6 +746,7 @@
     border-right: 1px solid var(--line);
     padding: 20px 14px;
     overflow-y: auto;
+    overflow-wrap: anywhere;
   }
   .side-group { margin-bottom: 26px; }
   .side-group:last-child { margin-bottom: 0; }
@@ -2739,6 +2744,8 @@
       gap: 8px;
       padding: 7px 12px;
     }
+    .topbar-brand, .brand { min-width: 0; flex: 0 1 auto; }
+    .brand-name { min-width: 0; }
     .topbar-actions { margin-left: auto; gap: 8px; }
 
     .topbar-nav-slot {
@@ -2769,8 +2776,7 @@
     }
 
     .authbar { gap: 0; }
-    .authbar .logout-btn,
-    .user-chip .uc-name { display: none; }
+    .authbar:has(.logout-btn) .user-chip { display: none; }
     .user-chip {
       width: 44px;
       padding: 0;
@@ -3137,6 +3143,9 @@
 
   .confirm-card {
     width: min(460px, 100%);
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+    overflow-wrap: anywhere;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -3243,6 +3252,8 @@
   }
 
   .oplog-filter-field {
+    max-width: 100%;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -3258,7 +3269,8 @@
   }
 
   .oplog-filter-field .inp {
-    min-width: 150px;
+    min-width: min(150px, 100%);
+    max-width: 100%;
   }
 
   .oplog-filter-reset {
