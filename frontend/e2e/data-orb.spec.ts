@@ -62,23 +62,6 @@ async function instrument(page: Page, mode: "native" | "mock", failure?: Failure
     };
 
     const getContext = HTMLCanvasElement.prototype.getContext;
-    const drawArrays = WebGLRenderingContext.prototype.drawArrays;
-    WebGLRenderingContext.prototype.drawArrays = function (this: WebGLRenderingContext, ...args) {
-      drawArrays.apply(this, args);
-      if (this.canvas !== activeCanvas) return;
-      const width = this.drawingBufferWidth;
-      const row = new Uint8Array(width * 4);
-      this.readPixels(0, this.drawingBufferHeight >> 1, width, 1, this.RGBA, this.UNSIGNED_BYTE, row);
-      // Sample across the fluid surface. A single pixel in the specular
-      // highlight can stay saturated even while the surrounding colors move.
-      const body = [0.28, 0.38, 0.5, 0.62, 0.72].flatMap((ratio) => {
-        const start = Math.floor(width * ratio) * 4;
-        return Array.from(row.subarray(start, start + 4));
-      });
-      const haloAlpha = row[Math.floor(width * 0.88) * 4 + 3];
-      probe.draws.push({ time: performance.now(), width, body, haloAlpha });
-    };
-
     Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
       configurable: true,
       value(this: HTMLCanvasElement, type: string, options?: WebGLContextAttributes) {
@@ -93,6 +76,22 @@ async function instrument(page: Page, mode: "native" | "mock", failure?: Failure
           probe.supported = Boolean(gl?.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT)?.precision);
           probe.canLose = Boolean(loss);
           probe.loseContext = () => loss?.loseContext();
+          if (gl) {
+            const drawArrays = gl.drawArrays.bind(gl);
+            gl.drawArrays = (...args) => {
+              drawArrays(...args);
+              const width = gl.drawingBufferWidth;
+              const row = new Uint8Array(width * 4);
+              gl.readPixels(0, gl.drawingBufferHeight >> 1, width, 1, gl.RGBA, gl.UNSIGNED_BYTE, row);
+              // A pixel in the specular highlight can stay saturated while the fluid moves.
+              const body = [0.28, 0.38, 0.5, 0.62, 0.72].flatMap((ratio) => {
+                const start = Math.floor(width * ratio) * 4;
+                return Array.from(row.subarray(start, start + 4));
+              });
+              const haloAlpha = row[Math.floor(width * 0.88) * 4 + 3];
+              probe.draws.push({ time: performance.now(), width, body, haloAlpha });
+            };
+          }
           return gl;
         }
         return {
@@ -171,9 +170,17 @@ for (const [width, theme] of [[390, "dark"], [1440, "light"]] as const) {
     });
 
     test("native WebGL renders and reports frame and DPR measurements when supported", async ({ page }, info) => {
+      test.setTimeout(45_000);
+      const pageErrors: string[] = [];
+      page.on("pageerror", (error) => pageErrors.push(error.message));
+      await page.bringToFront();
+      await page.emulateMedia({ reducedMotion: "no-preference" });
       await instrument(page, "native");
       await page.goto(`${fixture}?theme=${theme}&effects=full`);
-      await expect.poll(async () => (await stats(page)).contexts).toBe(1);
+      await expect(page.locator(".data-orb")).toBeVisible();
+      await expect.poll(async () => ({ contexts: (await stats(page)).contexts, pageErrors }), {
+        timeout: 12_000,
+      }).toEqual({ contexts: 1, pageErrors: [] });
       const support = await page.evaluate(() => window.orbProbe.supported);
       test.skip(!support, "This runner cannot allocate WebGL 1 highp with failIfMajorPerformanceCaveat");
       await expect(page.locator(canvas)).toBeVisible();
