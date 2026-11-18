@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  getAdminBrandingConfig,
   getDefaultPublicBranding,
   parsePublicBrandingConfig,
+  resetAdminBrandingConfig,
+  updateAdminBrandingConfig,
+  uploadBrandingAsset,
   type PublicBrandingConfig,
 } from './branding.ts';
 
@@ -46,4 +50,24 @@ test('public branding parser falls back per field and discards unknown or unsafe
 test('malformed public branding payload falls back to a complete localized config', () => {
   const parsed = parsePublicBrandingConfig({ site: 'invalid', hero: null }, 'zh-CN');
   assert.deepEqual(parsed, getDefaultPublicBranding('zh-CN'));
+});
+
+test('Mock branding remains read-only and never contacts the backend', async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    throw new Error('Mock branding must not fetch');
+  }) as typeof fetch;
+  try {
+    const local = await getAdminBrandingConfig();
+    assert.equal(local.version, 'local-default');
+    assert.equal(local.config.site.title['zh-CN'], getDefaultPublicBranding('zh-CN').site.title);
+    await assert.rejects(updateAdminBrandingConfig(local.config), /Remote mode/);
+    await assert.rejects(resetAdminBrandingConfig(), /Remote mode/);
+    await assert.rejects(uploadBrandingAsset('logo', new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' })), /Remote mode/);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

@@ -41,6 +41,10 @@ function buildApiProxyKey(apiBaseUrl) {
   return `^${escapedBaseUrl}(?:/|$)`;
 }
 
+function buildBrandingProxyKey() {
+  return "^/static/branding/[0-9a-f]{64}\\.(?:png|svg)$";
+}
+
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiMode = resolveFrontendApiMode(env, command);
@@ -59,6 +63,10 @@ export default defineConfig(({ mode, command }) => {
       },
       proxy: apiMode === "remote" ? {
         [buildApiProxyKey(apiBaseUrl)]: {
+          target: backendTarget,
+          changeOrigin: true,
+        },
+        [buildBrandingProxyKey()]: {
           target: backendTarget,
           changeOrigin: true,
         },

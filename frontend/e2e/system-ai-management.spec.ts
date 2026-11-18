@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
 type PermissionMode = "admin" | "readonly" | "none";
+type FixtureOptions = {
+  brandingReadGate?: () => Promise<void>;
+  brandingReadStatus?: (attempt: number) => number;
+};
 
 const quota = {
   parameterCode: "AI_LLM_DAILY_LIMIT",
@@ -40,11 +44,12 @@ const brandingConfig = {
   },
 };
 
-async function installFixtures(page: Page, mode: PermissionMode, language = "zh-CN") {
+async function installFixtures(page: Page, mode: PermissionMode, language = "zh-CN", options: FixtureOptions = {}) {
   const permissions = mode === "admin"
     ? ["system:param:read", "system:param:write"]
     : mode === "readonly" ? ["system:param:read"] : [];
   const requests: Array<{ method: string; path: string; body?: unknown }> = [];
+  let brandingReadAttempts = 0;
 
   await page.addInitScript((selectedLanguage) => {
     localStorage.removeItem("dap_auth");
@@ -106,7 +111,16 @@ async function installFixtures(page: Page, mode: PermissionMode, language = "zh-
       return route.fulfill({ json: { data: { status: "disabled", reasonCode: "disabled", health: "unknown", ready: false, tokenConfigured: false } } });
     }
     if (path === "/system/branding-config" && method === "GET") {
+      brandingReadAttempts += 1;
+      await options.brandingReadGate?.();
+      const status = options.brandingReadStatus?.(brandingReadAttempts) ?? 200;
+      if (status !== 200) {
+        return route.fulfill({ status, contentType: "application/json", body: JSON.stringify({ message: "branding service unavailable" }) });
+      }
       return route.fulfill({ json: { data: { config: brandingConfig, version: "qa-v1" } } });
+    }
+    if (path === "/system/branding-config" && method === "PUT") {
+      return route.fulfill({ json: { data: { config: body, version: "qa-saved-v2" } } });
     }
     if (path === "/system/menus") {
       return route.fulfill({ json: { items: [] } });
@@ -190,4 +204,62 @@ test("users without system parameter read permission cannot open AI configuratio
   await expect(page.locator(".llm-quota-panel, .rag-config-panel")).toHaveCount(0);
   expect(requests.some(({ path }) => path === "/system/ai-llm-daily-quota")).toBe(false);
   expect(requests.some(({ path }) => path.startsWith("/system/rag-search-config"))).toBe(false);
+});
+
+test("branding can be edited and saved after the persisted configuration loads", async ({ page }) => {
+  let finishRead!: () => void;
+  const readGate = new Promise<void>((resolve) => { finishRead = resolve; });
+  const requests = await installFixtures(page, "admin", "en-US", { brandingReadGate: () => readGate });
+  await page.goto("/system-management/branding");
+
+  await expect(page.getByRole("status").filter({ hasText: "Loading site branding settings" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save settings" })).toHaveCount(0);
+  finishRead();
+
+  const title = page.getByRole("textbox", { name: "Browser and site title (zh-CN)" });
+  await expect(title).toBeEnabled();
+  await title.fill("Persisted QA Portal");
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Site branding settings were saved" })).toBeVisible();
+
+  const update = requests.find(({ path, method }) => path === "/system/branding-config" && method === "PUT");
+  expect(update?.body).toMatchObject({ site: { title: { "zh-CN": "Persisted QA Portal" } } });
+});
+
+test("failed branding reads expose only retry and never write local defaults", async ({ page }) => {
+  const requests = await installFixtures(page, "admin", "en-US", { brandingReadStatus: () => 503 });
+  await page.goto("/system-management/branding");
+
+  await expect(page.getByRole("alert")).toContainText("Could not load site branding settings");
+  const retry = page.getByRole("button", { name: "Reload settings" });
+  await expect(retry).toBeEnabled();
+  await retry.click();
+  await expect(page.getByRole("alert")).toContainText("Could not load site branding settings");
+
+  await expect(page.locator("input[type=file]")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save settings" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Restore all defaults" })).toHaveCount(0);
+  const brandingRequests = requests.filter(({ path }) => path === "/system/branding-config" || path.startsWith("/system/branding-config/assets/"));
+  expect(brandingRequests.some(({ method }) => method === "GET")).toBe(true);
+  expect(brandingRequests.every(({ method }) => method === "GET")).toBe(true);
+});
+
+test("retrying a failed branding read enables editing only after the persisted config loads", async ({ page }) => {
+  const retryState = { available: false };
+  const requests = await installFixtures(page, "admin", "en-US", { brandingReadStatus: () => retryState.available ? 200 : 503 });
+  await page.goto("/system-management/branding");
+
+  await expect(page.getByRole("alert")).toContainText("Could not load site branding settings");
+  retryState.available = true;
+  await page.getByRole("button", { name: "Reload settings" }).click();
+
+  const title = page.getByRole("textbox", { name: "Browser and site title (zh-CN)" });
+  await expect(title).toBeEnabled();
+  await title.fill("Recovered QA Portal");
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Site branding settings were saved" })).toBeVisible();
+
+  const updates = requests.filter(({ path, method }) => path === "/system/branding-config" && method === "PUT");
+  expect(updates).toHaveLength(1);
+  expect(updates[0]?.body).toMatchObject({ site: { title: { "zh-CN": "Recovered QA Portal" } } });
 });

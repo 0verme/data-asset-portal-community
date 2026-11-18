@@ -665,6 +665,13 @@ jobs:
           VITE_API_MODE: remote
         run: npm run test:browser -- e2e/system-ai-management.spec.ts --workers=2
 
+      - name: Remote branding asset uploads through the Vite dev proxy (Chromium and WebKit)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/branding-proxy-playwright
+          VITE_API_MODE: remote
+        run: npm run test:browser -- e2e/branding-proxy.spec.ts --workers=2
+
       - name: Remote API, report-option authority, and data trust browser regression (Chromium and WebKit)
         if: matrix.lane == 'a'
         env:
