@@ -619,6 +619,8 @@ export default function App(): React.ReactElement {
       roles: canViewRoles,
       menus: canViewMenus,
       "param-dicts": canViewParams,
+      ai: canViewParams,
+      branding: canViewParams,
       "operation-logs": canViewOperationLog,
     };
     if (!accessible[systemRoute.page]) setSystemRoute(systemLandingRoute);
@@ -714,6 +716,10 @@ export default function App(): React.ReactElement {
                 ? tCommon("search.placeholder.systemMenus")
                 : systemRoute.page === "param-dicts"
                   ? tCommon("search.placeholder.systemParams")
+                    : systemRoute.page === "ai"
+                      ? tCommon("search.placeholder.systemAi")
+                      : systemRoute.page === "branding"
+                        ? tCommon("search.placeholder.systemBranding")
                   : systemRoute.page === "roles"
                     ? tCommon("search.placeholder.systemRoles")
                     : systemRoute.page === "operation-logs"

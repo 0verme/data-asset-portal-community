@@ -21,9 +21,6 @@ import { EmptyState, RowActions, StatusBadge, WideTableScroll } from "../common/
 import { Highlight, Icon } from "../ui.tsx";
 import { Button, TablePagination } from "../../ui/index.ts";
 import { PARAM_STATUS_META } from "./constants.ts";
-import { RagSearchConfigPanel } from "./RagSearchConfigPanel.tsx";
-import { AiLlmDailyQuotaPanel } from "./AiLlmDailyQuotaPanel.tsx";
-import { BrandingConfigPanel } from "./BrandingConfigPanel.tsx";
 
 export interface ParamDictPageProps {
   categories: readonly ParamDictCategoryWithCount[];
@@ -81,9 +78,6 @@ export function ParamDictPage({
 
   return (
     <div className="system-page">
-      <BrandingConfigPanel canEdit={canEdit} />
-      <AiLlmDailyQuotaPanel canEdit={canEdit} />
-      <RagSearchConfigPanel canEdit={canEdit} />
       <div className="page-head">
         <div>
           <div className="page-title">

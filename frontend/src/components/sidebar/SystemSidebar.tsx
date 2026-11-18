@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { SystemRoute } from "../../routing/types.ts";
 
 export interface SystemSidebarProps {
@@ -29,6 +30,7 @@ export function SystemSidebar({
   canManageMenus,
   canManageParams,
 }: SystemSidebarProps) {
+  const { t } = useTranslation("common");
   const hasManagementPage = canViewUsers || canViewRoles || canViewMenus || canViewParams;
   if (!hasManagementPage && canViewOperationLog) {
     return <div className="side-group"><div className="side-title">操作日志</div></div>;
@@ -43,6 +45,8 @@ export function SystemSidebar({
         {canViewRoles ? <div className={`side-item${systemRoute.page === "roles" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "roles" })}>角色管理</div> : null}
         {canViewMenus ? <div className={`side-item${systemRoute.page === "menus" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "menus" })}>菜单管理</div> : null}
         {canViewParams ? <div className={`side-item${systemRoute.page === "param-dicts" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "param-dicts" })}>参数字典</div> : null}
+        {canViewParams ? <div className={`side-item${systemRoute.page === "branding" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "branding" })}>{t("systemManagement.branding")}</div> : null}
+        {canViewParams ? <div className={`side-item${systemRoute.page === "ai" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "ai" })}>{t("systemManagement.ai")}</div> : null}
         {canViewOperationLog ? <div className={`side-item${systemRoute.page === "operation-logs" ? " active" : ""}`} onClick={() => setSystemRoute({ page: "operation-logs" })}>操作日志</div> : null}
       </div>
 

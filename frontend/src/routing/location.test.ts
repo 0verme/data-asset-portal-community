@@ -92,6 +92,8 @@ test("canonical module paths restore their existing route shapes", () => {
     ["/upstream/CRM%201", "upstream", { page: "detail", id: "CRM 1" }, "upRoute"],
     ["/push/SYS/JOB/edit", "push", { page: "jobEdit", sys: "SYS", job: "JOB" }, "pushRoute"],
     ["/system-management/roles", "system", { page: "roles" }, "systemRoute"],
+    ["/system-management/ai", "system", { page: "ai" }, "systemRoute"],
+    ["/system-management/branding", "system", { page: "branding" }, "systemRoute"],
     ["/root-management", "root", null, null],
     ["/code-table-maintenance", "codeTable", null, null],
     ["/portal", "portal", null, null],
@@ -116,6 +118,17 @@ test("mapping keeps the canonical sourceSystemId parameter", () => {
     sourceTable: "orders",
     dwfTable: "dws_orders",
   });
+});
+
+test("AI management and site branding have independent system-management routes", () => {
+  for (const page of ["ai", "branding"] as const) {
+    const location = buildNavigationLocation({
+      module: "system",
+      routes: { ...emptyRoutes, system: { page } },
+    });
+    assert.equal(location.url, `/system-management/${page}`);
+    assert.deepEqual(parseLocation(location.url).systemRoute, { page });
+  }
 });
 
 test("mapping routes retain the persistent table identity", () => {
