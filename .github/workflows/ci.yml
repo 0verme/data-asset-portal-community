@@ -615,8 +615,8 @@ jobs:
           DAP_STATIC_MOCK_BUILD: "1"
         run: npm run build:frontend
 
-      - name: Dependency audit gate (Critical/High must be 0)
-        run: npm audit --audit-level=high
+      - name: Dependency audit gate (Critical/High)
+        run: node scripts/dependency-audit.mjs
 
   frontend-browser:
     name: Frontend Browser / Lane ${{ matrix.lane }}
