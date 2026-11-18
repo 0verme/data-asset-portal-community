@@ -194,15 +194,23 @@ class Reset:
         self.backup_identity = file_identity(os.fstat(fd))
         log("BACKUP: SQLite snapshot verified")
 
+    def preserve_database_metadata(self, fd):
+        replacement = os.fstat(fd)
+        original = self.original_info
+        if (replacement.st_uid, replacement.st_gid) != (original.st_uid, original.st_gid):
+            os.fchown(fd, original.st_uid, original.st_gid)
+        os.fchmod(fd, stat.S_IMODE(original.st_mode))
+
     def prepare_replacement(self, stack):
+        replacement, fd = temporary_file(stack, self.database.parent, ".reset-new-")
+        self.preserve_database_metadata(fd)
+        self.replacement_identity = file_identity(os.fstat(fd))
         self.check_target(self.original)
         # Flush the old WAL through SQLite before swapping the main file. An
         # interrupted swap must never leave the old main without its commits.
         with closing(sqlite3.connect(self.database.as_uri() + "?mode=rw", uri=True)) as db:
             if db.execute("PRAGMA journal_mode=DELETE").fetchone() != ("delete",):
                 raise Refused("could not close the live SQLite journal")
-        replacement, fd = temporary_file(stack, self.database.parent, ".reset-new-")
-        self.replacement_identity = file_identity(os.fstat(fd))
         if self.check_target(self.original):
             raise Refused("SQLite sidecars remained after stopping writes")
         self.replace_attempted = True
@@ -261,6 +269,7 @@ class Reset:
         temporary, fd = temporary_file(stack, self.database.parent, ".reset-restore-")
         shutil.copyfile(self.backup, temporary)
         verify_copy(temporary)
+        self.preserve_database_metadata(fd)
         os.fsync(fd)
         self.check_identity(self.replacement_identity)
         for entry in sidecars(self.database):
@@ -296,7 +305,8 @@ class Reset:
                     raise Refused("effective SQLite file differs from the authorized target")
                 fd = os.open(self.database, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
                 stack.callback(os.close, fd)
-                self.original = file_identity(os.fstat(fd))
+                self.original_info = os.fstat(fd)
+                self.original = file_identity(self.original_info)
                 self.check_target(self.original)
                 version = json.loads((REPO / "demo/manifest.json").read_text())["version"]
                 if type(version) is not int:

@@ -9,6 +9,7 @@ import json
 import os
 import runpy
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
@@ -38,6 +39,8 @@ class DemoResetTests(unittest.TestCase):
                 db.execute("CREATE TABLE before_reset (value TEXT)")
                 db.execute("INSERT INTO before_reset VALUES (?)", (path.stem,))
                 db.commit()
+        self.database.chmod(0o640)
+        self.original_stat = self.database.stat()
         self.backups = self.root / "backups"
         self.backups.mkdir()
         self.config = self.root / "database.yaml"
@@ -157,7 +160,14 @@ os._exit(0)
 """, str(self.database), query, value], check=True, timeout=10)
         self.assertTrue(self.database.with_suffix(".sqlite-wal").is_file())
 
+    def assert_metadata_preserved(self):
+        actual = self.database.stat()
+        self.assertEqual(stat.S_IMODE(actual.st_mode), 0o640)
+        self.assertEqual((actual.st_uid, actual.st_gid),
+                         (self.original_stat.st_uid, self.original_stat.st_gid))
+
     def snapshot_seed(self):
+        self.assert_metadata_preserved()
         plan = community_seed_plan()
         with closing(sqlite3.connect(self.database)) as db:
             rows = {}
@@ -241,6 +251,7 @@ os._exit(0)
         self.assertIn("FAILURE: stage=smoke", logs)
         self.assertIn("ROLLBACK: database restored", logs)
         self.assertIn("SERVICE_RECOVERY: active", logs)
+        self.assert_metadata_preserved()
         for suffix in ("-wal", "-shm", "-journal"):
             self.assertFalse(Path(str(self.database) + suffix).exists())
         with closing(sqlite3.connect(self.database)) as db:

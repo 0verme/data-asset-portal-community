@@ -19,7 +19,8 @@ these checks on the host.
    helper and backup directories writable only by trusted deployment users.
    The reset assumes the stopped Demo service is the database writer.
 2. Confirm the existing backup directory is writable by the Cron user and has
-   space for the snapshot and rebuild. Confirm that user can stop/start the
+   space for the snapshot and rebuild. Confirm that user can preserve the
+   database ownership and mode on a replacement file and can stop/start the
    service using the existing passwordless systemctl commands.
 3. Point the existing host-local `restore-personal-overrides.py` entry point
    at the corrected tracked helper with a symlink. Both the update and reset
@@ -52,7 +53,8 @@ these checks on the host.
    target before stopping the service and again before replacing it, migrating,
    seeding and applying the RAG override. It stops writes, takes a standalone
    SQLite Backup API snapshot, verifies integrity and rebuilds at the existing
-   path. The latest seven backups keep the existing database basename and
+   path with its original ownership and mode. The latest seven backups keep
+   the existing database basename and
    timestamp naming convention. If a rebuild or probe fails, the helper
    stops the service before restoring the verified snapshot and clearing
    sidecars belonging to the failed rebuild. The job still reports failure
