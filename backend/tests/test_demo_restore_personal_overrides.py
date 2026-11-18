@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -49,7 +50,7 @@ class DemoRestorePersonalOverridesTests(unittest.TestCase):
         return result
 
     def stored(self):
-        with sqlite3.connect(self.database) as connection:
+        with closing(sqlite3.connect(self.database)) as connection:
             table, = connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%code_item'"
             ).fetchone()
