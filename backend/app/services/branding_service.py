@@ -86,10 +86,43 @@ _SVG_NUMBER_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?(?:p
 _SVG_OPACITY_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$")
 _SVG_COORDINATES_RE = re.compile(r"^[0-9eE+.,\-\s]+$")
 _SVG_PATH_RE = re.compile(r"^[MmZzLlHhVvCcSsQqTtAa0-9eE+.,\-\s]+$")
-_SVG_TRANSFORM_RE = re.compile(
-    r"^(?:(?:translate|scale|rotate)\(\s*[0-9eE+.,\-\s]+\s*\)\s*)+$"
-)
 _SVG_COLOR_RE = re.compile(r"^(?:none|transparent|currentColor|#[0-9a-fA-F]{3,8}|black|white|red|green|blue|gray|grey)$")
+
+
+def _is_safe_svg_transform(value: str) -> bool:
+    """Validate a small SVG transform grammar without a backtracking regex."""
+    allowed_argument_counts = {"translate": {1, 2}, "scale": {1, 2}, "rotate": {1, 3}}
+    position = 0
+    transform_count = 0
+    while position < len(value):
+        while position < len(value) and value[position].isspace():
+            position += 1
+        if position == len(value):
+            break
+
+        name = next(
+            (candidate for candidate in allowed_argument_counts if value.startswith(f"{candidate}(", position)),
+            None,
+        )
+        if name is None:
+            return False
+        position += len(name) + 1
+        end = value.find(")", position)
+        if end < 0:
+            return False
+
+        arguments = value[position:end].strip()
+        if not arguments or not _SVG_COORDINATES_RE.fullmatch(arguments):
+            return False
+        numbers = [part for part in re.split(r"[,\s]+", arguments) if part]
+        if len(numbers) not in allowed_argument_counts[name]:
+            return False
+        if any(not _SVG_OPACITY_RE.fullmatch(number) for number in numbers):
+            return False
+        position = end + 1
+        transform_count += 1
+
+    return transform_count > 0
 
 
 class BrandingManagementError(Exception):
@@ -293,7 +326,7 @@ def sanitize_svg(data: bytes) -> bytes:
             raise BrandingValidationError("SVG 线端样式无效")
         if name == "stroke-linejoin" and stripped not in {"miter", "round", "bevel"}:
             raise BrandingValidationError("SVG 连接样式无效")
-        if name == "transform" and not _SVG_TRANSFORM_RE.fullmatch(stripped):
+        if name == "transform" and not _is_safe_svg_transform(stripped):
             raise BrandingValidationError("SVG 变换无效")
 
     for element in nodes:

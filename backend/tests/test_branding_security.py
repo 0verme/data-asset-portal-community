@@ -46,12 +46,13 @@ class BrandingAssetSecurityTests(unittest.TestCase):
 
     def test_safe_svg_is_parsed_and_normalized(self):
         sanitized = sanitize_svg(
-            b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2 2 L22 22" stroke="#123456" stroke-width="2"/></svg>'
+            b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2 2 L22 22" stroke="#123456" stroke-width="2" transform="translate(1, 2) scale(1)"/></svg>'
         )
         self.assertIn(b"<path", sanitized)
         self.assertNotIn(b"https://", sanitized)
 
     def test_svg_rejects_active_elements_attributes_external_urls_and_entities(self):
+        repeated_transform = b"scale(\t\t)scale(" * 5000
         cases = [
             b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><script>alert(1)</script></svg>',
             b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" onload="alert(1)"><path d="M0 0"/></svg>',
@@ -59,6 +60,7 @@ class BrandingAssetSecurityTests(unittest.TestCase):
             b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><foreignObject/></svg>',
             b'<!DOCTYPE svg [<!ENTITY x SYSTEM "file:///etc/passwd">]><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">&x;</svg>',
             b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path style="fill:red" d="M0 0"/></svg>',
+            b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path transform="' + repeated_transform + b'"/></svg>',
         ]
         for source in cases:
             with self.subTest(svg=source[:45]), self.assertRaises(BrandingValidationError):
