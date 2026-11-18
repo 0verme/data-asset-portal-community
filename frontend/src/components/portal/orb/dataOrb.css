@@ -1,0 +1,69 @@
+.data-orb {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: var(--data-orb-size, clamp(200px, 52vw, 340px));
+  max-width: 100%;
+  aspect-ratio: 1;
+  pointer-events: none;
+}
+
+.data-orb__surface,
+.data-orb__static {
+  position: absolute;
+  inset: 0;
+}
+
+.data-orb__surface > canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.data-orb__surface:not(:empty) + .data-orb__static {
+  display: none;
+}
+
+/* Two independent layers make the complete static sphere available before JS/GL. */
+.data-orb__static::before,
+.data-orb__static::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+}
+
+.data-orb__static::before {
+  inset: 0;
+  background-image:
+    radial-gradient(ellipse 44% 46% at 48% 50%, rgba(111, 72, 242, .32) 25%, rgba(111, 72, 242, 0) 100%),
+    radial-gradient(ellipse 41% 44% at 56% 47%, rgba(47, 123, 255, .25) 29%, rgba(47, 123, 255, 0) 100%),
+    radial-gradient(ellipse 44% 42% at 50% 56%, rgba(25, 198, 193, .22) 25%, rgba(25, 198, 193, 0) 100%);
+}
+
+.data-orb__static::after {
+  /* Matches the fragment shader's .30 radius within the square surface. */
+  inset: 20%;
+  background-color: #6a45f0;
+  background-image:
+    radial-gradient(ellipse at 33% 25%, rgba(255, 255, 255, .86), rgba(255, 255, 255, 0) 47%),
+    radial-gradient(ellipse at 72% 39%, rgba(47, 123, 255, .80), rgba(47, 123, 255, 0) 62%),
+    radial-gradient(ellipse at 44% 71%, rgba(25, 198, 193, .56), rgba(25, 198, 193, 0) 52%),
+    radial-gradient(ellipse at 71% 76%, rgba(255, 179, 138, .55), rgba(255, 179, 138, 0) 52%);
+  box-shadow: inset 0 0 19px rgba(220, 231, 255, .7), inset 0 0 2px #fff, 0 0 22px rgba(106, 69, 240, .22);
+}
+
+.data-orb[data-theme="dark"] .data-orb__static::before {
+  opacity: .92;
+}
+
+.data-orb[data-theme="light"] .data-orb__static::before {
+  opacity: .75;
+}
+
+.data-orb[data-status="focused"] .data-orb__static::before,
+.data-orb[data-status="typing"] .data-orb__static::before,
+.data-orb[data-status="processing"] .data-orb__static::before,
+.data-orb[data-status="retrieving"] .data-orb__static::before,
+.data-orb[data-status="generating"] .data-orb__static::before {
+  opacity: 1;
+}

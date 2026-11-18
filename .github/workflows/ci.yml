@@ -644,6 +644,13 @@ jobs:
       - name: Install Playwright browsers for API asset validation
         run: npx playwright install --with-deps chromium webkit
 
+      - name: DataOrb component and fallback (Chromium and WebKit)
+        if: matrix.lane == 'b'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/data-orb-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- e2e/data-orb.spec.ts --workers=1
+
       - name: Internationalization language switching and state preservation (Chromium and WebKit)
         if: matrix.lane == 'a'
         env:

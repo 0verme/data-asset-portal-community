@@ -16,3 +16,10 @@ required for these packages.
 
 This product includes software developed at
 Jearhe (overme.cn).
+
+DataOrb includes Orb shader code from fanmihua/data-hub-demo, Copyright (c) 2026
+fanmihua, and 3D simplex noise code from webgl-noise, Copyright (C) 2011 by
+Ashima Arts (Simplex noise) and Copyright (C) 2011-2016 by Stefan Gustavson
+(Classic noise and others). The complete MIT notices and pinned sources are
+provided in frontend/public/licenses/data-orb.txt and copied to licenses/data-orb.txt
+in the frontend distribution.
