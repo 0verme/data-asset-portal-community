@@ -91,6 +91,7 @@ void main(){
   vec3 hc=mix(uC1,uC3,.5+.5*sin(ang+t*.4*uFx));
   hc=mix(hc,uC2,.3);
   float ha=clamp((halo+rim)*mix(.8,1.15,uDark),0.,1.);
+  ha *= 1. - smoothstep(.42, .5, r);
   float a=inside+(1.-inside)*ha;
   vec3 c=col*inside+(1.-inside)*hc*ha;
   gl_FragColor=vec4(c,a);

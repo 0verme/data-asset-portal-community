@@ -35,9 +35,9 @@
 .data-orb__static::before {
   inset: 0;
   background-image:
-    radial-gradient(ellipse at 46% 50%, rgba(111, 72, 242, .32) 25%, rgba(111, 72, 242, 0) 69%),
-    radial-gradient(ellipse at 57% 47%, rgba(47, 123, 255, .25) 29%, rgba(47, 123, 255, 0) 69%),
-    radial-gradient(ellipse at 50% 57%, rgba(25, 198, 193, .22) 25%, rgba(25, 198, 193, 0) 69%);
+    radial-gradient(ellipse 44% 46% at 48% 50%, rgba(111, 72, 242, .32) 25%, rgba(111, 72, 242, 0) 100%),
+    radial-gradient(ellipse 41% 44% at 56% 47%, rgba(47, 123, 255, .25) 29%, rgba(47, 123, 255, 0) 100%),
+    radial-gradient(ellipse 44% 42% at 50% 56%, rgba(25, 198, 193, .22) 25%, rgba(25, 198, 193, 0) 100%);
 }
 
 .data-orb__static::after {
