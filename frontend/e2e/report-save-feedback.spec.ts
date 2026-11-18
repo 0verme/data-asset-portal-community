@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-test("long report save failures keep input, locate field conflicts, and show ordinary errors above the sticky bar", async ({ page }) => {
+async function checkReportSaveFeedback(page: Page, width: number, theme: "light" | "dark") {
   let saveRequests = 0;
   let savedReport: Record<string, unknown> | null = null;
 
@@ -125,9 +125,11 @@ test("long report save failures keep input, locate field conflicts, and show ord
     await route.fulfill({ contentType: "application/json", json: { items: [] } });
   });
 
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript((theme) => localStorage.setItem("dap-theme", theme), theme);
+  await page.setViewportSize({ width, height: 844 });
   await page.goto("/report-assets/new");
   await expect(page.getByRole("heading", { name: "新增报表" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
 
   const code = page.getByLabel("报表编码");
   await code.fill("RPT_PAY_DAILY");
@@ -141,7 +143,7 @@ test("long report save failures keep input, locate field conflicts, and show ord
   ]) {
     const control = page.getByRole("combobox", { name: label });
     await control.click();
-    await page.getByRole("option").filter({ hasNotText: placeholder }).first().click();
+    await page.getByRole("option").filter({ hasNotText: placeholder }).first().press("Enter");
   }
   await page.getByLabel("负责人").fill("E2E 测试用户");
   await page.getByRole("combobox", { name: "统计口径" }).fill("当日");
@@ -196,6 +198,33 @@ test("long report save failures keep input, locate field conflicts, and show ord
   await expect(serviceError).toBeVisible();
   const errorToastSurface = serviceError.locator("xpath=ancestor::*[@data-kumo-part='surface'][1]");
   await expect(errorToastSurface).toBeVisible();
+  // Take multiple consecutive frames starting as soon as the error appears.
+  // A transient slide over the action bar is a failure as well as a bad resting position.
+  const samples = await errorToastSurface.evaluate(async (surface) => {
+    const bar = document.querySelector(".form-action-bar")!;
+    const samples = [];
+    for (let frame = 0; frame < 12; frame += 1) {
+      const bounds = surface.getBoundingClientRect();
+      samples.push({
+        gap: bar.getBoundingClientRect().top - bounds.bottom,
+        top: bounds.top,
+        bottom: bounds.bottom,
+        left: bounds.left,
+        right: bounds.right,
+      });
+      await new Promise(requestAnimationFrame);
+    }
+    return samples;
+  });
+  for (const bounds of samples) {
+    expect(bounds.gap, "the visible Toast surface must stay 8–24px above the action bar").toBeGreaterThanOrEqual(8);
+    expect(bounds.gap).toBeLessThanOrEqual(24);
+    expect(bounds.top).toBeGreaterThanOrEqual(0);
+    expect(bounds.bottom).toBeLessThanOrEqual(844);
+    expect(bounds.left).toBeGreaterThanOrEqual(0);
+    expect(bounds.right).toBeLessThanOrEqual(width);
+  }
+
   await expect(errorToastSurface).toHaveClass(/ring-kumo-danger/);
   await expect.poll(() => saveRequests).toBe(3);
   await expect(code).toHaveValue("RPT_E2E_UNAVAILABLE");
@@ -204,17 +233,6 @@ test("long report save failures keep input, locate field conflicts, and show ord
   const actionBar = page.locator(".form-action-bar");
   expect(Number(await notifications.evaluate((element) => getComputedStyle(element).zIndex)))
     .toBeGreaterThan(Number(await actionBar.evaluate((element) => getComputedStyle(element).zIndex)));
-  const toastBox = await errorToastSurface.boundingBox();
-  const actionBarBox = await actionBar.boundingBox();
-  expect(toastBox).not.toBeNull();
-  expect(actionBarBox).not.toBeNull();
-  const toastToActionBarGap = actionBarBox!.y - (toastBox!.y + toastBox!.height);
-  expect(toastToActionBarGap, "the visible Toast surface must stay 8–24px above the mobile action bar")
-    .toBeGreaterThanOrEqual(8);
-  expect(toastToActionBarGap).toBeLessThanOrEqual(24);
-  expect(toastBox!.y).toBeGreaterThanOrEqual(0);
-  expect(toastBox!.y + toastBox!.height).toBeLessThanOrEqual(844);
-  expect(toastBox!.y + toastBox!.height).toBeLessThanOrEqual(actionBarBox!.y);
 
   const successfulSubmit = save.click();
   await expect.poll(() => saveRequests).toBe(4);
@@ -225,4 +243,12 @@ test("long report save failures keep input, locate field conflicts, and show ord
   const successToastSurface = successToast.locator("xpath=ancestor::*[@data-kumo-part='surface'][1]");
   await expect(successToastSurface).toHaveClass(/ring-kumo-success/);
   await expect(page.locator(".page-title")).toContainText("报表资产");
-});
+}
+
+for (const width of [390, 500, 768, 1440]) {
+  for (const theme of ["light", "dark"] as const) {
+    test(`report save feedback clears the action bar at ${width}px in ${theme}`, async ({ page }) => {
+      await checkReportSaveFeedback(page, width, theme);
+    });
+  }
+}
