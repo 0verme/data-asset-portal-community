@@ -10,9 +10,9 @@ function flattenKeys(value: unknown, prefix = ""): string[] {
   return Object.entries(value).flatMap(([key, child]) => flattenKeys(child, prefix ? `${prefix}.${key}` : key));
 }
 
-test("zh-CN and en-US resources have matching keys for Phase 0 namespaces", async () => {
+test("zh-CN and en-US resources have matching keys for all application namespaces", async () => {
   await i18nReady;
-  for (const namespace of ["common", "navigation", "auth", "warehouse"] as const) {
+  for (const namespace of ["common", "navigation", "auth", "warehouse", "lineage"] as const) {
     const zh = i18n.getResourceBundle("zh-CN", namespace);
     const en = i18n.getResourceBundle("en-US", namespace);
     assert.deepEqual(

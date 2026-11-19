@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 test.describe("Remote UX states", () => {
   for (const outcome of ["zero", "empty", "failure", "forbidden", "invalid"] as const) {
@@ -263,4 +263,160 @@ test.describe("Mock UX navigation and layout", () => {
       }
     }
   });
+});
+
+test.describe("Remote UX lineage", () => {
+  const snapshotAt = "2026-07-20T10:00:00+08:00";
+  const rootName = "analytics." + "long_table_identifier_".repeat(5);
+  const longChineseName = "跨区域业务明细与对应历史记录".repeat(5);
+  const rootId = "table:analytics:root";
+
+  async function routeLineage(
+    page: Page,
+    result: (request: URL) => { status?: number; json: object },
+  ) {
+    await page.route((url) => url.pathname.startsWith("/api/"), (route) => {
+      const url = new URL(route.request().url());
+      switch (url.pathname) {
+        case "/api/auth/me":
+          return route.fulfill({ status: 401, json: {} });
+        case "/api/public-catalog/config":
+          return route.fulfill({ json: { profile: "internal", exportEnabled: false } });
+        case "/api/lineage/initial-view":
+          return route.fulfill(result(url));
+        default:
+          return route.fulfill({ json: { items: [] } });
+      }
+    });
+  }
+
+  function bootstrap(status: string, nodeCount = 0) {
+    return {
+      mode: "persistent", status, snapshotId: status === "no_active_snapshot" ? "" : "test-snapshot",
+      snapshotName: "Lineage test snapshot", snapshotAt, defaultRootId: nodeCount ? rootId : "",
+      nodeCount, edgeCount: Math.max(nodeCount - 1, 0),
+    };
+  }
+
+  for (const { width, count, language, theme } of [
+    { width: 1440, count: 100, language: "en-US", theme: "light" },
+    { width: 390, count: 25, language: "zh-CN", theme: "light" },
+    { width: 320, count: 100, language: "en-US", theme: "dark" },
+  ] as const) {
+    test(`fits and navigates ${count} nodes at ${width}px in ${language} / ${theme}`, async ({ page }, testInfo) => {
+      const english = language === "en-US";
+      await page.emulateMedia({ colorScheme: theme });
+      await page.setViewportSize({ width, height: 900 });
+      await page.addInitScript((locale) => localStorage.setItem("dap-language", locale), language);
+      const root = { id: rootId, kind: "table", name: rootName, displayName: rootName, namespace: "analytics", schema: "analytics", attributes: {} };
+      const leaves = Array.from({ length: count - 1 }, (_, index) => {
+        const name = index === 0 ? longChineseName : `LEAF_${index}`;
+        return { id: `table:billing:${index}`, kind: "table", name, displayName: name, namespace: "billing", schema: "billing", attributes: {} };
+      });
+      const edges = leaves.map((node, i) => ({
+        id: `edge:${i}`, sourceId: rootId, targetId: node.id, kind: "table_lineage",
+        evidence: { type: "derived_job_path", description: "Fixture evidence" }, confidence: "high",
+      }));
+      await routeLineage(page, () => ({ json: { data: {
+        bootstrap: bootstrap("ready", count), noticeCode: null,
+        graph: {
+          snapshot: { snapshotId: "test-snapshot", generatedAt: snapshotAt, generator: { name: "fixture", version: "1" } },
+          rootId, view: "table", nodes: [root, ...leaves], edges, truncated: count === 100, diagnostics: [],
+        },
+      } } }));
+      await page.goto("/lineage");
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      const viewer = page.locator("lineage-viewer");
+      const svg = viewer.locator("svg");
+      const fit = page.getByRole("button", { name: english ? "Fit entire graph" : "适应全部" });
+      await expect(viewer.locator(".node")).toHaveCount(count);
+      expect(await viewer.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return style.getPropertyValue("--lineage-background").trim() === style.getPropertyValue("--surface-2").trim();
+      })).toBe(true);
+      await fit.click();
+      const readTransform = () => viewer.locator(".viewport").evaluate((el) => {
+        const value = (el as SVGGraphicsElement).transform.baseVal.consolidate()?.matrix;
+        return { scale: value?.a ?? 0, x: value?.e ?? 0, y: value?.f ?? 0 };
+      });
+      const initialFit = await readTransform();
+      expect(initialFit.scale).toBeGreaterThan(0);
+      if (count === 100) expect(initialFit.scale).toBeLessThan(0.1);
+      expect(await svg.evaluate((el) => {
+        const bounds = el.getBoundingClientRect();
+        return Array.from(el.querySelectorAll(".node-surface")).every((node) => {
+          const box = node.getBoundingClientRect();
+          return box.left >= bounds.left && box.right <= bounds.right
+            && box.top >= bounds.top && box.bottom <= bounds.bottom;
+        });
+      })).toBe(true);
+
+      await page.getByRole("button", { name: english ? "Zoom in" : "放大" }).click();
+      await expect.poll(async () => (await readTransform()).scale).toBeCloseTo(initialFit.scale * 1.2, 5);
+      await page.getByRole("button", { name: english ? "Zoom out" : "缩小" }).click();
+      await expect.poll(async () => (await readTransform()).scale).toBeCloseTo(initialFit.scale, 5);
+      await fit.click();
+      await svg.scrollIntoViewIfNeeded();
+      const box = (await svg.boundingBox())!;
+      await page.mouse.move(box.x + 12, box.y + 60);
+      await page.mouse.wheel(0, -80);
+      await expect.poll(async () => (await readTransform()).scale).toBeCloseTo(initialFit.scale * Math.exp(0.16), 5);
+      const afterWheel = await readTransform();
+      await page.mouse.down();
+      await page.mouse.move(box.x + 48, box.y + 94, { steps: 4 });
+      await page.mouse.up();
+      await expect.poll(async () => (await readTransform()).x).toBeCloseTo(afterWheel.x + 36, 3);
+      await expect.poll(async () => (await readTransform()).y).toBeCloseTo(afterWheel.y + 34, 3);
+
+      await page.getByRole("button", { name: english ? "Focus root neighborhood" : "定位根节点邻域" }).click();
+      expect((await readTransform()).scale).toBeLessThan(initialFit.scale);
+      await fit.click();
+      expect(await readTransform()).toEqual(initialFit);
+      await expect(viewer.locator(`g.node[data-node-id="${rootId}"] > title`)).toHaveText(rootName);
+      await expect(viewer.locator(`g.node[data-node-id="${rootId}"] .node-subtitle`)).toHaveCount(0);
+      await expect(viewer.locator('g.node[data-node-id="table:billing:0"] > title')).toHaveText(`billing.${longChineseName}`);
+      await expect(page.locator(".lineage-detail h2")).toHaveText(rootName);
+      await expect(page.locator(".lineage-detail-content > p")).toHaveCount(0);
+      await expect(page.locator(".lineage-detail")).toContainText("2026-07-20 10:00:00 +08:00");
+      if (count === 100) await expect(page.locator(".lineage-notice")).toContainText("Results were truncated");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      expect(await page.locator(".lineage-detail-content").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+
+      if (width === 1440) {
+        const table = page.locator(".lineage-table-item").filter({ hasText: "long_table_identifier_" });
+        await expect(table).toHaveAttribute("title", rootName);
+        const snapshot = page.locator(".lineage-snapshot-info");
+        await snapshot.locator("summary").click();
+        await expect(snapshot).toContainText("2026-07-20 10:00:00 +08:00");
+      }
+      await page.locator(".lineage-card").screenshot({ path: testInfo.outputPath(`lineage-${width}-${language}-${theme}.png`) });
+    });
+  }
+
+  for (const status of ["no_active_snapshot", "empty_snapshot", "unavailable"] as const) {
+    test(`renders and retries ${status} without falling back to Mock`, async ({ page }) => {
+      await page.addInitScript(() => localStorage.setItem("dap-language", "en-US"));
+      let requests = 0;
+      await routeLineage(page, () => {
+        requests++;
+        return status === "unavailable" && requests === 1
+          ? { status: 503, json: { message: "Fixture snapshot read failed" } }
+          : { json: { data: { bootstrap: bootstrap(status === "unavailable" ? "no_active_snapshot" : status), graph: null, noticeCode: null } } };
+      });
+      await page.goto("/lineage");
+      if (status === "unavailable") {
+        await expect(page.getByRole("alert").filter({ hasText: "Could not load lineage" })).toContainText("Fixture snapshot read failed");
+        await expect(page.locator("lineage-viewer")).toHaveCount(0);
+        await expect(page.getByText("Demo lineage data", { exact: true })).toHaveCount(0);
+      } else {
+        const text = status === "empty_snapshot" ? "The active snapshot has no nodes." : "There is no active lineage snapshot.";
+        await expect(page.locator(".empty").filter({ hasText: text })).toBeVisible();
+      }
+      await page.getByRole("button", { name: "Reload" }).click();
+      await expect(page.locator(".empty").filter({ hasText: "No lineage snapshot data" })).toBeVisible();
+      await expect(page.locator(".state-card-error")).toHaveCount(0);
+      await expect(page.locator("lineage-viewer")).toHaveCount(0);
+      expect(requests).toBe(2);
+    });
+  }
 });

@@ -3,10 +3,12 @@ import { initReactI18next } from "react-i18next";
 
 import authEn from "./locales/en-US/auth.json" with { type: "json" };
 import commonEn from "./locales/en-US/common.json" with { type: "json" };
+import lineageEn from "./locales/en-US/lineage.json" with { type: "json" };
 import navigationEn from "./locales/en-US/navigation.json" with { type: "json" };
 import warehouseEn from "./locales/en-US/warehouse.json" with { type: "json" };
 import authZh from "./locales/zh-CN/auth.json" with { type: "json" };
 import commonZh from "./locales/zh-CN/common.json" with { type: "json" };
+import lineageZh from "./locales/zh-CN/lineage.json" with { type: "json" };
 import navigationZh from "./locales/zh-CN/navigation.json" with { type: "json" };
 import warehouseZh from "./locales/zh-CN/warehouse.json" with { type: "json" };
 
@@ -24,8 +26,8 @@ export type { SupportedLanguage } from "./locale.ts";
 export const i18n = i18next.createInstance();
 
 const resources = {
-  "zh-CN": { common: commonZh, navigation: navigationZh, auth: authZh, warehouse: warehouseZh },
-  "en-US": { common: commonEn, navigation: navigationEn, auth: authEn, warehouse: warehouseEn },
+  "zh-CN": { common: commonZh, lineage: lineageZh, navigation: navigationZh, auth: authZh, warehouse: warehouseZh },
+  "en-US": { common: commonEn, lineage: lineageEn, navigation: navigationEn, auth: authEn, warehouse: warehouseEn },
 } as const;
 
 function syncDocumentLanguage(language: string): void {
@@ -45,7 +47,7 @@ export const i18nReady = i18n
     fallbackLng: DEFAULT_LANGUAGE,
     supportedLngs: ["zh-CN", "en-US"],
     load: "currentOnly",
-    ns: ["common", "navigation", "auth", "warehouse"],
+    ns: ["common", "navigation", "auth", "warehouse", "lineage"],
     defaultNS: "common",
     returnNull: false,
     saveMissing: false,

@@ -7,8 +7,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from fastapi.testclient import TestClient
+
+from backend.app.application import Identity
+from backend.app.authorization.core import AuthorizationService, AuthorizationSubject
 from backend.app.db.service import CoreAccess
 from backend.app.db.sqlite_adapter import connect
+from backend.app.fastapi_app import create_fastapi_app
 from backend.app.migrations.schema import initialize
 from backend.app.services import lineage_service
 
@@ -402,6 +407,72 @@ class PersistentLineageReadTests(unittest.TestCase):
         ids = {node["id"] for node in graph["nodes"]}
         self.assertIn("table:dwf_boundary", ids)
         self.assertNotIn("table:above_dwf", ids)
+
+    def test_catalog_profiles_scope_lineage_reads_to_active_public_metadata(self):
+        class FixtureAuthorizationRepository:
+            def get_subject(self, identity):
+                return AuthorizationSubject(identity.user, identity.role, role_enabled=identity.role != "disabled")
+
+            def get_permissions(self, role_code):
+                return ("lineage:read",) if role_code == "maintainer" else ()
+
+        paths = {
+            "bootstrap": "/api/lineage/bootstrap",
+            "assets": "/api/lineage/assets?name=MATCHING",
+            "subgraph": "/api/lineage/subgraph?rootId=table:input_a&view=detail&direction=downstream",
+            "initial": "/api/lineage/initial-view?rootId=table:input_a&view=detail&direction=downstream",
+        }
+        authorization = AuthorizationService(FixtureAuthorizationRepository())
+        for profile in ("internal", "strict", "disabled"):
+            for role in (None, "maintainer", "restricted", "disabled"):
+                with self.subTest(profile=profile, role=role), patch.dict(
+                    os.environ, {"PUBLIC_CATALOG_PROFILE": profile}
+                ):
+                    identity = Identity(role=role, user=f"fixture-{role}", name="Fixture user") if role else None
+                    with TestClient(create_fastapi_app(
+                        identity_resolver=lambda _request: identity,
+                        authorization_service_instance=authorization,
+                    )) as client:
+                        responses = {key: client.get(path) for key, path in paths.items()}
+                    if profile == "disabled" and role in (None, "disabled"):
+                        status = 401 if role is None else 403
+                        for response in responses.values():
+                            self.assertEqual(status, response.status_code, response.text)
+                            self.assertNotIn("data", response.json())
+                        continue
+
+                    for response in responses.values():
+                        self.assertEqual(200, response.status_code, response.text)
+                        self.assertNotIn("MATCHING_INACTIVE", response.text)
+                        self.assertNotIn("input-record-a1", response.text)
+                    result = {key: response.json()["data"] for key, response in responses.items()}
+                    for bootstrap in (result["bootstrap"], result["initial"]["bootstrap"]):
+                        self.assertEqual("active", bootstrap["snapshotId"])
+                        self.assertEqual((14, 13), (bootstrap["nodeCount"], bootstrap["edgeCount"]))
+                    self.assertEqual(
+                        {"MATCHING_ONE", "MATCHING_TWO", "MATCHING_THREE"},
+                        {node["name"] for node in result["assets"]},
+                    )
+                    for graph in (result["subgraph"], result["initial"]["graph"]):
+                        self.assertEqual("active", graph["snapshot"]["snapshotId"])
+                        nodes = {node["id"] for node in graph["nodes"]}
+                        self.assertIn("table:input_a", nodes)
+                        self.assertNotIn("table:inactive-match", nodes)
+                        self.assertTrue(graph["edges"])
+                        for edge in graph["edges"]:
+                            self.assertIn(edge["sourceId"], nodes)
+                            self.assertIn(edge["targetId"], nodes)
+                            self.assertNotIn("sourceRecordId", edge["evidence"])
+                            self.assertNotIn("diagnostics", edge)
+
+    def test_edge_budget_reports_truncation_without_reaching_node_limit(self):
+        with patch.object(lineage_service, "MAX_LINEAGE_SUBGRAPH_EDGE_ROWS", 1):
+            graph = lineage_service.get_subgraph(
+                "table:input_a", "downstream", 3, 25, "detail"
+            )
+        self.assertTrue(graph["truncated"])
+        self.assertLess(len(graph["nodes"]), 25)
+        self.assertLessEqual(len(graph["edges"]), 1)
 
     def test_large_snapshot_reads_remain_bounded_at_twenty_thousand_nodes_and_fifty_thousand_edges(self):
         connection = connect({"type": "sqlite", "database": str(self.database)})

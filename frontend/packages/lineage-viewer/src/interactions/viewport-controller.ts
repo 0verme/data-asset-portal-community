@@ -1,4 +1,5 @@
 import {
+  MIN_SCALE,
   fitTransform,
   fitBoundsTransform,
   focusTransform,
@@ -20,6 +21,7 @@ export class ViewportController {
   private viewport: ViewportSize = { width: 0, height: 0 };
   private scene: SceneBounds | null = null;
   private userInteracted = false;
+  private minZoomScale = MIN_SCALE;
   constructor(private readonly apply: (transform: ViewportTransform) => void) {}
   setScene(scene: SceneBounds | null, viewport: ViewportSize, fitOnLoad: boolean): void {
     this.scene = scene;
@@ -27,7 +29,7 @@ export class ViewportController {
     this.userInteracted = false;
     const initial = fitOnLoad && scene !== null ? fitTransform(scene, viewport) : identityTransform;
     this.baseline = initial ?? identityTransform;
-    this.setTransform(this.baseline);
+    this.applyFit(this.baseline);
   }
   resize(viewport: ViewportSize, fitOnLoad: boolean): void {
     const previous = this.viewport;
@@ -37,7 +39,7 @@ export class ViewportController {
       const fit = fitTransform(this.scene, viewport);
       if (fit) {
         this.baseline = fit;
-        this.setTransform(fit);
+        this.applyFit(fit);
       }
       return;
     }
@@ -63,17 +65,17 @@ export class ViewportController {
   fit(): void {
     if (this.scene) {
       const fit = fitTransform(this.scene, this.viewport);
-      if (fit) this.setTransform(fit);
+      if (fit) this.applyFit(fit);
     }
   }
   fitBounds(bounds: SceneBounds, options?: ViewportFitOptions): void {
     const fit = fitBoundsTransform(bounds, this.viewport, options);
-    if (fit) this.setTransform(fit);
+    if (fit) this.applyFit(fit);
   }
   reset(): void {
     if (this.scene) {
       this.userInteracted = false;
-      this.setTransform(this.baseline);
+      this.applyFit(this.baseline);
     }
   }
   focus(center: { x: number; y: number }): void {
@@ -89,10 +91,14 @@ export class ViewportController {
   }
   zoom(point: { x: number; y: number }, factor: number): void {
     this.userInteracted = true;
-    this.setTransform(zoomAt(this.transform, point, factor));
+    this.setTransform(zoomAt(this.transform, point, factor, this.minZoomScale));
   }
   destroy(): void {
     this.scene = null;
+  }
+  private applyFit(transform: ViewportTransform): void {
+    this.minZoomScale = Math.min(MIN_SCALE, transform.scale);
+    this.setTransform(transform);
   }
   private setTransform(value: ViewportTransform): void {
     this.transform = sanitize(value);

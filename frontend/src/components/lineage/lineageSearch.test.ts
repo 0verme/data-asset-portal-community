@@ -3,7 +3,6 @@ import test from "node:test";
 
 import type { LineageNode } from "../../api/lineage.ts";
 import {
-  describeLineageSearchCandidate,
   lineageSearchQueryForCandidate,
   resolveLineageSearchMatches,
 } from "./lineageSearch.ts";
@@ -32,7 +31,6 @@ test("collector-qualified table names normalize to exact matches before exact ta
   assert.equal(bare.directMatch?.id, collectorQualifiedTable.id);
   assert.equal(qualified.directMatch?.id, collectorQualifiedTable.id);
   assert.equal(lineageSearchQueryForCandidate(collectorQualifiedTable), "dwm.ACCOUNT");
-  assert.equal(describeLineageSearchCandidate(collectorQualifiedTable).nameLabel, "表名：ACCOUNT");
 });
 
 test("same-name exact tables in different schemas remain explicit candidates", () => {
@@ -59,14 +57,4 @@ test("partial searches retain single-result behavior and list ambiguous candidat
   assert.equal(ambiguousPartial.directMatch, null);
   assert.deepEqual(ambiguousPartial.candidates, [exactDwmTable, fuzzyJob]);
   assert.equal(job.directMatch?.id, fuzzyJob.id);
-  assert.deepEqual(describeLineageSearchCandidate(exactDwmTable), {
-    kindLabel: "表节点",
-    namespaceLabel: "业务 Schema / namespace_name：DWM",
-    nameLabel: "表名：M_JJQD_LIST",
-  });
-  assert.deepEqual(describeLineageSearchCandidate(fuzzyJob), {
-    kindLabel: "作业节点",
-    namespaceLabel: "命名空间：scheduler",
-    nameLabel: "作业名：JOB_M_JJQD_LIST",
-  });
 });
