@@ -267,14 +267,15 @@ Windows PowerShell：
 .\scripts\demo.ps1
 ```
 
-#### 演示管理员
+#### 演示业务维护员
 
 Community Demo 初始化完成后，可以使用：
 
-- 用户名：`admin`
-- 密码：`123456`
+- 用户名：`devp`
+- 密码：`devp`
+- 角色：`maintainer`（业务维护员）
 
-该账号仅用于 Community Demo / 本地体验环境，不是生产环境默认管理员。正式部署请使用 `backend/scripts/create_admin.py` 交互创建管理员；生产 bootstrap 不提供默认密码。
+该公开账号仅用于隔离的 Community Demo / 本地体验环境，不具有用户、角色和系统参数管理权限。正式部署请使用 `backend/scripts/create_admin.py` 交互创建管理员；生产 bootstrap 不提供默认密码。
 
 详细说明见 [Community Demo 指南](./docs/community-demo.md)。
 
