@@ -741,7 +741,7 @@ jobs:
         env:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/ai-ask-playwright
           VITE_API_MODE: remote
-        run: npm run test:browser -- e2e/ai-ask.spec.ts --workers=2
+        run: npm run test:browser -- e2e/ai-ask.spec.ts e2e/portal-homepage.spec.ts --workers=2
 
       - name: Static Mock AI browser regression (Chromium and WebKit)
         if: matrix.lane == 'b'
