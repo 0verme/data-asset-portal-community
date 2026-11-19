@@ -331,18 +331,19 @@ backend/.venv/bin/python demo/seed_postgres.py --dialect postgres --schema dwp
 
 `docs/pg/`、`docs/dws/` 中的方言 SQL 和 external integration 说明是补充参考，不是 `backend/schema` + Alembic 的替代。需要 vendor-specific DDL 时先确认目标 profile、依赖和对象归属，不要无条件执行全部 SQL。
 
-## Community Demo 默认管理员
+## Community Demo 业务维护员
 
-Community Demo 初始化过程中会自动创建演示管理员：
+Community Demo 初始化过程中会创建非管理员演示账户：
 
 | 项目 | 默认值 |
 | --- | --- |
-| 用户名 | `admin` |
-| 密码 | `123456` |
-| 角色 | 管理员 |
+| 用户名 | `devp` |
+| 密码 | `devp` |
+| 角色 | 业务维护员（`maintainer`） |
 
-- 仅用于 Community Demo / 本地测试
-- 不应作为生产环境凭据
+- 仅用于隔离的 Community Demo / 本地测试；凭证公开，不应作为生产环境凭据
+- 不具备用户、角色、系统参数的管理权限
+- 旧版 Demo 默认管理员不能通过简单重复 Seed 安全迁移；仅在可丢弃的 Demo 数据库上重新初始化
 - 正式部署请使用 `backend/scripts/create_admin.py` 交互创建管理员；生产 bootstrap 不提供默认密码
 
 血缘 API 与其他 DAP 元数据模块使用同一个 `ASSET_DB_PROFILE`，不需要单独设置 `LINEAGE_DB_PROFILE` 或 `LINEAGE_STORAGE_MODE`。先确认该参数库的血缘三表和有效快照；如需首次采集，请按 [`血缘快照采集与发布指南`](./docs/lineage_bulk_import_guide.md) 使用同一个 Profile 执行 `collect_lineage_snapshot.py --dry-run`，确认后再单独授权正式发布。无 ACTIVE 快照会显示空状态，采集失败应保留原 ACTIVE 快照。
