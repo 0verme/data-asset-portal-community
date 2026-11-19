@@ -119,16 +119,11 @@ test("More menu items keep selection and navigation inside the DAP DropdownMenu 
   assert.doesNotMatch(moreNav, /role="menuitem"|<button/);
 });
 
-test("accent preset controls are accessible DAP buttons with a visible selected marker", () => {
-  assert.ok(app.includes('import { useAccent } from "./hooks/useAccent.ts";'));
-  assert.ok(app.includes('const { accent, setAccent } = useAccent();'));
-  assert.match(app, /<div className="accent-preset-group" role="group" aria-label=\{tCommon\("theme\.palette"\)\}>/);
-  for (const [preset, label] of [["green", "theme.green"], ["purple", "theme.purple"]]) {
-    assert.ok(app.includes(`aria-label={tCommon("${label}")}`));
-    assert.ok(app.includes(`aria-pressed={accent === "${preset}"}`));
-    assert.ok(app.includes(`onClick={() => setAccent("${preset}")}`));
-  }
-  assert.match(appStyles, /\.accent-preset-button\[aria-pressed="true"\] \.accent-preset-check/);
+test("the shared header has one appearance entry beside the theme shortcut", () => {
+  const actions = app.slice(app.indexOf('<div className="topbar-actions">'));
+  assert.match(actions, /<LanguageSwitcher \/>[\s\S]*?className="theme-toggle"[\s\S]*?<AppearanceSettings \/>[\s\S]*?<AuthBar/);
+  assert.equal([...app.matchAll(/<AppearanceSettings \/>/g)].length, 1);
+  assert.doesNotMatch(actions, /accent-preset-group/);
 });
 
 test("theme trigger uses a DAP IconButton and preserves its dynamic label and title", () => {

@@ -217,10 +217,42 @@
   },
   "theme": {
     "switchToLight": "Switch to light theme",
-    "switchToDark": "Switch to dark theme",
-    "palette": "Theme colors",
-    "green": "Green",
-    "purple": "Purple"
+    "switchToDark": "Switch to dark theme"
+  },
+  "appearance": {
+    "title": "Appearance settings",
+    "description": "Customize the interface on this device.",
+    "close": "Close appearance settings",
+    "themeMode": "Theme mode",
+    "modes": {
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "accent": "Accent color",
+    "presets": {
+      "green": "Green",
+      "blue": "Blue",
+      "purple": "Purple",
+      "orange": "Orange"
+    },
+    "custom": "Custom color",
+    "effectiveAccent": "Applied accent color",
+    "hexHint": "Enter #RRGGBB. The swatch shows the contrast-adjusted color.",
+    "invalidHex": "Enter a valid HEX color, such as #2563EB.",
+    "effects": "Visual effects",
+    "effectLevels": {
+      "full": "Full",
+      "subtle": "Subtle",
+      "off": "Off"
+    },
+    "reducedMotion": "Decorative effects are off because your system prefers reduced motion.",
+    "density": "Display density",
+    "densities": {
+      "comfortable": "Comfortable",
+      "compact": "Compact"
+    },
+    "restoreDefaults": "Restore defaults"
   },
   "access": {
     "moduleLoadingTitle": "Loading module",

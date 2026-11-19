@@ -241,18 +241,26 @@ test("blocked localStorage still allows the real app to mount and switch theme",
 
 test("open Kumo portals inherit updated accent and readable primary action colors", async ({ context, page }, testInfo) => {
   const writer = await context.newPage();
-  await openControls(writer);
+  await writer.goto("/");
+  await writer.getByRole("button", { name: "风格设置" }).press("Enter");
+  const settings = writer.getByRole("dialog", { name: "风格设置" });
+  const choose = async (name: string) => {
+    const radio = settings.getByRole("radio", { name, exact: true });
+    await expect(radio).toBeVisible();
+    await radio.press("Space");
+    await expect(radio).toBeChecked();
+  };
   await openControls(page);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await activate(writer, "dark");
+  await choose("深色");
   const brand = (target: ReturnType<Page["locator"]>) => target.evaluate((element) => {
     return getComputedStyle(element).getPropertyValue("--color-kumo-brand").trim();
   });
-  const checkActivePortal = async (popup: ReturnType<Page["locator"]>, nextAccent: string) => {
+  const checkActivePortal = async (popup: ReturnType<Page["locator"]>, update: () => Promise<void>) => {
     await expect(popup).toBeVisible();
     expect(await popup.evaluate((element) => element.closest("#root"))).toBeNull();
     const previous = await brand(popup);
-    await activate(writer, nextAccent);
+    await update();
     await expect.poll(() => brand(popup)).not.toBe(previous);
     expect(await brand(popup)).toBe(await brand(page.locator("html")));
     await expect(popup).toBeVisible();
@@ -260,25 +268,34 @@ test("open Kumo portals inherit updated accent and readable primary action color
 
   await page.getByTestId("open-kumo-dialog").press("Enter");
   const dialog = page.getByRole("dialog", { name: "字段映射确认" });
-  await checkActivePortal(dialog, "blue");
+  await checkActivePortal(dialog, () => choose("深海蓝"));
   const action = dialog.getByTestId("close-kumo-dialog");
   await expect(action).toHaveCSS("color", "rgb(0, 0, 0)");
   await expect(action).toHaveCSS("background-color", await page.locator("html").evaluate((element) => {
     return getComputedStyle(element).getPropertyValue("--accent-strong").replaceAll(",", ", ");
   }));
   await page.screenshot({ path: testInfo.outputPath("appearance-dark-blue-dialog-1440.png") });
+  await dialog.getByRole("button", { name: "Dialog 内触发 Toast" }).press("Enter");
+  const toast = page.getByText("对话框内 Toast", { exact: true });
+  await expect(toast).toBeVisible();
+  await checkActivePortal(toast, () => choose("翠绿"));
+  const previousSurface = await dialog.evaluate((node) => getComputedStyle(node).backgroundColor);
+  await choose("浅色");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(dialog).not.toHaveCSS("background-color", previousSurface);
+  await expect(toast).toBeVisible();
   await action.press("Enter");
   await expect(dialog).toBeHidden();
   await page.getByRole("combobox", { name: "上游系统" }).press("ArrowDown");
   const select = page.getByRole("listbox");
-  await checkActivePortal(select, "orange");
+  await checkActivePortal(select, () => choose("暖橙"));
   await page.keyboard.press("Escape");
   await expect(select).toBeHidden();
   await page.getByTestId("open-kumo-menu").press("Enter");
-  await checkActivePortal(page.getByRole("menu"), "custom");
+  await checkActivePortal(page.getByRole("menu"), () => settings.getByRole("textbox", { name: "自定义颜色" }).fill("#FFFFFF"));
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
-  await activate(writer, "green");
+  await choose("翠绿");
   await expect(page.locator("html")).toHaveAttribute("data-accent", "green");
   expect(await page.locator("html").evaluate((root) => root.style.getPropertyValue("--accent"))).toBe("");
 });

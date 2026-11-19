@@ -217,10 +217,42 @@
   },
   "theme": {
     "switchToLight": "切换到浅色主题",
-    "switchToDark": "切换到深色主题",
-    "palette": "主题色",
-    "green": "绿色",
-    "purple": "紫色"
+    "switchToDark": "切换到深色主题"
+  },
+  "appearance": {
+    "title": "风格设置",
+    "description": "自定义此设备上的界面外观。",
+    "close": "关闭风格设置",
+    "themeMode": "主题模式",
+    "modes": {
+      "system": "跟随系统",
+      "light": "浅色",
+      "dark": "深色"
+    },
+    "accent": "主题色",
+    "presets": {
+      "green": "翠绿",
+      "blue": "深海蓝",
+      "purple": "暮光紫",
+      "orange": "暖橙"
+    },
+    "custom": "自定义颜色",
+    "effectiveAccent": "当前生效的主题色",
+    "hexHint": "输入 #RRGGBB。色块显示对比度调整后的颜色。",
+    "invalidHex": "请输入有效的 HEX 颜色，例如 #2563EB。",
+    "effects": "视觉特效",
+    "effectLevels": {
+      "full": "完整",
+      "subtle": "轻量",
+      "off": "关闭"
+    },
+    "reducedMotion": "系统已启用减少动态效果，当前装饰动效已关闭。",
+    "density": "信息密度",
+    "densities": {
+      "comfortable": "舒适",
+      "compact": "紧凑"
+    },
+    "restoreDefaults": "恢复默认"
   },
   "access": {
     "moduleLoadingTitle": "加载业务模块",

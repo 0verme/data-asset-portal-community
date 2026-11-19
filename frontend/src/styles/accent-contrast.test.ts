@@ -139,26 +139,28 @@ test("purple light and dark selectors define the complete preset without leaking
   assert.equal(light["--on-accent"], "#FFFFFF");
 });
 
-test("purple text and opaque accent contrast pass in light and dark themes", () => {
-  for (const theme of ["light", "dark"] as const) {
-    const tokens = effectiveTokens(theme, "purple");
-    const onAccent = parseColor(token(tokens, "--on-accent"));
-    const accent = parseColor(token(tokens, "--accent"));
-    const surface = parseColor(token(tokens, "--surface"));
-    const surface3 = parseColor(token(tokens, "--surface-3"));
-    const softText = parseColor(token(tokens, "--accent-soft-color"));
-    const soft = parseColor(token(tokens, "--accent-soft"));
+for (const preset of ["green", "purple"] as const) {
+  test(`${preset} text and opaque accent contrast pass in light and dark themes`, () => {
+    for (const theme of ["light", "dark"] as const) {
+      const tokens = effectiveTokens(theme, preset);
+      const onAccent = parseColor(token(tokens, "--on-accent"));
+      const accent = parseColor(token(tokens, "--accent"));
+      const surface = parseColor(token(tokens, "--surface"));
+      const surface3 = parseColor(token(tokens, "--surface-3"));
+      const softText = parseColor(token(tokens, "--accent-soft-color"));
+      const soft = parseColor(token(tokens, "--accent-soft"));
 
-    assertContrast(`${theme} button text`, onAccent, accent, 4.5);
-    assertContrast(`${theme} hover text`, onAccent, parseColor(token(tokens, "--accent-strong")), 4.5);
-    assertContrast(`${theme} soft text on surface tint`, softText, composite(soft, surface), 4.5);
-    assertContrast(`${theme} soft text on surface-3 tint`, softText, composite(soft, surface3), 4.5);
-    assertContrast(`${theme} opaque accent on surface`, accent, surface, 3);
+      assertContrast(`${theme} button text`, onAccent, accent, 4.5);
+      assertContrast(`${theme} hover text`, onAccent, parseColor(token(tokens, "--accent-strong")), 4.5);
+      assertContrast(`${theme} soft text on surface tint`, softText, composite(soft, surface), 4.5);
+      assertContrast(`${theme} soft text on surface-3 tint`, softText, composite(soft, surface3), 4.5);
+      assertContrast(`${theme} opaque accent on surface`, accent, surface, 3);
 
-    // Translucent --accent-line / --accent-soft border and focus colors fall below 3:1.
-    // This known issue is out of scope, so their 3:1 contrast is intentionally not asserted.
-  }
-});
+      // Translucent --accent-line / --accent-soft border and focus colors fall below 3:1.
+      // This known issue is out of scope, so their 3:1 contrast is intentionally not asserted.
+    }
+  });
+}
 
 test("success tokens are theme-specific, accent-independent, and readable on required surfaces", () => {
   const successValues = {

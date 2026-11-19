@@ -19,7 +19,7 @@ export const DARK_QUERY = "(prefers-color-scheme: dark)";
 export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const LEGACY_THEME = "dap-theme";
 const LEGACY_ACCENT = "dap-accent";
-const isHex = (value: string) => value.length === 7 && /^#[0-9a-f]{6}$/i.test(value);
+export const isAccentHex = (value: string) => value.length === 7 && /^#[0-9a-f]{6}$/i.test(value);
 
 export function appearanceKey(base: string, scope?: string): string {
   return `dap-appearance:v1:${encodeURIComponent(scope?.trim() || base)}`;
@@ -57,7 +57,7 @@ export function validatePreference(value: unknown): AppearancePreferenceV1 | nul
   if (accent?.kind === "preset" && isPreset(accent.preset)) {
     return { version, themeMode, accent: { kind: "preset", preset: accent.preset }, effects, density };
   }
-  if (accent?.kind === "custom" && typeof accent.hex === "string" && isHex(accent.hex)) {
+  if (accent?.kind === "custom" && typeof accent.hex === "string" && isAccentHex(accent.hex)) {
     return { version, themeMode, accent: { kind: "custom", hex: accent.hex.toLowerCase() }, effects, density };
   }
   return null;
@@ -136,14 +136,14 @@ export function contrastRatio(first: RGB, second: RGB): number {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
-const presetSeeds = { blue: "#3b82f6", orange: "#f97316" } as const;
+export const generatedPresetSeeds = { blue: "#3b82f6", orange: "#f97316" } as const;
 const generatedTokens = [
   "--accent", "--accent-strong", "--accent-soft-color", "--accent-soft",
   "--accent-line", "--bg-grad-1", "--on-accent",
 ] as const;
 
 export function makeAccentPalette(hex: string, theme: ResolvedTheme) {
-  if (!isHex(hex)) return null;
+  if (!isAccentHex(hex)) return null;
   const seed = rgb(hex);
   // Match the lowest-contrast neutral surface in each DAP theme.
   const surface = rgb(theme === "light" ? "#edf3f8" : "#16223a");
@@ -182,7 +182,7 @@ export function applyAppearance(
   root.dataset["effects"] = effectiveEffects;
   const seed = preference.accent.kind === "custom"
     ? preference.accent.hex
-    : (accent === "blue" || accent === "orange" ? presetSeeds[accent] : null);
+    : (accent === "blue" || accent === "orange" ? generatedPresetSeeds[accent] : null);
   const palette = seed && makeAccentPalette(seed, theme);
   for (const token of generatedTokens) {
     if (palette) root.style.setProperty(token, palette[token]);

@@ -16,7 +16,7 @@
     --accent: #10b981;
     --accent-strong: #059669;
     --accent-soft-color: #34d399;
-    --on-accent: #ffffff;
+    --on-accent: #000000;
     --accent-soft: rgba(16, 185, 129, 0.13);
     --accent-line: rgba(16, 185, 129, 0.4);
     --chip: rgba(255, 255, 255, 0.05);
@@ -73,9 +73,9 @@
     --line: rgba(20, 33, 51, 0.1);
     --line-2: rgba(20, 33, 51, 0.06);
     --line-strong: rgba(20, 33, 51, 0.18);
-    --accent: #0f9f78;
-    --accent-strong: #0b8766;
-    --accent-soft-color: #0b7e5f;
+    --accent: #0a7456;
+    --accent-strong: #085f47;
+    --accent-soft-color: #0a7456;
     --on-accent: #ffffff;
     --accent-soft: rgba(16, 185, 129, 0.12);
     --accent-line: rgba(15, 159, 120, 0.28);
@@ -387,44 +387,6 @@
     color: var(--accent);
     background: var(--accent-soft);
   }
-
-  .accent-preset-group {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    flex: 0 0 auto;
-  }
-  .accent-preset-button {
-    position: relative;
-    width: 36px;
-    min-width: 36px;
-    height: 36px;
-    padding: 0;
-    display: inline-grid;
-    place-items: center;
-    flex: 0 0 auto;
-  }
-  .accent-preset-dot { display: block; width: 14px; height: 14px; border-radius: 50%; }
-  .accent-preset-dot-green { background: #10b981; }
-  :root[data-theme="light"] .accent-preset-dot-green { background: #0f9f78; }
-  .accent-preset-dot-purple { background: #A78BFA; }
-  :root[data-theme="light"] .accent-preset-dot-purple { background: #6B5CA5; }
-  .accent-preset-check {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    background: var(--surface);
-    color: var(--ink);
-    font: 700 9px/1 var(--sans);
-    opacity: 0;
-    pointer-events: none;
-  }
-  .accent-preset-button[aria-pressed="true"] .accent-preset-check { opacity: 1; }
 
   .login-mask {
     position: fixed;
@@ -946,6 +908,9 @@
   .tcard::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--bar-color, var(--accent)); opacity: 0; transition: 0.16s; }
   .tcard:hover { border-color: var(--accent-line); box-shadow: var(--shadow-md); transform: translateY(-2px); }
   .tcard:hover::before { opacity: 1; }
+  :root:not([data-effects="full"]) .tcard:hover { transform: none; }
+  :root[data-effects="off"] .tcard,
+  :root[data-effects="off"] .tcard::before { transition: none; }
   .tcard-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .tcard-badges { display: flex; align-items: center; gap: 6px; }
   .tcard-name { font-family: var(--mono); font-size: 13.5px; font-weight: 600; color: var(--ink); word-break: break-all; line-height: 1.4; }
@@ -2766,7 +2731,7 @@
     }
 
     .theme-toggle,
-    .accent-preset-button,
+    .appearance-trigger,
     .topbar.portal-topbar .language-switcher,
     .login-cta,
     .logout-btn,

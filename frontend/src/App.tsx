@@ -37,7 +37,7 @@ import {
 import { useAssetModule } from "./hooks/useAssetModule.ts";
 import { useApiAssetModule } from "./hooks/useApiAssetModule.ts";
 import { useAuthSession, type UseAuthSessionResult } from "./hooks/useAuthSession.ts";
-import { useAccent } from "./hooks/useAccent.ts";
+import { AppearanceSettings } from "./appearance/AppearanceSettings.tsx";
 import { useIndicatorModule } from "./hooks/useIndicatorModule.ts";
 import { useManualCodeTableModule } from "./hooks/useManualCodeTableModule.ts";
 import { usePublicCatalogConfig } from "./hooks/usePublicCatalogConfig.ts";
@@ -218,7 +218,6 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
     setLineageFocusRequest(null);
   }, [module]);
 
-  const { accent, setAccent } = useAccent();
   const { theme, toggleTheme } = useTheme();
   const themeToggleLabel = theme === "dark" ? tCommon("theme.switchToLight") : tCommon("theme.switchToDark");
   const { statusOptions: rawStatusOptions } = useStatusOptions();
@@ -967,32 +966,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
               />
             </span>
 
-            <div className="accent-preset-group" role="group" aria-label={tCommon("theme.palette")}>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="accent-preset-button"
-                aria-label={tCommon("theme.green")}
-                aria-pressed={accent === "green"}
-                onClick={() => setAccent("green")}
-              >
-                <span className="accent-preset-dot accent-preset-dot-green" aria-hidden="true" />
-                <span className="accent-preset-check" aria-hidden="true">{accent === "green" ? "✓" : ""}</span>
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="accent-preset-button"
-                aria-label={tCommon("theme.purple")}
-                aria-pressed={accent === "purple"}
-                onClick={() => setAccent("purple")}
-              >
-                <span className="accent-preset-dot accent-preset-dot-purple" aria-hidden="true" />
-                <span className="accent-preset-check" aria-hidden="true">{accent === "purple" ? "✓" : ""}</span>
-              </Button>
-            </div>
+            <AppearanceSettings />
 
             <AuthBar
               auth={auth}

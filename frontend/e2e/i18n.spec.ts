@@ -25,7 +25,11 @@ test("desktop language switching is immediate, persistent, and preserves route/s
   await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe("phase0-state-preservation");
   const stateUrl = page.url();
   await page.screenshot({ path: testInfo.outputPath("phase0-desktop-zh.png"), animations: "disabled" });
-  await page.getByRole("button", { name: "紫色" }).click();
+  await page.getByRole("button", { name: "风格设置" }).click();
+  const settings = page.getByRole("dialog", { name: "风格设置" });
+  await settings.getByRole("radio", { name: "暮光紫" }).check();
+  await page.keyboard.press("Escape");
+  await expect(settings).toBeHidden();
   await page.getByRole("button", { name: "切换到深色主题" }).click();
 
   const requestsBeforeSwitch = apiRequests.length;
