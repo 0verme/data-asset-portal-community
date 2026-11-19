@@ -100,13 +100,20 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
                     ),
                 ],
             )
-            connection.execute("CREATE TABLE p_admin_user (username TEXT)")
-            connection.execute("INSERT INTO p_admin_user VALUES ('admin')")
+            connection.execute(
+                "CREATE TABLE p_admin_user "
+                "(id INTEGER, username TEXT, role TEXT, status TEXT)"
+            )
+            connection.execute(
+                "INSERT INTO p_admin_user VALUES (1, 'devp', 'maintainer', 'ACTIVE')"
+            )
             connection.commit()
 
         with (
             patch("demo.seed_loader.community_seed_plan", return_value=plan),
-            patch("demo.seed_loader.ADMIN_USER", {"username": "admin"}),
+            patch("demo.seed_loader.DEMO_USER", {
+                "id": 1, "username": "devp", "role": "maintainer", "status": "ACTIVE"
+            }),
         ):
             counts = verify_demo_database(database)
             self.assertEqual(3, counts["p_code_category"])
@@ -350,9 +357,9 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         frontend_command = popen_mock.call_args_list[1].args[0]
         self.assertEqual("15099", backend_command[-1])
         self.assertEqual("15173", frontend_command[-2])
-        self.assertIn("Demo administrator:", output.getvalue())
-        self.assertIn("Username: admin", output.getvalue())
-        self.assertIn("Password: 123456", output.getvalue())
+        self.assertIn("Demo maintenance account:", output.getvalue())
+        self.assertIn("Username: devp", output.getvalue())
+        self.assertIn("Password: devp", output.getvalue())
         wait_mock.assert_any_call(
             "http://127.0.0.1:15099/healthz", backend_process, "Backend"
         )
@@ -363,7 +370,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             [call(frontend_process, "frontend"), call(backend_process, "backend")]
         )
 
-    def test_init_only_prints_demo_admin_credentials(self):
+    def test_init_only_prints_demo_maintainer_credentials(self):
         output = io.StringIO()
         with (
             redirect_stdout(output),
@@ -376,9 +383,9 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             result = _demo.main(["--init-only"])
 
         self.assertEqual(0, result)
-        self.assertIn("Demo administrator:", output.getvalue())
-        self.assertIn("Username: admin", output.getvalue())
-        self.assertIn("Password: 123456", output.getvalue())
+        self.assertIn("Demo maintenance account:", output.getvalue())
+        self.assertIn("Username: devp", output.getvalue())
+        self.assertIn("Password: devp", output.getvalue())
 
     def test_missing_lineage_entries_trigger_one_idempotent_workspace_build(self):
         commands = []
