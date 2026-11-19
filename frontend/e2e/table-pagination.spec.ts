@@ -1,4 +1,5 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { appearanceKey, defaults } from "../src/appearance/preferences.ts";
 
 const fixturePager = (page: Page) => page.getByRole("navigation", { name: "分页组件测试" });
 
@@ -102,10 +103,12 @@ test("completed paginated business lists share the adapter without changing thei
 });
 
 test("pagination groups remain intact at mobile/tablet/desktop widths in light and dark themes", async ({ page }, testInfo: TestInfo) => {
-  await page.addInitScript(() => {
+  await page.addInitScript(({ key, preference }) => {
     const theme = new URLSearchParams(window.location.search).get("theme");
-    if (theme === "light" || theme === "dark") localStorage.setItem("dap-theme", theme);
-  });
+    if (theme === "light" || theme === "dark") {
+      localStorage.setItem(key, JSON.stringify({ ...preference, themeMode: theme }));
+    }
+  }, { key: appearanceKey("/", process.env["VITE_APPEARANCE_SCOPE"]), preference: defaults() });
   const screenshots: Array<{ theme: "light" | "dark"; width: number }> = [
     { theme: "light", width: 1440 },
     { theme: "light", width: 768 },
