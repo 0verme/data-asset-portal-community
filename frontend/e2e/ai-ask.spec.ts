@@ -808,15 +808,16 @@ test("cancelled requests are explicit and cannot overwrite a subsequent answer",
   ]);
 });
 
-test("portal orb follows real Remote SSE frames and isolates each request", async ({ page }, testInfo) => {
+test("portal orb follows real Remote SSE frames and isolates each request", async ({ page, baseURL }, testInfo) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
+  if (!baseURL) throw new Error("Missing Playwright base URL");
+  const portalOrigin = new URL(baseURL).origin;
   const streams: ServerResponse[] = [];
   const server = createServer((request, response) => {
     // This fixture lives on a separate local port and sends each SSE frame over HTTP.
-    response.setHeader("Access-Control-Allow-Origin", request.headers.origin ?? "*");
-    response.setHeader("Access-Control-Allow-Credentials", "true");
+    response.setHeader("Access-Control-Allow-Origin", portalOrigin);
     response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
     response.setHeader("Access-Control-Allow-Headers", "Content-Type");
     if (request.method === "OPTIONS") {
@@ -837,12 +838,12 @@ test("portal orb follows real Remote SSE frames and isolates each request", asyn
     if (!address || typeof address === "string") throw new Error("Missing test stream address");
     await page.addInitScript((streamUrl) => {
       const nativeFetch = window.fetch.bind(window);
-      window.fetch = (input, options) => nativeFetch(
-        typeof input === "string" && new URL(input, location.href).pathname === "/api/ai/ask/stream"
-          ? streamUrl
-          : input,
-        options,
-      );
+      window.fetch = (input, options) => {
+        if (typeof input === "string" && new URL(input, location.href).pathname === "/api/ai/ask/stream") {
+          return nativeFetch(streamUrl, { ...options, credentials: "omit" });
+        }
+        return nativeFetch(input, options);
+      };
     }, `http://127.0.0.1:${address.port}/stream`);
     const { searches } = await openAiPortal(page);
 
