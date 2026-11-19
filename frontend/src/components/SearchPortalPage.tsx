@@ -33,6 +33,9 @@ import {
 } from "../api/aiAskExecution.ts";
 import { receivedTerminalEvent } from "../api/aiAskExecutionSummary.ts";
 import { AiAskExecutionPanel } from "./AiAskExecutionPanel.tsx";
+import { useAppearance } from "../appearance/AppearanceProvider.tsx";
+import { DataOrb } from "./portal/orb/DataOrb.tsx";
+import { resolveDataOrbStatus } from "./portal/resolveDataOrbStatus.ts";
 import { selectVerifiedCitedCandidates } from "./aiAskSources.ts";
 import {
   getRagRecommendations,
@@ -426,6 +429,7 @@ export function SearchPortalPage({
   searchPlaceholder,
 }: SearchPortalPageProps) {
   const { t } = useTranslation("common");
+  const { theme, effectiveEffects } = useAppearance();
   const scopeOptions = useMemo(
     () => filterPortalScopesByModules(availableModules),
     [availableModules],
@@ -439,6 +443,9 @@ export function SearchPortalPage({
   const initialSearchRef = useRef(readPortalSearchParams(initialScopeKeys, initialSearchLocationRef.current));
   const initialSearchBootstrapPendingRef = useRef(true);
   const [query, setQuery] = useState(initialSearchRef.current.query);
+  const [inputFocused, setInputFocused] = useState(false);
+  const [inputTyping, setInputTyping] = useState(false);
+  const [pulseKey, setPulseKey] = useState(0);
   const [scope, setScope] = useState(initialSearchRef.current.scope);
   const [hotKeywords, setHotKeywords] = useState<PortalHotKeyword[]>([]);
   const [stats, setStats] = useState<PortalStatItem[]>([]);
@@ -467,12 +474,15 @@ export function SearchPortalPage({
   );
 
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const compositionStartValue = useRef<string | null>(null);
+  const typingTimer = useRef<number | undefined>(undefined);
   const resultContainerRef = useRef<HTMLDivElement | null>(null);
   const requestSeq = useRef(0);
   const aiRequestSeq = useRef(0);
   const aiAbortController = useRef<AbortController | null>(null);
 
   useEffect(() => () => {
+    window.clearTimeout(typingTimer.current);
     aiRequestSeq.current += 1;
     aiAbortController.current?.abort();
     aiAbortController.current = null;
@@ -529,8 +539,23 @@ export function SearchPortalPage({
     }
   };
 
+  const stopTyping = (): void => {
+    window.clearTimeout(typingTimer.current);
+    setInputTyping(false);
+  };
+
+  const showInputFeedback = (): void => {
+    if (effectiveEffects === "off") return;
+    // Replace the previous timeout. DataOrb blends rapid pulses into one bounded signal.
+    window.clearTimeout(typingTimer.current);
+    setInputTyping(true);
+    setPulseKey((current) => current + 1);
+    typingTimer.current = window.setTimeout(() => setInputTyping(false), 400);
+  };
+
   const resetSearchState = (nextScope = scope): void => {
     initialSearchBootstrapPendingRef.current = false;
+    stopTyping();
     const preservedScope = validScopeKeys.has(nextScope)
       ? nextScope
       : DEFAULT_PORTAL_SCOPE;
@@ -576,6 +601,7 @@ export function SearchPortalPage({
       clearSearch(nextScope);
       return;
     }
+    stopTyping();
     const seq = ++requestSeq.current;
     setActiveResultTab("search");
     requestResultScroll();
@@ -637,6 +663,7 @@ export function SearchPortalPage({
   const runAiAsk = (rawQuery = query): void => {
     const question = String(rawQuery ?? "").trim();
     if (!publicAccessReady || !aiEnabled || !question) return;
+    stopTyping();
     setActiveResultTab("ai");
     requestResultScroll();
     const seq = ++aiRequestSeq.current;
@@ -838,7 +865,9 @@ export function SearchPortalPage({
     // render-scoped dependencies would loop.
   }, [availableModules, publicAccessReady]);
 
-  const doSearch = (): void => runSearch(query, scope);
+  const doSearch = (): void => {
+    if (compositionStartValue.current === null) runSearch(query, scope);
+  };
 
   const pickHot = (term: string): void => {
     setQuery(term);
@@ -871,6 +900,14 @@ export function SearchPortalPage({
     || aiResponse?.status === "ambiguous_scope"
     || aiResponse?.status === "metadata_count_unavailable"
   );
+  const orbStatus = resolveDataOrbStatus({
+    aiActive: activeResultTab === "ai" && Boolean(publicAccessReady && aiEnabled && aiQuery),
+    aiLoading,
+    aiExecutionStatus,
+    aiExecutionEvents,
+    typing: inputTyping && effectiveEffects !== "off",
+    focused: inputFocused,
+  });
   const searchTabStatus = searchLoading ? "搜索中" : searchError ? "搜索失败" : searchedTerm ? "已搜索" : "未搜索";
   const aiProgressInterrupted = Boolean(aiError)
     && aiExecutionStatus !== "cancelled"
@@ -885,6 +922,7 @@ export function SearchPortalPage({
   return (
     <div className={`search-portal${searchedTerm || aiQuery ? " has-search-results" : ""}`}>
       <div className="sp-hero">
+        <DataOrb className="sp-data-orb" status={orbStatus} effects={effectiveEffects} theme={theme} pulseKey={pulseKey} />
         <h1>{heroTitle}</h1>
         {heroSubtitle ? <p>{heroSubtitle}</p> : null}
       </div>
@@ -901,9 +939,26 @@ export function SearchPortalPage({
             onChange={(event) => {
               initialSearchBootstrapPendingRef.current = false;
               setQuery(event.target.value);
+              if (compositionStartValue.current === null) showInputFeedback();
+            }}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => {
+              setInputFocused(false);
+              compositionStartValue.current = null;
+              stopTyping();
+            }}
+            onCompositionStart={(event) => {
+              compositionStartValue.current = event.currentTarget.value;
+              stopTyping();
+            }}
+            onCompositionEnd={(event) => {
+              const startValue = compositionStartValue.current;
+              compositionStartValue.current = null;
+              if (startValue !== null && startValue !== event.currentTarget.value) showInputFeedback();
             }}
             onKeyDown={(event) => {
-              if (event.key === "Enter") doSearch();
+              // Safari can report isComposing=false for the Enter that commits the candidate.
+              if (event.key === "Enter" && !event.nativeEvent.isComposing && event.keyCode !== 229) doSearch();
             }}
             placeholder={searchPlaceholder}
             aria-label="搜索数据资产"
