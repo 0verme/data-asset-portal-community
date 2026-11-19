@@ -7,7 +7,7 @@ const read = (path: string) => readFile(new URL(path, import.meta.url), "utf8");
 test("application footer keeps the version and exposes the project GitHub link", async () => {
   const [app, styles] = await Promise.all([read("./App.tsx"), read("./styles/app.css")]);
 
-  assert.match(app, /\{branding\.site\.title\} \{APP_VERSION\}/);
+  assert.match(app, /\{isHome \? branding\.site\.display_name : branding\.site\.title\} \{APP_VERSION\}/);
   assert.match(
     app,
     /<a\s+className="app-footer-link"\s+href="https:\/\/github\.com\/0verme\/data-asset-portal-community"\s+target="_blank"\s+rel="noopener noreferrer"[\s\S]*?GitHub ↗/

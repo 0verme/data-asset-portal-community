@@ -19,7 +19,7 @@ async function openPortal(page: Page, path = "/") {
     }),
   }));
   await page.goto(path);
-  await expect(page.getByRole("heading", { name: "数据资产管理与血缘分析平台" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "数据资产门户" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "搜索数据资产" })).toBeVisible();
 }
 

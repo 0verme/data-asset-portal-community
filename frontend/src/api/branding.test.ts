@@ -12,7 +12,9 @@ import {
 } from './branding.ts';
 
 test('branding defaults preserve the localized Chinese and English portal copy', () => {
-  assert.equal(getDefaultPublicBranding('zh-CN').hero.title, '数据资产管理与血缘分析平台');
+  assert.equal(getDefaultPublicBranding('zh-CN').hero.title, '数据资产门户');
+  assert.equal(getDefaultPublicBranding('en-US').hero.title, 'Data Asset Portal');
+  assert.equal(getDefaultPublicBranding('zh-CN').site.title, '数据资产管理与血缘分析平台');
   assert.match(getDefaultPublicBranding('en-US').hero.search_placeholder, /^Search assets/);
   assert.equal(getDefaultPublicBranding('en-US').login.quick_demo_login_enabled, false);
 });

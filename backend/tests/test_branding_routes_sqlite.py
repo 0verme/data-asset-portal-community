@@ -77,6 +77,10 @@ class BrandingRoutesSqliteTests(unittest.TestCase):
         self.assertEqual(set(data), {"site", "hero", "login", "version"})
         self.assertEqual(set(data["site"]), {"title", "display_name", "announcement", "logo_url", "favicon_url"})
         self.assertEqual(default_public_branding("en-US"), data)
+        self.assertEqual("Data Asset Portal", data["hero"]["title"])
+        self.assertEqual("数据资产门户", self.anonymous.get(
+            "/api/system/public-config", params={"lang": "zh-CN"}
+        ).json()["data"]["hero"]["title"])
         self.assertNotIn("database", json.dumps(data).lower())
 
         self.assertEqual(401, self.anonymous.get("/api/system/branding-config").status_code)
@@ -105,6 +109,10 @@ class BrandingRoutesSqliteTests(unittest.TestCase):
         self.assertEqual("请联系管理员", self.anonymous.get(
             "/api/system/public-config", params={"lang": "zh-CN"}
         ).json()["data"]["login"]["hint"])
+        for language, expected in payload["hero"]["title"].items():
+            self.assertEqual(expected, self.anonymous.get(
+                "/api/system/public-config", params={"lang": language}
+            ).json()["data"]["hero"]["title"])
         after_count = self.connection.execute("SELECT COUNT(*) FROM dwp.p_operation_log").fetchone()[0]
         self.assertGreater(after_count, before_count)
 

@@ -401,7 +401,7 @@ async function openAiPortal(page: Page, options?: { aiEnabled?: boolean; askFail
     sessionStorage.removeItem("dap_auth");
   });
   await page.goto(path);
-  await expect(page.getByRole("heading", { name: "数据资产管理与血缘分析平台" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "数据资产门户" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "搜索数据资产" })).toBeVisible();
   return fixtures;
 }
@@ -419,11 +419,17 @@ async function expectNoHorizontalOverflow(page: Page) {
 test("Enter and Search stay deterministic; explicit AI preserves query and opens the verified asset", async ({ page }, testInfo) => {
   const fixtures = await openAiPortal(page);
   const input = page.getByRole("textbox", { name: "搜索数据资产" });
+  const footer = page.locator(".main").getByRole("contentinfo");
+  const expectFooterBelowResults = async () => {
+    const results = (await page.locator(".sp-results").boundingBox())!;
+    expect((await footer.boundingBox())!.y).toBeGreaterThanOrEqual(results.y + results.height);
+  };
   const query = "candidate account balance";
   await input.fill(query);
   await input.press("Enter");
   await expect(page.locator(".sp-hit").first()).toBeVisible();
   expect(fixtures.asked).toEqual([], "Enter must not call the AI endpoint");
+  await expectFooterBelowResults();
   if (process.env["DAP_PORTAL_CAPTURE"] === "1") {
     await page.setViewportSize({ width: 1440, height: 960 });
     await page.locator(".main").evaluate((element) => element.scrollTo({ top: 0, behavior: "instant" }));
@@ -445,6 +451,9 @@ test("Enter and Search stay deterministic; explicit AI preserves query and opens
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoHorizontalOverflow(page);
   await page.screenshot({ path: testInfo.outputPath("ai-ask-summary-light-mobile.png"), fullPage: true });
+  await expectFooterBelowResults();
+  await footer.getByRole("link", { name: "GitHub ↗" }).scrollIntoViewIfNeeded();
+  await expect(footer.getByRole("link", { name: "GitHub ↗" })).toBeInViewport({ ratio: 1 });
   await page.setViewportSize({ width: 1440, height: 960 });
   await progress.locator(":scope > summary").click();
   await expect(progress).toContainText("已完成");

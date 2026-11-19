@@ -64,8 +64,8 @@ const BASE_BRANDING: BrandingConfig = {
   },
   hero: {
     title: {
-      'zh-CN': '数据资产管理与血缘分析平台',
-      'en-US': 'Data Asset Management and Lineage Platform',
+      'zh-CN': '数据资产门户',
+      'en-US': 'Data Asset Portal',
     },
     subtitle: {
       'zh-CN': '一个入口，搜索系统、字段、词根、指标、报表、API、资产、下游推送和码值表。',
