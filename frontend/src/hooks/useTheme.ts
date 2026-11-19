@@ -12,29 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useEffect, useState } from 'react';
-import { applyThemeAttributes, getInitialTheme, THEME_STORAGE_KEY, type ThemeMode } from '../utils/ui.ts';
+import { useAppearance } from '../appearance/AppearanceProvider.tsx';
+import type { ResolvedTheme } from '../appearance/preferences.ts';
 
 export interface UseThemeResult {
-  theme: ThemeMode;
+  theme: ResolvedTheme;
   toggleTheme: () => void;
 }
 
+/** Compatibility facade. Prefer useAppearance for new consumers. */
 export function useTheme(): UseThemeResult {
-  const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
-
-  useEffect(() => {
-    applyThemeAttributes(theme, document.documentElement);
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch {
-      // Theme selection still works when storage is disabled.
-    }
-  }, [theme]);
-
-  const toggleTheme = (): void => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  };
-
-  return { theme, toggleTheme };
+  const { theme, setThemeMode } = useAppearance();
+  return { theme, toggleTheme: () => setThemeMode(theme === 'dark' ? 'light' : 'dark') };
 }

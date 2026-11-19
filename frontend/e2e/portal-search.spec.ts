@@ -251,13 +251,13 @@ test("portal search remains within light/dark and desktop-to-phone viewport boun
   const html = page.locator("html");
 
   for (const theme of ["light", "dark"] as const) {
-    const currentMode = await html.getAttribute("data-mode");
+    const currentMode = await html.getAttribute("data-theme");
     if (currentMode !== theme) {
       await page.getByRole("button", {
         name: currentMode === "dark" ? "切换到浅色主题" : "切换到深色主题",
       }).click();
     }
-    await expect(html).toHaveAttribute("data-mode", theme);
+    await expect(html).toHaveAttribute("data-theme", theme);
 
     for (const width of [960, 768, 480, 390]) {
       await page.setViewportSize({ width, height: 844 });

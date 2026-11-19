@@ -36,10 +36,10 @@ test("accent preset supports keyboard switching and persists across reload", asy
   await expect(root).toHaveAttribute("data-accent", switchedAccent);
   await expect(nextButton).toHaveAttribute("aria-pressed", "true");
   await expect(initialButton).toHaveAttribute("aria-pressed", "false");
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("dap-accent"))).toBe(switchedAccent);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("dap-appearance:v1:%2F") ?? "{}").accent?.preset)).toBe(switchedAccent);
 
   await page.reload();
   await expect(root).toHaveAttribute("data-accent", switchedAccent);
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("dap-accent"))).toBe(switchedAccent);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("dap-appearance:v1:%2F") ?? "{}").accent?.preset)).toBe(switchedAccent);
   await expect(nextButton).toHaveAttribute("aria-pressed", "true");
 });

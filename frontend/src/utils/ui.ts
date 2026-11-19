@@ -12,61 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const THEME_STORAGE_KEY = 'dap-theme';
-const ACCENT_STORAGE_KEY = 'dap-accent';
-
-export { ACCENT_STORAGE_KEY, THEME_STORAGE_KEY };
-
-export type ThemeMode = 'light' | 'dark';
-export type AccentPreset = 'green' | 'purple';
-
-export function resolveDefaultAccent(value: unknown): AccentPreset {
-  return typeof value === 'string' && value.trim().toLowerCase() === 'purple'
-    ? 'purple'
-    : 'green';
-}
-
-const DEFAULT_ACCENT = resolveDefaultAccent(
-  typeof import.meta !== 'undefined' ? import.meta.env?.['VITE_DEFAULT_ACCENT'] : undefined,
-);
-
-export function applyThemeAttributes(
-  theme: ThemeMode,
-  root: Pick<HTMLElement, 'dataset'>,
-): void {
-  root.dataset['theme'] = theme;
-  root.dataset['mode'] = theme;
-}
-
-export function getInitialTheme(): ThemeMode {
-  if (typeof window === 'undefined') return 'light';
-  try {
-    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
-  } catch {
-    // Storage can be unavailable in restricted browser contexts.
-  }
-  return 'light';
-}
-
-export function applyAccentAttributes(
-  accent: AccentPreset,
-  root: Pick<HTMLElement, 'dataset'>,
-): void {
-  root.dataset['accent'] = accent;
-}
-
-export function getInitialAccent(defaultAccent: AccentPreset = DEFAULT_ACCENT): AccentPreset {
-  if (typeof window === 'undefined') return defaultAccent;
-  try {
-    const savedAccent = window.localStorage.getItem(ACCENT_STORAGE_KEY);
-    if (savedAccent === 'green' || savedAccent === 'purple') return savedAccent;
-  } catch {
-    // Storage can be unavailable in restricted browser contexts.
-  }
-  return defaultAccent;
-}
-
 export function scrollMainToTop(): void {
   window.scrollTo(0, 0);
   const main = document.querySelector('.main');

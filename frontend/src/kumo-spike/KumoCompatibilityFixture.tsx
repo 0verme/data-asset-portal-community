@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ArrowCounterClockwise,
   Database,
@@ -24,21 +24,17 @@ import { Tabs } from "@cloudflare/kumo/components/tabs";
 import { useKumoToastManager } from "@cloudflare/kumo/components/toast";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { ConfirmDialog, ToastHost, toast } from "../components/common/index.ts";
+import { useTheme } from "../hooks/useTheme.ts";
 import "./kumo-spike.css";
 
 type Theme = "light" | "dark";
 
-const THEME_KEY = "dap-theme";
 const schemas = [
   "dwd_xxx",
   "schema.table_name",
   "DWS_TRADE_SALES_STAT_1D",
   "retail_order_detail_long_schema_name",
 ];
-
-function initialTheme(): Theme {
-  return window.localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
-}
 
 function ToastActions() {
   const kumoToasts = useKumoToastManager();
@@ -276,21 +272,7 @@ function FixtureBody({ theme, onThemeChange }: { theme: Theme; onThemeChange: ()
 }
 
 export default function KumoCompatibilityFixture() {
-  const [theme, setTheme] = useState<Theme>(initialTheme);
-
-  useEffect(() => {
-    document.documentElement.dataset["theme"] = theme;
-    document.documentElement.dataset["mode"] = theme === "dark" ? "dark" : "light";
-    window.localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    const next = theme === "light" ? "dark" : "light";
-    document.documentElement.dataset["theme"] = next;
-    document.documentElement.dataset["mode"] = next === "dark" ? "dark" : "light";
-    window.localStorage.setItem(THEME_KEY, next);
-    setTheme(next);
-  };
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <ToastHost>
