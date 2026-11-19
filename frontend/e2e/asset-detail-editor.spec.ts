@@ -235,7 +235,7 @@ test("admin detail stays usable across light/dark and desktop-to-phone viewports
     await expect(mode).toHaveAttribute("data-theme", theme);
     await expect(page.getByRole("tab", { name: /字段信息/ })).toHaveCSS(
       "color",
-      theme === "light" ? "rgb(15, 159, 120)" : "rgb(16, 185, 129)",
+      theme === "light" ? "rgb(10, 116, 86)" : "rgb(16, 185, 129)",
     );
 
     for (const width of [960, 768, 480, 390]) {

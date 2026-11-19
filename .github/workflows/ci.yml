@@ -791,7 +791,7 @@ jobs:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/appearance-playwright
           VITE_API_MODE: mock
           VITE_DEFAULT_ACCENT: purple
-        run: npm run test:browser -- e2e/appearance.spec.ts e2e/accent-presets.spec.ts --workers=2
+        run: npm run test:browser -- e2e/appearance.spec.ts e2e/appearance-settings.spec.ts --workers=2
 
       - name: Upload Appearance screenshots
         if: always() && matrix.lane == 'b'

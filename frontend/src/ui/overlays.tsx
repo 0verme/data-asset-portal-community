@@ -7,6 +7,7 @@ import {
   useState,
   type ComponentProps,
   type ComponentPropsWithoutRef,
+  type CSSProperties,
   type ReactElement,
   type ReactNode,
 } from "react";
@@ -62,6 +63,7 @@ export interface DialogProps {
   closeOnOutsideClick?: boolean | undefined;
   busy?: boolean | undefined;
   className?: string | undefined;
+  style?: CSSProperties | undefined;
   size?: "sm" | "md" | "lg" | "xl" | undefined;
   container?: PortalContainer | undefined;
 }
@@ -79,6 +81,7 @@ export function Dialog({
   closeOnOutsideClick = true,
   busy = false,
   className,
+  style,
   size = "md",
   container,
 }: DialogProps) {
@@ -166,6 +169,7 @@ export function Dialog({
         <KumoDialogPrimitive.Backdrop className="dap-ui-dialog-backdrop" />
         <KumoLayerCard
           ref={popupRef}
+          style={style}
           render={(
             <KumoDialogPrimitive.Popup
               role={role}

@@ -1,0 +1,276 @@
+.appearance-trigger.dap-ui-icon-button {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+}
+
+/* The shared portal has its own stacking context. Lift it above sticky
+   application chrome while this edge-to-edge dialog is mounted. */
+#dap-ui-overlay-root:has(.appearance-drawer) { z-index: 40; }
+
+.appearance-drawer.dap-ui-dialog-popup {
+  top: var(--appearance-viewport-top, 0px);
+  right: 0;
+  left: auto;
+  width: min(420px, 100%);
+  height: 100vh;
+  height: var(--appearance-viewport-height, 100dvh);
+  max-height: none;
+  overflow: hidden;
+  padding: 0;
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+  transform: none;
+  opacity: 1;
+  --appearance-side-padding: 24px;
+  --appearance-inline-start: max(var(--appearance-side-padding), env(safe-area-inset-left));
+  --appearance-inline-end: max(var(--appearance-side-padding), env(safe-area-inset-right));
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+:root[data-effects="full"] .appearance-drawer {
+  transition: transform 220ms ease, opacity 160ms ease;
+}
+
+.appearance-drawer.dap-ui-dialog-popup[data-starting-style],
+.appearance-drawer.dap-ui-dialog-popup[data-ending-style] {
+  opacity: 0;
+  transform: translateX(12px);
+}
+
+:root[data-effects="full"] .appearance-drawer:is([data-starting-style], [data-ending-style]) {
+  transform: translateX(100%);
+}
+
+:root[data-effects="off"] .appearance-drawer,
+:root[data-effects="off"] #dap-ui-overlay-root:has(.appearance-drawer) .dap-ui-dialog-backdrop {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root .appearance-drawer.dap-ui-dialog-popup { transition: none; }
+  :root .appearance-drawer:is([data-starting-style], [data-ending-style]) { transform: none; }
+}
+
+.appearance-drawer > .dap-ui-dialog-heading {
+  padding: calc(14px + env(safe-area-inset-top)) var(--appearance-inline-end) 0 var(--appearance-inline-start);
+}
+
+.appearance-drawer .dap-ui-dialog-title {
+  font-size: 20px;
+}
+
+.appearance-drawer .appearance-close {
+  width: 44px;
+  height: 44px;
+}
+
+.appearance-drawer > .dap-ui-dialog-description {
+  margin: 0;
+  padding: 0 var(--appearance-inline-end) 18px var(--appearance-inline-start);
+  border-bottom: 1px solid var(--dap-color-border);
+}
+
+.appearance-scroll {
+  display: grid;
+  align-content: start;
+  flex: 1 1 auto;
+  gap: 22px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 22px var(--appearance-inline-end) 24px var(--appearance-inline-start);
+  scroll-padding-block: 12px;
+}
+
+.appearance-choices {
+  min-inline-size: 0;
+  border: 0;
+}
+
+.appearance-choices legend {
+  margin-bottom: 9px;
+  font-size: var(--dap-font-size-base);
+  font-weight: 650;
+}
+
+.appearance-options {
+  display: grid;
+  gap: 8px;
+}
+
+.appearance-option {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.appearance-option input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.appearance-option-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 5px 4px;
+  border: 1px solid var(--dap-color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--dap-color-surface-raised);
+  color: var(--dap-color-text);
+  font-size: var(--dap-font-size-sm);
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.appearance-colors .appearance-option-body {
+  justify-content: flex-start;
+  gap: 8px;
+  padding-inline: 10px;
+  text-align: start;
+}
+
+.appearance-option input:checked + .appearance-option-body {
+  border-color: var(--dap-color-brand);
+  background: var(--accent-soft);
+  font-weight: 650;
+}
+
+.appearance-option input:focus-visible + .appearance-option-body,
+.appearance-trigger.dap-ui-icon-button:focus-visible,
+.appearance-drawer .appearance-close:focus-visible {
+  outline: 2px solid var(--dap-color-brand);
+  outline-offset: 2px;
+}
+
+.appearance-option-check {
+  display: none;
+  flex: none;
+}
+
+.appearance-colors .appearance-option-check {
+  margin-inline-start: auto;
+}
+
+.appearance-option input:checked + .appearance-option-body .appearance-option-check {
+  display: block;
+}
+
+.appearance-swatch,
+.appearance-effective-swatch {
+  flex: none;
+  border: 1px solid var(--dap-color-border-strong);
+  background: var(--dap-color-brand);
+}
+
+.appearance-swatch {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+}
+
+.appearance-swatch[data-preset="green"] { background: #10b981; }
+.appearance-swatch[data-preset="purple"] { background: #a78bfa; }
+:root[data-theme="light"] .appearance-swatch[data-preset="green"] { background: #0a7456; }
+:root[data-theme="light"] .appearance-swatch[data-preset="purple"] { background: #6b5ca5; }
+
+.appearance-option input:checked + .appearance-option-body .appearance-swatch {
+  background: var(--dap-color-brand) !important;
+}
+
+.appearance-hex-label {
+  display: block;
+  margin: 12px 0 6px;
+  color: var(--dap-color-text);
+  font-size: var(--dap-font-size-sm);
+  font-weight: 600;
+}
+
+.appearance-hex-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.appearance-hex-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding-inline: 12px;
+  font-family: var(--mono);
+  font-size: 16px;
+}
+
+.appearance-hex-row input[aria-invalid="true"] { border-color: var(--danger); }
+
+.appearance-effective-swatch {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+}
+
+.appearance-hint,
+.appearance-hex-hint {
+  margin: 6px 0 0;
+  color: var(--dap-color-text-muted);
+  font-size: var(--dap-font-size-xs);
+  line-height: 1.45;
+}
+
+.appearance-hex-hint { min-height: 2.9em; }
+.appearance-hex-hint[data-invalid="true"] { color: var(--danger); }
+
+.appearance-footer {
+  display: flex;
+  justify-content: space-between;
+  flex: none;
+  gap: 10px;
+  padding: 12px var(--appearance-inline-end) max(12px, env(safe-area-inset-bottom)) var(--appearance-inline-start);
+  border-top: 1px solid var(--dap-color-border);
+  background: var(--dap-color-surface-raised);
+}
+
+.appearance-footer button { min-height: 44px; padding-inline: 12px; }
+
+@media (max-width: 768px) {
+  .appearance-trigger.dap-ui-icon-button { width: 44px; height: 44px; }
+}
+
+@media (max-width: 480px) {
+  .appearance-drawer.dap-ui-dialog-popup {
+    --appearance-side-padding: 16px;
+    border-left: 0;
+  }
+}
+
+/* Density applies to catalog lists, their filters, and inline forms. */
+@media (min-width: 769px) {
+  :root[data-density="compact"] :is(.asset-wide-table, .root-wide-table, .manual-code-wide-table) tbody td {
+    padding-block: 8px;
+  }
+
+  :root[data-density="compact"] .main .filter-bar {
+    margin-bottom: 10px;
+    gap: 6px;
+  }
+
+  :root[data-density="compact"] .main .form-card > .form-grid {
+    row-gap: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  :root[data-density="compact"] .asset-wide-table tbody {
+    row-gap: 8px;
+  }
+}

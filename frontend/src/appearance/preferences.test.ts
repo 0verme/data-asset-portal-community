@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  appearanceKey, contrastRatio, defaults, initializedKey, makeAccentPalette, parsePreference,
+  appearanceKey, applyAppearance, contrastRatio, defaults, initializedKey, isAccentHex, makeAccentPalette, parsePreference,
   readPreference, resolveAppearance, validatePreference,
 } from "./preferences.ts";
 
@@ -31,8 +31,10 @@ test("strict parsing validates the whole versioned preference and normalizes cus
     assert.equal(validatePreference({ ...value, ...patch }), null);
   }
   for (const hex of ["#aaa", "#12345678", "#123456\n", "#123456 ", "#zzz000", "red", "rgb(0,0,0)"]) {
+    assert.equal(isAccentHex(hex), false);
     assert.equal(validatePreference({ ...value, accent: { kind: "custom", hex } }), null);
   }
+  assert.equal(isAccentHex("#A1B2C3"), true);
   assert.deepEqual(validatePreference({ ...value, accent: { kind: "custom", hex: "#A1B2C3" } })?.accent,
     { kind: "custom", hex: "#a1b2c3" });
   assert.equal(parsePreference("{broken"), null);
@@ -65,6 +67,34 @@ test("system preferences resolve independently of saved theme and effects", () =
   assert.deepEqual(resolveAppearance({ ...preference, themeMode: "light" }, true, false),
     { theme: "light", effectiveEffects: "full" });
   assert.equal(preference.effects, "full");
+});
+
+test("all drawer choices project through the same document appearance contract", () => {
+  const tokens = new Map<string, string>();
+  const root = {
+    dataset: {},
+    style: { setProperty: tokens.set.bind(tokens), removeProperty: tokens.delete.bind(tokens) },
+  } as unknown as HTMLElement;
+
+  for (const preset of ["blue", "orange", "green", "purple"] as const) {
+    for (const themeMode of ["system", "light", "dark"] as const) {
+      for (const density of ["comfortable", "compact"] as const) {
+        for (const effects of ["full", "subtle", "off"] as const) {
+          const preference = { ...defaults(preset), themeMode, density, effects };
+          const resolved = resolveAppearance(preference, true, effects === "full");
+          applyAppearance(root, preference, resolved);
+          assert.deepEqual(root.dataset, {
+            theme: themeMode === "light" ? "light" : "dark",
+            mode: themeMode,
+            accent: preset,
+            density,
+            effects: effects === "full" ? "off" : effects,
+          });
+          assert.equal(tokens.has("--accent"), preset === "blue" || preset === "orange");
+        }
+      }
+    }
+  }
 });
 
 test("generated colors protect foregrounds and surface text even at the sRGB extremes", () => {
