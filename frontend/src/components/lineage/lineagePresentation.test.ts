@@ -48,6 +48,18 @@ test("full names and meaningful subtitles survive canvas shortening, with no inf
   assert.match(node?.subtitle ?? "", /…$/);
 });
 
+test("other asset kinds retain their identity without inheriting a viewer type", () => {
+  const graph = toViewerGraph({
+    nodes: ["indicator", "report", "constructor"].map((kind) => ({ ...table, id: kind, kind })),
+    edges: [],
+  });
+  assert.deepEqual(graph.nodes.map((node) => [node.id, node.type, node.metadata?.["kind"]]), [
+    ["indicator", undefined, "indicator"],
+    ["report", undefined, "report"],
+    ["constructor", undefined, "constructor"],
+  ]);
+});
+
 test("lineage snapshot times retain UTC, offsets and unspecified timezone semantics", () => {
   assert.deepEqual(formatLineageSnapshotTime("2026-07-20T02:00:00Z"), { text: "2026-07-20 02:00:00 UTC", hasOffset: true });
   assert.deepEqual(formatLineageSnapshotTime("2026-07-20T10:00:00.123+08:00"), { text: "2026-07-20 10:00:00 +08:00", hasOffset: true });
