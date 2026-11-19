@@ -57,9 +57,9 @@ preflight
 Community Demo ready
 Frontend:    http://127.0.0.1:5173/
 Backend/API: http://127.0.0.1:15099
-Demo administrator:
-  Username: admin
-  Password: 123456
+Demo maintenance account:
+  Username: devp
+  Password: devp
 Database:    <repository>/.demo/community-demo/community.sqlite
 Stop: Ctrl+C
 ```
@@ -145,13 +145,14 @@ Run #2 → migration no-op/seed idempotent → HTTP smoke
 ## Demo account
 
 ```text
-username: admin
-password: 123456
+username: devp
+password: devp
+role: maintainer
 ```
 
-这是 canonical Community seed 的虚构本地账号，仅用于 Community Demo / 本地体验，不是生产环境默认管理员。正式部署请使用 `backend/scripts/create_admin.py` 交互创建管理员，不提供默认密码。
+这是 canonical Community seed 的业务维护员账号，仅用于隔离的 Community Demo / 本地体验，不是生产管理员，也没有系统用户、角色或参数管理权限。正式部署请使用 `backend/scripts/create_admin.py` 交互创建管理员，不提供默认密码。
 
-已有 Demo SQLite 数据库不会因重复执行 seed 自动重置管理员密码；需要验证新的默认凭据时，请重新初始化 Demo 数据库。
+重复执行 Seed 不会重置已有业务维护员的自定义密码；含有旧版默认管理员的 Demo 数据库会拒绝原地覆盖，请仅对可丢弃的 Demo 数据库重新初始化，切勿清理业务数据。
 
 ## Troubleshooting
 
