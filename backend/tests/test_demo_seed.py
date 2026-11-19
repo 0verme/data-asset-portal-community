@@ -31,7 +31,7 @@ from demo.indicator_path_contract import (
     indicator_path_contract_errors,
 )
 from demo.seed_loader import (
-    ADMIN_USER,
+    DEMO_USER,
     DEMO_PUSH_AUTH_TYPE,
     LEGACY_DEMO_PUSH_AUTH_TYPE,
     load_dataset,
@@ -137,11 +137,11 @@ class CommunityDemoSeedTests(unittest.TestCase):
         seed(self.database)
         common_code_service.invalidate()
 
-    def test_seed_creates_demo_admin_with_hashed_password(self):
-        self.assertEqual("admin", ADMIN_USER["username"])
-        self.assertEqual("123456", ADMIN_USER["password"])
-        self.assertEqual("admin", ADMIN_USER["role"])
-        self.assertEqual("ACTIVE", ADMIN_USER["status"])
+    def test_seed_creates_demo_maintainer_with_hashed_password(self):
+        self.assertEqual("devp", DEMO_USER["username"])
+        self.assertEqual("devp", DEMO_USER["password"])
+        self.assertEqual("maintainer", DEMO_USER["role"])
+        self.assertEqual("ACTIVE", DEMO_USER["status"])
 
         self._seed()
         connection = sqlite3.connect(self.database)
@@ -149,27 +149,32 @@ class CommunityDemoSeedTests(unittest.TestCase):
             row = connection.execute(
                 "SELECT username, password_hash, role, status "
                 "FROM p_admin_user WHERE id = ?",
-                (ADMIN_USER["id"],),
+                (DEMO_USER["id"],),
             ).fetchone()
+            privileged_count = connection.execute(
+                "SELECT COUNT(*) FROM p_admin_user "
+                "WHERE role = 'admin' OR username = 'admin'"
+            ).fetchone()[0]
         finally:
             connection.close()
 
         self.assertIsNotNone(row)
         username, password_hash, role, status = row
-        self.assertEqual("admin", username)
-        self.assertNotEqual("123456", password_hash)
-        self.assertTrue(check_password_hash(password_hash, "123456"))
-        self.assertEqual("admin", role)
+        self.assertEqual("devp", username)
+        self.assertNotEqual("devp", password_hash)
+        self.assertTrue(check_password_hash(password_hash, "devp"))
+        self.assertEqual("maintainer", role)
         self.assertEqual("ACTIVE", status)
+        self.assertEqual(0, privileged_count)
 
-    def test_reseeding_does_not_reset_existing_demo_admin_password(self):
+    def test_reseeding_does_not_reset_existing_demo_maintainer_password(self):
         self._seed()
-        legacy_password_hash = generate_password_hash("12346")
+        changed_hash = generate_password_hash("local-custom-password")
         connection = sqlite3.connect(self.database)
         try:
             connection.execute(
                 "UPDATE p_admin_user SET password_hash = ? WHERE id = ?",
-                (legacy_password_hash, ADMIN_USER["id"]),
+                (changed_hash, DEMO_USER["id"]),
             )
             connection.commit()
         finally:
@@ -180,14 +185,40 @@ class CommunityDemoSeedTests(unittest.TestCase):
         try:
             password_hash = connection.execute(
                 "SELECT password_hash FROM p_admin_user WHERE id = ?",
-                (ADMIN_USER["id"],),
+                (DEMO_USER["id"],),
             ).fetchone()[0]
         finally:
             connection.close()
 
-        self.assertEqual(legacy_password_hash, password_hash)
-        self.assertTrue(check_password_hash(password_hash, "12346"))
-        self.assertFalse(check_password_hash(password_hash, "123456"))
+        self.assertEqual(changed_hash, password_hash)
+        self.assertTrue(check_password_hash(password_hash, "local-custom-password"))
+        self.assertFalse(check_password_hash(password_hash, "devp"))
+
+    def test_reseeding_legacy_admin_requires_fresh_disposable_demo(self):
+        connection = sqlite3.connect(self.database)
+        try:
+            legacy_hash = generate_password_hash("123456")
+            connection.execute(
+                "INSERT INTO p_admin_user "
+                "(id, username, password_hash, display_name, role, status) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (1, "admin", legacy_hash, "旧演示管理员", "admin", "ACTIVE"),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        with self.assertRaisesRegex(ValueError, "legacy admin"):
+            self._seed()
+
+        connection = sqlite3.connect(self.database)
+        try:
+            account = connection.execute(
+                "SELECT username, password_hash, role FROM p_admin_user WHERE id = 1"
+            ).fetchone()
+        finally:
+            connection.close()
+        self.assertEqual(("admin", legacy_hash, "admin"), account)
 
     def _counts(self):
         connection = sqlite3.connect(self.database)
