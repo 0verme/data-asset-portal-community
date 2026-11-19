@@ -2,7 +2,7 @@
 
 Playwright 在 Chromium 和 WebKit 中实际渲染。Remote API 与回答使用合成浏览器测试数据。
 
-基线 `5dbaba5be5eeed79fd4638d7bab3a1a4adc07d15`，改造 `5a8a567cfd0436d160d4c2474102134e98041176`。
+基线 `5dbaba5be5eeed79fd4638d7bab3a1a4adc07d15`，改造 `0725f8ccff0fee7e27b7029d0c9c33cf434e994d`。
 
 对照图左侧为改造前，右侧为改造后。
 
