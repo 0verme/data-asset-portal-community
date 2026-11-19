@@ -127,6 +127,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
   const navSlotRef = useRef<HTMLDivElement | null>(null);
   const navMeasureRef = useRef<HTMLElement | null>(null);
+  const navActionsRef = useRef<HTMLDivElement | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -376,6 +377,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
     };
   }, []);
 
+  const isHome = module === "portal";
   const visibleNavMenus = useMemo(
     () => getVisibleNavigationMenus(navMenus, { canManageSystem, canViewOperationLog }),
     [canManageSystem, canViewOperationLog, navMenus],
@@ -385,9 +387,14 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
   const navigationMenuKey = JSON.stringify(navigationPrimaryMenus.map((item) => [item.code, displayMenuName(item), item.icon]));
 
   useLayoutEffect(() => {
+    const actions = navActionsRef.current;
     const measureNavigation = (): void => {
       const slot = navSlotRef.current;
       const measure = navMeasureRef.current;
+      if (isHome && actions) {
+        // Reserve matching room on both sides of the centered navigation.
+        slot?.parentElement?.style.setProperty("--portal-tools-width", `${actions.getBoundingClientRect().width}px`);
+      }
       if (!slot || !measure || getComputedStyle(measure).display === "none") return;
       const availableWidth = slot.getBoundingClientRect().width;
       if (availableWidth <= 0) return;
@@ -432,12 +439,13 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
     const observer = new ResizeObserver(measureNavigation);
     if (navSlotRef.current) observer.observe(navSlotRef.current);
     if (navMeasureRef.current) observer.observe(navMeasureRef.current);
+    if (isHome && actions) observer.observe(actions);
     window.addEventListener("resize", measureNavigation);
     return () => {
       observer.disconnect();
       window.removeEventListener("resize", measureNavigation);
     };
-  }, [module, navigationMenuKey, navigationPrimaryMenuCount]);
+  }, [isHome, module, navigationMenuKey, navigationPrimaryMenuCount]);
 
   const navigationFitMetrics = navigationFitSnapshot?.menuKey === navigationMenuKey
     ? navigationFitSnapshot
@@ -630,14 +638,15 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
   const isPortal = module === "portal" || module === "notFound";
 
   useEffect(() => {
+    setMoreNavOpen(false);
+    if (isHome) return;
     const hiddenNavigation = window.matchMedia(isPortal ? "(max-width: 768px)" : "(max-width: 959px)");
     const closeWhenHidden = (): void => {
       if (hiddenNavigation.matches) setMoreNavOpen(false);
     };
-    closeWhenHidden();
     hiddenNavigation.addEventListener("change", closeWhenHidden);
     return () => hiddenNavigation.removeEventListener("change", closeWhenHidden);
-  }, [isPortal]);
+  }, [isHome, isPortal]);
 
   const searchPlaceholder = isPush
     ? tCommon("search.placeholder.push")
@@ -779,10 +788,27 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
   const moduleContent = <ModuleContent module={module} context={moduleContext} />;
   const moduleSidebar = editorAccessDenied ? null : <ModuleSidebar module={module} context={moduleContext} />;
 
+  const footer = (
+    <footer className={isHome ? "app-footer-shell portal-home-footer" : "app-footer-shell"} role="contentinfo">
+      <div className="app-footer">
+        <span className="app-footer-copy">{isHome ? branding.site.display_name : branding.site.title} {APP_VERSION}</span>
+        <span className="app-footer-separator" aria-hidden="true">{isHome ? null : "·"}</span>
+        <a
+          className="app-footer-link"
+          href="https://github.com/0verme/data-asset-portal-community"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          GitHub ↗
+        </a>
+      </div>
+    </footer>
+  );
+
   return (
     <AuthContext.Provider value={authContextValue}>
       <AppShell>
-        <header className={`topbar${isPortal ? " portal-topbar" : ""}`}>
+        <header className={`topbar${isPortal ? " portal-topbar" : ""}${isHome ? " portal-home-topbar" : ""}`}>
           <div className="topbar-brand">
             {!isPortal ? (
               <IconButton
@@ -813,12 +839,13 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
           <div className="topbar-nav-slot" ref={navSlotRef}>
             <nav className="mainnav" aria-label={tCommon("navigation.main")}>
               {currentNavMenuStatus === "loading" ? (
-                <Button type="button" variant="tertiary" size="sm" disabled>{tCommon("navigation.loadingMenus")}</Button>
+                <Button type="button" variant="tertiary" size="sm" disabled className="navigation-message">{tCommon("navigation.loadingMenus")}</Button>
               ) : currentNavMenuStatus === "error" ? (
                 <Button
                   type="button"
                   variant="tertiary"
                   size="sm"
+                  className="navigation-message"
                   onClick={() => void loadMenus(navigationAuthKey)}
                 >
                   {tCommon("navigation.menuLoadFailed")}
@@ -849,13 +876,21 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
                           className={`more-nav-trigger${moreNavActive ? " active" : ""}${moreNavOpen ? " open" : ""}`}
                           type="button"
                           aria-expanded={moreNavOpen}
+                          aria-label={tCommon("navigation.more")}
                           aria-controls="more-nav-menu"
                         />
                       )}
                     >
-                      {tCommon("navigation.more")}<Icon name="chevron" size={13} />
+                      <span className="more-nav-label">{tCommon("navigation.more")}</span>
+                      <Icon name="chevron" size={13} />
+                      {isHome ? <span className="portal-nav-menu-icon" aria-hidden="true"><Icon name="menu" size={18} /></span> : null}
                     </DropdownMenu.Trigger>
-                    <DropdownMenu.Content id="more-nav-menu" className="more-nav-menu" align="end" side="bottom">
+                    <DropdownMenu.Content
+                      id="more-nav-menu"
+                      className={isHome ? "more-nav-menu portal-more-nav-menu" : "more-nav-menu"}
+                      align="end"
+                      side="bottom"
+                    >
                       {moreNavMenus.map((item) => (
                         <DropdownMenu.Item
                           key={item.code}
@@ -904,7 +939,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
             </nav>
           </div>
 
-          <div className="topbar-actions">
+          <div className="topbar-actions" ref={navActionsRef}>
             {!isPortal ? (
               <button
                 ref={searchToggleRef}
@@ -1053,7 +1088,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
             </>
           ) : null}
 
-          <main className="main">
+          <main className={isHome ? "main portal-home-main" : "main"}>
             <div className="main-inner">
               <ModuleErrorBoundary
                 resetKey={mainResetKey}
@@ -1064,23 +1099,11 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
                 {moduleContent}
               </ModuleErrorBoundary>
             </div>
+            {isHome ? footer : null}
           </main>
         </div>
 
-        <footer className="app-footer-shell">
-          <div className="app-footer">
-            <span className="app-footer-copy">{branding.site.title} {APP_VERSION}</span>
-            <span className="app-footer-separator" aria-hidden="true">·</span>
-            <a
-              className="app-footer-link"
-              href="https://github.com/0verme/data-asset-portal-community"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              GitHub ↗
-            </a>
-          </div>
-        </footer>
+        {!isHome ? footer : null}
 
         <LoginModal
           open={loginOpen}

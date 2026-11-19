@@ -107,7 +107,7 @@ test("public branding request failure preserves the default anonymous experience
   await installRemoteFixtures(page, true);
   await page.goto("/");
   await expect(page).toHaveTitle("数据资产管理与血缘分析平台");
-  await expect(page.getByRole("heading", { name: "数据资产管理与血缘分析平台" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "数据资产门户" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "搜索数据资产" })).toBeVisible();
   await expect(page.locator(".app-announcement")).toHaveCount(0);
 });

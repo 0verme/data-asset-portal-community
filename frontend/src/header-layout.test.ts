@@ -26,7 +26,7 @@ test("shared header keeps brand, navigation, and actions in stable DOM and grid 
   assert.match(headerGrid, /grid-template-columns:\s*max-content\s+minmax\(0,\s*1fr\)\s+max-content/);
   assert.match(
     app,
-    /<div className="topbar-brand">[\s\S]*?<div className="topbar-nav-slot"[\s\S]*?<nav className="mainnav"[\s\S]*?<div className="topbar-actions">/,
+    /<div className="topbar-brand">[\s\S]*?<div className="topbar-nav-slot"[\s\S]*?<nav className="mainnav"[\s\S]*?<div className="topbar-actions" ref={navActionsRef}>/,
   );
   assert.match(appStyles, /\.topbar-brand\s*\{[^}]*flex:\s*0 0 auto/);
   assert.match(appStyles, /\.topbar-nav-slot\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%/);
@@ -73,7 +73,7 @@ test("More navigation uses the DAP DropdownMenu adapter with bounded Kumo conten
 
   assert.match(app, /import \{ Button, DropdownMenu, IconButton, Input \} from "\.\/ui\/index\.ts"/);
   assert.match(app, /<DropdownMenu\.Trigger[\s\S]*?render=\{[\s\S]*?<Button/);
-  assert.match(app, /<DropdownMenu\.Content id="more-nav-menu" className="more-nav-menu" align="end" side="bottom">/);
+  assert.match(app, /<DropdownMenu\.Content\s+id="more-nav-menu"\s+className=\{isHome \? "more-nav-menu portal-more-nav-menu" : "more-nav-menu"\}\s+align="end"\s+side="bottom"/);
   assert.match(app, /<DropdownMenu\.Item[\s\S]*?selected=\{module === item\.code\}[\s\S]*?aria-current=\{module === item\.code \? "page" : undefined\}/);
   assert.match(menu, /width:\s*max-content/);
   assert.match(menu, /min-width:\s*156px/);
@@ -90,7 +90,7 @@ test("primary navigation actions use the frozen DAP Button adapter", () => {
   assert.match(app, /import \{ Button, DropdownMenu, IconButton, Input \} from "\.\/ui\/index\.ts"/);
   assert.match(
     app,
-    /currentNavMenuStatus === "loading" \? \([\s\S]*?<Button type="button" variant="tertiary" size="sm" disabled>/,
+    /currentNavMenuStatus === "loading" \? \([\s\S]*?<Button type="button" variant="tertiary" size="sm" disabled className="navigation-message">/,
   );
   assert.match(
     app,
@@ -106,7 +106,7 @@ test("primary navigation actions use the frozen DAP Button adapter", () => {
 
 test("More menu items keep selection and navigation inside the DAP DropdownMenu boundary", () => {
   const moreNavStart = app.indexOf('<div className="more-nav">');
-  const actionsStart = app.indexOf('<div className="topbar-actions">', moreNavStart);
+  const actionsStart = app.indexOf('<div className="topbar-actions" ref={navActionsRef}>', moreNavStart);
   const moreNav = app.slice(moreNavStart, actionsStart);
 
   assert.ok(moreNav.includes("<DropdownMenu open={moreNavOpen}"));
@@ -120,7 +120,7 @@ test("More menu items keep selection and navigation inside the DAP DropdownMenu 
 });
 
 test("the shared header has one appearance entry beside the theme shortcut", () => {
-  const actions = app.slice(app.indexOf('<div className="topbar-actions">'));
+  const actions = app.slice(app.indexOf('<div className="topbar-actions" ref={navActionsRef}>'));
   assert.match(actions, /<LanguageSwitcher \/>[\s\S]*?className="theme-toggle"[\s\S]*?<AppearanceSettings \/>[\s\S]*?<AuthBar/);
   assert.equal([...app.matchAll(/<AppearanceSettings \/>/g)].length, 1);
   assert.doesNotMatch(actions, /accent-preset-group/);

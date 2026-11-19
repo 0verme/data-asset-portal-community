@@ -45,7 +45,7 @@ DEFAULT_BRANDING_CONFIG: dict[str, Any] = {
         "favicon_url": DEFAULT_FAVICON_URL,
     },
     "hero": {
-        "title": _localized("数据资产管理与血缘分析平台", "Data Asset Management and Lineage Platform"),
+        "title": _localized("数据资产门户", "Data Asset Portal"),
         "subtitle": _localized(
             "一个入口，搜索系统、字段、词根、指标、报表、API、资产、下游推送和码值表。",
             "One place to search systems, fields, roots, metrics, reports, APIs, assets, downstream deliveries, and code tables.",

@@ -1936,7 +1936,7 @@
   }
 
   @media (max-width: 768px) {
-    .more-nav-menu {
+    .more-nav-menu:not(.portal-more-nav-menu) {
       display: none;
     }
   }
@@ -3316,4 +3316,156 @@
     .oplog-detail-grid {
       grid-template-columns: 1fr;
     }
+  }
+
+
+  /* Portal home. The shared shell layout continues to serve catalog pages and 404. */
+  .app:has(> .portal-home-topbar) {
+    background:
+      radial-gradient(ellipse 500px 320px at 50% 27%, var(--accent-soft), transparent 75%),
+      radial-gradient(ellipse 700px 240px at 54% 82%, var(--bg-grad-1), transparent 80%),
+      linear-gradient(180deg, color-mix(in srgb, var(--surface) 65%, var(--bg)), color-mix(in srgb, var(--surface) 24%, var(--bg)) 85%);
+  }
+  .portal-home-topbar {
+    --portal-header-side: max(252px, var(--portal-tools-width, 0px));
+    height: auto;
+    min-height: 68px;
+    flex: 0 0 auto;
+    width: min(1360px, calc(100% - 44px));
+    margin: 0 auto;
+    padding: 0;
+    grid-template-columns: var(--portal-header-side) minmax(0, 1fr) var(--portal-header-side);
+    gap: 13px;
+    background: transparent;
+    border: 0;
+  }
+  .portal-home-topbar .topbar-brand,
+  .portal-home-topbar .brand { min-width: 0; }
+  .portal-home-topbar .brand-mark { width: 35px; height: 35px; border-radius: 10px; }
+  .portal-home-topbar .brand-name { min-width: 0; font-size: 17px; letter-spacing: -.02em; }
+  .portal-home-topbar .brand-name small { font-size: 11px; }
+  .portal-home-topbar .topbar-actions { gap: 9px; }
+  .portal-home-topbar .mainnav {
+    min-height: 44px;
+    padding: 4px 8px;
+    gap: 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 60%, transparent);
+    box-shadow: var(--shadow-sm);
+  }
+  .portal-home-topbar .mainnav:not(.mainnav-measure) {
+    /* The measured menu catches up on resize. Keep the previous fit within its slot. */
+    overflow: clip;
+    overflow-clip-margin: 3px;
+  }
+  .portal-home-topbar .mainnav:not(.mainnav-measure):empty { visibility: hidden; }
+  .portal-home-topbar .mainnav .navigation-message {
+    height: auto;
+    min-height: 34px;
+    flex-shrink: 1;
+    white-space: normal;
+  }
+  .portal-home-topbar .mainnav button {
+    height: 34px;
+    padding-inline: clamp(8px, calc(2vw - 17px), 12px);
+    border-radius: 999px;
+  }
+  .portal-home-topbar .navigation-status { padding-inline: 8px; color: var(--ink-2); white-space: normal; }
+  .portal-nav-menu-icon { display: none; }
+  .portal-home-topbar :is(.theme-toggle, .appearance-trigger, .login-cta, .logout-btn, .user-chip) {
+    height: 39px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 50%, transparent);
+    transition: background-color .15s, border-color .15s, color .15s;
+  }
+  .portal-home-topbar :is(.theme-toggle, .appearance-trigger, .logout-btn) { width: 39px; }
+  .portal-home-topbar :is(.theme-toggle, .appearance-trigger, .login-cta, .logout-btn):hover {
+    background: var(--accent-soft);
+  }
+  .portal-home-topbar .language-switcher { font-size: 12px; }
+
+  .portal-home-main {
+    display: flex;
+    flex-direction: column;
+  }
+  .portal-home-main .main-inner {
+    max-width: none;
+    width: 100%;
+    flex: 1 0 auto;
+    padding: 0 18px;
+  }
+  .portal-home-footer {
+    margin-top: 70px;
+    padding: 8px 20px max(27px, env(safe-area-inset-bottom));
+    border-top: 0;
+  }
+  .portal-home-footer .app-footer { gap: 0 20px; }
+  .portal-home-footer .app-footer-copy { overflow-wrap: anywhere; }
+  .portal-home-footer .app-footer-separator { width: 1px; height: 16px; background: var(--line-strong); }
+  /* Theme tokens change together, so the link also needs to change color immediately. */
+  .portal-home-footer .app-footer-link { transition: none; }
+  .portal-home-footer .app-footer-link:hover { text-decoration: underline; }
+
+  @media (min-width: 1181px) {
+    .portal-home-topbar .brand-name small { display: inline; }
+  }
+  @media (max-width: 860px) {
+    .portal-home-topbar .brand-name { font-size: 14px; }
+    .portal-home-topbar .uc-name { max-width: 72px; }
+  }
+  @media (max-width: 768px) {
+    .portal-home-topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      width: calc(100% - 28px);
+      gap: 4px;
+    }
+    .portal-home-topbar .brand { gap: 7px; }
+    .portal-home-topbar .topbar-actions { gap: 4px; }
+    .portal-home-topbar .topbar-nav-slot { display: flex; width: 44px; }
+    .portal-home-topbar .topbar-nav-slot:has(:is(.navigation-message, .navigation-status)) {
+      grid-area: 2 / 1 / 3 / -1;
+      width: 100%;
+      padding-bottom: 4px;
+    }
+    .portal-home-topbar .topbar-brand { grid-column: 1; }
+    .portal-home-topbar .topbar-actions { grid-area: 1 / 3; }
+    .portal-home-topbar .mainnav:not(.mainnav-measure) {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+    .portal-home-topbar .mainnav:not(.mainnav-measure) > .dap-ui-button:not(.navigation-message) { display: none; }
+    .portal-home-topbar .mainnav-measure { position: fixed; }
+    .portal-home-topbar .mainnav-measure button { min-width: 44px; }
+    .portal-home-topbar .mainnav .more-nav-trigger:not([data-nav-measure-more]) {
+      width: 44px;
+      height: 44px;
+      justify-content: center;
+      padding: 0;
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--surface) 50%, transparent);
+    }
+    .portal-home-topbar .more-nav-label,
+    .portal-home-topbar .more-nav-label + svg { display: none; }
+    .portal-home-topbar .portal-nav-menu-icon { display: inline-flex; }
+    .portal-home-topbar .portal-nav-menu-icon svg { transform: none; }
+    .portal-home-topbar :is(.language-switcher, .theme-toggle, .appearance-trigger, .login-cta, .logout-btn) {
+      height: 44px;
+    }
+    .portal-home-topbar :is(.theme-toggle, .appearance-trigger, .logout-btn) { width: 44px; }
+  }
+  @media (min-width: 361px) and (max-width: 768px) {
+    .portal-home-topbar .brand-name { display: block; }
+  }
+  @media (max-width: 600px) {
+    .portal-home-topbar { min-height: 63px; }
+    .portal-home-topbar .brand-mark { width: 32px; height: 32px; }
+    .portal-home-main .main-inner { padding-inline: 14px; }
+    .portal-home-footer { margin-top: 52px; padding-bottom: max(22px, env(safe-area-inset-bottom)); }
+  }
+  @media (max-width: 360px) {
+    .portal-home-topbar .login-cta { padding-inline: 6px; }
+    .portal-home-topbar .login-cta > svg { display: none; }
   }

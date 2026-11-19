@@ -59,12 +59,14 @@ for (const { name, theme, accent, density, language } of appearances) {
 
     const grid = page.locator(".sp-stats-grid");
     await expect(grid.locator(".sp-stat-num")).toHaveText(statItems.map(({ value }) => String(value)));
-    await expect(grid.locator("a, button, [tabindex]")).toHaveCount(0);
+    await expect(grid.locator(".sp-stat-label")).toHaveText(statItems.map(({ label }) => label));
+    await expect(grid.locator("a, button, [tabindex], svg")).toHaveCount(0);
+    await expect(grid.locator(".sp-stat-card").first().locator(":scope > :first-child")).toHaveClass("sp-stat-label");
     await expect(page.locator(".sp-hot-item").first()).toHaveText("catalog_events");
     await expect(page.getByRole("button", { name: "问 AI", exact: true })).toBeDisabled();
     await page.getByRole("heading", { level: 1 }).click();
 
-    for (const [width, columns] of [[1440, 6], [768, 3], [390, 2], [320, 2]] as const) {
+    for (const [width, columns] of [[1440, 6], [861, 6], [860, 3], [768, 3], [601, 3], [600, 2], [390, 2], [320, 2]] as const) {
       await page.setViewportSize({ width, height: width === 1440 ? 960 : 844 });
       const rendered = await grid.evaluate((element) => {
         const boxes = [...document.querySelectorAll(".sp-searchbox, .sp-searchbox input, .sp-searchbox button, .sp-scope-chip, .sp-hot-item, .sp-stat-card")]
@@ -74,11 +76,14 @@ for (const { name, theme, accent, density, language } of appearances) {
           columns: [...element.children].filter((card) => card.getBoundingClientRect().top === firstRowY).length,
           maxRight: Math.max(document.documentElement.scrollWidth, ...boxes.map(({ right }) => right)),
           minLeft: Math.min(...boxes.map(({ left }) => left)),
+          minActionHeight: Math.min(...[...document.querySelectorAll(".sp-search-actions button")]
+            .map((action) => action.getBoundingClientRect().height)),
         };
       });
       expect(rendered.columns).toBe(columns);
       expect(rendered.maxRight).toBeLessThanOrEqual(width);
       expect(rendered.minLeft).toBeGreaterThanOrEqual(0);
+      expect(rendered.minActionHeight).toBeGreaterThanOrEqual(44);
       if (process.env["DAP_PORTAL_CAPTURE"] === "1"
         && ((name === "light" && width !== 768) || (width === 1440 && ["dark", "compact"].includes(name)))) {
         await page.screenshot({ path: testInfo.outputPath(`homepage-${name}-${width}.png`), animations: "disabled" });
@@ -105,6 +110,41 @@ test("homepage renders only the statistics visible to the current catalog", asyn
   }
   await expect(page.locator(".sp-stat-label")).toHaveText(visible.map(({ label }) => label));
   await expect(page.locator(".sp-stat-num")).toHaveText(visible.map(({ value }) => String(value)));
+  expect(await statDividers(page)).toEqual([{ below: false, next: true }, { below: false, next: false }]);
+});
+
+async function statDividers(page: Page) {
+  return page.locator(".sp-stat-card").evaluateAll((cells) => cells.map((cell) => ({
+    below: getComputedStyle(cell, "::before").content === '""',
+    next: getComputedStyle(cell, "::after").content === '""',
+  })));
+}
+
+test("partial rows draw only adjacent dividers and wrap long labels and values", async ({ page }) => {
+  await routePortal(page);
+  const longItem = {
+    label: "long-catalog-label-without-spaces".repeat(4),
+    value: "123456789012345678901234567890",
+  };
+  await page.route("**/api/portal/stats", (route) =>
+    route.fulfill({ json: { items: [...statItems.slice(0, 10), longItem] } }));
+
+  await page.goto("/");
+  const cells = page.locator(".sp-stat-card");
+  await expect(cells.last().locator(".sp-stat-label")).toHaveText(longItem.label);
+  await expect(cells.last().locator(".sp-stat-num")).toHaveText(longItem.value);
+  await expect(cells).toHaveCount(11);
+  for (const [width, columns] of [[1440, 6], [768, 3], [320, 2]] as const) {
+    await page.setViewportSize({ width, height: 1024 });
+    expect(await statDividers(page)).toEqual(Array.from({ length: 11 }, (_, index) => ({
+      below: index + columns < 11,
+      next: index < 10 && (index + 1) % columns !== 0,
+    })));
+    const content = await cells.last().locator(".sp-stat-label, .sp-stat-num").evaluateAll((elements) =>
+      elements.map((element) => ({ width: element.clientWidth, contentWidth: element.scrollWidth })));
+    expect(content).toHaveLength(2);
+    for (const { width, contentWidth } of content) expect(contentWidth).toBeLessThanOrEqual(width);
+  }
 });
 
 test("homepage distinguishes zero and unknown values from an empty catalog and request errors", async ({ page }) => {

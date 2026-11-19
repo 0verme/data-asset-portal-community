@@ -2,7 +2,7 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
 const VIEWPORTS = [1440, 1024, 768, 390, 375] as const;
 
-async function openPortal(page: Page) {
+async function openPage(page: Page, path = "/") {
   await page.addInitScript(() => {
     localStorage.removeItem("dap_auth");
     sessionStorage.removeItem("dap_auth");
@@ -13,7 +13,7 @@ async function openPortal(page: Page) {
     contentType: "application/json",
     body: JSON.stringify({ items: [] }),
   }));
-  await page.goto("/");
+  await page.goto(path);
   await expect(page.locator("footer.app-footer-shell")).toBeVisible();
 }
 
@@ -46,7 +46,7 @@ function contrastRatio(foreground: string, background: string): number {
 }
 
 test("global footer stays compact, readable, responsive, and outside main scrolling", async ({ page }, testInfo: TestInfo) => {
-  await openPortal(page);
+  await openPage(page, "/data-warehouse");
   const footer = page.locator("footer.app-footer-shell");
   const copy = footer.locator(".app-footer-copy");
   const link = footer.getByRole("link", { name: "GitHub ↗" });
@@ -64,6 +64,9 @@ test("global footer stays compact, readable, responsive, and outside main scroll
       }).click();
     }
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    // Business pages retain the shared hover transition. Measure their settled colors.
+    await expect.poll(() => link.evaluate((element) => getComputedStyle(element).color))
+      .toBe(await copy.evaluate((element) => getComputedStyle(element).color));
 
     for (const width of VIEWPORTS) {
       await page.setViewportSize({ width, height: 900 });
@@ -177,4 +180,77 @@ test("global footer stays compact, readable, responsive, and outside main scroll
     body: JSON.stringify(longPageMetrics, null, 2),
     contentType: "application/json",
   });
+});
+
+
+test("homepage footer follows the content and remains readable as theme tokens change", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1024 });
+  await openPage(page);
+  const main = page.locator(".portal-home-main");
+  const footer = main.getByRole("contentinfo");
+  const link = footer.getByRole("link", { name: "GitHub ↗" });
+  const panel = main.locator(".sp-stats");
+  await expect(panel.locator(".sp-stat-num")).toHaveCount(11);
+  await expect(footer.locator(".app-footer-copy")).toHaveText(/^数据资产门户 V\d+\.\d+\.\d+$/);
+  await expect(footer).toHaveCSS("border-top-width", "0px");
+  await expect(footer.locator(".app-footer-separator")).toHaveCSS("width", "1px");
+  await expect(link).toHaveAttribute("href", "https://github.com/0verme/data-asset-portal-community");
+  await expect(footer).toBeInViewport({ ratio: 1 });
+  const shortFooter = (await footer.boundingBox())!;
+  expect(shortFooter.y + shortFooter.height).toBeCloseTo(1024, 0);
+
+  async function switchThemeAndSample(target: "light" | "dark") {
+    const samples = await link.evaluate((element, targetTheme) => new Promise<Array<[string, string, string]>>((resolve, reject) => {
+      const root = document.documentElement;
+      const button = document.querySelector<HTMLButtonElement>("header .theme-toggle");
+      if (!button) { reject(new Error("Theme shortcut is missing")); return; }
+      const colors: Array<[string, string, string]> = [];
+      const sample = () => {
+        const tokens = getComputedStyle(root);
+        colors.push([
+          getComputedStyle(element).color,
+          tokens.getPropertyValue("--surface"),
+          tokens.getPropertyValue("--bg"),
+        ]);
+      };
+      const observer = new MutationObserver(() => {
+        if (root.dataset["theme"] !== targetTheme) return;
+        observer.disconnect();
+        sample();
+        requestAnimationFrame(() => {
+          sample();
+          requestAnimationFrame(() => { sample(); resolve(colors); });
+        });
+      });
+      observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+      button.click();
+    }), target);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", target);
+    for (const [foreground, surface, background] of samples) {
+      expect(contrastRatio(foreground, surface)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(foreground, background)).toBeGreaterThanOrEqual(4.5);
+    }
+    const resolvedForeground = await link.evaluate((element) => getComputedStyle(element).color);
+    expect(samples.every(([foreground]) => foreground === resolvedForeground)).toBe(true);
+  }
+  await switchThemeAndSample("dark");
+  await switchThemeAndSample("light");
+
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await main.evaluate((element) => { element.scrollTop = 0; });
+    await expect(footer).not.toBeInViewport();
+    await link.scrollIntoViewIfNeeded();
+    await expect(link).toBeInViewport({ ratio: 1 });
+    const scrollOffset = await main.evaluate((element) => element.scrollTop);
+    expect(scrollOffset).toBeGreaterThan(0);
+    expect((await panel.boundingBox())!.y + (await panel.boundingBox())!.height)
+      .toBeLessThan((await footer.boundingBox())!.y);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+
+  await page.goto("/no-such-page");
+  await expect(page.getByRole("heading", { name: /404/ })).toBeVisible();
+  await expect(page.locator(".app > .app-footer-shell")).toHaveCSS("border-top-width", "1px");
+  await expect(page.locator(".portal-home-footer")).toHaveCount(0);
 });
