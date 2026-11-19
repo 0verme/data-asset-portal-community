@@ -1271,9 +1271,9 @@ export function SearchPortalPage({
             <div className="sp-stats-grid" role="status" aria-label={t("portalStats.loading")}>
               {Array.from({ length: 12 }, (_, index) => (
                 <div className="sp-stat-card sp-stat-placeholder" key={index} aria-hidden="true">
-                  <SkeletonLine className="sp-stat-num" />
+                  <SkeletonLine className="sp-stat-placeholder-value" />
                   <span className="sp-stat-icon" />
-                  <SkeletonLine className="sp-stat-label" />
+                  <SkeletonLine className="sp-stat-placeholder-label" />
                 </div>
               ))}
             </div>
