@@ -49,12 +49,12 @@ LINEAGE_WORKSPACE_ENTRYPOINTS = (
 )
 
 
-def _print_demo_admin() -> None:
-    from demo.seed_loader import ADMIN_USER
+def _print_demo_account() -> None:
+    from demo.seed_loader import DEMO_USER
 
-    print("Demo administrator:", flush=True)
-    print(f"  Username: {ADMIN_USER['username']}", flush=True)
-    print(f"  Password: {ADMIN_USER['password']}", flush=True)
+    print("Demo maintenance account:", flush=True)
+    print(f"  Username: {DEMO_USER['username']}", flush=True)
+    print(f"  Password: {DEMO_USER['password']}", flush=True)
     print(
         "WARNING: Demo credentials only. Change them for real deployments.",
         flush=True,
@@ -516,7 +516,7 @@ def verify_demo_database(database: Path) -> dict[str, int]:
         RAG_CONFIG_ITEM_CODE,
         RAG_CONFIG_ITEM_NAME,
     )
-    from demo.seed_loader import ADMIN_USER, community_seed_plan
+    from demo.seed_loader import DEMO_USER, community_seed_plan
 
     if not database.is_file():
         raise BootstrapError(f"Demo database was not created: {database}")
@@ -615,15 +615,24 @@ def verify_demo_database(database: Path) -> dict[str, int]:
                     f"Unexpected demo count for {table}: {count} (expected {expected})"
                 )
             counts[table] = count
-        admin_count = connection.execute(
-            "SELECT COUNT(*) FROM p_admin_user WHERE username = ?",
-            (ADMIN_USER["username"],),
-        ).fetchone()[0]
-        if admin_count != 1:
+        account = connection.execute(
+            "SELECT username, role, status FROM p_admin_user WHERE id = ?",
+            (DEMO_USER["id"],),
+        ).fetchone()
+        expected_account = (
+            DEMO_USER["username"], DEMO_USER["role"], DEMO_USER["status"]
+        )
+        if account != expected_account:
             raise BootstrapError(
-                f"Demo account count is {admin_count} (expected 1)"
+                "Demo maintenance account is missing or has an unexpected role/status"
             )
-        counts[f"p_admin_user:{ADMIN_USER['username']}"] = admin_count
+        privileged_count = connection.execute(
+            "SELECT COUNT(*) FROM p_admin_user "
+            "WHERE role = 'admin' OR username = 'admin'"
+        ).fetchone()[0]
+        if privileged_count:
+            raise BootstrapError("Demo database must not contain a seeded admin login")
+        counts[f"p_admin_user:{DEMO_USER['username']}"] = 1
         print(
             "[demo] verified repository data: "
             f"menus={counts['p_menu']}, "
@@ -632,7 +641,7 @@ def verify_demo_database(database: Path) -> dict[str, int]:
             f"push={counts['p_push_system']}, "
             f"reports={counts['p_report_asset']}, "
             f"lineage_nodes={counts['p_lineage_node']}, "
-            f"{ADMIN_USER['username']}=1",
+            f"{DEMO_USER['username']}=1",
             flush=True,
         )
         return counts
@@ -777,7 +786,7 @@ def run_demo(
         print("\nCommunity Demo ready\n", flush=True)
         print(f"Frontend:    http://127.0.0.1:{frontend_port}/", flush=True)
         print(f"Backend/API: http://127.0.0.1:{backend_port}", flush=True)
-        _print_demo_admin()
+        _print_demo_account()
         print(f"Database:    {paths.database}", flush=True)
         print("\nStop: Ctrl+C\n", flush=True)
         while True:
@@ -827,7 +836,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         )
         if args.init_only:
             print("Community Demo initialization complete (--init-only).", flush=True)
-            _print_demo_admin()
+            _print_demo_account()
             return 0
         run_demo(
             paths,
