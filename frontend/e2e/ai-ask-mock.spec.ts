@@ -34,3 +34,25 @@ test("static Mock AI rejects unknown evidence and preserves keyword search", asy
   await expect(page.locator(".sp-hit").first()).toBeVisible();
   expect(remoteAiCalls).toEqual([]);
 });
+
+test("portal orb follows Mock progress without inventing a generation phase", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const orb = page.locator(".sp-data-orb");
+  await orb.evaluate((element) => {
+    const states = new Set<string>();
+    new MutationObserver(() => {
+      states.add(element.getAttribute("data-status") ?? "");
+      element.setAttribute("data-observed-states", [...states].join(" "));
+    }).observe(element, { attributes: true, attributeFilter: ["data-status"] });
+  });
+
+  await page.getByRole("textbox", { name: "搜索数据资产" }).fill("订单金额在哪张表？");
+  await page.getByRole("button", { name: "问 AI", exact: true }).click();
+  await expect(orb).toHaveAttribute("data-status", "completed");
+  const states = (await orb.getAttribute("data-observed-states"))?.split(" ");
+  expect(states).toEqual(expect.arrayContaining(["processing", "retrieving", "completed"]));
+  expect(states).not.toContain("generating");
+  await page.getByRole("tab", { name: /搜索结果/ }).click();
+  await expect(orb).toHaveAttribute("data-status", "idle");
+});

@@ -1,3 +1,4 @@
+import { createServer, type ServerResponse } from "node:http";
 import { expect, test, type Page } from "@playwright/test";
 
 const ASSET_ID = 42;
@@ -805,4 +806,169 @@ test("cancelled requests are explicit and cannot overwrite a subsequent answer",
   expect(fixtures.asked.map((item) => item.query)).toEqual([
     "cancel-first question", "replacement question",
   ]);
+});
+
+test("portal orb follows real Remote SSE frames and isolates each request", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
+  const streams: ServerResponse[] = [];
+  const server = createServer((request, response) => {
+    // This fixture lives on a separate local port and sends each SSE frame over HTTP.
+    response.setHeader("Access-Control-Allow-Origin", request.headers.origin ?? "*");
+    response.setHeader("Access-Control-Allow-Credentials", "true");
+    response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (request.method === "OPTIONS") {
+      response.writeHead(204).end();
+      return;
+    }
+    request.resume();
+    response.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" });
+    response.flushHeaders();
+    streams.push(response);
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Missing test stream address");
+    await page.addInitScript((streamUrl) => {
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = (input, options) => nativeFetch(
+        typeof input === "string" && new URL(input, location.href).pathname === "/api/ai/ask/stream"
+          ? streamUrl
+          : input,
+        options,
+      );
+    }, `http://127.0.0.1:${address.port}/stream`);
+    const { searches } = await openAiPortal(page);
+
+    const orb = page.locator(".sp-data-orb");
+    const input = page.getByRole("textbox", { name: "搜索数据资产" });
+    const ask = page.getByRole("button", { name: "问 AI", exact: true });
+    const cancel = page.getByRole("button", { name: "取消问答" });
+    const status = (value: string) => expect(orb).toHaveAttribute("data-status", value);
+    const getStream = async (index: number) => {
+      await expect.poll(() => streams.length).toBe(index + 1);
+      return streams[index]!;
+    };
+    const frame = (stream: ServerResponse, event: string, stepId: string, data = {}) => {
+      stream.write(`event: ${event}\ndata: ${JSON.stringify({
+        request_id: "0123456789abcdef0123456789abcdef", step_id: stepId,
+        timestamp: "2026-01-01T00:00:00.000Z", message: stepId, data,
+      })}\n\n`);
+    };
+    const complete = (stream: ServerResponse, query: string) => {
+      const body = sseResponse(answer(query), query).body;
+      stream.write(body.slice(body.indexOf("event: answer")));
+    };
+    const capture = async (name: string) => {
+      // Keep the hero in the frame while exercising the existing result auto-scroll.
+      await page.locator(".main").evaluate((element) => element.scrollTo({ top: 0, behavior: "instant" }));
+      await expect(orb).toBeInViewport();
+      await page.screenshot({ path: testInfo.outputPath(`portal-orb-${name}.png`), animations: "disabled", scale: "css" });
+    };
+
+    await input.focus();
+    await status("focused");
+    await input.dispatchEvent("compositionstart", { data: "" });
+    await input.fill("订单金额");
+    await input.dispatchEvent("keydown", { key: "Enter", isComposing: true, keyCode: 229 });
+    await expect(page.locator(".sp-results")).toHaveCount(0);
+    expect(searches).toHaveLength(0);
+    await status("focused");
+    await input.dispatchEvent("compositionend", { data: "订单金额" });
+    await status("typing");
+    await ask.click();
+    const first = await getStream(0);
+    await status("processing");
+    frame(first, "step_start", "rag-round-1", { round: 1 });
+    frame(first, "step_start", "search-0123456789abcdef");
+    frame(first, "step_error", "search-0123456789abcdef", { errorCode: "unavailable" });
+    await status("retrieving");
+    await capture("remote-retrieving");
+    frame(first, "step_complete", "rag-round-1", { round: 1 });
+    frame(first, "step_start", "generating");
+    await status("generating");
+    await capture("remote-generating");
+    complete(first, "订单金额");
+    await status("completed");
+    const aiTab = page.getByRole("tab", { name: /AI 问答/ });
+    await expect(aiTab).toContainText("问答中");
+    await capture("remote-completed");
+    first.end();
+    await expect(aiTab).toContainText("已完成");
+
+    await page.getByRole("tab", { name: /搜索结果/ }).click();
+    await status("idle");
+    await page.getByRole("tab", { name: /AI 问答/ }).click();
+    await status("completed");
+    await page.getByRole("button", { name: "搜索", exact: true }).click();
+    await expect(page.locator(".sp-hit").first()).toBeVisible();
+    await status("idle");
+    await expectNoHorizontalOverflow(page);
+    await capture("remote-search-results");
+
+    await input.fill("统计测试");
+    await ask.click();
+    const count = await getStream(1);
+    frame(count, "step_start", "metadata-count", { intent: "metadata_count", phase: "database" });
+    await status("retrieving");
+    await cancel.click();
+    await status("cancelled");
+    frame(count, "done", "done", { status: "completed" });
+    count.end();
+    await expect.poll(() => count.destroyed).toBe(true);
+    await status("cancelled");
+
+    await input.fill("先前请求");
+    await ask.click();
+    const old = await getStream(2);
+    frame(old, "step_start", "generating");
+    await status("generating");
+    await input.fill("后续请求");
+    await ask.click();
+    const current = await getStream(3);
+    complete(old, "先前请求");
+    old.end();
+    await expect.poll(() => old.destroyed).toBe(true);
+    await status("processing");
+    frame(current, "step_start", "verification", { phase: "database" });
+    await status("retrieving");
+    frame(current, "step_error", "verification", { errorCode: "unavailable" });
+    await status("processing");
+    const failure = sseResponse({
+      status: "retrieval_unavailable", answer: "合成测试检索失败。", citations: [], candidates: [],
+      retrievalStatus: "unavailable", generationStatus: "not_run", resultsTruncated: false,
+      reasonCode: "retrieval_unavailable", elapsedMs: 3,
+    }, "后续请求").body;
+    current.end(failure.slice(failure.indexOf("event: answer")));
+    await status("failed");
+    await expect(cancel).toHaveCount(0);
+    await capture("remote-failed");
+
+    await page.getByRole("button", { name: "重试", exact: true }).click();
+    const retry = await getStream(4);
+    await status("processing");
+    await input.fill("");
+    await input.press("Enter");
+    await expect(page.locator(".sp-results")).toHaveCount(0);
+    await status("focused");
+    complete(retry, "后续请求");
+    retry.end();
+    await status("focused");
+
+    await input.fill("离开首页");
+    await ask.click();
+    const unmounted = await getStream(5);
+    await page.getByRole("button", { name: "数据仓库", exact: true }).click();
+    await expect(orb).toHaveCount(0);
+    await expect.poll(() => unmounted.destroyed).toBe(true);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });

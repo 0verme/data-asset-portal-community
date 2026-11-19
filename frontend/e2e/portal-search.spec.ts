@@ -271,3 +271,115 @@ test("portal search remains within light/dark and desktop-to-phone viewport boun
     }
   }
 });
+
+test("home orb fits the hero and follows Appearance through live and static modes", async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    let attempts = 0;
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+      value(this: HTMLCanvasElement, type: string, ...args: unknown[]) {
+        if (type === "webgl") document.documentElement.dataset["orbContextAttempts"] = String(++attempts);
+        return Reflect.apply(getContext, this, [type, ...args]);
+      },
+    });
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
+  await openPortal(page);
+  const orb = page.locator(".sp-data-orb");
+  const html = page.locator("html");
+  const searchBox = page.locator(".sp-searchbox");
+  const capture = (name: string) => page.screenshot({ path: testInfo.outputPath(`portal-orb-${name}.png`), animations: "disabled", scale: "css" });
+  const checkOrbLayout = async () => {
+    const orbBox = (await orb.boundingBox())!;
+    const box = (await searchBox.boundingBox())!;
+    expect(orbBox.y + orbBox.height).toBeLessThan(box.y);
+    await checkNoHorizontalOverflow(page);
+  };
+  await expect(orb).toHaveAttribute("aria-hidden", "true");
+  await expect(orb).toHaveCSS("pointer-events", "none");
+  await expect(orb).toHaveAttribute("data-theme", "light");
+  await expect(html).toHaveAttribute("data-effects", "subtle");
+  await expect(html).toHaveAttribute("data-orb-context-attempts", "1");
+  // Existing autofocus keeps the input immediately usable. Blur for the idle screenshots.
+  await page.getByRole("heading", { level: 1 }).click();
+  await expect(orb).toHaveAttribute("data-status", "idle");
+  await checkOrbLayout();
+  const desktopDiameter = (await orb.boundingBox())!.width * .6;
+  expect(desktopDiameter).toBeGreaterThanOrEqual(180);
+  expect(desktopDiameter).toBeLessThanOrEqual(220);
+  await capture("light-desktop");
+  for (const width of [768, 390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await checkOrbLayout();
+    if (width <= 390) await capture(`light-mobile-${width}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const input = page.getByRole("textbox", { name: "搜索数据资产" });
+  await input.fill("目录");
+  await expect(orb).toHaveAttribute("data-status", "typing");
+  await expect(orb).toHaveAttribute("data-status", "focused");
+  await expect(html).toHaveAttribute("data-orb-context-attempts", "1");
+  await input.fill("");
+
+  const trigger = page.getByRole("button", { name: "风格设置", exact: true });
+  const drawer = page.getByRole("dialog", { name: "风格设置" });
+  await trigger.click();
+  await drawer.getByRole("radio", { name: "深色", exact: true }).check();
+  await drawer.getByRole("radio", { name: "暖橙", exact: true }).check();
+  await drawer.getByRole("radio", { name: "完整", exact: true }).check();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+  await expect(orb).toHaveAttribute("data-theme", "dark");
+  await expect(html).toHaveAttribute("data-accent", "orange");
+  await expect(html).toHaveAttribute("data-effects", "full");
+  await expect(html).toHaveAttribute("data-orb-context-attempts", "1");
+  await capture("dark-full");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(html).toHaveAttribute("data-effects", "off");
+  await expect(orb.locator("canvas")).toHaveCount(0);
+  await page.reload();
+  await expect(orb.locator(".data-orb__static")).toBeVisible();
+  await expect(html).not.toHaveAttribute("data-orb-context-attempts", /./);
+  await capture("dark-reduced-motion");
+
+  await trigger.click();
+  await drawer.getByRole("radio", { name: "关闭", exact: true }).check();
+  await page.keyboard.press("Escape");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.reload();
+  await expect(html).toHaveAttribute("data-effects", "off");
+  await expect(orb.locator(".data-orb__static")).toBeVisible();
+  await expect(html).not.toHaveAttribute("data-orb-context-attempts", /./);
+  await capture("dark-off");
+  await input.fill("静态目录");
+  await expect(orb).toHaveAttribute("data-status", "focused");
+  await expect(html).not.toHaveAttribute("data-orb-context-attempts", /./);
+});
+
+test("portal orb retains a visible CSS sphere without WebGL", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
+  await page.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+      value(this: HTMLCanvasElement, type: string, ...args: unknown[]) {
+        if (type === "webgl") {
+          document.documentElement.dataset["orbWebglUnavailable"] = "true";
+          return null;
+        }
+        return Reflect.apply(getContext, this, [type, ...args]);
+      },
+    });
+  });
+  await openPortal(page);
+  await expect(page.locator("html")).toHaveAttribute("data-orb-webgl-unavailable", "true");
+  const orb = page.locator(".sp-data-orb");
+  await expect(orb.locator("canvas")).toHaveCount(0);
+  const fallback = orb.locator(".data-orb__static");
+  await expect(fallback).toBeVisible();
+  expect(await fallback.evaluate((element) => getComputedStyle(element, "::after").backgroundColor))
+    .toBe("rgb(106, 69, 240)");
+  await page.screenshot({ path: testInfo.outputPath("portal-orb-light-css-fallback.png"), scale: "css" });
+});

@@ -146,7 +146,7 @@ test("AI is explicitly enabled, Enter remains traditional search, and model requ
 
   assert.match(source, /getAiAskAvailability\(\)/);
   assert.match(source, /\.catch\(\(\) => \{[\s\S]*?if \(!cancelled\) \{[\s\S]*?setAiEnabled\(false\)/);
-  assert.match(source, /if \(event\.key === "Enter"\) doSearch\(\)/);
+  assert.match(source, /if \(event\.key === "Enter" && !event\.nativeEvent\.isComposing && event\.keyCode !== 229\) doSearch\(\)/);
   assert.match(source, /onClick=\{\(\) => runAiAsk\(query\)\}/);
   assert.match(source, /askAiWithExecution\(\s*question/);
   assert.match(source, /syncSearchUrl\(question, scope\)/);

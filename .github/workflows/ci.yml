@@ -793,6 +793,15 @@ jobs:
           VITE_DEFAULT_ACCENT: purple
         run: npm run test:browser -- e2e/appearance.spec.ts e2e/appearance-settings.spec.ts --workers=2
 
+      - name: Upload portal DataOrb screenshots
+        if: always() && matrix.lane == 'b'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: portal-data-orb-screenshots
+          path: |
+            ${{ runner.temp }}/portal-search-layout-playwright/**/portal-orb-*.png
+            ${{ runner.temp }}/ai-ask-playwright/**/portal-orb-*.png
+
       - name: Upload Appearance screenshots
         if: always() && matrix.lane == 'b'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
