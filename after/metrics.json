@@ -1,0 +1,2114 @@
+{
+  "chromium-light-dark-1440": {
+    "theme": {
+      "theme": "light",
+      "mode": "light",
+      "accent": "purple",
+      "token": "#6b5ca5"
+    },
+    "editor-domain": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 309,
+        "width": 531,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 303,
+        "y": 439
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 519,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(246, 249, 252)",
+        "x": 309,
+        "y": 544
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1m_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"主题域\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1m_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 456px; --anchor-width: 531px; --anchor-height: 36px; --transform-origin: 0% -4px; transform: translate(303px, 439px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1m_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "editor-layer": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 276,
+        "width": 531,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 850,
+        "y": 439
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 519,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(246, 249, 252)",
+        "x": 856,
+        "y": 577
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1s_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"数据层级\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1s_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 456px; --anchor-width: 531px; --anchor-height: 36px; --transform-origin: 0% -4px; transform: translate(850px, 439px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1s_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "pagination": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 144,
+        "width": 72,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 1123,
+        "y": 614
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 60,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 1129,
+        "y": 686
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1c_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"每页条数\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-6.5 gap-1 rounded-md px-2 text-xs !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select dap-table-pagination__select\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"top\" aria-controls=\"base-ui-_r_1c_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"top\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"top\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 753px; --anchor-width: 72px; --anchor-height: 26px; --transform-origin: 0% calc(100% + 4px); transform: translate(1123px, 614px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1c_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "filter": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 111,
+        "width": 77.734375,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 520,
+        "y": 253
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 65.734375,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 526,
+        "y": 292
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_q_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"操作结果\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select inp\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_q_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 642.25px; --anchor-width: 74px; --anchor-height: 38px; --transform-origin: 0% -4px; transform: translate(520px, 253px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_q_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "nativeSelect": {
+      "padding": "0px 36px 0px 12px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 38,
+      "width": 531,
+      "boxSizing": "border-box",
+      "color": "rgb(20, 33, 51)",
+      "background": "rgb(246, 249, 252)",
+      "x": 303,
+      "y": 668.25
+    },
+    "legacy": {
+      "modal": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 656.875,
+        "width": 820,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 310,
+        "y": 121.5625
+      },
+      "heading": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "27px",
+        "height": 27,
+        "width": 71.453125,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 373,
+        "y": 143.0625
+      },
+      "input": {
+        "padding": "0px 12px",
+        "margin": "0px",
+        "lineHeight": "19.5px",
+        "height": 38,
+        "width": 377,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 335,
+        "y": 306.8125
+      },
+      "note": {
+        "padding": "10px 12px",
+        "margin": "0px",
+        "lineHeight": "21.45px",
+        "height": 104,
+        "width": 770,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 335,
+        "y": 580.4375
+      }
+    },
+    "dialog": {
+      "padding": "20px",
+      "margin": "0px",
+      "lineHeight": "21px",
+      "height": 413.328125,
+      "width": 560,
+      "boxSizing": "border-box",
+      "color": "rgb(20, 33, 51)",
+      "background": "rgb(255, 255, 255)",
+      "x": 440,
+      "y": 243.3359375
+    },
+    "popover": {
+      "padding": "12px 16px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 72,
+      "width": 229.203125,
+      "boxSizing": "border-box",
+      "color": "rgb(20, 33, 51)",
+      "background": "rgb(255, 255, 255)",
+      "x": 225,
+      "y": 528
+    },
+    "dropdown": {
+      "popup": {
+        "padding": "6px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 78,
+        "width": 144,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 280,
+        "y": 528
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 132,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 286,
+        "y": 534
+      }
+    }
+  },
+  "chromium-dark-light-390": {
+    "theme": {
+      "theme": "dark",
+      "mode": "dark",
+      "accent": "purple",
+      "token": "#a78bfa"
+    },
+    "editor-domain": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 309,
+        "width": 332,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 29,
+        "y": 498
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 320,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(18, 29, 49)",
+        "x": 35,
+        "y": 603
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1j_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"主题域\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1j_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 397.25px; --anchor-width: 332px; --anchor-height: 36px; --transform-origin: 0% -4px; transform: translate(29px, 498px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1j_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "editor-layer": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 276,
+        "width": 332,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 29,
+        "y": 575
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 320,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(18, 29, 49)",
+        "x": 35,
+        "y": 713
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1p_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"数据层级\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1p_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 320.5px; --anchor-width: 332px; --anchor-height: 36px; --transform-origin: 0% -4px; transform: translate(29px, 575px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1p_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "pagination": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 144,
+        "width": 72,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 56,
+        "y": 634
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 60,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 62,
+        "y": 706
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1h_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"每页条数\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-6.5 gap-1 rounded-md px-2 text-xs !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select dap-table-pagination__select\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"top\" aria-controls=\"base-ui-_r_1h_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"top\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"top\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 773px; --anchor-width: 72px; --anchor-height: 26px; --transform-origin: 0% calc(100% + 4px); transform: translate(56px, 634px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1h_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "filter": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 111,
+        "width": 77.734375,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 252,
+        "y": 231
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 65.734375,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 258,
+        "y": 270
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_q_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"操作结果\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select inp\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_q_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 664.25px; --anchor-width: 74px; --anchor-height: 38px; --transform-origin: 0% -4px; transform: translate(252px, 231px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_q_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "nativeSelect": {
+      "padding": "0px 36px 0px 12px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 38,
+      "width": 332,
+      "boxSizing": "border-box",
+      "color": "rgb(238, 242, 247)",
+      "background": "rgb(18, 29, 49)",
+      "x": 29,
+      "y": 959.25
+    },
+    "legacy": {
+      "modal": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 876,
+        "width": 366,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 12,
+        "y": 12
+      },
+      "heading": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "27px",
+        "height": 27,
+        "width": 71.453125,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 67,
+        "y": 33.5
+      },
+      "input": {
+        "padding": "0px 12px",
+        "margin": "0px",
+        "lineHeight": "19.5px",
+        "height": 38,
+        "width": 332,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 29,
+        "y": 259.25
+      },
+      "note": {
+        "padding": "10px 12px",
+        "margin": "0px",
+        "lineHeight": "21.45px",
+        "height": 104,
+        "width": 332,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 29,
+        "y": 698.375
+      }
+    },
+    "dialog": {
+      "padding": "16px",
+      "margin": "0px",
+      "lineHeight": "21px",
+      "height": 426.328125,
+      "width": 358,
+      "boxSizing": "border-box",
+      "color": "rgb(238, 242, 247)",
+      "background": "rgb(14, 22, 38)",
+      "x": 16,
+      "y": 236.8359375
+    },
+    "popover": {
+      "padding": "12px 16px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 72,
+      "width": 229.203125,
+      "boxSizing": "border-box",
+      "color": "rgb(238, 242, 247)",
+      "background": "rgb(14, 22, 38)",
+      "x": 93,
+      "y": 673
+    },
+    "dropdown": {
+      "popup": {
+        "padding": "6px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 78,
+        "width": 144,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 148,
+        "y": 673
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 132,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 154,
+        "y": 679
+      }
+    }
+  },
+  "chromium-system-light-390": {
+    "theme": {
+      "theme": "light",
+      "mode": "system",
+      "accent": "purple",
+      "token": "#6b5ca5"
+    },
+    "editor-domain": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 309,
+        "width": 332,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 29,
+        "y": 498
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 320,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(246, 249, 252)",
+        "x": 35,
+        "y": 603
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1m_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"主题域\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1m_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 397.25px; --anchor-width: 332px; --anchor-height: 36px; --transform-origin: 0% -4px; transform: translate(29px, 498px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1m_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "editor-layer": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 276,
+        "width": 332,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 29,
+        "y": 575
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 320,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(246, 249, 252)",
+        "x": 35,
+        "y": 713
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1s_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"数据层级\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1s_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 320.5px; --anchor-width: 332px; --anchor-height: 36px; --transform-origin: 0% -4px; transform: translate(29px, 575px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1s_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "pagination": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 144,
+        "width": 72,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 56,
+        "y": 634
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 60,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 62,
+        "y": 706
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1h_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"每页条数\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-6.5 gap-1 rounded-md px-2 text-xs !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select dap-table-pagination__select\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"top\" aria-controls=\"base-ui-_r_1h_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"top\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"top\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 773px; --anchor-width: 72px; --anchor-height: 26px; --transform-origin: 0% calc(100% + 4px); transform: translate(56px, 634px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1h_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "filter": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 111,
+        "width": 77.734375,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 252,
+        "y": 231
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 65.734375,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 258,
+        "y": 270
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_q_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"操作结果\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select inp\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_q_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 664.25px; --anchor-width: 74px; --anchor-height: 38px; --transform-origin: 0% -4px; transform: translate(252px, 231px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_q_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "nativeSelect": {
+      "padding": "0px 36px 0px 12px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 38,
+      "width": 332,
+      "boxSizing": "border-box",
+      "color": "rgb(20, 33, 51)",
+      "background": "rgb(246, 249, 252)",
+      "x": 29,
+      "y": 959.25
+    },
+    "legacy": {
+      "modal": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 876,
+        "width": 366,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 12,
+        "y": 12
+      },
+      "heading": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "27px",
+        "height": 27,
+        "width": 71.453125,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 67,
+        "y": 33.5
+      },
+      "input": {
+        "padding": "0px 12px",
+        "margin": "0px",
+        "lineHeight": "19.5px",
+        "height": 38,
+        "width": 332,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 29,
+        "y": 259.25
+      },
+      "note": {
+        "padding": "10px 12px",
+        "margin": "0px",
+        "lineHeight": "21.45px",
+        "height": 104,
+        "width": 332,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 29,
+        "y": 698.375
+      }
+    },
+    "dialog": {
+      "padding": "16px",
+      "margin": "0px",
+      "lineHeight": "21px",
+      "height": 426.328125,
+      "width": 358,
+      "boxSizing": "border-box",
+      "color": "rgb(20, 33, 51)",
+      "background": "rgb(255, 255, 255)",
+      "x": 16,
+      "y": 236.8359375
+    },
+    "popover": {
+      "padding": "12px 16px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 72,
+      "width": 229.203125,
+      "boxSizing": "border-box",
+      "color": "rgb(20, 33, 51)",
+      "background": "rgb(255, 255, 255)",
+      "x": 93,
+      "y": 673
+    },
+    "dropdown": {
+      "popup": {
+        "padding": "6px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 78,
+        "width": 144,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 148,
+        "y": 673
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 132,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 154,
+        "y": 679
+      }
+    }
+  },
+  "chromium-system-dark-1440": {
+    "theme": {
+      "theme": "dark",
+      "mode": "system",
+      "accent": "purple",
+      "token": "#a78bfa"
+    },
+    "editor-domain": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 309,
+        "width": 531,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 303,
+        "y": 439
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 519,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(18, 29, 49)",
+        "x": 309,
+        "y": 544
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1m_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"主题域\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1m_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 456px; --anchor-width: 531px; --anchor-height: 36px; --transform-origin: 0% -4px; transform: translate(303px, 439px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1m_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "editor-layer": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 276,
+        "width": 531,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 850,
+        "y": 439
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 519,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(18, 29, 49)",
+        "x": 856,
+        "y": 577
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1s_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"数据层级\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1s_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 456px; --anchor-width: 531px; --anchor-height: 36px; --transform-origin: 0% -4px; transform: translate(850px, 439px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1s_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "pagination": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 144,
+        "width": 72,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 1123,
+        "y": 614
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 60,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 1129,
+        "y": 686
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1c_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"每页条数\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-6.5 gap-1 rounded-md px-2 text-xs !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select dap-table-pagination__select\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"top\" aria-controls=\"base-ui-_r_1c_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"top\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"top\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 753px; --anchor-width: 72px; --anchor-height: 26px; --transform-origin: 0% calc(100% + 4px); transform: translate(1123px, 614px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1c_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "filter": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 111,
+        "width": 77.734375,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 520,
+        "y": 253
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 65.734375,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 526,
+        "y": 292
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_q_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"操作结果\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select inp\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_q_-list\">",
+        "popup": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" style=\"\">",
+        "positioner": "<div data-open=\"\" data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 642.25px; --anchor-width: 74px; --anchor-height: 38px; --transform-origin: 0% -4px; transform: translate(520px, 253px);\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_q_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "nativeSelect": {
+      "padding": "0px 36px 0px 12px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 38,
+      "width": 531,
+      "boxSizing": "border-box",
+      "color": "rgb(238, 242, 247)",
+      "background": "rgb(18, 29, 49)",
+      "x": 303,
+      "y": 668.25
+    },
+    "legacy": {
+      "modal": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 656.875,
+        "width": 820,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 310,
+        "y": 121.5625
+      },
+      "heading": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "27px",
+        "height": 27,
+        "width": 71.453125,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 373,
+        "y": 143.0625
+      },
+      "input": {
+        "padding": "0px 12px",
+        "margin": "0px",
+        "lineHeight": "19.5px",
+        "height": 38,
+        "width": 377,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 335,
+        "y": 306.8125
+      },
+      "note": {
+        "padding": "10px 12px",
+        "margin": "0px",
+        "lineHeight": "21.45px",
+        "height": 104,
+        "width": 770,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 335,
+        "y": 580.4375
+      }
+    },
+    "dialog": {
+      "padding": "20px",
+      "margin": "0px",
+      "lineHeight": "21px",
+      "height": 413.328125,
+      "width": 560,
+      "boxSizing": "border-box",
+      "color": "rgb(238, 242, 247)",
+      "background": "rgb(14, 22, 38)",
+      "x": 440,
+      "y": 243.3359375
+    },
+    "popover": {
+      "padding": "12px 16px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 72,
+      "width": 229.203125,
+      "boxSizing": "border-box",
+      "color": "rgb(238, 242, 247)",
+      "background": "rgb(14, 22, 38)",
+      "x": 225,
+      "y": 528
+    },
+    "dropdown": {
+      "popup": {
+        "padding": "6px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 78,
+        "width": 144,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 280,
+        "y": 528
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 132,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 286,
+        "y": 534
+      }
+    }
+  },
+  "webkit-light-dark-1440": {
+    "theme": {
+      "theme": "light",
+      "mode": "light",
+      "accent": "purple",
+      "token": "#6b5ca5"
+    },
+    "editor-domain": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 309,
+        "width": 526,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 303,
+        "y": 439
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 514,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(246, 249, 252)",
+        "x": 309,
+        "y": 544
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1j_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"主题域\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1j_-list\">",
+        "popup": "<div data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 456px; --transform-origin: 0% -4px; --anchor-width: 526px; --anchor-height: 36px; transform: translate(303px, 439px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1j_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "editor-layer": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 276,
+        "width": 526,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 845,
+        "y": 439
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 514,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(246, 249, 252)",
+        "x": 851,
+        "y": 577
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1p_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"数据层级\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1p_-list\">",
+        "popup": "<div data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 456px; --transform-origin: 0% -4px; --anchor-width: 526px; --anchor-height: 36px; transform: translate(845px, 439px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1p_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "pagination": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 144,
+        "width": 72,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 1112,
+        "y": 614
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 60,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 1118,
+        "y": 686
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1c_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"每页条数\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-6.5 gap-1 rounded-md px-2 text-xs !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select dap-table-pagination__select\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"top\" aria-controls=\"base-ui-_r_1c_-list\">",
+        "popup": "<div data-side=\"top\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"top\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 753px; --transform-origin: 0% calc(100% + 4px); --anchor-width: 72px; --anchor-height: 26px; transform: translate(1112px, 614px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1c_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "filter": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 111,
+        "width": 78.28125,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 522,
+        "y": 253
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 66.28125,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 528,
+        "y": 292
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_q_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"操作结果\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select inp\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_q_-list\">",
+        "popup": "<div data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 642.25px; --transform-origin: 0% -4px; --anchor-width: 74px; --anchor-height: 38px; transform: translate(522px, 253px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_q_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "nativeSelect": {
+      "padding": "0px 36px 0px 12px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 38,
+      "width": 526,
+      "boxSizing": "border-box",
+      "color": "rgb(20, 33, 51)",
+      "background": "rgb(246, 249, 252)",
+      "x": 303,
+      "y": 668.25
+    },
+    "legacy": {
+      "modal": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 656.875,
+        "width": 820,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 310,
+        "y": 121.5625
+      },
+      "heading": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "27px",
+        "height": 27,
+        "width": 72.8125,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 373,
+        "y": 143.0625
+      },
+      "input": {
+        "padding": "0px 12px",
+        "margin": "0px",
+        "lineHeight": "19.5px",
+        "height": 38,
+        "width": 377,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 335,
+        "y": 306.8125
+      },
+      "note": {
+        "padding": "10px 12px",
+        "margin": "0px",
+        "lineHeight": "21.449999px",
+        "height": 104,
+        "width": 770,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 335,
+        "y": 580.4375
+      }
+    },
+    "dialog": {
+      "padding": "20px",
+      "margin": "0px",
+      "lineHeight": "21px",
+      "height": 413.328125,
+      "width": 560,
+      "boxSizing": "border-box",
+      "color": "rgb(20, 33, 51)",
+      "background": "rgb(255, 255, 255)",
+      "x": 435,
+      "y": 243.5
+    },
+    "popover": {
+      "padding": "12px 16px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 71.96875,
+      "width": 235.921875,
+      "boxSizing": "border-box",
+      "color": "rgb(20, 33, 51)",
+      "background": "rgb(255, 255, 255)",
+      "x": 220,
+      "y": 528
+    },
+    "dropdown": {
+      "popup": {
+        "padding": "6px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 78,
+        "width": 144,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 279,
+        "y": 528
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 132,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 285,
+        "y": 534
+      }
+    }
+  },
+  "webkit-dark-light-390": {
+    "theme": {
+      "theme": "dark",
+      "mode": "dark",
+      "accent": "purple",
+      "token": "#a78bfa"
+    },
+    "editor-domain": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 309,
+        "width": 322,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 29,
+        "y": 498
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 310,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(18, 29, 49)",
+        "x": 35,
+        "y": 603
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1j_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"主题域\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1j_-list\">",
+        "popup": "<div data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 397.25px; --transform-origin: 0% -4px; --anchor-width: 322px; --anchor-height: 36px; transform: translate(29px, 498px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1j_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "editor-layer": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 276,
+        "width": 322,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 29,
+        "y": 575
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 310,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(18, 29, 49)",
+        "x": 35,
+        "y": 713
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1p_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"数据层级\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1p_-list\">",
+        "popup": "<div data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 320.5px; --transform-origin: 0% -4px; --anchor-width: 322px; --anchor-height: 36px; transform: translate(29px, 575px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1p_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "pagination": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 144,
+        "width": 72,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 56,
+        "y": 634
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 60,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 62,
+        "y": 706
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1c_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"每页条数\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-6.5 gap-1 rounded-md px-2 text-xs !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select dap-table-pagination__select\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"top\" aria-controls=\"base-ui-_r_1c_-list\">",
+        "popup": "<div data-side=\"top\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"top\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 773px; --transform-origin: 0% calc(100% + 4px); --anchor-width: 72px; --anchor-height: 26px; transform: translate(56px, 634px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1c_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "filter": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 111,
+        "width": 78.28125,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 254,
+        "y": 231
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 66.28125,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 260,
+        "y": 270
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_q_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"操作结果\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select inp\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_q_-list\">",
+        "popup": "<div data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 664.25px; --transform-origin: 0% -4px; --anchor-width: 74px; --anchor-height: 38px; transform: translate(254px, 231px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_q_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "nativeSelect": {
+      "padding": "0px 36px 0px 12px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 38,
+      "width": 322,
+      "boxSizing": "border-box",
+      "color": "rgb(238, 242, 247)",
+      "background": "rgb(18, 29, 49)",
+      "x": 29,
+      "y": 959.25
+    },
+    "legacy": {
+      "modal": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 876,
+        "width": 366,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 12,
+        "y": 12
+      },
+      "heading": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "27px",
+        "height": 27,
+        "width": 72.8125,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 67,
+        "y": 33.5
+      },
+      "input": {
+        "padding": "0px 12px",
+        "margin": "0px",
+        "lineHeight": "19.5px",
+        "height": 38,
+        "width": 322,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 29,
+        "y": 259.25
+      },
+      "note": {
+        "padding": "10px 12px",
+        "margin": "0px",
+        "lineHeight": "21.449999px",
+        "height": 104,
+        "width": 322,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 29,
+        "y": 698.375
+      }
+    },
+    "dialog": {
+      "padding": "16px",
+      "margin": "0px",
+      "lineHeight": "21px",
+      "height": 446.46875,
+      "width": 358,
+      "boxSizing": "border-box",
+      "color": "rgb(238, 242, 247)",
+      "background": "rgb(14, 22, 38)",
+      "x": 11,
+      "y": 227
+    },
+    "popover": {
+      "padding": "12px 16px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 71.96875,
+      "width": 235.921875,
+      "boxSizing": "border-box",
+      "color": "rgb(238, 242, 247)",
+      "background": "rgb(14, 22, 38)",
+      "x": 93,
+      "y": 693
+    },
+    "dropdown": {
+      "popup": {
+        "padding": "6px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 78,
+        "width": 144,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 152,
+        "y": 693
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 132,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 158,
+        "y": 699
+      }
+    }
+  },
+  "webkit-system-light-390": {
+    "theme": {
+      "theme": "light",
+      "mode": "system",
+      "accent": "purple",
+      "token": "#6b5ca5"
+    },
+    "editor-domain": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 309,
+        "width": 322,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 29,
+        "y": 498
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 310,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(246, 249, 252)",
+        "x": 35,
+        "y": 603
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1j_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"主题域\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1j_-list\">",
+        "popup": "<div data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 397.25px; --transform-origin: 0% -4px; --anchor-width: 322px; --anchor-height: 36px; transform: translate(29px, 498px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1j_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "editor-layer": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 276,
+        "width": 322,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 29,
+        "y": 575
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 310,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(246, 249, 252)",
+        "x": 35,
+        "y": 713
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1p_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"数据层级\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1p_-list\">",
+        "popup": "<div data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 320.5px; --transform-origin: 0% -4px; --anchor-width: 322px; --anchor-height: 36px; transform: translate(29px, 575px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1p_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "pagination": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 144,
+        "width": 72,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 56,
+        "y": 634
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 60,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 62,
+        "y": 706
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1c_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"每页条数\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-6.5 gap-1 rounded-md px-2 text-xs !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select dap-table-pagination__select\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"top\" aria-controls=\"base-ui-_r_1c_-list\">",
+        "popup": "<div data-side=\"top\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"top\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 773px; --transform-origin: 0% calc(100% + 4px); --anchor-width: 72px; --anchor-height: 26px; transform: translate(56px, 634px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1c_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "filter": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 111,
+        "width": 78.28125,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 254,
+        "y": 231
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 66.28125,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 260,
+        "y": 270
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_q_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"操作结果\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select inp\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_q_-list\">",
+        "popup": "<div data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 380px; --available-height: 664.25px; --transform-origin: 0% -4px; --anchor-width: 74px; --anchor-height: 38px; transform: translate(254px, 231px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_q_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "nativeSelect": {
+      "padding": "0px 36px 0px 12px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 38,
+      "width": 322,
+      "boxSizing": "border-box",
+      "color": "rgb(20, 33, 51)",
+      "background": "rgb(246, 249, 252)",
+      "x": 29,
+      "y": 959.25
+    },
+    "legacy": {
+      "modal": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 876,
+        "width": 366,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 12,
+        "y": 12
+      },
+      "heading": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "27px",
+        "height": 27,
+        "width": 72.8125,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 67,
+        "y": 33.5
+      },
+      "input": {
+        "padding": "0px 12px",
+        "margin": "0px",
+        "lineHeight": "19.5px",
+        "height": 38,
+        "width": 322,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 29,
+        "y": 259.25
+      },
+      "note": {
+        "padding": "10px 12px",
+        "margin": "0px",
+        "lineHeight": "21.449999px",
+        "height": 104,
+        "width": 322,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 29,
+        "y": 698.375
+      }
+    },
+    "dialog": {
+      "padding": "16px",
+      "margin": "0px",
+      "lineHeight": "21px",
+      "height": 446.46875,
+      "width": 358,
+      "boxSizing": "border-box",
+      "color": "rgb(20, 33, 51)",
+      "background": "rgb(255, 255, 255)",
+      "x": 11,
+      "y": 227
+    },
+    "popover": {
+      "padding": "12px 16px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 71.96875,
+      "width": 235.921875,
+      "boxSizing": "border-box",
+      "color": "rgb(20, 33, 51)",
+      "background": "rgb(255, 255, 255)",
+      "x": 93,
+      "y": 693
+    },
+    "dropdown": {
+      "popup": {
+        "padding": "6px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 78,
+        "width": 144,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgb(255, 255, 255)",
+        "x": 152,
+        "y": 693
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 132,
+        "boxSizing": "border-box",
+        "color": "rgb(20, 33, 51)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 158,
+        "y": 699
+      }
+    }
+  },
+  "webkit-system-dark-1440": {
+    "theme": {
+      "theme": "dark",
+      "mode": "system",
+      "accent": "purple",
+      "token": "#a78bfa"
+    },
+    "editor-domain": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 309,
+        "width": 526,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 303,
+        "y": 439
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 514,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(18, 29, 49)",
+        "x": 309,
+        "y": 544
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1j_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"主题域\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1j_-list\">",
+        "popup": "<div data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 456px; --transform-origin: 0% -4px; --anchor-width: 526px; --anchor-height: 36px; transform: translate(303px, 439px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1j_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "editor-layer": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 276,
+        "width": 526,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 845,
+        "y": 439
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 514,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(18, 29, 49)",
+        "x": 851,
+        "y": 577
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1p_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"数据层级\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select\" data-filled=\"\" data-focused=\"\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_1p_-list\">",
+        "popup": "<div data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 456px; --transform-origin: 0% -4px; --anchor-width: 526px; --anchor-height: 36px; transform: translate(845px, 439px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1p_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div data-selected=\"\" role=\"option\" aria-selected=\"true\" tabindex=\"0\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\" data-highlighted=\"\">",
+        "hitTarget": true
+      }
+    },
+    "pagination": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 144,
+        "width": 72,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 1112,
+        "y": 614
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 60,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 1118,
+        "y": 686
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_1c_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"每页条数\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-6.5 gap-1 rounded-md px-2 text-xs !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select dap-table-pagination__select\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"top\" aria-controls=\"base-ui-_r_1c_-list\">",
+        "popup": "<div data-side=\"top\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"top\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 753px; --transform-origin: 0% calc(100% + 4px); --anchor-width: 72px; --anchor-height: 26px; transform: translate(1112px, 614px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_1c_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "filter": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 111,
+        "width": 78.28125,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 522,
+        "y": 253
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 66.28125,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 528,
+        "y": 292
+      },
+      "dom": {
+        "trigger": "<button type=\"button\" tabindex=\"0\" id=\"base-ui-_r_q_\" role=\"combobox\" aria-expanded=\"true\" aria-haspopup=\"listbox\" data-kumo-component=\"Select\" data-kumo-part=\"trigger\" aria-label=\"操作结果\" class=\"group flex w-max shrink-0 items-center select-none border-0 shadow-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-kumo-brand cursor-pointer disabled:cursor-not-allowed disabled:text-kumo-subtle h-9 gap-1.5 rounded-lg px-3 text-base leading-5 !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:!text-kumo-default/70 ring-kumo-line bg-kumo-control disabled:bg-kumo-control/50 data-[state=open]:bg-kumo-control justify-between font-normal focus:opacity-100 focus:ring-kumo-focus/50 focus-visible:ring-inset *:in-focus:opacity-100 dap-ui-select inp\" data-popup-open=\"\" data-pressed=\"\" data-popup-side=\"bottom\" aria-controls=\"base-ui-_r_q_-list\">",
+        "popup": "<div data-side=\"bottom\" data-align=\"start\" tabindex=\"-1\" data-base-ui-focusable=\"\" role=\"presentation\" class=\"flex flex-col max-h-[var(--available-height)] bg-kumo-base text-kumo-default rounded-lg shadow-lg ring ring-kumo-line max-w-(--available-width) min-w-(--anchor-width) py-1.5\" data-open=\"\" style=\"\">",
+        "positioner": "<div data-side=\"bottom\" data-align=\"start\" role=\"presentation\" style=\"position: absolute; top: 0px; left: 0px; --available-width: 1430px; --available-height: 642.25px; --transform-origin: 0% -4px; --anchor-width: 74px; --anchor-height: 38px; transform: translate(522px, 253px);\" data-open=\"\">",
+        "portalParent": "BODY",
+        "outsideEditor": true,
+        "list": "<div id=\"base-ui-_r_q_-list\" role=\"listbox\" class=\"min-h-0 flex-1 scroll-pt-2 scroll-pb-2 overflow-y-auto overscroll-none\">",
+        "option": "<div role=\"option\" aria-selected=\"false\" tabindex=\"-1\" data-kumo-component=\"Select\" data-kumo-part=\"option\" class=\"group mx-1.5 flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-base outline-none focus-visible:outline-hidden focus-visible:z-50 focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:ring-inset data-highlighted:bg-kumo-tint data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50\">",
+        "hitTarget": true
+      }
+    },
+    "nativeSelect": {
+      "padding": "0px 36px 0px 12px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 38,
+      "width": 526,
+      "boxSizing": "border-box",
+      "color": "rgb(238, 242, 247)",
+      "background": "rgb(18, 29, 49)",
+      "x": 303,
+      "y": 668.25
+    },
+    "legacy": {
+      "modal": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 656.875,
+        "width": 820,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 310,
+        "y": 121.5625
+      },
+      "heading": {
+        "padding": "0px",
+        "margin": "0px",
+        "lineHeight": "27px",
+        "height": 27,
+        "width": 72.8125,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 373,
+        "y": 143.0625
+      },
+      "input": {
+        "padding": "0px 12px",
+        "margin": "0px",
+        "lineHeight": "19.5px",
+        "height": 38,
+        "width": 377,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 335,
+        "y": 306.8125
+      },
+      "note": {
+        "padding": "10px 12px",
+        "margin": "0px",
+        "lineHeight": "21.449999px",
+        "height": 104,
+        "width": 770,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 335,
+        "y": 580.4375
+      }
+    },
+    "dialog": {
+      "padding": "20px",
+      "margin": "0px",
+      "lineHeight": "21px",
+      "height": 413.328125,
+      "width": 560,
+      "boxSizing": "border-box",
+      "color": "rgb(238, 242, 247)",
+      "background": "rgb(14, 22, 38)",
+      "x": 435,
+      "y": 243.5
+    },
+    "popover": {
+      "padding": "12px 16px",
+      "margin": "0px",
+      "lineHeight": "19.5px",
+      "height": 71.96875,
+      "width": 235.921875,
+      "boxSizing": "border-box",
+      "color": "rgb(238, 242, 247)",
+      "background": "rgb(14, 22, 38)",
+      "x": 220,
+      "y": 1428
+    },
+    "dropdown": {
+      "popup": {
+        "padding": "6px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 78,
+        "width": 144,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgb(14, 22, 38)",
+        "x": 279,
+        "y": 528
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px",
+        "lineHeight": "21px",
+        "height": 33,
+        "width": 132,
+        "boxSizing": "border-box",
+        "color": "rgb(238, 242, 247)",
+        "background": "rgba(0, 0, 0, 0)",
+        "x": 285,
+        "y": 534
+      }
+    }
+  }
+}

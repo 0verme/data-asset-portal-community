@@ -1,0 +1,238 @@
+{
+  "chromium-before": {
+    "asset": "/assets/index-BMnGPMEu.css",
+    "layers": [
+      "properties",
+      "theme",
+      "base",
+      "components",
+      "utilities"
+    ],
+    "matched": [
+      {
+        "role": "option",
+        "layer": "utilities",
+        "rule": ".mx-1\\.5 { margin-inline: calc(var(--spacing)*1.5); }"
+      },
+      {
+        "role": "option",
+        "layer": "utilities",
+        "rule": ".px-2 { padding-inline: calc(var(--spacing)*2); }"
+      },
+      {
+        "role": "popup",
+        "layer": "utilities",
+        "rule": ".py-1\\.5 { padding-block: calc(var(--spacing)*1.5); }"
+      },
+      {
+        "role": "option",
+        "layer": "utilities",
+        "rule": ".py-1\\.5 { padding-block: calc(var(--spacing)*1.5); }"
+      },
+      {
+        "role": "popup",
+        "layer": "(unlayered)",
+        "rule": "* { box-sizing: border-box; margin: 0px; padding: 0px; }"
+      },
+      {
+        "role": "option",
+        "layer": "(unlayered)",
+        "rule": "* { box-sizing: border-box; margin: 0px; padding: 0px; }"
+      }
+    ],
+    "computed": {
+      "popup": {
+        "padding": "0px",
+        "margin": "0px",
+        "boxSizing": "border-box"
+      },
+      "option": {
+        "padding": "0px",
+        "margin": "0px",
+        "boxSizing": "border-box"
+      }
+    }
+  },
+  "chromium-after": {
+    "asset": "/assets/index-BYtxfxT6.css",
+    "layers": [
+      "properties",
+      "theme",
+      "base",
+      "components",
+      "utilities"
+    ],
+    "matched": [
+      {
+        "role": "popup",
+        "layer": "base",
+        "rule": "* { margin: 0px; padding: 0px; }"
+      },
+      {
+        "role": "option",
+        "layer": "base",
+        "rule": "* { margin: 0px; padding: 0px; }"
+      },
+      {
+        "role": "option",
+        "layer": "utilities",
+        "rule": ".mx-1\\.5 { margin-inline: calc(var(--spacing)*1.5); }"
+      },
+      {
+        "role": "option",
+        "layer": "utilities",
+        "rule": ".px-2 { padding-inline: calc(var(--spacing)*2); }"
+      },
+      {
+        "role": "popup",
+        "layer": "utilities",
+        "rule": ".py-1\\.5 { padding-block: calc(var(--spacing)*1.5); }"
+      },
+      {
+        "role": "option",
+        "layer": "utilities",
+        "rule": ".py-1\\.5 { padding-block: calc(var(--spacing)*1.5); }"
+      },
+      {
+        "role": "popup",
+        "layer": "(unlayered)",
+        "rule": "* { box-sizing: border-box; }"
+      },
+      {
+        "role": "option",
+        "layer": "(unlayered)",
+        "rule": "* { box-sizing: border-box; }"
+      }
+    ],
+    "computed": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "boxSizing": "border-box"
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "boxSizing": "border-box"
+      }
+    }
+  },
+  "webkit-before": {
+    "asset": "/assets/index-BMnGPMEu.css",
+    "layers": [
+      "properties",
+      "theme",
+      "base",
+      "components",
+      "utilities"
+    ],
+    "matched": [
+      {
+        "role": "option",
+        "layer": "utilities",
+        "rule": ".mx-1\\.5 { margin-inline: calc(var(--spacing)*1.5); }"
+      },
+      {
+        "role": "option",
+        "layer": "utilities",
+        "rule": ".px-2 { padding-inline: calc(var(--spacing)*2); }"
+      },
+      {
+        "role": "popup",
+        "layer": "utilities",
+        "rule": ".py-1\\.5 { padding-block: calc(var(--spacing)*1.5); }"
+      },
+      {
+        "role": "option",
+        "layer": "utilities",
+        "rule": ".py-1\\.5 { padding-block: calc(var(--spacing)*1.5); }"
+      },
+      {
+        "role": "popup",
+        "layer": "(unlayered)",
+        "rule": "* { box-sizing: border-box; margin: 0px; padding: 0px; }"
+      },
+      {
+        "role": "option",
+        "layer": "(unlayered)",
+        "rule": "* { box-sizing: border-box; margin: 0px; padding: 0px; }"
+      }
+    ],
+    "computed": {
+      "popup": {
+        "padding": "0px",
+        "margin": "0px",
+        "boxSizing": "border-box"
+      },
+      "option": {
+        "padding": "0px",
+        "margin": "0px",
+        "boxSizing": "border-box"
+      }
+    }
+  },
+  "webkit-after": {
+    "asset": "/assets/index-BYtxfxT6.css",
+    "layers": [
+      "properties",
+      "theme",
+      "base",
+      "components",
+      "utilities"
+    ],
+    "matched": [
+      {
+        "role": "popup",
+        "layer": "base",
+        "rule": "* { margin: 0px; padding: 0px; }"
+      },
+      {
+        "role": "option",
+        "layer": "base",
+        "rule": "* { margin: 0px; padding: 0px; }"
+      },
+      {
+        "role": "option",
+        "layer": "utilities",
+        "rule": ".mx-1\\.5 { margin-inline: calc(var(--spacing)*1.5); }"
+      },
+      {
+        "role": "option",
+        "layer": "utilities",
+        "rule": ".px-2 { padding-inline: calc(var(--spacing)*2); }"
+      },
+      {
+        "role": "popup",
+        "layer": "utilities",
+        "rule": ".py-1\\.5 { padding-block: calc(var(--spacing)*1.5); }"
+      },
+      {
+        "role": "option",
+        "layer": "utilities",
+        "rule": ".py-1\\.5 { padding-block: calc(var(--spacing)*1.5); }"
+      },
+      {
+        "role": "popup",
+        "layer": "(unlayered)",
+        "rule": "* { box-sizing: border-box; }"
+      },
+      {
+        "role": "option",
+        "layer": "(unlayered)",
+        "rule": "* { box-sizing: border-box; }"
+      }
+    ],
+    "computed": {
+      "popup": {
+        "padding": "6px 0px",
+        "margin": "0px",
+        "boxSizing": "border-box"
+      },
+      "option": {
+        "padding": "6px 8px",
+        "margin": "0px 6px",
+        "boxSizing": "border-box"
+      }
+    }
+  }
+}

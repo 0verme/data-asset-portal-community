@@ -1,0 +1,94 @@
+[
+  {
+    "engine": "chromium",
+    "width": 1440,
+    "fields": [
+      {
+        "field": "主题域",
+        "focusReturned": true,
+        "cleared": true,
+        "selectedByKeyboard": "商品",
+        "initial": "交易",
+        "saved": "售后"
+      },
+      {
+        "field": "数据层级",
+        "focusReturned": true,
+        "cleared": true,
+        "selectedByKeyboard": "ODS",
+        "initial": "DWM",
+        "saved": "ADS"
+      }
+    ],
+    "savedAndReopened": true
+  },
+  {
+    "engine": "chromium",
+    "width": 390,
+    "fields": [
+      {
+        "field": "主题域",
+        "focusReturned": true,
+        "cleared": true,
+        "selectedByKeyboard": "商品",
+        "initial": "交易",
+        "saved": "售后"
+      },
+      {
+        "field": "数据层级",
+        "focusReturned": true,
+        "cleared": true,
+        "selectedByKeyboard": "ODS",
+        "initial": "DWM",
+        "saved": "ADS"
+      }
+    ],
+    "savedAndReopened": true
+  },
+  {
+    "engine": "webkit",
+    "width": 1440,
+    "fields": [
+      {
+        "field": "主题域",
+        "focusReturned": true,
+        "cleared": true,
+        "selectedByKeyboard": "商品",
+        "initial": "交易",
+        "saved": "售后"
+      },
+      {
+        "field": "数据层级",
+        "focusReturned": true,
+        "cleared": true,
+        "selectedByKeyboard": "ODS",
+        "initial": "DWM",
+        "saved": "ADS"
+      }
+    ],
+    "savedAndReopened": true
+  },
+  {
+    "engine": "webkit",
+    "width": 390,
+    "fields": [
+      {
+        "field": "主题域",
+        "focusReturned": true,
+        "cleared": true,
+        "selectedByKeyboard": "商品",
+        "initial": "交易",
+        "saved": "售后"
+      },
+      {
+        "field": "数据层级",
+        "focusReturned": true,
+        "cleared": true,
+        "selectedByKeyboard": "ODS",
+        "initial": "DWM",
+        "saved": "ADS"
+      }
+    ],
+    "savedAndReopened": true
+  }
+]
