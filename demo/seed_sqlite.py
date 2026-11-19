@@ -23,7 +23,7 @@ if str(ROOT.parent) not in sys.path:
 try:
     from backend.app.authorization.persistence import seed_rbac  # noqa: E402
     from seed_loader import (  # noqa: E402
-        ADMIN_USER,
+        DEMO_USER,
         DEMO_PUSH_AUTH_TYPE,
         LEGACY_DEMO_PUSH_AUTH_TYPE,
         community_seed_plan,
@@ -32,7 +32,7 @@ try:
 except ImportError:  # imported as demo.seed_sqlite from tests
     from backend.app.authorization.persistence import seed_rbac  # noqa: E402
     from demo.seed_loader import (  # noqa: E402
-        ADMIN_USER,
+        DEMO_USER,
         DEMO_PUSH_AUTH_TYPE,
         LEGACY_DEMO_PUSH_AUTH_TYPE,
         community_seed_plan,
@@ -95,6 +95,25 @@ def _assert_existing_indicator_seed_rows_compatible(connection, seed_plan):
                 )
 
 
+def _assert_safe_demo_account_target(connection):
+    """Never silently retain the old privileged demo login on a re-seed.
+
+    A clean disposable Demo database is required to migrate from the legacy
+    admin credential.  Do not delete accounts from an existing database.
+    """
+    rows = connection.execute(
+        "SELECT id, username, role FROM p_admin_user "
+        "WHERE role = 'admin' OR username IN (?, ?) OR id = ?",
+        ("admin", DEMO_USER["username"], DEMO_USER["id"]),
+    ).fetchall()
+    expected = (DEMO_USER["id"], DEMO_USER["username"], DEMO_USER["role"])
+    if any(tuple(row) != expected for row in rows):
+        raise ValueError(
+            "Demo seed refused: legacy admin login or conflicting demo account. "
+            "Recreate only a disposable Demo database; do not overwrite user data."
+        )
+
+
 def seed(database: Path):
     if not database.is_absolute():
         raise ValueError("--database must be an absolute path")
@@ -103,6 +122,7 @@ def seed(database: Path):
     connection.execute("PRAGMA foreign_keys = ON")
     try:
         _assert_existing_indicator_seed_rows_compatible(connection, seed_plan)
+        _assert_safe_demo_account_target(connection)
         seed_rbac(
             connection,
             {"type": "sqlite", "database": str(database)},
@@ -112,12 +132,12 @@ def seed(database: Path):
             "INSERT OR IGNORE INTO p_admin_user "
             "(id,username,password_hash,display_name,role,status) VALUES (?,?,?,?,?,?)",
             (
-                ADMIN_USER["id"],
-                ADMIN_USER["username"],
-                generate_password_hash(ADMIN_USER["password"]),
-                ADMIN_USER["display_name"],
-                ADMIN_USER["role"],
-                ADMIN_USER["status"],
+                DEMO_USER["id"],
+                DEMO_USER["username"],
+                generate_password_hash(DEMO_USER["password"]),
+                DEMO_USER["display_name"],
+                DEMO_USER["role"],
+                DEMO_USER["status"],
             ),
         )
         for table, spec in seed_plan.items():
