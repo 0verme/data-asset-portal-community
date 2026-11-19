@@ -52,13 +52,14 @@ DOMAIN_CODE_BY_NAME = {
     "售后": "SERVICE",
 }
 
-# Community demo admin account. Seed scripts hash the password themselves.
-ADMIN_USER = {
+# Disposable Community Demo login; never use this known credential for production.
+# Keep the built-in admin role in RBAC, but do not seed a default admin account.
+DEMO_USER = {
     "id": 1,
-    "username": "admin",
-    "password": "123456",
-    "display_name": "演示管理员",
-    "role": "admin",
+    "username": "devp",
+    "password": "devp",
+    "display_name": "演示业务维护员",
+    "role": "maintainer",
     "status": "ACTIVE",
 }
 
