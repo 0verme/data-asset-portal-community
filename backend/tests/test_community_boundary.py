@@ -13,7 +13,7 @@ from backend.app.core.capabilities import resolve_capabilities, set_resolved_cap
 from backend.app.db.facade import connect_with_profile
 from backend.app.migrations.schema import initialize, verify_database
 from fastapi.testclient import TestClient
-from demo.seed_loader import ADMIN_USER
+from demo.seed_loader import DEMO_USER
 
 ROOT = Path(__file__).resolve().parents[1]
 COMMUNITY_CONFIG = ROOT / "configs" / "database.community.yaml"
@@ -70,8 +70,8 @@ class RepositoryOpenBoundaryTests(unittest.TestCase):
             login = client.post(
                 "/api/auth/login",
                 json={
-                    "username": ADMIN_USER["username"],
-                    "password": ADMIN_USER["password"],
+                    "username": DEMO_USER["username"],
+                    "password": DEMO_USER["password"],
                 },
             )
             self.assertEqual(200, login.status_code, login.text)
@@ -128,15 +128,19 @@ class RepositoryOpenBoundaryTests(unittest.TestCase):
         keys = {item["key"] for item in stats.json().get("items", [])}
         self.assertTrue({"system", "downstream_system", "report", "code_table"} <= keys)
 
-    def test_seeded_admin_contract_still_works(self):
+    def test_seeded_maintainer_contract_and_system_restrictions(self):
         response = self.client().post(
             "/api/auth/login",
             json={
-                "username": ADMIN_USER["username"],
-                "password": ADMIN_USER["password"],
+                "username": DEMO_USER["username"],
+                "password": DEMO_USER["password"],
             },
         )
         self.assertEqual(200, response.status_code)
+        client = self.client(authenticated=True)
+        for endpoint in ("/api/system/users", "/api/system/roles"):
+            with self.subTest(endpoint=endpoint):
+                self.assertEqual(403, client.get(endpoint).status_code)
 
 
 if __name__ == "__main__":
