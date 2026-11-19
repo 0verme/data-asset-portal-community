@@ -89,7 +89,7 @@ test("guest portal exposes scopes, statistics and API-provided hot keywords", as
   await expect(scopes.getByRole("button", { name: "资产", exact: true })).toBeVisible();
   await expect(page.getByText("PR7-portal-search-smoke", { exact: true })).toBeVisible();
   await expect(page.locator(".sp-stats-grid")).toBeVisible();
-  await expect(page.locator(".sp-stat-card").first()).toBeVisible();
+  await expect(page.locator(".sp-stat-card:not(.sp-stat-placeholder)")).toHaveCount(11);
 });
 
 test("q URL initializes the portal search and displays matching results", async ({ page }) => {

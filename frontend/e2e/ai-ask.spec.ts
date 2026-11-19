@@ -424,6 +424,11 @@ test("Enter and Search stay deterministic; explicit AI preserves query and opens
   await input.press("Enter");
   await expect(page.locator(".sp-hit").first()).toBeVisible();
   expect(fixtures.asked).toEqual([], "Enter must not call the AI endpoint");
+  if (process.env["DAP_PORTAL_CAPTURE"] === "1") {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.locator(".main").evaluate((element) => element.scrollTo({ top: 0, behavior: "instant" }));
+    await page.screenshot({ path: testInfo.outputPath("homepage-search-1440.png"), animations: "disabled" });
+  }
 
   await page.getByRole("button", { name: "问 AI", exact: true }).click();
   const aiTab = page.getByRole("tab", { name: /AI 问答/ });
@@ -468,7 +473,7 @@ test("Enter and Search stay deterministic; explicit AI preserves query and opens
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: testInfo.outputPath("search-ai-tabs-answer-390.png"), fullPage: true });
 
-  for (const width of [1920, 1440, 1280, 768, 390]) {
+  for (const width of [1920, 1440, 1280, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 900 });
     await expectNoHorizontalOverflow(page);
   }
@@ -886,6 +891,8 @@ test("portal orb follows real Remote SSE frames and isolates each request", asyn
     await ask.click();
     const first = await getStream(0);
     await status("processing");
+    await expect(ask).toHaveAttribute("aria-busy", "true");
+    await expect(ask).toBeDisabled();
     frame(first, "step_start", "rag-round-1", { round: 1 });
     frame(first, "step_start", "search-0123456789abcdef");
     frame(first, "step_error", "search-0123456789abcdef", { errorCode: "unavailable" });
@@ -902,6 +909,8 @@ test("portal orb follows real Remote SSE frames and isolates each request", asyn
     await capture("remote-completed");
     first.end();
     await expect(aiTab).toContainText("已完成");
+    await expect(ask).toHaveAttribute("aria-busy", "false");
+    await expect(ask).toBeEnabled();
 
     await page.getByRole("tab", { name: /搜索结果/ }).click();
     await status("idle");

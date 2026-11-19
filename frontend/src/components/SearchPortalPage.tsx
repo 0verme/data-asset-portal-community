@@ -70,6 +70,14 @@ export interface SearchPortalPageProps {
   searchPlaceholder: string;
 }
 
+// Remote and Mock share the label/value display contract. Unrecognized labels use the catalog icon.
+const PORTAL_STAT_ICONS = new Map([
+  ["源系统", "server"], ["源表", "table"], ["源字段", "columns"], ["字段", "columns"],
+  ["指标", "hash"], ["下游系统", "server"], ["下游推送文件", "push"], ["下游推送", "push"],
+  ["主题域", "layers"], ["主题表", "db"], ["报表", "file"], ["API", "api"],
+  ["词根", "book"], ["码值表", "list"],
+]);
+
 const MAX_MATCHED_FIELD_LABELS = 2;
 
 function formatMatchedField(item: SearchResultItem): string {
@@ -923,64 +931,78 @@ export function SearchPortalPage({
     <div className={`search-portal${searchedTerm || aiQuery ? " has-search-results" : ""}`}>
       <div className="sp-hero">
         <DataOrb className="sp-data-orb" status={orbStatus} effects={effectiveEffects} theme={theme} pulseKey={pulseKey} />
-        <h1>{heroTitle}</h1>
-        {heroSubtitle ? <p>{heroSubtitle}</p> : null}
+        <div className="sp-hero-copy">
+          <h1>{heroTitle}</h1>
+          {heroSubtitle ? <p>{heroSubtitle}</p> : null}
+        </div>
       </div>
 
       <div className="sp-search-wrap">
         <div className="sp-searchbox">
-          <span className="sp-ico">
-            <Icon name="search" size={20} />
-          </span>
-          <Input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(event) => {
-              initialSearchBootstrapPendingRef.current = false;
-              setQuery(event.target.value);
-              if (compositionStartValue.current === null) showInputFeedback();
-            }}
-            onFocus={() => setInputFocused(true)}
-            onBlur={() => {
-              setInputFocused(false);
-              compositionStartValue.current = null;
-              stopTyping();
-            }}
-            onCompositionStart={(event) => {
-              compositionStartValue.current = event.currentTarget.value;
-              stopTyping();
-            }}
-            onCompositionEnd={(event) => {
-              const startValue = compositionStartValue.current;
-              compositionStartValue.current = null;
-              if (startValue !== null && startValue !== event.currentTarget.value) showInputFeedback();
-            }}
-            onKeyDown={(event) => {
-              // Safari can report isComposing=false for the Enter that commits the candidate.
-              if (event.key === "Enter" && !event.nativeEvent.isComposing && event.keyCode !== 229) doSearch();
-            }}
-            placeholder={searchPlaceholder}
-            aria-label="搜索数据资产"
-            autoFocus
-          />
-          <Button variant="primary" type="button" className="sp-search-btn" aria-label="搜索" onClick={doSearch}>
-            <Icon name="search" size={17} />
-            <span className="sp-btn-text">搜索</span>
-          </Button>
-          {aiEnabled ? (
+          <div className="sp-search-field">
+            <span className="sp-ico" aria-hidden="true">
+              <Icon name="search" size={20} />
+            </span>
+            <Input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(event) => {
+                initialSearchBootstrapPendingRef.current = false;
+                setQuery(event.target.value);
+                if (compositionStartValue.current === null) showInputFeedback();
+              }}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => {
+                setInputFocused(false);
+                compositionStartValue.current = null;
+                stopTyping();
+              }}
+              onCompositionStart={(event) => {
+                compositionStartValue.current = event.currentTarget.value;
+                stopTyping();
+              }}
+              onCompositionEnd={(event) => {
+                const startValue = compositionStartValue.current;
+                compositionStartValue.current = null;
+                if (startValue !== null && startValue !== event.currentTarget.value) showInputFeedback();
+              }}
+              onKeyDown={(event) => {
+                // Safari can report isComposing=false for the Enter that commits the candidate.
+                if (event.key === "Enter" && !event.nativeEvent.isComposing && event.keyCode !== 229) doSearch();
+              }}
+              placeholder={searchPlaceholder}
+              aria-label="搜索数据资产"
+              autoFocus
+            />
+          </div>
+          <div className="sp-search-actions">
             <Button
-              variant="tertiary"
+              variant="primary"
               type="button"
-              className="sp-ask-btn"
-              aria-label="问 AI"
-              disabled={!query.trim() || (aiLoading && query.trim() === aiQuery)}
-              onClick={() => runAiAsk(query)}
+              className="sp-search-btn"
+              aria-label="搜索"
+              aria-busy={searchLoading}
+              onClick={doSearch}
             >
-              <span className="sp-ask-mark" aria-hidden="true">✦</span>
-              <span>问 AI</span>
+              <span>搜索</span>
+              <span className="sp-action-mark" aria-hidden="true"><Icon name="arrow" size={15} /></span>
             </Button>
-          ) : null}
+            {aiEnabled ? (
+              <Button
+                variant="tertiary"
+                type="button"
+                className="sp-ask-btn"
+                aria-label="问 AI"
+                aria-busy={aiLoading && query.trim() === aiQuery}
+                disabled={!query.trim() || (aiLoading && query.trim() === aiQuery)}
+                onClick={() => runAiAsk(query)}
+              >
+                <span className="sp-action-mark" aria-hidden="true">✦</span>
+                <span>问 AI</span>
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -1001,7 +1023,10 @@ export function SearchPortalPage({
 
       {hotTags.length > 0 ? (
         <div className="sp-hot">
-          <span className="sp-hot-label">热门</span>
+          <span className="sp-hot-label">
+            <span aria-hidden="true"><Icon name="up" size={14} /></span>
+            热门
+          </span>
           {hotTags.map((item) => (
             <Button
               type="button"
@@ -1246,8 +1271,9 @@ export function SearchPortalPage({
             <div className="sp-stats-grid" role="status" aria-label={t("portalStats.loading")}>
               {Array.from({ length: 12 }, (_, index) => (
                 <div className="sp-stat-card sp-stat-placeholder" key={index} aria-hidden="true">
-                  <SkeletonLine />
-                  <SkeletonLine />
+                  <SkeletonLine className="sp-stat-placeholder-value" />
+                  <span className="sp-stat-icon" />
+                  <SkeletonLine className="sp-stat-placeholder-label" />
                 </div>
               ))}
             </div>
@@ -1260,6 +1286,9 @@ export function SearchPortalPage({
               {stats.map((item) => (
                 <div key={item.label} className="sp-stat-card">
                   <div className="sp-stat-num">{item.value}</div>
+                  <span className="sp-stat-icon" aria-hidden="true">
+                    <Icon name={PORTAL_STAT_ICONS.get(item.label) ?? "grid"} size={16} />
+                  </span>
                   <div className="sp-stat-label">{item.label}</div>
                 </div>
               ))}
