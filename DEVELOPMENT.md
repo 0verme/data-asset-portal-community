@@ -260,7 +260,7 @@ GaussDB / DWS 只有 `backend/schema/dws.sql` 方言 baseline 与离线结构校
 
 > 🚫 仓库不再包含整库快照（`app-*-init-data.sql` 与 `docs/*/sample/*.sql` 已从公开树移除）。
 > 需要 SQL 形式演示数据时用 `python demo/generate_demo_sql.py` 从安全演示源生成。
-> Community seed 会创建 `admin` 演示管理员；手动 full/extension 建库时需按目标部署自行准备管理员数据。
+> Community Seed 会创建 `devp` 演示业务维护员（`maintainer`），不再创建默认管理员；手动 full/extension 建库时仍需按目标部署自行准备管理员数据。前端 Mock 的 `admin/123456` 是独立模拟凭证，不受影响。
 
 ## 测试与质量检查
 
