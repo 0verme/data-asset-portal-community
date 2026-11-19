@@ -131,7 +131,7 @@ export interface LineageBootstrap {
 
 export interface LineageInitialViewResult {
   bootstrap: LineageBootstrap;
-  graph: LineageSubgraph;
+  graph: LineageSubgraph | null;
   noticeCode: string | null;
 }
 

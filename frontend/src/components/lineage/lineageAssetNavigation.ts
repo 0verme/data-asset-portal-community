@@ -15,7 +15,11 @@ export interface LineageSchemaGroup {
  * `namespace` can represent a source or processing layer, so it is never
  * promoted to Schema. Table-name prefixes are never parsed.
  */
-export function resolveLineageNodeSchema(node: LineageNode): string | null {
+export function resolveLineageNodeSchema(node: {
+  kind: string;
+  schema?: string | undefined;
+  attributes?: Record<string, unknown> | undefined;
+}): string | null {
   if (node.kind !== "table") return null;
   if (typeof node.schema === "string" && node.schema.trim()) return node.schema.trim();
   for (const key of ["schema", "schemaName", "schema_name"]) {

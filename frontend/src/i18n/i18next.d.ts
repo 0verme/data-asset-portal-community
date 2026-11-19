@@ -2,6 +2,7 @@ import "i18next";
 
 import type auth from "./locales/zh-CN/auth.json" with { "resolution-mode": "import" };
 import type common from "./locales/zh-CN/common.json" with { "resolution-mode": "import" };
+import type lineage from "./locales/zh-CN/lineage.json" with { "resolution-mode": "import" };
 import type navigation from "./locales/zh-CN/navigation.json" with { "resolution-mode": "import" };
 import type warehouse from "./locales/zh-CN/warehouse.json" with { "resolution-mode": "import" };
 
@@ -14,6 +15,7 @@ declare module "i18next" {
     defaultNS: "common";
     resources: {
       common: DeepStringify<typeof common>;
+      lineage: DeepStringify<typeof lineage>;
       navigation: DeepStringify<typeof navigation>;
       auth: DeepStringify<typeof auth>;
       warehouse: DeepStringify<typeof warehouse>;

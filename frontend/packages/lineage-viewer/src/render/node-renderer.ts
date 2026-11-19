@@ -38,7 +38,7 @@ export class NodeRenderer {
     title.setAttribute("y", "30");
     title.setAttribute("clip-path", `url(#${clipId})`);
     title.textContent = item.node.label;
-    group.append(clipPath, tooltip, rect, title);
+    group.append(tooltip, clipPath, rect, title);
     if (item.node.subtitle) {
       const subtitle = createSvgElement("text");
       subtitle.setAttribute("class", "node-subtitle");

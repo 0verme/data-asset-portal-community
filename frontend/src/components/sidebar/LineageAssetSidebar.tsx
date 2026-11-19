@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 import type { LineageBootstrap, LineageNode } from "../../api/lineage.ts";
 import { Icon } from "../ui.tsx";
@@ -9,8 +10,10 @@ import {
   filterLineageSchemaGroups,
   setAllLineageSchemasExpanded,
   toggleLineageSchemaExpansion,
-  UNCLASSIFIED_SCHEMA_LABEL,
 } from "../lineage/lineageAssetNavigation.ts";
+
+import { describeLineageNode } from "../lineage/lineageNodePresentation.ts";
+import { LineageSnapshotTime } from "../lineage/LineageSnapshotTime.tsx";
 
 export interface LineageAssetSidebarProps {
   nodes: readonly LineageNode[];
@@ -27,6 +30,7 @@ export function LineageAssetSidebar({
   snapshot,
   onSelectNode,
 }: LineageAssetSidebarProps) {
+  const { t } = useTranslation("lineage");
   const [query, setQuery] = React.useState("");
   const [expandedKeys, setExpandedKeys] = React.useState<Set<string>>(() => new Set());
   const groupListId = React.useId();
@@ -54,56 +58,57 @@ export function LineageAssetSidebar({
   }, [groups, selectedGroupKey, selectedNodeId, selectionSequence]);
 
   const snapshotSource = snapshot?.mode === "persistent"
-    ? "持久化血缘快照"
+    ? t("persistent")
     : ["poc", "demo"].includes(snapshot?.mode || "")
-      ? "演示血缘数据（非数据库真实血缘）"
-      : "血缘数据源尚未配置";
+      ? t("demoSource")
+      : t("noSource");
 
   return (
     <section className="side-group lineage-asset-sidebar" aria-labelledby="lineage-asset-sidebar-title">
       <h2 id="lineage-asset-sidebar-title" className="lineage-asset-sidebar-title">
         <Icon name="layers" size={16} />
-        <span>血缘资产导航</span>
+        <span>{t("sidebar.title")}</span>
       </h2>
 
       <Input
-        aria-label="Schema 名和表名搜索"
+        aria-label={t("sidebar.searchLabel")}
         className="lineage-asset-search"
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="搜索 Schema 或表名"
+        placeholder={t("sidebar.searchPlaceholder")}
       />
 
       <div className="lineage-asset-toolbar">
         <span className="lineage-asset-count" aria-live="polite">
-          {searchActive ? `${visibleTableCount} / ${tableCount} 张表` : `${tableCount} 张表`}
+          {searchActive ? t("sidebar.filteredCount", { visible: visibleTableCount, total: tableCount }) : t("sidebar.tableCount", { count: tableCount })}
         </span>
-        <div className="lineage-asset-actions" role="group" aria-label="Schema 展开操作">
+        <div className="lineage-asset-actions" role="group" aria-label={t("sidebar.actions")}>
           <button
             type="button"
             onClick={() => setExpandedKeys(setAllLineageSchemasExpanded(groups, true))}
             disabled={groups.length === 0 || allExpanded}
           >
-            全部展开
+            {t("sidebar.expand")}
           </button>
           <button
             type="button"
             onClick={() => setExpandedKeys(setAllLineageSchemasExpanded(groups, false))}
             disabled={groups.length === 0 || allCollapsed}
           >
-            全部折叠
+            {t("sidebar.collapse")}
           </button>
         </div>
       </div>
 
       {groups.length === 0 ? (
-        <p className="lineage-asset-empty" role="status">当前血缘查询结果暂无表节点。</p>
+        <p className="lineage-asset-empty" role="status">{t("sidebar.noTables")}</p>
       ) : visibleGroups.length === 0 ? (
-        <p className="lineage-asset-empty" role="status">没有匹配的 Schema 或表名。</p>
+        <p className="lineage-asset-empty" role="status">{t("sidebar.noMatch")}</p>
       ) : (
-        <ul className="lineage-schema-list" aria-label="当前血缘查询结果中的表节点">
+        <ul className="lineage-schema-list" aria-label={t("sidebar.list")}>
           {visibleGroups.map((group) => {
+            const groupLabel = group.schemaName ? group.displayName : t("sidebar.unclassified");
             const originalGroupIndex = groups.findIndex((candidate) => candidate.key === group.key);
             const tablesVisible = searchActive || expandedKeys.has(group.key);
             const groupListItemId = `${groupListId}-schema-${originalGroupIndex}`;
@@ -114,34 +119,32 @@ export function LineageAssetSidebar({
                   className="lineage-schema-heading"
                   aria-expanded={tablesVisible}
                   aria-controls={groupListItemId}
-                  title={group.schemaName || UNCLASSIFIED_SCHEMA_LABEL}
+                  title={group.schemaName || groupLabel}
                   onClick={() => setExpandedKeys((current) => toggleLineageSchemaExpansion(current, group.key))}
                 >
                   <Icon name="chevron" size={13} />
-                  <span className="lineage-schema-label">{group.displayName}</span>
+                  <span className="lineage-schema-label">{groupLabel}</span>
                   <span className="lineage-schema-count">{group.tables.length}</span>
                 </button>
                 <ul
                   id={groupListItemId}
                   className="lineage-table-list"
                   hidden={!tablesVisible}
-                  aria-label={`${group.displayName} 表列表`}
+                  aria-label={t("sidebar.groupList", { schema: groupLabel })}
                 >
                   {group.tables.map((node) => {
-                    const qualifiedName = group.schemaName
-                      ? `${group.schemaName}.${node.name}`
-                      : node.name;
+                    const label = describeLineageNode(node);
                     return (
                       <li key={node.id}>
                         <button
                           type="button"
                           className="lineage-table-item side-item"
-                          title={qualifiedName}
-                          aria-label={`${node.name}，${group.displayName}，节点 ID ${node.id}`}
+                          title={label.title}
+                          aria-label={t("sidebar.tableLabel", { name: label.tableName, schema: groupLabel, id: node.id })}
                           aria-pressed={selectedNodeId === node.id}
                           onClick={() => onSelectNode(node.id)}
                         >
-                          <span className="lineage-table-label">{node.name}</span>
+                          <span className="lineage-table-label">{label.tableName}</span>
                         </button>
                       </li>
                     );
@@ -154,14 +157,14 @@ export function LineageAssetSidebar({
       )}
 
       <details className="lineage-snapshot-info">
-        <summary>快照信息</summary>
+        <summary>{t("sidebar.snapshotInfo")}</summary>
         <p className="lineage-snapshot-source">{snapshotSource}</p>
         <dl>
-          <dt>快照标识</dt><dd title={snapshot?.snapshotId || undefined}>{snapshot?.snapshotId || "—"}</dd>
-          <dt>快照名称</dt><dd>{snapshot?.snapshotName || "—"}</dd>
-          <dt>更新时间</dt><dd>{snapshot?.snapshotAt || "—"}</dd>
-          <dt>节点数量</dt><dd>{snapshot?.nodeCount ?? "—"}</dd>
-          <dt>关系数量</dt><dd>{snapshot?.edgeCount ?? "—"}</dd>
+          <dt>{t("sidebar.snapshotId")}</dt><dd title={snapshot?.snapshotId || undefined}>{snapshot?.snapshotId || "—"}</dd>
+          <dt>{t("sidebar.snapshotName")}</dt><dd>{snapshot?.snapshotName || "—"}</dd>
+          <dt>{t("sidebar.snapshotAt")}</dt><dd><LineageSnapshotTime value={snapshot?.snapshotAt} /></dd>
+          <dt>{t("sidebar.nodeCount")}</dt><dd>{snapshot?.nodeCount ?? "—"}</dd>
+          <dt>{t("sidebar.edgeCount")}</dt><dd>{snapshot?.edgeCount ?? "—"}</dd>
         </dl>
       </details>
     </section>

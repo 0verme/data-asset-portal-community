@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { MouseEventHandler, ReactNode } from "react";
+import type { ComponentProps, MouseEventHandler, ReactNode } from "react";
 
 import { Status as DAPStatus } from "../../ui/index.ts";
 import { Icon } from "../ui.tsx";
@@ -39,16 +39,17 @@ export function LoadingState({ title, desc }: LoadingStateProps) {
 export interface ErrorStateProps {
   title: ReactNode;
   desc: ReactNode;
+  retryText?: string | undefined;
   onRetry?: MouseEventHandler<HTMLButtonElement> | undefined;
 }
 
-export function ErrorState({ title, desc, onRetry }: ErrorStateProps) {
+export function ErrorState({ title, desc, retryText = "重新加载", onRetry }: ErrorStateProps) {
   return (
     <div className="state-card state-card-error" role="alert">
       <div className="ec"><Icon name="inbox" size={24} /></div>
       <h4>{title}</h4>
       <p>{desc}</p>
-      <button className="btn state-btn" onClick={onRetry}>重新加载</button>
+      <button className="btn state-btn" onClick={onRetry}>{retryText}</button>
     </div>
   );
 }
@@ -57,10 +58,11 @@ export interface EmptyStateProps {
   title: ReactNode;
   desc?: ReactNode;
   actionText?: string | undefined;
+  actionIcon?: ComponentProps<typeof Icon>["name"];
   onAction?: MouseEventHandler<HTMLButtonElement> | undefined;
 }
 
-export function EmptyState({ title, desc, actionText, onAction }: EmptyStateProps) {
+export function EmptyState({ title, desc, actionText, actionIcon = "plus", onAction }: EmptyStateProps) {
   return (
     <div className="empty">
       <div className="ec"><Icon name="inbox" size={26} /></div>
@@ -68,7 +70,7 @@ export function EmptyState({ title, desc, actionText, onAction }: EmptyStateProp
       {desc ? <p>{desc}</p> : null}
       {actionText && onAction ? (
         <button className="btn primary system-empty-action" type="button" onClick={onAction}>
-          <Icon name="plus" size={14} />{actionText}
+          <Icon name={actionIcon} size={14} />{actionText}
         </button>
       ) : null}
     </div>

@@ -72,17 +72,3 @@ export function lineageSearchQueryForCandidate(node: LineageNode): string {
   const namespace = String(node.namespace || "").trim();
   return namespace ? `${namespace}.${tableName}` : tableName;
 }
-
-export function describeLineageSearchCandidate(node: LineageNode): {
-  kindLabel: string;
-  namespaceLabel: string;
-  nameLabel: string;
-} {
-  const isTable = node.kind === "table";
-  const namespace = String(node.namespace || "").trim() || "未提供";
-  return {
-    kindLabel: isTable ? "表节点" : "作业节点",
-    namespaceLabel: `${isTable ? "业务 Schema / namespace_name" : "命名空间"}：${namespace}`,
-    nameLabel: `${isTable ? "表名" : "作业名"}：${isTable ? terminalTableName(node.name) : node.name}`,
-  };
-}

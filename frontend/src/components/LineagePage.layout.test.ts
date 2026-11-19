@@ -57,10 +57,10 @@ test("initial lineage view uses the shared root-neighborhood fit", async () => {
 test("viewport controls remain host-owned and accessible", async () => {
   const canvas = await readFile(canvasPath, "utf8");
 
-  assert.match(canvas, /aria-label="缩小"/);
-  assert.match(canvas, /aria-label="放大"/);
-  assert.match(canvas, /aria-label="定位根节点邻域"/);
-  assert.match(canvas, /aria-label="适应全部"/);
+  assert.match(canvas, /aria-label=\{t\("zoomOut"\)\}/);
+  assert.match(canvas, /aria-label=\{t\("zoomIn"\)\}/);
+  assert.match(canvas, /aria-label=\{t\("focusRoot"\)\}/);
+  assert.match(canvas, /aria-label=\{t\("fitAll"\)\}/);
   assert.match(canvas, /viewerRef\.current\?\.fitView\(\)/);
 });
 
@@ -92,8 +92,8 @@ test("lineage search accepts table and task nodes", async () => {
   ]);
 
   assert.match(page, /findLineageNodes/);
-  assert.match(page, /表或作业名称查询/);
-  assert.match(page, /aria-label="血缘节点候选项"/);
+  assert.match(page, /t\("queryLabel"\)/);
+  assert.match(page, /aria-label=\{t\("candidates"\)\}/);
   assert.match(page, /candidate\.kind === "task" \? "detail"/);
   assert.match(
     api,
@@ -111,13 +111,11 @@ test("lineage search selects exact table matches and labels ambiguous candidates
 
   assert.match(page, /resolveLineageSearchMatches\(nodeName, matches\)/);
   assert.match(page, /if \(resolution\.directMatch\)/);
-  assert.match(page, /describeLineageSearchCandidate\(candidate\)/);
+  assert.match(page, /describeLineageNode\(candidate\)/);
   assert.match(search, /const nodeNamespace = String\(node\.namespace \|\| ""\)\.trim\(\)\.toLowerCase\(\)/);
   assert.match(search, /nodeName === `\$\{namespace\}\.\$\{tableName\}`/);
   assert.match(search, /matchesUnqualifiedTableName/);
   assert.match(search, /exactTables\.length === 1/);
-  assert.match(search, /业务 Schema \/ namespace_name/);
-  assert.match(search, /isTable \? "表名" : "作业名"/);
   assert.match(search, /terminalTableName\(node\.name\)/);
   assert.match(search, /lineageSearchQueryForCandidate/);
   assert.match(search, /node\.name/);
@@ -141,7 +139,8 @@ test("lineage filters wait for an explicit query", async () => {
     page,
     /if \(!nodeName\) \{[\s\S]*await loadGraph\(\{[\s\S]*\.\.\.pendingFilters/,
   );
-  assert.match(page, /onRetry=\{\(\) => (?:void )?loadGraph\(route\)\}/);
+  assert.match(page, /const retry = \(\) => void loadGraph\(route\)/);
+  assert.match(page, /onRetry=\{retry\}/);
 });
 
 test("lineage initialization uses one coalesced initial-view request", async () => {
@@ -163,10 +162,10 @@ test("lineage page supports table and detail views with snapshot diagnostics", a
     readFile(stylesPath, "utf8"),
   ]);
 
-  assert.match(page, /\{ label: "表级简图", value: "table" \}/);
-  assert.match(page, /\{ label: "作业详图", value: "detail" \}/);
+  assert.match(page, /\{ label: t\("viewType.table"\), value: "table" \}/);
+  assert.match(page, /\{ label: t\("viewType.detail"\), value: "detail" \}/);
   assert.match(page, /view: nextRoute\.view/);
-  assert.match(page, /快照诊断/);
+  assert.match(page, /t\("diagnostics",/);
   assert.match(styles, /\.lineage-diagnostics \{[^}]*var\(--warn-line\)/);
 });
 

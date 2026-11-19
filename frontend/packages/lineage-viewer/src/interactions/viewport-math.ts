@@ -35,13 +35,13 @@ export function fitBoundsTransform(
 ): ViewportTransform | null {
   if (!validBounds(scene) || !validSize(viewport)) return null;
   const padding = validPadding(options.padding) ? options.padding : FIT_PADDING;
-  const availableWidth = viewport.width - padding * 2;
-  const availableHeight = viewport.height - padding * 2;
-  if (availableWidth <= 0 || availableHeight <= 0) return null;
+  const availableWidth = viewport.width - 2 * Math.min(padding, viewport.width / 4);
+  const availableHeight = viewport.height - 2 * Math.min(padding, viewport.height / 4);
   const scale = clampFitScale(
     Math.min(availableWidth / scene.width, availableHeight / scene.height),
     options,
   );
+  if (!validScale(scale)) return null;
   return sanitize({
     scale,
     translateX: (viewport.width - scene.width * scale) / 2 - scene.x * scale,
@@ -65,6 +65,7 @@ export function zoomAt(
   transform: ViewportTransform,
   point: { x: number; y: number },
   factor: number,
+  minScale = MIN_SCALE,
 ): ViewportTransform {
   if (
     !Number.isFinite(point.x) ||
@@ -73,13 +74,14 @@ export function zoomAt(
     factor <= 0
   )
     return sanitize(transform);
-  const scale = clamp(transform.scale * factor);
-  const sceneX = (point.x - transform.translateX) / transform.scale;
-  const sceneY = (point.y - transform.translateY) / transform.scale;
+  const current = sanitize(transform);
+  const scale = Math.min(MAX_SCALE, Math.max(Math.min(minScale, current.scale), current.scale * factor));
+  if (scale === current.scale) return current;
+  const ratio = scale / current.scale;
   return sanitize({
     scale,
-    translateX: point.x - sceneX * scale,
-    translateY: point.y - sceneY * scale,
+    translateX: point.x - (point.x - current.translateX) * ratio,
+    translateY: point.y - (point.y - current.translateY) * ratio,
   });
 }
 
@@ -98,21 +100,15 @@ export function focusTransform(
 
 export function sanitize(transform: ViewportTransform): ViewportTransform {
   return {
-    scale: clamp(transform.scale),
+    scale: validScale(transform.scale) ? Math.min(MAX_SCALE, transform.scale) : 1,
     translateX: Number.isFinite(transform.translateX) ? transform.translateX : 0,
     translateY: Number.isFinite(transform.translateY) ? transform.translateY : 0,
   };
 }
-function clamp(value: number): number {
-  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Number.isFinite(value) ? value : 1));
-}
 function clampFitScale(value: number, options: ViewportFitOptions): number {
-  const minScale = Math.max(MIN_SCALE, validScale(options.minScale) ? options.minScale : MIN_SCALE);
-  const maxScale = Math.max(
-    minScale,
-    Math.min(MAX_SCALE, validScale(options.maxScale) ? options.maxScale : MAX_SCALE),
-  );
-  return Math.min(maxScale, Math.max(minScale, value));
+  const minScale = validScale(options.minScale) ? Math.min(MAX_SCALE, options.minScale) : 0;
+  const maxScale = validScale(options.maxScale) ? Math.min(MAX_SCALE, options.maxScale) : MAX_SCALE;
+  return Math.max(minScale, Math.min(maxScale, value));
 }
 function validPadding(value: number | undefined): value is number {
   return value !== undefined && Number.isFinite(value) && value >= 0;
