@@ -47,11 +47,14 @@ function Choices<Value extends string>({
 function SettingsContent() {
   const { t } = useTranslation("common", { keyPrefix: "appearance" });
   const { preference, effectiveEffects, setThemeMode, setAccent, setEffects, setDensity, reset } = useAppearance();
-  const [draft, setDraft] = useState<{ text: string; accent: typeof preference.accent }>();
+  const [draft, setDraft] = useState<{ text: string; accentValue: string }>();
   const hexId = useId();
   const accent = preference.accent;
   const custom = accent.kind === "custom";
-  const invalid = draft?.accent === accent;
+  // A preference update can recreate the accent object without changing its value.
+  const accentValue = custom ? accent.hex : accent.preset;
+  const invalid = draft?.accentValue === accentValue;
+  if (draft && !invalid) setDraft(undefined);
 
   return (
     <>
@@ -97,7 +100,7 @@ function SettingsContent() {
                   setDraft(undefined);
                   setAccent({ kind: "custom", hex: text });
                 } else {
-                  setDraft({ text, accent });
+                  setDraft({ text, accentValue });
                 }
               }}
             />

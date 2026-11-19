@@ -268,3 +268,9 @@
     row-gap: 10px;
   }
 }
+
+@media (max-width: 768px) {
+  :root[data-density="compact"] .asset-wide-table tbody {
+    row-gap: 8px;
+  }
+}

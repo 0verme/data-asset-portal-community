@@ -74,13 +74,19 @@ test("all presets and custom HEX update immediately, persist, and restore the de
   await expect(hex).toHaveAccessibleDescription(/请输入有效的 HEX 颜色/);
   await expect(html).toHaveAttribute("data-accent", "orange");
   expect((await saved(page)).accent).toEqual({ kind: "preset", preset: "orange" });
+  for (const name of ["浅色", "完整", "紧凑", "深色"]) {
+    await drawer.getByRole("radio", { name, exact: true }).check();
+    await expect(hex).toHaveValue("#FFF");
+    await expect(hex).toHaveAttribute("aria-invalid", "true");
+  }
+  await drawer.getByRole("radio", { name: "翠绿" }).check();
+  await expect(hex).toHaveValue("");
+  await expect(hex).toHaveAttribute("aria-invalid", "false");
   await hex.fill("#000000");
   await expect(hex).toHaveAttribute("aria-invalid", "false");
   await expect(html).toHaveAttribute("data-accent", "custom");
   await expect(drawer.getByRole("img", { name: "当前生效的主题色" }))
     .toHaveCSS("background-color", makeAccentPalette("#000000", "dark")!["--accent"].replaceAll(",", ", "));
-  await drawer.getByRole("radio", { name: "紧凑" }).check();
-  await drawer.getByRole("radio", { name: "完整" }).check();
   await screenshot("dark-custom-compact");
 
   await hex.fill("#0000x");
@@ -192,6 +198,10 @@ test.describe("touch layouts", () => {
       await screenshot("mobile-light");
       await drawer.getByRole("radio", { name: "深色" }).check();
       await screenshot("mobile-dark");
+      const cards = page.locator(".asset-wide-table tbody");
+      await expect(cards).toHaveCSS("row-gap", "12px");
+      await drawer.getByRole("radio", { name: "紧凑" }).check();
+      await expect(cards).toHaveCSS("row-gap", "8px");
 
       await hex.fill("#25");
       await hex.focus();
