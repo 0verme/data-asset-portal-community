@@ -71,10 +71,63 @@ test("Release sync updates only the npm root package and lockfile versions", asy
   try {
     await writeFile(resolve(frontendRoot, "package.json"), `${JSON.stringify({ name: "dap", version: "0.2.0" }, null, 2)}\n`);
     await writeFile(resolve(frontendRoot, "package-lock.json"), `${JSON.stringify({ name: "dap", version: "0.2.0", packages: { "": { name: "dap", version: "0.2.0" }, "node_modules/demo": { version: "1.0.0" } } }, null, 2)}\n`);
-    assert.equal(await syncReleaseVersion("v0.2.7", frontendRoot), "0.2.7");
+    const result = await syncReleaseVersion("v0.2.7", frontendRoot, {
+      env: {},
+      fetchImpl: async () => ({ ok: true, json: async () => ({ draft: false, prerelease: false, tag_name: "v0.2.7" }) }),
+    });
+    assert.deepEqual(result, { shouldSync: true, version: "0.2.7", latestTag: "v0.2.7" });
     await assertPackageReleaseVersion("v0.2.7", frontendRoot);
     const lock = JSON.parse(await readFile(resolve(frontendRoot, "package-lock.json"), "utf8"));
     assert.equal(lock.packages["node_modules/demo"].version, "1.0.0");
+  } finally {
+    await rm(frontendRoot, { recursive: true, force: true });
+  }
+});
+
+test("a published non-latest stable Release is skipped without changing package files", async () => {
+  const frontendRoot = await mkdtemp(resolve(tmpdir(), "dap-release-version-stale-"));
+  try {
+    const packagePath = resolve(frontendRoot, "package.json");
+    const lockPath = resolve(frontendRoot, "package-lock.json");
+    const packageContents = `${JSON.stringify({ name: "dap", version: "0.2.6" }, null, 2)}\n`;
+    const lockContents = `${JSON.stringify({ name: "dap", version: "0.2.6", packages: { "": { name: "dap", version: "0.2.6" } } }, null, 2)}\n`;
+    await writeFile(packagePath, packageContents);
+    await writeFile(lockPath, lockContents);
+    const result = await syncReleaseVersion("v0.1.9", frontendRoot, {
+      env: {},
+      fetchImpl: async () => ({ ok: true, json: async () => ({ draft: false, prerelease: false, tag_name: "v0.2.6" }) }),
+    });
+    assert.deepEqual(result, { shouldSync: false, version: "0.1.9", latestTag: "v0.2.6" });
+    assert.equal(await readFile(packagePath, "utf8"), packageContents);
+    assert.equal(await readFile(lockPath, "utf8"), lockContents);
+  } finally {
+    await rm(frontendRoot, { recursive: true, force: true });
+  }
+});
+
+test("prerelease, invalid latest tag, and API failure all fail without writing versions", async () => {
+  const frontendRoot = await mkdtemp(resolve(tmpdir(), "dap-release-version-fail-"));
+  try {
+    const packagePath = resolve(frontendRoot, "package.json");
+    const lockPath = resolve(frontendRoot, "package-lock.json");
+    const packageContents = `${JSON.stringify({ name: "dap", version: "0.2.6" }, null, 2)}\n`;
+    const lockContents = `${JSON.stringify({ name: "dap", version: "0.2.6", packages: { "": { name: "dap", version: "0.2.6" } } }, null, 2)}\n`;
+    await writeFile(packagePath, packageContents);
+    await writeFile(lockPath, lockContents);
+    await assert.rejects(
+      syncReleaseVersion("v0.2.7-rc.1", frontendRoot, { env: {}, fetchImpl: () => assert.fail("invalid event tag must be rejected before API access") }),
+      /vX\.Y\.Z/,
+    );
+    await assert.rejects(
+      syncReleaseVersion("v0.2.6", frontendRoot, { env: {}, fetchImpl: async () => ({ ok: false, status: 503 }) }),
+      /HTTP 503.*no fallback version is used/,
+    );
+    await assert.rejects(
+      syncReleaseVersion("v0.2.6", frontendRoot, { env: {}, fetchImpl: async () => ({ ok: true, json: async () => ({ draft: false, prerelease: false, tag_name: "v0.2.6-beta" }) }) }),
+      /vX\.Y\.Z/,
+    );
+    assert.equal(await readFile(packagePath, "utf8"), packageContents);
+    assert.equal(await readFile(lockPath, "utf8"), lockContents);
   } finally {
     await rm(frontendRoot, { recursive: true, force: true });
   }

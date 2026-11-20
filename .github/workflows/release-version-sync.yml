@@ -19,6 +19,7 @@ jobs:
       contents: write
     env:
       RELEASE_TAG: ${{ github.event.release.tag_name }}
+      DAP_RELEASE_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,13 +30,16 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Sync frontend package and lockfile to the published stable tag
-        run: node frontend/scripts/sync-release-version.mjs "$RELEASE_TAG"
+      - name: Sync frontend package and lockfile only when this is the latest stable Release
+        id: sync
+        run: node frontend/scripts/sync-release-version.mjs "$RELEASE_TAG" "$GITHUB_OUTPUT"
 
       - name: Verify the synchronized npm versions
+        if: steps.sync.outputs.should_sync == 'true'
         run: node frontend/scripts/check-release-version.mjs "$RELEASE_TAG"
 
       - name: Commit version metadata only when it changed
+        if: steps.sync.outputs.should_sync == 'true'
         run: |
           set -euo pipefail
           git diff --check

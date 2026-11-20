@@ -98,6 +98,17 @@ async function resolveLatestPublishedRelease(repository, env, fetchImpl) {
   return releaseMetadataForTag(release.tag_name, repository, "github-api");
 }
 
+export async function resolveLatestStableRelease({
+  env = process.env,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const repository = resolveRepository(env.GITHUB_REPOSITORY);
+  if (typeof fetchImpl !== "function") {
+    throw new Error("This Node.js runtime has no fetch implementation; cannot resolve the latest GitHub Release");
+  }
+  return resolveLatestPublishedRelease(repository, env, fetchImpl);
+}
+
 export async function resolveReleaseMetadata({
   env = process.env,
   fetchImpl = globalThis.fetch,
@@ -109,10 +120,7 @@ export async function resolveReleaseMetadata({
   }
   const override = env.DAP_RELEASE_TAG?.trim();
   if (override) return releaseMetadataForTag(override, repository, "override");
-  if (typeof fetchImpl !== "function") {
-    throw new Error("This Node.js runtime has no fetch implementation; cannot resolve the latest GitHub Release");
-  }
-  return resolveLatestPublishedRelease(repository, env, fetchImpl);
+  return resolveLatestStableRelease({ env, fetchImpl });
 }
 
 export async function assertPackageReleaseVersion(tag, frontendRoot = FRONTEND_ROOT) {
