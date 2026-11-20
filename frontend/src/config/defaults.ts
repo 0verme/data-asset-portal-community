@@ -164,8 +164,6 @@ export const ASSET_VIEW_OPTIONS: ReadonlySet<string> = new Set([
   "card",
   "group",
 ]);
-export const APP_VERSION = "V0.2.0";
-
 export const DATA_MODE = (
   typeof import.meta !== "undefined" && import.meta.env?.["VITE_API_MODE"]
     ? String(import.meta.env["VITE_API_MODE"])

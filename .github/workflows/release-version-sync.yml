@@ -1,0 +1,55 @@
+name: Sync Frontend Release Version
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-frontend-release-version
+  cancel-in-progress: false
+
+jobs:
+  sync-frontend-version:
+    if: github.event.release.draft == false && github.event.release.prerelease == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      DAP_RELEASE_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "22"
+
+      - name: Sync frontend package and lockfile only when this is the latest stable Release
+        id: sync
+        run: node frontend/scripts/sync-release-version.mjs "$RELEASE_TAG" "$GITHUB_OUTPUT"
+
+      - name: Verify the synchronized npm versions
+        if: steps.sync.outputs.should_sync == 'true'
+        run: node frontend/scripts/check-release-version.mjs "$RELEASE_TAG"
+
+      - name: Commit version metadata only when it changed
+        if: steps.sync.outputs.should_sync == 'true'
+        run: |
+          set -euo pipefail
+          git diff --check
+          if git diff --quiet -- frontend/package.json frontend/package-lock.json; then
+            echo "Frontend package versions already match $RELEASE_TAG."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/package.json frontend/package-lock.json
+          git commit -m "chore(release): sync frontend package to $RELEASE_TAG"
+          git pull --rebase origin main
+          git push origin HEAD:main

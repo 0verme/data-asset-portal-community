@@ -8,6 +8,7 @@
 ## 部署与运维
 
 - [部署说明](../DEPLOYMENT.md)：介绍内网单机部署、配置、数据库迁移、服务运行和验收步骤。
+- [前端版本发布流程](release-versioning.md)：说明正式 Release 如何驱动构建时 Footer 版本、npm 根包同步和独立部署。
 - [Backend configuration](configuration.md)：说明后端首次部署配置、可选能力和进阶运行参数。
 - [数据库支持矩阵](database-support.md)：定义数据库能力等级、支持矩阵及各数据库的验证边界。
 - [血缘快照采集与发布指南](lineage_bulk_import_guide.md)：说明血缘快照的数据模型、首次采集、原子发布、失败回退和定时执行。

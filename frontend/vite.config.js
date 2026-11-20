@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv, searchForWorkspaceRoot } from "vite";
 import react from "@vitejs/plugin-react";
 import { appearanceBootstrap } from "./appearance-bootstrap.js";
+import { assertPackageReleaseVersion, resolveReleaseMetadata } from "./scripts/release-metadata.mjs";
 
 export function resolveFrontendApiMode(env, command) {
   const mode = env.VITE_API_MODE?.trim().toLowerCase();
@@ -59,11 +60,15 @@ function kumoResolvedTheme() {
   };
 }
 
-export default defineConfig(({ mode, command }) => {
+export default defineConfig(async ({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiMode = resolveFrontendApiMode(env, command);
   const apiBaseUrl = resolveFrontendApiBaseUrl(env);
   const backendTarget = resolveBackendTarget(env);
+  const releaseMetadata = await resolveReleaseMetadata({ env: { ...env, ...process.env } });
+  if (!["override", "release-event"].includes(releaseMetadata.source)) {
+    await assertPackageReleaseVersion(releaseMetadata.version);
+  }
 
   return {
     plugins: [react(), appearanceBootstrap(), kumoResolvedTheme()],
@@ -89,6 +94,11 @@ export default defineConfig(({ mode, command }) => {
     define: {
       "import.meta.env.VITE_API_MODE": JSON.stringify(apiMode),
       "import.meta.env.VITE_API_BASE_URL": JSON.stringify(apiBaseUrl),
+      __DAP_RELEASE_METADATA__: JSON.stringify({
+        version: releaseMetadata.version,
+        releaseUrl: releaseMetadata.releaseUrl,
+        repositoryUrl: releaseMetadata.repositoryUrl,
+      }),
     },
   };
 });

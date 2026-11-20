@@ -46,6 +46,8 @@ npm run verify:lineage-packages
 PowerShell 对应执行 `$env:VITE_API_MODE='remote'; npm run build`。
 本地演示继续使用 `VITE_API_MODE=mock` 的开发服务器，不生成 Mock 发布包。
 
+前端版本在 Vite 启动/构建时从 GitHub 最新稳定 Release 解析，API 不可用时会明确报错而不回退到固定版本。需要模拟版本时，可显式设置 `DAP_RELEASE_TAG=v0.2.6`；该覆盖仅用于本次本地验证，不会修改 npm 包版本。完整规则见[前端版本发布流程](./docs/release-versioning.md)。
+
 | Artifact | Repository policy | Producer / consumer |
 |---|---|---|
 | `src/`、TypeScript/TSX source、配置、docs/examples | `KEEP` | 人工维护；workspace build、typecheck 和 frontend 消费 |
