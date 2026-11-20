@@ -568,6 +568,22 @@
 .sp-ai-candidate-meta { color: var(--ink-3); }
 .sp-ai-candidate-evidence { color: var(--ink-2); }
 
+@media (min-width: 861px) and (min-height: 1081px) {
+  /* Spread taller viewports across the landing content, capped at 1440px. */
+  .portal-home-main .search-portal:not(.has-search-results) {
+    --sp-tall-space: clamp(0px, calc((100dvh - 1080px) / 15), 24px);
+
+    .sp-orb-stage {
+      margin-top: calc(var(--sp-orb-stage-top) + 3 * var(--sp-tall-space));
+      margin-bottom: calc(2 * var(--sp-tall-space));
+    }
+
+    .sp-hero p { margin-top: calc(17px + var(--sp-tall-space)); }
+    .sp-search-wrap { margin-top: calc(var(--sp-search-space) + 3 * var(--sp-tall-space)); }
+    .sp-stats { margin-top: calc(var(--sp-stats-space) + 3 * var(--sp-tall-space)); }
+  }
+}
+
 @media (max-width: 860px) {
   .search-portal {
     --sp-orb-stage-height: 218px;

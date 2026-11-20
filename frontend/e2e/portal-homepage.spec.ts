@@ -92,6 +92,57 @@ for (const { name, theme, accent, density, language } of appearances) {
   });
 }
 
+test("homepage distributes tall desktop space while preserving short viewport scrolling", async ({ page }, testInfo) => {
+  await routePortal(page);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+  await expect(page.locator(".sp-stat-num")).toHaveCount(12);
+  await expect(page.locator(".sp-hot-item")).toHaveCount(3);
+  await page.evaluate(() => document.fonts.ready);
+
+  const panel = page.locator(".sp-stats");
+  const orb = page.locator(".sp-data-orb");
+  const footer = page.locator(".portal-home-footer");
+  const baseline = (await panel.boundingBox())!;
+  const baselineOrb = (await orb.boundingBox())!;
+
+  for (const [width, height] of [[1920, 1440], [2560, 1440], [2560, 900], [1920, 1080]] as const) {
+    await page.setViewportSize({ width, height });
+    const stats = (await panel.boundingBox())!;
+    const sphere = (await orb.boundingBox())!;
+    expect(stats.width).toBeCloseTo(baseline.width, 0);
+    expect(stats.height).toBeCloseTo(baseline.height, 0);
+    expect(sphere.width).toBeCloseTo(baselineOrb.width, 0);
+    expect(sphere.height).toBeCloseTo(baselineOrb.height, 0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    expect((await footer.boundingBox())!.y).toBeGreaterThan(stats.y + stats.height);
+    if (height === 1440) {
+      expect(stats.y - baseline.y).toBeGreaterThan(180);
+      expect(sphere.y).toBeGreaterThan(baselineOrb.y);
+      const footerBox = (await footer.boundingBox())!;
+      expect(footerBox.y + footerBox.height).toBeCloseTo(height, 0);
+    } else {
+      expect(stats.y).toBeCloseTo(baseline.y, 0);
+      expect(sphere.y).toBeCloseTo(baselineOrb.y, 0);
+    }
+    if (height >= 1080) {
+      await page.screenshot({ path: testInfo.outputPath(`portal-orb-homepage-${width}x${height}.png`) });
+    }
+  }
+
+  for (const [width, height] of [[2560, 900], [390, 667]] as const) {
+    await page.setViewportSize({ width, height });
+    const main = page.locator(".portal-home-main");
+    await main.evaluate((element) => { element.scrollTop = 0; });
+    await expect(footer).not.toBeInViewport();
+    await footer.getByRole("link").scrollIntoViewIfNeeded();
+    await expect(footer.getByRole("link")).toBeInViewport({ ratio: 1 });
+    const footerBox = (await footer.boundingBox())!;
+    expect(footerBox.y + footerBox.height).toBeCloseTo(height, 0);
+    expect(await main.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  }
+});
+
 test("homepage renders only the statistics visible to the current catalog", async ({ page }) => {
   await routePortal(page);
   const visible = statItems.slice(6, 8);
