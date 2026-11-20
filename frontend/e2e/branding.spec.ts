@@ -106,10 +106,16 @@ test("public branding updates the portal, login, favicon, and responsive announc
 test("public branding request failure preserves the default anonymous experience", async ({ page }) => {
   await installRemoteFixtures(page, true);
   await page.goto("/");
-  await expect(page).toHaveTitle("数据资产管理与血缘分析平台");
+  await expect(page).toHaveTitle("数据资产门户");
+  await expect(page.locator(".brand-name")).toContainText("数据资产门户");
   await expect(page.getByRole("heading", { name: "数据资产门户" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "搜索数据资产" })).toBeVisible();
   await expect(page.locator(".app-announcement")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "切换到英文" }).click();
+  await expect(page).toHaveTitle("Data Asset Portal");
+  await expect(page.locator(".brand-name")).toContainText("Data Asset Portal");
+  await expect(page.getByRole("heading", { name: "Data Asset Portal" })).toBeVisible();
 });
 
 test("public branding remains applied after an authenticated session loads", async ({ page }) => {

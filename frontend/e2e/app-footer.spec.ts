@@ -51,7 +51,7 @@ test("global footer stays compact, readable, responsive, and outside main scroll
   const copy = footer.locator(".app-footer-copy");
   const release = footer.getByRole("link", { name: /^v\d+\.\d+\.\d+$/ });
   const link = footer.getByRole("link", { name: "GitHub ↗" });
-  await expect(copy).toContainText("数据资产管理与血缘分析平台");
+  await expect(copy).toContainText("数据资产门户");
   await expect(copy).toContainText(/v\d+\.\d+\.\d+/);
   await expect(release).toHaveAttribute("href", /^https:\/\/github\.com\/0verme\/data-asset-portal-community\/releases\/tag\/v\d+\.\d+\.\d+$/);
   await expect(release).toHaveAttribute("target", "_blank");

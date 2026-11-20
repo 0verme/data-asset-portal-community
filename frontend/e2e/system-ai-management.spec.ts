@@ -44,6 +44,19 @@ const brandingConfig = {
   },
 };
 
+const defaultBrandingConfig = {
+  ...brandingConfig,
+  site: {
+    ...brandingConfig.site,
+    title: { "zh-CN": "数据资产门户", "en-US": "Data Asset Portal" },
+    display_name: { "zh-CN": "数据资产门户", "en-US": "Data Asset Portal" },
+  },
+  hero: {
+    ...brandingConfig.hero,
+    title: { "zh-CN": "数据资产门户", "en-US": "Data Asset Portal" },
+  },
+};
+
 async function installFixtures(page: Page, mode: PermissionMode, language = "zh-CN", options: FixtureOptions = {}) {
   const permissions = mode === "admin"
     ? ["system:param:read", "system:param:write"]
@@ -121,6 +134,9 @@ async function installFixtures(page: Page, mode: PermissionMode, language = "zh-
     }
     if (path === "/system/branding-config" && method === "PUT") {
       return route.fulfill({ json: { data: { config: body, version: "qa-saved-v2" } } });
+    }
+    if (path === "/system/branding-config/reset" && method === "POST") {
+      return route.fulfill({ json: { data: { config: defaultBrandingConfig, version: "qa-default-v1" } } });
     }
     if (path === "/system/menus") {
       return route.fulfill({ json: { items: [] } });
@@ -224,6 +240,21 @@ test("branding can be edited and saved after the persisted configuration loads",
 
   const update = requests.find(({ path, method }) => path === "/system/branding-config" && method === "PUT");
   expect(update?.body).toMatchObject({ site: { title: { "zh-CN": "Persisted QA Portal" } } });
+});
+
+test("restoring all branding defaults uses the portal name in both locales", async ({ page }) => {
+  const requests = await installFixtures(page, "admin");
+  await page.goto("/system-management/branding");
+
+  await expect(page.getByRole("textbox", { name: "浏览器标题与站点标题 (zh-CN)" })).toHaveValue("测试站点");
+  await page.getByRole("button", { name: "恢复全部默认" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "站点文案与资源已恢复默认值" })).toBeVisible();
+
+  for (const field of ["浏览器标题与站点标题", "产品展示名称", "首页主标题"]) {
+    await expect(page.getByRole("textbox", { name: `${field} (zh-CN)` })).toHaveValue("数据资产门户");
+    await expect(page.getByRole("textbox", { name: `${field} (en-US)` })).toHaveValue("Data Asset Portal");
+  }
+  expect(requests.some(({ path, method }) => path === "/system/branding-config/reset" && method === "POST")).toBe(true);
 });
 
 test("failed branding reads expose only retry and never write local defaults", async ({ page }) => {

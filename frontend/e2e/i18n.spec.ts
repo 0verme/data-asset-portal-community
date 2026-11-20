@@ -18,7 +18,8 @@ test("desktop language switching is immediate, persistent, and preserves route/s
   const search = page.getByRole("textbox", { name: "全局搜索" });
   await expect(search).toBeVisible();
   await expect(page.locator(".page-title")).toContainText("数据资产");
-  await expect(page).toHaveTitle("数据资产管理与血缘分析平台");
+  await expect(page).toHaveTitle("数据资产门户");
+  await expect(page.locator(".brand-name")).toContainText("数据资产门户");
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
   await expect(page).toHaveURL(/\/data-warehouse$/);
   await search.fill("phase0-state-preservation");
@@ -35,7 +36,8 @@ test("desktop language switching is immediate, persistent, and preserves route/s
   const requestsBeforeSwitch = apiRequests.length;
   await page.getByRole("button", { name: "切换到英文" }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en-US");
-  await expect(page).toHaveTitle("Data Asset Management and Lineage Platform");
+  await expect(page).toHaveTitle("Data Asset Portal");
+  await expect(page.locator(".brand-name")).toContainText("Data Asset Portal");
   await expect(page.locator(".page-title")).toContainText("Data Assets");
   await expect(page.getByRole("button", { name: "Data Warehouse" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Global search" })).toHaveValue("phase0-state-preservation");
@@ -55,6 +57,8 @@ test("desktop language switching is immediate, persistent, and preserves route/s
 
   await page.getByRole("button", { name: "Switch language to Chinese" }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await expect(page).toHaveTitle("数据资产门户");
+  await expect(page.locator(".brand-name")).toContainText("数据资产门户");
   await expect(page.getByRole("textbox", { name: "全局搜索" })).toHaveValue("phase0-state-preservation");
   await expect(page.getByRole("button", { name: "数据仓库" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");

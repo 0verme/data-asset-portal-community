@@ -38,7 +38,7 @@ def _localized(zh: str, en: str) -> dict[str, str]:
 
 DEFAULT_BRANDING_CONFIG: dict[str, Any] = {
     "site": {
-        "title": _localized("数据资产管理与血缘分析平台", "Data Asset Management and Lineage Platform"),
+        "title": _localized("数据资产门户", "Data Asset Portal"),
         "display_name": _localized("数据资产门户", "Data Asset Portal"),
         "announcement": _localized("", ""),
         "logo_url": DEFAULT_LOGO_URL,

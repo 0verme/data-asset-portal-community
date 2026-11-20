@@ -11,10 +11,18 @@ import {
   type PublicBrandingConfig,
 } from './branding.ts';
 
-test('branding defaults preserve the localized Chinese and English portal copy', () => {
-  assert.equal(getDefaultPublicBranding('zh-CN').hero.title, '数据资产门户');
-  assert.equal(getDefaultPublicBranding('en-US').hero.title, 'Data Asset Portal');
-  assert.equal(getDefaultPublicBranding('zh-CN').site.title, '数据资产管理与血缘分析平台');
+test('branding defaults use the localized portal name for all three brand fields', () => {
+  for (const [locale, brandName] of [['zh-CN', '数据资产门户'], ['en-US', 'Data Asset Portal']] as const) {
+    const branding = getDefaultPublicBranding(locale);
+    assert.equal(branding.site.title, brandName);
+    assert.equal(branding.site.display_name, brandName);
+    assert.equal(branding.hero.title, brandName);
+
+    const missingConfig = parsePublicBrandingConfig({ site: {}, hero: {} }, locale);
+    assert.equal(missingConfig.site.title, brandName);
+    assert.equal(missingConfig.site.display_name, brandName);
+    assert.equal(missingConfig.hero.title, brandName);
+  }
   assert.match(getDefaultPublicBranding('en-US').hero.search_placeholder, /^Search assets/);
   assert.equal(getDefaultPublicBranding('en-US').login.quick_demo_login_enabled, false);
 });

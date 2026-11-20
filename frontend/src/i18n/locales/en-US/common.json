@@ -1,10 +1,10 @@
 {
   "app": {
-    "documentTitle": "Data Asset Management and Lineage Platform",
+    "documentTitle": "Data Asset Portal",
     "brandAlt": "Data Asset Portal",
     "brandName": "Data Asset Portal",
     "brandTagline": "Data Asset Management & Lineage",
-    "footer": "Data Asset Management and Lineage Platform"
+    "footer": "Data Asset Portal"
   },
   "branding": {
     "title": "Site branding and personalization",
