@@ -3385,7 +3385,6 @@
     border-radius: 999px;
   }
   .portal-home-topbar .navigation-status { padding-inline: 8px; color: var(--ink-2); white-space: normal; }
-  .portal-nav-menu-icon { display: none; }
   .portal-home-topbar :is(.theme-toggle, .appearance-trigger, .login-cta, .logout-btn, .user-chip) {
     height: 39px;
     border-radius: 999px;
@@ -3427,59 +3426,81 @@
     .portal-home-topbar .brand-name { font-size: 14px; }
     .portal-home-topbar .uc-name { max-width: 72px; }
   }
+  .portal-home-topbar ~ .body .sidebar { display: none; }
+
   @media (max-width: 768px) {
     .portal-home-topbar {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto auto;
-      width: calc(100% - 28px);
-      gap: 4px;
-    }
-    .portal-home-topbar .brand { gap: 7px; }
-    .portal-home-topbar .topbar-actions { gap: 4px; }
-    .portal-home-topbar .topbar-nav-slot { display: flex; width: 44px; }
-    .portal-home-topbar .topbar-nav-slot:has(:is(.navigation-message, .navigation-status)) {
-      grid-area: 2 / 1 / 3 / -1;
       width: 100%;
-      padding-bottom: 4px;
+      min-height: 0;
+      margin: 0;
+      border-bottom: 1px solid transparent;
     }
-    .portal-home-topbar .topbar-brand { grid-column: 1; }
-    .portal-home-topbar .topbar-actions { grid-area: 1 / 3; }
-    .portal-home-topbar .mainnav:not(.mainnav-measure) {
-      padding: 0;
-      border: 0;
-      background: transparent;
-      box-shadow: none;
+    .portal-home-topbar ~ .body .sidebar { display: block; }
+
+    .topbar:is(.portal-home-topbar, :not(.portal-topbar)) {
+      --mobile-header-gap: 6px;
+      display: flex;
+      height: 58px;
+      flex: 0 0 58px;
+      gap: var(--mobile-header-gap);
+      padding: 0 12px;
     }
-    .portal-home-topbar .mainnav:not(.mainnav-measure) > .dap-ui-button:not(.navigation-message) { display: none; }
-    .portal-home-topbar .mainnav-measure { position: fixed; }
-    .portal-home-topbar .mainnav-measure button { min-width: 44px; }
-    .portal-home-topbar .mainnav .more-nav-trigger:not([data-nav-measure-more]) {
+
+    .topbar:is(.portal-home-topbar, :not(.portal-topbar)) .topbar-brand {
+      container: mobile-brand / inline-size;
+      flex: 1 1 0;
+      gap: var(--mobile-header-gap);
+    }
+    .topbar:is(.portal-home-topbar, :not(.portal-topbar)) .brand {
+      gap: var(--mobile-header-gap);
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .topbar:is(.portal-home-topbar, :not(.portal-topbar)) .brand-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+    }
+    .topbar:is(.portal-home-topbar, :not(.portal-topbar)) .brand-name {
+      display: block;
+      font-size: 13px;
+    }
+    /* Budget space for the menu, logo, gaps and a readable name. */
+    @container mobile-brand (width < 10.5rem) {
+      .topbar:is(.portal-home-topbar, :not(.portal-topbar)) .brand-name { display: none; }
+    }
+    @container mobile-brand (width < 13rem) {
+      html[lang="en-US"] .topbar:is(.portal-home-topbar, :not(.portal-topbar)) .brand-name { display: none; }
+    }
+
+    .topbar:is(.portal-home-topbar, :not(.portal-topbar)) .topbar-actions { gap: 4px; }
+    .topbar:is(.portal-home-topbar, :not(.portal-topbar)) :is(.language-switcher, .theme-toggle, .appearance-trigger, .login-cta, .logout-btn) {
       width: 44px;
       height: 44px;
+      flex-basis: 44px;
+      padding-inline: 0;
+    }
+    .topbar:not(.portal-topbar) .language-switcher { display: inline-flex; }
+    .sidebar-language-switcher { display: none; }
+    .topbar:is(.portal-home-topbar, :not(.portal-topbar)) :is(.language-switcher, .login-cta) {
       justify-content: center;
-      padding: 0;
-      border: 1px solid var(--line);
-      background: color-mix(in srgb, var(--surface) 50%, transparent);
     }
-    .portal-home-topbar .more-nav-label,
-    .portal-home-topbar .more-nav-label + svg { display: none; }
-    .portal-home-topbar .portal-nav-menu-icon { display: inline-flex; }
-    .portal-home-topbar .portal-nav-menu-icon svg { transform: none; }
-    .portal-home-topbar :is(.language-switcher, .theme-toggle, .appearance-trigger, .login-cta, .logout-btn) {
-      height: 44px;
+    .topbar:is(.portal-home-topbar, :not(.portal-topbar)) .login-cta span { display: none; }
+
+    .sidebar:not(.open) {
+      visibility: hidden;
+      transition: transform 0.22s ease, visibility 0s 0.22s;
     }
-    .portal-home-topbar :is(.theme-toggle, .appearance-trigger, .logout-btn) { width: 44px; }
   }
-  @media (min-width: 361px) and (max-width: 768px) {
-    .portal-home-topbar .brand-name { display: block; }
+
+  /* The module search uses the extra action slot on the narrowest screens. */
+  @media (max-width: 22rem) {
+    .topbar:not(.portal-topbar) .language-switcher { display: none; }
+    .sidebar-language-switcher { display: flex; }
+    .sidebar-language-switcher .language-switcher { height: 44px; }
   }
+
   @media (max-width: 600px) {
-    .portal-home-topbar { min-height: 63px; }
-    .portal-home-topbar .brand-mark { width: 32px; height: 32px; }
     .portal-home-main .main-inner { padding-inline: 14px; }
     .portal-home-footer { margin-top: 52px; padding-bottom: max(22px, env(safe-area-inset-bottom)); }
-  }
-  @media (max-width: 360px) {
-    .portal-home-topbar .login-cta { padding-inline: 6px; }
-    .portal-home-topbar .login-cta > svg { display: none; }
   }

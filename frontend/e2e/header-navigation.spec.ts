@@ -303,7 +303,7 @@ test("administrator More menu exposes authorized system navigation", async ({ pa
 
 
 for (const administrator of [false, true]) {
-  test(`homepage keeps centered navigation and narrow-screen tools available to ${administrator ? "administrators" : "guests"}`, async ({ page }) => {
+  test(`homepage keeps centered navigation and shared mobile navigation available to ${administrator ? "administrators" : "guests"}`, async ({ page }) => {
     await page.addInitScript((admin) => {
       localStorage.removeItem("dap_auth");
       if (admin) localStorage.setItem("dap_auth", JSON.stringify({
@@ -315,11 +315,10 @@ for (const administrator of [false, true]) {
 
     const header = page.locator("header.topbar");
     const nav = header.getByRole("navigation");
-    const trigger = nav.getByRole("button", { name: "更多" });
     await expect(header).toHaveClass(/portal-home-topbar/);
     await expect(nav.getByRole("button", { name: "数据仓库" })).toBeVisible();
 
-    for (const width of [1440, 1024, 861, 860]) {
+    for (const width of [2560, 1920, 1440, 1024, 861, 860]) {
       await page.setViewportSize({ width, height: 1024 });
       await expect.poll(() => nav.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
       const frame = (await header.boundingBox())!;
@@ -337,33 +336,62 @@ for (const administrator of [false, true]) {
       }
     }
 
-    for (const width of [768, 390, 320]) {
+    const hamburger = header.locator(".hamburger");
+    const drawer = page.locator("#mobile-sidebar");
+    for (const width of [320, 375, 390, 430, 768]) {
       await page.setViewportSize({ width, height: 844 });
-      await expect(nav.getByRole("button", { name: "数据仓库" })).toHaveCount(0);
-      const controls = [
-        trigger,
-        header.getByRole("button", { name: "切换到英文" }),
-        header.locator(".theme-toggle"),
-        header.getByRole("button", { name: "风格设置" }),
-        header.getByRole("button", { name: administrator ? "退出登录" : "登录", exact: true }),
-      ];
-      for (const control of controls) await expect(control).toBeInViewport({ ratio: 1 });
-      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-      await trigger.focus();
-      await page.keyboard.press("Enter");
-      const menu = page.getByRole("menu");
-      await expect(menu.getByRole("menuitem", { name: "数据仓库" })).toBeVisible();
-      await expect(menu.getByRole("menuitem", { name: "系统管理" })).toHaveCount(administrator ? 1 : 0);
-      await page.keyboard.press("Escape");
-      await expect(menu).toBeHidden();
-      await expect(trigger).toBeFocused();
-    }
+      const measureMobileHeader = async () => {
+        await expect(nav).toBeHidden();
+        const menu = (await hamburger.boundingBox())!;
+        const logo = (await header.locator(".brand-mark").boundingBox())!;
+        const brand = (await header.locator(".topbar-brand").boundingBox())!;
+        const actions = (await header.locator(".topbar-actions").boundingBox())!;
+        const frame = (await header.boundingBox())!;
+        expect(menu.width).toBe(44);
+        expect(menu.height).toBe(44);
+        expect(menu.x).toBe(12);
+        expect(logo.x).toBeGreaterThan(menu.x + menu.width);
+        expect(brand.x + brand.width).toBeLessThan(actions.x);
+        expect(actions.x + actions.width).toBeLessThanOrEqual(width);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+        const buttons = header.locator(".topbar-actions").getByRole("button");
+        for (const button of await buttons.all()) {
+          await expect(button).toBeInViewport({ ratio: 1 });
+          const bounds = (await button.boundingBox())!;
+          expect(bounds.width).toBeGreaterThanOrEqual(44);
+          expect(bounds.height).toBeGreaterThanOrEqual(44);
+        }
+        return { menu, logo, height: frame.height };
+      };
 
-    await trigger.click();
-    await page.getByRole("menuitem", { name: "数据仓库" }).click();
-    await expect(page).toHaveURL(/\/data-warehouse$/);
-    await expect(header).not.toHaveClass(/portal-home-topbar/);
-    await expect(header.getByRole("button", { name: "打开导航" })).toBeVisible();
+      const home = await measureMobileHeader();
+      await expect(header.getByRole("button", { name: "切换到英文" })).toBeVisible();
+      await hamburger.focus();
+      await page.keyboard.press("Enter");
+      await expect(drawer.getByRole("button", { name: "数据仓库" })).toBeVisible();
+      await expect(drawer.getByRole("button", { name: "系统管理" })).toHaveCount(administrator ? 1 : 0);
+      await page.keyboard.press("Escape");
+      await expect(drawer).toBeHidden();
+      await expect(hamburger).toBeFocused();
+
+      await hamburger.click();
+      await drawer.getByRole("button", { name: "数据仓库" }).click();
+      await expect(page).toHaveURL(/\/data-warehouse$/);
+      await expect(hamburger).toHaveAttribute("aria-expanded", "false");
+      expect(await measureMobileHeader()).toEqual(home);
+      await expect(header.locator(".mobile-search-toggle")).toBeVisible();
+      if (width === 320) {
+        await expect(header.getByRole("button", { name: "切换到英文" })).toBeHidden();
+        await hamburger.click();
+        await expect(drawer.getByRole("button", { name: "切换到英文" })).toBeInViewport();
+        await page.keyboard.press("Escape");
+      } else {
+        await expect(header.getByRole("button", { name: "切换到英文" })).toBeVisible();
+      }
+      await header.locator(".brand").click();
+      await expect(header).toHaveClass(/portal-home-topbar/);
+      expect(await measureMobileHeader()).toEqual(home);
+    }
 
     await page.goto("/no-such-page");
     await expect(page.getByRole("heading", { name: /404/ })).toBeVisible();

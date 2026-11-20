@@ -247,9 +247,10 @@ export function AuthBar({ auth, onLogin, onLogout }: AuthBarProps) {
           size="sm"
           className="login-cta"
           onClick={onLogin}
+          aria-label={t("login")}
         >
           <Icon name="login" size={15} />
-          {t("login")}
+          <span>{t("login")}</span>
         </Button>
       </div>
     );

@@ -63,11 +63,19 @@ test("mobile module navigation switches modules and closes the sidebar", async (
   await expect.poll(() => page.evaluate(() => document.body.style.overflow)).not.toBe("hidden");
 });
 
-test("portal route renders no module sidebar shell", async ({ page }) => {
-  await page.addInitScript(() => localStorage.removeItem("dap_auth"));
-  await page.setViewportSize({ width: 480, height: 844 });
+test("portal drawer closes when the desktop navigation returns", async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 844 });
   await page.goto("/portal");
-  await expect(page.locator("button.hamburger")).toHaveCount(0);
-  await expect(page.locator("#mobile-sidebar")).toHaveCount(0);
-  await expect(page.locator(".sidebar-overlay")).toHaveCount(0);
+
+  const hamburger = page.locator("button.hamburger");
+  const sidebar = page.locator("#mobile-sidebar");
+  await hamburger.click();
+  await expect(sidebar).toHaveClass(/open/);
+  await page.setViewportSize({ width: 769, height: 844 });
+  await expect(hamburger).toBeHidden();
+  await expect(sidebar).toBeHidden();
+  await expect.poll(() => page.evaluate(() => document.body.style.overflow)).not.toBe("hidden");
+  await page.setViewportSize({ width: 768, height: 844 });
+  await expect(hamburger).toHaveAttribute("aria-expanded", "false");
+  await expect(sidebar).toBeHidden();
 });

@@ -358,8 +358,10 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [mobileSearchOpen]);
 
+  const isHome = module === "portal";
+
   useEffect(() => {
-    const desktopSidebarViewport = window.matchMedia("(min-width: 960px)");
+    const desktopSidebarViewport = window.matchMedia(isHome ? "(min-width: 769px)" : "(min-width: 960px)");
     const desktopSearchViewport = window.matchMedia("(min-width: 769px)");
     const closeSidebarOnDesktop = (event: MediaQueryListEvent): void => {
       if (event.matches) setSidebarOpen(false);
@@ -373,9 +375,8 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
       desktopSidebarViewport.removeEventListener("change", closeSidebarOnDesktop);
       desktopSearchViewport.removeEventListener("change", closeSearchOnDesktop);
     };
-  }, []);
+  }, [isHome]);
 
-  const isHome = module === "portal";
   const visibleNavMenus = useMemo(
     () => getVisibleNavigationMenus(navMenus, { canManageSystem, canViewOperationLog }),
     [canManageSystem, canViewOperationLog, navMenus],
@@ -633,11 +634,11 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
   const isUpstream = module === "upstream";
   const isMapping = module === "mapping";
   const isCodeTable = module === "codeTable";
-  const isPortal = module === "portal" || module === "notFound";
+  const hasModuleSidebar = module !== "notFound";
+  const isPortal = isHome || !hasModuleSidebar;
 
   useEffect(() => {
     setMoreNavOpen(false);
-    if (isHome) return;
     const hiddenNavigation = window.matchMedia(isPortal ? "(max-width: 768px)" : "(max-width: 959px)");
     const closeWhenHidden = (): void => {
       if (hiddenNavigation.matches) setMoreNavOpen(false);
@@ -818,7 +819,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
       <AppShell>
         <header className={`topbar${isPortal ? " portal-topbar" : ""}${isHome ? " portal-home-topbar" : ""}`}>
           <div className="topbar-brand">
-            {!isPortal ? (
+            {hasModuleSidebar ? (
               <IconButton
                 ref={hamburgerRef}
                 className="hamburger"
@@ -889,9 +890,8 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
                         />
                       )}
                     >
-                      <span className="more-nav-label">{tCommon("navigation.more")}</span>
+                      {tCommon("navigation.more")}
                       <Icon name="chevron" size={13} />
-                      {isHome ? <span className="portal-nav-menu-icon" aria-hidden="true"><Icon name="menu" size={18} /></span> : null}
                     </DropdownMenu.Trigger>
                     <DropdownMenu.Content
                       id="more-nav-menu"
@@ -1037,7 +1037,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
         ) : null}
 
         <div className="body">
-          {!isPortal ? (
+          {hasModuleSidebar ? (
             <>
               <div
                 className={`sidebar-overlay${sidebarOpen ? " open" : ""}`}
@@ -1048,6 +1048,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
                 role="presentation"
               />
               <aside
+                key={isHome ? "portal" : "module"}
                 ref={sidebarRef}
                 id="mobile-sidebar"
                 className={`sidebar${sidebarOpen ? " open" : ""}`}
@@ -1059,7 +1060,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
                   }
                 }}
               >
-                <div className="sidebar-language-switcher"><LanguageSwitcher /></div>
+                {!isPortal ? <div className="sidebar-language-switcher"><LanguageSwitcher /></div> : null}
                 <nav className="mobile-module-nav" aria-label={tCommon("navigation.module")}>
                   <div className="side-title">{tCommon("navigation.module")}</div>
                   {currentNavMenuStatus === "loading" ? (
