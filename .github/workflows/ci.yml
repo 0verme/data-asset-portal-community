@@ -785,12 +785,12 @@ jobs:
           VITE_API_MODE: remote
         run: npm run test:browser -- e2e/root-import-parser.spec.ts --workers=2
 
-      - name: Overlay focus and feedback browser regression (Chromium and WebKit)
+      - name: Overlay, Select spacing and pagination browser regression (Chromium and WebKit)
         if: matrix.lane == 'b'
         env:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/overlay-feedback-playwright
           VITE_API_MODE: mock
-        run: npm run test:browser -- e2e/kumo-overlays.spec.ts --workers=2
+        run: npm run test:browser -- e2e/kumo-overlays.spec.ts e2e/select-reset.spec.ts e2e/table-pagination.spec.ts --workers=2
 
       - name: Appearance preferences and theme browser regression (Chromium and WebKit)
         if: matrix.lane == 'b'

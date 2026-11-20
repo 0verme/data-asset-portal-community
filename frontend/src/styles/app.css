@@ -115,7 +115,13 @@
     --on-accent: #FFFFFF;
   }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; }
+
+  /* Kumo declares base before utilities, so its spacing can override the reset. */
+  @layer base {
+    * { margin: 0; padding: 0; }
+  }
+
   html, body { height: 100%; }
   body {
     font-family: var(--sans);
@@ -1467,6 +1473,11 @@
   .dap-ui-select {
     width: 100%;
     min-width: 0;
+  }
+
+  /* Keep portaled Select menus above sticky chrome when their restored spacing reaches it. */
+  [data-base-ui-portal] > [data-side]:has(> [data-side] > [role="listbox"] [data-kumo-component="Select"]) {
+    z-index: 150;
   }
 
   .inp,
