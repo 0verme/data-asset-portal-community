@@ -51,8 +51,8 @@ const API_MODE = (
 const BASE_BRANDING: BrandingConfig = {
   site: {
     title: {
-      'zh-CN': '数据资产管理与血缘分析平台',
-      'en-US': 'Data Asset Management and Lineage Platform',
+      'zh-CN': '数据资产门户',
+      'en-US': 'Data Asset Portal',
     },
     display_name: {
       'zh-CN': '数据资产门户',

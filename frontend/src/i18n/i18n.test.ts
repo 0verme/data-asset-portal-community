@@ -25,8 +25,10 @@ test("zh-CN and en-US resources have matching keys for all application namespace
 
 test("both locales resolve known messages; missing keys never render a raw key", async () => {
   await i18nReady;
-  assert.equal(i18n.t("app.documentTitle", { lng: "zh-CN", ns: "common" }), "数据资产管理与血缘分析平台");
-  assert.equal(i18n.t("app.documentTitle", { lng: "en-US", ns: "common" }), "Data Asset Management and Lineage Platform");
+  assert.equal(i18n.t("app.documentTitle", { lng: "zh-CN", ns: "common" }), "数据资产门户");
+  assert.equal(i18n.t("app.documentTitle", { lng: "en-US", ns: "common" }), "Data Asset Portal");
+  assert.equal(i18n.t("app.footer", { lng: "zh-CN", ns: "common" }), "数据资产门户");
+  assert.equal(i18n.t("app.footer", { lng: "en-US", ns: "common" }), "Data Asset Portal");
   assert.equal(i18n.t("menus.dwm", { lng: "en-US", ns: "navigation" }), "Data Warehouse");
   assert.equal(i18n.t("missing.phase0.key", { lng: "en-US", ns: "common", defaultValue: "Fallback label" }), "Fallback label");
 });

@@ -45,6 +45,12 @@ the frontend also refreshes after an administrator save and every 60 seconds.
 English and Chinese copy are independent administrator fields and are never
 machine translated.
 
+A fresh install uses **数据资产门户** for the Chinese browser/site title,
+product display name, and home title, and **Data Asset Portal** for all three
+English fields. Restoring all defaults returns these names. Existing saved
+branding remains authoritative when the application starts; changing these
+repository defaults does not rewrite database values or administrator edits.
+
 Logo and Favicon uploads accept PNG and a strict static SVG subset under 200 KB.
 Files are content-addressed in `uploads/branding/` relative to the backend's
 working directory and are served from `/static/branding/`. Mount this directory

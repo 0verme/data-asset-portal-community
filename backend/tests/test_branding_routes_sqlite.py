@@ -78,9 +78,14 @@ class BrandingRoutesSqliteTests(unittest.TestCase):
         self.assertEqual(set(data["site"]), {"title", "display_name", "announcement", "logo_url", "favicon_url"})
         self.assertEqual(default_public_branding("en-US"), data)
         self.assertEqual("Data Asset Portal", data["hero"]["title"])
-        self.assertEqual("数据资产门户", self.anonymous.get(
+        self.assertEqual("Data Asset Portal", data["site"]["title"])
+        self.assertEqual("Data Asset Portal", data["site"]["display_name"])
+        chinese_default = self.anonymous.get(
             "/api/system/public-config", params={"lang": "zh-CN"}
-        ).json()["data"]["hero"]["title"])
+        ).json()["data"]
+        self.assertEqual("数据资产门户", chinese_default["site"]["title"])
+        self.assertEqual("数据资产门户", chinese_default["site"]["display_name"])
+        self.assertEqual("数据资产门户", chinese_default["hero"]["title"])
         self.assertNotIn("database", json.dumps(data).lower())
 
         self.assertEqual(401, self.anonymous.get("/api/system/branding-config").status_code)
@@ -106,6 +111,9 @@ class BrandingRoutesSqliteTests(unittest.TestCase):
         self.assertEqual("Orbit Catalog", self.anonymous.get(
             "/api/system/public-config", params={"lang": "en-US"}
         ).json()["data"]["site"]["title"])
+        self.assertEqual("Orbit Data Portal", self.anonymous.get(
+            "/api/system/public-config", params={"lang": "en-US"}
+        ).json()["data"]["site"]["display_name"])
         self.assertEqual("请联系管理员", self.anonymous.get(
             "/api/system/public-config", params={"lang": "zh-CN"}
         ).json()["data"]["login"]["hint"])
@@ -122,6 +130,29 @@ class BrandingRoutesSqliteTests(unittest.TestCase):
             "/api/system/public-config", params={"lang": "en-US"}
         ).json()["data"])
         self.assertEqual(DEFAULT_BRANDING_CONFIG["site"]["title"], restored.json()["data"]["config"]["site"]["title"])
+        self.assertEqual(DEFAULT_BRANDING_CONFIG["site"]["display_name"], restored.json()["data"]["config"]["site"]["display_name"])
+        self.assertEqual(DEFAULT_BRANDING_CONFIG["hero"]["title"], restored.json()["data"]["config"]["hero"]["title"])
+
+    def test_saved_legacy_brand_values_are_preserved_when_reading_existing_config(self):
+        legacy_names = {
+            "zh-CN": "数据资产管理与血缘分析平台",
+            "en-US": "Data Asset Management and Lineage Platform",
+        }
+        saved = self.admin.put("/api/system/branding-config", json={
+            "site": {"title": legacy_names},
+            "hero": {"title": legacy_names},
+        })
+        self.assertEqual(200, saved.status_code, saved.text)
+
+        loaded = self.admin.get("/api/system/branding-config").json()["data"]["config"]
+        self.assertEqual(legacy_names, loaded["site"]["title"])
+        self.assertEqual(legacy_names, loaded["hero"]["title"])
+        for locale, expected in legacy_names.items():
+            public = self.anonymous.get(
+                "/api/system/public-config", params={"lang": locale}
+            ).json()["data"]
+            self.assertEqual(expected, public["site"]["title"])
+            self.assertEqual(expected, public["hero"]["title"])
 
     def test_read_permission_cannot_write_and_invalid_types_do_not_change_config(self):
         before = self.branding.get_admin_config()
