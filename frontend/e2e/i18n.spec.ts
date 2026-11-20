@@ -82,7 +82,7 @@ test("mobile navigation provides the language switch without closing or resettin
       sessionStorage.setItem("dap-562-i18n-e2e-clean", "1");
     }
   });
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 320, height: 844 });
   await page.goto("/data-warehouse?layout=list");
   await expect(page.locator(".page-title")).toContainText("数据资产");
   await expect(page.locator(".topbar .language-switcher")).toBeHidden();
