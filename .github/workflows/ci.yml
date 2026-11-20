@@ -816,6 +816,14 @@ jobs:
           name: appearance-screenshots
           path: ${{ runner.temp }}/appearance-playwright/**/appearance-*.png
 
+      - name: Upload failed Appearance traces
+        if: failure() && matrix.lane == 'b'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: appearance-failure-traces-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/appearance-playwright/**/trace.zip
+          if-no-files-found: ignore
+
   frontend-gate:
     # Keep the original required check context. It must fail if EITHER
     # browser shard or ANY frontend core matrix entry fails, skips or cancels.

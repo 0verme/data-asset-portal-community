@@ -239,7 +239,10 @@ test("blocked localStorage still allows the real app to mount and switch theme",
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 });
 
-test("open Kumo portals inherit updated accent and readable primary action colors", async ({ context, page }, testInfo) => {
+test("open Kumo portals inherit updated accent and readable primary action colors", async ({ browserName, context, page }, testInfo) => {
+  // WebKit on CI needs more time for the full sequence of cross-tab updates.
+  if (browserName === "webkit") test.setTimeout(60_000);
+
   const writer = await context.newPage();
   await writer.goto("/");
   await writer.getByRole("button", { name: "风格设置" }).press("Enter");
