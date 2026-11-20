@@ -4,10 +4,7 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
 本文不是 Git 提交历史，而是基于仓库状态整理的阶段性变更摘要。
-条目按发布时间倒序排列；最新发布 tag 为 `v0.2.4`。
-
-> **版本元数据说明**：`frontend/package.json` 的 `version` 当前仍为 `0.2.0`，因此页脚显示的
-> `V0.2.0` 是前端构建元数据，不等于最新 GitHub Release tag。两者的对齐属于独立事项，不在本文范围内。
+条目按发布时间倒序排列；当前整理的变更摘要覆盖到 `v0.2.4`。正式版本以最新稳定 GitHub Release 为准，前端 Footer 在构建时读取该 Release tag；详见[前端版本发布流程](./docs/release-versioning.md)。
 
 ## [Unreleased]
 

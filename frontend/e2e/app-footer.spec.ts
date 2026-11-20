@@ -49,9 +49,13 @@ test("global footer stays compact, readable, responsive, and outside main scroll
   await openPage(page, "/data-warehouse");
   const footer = page.locator("footer.app-footer-shell");
   const copy = footer.locator(".app-footer-copy");
+  const release = footer.getByRole("link", { name: /^v\d+\.\d+\.\d+$/ });
   const link = footer.getByRole("link", { name: "GitHub ↗" });
   await expect(copy).toContainText("数据资产管理与血缘分析平台");
-  await expect(copy).toContainText(/V\d+\.\d+\.\d+/);
+  await expect(copy).toContainText(/v\d+\.\d+\.\d+/);
+  await expect(release).toHaveAttribute("href", /^https:\/\/github\.com\/0verme\/data-asset-portal-community\/releases\/tag\/v\d+\.\d+\.\d+$/);
+  await expect(release).toHaveAttribute("target", "_blank");
+  await expect(release).toHaveAttribute("rel", "noopener noreferrer");
   await expect(link).toHaveAttribute("href", "https://github.com/0verme/data-asset-portal-community");
   await expect(link).toHaveAttribute("target", "_blank");
   await expect(link).toHaveAttribute("rel", "noopener noreferrer");
@@ -185,15 +189,22 @@ test("global footer stays compact, readable, responsive, and outside main scroll
 
 test("homepage footer follows the content and remains readable as theme tokens change", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1024 });
+  const githubApiRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().startsWith("https://api.github.com/")) githubApiRequests.push(request.url());
+  });
   await openPage(page);
   const main = page.locator(".portal-home-main");
   const footer = main.getByRole("contentinfo");
+  const copy = footer.locator(".app-footer-copy");
+  const release = footer.getByRole("link", { name: /^v\d+\.\d+\.\d+$/ });
   const link = footer.getByRole("link", { name: "GitHub ↗" });
   const panel = main.locator(".sp-stats");
   await expect(panel.locator(".sp-stat-num")).toHaveCount(11);
-  await expect(footer.locator(".app-footer-copy")).toHaveText(/^数据资产门户 V\d+\.\d+\.\d+$/);
+  await expect(copy).toHaveText(/^数据资产门户 v\d+\.\d+\.\d+$/);
+  await expect(release).toHaveAttribute("href", /^https:\/\/github\.com\/0verme\/data-asset-portal-community\/releases\/tag\/v\d+\.\d+\.\d+$/);
+  await expect(footer.locator(".app-footer-separator")).toHaveText("|");
   await expect(footer).toHaveCSS("border-top-width", "0px");
-  await expect(footer.locator(".app-footer-separator")).toHaveCSS("width", "1px");
   await expect(link).toHaveAttribute("href", "https://github.com/0verme/data-asset-portal-community");
   await expect(footer).toBeInViewport({ ratio: 1 });
   const shortFooter = (await footer.boundingBox())!;
@@ -235,6 +246,36 @@ test("homepage footer follows the content and remains readable as theme tokens c
   }
   await switchThemeAndSample("dark");
   await switchThemeAndSample("light");
+
+  await page.getByRole("button", { name: "切换到英文" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en-US");
+  await expect(copy).toHaveText(/^Data Asset Portal v\d+\.\d+\.\d+$/);
+  await expect(release).toHaveAttribute("href", /^https:\/\/github\.com\/0verme\/data-asset-portal-community\/releases\/tag\/v\d+\.\d+\.\d+$/);
+  await page.getByRole("button", { name: "Switch language to Chinese" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+
+  for (const viewport of [{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }]) {
+    await page.setViewportSize(viewport);
+    await expect(footer).toBeInViewport({ ratio: 1 });
+    const metrics = await page.evaluate(() => {
+      const footerElement = document.querySelector<HTMLElement>(".portal-home-footer");
+      const copyElement = footerElement?.querySelector<HTMLElement>(".app-footer-copy");
+      const releaseElement = footerElement?.querySelector<HTMLElement>(".app-footer-version");
+      const githubElement = footerElement?.querySelector<HTMLElement>(".app-footer-link");
+      if (!footerElement || !copyElement || !releaseElement || !githubElement) throw new Error("Homepage footer is incomplete");
+      return {
+        viewportWidth: window.innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        left: Math.min(footerElement.getBoundingClientRect().left, copyElement.getBoundingClientRect().left),
+        right: Math.max(footerElement.getBoundingClientRect().right, githubElement.getBoundingClientRect().right, releaseElement.getBoundingClientRect().right),
+      };
+    });
+    expect(metrics.documentWidth).toBeLessThanOrEqual(viewport.width);
+    expect(metrics.left).toBeGreaterThanOrEqual(0);
+    expect(metrics.right).toBeLessThanOrEqual(viewport.width);
+  }
+  await page.setViewportSize({ width: 1440, height: 1024 });
+  expect(githubApiRequests).toEqual([]);
 
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });

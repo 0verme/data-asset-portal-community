@@ -95,6 +95,7 @@ jobs:
               "ci.yml": {"pull_request"},
               "community-metadata.yml": {"issues", "pull_request_target"},
               "release-drafter.yml": {"push"},
+              "release-version-sync.yml": {"release"},
           }
           metadata_actions = {
               "actions/first-interaction",
@@ -528,6 +529,9 @@ jobs:
     defaults:
       run:
         working-directory: frontend
+    env:
+      # Read-only token for the public Releases API; avoids unauthenticated rate limits.
+      DAP_RELEASE_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -540,6 +544,9 @@ jobs:
 
       - name: npm ci (clean install from lockfile)
         run: npm ci
+
+      - name: Verify npm package versions match the latest stable Release
+        run: npm run release:check
 
       - name: Build Lineage workspace packages from source
         run: npm run build:lineage
@@ -629,6 +636,9 @@ jobs:
     defaults:
       run:
         working-directory: frontend
+    env:
+      # The Vite dev server resolves the same immutable release metadata as production builds.
+      DAP_RELEASE_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Node

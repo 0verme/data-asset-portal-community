@@ -30,10 +30,8 @@ import { Icon } from "./components/ui.tsx";
 import { LanguageSwitcher } from "./i18n/LanguageSwitcher.tsx";
 import { resolveMenuDisplayName } from "./routing/menuLabels.ts";
 import { Button, DropdownMenu, IconButton, Input } from "./ui/index.ts";
-import {
-  APP_VERSION,
-  DEFAULT_SYSTEM_ROUTE,
-} from "./config/defaults.ts";
+import { DEFAULT_SYSTEM_ROUTE } from "./config/defaults.ts";
+import { APP_RELEASE_METADATA } from "./config/releaseMetadata.ts";
 import { useAssetModule } from "./hooks/useAssetModule.ts";
 import { useApiAssetModule } from "./hooks/useApiAssetModule.ts";
 import { useAuthSession, type UseAuthSessionResult } from "./hooks/useAuthSession.ts";
@@ -791,11 +789,21 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
   const footer = (
     <footer className={isHome ? "app-footer-shell portal-home-footer" : "app-footer-shell"} role="contentinfo">
       <div className="app-footer">
-        <span className="app-footer-copy">{isHome ? branding.site.display_name : branding.site.title} {APP_VERSION}</span>
-        <span className="app-footer-separator" aria-hidden="true">{isHome ? null : "·"}</span>
+        <span className="app-footer-copy">
+          {isHome ? branding.site.display_name : branding.site.title}{" "}
+          <a
+            className="app-footer-version"
+            href={APP_RELEASE_METADATA.releaseUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {APP_RELEASE_METADATA.version}
+          </a>
+        </span>
+        <span className="app-footer-separator" aria-hidden="true">{isHome ? "|" : "·"}</span>
         <a
           className="app-footer-link"
-          href="https://github.com/0verme/data-asset-portal-community"
+          href={APP_RELEASE_METADATA.repositoryUrl}
           target="_blank"
           rel="noopener noreferrer"
         >

@@ -692,6 +692,7 @@
   .app-footer-separator {
     color: var(--line-strong);
   }
+  .app-footer-version,
   .app-footer-link {
     color: var(--ink-2);
     font-weight: 500;
@@ -699,9 +700,11 @@
     text-decoration: none;
     transition: color 0.15s ease;
   }
+  .app-footer-version:hover,
   .app-footer-link:hover {
     color: var(--ink);
   }
+  .app-footer-version:focus-visible,
   .app-footer-link:focus-visible {
     outline: 2px solid var(--accent-line);
     outline-offset: 3px;
@@ -3412,7 +3415,7 @@
   }
   .portal-home-footer .app-footer { gap: 0 20px; }
   .portal-home-footer .app-footer-copy { overflow-wrap: anywhere; }
-  .portal-home-footer .app-footer-separator { width: 1px; height: 16px; background: var(--line-strong); }
+  .portal-home-footer .app-footer-separator { color: var(--line-strong); }
   /* Theme tokens change together, so the link also needs to change color immediately. */
   .portal-home-footer .app-footer-link { transition: none; }
   .portal-home-footer .app-footer-link:hover { text-decoration: underline; }
