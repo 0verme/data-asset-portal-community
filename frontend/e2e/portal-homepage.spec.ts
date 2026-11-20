@@ -135,8 +135,9 @@ test("homepage distributes tall desktop space while preserving short viewport sc
     const main = page.locator(".portal-home-main");
     await main.evaluate((element) => { element.scrollTop = 0; });
     await expect(footer).not.toBeInViewport();
-    await footer.getByRole("link").scrollIntoViewIfNeeded();
-    await expect(footer.getByRole("link")).toBeInViewport({ ratio: 1 });
+    const releaseLink = footer.getByRole("link", { name: /^v\d+\.\d+\.\d+$/ });
+    await releaseLink.scrollIntoViewIfNeeded();
+    await expect(releaseLink).toBeInViewport({ ratio: 1 });
     const footerBox = (await footer.boundingBox())!;
     expect(footerBox.y + footerBox.height).toBeCloseTo(height, 0);
     expect(await main.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
