@@ -200,6 +200,12 @@ export function UpstreamEditor({
   const dbTypeLegacy = isLegacyDictValue(dbTypeOptions, form.dbType);
   const deptLegacy =
     Boolean(form.dept) && isLegacyDictValue(deptOptions, form.dept);
+  const requiredLabel = (field: string): React.ReactNode => (
+    <>
+      {getUpstreamFieldLabel(field)}
+      <span className="upstream-required" aria-hidden="true">必填</span>
+    </>
+  );
 
   const setValue = <K extends keyof MockUpstreamSystem>(
     key: K,
@@ -260,7 +266,7 @@ export function UpstreamEditor({
   };
 
   return (
-    <div>
+    <div className="upstream-editor-page">
       <PageHeader
         back={{
           onClick: onCancel,
@@ -290,7 +296,7 @@ export function UpstreamEditor({
         </h3>
         <div className="form-grid">
           <div className="fl upstream-field" data-form-field="id">
-            <label>{getUpstreamFieldLabel("id")}</label>
+            <label>{requiredLabel("id")}</label>
             <Input
               aria-label={getUpstreamFieldLabel("id")}
               className={`inp mono${getFieldError("id") ? " invalid" : ""}`}
@@ -298,13 +304,14 @@ export function UpstreamEditor({
               onChange={(event) => setValue("id", event.target.value)}
               placeholder="例如：up_cbs"
               data-form-control
+              required
               aria-invalid={Boolean(getFieldError("id")) || undefined}
               aria-describedby={getFieldError("id") ? fieldErrorId("id") : undefined}
             />
             {renderFieldError("id")}
           </div>
           <div className="fl upstream-field" data-form-field="abbr">
-            <label>{getUpstreamFieldLabel("abbr")}</label>
+            <label>{requiredLabel("abbr")}</label>
             <Input
               aria-label={getUpstreamFieldLabel("abbr")}
               className={`inp mono${getFieldError("abbr") ? " invalid" : ""}`}
@@ -312,13 +319,14 @@ export function UpstreamEditor({
               onChange={(event) => setValue("abbr", event.target.value)}
               placeholder="例如：CBS"
               data-form-control
+              required
               aria-invalid={Boolean(getFieldError("abbr")) || undefined}
               aria-describedby={getFieldError("abbr") ? fieldErrorId("abbr") : undefined}
             />
             {renderFieldError("abbr")}
           </div>
           <div className="fl upstream-field" data-form-field="name">
-            <label>{getUpstreamFieldLabel("name")}</label>
+            <label>{requiredLabel("name")}</label>
             <Input
               aria-label={getUpstreamFieldLabel("name")}
               className={`inp${getFieldError("name") ? " invalid" : ""}`}
@@ -326,18 +334,20 @@ export function UpstreamEditor({
               onChange={(event) => setValue("name", event.target.value)}
               placeholder="例如：商品中心"
               data-form-control
+              required
               aria-invalid={Boolean(getFieldError("name")) || undefined}
               aria-describedby={getFieldError("name") ? fieldErrorId("name") : undefined}
             />
             {renderFieldError("name")}
           </div>
           <div className="fl upstream-field" data-form-field="dbType">
-            <label>{getUpstreamFieldLabel("dbType")}</label>
+            <label>{requiredLabel("dbType")}</label>
             <Select<string>
               aria-label={getUpstreamFieldLabel("dbType")}
               className={`sel${getFieldError("dbType") ? " invalid" : ""}`}
               placeholder="请选择数据库类型"
               value={form.dbType || null}
+              required
               onValueChange={(value) => setValue("dbType", value || "")}
               data-form-control
               aria-invalid={Boolean(getFieldError("dbType")) || undefined}
@@ -440,7 +450,7 @@ export function UpstreamEditor({
         </h3>
         <div className="form-grid">
           <div className="fl upstream-field" data-form-field="host">
-            <label>{getUpstreamFieldLabel("host")}</label>
+            <label>{requiredLabel("host")}</label>
             <Input
               aria-label={getUpstreamFieldLabel("host")}
               className={`inp mono${getFieldError("host") ? " invalid" : ""}`}
@@ -448,6 +458,7 @@ export function UpstreamEditor({
               onChange={(event) => setValue("host", event.target.value)}
               placeholder="例如：product.source.demo.invalid"
               data-form-control
+              required
               aria-invalid={Boolean(getFieldError("host")) || undefined}
               aria-describedby={getFieldError("host") ? fieldErrorId("host") : undefined}
             />
@@ -470,7 +481,7 @@ export function UpstreamEditor({
         <div className="form-card-head">
           <h3>
             <Icon name="clock" size={14} />
-            卸数时间点
+            {requiredLabel("unloadTimes")}
           </h3>
           <span className="form-card-meta">{unloadTimes.length} 个</span>
         </div>
@@ -491,6 +502,7 @@ export function UpstreamEditor({
                     onChange={(event) => setTime(index, event.target.value)}
                     aria-label={`卸数时间点 ${index + 1}`}
                     data-form-control
+                    aria-required="true"
                     aria-invalid={Boolean(timeError) || undefined}
                     aria-describedby={
                       timeError

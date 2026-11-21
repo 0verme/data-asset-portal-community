@@ -54,11 +54,13 @@ export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], o
     dept: displayDictValue(deptOptions, system.dept),
   };
   const detailMetadata = getUpstreamDetailMetadata(displaySystem);
+  const businessMetadata = detailMetadata.filter(({ visibility }) => visibility !== "connection");
+  const connectionMetadata = detailMetadata.filter(({ visibility }) => visibility === "connection");
   const dbTypeLegacy = isLegacyDictValue(dbTypeOptions, system.dbType);
   const deptLegacy = Boolean(system.dept) && isLegacyDictValue(deptOptions, system.dept);
 
   return (
-    <div>
+    <div className="upstream-detail-page">
       <PageHeader
         back={{ onClick: onBack, text: "返回上游卸数列表" }}
         breadcrumbs={buildModuleBreadcrumbs("upstream", [{ label: systemAbbr }], onBackToList)}
@@ -84,13 +86,29 @@ export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], o
             <Button className="btn" variant="secondary" type="button" onClick={onEdit}><Icon name="edit" size={15} />编辑</Button>
           </div> : null}
         </div>
-        <div className="dh-meta upstream-detail-meta" data-field-contract="upstream-system">
-          {detailMetadata.map(({ key, label, value, mono }) => (
-            <MetaItem key={key} label={label} value={value} mono={mono} />
-          ))}
+        <div className="upstream-detail-groups" data-field-contract="upstream-system">
+          <section className="upstream-detail-section" aria-label="系统基础信息">
+            <h2 className="upstream-section-title">系统基础信息</h2>
+            <div className="dh-meta upstream-detail-meta">
+              {businessMetadata.map(({ key, label, value, mono }) => (
+                <MetaItem key={key} label={label} value={value} mono={mono} />
+              ))}
+            </div>
+          </section>
+          {connectionMetadata.length ? (
+            <section className="upstream-detail-section" aria-label="数据库连接元数据">
+              <h2 className="upstream-section-title">数据库连接</h2>
+              <div className="dh-meta upstream-detail-meta upstream-connection-meta">
+                {connectionMetadata.map(({ key, label, value, mono }) => (
+                  <MetaItem key={key} label={label} value={value} mono={mono} />
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
       </div>
 
+      <h2 className="upstream-section-title upstream-flow-heading">数据流向</h2>
       <div className="flow-card">
         <div className="flow-node">
           <span className="fn-abbr">{systemAbbr}</span>
@@ -104,7 +122,7 @@ export function UpstreamDetail({ system, dbTypeOptions = [], deptOptions = [], o
           <Icon name="chevron" size={16} color="var(--ink-3)" />
         </div>
         <div className="flow-node">
-          <span className="fn-abbr lake"><Icon name="db" size={14} color="#fff" /></span>
+          <span className="fn-abbr lake"><Icon name="db" size={14} color="var(--ink-2)" /></span>
           <div className="fn-txt">
             <div className="fn-k">数据湖</div>
             <div className="fn-v mono">ODS 贴源层</div>

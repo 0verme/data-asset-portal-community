@@ -133,15 +133,17 @@ export function UpstreamView({
   const editorDeptOptions = configuredOptions?.categories["UPSTREAM_DEPT"] ?? upstreamDeptOptions;
 
   if (needsBusinessOptions && (optionLoad.loading || (!configuredOptions && !optionLoad.error))) {
-    return <LoadingState title="加载上游业务候选" desc="正在读取已配置的数据库类型和业务部门。" />;
+    return <div className="upstream-state-page"><LoadingState title="加载上游业务候选" desc="正在读取已配置的数据库类型和业务部门。" /></div>;
   }
   if (needsBusinessOptions && optionLoad.error) {
     return (
-      <ErrorState
-        title="上游业务候选加载失败"
-        desc={optionLoad.error}
-        onRetry={() => { void optionLoad.reload(); }}
-      />
+      <div className="upstream-state-page">
+        <ErrorState
+          title="上游业务候选加载失败"
+          desc={optionLoad.error}
+          onRetry={() => { void optionLoad.reload(); }}
+        />
+      </div>
     );
   }
   if (
@@ -152,17 +154,19 @@ export function UpstreamView({
       ? "数据库类型分类不存在或未启用"
       : "数据库类型分类没有启用项";
     return (
-      <ErrorState
-        title="上游数据库类型尚未配置"
-        desc={`${categoryState}；请先维护真实码值后重试，不会回退到 Demo 候选。`}
-        onRetry={() => { void optionLoad.reload(); }}
-      />
+      <div className="upstream-state-page">
+        <ErrorState
+          title="上游数据库类型尚未配置"
+          desc={`${categoryState}；请先维护真实码值后重试，不会回退到 Demo 候选。`}
+          onRetry={() => { void optionLoad.reload(); }}
+        />
+      </div>
     );
   }
 
   if (upstreamLoading && !upstreamLoaded && !["detail", "edit"].includes(upRoute.page)) {
     return (
-      <>
+      <div className="upstream-state-page">
         <LoadingState
           title="加载上游卸数配置"
           desc="正在准备系统清单和卸数计划。"
@@ -174,16 +178,17 @@ export function UpstreamView({
             pageSize={upstreamPageSize}
             total={upstreamTotal}
             loading
+            className="upstream-pagination"
             onPageChange={setUpstreamPage}
             onPageSizeChange={setUpstreamPageSize}
           />
         ) : null}
-      </>
+      </div>
     );
   }
   if (upstreamError && !["detail", "edit"].includes(upRoute.page)) {
     return (
-      <>
+      <div className="upstream-state-page">
         <ErrorState
           title="上游卸数加载失败"
           desc={upstreamError}
@@ -196,88 +201,96 @@ export function UpstreamView({
             pageSize={upstreamPageSize}
             total={upstreamTotal}
             disabled
+            className="upstream-pagination"
             onPageChange={setUpstreamPage}
             onPageSizeChange={setUpstreamPageSize}
           />
         ) : null}
-      </>
+      </div>
     );
   }
   if (!canEdit && ["new", "edit"].includes(upRoute.page)) {
     return (
-      <EmptyState
-        title="当前页面需要上游系统维护权限"
-        desc="上游系统目录可以公开浏览，新增和编辑需要相应写权限。"
-      />
+      <div className="upstream-state-page">
+        <EmptyState
+          title="当前页面需要上游系统维护权限"
+          desc="上游系统目录可以公开浏览，新增和编辑需要相应写权限。"
+        />
+      </div>
     );
   }
   if (upRoute.page === "list") {
     return (
       <div aria-busy={upstreamLoading}>
-      <UpstreamList
-        systems={filteredUpstreamSystems}
-        total={upstreamTotal}
-        pendingIds={upstreamPendingIds}
-        query={query}
-        view={upstreamView as ViewMode}
-        onChangeView={setUpstreamView}
-        onOpen={upOpen}
-        onEdit={
-          canEdit
-            ? (id) => requireLogin(() => upGoEdit(id), "upstream:write")
-            : undefined
-        }
-        canEdit={canEdit}
-        onNew={
-          canEdit
-            ? () =>
-                requireLogin(
-                  () => setUpRoute({ page: "new", id: null }),
-                  "upstream:write",
-                )
-            : undefined
-        }
-        onToggle={handleToggleUpstream}
-        onViewTables={onViewTables}
-        sort={upstreamSort}
-        onSortChange={setUpstreamSort}
-      />
-      <TablePagination
-        ariaLabel="上游系统分页"
-        page={upstreamPage}
-        pageSize={upstreamPageSize}
-        total={upstreamTotal}
-        loading={upstreamLoading}
-        onPageChange={setUpstreamPage}
-        onPageSizeChange={(nextPageSize) => {
-          setUpstreamPage(1);
-          setUpstreamPageSize(nextPageSize);
-        }}
-      />
+        <UpstreamList
+          systems={filteredUpstreamSystems}
+          total={upstreamTotal}
+          pendingIds={upstreamPendingIds}
+          query={query}
+          view={upstreamView as ViewMode}
+          onChangeView={setUpstreamView}
+          onOpen={upOpen}
+          onEdit={
+            canEdit
+              ? (id) => requireLogin(() => upGoEdit(id), "upstream:write")
+              : undefined
+          }
+          canEdit={canEdit}
+          onNew={
+            canEdit
+              ? () =>
+                  requireLogin(
+                    () => setUpRoute({ page: "new", id: null }),
+                    "upstream:write",
+                  )
+              : undefined
+          }
+          onToggle={handleToggleUpstream}
+          onViewTables={onViewTables}
+          sort={upstreamSort}
+          onSortChange={setUpstreamSort}
+        />
+        <TablePagination
+          ariaLabel="上游系统分页"
+          page={upstreamPage}
+          pageSize={upstreamPageSize}
+          total={upstreamTotal}
+          loading={upstreamLoading}
+          className="upstream-pagination"
+          onPageChange={setUpstreamPage}
+          onPageSizeChange={(nextPageSize) => {
+            setUpstreamPage(1);
+            setUpstreamPageSize(nextPageSize);
+          }}
+        />
       </div>
     );
   }
   if (upRoute.page === "detail") {
     if (upstreamDetailLoading) {
       return (
-        <LoadingState
-          title="加载上游系统详情"
-          desc="正在准备系统连接和卸数时间点。"
-        />
+        <div className="upstream-detail-page upstream-state-page">
+          <LoadingState
+            title="加载上游系统详情"
+            desc="正在准备系统连接和卸数时间点。"
+          />
+        </div>
       );
     }
     if (upstreamError) {
       return (
-        <ErrorState
-          title="上游系统详情加载失败"
-          desc={upstreamError}
-          onRetry={() => loadUpstreamDetail(upRoute.id || "")}
-        />
+        <div className="upstream-detail-page upstream-state-page">
+          <ErrorState
+            title="上游系统详情加载失败"
+            desc={upstreamError}
+            onRetry={() => loadUpstreamDetail(upRoute.id || "")}
+          />
+        </div>
       );
     }
     if (!currentUpstream) {
       return (
-        <div className="empty">
+        <div className="empty upstream-detail-page">
           <div className="ec">
             <Icon name="inbox" size={26} />
           </div>
@@ -323,24 +336,28 @@ export function UpstreamView({
   if (upRoute.page === "edit") {
     if (upstreamDetailLoading && !currentUpstreamEdit) {
       return (
-        <LoadingState
-          title="加载编辑页"
-          desc="正在准备系统元数据和卸数配置。"
-        />
+        <div className="upstream-editor-page upstream-state-page">
+          <LoadingState
+            title="加载编辑页"
+            desc="正在准备系统元数据和卸数配置。"
+          />
+        </div>
       );
     }
     if (upstreamError && !currentUpstreamEdit) {
       return (
-        <ErrorState
-          title="编辑页加载失败"
-          desc={upstreamError}
-          onRetry={() => loadUpstreamDetail(upRoute.id || "")}
-        />
+        <div className="upstream-editor-page upstream-state-page">
+          <ErrorState
+            title="编辑页加载失败"
+            desc={upstreamError}
+            onRetry={() => loadUpstreamDetail(upRoute.id || "")}
+          />
+        </div>
       );
     }
     if (!currentUpstreamEdit) {
       return (
-        <div className="empty">
+        <div className="empty upstream-editor-page">
           <div className="ec">
             <Icon name="inbox" size={26} />
           </div>
@@ -370,7 +387,7 @@ export function UpstreamView({
     );
   }
   return (
-    <div className="empty">
+    <div className="empty upstream-state-page">
       <div className="ec">
         <Icon name="inbox" size={26} />
       </div>

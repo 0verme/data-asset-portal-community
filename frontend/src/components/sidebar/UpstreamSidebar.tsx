@@ -5,6 +5,7 @@ import { DEFAULT_UP_FILTER } from "../../config/defaults.ts";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.tsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.tsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.tsx";
+import { Icon } from "../ui.tsx";
 
 export interface UpstreamSidebarProps {
   upstream: UseUpstreamModuleResult;
@@ -24,9 +25,11 @@ export function UpstreamSidebar({ upstream, statusOptions, requireLogin, canEdit
     enabled: upstreamFacets.status[enabledValue] || 0,
     disabled: upstreamFacets.status[disabledValue] || 0,
   };
+  const hasActiveFilters = Boolean(upFilter.dbType)
+    || upFilter.status !== DEFAULT_UP_FILTER.status;
 
   return (
-    <>
+    <div className="upstream-sidebar">
       <SidebarFilterGroup
         title="数据库类型"
         allOption={{
@@ -61,6 +64,17 @@ export function UpstreamSidebar({ upstream, statusOptions, requireLogin, canEdit
         onChange={(status) => setUpFilter((prev: UpstreamFilter) => ({ ...prev, status }))}
       />
 
+      <div className="upstream-sidebar-filter-tools">
+        <button
+          className="upstream-clear-filter"
+          type="button"
+          disabled={!hasActiveFilters}
+          onClick={() => setUpFilter(() => ({ ...DEFAULT_UP_FILTER }))}
+        >
+          <Icon name="close" size={13} />清空筛选
+        </button>
+      </div>
+
       <SidebarActionGroup
         actions={canEdit ? [{
           key: "create-upstream",
@@ -68,6 +82,6 @@ export function UpstreamSidebar({ upstream, statusOptions, requireLogin, canEdit
           onClick: () => requireLogin(() => setUpRoute({ page: "new", id: null })),
         }] : []}
       />
-    </>
+    </div>
   );
 }
