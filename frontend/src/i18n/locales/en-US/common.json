@@ -301,9 +301,9 @@
   "pagination": {
     "label": "Table pagination",
     "range": "{{first}}–{{last}} of {{total}}",
-    "size": "Rows per page",
+    "size": "Show",
     "sizeLabel": "Rows per page",
-    "unit": "",
+    "unit": "rows",
     "pages": "Pages",
     "previous": "Previous",
     "next": "Next"

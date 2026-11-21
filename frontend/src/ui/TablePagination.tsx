@@ -39,8 +39,6 @@ export function TablePagination({
   const controlsDisabled = disabled;
   const rootClassName = ["dap-table-pagination", className].filter(Boolean).join(" ");
 
-  const unit = t("pagination.unit");
-
   return (
     <nav
       className={rootClassName}
@@ -69,7 +67,7 @@ export function TablePagination({
               onPageSizeChange(value);
             }}
           />
-          {unit && <span>{unit}</span>}
+          <span>{t("pagination.unit")}</span>
         </label>
         <div className="dap-table-pagination__page-controls" role="group" aria-label={t("pagination.pages")}>
           <Button

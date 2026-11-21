@@ -151,6 +151,7 @@ test("data warehouse views, detail, DDL, risks, and editors stay consistent at t
   await expectNoPageOverflow(page);
   await capture(page, info, "warehouse-english-list-390x844");
   const pager = page.getByRole("navigation", { name: "Data warehouse asset table pagination" });
+  await expect(pager.locator(".dap-table-pagination__size-group")).toHaveText(/Show\s*20\s*rows/);
   await pager.getByRole("button", { name: "Next" }).click();
   await expect(pager).toContainText("21–40 of 224");
   await page.goto(`${ASSET_PATH}/${ASSET_NAME}`);
