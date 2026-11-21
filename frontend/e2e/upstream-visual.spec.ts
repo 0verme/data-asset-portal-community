@@ -47,6 +47,15 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
     expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport + 1);
   };
 
+  const expectSharedNavigationShape = async (): Promise<void> => {
+    const shape = await page.locator("nav.mainnav").first().evaluate((nav) => ({
+      containerRadius: getComputedStyle(nav).borderRadius,
+      itemRadius: getComputedStyle(nav.querySelector("button")!).borderRadius,
+      gap: getComputedStyle(nav).gap,
+    }));
+    expect(shape).toEqual({ containerRadius: "999px", itemRadius: "999px", gap: "0px" });
+  };
+
   for (const size of [
     { name: "1920x1080", width: 1920, height: 1080 },
     { name: "2560x1440", width: 2560, height: 1440 },
@@ -58,6 +67,7 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
 
     await page.goto("/upstream?view=list");
     await expect(page.locator(".upstream-list-page .page-title")).toBeVisible({ timeout: 20_000 });
+    await expectSharedNavigationShape();
     const listMode = page.locator(".upstream-list-page .seg").getByRole("button", { name: "列表", exact: true });
     await listMode.click();
     await expect(listMode).toHaveAttribute("aria-pressed", "true");

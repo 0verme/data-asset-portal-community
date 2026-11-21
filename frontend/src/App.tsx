@@ -788,7 +788,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
   const moduleSidebar = editorAccessDenied ? null : <ModuleSidebar module={module} context={moduleContext} />;
 
   const footer = (
-    <footer className={isHome ? "app-footer-shell portal-home-footer" : "app-footer-shell"} role="contentinfo">
+    <footer className="app-footer-shell" role="contentinfo">
       <div className="app-footer">
         <span className="app-footer-copy">
           {isHome ? branding.site.display_name : branding.site.title}{" "}
@@ -801,7 +801,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
             {APP_RELEASE_METADATA.version}
           </a>
         </span>
-        <span className="app-footer-separator" aria-hidden="true">{isHome ? "|" : "·"}</span>
+        <span className="app-footer-separator" aria-hidden="true">·</span>
         <a
           className="app-footer-link"
           href={APP_RELEASE_METADATA.repositoryUrl}

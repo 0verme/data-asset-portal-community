@@ -737,7 +737,7 @@ jobs:
         env:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/upstream-workspace-visual-playwright
           VITE_API_MODE: mock
-        run: npm run test:browser -- e2e/upstream-visual.spec.ts --project=chromium --workers=1
+        run: npm run test:browser -- e2e/upstream-visual.spec.ts e2e/shared-shell-visual.spec.ts --project=chromium --workers=1
 
       - name: Field-mapping mock CSV column regression (Chromium and WebKit)
         if: matrix.lane == 'a'
@@ -838,7 +838,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: upstream-workspace-visual-screenshots
-          path: ${{ runner.temp }}/upstream-workspace-visual-playwright/**/upstream-*.png
+          path: |
+            ${{ runner.temp }}/upstream-workspace-visual-playwright/**/upstream-*.png
+            ${{ runner.temp }}/upstream-workspace-visual-playwright/**/shared-shell-*.png
           if-no-files-found: ignore
 
       - name: Upload failed Appearance traces
