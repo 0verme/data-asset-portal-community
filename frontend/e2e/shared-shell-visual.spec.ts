@@ -84,6 +84,9 @@ test("shared capsule navigation matches across home and business modules", async
       const header = page.locator("header.topbar");
       const nav = page.locator(".topbar-nav-slot > .mainnav:not(.mainnav-measure)");
 
+      await expect(header).toHaveCSS("border-bottom-width", "0px");
+      await expect(header).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+
       if (viewport.width >= 769) {
         await expect(nav).toBeVisible();
         await expect(nav.getByRole("button", { name: "数据仓库", exact: true })).toBeVisible();
@@ -134,7 +137,7 @@ test("shared capsule navigation matches across home and business modules", async
           else sharedActiveStyle = selectedStyle;
         }
 
-        await nav.screenshot({
+        await page.screenshot({
           path: info.outputPath(`shared-shell-header-${route.name}-${viewport.name}.png`),
           animations: "disabled",
         });
@@ -162,7 +165,7 @@ test("shared capsule navigation matches across home and business modules", async
         expect(geometry.brandRight).toBeLessThanOrEqual(geometry.actionsLeft);
         expect(geometry.actionsRight).toBeLessThanOrEqual(viewport.width);
 
-        await page.locator("header.topbar").screenshot({
+        await page.screenshot({
           path: info.outputPath(`shared-shell-header-${route.name}-${viewport.name}.png`),
           animations: "disabled",
         });
@@ -254,7 +257,7 @@ test("shared footer matches on home, upstream, and warehouse across themes and s
         const sharedStyle = sharedFooterStyles.get(styleKey);
         if (sharedStyle) expect(sample.style).toEqual(sharedStyle);
         else sharedFooterStyles.set(styleKey, sample.style);
-        expect(sample.style.border).toContain("1px solid");
+        expect(sample.style.border).toContain("0px none");
         expect(sample.style.position).toBe("static");
         expect(sample.geometry.documentWidth).toBeLessThanOrEqual(viewport.width + 1);
         expect(sample.geometry.shellLeft).toBeGreaterThanOrEqual(0);
@@ -271,7 +274,7 @@ test("shared footer matches on home, upstream, and warehouse across themes and s
         }
 
         if (theme === "light") {
-          await footer.screenshot({
+          await page.screenshot({
             path: info.outputPath(`shared-shell-footer-${route.name}-${viewport.name}.png`),
             animations: "disabled",
           });

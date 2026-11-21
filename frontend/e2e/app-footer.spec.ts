@@ -204,8 +204,8 @@ test("homepage footer shares the global footer treatment and follows its content
   await expect(copy).toHaveText(/^数据资产门户 v\d+\.\d+\.\d+$/);
   await expect(release).toHaveAttribute("href", /^https:\/\/github\.com\/0verme\/data-asset-portal-community\/releases\/tag\/v\d+\.\d+\.\d+$/);
   await expect(footer.locator(".app-footer-separator")).toHaveText("·");
-  await expect(footer).toHaveCSS("border-top-width", "1px");
-  await expect(footer).toHaveCSS("border-top-style", "solid");
+  await expect(footer).toHaveCSS("border-top-width", "0px");
+  await expect(footer).toHaveCSS("border-top-style", "none");
   await expect(link).toHaveAttribute("href", "https://github.com/0verme/data-asset-portal-community");
   await expect(footer).toBeInViewport({ ratio: 1 });
   const shortFooter = (await footer.boundingBox())!;
@@ -293,6 +293,6 @@ test("homepage footer shares the global footer treatment and follows its content
 
   await page.goto("/no-such-page");
   await expect(page.getByRole("heading", { name: /404/ })).toBeVisible();
-  await expect(page.locator(".app > .app-footer-shell")).toHaveCSS("border-top-width", "1px");
+  await expect(page.locator(".app > .app-footer-shell")).toHaveCSS("border-top-width", "0px");
   await expect(page.locator(".portal-home-footer")).toHaveCount(0);
 });

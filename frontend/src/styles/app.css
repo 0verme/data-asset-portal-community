@@ -155,8 +155,8 @@
     gap: 16px;
     min-width: 0;
     padding: 0 24px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--line);
+    background: transparent;
+    border: 0;
     z-index: 20;
   }
   .topbar-brand { display: flex; align-items: center; gap: 12px; min-width: max-content; flex: 0 0 auto; }
@@ -667,7 +667,7 @@
     justify-content: center;
     margin-top: 16px;
     padding: 8px 24px max(8px, env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
+    border: 0;
     background: transparent;
   }
   .app-footer {
@@ -3351,8 +3351,6 @@
     padding: 0;
     grid-template-columns: var(--portal-header-side) minmax(0, 1fr) var(--portal-header-side);
     gap: 13px;
-    background: transparent;
-    border: 0;
   }
   .portal-home-topbar .topbar-brand,
   .portal-home-topbar .brand { min-width: 0; }
@@ -3409,7 +3407,6 @@
       width: 100%;
       min-height: 0;
       margin: 0;
-      border-bottom: 1px solid transparent;
     }
     .portal-home-topbar ~ .body .sidebar { display: block; }
 
