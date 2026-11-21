@@ -207,7 +207,7 @@ test("shared footer matches on home, upstream, and warehouse across themes and s
         await expect(footer.locator(".app-footer-copy")).toContainText("数据资产门户");
         await expect(release).toHaveAttribute("href", /^https:\/\/github\.com\/0verme\/data-asset-portal-community\/releases\/tag\/v\d+\.\d+\.\d+$/);
         await expect(github).toHaveAttribute("href", "https://github.com/0verme/data-asset-portal-community");
-        await expect(footer.locator(".app-footer-separator")).toHaveText("·");
+        await expect(footer.locator(".app-footer-separator")).toHaveCount(0);
 
         await page.mouse.move(0, 0);
         await footer.scrollIntoViewIfNeeded();

@@ -19,7 +19,7 @@ test("application footer keeps the version and exposes the project GitHub link",
     /<a\s+className="app-footer-link"\s+href=\{APP_RELEASE_METADATA\.repositoryUrl\}\s+target="_blank"\s+rel="noopener noreferrer"[\s\S]*?GitHub ↗/
   );
   assert.match(app, /<footer className="app-footer-shell" role="contentinfo">/);
-  assert.match(app, /<span className="app-footer-separator" aria-hidden="true">·<\/span>/);
+  assert.doesNotMatch(app, /app-footer-separator/);
   assert.doesNotMatch(defaults, /APP_VERSION|V\d+\.\d+\.\d+/);
   assert.match(releaseMetadata, /Object\.freeze\(__DAP_RELEASE_METADATA__\)/);
   assert.match(styles, /\.app-footer-shell \{[\s\S]*?border-top: 1px solid var\(--line\);[\s\S]*?background: transparent;/);

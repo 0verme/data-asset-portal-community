@@ -801,7 +801,6 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
             {APP_RELEASE_METADATA.version}
           </a>
         </span>
-        <span className="app-footer-separator" aria-hidden="true">·</span>
         <a
           className="app-footer-link"
           href={APP_RELEASE_METADATA.repositoryUrl}

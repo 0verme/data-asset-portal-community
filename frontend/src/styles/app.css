@@ -693,9 +693,6 @@
     font-weight: 500;
     overflow-wrap: anywhere;
   }
-  .app-footer-separator {
-    color: var(--line-strong);
-  }
   .app-footer-version,
   .app-footer-link {
     color: var(--ink-2);
