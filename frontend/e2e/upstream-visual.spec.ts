@@ -165,6 +165,18 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
     await expect(page.locator("html")).toHaveAttribute("data-theme", saved.themeMode);
     await expect(page.locator("html")).toHaveAttribute("data-density", saved.density);
     await expect(page.locator(".upstream-list-page .tcard").first()).toBeVisible();
+    const themeAccent = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      probe.style.color = "var(--accent)";
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+    const activeFilter = page.locator(".upstream-sidebar .side-item.active").first();
+    await expect(activeFilter).toHaveCSS("color", themeAccent);
+    expect(await activeFilter.evaluate((el) => getComputedStyle(el, "::before").backgroundColor)).toBe(themeAccent);
+    await expect(summary.locator(".upstream-summary-types strong")).toHaveCSS("color", themeAccent);
     await screenshot(`upstream-cards-${name}`);
   }
 

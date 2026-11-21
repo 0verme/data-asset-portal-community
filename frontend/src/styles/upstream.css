@@ -1231,8 +1231,6 @@
   }
 }
 .upstream-sidebar {
-  --rail-purple: #6b5ca5;
-  --rail-tint: color-mix(in srgb, var(--rail-purple) 12%, transparent);
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -1240,10 +1238,9 @@
   padding: 16px 10px 10px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: linear-gradient(155deg, var(--surface), color-mix(in srgb, var(--surface) 95%, var(--rail-purple)));
+  background: linear-gradient(155deg, var(--surface), color-mix(in srgb, var(--surface) 95%, var(--accent)));
   box-shadow: var(--shadow-sm);
 }
-[data-theme="dark"] .upstream-sidebar { --rail-purple: #a78bfa; }
 .upstream-sidebar-heading { margin: 0 6px 12px; font-size: 16px; color: var(--ink); }
 .upstream-sidebar-heading small { margin-left: 5px; color: var(--ink-3); font-size: 10px; letter-spacing: .1em; }
 .upstream-sidebar-menu { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 3px; }
@@ -1251,10 +1248,10 @@
 .upstream-sidebar .side-title { margin: 0 0 4px; padding-inline: 8px; }
 .upstream-sidebar .side-group + .side-group { padding-top: 12px; border-top: 1px solid var(--line); }
 .upstream-sidebar .side-item { min-height: 37px; padding: 6px 10px 6px 13px; margin-block: 1px; gap: 8px; }
-.upstream-sidebar .side-item.active { color: var(--rail-purple); background: var(--rail-tint); }
-.upstream-sidebar .side-item.active::before { content: ""; position: absolute; inset: 7px auto 7px 0; width: 3px; border-radius: 4px; background: var(--rail-purple); }
+.upstream-sidebar .side-item.active { color: var(--accent); background: var(--accent-soft); }
+.upstream-sidebar .side-item.active::before { content: ""; position: absolute; inset: 7px auto 7px 0; width: 3px; border-radius: 4px; background: var(--accent); }
 .upstream-sidebar .side-item .count { min-width: 24px; text-align: center; font-variant-numeric: tabular-nums; }
-.upstream-sidebar .side-item.active .count { color: inherit; border: 1px solid var(--rail-tint); background: var(--surface); border-radius: 7px; }
+.upstream-sidebar .side-item.active .count { color: inherit; border: 1px solid var(--accent-line); background: var(--surface); border-radius: 7px; }
 .upstream-sidebar .upstream-sidebar-filter-tools { margin: 0 0 8px; }
 .upstream-summary {
   flex: none;
@@ -1263,7 +1260,7 @@
   border-radius: 15px;
   border: 1px solid var(--line);
   background: var(--surface);
-  background: linear-gradient(130deg, color-mix(in srgb, var(--surface) 88%, transparent), var(--rail-tint));
+  background: linear-gradient(130deg, color-mix(in srgb, var(--surface) 88%, transparent), var(--accent-soft));
   backdrop-filter: blur(12px);
   box-shadow: var(--shadow-sm);
 }
@@ -1271,9 +1268,9 @@
 .upstream-summary-number { margin-top: 8px; color: var(--ink); font-size: 30px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .upstream-summary-number small { font-size: 17px; color: var(--ink-3); }
 .upstream-summary p, .upstream-summary-types { margin-top: 6px; font-size: 12px; color: var(--ink-2); }
-.upstream-summary progress { display: block; width: 100%; height: 6px; margin-top: 10px; appearance: none; overflow: hidden; border: 0; border-radius: 6px; background: var(--rail-tint); }
+.upstream-summary progress { display: block; width: 100%; height: 6px; margin-top: 10px; appearance: none; overflow: hidden; border: 0; border-radius: 6px; background: var(--accent-soft); }
 .upstream-summary progress::-webkit-progress-bar { background: transparent; }
-.upstream-summary progress::-webkit-progress-value { background: var(--rail-purple); border-radius: inherit; }
-.upstream-summary progress::-moz-progress-bar { background: var(--rail-purple); border-radius: inherit; }
+.upstream-summary progress::-webkit-progress-value { background: var(--accent); border-radius: inherit; }
+.upstream-summary progress::-moz-progress-bar { background: var(--accent); border-radius: inherit; }
 .upstream-summary-types { display: flex; align-items: center; gap: 4px; padding-top: 8px; }
-.upstream-summary-types strong { color: var(--rail-purple); }
+.upstream-summary-types strong { color: var(--accent); }
