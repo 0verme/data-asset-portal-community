@@ -40,7 +40,6 @@
   "fieldCountValue_other": "{{count}} fields",
   "groupTableCount_one": "{{count}} table",
   "groupTableCount_other": "{{count}} tables",
-  "groupOwner": "{{owner}} · {{count}} fields",
   "groupOwnerUnknown": "{{owner}} · field count unknown",
   "emptyTitle": "No matching tables found",
   "emptyDescription": "No table names or fields match “{{query}}”. Try another keyword or clear the filters.",
@@ -127,7 +126,7 @@
     "editTitle": "Edit data table",
     "newTitle": "Add data table",
     "currentTable": "Current table: {{tableName}}",
-    "newDescription": "Add metadata and fields using the existing DWM asset structure.",
+    "newDescription": "Enter the table metadata and define its fields.",
     "validationSummaryTitle": "Fix the following issues",
     "basicInformation": "Basic information",
     "primaryKey": "Primary key",
@@ -176,7 +175,7 @@
     "removeField": "Remove field {{fieldName}}",
     "addField": "Add field",
     "editSaveNote": "Saving updates table metadata, fields, and the DDL view.",
-    "newSaveNote": "Saving adds this table to the current DWM asset list.",
+    "newSaveNote": "Saving adds this table to the data warehouse catalog.",
     "cancel": "Cancel",
     "save": "Save",
     "saving": "Saving…",
@@ -184,14 +183,15 @@
     "discardDescription": "This form has unsaved changes. Discard them and return?",
     "discardAction": "Discard changes",
     "continueEditing": "Continue editing",
-    "deleteTypeLabel": "Asset table",
     "deleteImpact": "Deleting this table may affect its field list, DDL, asset search, and history. Confirm that no downstream dependency remains.",
     "deleteConsequenceBackend": "The server remains the authority for deletion checks.",
     "deleteConsequenceResponse": "Any server reason that blocks deletion will be shown here.",
     "confirmDeleteKeyword": "Enter the table name to confirm",
     "dangerZone": "Danger zone",
     "deleteDescription": "Deleting an asset table affects its field list, DDL, and metadata history.",
-    "deleteTable": "Delete table"
+    "deleteTable": "Delete table",
+    "deleteTitle": "Delete this table?",
+    "confirmDelete": "Confirm deletion"
   },
   "validation": {
     "tableNameRequired": "Enter an English table name.",
@@ -217,5 +217,11 @@
     "numericPrecisionInvalid": "NUMERIC precision must be a positive integer",
     "numericScaleInvalid": "NUMERIC scale must be zero or a positive integer",
     "numericScaleTooLarge": "NUMERIC scale cannot exceed precision"
-  }
+  },
+  "retry": "Retry",
+  "emptyFilters": "No tables match the current filters.",
+  "saveFailed": "Could not save the table.",
+  "deleteFailed": "Could not delete the table.",
+  "groupOwner_one": "{{owner}} · {{count}} field",
+  "groupOwner_other": "{{owner}} · {{count}} fields"
 }

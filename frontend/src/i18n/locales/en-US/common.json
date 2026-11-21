@@ -296,5 +296,16 @@
     "loading": "Loading asset statistics…",
     "empty": "No asset statistics available",
     "error": "Could not load asset statistics"
+  },
+  "confirmKeywordHint": "Enter {{keyword}} to confirm deletion.",
+  "pagination": {
+    "label": "Table pagination",
+    "range": "{{first}}–{{last}} of {{total}}",
+    "size": "Rows per page",
+    "sizeLabel": "Rows per page",
+    "unit": "",
+    "pages": "Pages",
+    "previous": "Previous",
+    "next": "Next"
   }
 }

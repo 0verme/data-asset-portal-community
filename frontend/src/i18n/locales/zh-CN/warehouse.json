@@ -123,7 +123,7 @@
     "editTitle": "编辑数据表",
     "newTitle": "新增数据表",
     "currentTable": "当前表：{{tableName}}",
-    "newDescription": "按现有 DWM 数据资产结构补充元数据与字段信息。",
+    "newDescription": "填写数据表基本信息，并维护字段清单。",
     "validationSummaryTitle": "请先修正以下问题",
     "basicInformation": "基本信息",
     "primaryKey": "主键",
@@ -172,7 +172,7 @@
     "removeField": "删除字段 {{fieldName}}",
     "addField": "新增字段",
     "editSaveNote": "保存后会更新表元数据、字段列表和 DDL 展示。",
-    "newSaveNote": "保存后会加入当前 DWM 资产列表。",
+    "newSaveNote": "保存后，新表将加入数据仓库目录。",
     "cancel": "取消",
     "save": "保存",
     "saving": "保存中...",
@@ -180,14 +180,15 @@
     "discardDescription": "当前表单存在未保存内容，确认放弃并返回吗？",
     "discardAction": "放弃修改",
     "continueEditing": "继续编辑",
-    "deleteTypeLabel": "资产表",
     "deleteImpact": "该表删除后，可能影响字段清单、DDL 展示、资产检索和历史追溯。请确认没有下游依赖。",
     "deleteConsequenceBackend": "删除前应以后端校验为准。",
     "deleteConsequenceResponse": "若后端返回不可删除原因，页面会直接展示原因。",
     "confirmDeleteKeyword": "请输入表名二次确认",
     "dangerZone": "危险操作",
     "deleteDescription": "删除资产表会影响字段清单、DDL 展示和历史元数据追溯，请谨慎操作。",
-    "deleteTable": "删除表"
+    "deleteTable": "删除表",
+    "deleteTitle": "确认删除这张表？",
+    "confirmDelete": "确认删除"
   },
   "validation": {
     "tableNameRequired": "请输入表英文名。",
@@ -213,5 +214,9 @@
     "numericPrecisionInvalid": "NUMERIC precision 必须为正整数",
     "numericScaleInvalid": "NUMERIC scale 必须为 0 或正整数",
     "numericScaleTooLarge": "NUMERIC scale 不能大于 precision"
-  }
+  },
+  "retry": "重新加载",
+  "emptyFilters": "当前筛选条件下暂无数据表。",
+  "saveFailed": "保存表失败。",
+  "deleteFailed": "删除表失败。"
 }

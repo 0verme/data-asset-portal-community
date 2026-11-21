@@ -55,7 +55,9 @@ export function AssetDeleteZone({ name, onDelete }: AssetDeleteZoneProps) {
   const removeAsset = async () => {
     const confirmed = await confirmDeleteAction({
       name,
-      typeLabel: t("editor.deleteTypeLabel"),
+      title: t("editor.deleteTitle"),
+      confirmText: t("editor.confirmDelete"),
+      cancelText: t("editor.cancel"),
       impact: t("editor.deleteImpact"),
       consequences: [
         t("editor.deleteConsequenceBackend"),

@@ -16,7 +16,6 @@ import React, { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AssetTableField, AssetTableItem } from "../api/assets.ts";
-import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { Button, Input, Tabs } from "../ui/index.ts";
 import { getAssetFieldCount } from "../utils/assetFieldCount.ts";
 import { getQualifiedAssetTableName } from "../utils/assetTableName.ts";
@@ -282,9 +281,10 @@ export function DetailPage({
     <div className="asset-detail-page">
       <PageHeader
         back={{ onClick: onBack, text: t("backToList") }}
-        breadcrumbs={buildModuleBreadcrumbs("dwm", [
+        breadcrumbs={[
+          { label: t("menus.dwm", { ns: "navigation" }), onClick: onBackToList },
           { label: asset.name },
-        ], onBackToList)}
+        ]}
       />
 
       <div className="detail-head">
@@ -292,7 +292,7 @@ export function DetailPage({
           <div>
             <div className="dh-title">
               <Icon name="table" size={22} color="var(--ink-2)" />
-              <span className="dh-en">{asset.name}</span>
+              <h1 className="dh-en">{asset.name}</h1>
               <DomainBadge domain={getWarehouseDomainLabel(asset.domain, t)} />
               <LayerBadge layer={asset.layer} />
             </div>

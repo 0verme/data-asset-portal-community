@@ -296,5 +296,16 @@
     "loading": "正在加载资产统计…",
     "empty": "暂无资产统计",
     "error": "资产统计加载失败"
+  },
+  "confirmKeywordHint": "请输入 {{keyword}} 以确认删除。",
+  "pagination": {
+    "label": "表格分页",
+    "range": "第 {{first}}–{{last}} 条 / 共 {{total}} 条",
+    "size": "每页",
+    "sizeLabel": "每页条数",
+    "unit": "条",
+    "pages": "翻页",
+    "previous": "上一页",
+    "next": "下一页"
   }
 }

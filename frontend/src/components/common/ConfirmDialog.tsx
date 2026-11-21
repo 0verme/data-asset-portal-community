@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import React, { type ReactNode } from "react";
 
 import { Icon } from "../ui.tsx";
@@ -42,6 +43,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation("common");
   const titleId = React.useId();
   const cancelRef = React.useRef<HTMLButtonElement>(null);
   React.useEffect(() => {
@@ -125,7 +127,7 @@ export function ConfirmDialog({
               onChange={(event) => setKeywordValue(event.target.value)}
               disabled={pending}
             />
-            <div className="confirm-keyword-hint">请输入 {normalizedKeyword} 以确认删除。</div>
+            <div className="confirm-keyword-hint">{t("confirmKeywordHint", { keyword: normalizedKeyword })}</div>
           </div>
         ) : null}
         <div className="confirm-actions">

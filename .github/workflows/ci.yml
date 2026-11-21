@@ -716,7 +716,7 @@ jobs:
         env:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/catalog-pagination-playwright
           VITE_API_MODE: remote
-        run: npm run test:browser -- e2e/catalog-pagination.spec.ts --workers=2
+        run: npm run test:browser -- e2e/catalog-pagination.spec.ts e2e/warehouse-detail-remote.spec.ts --workers=2
 
       - name: Report long-form save feedback regression (Chromium and WebKit)
         if: matrix.lane == 'a'

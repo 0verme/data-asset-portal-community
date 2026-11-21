@@ -46,7 +46,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
     options: visibleLayers,
     selectedValue: selectedLayer,
     getValue: (layer) => layer.code,
-    getCount: (layer) => layer.count || 0,
+    getCount: (layer) => homeLoading || homeError ? "—" : layer.count || 0,
     onSelect: (nextValue) => {
       setSelectedLayer(nextValue);
       assetBack();
@@ -73,7 +73,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
     options: visibleDomains,
     selectedValue: domain,
     getValue: (item) => item,
-    getCount: (item) => domainCounts[item] || 0,
+    getCount: (item) => homeLoading || homeError ? "—" : domainCounts[item] || 0,
     getLabel: (item) => getWarehouseDomainLabel(item, t),
     onSelect: (nextValue) => {
       setDomain(nextValue);
@@ -81,7 +81,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
     },
   }).map((item) => ({
     ...item,
-    tooltip: item.key.length > 6 ? item.key : undefined,
+    tooltip: typeof item.label === "string" && item.label.length > 6 ? item.label : undefined,
   }));
 
   const showCreateInSidebar = canEdit && (
@@ -95,7 +95,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
         allOption={{
           key: "all-layers",
           label: t("allLayers"),
-          count: Object.values(layerCounts).reduce(
+          count: homeLoading || homeError ? "—" : Object.values(layerCounts).reduce(
             (total, count) => total + count,
             0,
           ),
@@ -113,7 +113,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
         allOption={{
           key: "all-domains",
           label: t("allDomains"),
-          count: Object.values(domainCounts).reduce(
+          count: homeLoading || homeError ? "—" : Object.values(domainCounts).reduce(
             (total, count) => total + count,
             0,
           ),

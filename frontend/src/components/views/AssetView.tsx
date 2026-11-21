@@ -22,6 +22,7 @@ import { DetailPage } from "../DetailPage.tsx";
 import { HomePage } from "../HomePage.tsx";
 import { TableEditor } from "../TableEditor.tsx";
 import {
+  Button,
   EmptyState as AdapterEmptyState,
   ErrorState as AdapterErrorState,
   LoadingState as AdapterLoadingState,
@@ -131,6 +132,7 @@ export function AssetView({
           <AdapterErrorState
             title={t("listErrorTitle")}
             desc={homeError}
+            retryText={t("retry")}
             onRetry={loadHomeData}
           />
           <TablePagination
@@ -149,12 +151,12 @@ export function AssetView({
       <div className="asset-page">
         <div className="page-head">
           <div>
-            <div className="page-title">
-              <span className="pt-code">DATA</span>{t("pageTitle")}
-            </div>
+            <h1 className="page-title">
+              <Icon name="table" size={21} />{t("pageTitle")}
+            </h1>
             <div className="page-sub">
               {t("tableCountPrefix")}<b>{totalTables}</b>{t("tableCountSuffix", { count: totalTables })}
-              {selectedLayer ? <>{t("layerSummary", { layer: getWarehouseLayerLabel(selectedLayer, selectedLayer, t) })}</> : null}
+              {selectedLayer ? <>{t("layerSummary", { layer: getWarehouseLayerLabel(selectedLayer, visibleLayers.find((layer) => layer.code === selectedLayer)?.cn ?? selectedLayer, t) })}</> : null}
               {domain ? <>{t("domainSummary", { domain: getWarehouseDomainLabel(domain, t) })}</> : null}
               {query ? <>{t("querySummary", { query })}</> : null}
             </div>
@@ -162,14 +164,15 @@ export function AssetView({
           <div className="head-actions">
             <AssetViewModeSwitcher value={layout as ViewMode} onChange={setLayout} />
             {canEdit ? (
-              <button
+              <Button
+                variant="primary"
                 className="btn primary"
                 type="button"
                 onClick={assetCreate}
               >
                 <Icon name="plus" size={15} />
                 {t("addTable")}
-              </button>
+              </Button>
             ) : null}
           </div>
         </div>
@@ -209,6 +212,7 @@ export function AssetView({
         <AdapterErrorState
           title={t("detailErrorTitle")}
           desc={detailError}
+          retryText={t("retry")}
           onRetry={() => loadDetailData({ assetId: route.assetId, tableName: routeTable })}
         />
       );
@@ -246,6 +250,7 @@ export function AssetView({
         <AdapterErrorState
           title={t("editorErrorTitle")}
           desc={detailError}
+          retryText={t("retry")}
           onRetry={() => loadDetailData({ assetId: route.assetId, tableName: routeTable })}
         />
       );

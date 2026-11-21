@@ -41,7 +41,7 @@ async function focusFirstDetailActionByTab(page: Page) {
 }
 
 test("list, card, and group detail actions are reachable with Tab and activate once with Enter or Space", async ({ page }) => {
-  for (const [layout, key] of [["list", "Enter"], ["card", "Space"], ["group", "Enter"]] as const) {
+  for (const [layout, key] of [["list", "Enter"], ["card", "Enter"], ["card", "Space"], ["group", "Enter"]] as const) {
     await openFilteredView(page, layout);
     const trigger = await focusFirstDetailActionByTab(page);
     await expect(trigger).toBeFocused();
@@ -94,6 +94,7 @@ test("warehouse field types meet AA contrast in light mode without changing down
     const second = luminance(background);
     return { color, ink, ratio: (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05) };
   });
+  console.log("Warehouse field type contrast", contrast);
   expect(contrast.color).toBe(contrast.ink);
   expect(contrast.ratio).toBeGreaterThanOrEqual(4.5);
 

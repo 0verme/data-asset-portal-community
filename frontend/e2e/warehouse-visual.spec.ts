@@ -31,14 +31,16 @@ async function expectNoPageOverflow(page: Page) {
   const width = await page.evaluate(() => ({
     viewport: window.innerWidth,
     document: document.documentElement.scrollWidth,
+    main: document.querySelector("main")!.scrollWidth - document.querySelector("main")!.clientWidth,
     content: document.querySelector(".main-inner")?.getBoundingClientRect().width ?? 0,
   }));
   expect(width.document).toBeLessThanOrEqual(width.viewport + 1);
+  expect(width.main).toBeLessThanOrEqual(1);
   if (width.viewport > 1320) expect(width.content).toBeLessThanOrEqual(1321);
 }
 
 async function capture(page: Page, info: TestInfo, name: string) {
-  await page.locator(".main-inner").evaluate((element) => element.scrollTo(0, 0));
+  await page.locator("main").evaluate((element) => element.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath(`${name}.png`),
     fullPage: true,
@@ -148,4 +150,25 @@ test("data warehouse views, detail, DDL, risks, and editors stay consistent at t
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoPageOverflow(page);
   await capture(page, info, "warehouse-english-list-390x844");
+  const pager = page.getByRole("navigation", { name: "Data warehouse asset table pagination" });
+  await pager.getByRole("button", { name: "Next" }).click();
+  await expect(pager).toContainText("21–40 of 224");
+  await page.goto(`${ASSET_PATH}/${ASSET_NAME}`);
+  await expect(page.getByRole("button", { name: "Edit table" })).toBeVisible();
+  await expectNoPageOverflow(page);
+  await capture(page, info, "warehouse-english-detail-390x844");
+  await page.getByRole("button", { name: "Edit table" }).click();
+  await expect(page.getByRole("combobox", { name: "Subject area" })).toHaveText("Transactions");
+  await page.getByRole("button", { name: "Delete table" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText("Enter the table name to confirm");
+  await expect(dialog.getByRole("button", { name: "Confirm deletion" })).toBeDisabled();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await page.goto(`${ASSET_PATH}/new`);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Enter an English table name.", { exact: true }).first()).toBeVisible();
+  await expectNoPageOverflow(page);
+  const summary = page.locator(".dap-ui-form-error-summary");
+  expect(await summary.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await capture(page, info, "warehouse-english-validation-390x844");
 });

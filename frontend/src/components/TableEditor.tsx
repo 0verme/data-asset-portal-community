@@ -25,8 +25,8 @@ import {
   buildColumnType,
   parseColumnType,
 } from "../constants/dataTypes.ts";
+import { getQualifiedAssetTableName } from "../utils/assetTableName.ts";
 import { LAYER_OPTIONS, type LayerOption } from "../config/assets.ts";
-import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { PageHeader } from "./common/index.ts";
 import {
   Button,
@@ -38,7 +38,7 @@ import {
   Select,
   Textarea,
 } from "../ui/index.ts";
-import { getTableFieldLabel, validateTableForm, type TableFormTranslator, type TableRowErrors, type TableValidation } from "./tableFormErrors.ts";
+import { getTableFieldLabel, validateTableForm, type TableRowErrors, type TableValidation } from "./tableFormErrors.ts";
 import { AssetDeleteZone, AssetEditorActionBar } from "./views/asset/AssetEditorActions.tsx";
 import { getWarehouseDomainLabel, getWarehouseLayerLabel } from "./warehouseLabels.ts";
 import { Icon } from "./ui.tsx";
@@ -181,10 +181,6 @@ export function TableEditor({
   onDelete,
 }: TableEditorProps) {
   const { t } = useTranslation("warehouse");
-  const translate = React.useCallback<TableFormTranslator>(
-    (key, values) => String(t(key as never, values as never)),
-    [t],
-  );
   const isEdit = mode === "edit";
   const oldName = initial?.name || "";
   const [form, setForm] = React.useState<TableFormData>(() =>
@@ -207,8 +203,8 @@ export function TableEditor({
   }, [defaultLayer, initial]);
 
   const validation = React.useMemo(
-    () => touched ? validateTableForm(form, existingNames, oldName, translate) : EMPTY_TABLE_VALIDATION,
-    [existingNames, form, oldName, touched, translate],
+    () => touched ? validateTableForm(form, existingNames, oldName, t) : EMPTY_TABLE_VALIDATION,
+    [existingNames, form, oldName, touched, t],
   );
 
   React.useLayoutEffect(() => {
@@ -263,7 +259,7 @@ export function TableEditor({
   };
 
   const save = async (): Promise<void> => {
-    const nextValidation = validateTableForm(form, existingNames, oldName, translate);
+    const nextValidation = validateTableForm(form, existingNames, oldName, t);
     const hasErrors = Object.keys(nextValidation.formFields).length > 0;
     setTouched(true);
     if (hasErrors || saving) {
@@ -313,19 +309,16 @@ export function TableEditor({
     <div id={TABLE_FORM_ID} ref={formRef} className="asset-editor-page">
       <PageHeader
         back={{ onClick: onCancel, text: isEdit ? t("editor.backToDetail") : t("backToList") }}
-        breadcrumbs={buildModuleBreadcrumbs(
-          "dwm",
-          [
-            ...(isEdit ? [{ label: oldName, onClick: onBackToDetail }] : []),
-            { label: isEdit ? t("editTable") : t("addTable") },
-          ],
-          onBackToList,
-        )}
+        breadcrumbs={[
+          { label: t("menus.dwm", { ns: "navigation" }), onClick: onBackToList },
+          ...(isEdit ? [{ label: oldName, onClick: onBackToDetail }] : []),
+          { label: isEdit ? t("editTable") : t("addTable") },
+        ]}
         icon={isEdit ? "edit" : "plus"}
         title={isEdit ? t("editor.editTitle") : t("editor.newTitle")}
         subtitle={
           isEdit
-            ? t("editor.currentTable", { tableName: `dwm.${oldName}` })
+            ? t("editor.currentTable", { tableName: getQualifiedAssetTableName(oldName, initial?.schema) })
             : t("editor.newDescription")
         }
       />
@@ -333,7 +326,7 @@ export function TableEditor({
       <FormErrorSummary
         formId={TABLE_FORM_ID}
         errors={validation.formFields}
-        getFieldLabel={(field) => getTableFieldLabel(field, form.fields, translate)}
+        getFieldLabel={(field) => getTableFieldLabel(field, form.fields, t)}
         title={t("editor.validationSummaryTitle")}
       />
 
@@ -389,10 +382,11 @@ export function TableEditor({
               placeholder={t("editor.placeholders.selectDomain")}
               value={form.domain || null}
               onValueChange={(value) => setValue("domain", value || "")}
-            >
-              <Select.Option value="">{t("editor.placeholders.selectDomain")}</Select.Option>
-              {domains.map((name) => <Select.Option key={name} value={name}>{getWarehouseDomainLabel(name, t)}</Select.Option>)}
-            </Select>
+              items={[
+                { value: "", label: t("editor.placeholders.selectDomain") },
+                ...domains.map((name) => ({ value: name, label: getWarehouseDomainLabel(name, t) })),
+              ]}
+            />
           </FormField>
           <FormField
             className="fl"

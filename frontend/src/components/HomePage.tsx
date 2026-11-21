@@ -69,6 +69,7 @@ function ListLayout({ tables, query, onOpen }: TableLayoutProps) {
                   <Icon name="table" size={15} color="var(--ink-3)" />
                   <button
                     type="button"
+                    tabIndex={0}
                     className="asset-detail-trigger asset-list-detail-trigger"
                     aria-label={t("openTableDetails", { tableName: table.name })}
                     onClick={(event) => {
@@ -172,6 +173,7 @@ function GroupLayout({ tables, query, onOpen }: TableLayoutProps) {
               <AssetBusinessMeaning table={table} />
               <button
                 type="button"
+                tabIndex={0}
                 className="asset-detail-trigger asset-group-detail-trigger"
                 aria-label={t("openTableDetails", { tableName: table.name })}
                 onClick={(event) => {
@@ -202,7 +204,7 @@ export interface HomePageProps extends TableLayoutProps {
 export function HomePage({ tables, layout, query, onOpen }: HomePageProps) {
   const { t } = useTranslation("warehouse");
   if (tables.length === 0) {
-    return <EmptyState title={t("emptyTitle")} desc={t("emptyDescription", { query })} />;
+    return <EmptyState title={t("emptyTitle")} desc={query.trim() ? t("emptyDescription", { query }) : t("emptyFilters")} />;
   }
   if (layout === "card") return <CardLayout tables={tables} query={query} onOpen={onOpen} />;
   if (layout === "group") return <GroupLayout tables={tables} query={query} onOpen={onOpen} />;
