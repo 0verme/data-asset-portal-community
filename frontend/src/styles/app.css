@@ -155,8 +155,8 @@
     gap: 16px;
     min-width: 0;
     padding: 0 24px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--line);
+    background: transparent;
+    border: 0;
     z-index: 20;
   }
   .topbar-brand { display: flex; align-items: center; gap: 12px; min-width: max-content; flex: 0 0 auto; }
@@ -183,12 +183,14 @@
     max-width: 100%;
     flex: 0 1 auto;
     flex-wrap: nowrap;
-    gap: 6px;
+    gap: 0;
     white-space: nowrap;
-    padding: 4px;
-    background: var(--surface-2);
+    min-height: 44px;
+    padding: 4px 8px;
+    background: color-mix(in srgb, var(--surface) 60%, transparent);
     border: 1px solid var(--line);
-    border-radius: 11px;
+    border-radius: 999px;
+    box-shadow: var(--shadow-sm);
     overflow: visible;
   }
 
@@ -206,9 +208,9 @@
 
   .mainnav button {
     height: 34px;
-    padding: 0 10px;
+    padding: 0 clamp(8px, calc(2vw - 17px), 12px);
     border: none;
-    border-radius: 8px;
+    border-radius: 999px;
     background: transparent;
     color: var(--ink-2);
     font-family: var(--sans);
@@ -663,8 +665,9 @@
     flex: 0 0 auto;
     display: flex;
     justify-content: center;
-    padding: 8px 24px;
-    border-top: 1px solid var(--line);
+    margin-top: 16px;
+    padding: 8px 24px max(8px, env(safe-area-inset-bottom));
+    border: 0;
     background: transparent;
   }
   .app-footer {
@@ -688,9 +691,7 @@
   .app-footer-copy {
     color: inherit;
     font-weight: 500;
-  }
-  .app-footer-separator {
-    color: var(--line-strong);
+    overflow-wrap: anywhere;
   }
   .app-footer-version,
   .app-footer-link {
@@ -700,6 +701,7 @@
     text-decoration: none;
     transition: color 0.15s ease;
   }
+  .app-footer-link { transition: none; }
   .app-footer-version:hover,
   .app-footer-link:hover {
     color: var(--ink);
@@ -1876,16 +1878,12 @@
   @media (max-width: 1500px) and (min-width: 1200px) {
     .topbar { gap: 12px; padding-left: 16px; padding-right: 16px; }
     .brand-name small { display: none; }
-    .mainnav { gap: 2px; }
-    .mainnav button,
     .more-nav-trigger { padding-left: 8px; padding-right: 8px; }
   }
 
   @media (max-width: 1199px) and (min-width: 769px) {
     .topbar { gap: 12px; padding-left: 16px; padding-right: 16px; }
     .brand-name small { display: none; }
-    .mainnav { gap: 2px; }
-    .mainnav button,
     .more-nav-trigger { padding-left: 8px; padding-right: 8px; }
     .search {
       width: 36px;
@@ -2824,7 +2822,7 @@
     }
 
     .app-footer-shell {
-      padding: 8px 16px;
+      padding: 8px 16px max(8px, env(safe-area-inset-bottom));
     }
 
     .tbl-wrap {
@@ -3072,7 +3070,7 @@
     }
 
     .app-footer-shell {
-      padding: 8px 12px;
+      padding: 8px 12px max(8px, env(safe-area-inset-bottom));
     }
 
     .page-title {
@@ -3350,8 +3348,6 @@
     padding: 0;
     grid-template-columns: var(--portal-header-side) minmax(0, 1fr) var(--portal-header-side);
     gap: 13px;
-    background: transparent;
-    border: 0;
   }
   .portal-home-topbar .topbar-brand,
   .portal-home-topbar .brand { min-width: 0; }
@@ -3359,14 +3355,6 @@
   .portal-home-topbar .brand-name { min-width: 0; font-size: 17px; letter-spacing: -.02em; }
   .portal-home-topbar .brand-name small { font-size: 11px; }
   .portal-home-topbar .topbar-actions { gap: 9px; }
-  .portal-home-topbar .mainnav {
-    min-height: 44px;
-    padding: 4px 8px;
-    gap: 0;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--surface) 60%, transparent);
-    box-shadow: var(--shadow-sm);
-  }
   .portal-home-topbar .mainnav:not(.mainnav-measure) {
     /* The measured menu catches up on resize. Keep the previous fit within its slot. */
     overflow: clip;
@@ -3378,11 +3366,6 @@
     min-height: 34px;
     flex-shrink: 1;
     white-space: normal;
-  }
-  .portal-home-topbar .mainnav button {
-    height: 34px;
-    padding-inline: clamp(8px, calc(2vw - 17px), 12px);
-    border-radius: 999px;
   }
   .portal-home-topbar .navigation-status { padding-inline: 8px; color: var(--ink-2); white-space: normal; }
   .portal-home-topbar :is(.theme-toggle, .appearance-trigger, .login-cta, .logout-btn, .user-chip) {
@@ -3407,18 +3390,6 @@
     flex: 1 0 auto;
     padding: 0 18px;
   }
-  .portal-home-footer {
-    margin-top: 70px;
-    padding: 8px 20px max(27px, env(safe-area-inset-bottom));
-    border-top: 0;
-  }
-  .portal-home-footer .app-footer { gap: 0 20px; }
-  .portal-home-footer .app-footer-copy { overflow-wrap: anywhere; }
-  .portal-home-footer .app-footer-separator { color: var(--line-strong); }
-  /* Theme tokens change together, so the link also needs to change color immediately. */
-  .portal-home-footer .app-footer-link { transition: none; }
-  .portal-home-footer .app-footer-link:hover { text-decoration: underline; }
-
   @media (min-width: 1181px) {
     .portal-home-topbar .brand-name small { display: inline; }
   }
@@ -3433,7 +3404,6 @@
       width: 100%;
       min-height: 0;
       margin: 0;
-      border-bottom: 1px solid transparent;
     }
     .portal-home-topbar ~ .body .sidebar { display: block; }
 
@@ -3502,5 +3472,4 @@
 
   @media (max-width: 600px) {
     .portal-home-main .main-inner { padding-inline: 14px; }
-    .portal-home-footer { margin-top: 52px; padding-bottom: max(22px, env(safe-area-inset-bottom)); }
   }

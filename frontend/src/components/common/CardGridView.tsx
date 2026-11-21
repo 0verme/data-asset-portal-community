@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Key, ReactNode } from "react";
+import type { KeyboardEvent, Key, ReactNode } from "react";
 
 import { Icon } from "../ui.tsx";
 
@@ -23,6 +23,7 @@ import { Icon } from "../ui.tsx";
 export interface CardGridViewProps<T> {
   items: readonly T[];
   getKey: (item: T) => Key;
+  getAccessibleLabel?: ((item: T) => string) | undefined;
   onItemClick: (item: T) => void;
   renderBadges: (item: T) => ReactNode;
   renderTitle: (item: T) => ReactNode;
@@ -36,6 +37,7 @@ export interface CardGridViewProps<T> {
 export function CardGridView<T>({
   items,
   getKey,
+  getAccessibleLabel,
   onItemClick,
   renderBadges,
   renderTitle,
@@ -48,7 +50,21 @@ export function CardGridView<T>({
   return (
     <div className="card-grid">
       {items.map((item) => (
-        <div key={getKey(item)} className="tcard" onClick={() => onItemClick(item)}>
+        <div
+          key={getKey(item)}
+          className="tcard"
+          role={getAccessibleLabel ? "button" : undefined}
+          tabIndex={getAccessibleLabel ? 0 : undefined}
+          aria-label={getAccessibleLabel?.(item)}
+          onClick={() => onItemClick(item)}
+          onKeyDown={getAccessibleLabel ? (event: KeyboardEvent<HTMLDivElement>) => {
+            if (event.target !== event.currentTarget) return;
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onItemClick(item);
+            }
+          } : undefined}
+        >
           <div className="tcard-top">
             <div className="tcard-badges">{renderBadges(item)}</div>
             <Icon name="arrow" size={15} color="var(--ink-3)" />

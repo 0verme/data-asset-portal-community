@@ -102,7 +102,7 @@ test("homepage distributes tall desktop space while preserving short viewport sc
 
   const panel = page.locator(".sp-stats");
   const orb = page.locator(".sp-data-orb");
-  const footer = page.locator(".portal-home-footer");
+  const footer = page.locator(".portal-home-main > .app-footer-shell");
   const baseline = (await panel.boundingBox())!;
   const baselineOrb = (await orb.boundingBox())!;
 

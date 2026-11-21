@@ -732,6 +732,13 @@ jobs:
           VITE_API_MODE: remote
         run: npm run test:browser -- e2e/system-list-pagination.spec.ts
 
+      - name: Upstream workspace visual and responsive evidence (Chromium)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/upstream-workspace-visual-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- e2e/upstream-visual.spec.ts e2e/shared-shell-visual.spec.ts --project=chromium --workers=1
+
       - name: Field-mapping mock CSV column regression (Chromium and WebKit)
         if: matrix.lane == 'a'
         env:
@@ -825,6 +832,16 @@ jobs:
         with:
           name: appearance-screenshots
           path: ${{ runner.temp }}/appearance-playwright/**/appearance-*.png
+
+      - name: Upload upstream workspace visual screenshots
+        if: always() && matrix.lane == 'a'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: upstream-workspace-visual-screenshots
+          path: |
+            ${{ runner.temp }}/upstream-workspace-visual-playwright/**/upstream-*.png
+            ${{ runner.temp }}/upstream-workspace-visual-playwright/**/shared-shell-*.png
+          if-no-files-found: ignore
 
       - name: Upload failed Appearance traces
         if: failure() && matrix.lane == 'b'

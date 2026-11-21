@@ -18,7 +18,8 @@ test("application footer keeps the version and exposes the project GitHub link",
     app,
     /<a\s+className="app-footer-link"\s+href=\{APP_RELEASE_METADATA\.repositoryUrl\}\s+target="_blank"\s+rel="noopener noreferrer"[\s\S]*?GitHub ↗/
   );
-  assert.match(app, /isHome \? "\|" : "·"/);
+  assert.match(app, /<footer className="app-footer-shell" role="contentinfo">/);
+  assert.doesNotMatch(app, /app-footer-separator/);
   assert.doesNotMatch(defaults, /APP_VERSION|V\d+\.\d+\.\d+/);
   assert.match(releaseMetadata, /Object\.freeze\(__DAP_RELEASE_METADATA__\)/);
   assert.match(styles, /\.app-footer-shell \{[\s\S]*?border-top: 1px solid var\(--line\);[\s\S]*?background: transparent;/);
@@ -27,5 +28,7 @@ test("application footer keeps the version and exposes the project GitHub link",
     /\.app-footer \{[\s\S]*?flex-wrap: wrap;[\s\S]*?gap: 0 8px;[\s\S]*?padding: 0;[\s\S]*?border: 0;[\s\S]*?border-radius: 0;[\s\S]*?background: transparent;[\s\S]*?box-shadow: none;[\s\S]*?color: var\(--ink-2\);/
   );
   assert.match(styles, /\.app-footer-version,[\s\S]*?\.app-footer-link \{[\s\S]*?color: var\(--ink-2\);[\s\S]*?white-space: nowrap;/);
+  assert.match(styles, /\.app-footer-link \{ transition: none; \}/);
   assert.match(styles, /\.app-footer-link:hover \{[\s\S]*?color: var\(--ink\);/);
+  assert.doesNotMatch(styles, /\.portal-home-footer/);
 });
