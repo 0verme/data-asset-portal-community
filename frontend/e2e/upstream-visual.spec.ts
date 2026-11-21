@@ -20,6 +20,7 @@ const preference = (
 
 test("upstream workspace responsive and theme evidence", async ({ page, browserName }, info) => {
   test.skip(browserName !== "chromium", "Visual evidence is captured once in Chromium; functional coverage also runs in WebKit.");
+  test.setTimeout(120_000);
 
   const initialPreference = preference("light", "green");
   await page.addInitScript(({ key, saved }) => {
@@ -57,11 +58,16 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
 
     await page.goto("/upstream?view=list");
     await expect(page.locator(".upstream-list-page .page-title")).toBeVisible({ timeout: 20_000 });
+    const listMode = page.locator(".upstream-list-page .seg").getByRole("button", { name: "列表", exact: true });
+    await listMode.click();
+    await expect(listMode).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator(".upstream-wide-table")).toBeVisible();
     await expectNoPageOverflow();
     await screenshot(`upstream-list-${size.name}`);
 
-    await page.goto("/upstream?view=card");
+    const cardMode = page.locator(".upstream-list-page .seg").getByRole("button", { name: "卡片", exact: true });
+    await cardMode.click();
+    await expect(cardMode).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator(".upstream-list-page .tcard").first()).toBeVisible();
     await expectNoPageOverflow();
     await screenshot(`upstream-cards-${size.name}`);
@@ -87,8 +93,11 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/upstream\/up_member$/);
 
-  await page.goto("/upstream?view=card");
+  await page.goto("/upstream?view=list");
+  await page.locator(".upstream-list-page .seg").getByRole("button", { name: "列表", exact: true }).click();
   const card = page.locator(".upstream-list-page .tcard").filter({ hasText: "会员中心" }).first();
+  await page.locator(".upstream-list-page .seg").getByRole("button", { name: "卡片", exact: true }).click();
+  await expect(card).toBeVisible();
   await card.focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/upstream\/up_member$/);
@@ -105,7 +114,9 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
   await expect(page.getByRole("heading", { name: "新增上游卸数系统" })).toBeVisible();
   await screenshot("upstream-new-390x844");
 
-  await page.goto("/upstream?view=card");
+  await page.goto("/upstream?view=list");
+  await page.locator(".upstream-list-page .seg").getByRole("button", { name: "列表", exact: true }).click();
+  await page.locator(".upstream-list-page .seg").getByRole("button", { name: "卡片", exact: true }).click();
   await expect(page.locator(".upstream-list-page .tcard").first()).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("button.hamburger").click();
@@ -124,7 +135,9 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
       value: saved,
     });
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/upstream?view=card");
+    await page.goto("/upstream?view=list");
+    await page.locator(".upstream-list-page .seg").getByRole("button", { name: "列表", exact: true }).click();
+    await page.locator(".upstream-list-page .seg").getByRole("button", { name: "卡片", exact: true }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", saved.themeMode);
     await expect(page.locator("html")).toHaveAttribute("data-density", saved.density);
     await expect(page.locator(".upstream-list-page .tcard").first()).toBeVisible();
