@@ -198,6 +198,8 @@ test("asset filter groups collapse independently and preserve URL, selection, co
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await transaction.click();
   await expect(transaction).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => transaction.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .not.toBe("rgba(0, 0, 0, 0)");
   const selectedColors = await transaction.evaluate((element) => ({
     background: getComputedStyle(element).backgroundColor,
     color: getComputedStyle(element).color,

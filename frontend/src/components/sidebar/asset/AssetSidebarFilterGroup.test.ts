@@ -21,7 +21,7 @@ test("asset filter headings expose independent controlled disclosure semantics a
 test("asset facet tooltips retain full layer labels and only expand long domain labels", async () => {
   const sidebar = await sidebarSource();
 
-  assert.match(sidebar, /tooltip: layer \? `\$\{layer\.code\} \$\{layer\.cn\}` : undefined/);
+  assert.match(sidebar, /tooltip: layer\s*\? `\$\{layer\.code\} \$\{getWarehouseLayerLabel\(layer\.code, layer\.cn, t\)\}`\s*:\s*undefined/);
   assert.match(sidebar, /tooltip: item\.key\.length > 6 \? item\.key : undefined/);
 });
 

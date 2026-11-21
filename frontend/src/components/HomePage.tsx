@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import type { AssetTableItem } from "../api/assets.ts";
 import { EmptyState } from "../ui/index.ts";
 import { getAssetFieldCount } from "../utils/assetFieldCount.ts";
+import { getWarehouseDomainLabel } from "./warehouseLabels.ts";
 import { CardGridView, GroupView, WideTableScroll } from "./common/index.ts";
 import { DomainBadge, Highlight, Icon, LayerBadge, initial } from "./ui.tsx";
 
@@ -66,8 +67,18 @@ function ListLayout({ tables, query, onOpen }: TableLayoutProps) {
               <td data-label="">
                 <div className="t-name">
                   <Icon name="table" size={15} color="var(--ink-3)" />
-                  <span><Highlight text={table.name} q={query} /></span>
-                  <span className="go"><Icon name="arrow" size={14} /></span>
+                  <button
+                    type="button"
+                    className="asset-detail-trigger asset-list-detail-trigger"
+                    aria-label={t("openTableDetails", { tableName: table.name })}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOpen(table);
+                    }}
+                  >
+                    <span><Highlight text={table.name} q={query} /></span>
+                    <span className="go" aria-hidden="true"><Icon name="arrow" size={14} /></span>
+                  </button>
                 </div>
                 {table._fieldMatch ? (
                   <div className="match-hint">
@@ -79,7 +90,7 @@ function ListLayout({ tables, query, onOpen }: TableLayoutProps) {
                 <span className="t-cn"><Highlight text={table.cn} q={query} /></span>
                 <AssetBusinessMeaning table={table} />
               </td>
-              <td data-label={t("domain")}><DomainBadge domain={table.domain} /></td>
+              <td data-label={t("domain")}><DomainBadge domain={getWarehouseDomainLabel(table.domain, t)} /></td>
               <td data-label={t("layer")}><LayerBadge layer={table.layer} /></td>
               <td data-label={t("owner")}>
                 <div className="t-owner">
@@ -109,10 +120,11 @@ function CardLayout({ tables, query, onOpen }: TableLayoutProps) {
     <CardGridView
       items={tables}
       getKey={assetKey}
+      getAccessibleLabel={(table) => t("openTableDetails", { tableName: table.name })}
       onItemClick={(table) => onOpen(table)}
       renderBadges={(table) => (
         <>
-          <DomainBadge domain={table.domain} />
+          <DomainBadge domain={getWarehouseDomainLabel(table.domain, t)} />
           <LayerBadge layer={table.layer} />
         </>
       )}
@@ -148,7 +160,7 @@ function GroupLayout({ tables, query, onOpen }: TableLayoutProps) {
       onItemClick={(table) => onOpen(table)}
       groupBy={(table) => table.domain}
       groupOrder={order}
-      renderGroupLabel={(domain) => <span className="tag tag-neutral">{domain}</span>}
+      renderGroupLabel={(domain) => <span className="tag tag-neutral">{getWarehouseDomainLabel(domain, t)}</span>}
       renderGroupCount={(count) => t("groupTableCount", { count })}
       renderCardName={(table) => <Highlight text={table.name} q={query} />}
       renderCardBody={(table) => {
@@ -158,6 +170,18 @@ function GroupLayout({ tables, query, onOpen }: TableLayoutProps) {
             <div className="asset-group-meaning">
               <span><Highlight text={table.cn} q={query} /></span>
               <AssetBusinessMeaning table={table} />
+              <button
+                type="button"
+                className="asset-detail-trigger asset-group-detail-trigger"
+                aria-label={t("openTableDetails", { tableName: table.name })}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpen(table);
+                }}
+              >
+                {t("viewDetails")}
+                <Icon name="arrow" size={13} />
+              </button>
             </div>
             <span className="gc-owner">
               {count === null

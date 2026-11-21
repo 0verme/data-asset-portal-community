@@ -739,6 +739,13 @@ jobs:
           VITE_API_MODE: mock
         run: npm run test:browser -- e2e/upstream-visual.spec.ts e2e/shared-shell-visual.spec.ts --project=chromium --workers=1
 
+      - name: Data warehouse workspace accessibility and visual evidence (Chromium)
+        if: matrix.lane == 'a'
+        env:
+          DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/data-warehouse-workspace-playwright
+          VITE_API_MODE: mock
+        run: npm run test:browser -- e2e/warehouse-accessibility.spec.ts e2e/warehouse-visual.spec.ts --project=chromium --workers=1
+
       - name: Field-mapping mock CSV column regression (Chromium and WebKit)
         if: matrix.lane == 'a'
         env:
@@ -841,6 +848,14 @@ jobs:
           path: |
             ${{ runner.temp }}/upstream-workspace-visual-playwright/**/upstream-*.png
             ${{ runner.temp }}/upstream-workspace-visual-playwright/**/shared-shell-*.png
+          if-no-files-found: ignore
+
+      - name: Upload data warehouse workspace visual screenshots
+        if: always() && matrix.lane == 'a'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: data-warehouse-workspace-screenshots
+          path: ${{ runner.temp }}/data-warehouse-workspace-playwright/**/warehouse-*.png
           if-no-files-found: ignore
 
       - name: Upload failed Appearance traces

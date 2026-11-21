@@ -29,6 +29,7 @@ import {
 } from "../../ui/index.ts";
 import { Icon } from "../ui.tsx";
 import { EmptyState } from "../common/index.ts";
+import { getWarehouseDomainLabel, getWarehouseLayerLabel } from "../warehouseLabels.ts";
 import { AssetViewModeSwitcher } from "./AssetViewModeSwitcher.tsx";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 
@@ -153,8 +154,8 @@ export function AssetView({
             </div>
             <div className="page-sub">
               {t("tableCountPrefix")}<b>{totalTables}</b>{t("tableCountSuffix", { count: totalTables })}
-              {selectedLayer ? <>{t("layerSummary", { layer: selectedLayer })}</> : null}
-              {domain ? <>{t("domainSummary", { domain })}</> : null}
+              {selectedLayer ? <>{t("layerSummary", { layer: getWarehouseLayerLabel(selectedLayer, selectedLayer, t) })}</> : null}
+              {domain ? <>{t("domainSummary", { domain: getWarehouseDomainLabel(domain, t) })}</> : null}
               {query ? <>{t("querySummary", { query })}</> : null}
             </div>
           </div>

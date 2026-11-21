@@ -850,6 +850,32 @@
   /* ===== 数据资产页作用域覆盖（不影响其他页） ===== */
   .asset-page .seg button.active { color: var(--ink); }
   .asset-page .t-num { font-variant-numeric: tabular-nums; }
+  .asset-page .page-head {
+    align-items: center;
+    gap: 20px;
+    padding-bottom: 18px;
+    border-bottom: 0.5px solid var(--line-2);
+  }
+  .asset-page .page-title { font-size: 24px; letter-spacing: 0; }
+  .asset-page .page-sub { max-width: 760px; line-height: 1.6; }
+  .asset-page .head-actions { justify-content: flex-end; gap: 10px; }
+  .asset-page .asset-view-mode-switcher { flex: 0 0 auto; }
+  .asset-page .asset-view-mode-switcher button { min-height: 36px; }
+  .asset-page .asset-view-mode-switcher button:focus-visible {
+    outline: 2px solid var(--accent-line);
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+  .asset-page .head-actions > .btn.primary { min-height: 38px; }
+  .asset-sidebar-filter-group .asset-sidebar-filter-heading { color: var(--ink-2); }
+  .asset-sidebar-filter-group .asset-sidebar-filter-option.active {
+    background: var(--surface-2);
+    background-color: var(--surface-2) !important;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .asset-sidebar-filter-items { display: grid; gap: 2px; }
+  .asset-sidebar-filter-option { min-height: 36px; }
   .asset-page table.dt thead th {
     font-size: 13px;
     font-weight: 500;
@@ -1185,6 +1211,102 @@
   .asset-detail-panel {
     border-top: 0;
     border-radius: 0 0 var(--radius) var(--radius);
+  }
+  .asset-detail-page { min-width: 0; }
+  .asset-detail-page .detail-head { border-color: var(--line-strong); }
+  .asset-detail-page .dh-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .asset-detail-page .dh-meta .mi { min-width: 128px; }
+  .asset-detail-page table.fields .c-type { color: var(--ink-2); }
+  .asset-detail-page .field-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-color: var(--ink-3) var(--surface-2);
+    scrollbar-width: thin;
+  }
+  .asset-detail-page .asset-field-empty-row td {
+    padding: 30px 16px;
+    color: var(--ink-2);
+    text-align: center;
+  }
+  .asset-editor-page > .form-card {
+    border-color: var(--line-strong);
+    margin-bottom: 20px;
+  }
+  .asset-editor-page .form-card h3 { font-size: 16px; }
+  .asset-editor-page .form-card-meta {
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .asset-editor-page .fields-edit tbody tr:hover { background: var(--surface-2); }
+  .asset-required {
+    margin-left: 7px;
+    color: var(--danger);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .asset-editor-page .form-action-bar {
+    border-color: var(--line-strong);
+    border-radius: var(--radius);
+  }
+  .asset-editor-page .danger-zone {
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+  .asset-detail-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--ink-2);
+    font: inherit;
+    line-height: 1.35;
+    text-align: left;
+    cursor: pointer;
+    transition: color 0.14s ease, background 0.14s ease;
+  }
+  .asset-detail-trigger:hover { background: var(--surface-2); color: var(--ink); }
+  .asset-detail-trigger:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+  .asset-list-detail-trigger { justify-content: flex-start; color: var(--ink); }
+  .asset-list-detail-trigger > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+  .asset-list-detail-trigger .go { opacity: 0; transform: translateX(-3px); transition: 0.12s; }
+  .asset-list-detail-trigger:hover .go,
+  .asset-list-detail-trigger:focus-visible .go { opacity: 1; transform: translateX(0); color: var(--ink-2); }
+  .asset-card-detail-trigger { flex: 0 0 auto; white-space: nowrap; }
+  .asset-group-detail-trigger { align-self: flex-start; font-size: 12px; }
+  .asset-page .tcard:has(.asset-detail-trigger:focus-visible),
+  .asset-page .gcard:has(.asset-detail-trigger:focus-visible),
+  .asset-page .tcard:focus-visible {
+    outline: 2px solid var(--accent-line);
+    outline-offset: 2px;
+  }
+  .asset-page .tcard-foot { flex-wrap: wrap; row-gap: 10px; }
+  @media (max-width: 900px) {
+    .asset-page .page-head { align-items: flex-start; }
+    .asset-page .head-actions { width: 100%; justify-content: space-between; }
+    .asset-detail-page .dh-actions { width: 100%; justify-content: flex-start; }
+  }
+  @media (max-width: 480px) {
+    .asset-page .page-head { padding-bottom: 15px; }
+    .asset-page .head-actions { gap: 8px; }
+    .asset-page .asset-view-mode-switcher { flex: 1 1 auto; justify-content: space-between; }
+    .asset-page .asset-view-mode-switcher button { flex: 1 1 0; justify-content: center; padding-inline: 8px; }
+    .asset-page .head-actions > .btn.primary { flex: 0 0 auto; justify-content: center; }
+    .asset-detail-page .dh-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .asset-detail-page .dh-meta .mi { min-width: 0; padding-right: 0; }
+    .asset-detail-page .dh-meta .mi + .mi { border-left: 0; padding-left: 0; }
+    .asset-detail-page .dh-meta .mi .v { overflow-wrap: anywhere; }
+    .asset-editor-page .asset-required { margin-left: 4px; }
   }
   @media (max-width: 480px) {
     .asset-detail-tabs { padding-inline: 12px; }

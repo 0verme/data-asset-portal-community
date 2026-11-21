@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { Button } from "../../../ui/index.ts";
 import { confirmAction, confirmDeleteAction } from "../../common/index.ts";
 import { Icon } from "../../ui.tsx";
@@ -11,14 +13,15 @@ export interface AssetEditorActionBarProps {
 }
 
 export function AssetEditorActionBar({ note, onCancel, onSave, saving, isDirty }: AssetEditorActionBarProps) {
+  const { t } = useTranslation("warehouse");
   const handleCancel = async () => {
     if (saving) return;
     if (isDirty) {
       const confirmed = await confirmAction({
-        title: "放弃未保存修改？",
-        content: "当前表单存在未保存内容，确认放弃并返回吗？",
-        confirmText: "放弃修改",
-        cancelText: "继续编辑",
+        title: t("editor.discardTitle"),
+        content: t("editor.discardDescription"),
+        confirmText: t("editor.discardAction"),
+        cancelText: t("editor.continueEditing"),
       });
       if (!confirmed) return;
     }
@@ -31,10 +34,10 @@ export function AssetEditorActionBar({ note, onCancel, onSave, saving, isDirty }
       <div className="fab-main">
         <div className="fab-actions">
           <Button className="btn" variant="secondary" type="button" onClick={() => void handleCancel()} disabled={saving}>
-            <Icon name="close" size={14} />取消
+            <Icon name="close" size={14} />{t("editor.cancel")}
           </Button>
           <Button className="btn primary" variant="primary" type="button" onClick={() => void onSave()} disabled={saving}>
-            <Icon name="save" size={14} />{saving ? "保存中..." : "保存"}
+            <Icon name="save" size={14} />{saving ? t("editor.saving") : t("editor.save")}
           </Button>
         </div>
       </div>
@@ -48,33 +51,34 @@ export interface AssetDeleteZoneProps {
 }
 
 export function AssetDeleteZone({ name, onDelete }: AssetDeleteZoneProps) {
+  const { t } = useTranslation("warehouse");
   const removeAsset = async () => {
     const confirmed = await confirmDeleteAction({
       name,
-      typeLabel: "资产表",
-      impact: "该表删除后，可能影响字段清单、DDL 展示、资产检索和历史追溯。请确认没有下游依赖。",
+      typeLabel: t("editor.deleteTypeLabel"),
+      impact: t("editor.deleteImpact"),
       consequences: [
-        "删除前应以后端校验为准。",
-        "若后端返回不可删除原因，页面会直接展示原因。",
+        t("editor.deleteConsequenceBackend"),
+        t("editor.deleteConsequenceResponse"),
       ],
       confirmKeyword: name,
-      confirmKeywordLabel: "请输入表名二次确认",
+      confirmKeywordLabel: t("editor.confirmDeleteKeyword"),
     });
     if (confirmed) await onDelete?.(name);
   };
 
   return (
-    <section className="danger-zone" aria-label="危险操作">
+    <section className="danger-zone" aria-label={t("editor.dangerZone")}>
       <div className="danger-zone-head">
         <div className="danger-zone-title">
           <Icon name="shield" size={16} color="var(--danger)" />
-          <h3>危险操作</h3>
+          <h3>{t("editor.dangerZone")}</h3>
         </div>
-        <div className="danger-zone-desc">删除资产表会影响字段清单、DDL 展示和历史元数据追溯，请谨慎操作。</div>
+        <div className="danger-zone-desc">{t("editor.deleteDescription")}</div>
       </div>
       <div className="danger-zone-actions">
         <Button className="btn ghost-danger" variant="danger" type="button" onClick={() => void removeAsset()}>
-          <Icon name="trash" size={14} />删除表
+          <Icon name="trash" size={14} />{t("editor.deleteTable")}
         </Button>
       </div>
     </section>

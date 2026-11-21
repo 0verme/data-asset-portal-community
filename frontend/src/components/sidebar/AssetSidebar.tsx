@@ -13,7 +13,9 @@
 // limitations under the License.
 
 import type { UseAssetModuleResult } from "../../hooks/useAssetModule.ts";
+import { useTranslation } from "react-i18next";
 import type { AssetRoute } from "../../routing/types.ts";
+import { getWarehouseDomainLabel, getWarehouseLayerLabel } from "../warehouseLabels.ts";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.tsx";
 import { AssetSidebarFilterGroup, type AssetSidebarFilterItem } from "./asset/AssetSidebarFilterGroup.tsx";
 import { buildSidebarFacetItems } from "./common/buildSidebarFacetItems.ts";
@@ -25,6 +27,7 @@ export interface AssetSidebarProps {
 }
 
 export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProps) {
+  const { t } = useTranslation("warehouse");
   const {
     domain,
     homeLoading,
@@ -52,7 +55,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
       <>
         <span className="asset-sidebar-filter-layer-label">
           <span className="layer-code">{option.code}</span>
-          <span className="layer-cn">{option.cn}</span>
+          <span className="layer-cn">{getWarehouseLayerLabel(option.code, option.cn, t)}</span>
         </span>
         <span className="count">{count}</span>
       </>
@@ -61,7 +64,9 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
     const layer = visibleLayers.find((option) => option.code === item.key);
     return {
       ...item,
-      tooltip: layer ? `${layer.code} ${layer.cn}` : undefined,
+      tooltip: layer
+        ? `${layer.code} ${getWarehouseLayerLabel(layer.code, layer.cn, t)}`
+        : undefined,
     };
   });
   const domainItems: AssetSidebarFilterItem[] = buildSidebarFacetItems({
@@ -69,6 +74,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
     selectedValue: domain,
     getValue: (item) => item,
     getCount: (item) => domainCounts[item] || 0,
+    getLabel: (item) => getWarehouseDomainLabel(item, t),
     onSelect: (nextValue) => {
       setDomain(nextValue);
       assetBack();
@@ -85,10 +91,10 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
   return (
     <>
       <AssetSidebarFilterGroup
-        title="数据分层"
+        title={t("filterLayers")}
         allOption={{
           key: "all-layers",
-          label: "全部层级",
+          label: t("allLayers"),
           count: Object.values(layerCounts).reduce(
             (total, count) => total + count,
             0,
@@ -103,10 +109,10 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
       />
 
       <AssetSidebarFilterGroup
-        title="主题域"
+        title={t("filterDomains")}
         allOption={{
           key: "all-domains",
-          label: "全部主题域",
+          label: t("allDomains"),
           count: Object.values(domainCounts).reduce(
             (total, count) => total + count,
             0,
@@ -126,7 +132,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
             ? [
                 {
                   key: "create-asset",
-                  label: "新增表",
+                  label: t("addTable"),
                   onClick: assetCreate,
                 },
               ]
