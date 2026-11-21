@@ -36,6 +36,8 @@
 
 Purple 是受支持的用户 Accent 之一；某张截图或测试选择 Purple 不表示所有用户默认使用 Purple。不要硬编码“全站默认绿色”，也不要将业务状态色接到 Accent 色族。
 
+侧栏选中行、左侧强调线、选中数量徽标和普通占比进度条随当前 Accent 一起切换。参考稿中的具体色相由用户主题决定。例如，紫色主题下的启用比例条使用紫色，而表示“已启用”的状态点仍使用业务成功色。
+
 ## 3. Token 使用规则
 
 ### 3.1 现有全局设计 Token
@@ -109,6 +111,12 @@ Workspace 页面使用统一的标题层级、工具区域、Surface、表格分
 
 Form 编辑流程应让标题、字段分组、校验、未保存状态和保存/取消操作清楚。继续保留页面既有确认、权限和错误语义。状态只读展示与状态编辑控件分开；不得用可交互 Switch 冒充只读状态标签。
 
+#### 筛选型侧栏
+
+数据源、目录等筛选项可放在独立圆角面板中，用标题和缩进区分维度，同级数量靠右对齐。选中项应有文字之外的可见标记。长菜单独立滚动，移动端沿用应用抽屉，确保最后一个筛选项和有权限的维护操作均可到达。
+
+当用户需要了解覆盖范围或占比，且接口能提供可靠统计时，可在底部保留摘要空间。摘要使用轻边框和表面色，半透明效果在缺少模糊支持时仍须可读。标明统计范围：全局摘要使用接口的全量聚合，筛选结果使用对应查询的总数。首次加载与真实零值分别展示，分母为零时显示空进度，维护成功后随数据刷新。
+
 ### 4.4 状态、行操作和表单文字
 
 - 业务状态优先复用 [common/StateCards.tsx](src/components/common/StateCards.tsx) 导出的 StatusBadge 与业务映射；通用语义提示使用 UI Adapter 的 Badge / Status。列表中的只读状态不做成开关，Switch 只用于实际可编辑的表单值。
@@ -152,10 +160,10 @@ app.css 的盒模型和间距 Reset 有意将间距重置放在 @layer base 中�
 - [ ] 保留原有业务组件行为。
 - [ ] 页面标题、工具栏及卡片样式符合 Workspace 规范。
 - [ ] Light / Dark / System 三种主题模式兼容。
-- [ ] Green / Blue / Purple / Orange / Custom Accent 无明显冲突，业务语义色保持清晰。
+- [ ] Green / Blue / Purple / Orange / Custom Accent 无明显冲突，业务语义色保持清晰。在同一页面切换绿色与紫色，核对选中项、徽标与进度条同步变色，再检查其他预设及自定义色。
 - [ ] Compact / Comfortable 无明显布局问题，并注明未覆盖区域。
 - [ ] 桌面和移动端主要操作可访问。
 - [ ] 不破坏权限、分页、筛选、编辑和保存。
 - [ ] 提供实际视觉验收证据；未覆盖的组合明确标为未验证。
 
-P1 上游卸数可从 [UpstreamView](src/components/views/UpstreamView.tsx) 及 [UpstreamList](src/components/upstream/UpstreamList.tsx) 的现有构成开始：保留当前侧栏筛选和权限、分页状态、Card/List 切换、宽表、行操作及表单校验。该页面已使用部分 UI Adapter 和业务共享组件；后续改造应按 [UI Adapter README](src/ui/README.md) 核对导入来源，记录未迁移控件，逐区验证，不宣称全站视觉已经统一。
+筛选型工作台可参考已落地的 [UpstreamSidebar](src/components/sidebar/UpstreamSidebar.tsx) 和[上游视觉回归](e2e/upstream-visual.spec.ts)。桌面截图保留侧栏和主内容同屏，移动端截图展开抽屉，检查滚动菜单时底部摘要是否遮挡操作。各模块按自身任务选择筛选维度和摘要指标。

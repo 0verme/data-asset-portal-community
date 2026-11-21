@@ -27,6 +27,10 @@
 
 对于复杂表格、字段映射编辑器和血缘画布，保留成熟实现可以优先于创建通用抽象。不要为统一外观而重写业务行为。
 
+### 工作台筛选侧栏
+
+组合业务共享的 [SidebarFilterGroup](../components/sidebar/common/SidebarFilterGroup.tsx)、[StatusFilterGroup](../components/sidebar/common/StatusFilterGroup.tsx) 和 [SidebarActionGroup](../components/sidebar/common/SidebarActionGroup.tsx)。调用模块提供计数、筛选回调、权限和数据刷新。选中背景使用 `--accent-soft`，强调线和占比进度使用 `--accent`，徽标描边使用 `--accent-line`。布局和验收见[全站设计语言](../../DESIGN.md)，具体组合见 [UpstreamSidebar](../components/sidebar/UpstreamSidebar.tsx)。
+
 ## 3. 已导出的 Adapter API
 
 下面列出的 API 均从 src/ui/index.ts 导出。组件是否已经被所有业务页面使用，需要逐页核对。
