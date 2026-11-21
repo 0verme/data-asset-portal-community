@@ -218,6 +218,10 @@ for (const kind of ['upstream', 'push'] as const) {
     await expect(page.locator('table.dt tbody tr')).toHaveCount(0);
     await expect(pager).toContainText('共 0 条');
     await expect(page.locator('.side-item').filter({ hasText: tail }).locator('.count')).toHaveText('1');
+    if (kind === 'upstream') {
+      await expect(page.locator('.upstream-summary-number')).toHaveText('11 / 21');
+      await expect(page.locator('.upstream-summary-types')).toContainText('2 类');
+    }
     expect(api.lists.length).toBeGreaterThan(3);
     expect(api.lists.every((url) => url.searchParams.has('page') && url.searchParams.has('pageSize'))).toBe(true);
     expect(api.lists.at(-1)?.searchParams.get('page')).toBe('1');
@@ -439,4 +443,23 @@ test('configured push options accept cross-industry protocol, delimiter, encodin
     if (label === '推送频率') await expect(page.getByRole('option', { name: 'T+1', exact: true })).toHaveCount(0);
     await page.keyboard.press('Escape');
   }
+});
+
+test('system list pagination upstream: pending and empty coverage', async ({ page }) => {
+  test.skip(!remote, 'Explicit remote HTTP fixture contract');
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  await fixture(page, 'upstream', { onList: async (route) => {
+    await pending;
+    await route.fulfill({ json: { items: [], page: 1, pageSize: 20, total: 0,
+      facets: { dbType: {}, status: {}, dept: {} }, options: { dbTypes: [], depts: [] }, stats: { systemCount: 0 } } });
+  } });
+  await page.goto('/upstream');
+  const summary = page.locator('.upstream-summary');
+  try {
+    await expect(summary).toContainText('正在加载统计');
+  } finally { release(); }
+  await expect(summary.locator('.upstream-summary-number')).toHaveText('0 / 0');
+  await expect(summary.locator('progress')).toHaveJSProperty('position', 0);
+  await expect(summary).toContainText('0 类');
 });

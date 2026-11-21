@@ -93,7 +93,13 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
   await page.goto("/upstream?view=list");
   const filterOption = page.getByRole("button", { name: /PostgreSQL/ }).first();
   await expect(filterOption).toBeVisible();
+  const summary = page.getByRole("region", { name: "系统覆盖摘要" });
+  await expect(summary).toContainText("已启用 7 个上游系统");
   await filterOption.click();
+  await page.locator(".upstream-sidebar .side-item").filter({ hasText: /^禁用/ }).click();
+  await expect(summary.locator("progress")).toHaveAttribute("max", "8");
+  await expect(summary.locator("progress")).toHaveAttribute("value", "7");
+  await expect(summary).toContainText("7 类");
   await expect(page.getByRole("button", { name: "清空筛选" })).toBeEnabled();
   await page.getByRole("button", { name: "清空筛选" }).click();
   await expect(page.getByRole("button", { name: "清空筛选" })).toBeDisabled();
@@ -132,6 +138,14 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
   await page.locator("button.hamburger").click();
   await expect(page.locator("#mobile-sidebar")).toHaveClass(/open/);
   await expect(page.locator(".upstream-sidebar")).toBeVisible();
+  await expect(summary).toBeInViewport();
+  const menu = page.locator(".upstream-sidebar-menu");
+  await expect.poll(() => page.locator("#mobile-sidebar").evaluate((el) => Math.round(el.getBoundingClientRect().left))).toBe(0);
+  const before = await summary.boundingBox();
+  await menu.getByRole("button", { name: "新增系统" }).scrollIntoViewIfNeeded();
+  expect(await menu.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  expect(await summary.boundingBox()).toEqual(before);
+  await menu.evaluate((el) => { el.scrollTop = 0; });
   await screenshot("upstream-sidebar-open-390x844");
 
   for (const [name, saved] of [
@@ -155,4 +169,11 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
   }
 
   await page.evaluate(({ key }) => localStorage.removeItem(key), { key: storageKey });
+});
+
+test("guest sees coverage without maintenance actions", async ({ page }) => {
+  await page.goto("/upstream");
+  const rail = page.locator(".upstream-sidebar");
+  await expect(rail.locator("progress")).toHaveAttribute("value", "7");
+  await expect(rail.getByRole("button", { name: "新增系统" })).toHaveCount(0);
 });
