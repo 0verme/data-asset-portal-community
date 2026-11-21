@@ -103,6 +103,16 @@ test("shared capsule navigation matches across home and business modules", async
 
         const hoverTarget = nav.getByRole("button", { name: "字段映射", exact: true });
         await hoverTarget.hover();
+        const expectedHoverColor = await page.evaluate(() => {
+          const probe = document.createElement("span");
+          probe.style.color = "var(--ink)";
+          document.body.append(probe);
+          const color = getComputedStyle(probe).color;
+          probe.remove();
+          return color;
+        });
+        await expect.poll(() => hoverTarget.evaluate((element) => getComputedStyle(element).color))
+          .toBe(expectedHoverColor);
         const hoverStyle = await hoverTarget.evaluate((element) => ({
           color: getComputedStyle(element).color,
           background: getComputedStyle(element).backgroundColor,
