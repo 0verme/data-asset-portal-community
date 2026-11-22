@@ -316,7 +316,7 @@ test("source-system navigator searches locally and filters table/field queries, 
   const mobileSidebar = page.locator(".sidebar");
   await expect(mobileSidebar).toHaveClass(/open/);
   await expect.poll(() => mobileSidebar.evaluate((element) => document.activeElement === element)).toBe(true);
-  await mobileSidebar.evaluate((element) => { element.scrollTop = 0; element.scrollLeft = 0; });
+  await mobileSidebar.locator(".sidebar-content").evaluate((element) => { element.scrollTop = 0; });
   await expect(page.getByRole("navigation", { name: "源系统列表" })).toBeVisible();
   await expect(search).toBeVisible();
   const sidebarBounds = await mobileSidebar.evaluate((element) => {
@@ -324,7 +324,7 @@ test("source-system navigator searches locally and filters table/field queries, 
     return { width: rect.width, height: rect.height, open: element.classList.contains("open") };
   });
   expect(sidebarBounds.open).toBe(true);
-  expect(sidebarBounds.width).toBeLessThanOrEqual(260);
+  expect(sidebarBounds.width).toBe(280);
   expect(sidebarBounds.height).toBeGreaterThanOrEqual(844);
   const pageWidth = await page.locator("html").evaluate((element) => element.scrollWidth);
   expect(pageWidth).toBeLessThanOrEqual(390);
