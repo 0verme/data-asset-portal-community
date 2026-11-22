@@ -13,10 +13,25 @@
 // limitations under the License.
 
 import type { UseAssetModuleResult } from "../../hooks/useAssetModule.ts";
+import { useTranslation } from "react-i18next";
 import type { AssetRoute } from "../../routing/types.ts";
+import { getWarehouseDomainLabel, getWarehouseLayerLabel } from "../warehouseLabels.ts";
 import { SidebarActionGroup } from "./common/SidebarActionGroup.tsx";
 import { AssetSidebarFilterGroup, type AssetSidebarFilterItem } from "./asset/AssetSidebarFilterGroup.tsx";
 import { buildSidebarFacetItems } from "./common/buildSidebarFacetItems.ts";
+import { ModuleReadiness } from "./common/ModuleReadiness.tsx";
+import type { ModuleReadinessResult } from "./common/moduleReadiness.ts";
+
+const warehouseReadiness: ModuleReadinessResult = {
+  moduleId: "data-warehouse",
+  metricId: null,
+  status: "pending_definition",
+  definition: null,
+  numerator: null,
+  denominator: null,
+  percentage: null,
+  updatedAt: null,
+};
 
 export interface AssetSidebarProps {
   asset: UseAssetModuleResult;
@@ -25,6 +40,7 @@ export interface AssetSidebarProps {
 }
 
 export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProps) {
+  const { t } = useTranslation("warehouse");
   const {
     domain,
     homeLoading,
@@ -43,7 +59,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
     options: visibleLayers,
     selectedValue: selectedLayer,
     getValue: (layer) => layer.code,
-    getCount: (layer) => layer.count || 0,
+    getCount: (layer) => homeLoading || homeError ? "—" : layer.count || 0,
     onSelect: (nextValue) => {
       setSelectedLayer(nextValue);
       assetBack();
@@ -52,7 +68,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
       <>
         <span className="asset-sidebar-filter-layer-label">
           <span className="layer-code">{option.code}</span>
-          <span className="layer-cn">{option.cn}</span>
+          <span className="layer-cn">{getWarehouseLayerLabel(option.code, option.cn, t)}</span>
         </span>
         <span className="count">{count}</span>
       </>
@@ -61,21 +77,24 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
     const layer = visibleLayers.find((option) => option.code === item.key);
     return {
       ...item,
-      tooltip: layer ? `${layer.code} ${layer.cn}` : undefined,
+      tooltip: layer
+        ? `${layer.code} ${getWarehouseLayerLabel(layer.code, layer.cn, t)}`
+        : undefined,
     };
   });
   const domainItems: AssetSidebarFilterItem[] = buildSidebarFacetItems({
     options: visibleDomains,
     selectedValue: domain,
     getValue: (item) => item,
-    getCount: (item) => domainCounts[item] || 0,
+    getCount: (item) => homeLoading || homeError ? "—" : domainCounts[item] || 0,
+    getLabel: (item) => getWarehouseDomainLabel(item, t),
     onSelect: (nextValue) => {
       setDomain(nextValue);
       assetBack();
     },
   }).map((item) => ({
     ...item,
-    tooltip: item.key.length > 6 ? item.key : undefined,
+    tooltip: typeof item.label === "string" && item.label.length > 6 ? item.label : undefined,
   }));
 
   const showCreateInSidebar = canEdit && (
@@ -83,56 +102,59 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
   );
 
   return (
-    <>
-      <AssetSidebarFilterGroup
-        title="数据分层"
-        allOption={{
-          key: "all-layers",
-          label: "全部层级",
-          count: Object.values(layerCounts).reduce(
-            (total, count) => total + count,
-            0,
-          ),
-          active: !selectedLayer,
-          onClick: () => {
-            setSelectedLayer(null);
-            assetBack();
-          },
-        }}
-        items={layerItems}
-      />
+    <div className="warehouse-sidebar">
+      <div className="warehouse-sidebar-filters">
+        <AssetSidebarFilterGroup
+          title={t("filterLayers")}
+          allOption={{
+            key: "all-layers",
+            label: t("allLayers"),
+            count: homeLoading || homeError ? "—" : Object.values(layerCounts).reduce(
+              (total, count) => total + count,
+              0,
+            ),
+            active: !selectedLayer,
+            onClick: () => {
+              setSelectedLayer(null);
+              assetBack();
+            },
+          }}
+          items={layerItems}
+        />
 
-      <AssetSidebarFilterGroup
-        title="主题域"
-        allOption={{
-          key: "all-domains",
-          label: "全部主题域",
-          count: Object.values(domainCounts).reduce(
-            (total, count) => total + count,
-            0,
-          ),
-          active: !domain,
-          onClick: () => {
-            setDomain(null);
-            assetBack();
-          },
-        }}
-        items={domainItems}
-      />
+        <AssetSidebarFilterGroup
+          title={t("filterDomains")}
+          allOption={{
+            key: "all-domains",
+            label: t("allDomains"),
+            count: homeLoading || homeError ? "—" : Object.values(domainCounts).reduce(
+              (total, count) => total + count,
+              0,
+            ),
+            active: !domain,
+            onClick: () => {
+              setDomain(null);
+              assetBack();
+            },
+          }}
+          items={domainItems}
+        />
 
-      <SidebarActionGroup
-        actions={
-          showCreateInSidebar
-            ? [
-                {
-                  key: "create-asset",
-                  label: "新增表",
-                  onClick: assetCreate,
-                },
-              ]
-            : []
-        }
-      />
-    </>
+        <SidebarActionGroup
+          actions={
+            showCreateInSidebar
+              ? [
+                  {
+                    key: "create-asset",
+                    label: t("addTable"),
+                    onClick: assetCreate,
+                  },
+                ]
+              : []
+          }
+        />
+      </div>
+      <ModuleReadiness result={warehouseReadiness} />
+    </div>
   );
 }

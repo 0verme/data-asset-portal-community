@@ -1054,8 +1054,13 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
                 aria-label={tCommon("navigation.moduleAndFilters")}
                 tabIndex={-1}
                 onClick={(event) => {
-                  if (event.target instanceof Element && event.target.closest(".side-item")) {
+                  if (sidebarOpen && event.target instanceof Element && event.target.closest(".side-item")) {
                     setSidebarOpen(false);
+                    requestAnimationFrame(() => {
+                      if (document.activeElement === document.body || sidebarRef.current?.contains(document.activeElement)) {
+                        hamburgerRef.current?.focus();
+                      }
+                    });
                   }
                 }}
               >

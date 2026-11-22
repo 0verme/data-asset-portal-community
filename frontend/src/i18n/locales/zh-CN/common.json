@@ -1,4 +1,22 @@
 {
+  "readiness": {
+    "title": "模块就绪度",
+    "updated": "更新时间",
+    "status": {
+      "ready": "已计算",
+      "loading": "加载中",
+      "unavailable": "暂不可用",
+      "pending_definition": "待接入",
+      "not_applicable": "不适用"
+    },
+    "description": {
+      "ready": "按已确认口径统计。",
+      "loading": "正在获取就绪度统计。",
+      "unavailable": "暂无可靠统计结果。",
+      "pending_definition": "统计口径待确认，尚未计算。",
+      "not_applicable": "此模块不适用该指标。"
+    }
+  },
   "app": {
     "documentTitle": "数据资产门户",
     "brandAlt": "数据资产门户",
@@ -296,5 +314,16 @@
     "loading": "正在加载资产统计…",
     "empty": "暂无资产统计",
     "error": "资产统计加载失败"
+  },
+  "confirmKeywordHint": "请输入 {{keyword}} 以确认删除。",
+  "pagination": {
+    "label": "表格分页",
+    "range": "第 {{first}}–{{last}} 条 / 共 {{total}} 条",
+    "size": "每页",
+    "sizeLabel": "每页条数",
+    "unit": "条",
+    "pages": "翻页",
+    "previous": "上一页",
+    "next": "下一页"
   }
 }

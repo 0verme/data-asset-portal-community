@@ -27,6 +27,7 @@ import {
   type DomainCountItem,
   type LayerCountItem,
 } from '../api/assets.ts';
+import { i18n } from '../i18n/index.ts';
 import { DOMAIN_ORDER, LAYER_OPTIONS } from '../config/assets.ts';
 import {
   DEFAULT_DETAIL_TAB,
@@ -242,7 +243,7 @@ export function useAssetModule({
       setLayers(layerList);
     } catch (error: unknown) {
       if (requestId !== homeRequestRef.current) return;
-      setHomeError(getErrorMessage(error, '资产元数据加载失败。'));
+      setHomeError(getErrorMessage(error, i18n.t('listErrorTitle', { ns: 'warehouse' })));
     } finally {
       if (requestId === homeRequestRef.current) setHomeLoading(false);
     }
@@ -268,7 +269,7 @@ export function useAssetModule({
         ddlDialect: 'postgresql',
         ddlDialectLabel: 'PostgreSQL SQL',
       });
-      setDetailError(getErrorMessage(error, '资产详情加载失败。'));
+      setDetailError(getErrorMessage(error, i18n.t('detailErrorTitle', { ns: 'warehouse' })));
     } finally {
       if (requestId === detailRequestRef.current) setDetailLoading(false);
     }
@@ -373,7 +374,7 @@ export function useAssetModule({
         setDetailTab(DEFAULT_DETAIL_TAB);
         scrollMainToTop();
       },
-      '保存表失败。',
+      i18n.t('saveFailed', { ns: 'warehouse' }),
       'asset:write',
     );
   };
@@ -389,7 +390,7 @@ export function useAssetModule({
         setRoute(getModuleListRoute('dwm') as AssetRoute);
         scrollMainToTop();
       },
-      '删除表失败。',
+      i18n.t('deleteFailed', { ns: 'warehouse' }),
       'asset:write',
     );
   };

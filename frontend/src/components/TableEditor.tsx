@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 import type { AssetTableField, AssetTableItem } from "../api/assets.ts";
 import {
@@ -24,8 +25,8 @@ import {
   buildColumnType,
   parseColumnType,
 } from "../constants/dataTypes.ts";
+import { getQualifiedAssetTableName } from "../utils/assetTableName.ts";
 import { LAYER_OPTIONS, type LayerOption } from "../config/assets.ts";
-import { buildModuleBreadcrumbs } from "../routing/navigation.ts";
 import { PageHeader } from "./common/index.ts";
 import {
   Button,
@@ -39,6 +40,7 @@ import {
 } from "../ui/index.ts";
 import { getTableFieldLabel, validateTableForm, type TableRowErrors, type TableValidation } from "./tableFormErrors.ts";
 import { AssetDeleteZone, AssetEditorActionBar } from "./views/asset/AssetEditorActions.tsx";
+import { getWarehouseDomainLabel, getWarehouseLayerLabel } from "./warehouseLabels.ts";
 import { Icon } from "./ui.tsx";
 
 interface EditorField {
@@ -178,6 +180,7 @@ export function TableEditor({
   onSave,
   onDelete,
 }: TableEditorProps) {
+  const { t } = useTranslation("warehouse");
   const isEdit = mode === "edit";
   const oldName = initial?.name || "";
   const [form, setForm] = React.useState<TableFormData>(() =>
@@ -200,8 +203,8 @@ export function TableEditor({
   }, [defaultLayer, initial]);
 
   const validation = React.useMemo(
-    () => touched ? validateTableForm(form, existingNames, oldName) : EMPTY_TABLE_VALIDATION,
-    [existingNames, form, oldName, touched],
+    () => touched ? validateTableForm(form, existingNames, oldName, t) : EMPTY_TABLE_VALIDATION,
+    [existingNames, form, oldName, touched, t],
   );
 
   React.useLayoutEffect(() => {
@@ -256,7 +259,7 @@ export function TableEditor({
   };
 
   const save = async (): Promise<void> => {
-    const nextValidation = validateTableForm(form, existingNames, oldName);
+    const nextValidation = validateTableForm(form, existingNames, oldName, t);
     const hasErrors = Object.keys(nextValidation.formFields).length > 0;
     setTouched(true);
     if (hasErrors || saving) {
@@ -296,51 +299,55 @@ export function TableEditor({
     }
   };
 
+  const requiredLabel = (label: string): React.ReactNode => (
+    <>
+      {label}<span className="asset-required" aria-hidden="true">{t("editor.required")}</span>
+    </>
+  );
+
   return (
-    <div id={TABLE_FORM_ID} ref={formRef}>
+    <div id={TABLE_FORM_ID} ref={formRef} className="asset-editor-page">
       <PageHeader
-        back={{ onClick: onCancel, text: isEdit ? "返回上一层" : "返回列表" }}
-        breadcrumbs={buildModuleBreadcrumbs(
-          "dwm",
-          [
-            ...(isEdit ? [{ label: oldName, onClick: onBackToDetail }] : []),
-            { label: isEdit ? "编辑表" : "新增表" },
-          ],
-          onBackToList,
-        )}
+        back={{ onClick: onCancel, text: isEdit ? t("editor.backToDetail") : t("backToList") }}
+        breadcrumbs={[
+          { label: t("menus.dwm", { ns: "navigation" }), onClick: onBackToList },
+          ...(isEdit ? [{ label: oldName, onClick: onBackToDetail }] : []),
+          { label: isEdit ? t("editTable") : t("addTable") },
+        ]}
         icon={isEdit ? "edit" : "plus"}
-        title={isEdit ? "编辑数据表" : "新增数据表"}
+        title={isEdit ? t("editor.editTitle") : t("editor.newTitle")}
         subtitle={
           isEdit
-            ? `当前表：dwm.${oldName}`
-            : "按现有 DWM 数据资产结构补充元数据与字段信息。"
+            ? t("editor.currentTable", { tableName: getQualifiedAssetTableName(oldName, initial?.schema) })
+            : t("editor.newDescription")
         }
       />
 
       <FormErrorSummary
         formId={TABLE_FORM_ID}
         errors={validation.formFields}
-        getFieldLabel={(field) => getTableFieldLabel(field, form.fields)}
-        title="请先修正以下问题"
+        getFieldLabel={(field) => getTableFieldLabel(field, form.fields, t)}
+        title={t("editor.validationSummaryTitle")}
       />
 
       <div className="form-card">
         <h3>
           <Icon name="table" size={14} />
-          基本信息
+          {t("editor.basicInformation")}
         </h3>
         <div className="form-grid">
           <FormField
             className="fl"
             formId={TABLE_FORM_ID}
             name="name"
-            label="表名（英文）"
+            label={requiredLabel(t("editor.fieldLabels.tableName"))}
             error={validation.formFields["name"]}
           >
             <Input
-              aria-label="表名（英文）"
+              aria-label={t("editor.fieldLabels.tableName")}
+              required
               className={`inp mono${validation.formFields["name"] ? " invalid" : ""}`}
-              placeholder="例如：dwm_xxx_detail_di"
+              placeholder={t("editor.placeholders.tableName")}
               value={form.name}
               onChange={(event) => setValue("name", event.target.value)}
             />
@@ -349,13 +356,14 @@ export function TableEditor({
             className="fl"
             formId={TABLE_FORM_ID}
             name="cn"
-            label="表中文名 / 业务含义"
+            label={requiredLabel(t("editor.fieldLabels.tableMeaning"))}
             error={validation.formFields["cn"]}
           >
             <Input
-              aria-label="表中文名 / 业务含义"
+              aria-label={t("editor.fieldLabels.tableMeaning")}
+              required
               className={`inp${validation.formFields["cn"] ? " invalid" : ""}`}
-              placeholder="例如：支付交易明细中间表"
+              placeholder={t("editor.placeholders.tableMeaning")}
               value={form.cn}
               onChange={(event) => setValue("cn", event.target.value)}
             />
@@ -364,78 +372,81 @@ export function TableEditor({
             className="fl"
             formId={TABLE_FORM_ID}
             name="domain"
-            label="主题域"
+            label={requiredLabel(t("editor.fieldLabels.domain"))}
             error={validation.formFields["domain"]}
           >
             <Select<string>
-              aria-label="主题域"
+              aria-label={t("editor.fieldLabels.domain")}
+              aria-required="true"
               className={`sel${validation.formFields["domain"] ? " invalid" : ""}`}
-              placeholder="请选择主题域"
+              placeholder={t("editor.placeholders.selectDomain")}
               value={form.domain || null}
               onValueChange={(value) => setValue("domain", value || "")}
-            >
-              <Select.Option value="">请选择主题域</Select.Option>
-              {domains.map((name) => <Select.Option key={name} value={name}>{name}</Select.Option>)}
-            </Select>
+              items={[
+                { value: "", label: t("editor.placeholders.selectDomain") },
+                ...domains.map((name) => ({ value: name, label: getWarehouseDomainLabel(name, t) })),
+              ]}
+            />
           </FormField>
           <FormField
             className="fl"
             formId={TABLE_FORM_ID}
             name="layer"
-            label="数据层级"
+            label={requiredLabel(t("editor.fieldLabels.layer"))}
             error={validation.formFields["layer"]}
           >
             <Select<string>
-              aria-label="数据层级"
+              aria-label={t("editor.fieldLabels.layer")}
+              aria-required="true"
               className={`sel${validation.formFields["layer"] ? " invalid" : ""}`}
-              placeholder="请选择数据层级"
+              placeholder={t("editor.placeholders.selectLayer")}
               value={form.layer || null}
               onValueChange={(value) => setValue("layer", value || "")}
             >
-              <Select.Option value="">请选择数据层级</Select.Option>
+              <Select.Option value="">{t("editor.placeholders.selectLayer")}</Select.Option>
               {layers.map((item) => {
                 const code = item.code;
-                const label = `${item.code} · ${item.cn || item.code}`;
+                const label = `${item.code} · ${getWarehouseLayerLabel(item.code, item.cn, t)}`;
                 return <Select.Option key={code} value={code}>{label}</Select.Option>;
               })}
             </Select>
           </FormField>
           <div className="fl">
-            <label>负责人</label>
+            <label>{t("owner")}</label>
             <Input
-              aria-label="负责人"
+              aria-label={t("owner")}
               className="inp"
-              placeholder="例如：何嘉佳"
+              placeholder={t("editor.placeholders.owner")}
               value={form.owner}
               onChange={(event) => setValue("owner", event.target.value)}
             />
           </div>
           <div className="fl">
-            <label>数据粒度</label>
+            <label>{t("grain")}</label>
             <Input
-              aria-label="数据粒度"
+              aria-label={t("grain")}
               className="inp"
-              placeholder="例如：一笔支付交易"
+              placeholder={t("editor.placeholders.grain")}
               value={form.grain}
               onChange={(event) => setValue("grain", event.target.value)}
             />
           </div>
           <div className="fl">
-            <label>更新周期</label>
+            <label>{t("updateCycle")}</label>
             <Input
-              aria-label="更新周期"
+              aria-label={t("updateCycle")}
               className="inp"
-              placeholder="例如：每日增量 T+1"
+              placeholder={t("editor.placeholders.updateCycle")}
               value={form.cycle}
               onChange={(event) => setValue("cycle", event.target.value)}
             />
           </div>
           <div className="fl full">
-            <label>表说明</label>
+            <label>{t("editor.fieldLabels.description")}</label>
             <Textarea
-              aria-label="表说明"
+              aria-label={t("editor.fieldLabels.description")}
               className="ta"
-              placeholder="描述表来源、加工逻辑和下游用途。"
+              placeholder={t("editor.placeholders.description")}
               value={form.desc}
               onChange={(event) => setValue("desc", event.target.value)}
             />
@@ -447,28 +458,28 @@ export function TableEditor({
         <div className="form-card-head">
           <h3>
             <Icon name="columns" size={14} />
-            字段信息
+            {t("fieldsTab")}
           </h3>
-          <span className="form-card-meta">共 {form.fields.length} 个字段</span>
+          <span className="form-card-meta">{t("fieldCountValue", { count: form.fields.length })}</span>
         </div>
         <div className="fe-scroll">
           <table className="fields-edit mobile-edit-table">
             <thead>
               <tr>
                 <th style={{ width: 40 }}>#</th>
-                <th style={{ minWidth: 160 }}>字段名</th>
-                <th style={{ minWidth: 140 }}>中文注释</th>
-                <th style={{ width: 160 }}>数据类型</th>
+                <th style={{ minWidth: 160 }}>{requiredLabel(t("fieldName"))}</th>
+                <th style={{ minWidth: 140 }}>{requiredLabel(t("fieldComment"))}</th>
+                <th style={{ width: 160 }}>{requiredLabel(t("fieldType"))}</th>
                 <th className="ctr" style={{ width: 64 }}>
-                  主键
+                  {t("editor.primaryKey")}
                 </th>
                 <th className="ctr" style={{ width: 64 }}>
-                  分区
+                  {t("partition")}
                 </th>
                 <th className="ctr" style={{ width: 64 }}>
-                  可空
+                  {t("nullable")}
                 </th>
-                <th style={{ minWidth: 180 }}>枚举 / 取值说明</th>
+                <th style={{ minWidth: 180 }}>{t("enumDescription")}</th>
                 <th style={{ width: 110 }}></th>
               </tr>
             </thead>
@@ -479,19 +490,20 @@ export function TableEditor({
 
                 return (
                   <tr key={field._key}>
-                    <td data-label="字段序号" className="idx-cell">
+                    <td data-label={t("editor.fieldNumber")} className="idx-cell">
                       {index + 1}
                     </td>
-                    <td data-label="字段名">
+                    <td data-label={t("fieldName")}>
                       <FormField
                         formId={TABLE_FORM_ID}
                         name={`fields.${field._key}.name`}
-                        label={`字段${index + 1}字段名`}
+                        label={requiredLabel(t("editor.fieldLabels.rowName", { index: index + 1 }))}
                         hideLabel
                         error={rowErrors.name}
                       >
                         <Input
-                          aria-label={`字段${index + 1}字段名`}
+                          aria-label={t("editor.fieldLabels.rowName", { index: index + 1 })}
+                          required
                           className={`cell-inp mono${rowErrors.name ? " invalid" : ""}`}
                           placeholder="field_name"
                           value={field.name}
@@ -501,18 +513,19 @@ export function TableEditor({
                         />
                       </FormField>
                     </td>
-                    <td data-label="中文注释">
+                    <td data-label={t("fieldComment")}>
                       <FormField
                         formId={TABLE_FORM_ID}
                         name={`fields.${field._key}.cn`}
-                        label={`字段${index + 1}中文注释`}
+                        label={requiredLabel(t("editor.fieldLabels.rowComment", { index: index + 1 }))}
                         hideLabel
                         error={rowErrors.cn}
                       >
                         <Input
-                          aria-label={`字段${index + 1}中文注释`}
+                          aria-label={t("editor.fieldLabels.rowComment", { index: index + 1 })}
+                          required
                           className={`cell-inp${rowErrors.cn ? " invalid" : ""}`}
-                          placeholder="字段含义"
+                          placeholder={t("editor.placeholders.fieldComment")}
                           value={field.cn}
                           onChange={(event) =>
                             setField(field._key, { cn: event.target.value })
@@ -520,17 +533,18 @@ export function TableEditor({
                         />
                       </FormField>
                     </td>
-                    <td data-label="数据类型">
+                    <td data-label={t("fieldType")}>
                       <div style={{ display: "grid", gap: 6 }}>
                         <FormField
                           formId={TABLE_FORM_ID}
                           name={`fields.${field._key}.typeBase`}
-                          label={`字段${index + 1}数据类型`}
+                          label={requiredLabel(t("editor.fieldLabels.rowType", { index: index + 1 }))}
                           hideLabel
                           error={rowErrors.typeField === "typeBase" ? rowErrors.type : undefined}
                         >
                           <Select<string>
-                            aria-label={`字段${index + 1}数据类型`}
+                            aria-label={t("editor.fieldLabels.rowType", { index: index + 1 })}
+                            aria-required="true"
                             className={`cell-inp mono${rowErrors.typeField === "typeBase" ? " invalid" : ""}`}
                             collisionAvoidance={{ side: "flip", align: "shift" }}
                             side="top"
@@ -571,15 +585,15 @@ export function TableEditor({
                           <FormField
                             formId={TABLE_FORM_ID}
                             name={`fields.${field._key}.typeLength`}
-                            label={`字段${index + 1}类型长度`}
+                            label={t("editor.fieldLabels.rowLength", { index: index + 1 })}
                             hideLabel
                             error={rowErrors.typeField === "typeLength" ? rowErrors.type : undefined}
                           >
                             <Input
-                              aria-label={`字段${index + 1}类型长度`}
+                              aria-label={t("editor.fieldLabels.rowLength", { index: index + 1 })}
                               className={`cell-inp mono${rowErrors.typeField === "typeLength" ? " invalid" : ""}`}
                               inputMode="numeric"
-                              placeholder={`长度，默认 ${DEFAULT_VARCHAR_LENGTH}`}
+                              placeholder={t("editor.placeholders.typeLength", { value: DEFAULT_VARCHAR_LENGTH })}
                               value={field.typeLength}
                               onChange={(event) =>
                                 setField(field._key, {
@@ -603,15 +617,15 @@ export function TableEditor({
                             <FormField
                               formId={TABLE_FORM_ID}
                               name={`fields.${field._key}.typePrecision`}
-                              label={`字段${index + 1}精度`}
+                              label={t("editor.fieldLabels.rowPrecision", { index: index + 1 })}
                               hideLabel
                               error={rowErrors.typeField === "typePrecision" ? rowErrors.type : undefined}
                             >
                               <Input
-                                aria-label={`字段${index + 1}精度`}
+                                aria-label={t("editor.fieldLabels.rowPrecision", { index: index + 1 })}
                                 className={`cell-inp mono${rowErrors.typeField === "typePrecision" ? " invalid" : ""}`}
                                 inputMode="numeric"
-                                placeholder={`precision，默认 ${DEFAULT_NUMERIC_PRECISION}`}
+                                placeholder={t("editor.placeholders.typePrecision", { value: DEFAULT_NUMERIC_PRECISION })}
                                 value={field.typePrecision}
                                 onChange={(event) =>
                                   setField(field._key, {
@@ -626,15 +640,15 @@ export function TableEditor({
                             <FormField
                               formId={TABLE_FORM_ID}
                               name={`fields.${field._key}.typeScale`}
-                              label={`字段${index + 1}小数位`}
+                              label={t("editor.fieldLabels.rowScale", { index: index + 1 })}
                               hideLabel
                               error={rowErrors.typeField === "typeScale" ? rowErrors.type : undefined}
                             >
                               <Input
-                                aria-label={`字段${index + 1}小数位`}
+                                aria-label={t("editor.fieldLabels.rowScale", { index: index + 1 })}
                                 className={`cell-inp mono${rowErrors.typeField === "typeScale" ? " invalid" : ""}`}
                                 inputMode="numeric"
-                                placeholder={`scale，默认 ${DEFAULT_NUMERIC_SCALE}`}
+                                placeholder={t("editor.placeholders.typeScale", { value: DEFAULT_NUMERIC_SCALE })}
                                 value={field.typeScale}
                                 onChange={(event) =>
                                   setField(field._key, {
@@ -650,16 +664,16 @@ export function TableEditor({
                         ) : null}
                       </div>
                     </td>
-                    <td data-label="主键" className="ctr">
+                    <td data-label={t("editor.primaryKey")} className="ctr">
                       <FormField
                         formId={TABLE_FORM_ID}
                         name={`fields.${field._key}.pk`}
-                        label={`字段${index + 1}主键设置`}
+                        label={t("editor.fieldLabels.rowPrimaryKey", { index: index + 1 })}
                         hideLabel
                         error={rowErrors.nullable}
                       >
                         <Button
-                          aria-label={`${field.pk ? "取消" : "设为"}主键 ${field.name || `字段${index + 1}`}`}
+                          aria-label={t(field.pk ? "editor.unsetPrimaryKey" : "editor.setPrimaryKey", { fieldName: field.name || t("editor.fieldNumberValue", { index: index + 1 }) })}
                           aria-pressed={field.pk}
                           className={`cbtn amber${field.pk ? " on" : ""}${rowErrors.nullable ? " invalid" : ""}`}
                           onClick={() => setField(field._key, { pk: !field.pk })}
@@ -671,9 +685,9 @@ export function TableEditor({
                         </Button>
                       </FormField>
                     </td>
-                    <td data-label="分区" className="ctr">
+                    <td data-label={t("partition")} className="ctr">
                       <Button
-                        aria-label={`${field.part ? "取消" : "设为"}分区字段 ${field.name || `字段${index + 1}`}`}
+                        aria-label={t(field.part ? "editor.unsetPartition" : "editor.setPartition", { fieldName: field.name || t("editor.fieldNumberValue", { index: index + 1 }) })}
                         aria-pressed={field.part}
                         className={`cbtn cyan${field.part ? " on" : ""}`}
                         onClick={() =>
@@ -686,9 +700,9 @@ export function TableEditor({
                         <Icon name="hash" size={13} />
                       </Button>
                     </td>
-                    <td data-label="可空" className="ctr">
+                    <td data-label={t("nullable")} className="ctr">
                       <Button
-                        aria-label={`${field.nullable ? "禁止" : "允许"}字段可空 ${field.name || `字段${index + 1}`}`}
+                        aria-label={t(field.nullable ? "editor.disallowNullable" : "editor.allowNullable", { fieldName: field.name || t("editor.fieldNumberValue", { index: index + 1 }) })}
                         aria-pressed={field.nullable}
                         className={`cbtn${field.nullable ? " on" : ""}`}
                         onClick={() =>
@@ -702,11 +716,11 @@ export function TableEditor({
                         <Icon name="check" size={13} />
                       </Button>
                     </td>
-                    <td data-label="枚举 / 取值说明">
+                    <td data-label={t("enumDescription")}>
                       <Input
-                        aria-label={`字段${index + 1}枚举 / 取值说明`}
+                        aria-label={t("editor.fieldLabels.rowEnum", { index: index + 1 })}
                         className="cell-inp"
-                        placeholder="例如：SUCCESS-成功 / FAIL-失败"
+                        placeholder={t("editor.placeholders.enum")}
                         value={field.enum}
                         onChange={(event) =>
                           setField(field._key, { enum: event.target.value })
@@ -716,7 +730,7 @@ export function TableEditor({
                     <td data-label="">
                       <div className="row-tools">
                         <IconButton
-                          aria-label={`上移字段 ${field.name || index + 1}`}
+                          aria-label={t("editor.moveFieldUp", { fieldName: field.name || index + 1 })}
                           className="icon-btn"
                           disabled={index === 0}
                           icon={<Icon name="up" size={14} />}
@@ -726,7 +740,7 @@ export function TableEditor({
                           variant="tertiary"
                         />
                         <IconButton
-                          aria-label={`下移字段 ${field.name || index + 1}`}
+                          aria-label={t("editor.moveFieldDown", { fieldName: field.name || index + 1 })}
                           className="icon-btn"
                           disabled={index === form.fields.length - 1}
                           icon={<Icon name="down" size={14} />}
@@ -736,7 +750,7 @@ export function TableEditor({
                           variant="tertiary"
                         />
                         <IconButton
-                          aria-label={`删除字段 ${field.name || index + 1}`}
+                          aria-label={t("editor.removeField", { fieldName: field.name || index + 1 })}
                           className="icon-btn danger"
                           disabled={form.fields.length === 1}
                           icon={<Icon name="trash" size={14} />}
@@ -756,13 +770,13 @@ export function TableEditor({
         <FormField
           formId={TABLE_FORM_ID}
           name="fields"
-          label="字段信息"
+          label={t("fieldsTab")}
           hideLabel
           error={validation.formFields["fields"]}
         >
           <Button className="add-field" onClick={addField} size="sm" type="button" variant="tertiary">
             <Icon name="plus" size={14} />
-            新增字段
+            {t("editor.addField")}
           </Button>
         </FormField>
       </div>
@@ -770,8 +784,8 @@ export function TableEditor({
       <AssetEditorActionBar
         note={
           isEdit
-            ? "保存后会更新表元数据、字段列表和 DDL 展示。"
-            : "保存后会加入当前 DWM 资产列表。"
+            ? t("editor.editSaveNote")
+            : t("editor.newSaveNote")
         }
         onCancel={onCancel}
         onSave={save}

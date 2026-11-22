@@ -24,6 +24,7 @@ import "./styles/app.css";
 import "./styles/push.css";
 import "./styles/report.css";
 import "./styles/upstream.css";
+import "./styles/warehouse.css";
 import "./styles/indicator.css";
 import "./styles/system.css";
 import "./styles/search.css";

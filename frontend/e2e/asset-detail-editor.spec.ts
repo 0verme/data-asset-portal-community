@@ -122,7 +122,7 @@ test("guest and read-only users can inspect fields and DDL but cannot edit asset
       await page.locator(".main-inner").evaluate((element) => element.scrollTo(0, 0));
       await page.screenshot({ path: testInfo.outputPath("asset-detail-fields-1280.png"), fullPage: true });
       await page.getByRole("button", { name: "复制表名" }).click();
-      await expect.poll(() => page.evaluate(() => sessionStorage.getItem("dap-test-copied-text"))).toBe(`dwm.${EXISTING_ASSET}`);
+      await expect.poll(() => page.evaluate(() => sessionStorage.getItem("dap-test-copied-text"))).toBe(EXISTING_ASSET);
       await expect(page.getByRole("button", { name: "已复制" }).first()).toBeVisible();
     }
     await fieldTab.focus();

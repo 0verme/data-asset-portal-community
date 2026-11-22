@@ -67,8 +67,12 @@ test("all target asset sidebar dimensions have an explicit reset entry", async (
 		readFile(pushSidebarPath, "utf8"),
 	]);
 
-	assertAllOption(asset, "全部层级");
-	assertAllOption(asset, "全部主题域");
+	assert.match(asset, /label: t\("allLayers"\)/);
+	assert.match(asset, /label: t\("allDomains"\)/);
+	assert.match(asset, /active: !selectedLayer/);
+	assert.match(asset, /active: !domain/);
+	assert.match(asset, /setSelectedLayer\(null\)/);
+	assert.match(asset, /setDomain\(null\)/);
 	assertAllOption(upstream, "全部类型");
 	assertAllOption(report, "全部报表类型");
 	assertAllOption(report, "全部归属部门");
@@ -133,8 +137,8 @@ test("all entries retain global facet counts rather than current-page lengths", 
 		pushSidebarPath,
 	);
 
-	assert.match(source, /count: Object\.values\(layerCounts\)\.reduce/);
-	assert.match(source, /count: Object\.values\(domainCounts\)\.reduce/);
+	assert.match(source, /count: homeLoading \|\| homeError \? "—" : Object\.values\(layerCounts\)\.reduce/);
+	assert.match(source, /count: homeLoading \|\| homeError \? "—" : Object\.values\(domainCounts\)\.reduce/);
 	assert.match(source, /count: upstreamSystemCount/);
 	assert.doesNotMatch(source, /count: upstreamSystems\.length/);
 	assert.match(source, /count: reportCount/);

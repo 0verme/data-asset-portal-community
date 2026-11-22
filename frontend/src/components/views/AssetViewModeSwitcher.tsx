@@ -1,17 +1,19 @@
+import { useTranslation } from "react-i18next";
+
 import { Button } from "../../ui/index.ts";
 import type { ViewMode } from "../common/ViewModeSwitcher.tsx";
 import { Icon } from "../ui.tsx";
 
 interface ViewModeOption {
   value: ViewMode;
-  label: string;
+  labelKey: "viewModes.list" | "viewModes.card" | "viewModes.group";
   icon: string;
 }
 
 const ASSET_VIEW_MODES: readonly ViewModeOption[] = [
-  { value: "list", label: "列表", icon: "list" },
-  { value: "card", label: "卡片", icon: "grid" },
-  { value: "group", label: "分组", icon: "layers" },
+  { value: "list", labelKey: "viewModes.list", icon: "list" },
+  { value: "card", labelKey: "viewModes.card", icon: "grid" },
+  { value: "group", labelKey: "viewModes.group", icon: "layers" },
 ];
 
 export interface AssetViewModeSwitcherProps {
@@ -20,8 +22,9 @@ export interface AssetViewModeSwitcherProps {
 }
 
 export function AssetViewModeSwitcher({ value, onChange }: AssetViewModeSwitcherProps) {
+  const { t } = useTranslation("warehouse");
   return (
-    <div className="seg asset-view-mode-switcher" role="group" aria-label="视图切换">
+    <div className="seg asset-view-mode-switcher" role="group" aria-label={t("viewModes.label")}>
       {ASSET_VIEW_MODES.map((mode) => (
         <Button
           key={mode.value}
@@ -31,7 +34,7 @@ export function AssetViewModeSwitcher({ value, onChange }: AssetViewModeSwitcher
           aria-pressed={value === mode.value}
           onClick={() => onChange(mode.value)}
         >
-          <Icon name={mode.icon} size={15} />{mode.label}
+          <Icon name={mode.icon} size={15} />{t(mode.labelKey)}
         </Button>
       ))}
     </div>

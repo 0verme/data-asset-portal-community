@@ -1,4 +1,22 @@
 {
+  "readiness": {
+    "title": "Module readiness",
+    "updated": "Updated",
+    "status": {
+      "ready": "Calculated",
+      "loading": "Loading",
+      "unavailable": "Unavailable",
+      "pending_definition": "Pending integration",
+      "not_applicable": "Not applicable"
+    },
+    "description": {
+      "ready": "Based on the confirmed definition.",
+      "loading": "Retrieving readiness data.",
+      "unavailable": "Reliable results are unavailable.",
+      "pending_definition": "The metric definition is pending. No result yet.",
+      "not_applicable": "This metric does not apply to the module."
+    }
+  },
   "app": {
     "documentTitle": "Data Asset Portal",
     "brandAlt": "Data Asset Portal",
@@ -296,5 +314,16 @@
     "loading": "Loading asset statistics…",
     "empty": "No asset statistics available",
     "error": "Could not load asset statistics"
+  },
+  "confirmKeywordHint": "Enter {{keyword}} to confirm deletion.",
+  "pagination": {
+    "label": "Table pagination",
+    "range": "{{first}}–{{last}} of {{total}}",
+    "size": "Show",
+    "sizeLabel": "Rows per page",
+    "unit": "rows",
+    "pages": "Pages",
+    "previous": "Previous",
+    "next": "Next"
   }
 }

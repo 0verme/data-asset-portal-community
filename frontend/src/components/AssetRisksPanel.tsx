@@ -13,28 +13,29 @@
 // limitations under the License.
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { formatDateTime } from "../utils/date.ts";
 import { Icon } from "./ui.tsx";
 
 interface SeverityMeta {
-    label: string;
+    labelKey: "risk.severity.error" | "risk.severity.warning" | "risk.severity.info";
     tagClass: string;
 }
 
 const SEVERITY_META: Record<string, SeverityMeta> = {
-    error: { label: "严重", tagClass: "tag-danger" },
-    warning: { label: "警告", tagClass: "tag-warn" },
-    info: { label: "提示", tagClass: "tag-info" },
+    error: { labelKey: "risk.severity.error", tagClass: "tag-danger" },
+    warning: { labelKey: "risk.severity.warning", tagClass: "tag-warn" },
+    info: { labelKey: "risk.severity.info", tagClass: "tag-info" },
 };
-const DEFAULT_SEVERITY: SeverityMeta = { label: "警告", tagClass: "tag-warn" };
+const DEFAULT_SEVERITY: SeverityMeta = { labelKey: "risk.severity.warning", tagClass: "tag-warn" };
 
-const SOURCE_META: Record<string, string> = {
-    portal: "资产门户",
-    code_audit: "代码审计",
-    manual: "人工",
-    import: "导入",
-    external: "外部",
+const SOURCE_META: Record<string, "risk.sources.portal" | "risk.sources.codeAudit" | "risk.sources.manual" | "risk.sources.import" | "risk.sources.external"> = {
+    portal: "risk.sources.portal",
+    code_audit: "risk.sources.codeAudit",
+    manual: "risk.sources.manual",
+    import: "risk.sources.import",
+    external: "risk.sources.external",
 };
 
 interface AssetRisk {
@@ -92,10 +93,11 @@ function RiskMeta({ label, value, mono = false }: RiskMetaProps) {
 }
 
 function AssetRiskCard({ risk }: { risk: AssetRisk }) {
+    const { t } = useTranslation("warehouse");
     const severity =
         SEVERITY_META[risk.severity || ""] || DEFAULT_SEVERITY;
-    const source =
-        SOURCE_META[risk.risk_source || ""] || getText(risk.risk_source);
+    const sourceKey = SOURCE_META[risk.risk_source || ""];
+    const source = sourceKey ? t(sourceKey) : getText(risk.risk_source);
     const assetName = getText(risk.asset_name || risk.asset_key);
     const actionUrl = getSafeActionUrl(risk.action_url);
 
@@ -104,7 +106,7 @@ function AssetRiskCard({ risk }: { risk: AssetRisk }) {
             <div className="asset-risk-card-head">
                 <div className="asset-risk-tags">
                     <span className={`tag ${severity.tagClass}`}>
-                        {severity.label}
+                        {t(severity.labelKey)}
                     </span>
                     <span className="tag tag-neutral">{source}</span>
                 </div>
@@ -119,16 +121,16 @@ function AssetRiskCard({ risk }: { risk: AssetRisk }) {
                 <span className="asset-risk-rule mono">
                     {getText(risk.rule_code)}
                 </span>
-                <span>{getText(risk.rule_name, "未命名规则")}</span>
+                <span>{getText(risk.rule_name, t("risk.unnamedRule"))}</span>
             </div>
 
             <div className="asset-risk-meta">
-                <RiskMeta label="资产" value={assetName} mono />
-                <RiskMeta label="来源" value={source} />
+                <RiskMeta label={t("risk.asset")} value={assetName} mono />
+                <RiskMeta label={t("risk.source")} value={source} />
             </div>
 
             <div className="asset-risk-text">
-                {getText(risk.message, "暂无风险说明")}
+                {getText(risk.message, t("risk.noDescription"))}
             </div>
             {risk.suggestion ? (
                 <div className="asset-risk-suggestion">
@@ -140,7 +142,7 @@ function AssetRiskCard({ risk }: { risk: AssetRisk }) {
                 <div className="asset-risk-actions">
                     <a className="btn" href={actionUrl}>
                         <Icon name="edit" size={14} />
-                        去处理
+                        {t("risk.resolve")}
                     </a>
                 </div>
             ) : null}
@@ -153,6 +155,7 @@ export interface AssetRisksPanelProps {
 }
 
 export function AssetRisksPanel({ assetRisks }: AssetRisksPanelProps) {
+    const { t } = useTranslation("warehouse");
     const risks = Array.isArray(assetRisks)
         ? assetRisks.filter(isAssetRisk)
         : [];
@@ -165,7 +168,7 @@ export function AssetRisksPanel({ assetRisks }: AssetRisksPanelProps) {
             <div className="asset-risks-head">
                 <h3 id="asset-risks-title">
                     <Icon name="inbox" size={15} />
-                    资产风险
+                    {t("risk.title")}
                 </h3>
                 <span className="asset-risks-count mono">{risks.length}</span>
             </div>
@@ -183,7 +186,7 @@ export function AssetRisksPanel({ assetRisks }: AssetRisksPanelProps) {
                     ))}
                 </div>
             ) : (
-                <div className="asset-risks-empty">当前暂无资产风险</div>
+                <div className="asset-risks-empty">{t("risk.empty")}</div>
             )}
         </section>
     );

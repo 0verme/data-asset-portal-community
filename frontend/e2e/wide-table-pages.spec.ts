@@ -85,6 +85,13 @@ test("audited wide-table pages keep every column reachable without clipping outs
     await test.step(label, async () => {
       await page.setViewportSize({ width: 1440, height: 850 });
       await page.goto(route);
+      // The mock word-root catalog starts empty. Give its table a row in this browser session.
+      if (route === "/root-management" && process.env["VITE_API_MODE"] !== "remote") {
+        await page.locator(".root-page .page-head").getByRole("button", { name: "新增词根" }).click();
+        await page.getByLabel("词根缩写").fill("widerow");
+        await page.getByLabel("中文名").fill("宽表测试词根");
+        await page.getByRole("button", { name: "保存", exact: true }).click();
+      }
       await verifyWideTable(page, label);
       await page.setViewportSize({ width: 390, height: 844 });
       await verifyMobileCard(page, label);
