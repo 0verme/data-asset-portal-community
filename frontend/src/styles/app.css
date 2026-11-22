@@ -2044,7 +2044,7 @@
 
   }
 
-  @media (width < 960px) {
+  @media (max-width: 1024px) {
     .topbar:not(.portal-topbar) .language-switcher { display: none; }
     .sidebar-language-switcher { display: flex; justify-content: flex-end; padding: 0 0 8px; }
     .sidebar-language-switcher .language-switcher { min-width: 56px; height: 40px; }
