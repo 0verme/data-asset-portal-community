@@ -114,6 +114,7 @@ test("home and peer workspaces retain shell and readiness hierarchy", async ({ p
   await page.keyboard.press("Escape");
   await expect(hamburger).toBeFocused();
   const brand = page.locator("button.brand");
+  await expect(brand).toHaveAccessibleName("数据资产门户");
   await brand.focus();
   await page.keyboard.press("Enter");
   await expect(page.locator(".sp-stats")).toBeVisible();

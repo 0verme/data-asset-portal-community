@@ -841,7 +841,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
               />
             ) : null}
 
-            <button type="button" className="brand" aria-label={tCommon("navigation.backHome")} onClick={() => switchModule("portal")}>
+            <button type="button" className="brand" aria-label={branding.site.display_name} onClick={() => switchModule("portal")}>
               <span className="brand-mark">
                 <BrandLogo src={branding.site.logo_url} alt={branding.site.display_name} />
               </span>
