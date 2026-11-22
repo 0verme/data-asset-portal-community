@@ -142,7 +142,9 @@ export function Dialog({
           render={(
             <KumoDialogPrimitive.Popup
               role={role}
-              aria-modal="true"
+              aria-modal={open || undefined}
+              inert={!open}
+              aria-hidden={open ? undefined : true}
               initialFocus={initialFocus}
               finalFocus={() => returnFocusRef.current?.isConnected ? returnFocusRef.current : false}
               aria-label={title == null ? ariaLabel : undefined}
