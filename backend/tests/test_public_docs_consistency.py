@@ -6,7 +6,8 @@ These tests pin the facts that repeatedly drifted in the public docs:
 * the AI capability must stay documented as opt-in and disabled by default;
 * the retired "vector search / Embedding / LLM is explicitly out of scope"
   assertion must not come back, because it contradicted the shipped adapters;
-* the public static Demo must not be described as calling a real model.
+* the public Demo must be documented as a real-backend Remote deployment,
+  while the Frontend Mock adapter stays documented as mock-only.
 
 They are intentionally narrow: they guard statements the repository has already
 gotten wrong once, not general prose style.
@@ -155,10 +156,18 @@ class PublicDocsConsistencyTests(unittest.TestCase):
         # optional RAG / AI integration.
         self.assertIn("可选", readme)
 
-    def test_public_static_demo_is_not_described_as_real_ai(self) -> None:
+    def test_public_demo_is_documented_as_real_backend_not_static_mock(self) -> None:
         readme = _read("README.md")
-        self.assertIn("不是真实 DeepSeek 输出", readme)
+        # data.overme.cn is a real backend deployment using Remote API.
+        self.assertIn("https://data.overme.cn/", readme)
+        self.assertIn("使用真实 DAP 后端和 Remote API", readme)
+        self.assertNotIn("静态 mock bundle", readme)
+        self.assertNotIn("公网静态 Demo", readme)
+        self.assertIn("在线演示站使用真实 AI 问答吗", readme)
+        self.assertNotIn("公网静态 Demo 用的是真实 DeepSeek 吗", readme)
+        # The Frontend Mock adapter must stay documented as mock-only.
         self.assertIn("docs/ai-ask-static-mock.md", readme)
+        self.assertIn("不调用任何 RAG 服务或 LLM", readme)
         static_mock = _read("docs/ai-ask-static-mock.md")
         self.assertIn("不会执行真实 AI", static_mock)
         self.assertIn("VITE_API_MODE=mock", static_mock)
