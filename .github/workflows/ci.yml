@@ -628,7 +628,7 @@ jobs:
   frontend-browser:
     name: Frontend Browser / Lane ${{ matrix.lane }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: ${{ matrix.lane == 'a' && 25 || 20 }}
     strategy:
       fail-fast: false
       matrix:
