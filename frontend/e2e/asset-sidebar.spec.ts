@@ -255,7 +255,7 @@ test("warehouse facets share one desktop surface and remain reachable in the dra
   await openAssetList(page, "guest");
   const rail = page.locator("#mobile-sidebar");
   const panel = rail.locator(":scope > .warehouse-sidebar");
-  const groups = panel.locator(":scope > .asset-sidebar-filter-group");
+  const groups = panel.locator(".warehouse-sidebar-filters > .asset-sidebar-filter-group");
   const transparent = "rgba(0, 0, 0, 0)";
   await expect(rail).toHaveCSS("width", "244px");
   await expect(rail).toHaveCSS("background-color", transparent);
@@ -279,4 +279,47 @@ test("warehouse facets share one desktop surface and remain reachable in the dra
   await expect(page).toHaveURL(/domain=/);
   await expect(rail).not.toHaveClass(/open/);
   await expect(page.locator("button.hamburger")).toBeFocused();
+});
+
+test("warehouse matches the upstream desktop frame and keeps pending readiness below scrollable filters", async ({ page }) => {
+  await page.setViewportSize({ width: 1626, height: 1314 });
+  await page.goto("/upstream");
+  const enabled = page.getByRole("progressbar", { name: "系统启用比例" });
+  await expect(enabled).toHaveAttribute("value", "7");
+  await expect(enabled).toHaveAttribute("max", "8");
+  const baseline = await page.locator(".upstream-sidebar").boundingBox();
+  const headingStyle = () => page.locator("h1.page-title").evaluate((element) => {
+    const { fontSize, fontWeight, lineHeight, gap } = getComputedStyle(element);
+    return { fontSize, fontWeight, lineHeight, gap };
+  });
+  const heading = await headingStyle();
+  await openAssetList(page, "guest");
+  const panel = page.locator(".warehouse-sidebar");
+  expect(await panel.boundingBox()).toEqual(baseline);
+  expect(await headingStyle()).toEqual(heading);
+  const readiness = panel.getByRole("region", { name: "模块就绪度" });
+  await expect(readiness.getByRole("status")).toHaveText("待接入");
+  await expect(readiness.getByRole("progressbar")).toHaveCount(0);
+  await expect(readiness).not.toContainText("%");
+  const bounds = await readiness.boundingBox();
+  for (const group of await panel.locator(".asset-sidebar-filter-heading").all()) await group.click();
+  expect(await readiness.boundingBox()).toEqual(bounds);
+  await page.goto("/data-warehouse/dwm_trade_order_item_di");
+  await expect(readiness).toBeVisible();
+  expect(await readiness.boundingBox()).toEqual(bounds);
+
+  await page.setViewportSize({ width: 1280, height: 640 });
+  const last = panel.locator(".asset-sidebar-filter-option").last();
+  await last.scrollIntoViewIfNeeded();
+  const lastBox = await last.boundingBox();
+  const readyBox = await readiness.boundingBox();
+  expect(lastBox!.y + lastBox!.height).toBeLessThanOrEqual(readyBox!.y);
+  const footer = await page.locator("footer").last().boundingBox();
+  expect(readyBox!.y + readyBox!.height).toBeLessThanOrEqual(footer!.y);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openMobileSidebar(page, 390);
+  await expect(readiness).toBeInViewport({ ratio: 1 });
+  await last.scrollIntoViewIfNeeded();
+  await expect(last).toBeInViewport({ ratio: 1 });
+  await expect(readiness).toBeInViewport({ ratio: 1 });
 });
