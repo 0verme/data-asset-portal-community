@@ -47,41 +47,6 @@
   cursor: default;
 }
 
-/* List heading and toolbar. */
-.upstream-list-page .page-head {
-  align-items: center;
-  gap: 20px 32px;
-  margin-bottom: 24px;
-}
-
-.upstream-list-page .page-head > div:first-child {
-  min-width: 0;
-}
-
-.upstream-list-page .page-title {
-  gap: 10px;
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: 0;
-  line-height: 1.25;
-}
-
-.upstream-list-page .page-title svg {
-  flex: 0 0 auto;
-}
-
-.upstream-list-page .page-sub {
-  margin-top: 8px;
-  color: var(--ink-2);
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.upstream-list-page .head-actions {
-  justify-content: flex-end;
-  gap: 10px;
-}
-
 .upstream-list-page .table-list-sort {
   min-width: 148px;
 }
@@ -1080,7 +1045,6 @@
 }
 
 @media (max-width: 560px) {
-  .upstream-list-page .page-title,
   .upstream-editor-page .editor-title h2 {
     font-size: 20px;
   }
@@ -1248,10 +1212,6 @@
 .upstream-sidebar .side-title { margin: 0 0 4px; padding-inline: 8px; }
 .upstream-sidebar .side-group + .side-group { padding-top: 12px; border-top: 1px solid var(--line); }
 .upstream-sidebar .side-item { min-height: 37px; padding: 6px 10px 6px 13px; margin-block: 1px; gap: 8px; }
-.upstream-sidebar .side-item.active { color: var(--accent); background: var(--accent-soft); }
-.upstream-sidebar .side-item.active::before { content: ""; position: absolute; inset: 7px auto 7px 0; width: 3px; border-radius: 4px; background: var(--accent); }
-.upstream-sidebar .side-item .count { min-width: 24px; text-align: center; font-variant-numeric: tabular-nums; }
-.upstream-sidebar .side-item.active .count { color: inherit; border: 1px solid var(--accent-line); background: var(--surface); border-radius: 7px; }
 .upstream-sidebar .upstream-sidebar-filter-tools { margin: 0 0 8px; }
 .upstream-summary {
   flex: none;

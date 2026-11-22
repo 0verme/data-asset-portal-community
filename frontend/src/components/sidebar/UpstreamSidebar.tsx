@@ -6,6 +6,19 @@ import { SidebarActionGroup } from "./common/SidebarActionGroup.tsx";
 import { SidebarFilterGroup } from "./common/SidebarFilterGroup.tsx";
 import { StatusFilterGroup } from "./common/StatusFilterGroup.tsx";
 import { Icon } from "../ui.tsx";
+import { ModuleReadiness } from "./common/ModuleReadiness.tsx";
+import type { ModuleReadinessResult } from "./common/moduleReadiness.ts";
+
+const upstreamReadiness: ModuleReadinessResult = {
+  moduleId: "upstream",
+  metricId: null,
+  status: "pending_definition",
+  definition: null,
+  numerator: null,
+  denominator: null,
+  percentage: null,
+  updatedAt: null,
+};
 
 export interface UpstreamSidebarProps {
   upstream: UseUpstreamModuleResult;
@@ -99,6 +112,7 @@ export function UpstreamSidebar({ upstream, statusOptions, requireLogin, canEdit
           </>
         ) : <p>{upstream.upstreamError ? "统计暂不可用" : "正在加载统计…"}</p>}
       </section>
+      <ModuleReadiness result={upstreamReadiness} />
     </div>
   );
 }

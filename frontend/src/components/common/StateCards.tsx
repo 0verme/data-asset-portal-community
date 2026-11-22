@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 // Copyright 2025 Jearhe
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,13 +44,14 @@ export interface ErrorStateProps {
   onRetry?: MouseEventHandler<HTMLButtonElement> | undefined;
 }
 
-export function ErrorState({ title, desc, retryText = "重新加载", onRetry }: ErrorStateProps) {
+export function ErrorState({ title, desc, retryText, onRetry }: ErrorStateProps) {
+  const { t } = useTranslation("common");
   return (
     <div className="state-card state-card-error" role="alert">
       <div className="ec"><Icon name="inbox" size={24} /></div>
       <h4>{title}</h4>
       <p>{desc}</p>
-      <button className="btn state-btn" onClick={onRetry}>{retryText}</button>
+      <button className="btn state-btn" onClick={onRetry}>{retryText ?? t("shared.reload")}</button>
     </div>
   );
 }
@@ -91,6 +93,9 @@ export interface StatusBadgeProps {
  *   2) on(布尔) + 可选 label：二态启停或操作结果，label 用于保留成功/失败等语义。
  */
 export function StatusBadge({ status, metaMap, on, label }: StatusBadgeProps) {
-  const presentation = resolveStatusBadgePresentation({ status, metaMap, on, label });
+  const { t } = useTranslation("common");
+  const presentation = resolveStatusBadgePresentation({ status, metaMap, on, label }, {
+    enabled: t("shared.enabled"), disabled: t("shared.disabled"), unknown: t("shared.unknown"),
+  });
   return <DAPStatus tone={presentation.tone}>{presentation.label}</DAPStatus>;
 }

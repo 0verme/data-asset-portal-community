@@ -1,17 +1,17 @@
+import { useTranslation } from "react-i18next";
 import { Icon } from "../ui.tsx";
 
 export type ViewMode = "list" | "card" | "group";
 
 interface ViewModeOption {
   value: ViewMode;
-  label: string;
   icon: string;
 }
 
 const VIEW_MODES: readonly ViewModeOption[] = [
-  { value: "list", label: "列表", icon: "list" },
-  { value: "card", label: "卡片", icon: "grid" },
-  { value: "group", label: "分组", icon: "layers" },
+  { value: "list", icon: "list" },
+  { value: "card", icon: "grid" },
+  { value: "group", icon: "layers" },
 ];
 
 export interface ViewModeSwitcherProps {
@@ -25,12 +25,13 @@ export function ViewModeSwitcher({
   onChange,
   modes = VIEW_MODES.map((mode) => mode.value),
 }: ViewModeSwitcherProps) {
+  const { t } = useTranslation("common");
   const visibleModes = modes
     .map((modeValue) => VIEW_MODES.find((mode) => mode.value === modeValue))
     .filter((mode): mode is ViewModeOption => Boolean(mode));
 
   return (
-    <div className="seg" aria-label="视图切换">
+    <div className="seg" role="group" aria-label={t("shared.viewMode")}>
       {visibleModes.map((mode) => (
         <button
           key={mode.value}
@@ -39,7 +40,7 @@ export function ViewModeSwitcher({
           aria-pressed={value === mode.value}
           onClick={() => onChange(mode.value)}
         >
-          <Icon name={mode.icon} size={15} />{mode.label}
+          <Icon name={mode.icon} size={15} />{t(`shared.${mode.value}`)}
         </button>
       ))}
     </div>

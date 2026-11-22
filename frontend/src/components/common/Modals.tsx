@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { type ReactNode } from "react";
+import type { ReactNode } from "react";
 
+import { FormModal as AdapterFormModal } from "../../ui/FormModal.tsx";
 import { Icon } from "../ui.tsx";
 
 export interface FormModalProps {
@@ -30,55 +31,6 @@ export interface FormModalProps {
   showSubmit?: boolean | undefined;
 }
 
-export function FormModal({
-  open,
-  title,
-  subtitle,
-  icon = "edit",
-  children,
-  onClose,
-  onSubmit,
-  submitText = "保存修改",
-  cancelText = "取消",
-  busy = false,
-  showSubmit = true,
-}: FormModalProps) {
-  React.useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) onClose?.();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [busy, onClose, open]);
-
-  if (!open) return null;
-
-  return (
-    <div className="confirm-mask system-modal-mask" onMouseDown={() => !busy && onClose?.()}>
-      <div className="system-modal-card" onMouseDown={(event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="system-modal-title">
-        <div className="editor-head system-modal-head">
-          <div className="system-modal-heading">
-            <div className="editor-title">
-              <span className="system-modal-icon" aria-hidden="true"><Icon name={icon} size={18} /></span>
-              <h2 id="system-modal-title">{title}</h2>
-            </div>
-            {subtitle ? <div className="editor-sub">{subtitle}</div> : null}
-          </div>
-          <button className="system-modal-close" type="button" onClick={onClose} disabled={busy} aria-label="关闭弹窗">
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-        <div className="system-modal-body">{children}</div>
-        <div className="system-modal-footer">
-          <button className="btn" type="button" onClick={onClose} disabled={busy}>{cancelText}</button>
-          {showSubmit ? (
-            <button className="btn primary" type="button" onClick={onSubmit} disabled={busy}>
-              <Icon name="save" size={14} />{busy ? "保存中..." : submitText}
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
+export function FormModal({ icon = "edit", ...props }: FormModalProps) {
+  return <AdapterFormModal {...props} className="system-modal-card" bodyClassName="system-modal-body" icon={<Icon name={icon} size={18} />} />;
 }

@@ -1,12 +1,4 @@
-.asset-page .page-head {
-  align-items: center;
-  gap: 20px 32px;
-  margin-bottom: 24px;
-}
-.asset-page .page-title { gap: 10px; font-size: 24px; font-weight: 600; line-height: 1.25; letter-spacing: 0; }
-.asset-page .page-title svg { flex: none; }
-.asset-page .page-sub { max-width: 760px; margin-top: 8px; color: var(--ink-2); font-size: 13px; line-height: 1.55; }
-.asset-page .head-actions { justify-content: flex-end; gap: 10px; }
+.asset-page .page-sub { max-width: 760px; }
 .asset-page .asset-view-mode-switcher { flex: 0 0 auto; }
 .asset-page .asset-view-mode-switcher button { min-height: 36px; }
 .asset-page .asset-view-mode-switcher button:focus-visible {
@@ -99,9 +91,6 @@
 }
 @media (max-width: 768px) {
   .asset-page .page-head { gap: 16px; margin-bottom: 20px; }
-}
-@media (max-width: 560px) {
-  .asset-page .page-title { font-size: 20px; }
 }
 @media (max-width: 480px) {
 

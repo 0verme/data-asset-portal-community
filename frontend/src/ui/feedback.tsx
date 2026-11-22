@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useEffect, type MouseEventHandler, type ReactNode } from "react";
 import { Banner as KumoBanner } from "@cloudflare/kumo/components/banner";
 import { Empty as KumoEmpty } from "@cloudflare/kumo/components/empty";
@@ -167,10 +168,11 @@ export interface LoadingStateProps {
   label?: string | undefined;
 }
 
-export function LoadingState({ title, desc, className, label = "正在加载" }: LoadingStateProps) {
+export function LoadingState({ title, desc, className, label }: LoadingStateProps) {
+  const { t } = useTranslation("common");
   return (
     <div className={joinClassNames("dap-ui-loading-state", className)} role="status" aria-live="polite">
-      <KumoLoader aria-label={label} />
+      <KumoLoader aria-label={label ?? t("action.loading")} />
       <h3>{title}</h3>
       <p>{desc}</p>
     </div>
@@ -210,13 +212,14 @@ export interface ErrorStateProps {
   retryText?: string | undefined;
 }
 
-export function ErrorState({ title, desc, onRetry, className, retryText = "重新加载" }: ErrorStateProps) {
+export function ErrorState({ title, desc, onRetry, className, retryText }: ErrorStateProps) {
+  const { t } = useTranslation("common");
   return (
     <Banner
       tone="error"
       title={title}
       description={desc}
-      action={onRetry ? <Button variant="secondary" type="button" onClick={onRetry}>{retryText}</Button> : undefined}
+      action={onRetry ? <Button variant="secondary" type="button" onClick={onRetry}>{retryText ?? t("shared.reload")}</Button> : undefined}
       className={joinClassNames("dap-ui-error-state", className)}
     />
   );

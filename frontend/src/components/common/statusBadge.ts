@@ -1,4 +1,4 @@
-import { normalizeBinaryStatusLabel, normalizeBinaryStatusValue } from "./status.ts";
+import { normalizeBinaryStatusValue } from "./status.ts";
 
 export type StatusBadgeTone = "neutral" | "success" | "warning" | "danger";
 
@@ -62,7 +62,7 @@ export function resolveStatusBadgePresentation({
   metaMap,
   on,
   label,
-}: ResolveStatusBadgeOptions): StatusBadgePresentation {
+}: ResolveStatusBadgeOptions, labels = { enabled: "启用", disabled: "禁用", unknown: "未知" }): StatusBadgePresentation {
   const hasStatus = status !== undefined;
   const value = hasStatus ? status : on;
   const normalized = normalizeBinaryStatusValue(value);
@@ -71,11 +71,11 @@ export function resolveStatusBadgePresentation({
   const meta = statusKey ? statusMap[statusKey] : undefined;
 
   const fallbackLabel = hasStatus
-    ? label || (typeof status === "string" && status.trim() ? status : "未知")
-    : label || (typeof on === "string" && on.trim() ? on : "未知");
+    ? label || (typeof status === "string" && status.trim() ? status : labels.unknown)
+    : label || (typeof on === "string" && on.trim() ? on : labels.unknown);
   const displayLabel = !hasStatus && label
     ? label
-    : meta?.label || (normalized ? normalizeBinaryStatusLabel(value) : fallbackLabel);
+    : (statusMap !== DEFAULT_STATUS_META && meta?.label) || (normalized ? labels[normalized] : fallbackLabel);
 
   return {
     label: displayLabel,

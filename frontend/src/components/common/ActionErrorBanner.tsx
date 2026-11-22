@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { MouseEventHandler } from "react";
 
 import { Icon } from "../ui.tsx";
@@ -10,11 +11,12 @@ export interface ActionErrorBannerProps {
 }
 
 export function ActionErrorBanner({
-  title = "操作失败",
+  title,
   message,
   messages = [],
   onClose,
 }: ActionErrorBannerProps) {
+  const { t } = useTranslation("common");
   const items = (messages.length ? messages : [message]).filter(
     (item): item is string => Boolean(item),
   );
@@ -24,10 +26,10 @@ export function ActionErrorBanner({
     <div className="err-banner" role="alert">
       <span className="eb-ic"><Icon name="close" size={15} color="var(--danger)" /></span>
       <div style={onClose ? { flex: 1 } : undefined}>
-        <b>{title}：</b>
+        <b>{title ?? t("shared.failed")}</b>
         <ul>{items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>
       </div>
-      {onClose ? <button className="btn" type="button" onClick={onClose}>关闭</button> : null}
+      {onClose ? <button className="btn" type="button" onClick={onClose}>{t("action.close")}</button> : null}
     </div>
   );
 }

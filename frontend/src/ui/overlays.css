@@ -4,6 +4,8 @@
   isolation: isolate;
 }
 
+#dap-ui-overlay-root:has(.dap-ui-dialog-popup) { z-index: 120; }
+
 .dap-ui-dialog-backdrop {
   position: fixed;
   z-index: 100;

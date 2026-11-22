@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 // Copyright 2025 Jearhe
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -58,8 +59,8 @@ class ModuleErrorBoundaryInner extends React.Component<ModuleErrorBoundaryProps,
     if (error) {
       return (
         <ErrorState
-          title={title || "模块渲染失败"}
-          desc={error.message || desc || "页面渲染时发生异常，请稍后重试。"}
+          title={title}
+          desc={error.message || desc}
           onRetry={onRetry}
         />
       );
@@ -69,5 +70,6 @@ class ModuleErrorBoundaryInner extends React.Component<ModuleErrorBoundaryProps,
 }
 
 export function ModuleErrorBoundary(props: ModuleErrorBoundaryProps) {
-  return <ModuleErrorBoundaryInner {...props} />;
+  const { t } = useTranslation("common");
+  return <ModuleErrorBoundaryInner {...props} title={props.title || t("navigation.moduleErrorTitle")} desc={props.desc || t("navigation.moduleErrorDescription")} />;
 }

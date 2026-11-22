@@ -34,7 +34,8 @@ test("responsive sidebar shell keeps overlay, scroll-lock, focus and aria contra
   assert.match(app, /document\.body\.style\.overflow = previousOverflow/);
   assert.match(app, /event\.key !== "Escape"/);
   assert.match(app, /setSidebarOpen\(false\)/);
-  assert.match(app, /requestAnimationFrame\(\(\) => hamburgerRef\.current\?\.focus\(\)\)/);
+  assert.match(app, /const opener = hamburgerRef\.current;/);
+  assert.match(app, /opener\?\.focus\(\)/);
   assert.match(app, /requestAnimationFrame\(\(\) => sidebarRef\.current\?\.focus\(\)\)/);
   assert.match(app, /id="mobile-sidebar"/);
   assert.match(app, /aria-label=\{tCommon\("navigation\.moduleAndFilters"\)\}/);

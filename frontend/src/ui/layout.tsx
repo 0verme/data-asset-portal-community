@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { forwardRef, type ComponentPropsWithRef, type ReactNode } from "react";
 import { Grid as KumoGrid, GridItem as KumoGridItem } from "@cloudflare/kumo/components/grid";
 import { LayerCard as KumoLayerCard } from "@cloudflare/kumo/components/layer-card";
@@ -74,11 +75,12 @@ export const Breadcrumbs = forwardRef<HTMLElement, BreadcrumbsProps>(function Da
   { ariaLabel, className, items, ...navProps },
   ref,
 ) {
+  const { t } = useTranslation("common");
   return (
     <nav
       {...navProps}
       ref={ref}
-      aria-label={ariaLabel ?? navProps["aria-label"] ?? "面包屑"}
+      aria-label={ariaLabel ?? navProps["aria-label"] ?? t("shared.breadcrumb")}
       className={joinClassNames("dap-ui-breadcrumbs", className)}
     >
       <ol className="dap-ui-breadcrumbs-list">

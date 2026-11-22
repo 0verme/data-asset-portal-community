@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { ComponentProps, ReactElement } from "react";
 import { Combobox as KumoCombobox } from "@cloudflare/kumo/components/combobox";
 
@@ -7,12 +8,14 @@ type KumoComboboxProps = ComponentProps<typeof KumoCombobox>;
 type KumoTriggerInputProps = ComponentProps<typeof KumoCombobox.TriggerInput>;
 type KumoChipProps = ComponentProps<typeof KumoCombobox.Chip>;
 
-function DapTriggerInput({ clearLabel = "清除选择", showOptionsLabel = "显示选项", ...props }: KumoTriggerInputProps) {
-  return <KumoCombobox.TriggerInput {...props} clearLabel={clearLabel} showOptionsLabel={showOptionsLabel} />;
+function DapTriggerInput({ clearLabel, showOptionsLabel, ...props }: KumoTriggerInputProps) {
+  const { t } = useTranslation("common");
+  return <KumoCombobox.TriggerInput {...props} clearLabel={clearLabel ?? t("shared.clearSelection")} showOptionsLabel={showOptionsLabel ?? t("shared.showOptions")} />;
 }
 
-function DapChip({ removeLabel = "移除", ...props }: KumoChipProps) {
-  return <KumoCombobox.Chip {...props} removeLabel={removeLabel} />;
+function DapChip({ removeLabel, ...props }: KumoChipProps) {
+  const { t } = useTranslation("common");
+  return <KumoCombobox.Chip {...props} removeLabel={removeLabel ?? t("shared.remove")} />;
 }
 
 export type ComboboxProps<Value = unknown, Multiple extends boolean = false> = Omit<

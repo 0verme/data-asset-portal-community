@@ -65,9 +65,9 @@ test("related asset pickers expose stable search accessible names", async () => 
     "utf8",
   );
 
-  assert.match(assetReferenceSelector, /aria-label=\{`搜索\$\{title\}`\}/);
-  assert.match(assetReferenceSelector, /<Picker title="关联表"/);
-  assert.match(assetReferenceSelector, /<Picker title="关联指标"/);
+  assert.match(assetReferenceSelector, /aria-label=\{t\("shared\.searchFor", \{ title \}\)\}/);
+  assert.match(assetReferenceSelector, /<Picker title=\{t\("shared\.relatedTables"\)\}/);
+  assert.match(assetReferenceSelector, /<Picker title=\{t\("shared\.relatedIndicators"\)\}/);
   assert.match(
     assetReferenceSelector,
     /const locked = disabled \|\| readonly;/,
