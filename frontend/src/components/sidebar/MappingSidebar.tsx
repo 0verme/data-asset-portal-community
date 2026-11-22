@@ -124,6 +124,7 @@ export function MappingSidebar({ catalogAccessReady, route, setRoute }: MappingS
               className={`side-item mapping-system-item${selectedSourceSystemId ? "" : " active"}`}
               type="button"
               aria-label="全部源系统"
+              data-sidebar-dismiss
               aria-pressed={!selectedSourceSystemId}
               onClick={() => selectSourceSystem("")}
             >
@@ -162,6 +163,7 @@ export function MappingSidebar({ catalogAccessReady, route, setRoute }: MappingS
                   className={`side-item mapping-system-item${selected ? " active" : ""}`}
                   type="button"
                   aria-label={label}
+                  data-sidebar-dismiss
                   aria-pressed={selected}
                   title={label}
                   onClick={() => selectSourceSystem(sourceSystemId)}

@@ -139,6 +139,7 @@ export function LineageAssetSidebar({
                         <button
                           type="button"
                           className="lineage-table-item side-item"
+                          data-sidebar-dismiss
                           title={label.title}
                           aria-label={t("sidebar.tableLabel", { name: label.tableName, schema: groupLabel, id: node.id })}
                           aria-pressed={selectedNodeId === node.id}

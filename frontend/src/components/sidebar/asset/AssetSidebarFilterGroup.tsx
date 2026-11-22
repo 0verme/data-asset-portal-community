@@ -29,6 +29,7 @@ function AssetSidebarFilterButton({ item }: { item: AssetSidebarFilterItem }) {
       variant="tertiary"
       size="sm"
       className={`${className} asset-sidebar-filter-option`}
+      data-sidebar-dismiss
       onClick={item.disabled ? undefined : item.onClick}
       disabled={item.disabled}
       aria-pressed={typeof item.active === "boolean" ? item.active : undefined}

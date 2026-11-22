@@ -27,15 +27,13 @@
 
 对于复杂表格、字段映射编辑器和血缘画布，保留成熟实现可以优先于创建通用抽象。不要为统一外观而重写业务行为。
 
-### 工作台筛选侧栏
+### 工作台侧栏
 
-组合业务共享的 [SidebarFilterGroup](../components/sidebar/common/SidebarFilterGroup.tsx)、[StatusFilterGroup](../components/sidebar/common/StatusFilterGroup.tsx) 和 [SidebarActionGroup](../components/sidebar/common/SidebarActionGroup.tsx)。调用模块提供计数、筛选回调、权限和数据刷新。选中背景使用 `--accent-soft`，强调线和占比进度使用 `--accent`，徽标描边使用 `--accent-line`。布局和验收见[全站设计语言](../../DESIGN.md)，具体组合见 [UpstreamSidebar](../components/sidebar/UpstreamSidebar.tsx)。
+[App.tsx](../App.tsx) 提供透明轨道、单一毛玻璃表面和移动抽屉。[ModuleSidebar](../components/app/ModuleSidebar.tsx) 提供可滚动业务区和底部进度区域。模块组合已有的 [SidebarFilterGroup](../components/sidebar/common/SidebarFilterGroup.tsx)、[StatusFilterGroup](../components/sidebar/common/StatusFilterGroup.tsx) 和 [SidebarActionGroup](../components/sidebar/common/SidebarActionGroup.tsx)，并提供计数、回调、权限和刷新。树和专用导航沿用原有业务组件。给需要在移动端收起抽屉的业务按钮加 `data-sidebar-dismiss`，例如筛选项、维护入口和血缘表节点。展开、搜索等就地操作可继续在抽屉内完成。
+
+底部区域优先展示真实业务进度。上游卸数使用原有「系统覆盖摘要」。其他模块由 ModuleSidebar 统一挂载 `ModuleReadiness`，以状态文字和空轨道表示尚未接入的就绪度。接入后由权威生产方提供模块与指标 ID、统计定义和结果。选中背景使用 `--accent-soft`，强调线和业务进度使用 `--accent`，徽标描边使用 `--accent-line`。布局和验收见[全站设计语言](../../DESIGN.md)。
 
 目录页可直接采用两个样板的 `page-head workspace-page-header`，其内组合 `h1.page-title`、`.page-sub`、`.head-actions`。模块负责工具栏内容和窄屏操作排列。表单与详情继续使用 PageHeader 的返回和面包屑接口。
-
-### Workspace 就绪度
-
-在主容器的可滚动筛选区之后挂载 `<ModuleReadiness result={result} />`。可选 title 由调用方随语言切换，默认标题由共享组件翻译。参照 UpstreamSidebar 和 AssetSidebar。生产方提供模块与指标 ID、统计定义和权威结果。定义待确认用 pending_definition，已有定义但未接通统计用 pending_integration。两者都显示空轨道；loading 用不定进度。业务覆盖摘要沿用独立标签与数据源。
 
 ## 3. 已导出的 Adapter API
 

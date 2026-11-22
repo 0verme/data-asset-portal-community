@@ -54,6 +54,7 @@ export function SystemSidebar({
             key={page}
             className={`side-item${page === systemRoute.page ? " active" : ""}`}
             type="button"
+            data-sidebar-dismiss
             aria-current={page === systemRoute.page ? "page" : undefined}
             onClick={() => setSystemRoute({ page })}
           >
@@ -64,7 +65,7 @@ export function SystemSidebar({
       {action ? (
         <div className="side-group">
           <div className="side-title">{t("systemManagement.maintenance")}</div>
-          <button className="side-item" type="button" onClick={() => setSystemActionIntent(action)}>
+          <button className="side-item" data-sidebar-dismiss type="button" onClick={() => setSystemActionIntent(action)}>
             {current?.actionLabel}
           </button>
         </div>

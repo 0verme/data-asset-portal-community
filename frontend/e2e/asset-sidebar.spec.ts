@@ -254,8 +254,8 @@ test("warehouse facets share one desktop surface and remain reachable in the dra
   await page.setViewportSize({ width: 1440, height: 900 });
   await openAssetList(page, "guest");
   const rail = page.locator("#mobile-sidebar");
-  const panel = rail.locator(":scope > .warehouse-sidebar");
-  const groups = panel.locator(".warehouse-sidebar-filters > .asset-sidebar-filter-group");
+  const panel = rail.locator(":scope > .sidebar-panel");
+  const groups = panel.locator(".warehouse-sidebar > .asset-sidebar-filter-group");
   const transparent = "rgba(0, 0, 0, 0)";
   await expect(rail).toHaveCSS("width", "244px");
   await expect(rail).toHaveCSS("background-color", transparent);
@@ -270,8 +270,8 @@ test("warehouse facets share one desktop surface and remain reachable in the dra
 
   await page.setViewportSize({ width: 390, height: 844 });
   await openMobileSidebar(page, 390);
-  await expect(rail).not.toHaveCSS("background-color", transparent);
-  await expect(panel).toHaveCSS("background-color", transparent);
+  await expect(rail).toHaveCSS("background-color", transparent);
+  await expect(panel).not.toHaveCSS("background-color", transparent);
   const lastDomain = groups.last().locator(".side-item").last();
   await lastDomain.scrollIntoViewIfNeeded();
   await expect(lastDomain).toBeInViewport();
@@ -287,14 +287,14 @@ test("warehouse matches the upstream desktop frame and keeps pending readiness b
   const enabled = page.getByRole("progressbar", { name: "系统启用比例" });
   await expect(enabled).toHaveAttribute("value", "7");
   await expect(enabled).toHaveAttribute("max", "8");
-  const baseline = await page.locator(".upstream-sidebar").boundingBox();
+  const baseline = await page.locator(".sidebar-panel").boundingBox();
   const headingStyle = () => page.locator("h1.page-title").evaluate((element) => {
     const { fontSize, fontWeight, lineHeight, gap } = getComputedStyle(element);
     return { fontSize, fontWeight, lineHeight, gap };
   });
   const heading = await headingStyle();
   await openAssetList(page, "guest");
-  const panel = page.locator(".warehouse-sidebar");
+  const panel = page.locator(".sidebar-panel");
   expect(await panel.boundingBox()).toEqual(baseline);
   expect(await headingStyle()).toEqual(heading);
   const readiness = panel.getByRole("region", { name: "模块就绪度" });

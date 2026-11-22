@@ -139,7 +139,7 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
   await expect(page.locator("#mobile-sidebar")).toHaveClass(/open/);
   await expect(page.locator(".upstream-sidebar")).toBeVisible();
   await expect(summary).toBeInViewport();
-  const menu = page.locator(".upstream-sidebar-menu");
+  const menu = page.locator(".sidebar-content");
   await expect.poll(() => page.locator("#mobile-sidebar").evaluate((el) => Math.round(el.getBoundingClientRect().left))).toBe(0);
   const before = await summary.boundingBox();
   await menu.getByRole("button", { name: "新增系统" }).scrollIntoViewIfNeeded();
@@ -165,18 +165,20 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
     await expect(page.locator("html")).toHaveAttribute("data-theme", saved.themeMode);
     await expect(page.locator("html")).toHaveAttribute("data-density", saved.density);
     await expect(page.locator(".upstream-list-page .tcard").first()).toBeVisible();
-    const themeAccent = await page.evaluate(() => {
+    const themeColors = await page.evaluate(() => {
       const probe = document.createElement("span");
       probe.style.color = "var(--accent)";
       document.body.append(probe);
-      const color = getComputedStyle(probe).color;
+      const accent = getComputedStyle(probe).color;
+      probe.style.color = "var(--accent-soft-color)";
+      const selected = getComputedStyle(probe).color;
       probe.remove();
-      return color;
+      return { accent, selected };
     });
     const activeFilter = page.locator(".upstream-sidebar .side-item.active").first();
-    await expect(activeFilter).toHaveCSS("color", themeAccent);
-    expect(await activeFilter.evaluate((el) => getComputedStyle(el, "::before").backgroundColor)).toBe(themeAccent);
-    await expect(summary.locator(".upstream-summary-types strong")).toHaveCSS("color", themeAccent);
+    await expect(activeFilter).toHaveCSS("color", themeColors.selected);
+    expect(await activeFilter.evaluate((el) => getComputedStyle(el, "::before").backgroundColor)).toBe(themeColors.accent);
+    await expect(summary.locator(".upstream-summary-types strong")).toHaveCSS("color", themeColors.accent);
     await screenshot(`upstream-cards-${name}`);
   }
 
@@ -185,7 +187,7 @@ test("upstream workspace responsive and theme evidence", async ({ page, browserN
 
 test("guest sees coverage without maintenance actions", async ({ page }) => {
   await page.goto("/upstream");
-  const rail = page.locator(".upstream-sidebar");
+  const rail = page.locator(".sidebar-panel");
   await expect(rail.locator("progress")).toHaveAttribute("value", "7");
   await expect(rail.getByRole("button", { name: "新增系统" })).toHaveCount(0);
 });
