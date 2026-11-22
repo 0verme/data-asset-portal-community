@@ -41,7 +41,7 @@ test("middle-width navigation derives its visible prefix from measured available
     /@media \(max-width: 1199px\) and \(min-width: 769px\) \{[\s\S]*?\n\s{2}\}/,
   )?.[0] || "";
   const tabletHeader = appStyles.match(
-    /@media \(max-width: 959px\) and \(min-width: 769px\) \{[\s\S]*?\n\s{2}\}/,
+    /@media \(769px <= width < 960px\) \{[\s\S]*?\n\s{2}\}/,
   )?.[0] || "";
 
   assert.match(appStyles, /\.search \{\s*position: relative;\s*width: clamp\(180px, 20vw, 360px\);/);
@@ -56,8 +56,8 @@ test("middle-width navigation derives its visible prefix from measured available
   assert.match(appStyles, /\.search\.has-val \.clear \{ opacity: 1; pointer-events: auto; \}/);
   assert.match(tabletHeader, /\.hamburger \{ display: grid/);
   assert.match(tabletHeader, /\.mainnav \{ display: none/);
-  assert.match(appStyles, /@media \(max-width: 768px\)[\s\S]*?\.topbar-nav-slot \{\s*display: none;\s*\}/);
-  assert.match(appStyles, /@media \(max-width: 768px\)[\s\S]*?\.search\.mobile-open \{ display: block; \}/);
+  assert.match(appStyles, /@media \(width < 769px\)[\s\S]*?\.topbar-nav-slot \{\s*display: none;\s*\}/);
+  assert.match(appStyles, /@media \(width < 769px\)[\s\S]*?\.search\.mobile-open \{ display: block; \}/);
   assert.match(app, /id="global-search"/);
   assert.match(app, /aria-label=\{tCommon\("search\.global"\)\}/);
   assert.match(app, /<Input[\s\S]*?className="search-input"[\s\S]*?value=\{query\}/);
