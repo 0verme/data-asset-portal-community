@@ -261,8 +261,11 @@ test("Remote option failures and stalled responses show an actionable error, pre
   await page.getByLabel("报表名称").fill("Preserved input");
   const typeSelect = page.getByRole("combobox", { name: "报表类型" });
   await typeSelect.click();
+  const placeholderOption = page.getByRole("option", { name: "请选择报表类型", exact: true });
+  await expect(placeholderOption).toBeVisible();
   await expect(page.getByRole("option", { name: "经营分析", exact: true })).toHaveCount(0);
-  await page.keyboard.press("Escape");
+  await placeholderOption.click();
+  await expect(placeholderOption).toBeHidden();
 
   for (let failureIndex = 1; failureIndex <= failures.length; failureIndex += 1) {
     const failure = failures[failureIndex];

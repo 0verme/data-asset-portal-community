@@ -169,8 +169,11 @@ test("Remote strict collection response keeps indicator fields scoped to the sel
   const retryFields = page.getByRole("button", { name: "重试加载字段" });
   await expect(retryFields).toBeVisible();
   await resultField.click();
+  const tableOnly = page.getByRole("option", { name: "整表来源 / 未指定字段" });
+  await expect(tableOnly).toBeVisible();
   await expect(page.getByRole("option", { name: "字段 A · FIELD_A" })).toHaveCount(0);
-  await page.keyboard.press("Escape");
+  await tableOnly.click();
+  await expect(tableOnly).toBeHidden();
 
   allowAssetBRecovery = true;
   await retryFields.click();
