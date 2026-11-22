@@ -115,22 +115,30 @@ DAP 有三条互不影响的检索 / 问答路径。默认只开启第一条：
 - 执行进度通过 SSE 返回后端真实阶段（`step_start` / `step_complete` / `step_error` / `answer` / `done` / `keep_alive`），**不逐 token 流式输出**；浏览器取消会 abort SSE，并在阶段边界停止上游调用，旧响应不会覆盖新请求。
 - 全站每日默认共享 **50 次 AI 问答**（北京时间自然日），不是 50 次模型 HTTP 调用：一次问答内的规划、答案生成和重试最多扣一次；没有发起 LLM HTTP 请求的纯目录统计不扣减。额度不按用户/IP 区分，沿用 `AI_LLM_DAILY_LIMIT` 参数编码及既有系统参数表、`system:param:write` 权限和操作审计。额度耗尽或计数不可用时 fail closed；Mock、普通搜索及 RAG 推荐不消耗额度。模型配置默认 `AI_LLM_MAX_TOKENS=3072`、`AI_LLM_TIMEOUT_MS=30000`；显式部署环境变量值保持优先。完整额度、参数与部署契约见 [单轮 AI 数据资产问答](./docs/ai-ask-mvp.md) 和[配置说明](./docs/configuration.md)；统计意图见 [权威资产目录统计](./docs/ai-metadata-count.md)。
 
-> **不要把 Mock 当成真实能力。** 公开静态 Demo [https://data.overme.cn/](https://data.overme.cn/) 使用
-> `VITE_API_MODE=mock` 的独立构建：问答由前端本地演示适配器按演示目录名称 / 字段匹配生成，
-> **不调用任何 RAG 服务或 LLM，也不是真实 DeepSeek 输出**。Remote 模式不会回退到 Mock，
-> Mock 构建也不会被当作生产 Bundle。详见 [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md)。
+> **区分 Mock AI 与 Remote AI，不要把 Mock 当成真实能力。** 前端 Mock 模式（`VITE_API_MODE=mock`）的
+> AI 问答由前端本地演示适配器按演示目录名称 / 字段匹配生成，**不调用任何 RAG 服务或 LLM**，
+> 只用于 Frontend Mock 演示，详见 [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md)。
+> Remote 模式通过 `/api` 访问真实后端，不会回退到 Mock；公网在线演示站
+> [https://data.overme.cn/](https://data.overme.cn/) 就是 Remote 模式，其 AI 问答是否启用、
+> 连接哪个 RAG 与 LLM 以该站点当前部署配置为准。Mock 构建不会被当作生产 Bundle，
+> 某个部署启用了 AI 也不代表 Community 默认配置已启用。
 
 ### 当前验证状态（不要过度解读）
 
 | 事项 | 状态 |
 | --- | --- |
 | `/api/search`、`/api/search/recommendations`、`/api/ai/status`、`/api/ai/ask`、`/api/ai/ask/progress`、`/api/ai/ask/stream` 的代码与单元 / 契约测试 | 已合入 `main`，CI 覆盖 |
-| 与 `dap-rag-lab` 的最终 HTTP 契约对齐、真实 RAG 服务联调 | **NOT VERIFIED**（外部 issue #14 仍 OPEN） |
+| 仓库 `main` 与 `dap-rag-lab` 的最终 HTTP 契约对齐、真实 RAG 联调验收 | **NOT VERIFIED**（外部 issue #14 仍 OPEN） |
 | 真实 OpenAI-compatible / DeepSeek 端点的回答质量与 wire 兼容性 | **NOT VERIFIED** |
 | GaussDB / DWS 上的真实 RAG 检索与模型性能 | **NOT VERIFIED** |
 
 `main` 上的自动化只证明结构化契约、身份校验、降级与 UI 行为，不证明任何外部服务在线可用，
 也不证明回答准确率。
+
+上表的 **NOT VERIFIED** 描述的是仓库 `main` 的验证范围与外部集成质量，不代表公网演示站的运行状态。
+仓库 CI 验证、公网演示站的实际运行状态、外部 RAG / LLM 集成验证是三件不同的事：公网演示站是独立部署，
+其真实后端、RAG 与 LLM Provider 由部署方配置和验证；即使演示站已启用这些能力，也不代表 Community 默认配置、
+其他部署环境、回答质量或所有数据库组合已经验证。
 
 ## 🎯 为什么选 DAP
 
@@ -276,6 +284,14 @@ Community Demo 初始化完成后，可以使用：
 
 该账号仅用于 Community Demo / 本地体验环境，不是生产环境默认管理员。正式部署请使用 `backend/scripts/create_admin.py` 交互创建管理员；生产 bootstrap 不提供默认密码。
 
+三种运行面的登录方式与账号彼此独立：
+
+| 运行面 | 登录方式 | 账号说明 |
+| --- | --- | --- |
+| Repository Community Demo（本地真实后端） | 真实后端登录 | 初始化后为 `admin` / `123456`，仅适用于本地 Demo 环境 |
+| Frontend Mock（`VITE_API_MODE=mock`） | 前端 Mock 身份认证 | 默认 `admin` / `123456`，可用 `VITE_MOCK_AUTH_*` 覆盖；不代表真实后端登录 |
+| 在线演示（Public Demo） | 独立公网部署的认证配置 | 由部署方维护；不承诺本地 Demo 默认账号适用于公网，本文档不公布公网账号密码 |
+
 详细说明见 [Community Demo 指南](./docs/community-demo.md)。
 
 > Windows 内网使用 Nexus npm 镜像更新前端：参见 [Windows 内网构建与部署流程](./DEPLOYMENT.md#73-windows-内网-npm-镜像构建与部署issue-468)，不要直接套用 Linux/systemd 命令。
@@ -293,15 +309,24 @@ npm --prefix frontend run dev
 确认 `frontend/.env.local` 中为 `VITE_API_MODE=mock` 后，使用公开演示账号 `admin` / `123456` 登录
 （仅 mock 模式有效；可用 `VITE_MOCK_AUTH_*` 覆盖）。mock 数据不会写入数据库。
 
-### 在线静态 Demo
+### 在线演示（Public Demo）
 
-[https://data.overme.cn/](https://data.overme.cn/) 是独立部署的静态 mock bundle，用于快速预览界面。
-它的版本、数据和部署 revision 独立于本仓库，不代表当前 `origin/main` 或已发布的 Release。
-它的 AI 问答由前端演示适配器生成，**不连接任何 RAG 服务或 LLM**；详见 [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md)。
+[https://data.overme.cn/](https://data.overme.cn/) 是部署方独立运维的公网演示站，提供用于体验产品的演示资产
+（仓库内的虚构零售数据）。它**使用真实 DAP 后端和 Remote API**，不属于纯前端静态 Mock：
+
+- 前端以 Remote 模式构建，Nginx 托管前端静态资源并把 `/api` 反向代理到真实 FastAPI 后端；
+- 演示数据每天自动重置；当前部署的重置任务在每天 04:00（服务器本地时区 Asia/Shanghai）重建演示数据库，
+  具体时间与保留策略以实际部署配置为准；
+- 演示站由部署方独立部署和更新，不通过本仓库的 Release 流程自动发布；实际运行版本、构建 revision 与 GitHub
+  Release 的对应关系以该站点当前部署为准，可能落后于 `origin/main` 或最新 Release；
+- 演示站使用独立的公网部署与认证配置，账号由部署方维护，本文档不公布其密码（见[演示管理员](#演示管理员)）。
+
+该站点是否启用 AI 问答、连接哪个 RAG 与 LLM，同样以当前部署配置为准；见下文与 [FAQ](#-常见问题)。
 
 ### AI 能力需要单独启用
 
 Community Demo 与 mock 模式都不会自动打开真实 AI：`AI_ASK_ENABLED` 默认 `false`，RAG 配置独立且默认停用。
+公网在线演示站是独立部署，其 AI 开关、RAG 与 LLM Provider 由部署方配置，可能与仓库默认值不同。
 启用步骤、Secret 注入方式与回滚见 [后端配置](./docs/configuration.md) 与 [部署说明](./DEPLOYMENT.md#36-optional-single-turn-ai-asset-qa)。
 
 ## 🤝 社区入口
@@ -385,7 +410,7 @@ V1 血缘只支持 self-contained `replace` snapshot：新快照先以 `INACTIVE
 | [资产风险联动设计](./docs/asset-risk-integration-design.md) | 外部审计结果接入边界与提案 |
 | [单轮 AI 数据资产问答](./docs/ai-ask-mvp.md) | AI 问答契约、状态语义、Mock 边界与未验收项 |
 | [权威资产目录统计](./docs/ai-metadata-count.md) | 表数 / 字段数统计意图、歧义与失败状态 |
-| [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md) | 公网静态 Demo 的本地演示适配器与隔离约束 |
+| [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md) | Frontend Mock（`VITE_API_MODE=mock`）的本地演示适配器与隔离约束 |
 | [智能问数与语义推荐](./docs/semantic-recommendation-roadmap.md) | 问数底座与语义推荐路线 |
 | [待确认事项](./docs/todo.md) | 当前尚未完成或待决策事项 |
 | [更新日志](./CHANGELOG.md) | 阶段性变更 |
@@ -438,6 +463,7 @@ SQLite（本地 / Demo / CI）、PostgreSQL、MySQL 8.0 为 **Verified**；Gauss
 `VITE_API_MODE=mock` 只读取前端内置数据，使用公开演示账号 `admin` / `123456` 登录；
 `remote` 通过 `/api` 访问后端真实数据库，需要先按 [Community Demo](./docs/community-demo.md) 或 [开发指南](./DEVELOPMENT.md) 配置。
 mock 模式下的 AI 问答由前端演示适配器生成，不调用 RAG 或 LLM；remote 模式不会回退到 mock。
+公网在线演示站 [https://data.overme.cn/](https://data.overme.cn/) 使用 remote 模式，不是 mock 构建。
 
 ### AI 问答默认开启吗？需要什么？
 
@@ -445,10 +471,13 @@ mock 模式下的 AI 问答由前端演示适配器生成，不调用 RAG 或 LL
 `AI_LLM_API_KEY`）以及已启用并配置好服务 Token 的 RAG 搜索。配置不完整时 `/api/ai/status` 返回
 `{"enabled": false}`，前端隐藏入口。传统搜索不受影响。详见 [后端配置](./docs/configuration.md)。
 
-### 公网静态 Demo 用的是真实 DeepSeek 吗？
+### 在线演示站使用真实 AI 问答吗？
 
-不是。公网静态 Demo 是 `VITE_API_MODE=mock` 的独立构建，问答由前端本地演示适配器按演示目录匹配生成，
-不发起任何 RAG / LLM 请求。真实链路需要按 [部署说明](./DEPLOYMENT.md) 自行接入并验证。
+在线演示站是真实后端 + Remote API 的部署，不是静态 Mock。它的 AI 问答是否启用、连接哪个 RAG 与 LLM
+由该站点的部署配置决定：当前部署已启用真实 AI 问答（后端 OpenAI-compatible LLM Provider + 外部 RAG 检索服务），
+但 Provider、模型和可用性都可能随部署调整，本文档不承诺具体模型或长期可用性。
+Community 默认配置仍然关闭 AI 问答，自建部署需要按 [部署说明](./DEPLOYMENT.md) 与
+[后端配置](./docs/configuration.md) 自行接入并验证。
 
 ### DAP 内置向量检索吗？
 
