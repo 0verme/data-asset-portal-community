@@ -110,12 +110,33 @@
   .asset-editor-page .asset-required { margin-left: 4px; }
 }
 
-/* Each facet keeps its own disclosure and its own "all" option. */
-.asset-sidebar-filter-group {
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
+/* The shell scrolls both sections together. On small screens the drawer supplies the surface. */
+@media (min-width: 960px) {
+  .sidebar:has(> .warehouse-sidebar) {
+    width: 244px;
+    flex-basis: 244px;
+    padding: 14px 0 14px 14px;
+    border: 0;
+    background: transparent;
+  }
+  .warehouse-sidebar {
+    padding: 12px 10px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+}
+.warehouse-sidebar > .side-group {
+  margin: 0;
+}
+.warehouse-sidebar > .side-group + .side-group {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.warehouse-sidebar .asset-sidebar-filter-heading[aria-expanded="false"] {
+  margin-bottom: 0;
 }
 .asset-sidebar-filter-group .asset-sidebar-filter-heading {
   padding-inline: 8px;

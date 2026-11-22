@@ -249,3 +249,34 @@ test("guest can open asset details without write actions", async ({ page }) => {
   await expect(page.getByRole("button", { name: "新增表" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "编辑表" })).toHaveCount(0);
 });
+
+test("warehouse facets share one desktop surface and remain reachable in the drawer", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openAssetList(page, "guest");
+  const rail = page.locator("#mobile-sidebar");
+  const panel = rail.locator(":scope > .warehouse-sidebar");
+  const groups = panel.locator(":scope > .asset-sidebar-filter-group");
+  const transparent = "rgba(0, 0, 0, 0)";
+  await expect(rail).toHaveCSS("width", "244px");
+  await expect(rail).toHaveCSS("background-color", transparent);
+  await expect(panel).not.toHaveCSS("background-color", transparent);
+  await expect(panel).toHaveCSS("border-radius", "16px");
+  await expect(groups).toHaveCount(2);
+  for (const group of await groups.all()) {
+    await expect(group).toHaveCSS("background-color", transparent);
+    await expect(group).toHaveCSS("border-left-width", "0px");
+    await expect(group).toHaveCSS("box-shadow", "none");
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openMobileSidebar(page, 390);
+  await expect(rail).not.toHaveCSS("background-color", transparent);
+  await expect(panel).toHaveCSS("background-color", transparent);
+  const lastDomain = groups.last().locator(".side-item").last();
+  await lastDomain.scrollIntoViewIfNeeded();
+  await expect(lastDomain).toBeInViewport();
+  await lastDomain.click();
+  await expect(page).toHaveURL(/domain=/);
+  await expect(rail).not.toHaveClass(/open/);
+  await expect(page.locator("button.hamburger")).toBeFocused();
+});

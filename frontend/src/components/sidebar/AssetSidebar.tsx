@@ -89,7 +89,7 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
   );
 
   return (
-    <>
+    <div className="warehouse-sidebar">
       <AssetSidebarFilterGroup
         title={t("filterLayers")}
         allOption={{
@@ -139,6 +139,6 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
             : []
         }
       />
-    </>
+    </div>
   );
 }
