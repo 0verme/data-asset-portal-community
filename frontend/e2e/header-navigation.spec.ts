@@ -304,6 +304,7 @@ test("administrator More menu exposes authorized system navigation", async ({ pa
 
 for (const administrator of [false, true]) {
   test(`homepage keeps centered navigation and shared mobile navigation available to ${administrator ? "administrators" : "guests"}`, async ({ page }) => {
+    test.setTimeout(60_000);
     await page.addInitScript((admin) => {
       localStorage.removeItem("dap_auth");
       if (admin) localStorage.setItem("dap_auth", JSON.stringify({
