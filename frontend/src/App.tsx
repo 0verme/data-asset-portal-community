@@ -20,6 +20,7 @@ import { getMenus, MENUS_CHANGED_EVENT } from "./api/menus.ts";
 import type { MenuItem } from "./data/menus.ts";
 import { isDbAuthMode } from "./auth.ts";
 import { AuthBar, AuthContext, LoginModal } from "./components/AuthControls.tsx";
+import { cycleModalTab } from "./ui/modalFocus.ts";
 import { BrandLogo } from "./components/BrandLogo.tsx";
 import { AppShell } from "./components/app/AppShell.tsx";
 import { ModuleContent } from "./components/app/ModuleContent.tsx";
@@ -332,17 +333,21 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
   useEffect(() => {
     if (!sidebarOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
-    const closeOnEscape = (event: KeyboardEvent): void => {
+    const handleDrawerKey = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented) return;
+      if (event.key === "Tab" && sidebarRef.current) cycleModalTab(event, sidebarRef.current);
       if (event.key !== "Escape") return;
       setSidebarOpen(false);
-      requestAnimationFrame(() => hamburgerRef.current?.focus());
     };
+    const opener = hamburgerRef.current;
     document.body.style.overflow = "hidden";
-    requestAnimationFrame(() => sidebarRef.current?.focus());
-    window.addEventListener("keydown", closeOnEscape);
+    const frame = requestAnimationFrame(() => sidebarRef.current?.focus());
+    window.addEventListener("keydown", handleDrawerKey);
     return () => {
+      cancelAnimationFrame(frame);
+      if (!document.activeElement?.closest('[aria-modal="true"]:not(#mobile-sidebar)')) opener?.focus();
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("keydown", handleDrawerKey);
     };
   }, [sidebarOpen]);
 
@@ -836,12 +841,12 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
               />
             ) : null}
 
-            <div className="brand" onClick={() => switchModule("portal")}>
-              <div className="brand-mark">
+            <button type="button" className="brand" aria-label={tCommon("navigation.backHome")} onClick={() => switchModule("portal")}>
+              <span className="brand-mark">
                 <BrandLogo src={branding.site.logo_url} alt={branding.site.display_name} />
-              </div>
-              <div className="brand-name">{branding.site.display_name}<small>{tCommon("app.brandTagline")}</small></div>
-            </div>
+              </span>
+              <span className="brand-name">{branding.site.display_name}<small>{tCommon("app.brandTagline")}</small></span>
+            </button>
           </div>
 
           <div className="topbar-nav-slot" ref={navSlotRef}>
@@ -1040,15 +1045,14 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
             <>
               <div
                 className={`sidebar-overlay${sidebarOpen ? " open" : ""}`}
-                onClick={() => {
-                  setSidebarOpen(false);
-                  requestAnimationFrame(() => hamburgerRef.current?.focus());
-                }}
+                onClick={() => setSidebarOpen(false)}
                 role="presentation"
               />
               <aside
                 key={isHome ? "portal" : "module"}
                 ref={sidebarRef}
+                role={sidebarOpen ? "dialog" : undefined}
+                aria-modal={sidebarOpen || undefined}
                 id="mobile-sidebar"
                 className={`sidebar${sidebarOpen ? " open" : ""}`}
                 aria-label={tCommon("navigation.moduleAndFilters")}
@@ -1056,11 +1060,6 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
                 onClick={(event) => {
                   if (sidebarOpen && event.target instanceof Element && event.target.closest(".side-item")) {
                     setSidebarOpen(false);
-                    requestAnimationFrame(() => {
-                      if (document.activeElement === document.body || sidebarRef.current?.contains(document.activeElement)) {
-                        hamburgerRef.current?.focus();
-                      }
-                    });
                   }
                 }}
               >

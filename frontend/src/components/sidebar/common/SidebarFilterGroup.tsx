@@ -55,7 +55,7 @@ export function SidebarFilterGroup({
   const renderedItems = allOption ? [allOption, ...items] : items;
 
   return (
-    <div className="side-group">
+    <div className="side-group sidebar-filter-group">
       <div className="side-title">{title}</div>
       {renderedItems.map((item) => (
         <SidebarFilterItem key={item.key} item={item} />

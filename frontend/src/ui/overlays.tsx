@@ -1,3 +1,5 @@
+import { i18n } from "../i18n/index.ts";
+import { useTranslation } from "react-i18next";
 import {
   cloneElement,
   useEffect,
@@ -26,27 +28,8 @@ import {
   OverlayContainerContext,
   useOverlayContainer,
 } from "./overlayPortal.ts";
+import { cycleModalTab, FOCUSABLE_SELECTOR, getFocusableElements } from "./modalFocus.ts";
 import "./overlays.css";
-
-const FOCUSABLE_SELECTOR = [
-  "a[href]",
-  "area[href]",
-  "button:not([disabled])",
-  "input:not([disabled]):not([type=hidden])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  "iframe",
-  "[contenteditable=true]",
-  "[tabindex]:not([tabindex='-1'])",
-].join(",");
-
-function getFocusableElements(container: HTMLElement): HTMLElement[] {
-  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter((element) => {
-    if (element.closest("[inert]") || element.getAttribute("aria-hidden") === "true") return false;
-    const style = window.getComputedStyle(element);
-    return style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0;
-  });
-}
 
 export type DialogRole = "dialog" | "alertdialog";
 
@@ -54,6 +37,7 @@ export interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: ReactNode;
+  initialFocus?: ComponentProps<typeof KumoDialogPrimitive.Popup>["initialFocus"];
   titleAdornment?: ReactNode;
   titleAction?: ReactNode;
   description?: ReactNode;
@@ -72,6 +56,7 @@ export function Dialog({
   open,
   onOpenChange,
   title,
+  initialFocus,
   titleAdornment,
   titleAction,
   description,
@@ -134,23 +119,7 @@ export function Dialog({
     const popup = popupRef.current;
     if (!popup) return;
 
-    const focusable = getFocusableElements(popup);
-    if (!focusable.length) {
-      event.preventDefault();
-      popup.focus({ preventScroll: true });
-      return;
-    }
-
-    const first = focusable[0]!;
-    const last = focusable[focusable.length - 1]!;
-    const activeElement = popup.ownerDocument.activeElement;
-    if (event.shiftKey && (activeElement === first || !popup.contains(activeElement))) {
-      event.preventDefault();
-      last.focus({ preventScroll: true });
-    } else if (!event.shiftKey && (activeElement === last || !popup.contains(activeElement))) {
-      event.preventDefault();
-      first.focus({ preventScroll: true });
-    }
+    cycleModalTab(event, popup);
   };
 
   if (!portalContainer) return null;
@@ -174,6 +143,7 @@ export function Dialog({
             <KumoDialogPrimitive.Popup
               role={role}
               aria-modal="true"
+              initialFocus={initialFocus}
               finalFocus={() => returnFocusRef.current?.isConnected ? returnFocusRef.current : false}
               aria-label={title == null ? ariaLabel : undefined}
               onKeyDownCapture={handleTabKey}
@@ -222,34 +192,34 @@ export interface ConfirmDialogProps {
 
 export type ConfirmOptions = Omit<ConfirmDialogProps, "open" | "busy">;
 
-const DEFAULT_CONFIRM_TITLE = "确认删除该数据？";
-const DEFAULT_CONFIRM_CONTENT = "删除后将无法恢复，请谨慎操作。";
 
 export function ConfirmDialog({
   open,
-  title = DEFAULT_CONFIRM_TITLE,
-  content = DEFAULT_CONFIRM_CONTENT,
+  title,
+  content,
   desc,
   details = [],
   confirmKeyword = "",
-  confirmKeywordLabel = "请输入确认信息",
+  confirmKeywordLabel,
   keywordPlaceholder = "",
-  confirmText = "确认删除",
-  cancelText = "取消",
+  confirmText,
+  cancelText,
   busy = false,
   danger = false,
   maskClosable = true,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation("common");
   const [internalBusy, setInternalBusy] = useState(false);
   const [keywordValue, setKeywordValue] = useState("");
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const keywordInputId = useId();
   const keywordHintId = useId();
   const pending = busy || internalBusy;
   const normalizedKeyword = String(confirmKeyword || "").trim();
   const keywordMatched = !normalizedKeyword || keywordValue.trim() === normalizedKeyword;
-  const body = desc != null ? desc : content;
+  const body = desc != null ? desc : content === undefined ? t("shared.deleteWarning") : content;
 
   useEffect(() => {
     if (!open) {
@@ -279,12 +249,13 @@ export function ConfirmDialog({
       onOpenChange={(nextOpen) => {
         if (!nextOpen) onCancel?.();
       }}
-      title={title}
+      title={title ?? t("shared.deleteTitle")}
+      initialFocus={cancelRef}
       role="alertdialog"
       closeOnOutsideClick={maskClosable}
       busy={pending}
       size="sm"
-      className={danger ? "dap-ui-confirm-danger" : undefined}
+      className={danger ? "confirm-card dap-ui-confirm-danger" : "confirm-card"}
     >
       {body ? <div className="dap-ui-confirm-description">{body}</div> : null}
       {details.length ? (
@@ -293,8 +264,8 @@ export function ConfirmDialog({
         </ul>
       ) : null}
       {normalizedKeyword ? (
-        <div className="dap-ui-confirm-keyword">
-          <label htmlFor={keywordInputId}>{confirmKeywordLabel}</label>
+        <div className="confirm-keyword dap-ui-confirm-keyword">
+          <label htmlFor={keywordInputId}>{confirmKeywordLabel ?? t("shared.keyword")}</label>
           <input
             id={keywordInputId}
             className="dap-ui-confirm-keyword-input"
@@ -305,12 +276,12 @@ export function ConfirmDialog({
             onChange={(event) => setKeywordValue(event.target.value)}
             disabled={pending}
           />
-          <p id={keywordHintId}>请输入 {normalizedKeyword} 以确认删除。</p>
+          <p id={keywordHintId}>{t("confirmKeywordHint", { keyword: normalizedKeyword })}</p>
         </div>
       ) : null}
       <div className="dap-ui-dialog-actions">
-        <Button variant="secondary" type="button" onClick={onCancel} disabled={pending}>
-          {cancelText}
+        <Button ref={cancelRef} variant="secondary" type="button" onClick={onCancel} disabled={pending}>
+          {cancelText ?? t("action.cancel")}
         </Button>
         <Button
           variant={danger ? "danger" : "primary"}
@@ -318,7 +289,7 @@ export function ConfirmDialog({
           onClick={handleConfirm}
           disabled={pending || !keywordMatched}
         >
-          {pending ? "处理中..." : confirmText}
+          {pending ? t("shared.processing") : confirmText ?? t("shared.delete")}
         </Button>
       </div>
     </Dialog>
@@ -398,9 +369,6 @@ export function confirmAction(options: ConfirmOptions = {}): Promise<boolean> {
 
 export function confirmDelete(options: ConfirmOptions = {}): Promise<boolean> {
   return confirmAction({
-    title: DEFAULT_CONFIRM_TITLE,
-    confirmText: "确认删除",
-    cancelText: "取消",
     danger: true,
     ...options,
   });
@@ -415,7 +383,7 @@ export interface ConfirmDeleteActionOptions extends ConfirmOptions {
 
 export function confirmDeleteAction({
   name,
-  typeLabel = "该数据",
+  typeLabel,
   impact = "",
   consequences = [],
   confirmKeyword = "",
@@ -423,7 +391,8 @@ export function confirmDeleteAction({
   keywordPlaceholder,
   ...options
 }: ConfirmDeleteActionOptions = {}): Promise<boolean> {
-  const content = impact || `${typeLabel}${name ? `“${name}”` : ""}删除后将无法恢复，请谨慎操作。`;
+  const item = `${typeLabel ?? i18n.t("shared.item")}${name ? `“${name}”` : ""}`;
+  const content = impact || i18n.t("shared.deleteItem", { item });
   return confirmDelete({
     content,
     details: consequences,

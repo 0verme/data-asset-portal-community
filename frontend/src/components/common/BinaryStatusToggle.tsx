@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   getBinaryStatusValue,
   normalizeBinaryStatusOptions,
@@ -23,9 +24,10 @@ export function BinaryStatusToggle({
   className = "",
   disabled = false,
   name,
-  ariaLabel = "状态选择",
+  ariaLabel,
   onChange,
 }: BinaryStatusToggleProps) {
+  const { t } = useTranslation("common");
   const items = normalizeBinaryStatusOptions(options);
   const currentValue = getBinaryStatusValue(value);
   const wrapperClassName = ["seg", className].filter(Boolean).join(" ");
@@ -36,7 +38,7 @@ export function BinaryStatusToggle({
   };
 
   return (
-    <div className={wrapperClassName} role="group" aria-label={ariaLabel}>
+    <div className={wrapperClassName} role="group" aria-label={ariaLabel ?? t("shared.selectStatus")}>
       {items.map((item) => (
         <button
           key={item.value}
@@ -47,7 +49,7 @@ export function BinaryStatusToggle({
           aria-pressed={currentValue === item.value}
           onClick={() => handleChange(item.value)}
         >
-          {item.name}
+          {t(`shared.${item.value}`)}
         </button>
       ))}
     </div>

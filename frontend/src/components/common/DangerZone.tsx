@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { ReactNode } from "react";
 
 import { Icon } from "../ui.tsx";
@@ -19,10 +20,13 @@ export interface DangerZoneProps {
 }
 
 export function DangerZone({
-  title = "危险操作",
-  description = "以下操作不可逆，请确认影响范围后再继续。",
+  title: suppliedTitle,
+  description: suppliedDescription,
   actions = [],
 }: DangerZoneProps) {
+  const { t } = useTranslation("common");
+  const title = suppliedTitle ?? t("shared.danger");
+  const description = suppliedDescription ?? t("shared.dangerHint");
   const visibleActions = actions.filter(
     (action): action is DangerZoneAction => Boolean(action),
   );

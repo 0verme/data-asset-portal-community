@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   useLayoutEffect,
   useRef,
@@ -85,6 +86,7 @@ function sameSnapshot(left: ScrollSnapshot, right: ScrollSnapshot): boolean {
 }
 
 export function WideTableScroll({ children, ariaLabel, className = "" }: WideTableScrollProps) {
+  const { t } = useTranslation("common");
   const wrapperRef = useRef<HTMLDivElement>(null);
   const scrollbarTrackRef = useRef<HTMLDivElement>(null);
   const scrollbarThumbRef = useRef<HTMLDivElement>(null);
@@ -334,13 +336,13 @@ export function WideTableScroll({ children, ariaLabel, className = "" }: WideTab
               className="wide-table-sticky-scrollbar"
               style={scrollbarStyle}
               role="scrollbar"
-              aria-label={`${ariaLabel}横向滚动`}
+              aria-label={t("shared.horizontal", { label: ariaLabel })}
               aria-controls={scrollRegionId}
               aria-orientation="horizontal"
               aria-valuemin={0}
               aria-valuemax={Math.round(maxScroll)}
               aria-valuenow={Math.round(scrollLeft)}
-              aria-valuetext={`已滚动 ${Math.round(scrollLeft)}，可滚动 ${Math.round(maxScroll)} 像素`}
+              aria-valuetext={t("shared.scrollValue", { left: Math.round(scrollLeft), max: Math.round(maxScroll) })}
               tabIndex={0}
               onPointerDown={handleScrollbarPointerDown}
               onPointerMove={handleScrollbarPointerMove}

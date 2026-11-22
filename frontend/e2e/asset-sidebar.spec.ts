@@ -298,7 +298,7 @@ test("warehouse matches the upstream desktop frame and keeps pending readiness b
   expect(await panel.boundingBox()).toEqual(baseline);
   expect(await headingStyle()).toEqual(heading);
   const readiness = panel.getByRole("region", { name: "模块就绪度" });
-  await expect(readiness.getByRole("status")).toHaveText("待接入");
+  await expect(readiness.getByRole("status")).toHaveText("口径待确认");
   await expect(readiness.getByRole("progressbar")).toHaveCount(0);
   await expect(readiness).not.toContainText("%");
   const bounds = await readiness.boundingBox();

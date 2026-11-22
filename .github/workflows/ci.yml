@@ -681,7 +681,7 @@ jobs:
         env:
           DAP_KUMO_TEST_OUTPUT: ${{ runner.temp }}/header-footer-playwright
           VITE_API_MODE: mock
-        run: npm run test:browser -- e2e/header-navigation.spec.ts e2e/app-footer.spec.ts --workers=2
+        run: npm run test:browser -- e2e/header-navigation.spec.ts e2e/app-footer.spec.ts e2e/sidebar-shell.spec.ts e2e/shared-foundation.spec.ts --workers=2
 
       - name: Public branding configuration and responsive portal (Chromium and WebKit)
         if: matrix.lane == 'a'

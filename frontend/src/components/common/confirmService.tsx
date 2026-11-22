@@ -1,3 +1,4 @@
+import { i18n } from "../../i18n/index.ts";
 import React from "react";
 
 import { ConfirmDialog, type ConfirmOptions } from "./ConfirmDialog.tsx";
@@ -13,9 +14,6 @@ export function confirmAction(options: ConfirmOptions = {}): Promise<boolean> {
 
 export function confirmDelete(options: ConfirmOptions = {}): Promise<boolean> {
   return confirmAction({
-    title: "确认删除该数据？",
-    confirmText: "确认删除",
-    cancelText: "取消",
     danger: true,
     ...options,
   });
@@ -30,7 +28,7 @@ export interface ConfirmDeleteActionOptions extends ConfirmOptions {
 
 export function confirmDeleteAction({
   name,
-  typeLabel = "该数据",
+  typeLabel,
   impact = "",
   consequences = [],
   confirmKeyword = "",
@@ -38,7 +36,8 @@ export function confirmDeleteAction({
   keywordPlaceholder,
   ...options
 }: ConfirmDeleteActionOptions = {}): Promise<boolean> {
-  const content = impact || `${typeLabel}${name ? `“${name}”` : ""}删除后将无法恢复，请谨慎操作。`;
+  const item = `${typeLabel ?? i18n.t("shared.item")}${name ? `“${name}”` : ""}`;
+  const content = impact || i18n.t("shared.deleteItem", { item });
   return confirmDelete({
     content,
     details: consequences,
@@ -60,11 +59,13 @@ export function ConfirmDialogHost() {
   const resolverRef = React.useRef<((result: boolean) => void) | null>(null);
 
   React.useEffect(() => {
-    openConfirm = (options: ConfirmOptions) =>
-      new Promise<boolean>((resolve) => {
+    openConfirm = (options: ConfirmOptions) => {
+      if (resolverRef.current) return Promise.resolve(false);
+      return new Promise<boolean>((resolve) => {
         resolverRef.current = resolve;
         setState({ open: true, options, busy: false });
       });
+    };
     return () => {
       openConfirm = null;
       const resolve = resolverRef.current;

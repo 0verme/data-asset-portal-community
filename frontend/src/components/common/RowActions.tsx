@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { MouseEventHandler, ReactNode } from "react";
 
 import { Icon } from "../ui.tsx";
@@ -34,6 +35,7 @@ export function RowActions({
   toggle,
   disabled = false,
 }: RowActionsProps) {
+  const { t } = useTranslation("common");
   const runConfirm = async (
     options: true | ConfirmOptions | undefined,
     action: (() => void | Promise<unknown>) | undefined,
@@ -49,13 +51,13 @@ export function RowActions({
 
   const handleToggle = () => {
     if (!toggle) return;
-    const acting = toggle.enabled ? "禁用" : "启用";
+    const acting = toggle.enabled ? t("shared.disable") : t("shared.enable");
     void runConfirm(
       {
         title: acting,
-        content: `确认${acting}${toggle.label ? ` ${toggle.label}` : ""}吗？`,
+        content: t("shared.toggle", { action: acting, name: toggle.label ? ` ${toggle.label}` : "" }),
         confirmText: acting,
-        cancelText: "取消",
+        cancelText: t("action.cancel"),
       },
       toggle.onToggle,
     );
@@ -65,12 +67,12 @@ export function RowActions({
     <div className="row-actions">
       {onView ? (
         <button className="btn" type="button" disabled={disabled} onClick={onView}>
-          <Icon name="eye" size={14} />查看
+          <Icon name="eye" size={14} />{t("shared.view")}
         </button>
       ) : null}
       {onEdit ? (
         <button className="btn" type="button" disabled={disabled} onClick={onEdit}>
-          <Icon name="edit" size={14} />编辑
+          <Icon name="edit" size={14} />{t("shared.edit")}
         </button>
       ) : null}
       {toggle ? (
@@ -81,7 +83,7 @@ export function RowActions({
           onClick={handleToggle}
         >
           <Icon name={toggle.enabled ? "close" : "check"} size={14} />
-          {toggle.enabled ? "禁用" : "启用"}
+          {toggle.enabled ? t("shared.disable") : t("shared.enable")}
         </button>
       ) : null}
       {extraActions.map((action) => (

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState, type ReactNode } from "react";
 
 import { Button } from "./Button.tsx";
@@ -5,6 +6,8 @@ import { Dialog } from "./overlays.tsx";
 import "./overlays.css";
 
 export interface FormModalProps {
+  className?: string;
+  bodyClassName?: string;
   open: boolean;
   title: ReactNode;
   subtitle?: ReactNode;
@@ -20,6 +23,8 @@ export interface FormModalProps {
 }
 
 export function FormModal({
+  className,
+  bodyClassName,
   open,
   title,
   subtitle,
@@ -27,12 +32,13 @@ export function FormModal({
   children,
   onClose,
   onSubmit,
-  submitText = "保存修改",
-  cancelText = "取消",
+  submitText,
+  cancelText,
   busy = false,
   showSubmit = true,
   closeOnOutsideClick = true,
 }: FormModalProps) {
+  const { t } = useTranslation("common");
   const [internalBusy, setInternalBusy] = useState(false);
   const pending = busy || internalBusy;
 
@@ -63,7 +69,7 @@ export function FormModal({
         <Button
           variant="tertiary"
           type="button"
-          aria-label="关闭弹窗"
+          aria-label={t("shared.closeDialog")}
           className="dap-ui-form-modal-close"
           onClick={() => !pending && onClose?.()}
           disabled={pending}
@@ -75,16 +81,16 @@ export function FormModal({
       closeOnOutsideClick={closeOnOutsideClick}
       busy={pending}
       size="lg"
-      className="dap-ui-form-modal"
+      className={["dap-ui-form-modal", className].filter(Boolean).join(" ")}
     >
-      <div className="dap-ui-form-modal-body">{children}</div>
+      <div className={["dap-ui-form-modal-body", bodyClassName].filter(Boolean).join(" ")}>{children}</div>
       <div className="dap-ui-dialog-actions">
         <Button variant="secondary" type="button" onClick={onClose} disabled={pending}>
-          {cancelText}
+          {cancelText ?? t("action.cancel")}
         </Button>
         {showSubmit ? (
           <Button variant="primary" type="button" onClick={handleSubmit} disabled={pending}>
-            {pending ? "保存中..." : submitText}
+            {pending ? t("shared.saving") : submitText ?? t("shared.saveChanges")}
           </Button>
         ) : null}
       </div>

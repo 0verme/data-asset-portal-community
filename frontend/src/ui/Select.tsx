@@ -6,6 +6,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
+import { useContext } from "react";
+import { OverlayContainerContext } from "./overlayPortal.ts";
 import { Select as KumoSelect } from "@cloudflare/kumo/components/select";
 
 import { joinClassNames } from "./classNames.ts";
@@ -80,7 +82,9 @@ function DapSelect<Value = string>({
   value,
   ...props
 }: SelectProps<Value>) {
+  const dialogContainer = useContext(OverlayContainerContext);
   const selectProps = {
+    ...(dialogContainer ? { container: dialogContainer } : {}),
     ...props,
     className: normalizeKumoSelectClassName(className),
     render: withAriaInvalid(render, ariaInvalid),

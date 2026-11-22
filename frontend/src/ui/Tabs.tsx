@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { ComponentProps } from "react";
 import { Tabs as KumoTabs } from "@cloudflare/kumo/components/tabs";
 
@@ -20,9 +21,10 @@ export function Tabs({
   size = "md",
   ...props
 }: TabsProps) {
+  const { t } = useTranslation("common");
   const localizedLabels = {
-    scrollStart: "向左滚动标签",
-    scrollEnd: "向右滚动标签",
+    scrollStart: t("shared.tabsStart"),
+    scrollEnd: t("shared.tabsEnd"),
     ...labels,
   };
   return (

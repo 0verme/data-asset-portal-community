@@ -17,7 +17,7 @@ test("missing definition, invalid counts, missing percentage and non-ready state
     { metricId: null }, { definition: " " }, { denominator: null }, { denominator: 0 },
     { numerator: -1 }, { numerator: 4 }, { numerator: null }, { denominator: Infinity },
     { percentage: null }, { percentage: NaN }, { percentage: 101 },
-    { status: "pending_definition" }, { status: "loading" }, { status: "unavailable" }, { status: "not_applicable" },
+    { status: "pending_definition" }, { status: "pending_integration" }, { status: "loading" }, { status: "unavailable" }, { status: "not_applicable" },
   ];
   for (const patch of invalid) assert.equal(readinessPercentage({ ...result, ...patch }), null);
 });

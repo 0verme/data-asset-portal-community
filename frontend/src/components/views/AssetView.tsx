@@ -149,7 +149,7 @@ export function AssetView({
     }
     return (
       <div className="asset-page">
-        <div className="page-head">
+        <div className="page-head workspace-page-header">
           <div>
             <h1 className="page-title">
               <Icon name="table" size={21} />{t("pageTitle")}

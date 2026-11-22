@@ -31,6 +31,12 @@
 
 组合业务共享的 [SidebarFilterGroup](../components/sidebar/common/SidebarFilterGroup.tsx)、[StatusFilterGroup](../components/sidebar/common/StatusFilterGroup.tsx) 和 [SidebarActionGroup](../components/sidebar/common/SidebarActionGroup.tsx)。调用模块提供计数、筛选回调、权限和数据刷新。选中背景使用 `--accent-soft`，强调线和占比进度使用 `--accent`，徽标描边使用 `--accent-line`。布局和验收见[全站设计语言](../../DESIGN.md)，具体组合见 [UpstreamSidebar](../components/sidebar/UpstreamSidebar.tsx)。
 
+目录页可直接采用两个样板的 `page-head workspace-page-header`，其内组合 `h1.page-title`、`.page-sub`、`.head-actions`。模块负责工具栏内容和窄屏操作排列。表单与详情继续使用 PageHeader 的返回和面包屑接口。
+
+### Workspace 就绪度
+
+在主容器的可滚动筛选区之后挂载 `<ModuleReadiness result={result} />`。可选 title 由调用方随语言切换，默认标题由共享组件翻译。参照 UpstreamSidebar 和 AssetSidebar。生产方提供模块与指标 ID、统计定义和权威结果。定义待确认用 pending_definition，已有定义但未接通统计用 pending_integration。两者都显示空轨道；loading 用不定进度。业务覆盖摘要沿用独立标签与数据源。
+
 ## 3. 已导出的 Adapter API
 
 下面列出的 API 均从 src/ui/index.ts 导出。组件是否已经被所有业务页面使用，需要逐页核对。
@@ -40,10 +46,10 @@
 | 按钮 | Button、IconButton | Button 变体 primary / secondary / tertiary / danger / outline；尺寸 sm / md，默认 secondary / md。IconButton 默认 square，必须提供 aria-label 或 aria-labelledby |
 | 输入 | Input、Textarea、Field | Input、Textarea 支持受控 value + 原生 onChange，或非受控 defaultValue；intent 为 default / error，尺寸 sm / md。Field 包一项控件；error 会设置 aria-invalid 并关联可见错误 |
 | 单选下拉 | Select | 单值；可用 value + onValueChange 或 defaultValue；支持 items 与 Option / Group / GroupLabel / Separator 组合；回调值可为空 |
-| 搜索选择 | Combobox | 泛型 items/value；支持单值及 multiple 模式、onValueChange 和 Kumo 组合部件。清除、展示选项和移除标签的默认无障碍名称为中文 |
+| 搜索选择 | Combobox | 泛型 items/value；支持单值及 multiple 模式、onValueChange 和 Kumo 组合部件。清除、展示选项和移除标签的默认无障碍名称随当前语言切换 |
 | 复选与开关 | Checkbox、Switch | 沿用 checked/defaultChecked 选择状态；回调 onCheckedChange 统一报告 boolean。Checkbox 的 indeterminate 会归一为 false |
 | 标签 | Badge、Status | Badge 支持 filled 和 dot。filled tones 为 brand / neutral / success / warning / danger / info；dot/Status 支持 neutral / success / warning / danger |
-| 标签页 | Tabs | appearance 为 segmented（默认）或 line，尺寸 sm / md；受控 value + onValueChange 或 defaultValue；滚动标签默认中文 |
+| 标签页 | Tabs | appearance 为 segmented（默认）或 line，尺寸 sm / md；受控 value + onValueChange 或 defaultValue；滚动标签名称随当前语言切换 |
 | 布局 | Surface、Grid、GridItem、Breadcrumbs | Surface 暴露 Primary / Secondary；Grid 列数 2 / 3 / 4 / 6，gap density compact / normal / spacious（默认 compact），只影响该 Grid 的间隔，与 Appearance 的 Compact / Comfortable 无关；Breadcrumbs 项类型为 link / action / text |
 | 分页 | TablePagination | 受控 page / pageSize / total 与变更回调；页面仍负责取数和筛选状态，不接管业务分页状态 |
 | 表单错误 | FormField、FormErrorSummary、mergeFormFieldErrors、clearFormFieldErrors、focusFirstFormError、focusFormField、formErrorSummaryId、formFieldElementId | 提供稳定字段路径、内联错误、错误摘要和聚焦辅助；不拥有表单值、提交或业务校验规则 |
@@ -73,7 +79,7 @@
 
 Dialog 和 Tooltip 在 Adapter 内组合 Kumo 原语，以实现当前 DAP 的 Portal、焦点、role 和 aria-describedby 契约；这是 Adapter 内部实现边界，不允许业务页据此绕过 Adapter 深层导入。Tooltip 的 trigger 是 React 元素，调用 Tooltip 时传入 trigger 与 content，不以 Button 的 title 属性代替。
 
-业务共享目录也存在同名的 FormModal、ConfirmDialog 和 LoadingState / EmptyState / ErrorState。特别是 [common index](../components/common/index.ts) 的 FormModal 来自旧业务实现，与 src/ui 的 FormModal 不是相同 API。新增代码明确从 src/ui/index.ts 或 common/index.ts 导入；已有模块先保持当前调用契约，再按 Issue 迁移。
+业务共享目录也存在同名的 FormModal、ConfirmDialog 和 LoadingState / EmptyState / ErrorState。特别是 [common index](../components/common/index.ts) 的 FormModal 来自旧业务实现，保留字符串图标及原有 Props，内部委托 src/ui 的 FormModal。共用 Dialog 焦点边界，Select 与 Popover 在所属 Dialog 的 Portal 内渲染。新增代码明确从 src/ui/index.ts 或 common/index.ts 导入；已有模块先保持当前调用契约，再按 Issue 迁移。
 
 ## 5. Select 样式边界和兼容性
 

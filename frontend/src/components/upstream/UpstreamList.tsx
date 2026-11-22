@@ -78,7 +78,7 @@ export function UpstreamList({
 }: UpstreamListProps) {
   return (
     <section className="upstream-page upstream-list-page" aria-labelledby="upstream-list-title">
-      <header className="page-head">
+      <header className="page-head workspace-page-header">
         <div>
           <h1 id="upstream-list-title" className="page-title"><Icon name="download" size={21} color="var(--ink-2)" />上游卸数系统</h1>
           <div className="page-sub">

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import React, { type ReactNode } from "react";
 
 import { getAssetTables } from "../../api/assets.ts";
@@ -86,6 +87,7 @@ function Chips<T extends ReferenceRecord>({
   disabled,
   empty,
 }: ChipsProps<T>) {
+  const { t } = useTranslation("common");
   if (!items.length) return <div className="report-ref-empty">{empty}</div>;
   return (
     <div className="report-ref-chip-list">
@@ -95,7 +97,7 @@ function Chips<T extends ReferenceRecord>({
         return (
           <span key={key} className="tag tag-neutral mono">
             <span className="report-ref-chip-text">{label}</span>
-            {!disabled && <button type="button" className="report-ref-chip-remove" onClick={() => onRemove(key)} aria-label={`移除 ${label}`}><Icon name="close" size={11} /></button>}
+            {!disabled && <button type="button" className="report-ref-chip-remove" onClick={() => onRemove(key)} aria-label={t("shared.removeItem", { label })}><Icon name="close" size={11} /></button>}
           </span>
         );
       })}
@@ -130,6 +132,7 @@ function Picker<T extends ReferenceRecord>({
   searchValue,
   onSearchChange,
 }: PickerProps<T>) {
+  const { t } = useTranslation("common");
   const [localSearch, setLocalSearch] = React.useState("");
   const search = searchValue ?? localSearch;
   const setSearch = onSearchChange || setLocalSearch;
@@ -143,9 +146,9 @@ function Picker<T extends ReferenceRecord>({
 
   return (
     <div className="report-picker">
-      <div className="report-picker-head"><div className="report-picker-title">{title}</div><div className="report-picker-meta">已选 {items.length}</div></div>
-      <Chips items={items} itemKey={itemKey} labelKey={labelKey} onRemove={remove} disabled={disabled} empty={`暂无${title}`} />
-      <div className="report-picker-search"><Icon name="search" size={14} /><input value={search} disabled={disabled} onChange={(event) => setSearch(event.target.value)} aria-label={`搜索${title}`} placeholder={`搜索${title}`} /></div>
+      <div className="report-picker-head"><div className="report-picker-title">{title}</div><div className="report-picker-meta">{t("shared.selected", { count: items.length })}</div></div>
+      <Chips items={items} itemKey={itemKey} labelKey={labelKey} onRemove={remove} disabled={disabled} empty={t("shared.emptySelection", { title })} />
+      <div className="report-picker-search"><Icon name="search" size={14} /><input value={search} disabled={disabled} onChange={(event) => setSearch(event.target.value)} aria-label={t("shared.searchFor", { title })} placeholder={t("shared.searchFor", { title })} /></div>
       <div className="report-picker-list">{filtered.length ? filtered.map((item) => {
         const key = itemValue(item, itemKey);
         return (
@@ -234,11 +237,12 @@ export function AssetReferenceSelector({
   loading = false,
   readonly = false,
 }: AssetReferenceSelectorProps) {
+  const { t } = useTranslation("common");
   const [options, setOptions] = React.useState<{
     tables: TableReference[];
     indicators: IndicatorReference[];
   }>({ tables: [], indicators: [] });
-  const [error, setError] = React.useState("");
+  const [error, setError] = React.useState<string | null>("");
   const [retryRevision, setRetryRevision] = React.useState(0);
   const externalOptions = Array.isArray(tableOptions) || Array.isArray(indicatorOptions);
 
@@ -254,7 +258,7 @@ export function AssetReferenceSelector({
         setError("");
       }
     }).catch((reason: unknown) => {
-      if (!cancelled) setError(reason instanceof Error ? reason.message : "关联资产加载失败。 ");
+      if (!cancelled) setError(reason instanceof Error ? reason.message : null);
     });
     return () => { cancelled = true; };
   }, [externalOptions, retryRevision]);
@@ -273,16 +277,16 @@ export function AssetReferenceSelector({
 
   return (
     <>
-      {error && (
+      {error !== "" && (
         <div className="match-hint" role="alert" style={{ color: "var(--danger)" }}>
-          {error}{" "}
-          <button className="btn" type="button" onClick={() => setRetryRevision((revision) => revision + 1)}>重试加载关联资产</button>
+          {error ?? t("shared.referenceError")}{" "}
+          <button className="btn" type="button" onClick={() => setRetryRevision((revision) => revision + 1)}>{t("shared.referenceRetry")}</button>
         </div>
       )}
-      {loading && <div className="match-hint">正在加载可关联资产…</div>}
+      {loading && <div className="match-hint">{t("shared.referenceLoading")}</div>}
       <div className="report-picker-grid">
-        <Picker title="关联表" items={tables} candidates={tableCandidates} itemKey="tableName" labelKey="tableName" subtitle={(item) => [item.layer, item.domain, item.tableCn].filter(Boolean).join(" / ")} onChange={onTablesChange} disabled={locked} emptyText="未找到关联表" />
-        <Picker title="关联指标" items={indicators} candidates={indicatorCandidates} itemKey="indicatorId" labelKey="indicatorId" subtitle={(item) => [item.indicatorName, item.path].filter(Boolean).join(" / ")} onChange={onIndicatorsChange} disabled={locked} emptyText="未找到关联指标" />
+        <Picker title={t("shared.relatedTables")} items={tables} candidates={tableCandidates} itemKey="tableName" labelKey="tableName" subtitle={(item) => [item.layer, item.domain, item.tableCn].filter(Boolean).join(" / ")} onChange={onTablesChange} disabled={locked} emptyText={t("shared.noTables")} />
+        <Picker title={t("shared.relatedIndicators")} items={indicators} candidates={indicatorCandidates} itemKey="indicatorId" labelKey="indicatorId" subtitle={(item) => [item.indicatorName, item.path].filter(Boolean).join(" / ")} onChange={onIndicatorsChange} disabled={locked} emptyText={t("shared.noIndicators")} />
       </div>
     </>
   );

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { ReactElement, ReactNode } from "react";
 
 import { Button } from "./Button.tsx";
@@ -54,8 +55,9 @@ export function FormErrorSummary({
   errors,
   getFieldLabel,
   onBeforeFocus,
-  title = "请检查表单",
+  title,
 }: FormErrorSummaryProps): ReactElement | null {
+  const { t } = useTranslation("common");
   const entries = Object.entries(errors).filter(([, message]) => typeof message === "string" && message.trim());
   if (!entries.length) return null;
 
@@ -70,7 +72,7 @@ export function FormErrorSummary({
       id={formErrorSummaryId(formId)}
       className="dap-ui-form-error-summary"
       tone="error"
-      title={title}
+      title={title ?? t("shared.checkForm")}
       description={(
         <ul className="dap-ui-form-error-summary__list">
           {entries.map(([field, message]) => (

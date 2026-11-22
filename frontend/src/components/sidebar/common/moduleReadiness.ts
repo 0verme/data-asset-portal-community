@@ -2,7 +2,7 @@
 export interface ModuleReadinessResult {
   moduleId: string;
   metricId: string | null;
-  status: "ready" | "loading" | "unavailable" | "pending_definition" | "not_applicable";
+  status: "ready" | "loading" | "unavailable" | "pending_definition" | "pending_integration" | "not_applicable";
   definition: string | null;
   numerator: number | null;
   denominator: number | null;

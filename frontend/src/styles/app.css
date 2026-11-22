@@ -165,7 +165,7 @@
   .topbar-actions { display: flex; align-items: center; justify-self: end; gap: 8px; min-width: max-content; flex: 0 0 auto; white-space: nowrap; }
   .language-switcher { min-width: 40px; padding-left: 8px; padding-right: 8px; flex: 0 0 auto; }
   .sidebar-language-switcher { display: none; }
-  .brand { display: flex; align-items: center; gap: 11px; min-width: max-content; flex: 0 0 auto; cursor: pointer; user-select: none; }
+  .brand { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-align: start; display: flex; align-items: center; gap: 11px; min-width: max-content; flex: 0 0 auto; cursor: pointer; user-select: none; }
   .brand-mark {
     width: 30px; height: 30px; border-radius: 8px;
     overflow: hidden;
@@ -792,6 +792,11 @@
   .mapping-system-state { padding: 10px; color: var(--ink-3); font-size: 12px; line-height: 1.45; }
   .mapping-system-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--danger); }
   .mapping-system-retry { flex: 0 0 auto; }
+  .sidebar-filter-group .side-item.active { color: var(--accent); background: var(--accent-soft); }
+  .sidebar-filter-group .side-item.active::before { content: ""; position: absolute; inset: 7px auto 7px 0; width: 3px; border-radius: 4px; background: var(--accent); }
+  .sidebar-filter-group .side-item .count { min-width: 24px; text-align: center; font-variant-numeric: tabular-nums; }
+  .sidebar-filter-group .side-item.active .count { color: inherit; border: 1px solid var(--accent-line); background: var(--surface); border-radius: 7px; }
+  .sidebar-filter-group .side-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .side-item .layer-code { font-family: var(--mono); font-size: 12.5px; font-weight: 600; }
   .side-item .layer-cn { font-size: 12px; color: var(--ink-3); }
   .side-item.active .layer-cn { color: var(--ink-2); opacity: 0.8; }
@@ -805,6 +810,44 @@
   /* ===== Page header ===== */
   .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 22px; flex-wrap: wrap; }
   .page-title { font-size: 23px; font-weight: 650; color: var(--ink); letter-spacing: 0.2px; display: flex; align-items: center; gap: 12px; }
+/* List heading and toolbar. */
+.workspace-page-header.page-head {
+  align-items: center;
+  gap: 20px 32px;
+  margin-bottom: 24px;
+}
+
+.workspace-page-header.page-head > div:first-child {
+  min-width: 0;
+}
+
+.workspace-page-header .page-title {
+  gap: 10px;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+
+.workspace-page-header .page-title svg {
+  flex: 0 0 auto;
+}
+
+.workspace-page-header .page-sub {
+  margin-top: 8px;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.workspace-page-header .head-actions {
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  .workspace-page-header .page-title { font-size: 20px; }
+}
   .page-title .pt-code { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--ink); background: var(--surface-3); padding: 3px 9px; border-radius: 7px; letter-spacing: 0.5px; }
   .page-sub { color: var(--ink-2); font-size: 13.5px; margin-top: 7px; }
   .page-sub b { color: var(--ink); font-weight: 600; }
@@ -898,8 +941,8 @@
   .t-owner .mini-av { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 600; background: var(--chip); color: var(--ink-2); flex: 0 0 auto; }
   .t-num { font-family: var(--mono); color: var(--ink-2); font-size: 13px; }
   .match-hint { margin-top: 4px; font-size: 11.5px; color: var(--ink-3); display: flex; align-items: center; gap: 5px; }
-  .match-hint mark { background: rgba(245, 158, 11, 0.25); color: #fbbf24; padding: 0 3px; border-radius: 3px; font-family: var(--mono); font-size: 11px; }
-  mark.hl { background: rgba(245, 158, 11, 0.25); color: #fbbf24; padding: 0 1px; border-radius: 2px; }
+  .match-hint mark { background: color-mix(in srgb, var(--surface) 70%, var(--warn)); color: var(--ink); padding: 0 3px; border-radius: 3px; font-family: var(--mono); font-size: 11px; }
+  mark.hl { background: color-mix(in srgb, var(--surface) 70%, var(--warn)); color: var(--ink); padding: 0 1px; border-radius: 2px; }
   /* 统一列表行操作容器（共享 RowActions） */
   .row-actions {
     display: inline-flex;
