@@ -11,17 +11,45 @@ import {
   ReportSidebar,
   RootSidebar,
   SystemSidebar,
+  UpstreamCoverageSummary,
   UpstreamSidebar,
 } from "../sidebar/index.ts";
+import { ModuleReadiness } from "../sidebar/common/ModuleReadiness.tsx";
 import type { ModuleId } from "../../routing/types.ts";
 import type { AppModuleContext } from "./appTypes.ts";
 
+type WorkspaceModuleId = Exclude<ModuleId, "portal" | "notFound">;
+
 export interface ModuleSidebarProps {
-  module: ModuleId;
+  module: WorkspaceModuleId;
   context: AppModuleContext;
 }
 
-export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactElement | null {
+export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactElement {
+  return (
+    <>
+      <div className="sidebar-content">{renderModuleSidebar(module, context)}</div>
+      <div className="sidebar-progress">
+        {module === "upstream" ? (
+          <UpstreamCoverageSummary upstream={context.upstream} statusOptions={context.statusOptions} />
+        ) : (
+          <ModuleReadiness result={{
+            moduleId: module === "dwm" ? "data-warehouse" : module,
+            status: "pending_definition",
+            metricId: null,
+            definition: null,
+            numerator: null,
+            denominator: null,
+            percentage: null,
+            updatedAt: null,
+          }} />
+        )}
+      </div>
+    </>
+  );
+}
+
+function renderModuleSidebar(module: WorkspaceModuleId, context: AppModuleContext): ReactElement {
   const {
     apiAsset,
     apiAssetFilter,

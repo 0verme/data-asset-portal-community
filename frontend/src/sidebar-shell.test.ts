@@ -38,11 +38,12 @@ test("responsive sidebar shell keeps overlay, scroll-lock, focus and aria contra
   assert.match(app, /opener\?\.focus\(\)/);
   assert.match(app, /requestAnimationFrame\(\(\) => sidebarRef\.current\?\.focus\(\)\)/);
   assert.match(app, /id="mobile-sidebar"/);
-  assert.match(app, /aria-label=\{tCommon\("navigation\.moduleAndFilters"\)\}/);
+  assert.match(app, /aria-label=\{tCommon\(isHome \? "navigation\.module" : "navigation\.moduleAndFilters"\)\}/);
   assert.match(app, /tabIndex=\{-1\}/);
-  assert.match(app, /closest\("\.side-item"\)/);
+  assert.match(app, /closest\("\[data-sidebar-dismiss\]"\)/);
+  assert.doesNotMatch(app, /closest\("\.side-item"\)/);
   assert.match(app, /className=\{`sidebar-overlay\$\{sidebarOpen \? " open" : ""\}`\}/);
-  assert.match(app, /className=\{`sidebar\$\{sidebarOpen \? " open" : ""\}`\}/);
+  assert.match(app, /className=\{`sidebar \$\{isHome \? "sidebar--portal" : "sidebar--workspace"\}\$\{sidebarOpen \? " open" : ""\}`\}/);
 });
 
 test("sidebar shell does not bypass the DAP adapter boundary", () => {

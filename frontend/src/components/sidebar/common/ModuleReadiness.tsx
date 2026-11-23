@@ -1,7 +1,6 @@
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { readinessPercentage, type ModuleReadinessResult } from "./moduleReadiness.ts";
-import "./module-readiness.css";
 
 export function ModuleReadiness({ result, title }: { result: ModuleReadinessResult; title?: string }) {
   const { t, i18n } = useTranslation("common");
@@ -21,9 +20,9 @@ export function ModuleReadiness({ result, title }: { result: ModuleReadinessResu
         {percentage !== null && <small> · {result.numerator} / {result.denominator}</small>}
       </p>
       {percentage !== null || status === "loading" ? (
-        <progress aria-labelledby={id} aria-describedby={`${id}-description`} max={100} value={percentage ?? undefined} />
+        <progress className="sidebar-progress-track" aria-labelledby={id} aria-describedby={`${id}-description`} max={100} value={percentage ?? undefined} />
       ) : (
-        <div className="module-readiness__empty-track" aria-hidden="true" />
+        <div className="sidebar-progress-track sidebar-progress-track--empty" aria-hidden="true" />
       )}
       <small id={`${id}-description`}>{result.definition?.trim() || t(`readiness.description.${status}`)}</small>
       {updated && Number.isFinite(updated.getTime()) && (

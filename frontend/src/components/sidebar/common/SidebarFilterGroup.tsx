@@ -30,6 +30,7 @@ function SidebarFilterItem({ item }: { item: SidebarFilterItem }) {
     <button
       type="button"
       className={className}
+      data-sidebar-dismiss
       onClick={item.disabled ? undefined : item.onClick}
       disabled={item.disabled}
       aria-pressed={typeof item.active === "boolean" ? item.active : undefined}

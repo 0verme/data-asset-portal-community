@@ -90,10 +90,17 @@ test("home and peer workspaces retain shell and readiness hierarchy", async ({ p
   for (const route of ["upstream", "data-warehouse"]) {
     await page.goto("/" + route);
     await expect(page.locator("h1.page-title")).toBeVisible();
-    const readiness = page.locator(`.module-readiness[data-module="${route}"]`);
-    await expect(readiness.getByRole("status")).toContainText("口径待确认");
-    await expect(readiness.locator("progress")).toHaveCount(0);
-    if (route === "upstream") await expect(page.locator(".upstream-summary-number")).toHaveText("7 / 8");
+    const footer = page.locator(".sidebar-progress");
+    if (route === "upstream") {
+      await expect(footer.locator(".upstream-summary-number")).toHaveText("7 / 8");
+      const progress = footer.getByRole("progressbar", { name: "系统启用比例" });
+      await expect(progress).toHaveAttribute("value", "7");
+      await expect(progress).toHaveAttribute("max", "8");
+      await expect(footer.locator(".module-readiness")).toHaveCount(0);
+    } else {
+      await expect(footer.getByRole("status")).toHaveText("口径待确认");
+      await expect(footer.getByRole("progressbar")).toHaveCount(0);
+    }
     await page.screenshot({ path: info.outputPath(route + ".png") });
   }
   await page.setViewportSize({ width: 390, height: 844 });
@@ -168,3 +175,61 @@ test("a service confirmation inside an edit form returns focus to the delete act
   await expect(remove).toBeFocused();
   await expect(form).toBeVisible();
 });
+
+const workspaceRoutes = [
+  "/data-warehouse", "/upstream", "/field-mapping", "/lineage", "/root-management",
+  "/indicator-maintenance", "/report-assets", "/api-assets", "/push",
+  "/code-table-maintenance", "/system-management/users",
+];
+
+for (const { width, height, theme, accent } of [
+  { width: 1440, height: 900, theme: "light", accent: "green" },
+  { width: 2560, height: 1440, theme: "dark", accent: "purple" },
+  { width: 390, height: 844, theme: "dark", accent: "purple" },
+] as const) {
+  test(`all workspaces share one sidebar surface and one progress area at ${width}px / ${theme}`, async ({ page }) => {
+    test.setTimeout(60_000);
+    await preferences(page, theme, accent);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width, height });
+    const sidebar = page.locator("#mobile-sidebar");
+    const panel = sidebar.locator(":scope > .sidebar-panel");
+    const measureSurface = () => panel.evaluate(el => {
+      const { x, y, width, height } = el.getBoundingClientRect();
+      const { backgroundColor, borderRadius, boxShadow, backdropFilter } = getComputedStyle(el);
+      return { x, y, width, height, backgroundColor, borderRadius, boxShadow, backdropFilter };
+    });
+    let baseline: Awaited<ReturnType<typeof measureSurface>> | undefined;
+    for (const route of workspaceRoutes) {
+      await test.step(route, async () => {
+        await page.goto(route);
+        await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+        if (width < 960) await page.locator(".hamburger").click();
+        await expect(panel).toHaveCount(1);
+        await expect(panel).toBeInViewport({ ratio: 0.95 });
+        await expect(sidebar).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+        const styles = await measureSurface();
+        baseline ??= styles;
+        expect(styles).toEqual(baseline);
+        expect(styles.borderRadius).toBe("16px");
+        expect(styles.backdropFilter).toContain("blur(16px)");
+        expect(styles.boxShadow).not.toBe("none");
+        await expect(panel.locator(":scope > .sidebar-content")).toHaveCSS("overflow-y", "auto");
+        const progress = panel.locator(":scope > .sidebar-progress");
+        await expect(progress).toHaveCount(1);
+        await expect(progress).toBeInViewport({ ratio: 1 });
+        await expect(progress).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+        const placeholder = progress.getByRole("region", { name: "模块就绪度" });
+        if (route === "/upstream") {
+          await expect(placeholder).toHaveCount(0);
+          await expect(progress.getByRole("progressbar", { name: "系统启用比例" })).toHaveAttribute("max", "8");
+        } else {
+          await expect(placeholder.getByRole("status")).toHaveText("口径待确认");
+          await expect(placeholder.locator(".sidebar-progress-track--empty")).toHaveAttribute("aria-hidden", "true");
+          await expect(placeholder.getByRole("progressbar")).toHaveCount(0);
+          await expect(placeholder).not.toContainText("%");
+        }
+      });
+    }
+  });
+}

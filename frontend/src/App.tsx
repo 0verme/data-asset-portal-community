@@ -639,8 +639,8 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
   const isUpstream = module === "upstream";
   const isMapping = module === "mapping";
   const isCodeTable = module === "codeTable";
-  const hasModuleSidebar = module !== "notFound";
-  const isPortal = isHome || !hasModuleSidebar;
+  const hasSidebar = module !== "notFound";
+  const isPortal = isHome || !hasSidebar;
 
   useEffect(() => {
     setMoreNavOpen(false);
@@ -790,7 +790,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
     visibleModuleKeys,
   };
   const moduleContent = <ModuleContent module={module} context={moduleContext} />;
-  const moduleSidebar = editorAccessDenied ? null : <ModuleSidebar module={module} context={moduleContext} />;
+  const moduleSidebar = module === "portal" || module === "notFound" || editorAccessDenied ? null : <ModuleSidebar module={module} context={moduleContext} />;
 
   const footer = (
     <footer className="app-footer-shell" role="contentinfo">
@@ -823,7 +823,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
       <AppShell>
         <header className={`topbar${isPortal ? " portal-topbar" : ""}${isHome ? " portal-home-topbar" : ""}`}>
           <div className="topbar-brand">
-            {hasModuleSidebar ? (
+            {hasSidebar ? (
               <IconButton
                 ref={hamburgerRef}
                 className="hamburger"
@@ -1041,7 +1041,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
         ) : null}
 
         <div className="body">
-          {hasModuleSidebar ? (
+          {hasSidebar ? (
             <>
               <div
                 className={`sidebar-overlay${sidebarOpen ? " open" : ""}`}
@@ -1054,48 +1054,52 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
                 role={sidebarOpen ? "dialog" : undefined}
                 aria-modal={sidebarOpen || undefined}
                 id="mobile-sidebar"
-                className={`sidebar${sidebarOpen ? " open" : ""}`}
-                aria-label={tCommon("navigation.moduleAndFilters")}
+                className={`sidebar ${isHome ? "sidebar--portal" : "sidebar--workspace"}${sidebarOpen ? " open" : ""}`}
+                aria-label={tCommon(isHome ? "navigation.module" : "navigation.moduleAndFilters")}
                 tabIndex={-1}
                 onClick={(event) => {
-                  if (sidebarOpen && event.target instanceof Element && event.target.closest(".side-item")) {
+                  if (sidebarOpen && event.target instanceof Element && event.target.closest("[data-sidebar-dismiss]")) {
                     setSidebarOpen(false);
                   }
                 }}
               >
-                {!isPortal ? <div className="sidebar-language-switcher"><LanguageSwitcher /></div> : null}
-                <nav className="mobile-module-nav" aria-label={tCommon("navigation.module")}>
-                  <div className="side-title">{tCommon("navigation.module")}</div>
-                  {currentNavMenuStatus === "loading" ? (
-                    <Button className="mobile-module-link" type="button" variant="tertiary" size="sm" disabled>{tCommon("navigation.loadingMenus")}</Button>
-                  ) : currentNavMenuStatus === "error" ? (
-                    <Button className="mobile-module-link" type="button" variant="tertiary" size="sm" onClick={() => void loadMenus(navigationAuthKey)}>
-                      {tCommon("navigation.menuLoadFailed")}
-                    </Button>
-                  ) : catalogDataAccessReady && visibleNavMenus.length === 0 ? (
-                    <span className="navigation-status" role="status">{tCommon("navigation.noMenus")}</span>
-                  ) : null}
-                  {visibleNavMenus.map((item) => (
-                    <Button
-                      key={item.code}
-                      className={`mobile-module-link${module === item.code ? " active" : ""}`}
-                      type="button"
-                      variant="tertiary"
-                      size="sm"
-                      onClick={() => switchModuleFromMenu(item.code)}
+                <div className="sidebar-panel">
+                  {!isPortal ? <div className="sidebar-language-switcher"><LanguageSwitcher /></div> : null}
+                  <nav className="mobile-module-nav" aria-label={tCommon("navigation.module")}>
+                    <div className="side-title">{tCommon("navigation.module")}</div>
+                    {currentNavMenuStatus === "loading" ? (
+                      <Button className="mobile-module-link" type="button" variant="tertiary" size="sm" disabled>{tCommon("navigation.loadingMenus")}</Button>
+                    ) : currentNavMenuStatus === "error" ? (
+                      <Button className="mobile-module-link" type="button" variant="tertiary" size="sm" onClick={() => void loadMenus(navigationAuthKey)}>
+                        {tCommon("navigation.menuLoadFailed")}
+                      </Button>
+                    ) : catalogDataAccessReady && visibleNavMenus.length === 0 ? (
+                      <span className="navigation-status" role="status">{tCommon("navigation.noMenus")}</span>
+                    ) : null}
+                    {visibleNavMenus.map((item) => (
+                      <Button
+                        key={item.code}
+                        className={`mobile-module-link${module === item.code ? " active" : ""}`}
+                        type="button"
+                        variant="tertiary"
+                        size="sm"
+                        onClick={() => switchModuleFromMenu(item.code)}
+                      >
+                        <Icon name={item.icon} size={16} />{displayMenuName(item)}
+                      </Button>
+                    ))}
+                  </nav>
+                  {moduleSidebar ? (
+                    <ModuleErrorBoundary
+                      resetKey={sidebarResetKey}
+                      title={tCommon("navigation.sidebarErrorTitle")}
+                      desc={tCommon("navigation.sidebarErrorDescription")}
+                      onRetry={() => window.location.reload()}
                     >
-                      <Icon name={item.icon} size={16} />{displayMenuName(item)}
-                    </Button>
-                  ))}
-                </nav>
-                <ModuleErrorBoundary
-                  resetKey={sidebarResetKey}
-                  title={tCommon("navigation.sidebarErrorTitle")}
-                  desc={tCommon("navigation.sidebarErrorDescription")}
-                  onRetry={() => window.location.reload()}
-                >
-                  {moduleSidebar}
-                </ModuleErrorBoundary>
+                      {moduleSidebar}
+                    </ModuleErrorBoundary>
+                  ) : null}
+                </div>
               </aside>
             </>
           ) : null}

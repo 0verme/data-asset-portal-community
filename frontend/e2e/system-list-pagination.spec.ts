@@ -460,6 +460,7 @@ test('system list pagination upstream: pending and empty coverage', async ({ pag
     await expect(summary).toContainText('正在加载统计');
   } finally { release(); }
   await expect(summary.locator('.upstream-summary-number')).toHaveText('0 / 0');
-  await expect(summary.locator('progress')).toHaveJSProperty('position', 0);
+  await expect(summary.getByRole('progressbar')).toHaveCount(0);
+  await expect(summary.locator('.sidebar-progress-track--empty')).toHaveAttribute('aria-hidden', 'true');
   await expect(summary).toContainText('0 类');
 });

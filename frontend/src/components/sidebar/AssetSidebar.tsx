@@ -19,19 +19,6 @@ import { getWarehouseDomainLabel, getWarehouseLayerLabel } from "../warehouseLab
 import { SidebarActionGroup } from "./common/SidebarActionGroup.tsx";
 import { AssetSidebarFilterGroup, type AssetSidebarFilterItem } from "./asset/AssetSidebarFilterGroup.tsx";
 import { buildSidebarFacetItems } from "./common/buildSidebarFacetItems.ts";
-import { ModuleReadiness } from "./common/ModuleReadiness.tsx";
-import type { ModuleReadinessResult } from "./common/moduleReadiness.ts";
-
-const warehouseReadiness: ModuleReadinessResult = {
-  moduleId: "data-warehouse",
-  metricId: null,
-  status: "pending_definition",
-  definition: null,
-  numerator: null,
-  denominator: null,
-  percentage: null,
-  updatedAt: null,
-};
 
 export interface AssetSidebarProps {
   asset: UseAssetModuleResult;
@@ -103,58 +90,55 @@ export function AssetSidebar({ asset, route, canEdit = false }: AssetSidebarProp
 
   return (
     <div className="warehouse-sidebar">
-      <div className="warehouse-sidebar-filters">
-        <AssetSidebarFilterGroup
-          title={t("filterLayers")}
-          allOption={{
-            key: "all-layers",
-            label: t("allLayers"),
-            count: homeLoading || homeError ? "—" : Object.values(layerCounts).reduce(
-              (total, count) => total + count,
-              0,
-            ),
-            active: !selectedLayer,
-            onClick: () => {
-              setSelectedLayer(null);
-              assetBack();
-            },
-          }}
-          items={layerItems}
-        />
+      <AssetSidebarFilterGroup
+        title={t("filterLayers")}
+        allOption={{
+          key: "all-layers",
+          label: t("allLayers"),
+          count: homeLoading || homeError ? "—" : Object.values(layerCounts).reduce(
+            (total, count) => total + count,
+            0,
+          ),
+          active: !selectedLayer,
+          onClick: () => {
+            setSelectedLayer(null);
+            assetBack();
+          },
+        }}
+        items={layerItems}
+      />
 
-        <AssetSidebarFilterGroup
-          title={t("filterDomains")}
-          allOption={{
-            key: "all-domains",
-            label: t("allDomains"),
-            count: homeLoading || homeError ? "—" : Object.values(domainCounts).reduce(
-              (total, count) => total + count,
-              0,
-            ),
-            active: !domain,
-            onClick: () => {
-              setDomain(null);
-              assetBack();
-            },
-          }}
-          items={domainItems}
-        />
+      <AssetSidebarFilterGroup
+        title={t("filterDomains")}
+        allOption={{
+          key: "all-domains",
+          label: t("allDomains"),
+          count: homeLoading || homeError ? "—" : Object.values(domainCounts).reduce(
+            (total, count) => total + count,
+            0,
+          ),
+          active: !domain,
+          onClick: () => {
+            setDomain(null);
+            assetBack();
+          },
+        }}
+        items={domainItems}
+      />
 
-        <SidebarActionGroup
-          actions={
-            showCreateInSidebar
-              ? [
-                  {
-                    key: "create-asset",
-                    label: t("addTable"),
-                    onClick: assetCreate,
-                  },
-                ]
-              : []
-          }
-        />
-      </div>
-      <ModuleReadiness result={warehouseReadiness} />
+      <SidebarActionGroup
+        actions={
+          showCreateInSidebar
+            ? [
+                {
+                  key: "create-asset",
+                  label: t("addTable"),
+                  onClick: assetCreate,
+                },
+              ]
+            : []
+        }
+      />
     </div>
   );
 }

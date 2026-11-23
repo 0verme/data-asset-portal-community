@@ -19,7 +19,7 @@ export { ReportSidebar } from "./ReportSidebar.tsx";
 export { ApiAssetSidebar } from "./ApiAssetSidebar.tsx";
 export { RootSidebar } from "./RootSidebar.tsx";
 export { SystemSidebar } from "./SystemSidebar.tsx";
-export { UpstreamSidebar } from "./UpstreamSidebar.tsx";
+export { UpstreamCoverageSummary, UpstreamSidebar } from "./UpstreamSidebar.tsx";
 export { MappingSidebar } from "./MappingSidebar.tsx";
 export { ManualCodeTableSidebar } from "./ManualCodeTableSidebar.tsx";
 export { LineageAssetSidebar } from "./LineageAssetSidebar.tsx";
