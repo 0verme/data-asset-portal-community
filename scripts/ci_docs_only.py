@@ -26,8 +26,6 @@ from urllib.parse import unquote
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-if str(REPO_ROOT / "demo") not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT / "demo"))
 
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 REGULAR_FILE_MODES = frozenset({"100644", "000000"})
@@ -755,7 +753,7 @@ def _cmd_check_docs(args: argparse.Namespace) -> int:
 
     # 1. If we have a valid PR diff range, run `git diff --check` across the commit range
     # and scan every changed Markdown file for broken links, conflict markers, and safety findings.
-    from safety_scan import high_severity, scan_file  # noqa: E402
+    from demo.safety_scan import high_severity, scan_file  # noqa: E402
 
     ranges = (
         _resolve_diff_ranges(repo_root, args.base_sha.strip(), args.head_sha.strip())

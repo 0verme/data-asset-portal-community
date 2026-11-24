@@ -566,6 +566,15 @@ class CiWorkflowContractTests(unittest.TestCase):
             action_ref = match.group(1)
             self.assertRegex(action_ref, r"^[^@\s]+@[0-9a-f]{40}$")
 
+    def test_importing_ci_docs_only_does_not_pollute_sys_path_with_demo_dir(self) -> None:
+        import sys
+
+        self.assertNotIn(
+            str(REPO_ROOT / "demo"),
+            sys.path,
+            "scripts.ci_docs_only must not insert demo/ into sys.path (breaks demo.seed_loader patching)",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
