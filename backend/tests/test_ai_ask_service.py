@@ -654,6 +654,62 @@ class AiAskServiceTests(unittest.TestCase):
                 self.assertEqual(reason, generating_failure.error_code)
                 self.assertEqual([], response.citations)
 
+    def test_parent_table_of_verified_field_candidate_and_duplicate_claims_are_accepted(self):
+        field_only_retrieval = RagRecommendationsResponse(
+            query="平均客单价的定义是什么？用哪张表哪几个字段？",
+            status="available",
+            recommendations=[FIELD],
+            count=1,
+        )
+        output = json.dumps({
+            "questionType": "field_explanation",
+            "claims": [
+                {"assetType": "table", "assetId": 7, "fieldId": None, "relevance": "direct"},
+                {"assetType": "field", "assetId": 7, "fieldId": 11, "relevance": "related"},
+                {"assetType": "field", "assetId": 7, "fieldId": 11, "relevance": "direct"},
+            ],
+        })
+        service, _rag, llm = self._service(
+            retrieval=field_only_retrieval,
+            llm=StubLLMProvider(content=output),
+        )
+
+        response = service.ask(
+            AiAskRequest(query="平均客单价的定义是什么？用哪张表哪几个字段？"),
+            profile="strict",
+        )
+
+        self.assertEqual("answered", response.status)
+        self.assertEqual(1, len(llm.calls))
+        self.assertEqual(
+            [("table", 7, None), ("field", 7, 11)],
+            [(item.asset_type, item.asset_id, item.field_id) for item in response.citations],
+        )
+        self.assertEqual(
+            ["direct", "direct"],
+            [item.relevance for item in response.candidates],
+        )
+        self.assertIn("ACCOUNT_BALANCE", response.answer)
+        self.assertIn("BALANCE_AMT", response.answer)
+
+    def test_citation_error_repair_can_recover_with_verified_candidates(self):
+        invalid = json.dumps({
+            "questionType": "field_explanation",
+            "claims": [{"assetId": 999, "fieldId": None, "relevance": "direct"}],
+        })
+        repaired = json.dumps({
+            "questionType": "field_explanation",
+            "claims": [{"assetId": 7, "fieldId": 11, "relevance": "direct"}],
+        })
+        service, _rag, llm = self._service(llm=StubLLMProvider(content=[invalid, repaired]))
+
+        response = service.ask(AiAskRequest(query="平均客单价用哪个字段？"), profile="strict")
+
+        self.assertEqual("answered", response.status)
+        self.assertEqual(2, len(llm.calls))
+        self.assertIn("有界的结构化引用修正", llm.calls[1][0])
+        self.assertEqual([(7, 11)], [(item.asset_id, item.field_id) for item in response.citations])
+
     def test_empty_model_selection_is_rechecked_once_then_becomes_insufficient(self):
         empty = json.dumps({"questionType": "general", "claims": []})
         service, _rag, llm = self._service(llm=StubLLMProvider(content=[empty, empty]))

@@ -12,11 +12,14 @@ const DURATION_KEYS = ["durationMs", "elapsedMs"] as const;
 const STAGE_TIMING_KEYS = ["httpSearchMs", "catalogValidationMs"] as const;
 const SAFE_DIAGNOSTIC_CODES = new Set([
   "ai_disabled", "ambiguous_scope", "asset_verification_unavailable", "busy", "cancelled",
-  "disabled", "empty_query", "field_not_found", "insufficient_evidence", "invalid_detail",
-  "invalid_plan", "invalid_request", "invalid_response", "llm_busy", "llm_timeout",
-  "llm_unavailable", "metadata_count_unavailable", "model_mismatch", "not_found", "partial_results",
-  "service_auth_not_configured", "service_unavailable", "service_unauthorized", "timeout",
-  "unavailable", "visibility_unavailable", "index_not_ready",
+  "disabled", "empty_query", "field_not_found", "insufficient_evidence", "invalid_citation",
+  "invalid_detail", "invalid_model_output", "invalid_plan", "invalid_request", "invalid_response",
+  "llm_busy", "llm_daily_quota_exceeded", "llm_not_configured", "llm_quota_unavailable",
+  "llm_timeout", "llm_unavailable", "metadata_count_unavailable", "model_mismatch", "not_found",
+  "partial_results", "retrieval_degraded_without_evidence", "retrieval_disabled",
+  "retrieval_timeout", "retrieval_unavailable", "service_auth_not_configured",
+  "service_unavailable", "service_unauthorized", "timeout", "unavailable",
+  "visibility_unavailable", "index_not_ready",
 ]);
 const VALID_EVENTS = new Set(["step_start", "step_complete", "step_error", "answer", "done", "keep_alive"]);
 const VALID_STATUSES = new Set(["running", "completed", "failed", "cancelled"]);

@@ -73,3 +73,26 @@ test("redacts dynamic identifiers and bounds diagnostic event volume", () => {
   assert.ok(parsed.events.slice(1).every((item) => item.step === "other"));
   assert.doesNotMatch(JSON.stringify(parsed), /future-private-step|search-0123456789abcdef/);
 });
+
+test("retains safe generation failure diagnostic codes such as invalid_citation", () => {
+  const copied = formatSafeAiAskDiagnostics(
+    [
+      event({
+        stepId: "generating",
+        data: { errorCode: "invalid_citation", reasonCode: "invalid_citation", evidenceCount: 9 },
+      }),
+    ],
+    "failed",
+    "平均客单价的定义是什么？用哪张表哪几个字段？",
+  );
+  const parsed = JSON.parse(copied) as {
+    events: Array<{ step: string; data: Record<string, unknown> }>;
+  };
+
+  assert.equal(parsed.events[0]?.step, "generating");
+  assert.deepEqual(parsed.events[0]?.data, {
+    evidenceCount: 9,
+    errorCode: "invalid_citation",
+    reasonCode: "invalid_citation",
+  });
+});
