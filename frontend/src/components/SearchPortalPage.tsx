@@ -48,6 +48,7 @@ import {
 } from "../api/search.ts";
 import {
   DEFAULT_PORTAL_SCOPE,
+  PORTAL_ASK_AI_EXAMPLE_KEYS,
   PORTAL_SCOPE_CONFIGS,
   filterPortalHotKeywordsByModules,
   filterPortalScopesByModules,
@@ -428,7 +429,7 @@ export function SearchPortalPage({
   heroSubtitle,
   searchPlaceholder,
 }: SearchPortalPageProps) {
-  const { t } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
   const { theme, effectiveEffects } = useAppearance();
   const scopeOptions = useMemo(
     () => filterPortalScopesByModules(availableModules),
@@ -468,10 +469,72 @@ export function SearchPortalPage({
   const [aiExecutionEvents, setAiExecutionEvents] = useState<AiAskExecutionEvent[]>([]);
   const [aiExecutionStatus, setAiExecutionStatus] = useState<AiAskExecutionStatus | null>(null);
   const [aiExecutionRunId, setAiExecutionRunId] = useState(0);
+  const [emptyAskPromptVisible, setEmptyAskPromptVisible] = useState(false);
+  const [typewriterText, setTypewriterText] = useState("");
   const hotTags = useMemo(
     () => filterPortalHotKeywordsByModules(hotKeywords, availableModules),
     [hotKeywords, availableModules],
   );
+  const askExamples = useMemo(
+    () => PORTAL_ASK_AI_EXAMPLE_KEYS.map((key) => ({
+      key,
+      question: t(`portalSearch.askExamples.${key}`),
+    })).filter((item) => item.question.trim().length > 0),
+    [t, i18n.resolvedLanguage, i18n.language],
+  );
+  const primaryAskExample = askExamples[0]?.question ?? "";
+  const staticSearchPlaceholder = useMemo(() => {
+    const base = String(searchPlaceholder || "").trim();
+    if (!aiEnabled || !primaryAskExample) return base;
+    if (/问\s*AI|ask\s*AI/i.test(base)) return base;
+    return `${base}${t("portalSearch.placeholderAiSuffix", { example: primaryAskExample })}`;
+  }, [aiEnabled, primaryAskExample, searchPlaceholder, t]);
+
+  useEffect(() => {
+    if (!aiEnabled || query.trim() || effectiveEffects === "off" || askExamples.length === 0) {
+      setTypewriterText("");
+      return;
+    }
+    const candidates = [
+      staticSearchPlaceholder,
+      ...askExamples.map((item) => t("portalSearch.placeholderAskPrefix", { example: item.question })),
+    ].filter(Boolean);
+    if (candidates.length <= 1) {
+      setTypewriterText("");
+      return;
+    }
+    let candidateIndex = 0;
+    let charIndex = candidates[0]?.length ?? 0;
+    let phase: "hold" | "typing" = "hold";
+    let timerId: number | undefined;
+
+    const step = () => {
+      const target = candidates[candidateIndex] ?? staticSearchPlaceholder;
+      if (phase === "hold") {
+        candidateIndex = (candidateIndex + 1) % candidates.length;
+        charIndex = 1;
+        phase = "typing";
+        const nextTarget = candidates[candidateIndex] ?? staticSearchPlaceholder;
+        setTypewriterText(nextTarget.slice(0, charIndex));
+        timerId = window.setTimeout(step, 42);
+        return;
+      }
+      if (charIndex < target.length) {
+        charIndex = Math.min(target.length, charIndex + 2);
+        setTypewriterText(target.slice(0, charIndex));
+        timerId = window.setTimeout(step, 38);
+        return;
+      }
+      phase = "hold";
+      timerId = window.setTimeout(step, 2800);
+    };
+
+    setTypewriterText(candidates[0] ?? staticSearchPlaceholder);
+    timerId = window.setTimeout(step, 2400);
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [aiEnabled, askExamples, effectiveEffects, query, staticSearchPlaceholder, t]);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const compositionStartValue = useRef<string | null>(null);
@@ -579,6 +642,7 @@ export function SearchPortalPage({
     setAiError("");
     setAiExecutionEvents([]);
     setAiExecutionStatus(null);
+    setEmptyAskPromptVisible(false);
     syncSearchUrl("", preservedScope);
   };
 
@@ -662,7 +726,13 @@ export function SearchPortalPage({
 
   const runAiAsk = (rawQuery = query): void => {
     const question = String(rawQuery ?? "").trim();
-    if (!publicAccessReady || !aiEnabled || !question) return;
+    if (!publicAccessReady || !aiEnabled) return;
+    if (!question) {
+      setEmptyAskPromptVisible(true);
+      inputRef.current?.focus();
+      return;
+    }
+    setEmptyAskPromptVisible(false);
     stopTyping();
     setActiveResultTab("ai");
     requestResultScroll();
@@ -870,8 +940,15 @@ export function SearchPortalPage({
   };
 
   const pickHot = (term: string): void => {
+    setEmptyAskPromptVisible(false);
     setQuery(term);
     runSearch(term, scope);
+  };
+
+  const pickAskExample = (question: string): void => {
+    setEmptyAskPromptVisible(false);
+    setQuery(question);
+    runAiAsk(question);
   };
 
   const pickScope = (nextScope: string): void => {
@@ -919,6 +996,10 @@ export function SearchPortalPage({
       .filter((assetId): assetId is number => Number.isInteger(assetId) && Number(assetId) > 0),
   );
 
+  const hasQueryText = Boolean(query.trim());
+  const askBusy = aiLoading && query.trim() === aiQuery && hasQueryText;
+  const effectiveSearchPlaceholder = !hasQueryText && typewriterText ? typewriterText : staticSearchPlaceholder;
+
   return (
     <div className={`search-portal${searchedTerm || aiQuery ? " has-search-results" : ""}`}>
       <div className="sp-hero">
@@ -943,7 +1024,9 @@ export function SearchPortalPage({
               value={query}
               onChange={(event) => {
                 initialSearchBootstrapPendingRef.current = false;
-                setQuery(event.target.value);
+                const nextValue = event.target.value;
+                setQuery(nextValue);
+                if (nextValue.trim()) setEmptyAskPromptVisible(false);
                 if (compositionStartValue.current === null) showInputFeedback();
               }}
               onFocus={() => setInputFocused(true)}
@@ -965,8 +1048,9 @@ export function SearchPortalPage({
                 // Safari can report isComposing=false for the Enter that commits the candidate.
                 if (event.key === "Enter" && !event.nativeEvent.isComposing && event.keyCode !== 229) doSearch();
               }}
-              placeholder={searchPlaceholder}
-              aria-label="搜索数据资产"
+              placeholder={effectiveSearchPlaceholder}
+              aria-label={t("portalSearch.inputAriaLabel")}
+              aria-describedby={emptyAskPromptVisible && aiEnabled ? "sp-ask-empty-hint" : undefined}
               autoFocus
             />
           </div>
@@ -975,29 +1059,41 @@ export function SearchPortalPage({
               variant="primary"
               type="button"
               className="sp-search-btn"
-              aria-label="搜索"
+              aria-label={t("portalSearch.searchButton")}
               aria-busy={searchLoading}
               onClick={doSearch}
             >
-              <span>搜索</span>
+              <span>{t("portalSearch.searchButton")}</span>
               <span className="sp-action-mark" aria-hidden="true"><Icon name="arrow" size={15} /></span>
             </Button>
             {aiEnabled ? (
               <Button
-                variant="tertiary"
+                variant={hasQueryText ? "primary" : "tertiary"}
                 type="button"
-                className="sp-ask-btn"
-                aria-label="问 AI"
-                aria-busy={aiLoading && query.trim() === aiQuery}
-                disabled={!query.trim() || (aiLoading && query.trim() === aiQuery)}
+                className={`sp-ask-btn${hasQueryText ? " sp-ask-btn-active" : " sp-ask-btn-idle"}`}
+                data-ask-state={hasQueryText ? "active" : "idle"}
+                aria-label={t("portalSearch.askAiButton")}
+                aria-busy={askBusy}
+                disabled={askBusy}
                 onClick={() => runAiAsk(query)}
               >
                 <span className="sp-action-mark" aria-hidden="true">✦</span>
-                <span>问 AI</span>
+                <span>{t("portalSearch.askAiButton")}</span>
               </Button>
             ) : null}
           </div>
         </div>
+        {aiEnabled && emptyAskPromptVisible && !hasQueryText ? (
+          <div
+            id="sp-ask-empty-hint"
+            className="sp-ask-empty-hint"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="sp-ask-empty-hint-mark" aria-hidden="true">✦</span>
+            <span>{t("portalSearch.emptyAskPrompt", { example: primaryAskExample })}</span>
+          </div>
+        ) : null}
       </div>
 
       <div className="sp-scopes" role="group" aria-label="搜索范围">
@@ -1014,6 +1110,27 @@ export function SearchPortalPage({
           </Button>
         ))}
       </div>
+
+      {aiEnabled && askExamples.length > 0 ? (
+        <div className="sp-ask-examples" role="group" aria-label={t("portalSearch.askExamplesAriaLabel")}>
+          <span className="sp-ask-examples-label">
+            <span aria-hidden="true">✦</span>
+            {t("portalSearch.askExamplesLabel")}
+          </span>
+          {askExamples.map((item) => (
+            <Button
+              type="button"
+              key={item.key}
+              variant="tertiary"
+              className="sp-ask-pill"
+              disabled={aiLoading && aiQuery === item.question}
+              onClick={() => pickAskExample(item.question)}
+            >
+              <span>{item.question}</span>
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       {hotTags.length > 0 ? (
         <div className="sp-hot">
@@ -1250,8 +1367,8 @@ export function SearchPortalPage({
                 {aiEnabled ? (
                   <>
                     <p>{query.trim() ? `尚未对“${query.trim()}”发起 AI 问答。` : "尚未输入要问的问题。"}</p>
-                    <Button variant="tertiary" type="button" className="sp-panel-action" disabled={!query.trim()} onClick={() => runAiAsk(query)}>
-                      开始问 AI
+                    <Button variant={hasQueryText ? "primary" : "tertiary"} type="button" className="sp-panel-action" disabled={askBusy} onClick={() => runAiAsk(query)}>
+                      {t("portalSearch.startAskAiButton")}
                     </Button>
                   </>
                 ) : <p>AI 问答暂不可用，传统搜索仍可使用。</p>}

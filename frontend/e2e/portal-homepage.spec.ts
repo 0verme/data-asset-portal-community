@@ -63,13 +63,24 @@ for (const { name, theme, accent, density, language } of appearances) {
     await expect(grid.locator("a, button, [tabindex], svg")).toHaveCount(0);
     await expect(grid.locator(".sp-stat-card").first().locator(":scope > :first-child")).toHaveClass("sp-stat-label");
     await expect(page.locator(".sp-hot-item").first()).toHaveText("catalog_events");
-    await expect(page.getByRole("button", { name: "问 AI", exact: true })).toBeDisabled();
+    const askButton = page.locator(".sp-ask-btn");
+    await expect(askButton).toBeEnabled();
+    await expect(askButton).toHaveAttribute("data-ask-state", "idle");
+    await expect(page.locator(".sp-ask-pill")).toHaveCount(5);
+    await askButton.click();
+    await expect(page.locator("#sp-ask-empty-hint")).toBeVisible();
+    await expect(page.locator(".sp-searchbox input")).toBeFocused();
+    await page.locator(".sp-searchbox input").fill("sales_amount");
+    await expect(askButton).toHaveAttribute("data-ask-state", "active");
+    await expect(page.locator("#sp-ask-empty-hint")).toHaveCount(0);
+    await page.locator(".sp-searchbox input").fill("");
+    await expect(askButton).toHaveAttribute("data-ask-state", "idle");
     await page.getByRole("heading", { level: 1 }).click();
 
     for (const [width, columns] of [[1440, 6], [861, 6], [860, 3], [768, 3], [601, 3], [600, 2], [390, 2], [320, 2]] as const) {
       await page.setViewportSize({ width, height: width === 1440 ? 960 : 844 });
       const rendered = await grid.evaluate((element) => {
-        const boxes = [...document.querySelectorAll(".sp-searchbox, .sp-searchbox input, .sp-searchbox button, .sp-scope-chip, .sp-hot-item, .sp-stat-card")]
+        const boxes = [...document.querySelectorAll(".sp-searchbox, .sp-searchbox input, .sp-searchbox button, .sp-scope-chip, .sp-ask-pill, .sp-hot-item, .sp-stat-card")]
           .map((control) => control.getBoundingClientRect());
         const firstRowY = element.firstElementChild!.getBoundingClientRect().top;
         return {
@@ -223,5 +234,40 @@ test("homepage distinguishes zero and unknown values from an empty catalog and r
     await expect(page.getByText("资产统计加载失败", { exact: true })).toBeVisible();
     await expect(page.getByText(message, { exact: true })).toBeVisible();
     await expect(page.locator(".sp-stat-card")).toHaveCount(0);
+  }
+});
+
+test("Ask AI example pills trigger the standard authenticated/quota-checked streaming ask workflow on desktop and mobile", async ({ page }) => {
+  await routePortal(page);
+  const askedQuestions: string[] = [];
+  await page.route("**/api/ai/ask/stream**", async (route) => {
+    const body = route.request().postDataJSON() as { query?: string } | null;
+    const question = body?.query ?? "";
+    askedQuestions.push(question);
+    const sse = [
+      `event: done\ndata: ${JSON.stringify({
+        requestId: "req-pill-1",
+        timestamp: "2026-11-24T12:00:00Z",
+        status: "completed",
+      })}\n\n`,
+    ].join("");
+    await route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: sse,
+    });
+  });
+
+  for (const [width, height] of [[1440, 960], [390, 844]] as const) {
+    await page.setViewportSize({ width, height });
+    await page.goto("/");
+    const pills = page.locator(".sp-ask-pill");
+    await expect(pills).toHaveCount(5);
+    const thirdPillText = await pills.nth(2).innerText();
+    expect(thirdPillText).toContain("活动转化率的定义是什么");
+    await pills.nth(2).click();
+    await expect(page.locator("#sp-ai-tab")).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator(".sp-searchbox input")).toHaveValue(thirdPillText);
+    expect(askedQuestions.at(-1)).toBe(thirdPillText);
   }
 });

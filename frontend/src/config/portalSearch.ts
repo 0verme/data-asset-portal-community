@@ -103,6 +103,16 @@ export function isMonospaceHotKeyword(keyword: string): boolean {
  return /[A-Z]{2}/.test(keyword) && /[_/.$-]/.test(keyword);
 }
 
+export const PORTAL_ASK_AI_EXAMPLE_KEYS = [
+ "dailySales",
+ "salesAmount",
+ "campaignConversion",
+ "salableInventory",
+ "activeMembers",
+] as const;
+
+export type PortalAskAiExampleKey = (typeof PORTAL_ASK_AI_EXAMPLE_KEYS)[number];
+
 export interface PortalSearchParams {
  query: string;
  scope: string;

@@ -317,6 +317,26 @@
     "empty": "暂无资产统计",
     "error": "资产统计加载失败"
   },
+  "portalSearch": {
+    "inputAriaLabel": "搜索数据资产或向 AI 提问",
+    "searchButton": "搜索",
+    "askAiButton": "问 AI",
+    "startAskAiButton": "开始问 AI",
+    "askAiFindAssetButton": "问 AI 找资产",
+    "clearSearchButton": "清空搜索",
+    "emptyAskPrompt": "先输入一个问题，比如：{{example}}",
+    "placeholderAiSuffix": "；或直接问 AI，例如：“{{example}}”",
+    "placeholderAskPrefix": "问 AI：{{example}}",
+    "askExamplesLabel": "问 AI 示例",
+    "askExamplesAriaLabel": "问 AI 示例问题",
+    "askExamples": {
+      "dailySales": "我想看每天的销售情况，应该用哪张表哪个指标？",
+      "salesAmount": "销售额怎么算？口径是什么，从哪张表出？",
+      "campaignConversion": "活动转化率的定义是什么？用哪张表哪几个字段？",
+      "salableInventory": "可售库存量怎么算？用哪张表哪几个字段？",
+      "activeMembers": "活跃会员数的定义是什么？用哪张表哪几个字段？"
+    }
+  },
   "confirmKeywordHint": "请输入 {{keyword}} 以确认删除。",
   "pagination": {
     "label": "表格分页",
