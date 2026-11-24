@@ -38,8 +38,13 @@ jobs:
     name: Repository Guard
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      docs_only: ${{ steps.classify-changes.outputs.docs_only }}
+      classification_reason: ${{ steps.classify-changes.outputs.classification_reason }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
@@ -48,13 +53,27 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
-      - name: Install backend requirements
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+      - name: Classify PR changes (fail-closed to full CI)
+        id: classify-changes
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python scripts/ci_docs_only.py classify
+
+      - name: Install Repository Guard requirements
+        run: pip install PyYAML==6.0.3
 
       - name: Repository Public Data Guard (BLOCKER and SUSPICIOUS must be 0)
         run: python demo/validate_demo_data.py --strict
+
+      - name: Docs-only Markdown format, link/path, diff and safety contract checks
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DOCS_ONLY: ${{ steps.classify-changes.outputs.docs_only }}
+        run: python scripts/ci_docs_only.py check-docs
 
       - name: git diff --check
         run: git diff --check
@@ -165,6 +184,8 @@ jobs:
   backend:
     name: Backend / Python ${{ matrix.python }}
     runs-on: ubuntu-latest
+    needs: [repository-guard]
+    if: github.event_name != 'pull_request' || needs.repository-guard.outputs.docs_only != 'true'
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -213,6 +234,8 @@ jobs:
   postgres:
     name: PostgreSQL Integration
     runs-on: ubuntu-latest
+    needs: [repository-guard]
+    if: github.event_name != 'pull_request' || needs.repository-guard.outputs.docs_only != 'true'
     timeout-minutes: 20
     services:
       postgres:
@@ -437,6 +460,8 @@ jobs:
   mysql:
     name: MySQL 8 Integration
     runs-on: ubuntu-latest
+    needs: [repository-guard]
+    if: github.event_name != 'pull_request' || needs.repository-guard.outputs.docs_only != 'true'
     timeout-minutes: 20
     services:
       mysql:
@@ -521,6 +546,8 @@ jobs:
   frontend:
     name: ${{ matrix.node == '22' && 'Frontend Core / Node 22' || 'Frontend / Node 24' }}
     runs-on: ubuntu-latest
+    needs: [repository-guard]
+    if: github.event_name != 'pull_request' || needs.repository-guard.outputs.docs_only != 'true'
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -628,6 +655,8 @@ jobs:
   frontend-browser:
     name: Frontend Browser / Lane ${{ matrix.lane }}
     runs-on: ubuntu-latest
+    needs: [repository-guard]
+    if: github.event_name != 'pull_request' || needs.repository-guard.outputs.docs_only != 'true'
     timeout-minutes: ${{ matrix.lane == 'a' && 25 || 20 }}
     strategy:
       fail-fast: false
@@ -868,25 +897,36 @@ jobs:
 
   frontend-gate:
     # Keep the original required check context. It must fail if EITHER
-    # browser shard or ANY frontend core matrix entry fails, skips or cancels.
+    # browser shard or ANY frontend core matrix entry fails, skips or cancels,
+    # except when heavy frontend jobs are intentionally skipped on a verified docs-only PR.
     name: Frontend / Node 22
     runs-on: ubuntu-latest
-    needs: [frontend, frontend-browser]
+    needs: [repository-guard, frontend, frontend-browser]
     if: always()
     timeout-minutes: 2
     steps:
-      - name: Require frontend core and all browser shards
+      - name: Require frontend core and all browser shards (or verified docs-only fast path)
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          DOCS_ONLY: ${{ needs.repository-guard.outputs.docs_only }}
+          GUARD_RESULT: ${{ needs.repository-guard.result }}
           CORE_RESULT: ${{ needs.frontend.result }}
           BROWSER_RESULT: ${{ needs.frontend-browser.result }}
         run: |
-          echo "Frontend core: $CORE_RESULT; browser shards: $BROWSER_RESULT"
+          echo "Event: $EVENT_NAME; docs_only: $DOCS_ONLY; guard: $GUARD_RESULT; frontend core: $CORE_RESULT; browser shards: $BROWSER_RESULT"
+          test "$GUARD_RESULT" = success
+          if [ "$EVENT_NAME" = pull_request ] && [ "$DOCS_ONLY" = true ] && [ "$CORE_RESULT" = skipped ] && [ "$BROWSER_RESULT" = skipped ]; then
+            echo "Docs-only PR fast path verified by Repository Guard; heavy frontend jobs skipped cleanly."
+            exit 0
+          fi
           test "$CORE_RESULT" = success
           test "$BROWSER_RESULT" = success
 
   migration-community:
     name: Community Migration (SQLite)
     runs-on: ubuntu-latest
+    needs: [repository-guard]
+    if: github.event_name != 'pull_request' || needs.repository-guard.outputs.docs_only != 'true'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
