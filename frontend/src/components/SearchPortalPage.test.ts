@@ -141,6 +141,66 @@ test("search result rows size from content instead of the Kumo control box", asy
   );
 });
 
+test("Ask AI button stays interactive on empty input, focuses the search box with guidance, highlights on input, and exposes verified example pills", async () => {
+  const [source, styles, zhLocaleRaw, enLocaleRaw] = await Promise.all([
+    readFile(searchPagePath, "utf8"),
+    readFile(searchStylesPath, "utf8"),
+    readFile(fileURLToPath(new URL("../i18n/locales/zh-CN/common.json", import.meta.url)), "utf8"),
+    readFile(fileURLToPath(new URL("../i18n/locales/en-US/common.json", import.meta.url)), "utf8"),
+  ]);
+  const zhLocale = JSON.parse(zhLocaleRaw) as {
+    portalSearch: {
+      emptyAskPrompt: string;
+      askExamples: Record<string, string>;
+    };
+  };
+  const enLocale = JSON.parse(enLocaleRaw) as {
+    portalSearch: {
+      emptyAskPrompt: string;
+      askExamples: Record<string, string>;
+    };
+  };
+
+  // 1. Empty input no longer truly disables the Ask AI button; only in-flight duplicate ask is disabled.
+  assert.match(source, /const hasQueryText = Boolean\(query\.trim\(\)\)/);
+  assert.match(source, /const askBusy = aiLoading && query\.trim\(\) === aiQuery && hasQueryText/);
+  assert.match(source, /className=\{`sp-ask-btn\$\{hasQueryText \? " sp-ask-btn-active" : " sp-ask-btn-idle"\}`\}/);
+  assert.match(source, /data-ask-state=\{hasQueryText \? "active" : "idle"\}/);
+  assert.match(source, /disabled=\{askBusy\}/);
+  assert.doesNotMatch(source, /className="sp-ask-btn"[\s\S]{0,160}disabled=\{!query\.trim\(\)/);
+
+  // 2. Clicking Ask AI with empty input focuses the search input and reveals an inline guidance hint.
+  assert.match(source, /if \(!question\) \{\s*setEmptyAskPromptVisible\(true\);\s*inputRef\.current\?\.focus\(\);\s*return;\s*\}/);
+  assert.match(source, /id="sp-ask-empty-hint"/);
+  assert.match(source, /t\("portalSearch\.emptyAskPrompt", \{ example: primaryAskExample \}\)/);
+
+  // 3. Typing highlights the button to the primary theme color and clears the empty prompt.
+  assert.match(source, /if \(nextValue\.trim\(\)\) setEmptyAskPromptVisible\(false\)/);
+  assert.match(styles, /\.sp-ask-btn\.sp-ask-btn-active \{[\s\S]*?background: linear-gradient\(120deg, var\(--accent\), var\(--accent-strong\)\)/);
+
+  // 4 & 5. Placeholder includes Ask AI examples with typewriter rotation, and verified example pills trigger normal runAiAsk flow.
+  assert.match(source, /PORTAL_ASK_AI_EXAMPLE_KEYS/);
+  assert.match(source, /t\("portalSearch\.placeholderAiSuffix"/);
+  assert.match(source, /t\("portalSearch\.placeholderAskPrefix"/);
+  assert.match(source, /className="sp-ask-pill"/);
+  assert.match(source, /onClick=\{\(\) => pickAskExample\(item\.question\)\}/);
+  assert.match(source, /const pickAskExample = \(question: string\): void => \{\s*setEmptyAskPromptVisible\(false\);\s*setQuery\(question\);\s*runAiAsk\(question\);\s*\}/);
+
+  const zhQuestions = Object.values(zhLocale.portalSearch.askExamples);
+  const enQuestions = Object.values(enLocale.portalSearch.askExamples);
+  assert.deepEqual(zhQuestions, [
+    "我想看每天的销售情况，应该用哪张表哪个指标？",
+    "销售额怎么算？口径是什么，从哪张表出？",
+    "活动转化率的定义是什么？用哪张表哪几个字段？",
+    "可售库存量怎么算？用哪张表哪几个字段？",
+    "活跃会员数的定义是什么？用哪张表哪几个字段？",
+  ]);
+  assert.equal(enQuestions.length, 5);
+  for (const text of [...zhQuestions, zhLocale.portalSearch.emptyAskPrompt, ...enQuestions, enLocale.portalSearch.emptyAskPrompt]) {
+    assert.doesNotMatch(text, /下单用户数|order_user_cnt/i);
+  }
+});
+
 test("AI is explicitly enabled, Enter remains traditional search, and model requests are isolated", async () => {
   const source = await readFile(searchPagePath, "utf8");
 

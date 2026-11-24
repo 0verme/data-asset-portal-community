@@ -317,6 +317,26 @@
     "empty": "No asset statistics available",
     "error": "Could not load asset statistics"
   },
+  "portalSearch": {
+    "inputAriaLabel": "Search data assets or ask AI a question",
+    "searchButton": "Search",
+    "askAiButton": "Ask AI",
+    "startAskAiButton": "Start Ask AI",
+    "askAiFindAssetButton": "Ask AI to find assets",
+    "clearSearchButton": "Clear search",
+    "emptyAskPrompt": "Enter a question first, for example: {{example}}",
+    "placeholderAiSuffix": " — or ask AI: “{{example}}”",
+    "placeholderAskPrefix": "Ask AI: {{example}}",
+    "askExamplesLabel": "Ask AI examples",
+    "askExamplesAriaLabel": "Ask AI example questions",
+    "askExamples": {
+      "dailySales": "Which table and metric should I use to view daily sales performance?",
+      "salesAmount": "How is sales amount calculated? What is the definition and source table?",
+      "campaignConversion": "What is the definition of campaign conversion rate, and which table and fields should I use?",
+      "salableInventory": "How is salable inventory calculated, and which table and fields should I use?",
+      "activeMembers": "What is the definition of active member count, and which table and fields should I use?"
+    }
+  },
   "confirmKeywordHint": "Enter {{keyword}} to confirm deletion.",
   "pagination": {
     "label": "Table pagination",
