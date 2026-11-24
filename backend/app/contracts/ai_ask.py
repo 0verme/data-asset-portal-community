@@ -321,15 +321,36 @@ class AiGeneratedClaim(_AiAskContract):
     field_id: StableFieldId | None = Field(default=None, alias="fieldId")
     relevance: Literal["direct", "related", "context_only"]
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_numeric_table_field_ids(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        asset_type = normalized.get("assetType") if "assetType" in normalized else normalized.get("asset_type")
+        field_key = "fieldId" if "fieldId" in normalized else "field_id" if "field_id" in normalized else None
+        raw_field_id = normalized.get(field_key) if field_key else None
+        if isinstance(raw_field_id, str) and raw_field_id.isdecimal() and int(raw_field_id) > 0:
+            normalized[field_key] = int(raw_field_id)
+            raw_field_id = normalized[field_key]
+        asset_key = "assetId" if "assetId" in normalized else "asset_id" if "asset_id" in normalized else None
+        raw_asset_id = normalized.get(asset_key) if asset_key else None
+        if (
+            asset_key
+            and isinstance(raw_asset_id, str)
+            and raw_asset_id.isdecimal()
+            and int(raw_asset_id) > 0
+            and (asset_type in {"table", "field"} or raw_field_id is not None)
+        ):
+            normalized[asset_key] = int(raw_asset_id)
+        return normalized
+
     @model_validator(mode="after")
     def validate_typed_identity(self) -> AiGeneratedClaim:
         if isinstance(self.asset_id, int):
             if self.asset_type not in {None, "table", "field"}:
                 raise ValueError("数字 assetId 只能用于表或字段候选")
-            if self.asset_type == "table" and self.field_id is not None:
-                raise ValueError("表 claim 不得提供 fieldId")
-            if self.asset_type == "field" and self.field_id is None:
-                raise ValueError("字段 claim 必须提供 fieldId")
+            self.asset_type = "field" if self.field_id is not None else "table"
         elif self.asset_type not in {"report", "indicator", "api"} or self.field_id is not None:
             raise ValueError("字符串 assetId 必须使用报表/指标/API 类型且不得提供 fieldId")
         return self

@@ -178,6 +178,23 @@ class AiAskContractTests(unittest.TestCase):
                 "questionType": "general",
                 "claims": [{"assetId": "SHARED-001", "fieldId": None, "relevance": "direct"}],
             })
+        normalized = AiGeneratedAnswer.model_validate({
+            "questionType": "field_explanation",
+            "claims": [
+                {"assetType": "table", "assetId": "7", "fieldId": "11", "relevance": "direct"},
+                {"assetType": "field", "assetId": "7", "fieldId": None, "relevance": "related"},
+            ],
+        })
+        self.assertEqual(("field", 7, 11), (
+            normalized.claims[0].asset_type,
+            normalized.claims[0].asset_id,
+            normalized.claims[0].field_id,
+        ))
+        self.assertEqual(("table", 7, None), (
+            normalized.claims[1].asset_type,
+            normalized.claims[1].asset_id,
+            normalized.claims[1].field_id,
+        ))
 
     def test_metadata_count_contract_is_exact_complete_and_separate_from_rag_citations(self):
         evidence = {

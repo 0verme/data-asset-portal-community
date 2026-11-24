@@ -33,6 +33,7 @@ from .ai_ask_service import (
     AIAskCancelled,
     AIAskService,
     INSUFFICIENT_EVIDENCE_ANSWER,
+    _CITATION_REPAIR_SYSTEM_PROMPT,
     _GENERATION_UNAVAILABLE_ANSWER,
     _MAX_CANDIDATES,
     _SYSTEM_PROMPT,
@@ -1318,6 +1319,13 @@ class AIAskExecutionService(AIAskService):
                     cancel_event=cancel_signal,
                 )
                 generated, selected, selection_error = self._parse_selection(raw_output, verified)
+                if selection_error:
+                    raw_output = self._llm_provider.complete_json(
+                        system_prompt=_CITATION_REPAIR_SYSTEM_PROMPT,
+                        user_payload=user_payload,
+                        cancel_event=cancel_signal,
+                    )
+                    generated, selected, selection_error = self._parse_selection(raw_output, verified)
                 if selection_error:
                     events.error("generating", "模型返回无法验证的结构化证据选择。", {"errorCode": selection_error})
                     return emit_answer(unavailable(

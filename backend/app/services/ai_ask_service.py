@@ -63,6 +63,10 @@ claims 中只能使用输入 candidates 的精确类型和稳定 ID；table/fiel
 _REPAIR_SYSTEM_PROMPT = _SYSTEM_PROMPT + """
 
 这是一次有界的证据复核：上一轮没有给出任何可直接支持问题的候选。重新比较原问题与每个已验证候选的类型、稳定 ID、名称及目录描述；如果至少有一项直接回答问题，或有明确相关性但不能直接回答，请用精确类型和 ID 标记 direct/related。若所有候选都只是上下文或无关线索，claims 仍返回空数组。不得为了凑答案引用候选，也不得生成自由文本。"""
+_CITATION_REPAIR_SYSTEM_PROMPT = _SYSTEM_PROMPT + """
+
+这是一次有界的结构化引用修正：上一轮输出未通过候选资产身份或 JSON 结构校验。claims 中的每一项必须严格复制输入 candidates 中某一条候选的精确 assetType、assetId 与 fieldId（或已验证字段候选所属表的 assetType="table"、assetId、fieldId=null）；不得输出未在 candidates 中出现的 ID，不得把不同候选的 assetId 与 fieldId 混搭，也不得输出额外字段。"""
+_CLAIM_RELEVANCE_PRIORITY = {"context_only": 0, "related": 1, "direct": 2}
 
 
 class AIAskCancelled(RuntimeError):
@@ -236,19 +240,46 @@ class AIAskService:
             (candidate.asset_type, candidate.asset_id, candidate.field_id): candidate
             for candidate in candidates
         }
+        parent_table_by_id: dict[tuple[str, int | str, int | None], AiAskCandidate] = {}
+        for candidate in candidates:
+            if (
+                candidate.asset_type != "field"
+                or not isinstance(candidate.asset_id, int)
+                or not candidate.table_name
+            ):
+                continue
+            parent_identity = ("table", candidate.asset_id, None)
+            if parent_identity not in candidate_by_id and parent_identity not in parent_table_by_id:
+                parent_table_by_id[parent_identity] = AiAskCandidate(
+                    assetId=candidate.asset_id,
+                    assetType="table",
+                    name=candidate.table_name,
+                    displayName=candidate.table_display_name or candidate.table_name,
+                    description=candidate.table_description,
+                    tableName=candidate.table_name,
+                    tableDisplayName=candidate.table_display_name or candidate.table_name,
+                    tableDescription=candidate.table_description,
+                    domain=candidate.domain,
+                    layer=candidate.layer,
+                    source="dap_catalog",
+                    retrievalSource=candidate.retrieval_source,
+                    matchEvidence=candidate.match_evidence,
+                    matchReason="表详情已按已核实字段的所属表身份由当前 DAP 目录校验。",
+                )
         selected: OrderedDict[tuple[str, int | str, int | None], tuple[AiAskCandidate, str]] = OrderedDict()
-        seen: set[tuple[str, int | str, int | None]] = set()
         for claim in generated.claims:
             asset_type = claim.asset_type or ("field" if claim.field_id is not None else "table")
             identity = (asset_type, claim.asset_id, claim.field_id)
-            candidate = candidate_by_id.get(identity)
+            candidate = candidate_by_id.get(identity) or parent_table_by_id.get(identity)
             if candidate is None:
                 raise ValueError("model selected an unknown candidate identity")
-            if identity in seen:
-                raise ValueError("model returned a duplicate candidate identity")
-            seen.add(identity)
             if claim.relevance in {"direct", "related"}:
-                selected[identity] = (candidate, claim.relevance)
+                existing = selected.get(identity)
+                if (
+                    existing is None
+                    or _CLAIM_RELEVANCE_PRIORITY[claim.relevance] > _CLAIM_RELEVANCE_PRIORITY[existing[1]]
+                ):
+                    selected[identity] = (candidate, claim.relevance)
         return list(selected.values())
 
     @staticmethod
@@ -702,6 +733,15 @@ class AIAskService:
             )
             progress.check_cancelled()
             generated, selected, selection_error = self._parse_selection(raw_output, candidates)
+            if selection_error:
+                progress.check_cancelled()
+                raw_output = self._llm_provider.complete_json(
+                    system_prompt=_CITATION_REPAIR_SYSTEM_PROMPT,
+                    user_payload=user_payload,
+                    **provider_options,
+                )
+                progress.check_cancelled()
+                generated, selected, selection_error = self._parse_selection(raw_output, candidates)
             if selection_error:
                 progress.fail("generating", selection_error)
                 return respond(

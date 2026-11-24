@@ -667,6 +667,45 @@ class AIAskExecutionServiceTests(unittest.TestCase):
         self.assertEqual([], assets.batch_calls)
         self.assertFalse(any(event == "answer" for event, _data in events))
 
+    def test_field_only_candidate_allows_parent_table_claim_and_deduplicates_claims(self):
+        plan = {
+            "queryType": "natural_language",
+            "keyConcepts": ["平均客单价"],
+            "queries": ["平均客单价 定义"],
+            "supplementalQuery": None,
+        }
+        answer = {
+            "questionType": "field_explanation",
+            "claims": [
+                {"assetType": "table", "assetId": 7, "fieldId": None, "relevance": "direct"},
+                {"assetType": "field", "assetId": 7, "fieldId": 11, "relevance": "related"},
+                {"assetType": "field", "assetId": 7, "fieldId": 11, "relevance": "direct"},
+            ],
+        }
+        responses = {
+            "平均客单价 定义": search_response("平均客单价 定义", [FIELD_7]),
+            "平均客单价的定义是什么？用哪张表哪几个字段？": search_response(
+                "平均客单价的定义是什么？用哪张表哪几个字段？",
+                [FIELD_7],
+            ),
+        }
+        service, _rag, llm, _assets = self._service(plan=plan, answer=answer, responses=responses)
+
+        response = service.ask(
+            AiAskRequest(query="平均客单价的定义是什么？用哪张表哪几个字段？"),
+            profile="strict",
+            request_id="parent-table-claim",
+        )
+
+        self.assertEqual("answered", response.status)
+        self.assertEqual(2, len(llm.calls))
+        self.assertEqual(
+            [("table", 7, None), ("field", 7, 11)],
+            [(item.asset_type, item.asset_id, item.field_id) for item in response.citations],
+        )
+        self.assertIn("AUTHORITATIVE_TABLE_7", response.answer)
+        self.assertIn("AUTHORITATIVE_FIELD_11", response.answer)
+
     def test_search_count_and_planning_query_count_are_bounded(self):
         plan = {
             "queryType": "complex",
