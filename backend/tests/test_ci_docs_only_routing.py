@@ -567,13 +567,23 @@ class CiWorkflowContractTests(unittest.TestCase):
             self.assertRegex(action_ref, r"^[^@\s]+@[0-9a-f]{40}$")
 
     def test_importing_ci_docs_only_does_not_pollute_sys_path_with_demo_dir(self) -> None:
+        import importlib
         import sys
+        import scripts.ci_docs_only as ci_docs_only_mod
 
-        self.assertNotIn(
-            str(REPO_ROOT / "demo"),
-            sys.path,
-            "scripts.ci_docs_only must not insert demo/ into sys.path (breaks demo.seed_loader patching)",
-        )
+        demo_dir = str(REPO_ROOT / "demo")
+        cleaned_path = [p for p in sys.path if p != demo_dir]
+        orig_path = list(sys.path)
+        try:
+            sys.path[:] = cleaned_path
+            importlib.reload(ci_docs_only_mod)
+            self.assertNotIn(
+                demo_dir,
+                sys.path,
+                "scripts.ci_docs_only must not insert demo/ into sys.path (breaks demo.seed_loader patching)",
+            )
+        finally:
+            sys.path[:] = orig_path
 
 
 if __name__ == "__main__":
