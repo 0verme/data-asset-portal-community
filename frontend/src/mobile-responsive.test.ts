@@ -12,6 +12,7 @@ const moduleStyles = {
   system: read("./styles/system.css"),
 };
 const app = read("./App.tsx");
+const appHeader = read("./components/app/AppHeader.tsx");
 
 test("mobile shell behavior applies below 769px", () => {
   const mobileSection = styles.match(/\/\* ===== Mobile drawer and layout ===== \*\/[\s\S]*?\/\* ===== Small phone ≤ 480px ===== \*\//)?.[0] || "";
@@ -25,10 +26,10 @@ test("mobile shell behavior applies below 769px", () => {
 });
 
 test("mobile navigation exposes accessible state and focus targets", () => {
-  assert.match(app, /aria-controls="mobile-sidebar"/);
-  assert.match(app, /aria-expanded=\{sidebarOpen\}/);
-  assert.match(app, /aria-controls="global-search"/);
-  assert.match(app, /aria-expanded=\{mobileSearchOpen\}/);
+  assert.match(appHeader, /aria-controls="mobile-sidebar"/);
+  assert.match(appHeader, /aria-expanded=\{sidebarOpen\}/);
+  assert.match(appHeader, /aria-controls="global-search"/);
+  assert.match(appHeader, /aria-expanded=\{mobileSearchOpen\}/);
   assert.match(app, /event\.key !== "Escape"/);
   assert.match(app, /document\.body\.style\.overflow = "hidden"/);
 });

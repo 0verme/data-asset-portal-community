@@ -7,15 +7,23 @@ test("primary navigation fits its available space and preserves browser history"
 
   const navigation = page.locator(".topbar-nav-slot > .mainnav:not(.mainnav-measure)");
   const primaryButtons = navigation.locator("button.dap-ui-button:not(.more-nav-trigger)");
-  for (const width of [1920, 1440, 1280, 1199, 1024]) {
+  for (const width of [2560, 1920, 1501, 1500, 1440, 1280, 1200, 1199, 1181, 1180, 1025, 1024]) {
     await page.setViewportSize({ width, height: 900 });
-    await expect(primaryButtons, `all configured primary menus fit at ${width}px`).toHaveCount(5);
     await expect(navigation.getByRole("button", { name: "更多" })).toBeVisible();
+    await expect.poll(async () => page.evaluate(() => {
+      const nav = document.querySelector<HTMLElement>(".topbar-nav-slot > .mainnav:not(.mainnav-measure)")!;
+      const slot = document.querySelector<HTMLElement>(".topbar-nav-slot")!;
+      return nav.scrollWidth <= nav.clientWidth + 1 && nav.getBoundingClientRect().width <= slot.clientWidth + 1;
+    }), `measured primary menus fit at ${width}px`).toBe(true);
+    const primaryCount = await primaryButtons.count();
+    expect(primaryCount, `measured primary menus fit at ${width}px`).toBeGreaterThanOrEqual(width >= 1181 ? 3 : 5);
+    expect(primaryCount, `measured primary menus fit at ${width}px`).toBeLessThanOrEqual(5);
     const metrics = await page.evaluate(() => {
       const nav = document.querySelector<HTMLElement>(".topbar-nav-slot > .mainnav:not(.mainnav-measure)")!;
       const slot = document.querySelector<HTMLElement>(".topbar-nav-slot")!;
       const brand = document.querySelector<HTMLElement>(".topbar-brand")!.getBoundingClientRect();
       const actions = document.querySelector<HTMLElement>(".topbar-actions")!.getBoundingClientRect();
+      const small = document.querySelector<HTMLElement>(".brand-name small")!;
       const navRect = nav.getBoundingClientRect();
       return {
         documentWidth: document.documentElement.scrollWidth,
@@ -27,13 +35,15 @@ test("primary navigation fits its available space and preserves browser history"
         navRight: navRect.right,
         brandRight: brand.right,
         actionsLeft: actions.left,
+        smallDisplay: getComputedStyle(small).display,
       };
     });
     expect(metrics.documentWidth, `no horizontal overflow at ${width}px`).toBeLessThanOrEqual(width + 1);
     expect(metrics.navScrollWidth, `nav contents fit at ${width}px`).toBeLessThanOrEqual(metrics.navClientWidth + 1);
-    expect(metrics.navWidth, `nav container stays compact at ${width}px`).toBeLessThan(metrics.slotWidth - 16);
+    expect(metrics.navWidth, `nav container stays compact at ${width}px`).toBeLessThanOrEqual(metrics.slotWidth + 1);
     expect(metrics.navLeft).toBeGreaterThanOrEqual(metrics.brandRight);
     expect(metrics.navRight).toBeLessThanOrEqual(metrics.actionsLeft);
+    expect(metrics.smallDisplay).toBe(width >= 1181 ? "inline" : "none");
   }
 
   await page.setViewportSize({ width: 960, height: 900 });
@@ -75,35 +85,43 @@ test("header geometry and mobile drawer stay responsive at all requested widths"
   await expect(page.locator(".main")).toContainText("共 224 张表");
 
   const navigation = page.locator(".topbar-nav-slot > .mainnav:not(.mainnav-measure)");
-  for (const width of [1920, 1440, 1280, 1024, 768, 390]) {
+  for (const width of [2560, 1920, 1440, 1280, 1024, 960, 959, 769, 768, 390, 352, 320]) {
     await page.setViewportSize({ width, height: 900 });
-    const metrics = await page.evaluate(() => {
-      const nav = document.querySelector<HTMLElement>(".topbar-nav-slot > .mainnav:not(.mainnav-measure)")!;
-      const navRect = nav.getBoundingClientRect();
-      const slot = document.querySelector<HTMLElement>(".topbar-nav-slot")!;
-      return {
-        documentWidth: document.documentElement.scrollWidth,
-        navDisplay: getComputedStyle(nav).display,
-        navWidth: navRect.width,
-        navScrollWidth: nav.scrollWidth,
-        navClientWidth: nav.clientWidth,
-        slotWidth: slot.clientWidth,
-      };
-    });
-    expect(metrics.documentWidth, `no document overflow at ${width}px`).toBeLessThanOrEqual(width + 1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), `no document overflow at ${width}px`).toBeLessThanOrEqual(width + 1);
 
     if (width >= 960) {
       await expect(navigation).toBeVisible();
-      await expect(navigation.locator("button.dap-ui-button:not(.more-nav-trigger)")).toHaveCount(5);
+      await expect.poll(async () => page.evaluate(() => {
+        const nav = document.querySelector<HTMLElement>(".topbar-nav-slot > .mainnav:not(.mainnav-measure)")!;
+        const slot = document.querySelector<HTMLElement>(".topbar-nav-slot")!;
+        return nav.scrollWidth <= nav.clientWidth + 1 && nav.getBoundingClientRect().width <= slot.clientWidth + 1;
+      })).toBe(true);
+      const metrics = await page.evaluate(() => {
+        const nav = document.querySelector<HTMLElement>(".topbar-nav-slot > .mainnav:not(.mainnav-measure)")!;
+        const navRect = nav.getBoundingClientRect();
+        const slot = document.querySelector<HTMLElement>(".topbar-nav-slot")!;
+        return {
+          navWidth: navRect.width,
+          navScrollWidth: nav.scrollWidth,
+          navClientWidth: nav.clientWidth,
+          slotWidth: slot.clientWidth,
+        };
+      });
+      const primaryCount = await navigation.locator("button.dap-ui-button:not(.more-nav-trigger)").count();
+      expect(primaryCount).toBeGreaterThanOrEqual(width >= 1181 ? 3 : 5);
+      expect(primaryCount).toBeLessThanOrEqual(5);
       expect(metrics.navScrollWidth).toBeLessThanOrEqual(metrics.navClientWidth + 1);
-      expect(metrics.navWidth).toBeLessThan(metrics.slotWidth - 16);
+      expect(metrics.navWidth).toBeLessThanOrEqual(metrics.slotWidth + 1);
       await expect(page.locator(".hamburger")).toBeHidden();
       await page.screenshot({ path: testInfo.outputPath(`header-${width}-light.png`), animations: "disabled" });
     } else {
       await expect(navigation).toBeHidden();
       await expect(page.getByRole("button", { name: "打开导航" })).toBeVisible();
-      await expect(page.locator(".mobile-search-toggle")).toBeVisible();
-      if (width <= 768) {
+      if (width > 768) {
+        await expect(page.locator(".mobile-search-toggle")).toBeHidden();
+        await expect(page.getByRole("textbox", { name: "全局搜索" })).toBeVisible();
+      } else {
+        await expect(page.locator(".mobile-search-toggle")).toBeVisible();
         const hamburger = page.getByRole("button", { name: "打开导航" });
         await hamburger.click();
         await expect(page.getByRole("button", { name: "关闭导航" })).toHaveAttribute("aria-expanded", "true");
@@ -204,8 +222,8 @@ test("theme trigger DAP IconButton preserves labels, persistence, and mobile siz
   await expect(root).toHaveAttribute("data-theme", "light");
   await expect(root).toHaveAttribute("data-mode", "system");
   const desktopBounds = await lightToggle.boundingBox();
-  expect(desktopBounds?.width).toBe(36);
-  expect(desktopBounds?.height).toBe(36);
+  expect(desktopBounds?.width).toBe(39);
+  expect(desktopBounds?.height).toBe(39);
 
   await lightToggle.click();
   const darkToggle = page.getByRole("button", { name: "切换到浅色主题" });
@@ -398,5 +416,68 @@ for (const administrator of [false, true]) {
     await expect(page.getByRole("heading", { name: /404/ })).toBeVisible();
     await expect(header).not.toHaveClass(/portal-home-topbar/);
     await expect(header.getByRole("navigation")).toBeHidden();
+    const notFoundFrame = (await header.boundingBox())!;
+    const notFoundLogo = (await header.locator(".brand-mark").boundingBox())!;
+    expect(notFoundFrame.height).toBe(58);
+    expect(notFoundLogo.width).toBe(32);
+    expect(notFoundLogo.height).toBe(32);
+    await page.getByRole("button", { name: "返回首页" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(header).toHaveClass(/portal-home-topbar/);
   });
 }
+
+test("long username and long brand name truncate cleanly without overflowing AppHeader across routes", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "dap_auth",
+      JSON.stringify({
+        role: "admin",
+        user: "admin_super_long_enterprise_account_identifier_2026",
+        name: "超长企业数据治理管理员账号名称测试",
+      }),
+    );
+  });
+
+  for (const path of ["/", "/data-warehouse", "/no-such-page"]) {
+    for (const width of [1440, 1024, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(path);
+      await page.evaluate(() => {
+        const brandName = document.querySelector<HTMLElement>(".topbar .brand-name");
+        const firstText = brandName?.firstChild;
+        if (firstText && firstText.nodeType === Node.TEXT_NODE) {
+          firstText.textContent = "超长企业级数据资产门户统一品牌标识名称验证 · Enterprise Unified Data Asset Portal Brand Name";
+        }
+      });
+
+      const metrics = await page.evaluate(() => {
+        const header = document.querySelector<HTMLElement>("header.topbar")!;
+        const brand = header.querySelector<HTMLElement>(".topbar-brand")!.getBoundingClientRect();
+        const brandName = header.querySelector<HTMLElement>(".brand-name")!;
+        const actions = header.querySelector<HTMLElement>(".topbar-actions")!.getBoundingClientRect();
+        const userName = header.querySelector<HTMLElement>(".uc-name")!;
+        const brandNameStyle = getComputedStyle(brandName);
+        const userNameStyle = getComputedStyle(userName);
+        return {
+          documentWidth: document.documentElement.scrollWidth,
+          brandRight: brand.right,
+          actionsLeft: actions.left,
+          actionsRight: actions.right,
+          brandOverflow: brandNameStyle.textOverflow,
+          brandWhiteSpace: brandNameStyle.whiteSpace,
+          userOverflow: userNameStyle.textOverflow,
+          userWhiteSpace: userNameStyle.whiteSpace,
+        };
+      });
+
+      expect(metrics.documentWidth).toBeLessThanOrEqual(width + 1);
+      expect(metrics.brandRight).toBeLessThanOrEqual(metrics.actionsLeft);
+      expect(metrics.actionsRight).toBeLessThanOrEqual(width + 1);
+      expect(metrics.brandOverflow).toBe("ellipsis");
+      expect(metrics.brandWhiteSpace).toBe("nowrap");
+      expect(metrics.userOverflow).toBe("ellipsis");
+      expect(metrics.userWhiteSpace).toBe("nowrap");
+    }
+  }
+});

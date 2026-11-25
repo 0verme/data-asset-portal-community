@@ -4,13 +4,15 @@ import test from "node:test";
 
 const read = (relativePath: string) => readFileSync(new URL(relativePath, import.meta.url), "utf8");
 const app = read("./App.tsx");
+const appHeader = read("./components/app/AppHeader.tsx");
 
 test("sidebar shell trigger uses the frozen DAP IconButton adapter", () => {
-  assert.match(app, /import \{ Button, DropdownMenu, IconButton, Input \} from "\.\/ui\/index\.ts"/);
+  assert.match(appHeader, /import \{ Button, DropdownMenu, IconButton, Input \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.match(
-    app,
+    appHeader,
     /<IconButton[\s\S]*?ref=\{hamburgerRef\}[\s\S]*?className="hamburger"[\s\S]*?variant="tertiary"[\s\S]*?size="sm"[\s\S]*?aria-controls="mobile-sidebar"[\s\S]*?aria-expanded=\{sidebarOpen\}[\s\S]*?aria-label=\{sidebarOpen \? tCommon\("navigation\.close"\) : tCommon\("navigation\.open"\)\}[\s\S]*?icon=\{<Icon name="menu" size=\{18\} \/>\}/,
   );
+  assert.doesNotMatch(appHeader, /<button[\s\S]{0,80}?ref=\{hamburgerRef\}/);
   assert.doesNotMatch(app, /<button[\s\S]{0,80}?ref=\{hamburgerRef\}/);
 });
 
