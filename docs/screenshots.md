@@ -1,8 +1,8 @@
 # 📸 界面截图画廊
 
-> 以下截图均来自仓库 **Repository Community Demo**（`demo/datasets/` 虚构零售数据）真实运行的
-> **SQLite → Service → FastAPI/Uvicorn → Frontend** 链路，前端无任何写死的演示假数据。
-> 截图基于 `2560×1440` 视口拍摄；完整可复现流程见 [Community Demo 指南](./community-demo.md)。它们不代表线上独立 static/mock bundle，也不自动代表当前 `origin/main` 的全部 route coverage。
+> 以下截图于 2026-11-25 拍摄自线上演示站 **data.overme.cn**（v0.2.7，暮光紫主题色），
+> 基于 `2560×1440` 视口。站内数据为虚构零售演示数据，每日自动重置。
+> 此前画廊截图为 V0.1.0 旧界面，已整体替换；界面继续演进时截图会再次过期，请以线上站为准。
 
 ## 资产门户总览
 
@@ -34,6 +34,12 @@
 
 ![统一搜索](./images/demo-global-search.png)
 
+## AI 问答
+
+输入业务问题，问 AI 给出执行过程、命中资产与已核实来源，直接定位到表和字段。
+
+![AI 问答](./images/demo-ai-qa.png)
+
 ## 字段映射
 
 源系统表 → DWD 目标表的字段映射，8 个源系统、48 个字段 100% 覆盖。
@@ -56,6 +62,42 @@
 
 ![指标维护](./images/demo-indicators.png)
 
+## 上游卸数
+
+8 个源系统接入卡片，含连接状态、卸数周期与最近运行结果。
+
+![上游卸数](./images/demo-source-ingestion.png)
+
+## 血缘分析
+
+以 DWD_TRADE_ORDER 为中心的上下游血缘图与节点详情（快照 demo-lineage-20260712-001）。
+
+![血缘分析](./images/demo-lineage.png)
+
+## 报表资产
+
+8 张报表资产，含所属部门、负责人、用途与血缘表数。
+
+![报表资产](./images/demo-report-assets.png)
+
+## API 资产
+
+10 个数据服务 API，含方法、路径、归属系统与负责人。
+
+![API 资产](./images/demo-api-assets.png)
+
+## 下游推送
+
+6 个下游系统与 6 个推送文件，含协议、频率与最近状态。
+
+![下游推送](./images/demo-downstream-push.png)
+
+## 码值表维护
+
+3 张码值表（渠道、会员等级、订单状态），含字段结构与启用行数。
+
+![码值表维护](./images/demo-code-tables.png)
+
 ## 系统管理 · 参数字典
 
 11 类参数字典、49 项字典值统一维护（需以 Community Demo 演示账号登录）。
@@ -67,5 +109,5 @@
 ## 说明
 
 - 所有数据均为**虚构零售演示数据**，不包含任何真实业务信息。
-- 截图来自 repository Community remote path，保留截图生成时的 Footer 内容；当前源码在构建时从最新稳定 GitHub Release 注入 `vX.Y.Z`，旧截图或已部署 bundle 不会被远端 Release 自动改写。线上 static Demo 仍是独立构建和部署。
-- 血缘分析页暂未纳入公开截图，因为 Remote 模式需要先发布 ACTIVE 血缘快照；未出现在画廊不表示该 route 在所有 profile 都不可用。
+- 截图来自线上演示站 data.overme.cn（v0.2.7），保留拍摄时的页脚版本与主题色（暮光紫，为本地外观设置；演示站默认主题为翠绿）。
+- 参数字典截图以演示管理员账号登录拍摄，其余截图为访客态（问 AI 不需要登录即可使用）。
