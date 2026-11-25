@@ -86,11 +86,22 @@ Kumo 桥接还定义 --dap-* 语义映射，并把它们映射到 Kumo 的颜色
 
 ### 4.1 Header 与主导航
 
-首页和业务工作台复用 [App.tsx](src/App.tsx) 的同一个 Header。业务模块不得另建 Header、主导航或复制 `.mainnav`。导航容器和按钮的圆角、Surface 背景、边框、阴影、间距与项高以 [app.css](src/styles/app.css) 的共享选择器为准。Hover 加深文字，当前主导航项用字重与 Accent 下划线标识；保留 Adapter 的键盘可见焦点和禁用语义（如菜单加载提示）。验收时比较同一视口、同一主题下的实际样式。
+门户首页、11 个业务工作台和 404 页面统一挂载 [AppHeader.tsx](src/components/app/AppHeader.tsx)，由 [App.tsx](src/App.tsx) 在 [AppShell.tsx](src/components/app/AppShell.tsx) 内提供会话、权限菜单、路由与搜索回调。业务模块不得另建 Header、主导航或复制 `.mainnav`，也不得在模块样式文件中覆盖 `.topbar`、`.brand`、`.mainnav` 或顶栏操作区按钮样式。公共 Header 的视觉规则统一归属 [app.css](src/styles/app.css) 与 [appearance-settings.css](src/appearance/appearance-settings.css)。
 
-- 桌面左侧为 Logo 和品牌名，中间为导航槽，右侧为语言、主题快捷切换、外观设置与登录或用户操作。首页为中央胶囊两侧预留对称空间，搜索位于门户内容；业务工作台在右侧容纳全局搜索，胶囊使用两侧之间的可用宽度。
-- 按权限取得可见菜单，再按配置位置和实测的导航槽、菜单项及“更多”按钮宽度分配主导航。其余可见项进入“更多”；当前页在其中时应可辨认。检查打开、键盘关闭与焦点返回、选择后收起并切换模块。禁止写死可见菜单数，或让导航与品牌、搜索、用户区重叠。
-- 窄屏沿用 Shell 的 Hamburger 和模块导航抽屉。在提供侧栏的页面检查打开、选择模块、Escape 关闭和焦点返回；工作台移动搜索与抽屉互斥。语言入口按现有断点在顶栏或抽屉内可达。用中英文、游客和登录用户实测长菜单名、搜索聚焦、用户信息及权限导致的菜单数量变化。
+#### 共有 Header 视觉不变量（以首页 V2.2 为统一基准）
+
+同一视口、同一主题、同一语言与角色下，所有路由的共有 Header 元素必须保持一致的计算样式与实际几何尺寸：
+
+- **顶栏外框（`.topbar`）**：桌面端（`>= 769px`）采用 `width: min(1360px, calc(100% - 44px))`、`margin: 0 auto`、`min-height: 68px`、`padding: 0`、`gap: 13px`，透明背景、无底边框；移动端（`< 769px`）采用 `width: 100%`、`height: 58px`、`padding: 0 12px`、`gap: 6px`。
+- **品牌区（`.topbar-brand` / `.brand`）**：桌面端 Logo（`.brand-mark`）为 `35px × 35px`、`border-radius: 10px`，品牌名（`.brand-name`）为 `17px`、`font-weight: 600`、`letter-spacing: -0.02em`（`<= 860px` 收敛为 `14px`），英文副标题（`small`）为 `11px` 且在 `>= 1181px` 显示、`<= 1180px` 隐藏；移动端 Logo 为 `32px × 32px`、`border-radius: var(--radius-sm)`，品牌名为 `13px` 并由 `mobile-brand` 容器查询在极窄可用宽度下自动收起。
+- **主导航胶囊（`.mainnav`）**：`min-height: 44px`、`padding: 4px 8px`、`border-radius: 999px`、`1px solid var(--line)`、半透明 Surface 背景与 `--shadow-sm` 阴影，内部主导航按钮高 `34px`、`border-radius: 999px`、`12px` 字号；Hover 加深文字为 `--ink`，当前主导航项或含当前页的“更多”按钮以 `600` 字重与 Accent 下划线标识；保留 Adapter 的键盘可见焦点和禁用语义（如菜单加载提示）。
+- **共同操作区（`.topbar-actions`）**：桌面端间距 `gap: 9px`，语言切换器 `12px` 字号，主题切换（`.theme-toggle`）、风格设置（`.appearance-trigger`）、登录按钮（`.login-cta`）、用户胶囊（`.user-chip`）及退出按钮（`.logout-btn`）统一使用 `height: 39px`、`border-radius: 999px` 与半透明 Surface 背景（图标按钮宽 `39px`）；移动端（`< 769px`）所有顶栏可点击控件（含 Hamburger、移动搜索开关、语言、主题、风格设置、登录/退出）统一为 `44px × 44px` 触控尺寸。
+
+#### 允许的页面功能差异
+
+- **搜索槽与导航定位**：首页保留页面中央大搜索，不在顶栏渲染全局搜索，顶栏通过 `--portal-header-side` 为中央胶囊两侧预留对称空间；11 个业务工作台在顶栏右侧操作区容纳全局搜索（`>= 1200px` 为展开输入框，`769px..1199px` 为 `36px` 折叠按钮并在聚焦或有值时展开为 `196px`，`< 769px` 为 `44px` 搜索按钮触发下拉搜索栏），导航胶囊利用品牌区与操作区之间的实测可用宽度；404 页面无顶栏搜索、无侧栏与 Hamburger，直接继承同一公共 Header 外观并提供返首页入口。
+- **动态测量与收纳**：`AppHeader` 按权限取得可见菜单，通过 `ResizeObserver` 实测导航槽、菜单项及“更多”按钮宽度，动态计算主导航可见数量，其余可见项进入“更多”下拉菜单；禁止写死可见菜单数，或让导航与品牌、搜索、用户区重叠。
+- **响应式抽屉与语言入口**：门户在 `< 769px` 启用 Hamburger 与移动模块导航抽屉；11 个业务工作台在 `< 960px` 将桌面侧栏切换为 Hamburger 抽屉（含模块导航与业务筛选），且移动搜索与抽屉互斥。工作台在 `769px..1024px` 及 `<= 22rem`（`352px`）将语言切换器收纳至侧栏/抽屉顶部，为顶栏导航与搜索留出空间。
 
 ### 4.2 Footer 与主内容滚动
 
@@ -145,7 +156,7 @@ Form 编辑流程应让标题、字段分组、校验、未保存状态和保存
 
 | 设计区域 | 当前参考实现 | 复用原则 |
 |---|---|---|
-| Header / Footer | [App.tsx](src/App.tsx) | 直接复用，按第 4 节回归 |
+| Header / Footer | [AppHeader](src/components/app/AppHeader.tsx)、[App.tsx](src/App.tsx) | 直接复用唯一公共组件，按第 4 节回归 |
 | 工作台标题、工具栏与表格 | [UpstreamList](src/components/upstream/UpstreamList.tsx) | 参考标题、视图切换、主次操作与行信息层级 |
 | 筛选侧栏 | [UpstreamSidebar](src/components/sidebar/UpstreamSidebar.tsx) | 共享外框由 Shell 提供，筛选维度和操作由模块提供 |
 | 卡片 | [CardGridView](src/components/common/CardGridView.tsx) | 已有卡片视图优先复用，摘要由模块提供 |

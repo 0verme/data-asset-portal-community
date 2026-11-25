@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { LineageBootstrap, LineageNode } from "./api/lineage.ts";
 import { getMenus, MENUS_CHANGED_EVENT } from "./api/menus.ts";
 import type { MenuItem } from "./data/menus.ts";
 import { isDbAuthMode } from "./auth.ts";
-import { AuthBar, AuthContext, LoginModal } from "./components/AuthControls.tsx";
+import { AuthContext, LoginModal } from "./components/AuthControls.tsx";
 import { cycleModalTab } from "./ui/modalFocus.ts";
-import { BrandLogo } from "./components/BrandLogo.tsx";
+import { AppHeader, type NavigationMenuStatus } from "./components/app/AppHeader.tsx";
 import { AppShell } from "./components/app/AppShell.tsx";
 import { ModuleContent } from "./components/app/ModuleContent.tsx";
 import { ModuleSidebar } from "./components/app/ModuleSidebar.tsx";
@@ -30,13 +30,12 @@ import { ConfirmDialogHost, ModuleErrorBoundary } from "./components/common/inde
 import { Icon } from "./components/ui.tsx";
 import { LanguageSwitcher } from "./i18n/LanguageSwitcher.tsx";
 import { resolveMenuDisplayName } from "./routing/menuLabels.ts";
-import { Button, DropdownMenu, IconButton, Input } from "./ui/index.ts";
+import { Button } from "./ui/index.ts";
 import { DEFAULT_SYSTEM_ROUTE } from "./config/defaults.ts";
 import { APP_RELEASE_METADATA } from "./config/releaseMetadata.ts";
 import { useAssetModule } from "./hooks/useAssetModule.ts";
 import { useApiAssetModule } from "./hooks/useApiAssetModule.ts";
 import { useAuthSession, type UseAuthSessionResult } from "./hooks/useAuthSession.ts";
-import { AppearanceSettings } from "./appearance/AppearanceSettings.tsx";
 import { useIndicatorModule } from "./hooks/useIndicatorModule.ts";
 import { useManualCodeTableModule } from "./hooks/useManualCodeTableModule.ts";
 import { usePublicCatalogConfig } from "./hooks/usePublicCatalogConfig.ts";
@@ -54,7 +53,6 @@ import {
   getVisibleNavigationMenus,
   loadNavigationMenus,
 } from "./routing/navigationMenus.ts";
-import { getNavigationPrimaryLimit, splitNavigationMenus, type NavigationMenuFitMetrics } from "./routing/navigationMenuGrouping.ts";
 import { useLocationSynchronization } from "./hooks/useLocationSynchronization.ts";
 import {
   useNavigationController,
@@ -84,10 +82,6 @@ function isModuleId(value: string): value is ModuleId {
 }
 
 type NavigationTarget = Parameters<NavigationActions["goToModuleWithQuery"]>[0];
-
-type NavigationMenuStatus = "loading" | "ready" | "error";
-
-type NavigationFitSnapshot = NavigationMenuFitMetrics & { menuKey: string };
 
 export default function App(): React.ReactElement {
   const { i18n } = useTranslation("common");
@@ -124,15 +118,10 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
   const sidebarRef = React.useRef<HTMLElement | null>(null);
   const searchToggleRef = React.useRef<HTMLButtonElement | null>(null);
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
-  const navSlotRef = useRef<HTMLDivElement | null>(null);
-  const navMeasureRef = useRef<HTMLElement | null>(null);
-  const navActionsRef = useRef<HTMLDivElement | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [dismissedAnnouncementVersion, setDismissedAnnouncementVersion] = useState<string | null>(null);
-  const [moreNavOpen, setMoreNavOpen] = useState(false);
-  const [navigationFitSnapshot, setNavigationFitSnapshot] = useState<NavigationFitSnapshot | null>(null);
   const [lineageBootstrap, setLineageBootstrap] = useState<LineageBootstrap | null>(null);
   const [lineageNodes, setLineageNodes] = useState<LineageNode[]>([]);
   const [lineageSelectedNodeId, setLineageSelectedNodeId] = useState<string | null>(null);
@@ -386,82 +375,6 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
     () => getVisibleNavigationMenus(navMenus, { canManageSystem, canViewOperationLog }),
     [canManageSystem, canViewOperationLog, navMenus],
   );
-  const navigationPrimaryMenus = visibleNavMenus.filter((item) => item.navPlacement === "primary");
-  const navigationPrimaryMenuCount = navigationPrimaryMenus.length;
-  const navigationMenuKey = JSON.stringify(navigationPrimaryMenus.map((item) => [item.code, displayMenuName(item), item.icon]));
-
-  useLayoutEffect(() => {
-    const actions = navActionsRef.current;
-    const measureNavigation = (): void => {
-      const slot = navSlotRef.current;
-      const measure = navMeasureRef.current;
-      if (isHome && actions) {
-        // Reserve matching room on both sides of the centered navigation.
-        slot?.parentElement?.style.setProperty("--portal-tools-width", `${actions.getBoundingClientRect().width}px`);
-      }
-      if (!slot || !measure || getComputedStyle(measure).display === "none") return;
-      const availableWidth = slot.getBoundingClientRect().width;
-      if (availableWidth <= 0) return;
-
-      const measuredMenuButtons = [...measure.querySelectorAll<HTMLElement>("[data-nav-measure-item]")];
-      const measuredMoreTrigger = measure.querySelector<HTMLElement>("[data-nav-measure-more]");
-      if (measuredMenuButtons.length !== navigationPrimaryMenuCount || !measuredMoreTrigger) return;
-
-      const style = getComputedStyle(measure);
-      const cssPixels = (value: string): number => Number.parseFloat(value) || 0;
-      const next: NavigationFitSnapshot = {
-        menuKey: navigationMenuKey,
-        availableWidth,
-        menuWidths: measuredMenuButtons.map((button) => button.getBoundingClientRect().width),
-        moreTriggerWidth: measuredMoreTrigger.getBoundingClientRect().width,
-        chromeWidth: cssPixels(style.paddingLeft) + cssPixels(style.paddingRight)
-          + cssPixels(style.borderLeftWidth) + cssPixels(style.borderRightWidth),
-        gap: cssPixels(style.columnGap),
-      };
-
-      setNavigationFitSnapshot((current) => {
-        const sameWidths = current?.menuWidths.length === next.menuWidths.length
-          && current.menuWidths.every((width, index) => {
-            const nextWidth = next.menuWidths[index];
-            return nextWidth !== undefined && Math.abs(width - nextWidth) < 0.5;
-          });
-        if (
-          current?.menuKey === next.menuKey
-          && Math.abs(current.availableWidth - next.availableWidth) < 0.5
-          && sameWidths
-          && Math.abs(current.moreTriggerWidth - next.moreTriggerWidth) < 0.5
-          && Math.abs(current.chromeWidth - next.chromeWidth) < 0.5
-          && Math.abs(current.gap - next.gap) < 0.5
-        ) {
-          return current;
-        }
-        return next;
-      });
-    };
-
-    measureNavigation();
-    const observer = new ResizeObserver(measureNavigation);
-    if (navSlotRef.current) observer.observe(navSlotRef.current);
-    if (navMeasureRef.current) observer.observe(navMeasureRef.current);
-    if (isHome && actions) observer.observe(actions);
-    window.addEventListener("resize", measureNavigation);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", measureNavigation);
-    };
-  }, [isHome, module, navigationMenuKey, navigationPrimaryMenuCount]);
-
-  const navigationFitMetrics = navigationFitSnapshot?.menuKey === navigationMenuKey
-    ? navigationFitSnapshot
-    : null;
-  const maxPrimaryMenus = navigationFitMetrics
-    ? getNavigationPrimaryLimit(visibleNavMenus, navigationFitMetrics)
-    : navigationPrimaryMenus.length;
-  const { primary: primaryNavMenus, more: moreNavMenus } = useMemo(
-    () => splitNavigationMenus(visibleNavMenus, { maxPrimary: maxPrimaryMenus }),
-    [maxPrimaryMenus, visibleNavMenus],
-  );
-  const moreNavActive = moreNavMenus.some((item) => item.code === module);
 
   const visibleModuleKeys = useMemo(
     () => visibleNavMenus.map((item) => item.code),
@@ -642,16 +555,6 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
   const hasSidebar = module !== "notFound";
   const isPortal = isHome || !hasSidebar;
 
-  useEffect(() => {
-    setMoreNavOpen(false);
-    const hiddenNavigation = window.matchMedia(isPortal ? "(max-width: 768px)" : "(max-width: 959px)");
-    const closeWhenHidden = (): void => {
-      if (hiddenNavigation.matches) setMoreNavOpen(false);
-    };
-    hiddenNavigation.addEventListener("change", closeWhenHidden);
-    return () => hiddenNavigation.removeEventListener("change", closeWhenHidden);
-  }, [isHome, isPortal]);
-
   const searchPlaceholder = isPush
     ? tCommon("search.placeholder.push")
     : isCodeTable
@@ -818,213 +721,58 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
     </footer>
   );
 
+  const handleGlobalSearchQueryChange = (nextQuery: string): void => {
+    setQuery(nextQuery);
+    if (!isPush && !isIndicator && !isReport && !isRoot && !isUpstream && !isMapping && route.page !== "home") assetBack();
+    if (isIndicator && indicatorRoute.page !== "list") indicatorBack();
+    if (isReport && reportRoute.page !== "list") reportBack();
+    if (isPush && pushRoute.page !== "systems") pushGoList();
+    if (isRoot && rootRoute.page !== "library") rootBack();
+    if (isUpstream && upRoute.page !== "list") upBack();
+  };
+
   return (
     <AuthContext.Provider value={authContextValue}>
-      <AppShell>
-        <header className={`topbar${isPortal ? " portal-topbar" : ""}${isHome ? " portal-home-topbar" : ""}`}>
-          <div className="topbar-brand">
-            {hasSidebar ? (
-              <IconButton
-                ref={hamburgerRef}
-                className="hamburger"
-                type="button"
-                variant="tertiary"
-                size="sm"
-                onClick={() => {
-                  setMobileSearchOpen(false);
-                  setSidebarOpen((prev) => !prev);
-                }}
-                aria-controls="mobile-sidebar"
-                aria-expanded={sidebarOpen}
-                aria-label={sidebarOpen ? tCommon("navigation.close") : tCommon("navigation.open")}
-                icon={<Icon name="menu" size={18} />}
-              />
-            ) : null}
-
-            <button type="button" className="brand" aria-label={branding.site.display_name} onClick={() => switchModule("portal")}>
-              <span className="brand-mark">
-                <BrandLogo src={branding.site.logo_url} alt={branding.site.display_name} />
-              </span>
-              <span className="brand-name">{branding.site.display_name}<small>{tCommon("app.brandTagline")}</small></span>
-            </button>
-          </div>
-
-          <div className="topbar-nav-slot" ref={navSlotRef}>
-            <nav className="mainnav" aria-label={tCommon("navigation.main")}>
-              {currentNavMenuStatus === "loading" ? (
-                <Button type="button" variant="tertiary" size="sm" disabled className="navigation-message">{tCommon("navigation.loadingMenus")}</Button>
-              ) : currentNavMenuStatus === "error" ? (
-                <Button
-                  type="button"
-                  variant="tertiary"
-                  size="sm"
-                  className="navigation-message"
-                  onClick={() => void loadMenus(navigationAuthKey)}
-                >
-                  {tCommon("navigation.menuLoadFailed")}
-                </Button>
-              ) : catalogDataAccessReady && visibleNavMenus.length === 0 ? (
-                <span className="navigation-status" role="status">{tCommon("navigation.noMenus")}</span>
-              ) : null}
-              {primaryNavMenus.map((item) => (
-                <Button
-                  key={item.code}
-                  type="button"
-                  variant="tertiary"
-                  size="sm"
-                  className={module === item.code ? "active" : ""}
-                  onClick={() => switchModuleFromMenu(item.code)}
-                >
-                  <Icon name={item.icon} size={15} />{displayMenuName(item)}
-                </Button>
-              ))}
-              {moreNavMenus.length ? (
-                <div className="more-nav">
-                  <DropdownMenu open={moreNavOpen} onOpenChange={(open) => setMoreNavOpen(open)}>
-                    <DropdownMenu.Trigger
-                      render={(
-                        <Button
-                          variant="tertiary"
-                          size="sm"
-                          className={`more-nav-trigger${moreNavActive ? " active" : ""}${moreNavOpen ? " open" : ""}`}
-                          type="button"
-                          aria-expanded={moreNavOpen}
-                          aria-label={tCommon("navigation.more")}
-                          aria-controls="more-nav-menu"
-                        />
-                      )}
-                    >
-                      {tCommon("navigation.more")}
-                      <Icon name="chevron" size={13} />
-                    </DropdownMenu.Trigger>
-                    <DropdownMenu.Content
-                      id="more-nav-menu"
-                      className={isHome ? "more-nav-menu portal-more-nav-menu" : "more-nav-menu"}
-                      align="end"
-                      side="bottom"
-                    >
-                      {moreNavMenus.map((item) => (
-                        <DropdownMenu.Item
-                          key={item.code}
-                          className="more-nav-menu-item"
-                          icon={<Icon name={item.icon} size={15} />}
-                          selected={module === item.code}
-                          aria-current={module === item.code ? "page" : undefined}
-                          onClick={() => {
-                            setMoreNavOpen(false);
-                            switchModuleFromMenu(item.code);
-                          }}
-                        >
-                          {displayMenuName(item)}
-                        </DropdownMenu.Item>
-                      ))}
-                    </DropdownMenu.Content>
-                  </DropdownMenu>
-                </div>
-              ) : null}
-            </nav>
-
-            <nav ref={navMeasureRef} className="mainnav mainnav-measure" aria-hidden="true" inert>
-              {navigationPrimaryMenus.map((item) => (
-                <Button
-                  key={item.code}
-                  type="button"
-                  variant="tertiary"
-                  size="sm"
-                  className={module === item.code ? "active" : ""}
-                  data-nav-measure-item={item.code}
-                >
-                  <Icon name={item.icon} size={15} />{displayMenuName(item)}
-                </Button>
-              ))}
-              <div className="more-nav">
-                <Button
-                  type="button"
-                  variant="tertiary"
-                  size="sm"
-                  className="more-nav-trigger active"
-                  data-nav-measure-more=""
-                >
-                  {tCommon("navigation.more")}<Icon name="chevron" size={13} />
-                </Button>
-              </div>
-            </nav>
-          </div>
-
-          <div className="topbar-actions" ref={navActionsRef}>
-            {!isPortal ? (
-              <button
-                ref={searchToggleRef}
-                className="mobile-search-toggle"
-                type="button"
-                onClick={() => {
-                  setSidebarOpen(false);
-                  setMobileSearchOpen((prev) => !prev);
-                }}
-                aria-controls="global-search"
-                aria-expanded={mobileSearchOpen}
-                aria-label={mobileSearchOpen ? tCommon("search.closeMobile") : tCommon("search.openMobile")}
-              >
-                <Icon name={mobileSearchOpen ? "close" : "search"} size={17} />
-              </button>
-            ) : null}
-            {!isPortal ? (
-              <div id="global-search" className={`search${query ? " has-val" : ""}${mobileSearchOpen ? " mobile-open" : ""}`}>
-                <span className="ico-search"><Icon name="search" size={16} /></span>
-                <Input
-                  ref={searchInputRef}
-                  aria-label={tCommon("search.global")}
-                  className="search-input"
-                  placeholder={searchPlaceholder}
-                  value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    if (!isPush && !isIndicator && !isReport && !isRoot && !isUpstream && !isMapping && route.page !== "home") assetBack();
-                    if (isIndicator && indicatorRoute.page !== "list") indicatorBack();
-                    if (isReport && reportRoute.page !== "list") reportBack();
-                    if (isPush && pushRoute.page !== "systems") pushGoList();
-                    if (isRoot && rootRoute.page !== "library") rootBack();
-                    if (isUpstream && upRoute.page !== "list") upBack();
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="tertiary"
-                  size="sm"
-                  className="clear"
-                  aria-label={tCommon("search.clear")}
-                  onClick={() => setQuery("")}
-                >
-                  <Icon name="close" size={13} />
-                </Button>
-              </div>
-            ) : null}
-
-            <LanguageSwitcher />
-            <span className="theme-toggle-wrapper" title={themeToggleLabel}>
-              <IconButton
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="theme-toggle"
-                onClick={toggleTheme}
-                aria-label={themeToggleLabel}
-                icon={<Icon name={theme === "dark" ? "sun" : "moon"} size={16} />}
-              />
-            </span>
-
-            <AppearanceSettings />
-
-            <AuthBar
-              auth={auth}
-              onLogin={() => {
-                setAuthError("");
-                setLoginOpen(true);
-              }}
-              onLogout={handleLogout}
-            />
-          </div>
-        </header>
+      <AppShell isHome={isHome}>
+        <AppHeader
+          module={module}
+          isHome={isHome}
+          isPortal={isPortal}
+          hasSidebar={hasSidebar}
+          branding={branding}
+          visibleNavMenus={visibleNavMenus}
+          navMenuStatus={currentNavMenuStatus}
+          catalogDataAccessReady={catalogDataAccessReady}
+          onRetryLoadMenus={() => void loadMenus(navigationAuthKey)}
+          onSelectModule={switchModuleFromMenu}
+          onGoHome={() => switchModule("portal")}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => {
+            setMobileSearchOpen(false);
+            setSidebarOpen((prev) => !prev);
+          }}
+          hamburgerRef={hamburgerRef}
+          mobileSearchOpen={mobileSearchOpen}
+          onToggleMobileSearch={() => {
+            setSidebarOpen(false);
+            setMobileSearchOpen((prev) => !prev);
+          }}
+          searchToggleRef={searchToggleRef}
+          searchInputRef={searchInputRef}
+          query={query}
+          searchPlaceholder={searchPlaceholder}
+          onQueryChange={handleGlobalSearchQueryChange}
+          onClearQuery={() => setQuery("")}
+          theme={theme}
+          themeToggleLabel={themeToggleLabel}
+          onToggleTheme={toggleTheme}
+          auth={auth}
+          onLogin={() => {
+            setAuthError("");
+            setLoginOpen(true);
+          }}
+          onLogout={handleLogout}
+        />
 
         {showAnnouncement ? (
           <aside className="app-announcement" role="status">

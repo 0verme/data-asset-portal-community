@@ -1,8 +1,8 @@
 .appearance-trigger.dap-ui-icon-button {
-  width: 36px;
-  height: 36px;
+  width: 39px;
+  height: 39px;
   flex: 0 0 auto;
-  border-radius: 10px;
+  border-radius: 999px;
 }
 
 /* The shared portal has its own stacking context. Lift it above sticky
