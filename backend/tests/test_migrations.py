@@ -39,8 +39,10 @@ class BaselineSchemaTests(unittest.TestCase):
 
     def test_schema_qualification_matches_backend_contract(self):
         self.assertIn("dwp.", baseline_path("sqlite").read_text(encoding="utf-8").lower())
-        self.assertIn("dwp.", baseline_path("postgresql").read_text(encoding="utf-8").lower())
-        self.assertIn("dwp.", baseline_path("dws").read_text(encoding="utf-8").lower())
+        self.assertIn("dap.", baseline_path("postgresql").read_text(encoding="utf-8").lower())
+        self.assertIn("dap.", baseline_path("dws").read_text(encoding="utf-8").lower())
+        self.assertNotIn("dwp.", baseline_path("postgresql").read_text(encoding="utf-8").lower())
+        self.assertNotIn("dwp.", baseline_path("dws").read_text(encoding="utf-8").lower())
 
 
 class BaselineLifecycleTests(unittest.TestCase):

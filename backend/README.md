@@ -180,7 +180,7 @@ profiles:
     host: 127.0.0.1
     port: 5432
     database: asset_portal
-    schema: dwp
+    schema: dap
     user: change_me
     password: change_me
 ```
@@ -209,8 +209,8 @@ profiles:
     driver: com.huawei.gauss200.jdbc.Driver
     # Relative to backend/; ASSET_DB_JAR_PATH can provide an environment-specific absolute path.
     jar_path: resources/jars/gaussdb200.jar
-    jdbc_url: jdbc:gaussdb://127.0.0.1:25308/asset_portal?currentSchema=dwp
-    schema: dwp
+    jdbc_url: jdbc:gaussdb://127.0.0.1:25308/asset_portal?currentSchema=dap
+    schema: dap
     user: change_me
     password: change_me
     socket_timeout: 120
@@ -344,7 +344,7 @@ python backend/scripts/schema_migrate.py verify \
 
 ```bash
 psql --dbname "$DAP38_PG_DSN" --set=ON_ERROR_STOP=1 \
-  --command "ALTER TABLE dwp.p_asset_table ADD COLUMN dap38_drift_marker TEXT;"
+  --command "ALTER TABLE ${DAP38_PG_SCHEMA}.p_asset_table ADD COLUMN dap38_drift_marker TEXT;"
 
 python backend/scripts/schema_migrate.py verify \
   --profile "$DAP38_PG_PROFILE" \
@@ -355,7 +355,7 @@ python backend/scripts/schema_migrate.py verify \
 
 ```bash
 psql --dbname "$DAP38_PG_DSN" --set=ON_ERROR_STOP=1 \
-  --command "ALTER TABLE dwp.p_asset_table DROP COLUMN dap38_drift_marker;"
+  --command "ALTER TABLE ${DAP38_PG_SCHEMA}.p_asset_table DROP COLUMN dap38_drift_marker;"
 
 python backend/scripts/schema_migrate.py verify \
   --profile "$DAP38_PG_PROFILE" \

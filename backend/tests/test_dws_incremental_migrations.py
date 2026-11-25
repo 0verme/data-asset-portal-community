@@ -200,7 +200,7 @@ class DwsBaselineStatementTests(unittest.TestCase):
         )
         joined = "\n".join(statements)
         for table in ("p_role", "p_permission", "p_role_permission"):
-            self.assertIn(f"CREATE TABLE IF NOT EXISTS dwp.{table} ", joined)
+            self.assertIn(f"CREATE TABLE IF NOT EXISTS dap.{table} ", joined)
         self.assertIn("idx_p_role_permission_permission", joined)
         self.assertNotIn("p_asset_table", joined)
         self.assertNotIn("p_indicator_item", joined)
@@ -210,7 +210,7 @@ class DwsBaselineStatementTests(unittest.TestCase):
         statements = baseline_table_statements("dws", list(OPEN_MODULE_TABLES))
         joined = "\n".join(statements)
         for table in OPEN_MODULE_TABLES:
-            self.assertIn(f"CREATE TABLE IF NOT EXISTS dwp.{table} ", joined)
+            self.assertIn(f"CREATE TABLE IF NOT EXISTS dap.{table} ", joined)
         self.assertIn("DISTRIBUTE BY REPLICATION", joined)
         self.assertNotIn("p_field_mapping_table", joined)
 

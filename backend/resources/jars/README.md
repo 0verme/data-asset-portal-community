@@ -22,8 +22,8 @@ profiles:
     type: gaussdb
     driver: com.huawei.gauss200.jdbc.Driver
     jar_path: resources/jars/gaussdb200.jar
-    jdbc_url: jdbc:gaussdb://127.0.0.1:25308/asset_portal?currentSchema=dwp
-    schema: dwp
+    jdbc_url: jdbc:gaussdb://127.0.0.1:25308/asset_portal?currentSchema=dap
+    schema: dap
 ```
 
 相对路径以 `backend/` 为基准（即 `backend/configs/database.yaml` 的上两级目录），不依赖启动时的当前工作目录；Linux 和 Windows 均无需修改仓库源码。

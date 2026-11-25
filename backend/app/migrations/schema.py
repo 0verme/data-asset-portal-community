@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from ..db.providers import gaussdb_schema_sql_identifier
+from ..db.providers import LOGICAL_SCHEMA, gaussdb_schema_sql_identifier
 from ..db.registry import get_provider
 from ..db.write_target import resolve_write_target
 
 BASELINE_REVISION = "0001_baseline"
 SUPPORTED_DIALECTS = ("sqlite", "postgresql", "mysql", "dws")
+CANONICAL_BASELINE_SCHEMAS = ("dap", "dwp", LOGICAL_SCHEMA)
 # This nonstandard GaussDB/DWS history table is outside the canonical baseline.
 # Preserve it without treating its presence as application-schema drift.
 DWS_PRESERVED_EXTERNAL_TABLES = frozenset({"p_recv_ops_mapping"})
@@ -24,7 +26,10 @@ class EmptyRevisionLedgerError(RuntimeError):
 
 
 SCHEMA_ROOT = Path(__file__).resolve().parents[2] / "schema"
-TABLE_RE = re.compile(r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(?:dwp\.)?([A-Za-z0-9_]+)", re.I)
+TABLE_RE = re.compile(
+    r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(?:(?:dap|dwp|__app__)\.)?([A-Za-z0-9_]+)",
+    re.I,
+)
 CREATE_TABLE_RE = re.compile(
     r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+"
     r"(?:(?:[A-Za-z0-9_\"`]+)\.)?(?P<table>[A-Za-z0-9_\"`]+)\s*\(",
@@ -611,15 +616,28 @@ def _prefix(config: dict) -> str:
     return f"{schema}." if schema else ""
 
 
+def _canonical_schema_sets(
+    canonical_schema: str | Iterable[str],
+) -> tuple[frozenset[str], frozenset[str]]:
+    if isinstance(canonical_schema, str):
+        values = (canonical_schema,)
+    else:
+        values = tuple(canonical_schema)
+    if not values or any(not isinstance(item, str) or not item for item in values):
+        raise ValueError("canonical_schema must contain at least one non-empty schema identifier")
+    return frozenset(values), frozenset(item.lower() for item in values)
+
+
 def _render_schema_qualified_identifiers(
     sql: str,
-    canonical_schema: str,
+    canonical_schema: str | Iterable[str],
     target_schema: str,
     *,
     rewrite_schema_declaration: bool = False,
 ) -> str:
     """Map schema identifier tokens, leaving literals and comments intact."""
     rendered: list[str] = []
+    exact_schemas, lower_schemas = _canonical_schema_sets(canonical_schema)
     target = gaussdb_schema_sql_identifier(target_schema)
     previous_words: list[str] = []
     index = 0
@@ -700,12 +718,12 @@ def _render_schema_qualified_identifiers(
                 previous_words[-2:] == ["CREATE", "SCHEMA"]
                 or previous_words[-5:] == ["CREATE", "SCHEMA", "IF", "NOT", "EXISTS"]
             )
-            if is_schema_declaration and quoted_value == canonical_schema:
+            if is_schema_declaration and quoted_value in exact_schemas:
                 rendered.append(target)
                 previous_words.clear()
                 index = end
             elif (
-                quoted_value == canonical_schema
+                quoted_value in exact_schemas
                 and after < len(sql)
                 and sql[after] == "."
             ):
@@ -745,7 +763,7 @@ def _render_schema_qualified_identifiers(
             after = end
             while after < len(sql) and sql[after].isspace():
                 after += 1
-            is_schema = token.lower() == canonical_schema.lower()
+            is_schema = token.lower() in lower_schemas
             is_schema_declaration = rewrite_schema_declaration and (
                 previous_words[-2:] == ["CREATE", "SCHEMA"]
                 or previous_words[-5:] == ["CREATE", "SCHEMA", "IF", "NOT", "EXISTS"]
@@ -779,14 +797,16 @@ def render_baseline_for_profile(
     sql = baseline_path(dialect, root).read_text(encoding="utf-8")
     if dialect == "dws":
         schema = _dws_schema(config)
-        return _render_schema_qualified_identifiers(sql, "dwp", schema)
+        return _render_schema_qualified_identifiers(
+            sql, CANONICAL_BASELINE_SCHEMAS, schema
+        )
     if dialect == "postgresql":
         provider = get_provider(config["type"])
         if provider.name != "postgres":
             raise ValueError("PostgreSQL baseline requires a PostgreSQL profile")
         schema = _profile_schema(config)
         return _render_schema_qualified_identifiers(
-            sql, "dwp", schema, rewrite_schema_declaration=True
+            sql, CANONICAL_BASELINE_SCHEMAS, schema, rewrite_schema_declaration=True
         )
     return sql
 
