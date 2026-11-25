@@ -9,14 +9,21 @@ test("primary navigation fits its available space and preserves browser history"
   const primaryButtons = navigation.locator("button.dap-ui-button:not(.more-nav-trigger)");
   for (const width of [2560, 1920, 1501, 1500, 1440, 1280, 1200, 1199, 1181, 1180, 1025, 1024]) {
     await page.setViewportSize({ width, height: 900 });
+    const minPrimary = width >= 1181 ? 3 : 5;
     await expect(navigation.getByRole("button", { name: "更多" })).toBeVisible();
-    await expect.poll(async () => page.evaluate(() => {
+    await expect.poll(async () => page.evaluate((minCount) => {
       const nav = document.querySelector<HTMLElement>(".topbar-nav-slot > .mainnav:not(.mainnav-measure)")!;
       const slot = document.querySelector<HTMLElement>(".topbar-nav-slot")!;
-      return nav.scrollWidth <= nav.clientWidth + 1 && nav.getBoundingClientRect().width <= slot.clientWidth + 1;
-    }), `measured primary menus fit at ${width}px`).toBe(true);
+      const count = nav.querySelectorAll("button.dap-ui-button:not(.more-nav-trigger)").length;
+      return (
+        nav.scrollWidth <= nav.clientWidth + 1
+        && nav.getBoundingClientRect().width <= slot.clientWidth + 1
+        && count >= minCount
+        && count <= 5
+      );
+    }, minPrimary), `measured primary menus fit at ${width}px`).toBe(true);
     const primaryCount = await primaryButtons.count();
-    expect(primaryCount, `measured primary menus fit at ${width}px`).toBeGreaterThanOrEqual(width >= 1181 ? 3 : 5);
+    expect(primaryCount, `measured primary menus fit at ${width}px`).toBeGreaterThanOrEqual(minPrimary);
     expect(primaryCount, `measured primary menus fit at ${width}px`).toBeLessThanOrEqual(5);
     const metrics = await page.evaluate(() => {
       const nav = document.querySelector<HTMLElement>(".topbar-nav-slot > .mainnav:not(.mainnav-measure)")!;
@@ -90,12 +97,19 @@ test("header geometry and mobile drawer stay responsive at all requested widths"
     expect(await page.evaluate(() => document.documentElement.scrollWidth), `no document overflow at ${width}px`).toBeLessThanOrEqual(width + 1);
 
     if (width >= 960) {
+      const minPrimary = width >= 1181 ? 3 : 5;
       await expect(navigation).toBeVisible();
-      await expect.poll(async () => page.evaluate(() => {
+      await expect.poll(async () => page.evaluate((minCount) => {
         const nav = document.querySelector<HTMLElement>(".topbar-nav-slot > .mainnav:not(.mainnav-measure)")!;
         const slot = document.querySelector<HTMLElement>(".topbar-nav-slot")!;
-        return nav.scrollWidth <= nav.clientWidth + 1 && nav.getBoundingClientRect().width <= slot.clientWidth + 1;
-      })).toBe(true);
+        const count = nav.querySelectorAll("button.dap-ui-button:not(.more-nav-trigger)").length;
+        return (
+          nav.scrollWidth <= nav.clientWidth + 1
+          && nav.getBoundingClientRect().width <= slot.clientWidth + 1
+          && count >= minCount
+          && count <= 5
+        );
+      }, minPrimary)).toBe(true);
       const metrics = await page.evaluate(() => {
         const nav = document.querySelector<HTMLElement>(".topbar-nav-slot > .mainnav:not(.mainnav-measure)")!;
         const navRect = nav.getBoundingClientRect();
@@ -108,7 +122,7 @@ test("header geometry and mobile drawer stay responsive at all requested widths"
         };
       });
       const primaryCount = await navigation.locator("button.dap-ui-button:not(.more-nav-trigger)").count();
-      expect(primaryCount).toBeGreaterThanOrEqual(width >= 1181 ? 3 : 5);
+      expect(primaryCount).toBeGreaterThanOrEqual(minPrimary);
       expect(primaryCount).toBeLessThanOrEqual(5);
       expect(metrics.navScrollWidth).toBeLessThanOrEqual(metrics.navClientWidth + 1);
       expect(metrics.navWidth).toBeLessThanOrEqual(metrics.slotWidth + 1);
