@@ -21,9 +21,10 @@ from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.app.db.facade import clear_engine_cache, execute_sql
+from backend.app.db.facade import clear_engine_cache, execute_sql, get_db_profile
 from backend.app.db.sqlite_adapter import connect
 from backend.app.db.tables import asset_change_log, asset_field, asset_table
+from backend.app.db.write_target import resolve_write_target
 from backend.app.migrations.schema import SUPPORTED_DIALECTS, baseline_columns, initialize
 from backend.scripts import seed_asset_layer_test_data as seed
 from backend.tests.db_test_support import (
@@ -121,11 +122,24 @@ class AssetLayerSeedSafetyTests(unittest.TestCase):
                 "host": "127.0.0.1",
                 "port": 5432,
                 "database": "asset_portal_test",
-                "schema": "dwp",
+                "schema": "dap",
             },
         )
         self.assertIn("postgres:", label)
         self.assertIn("asset_portal_test", label)
+        self.assertIn("schema=dap", label)
+
+    def test_safe_target_rejects_missing_schema_without_dwp_fallback(self):
+        with self.assertRaisesRegex(ValueError, "explicit Profile schema"):
+            seed._safe_target(
+                "local_test",
+                {
+                    "type": "postgres",
+                    "host": "127.0.0.1",
+                    "port": 5432,
+                    "database": "asset_portal_test",
+                },
+            )
 
     def test_seed_assets_definition_is_non_empty_and_layered(self):
         self.assertGreaterEqual(len(seed.ASSETS), 12)
@@ -219,6 +233,7 @@ class AssetLayerSeedPostgresIntegrationTests(unittest.TestCase):
         self.addCleanup(self.environment.stop)
         clear_engine_cache()
         self.addCleanup(clear_engine_cache)
+        self.schema = resolve_write_target(get_db_profile(self.profile)).rendered_schema()
         self.created_reference_rows: list[tuple[str, str]] = []
         self.addCleanup(self._delete_reference_rows)
         self.addCleanup(self._delete_probe_rows)
@@ -236,11 +251,11 @@ class AssetLayerSeedPostgresIntegrationTests(unittest.TestCase):
 
     def _seeded_counts(self):
         row = self._rows(
-            """
+            f"""
 SELECT
-  (SELECT COUNT(*) FROM dwp.p_asset_table WHERE created_by = ?) AS assets,
-  (SELECT COUNT(*) FROM dwp.p_asset_field WHERE created_by = ?) AS fields,
-  (SELECT COUNT(*) FROM dwp.p_asset_change_log WHERE operator_name = ?) AS change_logs
+  (SELECT COUNT(*) FROM {self.schema}.p_asset_table WHERE created_by = ?) AS assets,
+  (SELECT COUNT(*) FROM {self.schema}.p_asset_field WHERE created_by = ?) AS fields,
+  (SELECT COUNT(*) FROM {self.schema}.p_asset_change_log WHERE operator_name = ?) AS change_logs
 """,
             [seed.SEED_OPERATOR, seed.SEED_OPERATOR, seed.SEED_OPERATOR],
         )[0]
@@ -248,21 +263,21 @@ SELECT
 
     def _create_missing_reference_rows(self):
         """Provision the domains/layers the seed requires, tracking what we added."""
-        domains = {row["domain_code"] for row in self._rows("SELECT domain_code FROM dwp.p_asset_domain")}
+        domains = {row["domain_code"] for row in self._rows(f"SELECT domain_code FROM {self.schema}.p_asset_domain")}
         for domain in sorted({asset["domain"] for asset in seed.ASSETS} - domains):
             execute_sql(
                 self.profile,
-                "INSERT INTO dwp.p_asset_domain "
+                f"INSERT INTO {self.schema}.p_asset_domain "
                 "(domain_code, domain_name, display_order, is_active, is_deleted) "
                 "VALUES (?, ?, 99, 'Y', 'N')",
                 params=[domain, f"dap-265 {domain}"],
             )
             self.created_reference_rows.append(("p_asset_domain", domain))
-        layers = {row["layer_code"] for row in self._rows("SELECT layer_code FROM dwp.p_asset_layer")}
+        layers = {row["layer_code"] for row in self._rows(f"SELECT layer_code FROM {self.schema}.p_asset_layer")}
         for layer in sorted({asset["layer"] for asset in seed.ASSETS} - layers):
             execute_sql(
                 self.profile,
-                "INSERT INTO dwp.p_asset_layer "
+                f"INSERT INTO {self.schema}.p_asset_layer "
                 "(layer_code, layer_name, display_order, is_active, is_deleted) "
                 "VALUES (?, ?, 99, 'Y', 'N')",
                 params=[layer, f"dap-265 {layer}"],
@@ -270,7 +285,7 @@ SELECT
             self.created_reference_rows.append(("p_asset_layer", layer))
 
     def _next_id(self, table, column):
-        return int(self._rows(f"SELECT COALESCE(MAX({column}), 0) + 1 AS value FROM dwp.{table}")[0]["value"])
+        return int(self._rows(f"SELECT COALESCE(MAX({column}), 0) + 1 AS value FROM {self.schema}.{table}")[0]["value"])
 
     def _create_decoy_rows(self):
         """Create rows owned by another operator that ``--cleanup`` must not delete."""
@@ -279,7 +294,7 @@ SELECT
         change_id = self._next_id("p_asset_change_log", "change_id")
         execute_sql(
             self.profile,
-            "INSERT INTO dwp.p_asset_table "
+            f"INSERT INTO {self.schema}.p_asset_table "
             "(asset_id, table_name, table_cn_name, schema_name, layer_code, domain_code, "
             "owner_name, field_count, is_deleted, created_by, updated_by) "
             "VALUES (?, ?, ?, 'dwp', 'DM', 'PAY', 'decoy', 1, 'N', ?, ?)",
@@ -287,7 +302,7 @@ SELECT
         )
         execute_sql(
             self.profile,
-            "INSERT INTO dwp.p_asset_field "
+            f"INSERT INTO {self.schema}.p_asset_field "
             "(field_id, asset_id, field_name, field_cn_name, field_order, "
             "nullable_flag, pk_flag, partition_flag, is_deleted, created_by, updated_by) "
             "VALUES (?, ?, ?, ?, 1, 'Y', 'N', 'N', 'N', ?, ?)",
@@ -295,7 +310,7 @@ SELECT
         )
         execute_sql(
             self.profile,
-            "INSERT INTO dwp.p_asset_change_log "
+            f"INSERT INTO {self.schema}.p_asset_change_log "
             "(change_id, asset_id, table_name, change_type, change_summary, "
             "before_json, after_json, operator_name) "
             "VALUES (?, ?, ?, 'CREATE_TABLE', 'dap-265 cleanup decoy', NULL, NULL, ?)",
@@ -311,7 +326,7 @@ SELECT
         ):
             execute_sql(
                 self.profile,
-                f"DELETE FROM dwp.{table} WHERE {column} = ?",
+                f"DELETE FROM {self.schema}.{table} WHERE {column} = ?",
                 params=[DECOY_OPERATOR],
             )
         # Best effort only: a failing test must not leave seed rows behind.
@@ -329,7 +344,7 @@ SELECT
             for code in codes:
                 execute_sql(
                     self.profile,
-                    f"DELETE FROM dwp.{table} WHERE {code_column} = ?",
+                    f"DELETE FROM {self.schema}.{table} WHERE {code_column} = ?",
                     params=[code],
                 )
 
@@ -345,7 +360,7 @@ SELECT
             0,
             int(
                 self._scalar(
-                    "SELECT COUNT(*) AS value FROM dwp.p_asset_table "
+                    f"SELECT COUNT(*) AS value FROM {self.schema}.p_asset_table "
                     "WHERE created_by = ? AND (source_key IS NOT NULL "
                     "OR asset_type IS NOT NULL OR external_id IS NOT NULL)",
                     [seed.SEED_OPERATOR],
@@ -371,7 +386,7 @@ SELECT
                 1,
                 int(
                     self._scalar(
-                        f"SELECT COUNT(*) AS value FROM dwp.{table} WHERE {column} = ?",
+                        f"SELECT COUNT(*) AS value FROM {self.schema}.{table} WHERE {column} = ?",
                         [decoy_asset_id],
                     )
                 ),

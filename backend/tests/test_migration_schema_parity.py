@@ -21,7 +21,7 @@ from backend.tests.dws_relationship_contract import (
 
 def _table_body(sql: str, table: str) -> str:
     match = re.search(
-        rf"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(?:dwp\.)?{re.escape(table)}\s*\((.*?)\)\s*(?:ENGINE|;)",
+        rf"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(?:(?:dap|dwp|__app__)\.)?{re.escape(table)}\s*\((.*?)\)\s*(?:ENGINE|;)",
         sql,
         re.I | re.S,
     )
@@ -202,9 +202,21 @@ class MigrationSchemaParityTests(unittest.TestCase):
         self.assertEqual([], violations)
         self.assertRegex(
             _mask_sql_non_code(sql),
-            r"CREATE\s+INDEX\s+idx_p_asset_table_filter\s+ON\s+dwp\.p_asset_table\s*"
+            r"CREATE\s+INDEX\s+idx_p_asset_table_filter\s+ON\s+dap\.p_asset_table\s*"
             r"\(\s*layer_code\s*,\s*domain_code\s*\)",
         )
+
+    def test_canonical_pg_and_dws_baselines_use_dap_schema_and_keep_business_asset_default(self):
+        for dialect in ("postgresql", "dws"):
+            with self.subTest(dialect=dialect):
+                raw_sql = self.sql[dialect]
+                masked = _mask_sql_non_code(raw_sql)
+                self.assertNotRegex(masked, r"\bdwp\s*\.")
+                self.assertNotRegex(masked, r"CREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS\s+dwp\b")
+                self.assertIn("create table if not exists dap.p_system", masked.lower())
+                self.assertIn("default 'dwp'", _table_body(raw_sql, "p_asset_table"))
+        self.assertIn("create table if not exists dwp.p_system", _mask_sql_non_code(self.sql["sqlite"]).lower())
+        self.assertNotRegex(_mask_sql_non_code(self.sql["mysql"]), r"\b(?:dap|dwp)\s*\.")
 
     def test_postgresql_and_mysql_index_names_are_unqualified(self):
         # PostgreSQL and MySQL reject `CREATE INDEX schema.name ON ...`; the

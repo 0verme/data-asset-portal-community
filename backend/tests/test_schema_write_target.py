@@ -586,32 +586,52 @@ class SchemaWriteTargetContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="postgres-profile-baseline-") as directory:
             root = Path(directory)
             (root / "postgresql.sql").write_text(
-                "-- Keep dwp.p_comment in this reference comment\n"
+                "-- Keep dwp.p_comment and dap.p_comment in this reference comment\n"
+                "CREATE SCHEMA IF NOT EXISTS dap;\n"
                 "CREATE SCHEMA IF NOT EXISTS dwp;\n"
                 "CREATE SCHEMA IF NOT EXISTS \"dwp\";\n"
-                "CREATE TABLE IF NOT EXISTS dwp.p_system ("
+                "CREATE TABLE IF NOT EXISTS dap.p_system ("
                 "schema_name TEXT DEFAULT 'dwp', note TEXT DEFAULT '__app__.p_report_asset');\n"
-                "CREATE TABLE IF NOT EXISTS \"dwp\".quoted_table (id INTEGER);\n",
+                "CREATE TABLE IF NOT EXISTS \"dwp\".quoted_table (id INTEGER);\n"
+                "CREATE TABLE IF NOT EXISTS __app__.logical_table (id INTEGER);\n",
                 encoding="utf-8",
             )
             rendered = render_baseline_for_profile(
-                {"type": "postgres", "schema": "Dap"}, "postgresql", root
+                {"type": "postgres", "schema": "Custom_Meta"}, "postgresql", root
             )
 
-        self.assertIn("-- Keep dwp.p_comment in this reference comment", rendered)
-        self.assertEqual(2, rendered.count("CREATE SCHEMA IF NOT EXISTS dap;"))
-        self.assertIn("CREATE TABLE IF NOT EXISTS dap.p_system", rendered)
+        self.assertIn("-- Keep dwp.p_comment and dap.p_comment in this reference comment", rendered)
+        self.assertEqual(3, rendered.count("CREATE SCHEMA IF NOT EXISTS custom_meta;"))
+        self.assertIn("CREATE TABLE IF NOT EXISTS custom_meta.p_system", rendered)
         self.assertIn("DEFAULT 'dwp'", rendered)
         self.assertIn("DEFAULT '__app__.p_report_asset'", rendered)
-        self.assertIn("CREATE TABLE IF NOT EXISTS dap.quoted_table", rendered)
+        self.assertIn("CREATE TABLE IF NOT EXISTS custom_meta.quoted_table", rendered)
+        self.assertIn("CREATE TABLE IF NOT EXISTS custom_meta.logical_table", rendered)
         self.assertNotIn('CREATE TABLE IF NOT EXISTS "dwp".quoted_table', rendered)
 
-    def test_postgres_dwp_target_preserves_canonical_baseline(self):
+    def test_postgres_dap_target_preserves_canonical_baseline_and_supports_custom_and_legacy_dwp(self):
         canonical = baseline_path("postgresql").read_text(encoding="utf-8")
-        rendered = render_baseline_for_profile(
+        self.assertEqual(
+            canonical,
+            render_baseline_for_profile({"type": "postgres", "schema": "dap"}, "postgresql"),
+        )
+
+        custom_rendered = render_baseline_for_profile(
+            {"type": "postgres", "schema": "custom_meta"}, "postgresql"
+        )
+        self.assertIn("CREATE SCHEMA IF NOT EXISTS custom_meta;", custom_rendered)
+        self.assertIn("CREATE TABLE IF NOT EXISTS custom_meta.p_system", custom_rendered)
+        self.assertIn("schema_name VARCHAR(128) NOT NULL DEFAULT 'dwp'", custom_rendered)
+        self.assertNotIn("CREATE TABLE IF NOT EXISTS dap.", custom_rendered)
+        self.assertNotIn("CREATE TABLE IF NOT EXISTS dwp.", custom_rendered)
+
+        legacy_dwp_rendered = render_baseline_for_profile(
             {"type": "postgres", "schema": "dwp"}, "postgresql"
         )
-        self.assertEqual(canonical, rendered)
+        self.assertIn("CREATE SCHEMA IF NOT EXISTS dwp;", legacy_dwp_rendered)
+        self.assertIn("CREATE TABLE IF NOT EXISTS dwp.p_system", legacy_dwp_rendered)
+        self.assertIn("schema_name VARCHAR(128) NOT NULL DEFAULT 'dwp'", legacy_dwp_rendered)
+        self.assertNotIn("CREATE TABLE IF NOT EXISTS dap.", legacy_dwp_rendered)
 
     def test_postgres_profile_target_is_shared_by_baseline_ledger_and_reflection(self):
         config = {"type": "postgres", "schema": "Dap"}

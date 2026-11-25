@@ -45,6 +45,7 @@ from .search_hot_keyword_seed import plan_search_hot_keyword_seed
 from .rag_search_config_seed import plan_rag_search_config_seed
 from .ai_llm_quota_seed import plan_ai_llm_quota_seed
 from .schema import (
+    CANONICAL_BASELINE_SCHEMAS,
     SCHEMA_ROOT,
     ColumnSpec,
     IndexSpec,
@@ -196,7 +197,9 @@ def _non_unique_index(table: TableSpec, name: str, columns: tuple[str, ...]) -> 
 
 def _baseline_statements(ctx: DwsRevisionContext, tables: Sequence[str]) -> list[str]:
     return [
-        _render_schema_qualified_identifiers(statement, "dwp", ctx.schema)
+        _render_schema_qualified_identifiers(
+            statement, CANONICAL_BASELINE_SCHEMAS, ctx.schema
+        )
         for statement in baseline_table_statements("dws", list(tables), ctx.root)
     ]
 

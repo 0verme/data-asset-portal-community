@@ -43,7 +43,7 @@ def read_sql(path: Path) -> str:
 def extract_create_table_body(sql: str, table_name: str) -> str:
     """Return the CREATE TABLE body for table_name (best-effort text parse)."""
     pattern = re.compile(
-        rf"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(?:dwp\.)?{re.escape(table_name)}\s*\(",
+        rf"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(?:(?:dap|dwp|__app__)\.)?{re.escape(table_name)}\s*\(",
         re.IGNORECASE,
     )
     match = pattern.search(sql)

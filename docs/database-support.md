@@ -50,8 +50,8 @@ DAP 用标签而不是笼统的「支持」来描述数据库状态，避免把�
   5. repeat `apply` 必须为 no-op
   6. canonical repository schema 物理边界检查
   7. 启用集成测试后的**全量后端测试**（集成测试不 skip）
-- **Profile target**：fresh baseline 要求显式 Profile `schema`；仅将 canonical baseline 中受控的 `dwp` schema identifier tokens（含 `CREATE SCHEMA IF NOT EXISTS dwp`）渲染到该目标，并保持 `CREATE SCHEMA IF NOT EXISTS` 行为。ledger lookup/stamp、user-table preflight、reflection 与 DDL 使用同一 Profile schema；缺失目标在 catalog query/DDL 前拒绝。
-- **边界**：CI 使用隔离的一次性 schema（`dwp`），不连接任何生产库。当前 CI 在线服务覆盖 `dwp`；非 `dwp` rendering/ledger/reflection 由 Recording/offline tests 覆盖，未在部署数据库验证。
+- **Profile target**：fresh baseline 要求显式 Profile `schema`；canonical `postgresql.sql` 默认声明 `dap`，受控 renderer 仅将 schema identifier tokens（含 `CREATE SCHEMA IF NOT EXISTS` 目标，兼容历史 `dwp` / `__app__` 模板输入）渲染到该目标，并保持 `CREATE SCHEMA IF NOT EXISTS` 行为。ledger lookup/stamp、user-table preflight、reflection 与 DDL 使用同一 Profile schema；缺失目标在 catalog query/DDL 前拒绝。
+- **边界**：CI 使用隔离的一次性 schema（`dap`），并断言新安装/正常运行无需 `dwp` 存在、不连接任何生产库。自定义 schema 与显式兼容 `dwp` 的 rendering/ledger/reflection 由 Recording/offline tests 覆盖，未在真实生产部署数据库验证。
 
 ### MySQL 8.0 — Verified
 
@@ -75,7 +75,7 @@ GaussDB / DWS 的准确边界是：
 - 没有在线 GaussDB / DWS 实例，没有 CRMA/CRUD 集成测试，没有 seed 回归；
 - 商业 JDBC 驱动（如 `gaussdb200.jar`）不包含在仓库中，由部署方自行提供。
 - 在线 `apply` 必须在 GaussDB profile 中显式配置安全的 `schema`，并由部署方预先创建该 schema；migration 会先检查它存在，不会创建 schema，也不会回退到 `dwp`。
-- DWS canonical baseline 使用 `dwp` 作为逻辑 schema；运行时只将 schema-qualified identifiers 映射到 profile 的物理 schema。在线 GaussDB 仍需部署方自行验收。
+- DWS canonical baseline 默认使用 `dap` 作为逻辑管理 schema（兼容历史 `dwp` / `__app__` 模板输入）；运行时只将 schema-qualified identifiers 映射到 profile 的物理 schema。在线 GaussDB 仍需部署方自行验收。
 - `demo/seed_postgres.py --dialect dws` 也必须显式提供 `--schema`；它只生成 SQL，须由调用者传入最终有效 Profile schema 并核对执行会话。没有在线 DWS seed CI，SQL 生成不代表 DWS 部署验证。
 
 因此它只能被描述为 **Compatible**，不能被描述为「已验证支持」或与 PostgreSQL / MySQL 同级。
@@ -103,7 +103,7 @@ python demo/seed_sqlite.py --database <absolute-local-path>/community.db
 
 # PostgreSQL Community 初始化（需要隔离的一次性数据库）
 python backend/scripts/schema_migrate.py apply --profile community_postgres
-python demo/seed_postgres.py --dialect postgres --schema dwp
+python demo/seed_postgres.py --dialect postgres --schema dap
 
 # MySQL 8.0（先安装可选驱动）
 pip install -r backend/requirements-mysql.txt

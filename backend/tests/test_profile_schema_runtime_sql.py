@@ -6,13 +6,17 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from backend.app.contracts.metadata_ingestion import MetadataAsset, MetadataField
 from backend.app.db.facade import normalize_sql_for_profile
 from backend.app.db.providers import GaussDBProvider, MySQLProvider, PostgreSQLProvider
 from backend.app.db.sqlite_adapter import connect as connect_sqlite
+from backend.app.services.assets_service import AssetsService
+from backend.app.services.metadata_ingestion_service import MetadataIngestionService
 from backend.app.services.portal_service import PortalService
 from backend.app.services.providers.registry import list_portal_stats, list_search_entities
 from backend.app.services.search_provider import KeywordSearchProvider
-from backend.scripts import db_to_init_sql
+from backend.scripts import db_to_init_sql, seed_term_roots
+from scripts import sync_from_pg
 
 
 class RuntimeSqlProfileSchemaTests(unittest.TestCase):
@@ -256,6 +260,135 @@ VALUES
             )
             result_ids = {item["id"] for item in result["groups"][0]["items"]}
             self.assertNotIn("deleted_asset", result_ids)
+
+    def test_business_asset_schema_name_is_independent_of_platform_profile_schema(self):
+        ingestion = MetadataIngestionService()
+        explicit_dwp = ingestion._normalize_asset(
+            "warehouse_collector",
+            MetadataAsset(
+                name="fact_sales",
+                schema_name="dwp",
+                fields=[MetadataField(name="sale_id", data_type="BIGINT")],
+            ),
+        )
+        self.assertEqual("dwp", explicit_dwp["schema"])
+
+        derived_from_qualified = ingestion._normalize_asset(
+            "warehouse_collector",
+            MetadataAsset(
+                name="fact_orders",
+                qualified_name="dwd.fact_orders",
+                fields=[MetadataField(name="order_id", data_type="BIGINT")],
+            ),
+        )
+        self.assertEqual("dwd", derived_from_qualified["schema"])
+
+        missing_source_schema = ingestion._normalize_asset(
+            "warehouse_collector",
+            MetadataAsset(
+                name="orphan_table",
+                qualified_name="orphan_table",
+                fields=[MetadataField(name="id", data_type="BIGINT")],
+            ),
+        )
+        self.assertEqual("external", missing_source_schema["schema"])
+
+        service = AssetsService()
+        service._default_schema_prefix = ""
+        with (
+            patch.object(
+                service,
+                "_load_domain_mappings",
+                return_value=({"TRADE": "交易"}, {"交易": "TRADE"}),
+            ),
+            patch.object(
+                service,
+                "get_layers",
+                return_value=[{"code": "DWM", "cn": "中间层", "active": True, "count": 0}],
+            ),
+        ):
+            validated_dwp = service._validate_table_payload(
+                {
+                    "name": "dwm_order_sum_1d",
+                    "cn": "订单汇总日表",
+                    "domain": "交易",
+                    "layer": "DWM",
+                    "schema": "dwp",
+                    "fields": [
+                        {
+                            "name": "order_dt",
+                            "cn": "订单日期",
+                            "type": "VARCHAR(10)",
+                            "nullable": False,
+                            "pk": True,
+                            "part": False,
+                        }
+                    ],
+                }
+            )
+            validated_missing = service._validate_table_payload(
+                {
+                    "name": "dwm_order_sum_1d",
+                    "cn": "订单汇总日表",
+                    "domain": "交易",
+                    "layer": "DWM",
+                    "fields": [
+                        {
+                            "name": "order_dt",
+                            "cn": "订单日期",
+                            "type": "VARCHAR(10)",
+                            "nullable": False,
+                            "pk": True,
+                            "part": False,
+                        }
+                    ],
+                }
+            )
+        self.assertEqual("dwp", validated_dwp["schema"])
+        self.assertEqual("", validated_missing["schema"])
+
+        read_model = service._to_asset_table(
+            {
+                "asset_id": 10,
+                "table_name": "dwp_member_summary",
+                "table_cn_name": "会员汇总表",
+                "schema_name": "dwp",
+                "layer_code": "DWM",
+                "domain_name": "会员",
+            },
+            [],
+        )
+        self.assertEqual("dwp", read_model["schema"])
+
+    def test_sync_and_seed_scripts_use_dap_or_explicit_profile_schema_without_dwp_fallback(self):
+        self.assertEqual("dap", sync_from_pg.resolve_sync_schema(None))
+        self.assertEqual("custom_meta", sync_from_pg.resolve_sync_schema("Custom_Meta"))
+        for invalid in ("", "   ", "dap; DROP SCHEMA public"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError):
+                    sync_from_pg.resolve_sync_schema(invalid)
+
+        self.assertEqual(
+            "postgres:127.0.0.1/asset_portal_test schema=dap",
+            seed_term_roots._safe_target(
+                "local_test",
+                {
+                    "type": "postgres",
+                    "host": "127.0.0.1",
+                    "database": "asset_portal_test",
+                    "schema": "dap",
+                },
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "explicit Profile schema"):
+            seed_term_roots._safe_target(
+                "local_test",
+                {
+                    "type": "postgres",
+                    "host": "127.0.0.1",
+                    "database": "asset_portal_test",
+                },
+            )
 
 
 if __name__ == "__main__":

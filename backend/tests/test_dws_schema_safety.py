@@ -201,13 +201,21 @@ class DwsSchemaSafetyTests(unittest.TestCase):
         self.assertEqual('"Dap".p_role', _rbac_qualified_table("p_role", "Dap", gaussdb=True))
 
     def test_real_dws_baseline_maps_to_profile_schema_and_keeps_business_default(self):
-        rendered = render_baseline_for_profile(self.config, "dws")
-        self.assertIn("CREATE TABLE IF NOT EXISTS dap.p_system", rendered)
-        self.assertIn("CREATE TABLE IF NOT EXISTS dap.p_admin_user", rendered)
-        self.assertIn("CREATE TABLE IF NOT EXISTS dap.p_asset_table", rendered)
-        self.assertIn("schema_name VARCHAR(128) NOT NULL DEFAULT 'dwp'", rendered)
-        self.assertNotRegex(_mask_literals_and_comments(rendered), r"\bdwp\s*\.")
-        self.assertNotRegex(rendered, r"CREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS")
+        for target_schema in ("dap", "custom_meta", "dwp"):
+            with self.subTest(schema=target_schema):
+                rendered = render_baseline_for_profile(
+                    {"type": "gaussdb", "schema": target_schema}, "dws"
+                )
+                self.assertIn(f"CREATE TABLE IF NOT EXISTS {target_schema}.p_system", rendered)
+                self.assertIn(f"CREATE TABLE IF NOT EXISTS {target_schema}.p_admin_user", rendered)
+                self.assertIn(f"CREATE TABLE IF NOT EXISTS {target_schema}.p_asset_table", rendered)
+                self.assertIn("schema_name VARCHAR(128) NOT NULL DEFAULT 'dwp'", rendered)
+                masked = _mask_literals_and_comments(rendered)
+                if target_schema != "dwp":
+                    self.assertNotRegex(masked, r"\bdwp\s*\.")
+                if target_schema != "dap":
+                    self.assertNotRegex(masked, r"\bdap\s*\.")
+                self.assertNotRegex(rendered, r"CREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS")
 
     def test_fresh_apply_executes_profile_rendered_statements_and_stamps_same_schema(self):
         connection = RecordingConnection()

@@ -33,6 +33,7 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 from app.db.facade import database_transaction, execute_sql, fetch_all, get_db_profile
+from app.db.write_target import resolve_write_target
 
 
 SEED_OPERATOR = "asset_layer_test_seed"
@@ -410,12 +411,13 @@ def _safe_target(profile, config):
             "refusing asset-layer test data: profile/host/database must explicitly mark "
             "dev, test, or local"
         )
+    schema = resolve_write_target(config).schema
     if db_type == "postgres":
         return (
             f"postgres:{config.get('host')}:{config.get('port')}/{config.get('database')} "
-            f"schema={config.get('schema', 'dwp')}"
+            f"schema={schema}"
         )
-    return f"gaussdb:{config.get('jdbc_url')}"
+    return f"gaussdb:{config.get('jdbc_url')} schema={schema}"
 
 
 def _rows(profile, sql, params=None):

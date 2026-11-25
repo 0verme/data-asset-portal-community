@@ -16,7 +16,7 @@
 
 # -*- coding: utf-8 -*-
 """
-sync_from_pg.py — 把「测试环境 PostgreSQL(schema=dwp)」作为唯一真相，按表导出到下游。
+sync_from_pg.py — 把「测试环境 PostgreSQL(schema=dap)」作为唯一真相，按表导出到下游。
 
 默认导出到 git-ignored 目录（tmp/sync-from-pg/），防止测试库内容直接进入仓库：
 
@@ -39,7 +39,7 @@ sync_from_pg.py — 把「测试环境 PostgreSQL(schema=dwp)」作为唯一真�
 用法：
   set SYNC_PG_DSN=postgresql://user:pass@host:5432/dbname   (PowerShell: $env:SYNC_PG_DSN=...)
   python scripts/sync_from_pg.py
-  # 可选：SYNC_PG_SCHEMA 覆盖默认 schema(dwp)
+  # 可选：SYNC_PG_SCHEMA 覆盖默认 schema(dap)
 
 注意：先 review，再自行运行。
 """
@@ -49,6 +49,7 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import os
+import re
 import sys
 from decimal import Decimal
 from pathlib import Path
@@ -166,7 +167,17 @@ REPO_MOCK_DIR = ROOT / "frontend" / "src" / "mock"
 REPO_PG_DIR = ROOT / "docs" / "pg" / "sample"
 REPO_DWS_DIR = ROOT / "docs" / "dws" / "sample"
 
-DEFAULT_SCHEMA = os.environ.get("SYNC_PG_SCHEMA", "dwp")
+_PG_SCHEMA_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+
+
+def resolve_sync_schema(raw_schema: str | None = None) -> str:
+    candidate = os.environ.get("SYNC_PG_SCHEMA", "dap") if raw_schema is None else raw_schema
+    if not isinstance(candidate, str) or not _PG_SCHEMA_IDENTIFIER_RE.fullmatch(candidate.strip()):
+        raise ValueError("SYNC_PG_SCHEMA must be a non-empty safe PostgreSQL schema identifier")
+    return candidate.strip().lower()
+
+
+DEFAULT_SCHEMA = resolve_sync_schema()
 DEFAULT_LIMIT = 100
 BATCH_ROWS = 500  # 多行批量 INSERT 的每批行数
 

@@ -45,9 +45,9 @@
 当前四方言共享 table/column/primary-key/unique/logical relationship/index contract，但物理表达必须保留数据库能力差异：SQLite、PostgreSQL、MySQL 保留相同的 physical foreign-key inventory；当前 GaussDB(DWS) 目标版本不支持 `FOREIGN KEY ... REFERENCES` constraint，因此 DWS 只保留字段与 logical relationship contract，不创建 physical FK。这是数据库能力差异，不是业务 schema 漂移或 Community feature divergence。
 
 - SQLite 使用 attached `dwp` database、SQLite 类型和 `AUTOINCREMENT`；
-- PostgreSQL 使用 `dwp` schema、`BIGINT`/`VARCHAR`/identity；
+- PostgreSQL canonical baseline 默认使用 `dap` schema（由 profile-aware renderer 映射到实际 Profile `schema`）、`BIGINT`/`VARCHAR`/identity；
 - MySQL 不使用 schema qualification，使用 InnoDB、`utf8mb4_0900_ai_ci`、`AUTO_INCREMENT`，并将报表长文本使用 `TEXT` 以满足 InnoDB row-size 约束；
-- DWS 使用 JDBC/provider 路径以及 `DISTRIBUTE BY REPLICATION/HASH` 等 vendor storage clauses；logical relationship expectations 由静态测试检查。
+- DWS canonical baseline 默认使用 `dap` schema（由 profile-aware renderer 映射到实际 Profile `schema`）、JDBC/provider 路径以及 `DISTRIBUTE BY REPLICATION/HASH` 等 vendor storage clauses；logical relationship expectations 由静态测试检查。
 
 ### Alembic
 

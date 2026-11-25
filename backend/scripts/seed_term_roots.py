@@ -13,6 +13,7 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 from app.db.facade import database_transaction, execute_sql, fetch_all, get_db_profile
+from app.db.write_target import resolve_write_target
 
 
 SEED_OPERATOR = "term_root_seed"
@@ -236,7 +237,8 @@ def _safe_target(profile, config):
         raise RuntimeError("term-root seed only supports the PostgreSQL test profile")
     if any(word in marker for word in ("prod", "production")) or not any(word in marker for word in ("test", "dev", "local")):
         raise RuntimeError("refusing seed: profile must be explicitly marked test, dev, or local")
-    return f"postgres:{config.get('host')}/{config.get('database')} schema={config.get('schema', 'dwp')}"
+    schema = resolve_write_target(config).schema
+    return f"postgres:{config.get('host')}/{config.get('database')} schema={schema}"
 
 
 def _rows(profile, sql, params=None):

@@ -326,7 +326,7 @@ backend/.venv/bin/python demo/seed_sqlite.py --database /opt/data-asset-portal/i
 
 # 或使用隔离的 Community PostgreSQL 数据库
 backend/.venv/bin/python backend/scripts/schema_migrate.py apply --profile community_postgres
-backend/.venv/bin/python demo/seed_postgres.py --dialect postgres --schema dwp
+backend/.venv/bin/python demo/seed_postgres.py --dialect postgres --schema dap
 ```
 
 `docs/pg/`、`docs/dws/` 中的方言 SQL 和 external integration 说明是补充参考，不是 `backend/schema` + Alembic 的替代。需要 vendor-specific DDL 时先确认目标 profile、依赖和对象归属，不要无条件执行全部 SQL。
@@ -380,6 +380,19 @@ backend/.venv/bin/python backend/scripts/schema_migrate.py apply \
 ```
 
 不要用初始化 SQL 覆盖已有数据库，也不要对生产库执行未经确认的 destructive downgrade 或 reset。后续结构变更只通过新的 Alembic forward revision 管理。
+
+#### 历史 `dwp` 到 `dap` 的部署迁移边界
+
+平台新安装的默认管理 Schema 为 `dap`，但**修改默认配置不等于数据库物理迁移**：
+
+- 应用启动与运行时**绝不会**自动改名 Schema、搬迁已有表或覆盖业务数仓的 `dwp` Schema。
+- 仍在使用 `dwp` 存放平台元数据的存量实例，在未执行独立物理搬迁前，必须继续在 Profile 中显式配置 `schema: dwp`（GaussDB/DWS 需同步保持 `currentSchema=dwp`）。
+- 若存量实例计划将平台元数据从 `dwp` 迁入专用的 `dap` Schema，必须由 DBA 在停写窗口内按以下独立步骤显式执行：
+  1. **迁前检查**：停止应用写入，对旧 Profile 执行 `schema_migrate.py status` 与 `schema_migrate.py verify`，盘点 `42` 张平台表与 `alembic_version`，明确区分平台元数据表与同 Schema 下的业务数仓表。
+  2. **独立备份**：对原 `dwp` 中的平台元数据表做可恢复备份，并确认目标 `dap` Schema 为空且专属于 DAP 平台元数据。
+  3. **显式初始化与数据搬迁**：使用指向 `schema: dap` 的新 Profile 执行 `schema_migrate.py apply` 初始化目标表结构，再通过受控脚本（如 `backend/scripts/db_to_init_sql.py --profile <old_dwp_profile> --target-schema dap` 审阅后回放）或 DBA 审核的按表复制迁移平台元数据；**严禁**批量改写 `p_asset_table.schema_name` 等业务资产归属字段。
+  4. **比对与只读验收**：对新 `dap` Profile 执行 `schema_migrate.py status` 与 `schema_migrate.py verify`，逐表核对 `dwp` 与 `dap` 的行数及关键主键一致后，再切换 `ASSET_DB_PROFILE`。
+  5. **回滚边界**：观察期内保留原 `dwp` 中的平台表不做 `DROP`/`TRUNCATE`；若验收异常，直接将 `ASSET_DB_PROFILE` 切回显式 `schema: dwp` 的旧 Profile 并恢复服务。
 
 ## 6. Admin Initialization
 
