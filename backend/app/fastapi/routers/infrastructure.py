@@ -88,6 +88,43 @@ def _register_infrastructure_routes(
             content=project_public_catalog_value({"items": items}, profile=profile)
         )
 
+    @portal_router.get("/readiness", response_model=None)
+    def get_portal_readiness(
+        module: str | None = Query(default=None, max_length=64),
+        context: RequestContext = Depends(get_request_context),
+        authorization: Any = Depends(get_authorization_service),
+    ):
+        normalized_module = str(module or "").strip() or None
+        try:
+            result = portal_service.get_readiness(normalized_module)
+        except ValueError as error:
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "error": {
+                        "code": "VALIDATION_FAILED",
+                        "message": str(error),
+                        "details": [{"field": "module", "message": str(error)}],
+                    }
+                },
+            )
+        except Exception:
+            LOGGER.exception("portal readiness unavailable")
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": {
+                        "code": "PORTAL_READINESS_UNAVAILABLE",
+                        "message": "模块就绪度统计暂时不可用，请稍后重试。",
+                    }
+                },
+            )
+        profile = profile_for_request(context, authorization)
+        payload = {"data": result} if normalized_module else {"items": result}
+        return JSONResponse(
+            content=project_public_catalog_value(payload, profile=profile)
+        )
+
     search_router = APIRouter(
         prefix="/api/search",
         tags=["search-native"],

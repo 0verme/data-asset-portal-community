@@ -400,3 +400,15 @@ export async function updateIndicatorStatus(indicatorId: string, status: string)
   writeStore(readStore().map((current) => (current.id === indicatorId ? next : current)));
   return clone(next);
 }
+
+export function getMockIndicatorReadinessCounts(): { numerator: number; denominator: number } {
+  const enabled = mockIndicators.map(normalizeIndicator).filter((item) => item.status === 'enabled');
+  const numerator = enabled.filter(
+    (item) =>
+      String(item.caliber || '').trim() !== '' &&
+      (item.sourceAssetId !== null ||
+        String(item.resultTableName || '').trim() !== '' ||
+        (item.sources?.length ?? 0) > 0),
+  ).length;
+  return { numerator, denominator: enabled.length };
+}

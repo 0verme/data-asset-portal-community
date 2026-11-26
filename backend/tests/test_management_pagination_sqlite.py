@@ -158,6 +158,61 @@ class ManagementPaginationSqliteTests(unittest.TestCase):
             item["name"]: item["count"] for item in self.root.get_root_categories()
         })
 
+    def test_portal_module_readiness_computes_primary_table_counts_for_sqlite_tables(self):
+        from backend.app.services.portal_service import PortalService
+
+        self.connection.execute(
+            manual_code_table.update()
+            .where(manual_code_table.c.table_id == 1)
+            .values(owner_name="维护人", remark="订单状态说明")
+        )
+        self.connection.execute(
+            root_item.update()
+            .where(root_item.c.root_id == 1)
+            .values(root_desc="客户词根说明")
+        )
+        self.connection.execute(
+            insert(api_relation),
+            [
+                {
+                    "relation_pk": 1,
+                    "api_code": "API_B",
+                    "relation_type": "table",
+                    "target_code": "dwm_trade_order_item_di",
+                    "target_name": "订单商品明细中间表",
+                    "sort_no": 1,
+                }
+            ],
+        )
+
+        portal = PortalService()
+        portal._fetch_core_rows = self.core.fetch_rows
+        with patch("backend.app.services.portal_service.database_transaction", return_value=nullcontext()):
+            code_table_readiness = portal.get_readiness("codeTable")
+            api_readiness = portal.get_readiness("apiAsset")
+            root_readiness = portal.get_readiness("root")
+            system_readiness = portal.get_readiness("system")
+
+        self.assertEqual("codeTable", code_table_readiness["moduleId"])
+        self.assertEqual("code_table_readiness", code_table_readiness["metricId"])
+        self.assertEqual("ready", code_table_readiness["status"])
+        self.assertEqual(2, code_table_readiness["denominator"])
+        self.assertEqual(1, code_table_readiness["numerator"])
+        self.assertEqual(50.0, code_table_readiness["percentage"])
+
+        self.assertEqual("apiAsset", api_readiness["moduleId"])
+        self.assertEqual(2, api_readiness["denominator"])
+        self.assertEqual(1, api_readiness["numerator"])
+        self.assertEqual(50.0, api_readiness["percentage"])
+
+        self.assertEqual("root", root_readiness["moduleId"])
+        self.assertEqual(3, root_readiness["denominator"])
+        self.assertEqual(1, root_readiness["numerator"])
+        self.assertEqual(33.3, root_readiness["percentage"])
+
+        self.assertEqual("not_applicable", system_readiness["status"])
+        self.assertIsNone(system_readiness["percentage"])
+
 
 if __name__ == "__main__":
     unittest.main()

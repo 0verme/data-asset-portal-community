@@ -152,6 +152,14 @@ export function normalizeCollection(payload: unknown): MockManualCodeTable[] {
   return parseCollectionResponse<MockManualCodeTable>(payload, '码值表列表');
 }
 
+export function getMockManualCodeTableReadinessCounts(): { numerator: number; denominator: number } {
+  const enabled = mockItems.filter((item) => item.status === 'enabled');
+  const numerator = enabled.filter(
+    (item) => String(item.owner || '').trim() !== '' && String(item.remark || '').trim() !== '',
+  ).length;
+  return { numerator, denominator: enabled.length };
+}
+
 export async function exportManualCodeTablesCsv(
   filters: ManualCodeTableFilterParams = {},
 ): Promise<string | null> {

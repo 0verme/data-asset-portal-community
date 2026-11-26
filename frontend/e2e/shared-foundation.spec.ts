@@ -98,8 +98,9 @@ test("home and peer workspaces retain shell and readiness hierarchy", async ({ p
       await expect(progress).toHaveAttribute("max", "8");
       await expect(footer.locator(".module-readiness")).toHaveCount(0);
     } else {
-      await expect(footer.getByRole("status")).toHaveText("口径待确认");
-      await expect(footer.getByRole("progressbar")).toHaveCount(0);
+      await expect(footer.getByRole("status")).toContainText("%");
+      await expect(footer).toContainText("计入：有负责人和表说明");
+      await expect(footer.getByRole("progressbar")).toHaveCount(1);
     }
     await page.screenshot({ path: info.outputPath(route + ".png") });
   }
@@ -223,11 +224,17 @@ for (const { width, height, theme, accent } of [
         if (route === "/upstream") {
           await expect(placeholder).toHaveCount(0);
           await expect(progress.getByRole("progressbar", { name: "系统启用比例" })).toHaveAttribute("max", "8");
-        } else {
-          await expect(placeholder.getByRole("status")).toHaveText("口径待确认");
+        } else if (route.startsWith("/system-management")) {
+          await expect(placeholder.getByRole("status")).toHaveText("不适用");
           await expect(placeholder.locator(".sidebar-progress-track--empty")).toHaveAttribute("aria-hidden", "true");
           await expect(placeholder.getByRole("progressbar")).toHaveCount(0);
           await expect(placeholder).not.toContainText("%");
+        } else if (route === "/root-management" && process.env["VITE_API_MODE"] === "mock") {
+          await expect(placeholder.getByRole("status")).toHaveText("暂不可用");
+          await expect(placeholder.locator(".sidebar-progress-track--empty")).toHaveAttribute("aria-hidden", "true");
+        } else {
+          await expect(placeholder.getByRole("status")).toContainText("%");
+          await expect(placeholder.getByRole("progressbar")).toHaveCount(1);
         }
       });
     }

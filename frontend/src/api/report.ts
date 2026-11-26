@@ -50,6 +50,16 @@ function writeStore(items: MockReportItem[]): void {
   mockReports = clone(items);
 }
 
+export function getMockReportReadinessCounts(): { numerator: number; denominator: number } {
+  const enabled = readStore().filter((item) => item.status === 'enabled');
+  const numerator = enabled.filter(
+    (item) =>
+      (Array.isArray(item.relatedTables) && item.relatedTables.length > 0) ||
+      (Array.isArray(item.relatedIndicators) && item.relatedIndicators.length > 0),
+  ).length;
+  return { numerator, denominator: enabled.length };
+}
+
 function reportAlreadyExistsError(code: string): Error {
   const error = new Error(`Report already exists: ${code}`);
   return Object.assign(error, {

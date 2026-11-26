@@ -23,6 +23,7 @@ class RoutePermissionInventoryTests(unittest.TestCase):
     PUBLIC_GETS = {
         "/api/capabilities",
         "/api/portal/stats",
+        "/api/portal/readiness",
         "/api/search",
         "/api/search/hot-keywords",
         "/api/search/recommendations",

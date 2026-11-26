@@ -17,6 +17,35 @@
       "pending_definition": "The metric definition is pending. No result yet.",
       "not_applicable": "This metric does not apply to the module.",
       "pending_integration": "The metric is defined and awaits integration."
+    },
+    "metrics": {
+      "table_readiness": {
+        "definition": "Included: tables with owner and description"
+      },
+      "field_mapping_coverage": {
+        "definition": "Included: source fields mapped to target fields"
+      },
+      "root_definition_readiness": {
+        "definition": "Included: roots with English name and description"
+      },
+      "metric_definition": {
+        "definition": "Included: enabled indicators with definition and result table"
+      },
+      "code_table_readiness": {
+        "definition": "Included: enabled code tables with owner and remark"
+      },
+      "report_asset_link": {
+        "definition": "Included: enabled reports linked to tables or indicators"
+      },
+      "api_asset_link": {
+        "definition": "Included: enabled APIs linked to tables or indicators"
+      },
+      "push_job_readiness": {
+        "definition": "Included: enabled push jobs with source/target paths and description"
+      },
+      "lineage_snapshot_coverage": {
+        "definition": "Included: warehouse tables covered by the active lineage snapshot"
+      }
     }
   },
   "app": {
