@@ -1,304 +1,129 @@
 <div align="center">
 
-# 数据资产门户 · Data Asset Portal
+# 数据资产门户 · Data Asset Portal (DAP)
 
-**面向数据仓库团队的轻量数据资产目录 —— 内网、离线、单机也能跑。**
+**面向数据仓库团队的轻量级数据资产目录 —— 单机、内网、离线环境即刻可用。**
 
-A lightweight, intranet-friendly data asset catalog for data warehouse teams.
+A lightweight, intranet-ready data asset catalog built for data warehouse teams.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![CI](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/0verme/data-asset-portal-community/actions/workflows/ci.yml)
-![Stack](https://img.shields.io/badge/React%2019%20%2B%20Vite%208%20%7C%20FastAPI%20%2B%20Uvicorn?logo=react)
+![Stack](https://img.shields.io/badge/React%2019%20%2B%20Vite%208%20%7C%20FastAPI%20%2B%20Uvicorn-blue?logo=react)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-22.13%2B-5FA04E?logo=nodedotjs&logoColor=white)
 
-[快速开始](#-快速开始) · [为什么选 DAP](#-为什么选-dap) · [与 OpenMetadata 的差异](#-与-openmetadata-和-datahub-的定位差异) · [功能](#-功能) · [搜索与 AI 能力](#-搜索与-ai-能力) · [数据库兼容性](#-数据库兼容性) · [文档](#-文档导航)
-
-[官网](https://dap.overme.cn)
+**[🌐 在线演示 (Live Demo)](https://data.overme.cn/)** · **[📖 官方网站](https://dap.overme.cn)** · **[🚀 快速开始](#-快速开始)** · **[🧩 核心功能](#-核心功能)** · **[🏗 架构与接入](#-架构与元数据接入)** · **[📚 文档导航](#-文档导航)**
 
 </div>
 
 ---
 
-## 💡 DAP 是什么
+## 💡 为什么选择 DAP？
 
-数据团队经常需要回答：**表在哪、字段是什么意思、口径从哪里来、数据流向哪里？**
+数据仓库、数据治理与 BI 团队每天都在回答四个高频问题：**表在哪？字段是什么意思？指标口径从哪来？数据流向了哪些下游和报表？**
 
-DAP（数据资产门户 / Data Asset Portal）把这些元数据集中到一个可搜索、可维护的界面里，服务于数仓建模、数据治理和 BI 支撑团队。
-它的产品目标是**让数仓资产可见、可查、可维护**——是一个资产目录，不是一个大而全的元数据平台，也不是调度执行平台。
+当元数据散落在 Excel、Wiki 和建表脚本里时，查找与维护成本会随表规模迅速膨胀；而引入一套重型企业级元数据平台，又往往面临多组件运维（消息队列、独立搜索引擎、图数据库）与内网离线环境的部署门槛。
 
-一句话概括它的取舍：
+> **DAP 专注把「数仓资产目录」这一件事做好：用一个 Web 服务 + 一个关系型数据库，让数仓资产可见、可查、可维护。**
 
-> **DAP 只做「数仓资产目录」这一件事，并且尽量让它能在内网的一台机器上跑起来。**
+| 典型场景 | DAP 的产品主张 |
+| --- | --- |
+| **小团队 / 独立数仓团队** | 一个 Web 服务 + 一个数据库即可上线，无需额外部署 Kafka 或 Elasticsearch；默认内置确定性关键词检索 |
+| **内网 / 离线环境** | 原生适配无外网的单机部署（systemd + Nginx，详见 [部署说明](./DEPLOYMENT.md)） |
+| **以数仓建模与治理为核心** | 表分层、字段字典、物理 DDL、词根规范、指标口径、字段映射、血缘视图、码值表、报表与 API 台账均为一等公民 |
+| **已有采集/ETL，只缺资产目录** | 通过版本化 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 接入外部已整理的元数据，零侵入现有生产链路 |
+| **企业常见关系型数据库** | PostgreSQL、MySQL 8.0、SQLite（本地/Demo）均通过自动化验证，并提供 GaussDB / DWS 适配支持 |
+| **已有 RAG 服务或 LLM 网关** | 按需可选挂载外部语义推荐与单轮 AI 资产问答；DAP 仅做轻量 HTTP Client，不接也完全可用 |
 
-在「把元数据整理进目录」之外，DAP 提供三条互不影响的检索 / 问答路径：
+---
 
-- **确定性关键词搜索**（默认可用）：完全在 DAP 进程与元数据库内完成，不依赖 RAG，也不依赖 LLM。
-- **可选的相关资产推荐**（默认关闭）：DAP 作为 HTTP Client 调用外部 RAG 服务，失败只降级推荐。
-- **可选的单轮 AI 资产问答**（默认关闭）：在上面的 RAG 服务之上再接入一个 OpenAI-compatible LLM。
-
-后两者是**可选外部集成**，不是 DAP 内置能力。DAP 不内置向量引擎、不加载 Embedding 模型、不做 NL2SQL，
-也不会把关键词搜索自动改道成模型调用。详见 [搜索与 AI 能力](#-搜索与-ai-能力)。
-
-### 它明确不做
-
-- 不负责真实数据采集、任务编排或文件推送执行
-- 不主动发现数据、不扫描数据库、不解析 SQL，也不计算血缘
-- 不内置 SQL / DAG / 调度系统的自动血缘解析
-- 不提供数据质量、Profiling、数据合约与治理工作流
-- 不提供开箱即用的数百个数据源 connector
-
-如果你需要的正是上面这些，请先读 [与 OpenMetadata 和 DataHub 的定位差异](#-与-openmetadata-和-datahub-的定位差异)。
-
-## 📸 项目预览
-
-以下截图来自仓库内 `demo/datasets/` 的虚构零售数据，展示真实的 DB → Service → API → Frontend 链路：
+## 📸 界面预览
 
 <table>
   <tr>
     <td width="50%" valign="top" align="center">
-      <img src="./docs/images/demo-global-search.png" alt="资产搜索与发现" width="100%">
-      <br><sub><b>资产搜索与发现</b></sub>
+      <img src="./docs/images/demo-global-search.png" alt="全局资产搜索与发现" width="100%">
+      <br><sub><b>全局资产搜索与发现</b> —— 跨表、字段、词根、指标、报表与 API 聚合检索，支持搜索与 AI 问答双 Tab 协同</sub>
     </td>
     <td width="50%" valign="top" align="center">
-      <img src="./docs/images/demo-data-assets.png" alt="数据资产管理" width="100%">
-      <br><sub><b>数据资产管理</b></sub>
+      <img src="./docs/images/demo-data-assets.png" alt="数据仓库资产目录" width="100%">
+      <br><sub><b>数据仓库资产目录</b> —— 按数仓分层与主题域浏览表资产、落库状态与核心统计</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top" align="center">
-      <img src="./docs/images/demo-field-metadata.png" alt="字段映射" width="100%">
-      <br><sub><b>字段映射</b></sub>
+      <img src="./docs/images/demo-table-detail.png" alt="资产详情与字段字典" width="100%">
+      <br><sub><b>资产详情与字段字典</b> —— 一站式查阅字段业务释义、技术属性、建表 DDL 与关联引用</sub>
     </td>
     <td width="50%" valign="top" align="center">
-      <img src="./docs/images/demo-table-detail.png" alt="资产详情" width="100%">
-      <br><sub><b>资产详情</b></sub>
+      <img src="./docs/images/demo-field-metadata.png" alt="字段级映射追踪" width="100%">
+      <br><sub><b>字段级映射追踪</b> —— 清晰维护源表到目标表的字段加工规则、转换逻辑与来源系统映射</sub>
     </td>
   </tr>
 </table>
 
-更多页面见 [截图画廊](./docs/screenshots.md)。
+> 👉 无需注册即可直接访问 **[在线演示站 (https://data.overme.cn/)](https://data.overme.cn/)** 浏览公开资产目录，或查看 [全量界面截图画廊](./docs/screenshots.md)。
 
-## 🔎 搜索与 AI 能力
+---
 
-DAP 有三条互不影响的检索 / 问答路径。默认只开启第一条：
+## 🧩 核心功能
 
-| 能力 | 前端入口 | 后端接口 | 默认状态 | 外部依赖 |
-| --- | --- | --- | --- | --- |
-| 传统关键词搜索 | 搜索框 + Enter /「搜索」，结果页「搜索结果」Tab | `GET /api/search` | **默认可用** | 无 |
-| 可选 RAG 相关资产推荐 | 结果页「相关资产推荐」分组 | `GET /api/search/recommendations` | **默认关闭** | 可选外部 RAG HTTP 服务 |
-| 可选单轮 AI 资产问答 | 结果页「AI 问答」Tab、「问 AI 找资产」 | UI 使用 `POST /api/ai/ask/stream`；`POST /api/ai/ask`、`POST /api/ai/ask/progress` 为兼容接口；`GET /api/ai/status` 提供能力开关 | **默认关闭** | 上面的 RAG 服务 + 可选 OpenAI-compatible LLM |
+仓库内所有业务模块均以 Apache-2.0 协议开源，默认注册、开箱即用：
 
-### 传统关键词搜索：不依赖 RAG，也不依赖 LLM
+- **📊 数仓资产目录与字段映射**
+  - **门户首页与数据仓库**：聚合展示全站资产统计、分类导航、表级/字段级元数据与物理 DDL。
+  - **字段映射（Field Mapping）**：维护跨系统、跨数仓分层的字段级来源、映射关系与加工转换口径。
+  - **血缘浏览（Lineage Viewer）**：对已导入的血缘快照提供上下游拓扑可视化、多跳路径过滤与影响查看（详见 [血缘快照采集与发布指南](./docs/lineage_bulk_import_guide.md)）。
+- **📐 数据标准与指标口径**
+  - **词根管理**：维护标准命名词根与英文缩写规范，辅助数仓建模命名对齐。
+  - **指标资产**：沉淀业务指标定义、计算口径、加工路径与关联表归属。
+  - **码值表维护**：集中管理公共枚举字典与标准码值映射，消除跨系统编码歧义。
+- **🔄 上下游与消费端台账**
+  - **上游卸数 & 下游推送**：统一登记外部源系统连接元数据、卸数配置与下游数据推送台账。
+  - **报表资产 & API 资产**：将 BI 报表与数据服务接口纳入统一目录，打通「源系统 → 数仓表 → 指标 → 报表/API」全链路资产台账。
+- **🔎 统一搜索与可选 AI 协同**
+  - **确定性全局检索**：聚合所有已注册资产实体，支持分组筛选、字段级命中高亮与部分模块容错返回。
+  - **搜索页双 Tab 协同**：「搜索结果」与可选的「AI 问答」并存于同一页面，按稳定 `assetId` / `fieldId` 去重并支持一键下钻资产详情。
+- **🔐 分级公开目录（Public Catalog）与 RBAC 权限**
+  - **匿名只读目录**：默认支持匿名浏览脱敏后的公开业务目录与检索；通过 `PUBLIC_CATALOG_PROFILE`（`internal` / `strict` / `disabled`）灵活控制连接定位元数据的可见性与匿名访问开关（详见 [Public Catalog + Authenticated Management](./docs/rbac/authenticated-read-model.md)）。
+  - **受控管理后台**：所有写操作、元数据导入、凭据信息及系统管理（用户、角色、权限码绑定、菜单配置、参数字典、操作日志）均由后端 Permission-based RBAC 强制鉴权。
 
-`GET /api/search` 是确定性检索：按已注册的搜索 provider 聚合资产、字段、词根、指标、报表、API 资产、
-上游系统、下游推送和码值表，返回分组结果、`matchedFields`、`total` / `count` / `hasMore`，
-以及部分模块失败时的 `partial` / `failedGroups`。
+完整的页面路由、API 入口与数据库表对照请参阅 [模块清单](./docs/modules.md)。
 
-- 全流程在 DAP 进程与 DAP 元数据库内完成，**不发送任何外部请求**。
-- RAG 关闭、RAG 超时、远端返回无效 ID、LLM 未配置或故障，都不会改变关键词搜索结果，也不会自动改道成「问 AI」。
-- 只有普通搜索成功且零命中时，才出现「问 AI 找资产」入口；且仅当 AI 能力已启用时显示。部分模块失败不会伪装成「无结果」。
-
-### 可选 RAG 相关资产推荐：默认关闭
-
-- 开关与服务 URL 在受保护的系统管理页配置（`GET` / `PUT /api/system/rag-search-config`）；Bearer Token 只来自后端部署 Secret `RAG_SEARCH_SERVICE_TOKEN`，不写参数表、不下发浏览器。
-- DAP 只作为 HTTP Client Adapter：不导入 `dap-rag-lab`，不加载 BGE / PyTorch，不读 LanceDB，不执行 RAG CLI。
-- 远端返回的名称、描述、评分和 evidence 一律不作为权威数据；DAP 按当前 `PUBLIC_CATALOG_PROFILE` 回查 `assetId` / `fieldId` 及父子关系，只用 DAP 元数据重建展示内容。
-- 失败即降级：推荐分组显示不可用提示，关键词结果不受影响；检索分数不展示为可信度或准确率。
-
-### 可选单轮 AI 资产问答：默认关闭
-
-- `AI_ASK_ENABLED` 默认 `false`。只有该开关打开、LLM Provider 配置完整、且 RAG 已启用并配置服务 Token 时，`GET /api/ai/status` 才返回 `{"enabled": true}`；否则前端 fail closed 并隐藏入口。
-- 单轮、无会话、无历史、不持久化；不执行 SQL，不查询业务数值，不调用工具，不使用外部知识。
-- 模型只能返回结构化的候选稳定 ID 与直接 / 相关关系；表名、字段名、中文名、描述和引用卡全部由 DAP 使用当前校验后的元数据生成，模型无法为自由文本「背书」。
-- 回答状态区分 `answered` / `partial_answer` / `insufficient_evidence` / `retrieval_unavailable` / `generation_unavailable`；受控统计意图另有 `metadata_count_answered` / `ambiguous_scope` / `metadata_count_unavailable`。
-- 执行进度通过 SSE 返回后端真实阶段（`step_start` / `step_complete` / `step_error` / `answer` / `done` / `keep_alive`），**不逐 token 流式输出**；浏览器取消会 abort SSE，并在阶段边界停止上游调用，旧响应不会覆盖新请求。
-- 全站每日默认共享 **50 次 AI 问答**（北京时间自然日），不是 50 次模型 HTTP 调用：一次问答内的规划、答案生成和重试最多扣一次；没有发起 LLM HTTP 请求的纯目录统计不扣减。额度不按用户/IP 区分，沿用 `AI_LLM_DAILY_LIMIT` 参数编码及既有系统参数表、`system:param:write` 权限和操作审计。额度耗尽或计数不可用时 fail closed；Mock、普通搜索及 RAG 推荐不消耗额度。模型配置默认 `AI_LLM_MAX_TOKENS=3072`、`AI_LLM_TIMEOUT_MS=30000`；显式部署环境变量值保持优先。完整额度、参数与部署契约见 [单轮 AI 数据资产问答](./docs/ai-ask-mvp.md) 和[配置说明](./docs/configuration.md)；统计意图见 [权威资产目录统计](./docs/ai-metadata-count.md)。
-
-> **区分 Mock AI 与 Remote AI，不要把 Mock 当成真实能力。** 前端 Mock 模式（`VITE_API_MODE=mock`）的
-> AI 问答由前端本地演示适配器按演示目录名称 / 字段匹配生成，**不调用任何 RAG 服务或 LLM**，
-> 只用于 Frontend Mock 演示，详见 [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md)。
-> Remote 模式通过 `/api` 访问真实后端，不会回退到 Mock；公网在线演示站
-> [https://data.overme.cn/](https://data.overme.cn/) 就是 Remote 模式，其 AI 问答是否启用、
-> 连接哪个 RAG 与 LLM 以该站点当前部署配置为准。Mock 构建不会被当作生产 Bundle，
-> 某个部署启用了 AI 也不代表 Community 默认配置已启用。
-
-### 当前验证状态（不要过度解读）
-
-| 事项 | 状态 |
-| --- | --- |
-| `/api/search`、`/api/search/recommendations`、`/api/ai/status`、`/api/ai/ask`、`/api/ai/ask/progress`、`/api/ai/ask/stream` 的代码与单元 / 契约测试 | 已合入 `main`，CI 覆盖 |
-| 仓库 `main` 与 `dap-rag-lab` 的最终 HTTP 契约对齐、真实 RAG 联调验收 | **NOT VERIFIED**（外部 issue #14 仍 OPEN） |
-| 真实 OpenAI-compatible / DeepSeek 端点的回答质量与 wire 兼容性 | **NOT VERIFIED** |
-| GaussDB / DWS 上的真实 RAG 检索与模型性能 | **NOT VERIFIED** |
-
-`main` 上的自动化只证明结构化契约、身份校验、降级与 UI 行为，不证明任何外部服务在线可用，
-也不证明回答准确率。
-
-上表的 **NOT VERIFIED** 描述的是仓库 `main` 的验证范围与外部集成质量，不代表公网演示站的运行状态。
-仓库 CI 验证、公网演示站的实际运行状态、外部 RAG / LLM 集成验证是三件不同的事：公网演示站是独立部署，
-其真实后端、RAG 与 LLM Provider 由部署方配置和验证；即使演示站已启用这些能力，也不代表 Community 默认配置、
-其他部署环境、回答质量或所有数据库组合已经验证。
-
-## 🎯 为什么选 DAP
-
-DAP 面向的是**没有精力、也没有条件部署一整套元数据平台**的团队：
-
-| 场景 | DAP 的适配点 |
-| --- | --- |
-| 小团队 / 独立数仓团队 | 一个 Web 端 + 一个数据库即可上线，不需要消息中间件或独立搜索引擎；检索默认就是确定性关键词搜索 |
-| 内网 / 离线环境 | 支持完全离线的内网单机部署（systemd + Nginx，见 [部署说明](./DEPLOYMENT.md)） |
-| 以数仓为中心的元数据 | 表、字段、DDL、指标口径、词根、字段映射、上下游、报表、API 资产都是一等公民 |
-| 中国企业常见数据库环境 | PostgreSQL、MySQL 8.0、GaussDB / DWS 均有适配；SQLite 可用于本地与 CI |
-| 已有整理元数据的程序，只缺一个目录 | 外部系统通过版本化 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 接入，DAP 不侵入你的采集链路 |
-| 已有 RAG 服务或 LLM 网关 | 可选接入：DAP 只做 HTTP Client，不引入向量库或模型依赖；不接也完全可用 |
-
-## 🪶 与 OpenMetadata 和 DataHub 的定位差异
-
-**DAP 不试图替代 OpenMetadata、DataHub 或 Apache Atlas。**
-
-这三个项目是成熟的企业级元数据平台，覆盖了 DAP 明确不做的领域：数百个开箱即用的 connector、
-内置采集与调度、自动血缘解析、数据质量与 Profiling、治理工作流。
-
-> 如果你需要这些能力，OpenMetadata 或 DataHub 很可能是更合适的选择。
-> 这是**定位差异**，不是能力高低。
-
-DAP 只在一个更窄的范围里做取舍：**用更少的组件、更低的运维成本，交付一个数仓资产目录。**
-
-### 定位对比
-
-> 下表是**产品定位对比**，不是性能 benchmark，也不用于评判项目优劣。
-> 各项目的具体能力以其官方文档与版本为准。
-
-| 维度 | DAP | OpenMetadata | DataHub |
-| --- | --- | --- | --- |
-| 主要目标 | 轻量数仓资产目录 | 统一元数据平台（含治理闭环） | 企业级元数据平台 |
-| 部署形态 | Web 端 + 单个数据库，可单机内网部署 | 多服务：元数据服务 + ingestion + 索引/存储依赖 | 多组件：元数据服务 + 消息/索引/存储依赖 |
-| 运维复杂度 | 低 | 中高 | 中高 |
-| 数仓为中心 | 是（核心范围） | 是，但覆盖范围更广 | 是，但覆盖范围更广 |
-| 离线 / 内网单机部署 | 重点支持的场景 | 可行，但依赖组件更多 | 可行，但依赖组件更多 |
-| 内置 connector 生态 | 不提供 | 丰富 | 丰富 |
-| 内置自动采集与调度 | 不提供 | 提供 | 提供 |
-| 自动血缘解析 | 不提供，只展示导入的血缘 | 提供 | 提供 |
-| 数据质量 / Profiling | 不提供 | 提供 | 提供（随版本与配置） |
-| 治理广度 | 资产目录 + permission RBAC + 操作日志 | 目录 + 质量 + 血缘 + 词汇表 + 策略 | 目录 + 血缘 + 策略与元数据自动化 |
-| 外部整理元数据导入 | 核心集成方式，版本化契约 | 支持，但更强调内置 ingestion | 支持，但更强调内置 ingestion |
-| 小团队友好度 | 高 | 需要更多运维投入 | 需要更多运维投入 |
-
-Apache Atlas 主要面向 Hadoop 生态的元数据与治理（Hive、HDFS 等），依赖 HBase / Solr 等组件，
-与 DAP 的目标场景（关系型数仓 + 轻量内网部署）重叠更少，因此未列入上表。
-
-## 🧩 功能
-
-仓库中的模块全部以 Apache-2.0 开源，默认注册、默认可用：
-
-- **门户首页、数据仓库、字段映射、血缘浏览**：浏览资产、映射关系和已导入的血缘快照。
-- **上游卸数、下游推送、报表资产、码值表维护**：维护外部数据源、推送元数据、报表台账和码值表元数据。
-- **词根、指标、API 资产、系统管理**：维护命名规范、指标口径、API 元数据以及用户/菜单/参数字典/操作日志。
-- **Permission-based RBAC**：后端按 code 强制授权，支持角色、权限映射、角色管理和单角色用户绑定。
-- **统一搜索与门户统计**：为所有已注册搜索实体和统计 provider 提供聚合入口。
-- **搜索页双 Tab**：「搜索结果」与「AI 问答」并存于同一页面，按 stable `assetId` / `fieldId` 去重并可分别下钻资产详情。
-- **可选 AI 集成**：默认关闭的相关资产推荐与单轮 AI 资产问答，见 [搜索与 AI 能力](#-搜索与-ai-能力)。
-
-完整的页面 / 接口 / 数据表对照见 [模块清单](./docs/modules.md)。
-
-## 🏗 架构概览
-
-![数据资产门户系统架构：客户端经 Nginx、FastAPI、业务服务和数据库访问层查询元数据；外部采集器通过受控 API 接入](./docs/images/system-architecture.svg)
-
-后端模块运行在同一 FastAPI 进程中；外部 Collector 负责采集，门户负责元数据接入与查询。
-归属边界、访问策略与组件源码见 [架构说明及交互图](./docs/architecture.md#高层系统架构)。
-
-| 部件 | 说明 |
-| --- | --- |
-| 前端 | React 19 + Vite 8（`react@^19.3.1`、`vite@^8.3.5`），`frontend/src/` 主应用与测试已全量采用 TypeScript/TSX，严格模式关闭 JavaScript fallback |
-| 后端 | FastAPI + Uvicorn（`fastapi==0.162.0`、`uvicorn==0.54.0`、`pydantic==2.14.2`），入口 `backend/asgi.py` |
-| Production / local entrypoint | `uvicorn backend.asgi:app --host 127.0.0.1 --port 15099` |
-| 健康检查 | `GET /healthz`，只报告进程状态，不查询数据库 |
-| 数据访问 | Service Layer → Database Provider → SQLite / PostgreSQL / MySQL / GaussDB-DWS |
-| 部署 | Nginx 托管前端静态资源并反代 `/api`，见 [部署说明](./DEPLOYMENT.md) |
-
-外部元数据的接入链路是 `外部系统 → 已整理的 Metadata Contract → DAP Metadata API → DAP`：
-DAP 负责接收、校验、归一化、幂等、持久化、审计与展示；**采集、筛选、资产识别、血缘解析、调度和重试由外部系统负责**。
-DAP 不主动连接或扫描你的数据库。详见 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 与 [ADR-001](./docs/adr/001-metadata-ingestion-contract.md)。
-
-### 可选 AI / RAG 集成链路（默认关闭）
-
-```text
-                          ┌───────────────────────────────────┐
-DAP backend ──HTTP(S)────▶│ dap-rag-lab HTTP Search Service v1 │──▶ BGE Embedding + LanceDB 索引
-  Bearer Token            └───────────────────────────────────┘
-      │
-      └──────HTTP(S)─────▶ OpenAI-compatible LLM endpoint（例如 DeepSeek）
-              API Key
-```
-
-- 两条链路都是**外部、可选、默认关闭**的：DAP 不内置向量引擎，不内置模型推理，不加载 Embedding 模型。
-- RAG 服务与 LLM 端点由部署方独立运维；DAP 不部署、不修改它们，也不在普通搜索路径上做健康探测（只有管理员主动触发的诊断会请求 `/healthz` / `/readyz`）。
-- 目录权威始终在 DAP：远端只提供候选 `assetId` / `fieldId`，DAP 按当前 profile 回查并重建响应。
-- 目标 RAG 服务与目标 LLM 端点的真实联调在 `main` 上仍是 **NOT VERIFIED**，见 [语义推荐 roadmap](./docs/semantic-recommendation-roadmap.md) 与 [单轮 AI 数据资产问答](./docs/ai-ask-mvp.md)。
-
-技术栈与架构边界的完整说明见 [架构说明](./docs/architecture.md)。
-
-## 🗄 数据库兼容性
-
-DAP 用两个标签描述数据库支持程度：
-
-- **Verified** —— 有可复现的自动化测试或 CI job 覆盖（包含真实数据库实例或受支持的本地路径）。
-- **Compatible** —— 代码与 DDL 层面提供适配，但只有静态 / 离线验证，没有在线 CI 或真实实例回归。
-
-| 数据库 | Runtime | Migration | CI 验证 | 说明 |
-| --- | --- | --- | --- | --- |
-| SQLite | Verified | Verified | Verified | Community 本地开发、一键 Demo 与部分 CI 的默认数据库；**不是生产目标** |
-| PostgreSQL | Verified | Verified | Verified（真实 PG 16 实例） | fresh apply → seed → 全量后端集成测试 → repeat apply no-op |
-| MySQL 8.0 | Verified | Verified | Verified（真实 MySQL 8 实例） | baseline apply / verify + SQLAlchemy Core CRUD、分页、唯一约束、Unicode、NULL、rollback 契约 + repeat apply no-op |
-| GaussDB / DWS | Compatible | Compatible（offline/static DDL） | **Static verification only** | 仅执行 `schema_migrate.py verify --offline --dialect dws`；没有在线 CI 实例与端到端回归；JDBC 驱动由部署方自备 |
-| Cloudflare D1 | 不支持 | — | — | 无 adapter，也没有支持计划 |
-
-完整矩阵、验证命令与边界说明见 [数据库支持矩阵](./docs/database-support.md)。
+---
 
 ## 🚀 快速开始
 
-### Repository Community Demo（真实 remote API，推荐首次体验）
+### 方式一：在线演示（Public Demo，零安装即刻体验）
 
-需要 Python 3.10+、Node.js 22.13+ 和 npm 10+。执行以下一键命令后，按终端输出打开 Demo。
+直接访问 **[https://data.overme.cn/](https://data.overme.cn/)** 即可匿名浏览仓库内置的「全渠道零售数仓」演示数据集，体验全局搜索、表详情、字段映射、指标口径与血缘视图。
 
-Linux/macOS：
+- 该站点由部署方独立运维，**使用真实 DAP 后端和 Remote API**（Nginx 托管前端静态资源并反代 `/api` 至 FastAPI 后端），不属于纯前端静态 Mock；
+- 演示数据每日 04:00（Asia/Shanghai）自动重建重置；
+- 公网演示站的管理员认证配置以及可选 AI / RAG 连接由部署方独立维护，本文档不公布公网管理密码。
+
+### 方式二：本地一键启动 Community Demo（推荐完整体验）
+
+环境要求：`Python 3.10+`、`Node.js 22.13+`、`npm 10+`。执行以下脚本将自动初始化本地 SQLite 演示库、灌入演示数据并启动前后端服务：
 
 ```bash
+# Linux / macOS
 ./scripts/demo.sh
 ```
 
-Windows PowerShell：
-
 ```powershell
+# Windows PowerShell
 .\scripts\demo.ps1
 ```
 
-#### 演示管理员
+按终端输出的地址打开浏览器后，既可匿名浏览公开目录，也可使用本地演示管理员账号登录体验后台管理：
 
-Community Demo 初始化完成后，可以使用：
+- **用户名 / 密码**：`admin` / `123456`
+- *注：该默认账号仅适用于本地 Community Demo 与开发体验；生产部署不提供默认管理员密码，请使用 `backend/scripts/create_admin.py` 交互创建。更多数据库初始化方式见 [Community Demo 指南](./docs/community-demo.md)。*
 
-- 用户名：`admin`
-- 密码：`123456`
+### 方式三：纯前端 Mock 模式（无需 Python 与数据库）
 
-该账号仅用于 Community Demo / 本地体验环境，不是生产环境默认管理员。正式部署请使用 `backend/scripts/create_admin.py` 交互创建管理员；生产 bootstrap 不提供默认密码。
-
-三种运行面的登录方式与账号彼此独立：
-
-| 运行面 | 登录方式 | 账号说明 |
-| --- | --- | --- |
-| Repository Community Demo（本地真实后端） | 真实后端登录 | 初始化后为 `admin` / `123456`，仅适用于本地 Demo 环境 |
-| Frontend Mock（`VITE_API_MODE=mock`） | 前端 Mock 身份认证 | 默认 `admin` / `123456`，可用 `VITE_MOCK_AUTH_*` 覆盖；不代表真实后端登录 |
-| 在线演示（Public Demo） | 独立公网部署的认证配置 | 由部署方维护；不承诺本地 Demo 默认账号适用于公网，本文档不公布公网账号密码 |
-
-详细说明见 [Community Demo 指南](./docs/community-demo.md)。
-
-> Windows 内网使用 Nexus npm 镜像更新前端：参见 [Windows 内网构建与部署流程](./DEPLOYMENT.md#73-windows-内网-npm-镜像构建与部署issue-468)，不要直接套用 Linux/systemd 命令。
-
-### 只看前端（mock mode）
-
-只需 Node.js 22.13+ 和 npm 10+。mock mode 只读取前端受控数据，不需要数据库或后端服务。
+如果只想快速预览前端 UI 或调试前端样式，只需 `Node.js 22.13+`：
 
 ```bash
 npm --prefix frontend ci
@@ -306,208 +131,168 @@ cp frontend/.env.example frontend/.env.local
 npm --prefix frontend run dev
 ```
 
-确认 `frontend/.env.local` 中为 `VITE_API_MODE=mock` 后，使用公开演示账号 `admin` / `123456` 登录
-（仅 mock 模式有效；可用 `VITE_MOCK_AUTH_*` 覆盖）。mock 数据不会写入数据库。
+确认 `frontend/.env.local` 中 `VITE_API_MODE=mock` 后，使用演示账号 `admin` / `123456` 登录（可通过 `VITE_MOCK_AUTH_*` 覆盖）。前端 Mock 模式仅读取前端内置演示数据，其 AI 问答由本地演示适配器按名称/字段匹配生成，**不调用任何 RAG 服务或 LLM**（详见 [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md)）。
 
-### 在线演示（Public Demo）
+---
 
-[https://data.overme.cn/](https://data.overme.cn/) 是部署方独立运维的公网演示站，提供用于体验产品的演示资产
-（仓库内的虚构零售数据）。它**使用真实 DAP 后端和 Remote API**，不属于纯前端静态 Mock：
+## 🪶 产品边界与同类项目对比
 
-- 前端以 Remote 模式构建，Nginx 托管前端静态资源并把 `/api` 反向代理到真实 FastAPI 后端；
-- 演示数据每天自动重置；当前部署的重置任务在每天 04:00（服务器本地时区 Asia/Shanghai）重建演示数据库，
-  具体时间与保留策略以实际部署配置为准；
-- 演示站由部署方独立部署和更新，不通过本仓库的 Release 流程自动发布；实际运行版本、构建 revision 与 GitHub
-  Release 的对应关系以该站点当前部署为准，可能落后于 `origin/main` 或最新 Release；
-- 演示站使用独立的公网部署与认证配置，账号由部署方维护，本文档不公布其密码（见[演示管理员](#演示管理员)）。
+**DAP 不试图替代 OpenMetadata、DataHub 或 Apache Atlas。**
 
-该站点是否启用 AI 问答、连接哪个 RAG 与 LLM，同样以当前部署配置为准；见下文与 [FAQ](#-常见问题)。
+如果你的团队需要数百个开箱即用的数据源 Connector、内置定时采集调度、SQL / DAG 自动血缘解析、数据质量 Profiling 或复杂治理工作流，OpenMetadata 或 DataHub 是更合适的选择。DAP 的取舍是在更聚焦的范围内，**用更少的组件和更低的运维成本交付一个数仓资产目录**。
 
-### AI 能力需要单独启用
+| 维度 | DAP | OpenMetadata | DataHub |
+| --- | --- | --- | --- |
+| **核心定位** | 轻量级数仓资产目录 | 统一元数据平台（含治理闭环） | 企业级元数据平台 |
+| **部署形态** | Web 服务 + 单个关系型数据库，易于单机内网部署 | 多服务：元数据服务 + Ingestion + 索引/存储依赖 | 多组件：元数据服务 + 消息/索引/存储依赖 |
+| **运维复杂度** | 低（小团队友好） | 中高 | 中高 |
+| **离线 / 内网单机部署** | 核心支持场景 | 可行，但依赖组件更多 | 可行，但依赖组件更多 |
+| **内置采集器与自动调度** | 不内置（通过版本化 Ingestion API 接收外部导入） | 丰富 | 丰富 |
+| **血缘能力** | 展示外部导入的血缘快照（Lineage Viewer） | 内置自动血缘解析 | 内置自动血缘解析 |
+| **数据质量 / Profiling** | 不提供 | 提供 | 提供（随版本与配置） |
+| **治理与安全边界** | 分级公开目录 + Permission RBAC + 操作审计日志 | 目录 + 质量 + 血缘 + 词汇表 + 策略 | 目录 + 血缘 + 策略与元数据自动化 |
 
-Community Demo 与 mock 模式都不会自动打开真实 AI：`AI_ASK_ENABLED` 默认 `false`，RAG 配置独立且默认停用。
-公网在线演示站是独立部署，其 AI 开关、RAG 与 LLM Provider 由部署方配置，可能与仓库默认值不同。
-启用步骤、Secret 注入方式与回滚见 [后端配置](./docs/configuration.md) 与 [部署说明](./DEPLOYMENT.md#36-optional-single-turn-ai-asset-qa)。
+### DAP 明确委托给外部系统的边界
 
-## 🤝 社区入口
+为保持核心轻量与内网易部署，以下职责由外部系统或可选集成承担，**不在 DAP Core 内置范围内**：
 
-- **使用项目** → [文档导航](#-文档导航) 和 [Community Demo 指南](./docs/community-demo.md)
-- **有问题** → [GitHub Discussions · Q&A](https://github.com/0verme/data-asset-portal-community/discussions/categories/q-a)
-- **发现 Bug** → [Bug Report Issue Form](https://github.com/0verme/data-asset-portal-community/issues/new?template=bug_report.yml)
-- **想参与贡献** → [Good First Issues](https://github.com/0verme/data-asset-portal-community/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) · [CONTRIBUTING.md](./CONTRIBUTING.md)
-- **安全问题** → 阅读 [SECURITY.md](./SECURITY.md)，通过 GitHub Private Vulnerability Reporting 私密提交；不要发到公开 Issue 或 Discussion。
+- **数据采集与任务调度外置**：DAP 不主动扫描业务数据库、不承担 ETL 编排或真实下游文件推送执行；由现有治理程序或 ETL 平台整理好元数据后通过 API 导入。
+- **血缘解析外置**：DAP 不内置 SQL / DAG 自动血缘解析引擎，仅接收、校验并可视化展示已导入的 self-contained 血缘快照。
+- **向量引擎与模型推理外置**：DAP **不内置**向量数据库、Embedding 模型推理，也不提供自然语言转 SQL（NL2SQL）或可执行问数引擎；相关资产推荐与 AI 问答均作为**可选**的外部 HTTP 服务接入。
+- **高级 IAM 与数据质量外置**：当前不包含多角色叠加/ABAC/行级数据范围授权、外部 SSO/IAM 以及数据质量 Profiling。
 
-## 🔌 元数据接入 Metadata Ingestion
+---
 
-DAP 不主动发现数据、不扫描数据库、不解析 SQL、不计算血缘，也不承担数据生产或离线计算能力。
-请由现有数据治理程序、`lakehouse-toolkit`、ETL 平台或自定义脚本先筛选并整理需要管理的资产，
-再通过通用 Metadata API 导入：
+## 🏗 架构与元数据接入
+
+![数据资产门户系统架构：客户端经 Nginx、FastAPI、业务服务和数据库访问层查询元数据；外部采集器通过受控 API 接入](./docs/images/system-architecture.svg)
+
+后端所有模块运行在同一 FastAPI 进程内；详细分层、归属边界与交互架构图请参阅 [架构说明](./docs/architecture.md)。
+
+| 层级 | 技术栈与职责 |
+| --- | --- |
+| **前端（Frontend）** | React 19 + Vite 8 + TypeScript（`frontend/src/` 全量采用严格类型检查，关闭 JS fallback） |
+| **后端（Backend）** | FastAPI + Uvicorn（唯一运行入口 `backend/asgi.py`，本地/生产启动示例：`uvicorn backend.asgi:app --host 127.0.0.1 --port 15099`，进程探针 `GET /healthz`） |
+| **数据访问层（Data Access）** | Service Layer → Database Provider → SQLite / PostgreSQL / MySQL 8.0 / GaussDB-DWS |
+| **部署形态（Deployment）** | Nginx 托管前端静态产物并反向代理 `/api`（涵盖 Linux systemd 单机部署与 [Windows 内网 npm 镜像构建流程](./DEPLOYMENT.md#73-windows-内网-npm-镜像构建与部署issue-468)，详见 [部署说明](./DEPLOYMENT.md)） |
+
+### 契约式元数据接入（Metadata Ingestion）
 
 ```text
-External System
-    ↓
-curated metadata
-    ↓
-DAP Metadata Contract
-    ↓
-Metadata API
-    ↓
-DAP
+External System (ETL / 数据治理脚本 / lakehouse-toolkit)
+    ──▶ 已整理的 Metadata JSON ──▶ DAP Metadata Contract (/api) ──▶ 校验 · 归一化 · 幂等持久化 · 审计 · 目录展示
 ```
 
-- **外部系统负责**：采集、筛选、资产识别、血缘解析，以及自己的调度和重试；
-- **DAP 负责**：Receive、Validate、Normalize、Idempotency、Persist、Audit、Expose。
+- **外部系统负责**：数据源连接、筛选、资产识别、血缘解析、定时调度与失败重试；
+- **DAP 负责**：接收（Receive）、结构校验（Validate）、归一化（Normalize）、幂等更新（Idempotency）、持久化（Persist）、操作审计（Audit）与目录展示（Expose）。
 
-从一份 JSON 在几分钟内完成首次导入，请看 [Metadata API 最小资产导入 Demo](./examples/metadata_ingestion/README.md)。
-示例 payload 是 [assets.example.json](./examples/metadata_ingestion/assets.example.json)，完整字段与语义见
-[Metadata Ingestion Contract](./docs/metadata-ingestion.md)。DAP API 保持通用，不绑定任何外部工具。
+只需几分钟即可从一份 JSON 完成首次资产导入：请参考 [Metadata API 最小资产导入 Demo](./examples/metadata_ingestion/README.md) 与示例载荷 [assets.example.json](./examples/metadata_ingestion/assets.example.json)。完整字段语义见 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 与 [ADR-001](./docs/adr/001-metadata-ingestion-contract.md)。
 
-## 🔍 血缘浏览 Lineage
+---
 
-**DAP Core 不自动解析 SQL、DAG 或调度系统来生成血缘。**
+## 🔎 搜索与可选 AI 能力
 
-页面上的血缘来自**已导入的血缘快照（imported lineage snapshot）**，来源有两种：
+DAP 提供三条互不干扰的检索与问答路径，**默认仅开启传统关键词搜索**：
 
-1. 外部系统通过 [Metadata Ingestion Contract](./docs/metadata-ingestion.md) 推送已经整理好的 snapshot；
-2. 使用仓库已有的导入脚本手工发布（见 [血缘快照采集与发布指南](./docs/lineage_bulk_import_guide.md)）。
+| 能力路径 | 前端入口 | 后端接口 | 默认状态 | 外部依赖 |
+| --- | --- | --- | --- | --- |
+| **传统关键词搜索** | 全局搜索框、结果页「搜索结果」Tab | `GET /api/search` | **默认可用** | 无（进程内完成，**不依赖 RAG**，也**不依赖 LLM**） |
+| **可选 RAG 相关资产推荐** | 结果页「相关资产推荐」分组 | `GET /api/search/recommendations` | **默认关闭** | 可选外部 RAG HTTP 服务 |
+| **可选单轮 AI 资产问答** | 结果页「AI 问答」Tab、「问 AI 找资产」 | UI 使用 `POST /api/ai/ask/stream`；`POST /api/ai/ask`、`POST /api/ai/ask/progress` 为兼容接口；`GET /api/ai/status` 提供能力开关 | **默认关闭** | 上述 RAG 服务 + 可选 OpenAI-compatible LLM |
 
-因此这个能力的准确定位是**血缘浏览 / 血缘视图（Lineage Viewer）**：查询、过滤和展示已经导入的血缘关系，
-而不是血缘分析引擎。UI 中该模块的中文名称保留为「血缘分析」，指的就是这个浏览功能。
+### 核心设计原则
 
-V1 血缘只支持 self-contained `replace` snapshot：新快照先以 `INACTIVE` 写入，节点/边校验通过后在同一事务内切换为 `ACTIVE`。
+1. **默认关闭，故障零传染**：`AI_ASK_ENABLED` 默认 `false`（Community Demo 与前端 Mock 模式均不会自动连接真实 AI）。只有当该开关开启、LLM Provider 配置完整且 RAG 服务与 Token 就绪时，`GET /api/ai/status` 才返回启用状态；未启用或外部服务超时，前端自动隐藏入口或仅降级推荐分组，绝不影响传统关键词检索。
+2. **目录权威校验（防幻觉）**：DAP 仅作为 HTTP Client 调用外部 `dap-rag-lab` 检索服务与 OpenAI-compatible 模型端点。远端与模型只能返回候选稳定 `assetId` / `fieldId`；最终展示的表名、字段名、中文描述和引用卡全部由 DAP 按当前 `PUBLIC_CATALOG_PROFILE` 回查自身元数据库重建，模型无法编造不存在的资产。
+3. **额度管控与契约边界**：内置全站每日默认问答额度控制、SSE 阶段进度反馈与受控目录统计意图。目前仓库 `main` 的 CI 自动化覆盖全部接口契约、鉴权与降级行为，外部 RAG / LLM 端点的真实联调验收与回答质量由各部署方按实际环境配置验证。完整配置、状态语义与路线图详见 [单轮 AI 数据资产问答](./docs/ai-ask-mvp.md)、[权威资产目录统计](./docs/ai-metadata-count.md)、[智能问数与语义推荐路线](./docs/semantic-recommendation-roadmap.md)、[后端配置](./docs/configuration.md) 及 [部署说明](./DEPLOYMENT.md#36-optional-single-turn-ai-asset-qa)。
 
-## 🔐 API 安全边界
+---
 
-- **Public Catalog**：普通业务目录、搜索、字段/DDL、映射、血缘、菜单、报表、API 资产、码值表、上/下游目录和门户统计支持匿名只读浏览；公开响应按需脱敏，不是全部 GET 无脑公开。`PUBLIC_CATALOG_PROFILE`（`internal`/`strict`/`disabled`）同时决定可展示字段与可搜索字段：`internal` 允许匿名查看和搜索安全的连接定位元数据（host、port、database、schema、去除凭据的 JDBC endpoint），`strict` 隐藏这些字段且不允许通过搜索命中，`disabled` 关闭匿名目录与匿名搜索。
-- **Authenticated Management**：写操作、管理操作和敏感读取继续由 permission-based RBAC 控制。
-- **Protected data**：系统用户/角色/参数、操作日志、Metadata ingestion、上/下游 `admin-detail`、账号/密码/token/secret/credential 等凭据、认证信息、内部路径与诊断信息继续要求认证/权限。
+## 🗄 数据库兼容性
 
-完整 route 分类见 [Public Catalog + Authenticated Management](./docs/rbac/authenticated-read-model.md)。
+DAP 使用两个等级界定数据库支持范围：
+
+- **Verified**：有可复现的自动化测试与 CI 任务覆盖（含真实数据库实例或标准本地回归路径）。
+- **Compatible**：代码与 DDL 层面提供方言适配及离线静态校验，无在线 CI 实例回归。
+
+| 数据库 | Runtime | Migration | CI 验证等级 | 说明 |
+| --- | --- | --- | --- | --- |
+| **SQLite** | Verified | Verified | **Verified** | 本地开发、一键 Community Demo 与基础 CI 默认库；**非生产环境目标** |
+| **PostgreSQL** | Verified | Verified | **Verified（PG 16 实例）** | 覆盖空库迁移 → 演示数据灌入 → 全量后端集成测试 → 重复迁移幂等校验 |
+| **MySQL 8.0** | Verified | Verified | **Verified（MySQL 8 实例）** | 覆盖基线迁移/校验 + SQLAlchemy Core CRUD、分页、唯一约束、事务回滚与幂等契约 |
+| **GaussDB / DWS** | Compatible | Compatible（离线静态 DDL） | **Static verification only** | CI 仅执行 `schema_migrate.py verify --offline --dialect dws`；生产部署需由部署方自备对应 JVM 版本的商业 JDBC 驱动 |
+| **Cloudflare D1** | 不支持 | — | — | 无适配器，且不在支持计划内 |
+
+完整兼容矩阵、验证命令与迁移运维规范请参阅 [数据库支持矩阵](./docs/database-support.md) 与 [数据库迁移指南](./backend/schema/README.md)。
+
+---
 
 ## 📚 文档导航
 
 ### 使用与部署
 
-| 文档 | 内容 |
-| ------ | ------ |
-| [Community Demo 指南](./docs/community-demo.md) | SQLite / PostgreSQL 多步骤演示数据初始化 |
-| [后端配置](./docs/configuration.md) | 配置命名空间、Public Catalog profile、可选 RAG / AI 设置与默认值 |
-| [数据库支持矩阵](./docs/database-support.md) | Verified / Compatible 分层与验证边界 |
-| [部署说明](./DEPLOYMENT.md) | Linux 单机部署、systemd、Nginx、HTTPS 与验收 |
-| [开发指南](./DEVELOPMENT.md) | 环境变量、本地开发与测试矩阵 |
-| [架构说明](./docs/architecture.md) | 前后端架构、数据流和数据库边界 |
-| [模块清单](./docs/modules.md) | 页面、接口入口和数据表对照 |
-| [API 契约](./docs/api-contract.md) | API 约定、端点和请求/响应模型 |
-| [Metadata Ingestion Contract](./docs/metadata-ingestion.md) | 外部整理元数据导入、版本、幂等、血缘 snapshot 与示例 |
-| [ADR-001](./docs/adr/001-metadata-ingestion-contract.md) | Metadata Contract 架构决策记录 |
+| 文档 | 内容说明 |
+| --- | --- |
+| [Community Demo 指南](./docs/community-demo.md) | SQLite / PostgreSQL 演示环境初始化与重置流程 |
+| [部署说明](./DEPLOYMENT.md) | Linux 单机生产部署、systemd、Nginx、HTTPS、可选 AI 配置与 Windows 内网构建 |
+| [后端配置](./docs/configuration.md) | 环境变量命名空间、Public Catalog profile、可选 RAG / AI 参数与默认值 |
+| [数据库支持矩阵](./docs/database-support.md) | Verified / Compatible 分层说明与各数据库验证边界 |
 | [数据库迁移](./backend/schema/README.md) | Alembic baseline、stamp 与 forward migration 运维规则 |
-| [截图画廊](./docs/screenshots.md) | Community Demo 全量界面截图 |
+| [Metadata Ingestion Contract](./docs/metadata-ingestion.md) | 外部元数据导入规范、版本幂等、血缘快照契约与请求示例 |
+| [截图画廊](./docs/screenshots.md) | Community Demo 全量模块界面截图 |
 
-### 设计与规划
+### 架构与设计
 
-| 文档 | 内容 |
-| ------ | ------ |
-| [资产风险联动设计](./docs/asset-risk-integration-design.md) | 外部审计结果接入边界与提案 |
-| [单轮 AI 数据资产问答](./docs/ai-ask-mvp.md) | AI 问答契约、状态语义、Mock 边界与未验收项 |
-| [权威资产目录统计](./docs/ai-metadata-count.md) | 表数 / 字段数统计意图、歧义与失败状态 |
-| [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md) | Frontend Mock（`VITE_API_MODE=mock`）的本地演示适配器与隔离约束 |
-| [智能问数与语义推荐](./docs/semantic-recommendation-roadmap.md) | 问数底座与语义推荐路线 |
-| [待确认事项](./docs/todo.md) | 当前尚未完成或待决策事项 |
-| [更新日志](./CHANGELOG.md) | 阶段性变更 |
+| 文档 | 内容说明 |
+| --- | --- |
+| [架构说明](./docs/architecture.md) | 前后端分层架构、数据流向与组件边界（含交互式架构图入口） |
+| [模块清单](./docs/modules.md) | 前端页面、后端接口路由与数据库表全量对照表 |
+| [API 契约](./docs/api-contract.md) | REST API 约定、端点清单与请求/响应模型 |
+| [Public Catalog + RBAC 读模型](./docs/rbac/authenticated-read-model.md) | 匿名公开目录脱敏级别与受保护路由分类 |
+| [ADR-001](./docs/adr/001-metadata-ingestion-contract.md) | Metadata Ingestion Contract 架构决策记录 |
+| [单轮 AI 数据资产问答](./docs/ai-ask-mvp.md) | AI 问答接口契约、状态语义、额度控制与验收边界 |
+| [权威资产目录统计](./docs/ai-metadata-count.md) | 表数 / 字段数统计意图识别、歧义处理与失败降级 |
+| [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md) | 前端 Mock 模式（`VITE_API_MODE=mock`）本地适配器与隔离约束 |
+| [智能问数与语义推荐](./docs/semantic-recommendation-roadmap.md) | 语义推荐底座与演进路线图 |
+| [资产风险联动设计](./docs/asset-risk-integration-design.md) | 外部审计结果接入边界与设计提案 |
+| [待确认事项](./docs/todo.md) | 当前待决策事项与阶段性规划 |
+| [更新日志](./CHANGELOG.md) | 各版本功能演进与变更记录 |
 
-### 参与贡献
+### 参与贡献与开发
 
-| 文档 | 内容 |
-| ------ | ------ |
-| [首次贡献指南](./docs/first-contribution.md) | Fork、分支、测试和 PR walkthrough |
-| [Good First Issue 提案](./docs/good-first-issues.md) | 已审计的 contributor-friendly backlog 提案 |
-| [贡献指南](./CONTRIBUTING.md) | Issue、PR、代码风格和标签语义 |
-| [工程历史归档](./docs/archive/engineering-history/README.md) | 已完成迁移阶段的工程记录，仅供维护者追溯 |
-
-## 🗺 路线图与明确不做的事
-
-以下内容**当前明确不做**。欢迎先在 Discussions 讨论设计，再提交有边界的 Issue：
-
-- 自动 SQL / DAG / 调度血缘解析（血缘继续走导入式契约）
-- 内置采集调度、任务编排和失败重试
-- 真实下游文件推送执行链路
-- 数据质量、Profiling、数据合约与治理工作流
-- OpenMetadata / DataHub 量级的 connector 生态
-- 多角色绑定、ABAC/ACL、数据范围（row-level/data-scope）授权、SSO/外部 IAM
-- 自然语言转 SQL（NL2SQL）、可执行语义层与问数执行引擎
-
-### AI 相关的真实边界
-
-DAP **不内置**向量引擎、Embedding 模型、向量索引或模型推理，也**不提供** NL2SQL 与问数执行。
-这不等于「不支持可选 RAG / AI 集成」——DAP 已经落地的是：
-
-- 一个默认关闭的 HTTP Client Adapter，把相关资产推荐委托给外部 RAG 服务；
-- 一个默认关闭的单轮 AI 资产问答，复用同一个 RAG 适配器 + 一个 OpenAI-compatible LLM Provider；
-- 一套目录权威校验，保证远端和模型都不能发明表、字段或归属。
-
-以下仍**未实现或未验收**：DAP 内的向量存储方案（`pgvector` 不是 SQLite / GaussDB-DWS 的通用能力）、
-在线索引刷新与撤权传播契约、有业务标注的 golden query 离线评测、以及外部 RAG / LLM 的真实联调。
-路线与前置条件见 [语义推荐 roadmap](./docs/semantic-recommendation-roadmap.md)。
-
-阶段更新见 [CHANGELOG.md](./CHANGELOG.md)，待确认事项见 [docs/todo.md](./docs/todo.md)。
-
-## 🙋 常见问题
-
-### 支持哪些数据库？
-
-SQLite（本地 / Demo / CI）、PostgreSQL、MySQL 8.0 为 **Verified**；GaussDB / DWS 为 **Compatible**，
-只有离线静态验证。完整矩阵见 [数据库支持矩阵](./docs/database-support.md)。
-
-### mock 和 remote 有什么区别？
-
-`VITE_API_MODE=mock` 只读取前端内置数据，使用公开演示账号 `admin` / `123456` 登录；
-`remote` 通过 `/api` 访问后端真实数据库，需要先按 [Community Demo](./docs/community-demo.md) 或 [开发指南](./DEVELOPMENT.md) 配置。
-mock 模式下的 AI 问答由前端演示适配器生成，不调用 RAG 或 LLM；remote 模式不会回退到 mock。
-公网在线演示站 [https://data.overme.cn/](https://data.overme.cn/) 使用 remote 模式，不是 mock 构建。
-
-### AI 问答默认开启吗？需要什么？
-
-默认**关闭**。`AI_ASK_ENABLED` 默认 `false`；启用还需要 LLM Provider 配置（`AI_LLM_BASE_URL` / `AI_LLM_MODEL` /
-`AI_LLM_API_KEY`）以及已启用并配置好服务 Token 的 RAG 搜索。配置不完整时 `/api/ai/status` 返回
-`{"enabled": false}`，前端隐藏入口。传统搜索不受影响。详见 [后端配置](./docs/configuration.md)。
-
-### 在线演示站使用真实 AI 问答吗？
-
-在线演示站是真实后端 + Remote API 的部署，不是静态 Mock。它的 AI 问答是否启用、连接哪个 RAG 与 LLM
-由该站点的部署配置决定：当前部署已启用真实 AI 问答（后端 OpenAI-compatible LLM Provider + 外部 RAG 检索服务），
-但 Provider、模型和可用性都可能随部署调整，本文档不承诺具体模型或长期可用性。
-Community 默认配置仍然关闭 AI 问答，自建部署需要按 [部署说明](./DEPLOYMENT.md) 与
-[后端配置](./docs/configuration.md) 自行接入并验证。
-
-### DAP 内置向量检索吗？
-
-不内置。DAP 不包含向量引擎、Embedding 模型或索引存储，也没有 NL2SQL。相关资产推荐与 AI 问答都是
-对外部 RAG 服务的可选 HTTP 调用，默认关闭；传统关键词搜索完全不需要它们。
-
-### 这个项目负责真实数据采集吗？
-
-不负责 source-specific 采集和调度。DAP 提供稳定的 Metadata Ingestion Contract / API，接收外部系统已经整理好的资产和血缘 snapshot；
-采集连接、筛选、资产识别、解析、调度、失败重试和真实文件推送仍属于外部系统或独立集成项目。DAP 不提供数据库 Collector。
-
-### 它和 OpenMetadata / DataHub 是什么关系？
-
-不是替代关系。DAP 是更轻量的数仓资产目录，面向内网 / 离线 / 小团队；
-如果需要完整元数据平台能力，应优先评估 OpenMetadata 或 DataHub。详见[定位对比](#-与-openmetadata-和-datahub-的定位差异)。
-
-## 🤝 贡献
-
-欢迎从 [Good First Issues](https://github.com/0verme/data-asset-portal-community/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) 开始，
-并阅读 [首次贡献指南](./docs/first-contribution.md) 与 [CONTRIBUTING.md](./CONTRIBUTING.md)。
-
-## 📄 许可证
-
-本项目基于 [Apache License 2.0](./LICENSE) 开源。第三方归属说明见 [NOTICE](./NOTICE)。
+| 文档 | 内容说明 |
+| --- | --- |
+| [开发指南](./DEVELOPMENT.md) | 本地前后端联调、环境变量与完整测试矩阵 |
+| [首次贡献指南](./docs/first-contribution.md) | 从 Fork、分支创建、本地自测到提交 PR 的快速指引 |
+| [Good First Issue 提案](./docs/good-first-issues.md) | 面向新贡献者的清晰边界任务清单 |
+| [贡献指南](./CONTRIBUTING.md) | Issue / PR 规范、代码风格、发布检查与标签语义 |
+| [工程历史归档](./docs/archive/engineering-history/README.md) | 已完成架构迁移阶段的工程档案，供维护者溯源参考 |
 
 ---
 
-## License
+## 🙋 常见问题
 
-Licensed under the Apache License, Version 2.0. See the [LICENSE](./LICENSE) file for the full license text,
-and [NOTICE](./NOTICE) for attribution notices.
+### 1. `mock` 模式和 `remote` 模式有什么区别？
 
-Copyright 2025 Jearhe (overme.cn)
+`VITE_API_MODE=mock` 仅读取前端内置演示数据，无需启动 Python 后端与数据库，使用演示账号 `admin` / `123456` 登录，其 AI 问答由前端本地适配器生成；`remote` 模式通过 `/api` 访问真实 FastAPI 后端与数据库，不会回退到 Mock。公网在线演示站 [https://data.overme.cn/](https://data.overme.cn/) 运行在 `remote` 模式下。
+
+### 2. 在线演示站使用真实 AI 问答吗？
+
+在线演示站是真实后端 + Remote API 的独立部署，非静态 Mock。其 AI 问答是否启用、连接哪个 RAG 服务与 LLM Provider 由该站点的部署配置决定（当前部署已接入外部 RAG 检索与 OpenAI-compatible LLM Provider，具体模型与可用性随部署调整）。仓库 Community 默认配置仍保持 `AI_ASK_ENABLED=false`，自建部署需按 [部署说明](./DEPLOYMENT.md) 与 [后端配置](./docs/configuration.md) 自行配置并验证。
+
+### 3. 如何把我们团队现有的数仓表和血缘导入 DAP？
+
+DAP 不直接连库扫描你的业务数仓。你可以用现有的 Python 脚本、ETL 任务或治理工具将表结构、字段映射与血缘关系整理为标准 JSON，调用 DAP 的 Metadata Ingestion API 完成幂等导入。可先参考 [Metadata API 最小资产导入 Demo](./examples/metadata_ingestion/README.md) 在几分钟内跑通首次导入。
+
+---
+
+## 🤝 社区与许可证
+
+- **交流与提问** → [GitHub Discussions · Q&A](https://github.com/0verme/data-asset-portal-community/discussions/categories/q-a)
+- **反馈 Bug** → [Bug Report Issue Form](https://github.com/0verme/data-asset-portal-community/issues/new?template=bug_report.yml)
+- **参与代码贡献** → [Good First Issues](https://github.com/0verme/data-asset-portal-community/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) · [首次贡献指南](./docs/first-contribution.md) · [CONTRIBUTING.md](./CONTRIBUTING.md)
+- **报告安全漏洞** → 请阅读 [SECURITY.md](./SECURITY.md) 并通过 GitHub Private Vulnerability Reporting 私密提交，切勿在公开 Issue 或 Discussion 中披露。
+
+本项目基于 **[Apache License 2.0](./LICENSE)** 开源，第三方组件归属说明见 [NOTICE](./NOTICE)。
+
+Copyright 2025 Jearhe ([overme.cn](https://dap.overme.cn))
