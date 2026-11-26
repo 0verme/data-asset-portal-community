@@ -3,36 +3,62 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="面向数据仓库团队的轻量数据资产目录。DAP 把元数据集中到一个可搜索、可维护的界面里。">
-    <title>数据资产门户 DAP</title>
+    <meta name="description" content="面向数据仓库团队的轻量数据资产目录。DAP 把表、字段、指标口径与血缘快照集中到一个可搜索、可维护的界面里，内网单机即可运行。">
+    <title>数据资产门户 DAP — 面向数仓团队的轻量数据资产目录</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
     <link rel="canonical" href="https://dap.overme.cn/">
-    <meta property="og:title" content="数据资产门户 DAP">
-    <meta property="og:description" content="面向数据仓库团队的轻量数据资产目录。DAP 把元数据集中到一个可搜索、可维护的界面里。">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="数据资产门户">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:title" content="数据资产门户 DAP — 面向数仓团队的轻量数据资产目录">
+    <meta property="og:description" content="面向数据仓库团队的轻量数据资产目录。DAP 把表、字段、指标口径与血缘快照集中到一个可搜索、可维护的界面里，内网单机即可运行。">
     <meta property="og:url" content="https://dap.overme.cn/">
     <meta property="og:image" content="https://dap.overme.cn/assets/media/01-asset-search.jpg">
     <meta property="og:image:alt" content="数据资产门户中的资产搜索界面">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="数据资产门户 DAP — 面向数仓团队的轻量数据资产目录">
+    <meta name="twitter:description" content="面向数据仓库团队的轻量数据资产目录。DAP 把表、字段、指标口径与血缘快照集中到一个可搜索、可维护的界面里，内网单机即可运行。">
+    <meta name="twitter:image" content="https://dap.overme.cn/assets/media/01-asset-search.jpg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./styles.css">
     <script src="./app.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">跳到正文</a>
+    <div class="ambient-glow" aria-hidden="true"></div>
+
     <header class="site-header" id="top">
-      <div class="container header-inner">
+      <div class="header-bar">
         <a class="brand" href="#top" aria-label="数据资产门户 DAP 首页">
-          <span class="brand-mark" aria-hidden="true">DAP</span>
-          <span class="brand-name">数据资产门户</span>
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" class="brand-icon">
+              <rect x="3" y="4" width="18" height="5" rx="2" fill="currentColor"/>
+              <rect x="3" y="11" width="11" height="4" rx="1.75" fill="currentColor" fill-opacity="0.78"/>
+              <rect x="16" y="11" width="5" height="4" rx="1.75" fill="currentColor" fill-opacity="0.45"/>
+              <rect x="3" y="17" width="7" height="3.5" rx="1.5" fill="currentColor" fill-opacity="0.55"/>
+              <rect x="12" y="17" width="9" height="3.5" rx="1.5" fill="currentColor" fill-opacity="0.55"/>
+            </svg>
+          </span>
+          <span class="brand-text">
+            <span class="brand-name">数据资产门户</span>
+            <span class="brand-badge">DAP</span>
+          </span>
         </a>
         <nav class="primary-nav" aria-label="主导航">
+          <a href="#ask">能力</a>
+          <a href="#readiness">就绪度</a>
+          <a href="#deployment">部署</a>
+          <a href="#onboarding">接入</a>
           <a href="https://github.com/0verme/data-asset-portal-community/tree/main/docs">文档</a>
           <a href="https://github.com/0verme/data-asset-portal-community">GitHub</a>
-          <a href="https://data.overme.cn/">在线演示</a>
         </nav>
-        <div class="language-switch" aria-label="语言">
-          <span aria-current="page">中</span>
-          <button type="button" disabled aria-label="English 暂不可用">EN</button>
+        <div class="header-actions">
+          <a class="header-cta" href="https://data.overme.cn/">
+            <span>在线演示</span>
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 8h9m0 0L8.75 4.25M12.5 8l-3.75 3.75" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
         </div>
       </div>
     </header>
@@ -41,43 +67,49 @@
       <section class="hero container" aria-labelledby="hero-title">
         <div class="hero-intro">
           <div class="hero-copy">
-            <p class="eyebrow"><span class="eyebrow-rule" aria-hidden="true"></span>面向数据仓库团队的轻量数据资产目录</p>
+            <p class="eyebrow">
+              <span class="eyebrow-dot" aria-hidden="true"></span>
+              <span>面向数据仓库团队的轻量数据资产目录</span>
+              <span class="eyebrow-sep" aria-hidden="true">·</span>
+              <span class="eyebrow-version">v0.2.7 · Apache-2.0</span>
+            </p>
             <h1 id="hero-title">
               <span>表在哪、</span>
               <span>字段什么意思、</span>
               <span class="accent-text">口径从哪来。</span>
             </h1>
-            <p class="hero-description">DAP 把这些元数据集中到一个可搜索、可维护的界面里。<strong>内网、离线、一台机器也能跑。</strong></p>
+            <p class="hero-description">DAP 把分散在文档、表格与脚本里的数仓元数据收拢到一个可搜索、可追溯、可维护的门户。<strong>内网、离线、一台机器也能跑。</strong></p>
             <div class="hero-actions">
-              <a class="button button-primary" href="https://data.overme.cn/">打开在线演示</a>
-              <a class="button button-secondary" href="https://github.com/0verme/data-asset-portal-community">在 GitHub 查看</a>
+              <a class="button button-primary" href="https://data.overme.cn/">
+                <span>打开在线演示</span>
+                <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4 9h10m0 0L9.75 4.75M14 9l-4.25 4.25" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </a>
+              <a class="button button-secondary" href="https://github.com/0verme/data-asset-portal-community">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="button-icon"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2Z"/></svg>
+                <span>在 GitHub 查看</span>
+              </a>
             </div>
           </div>
 
-          <aside class="spec-panel" aria-labelledby="spec-title">
-            <h2 id="spec-title" class="spec-heading">规格</h2>
-            <dl class="spec-list">
+          <aside class="spec-panel" aria-label="核心规格">
+            <div class="spec-grid">
               <div class="spec-item">
-                <dt>许可证</dt>
-                <dd>Apache-2.0</dd>
+                <span class="spec-label">开源许可</span>
+                <strong class="spec-value">Apache-2.0</strong>
               </div>
               <div class="spec-item">
-                <dt>部署</dt>
-                <dd>内网 · 离线 · 单机</dd>
+                <span class="spec-label">部署形态</span>
+                <strong class="spec-value">内网 · 离线 · 单机</strong>
               </div>
               <div class="spec-item">
-                <dt>不依赖</dt>
-                <dd class="tag-list"><span>消息中间件</span><span>独立搜索引擎</span></dd>
+                <span class="spec-label">零外部中间件依赖</span>
+                <div class="tag-list"><span>无需消息队列</span><span>无需独立搜索引擎</span></div>
               </div>
               <div class="spec-item">
-                <dt>Verified</dt>
-                <dd class="database-list"><span>PostgreSQL</span><span>MySQL 8.0</span><span>SQLite</span></dd>
+                <span class="spec-label">CI 已验证数据库</span>
+                <div class="database-list"><span>PostgreSQL 16</span><span>MySQL 8.0</span><span>SQLite</span></div>
               </div>
-              <div class="spec-item">
-                <dt>版本</dt>
-                <dd>v0.2.5</dd>
-              </div>
-            </dl>
+            </div>
           </aside>
         </div>
 
@@ -86,15 +118,39 @@
 
       <section class="section container current-section" id="current" aria-labelledby="current-title">
         <div class="section-lead">
-          <p class="section-index">01 / 现状</p>
+          <p class="section-index">01 / 为什么需要 DAP</p>
           <h2 id="current-title">这几件事，做过数仓的人都经历过。</h2>
-          <p class="draft-label">文案草稿 · 待确认</p>
+          <p class="section-subnote">当元数据散落在个人文档和口头交接里，每一次找表和对齐口径都在重复消耗团队精力。</p>
         </div>
         <ol class="pain-list">
-          <li><span class="list-number">1</span><p><strong>新人上手慢。</strong>一张表能不能用，要先去问人。</p></li>
-          <li><span class="list-number">2</span><p><strong>同一指标两份口径。</strong>两张报表的「下单用户数」对不上，没人说得清谁对。</p></li>
-          <li><span class="list-number">3</span><p><strong>人一走，知识就丢。</strong>字段含义和加工逻辑，留在离职同事的脑子里。</p></li>
-          <li><span class="list-number">4</span><p><strong>业务问数答不准。</strong>同一个问题，换个人查，数就变了。</p></li>
+          <li>
+            <span class="list-number">01</span>
+            <div>
+              <strong>新人上手慢。</strong>
+              <p>一张表能不能用、更新频率是什么，要先找到写表的人问一圈。</p>
+            </div>
+          </li>
+          <li>
+            <span class="list-number">02</span>
+            <div>
+              <strong>同一指标两份口径。</strong>
+              <p>两张报表的「下单用户数」对不上，没人说得清哪份才是权威定义。</p>
+            </div>
+          </li>
+          <li>
+            <span class="list-number">03</span>
+            <div>
+              <strong>人一走，知识就断层。</strong>
+              <p>核心字段的业务含义、枚举码值和加工背景，留在离职同事的脑子里。</p>
+            </div>
+          </li>
+          <li>
+            <span class="list-number">04</span>
+            <div>
+              <strong>业务问数缺少可信底座。</strong>
+              <p>没有经过校验的资产与口径出处，同一个问题换个人或换个模型查，口径就变了。</p>
+            </div>
+          </li>
         </ol>
       </section>
 
@@ -102,13 +158,13 @@
         <div class="container section ask-section">
           <div class="ask-intro">
             <div class="ask-copy">
-              <p class="section-index">02 / 问资产</p>
-              <h2 id="ask-title">问资产，<br>不是问数。</h2>
-              <p class="section-description">DAP 不直接回答数字。它用可追溯的方式找出对的资产：哪张表、哪个字段、口径写在哪、数据从哪来。再通过 API 把检索和可信数据能力，交给问数等上层应用使用。</p>
+              <p class="section-index">02 / 检索与问资产</p>
+              <h2 id="ask-title">问资产，<br>不是盲目问数。</h2>
+              <p class="section-description">DAP 默认提供确定性关键词检索；开启可选 AI 问答后，也绝不直接编造业务数字，而是用可追溯的证据链锁定哪张表、哪个字段、口径写在哪、数据从哪来，并把校验后的资产结构交给上层应用。</p>
               <ul class="principle-list">
-                <li>只展示真实执行步骤：检索词、检索轮次、命中资产、证据来源。</li>
-                <li>不展示模型内部推理。</li>
-                <li>AI 问答默认关闭，是可选能力。</li>
+                <li>全链路透明：清晰呈现检索词拆解、检索轮次、命中资产与目录证据来源。</li>
+                <li>目录权威校验：所有返回的候选资产均按当前目录稳定 ID 回查核验，拒绝自由文本幻觉。</li>
+                <li>按需渐进启用：确定性搜索零外部依赖开箱即用；RAG 推荐与单轮 AI 问答默认关闭、可独立插拔。</li>
               </ul>
             </div>
             <dap-recording name="ai-rag"></dap-recording>
@@ -118,54 +174,56 @@
             <article class="sample-panel" aria-labelledby="evidence-title">
               <div class="panel-heading">
                 <div>
-                  <h3 id="evidence-title">证据链样本</h3>
-                  <p>一次问资产的完整执行过程</p>
+                  <h3 id="evidence-title">证据链追踪样本</h3>
+                  <p>一次「问资产」从问题拆解到目录回查的完整链路</p>
                 </div>
-                <span class="sample-label">示意数据</span>
+                <span class="sample-label">零售演示数据</span>
               </div>
               <ol class="evidence-steps">
                 <li class="evidence-step">
-                  <span class="step-index">1 / 检索词</span>
+                  <span class="step-index">1 / 检索词拆解</span>
                   <p class="question-sample">近 30 天下单用户数的口径是什么、从哪张表出？</p>
-                  <p class="secondary-label">拆出的检索词</p>
+                  <p class="secondary-label">提取的关键检索词</p>
                   <div class="keyword-list"><code>下单用户数</code><code>30天</code><code>口径</code></div>
                 </li>
                 <li class="evidence-step">
-                  <span class="step-index">2 / 检索轮次</span>
+                  <span class="step-index">2 / 多轮混合检索</span>
                   <div class="round-list">
-                    <p><b>R1</b><code>exact</code><span>“下单用户数” → 命中 1</span></p>
-                    <p><b>R2</b><code>keyword</code><span>“下单 用户 30天” → 命中 3</span></p>
-                    <p><b>R3</b><code>hybrid</code><span>“下单用户 去重 口径” → 命中 1</span></p>
+                    <p><b>R1</b><code>exact</code><span>“下单用户数” → 命中 1 项指标定义</span></p>
+                    <p><b>R2</b><code>keyword</code><span>“下单 用户 30天” → 命中 3 项汇总表与字段</span></p>
+                    <p><b>R3</b><code>hybrid</code><span>“下单用户 去重 口径” → 命中 1 条语义关联证据</span></p>
                   </div>
                 </li>
                 <li class="evidence-step">
-                  <span class="step-index">3 / 命中的资产</span>
+                  <span class="step-index">3 / 目录权威校验命中</span>
                   <dl class="asset-list">
-                    <div><dt>指标</dt><dd><code>order_user_cnt_30d</code></dd></div>
-                    <div><dt>表</dt><dd><code>dws.trade_user_stat_d</code></dd></div>
-                    <div><dt>字段</dt><dd><code>dws.trade_user_stat_d.order_user_cnt</code></dd></div>
+                    <div><dt>指标资产</dt><dd><code>order_user_cnt_30d</code></dd></div>
+                    <div><dt>出数主题表</dt><dd><code>dws.trade_user_stat_d</code></dd></div>
+                    <div><dt>结果字段</dt><dd><code>dws.trade_user_stat_d.order_user_cnt</code></dd></div>
                   </dl>
                 </li>
                 <li class="evidence-step">
-                  <span class="step-index">4 / 证据来源</span>
+                  <span class="step-index">4 / 溯源证据锚点</span>
                   <dl class="asset-list evidence-sources">
                     <div><dt>指标口径定义</dt><dd><code>order_user_cnt_30d</code></dd></div>
-                    <div><dt>字段注释</dt><dd><code>order_user_cnt</code></dd></div>
-                    <div><dt>血缘快照（导入于 <span class="placeholder">[日期]</span>）</dt><dd><code>dwd.trade_order_d → dws.trade_user_stat_d</code></dd></div>
+                    <div><dt>物理字段注释</dt><dd><code>order_user_cnt</code></dd></div>
+                    <div><dt>已导入血缘快照</dt><dd><code>dwd.trade_order_d → dws.trade_user_stat_d</code></dd></div>
                   </dl>
                 </li>
               </ol>
-              <p class="sample-note">检索方式名称与接口返回字段以实际实现为准 <span class="placeholder">[待核对]</span>。表名为虚构零售演示数据。</p>
+              <p class="sample-note">所有候选资产均由 DAP 按当前目录稳定主键（assetId / fieldId）回查重建。上方表名与指标来自仓库内置零售演示数据集。</p>
             </article>
 
             <article class="code-panel" aria-labelledby="api-title">
               <div class="panel-heading">
                 <div>
-                  <h3 id="api-title">对外 API 返回（节选）</h3>
+                  <h3 id="api-title">结构化证据响应（节选）</h3>
+                  <p>面向 BI 与上层问数应用的稳定引用载荷</p>
                 </div>
-                <span class="sample-label">示意数据</span>
+                <span class="sample-label">JSON Contract</span>
               </div>
               <pre class="code-block"><code>{
+  "status": "answered",
   "question": "近30天下单用户数的口径是什么、从哪张表出？",
   "rounds": [
     { "n": 1, "mode": "exact",   "query": "下单用户数",        "hits": 1 },
@@ -182,14 +240,13 @@
       "text": "近30天内成功下单的去重用户数" },
     { "asset": "dws.trade_user_stat_d.order_user_cnt", "source": "field_comment" },
     { "asset": "dws.trade_user_stat_d", "source": "lineage_snapshot",
-      "path": "dwd.trade_order_d -> dws.trade_user_stat_d",
-      "imported_at": "<span class=\"placeholder\">[日期]</span>" }
+      "path": "dwd.trade_order_d -> dws.trade_user_stat_d" }
   ]
 }</code></pre>
               <div class="api-explainer">
-                <h4>上层应用拿到的，不是一句答案</h4>
-                <p>而是一组带出处的资产：每一项都能回到口径定义、字段注释或血缘快照。问数应用可以据此生成查询，也可以据此拒绝回答。</p>
-                <p class="api-path">接口路径与鉴权方式：<span class="placeholder">[待补]</span></p>
+                <h4>上层应用拿到的，不是一句模糊回答</h4>
+                <p>而是一组带权威出处的结构化资产引用：每一项都能精确定位到指标口径、字段注释或血缘快照。上层应用既可据此安全拼接查询，也可在证据不足时明确拒答。</p>
+                <p class="api-path"><span>核心检索与问答端点：</span><code>GET /api/search</code> · <code>POST /api/ai/ask/stream</code></p>
               </div>
             </article>
           </div>
@@ -201,47 +258,50 @@
           <div class="readiness-copy">
             <p class="section-index">03 / 资产就绪度</p>
             <h2 id="readiness-title">用着用着，<br>就把资产补全了。</h2>
-            <p class="section-description">每个模块里有多少资产说得清楚、口径有出处，用一个百分比提示。它只是提示，用最小的代价让人知道哪里还缺。</p>
+            <p class="section-description">不需要搞运动式的治理专项。每个模块里有多少资产说得清楚、口径有出处，直接用就绪度百分比直观呈现——不绑架审批流，用最小的认知成本告诉团队哪里还缺。</p>
             <dap-recording name="readiness"></dap-recording>
           </div>
           <div class="readiness-panel">
             <div class="panel-heading">
-              <h3>各模块就绪度</h3>
-              <span class="sample-label">示意数据</span>
+              <div>
+                <h3>各模块资产就绪度</h3>
+                <p>基于完备性规则实时计算的目录健康度概览</p>
+              </div>
+              <span class="sample-label">零售演示数据</span>
             </div>
             <ul class="readiness-list">
               <li class="readiness-row">
                 <div class="readiness-meta"><span id="ready-table">表资产</span><span>82%</span></div>
-                <div class="readiness-track" role="progressbar" aria-labelledby="ready-table" aria-valuemin="0" aria-valuemax="100" aria-valuenow="82" aria-valuetext="示意数据，82%"><span style="width: 82%"></span></div>
-                <p>计入：有负责人和表说明</p>
+                <div class="readiness-track" role="progressbar" aria-labelledby="ready-table" aria-valuemin="0" aria-valuemax="100" aria-valuenow="82" aria-valuetext="零售演示数据，表资产就绪度 82%"><span style="width: 82%"></span></div>
+                <p>计入标准：已维护负责人与表业务说明</p>
               </li>
               <li class="readiness-row">
                 <div class="readiness-meta"><span id="ready-field">字段含义</span><span>64%</span></div>
-                <div class="readiness-track" role="progressbar" aria-labelledby="ready-field" aria-valuemin="0" aria-valuemax="100" aria-valuenow="64" aria-valuetext="示意数据，64%"><span style="width: 64%"></span></div>
-                <p>计入：已填写中文含义</p>
+                <div class="readiness-track" role="progressbar" aria-labelledby="ready-field" aria-valuemin="0" aria-valuemax="100" aria-valuenow="64" aria-valuetext="零售演示数据，字段含义就绪度 64%"><span style="width: 64%"></span></div>
+                <p>计入标准：已填写字段中文业务释义</p>
               </li>
               <li class="readiness-row">
                 <div class="readiness-meta"><span id="ready-metric">指标口径</span><span>71%</span></div>
-                <div class="readiness-track" role="progressbar" aria-labelledby="ready-metric" aria-valuemin="0" aria-valuemax="100" aria-valuenow="71" aria-valuetext="示意数据，71%"><span style="width: 71%"></span></div>
-                <p>计入：有口径文本和出数表</p>
+                <div class="readiness-track" role="progressbar" aria-labelledby="ready-metric" aria-valuemin="0" aria-valuemax="100" aria-valuenow="71" aria-valuetext="零售演示数据，指标口径就绪度 71%"><span style="width: 71%"></span></div>
+                <p>计入标准：已维护口径定义文本并绑定出数表与字段</p>
               </li>
               <li class="readiness-row">
-                <div class="readiness-meta"><span id="ready-code">码值</span><span>90%</span></div>
-                <div class="readiness-track" role="progressbar" aria-labelledby="ready-code" aria-valuemin="0" aria-valuemax="100" aria-valuenow="90" aria-valuetext="示意数据，90%"><span style="width: 90%"></span></div>
-                <p>计入：有码值说明</p>
+                <div class="readiness-meta"><span id="ready-code">标准码值</span><span>90%</span></div>
+                <div class="readiness-track" role="progressbar" aria-labelledby="ready-code" aria-valuemin="0" aria-valuemax="100" aria-valuenow="90" aria-valuetext="零售演示数据，标准码值就绪度 90%"><span style="width: 90%"></span></div>
+                <p>计入标准：已维护码值枚举明细与业务说明</p>
               </li>
               <li class="readiness-row">
                 <div class="readiness-meta"><span id="ready-report">报表与 API</span><span>55%</span></div>
-                <div class="readiness-track is-low" role="progressbar" aria-labelledby="ready-report" aria-valuemin="0" aria-valuemax="100" aria-valuenow="55" aria-valuetext="示意数据，55%"><span style="width: 55%"></span></div>
-                <p>计入：已关联到具体资产 <span class="status-pending">待补</span></p>
+                <div class="readiness-track is-low" role="progressbar" aria-labelledby="ready-report" aria-valuemin="0" aria-valuemax="100" aria-valuenow="55" aria-valuetext="零售演示数据，报表与 API 就绪度 55%"><span style="width: 55%"></span></div>
+                <p>计入标准：已建立与底层表或指标的来源关联 <span class="status-pending">优先补齐</span></p>
               </li>
               <li class="readiness-row">
                 <div class="readiness-meta"><span id="ready-lineage">血缘快照</span><span>38%</span></div>
-                <div class="readiness-track is-low" role="progressbar" aria-labelledby="ready-lineage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="38" aria-valuetext="示意数据，38%"><span style="width: 38%"></span></div>
-                <p>计入：已导入快照的表占比 <span class="status-pending">待补</span></p>
+                <div class="readiness-track is-low" role="progressbar" aria-labelledby="ready-lineage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="38" aria-valuetext="零售演示数据，血缘快照就绪度 38%"><span style="width: 38%"></span></div>
+                <p>计入标准：已导入激活态上下游血缘快照的表占比 <span class="status-pending">优先补齐</span></p>
               </li>
             </ul>
-            <p class="chart-note">百分比 = 满足条件的资产数 ÷ 该模块资产总数；低于 60% 标「待补」。以上百分比与阈值均为示意数据 <span class="placeholder">[口径待确认]</span>。</p>
+            <p class="chart-note">就绪度 = 满足完备性规则的资产数 ÷ 该模块资产总数；低于 60% 自动标记「优先补齐」，引导日常高频维护。</p>
           </div>
         </div>
       </section>
@@ -249,34 +309,36 @@
       <section class="tinted-section boundary-section" id="boundaries" aria-labelledby="boundary-title">
         <div class="section container">
           <div class="boundary-heading">
-            <p class="section-index">04 / 边界</p>
-            <h2 id="boundary-title">它明确<br>不做什么</h2>
-            <span class="not-mark" aria-hidden="true">不</span>
-            <p class="section-description">DAP 只做数仓资产目录这一件事，并且尽量让它能在内网的一台机器上跑起来。下面四件事，它不做，也不打算做。</p>
+            <p class="section-index">04 / 架构取舍与边界</p>
+            <h2 id="boundary-title">专注资产目录，<br>把重型链路留在外部。</h2>
+            <p class="section-description">DAP 之所以能在 2GB 内存的内网单机上轻松跑起来，是因为我们只聚焦「数仓资产目录」这一件事，主动对以下四类重型能力做减法：</p>
           </div>
           <div class="boundary-grid">
             <article class="boundary-item">
-              <span class="boundary-index">不做 01</span>
-              <h3>数据采集与调度</h3>
-              <p>不负责真实数据采集、任务编排或文件推送执行。由外部系统整理好元数据后，通过 Metadata Contract 导入。</p>
+              <span class="boundary-index">边界 01</span>
+              <h3>不内置数据采集与任务调度</h3>
+              <p>不侵入企业既有的 ETL 编排或文件推送执行。由外部系统整理好元数据后，通过版本化 Metadata Contract 标准导入。</p>
             </article>
             <article class="boundary-item">
-              <span class="boundary-index">不做 02</span>
-              <h3>扫描与解析</h3>
-              <p>不主动发现数据：不扫描数据库，不解析 SQL。</p>
+              <span class="boundary-index">边界 02</span>
+              <h3>不主动连接或扫描生产库</h3>
+              <p>DAP 不持有业务生产库凭据，不主动探查库表，也不在运行时解析复杂业务 SQL，从根源上降低内网安全合规顾虑。</p>
             </article>
             <article class="boundary-item">
-              <span class="boundary-index">不做 03</span>
-              <h3>血缘计算</h3>
-              <p>只浏览已导入的血缘快照，不做自动解析。</p>
+              <span class="boundary-index">边界 03</span>
+              <h3>不内置重型血缘计算引擎</h3>
+              <p>专注于流畅浏览与检索已导入的血缘快照（支持最多 30,000 节点 / 75,000 边的快照替换），把方言解析交给上游采集器。</p>
             </article>
             <article class="boundary-item">
-              <span class="boundary-index">不做 04</span>
-              <h3>质量与治理工作流</h3>
-              <p>不提供数据质量检测、Profiling 和治理审批流程。资产就绪度只是提示，不带审批、工单或流转。</p>
+              <span class="boundary-index">边界 04</span>
+              <h3>不绑架质量检测与审批流</h3>
+              <p>不内置重型数据 Profiling 与工单审批流转。资产就绪度只做轻量透明的健康提示，让数据团队保持敏捷。</p>
             </article>
           </div>
-          <p class="boundary-note"><strong>如果你需要这些能力，OpenMetadata 或 DataHub 可能更合适。</strong><span>这是定位差异，不是能力高低。</span></p>
+          <div class="boundary-note">
+            <strong>如果你需要覆盖数百个连接器与全套治理工作流，OpenMetadata 或 DataHub 会是更合适的选择。</strong>
+            <span>DAP 选择用更少的组件与更低的运维成本，为数仓团队交付一个开箱即用的轻量目录。</span>
+          </div>
         </div>
       </section>
 
@@ -284,43 +346,50 @@
         <div class="deployment-intro">
           <div>
             <p class="section-index">05 / 部署与信任</p>
-            <h2 id="deployment-title">一台机器，<br>装在内网里，数据不出门。</h2>
+            <h2 id="deployment-title">一台内网机器，<br>数据不出门，运维零负担。</h2>
+            <p class="section-description">一个前端静态包、一个 FastAPI 进程加上你现有的关系型数据库即可上线。无需维护 Kafka、Elasticsearch 或向量数据库集群。</p>
           </div>
           <dl class="trust-list">
-            <div><dt>部署</dt><dd>内网、离线、单机</dd></div>
-            <div><dt>外部依赖</dt><dd>不依赖消息中间件，不依赖独立搜索引擎</dd></div>
-            <div><dt>权限与审计</dt><dd>权限控制与操作日志<br><span class="placeholder">[角色模型待补]</span></dd></div>
-            <div><dt>安全披露</dt><dd>有披露流程<br><span class="placeholder">[SECURITY 链接 / 联系邮箱待补]</span></dd></div>
-            <div><dt>许可证</dt><dd>Apache-2.0</dd></div>
-            <div><dt>已验证环境</dt><dd>2 核 · 约 2 GB 内存 · 约 50 GB 磁盘<br><span>演示数据：30 张表、251 个字段</span></dd></div>
-            <div><dt>RAG 扩展</dt><dd>可独立部署，实测占用约 0.4 GB 内存、1.8 GB 磁盘</dd></div>
-            <div><dt>落地周期</dt><dd><span class="placeholder">[从安装到首批元数据可搜索的实测时间 待补]</span></dd></div>
+            <div><dt>部署形态</dt><dd>支持完全离线的内网单机部署（systemd + Nginx）</dd></div>
+            <div><dt>运行时依赖</dt><dd>单 Web 进程 + 单关系型数据库，零消息中间件与外部搜索依赖</dd></div>
+            <div><dt>权限与审计</dt><dd>基于权限码的 RBAC 强制授权（含公开目录只读与受控管理态）及全量操作审计</dd></div>
+            <div><dt>安全策略</dt><dd><a href="https://github.com/0verme/data-asset-portal-community/blob/main/SECURITY.md">遵循 SECURITY.md 漏洞私有披露流程与 CI 敏感数据守卫 →</a></dd></div>
+            <div><dt>开源许可</dt><dd>Apache-2.0</dd></div>
+            <div><dt>轻量资源占用</dt><dd>2 核 CPU · 约 2 GB 内存 · 约 50 GB 磁盘即可流畅运行<br><span>内置零售演示集：30 张主题表、251 个字段、16 个指标、40 个标准词根</span></dd></div>
+            <div><dt>可选 AI / RAG 扩展</dt><dd>独立 HTTP 客户端解耦接入；外部 RAG 实测仅需约 0.4 GB 内存、1.8 GB 磁盘</dd></div>
+            <div><dt>快速体验</dt><dd>执行 ./scripts/demo.sh 一键初始化 SQLite 演示库与前后端服务</dd></div>
           </dl>
         </div>
 
-        <div class="code-panel" aria-labelledby="demo-run-title">
-          <h3 id="demo-run-title">怎么跑起来</h3>
+        <div class="code-panel run-panel" aria-labelledby="demo-run-title">
+          <div class="panel-heading">
+            <div>
+              <h3 id="demo-run-title">三行命令，本地跑起完整演示</h3>
+              <p>包含真实 FastAPI 后端、SQLite 演示库与 8 大零售主题域完整数据集</p>
+            </div>
+            <span class="sample-label">Linux · macOS · Windows</span>
+          </div>
           <pre class="code-block"><code>git clone https://github.com/0verme/data-asset-portal-community.git
 cd data-asset-portal-community
 ./scripts/demo.sh</code></pre>
-          <p>启动完成后，按终端输出打开浏览器。生产部署见 <a href="https://github.com/0verme/data-asset-portal-community/blob/main/DEPLOYMENT.md">DEPLOYMENT.md</a>。</p>
+          <p class="run-panel-foot">启动完成后按终端提示打开浏览器（本地演示管理员 admin / 123456）。生产环境部署详见 <a href="https://github.com/0verme/data-asset-portal-community/blob/main/DEPLOYMENT.md">DEPLOYMENT.md</a> · <a href="https://github.com/0verme/data-asset-portal-community/blob/main/docs/community-demo.md">Community Demo 指南</a>。</p>
         </div>
 
         <div class="compatibility">
           <div class="compatibility-heading">
-            <h3>数据库兼容，分两档说清楚</h3>
-            <p>Verified：有可复现的自动化测试覆盖。Compatible：只有静态或离线验证。</p>
+            <h3>数据库兼容性分级透明</h3>
+            <p>Verified 代表通过真实数据库实例的 CI 自动化回归测试；Compatible 代表完成离线 DDL 与静态迁移契约校验。</p>
           </div>
           <div class="table-scroll" tabindex="0" role="region" aria-label="数据库兼容表，可横向滚动">
             <table>
               <thead>
-                <tr><th scope="col">数据库</th><th scope="col">档位</th><th scope="col">依据</th></tr>
+                <tr><th scope="col">数据库</th><th scope="col">支持档位</th><th scope="col">验证依据与适用场景</th></tr>
               </thead>
               <tbody>
-                <tr><th scope="row"><code>PostgreSQL</code></th><td><span class="badge-verified">Verified</span></td><td>真实 PG 16 实例的 CI 验证</td></tr>
-                <tr><th scope="row"><code>MySQL 8.0</code></th><td><span class="badge-verified">Verified</span></td><td>真实 MySQL 8 实例的 CI 验证</td></tr>
-                <tr><th scope="row"><code>SQLite</code></th><td><span class="badge-verified">Verified</span></td><td>本地开发与 Demo 使用，不是生产目标</td></tr>
-                <tr><th scope="row"><code>GaussDB / DWS</code></th><td><span class="badge-compatible">Compatible</span></td><td>仅离线静态验证，暂无在线 CI 实例</td></tr>
+                <tr><th scope="row"><code>PostgreSQL</code></th><td><span class="badge-verified">Verified</span></td><td>GitHub Actions 真实 PostgreSQL 16 实例全量迁移、种子数据与集成测试覆盖（推荐生产使用）</td></tr>
+                <tr><th scope="row"><code>MySQL 8.0</code></th><td><span class="badge-verified">Verified</span></td><td>GitHub Actions 真实 MySQL 8.0 实例基线迁移、CRUD、分页、唯一约束与事务回滚契约覆盖</td></tr>
+                <tr><th scope="row"><code>SQLite</code></th><td><span class="badge-verified">Verified</span></td><td>Community 本地开发、一键 Demo 与快速 CI 验证默认引擎（非生产并发目标）</td></tr>
+                <tr><th scope="row"><code>GaussDB / DWS</code></th><td><span class="badge-compatible">Compatible</span></td><td>通过 schema_migrate.py --offline --dialect dws 离线静态 DDL 与增量迁移安全校验</td></tr>
               </tbody>
             </table>
           </div>
@@ -330,52 +399,88 @@ cd data-asset-portal-community
       <section class="tinted-section onboarding-section" id="onboarding" aria-labelledby="onboarding-title">
         <div class="section container">
           <div class="onboarding-heading">
-            <p class="section-index">06 / 接入方式</p>
-            <h2 id="onboarding-title">采集在外面，<br>DAP 只管接收和展示。</h2>
-            <p class="section-description">采集由外部系统负责。DAP 负责接收、校验、归一化、幂等、持久化、审计和展示。</p>
+            <p class="section-index">06 / 开放接入契约</p>
+            <h2 id="onboarding-title">采集在外面，<br>DAP 只管幂等接收与权威展示。</h2>
+            <p class="section-description">无论你用的是自研 Python 脚本、Airflow 调度还是现有治理平台，只需按版本化 JSON Contract 提交 HTTP 请求，即可把元数据持续同步进 DAP。</p>
           </div>
           <ol class="flow-list" aria-label="元数据接入流程">
-            <li class="flow-node"><h3>外部系统</h3><p>采集平台、调度、脚本</p></li>
+            <li class="flow-node">
+              <span class="flow-step">STEP 01</span>
+              <h3>外部采集与调度</h3>
+              <p>ETL 平台、调度脚本、SQL 解析器</p>
+            </li>
             <li class="flow-arrow" aria-hidden="true"></li>
-            <li class="flow-node"><h3>整理好的元数据</h3><p>表、字段、指标、口径、血缘快照</p></li>
+            <li class="flow-node">
+              <span class="flow-step">STEP 02</span>
+              <h3>整理后的元数据</h3>
+              <p>表、字段、指标口径、血缘快照</p>
+            </li>
             <li class="flow-arrow" aria-hidden="true"></li>
-            <li class="flow-node"><h3>Metadata Contract</h3><p>导入格式的约定</p><span class="placeholder flow-placeholder">[Schema 链接待补]</span></li>
+            <li class="flow-node">
+              <span class="flow-step">STEP 03</span>
+              <h3>Metadata Contract</h3>
+              <p>版本化 JSON 载荷规范（v1.0）</p>
+              <a class="flow-link" href="https://github.com/0verme/data-asset-portal-community/blob/main/docs/metadata-ingestion.md">查看 Contract 规范 →</a>
+            </li>
             <li class="flow-arrow" aria-hidden="true"></li>
-            <li class="flow-node"><h3>Metadata API</h3><p>接收导入请求</p><span class="placeholder flow-placeholder">[接口文档待补]</span></li>
+            <li class="flow-node">
+              <span class="flow-step">STEP 04</span>
+              <h3>Metadata API</h3>
+              <p>批量幂等写入与 dryRun 预检</p>
+              <a class="flow-link" href="https://github.com/0verme/data-asset-portal-community/blob/main/examples/metadata_ingestion/README.md">查看最小导入示例 →</a>
+            </li>
             <li class="flow-arrow" aria-hidden="true"></li>
-            <li class="flow-node"><h3>DAP</h3><p>校验 · 归一化 · 幂等<br>持久化 · 审计 · 展示</p></li>
+            <li class="flow-node flow-node-highlight">
+              <span class="flow-step">STEP 05</span>
+              <h3>DAP</h3>
+              <p>校验 · 归一化 · 幂等比对 · 持久化 · 审计 · 门户展示</p>
+            </li>
           </ol>
 
           <div class="contract-grid" id="contract-sample">
             <article class="code-panel contract-panel" aria-labelledby="contract-title">
               <div class="panel-heading">
-                <h3 id="contract-title">Contract 样例（节选）</h3>
-                <span class="sample-label">示意数据</span>
+                <div>
+                  <h3 id="contract-title">Metadata Ingestion 载荷样例</h3>
+                  <p>POST /api/metadata/assets/ingestions</p>
+                </div>
+                <span class="sample-label">contractVersion 1.0</span>
               </div>
               <pre class="code-block"><code>{
-  "contract_version": "<span class="placeholder">[版本]</span>",
-  "source_system": "etl-demo",
-  "tables": [
+  "contractVersion": "1.0",
+  "source": {
+    "type": "postgresql",
+    "name": "warehouse-prod",
+    "namespace": "retail"
+  },
+  "assets": [
     {
-      "name": "dws.trade_user_stat_d",
-      "comment": "用户交易日汇总",
-      "columns": [
-        { "name": "order_user_cnt", "type": "bigint",
-          "comment": "当日下单用户数" }
+      "externalId": "dws.trade_user_stat_d",
+      "qualifiedName": "dws.trade_user_stat_d",
+      "displayName": "用户交易日汇总表",
+      "layer": "DWS",
+      "fields": [
+        {
+          "fieldName": "order_user_cnt",
+          "dataType": "bigint",
+          "description": "当日下单去重用户数"
+        }
       ]
     }
   ]
 }</code></pre>
-              <p class="sample-note">字段名以 Contract 文档为准 <span class="placeholder">[待核对]</span>。</p>
+              <p class="sample-note">支持按 (source, assetType, externalId) 自然键幂等更新与跨源隔离。完整字段定义与批量限制详见 <a href="https://github.com/0verme/data-asset-portal-community/blob/main/docs/metadata-ingestion.md">docs/metadata-ingestion.md</a>。</p>
             </article>
             <div class="responsibility-list">
-              <div>
+              <div class="responsibility-card">
+                <span class="responsibility-tag">Upstream Producer</span>
                 <h3>外部系统负责</h3>
-                <p>采集、调度、解析，以及产出符合 Contract 的元数据。</p>
+                <p>数据源连接、调度触发、SQL/DAG 解析，以及产出符合 Metadata Contract 的结构化 JSON。</p>
               </div>
-              <div>
-                <h3>DAP 负责</h3>
-                <p>接收、校验、归一化、幂等、持久化、审计和展示。</p>
+              <div class="responsibility-card responsibility-card-primary">
+                <span class="responsibility-tag">DAP Core</span>
+                <h3>DAP 门户负责</h3>
+                <p>Schema 校验、字段归一化、幂等变更比对、持久化存储、操作审计与全站检索展示。</p>
               </div>
             </div>
           </div>
@@ -383,8 +488,8 @@ cd data-asset-portal-community
       </section>
 
       <section class="section container open-source-section" id="opensource" aria-labelledby="opensource-title">
-        <p class="section-index">07 / 开源与入口</p>
-        <h2 id="opensource-title">Apache-2.0，代码和演示都是公开的。</h2>
+        <p class="section-index">07 / 开源生态与入口</p>
+        <h2 id="opensource-title">Apache-2.0 开源，代码、文档与在线演示全部公开。</h2>
         <div class="entry-grid">
           <a class="entry-link" href="https://github.com/0verme/data-asset-portal-community">
             <span class="entry-label">GitHub</span>
@@ -392,24 +497,35 @@ cd data-asset-portal-community
           </a>
           <a class="entry-link" href="https://data.overme.cn/">
             <span class="entry-label">在线演示</span>
-            <span class="entry-url">data.overme.cn（虚构零售演示数据） <span aria-hidden="true">→</span></span>
+            <span class="entry-url">data.overme.cn（含 8 大主题域零售演示数据） <span aria-hidden="true">→</span></span>
           </a>
           <a class="entry-link" href="https://github.com/0verme/data-asset-portal-community/blob/main/docs/README.md">
             <span class="entry-label">文档</span>
-            <span class="entry-url">…/data-asset-portal-community/blob/main/docs/README.md <span aria-hidden="true">→</span></span>
+            <span class="entry-url">github.com/0verme/data-asset-portal-community/tree/main/docs <span aria-hidden="true">→</span></span>
           </a>
-          <div class="entry-link entry-link-placeholder">
-            <span class="entry-label">讨论区</span>
-            <span class="entry-url"><span class="placeholder">[Discussions 链接待补]</span></span>
-          </div>
+          <a class="entry-link" href="https://github.com/0verme/data-asset-portal-community/blob/main/DEPLOYMENT.md">
+            <span class="entry-label">部署指南</span>
+            <span class="entry-url">内网单机 systemd + Nginx 与离线构建完整手册 <span aria-hidden="true">→</span></span>
+          </a>
         </div>
       </section>
     </main>
 
     <footer class="site-footer">
       <div class="container footer-inner">
-        <p>数据资产门户 DAP · Apache-2.0 开源</p>
-        <p>演示站数据均为虚构零售演示数据 · v0.2.5 · <span class="placeholder">[联系方式]</span></p>
+        <div class="footer-brand">
+          <span class="footer-mark" aria-hidden="true">DAP</span>
+          <p>数据资产门户 DAP · Apache-2.0 开源项目</p>
+        </div>
+        <div class="footer-meta">
+          <p>当前稳定版本 v0.2.7 · 演示站点均采用虚构零售数据集</p>
+          <nav class="footer-links" aria-label="页脚导航">
+            <a href="https://github.com/0verme/data-asset-portal-community">GitHub</a>
+            <a href="https://github.com/0verme/data-asset-portal-community/blob/main/docs/README.md">文档</a>
+            <a href="https://github.com/0verme/data-asset-portal-community/blob/main/DEPLOYMENT.md">部署指南</a>
+            <a href="https://github.com/0verme/data-asset-portal-community/blob/main/SECURITY.md">安全策略</a>
+          </nav>
+        </div>
       </div>
     </footer>
 
