@@ -176,9 +176,25 @@ Form 编辑流程应让标题、字段分组、校验、未保存状态和保存
 
 移动端复用同一主容器和 Shell 抽屉。门户在 769px 切回桌面导航，工作台在 960px 切回桌面侧栏。关闭的抽屉退出 Tab 顺序。保留 Escape、焦点返回、滚动、移动搜索互斥和安全区；提交筛选、导航或选择节点的控件按既有行为收起抽屉，搜索和展开等就地操作保留抽屉。门户抽屉提供主导航，工作台抽屉同时提供本模块内容和可达的进度区域。
 
-**侧栏底部进度区域**由 [ModuleSidebar](src/components/app/ModuleSidebar.tsx) 统一提供。常规高度下业务区独立滚动，底部区域常驻；短屏允许面板整体滚动，保证末项、维护操作和读屏状态可达。已有真实业务进度的模块在底部展示原指标，例如上游卸数的「系统覆盖摘要」和系统启用比例。其他模块复用 [ModuleReadiness](src/components/sidebar/common/ModuleReadiness.tsx) 展示「模块就绪度」状态和空轨道。每个模块的底部区域只展示对应的一项进度。
+**侧栏底部进度区域**由 [ModuleSidebar](src/components/app/ModuleSidebar.tsx) 统一提供。常规高度下业务区独立滚动，底部区域常驻；短屏允许面板整体滚动，保证末项、维护操作和读屏状态可达。已有真实业务进度的模块在底部展示原指标，例如上游卸数的「系统覆盖摘要」和系统启用比例。其他模块通过 [getModuleReadinessSkeleton](src/components/sidebar/common/moduleReadiness.ts) 与 [ModuleReadiness](src/components/sidebar/common/ModuleReadiness.tsx) 展示「模块就绪度」状态、已确认口径说明和空轨道。每个模块的底部区域只展示对应的一项进度。
 
-后续对接 dap.overme.cn 时，DAP 与官网应消费同一就绪度指标 ID、定义和权威计算结果。各模块可以有不同的判定条件。展示契约包含模块 ID、指标 ID、展示标题、口径说明、可空的分子、分母、百分比和更新时间。已确认口径且可信全量计数与正分母齐备时，展示生产方给出的百分比。业务指标、当前页数量、查询结果和官网示意比例均不得用作就绪度依据。
+后续对接 dap.overme.cn 时，DAP 与官网应消费同一就绪度指标 ID、定义和权威计算结果。各模块统一基于模块主表（或既有预聚合统计）计算，不下钻扫描深层明细子表，带启停状态的模块分母仅计入已启用（`enabled`）资产：
+
+| 模块 (`moduleId`) | 指标 ID (`metricId`) | 统计主表 | 分母（有效总量） | 分子（计入就绪条件） | 侧栏口径说明 (`definition`) |
+|---|---|---|---|---|---|
+| `upstream` | —（系统覆盖摘要） | `p_upstream_system` | 上游系统总数 | 已启用上游系统数 | `已启用 X 个上游系统`（附类型覆盖） |
+| `data-warehouse` (`dwm`) | `table_readiness` | `p_asset_table` | `is_deleted = 'N'` 的数仓表总数 | 已填 `owner_name` 且已填 `table_desc` | `计入：有负责人和表说明` |
+| `mapping` | `field_mapping_coverage` | `p_field_mapping_field` | 有效源字段总数 | 已配置目标字段与映射规则 | `计入：已完成目标字段映射` |
+| `root` | `root_definition_readiness` | `p_root_item` | `is_deleted = 'N'` 的词根总数 | 已填 `root_en_name` 且已填 `root_desc` | `计入：有英文全称和词根说明` |
+| `indicator` | `metric_definition` | `p_indicator_item` | `is_deleted = 'N'` 且 `status_code = 'enabled'` | 已填 `caliber_desc` 且已绑定出数表（`source_asset_id` 或 `result_table_name`） | `计入：有口径文本和出数表` |
+| `codeTable` | `code_table_readiness` | `p_manual_code_table` | `status_code = 'enabled'` 的已启用码表总数 | 已填 `owner_name` 且已填 `remark` | `计入：有负责人和码表说明` |
+| `report` | `report_asset_link` | `p_report_asset` | `is_deleted = 'N'` 且 `status_code = 'enabled'` | `related_tables_json` 或 `related_indicators_json` 非空 | `计入：已关联具体表或指标资产` |
+| `apiAsset` | `api_asset_link` | `p_api_asset` | `is_deleted = 'N'` 且 `status_code = 'enabled'` | `p_api_relation` 存在至少 1 条关联资产 | `计入：已关联具体表或指标资产` |
+| `push` | `push_job_readiness` | `p_push_job` | 已启用系统下 `is_deleted = 'N'` 且 `enabled_flag = 'Y'` 的推送作业数 | 已填 `source_path`、`target_path` 和 `job_desc` | `计入：已填写源/目标路径和作业说明` |
+| `lineage` | `lineage_snapshot_coverage` | `p_asset_table` | `is_deleted = 'N'` 的数仓表总数 | 当前激活血缘快照已覆盖的数仓表数 | `计入：已导入快照的表占比` |
+| `system` | `null` (`not_applicable`) | — | — | — | `此模块不适用该指标。` |
+
+展示契约包含模块 ID、指标 ID、展示标题、口径说明、可空的分子、分母、百分比和更新时间。已确认口径且可信全量计数与正分母齐备时，展示生产方给出的百分比。业务指标、当前页数量、查询结果和官网示意比例均不得用作就绪度依据。
 
 可计算的结果使用带标签的确定进度；等待已接入的数据时使用不定进度。口径待确认、待接入、统计暂不可用和不适用时，使用状态文字和空轨道。空轨道没有数值或进度条语义。业务摘要标明统计范围并沿用权威数据源；分母为零时保留实际数量和空轨道。
 

@@ -1,5 +1,10 @@
-import type { ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 
+import {
+  getMockModuleReadiness,
+  getModuleReadiness,
+  isRemoteReadinessMode,
+} from "../../api/moduleReadiness.ts";
 import {
   AssetSidebar,
   ApiAssetSidebar,
@@ -15,6 +20,12 @@ import {
   UpstreamSidebar,
 } from "../sidebar/index.ts";
 import { ModuleReadiness } from "../sidebar/common/ModuleReadiness.tsx";
+import {
+  getModuleReadinessSkeleton,
+  normalizeReadinessModuleId,
+  type ModuleReadinessResult,
+  type ReadinessWorkspaceModuleInput,
+} from "../sidebar/common/moduleReadiness.ts";
 import type { ModuleId } from "../../routing/types.ts";
 import type { AppModuleContext } from "./appTypes.ts";
 
@@ -25,7 +36,115 @@ export interface ModuleSidebarProps {
   context: AppModuleContext;
 }
 
+function moduleReadinessRefreshKey(
+  module: ReadinessWorkspaceModuleInput,
+  context: AppModuleContext,
+): string {
+  switch (module) {
+    case "dwm":
+    case "data-warehouse":
+      return `dwm:${context.asset.totalTables}:${context.asset.tables.length}:${context.asset.homeLoading}:${context.asset.homeError}`;
+    case "mapping":
+      return `mapping:${context.mappingRoute.sourceSystemId}:${context.mappingRoute.tablePk}`;
+    case "root":
+      return `root:${context.root.rootGlobalTotal}:${context.root.roots.length}:${context.root.rootLoading}:${context.root.rootError}`;
+    case "indicator":
+      return `indicator:${context.indicator.indicatorCount}:${context.indicator.indicators.length}:${context.indicator.indicatorLoading}:${context.indicator.indicatorError}`;
+    case "codeTable":
+      return `codeTable:${context.manualCodeTable.stats.total}:${context.manualCodeTable.stats.enabled}:${context.manualCodeTable.items.length}:${context.manualCodeTable.loading}:${context.manualCodeTable.error}`;
+    case "report":
+      return `report:${context.report.reportCount}:${context.report.reports.length}:${context.report.reportLoading}:${context.report.reportError}`;
+    case "apiAsset":
+      return `apiAsset:${context.apiAsset.globalTotal}:${context.apiAsset.items.length}:${context.apiAsset.loading}:${context.apiAsset.error}`;
+    case "push":
+      return `push:${context.push.pushSystemCount}:${context.push.pushSystems.length}:${context.push.pushLoading}:${context.push.pushError}`;
+    case "lineage":
+      return `lineage:${context.lineageBootstrap?.snapshotId || ""}:${context.lineageBootstrap?.nodeCount ?? ""}:${context.lineageNodes.length}`;
+    case "system":
+      return "system";
+  }
+}
+
+function useWorkspaceModuleReadiness(
+  module: WorkspaceModuleId,
+  context: AppModuleContext,
+): ModuleReadinessResult | null {
+  const isUpstream = module === "upstream";
+  const readinessModule: ReadinessWorkspaceModuleInput = isUpstream ? "system" : module;
+  const canonicalId = normalizeReadinessModuleId(readinessModule);
+  const remoteMode = isRemoteReadinessMode();
+  const refreshKey = isUpstream ? "upstream" : moduleReadinessRefreshKey(readinessModule, context);
+  const [remoteState, setRemoteState] = useState<{
+    moduleId: string;
+    result: ModuleReadinessResult;
+  } | null>(null);
+
+  useEffect(() => {
+    if (isUpstream || canonicalId === "system" || !remoteMode) {
+      return undefined;
+    }
+    if (!context.catalogDataAccessReady) {
+      setRemoteState({
+        moduleId: canonicalId,
+        result: getModuleReadinessSkeleton(canonicalId, {
+          status: context.businessAccessReady ? "unavailable" : "loading",
+        }),
+      });
+      return undefined;
+    }
+    let cancelled = false;
+    setRemoteState((current) =>
+      current?.moduleId === canonicalId
+        ? current
+        : {
+            moduleId: canonicalId,
+            result: getModuleReadinessSkeleton(canonicalId, { status: "loading" }),
+          },
+    );
+    void getModuleReadiness(canonicalId)
+      .then((result) => {
+        if (!cancelled) {
+          setRemoteState({ moduleId: canonicalId, result });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRemoteState({
+            moduleId: canonicalId,
+            result: getModuleReadinessSkeleton(canonicalId, { status: "unavailable" }),
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    canonicalId,
+    context.businessAccessReady,
+    context.catalogDataAccessReady,
+    isUpstream,
+    refreshKey,
+    remoteMode,
+  ]);
+
+  if (isUpstream) return null;
+  if (canonicalId === "system") return getModuleReadinessSkeleton("system");
+  if (!remoteMode) {
+    if (!context.catalogDataAccessReady) {
+      return getModuleReadinessSkeleton(canonicalId, {
+        status: context.businessAccessReady ? "unavailable" : "loading",
+      });
+    }
+    return getMockModuleReadiness(canonicalId);
+  }
+  if (remoteState?.moduleId === canonicalId) {
+    return remoteState.result;
+  }
+  return getModuleReadinessSkeleton(canonicalId, { status: "loading" });
+}
+
 export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactElement {
+  const readiness = useWorkspaceModuleReadiness(module, context);
   return (
     <>
       <div className="sidebar-content">{renderModuleSidebar(module, context)}</div>
@@ -33,16 +152,7 @@ export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactEle
         {module === "upstream" ? (
           <UpstreamCoverageSummary upstream={context.upstream} statusOptions={context.statusOptions} />
         ) : (
-          <ModuleReadiness result={{
-            moduleId: module === "dwm" ? "data-warehouse" : module,
-            status: "pending_definition",
-            metricId: null,
-            definition: null,
-            numerator: null,
-            denominator: null,
-            percentage: null,
-            updatedAt: null,
-          }} />
+          <ModuleReadiness result={readiness ?? getModuleReadinessSkeleton(module)} />
         )}
       </div>
     </>

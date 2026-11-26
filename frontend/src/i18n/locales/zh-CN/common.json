@@ -17,6 +17,35 @@
       "pending_definition": "统计口径待确认，尚未计算。",
       "not_applicable": "此模块不适用该指标。",
       "pending_integration": "指标已定义，等待统计结果接入。"
+    },
+    "metrics": {
+      "table_readiness": {
+        "definition": "计入：有负责人和表说明"
+      },
+      "field_mapping_coverage": {
+        "definition": "计入：已完成目标字段映射"
+      },
+      "root_definition_readiness": {
+        "definition": "计入：有英文全称和词根说明"
+      },
+      "metric_definition": {
+        "definition": "计入：有口径文本和出数表"
+      },
+      "code_table_readiness": {
+        "definition": "计入：有负责人和码表说明"
+      },
+      "report_asset_link": {
+        "definition": "计入：已关联具体表或指标资产"
+      },
+      "api_asset_link": {
+        "definition": "计入：已关联具体表或指标资产"
+      },
+      "push_job_readiness": {
+        "definition": "计入：已填写源/目标路径和作业说明"
+      },
+      "lineage_snapshot_coverage": {
+        "definition": "计入：已导入快照的表占比"
+      }
     }
   },
   "app": {

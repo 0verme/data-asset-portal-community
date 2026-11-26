@@ -69,6 +69,23 @@ class FastApiCommonInfrastructureTests(unittest.TestCase):
             {"items": self.portal_service.get_stats.return_value},
             client.get("/api/portal/stats").json(),
         )
+        self.portal_service.get_readiness.return_value = {
+            "moduleId": "data-warehouse",
+            "metricId": "table_readiness",
+            "status": "ready",
+            "definition": "计入：有负责人和表说明",
+            "numerator": 25,
+            "denominator": 30,
+            "percentage": 83.3,
+            "updatedAt": None,
+        }
+        readiness = client.get("/api/portal/readiness?module=dwm")
+        self.assertEqual(200, readiness.status_code)
+        self.assertEqual(
+            {"data": self.portal_service.get_readiness.return_value},
+            readiness.json(),
+        )
+        self.portal_service.get_readiness.assert_called_once_with("dwm")
         search = client.get("/api/search?q=ORDER&type=indicator&limit=7")
         self.assertEqual(200, search.status_code)
         self.assertEqual(self.search_provider.search.return_value, search.json())

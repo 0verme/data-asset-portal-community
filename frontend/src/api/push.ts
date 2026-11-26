@@ -46,6 +46,19 @@ function writeStore(systems: PushSystemItem[]): void {
   mockSystems = clone(systems);
 }
 
+export function getMockPushJobReadinessCounts(): { numerator: number; denominator: number } {
+  const enabledJobs = readStore()
+    .filter((system) => system.status === 'enabled')
+    .flatMap((system) => (system.jobs || []).filter((job) => Boolean(job.enabled)));
+  const numerator = enabledJobs.filter(
+    (job) =>
+      String(job.sourcePath || '').trim() !== '' &&
+      String(job.targetPath || '').trim() !== '' &&
+      String(job.desc || '').trim() !== '',
+  ).length;
+  return { numerator, denominator: enabledJobs.length };
+}
+
 export function normalizeCollection<T>(payload: unknown): T[] {
   return parseCollectionResponse<T>(payload, '推送系统列表');
 }

@@ -1,6 +1,11 @@
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
-import { readinessPercentage, type ModuleReadinessResult } from "./moduleReadiness.ts";
+import {
+  MODULE_READINESS_SPECS,
+  readinessPercentage,
+  type ModuleReadinessResult,
+  type ReadinessModuleId,
+} from "./moduleReadiness.ts";
 
 export function ModuleReadiness({ result, title }: { result: ModuleReadinessResult; title?: string }) {
   const { t, i18n } = useTranslation("common");
@@ -11,6 +16,14 @@ export function ModuleReadiness({ result, title }: { result: ModuleReadinessResu
   const percentageLabel = percentage === null ? null : new Intl.NumberFormat(i18n.language, {
     style: "percent", maximumFractionDigits: 2,
   }).format(percentage / 100);
+  const spec = MODULE_READINESS_SPECS[result.moduleId as ReadinessModuleId];
+  const rawDefinition = result.definition?.trim() || "";
+  const usesCanonicalDefinition = Boolean(
+    result.metricId && (!rawDefinition || rawDefinition === spec?.definition),
+  );
+  const localizedDefinition = usesCanonicalDefinition && result.metricId
+    ? t(`readiness.metrics.${result.metricId}.definition`, { defaultValue: rawDefinition })
+    : rawDefinition;
 
   return (
     <section className="module-readiness" data-module={result.moduleId} aria-labelledby={id}>
@@ -24,7 +37,7 @@ export function ModuleReadiness({ result, title }: { result: ModuleReadinessResu
       ) : (
         <div className="sidebar-progress-track sidebar-progress-track--empty" aria-hidden="true" />
       )}
-      <small id={`${id}-description`}>{result.definition?.trim() || t(`readiness.description.${status}`)}</small>
+      <small id={`${id}-description`}>{localizedDefinition || t(`readiness.description.${status}`)}</small>
       {updated && Number.isFinite(updated.getTime()) && (
         <small>{t("readiness.updated")} <time dateTime={updated.toISOString()}>{updated.toLocaleString(i18n.language)}</time></small>
       )}

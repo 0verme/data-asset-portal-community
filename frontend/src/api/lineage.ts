@@ -97,6 +97,10 @@ const edges: LineageEdge[] = [
 ];
 
 const tableNodes = nodes.filter((node) => node.kind === 'table');
+
+export function getMockLineageTableCount(): number {
+  return tableNodes.length;
+}
 const tableEdges: LineageEdge[] = [
   edge('table-1', tableNodes[0]?.id || '', tableNodes[2]?.id || '', 'table_lineage', 'derived_job_path'),
   edge('table-2', tableNodes[1]?.id || '', tableNodes[2]?.id || '', 'table_lineage', 'derived_job_path'),

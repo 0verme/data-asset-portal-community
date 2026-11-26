@@ -31,7 +31,7 @@
 
 [App.tsx](../App.tsx) 提供透明轨道、单一毛玻璃表面和移动抽屉。[ModuleSidebar](../components/app/ModuleSidebar.tsx) 提供可滚动业务区和底部进度区域。模块组合已有的 [SidebarFilterGroup](../components/sidebar/common/SidebarFilterGroup.tsx)、[StatusFilterGroup](../components/sidebar/common/StatusFilterGroup.tsx) 和 [SidebarActionGroup](../components/sidebar/common/SidebarActionGroup.tsx)，并提供计数、回调、权限和刷新。树和专用导航沿用原有业务组件。给需要在移动端收起抽屉的业务按钮加 `data-sidebar-dismiss`，例如筛选项、维护入口和血缘表节点。展开、搜索等就地操作可继续在抽屉内完成。
 
-底部区域优先展示真实业务进度。上游卸数使用原有「系统覆盖摘要」。其他模块由 ModuleSidebar 统一挂载 `ModuleReadiness`，以状态文字和空轨道表示尚未接入的就绪度。接入后由权威生产方提供模块与指标 ID、统计定义和结果。选中背景使用 `--accent-soft`，强调线和业务进度使用 `--accent`，徽标描边使用 `--accent-line`。布局和验收见[全站设计语言](../../DESIGN.md)。
+底部区域优先展示真实业务进度。上游卸数使用原有「系统覆盖摘要」。其他模块由 ModuleSidebar 通过 `getModuleReadinessSkeleton` 统一挂载 `ModuleReadiness`：9 个资产模块以「待接入」状态、已确认口径说明和空轨道展示就绪度骨架，系统管理展示「不适用」。接入统计结果后由权威生产方填充分子、分母与百分比。选中背景使用 `--accent-soft`，强调线和业务进度使用 `--accent`，徽标描边使用 `--accent-line`。布局和验收见[全站设计语言](../../DESIGN.md)。
 
 目录页可直接采用两个样板的 `page-head workspace-page-header`，其内组合 `h1.page-title`、`.page-sub`、`.head-actions`。模块负责工具栏内容和窄屏操作排列。表单与详情继续使用 PageHeader 的返回和面包屑接口。
 

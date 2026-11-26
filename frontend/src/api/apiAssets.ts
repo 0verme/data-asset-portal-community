@@ -22,6 +22,14 @@ function clone<T>(value: T): T {
 
 let store: MockApiAsset[] = clone(API_ASSETS as MockApiAsset[]);
 
+export function getMockApiAssetReadinessCounts(): { numerator: number; denominator: number } {
+  const enabled = store.filter((item) => item.status === 'enabled');
+  const numerator = enabled.filter(
+    (item) => Array.isArray(item.relations) && item.relations.length > 0,
+  ).length;
+  return { numerator, denominator: enabled.length };
+}
+
 export interface ApiAssetQueryParams {
   keyword?: string | undefined;
   status?: string | undefined;

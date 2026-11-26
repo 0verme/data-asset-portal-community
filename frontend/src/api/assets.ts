@@ -249,6 +249,14 @@ async function getMockAssetTables(params: AssetQueryParams = {}): Promise<AssetT
   return normalizeTableCollection(applyOverrides(clone(getMockTables(params))));
 }
 
+export function getMockAssetReadinessCounts(): { numerator: number; denominator: number } {
+  const tables = normalizeTableCollection(applyOverrides(clone(getMockTables())));
+  const numerator = tables.filter(
+    (table) => String(table.owner || '').trim() !== '' && String(table.desc || '').trim() !== '',
+  ).length;
+  return { numerator, denominator: tables.length };
+}
+
 async function getMockAssetDetail(identity: AssetIdentity | string): Promise<AssetTableItem> {
   const resolved = normalizeAssetIdentity(identity);
   const assetId = positiveInteger(resolved.assetId);

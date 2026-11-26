@@ -88,6 +88,14 @@ function writeStore(items: SanitizedWordRoot[]): void {
   mockRoots = clone(items);
 }
 
+export function getMockRootReadinessCounts(): { numerator: number; denominator: number } {
+  const items = sanitizeRoots(readStore());
+  const numerator = items.filter(
+    (item) => String(item.en || '').trim() !== '' && String(item.desc || '').trim() !== '',
+  ).length;
+  return { numerator, denominator: items.length };
+}
+
 export function normalizeCollection<T>(payload: unknown): T[] {
   return parseCollectionResponse<T>(payload, '词根列表');
 }

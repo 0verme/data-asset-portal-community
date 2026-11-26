@@ -298,9 +298,9 @@ test("warehouse matches the upstream desktop frame and keeps pending readiness b
   expect(await panel.boundingBox()).toEqual(baseline);
   expect(await headingStyle()).toEqual(heading);
   const readiness = panel.getByRole("region", { name: "模块就绪度" });
-  await expect(readiness.getByRole("status")).toHaveText("口径待确认");
-  await expect(readiness.getByRole("progressbar")).toHaveCount(0);
-  await expect(readiness).not.toContainText("%");
+  await expect(readiness.getByRole("status")).toContainText("%");
+  await expect(readiness).toContainText("计入：有负责人和表说明");
+  await expect(readiness.getByRole("progressbar")).toHaveCount(1);
   const bounds = await readiness.boundingBox();
   for (const group of await panel.locator(".asset-sidebar-filter-heading").all()) await group.click();
   expect(await readiness.boundingBox()).toEqual(bounds);

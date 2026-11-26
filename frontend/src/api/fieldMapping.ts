@@ -509,6 +509,11 @@ export async function getFieldMappingStats(params: FieldMappingQueryParams = {})
   return buildStats(getMockRows(params));
 }
 
+export function getMockFieldMappingReadinessCounts(): { numerator: number; denominator: number } {
+  const stats = buildStats(getMockRows({}));
+  return { numerator: stats.mappedFieldCount, denominator: stats.fieldCount };
+}
+
 export async function getFieldMappings(
   params: FieldMappingQueryParams = {},
 ): Promise<PagedFieldMappingResult<EnrichedFieldMappingRow>> {
