@@ -1,6 +1,6 @@
 # 架构图维护
 
-- `architecture.json`：Archify architecture 图源，包含 10 个组件、支持性卡片及固定提交的源码证据。
+- `architecture.json`：Archify architecture 图源，包含 9 个组件、支持性卡片及固定提交的源码证据。
 - `architecture.html`：Archify 生成的自包含交互文件。下载后本地打开；GitHub 文件页不执行 HTML。
 - `../images/system-architecture.svg`：README 用的紧凑静态排版，与图源保持同一组件及关系语义；不包含脚本、远程字体或外部资源，配色来自 `frontend/src/styles/app.css` 浅色 token。
 

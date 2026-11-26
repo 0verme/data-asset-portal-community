@@ -149,25 +149,6 @@
       ]
     },
     {
-      "id": "mobile",
-      "type": "frontend",
-      "label": "微信小程序",
-      "sublabel": "Taro · 只读目录客户端",
-      "pos": [
-        365,
-        100
-      ],
-      "size": [
-        195,
-        78
-      ],
-      "sources": [
-        {
-          "path": "miniapp/src/api/http.ts"
-        }
-      ]
-    },
-    {
       "id": "identity",
       "type": "security",
       "label": "会话与 RBAC",
@@ -296,10 +277,6 @@
       "variant": "emphasis"
     },
     {
-      "from": "mobile",
-      "to": "gateway"
-    },
-    {
       "from": "collector",
       "to": "gateway",
       "label": "Metadata API"
@@ -329,7 +306,7 @@
       "dot": "rose",
       "title": "02 / 信任边界与鉴权",
       "items": [
-        "浏览器、小程序和外部采集器的输入均不可信；Nginx 是部署入口，后端按部署文档仅监听 127.0.0.1:15099。",
+        "浏览器和外部采集器的输入均不可信；Nginx 是部署入口，后端按部署文档仅监听 127.0.0.1:15099。",
         "匿名目录访问由 PUBLIC_CATALOG_PROFILE 控制：internal / strict 提供不同公开投影，disabled 要求登录；批量导出另受开关与权限控制。写操作按 permission code 授权。",
         "元数据接入要求登录且具备 metadata:write；签名 Cookie 解析与数据库角色权限校验在应用内部完成。",
         "入口还具有请求体大小限制、安全响应头、可配置 CORS；生产 HTTPS 由 Nginx 配置。"
