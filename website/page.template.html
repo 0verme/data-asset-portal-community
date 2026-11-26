@@ -5,34 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="{{@seo.description}}">
     <title>{{seo.title}}</title>
+    <link rel="icon" type="image/svg+xml" href="{{@site.assetPrefix}}assets/favicon.svg">
     <link rel="canonical" href="{{@seo.canonical}}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{@brand.name}}">
+    <meta property="og:locale" content="{{@seo.ogLocale}}">
     <meta property="og:title" content="{{@seo.title}}">
     <meta property="og:description" content="{{@seo.description}}">
     <meta property="og:url" content="{{@seo.ogUrl}}">
     <meta property="og:image" content="https://dap.overme.cn/assets/media/01-asset-search.jpg">
     <meta property="og:image:alt" content="{{@seo.ogImageAlt}}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{@seo.title}}">
+    <meta name="twitter:description" content="{{@seo.description}}">
+    <meta name="twitter:image" content="https://dap.overme.cn/assets/media/01-asset-search.jpg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{@site.assetPrefix}}styles.css">
     <script src="{{@site.assetPrefix}}app.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">{{skip.label}}</a>
+    <div class="ambient-glow" aria-hidden="true"></div>
+
     <header class="site-header" id="top">
-      <div class="container header-inner">
+      <div class="header-bar">
         <a class="brand" href="#top" aria-label="{{@brand.homeLabel}}">
-          <span class="brand-mark" aria-hidden="true">DAP</span>
-          <span class="brand-name">{{brand.name}}</span>
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" class="brand-icon">
+              <rect x="3" y="4" width="18" height="5" rx="2" fill="currentColor"/>
+              <rect x="3" y="11" width="11" height="4" rx="1.75" fill="currentColor" fill-opacity="0.78"/>
+              <rect x="16" y="11" width="5" height="4" rx="1.75" fill="currentColor" fill-opacity="0.45"/>
+              <rect x="3" y="17" width="7" height="3.5" rx="1.5" fill="currentColor" fill-opacity="0.55"/>
+              <rect x="12" y="17" width="9" height="3.5" rx="1.5" fill="currentColor" fill-opacity="0.55"/>
+            </svg>
+          </span>
+          <span class="brand-text">
+            <span class="brand-name">{{brand.name}}</span>
+            <span class="brand-badge">DAP</span>
+          </span>
         </a>
         <nav class="primary-nav" aria-label="{{@nav.label}}">
+          <a href="#ask">{{nav.features}}</a>
+          <a href="#readiness">{{nav.readiness}}</a>
+          <a href="#deployment">{{nav.deployment}}</a>
+          <a href="#onboarding">{{nav.contract}}</a>
           <a href="https://github.com/0verme/data-asset-portal-community/tree/main/docs">{{nav.docs}}</a>
           <a href="https://github.com/0verme/data-asset-portal-community">{{entry.githubLabel}}</a>
-          <a href="https://data.overme.cn/">{{nav.demo}}</a>
         </nav>
-        <div class="language-switch" aria-label="{{@language.label}}">
-          <span aria-current="page">{{language.current}}</span>
-          <button type="button" disabled aria-label="{{@language.englishDisabled}}">EN</button>
+        <div class="header-actions">
+          <a class="header-cta" href="https://data.overme.cn/">
+            <span>{{nav.demo}}</span>
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 8h9m0 0L8.75 4.25M12.5 8l-3.75 3.75" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
         </div>
       </div>
     </header>
@@ -41,7 +67,12 @@
       <section class="hero container" aria-labelledby="hero-title">
         <div class="hero-intro">
           <div class="hero-copy">
-            <p class="eyebrow"><span class="eyebrow-rule" aria-hidden="true"></span>{{hero.eyebrow}}</p>
+            <p class="eyebrow">
+              <span class="eyebrow-dot" aria-hidden="true"></span>
+              <span>{{hero.eyebrow}}</span>
+              <span class="eyebrow-sep" aria-hidden="true">·</span>
+              <span class="eyebrow-version">{{spec.version.value}}</span>
+            </p>
             <h1 id="hero-title">
               <span>{{hero.title.line1}}</span>
               <span>{{hero.title.line2}}</span>
@@ -49,35 +80,36 @@
             </h1>
             <p class="hero-description">{{hero.description.lead}}<strong>{{hero.description.emphasis}}</strong></p>
             <div class="hero-actions">
-              <a class="button button-primary" href="https://data.overme.cn/">{{hero.action.demo}}</a>
-              <a class="button button-secondary" href="https://github.com/0verme/data-asset-portal-community">{{hero.action.github}}</a>
+              <a class="button button-primary" href="https://data.overme.cn/">
+                <span>{{hero.action.demo}}</span>
+                <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4 9h10m0 0L9.75 4.75M14 9l-4.25 4.25" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </a>
+              <a class="button button-secondary" href="https://github.com/0verme/data-asset-portal-community">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="button-icon"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2Z"/></svg>
+                <span>{{hero.action.github}}</span>
+              </a>
             </div>
           </div>
 
-          <aside class="spec-panel" aria-labelledby="spec-title">
-            <h2 id="spec-title" class="spec-heading">{{spec.title}}</h2>
-            <dl class="spec-list">
+          <aside class="spec-panel" aria-label="{{@spec.title}}">
+            <div class="spec-grid">
               <div class="spec-item">
-                <dt>{{spec.license}}</dt>
-                <dd>Apache-2.0</dd>
+                <span class="spec-label">{{spec.license}}</span>
+                <strong class="spec-value">Apache-2.0</strong>
               </div>
               <div class="spec-item">
-                <dt>{{spec.deployment}}</dt>
-                <dd>{{spec.deployment.value}}</dd>
+                <span class="spec-label">{{spec.deployment}}</span>
+                <strong class="spec-value">{{spec.deployment.value}}</strong>
               </div>
               <div class="spec-item">
-                <dt>{{spec.dependencies}}</dt>
-                <dd class="tag-list"><span>{{spec.dependency.messaging}}</span><span>{{spec.dependency.search}}</span></dd>
+                <span class="spec-label">{{spec.dependencies}}</span>
+                <div class="tag-list"><span>{{spec.dependency.messaging}}</span><span>{{spec.dependency.search}}</span></div>
               </div>
               <div class="spec-item">
-                <dt>Verified</dt>
-                <dd class="database-list"><span>PostgreSQL</span><span>MySQL 8.0</span><span>SQLite</span></dd>
+                <span class="spec-label">{{spec.verified}}</span>
+                <div class="database-list"><span>PostgreSQL 16</span><span>MySQL 8.0</span><span>SQLite</span></div>
               </div>
-              <div class="spec-item">
-                <dt>{{spec.version}}</dt>
-                <dd>v0.2.5</dd>
-              </div>
-            </dl>
+            </div>
           </aside>
         </div>
 
@@ -88,13 +120,37 @@
         <div class="section-lead">
           <p class="section-index">{{current.index}}</p>
           <h2 id="current-title">{{current.title}}</h2>
-          <p class="draft-label">{{current.draft}}</p>
+          <p class="section-subnote">{{current.subtitle}}</p>
         </div>
         <ol class="pain-list">
-          <li><span class="list-number">1</span><p><strong>{{current.pain1.lead}}</strong>{{current.pain1.body}}</p></li>
-          <li><span class="list-number">2</span><p><strong>{{current.pain2.lead}}</strong>{{current.pain2.body}}</p></li>
-          <li><span class="list-number">3</span><p><strong>{{current.pain3.lead}}</strong>{{current.pain3.body}}</p></li>
-          <li><span class="list-number">4</span><p><strong>{{current.pain4.lead}}</strong>{{current.pain4.body}}</p></li>
+          <li>
+            <span class="list-number">01</span>
+            <div>
+              <strong>{{current.pain1.lead}}</strong>
+              <p>{{current.pain1.body}}</p>
+            </div>
+          </li>
+          <li>
+            <span class="list-number">02</span>
+            <div>
+              <strong>{{current.pain2.lead}}</strong>
+              <p>{{current.pain2.body}}</p>
+            </div>
+          </li>
+          <li>
+            <span class="list-number">03</span>
+            <div>
+              <strong>{{current.pain3.lead}}</strong>
+              <p>{{current.pain3.body}}</p>
+            </div>
+          </li>
+          <li>
+            <span class="list-number">04</span>
+            <div>
+              <strong>{{current.pain4.lead}}</strong>
+              <p>{{current.pain4.body}}</p>
+            </div>
+          </li>
         </ol>
       </section>
 
@@ -151,21 +207,23 @@
                   <dl class="asset-list evidence-sources">
                     <div><dt>{{ask.evidence.metricDefinition}}</dt><dd><code>order_user_cnt_30d</code></dd></div>
                     <div><dt>{{ask.evidence.fieldComment}}</dt><dd><code>order_user_cnt</code></dd></div>
-                    <div><dt>{{ask.evidence.lineagePrefix}} <span class="placeholder">{{placeholder.date}}</span>）</dt><dd><code>dwd.trade_order_d → dws.trade_user_stat_d</code></dd></div>
+                    <div><dt>{{ask.evidence.lineageLabel}}</dt><dd><code>dwd.trade_order_d → dws.trade_user_stat_d</code></dd></div>
                   </dl>
                 </li>
               </ol>
-              <p class="sample-note">{{ask.evidence.note.lead}} <span class="placeholder">{{placeholder.verify}}</span>{{ask.evidence.note.tail}}</p>
+              <p class="sample-note">{{ask.evidence.note}}</p>
             </article>
 
             <article class="code-panel" aria-labelledby="api-title">
               <div class="panel-heading">
                 <div>
                   <h3 id="api-title">{{ask.api.title}}</h3>
+                  <p>{{ask.api.subtitle}}</p>
                 </div>
-                <span class="sample-label">{{sample.label}}</span>
+                <span class="sample-label">{{ask.api.badge}}</span>
               </div>
               <pre class="code-block"><code>{
+  "status": "answered",
   "question": "{{ask.api.question}}",
   "rounds": [
     { "n": 1, "mode": "exact",   "query": "{{ask.api.query.users}}",        "hits": 1 },
@@ -182,14 +240,13 @@
       "text": "{{ask.api.evidence.metricText}}" },
     { "asset": "dws.trade_user_stat_d.order_user_cnt", "source": "field_comment" },
     { "asset": "dws.trade_user_stat_d", "source": "lineage_snapshot",
-      "path": "dwd.trade_order_d -> dws.trade_user_stat_d",
-      "imported_at": "<span class=\"placeholder\">{{placeholder.date}}</span>" }
+      "path": "dwd.trade_order_d -> dws.trade_user_stat_d" }
   ]
 }</code></pre>
               <div class="api-explainer">
                 <h4>{{ask.api.explainer.title}}</h4>
                 <p>{{ask.api.explainer.body}}</p>
-                <p class="api-path">{{ask.api.pathLabel}}<span class="placeholder">{{placeholder.pending}}</span></p>
+                <p class="api-path"><span>{{ask.api.pathLabel}}</span><code>GET /api/search</code> · <code>POST /api/ai/ask/stream</code></p>
               </div>
             </article>
           </div>
@@ -206,7 +263,10 @@
           </div>
           <div class="readiness-panel">
             <div class="panel-heading">
-              <h3>{{readiness.panel.title}}</h3>
+              <div>
+                <h3>{{readiness.panel.title}}</h3>
+                <p>{{readiness.panel.subtitle}}</p>
+              </div>
               <span class="sample-label">{{sample.label}}</span>
             </div>
             <ul class="readiness-list">
@@ -241,7 +301,7 @@
                 <p>{{readiness.lineage.rule}} <span class="status-pending">{{readiness.pending}}</span></p>
               </li>
             </ul>
-            <p class="chart-note">{{readiness.note.lead}} <span class="placeholder">{{placeholder.readinessBasis}}</span>。</p>
+            <p class="chart-note">{{readiness.note}}</p>
           </div>
         </div>
       </section>
@@ -251,7 +311,6 @@
           <div class="boundary-heading">
             <p class="section-index">{{boundary.index}}</p>
             <h2 id="boundary-title">{{boundary.title.line1}}<br>{{boundary.title.line2}}</h2>
-            <span class="not-mark" aria-hidden="true">{{boundary.mark}}</span>
             <p class="section-description">{{boundary.description}}</p>
           </div>
           <div class="boundary-grid">
@@ -276,7 +335,10 @@
               <p>{{boundary.item4.body}}</p>
             </article>
           </div>
-          <p class="boundary-note"><strong>{{boundary.note.lead}}</strong><span>{{boundary.note.tail}}</span></p>
+          <div class="boundary-note">
+            <strong>{{boundary.note.lead}}</strong>
+            <span>{{boundary.note.tail}}</span>
+          </div>
         </div>
       </section>
 
@@ -285,25 +347,32 @@
           <div>
             <p class="section-index">{{deployment.index}}</p>
             <h2 id="deployment-title">{{deployment.title.line1}}<br>{{deployment.title.line2}}</h2>
+            <p class="section-description">{{deployment.description}}</p>
           </div>
           <dl class="trust-list">
             <div><dt>{{spec.deployment}}</dt><dd>{{trust.deployment.value}}</dd></div>
             <div><dt>{{trust.dependencies}}</dt><dd>{{trust.dependencies.value}}</dd></div>
-            <div><dt>{{trust.accessAudit}}</dt><dd>{{trust.accessAudit.value}}<br><span class="placeholder">{{placeholder.roles}}</span></dd></div>
-            <div><dt>{{trust.security}}</dt><dd>{{trust.security.value}}<br><span class="placeholder">{{placeholder.security}}</span></dd></div>
+            <div><dt>{{trust.accessAudit}}</dt><dd>{{trust.accessAudit.value}}</dd></div>
+            <div><dt>{{trust.security}}</dt><dd><a href="https://github.com/0verme/data-asset-portal-community/blob/main/SECURITY.md">{{trust.security.value}}</a></dd></div>
             <div><dt>{{spec.license}}</dt><dd>Apache-2.0</dd></div>
             <div><dt>{{trust.verifiedEnvironment}}</dt><dd>{{trust.verifiedEnvironment.value}}<br><span>{{trust.verifiedEnvironment.data}}</span></dd></div>
             <div><dt>{{trust.ragExtension}}</dt><dd>{{trust.ragExtension.value}}</dd></div>
-            <div><dt>{{trust.rolloutTime}}</dt><dd><span class="placeholder">{{placeholder.rolloutTime}}</span></dd></div>
+            <div><dt>{{trust.rolloutTime}}</dt><dd>{{trust.rolloutTime.value}}</dd></div>
           </dl>
         </div>
 
-        <div class="code-panel" aria-labelledby="demo-run-title">
-          <h3 id="demo-run-title">{{deployment.runTitle}}</h3>
+        <div class="code-panel run-panel" aria-labelledby="demo-run-title">
+          <div class="panel-heading">
+            <div>
+              <h3 id="demo-run-title">{{deployment.runTitle}}</h3>
+              <p>{{deployment.runSubtitle}}</p>
+            </div>
+            <span class="sample-label">Linux · macOS · Windows</span>
+          </div>
           <pre class="code-block"><code>git clone https://github.com/0verme/data-asset-portal-community.git
 cd data-asset-portal-community
 ./scripts/demo.sh</code></pre>
-          <p>{{deployment.runIntro}} <a href="https://github.com/0verme/data-asset-portal-community/blob/main/DEPLOYMENT.md">DEPLOYMENT.md</a>。</p>
+          <p class="run-panel-foot">{{deployment.runIntro}} <a href="https://github.com/0verme/data-asset-portal-community/blob/main/DEPLOYMENT.md">DEPLOYMENT.md</a> · <a href="https://github.com/0verme/data-asset-portal-community/blob/main/docs/community-demo.md">{{deployment.demoGuide}}</a>。</p>
         </div>
 
         <div class="compatibility">
@@ -335,45 +404,81 @@ cd data-asset-portal-community
             <p class="section-description">{{onboarding.description}}</p>
           </div>
           <ol class="flow-list" aria-label="{{@onboarding.flowLabel}}">
-            <li class="flow-node"><h3>{{onboarding.externalSystem}}</h3><p>{{onboarding.externalSystem.detail}}</p></li>
+            <li class="flow-node">
+              <span class="flow-step">STEP 01</span>
+              <h3>{{onboarding.externalSystem}}</h3>
+              <p>{{onboarding.externalSystem.detail}}</p>
+            </li>
             <li class="flow-arrow" aria-hidden="true"></li>
-            <li class="flow-node"><h3>{{onboarding.metadata}}</h3><p>{{onboarding.metadata.detail}}</p></li>
+            <li class="flow-node">
+              <span class="flow-step">STEP 02</span>
+              <h3>{{onboarding.metadata}}</h3>
+              <p>{{onboarding.metadata.detail}}</p>
+            </li>
             <li class="flow-arrow" aria-hidden="true"></li>
-            <li class="flow-node"><h3>Metadata Contract</h3><p>{{onboarding.contract.detail}}</p><span class="placeholder flow-placeholder">{{placeholder.schema}}</span></li>
+            <li class="flow-node">
+              <span class="flow-step">STEP 03</span>
+              <h3>Metadata Contract</h3>
+              <p>{{onboarding.contract.detail}}</p>
+              <a class="flow-link" href="https://github.com/0verme/data-asset-portal-community/blob/main/docs/metadata-ingestion.md">{{onboarding.contract.link}}</a>
+            </li>
             <li class="flow-arrow" aria-hidden="true"></li>
-            <li class="flow-node"><h3>Metadata API</h3><p>{{onboarding.api.detail}}</p><span class="placeholder flow-placeholder">{{placeholder.apiDocs}}</span></li>
+            <li class="flow-node">
+              <span class="flow-step">STEP 04</span>
+              <h3>Metadata API</h3>
+              <p>{{onboarding.api.detail}}</p>
+              <a class="flow-link" href="https://github.com/0verme/data-asset-portal-community/blob/main/examples/metadata_ingestion/README.md">{{onboarding.api.link}}</a>
+            </li>
             <li class="flow-arrow" aria-hidden="true"></li>
-            <li class="flow-node"><h3>DAP</h3><p>{{onboarding.dap.detail}}</p></li>
+            <li class="flow-node flow-node-highlight">
+              <span class="flow-step">STEP 05</span>
+              <h3>DAP</h3>
+              <p>{{onboarding.dap.detail}}</p>
+            </li>
           </ol>
 
           <div class="contract-grid" id="contract-sample">
             <article class="code-panel contract-panel" aria-labelledby="contract-title">
               <div class="panel-heading">
-                <h3 id="contract-title">{{onboarding.contract.title}}</h3>
-                <span class="sample-label">{{sample.label}}</span>
+                <div>
+                  <h3 id="contract-title">{{onboarding.contract.title}}</h3>
+                  <p>POST /api/metadata/assets/ingestions</p>
+                </div>
+                <span class="sample-label">contractVersion 1.0</span>
               </div>
               <pre class="code-block"><code>{
-  "contract_version": "<span class="placeholder">{{placeholder.version}}</span>",
-  "source_system": "etl-demo",
-  "tables": [
+  "contractVersion": "1.0",
+  "source": {
+    "type": "postgresql",
+    "name": "warehouse-prod",
+    "namespace": "retail"
+  },
+  "assets": [
     {
-      "name": "dws.trade_user_stat_d",
-      "comment": "{{onboarding.contract.comment.table}}",
-      "columns": [
-        { "name": "order_user_cnt", "type": "bigint",
-          "comment": "{{onboarding.contract.comment.field}}" }
+      "externalId": "dws.trade_user_stat_d",
+      "qualifiedName": "dws.trade_user_stat_d",
+      "displayName": "{{onboarding.contract.comment.table}}",
+      "layer": "DWS",
+      "fields": [
+        {
+          "fieldName": "order_user_cnt",
+          "dataType": "bigint",
+          "description": "{{onboarding.contract.comment.field}}"
+        }
       ]
     }
   ]
 }</code></pre>
-              <p class="sample-note">{{onboarding.contract.note.lead}} <span class="placeholder">{{placeholder.verify}}</span>。</p>
+              <p class="sample-note">{{onboarding.contract.note}} <a href="https://github.com/0verme/data-asset-portal-community/blob/main/docs/metadata-ingestion.md">docs/metadata-ingestion.md</a>。</p>
             </article>
             <div class="responsibility-list">
-              <div>
+              <div class="responsibility-card">
+                <span class="responsibility-tag">{{onboarding.external.tag}}</span>
                 <h3>{{onboarding.external.responsibility}}</h3>
                 <p>{{onboarding.external.responsibility.body}}</p>
               </div>
-              <div>
+              <div class="responsibility-card responsibility-card-primary">
+                <span class="responsibility-tag">{{onboarding.dap.tag}}</span>
                 <h3>{{onboarding.dap.responsibility}}</h3>
                 <p>{{onboarding.dap.responsibility.body}}</p>
               </div>
@@ -396,20 +501,31 @@ cd data-asset-portal-community
           </a>
           <a class="entry-link" href="https://github.com/0verme/data-asset-portal-community/blob/main/docs/README.md">
             <span class="entry-label">{{nav.docs}}</span>
-            <span class="entry-url">…/data-asset-portal-community/blob/main/docs/README.md <span aria-hidden="true">→</span></span>
+            <span class="entry-url">github.com/0verme/data-asset-portal-community/tree/main/docs <span aria-hidden="true">→</span></span>
           </a>
-          <div class="entry-link entry-link-placeholder">
-            <span class="entry-label">{{entry.discussions}}</span>
-            <span class="entry-url"><span class="placeholder">{{placeholder.discussions}}</span></span>
-          </div>
+          <a class="entry-link" href="https://github.com/0verme/data-asset-portal-community/blob/main/DEPLOYMENT.md">
+            <span class="entry-label">{{entry.deployment}}</span>
+            <span class="entry-url">{{entry.deployment.value}} <span aria-hidden="true">→</span></span>
+          </a>
         </div>
       </section>
     </main>
 
     <footer class="site-footer">
       <div class="container footer-inner">
-        <p>{{footer.title}}</p>
-        <p>{{footer.description}} <span class="placeholder">{{placeholder.contact}}</span></p>
+        <div class="footer-brand">
+          <span class="footer-mark" aria-hidden="true">DAP</span>
+          <p>{{footer.title}}</p>
+        </div>
+        <div class="footer-meta">
+          <p>{{footer.description}}</p>
+          <nav class="footer-links" aria-label="{{@footer.linksLabel}}">
+            <a href="https://github.com/0verme/data-asset-portal-community">GitHub</a>
+            <a href="https://github.com/0verme/data-asset-portal-community/blob/main/docs/README.md">{{nav.docs}}</a>
+            <a href="https://github.com/0verme/data-asset-portal-community/blob/main/DEPLOYMENT.md">{{entry.deployment}}</a>
+            <a href="https://github.com/0verme/data-asset-portal-community/blob/main/SECURITY.md">{{footer.security}}</a>
+          </nav>
+        </div>
       </div>
     </footer>
 
