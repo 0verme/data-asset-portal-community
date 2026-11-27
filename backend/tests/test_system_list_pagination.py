@@ -41,7 +41,7 @@ class SystemListPaginationTests(unittest.TestCase):
         )
         environment = patch.dict(os.environ, {
             "ASSET_DB_PROFILE": "dap_464_test", "ASSET_DB_CONFIG_PATH": str(config_path),
-            "ASSET_DB_DATABASE": str(database), "PUBLIC_CATALOG_PROFILE": "internal",
+            "PUBLIC_CATALOG_PROFILE": "internal",
         })
         environment.start()
         self.addCleanup(environment.stop)

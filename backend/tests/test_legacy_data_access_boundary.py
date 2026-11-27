@@ -170,12 +170,19 @@ class SQLitePushTransactionTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory(prefix="dap-139-push-")
         self.addCleanup(self.temp_dir.cleanup)
         self.database = Path(self.temp_dir.name) / "push.sqlite"
+        self.config_path = Path(self.temp_dir.name) / "database.yaml"
+        self.config_path.write_text(
+            "profiles:\n"
+            "  community_sqlite:\n"
+            "    type: sqlite\n"
+            f"    database: '{self.database.as_posix()}'\n",
+            encoding="utf-8",
+        )
         self.environment = patch.dict(
             os.environ,
             {
-                "ASSET_DB_CONFIG_PATH": str(ROOT / "configs" / "database.community.yaml"),
+                "ASSET_DB_CONFIG_PATH": str(self.config_path),
                 "ASSET_DB_PROFILE": "community_sqlite",
-                "ASSET_DB_DATABASE": str(self.database),
             },
             clear=False,
         )

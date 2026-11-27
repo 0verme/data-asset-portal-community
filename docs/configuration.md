@@ -229,17 +229,13 @@ Defaults are shown for orientation and are implemented by the runtime.
 
 | Variable | Purpose | Default / scope |
 |---|---|---|
-| `ASSET_DB_CONNECT_TIMEOUT_SECONDS` | DB connection timeout | `30`; provider dependent |
-| `ASSET_DB_STATEMENT_TIMEOUT_MS` | query statement timeout | `120000`; PostgreSQL/GaussDB |
 | `ASSET_SCHEMA_PREFIX` | logical schema prefix for asset services | unset; optional |
-| `ASSET_OPERATOR` | name used by explicitly declared system/background actors; not an HTTP fallback | `system` |
 | `APP_PAGE_SIZE_DEFAULT`, `APP_PAGE_SIZE_MAX` | pagination bounds | service defaults; runtime |
 | `PORTAL_STATS_CACHE_TTL_SECONDS` | portal aggregate statistics cache TTL | `600` |
 | `APP_SLOW_SERVICE_SECONDS` | slow-service logging threshold | `3` |
 | `SEARCH_DEFAULT_LIMIT`, `SEARCH_MODULE_LIMIT`, `SEARCH_MAX_LIMIT` | search result limits | `5`, `10`, `50` |
 | `APP_LOG_MAX_BYTES`, `APP_LOG_BACKUP_COUNT` | log rotation | `2097152`, `5` |
-| `ASSET_DB_TYPE` | provider type override | selected profile; provider-specific |
-| `ASSET_DB_JDBC_URL` | GaussDB JDBC URL override | selected profile; GaussDB only |
+| `ASSET_DB_PASSWORD` | database password secret override for the selected YAML profile | YAML `password`; secret manager |
 | `ASSET_DB_JAR_PATH` | GaussDB JDBC driver path | profile/default; GaussDB only |
 | `METADATA_MAX_BODY_MB` | finite metadata-ingestion body cap; effective cap is the minimum of this and `APP_MAX_CONTENT_LENGTH_MB` | `96`; hard max `128` MiB |
 | `METADATA_MAX_LINEAGE_NODES` | maximum nodes in one complete replace snapshot | `30000`; hard max `200000` |
@@ -250,9 +246,12 @@ For the large-lineage defaults, the example Nginx configuration uses
 body limit at least as high as the effective metadata cap. The application does
 not control an external proxy or load balancer.
 
-`ASSET_DB_HOST`, `ASSET_DB_PORT`, `ASSET_DB_DATABASE`, and `ASSET_DB_USER` are
-also supported as provider/profile overrides. `ASSET_DB_PASSWORD` and DSNs/JDBC
-URLs are sensitive and should not be placed in committed files.
+Database connection parameters (`type`, `host`, `port`, `database`, `user`,
+`dsn`, `jdbc_url`, `connect_timeout`, `socket_timeout`, `statement_timeout_ms`)
+are configured in `backend/configs/database.yaml` as the single source of
+truth. `ASSET_DB_PASSWORD` is supported as an environment secret override so
+passwords do not need to be stored in YAML files. Explicitly declared
+system/background audit actors always use the fixed canonical identity `system`.
 
 ## Lineage storage: same DAP metadata database (#536)
 
@@ -290,10 +289,11 @@ Resolution is:
 
 1. `ASSET_DB_PROFILE` selects the active profile from the resolved YAML file.
 2. YAML `defaults` are merged with the selected profile.
-3. Non-empty `ASSET_DB_*` environment overrides replace YAML/profile values.
-   This is **global to every selected named profile**. The lineage,
-   authentication, and authorization modules always consume the final
-   `ASSET_DB_PROFILE` configuration; they have no independent profile override.
+3. Non-empty `ASSET_DB_PASSWORD` replaces the profile's `password` field (and
+   isolated AI ask worker processes apply bounded in-process timeout overrides).
+   The lineage, authentication, and authorization modules always consume the
+   final `ASSET_DB_PROFILE` configuration; they have no independent profile
+   override.
 4. `ASSET_DB_JAR_PATH` overrides a GaussDB `jar_path`.
 5. A relative GaussDB `jar_path` is resolved against `backend/` (the parent of
    `configs/`); with the default `backend/configs/database.yaml`,

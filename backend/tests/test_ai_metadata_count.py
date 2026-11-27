@@ -137,12 +137,19 @@ class AssetCountCatalogIntegrationTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory(dir=root)
         self.addCleanup(self.temp_dir.cleanup)
         self.database = Path(self.temp_dir.name) / "issue-521.sqlite"
+        self.config_path = Path(self.temp_dir.name) / "database.yaml"
+        self.config_path.write_text(
+            "profiles:\n"
+            "  community_sqlite:\n"
+            "    type: sqlite\n"
+            f"    database: '{self.database.as_posix()}'\n",
+            encoding="utf-8",
+        )
         self.env = patch.dict(
             os.environ,
             {
-                "ASSET_DB_CONFIG_PATH": str(COMMUNITY_CONFIG),
+                "ASSET_DB_CONFIG_PATH": str(self.config_path),
                 "ASSET_DB_PROFILE": "community_sqlite",
-                "ASSET_DB_DATABASE": str(self.database),
             },
             clear=False,
         )
