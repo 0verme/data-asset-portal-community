@@ -84,7 +84,7 @@ test("home and peer workspaces retain shell and readiness hierarchy", async ({ p
   await preferences(page, "light", "green");
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
-  await expect(page.locator(".sp-stats .sp-stat-num")).toHaveCount(11);
+  await expect(page.locator(".sp-stats .sp-stat-num")).toHaveCount(12);
   await page.screenshot({ path: info.outputPath("home.png") });
   await page.setViewportSize({ width: 1920, height: 1080 });
   for (const route of ["upstream", "data-warehouse"]) {

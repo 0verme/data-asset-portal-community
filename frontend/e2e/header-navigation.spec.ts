@@ -155,13 +155,22 @@ test("global-search adapters preserve value, clear, and mobile focus behavior", 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/data-warehouse");
 
+  const searchContainer = page.locator("#global-search");
   const input = page.getByRole("textbox", { name: "全局搜索" });
   const clear = page.getByRole("button", { name: "清除全局搜索" });
   await expect(input).toBeVisible();
   await expect(input).toHaveClass(/dap-ui-input/);
+  await expect(input).toHaveCSS("border-radius", "999px");
+  expect(Math.round((await searchContainer.boundingBox())?.width ?? 0)).toBe(160);
+  await input.focus();
+  expect(Math.round((await searchContainer.boundingBox())?.width ?? 0)).toBe(270);
   await input.fill("warehouse");
+  await input.blur();
+  expect(Math.round((await searchContainer.boundingBox())?.width ?? 0)).toBe(270);
   await clear.click();
   await expect(input).toHaveValue("");
+  await input.blur();
+  expect(Math.round((await searchContainer.boundingBox())?.width ?? 0)).toBe(160);
 
   const toggle = page.locator(".mobile-search-toggle");
   for (const width of [960, 768, 480, 390]) {

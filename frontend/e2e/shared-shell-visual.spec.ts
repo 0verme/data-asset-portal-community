@@ -37,7 +37,7 @@ async function openRoute(page: Page, path: string, width: number, height: number
   await page.setViewportSize({ width, height });
   await page.goto(path);
   if (path === "/") {
-    await expect(page.locator(".sp-stats .sp-stat-num")).toHaveCount(11);
+    await expect(page.locator(".sp-stats .sp-stat-num")).toHaveCount(12);
   } else if (path.startsWith("/upstream")) {
     await expect(page.locator(".upstream-list-page .page-title")).toBeVisible({ timeout: 20_000 });
   } else if (path.startsWith("/data-warehouse")) {
@@ -280,12 +280,29 @@ test("shared AppHeader frame, brand, capsule, and common action controls match a
           if (route.activeModule) {
             const selected = nav.getByRole("button", { name: route.activeModule, exact: true });
             await expect(selected).toHaveClass(/active/);
+            const expectedActiveStyle = await page.evaluate(() => {
+              const probe = document.createElement("span");
+              probe.style.backgroundColor = "var(--accent-soft)";
+              probe.style.color = "var(--accent)";
+              document.body.append(probe);
+              const computed = getComputedStyle(probe);
+              const result = {
+                background: computed.backgroundColor,
+                color: computed.color,
+              };
+              probe.remove();
+              return result;
+            });
             const selectedStyle = await selected.evaluate((element) => ({
               color: getComputedStyle(element).color,
               background: getComputedStyle(element).backgroundColor,
               shadow: getComputedStyle(element).boxShadow,
               weight: getComputedStyle(element).fontWeight,
             }));
+            expect(selectedStyle.background).toBe(expectedActiveStyle.background);
+            expect(selectedStyle.color).toBe(expectedActiveStyle.color);
+            expect(selectedStyle.shadow).toBe("none");
+            expect(selectedStyle.weight).toBe("600");
             if (sharedActiveStyle) expect(selectedStyle).toEqual(sharedActiveStyle);
             else sharedActiveStyle = selectedStyle;
           }

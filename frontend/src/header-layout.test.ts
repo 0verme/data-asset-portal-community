@@ -55,6 +55,8 @@ test("shared header keeps brand, navigation, and actions in stable DOM and V2.2 
   assert.match(appStyles, /\.brand-name\s*\{[^}]*font-size:\s*17px;[^}]*font-weight:\s*600;[^}]*letter-spacing:\s*-0\.02em/);
   assert.match(appStyles, /\.brand-name small\s*\{[^}]*font-size:\s*11px/);
   assert.match(appStyles, /\.mainnav\s*\{[^}]*width:\s*max-content;[^}]*max-width:\s*100%/);
+  assert.match(appStyles, /\.mainnav button\.active\s*\{[\s\S]*?background:\s*var\(--accent-soft\);[\s\S]*?color:\s*var\(--accent\);[\s\S]*?box-shadow:\s*none;[\s\S]*?font-weight:\s*600/);
+  assert.match(appStyles, /\.more-nav-trigger\.active\s*\{[\s\S]*?background:\s*var\(--accent-soft\);[\s\S]*?color:\s*var\(--accent\);[\s\S]*?box-shadow:\s*none;[\s\S]*?font-weight:\s*600/);
   assert.match(appStyles, /\.topbar :is\(\.theme-toggle, \.appearance-trigger, \.login-cta, \.logout-btn, \.user-chip\)\s*\{[\s\S]*?height:\s*39px;[\s\S]*?border-radius:\s*999px/);
   assert.match(appearanceStyles, /\.appearance-trigger\.dap-ui-icon-button\s*\{[\s\S]*?width:\s*39px;[\s\S]*?height:\s*39px;[\s\S]*?border-radius:\s*999px/);
   assert.match(appHeader, /className="mainnav mainnav-measure" aria-hidden="true" inert/);
@@ -69,7 +71,9 @@ test("middle-width navigation derives its visible prefix from measured available
     /@media \(769px <= width < 960px\) \{[\s\S]*?\n\s{2}\}/,
   )?.[0] || "";
 
-  assert.match(appStyles, /\.search \{\s*position: relative;\s*width: clamp\(180px, 20vw, 360px\);/);
+  assert.match(appStyles, /\.search \{\s*position: relative;\s*width: 160px;[\s\S]*?flex: 0 0 160px;/);
+  assert.match(appStyles, /\.search:focus-within,\s*\.search\.has-val \{\s*width: 270px;[\s\S]*?flex-basis: 270px;/);
+  assert.match(appStyles, /\.search input \{[\s\S]*?height: 39px;[\s\S]*?border-radius: 999px;/);
   assert.match(compactHeader, /\.search \{\s*width: 36px;[\s\S]*?flex-basis: 36px;/);
   assert.match(compactHeader, /\.search:focus-within,[\s\S]*?width: 196px;/);
   assert.match(appHeader, /new ResizeObserver\(measureNavigation\)/);
