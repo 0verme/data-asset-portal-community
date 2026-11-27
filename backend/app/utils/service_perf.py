@@ -3,9 +3,7 @@ from __future__ import annotations
 import logging
 import time
 
-from ..settings import get_float_env
-
-
+SLOW_SERVICE_THRESHOLD_SECONDS = 3.0
 
 
 def log_slow_service_call(
@@ -20,7 +18,7 @@ def log_slow_service_call(
     keyword=None,
 ):
     elapsed = time.perf_counter() - started_at
-    if elapsed < get_float_env("APP_SLOW_SERVICE_SECONDS", 3.0, minimum=0.0):
+    if elapsed < SLOW_SERVICE_THRESHOLD_SECONDS:
         return elapsed
 
     logger.warning(

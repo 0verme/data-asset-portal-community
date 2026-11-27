@@ -40,13 +40,17 @@ from ..security.public_field_policy import (
     project_public_value,
     public_field_class_visible,
 )
-from ..settings import get_int_env, get_public_catalog_profile
+from ..settings import get_public_catalog_profile
 from .asset_field_match import asset_field_match_value
 from .providers import entity_module_codes, list_search_entities, module_scope_aliases
 from .system_management_service import system_management_service
 
 
 LOGGER = logging.getLogger(__name__)
+
+SEARCH_DEFAULT_LIMIT = 5
+SEARCH_MODULE_LIMIT = 10
+SEARCH_MAX_LIMIT = 50
 
 SCOPE_ALL = "all"
 SCOPE_ALIASES = {
@@ -306,15 +310,13 @@ class KeywordSearchProvider(SearchProvider):
         return params
 
     def _normalize_limit(self, limit):
-        default_limit = get_int_env("SEARCH_DEFAULT_LIMIT", 5, minimum=1)
-        max_limit = get_int_env("SEARCH_MAX_LIMIT", 50, minimum=default_limit)
         try:
             value = int(limit)
         except (TypeError, ValueError):
-            value = default_limit
+            value = SEARCH_DEFAULT_LIMIT
         if value <= 0:
-            value = default_limit
-        return min(value, max_limit)
+            value = SEARCH_DEFAULT_LIMIT
+        return min(value, SEARCH_MAX_LIMIT)
 
     def _normalize_scope(self, scope):
         raw = str(scope or SCOPE_ALL).strip()
@@ -510,9 +512,7 @@ class KeywordSearchProvider(SearchProvider):
             ") matched "
             "LIMIT ?"
         )
-        default_module_limit = get_int_env("SEARCH_MODULE_LIMIT", 10, minimum=1)
-        max_limit = get_int_env("SEARCH_MAX_LIMIT", 50, minimum=default_module_limit)
-        page_limit = min(max_limit, max(1, int(limit or default_module_limit)))
+        page_limit = min(SEARCH_MAX_LIMIT, max(1, int(limit or SEARCH_MODULE_LIMIT)))
         list_params = match_params + match_params + where_params + [page_limit]
         rows = self._fetch_rows_with_conn(conn, list_sql, params=list_params)
         total_matches = self._count_matches(conn, config, query, profile)

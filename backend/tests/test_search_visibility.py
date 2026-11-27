@@ -46,9 +46,6 @@ class SearchVisibilityTestCase(unittest.TestCase):
     def _normalized_limit(self, raw_limit):
         config = self.provider.ENTITY_CONFIGS[0]
         with (
-            patch.dict(
-                os.environ, {"SEARCH_DEFAULT_LIMIT": "7", "SEARCH_MAX_LIMIT": "11"}
-            ),
             patch.object(self.provider, "_visible_configs", return_value=[config]),
             patch.object(
                 self.provider, "_connection", return_value=self._connection_context()
@@ -91,16 +88,16 @@ class SearchVisibilityTestCase(unittest.TestCase):
         self.assertEqual(3, self._normalized_limit("3"))
 
     def test_non_numeric_limit_uses_configured_default(self):
-        self.assertEqual(7, self._normalized_limit("not-a-number"))
+        self.assertEqual(5, self._normalized_limit("not-a-number"))
 
     def test_zero_limit_uses_configured_default(self):
-        self.assertEqual(7, self._normalized_limit(0))
+        self.assertEqual(5, self._normalized_limit(0))
 
     def test_negative_limit_uses_configured_default(self):
-        self.assertEqual(7, self._normalized_limit(-4))
+        self.assertEqual(5, self._normalized_limit(-4))
 
     def test_limit_above_configured_maximum_is_clamped(self):
-        self.assertEqual(11, self._normalized_limit(99))
+        self.assertEqual(50, self._normalized_limit(99))
 
     def test_metric_scope_alias_maps_to_indicator(self):
         self._assert_scope_alias("metric", "indicator")

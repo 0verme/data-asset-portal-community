@@ -81,13 +81,13 @@ def get_string_env(name: str, default: str = "") -> str:
     return os.getenv(name, default).strip() or default
 
 
+PAGE_SIZE_MAX = 200
+
+
 def get_page_size_limits(default_size: int) -> tuple[int, int]:
-    """Return the shared page-size override and its safe maximum."""
-    maximum = get_int_env("APP_PAGE_SIZE_MAX", 200, minimum=1)
-    default = get_int_env(
-        "APP_PAGE_SIZE_DEFAULT", default_size, minimum=1, maximum=maximum
-    )
-    return default, maximum
+    """Return the service default page size clamped to the global safe maximum."""
+    default = max(1, min(int(default_size), PAGE_SIZE_MAX))
+    return default, PAGE_SIZE_MAX
 
 
 def get_default_operator() -> str:

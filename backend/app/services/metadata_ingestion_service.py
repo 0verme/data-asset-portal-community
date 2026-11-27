@@ -120,14 +120,6 @@ class MetadataIngestionService(AuditActorMixin):
         return self._db_profile or resolve_db_profile_name()
 
     @staticmethod
-    def _limit(name: str, default: int) -> int:
-        try:
-            value = int(os.getenv(name, str(default)))
-        except (TypeError, ValueError):
-            value = default
-        return max(1, value)
-
-    @staticmethod
     def _lineage_limit(name: str, default: int, maximum: int) -> int:
         try:
             value = int(os.getenv(name, str(default)))
@@ -312,14 +304,14 @@ class MetadataIngestionService(AuditActorMixin):
 
     def _preflight_assets(self, request: AssetMetadataIngestionRequest) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         count = len(request.assets)
-        limit = self._limit("METADATA_MAX_ASSETS_PER_REQUEST", MAX_ASSETS_PER_REQUEST)
+        limit = MAX_ASSETS_PER_REQUEST
         if count == 0:
             raise MetadataValidationError("assets must contain at least one item")
         if count > limit:
             raise MetadataPayloadTooLargeError(f"assets exceeds the configured limit of {limit}")
         total_fields = sum(len(item.fields) for item in request.assets)
-        per_asset_limit = self._limit("METADATA_MAX_FIELDS_PER_ASSET", MAX_FIELDS_PER_ASSET)
-        total_limit = self._limit("METADATA_MAX_TOTAL_FIELDS", MAX_TOTAL_FIELDS)
+        per_asset_limit = MAX_FIELDS_PER_ASSET
+        total_limit = MAX_TOTAL_FIELDS
         if any(len(item.fields) > per_asset_limit for item in request.assets) or total_fields > total_limit:
             raise MetadataPayloadTooLargeError(
                 f"field count exceeds configured limits (perAsset={per_asset_limit}, total={total_limit})"

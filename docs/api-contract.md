@@ -373,7 +373,7 @@ Base Path: `/api/search`
 - `GET /api/search`
 - `q`：搜索关键字；服务端会去除首尾空白
 - `scope`：搜索范围，默认 `all`；当前别名包括 `metric` → `indicator`、`apiAsset` → `api`；`scope=asset` 只返回资产组（结果为稳定排序，URL 可分享、可刷新、可重复）
-- `limit`：每个结果分组返回的 item 上限，默认 `5`，超过当前 `SEARCH_MAX_LIMIT`（默认 `50`）时截断；`limit` 不影响 `count`
+- `limit`：每个结果分组返回的 item 上限，默认 `5`，超过上限 `50` 时截断；`limit` 不影响 `count`
 
 ### 返回格式
 
