@@ -279,21 +279,21 @@ deployment, copy `backend/configs/database.example.yaml` to
 `backend/configs/database.yaml` and edit the selected profile. Leave
 `ASSET_DB_CONFIG_PATH` unset so the runtime uses that default path (resolved
 from the backend package, not process cwd). Set `ASSET_DB_CONFIG_PATH` only when
-you need an absolute, environment-specific YAML. Community runtime
-(`ASSET_RUNTIME_PROFILE=community`) selects `database.community.yaml`.
-`ASSET_AUTH_DB_PROFILE` is optional; when unset, auth falls back to
-`ASSET_DB_PROFILE` (and then to an available `primary` profile when present).
+you need an absolute, environment-specific YAML (such as
+`backend/configs/database.community.yaml` for isolated Community/local runs).
+`ASSET_DB_PROFILE` is the single database profile selector for all modules,
+including authentication, RBAC authorization, and lineage; the legacy
+`ASSET_AUTH_DB_PROFILE` variable is deprecated, cannot select a separate
+database, and should be removed from deployment environments.
 
 Resolution is:
 
-1. `ASSET_DB_PROFILE` (and optional `ASSET_AUTH_DB_PROFILE`) selects profiles.
+1. `ASSET_DB_PROFILE` selects the active profile from the resolved YAML file.
 2. YAML `defaults` are merged with the selected profile.
 3. Non-empty `ASSET_DB_*` environment overrides replace YAML/profile values.
-   This is **global to every selected named profile**, including the optional
-   authentication profile. The lineage module always consumes the final
-   `ASSET_DB_PROFILE` configuration; it has no independent profile override.
-   A separate authentication profile is not isolated from these environment
-   overrides merely by choosing a distinct profile name.
+   This is **global to every selected named profile**. The lineage,
+   authentication, and authorization modules always consume the final
+   `ASSET_DB_PROFILE` configuration; they have no independent profile override.
 4. `ASSET_DB_JAR_PATH` overrides a GaussDB `jar_path`.
 5. A relative GaussDB `jar_path` is resolved against `backend/` (the parent of
    `configs/`); with the default `backend/configs/database.yaml`,

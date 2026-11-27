@@ -26,7 +26,7 @@ except ModuleNotFoundError:
 
 
 def _load_runtime() -> None:
-    """Mirror native startup / schema_migrate: load env files, then runtime profile."""
+    """Mirror native startup / schema_migrate: load env files."""
     try:
         from app.settings import load_runtime_env
     except ModuleNotFoundError:  # pragma: no cover - package vs script entry
@@ -35,13 +35,6 @@ def _load_runtime() -> None:
     # Default overwrite=True matches historical/normal runtime file precedence.
     # Community demo uses overwrite=False in its own bootstrap path, not this CLI.
     load_runtime_env()
-
-    try:
-        from app.core.profiles import apply_runtime_profile
-    except ModuleNotFoundError:  # pragma: no cover - package vs script entry
-        from backend.app.core.profiles import apply_runtime_profile  # type: ignore
-
-    apply_runtime_profile()
 
 
 def _is_configuration_failure(error: BaseException) -> bool:

@@ -167,7 +167,6 @@ VITE_BACKEND_URL=http://localhost:15099
 ```env
 # backend/.env.local
 ASSET_DB_PROFILE=primary
-ASSET_AUTH_DB_PROFILE=primary
 APP_SECRET_KEY=<generate-a-strong-random-value>
 # Explicit local-development setting: permits HTTP session cookies locally.
 APP_ENV=development
@@ -230,7 +229,7 @@ Remote API 的普通业务目录 GET 支持匿名浏览：资产、字段/DDL、
 - `backend/configs/database.example.yaml`
 - `backend/configs/database.community.yaml`（Community/local 示例）
 
-完整版开发使用 `postgres` 或 `gaussdb` profile。Community/local 可设置 `ASSET_RUNTIME_PROFILE=community`，运行时会默认加载 `backend/configs/database.community.yaml` 的 `community_sqlite` profile；也可显式改用其中的 `community_postgres`。Cloudflare D1 不在支持范围内。
+完整版开发使用 `postgres`、`mysql` 或 `gaussdb` profile。Community/local 隔离运行可通过 `ASSET_DB_CONFIG_PATH=backend/configs/database.community.yaml`（或 CLI `--config backend/configs/database.community.yaml`）配合 `ASSET_DB_PROFILE=community_sqlite`（或 `community_postgres`、`community_mysql`）使用。Cloudflare D1 不在支持范围内。
 
 ## 数据库初始化
 
@@ -239,11 +238,11 @@ Remote API 的普通业务目录 GET 支持匿名浏览：资产、字段/DDL、
 
 ```bash
 # SQLite 本地 / Community Demo
-python backend/scripts/schema_migrate.py apply --profile community_sqlite
+python backend/scripts/schema_migrate.py apply --profile community_sqlite --config backend/configs/database.community.yaml
 python demo/seed_sqlite.py --database <absolute-local-path>/community.db
 
 # PostgreSQL Community 部署
-python backend/scripts/schema_migrate.py apply --profile community_postgres
+python backend/scripts/schema_migrate.py apply --profile community_postgres --config backend/configs/database.community.yaml
 python demo/seed_postgres.py --dialect postgres --schema dap
 ```
 

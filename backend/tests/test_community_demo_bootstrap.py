@@ -252,7 +252,8 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         self.assertEqual(
             str(self.paths.database.resolve()), environment["ASSET_DB_DATABASE"]
         )
-        self.assertEqual("community_sqlite", environment["ASSET_AUTH_DB_PROFILE"])
+        self.assertNotIn("ASSET_AUTH_DB_PROFILE", environment)
+        self.assertNotIn("ASSET_RUNTIME_PROFILE", environment)
         self.assertNotIn("BACKEND_RUNTIME", environment)
         # Deprecated lineage selectors must never survive into the demo child env.
         self.assertNotIn("LINEAGE_DB_PROFILE", environment)

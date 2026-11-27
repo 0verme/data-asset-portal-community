@@ -77,12 +77,6 @@ def _load_runtime():
         load_runtime_env()
     except Exception:
         pass
-    try:
-        from app.core.profiles import apply_runtime_profile
-
-        apply_runtime_profile()
-    except Exception:
-        pass
 
 
 def _offline(args):
@@ -125,12 +119,6 @@ def main(argv=None):
 
             demo_bootstrap = os.environ.get("COMMUNITY_DEMO_BOOTSTRAP") == "1"
             load_runtime_env(overwrite=not demo_bootstrap)
-        except Exception:
-            pass  # offline / non-profile invocations are unaffected
-        try:
-            from app.core.profiles import apply_runtime_profile
-
-            apply_runtime_profile()
         except Exception:
             pass  # offline / non-profile invocations are unaffected
     if args.offline:

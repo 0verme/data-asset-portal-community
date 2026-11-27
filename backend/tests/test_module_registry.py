@@ -12,7 +12,6 @@ from backend.app.core.capabilities import (
     resolve_capabilities,
 )
 from backend.app.core.modules import MODULES, list_module_codes, validate_manifest
-from backend.app.core.profiles import apply_runtime_profile
 
 
 class ModuleManifestTestCase(unittest.TestCase):
@@ -64,9 +63,8 @@ class ModuleCapabilityResolveTestCase(unittest.TestCase):
         self.assertFalse(is_repository_module("not-a-repository-module"))
         self.assertEqual(is_repository_module("dwm"), is_module_enabled("dwm"))
 
-    def test_runtime_profile_does_not_change_repository_module_set(self):
-        with patch.dict(os.environ, {"ASSET_RUNTIME_PROFILE": "community"}, clear=False):
-            apply_runtime_profile()
+    def test_db_profile_environment_does_not_change_repository_module_set(self):
+        with patch.dict(os.environ, {"ASSET_DB_PROFILE": "community_sqlite"}, clear=False):
             self.assertEqual(
                 set(list_module_codes()),
                 {item["code"] for item in resolve_capabilities()["modules"]},

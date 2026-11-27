@@ -12,6 +12,8 @@ class ConfigurationSurfaceTests(unittest.TestCase):
             "ASSET_ADMIN_USER",
             "ASSET_ADMIN_PASSWORD",
             "ASSET_ADMIN_DISPLAY_NAME",
+            "ASSET_AUTH_DB_PROFILE",
+            "ASSET_RUNTIME_PROFILE",
             "TEST_DATABASE_PROFILE",
             "FLASK_SECRET_KEY",
             "FLASK_ENV",
@@ -24,7 +26,6 @@ class ConfigurationSurfaceTests(unittest.TestCase):
         self.assertIn("ASSET_DB_PROFILE", template)
         # Relative cwd-dependent path must not be the active default assignment.
         self.assertNotRegex(template, r"(?m)^ASSET_DB_CONFIG_PATH=backend/")
-        self.assertIn("ASSET_AUTH_DB_PROFILE", template)
 
     def test_advanced_document_preserves_database_and_runtime_contracts(self):
         documentation = (ROOT / "docs/configuration.md").read_text(encoding="utf-8")

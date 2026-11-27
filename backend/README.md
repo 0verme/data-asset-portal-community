@@ -134,8 +134,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 
 | 变量 | 说明 | 常见值 |
 | --- | --- | --- |
-| `ASSET_DB_PROFILE` | 资产接口使用的数据库 profile | `primary` |
-| `ASSET_AUTH_DB_PROFILE` | 登录鉴权使用的数据库 profile | `primary` |
+| `ASSET_DB_PROFILE` | 应用与登录鉴权统一使用的数据库 profile | `primary` |
 | `ASSET_DB_CONFIG_PATH` | 数据库配置文件路径 | `backend/configs/database.yaml` |
 | `ASSET_DB_JAR_PATH` | GaussDB JDBC jar 的环境特定绝对路径（驱动需自行从官方渠道获取；优先于 profile 的 `jar_path`） | `<absolute path to vendor JDBC jar>` |
 | `ASSET_DB_CONNECT_TIMEOUT_SECONDS` | 数据库连接超时秒数 | `30` |
@@ -224,7 +223,7 @@ profiles:
 `backend/schema` 四方言 versioned baseline 与 `backend/alembic` immutable forward revisions 共同组成；runtime `tables.py` 不是完整 physical schema，详见 [ADR-002](../docs/adr/002-schema-canonical-source.md)）：
 
 ```bash
-python backend/scripts/schema_migrate.py apply --profile community_sqlite
+python backend/scripts/schema_migrate.py apply --profile community_sqlite --config backend/configs/database.community.yaml
 python demo/seed_sqlite.py --database <绝对路径>/community.db
 ```
 
@@ -232,7 +231,7 @@ MySQL 8.0 使用独立可选驱动和 profile：
 
 ```bash
 pip install -r backend/requirements-mysql.txt
-python backend/scripts/schema_migrate.py apply --profile community_mysql
+python backend/scripts/schema_migrate.py apply --profile community_mysql --config backend/configs/database.community.yaml
 ```
 
 `community_mysql` 必须指向隔离的 MySQL 8.0 数据库；密码通过安全配置或环境变量注入，
@@ -258,7 +257,7 @@ Full/module-specific/external-dependency 部署可手动逐个执行模块 DDL�
 - 创建带备份/恢复方案的隔离 PostgreSQL 数据库，例如 `dap_38_postgresql` 对应的专用测试对象；不要复用归属不明的共享库。
 - 准备一个不在 Git 中的 profile YAML，`type` 必须是 `postgres`，并指向该隔离数据库；将 profile 名称放入 `DAP38_PG_PROFILE`，文件路径放入 `DAP38_PG_CONFIG`。
 - 为执行 `psql` 的终端准备同一个测试库的 `DAP38_PG_DSN`，密码通过 `.pgpass` 或 secret store 提供，避免出现在命令历史中。
-- 设置 `ASSET_RUNTIME_PROFILE=community`；启动应用前将 `ASSET_DB_PROFILE` 指向同一个 `DAP38_PG_PROFILE`，并设置非空的本地 `APP_SECRET_KEY`。环境变量和安全边界详见 [首次贡献指南](../docs/first-contribution.md) 与 [开发指南](../DEVELOPMENT.md)。
+- 启动应用前将 `ASSET_DB_CONFIG_PATH` 指向 `$DAP38_PG_CONFIG`、`ASSET_DB_PROFILE` 指向同一个 `DAP38_PG_PROFILE`，并设置非空的本地 `APP_SECRET_KEY`。环境变量和安全边界详见 [首次贡献指南](../docs/first-contribution.md) 与 [开发指南](../DEVELOPMENT.md)。
 
 ### 2. 离线 baseline 检查
 

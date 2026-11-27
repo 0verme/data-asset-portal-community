@@ -11,7 +11,6 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 from app.db.facade import (  # noqa: E402
-    AUTH_PROFILE_ENV,
     DEFAULT_PROFILE_ENV,
     database_transaction,
     execute_many,
@@ -27,7 +26,6 @@ def resolve_profile(explicit_profile: str | None = None) -> str:
     profiles = load_db_profiles()
     candidates = (
         explicit_profile,
-        os.getenv(AUTH_PROFILE_ENV),
         os.getenv(DEFAULT_PROFILE_ENV),
         "primary",
     )
