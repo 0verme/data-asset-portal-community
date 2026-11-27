@@ -13,10 +13,13 @@ test("deployments have stable base or explicit scope and configured defaults", (
   assert.equal(appearanceKey("/internal/"), "dap-appearance:v1:%2Finternal%2F");
   assert.equal(appearanceKey("/", " community "), "dap-appearance:v1:community");
   assert.deepEqual(defaults(undefined), {
-    version: 1, themeMode: "system", accent: { kind: "preset", preset: "green" },
+    version: 1, themeMode: "system", accent: { kind: "preset", preset: "purple" },
     effects: "subtle", density: "comfortable",
   });
   assert.deepEqual(defaults(" PURPLE "), fallback);
+  assert.deepEqual(defaults(" GREEN "), {
+    ...fallback, accent: { kind: "preset", preset: "green" },
+  });
   assert.deepEqual(defaults("invalid"), defaults(undefined));
   for (const preset of ["green", "purple", "blue", "orange"]) {
     assert.deepEqual(defaults(preset).accent, { kind: "preset", preset });
