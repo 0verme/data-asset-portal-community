@@ -36,6 +36,22 @@ test("empty search results expose a clear action that preserves scope and focus"
   assert.match(styles, /\.sp-empty-action \{ margin: 16px auto 0; \}/);
 });
 
+test("clicking the header brand on the portal home resets search state, scope, and URL params", async () => {
+  const [source, appSource, moduleContentSource] = await Promise.all([
+    readFile(searchPagePath, "utf8"),
+    readFile(fileURLToPath(new URL("../App.tsx", import.meta.url)), "utf8"),
+    readFile(fileURLToPath(new URL("./app/ModuleContent.tsx", import.meta.url)), "utf8"),
+  ]);
+
+  assert.match(appSource, /const \[portalResetRequest, setPortalResetRequest\] = useState\(0\);/);
+  assert.match(appSource, /if \(nextModule === "portal"\) \{\s*setPortalResetRequest\(\(current\) => current \+ 1\);\s*\}/);
+  assert.match(appSource, /onGoHome=\{\(\) => switchModule\("portal"\)\}/);
+  assert.match(moduleContentSource, /resetRequest=\{context\.portalResetRequest\}/);
+  assert.match(source, /if \(resetRequest === undefined \|\| resetRequest === lastResetRequestRef\.current\) return;/);
+  assert.match(source, /lastResetRequestRef\.current = resetRequest;/);
+  assert.match(source, /clearSearch\(DEFAULT_PORTAL_SCOPE\);/);
+});
+
 test("asset search results use stable asset IDs for their rendered keys", async () => {
   const source = await readFile(searchPagePath, "utf8");
 

@@ -74,6 +74,7 @@ export interface AppModuleContext {
   lineageRoute: LineageRoute;
   manualCodeTable: UseManualCodeTableModuleResult;
   mappingRoute: MappingRoute;
+  portalResetRequest: number;
   push: UsePushModuleResult;
   pushRoute: PushRoute;
   query: string;
