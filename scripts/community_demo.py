@@ -246,7 +246,6 @@ def build_demo_environment(
     }
     environment.update(
         {
-            "COMMUNITY_DEMO_BOOTSTRAP": "1",
             "ASSET_DB_CONFIG_PATH": str(paths.database_config.resolve()),
             "ASSET_DB_PROFILE": "community_sqlite",
             "ASSET_DB_TYPE": "sqlite",

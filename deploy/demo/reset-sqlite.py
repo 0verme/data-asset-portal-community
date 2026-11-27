@@ -217,7 +217,7 @@ class Reset:
     def rebuild(self):
         env = {
             **os.environ, "ASSET_DB_PROFILE": PROFILE,
-            "ASSET_DB_CONFIG_PATH": str(self.config), "COMMUNITY_DEMO_BOOTSTRAP": "0",
+            "ASSET_DB_CONFIG_PATH": str(self.config),
         }
         self.stage = "schema-apply"
         self.check_target(self.replacement_identity)

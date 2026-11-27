@@ -106,14 +106,14 @@ ASSET_TRUST_PROXY_HEADERS=true
 
 ### 3.2 配置加载与环境变量优先级
 
-`backend/asgi.py` 会在创建 FastAPI application 前自动加载以下文件，后加载文件覆盖先加载文件：
+`backend/asgi.py`、`backend/scripts/schema_migrate.py` 和 `backend/scripts/create_admin.py` 在启动时采用 **进程环境变量优先、环境文件补充缺省值** 的策略。当进程环境未注入某变量时，按以下文件顺序加载，后加载文件覆盖先加载文件：
 
 1. 仓库根目录 `.env`
 2. 仓库根目录 `.env.local`
 3. `backend/.env`
 4. `backend/.env.local`
 
-`backend/scripts/schema_migrate.py` 和 `backend/scripts/create_admin.py` 也会加载同一套 runtime env。systemd 示例因此**没有**另设 `EnvironmentFile`，避免 systemd 和应用各维护一套可能冲突的配置。请确保 `backend/.env.local` 对 service `User` 可读，并将其权限限制为只有部署账号/服务账号可读，例如：
+systemd 示例因此**没有**另设 `EnvironmentFile`，避免 systemd 和应用各维护一套可能冲突的配置。请确保 `backend/.env.local` 对 service `User` 可读，并将其权限限制为只有部署账号/服务账号可读，例如：
 
 ```bash
 # dataasset 是 systemd 示例中的 User；若改用其他账号，请替换它
@@ -121,7 +121,7 @@ sudo chown dataasset:dataasset backend/.env.local backend/configs/database.yaml
 sudo chmod 600 backend/.env.local backend/configs/database.yaml
 ```
 
-如果系统环境或 systemd `Environment=` 设置了同名变量，而上述文件也定义了该变量，应用加载文件时会以最后一个文件的值为准；不要让两处出现不同值。使用 secret store 注入 `APP_SECRET_KEY` 等变量时，先删除 `.env.local` 中同名占位行。`PYTHONUNBUFFERED=1` 这类只由 unit 使用、且不在应用配置文件中的变量可以保留在 systemd 中。
+如果系统环境、Secret Store 或 systemd `Environment=` 已注入同名变量（如 `APP_SECRET_KEY`、`ASSET_DB_PASSWORD`），进程环境变量优先于上述 `.env*` 文件；仍建议从 `backend/.env.local` 中移除未使用的模板占位行以保持配置清晰。`PYTHONUNBUFFERED=1` 这类只由 unit 使用、且不在应用配置文件中的变量可以保留在 systemd 中。
 
 应用所有业务模块、登录认证与权限校验统一使用 `ASSET_DB_PROFILE` 指定的数据库 profile；已废弃的 `ASSET_AUTH_DB_PROFILE` 不会选择独立认证数据库，请勿在部署环境中配置。
 
@@ -418,6 +418,7 @@ CLI 会提示用户名、显示名、密码和密码确认；密码不会作为�
 cd /opt/data-asset-portal/frontend
 npm ci
 
+# 若构建机处于无法访问 api.github.com 的内网/离线环境，需同时指定当前稳定 Release 标签（如 DAP_RELEASE_TAG=v0.2.7）
 VITE_API_MODE=remote \
 VITE_API_BASE_URL=/api \
 npm run build

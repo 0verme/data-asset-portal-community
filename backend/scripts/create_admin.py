@@ -32,8 +32,6 @@ def _load_runtime() -> None:
     except ModuleNotFoundError:  # pragma: no cover - package vs script entry
         from backend.app.settings import load_runtime_env  # type: ignore
 
-    # Default overwrite=True matches historical/normal runtime file precedence.
-    # Community demo uses overwrite=False in its own bootstrap path, not this CLI.
     load_runtime_env()
 
 

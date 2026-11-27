@@ -118,7 +118,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 
 ## 环境变量
 
-后端按以下顺序读取环境文件，后者覆盖前者：
+进程已注入的环境变量优先；未在进程环境中设置的变量按以下顺序读取环境文件，后者覆盖前者：
 
 1. 根目录 `.env`
 2. 根目录 `.env.local`

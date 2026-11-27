@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -86,6 +85,5 @@ def create_native_app(
     )
 
 
-_demo_bootstrap = os.environ.get("COMMUNITY_DEMO_BOOTSTRAP") == "1"
-load_runtime_env(overwrite=not _demo_bootstrap)
+load_runtime_env()
 app = create_native_app()
