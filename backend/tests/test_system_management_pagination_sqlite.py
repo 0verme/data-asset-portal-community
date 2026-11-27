@@ -38,7 +38,6 @@ class SystemManagementPaginationSqliteTests(unittest.TestCase):
             {
                 "ASSET_DB_CONFIG_PATH": str(self.config_path),
                 "ASSET_DB_PROFILE": "primary",
-                "ASSET_AUTH_DB_PROFILE": "primary",
             },
             clear=False,
         )

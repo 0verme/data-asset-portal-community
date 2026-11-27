@@ -12,7 +12,6 @@ from typing import TextIO
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from app.core.profiles import apply_runtime_profile
 from app.db.base import redact_sensitive_text
 from app.db.facade import connect_with_profile, get_db_profile
 from app.migrations.schema import (
@@ -40,10 +39,6 @@ def _load_runtime() -> None:
 
         demo_bootstrap = os.environ.get("COMMUNITY_DEMO_BOOTSTRAP") == "1"
         load_runtime_env(overwrite=not demo_bootstrap)
-    except Exception:
-        pass
-    try:
-        apply_runtime_profile()
     except Exception:
         pass
 

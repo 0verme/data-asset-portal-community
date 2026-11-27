@@ -14,10 +14,8 @@
 
 """CLI contract tests for the schema migration command.
 
-The migration CLI mirrors native backend startup by applying the runtime profile
-(ASSET_RUNTIME_PROFILE) so the local quick-start commands work as written:
-`schema_migrate.py apply --profile community_sqlite` resolves the profile file
-without a module allowlist.
+The migration CLI mirrors native backend startup by loading runtime env files
+and resolving the explicit database config/profile without a module allowlist.
 """
 
 from __future__ import annotations
@@ -638,10 +636,10 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
         self.assertIn("dialect=mysql", proc.stdout)
 
     def test_community_profile_applies_config_path(self):
-        # With ASSET_RUNTIME_PROFILE=community the CLI must resolve the
-        # community config file without --config, mirroring normal startup.
+        # With ASSET_DB_CONFIG_PATH pointing at database.community.yaml the CLI
+        # resolves the community config file without --config, mirroring startup.
         env = {
-            "ASSET_RUNTIME_PROFILE": "community",
+            "ASSET_DB_CONFIG_PATH": str(BACKEND / "configs" / "database.community.yaml"),
             "ASSET_DB_PROFILE": "community_sqlite",
         }
         proc = _run_cli(["status", "--profile", "community_sqlite"], env_extra=env)
@@ -652,35 +650,36 @@ class SchemaMigrateCliContractTests(unittest.TestCase):
 
     def test_offline_plan_uses_the_canonical_repository_baseline(self):
         # Every fresh database receives the complete repository baseline.
-        env = {"ASSET_RUNTIME_PROFILE": "community"}
-        proc = _run_cli(["plan", "--offline", "--dialect", "sqlite"], env_extra=env)
+        proc = _run_cli(["plan", "--offline", "--dialect", "sqlite"])
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("0001_baseline", proc.stdout)
 
     def test_community_profile_reads_backend_env_local(self):
-        # Mirror native startup: the CLI must load backend/.env.local so the
-        # README Community quick-start (configure .env.local, then run
-        # `schema_migrate.py apply --profile community_sqlite`) works as
-        # written in a clean clone without hand-exported variables.
+        # Mirror native startup: the CLI must load backend/.env.local so a
+        # configured .env.local works without hand-exported shell variables.
         env_local = BACKEND / ".env.local"
         backup = env_local.read_text(encoding="utf-8") if env_local.exists() else None
         try:
+            community_cfg = BACKEND / "configs" / "database.community.yaml"
             env_local.write_text(
-                "ASSET_RUNTIME_PROFILE=community\n",
+                f"ASSET_DB_CONFIG_PATH={community_cfg}\nASSET_DB_PROFILE=community_sqlite\n",
                 encoding="utf-8",
             )
-            env = {k: v for k, v in os.environ.items() if k != "ASSET_RUNTIME_PROFILE"}
-            env.pop("ASSET_RUNTIME_PROFILE", None)
+            env = {
+                k: v
+                for k, v in os.environ.items()
+                if k not in {"ASSET_DB_CONFIG_PATH", "ASSET_DB_PROFILE"}
+            }
             proc = subprocess.run(
-                [PYTHON, str(MIGRATE), "plan", "--offline", "--dialect", "sqlite"],
+                [PYTHON, str(MIGRATE), "status", "--profile", "community_sqlite"],
                 cwd=REPO_ROOT,
                 env=env,
                 capture_output=True,
                 text=True,
                 timeout=120,
             )
-            self.assertEqual(0, proc.returncode, proc.stderr)
-            self.assertIn("0001_baseline", proc.stdout)
+            self.assertNotIn("database.yaml", proc.stderr, proc.stderr)
+            self.assertIn("dialect=", proc.stdout, proc.stdout)
         finally:
             if backup is None:
                 env_local.unlink(missing_ok=True)

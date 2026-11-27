@@ -31,7 +31,6 @@ class DemoRestorePersonalOverridesTests(unittest.TestCase):
             **os.environ,
             "ASSET_DB_CONFIG_PATH": str(config),
             "ASSET_DB_PROFILE": "public_demo",
-            "ASSET_AUTH_DB_PROFILE": "public_demo",
             "RAG_SEARCH_SERVICE_TOKEN": self.secret,
         }
         result = self.run_python("backend/scripts/schema_migrate.py", "apply", "--profile", "public_demo")

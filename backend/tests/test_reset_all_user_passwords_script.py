@@ -28,6 +28,13 @@ class ResetAllUserPasswordsScriptUnitTests(unittest.TestCase):
                     "    database: asset_portal_test",
                     "    user: test",
                     "    password: test",
+                    "  other_profile:",
+                    "    type: postgres",
+                    "    host: 127.0.0.1",
+                    "    port: 5432",
+                    "    database: other_test",
+                    "    user: test",
+                    "    password: test",
                     "",
                 ]
             ),
@@ -39,8 +46,8 @@ class ResetAllUserPasswordsScriptUnitTests(unittest.TestCase):
         }
         self.addCleanup(self._restore_env)
         os.environ["ASSET_DB_CONFIG_PATH"] = str(self.config_path)
-        os.environ["ASSET_AUTH_DB_PROFILE"] = "auth_test"
-        os.environ.pop("ASSET_DB_PROFILE", None)
+        os.environ["ASSET_DB_PROFILE"] = "auth_test"
+        os.environ["ASSET_AUTH_DB_PROFILE"] = "other_profile"
 
     def _restore_env(self):
         for key, value in self._original_env.items():
@@ -49,7 +56,7 @@ class ResetAllUserPasswordsScriptUnitTests(unittest.TestCase):
             else:
                 os.environ[key] = value
 
-    def test_resolve_profile_prefers_auth_profile(self):
+    def test_resolve_profile_uses_asset_db_profile_and_ignores_deprecated_auth_profile(self):
         self.assertEqual(resolve_profile(), "auth_test")
 
     def test_preview_does_not_mutate_and_uses_auth_profile(self):

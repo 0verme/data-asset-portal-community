@@ -232,6 +232,7 @@ def build_demo_environment(
         and key.upper()
         not in {
             "ASSET_RUNTIME_PROFILE",
+            "ASSET_AUTH_DB_PROFILE",
             "APP_ENV",
             "APP_DEBUG",
             "APP_SECRET_KEY",
@@ -246,10 +247,8 @@ def build_demo_environment(
     environment.update(
         {
             "COMMUNITY_DEMO_BOOTSTRAP": "1",
-            "ASSET_RUNTIME_PROFILE": "community",
             "ASSET_DB_CONFIG_PATH": str(paths.database_config.resolve()),
             "ASSET_DB_PROFILE": "community_sqlite",
-            "ASSET_AUTH_DB_PROFILE": "community_sqlite",
             "ASSET_DB_TYPE": "sqlite",
             "ASSET_DB_DATABASE": str(paths.database.resolve()),
             "APP_ENV": "development",

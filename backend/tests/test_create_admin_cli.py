@@ -50,18 +50,13 @@ class CreateBootstrapAdminServiceTests(unittest.TestCase):
 class CreateAdminCliTests(unittest.TestCase):
     def setUp(self):
         self._original_profile = os.environ.get("ASSET_DB_PROFILE")
-        self._original_runtime = os.environ.get("ASSET_RUNTIME_PROFILE")
         self.addCleanup(self._restore_env)
 
     def _restore_env(self):
-        for key, value in (
-            ("ASSET_DB_PROFILE", self._original_profile),
-            ("ASSET_RUNTIME_PROFILE", self._original_runtime),
-        ):
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
+        if self._original_profile is None:
+            os.environ.pop("ASSET_DB_PROFILE", None)
+        else:
+            os.environ["ASSET_DB_PROFILE"] = self._original_profile
 
     @patch.object(create_admin, "_load_runtime")
     @patch.object(create_admin.system_management_service, "create_bootstrap_admin", return_value="admin")

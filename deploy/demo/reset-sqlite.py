@@ -53,7 +53,6 @@ def database_identity(path):
 
 def effective_target():
     """Use the application's runtime environment and DB resolver, without connecting."""
-    from backend.app.core.profiles import apply_runtime_profile
     from backend.app.settings import load_runtime_env
 
     inherited = dict(os.environ)
@@ -61,7 +60,6 @@ def effective_target():
         if inherited.get("ASSET_DB_PROFILE", PROFILE).strip() != PROFILE:
             raise Refused("inherited database profile is not public_demo")
         load_runtime_env()
-        apply_runtime_profile()
         from backend.app.db.facade import (
             DEFAULT_CONFIG_PATH,
             get_db_profile,

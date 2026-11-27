@@ -83,7 +83,7 @@ backend、frontend、API 和文档共用同一套定义：
 | **Readiness / Diagnostics** | 运行时依赖和集成的实际状态：database connectivity、driver、storage、credentials、external service 等，由 provider/service error contract 表达 | 请求级成功、降级或可诊断错误 | Module identity、源码/route 存在性、菜单、RBAC、Edition |
 | **Menu Status** | 实例导航配置，事实源是 `p_menu.status` 及菜单排序/位置字段 | 导航展示，以及门户/搜索/统计的实例可见性过滤 | 删除源码模块、取消 route、后端授权、license、数据库可用性 |
 | **RBAC Permission** | 当前用户授权，事实源是 permission registry 与 role → permission mapping；后端 `require_permission` 是 enforcement | 受保护 API 的读写/管理操作；前端隐藏按钮仅是 UX | Module 是否存在、菜单实例配置、deployment readiness、runtime profile |
-| **Runtime / DB Profile** | 连接、provider 和部署选择，事实源是 `ASSET_RUNTIME_PROFILE`、`ASSET_DB_PROFILE` 与 profile config | 数据库/provider、连接参数、部署默认值和集成选择 | Module identity、license、菜单、用户 permission |
+| **Runtime / DB Profile** | 连接、provider 和部署选择，事实源是 `ASSET_DB_PROFILE`、`ASSET_DB_CONFIG_PATH` 与 profile config | 数据库/provider、连接参数、部署默认值和集成选择 | Module identity、license、菜单、用户 permission |
 
 由此得到几条实现约束，新增模块或诊断逻辑时必须遵守：
 
@@ -199,4 +199,4 @@ V1 lineage 只支持 self-contained `replace` snapshot：新 snapshot 先以 `IN
 
 ## 当前边界与后续 Issue
 
-仓库已有模块均默认进入统一的 route、repository-module capability contract、schema、seed、search 和 portal statistics contract。`backend/configs/community.yaml` 仅保留本地演示的数据库/集成配置；`p_menu.status` 仍是实例级可见性配置。WAIT_DB 或外部存储/驱动未配置时，模块 route 仍存在，由现有 Service error contract 返回可诊断状态。
+仓库已有模块均默认进入统一的 route、repository-module capability contract、schema、seed、search 和 portal statistics contract。`backend/configs/database.community.yaml` 提供本地演示的数据库 profile 示例；`p_menu.status` 仍是实例级可见性配置。WAIT_DB 或外部存储/驱动未配置时，模块 route 仍存在，由现有 Service error contract 返回可诊断状态。

@@ -34,7 +34,6 @@ class AiLlmDailyQuotaApiTests(unittest.TestCase):
         self.environment = patch.dict(os.environ, {
             "ASSET_DB_CONFIG_PATH": str(self.config_path),
             "ASSET_DB_PROFILE": "primary",
-            "ASSET_AUTH_DB_PROFILE": "primary",
         }, clear=False)
         self.environment.start()
         self.addCleanup(self.environment.stop)
