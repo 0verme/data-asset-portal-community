@@ -41,12 +41,12 @@ from ..db.tables import (
     root_item,
     upstream_system,
 )
-from ..settings import get_int_env
 from .providers import list_portal_stats
 from .system_management_service import system_management_service
 
 
 LOGGER = logging.getLogger(__name__)
+PORTAL_STATS_CACHE_TTL_SECONDS = 600
 
 READINESS_SPECS: dict[str, dict[str, str | None]] = {
     "data-warehouse": {
@@ -115,7 +115,7 @@ class PortalService:
 
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
-        self._stats_cache_ttl = get_int_env("PORTAL_STATS_CACHE_TTL_SECONDS", 600, minimum=1)
+        self._stats_cache_ttl = PORTAL_STATS_CACHE_TTL_SECONDS
         self._stats_cache = None
         self._stats_cache_expire_at = 0.0
         self._stats_cache_signature = None

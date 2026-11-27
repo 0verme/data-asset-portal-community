@@ -230,10 +230,6 @@ Defaults are shown for orientation and are implemented by the runtime.
 | Variable | Purpose | Default / scope |
 |---|---|---|
 | `ASSET_SCHEMA_PREFIX` | logical schema prefix for asset services | unset; optional |
-| `APP_PAGE_SIZE_DEFAULT`, `APP_PAGE_SIZE_MAX` | pagination bounds | service defaults; runtime |
-| `PORTAL_STATS_CACHE_TTL_SECONDS` | portal aggregate statistics cache TTL | `600` |
-| `APP_SLOW_SERVICE_SECONDS` | slow-service logging threshold | `3` |
-| `SEARCH_DEFAULT_LIMIT`, `SEARCH_MODULE_LIMIT`, `SEARCH_MAX_LIMIT` | search result limits | `5`, `10`, `50` |
 | `APP_LOG_MAX_BYTES`, `APP_LOG_BACKUP_COUNT` | log rotation | `2097152`, `5` |
 | `ASSET_DB_PASSWORD` | database password secret override for the selected YAML profile | YAML `password`; secret manager |
 | `ASSET_DB_JAR_PATH` | GaussDB JDBC driver path | profile/default; GaussDB only |

@@ -33,37 +33,10 @@ export const AUTH_MODE: 'db' | 'mock' = (
 
 const STORAGE_KEY = 'dap_auth';
 
-const MOCK_ROLE: 'admin' | 'maintainer' = (
-  typeof import.meta !== 'undefined' && import.meta.env?.['VITE_MOCK_AUTH_ROLE']
-    ? String(import.meta.env['VITE_MOCK_AUTH_ROLE'])
-    : 'admin'
-).trim().toLowerCase() === 'maintainer'
-  ? 'maintainer'
-  : 'admin';
-
-const MOCK_USER = (
-  typeof import.meta !== 'undefined' && import.meta.env?.['VITE_MOCK_AUTH_USER']
-    ? String(import.meta.env['VITE_MOCK_AUTH_USER'])
-    : 'admin'
-).trim() || 'admin';
-
-export function resolveMockPassword(environment: unknown): string {
-  const configuredPassword =
-    environment && typeof environment === 'object'
-      ? (environment as { VITE_MOCK_AUTH_PASSWORD?: unknown }).VITE_MOCK_AUTH_PASSWORD
-      : undefined;
-  return configuredPassword ? String(configuredPassword) : '123456';
-}
-
-const MOCK_PASSWORD = resolveMockPassword(
-  typeof import.meta !== 'undefined' ? import.meta.env : undefined,
-);
-
-const MOCK_NAME = (
-  typeof import.meta !== 'undefined' && import.meta.env?.['VITE_MOCK_AUTH_NAME']
-    ? String(import.meta.env['VITE_MOCK_AUTH_NAME'])
-    : '管理员'
-).trim() || '管理员';
+const MOCK_ROLE: 'admin' | 'maintainer' = 'admin';
+const MOCK_USER = 'admin';
+const MOCK_PASSWORD = '123456';
+const MOCK_NAME = '管理员';
 
 export const GUEST_AUTH: AuthSession = Object.freeze({
   role: 'guest',

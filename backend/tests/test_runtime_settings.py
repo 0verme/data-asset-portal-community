@@ -21,7 +21,6 @@ from backend.app.services.system_management_service import SystemManagementServi
 
 class RuntimeSettingsTestCase(unittest.TestCase):
     _ENV_KEYS = (
-        "APP_PAGE_SIZE_DEFAULT", "APP_PAGE_SIZE_MAX", "APP_SLOW_SERVICE_SECONDS",
         "ASSET_DB_CONFIG_PATH", "ASSET_DB_HOST", "ASSET_DB_PORT", "ASSET_DB_DATABASE",
         "ASSET_DB_USER", "ASSET_DB_PASSWORD", "ASSET_DB_DSN", "ASSET_DB_JDBC_URL",
         "ASSET_OPERATOR",
@@ -43,12 +42,9 @@ class RuntimeSettingsTestCase(unittest.TestCase):
                 os.environ[key] = value
 
     def test_invalid_runtime_numbers_use_defaults_and_bounds_are_applied(self):
-        os.environ["APP_PAGE_SIZE_DEFAULT"] = "invalid"
-        os.environ["APP_PAGE_SIZE_MAX"] = "0"
-        os.environ["APP_SLOW_SERVICE_SECONDS"] = "-1"
-
         self.assertEqual((20, 200), get_page_size_limits(20))
-        self.assertEqual(3.0, get_float_env("APP_SLOW_SERVICE_SECONDS", 3.0, minimum=0.0))
+        self.assertEqual((200, 200), get_page_size_limits(500))
+        self.assertEqual(3.0, get_float_env("MISSING_FLOAT_SETTING", 3.0, minimum=0.0))
         self.assertEqual(30, get_int_env("MISSING_SETTING", 30, minimum=1))
 
     def test_database_yaml_is_ssot_and_only_password_secret_can_override(self):

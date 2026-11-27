@@ -25,7 +25,8 @@ from sqlalchemy import and_, case, func, select
 from ..db.facade import resolve_db_profile_name
 from ..db.service import CoreAccess
 from ..db.tables import code_category, code_item
-from ..settings import get_int_env
+
+COMMON_CODE_CACHE_TTL_SECONDS = 300
 CATEGORY_CODE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
 MAX_BATCH_CATEGORIES = 50
 
@@ -69,7 +70,7 @@ class CommonCodeValidationError(Exception):
 class CommonCodeService:
     def __init__(self):
         self._db_profile = os.getenv("ASSET_DB_PROFILE", "").strip()
-        self._cache_ttl = get_int_env("COMMON_CODE_CACHE_TTL_SECONDS", 300, minimum=1)
+        self._cache_ttl = COMMON_CODE_CACHE_TTL_SECONDS
         self._cache_lock = threading.Lock()
         self._item_cache = {}
         self._category_cache = {}

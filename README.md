@@ -130,7 +130,7 @@ npm --prefix frontend ci
 VITE_API_MODE=mock npm --prefix frontend run dev
 ```
 
-也可在 `frontend/.env.local` 中设置 `VITE_API_MODE=mock`，再使用演示账号 `admin` / `123456` 登录（可通过 `VITE_MOCK_AUTH_*` 覆盖）。前端 Mock 模式仅读取前端内置演示数据，其 AI 问答由本地演示适配器按名称/字段匹配生成，**不调用任何 RAG 服务或 LLM**（详见 [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md)）。
+也可在 `frontend/.env.local` 中设置 `VITE_API_MODE=mock`，再使用演示账号 `admin` / `123456` 登录。前端 Mock 模式仅读取前端内置演示数据，其 AI 问答由本地演示适配器按名称/字段匹配生成，**不调用任何 RAG 服务或 LLM**（详见 [AI 问答静态 Mock 演示](./docs/ai-ask-static-mock.md)）。
 
 ---
 
