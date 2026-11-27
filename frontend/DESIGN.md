@@ -28,9 +28,9 @@
 外观偏好由 [AppearanceProvider](src/appearance/AppearanceProvider.tsx) 和 [preferences](src/appearance/preferences.ts) 管理，应用启动时由 [appearance bootstrap](appearance-bootstrap.js) 提前应用，主题 Token 在 [app.css](src/styles/app.css) 与 [kumo-theme.css](src/styles/kumo-theme.css) 中定义和桥接。
 
 - 主题模式支持 **System / Light / Dark**。新偏好默认是 System；System 根据操作系统的 prefers-color-scheme 解析成 Light 或 Dark。
-- 用户已保存的偏好优先于部署默认值。新偏好使用部署配置 VITE_DEFAULT_ACCENT；未配置或配置值无效时回落到 Green。仓库[示例配置](.env.example)目前填写 Green，但它不是所有部署和用户的强制默认主题。
+- 用户已保存的偏好优先于部署默认值。新偏好使用部署配置 VITE_DEFAULT_ACCENT；未配置或配置值无效时回落到 Purple。仓库[示例配置](.env.example)目前填写 Purple，但它不是所有部署和用户的强制默认主题。
 - Accent 支持 **Green / Blue / Purple / Orange / Custom**。Blue、Orange 和自定义色会由当前主题的调色逻辑生成可读的 Accent Token；Green、Purple 的预设值在样式中定义。
-- 当前[index.html](index.html)中的 Light / Green 是启动前的初始属性。运行时偏好会在应用渲染前读取并应用，不能据此将 Light 或 Green 描述为所有用户的默认选择。
+- 当前[index.html](index.html)中的 Light / Purple 是启动前的初始属性。运行时偏好会在应用渲染前读取并应用，不能据此将 Light 或 Purple 描述为所有用户的默认选择。
 - Compact / Comfortable 是可保存的密度偏好。Comfortable 为新偏好默认值；Compact 只在已有明确覆盖的区域改变间距，目前覆盖门户及部分目录表格、筛选栏和表单。它不是所有业务组件的全局缩放开关。见 [appearance-settings.css](src/appearance/appearance-settings.css) 与 [search.css](src/styles/search.css)。
 
 ### 2.2 Accent、品牌、语义和装饰

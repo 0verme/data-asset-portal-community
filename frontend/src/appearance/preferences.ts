@@ -33,12 +33,12 @@ function isPreset(value: unknown): value is AccentPreset {
   return value === "green" || value === "purple" || value === "blue" || value === "orange";
 }
 
-export function defaults(configuredAccent: unknown): AppearancePreferenceV1 & { accent: { kind: "preset"; preset: AccentPreset } } {
+export function defaults(configuredAccent?: unknown): AppearancePreferenceV1 & { accent: { kind: "preset"; preset: AccentPreset } } {
   const preset = typeof configuredAccent === "string" ? configuredAccent.trim().toLowerCase() : "";
   return {
     version: 1,
     themeMode: "system",
-    accent: { kind: "preset", preset: isPreset(preset) ? preset : "green" },
+    accent: { kind: "preset", preset: isPreset(preset) ? preset : "purple" },
     effects: "subtle",
     density: "comfortable",
   };
