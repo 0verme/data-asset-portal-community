@@ -146,6 +146,32 @@ test("empty all-scope search recovery clears q and restores input focus", async 
   await expect.poll(() => new URL(page.url()).searchParams.has("scope")).toBe(false);
 });
 
+test("clicking the header brand button resets active portal search results, scope, and URL parameters", async ({ page }) => {
+  await openPortal(page);
+  const search = page.getByRole("textbox", { name: "搜索数据资产" });
+  const scopes = page.getByRole("group", { name: "搜索范围" });
+  const allScope = scopes.getByRole("button", { name: "全部", exact: true });
+  const assetScope = scopes.getByRole("button", { name: "资产", exact: true });
+
+  await assetScope.click();
+  await search.fill(ASSET_NAME);
+  await search.press("Enter");
+  await expect(page.locator(".sp-hit-title").filter({ hasText: ASSET_NAME }).first()).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe(ASSET_NAME);
+  await expect.poll(() => new URL(page.url()).searchParams.get("scope")).toBe("asset");
+
+  await page.locator("header.topbar button.brand").click();
+
+  await expect(search).toHaveValue("");
+  await expect(search).toBeFocused();
+  await expect(allScope).toHaveAttribute("aria-pressed", "true");
+  await expect(assetScope).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".sp-results")).toHaveCount(0);
+  await expect(page.locator(".sp-stats-grid")).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.has("q")).toBe(false);
+  await expect.poll(() => new URL(page.url()).searchParams.has("scope")).toBe(false);
+});
+
 test("search result navigation opens the existing asset module without changing its route contract", async ({ page }) => {
   await openPortal(page);
   const search = page.getByRole("textbox", { name: "搜索数据资产" });

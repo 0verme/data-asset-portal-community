@@ -66,9 +66,21 @@ export interface SearchPortalPageProps {
     | undefined;
   availableModules?: readonly string[] | undefined;
   publicAccessReady?: boolean | undefined;
+  resetRequest?: number | undefined;
   heroTitle: string;
   heroSubtitle: string;
   searchPlaceholder: string;
+}
+
+function isPortalPathname(pathname: string): boolean {
+  return pathname === "/" || pathname === "/portal";
+}
+
+function readInitialPortalLocationSearch(): string {
+  if (typeof window === "undefined" || !isPortalPathname(window.location.pathname)) {
+    return "";
+  }
+  return window.location.search || "";
 }
 
 const MAX_MATCHED_FIELD_LABELS = 2;
@@ -425,6 +437,7 @@ export function SearchPortalPage({
   onNavigate,
   availableModules = [],
   publicAccessReady = true,
+  resetRequest,
   heroTitle,
   heroSubtitle,
   searchPlaceholder,
@@ -439,7 +452,7 @@ export function SearchPortalPage({
     () => new Set(scopeOptions.map((item) => item.key)),
     [scopeOptions],
   );
-  const initialSearchLocationRef = useRef(typeof window === "undefined" ? "" : window.location.search || "");
+  const initialSearchLocationRef = useRef(readInitialPortalLocationSearch());
   const initialScopeKeys = useMemo(() => new Set(PORTAL_SCOPE_CONFIGS.map((item) => item.key)), []);
   const initialSearchRef = useRef(readPortalSearchParams(initialScopeKeys, initialSearchLocationRef.current));
   const initialSearchBootstrapPendingRef = useRef(true);
@@ -574,7 +587,7 @@ export function SearchPortalPage({
     nextQuery: string,
     nextScope = DEFAULT_PORTAL_SCOPE,
   ): void => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !isPortalPathname(window.location.pathname)) return;
 
     const searchParams = new URLSearchParams(window.location.search || "");
     const keyword = String(nextQuery ?? "").trim();
@@ -618,6 +631,7 @@ export function SearchPortalPage({
 
   const resetSearchState = (nextScope = scope): void => {
     initialSearchBootstrapPendingRef.current = false;
+    initialSearchLocationRef.current = "";
     stopTyping();
     const preservedScope = validScopeKeys.has(nextScope)
       ? nextScope
@@ -650,6 +664,14 @@ export function SearchPortalPage({
     resetSearchState(nextScope);
     inputRef.current?.focus();
   };
+
+  const lastResetRequestRef = useRef(resetRequest);
+
+  useEffect(() => {
+    if (resetRequest === undefined || resetRequest === lastResetRequestRef.current) return;
+    lastResetRequestRef.current = resetRequest;
+    clearSearch(DEFAULT_PORTAL_SCOPE);
+  }, [resetRequest]);
 
   const runSearch = (
     rawQuery: string,

@@ -121,6 +121,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [portalResetRequest, setPortalResetRequest] = useState(0);
   const [dismissedAnnouncementVersion, setDismissedAnnouncementVersion] = useState<string | null>(null);
   const [lineageBootstrap, setLineageBootstrap] = useState<LineageBootstrap | null>(null);
   const [lineageNodes, setLineageNodes] = useState<LineageNode[]>([]);
@@ -514,6 +515,9 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
     resetPushNavigation();
     resetRootNavigation();
     resetUpstreamNavigation();
+    if (nextModule === "portal") {
+      setPortalResetRequest((current) => current + 1);
+    }
     switchNavigationModule(nextModule, { systemRoute: systemLandingRoute });
     setSystemActionIntent("");
     scrollMainToTop();
@@ -651,6 +655,7 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
     lineageRoute,
     manualCodeTable,
     mappingRoute,
+    portalResetRequest,
     push,
     pushRoute,
     query,
