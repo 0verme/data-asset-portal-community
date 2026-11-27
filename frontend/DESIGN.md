@@ -94,12 +94,12 @@ Kumo 桥接还定义 --dap-* 语义映射，并把它们映射到 Kumo 的颜色
 
 - **顶栏外框（`.topbar`）**：桌面端（`>= 769px`）采用 `width: min(1360px, calc(100% - 44px))`、`margin: 0 auto`、`min-height: 68px`、`padding: 0`、`gap: 13px`，透明背景、无底边框；移动端（`< 769px`）采用 `width: 100%`、`height: 58px`、`padding: 0 12px`、`gap: 6px`。
 - **品牌区（`.topbar-brand` / `.brand`）**：桌面端 Logo（`.brand-mark`）为 `35px × 35px`、`border-radius: 10px`，品牌名（`.brand-name`）为 `17px`、`font-weight: 600`、`letter-spacing: -0.02em`（`<= 860px` 收敛为 `14px`），英文副标题（`small`）为 `11px` 且在 `>= 1181px` 显示、`<= 1180px` 隐藏；移动端 Logo 为 `32px × 32px`、`border-radius: var(--radius-sm)`，品牌名为 `13px` 并由 `mobile-brand` 容器查询在极窄可用宽度下自动收起。
-- **主导航胶囊（`.mainnav`）**：`min-height: 44px`、`padding: 4px 8px`、`border-radius: 999px`、`1px solid var(--line)`、半透明 Surface 背景与 `--shadow-sm` 阴影，内部主导航按钮高 `34px`、`border-radius: 999px`、`12px` 字号；Hover 加深文字为 `--ink`，当前主导航项或含当前页的“更多”按钮以 `600` 字重与 Accent 下划线标识；保留 Adapter 的键盘可见焦点和禁用语义（如菜单加载提示）。
+- **主导航胶囊（`.mainnav`）**：`min-height: 44px`、`padding: 4px 8px`、`border-radius: 999px`、`1px solid var(--line)`、半透明 Surface 背景与 `--shadow-sm` 阴影，内部主导航按钮高 `34px`、`border-radius: 999px`、`12px` 字号；Hover 加深文字为 `--ink`，当前主导航项或含当前页的“更多”按钮采用标准分段胶囊选中态（`--accent-soft` 浅色胶囊背景、`--accent` 主题文字色与 `600` 字重，无底边内阴影）；保留 Adapter 的键盘可见焦点和禁用语义（如菜单加载提示）。
 - **共同操作区（`.topbar-actions`）**：桌面端间距 `gap: 9px`，语言切换器 `12px` 字号，主题切换（`.theme-toggle`）、风格设置（`.appearance-trigger`）、登录按钮（`.login-cta`）、用户胶囊（`.user-chip`）及退出按钮（`.logout-btn`）统一使用 `height: 39px`、`border-radius: 999px` 与半透明 Surface 背景（图标按钮宽 `39px`）；移动端（`< 769px`）所有顶栏可点击控件（含 Hamburger、移动搜索开关、语言、主题、风格设置、登录/退出）统一为 `44px × 44px` 触控尺寸。
 
 #### 允许的页面功能差异
 
-- **搜索槽与导航定位**：首页保留页面中央大搜索，不在顶栏渲染全局搜索，顶栏通过 `--portal-header-side` 为中央胶囊两侧预留对称空间；11 个业务工作台在顶栏右侧操作区容纳全局搜索（`>= 1200px` 为展开输入框，`769px..1199px` 为 `36px` 折叠按钮并在聚焦或有值时展开为 `196px`，`< 769px` 为 `44px` 搜索按钮触发下拉搜索栏），导航胶囊利用品牌区与操作区之间的实测可用宽度；404 页面无顶栏搜索、无侧栏与 Hamburger，直接继承同一公共 Header 外观并提供返首页入口。
+- **搜索槽与导航定位**：首页保留页面中央大搜索，不在顶栏渲染全局搜索，顶栏通过 `--portal-header-side` 为中央胶囊两侧预留对称空间；11 个业务工作台在顶栏右侧操作区容纳全局搜索（`>= 1200px` 默认为 `160px` 紧凑全圆角胶囊并在聚焦或有值时自动撑大为 `270px`，`769px..1199px` 为 `36px` 折叠按钮并在聚焦或有值时展开为 `196px`，`< 769px` 为 `44px` 搜索按钮触发下拉搜索栏），导航胶囊利用品牌区与操作区之间的实测可用宽度；404 页面无顶栏搜索、无侧栏与 Hamburger，直接继承同一公共 Header 外观并提供返首页入口。
 - **动态测量与收纳**：`AppHeader` 按权限取得可见菜单，通过 `ResizeObserver` 实测导航槽、菜单项及“更多”按钮宽度，动态计算主导航可见数量，其余可见项进入“更多”下拉菜单；禁止写死可见菜单数，或让导航与品牌、搜索、用户区重叠。
 - **响应式抽屉与语言入口**：门户在 `< 769px` 启用 Hamburger 与移动模块导航抽屉；11 个业务工作台在 `< 960px` 将桌面侧栏切换为 Hamburger 抽屉（含模块导航与业务筛选），且移动搜索与抽屉互斥。工作台在 `769px..1024px` 及 `<= 22rem`（`352px`）将语言切换器收纳至侧栏/抽屉顶部，为顶栏导航与搜索留出空间。
 

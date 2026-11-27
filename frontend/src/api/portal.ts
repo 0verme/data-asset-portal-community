@@ -43,6 +43,7 @@ const MOCK_PORTAL_STATS: readonly MockPortalStatConfig[] = [
   { label: '报表', value: '8', moduleKey: 'report' },
   { label: 'API', value: '10', moduleKey: 'apiAsset' },
   { label: '词根', value: '40', moduleKey: 'root' },
+  { label: '码值表', value: '8', moduleKey: 'codeTable' },
 ] as const;
 
 function normalizeStats(payload: unknown): PortalStatItem[] {

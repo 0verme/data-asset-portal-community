@@ -200,7 +200,7 @@ test("homepage footer shares the global footer treatment and follows its content
   const release = footer.getByRole("link", { name: /^v\d+\.\d+\.\d+$/ });
   const link = footer.getByRole("link", { name: "GitHub ↗" });
   const panel = main.locator(".sp-stats");
-  await expect(panel.locator(".sp-stat-num")).toHaveCount(11);
+  await expect(panel.locator(".sp-stat-num")).toHaveCount(12);
   await expect(copy).toHaveText(/^数据资产门户 v\d+\.\d+\.\d+$/);
   await expect(release).toHaveAttribute("href", /^https:\/\/github\.com\/0verme\/data-asset-portal-community\/releases\/tag\/v\d+\.\d+\.\d+$/);
   await expect(footer.locator(".app-footer-separator")).toHaveCount(0);
