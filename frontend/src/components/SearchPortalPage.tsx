@@ -506,24 +506,18 @@ export function SearchPortalPage({
     })).filter((item) => item.question.trim().length > 0);
   }, [configuredAiExamples, t, i18n.resolvedLanguage, i18n.language]);
   const primaryAskExample = askExamples[0]?.question ?? "";
-  const baseSearchPlaceholder = useMemo(
+  const staticSearchPlaceholder = useMemo(
     () => String(searchPlaceholder || "").trim(),
     [searchPlaceholder],
   );
-  const staticSearchPlaceholder = useMemo(() => {
-    const base = baseSearchPlaceholder;
-    if (!aiEnabled || !primaryAskExample) return base;
-    if (/问\s*AI|ask\s*AI/i.test(base)) return base;
-    return `${base}${t("portalSearch.placeholderAiSuffix", { example: primaryAskExample })}`;
-  }, [aiEnabled, baseSearchPlaceholder, primaryAskExample, t]);
 
   useEffect(() => {
-    if (!aiEnabled || query.trim() || effectiveEffects === "off" || askExamples.length === 0) {
+    if (!aiEnabled || query.trim() || askExamples.length === 0) {
       setTypewriterText("");
       return;
     }
     const candidates = [
-      baseSearchPlaceholder,
+      staticSearchPlaceholder,
       ...askExamples.map((item) => t("portalSearch.placeholderAskPrefix", { example: item.question })),
     ].filter(Boolean);
     if (candidates.length <= 1) {
@@ -537,6 +531,12 @@ export function SearchPortalPage({
 
     const step = () => {
       const target = candidates[candidateIndex] ?? staticSearchPlaceholder;
+      if (effectiveEffects === "off") {
+        candidateIndex = (candidateIndex + 1) % candidates.length;
+        setTypewriterText(candidates[candidateIndex] ?? staticSearchPlaceholder);
+        timerId = window.setTimeout(step, 2800);
+        return;
+      }
       if (phase === "hold") {
         candidateIndex = (candidateIndex + 1) % candidates.length;
         charIndex = 1;
@@ -561,7 +561,7 @@ export function SearchPortalPage({
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [aiEnabled, askExamples, baseSearchPlaceholder, effectiveEffects, query, staticSearchPlaceholder, t]);
+  }, [aiEnabled, askExamples, effectiveEffects, query, staticSearchPlaceholder, t]);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const compositionStartValue = useRef<string | null>(null);

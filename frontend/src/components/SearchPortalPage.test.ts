@@ -194,9 +194,9 @@ test("Ask AI button stays interactive on empty input, focuses the search box wit
   assert.match(source, /if \(nextValue\.trim\(\)\) setEmptyAskPromptVisible\(false\)/);
   assert.match(styles, /\.sp-ask-btn\.sp-ask-btn-active \{[\s\S]*?background: linear-gradient\(120deg, var\(--accent\), var\(--accent-strong\)\)/);
 
-  // 4 & 5. Placeholder includes Ask AI examples with typewriter rotation, and verified example pills trigger normal runAiAsk flow.
+  // 4 & 5. Placeholder rotates the base search prompt and Ask AI examples separately without concatenating them, and verified example pills trigger normal runAiAsk flow.
   assert.match(source, /PORTAL_ASK_AI_EXAMPLE_KEYS/);
-  assert.match(source, /t\("portalSearch\.placeholderAiSuffix"/);
+  assert.doesNotMatch(source, /t\("portalSearch\.placeholderAiSuffix"/);
   assert.match(source, /t\("portalSearch\.placeholderAskPrefix"/);
   assert.match(source, /className="sp-ask-pill"/);
   assert.match(source, /onClick=\{\(\) => pickAskExample\(item\.question\)\}/);
