@@ -70,10 +70,11 @@ test("table overflow is scoped to the reusable table viewport, not globally over
   assert.match(styles, /\.fm-sticky-horizontal-scrollbar,\s*\.wide-table-sticky-scrollbar\s*\{[^}]*position:\s*fixed/);
 });
 
-test("menu navigation position precedes actions and the action cell stays in the same row", () => {
-  const navHeading = menuSource.indexOf(">导航位置</th>");
+test("menu description precedes actions without legacy navigation position column and the action cell stays in the same row", () => {
+  const descHeading = menuSource.indexOf(">说明</th>");
   const actionHeading = menuSource.indexOf(">操作</th>");
-  assert.ok(navHeading >= 0 && actionHeading > navHeading);
+  assert.ok(descHeading >= 0 && actionHeading > descHeading);
+  assert.equal(menuSource.includes("导航位置"), false);
   assert.match(menuSource, /className="mobile-card-actions menu-actions-cell"/);
   assert.match(systemStyles, /menu-management-table th\.menu-actions-head,[\s\S]*?menu-management-table td\.menu-actions-cell\s*\{[\s\S]*?position:\s*sticky/);
   assert.match(systemStyles, /menu-management-table th\.menu-actions-head\s*\{[\s\S]*?z-index:\s*2/);

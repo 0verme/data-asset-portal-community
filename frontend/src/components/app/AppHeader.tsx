@@ -111,13 +111,9 @@ export function AppHeader({
   const [moreNavOpen, setMoreNavOpen] = useState(false);
   const [navigationFitSnapshot, setNavigationFitSnapshot] = useState<NavigationFitSnapshot | null>(null);
 
-  const navigationPrimaryMenus = useMemo(
-    () => visibleNavMenus.filter((item) => item.navPlacement === "primary"),
-    [visibleNavMenus],
-  );
-  const navigationPrimaryMenuCount = navigationPrimaryMenus.length;
+  const navigationPrimaryMenuCount = visibleNavMenus.length;
   const navigationMenuKey = JSON.stringify(
-    navigationPrimaryMenus.map((item) => [item.code, displayMenuName(item), item.icon]),
+    visibleNavMenus.map((item) => [item.code, displayMenuName(item), item.icon]),
   );
 
   useLayoutEffect(() => {
@@ -196,7 +192,7 @@ export function AppHeader({
     : null;
   const maxPrimaryMenus = navigationFitMetrics
     ? getNavigationPrimaryLimit(visibleNavMenus, navigationFitMetrics)
-    : navigationPrimaryMenus.length;
+    : visibleNavMenus.length;
   const { primary: primaryNavMenus, more: moreNavMenus } = useMemo(
     () => splitNavigationMenus(visibleNavMenus, { maxPrimary: maxPrimaryMenus }),
     [maxPrimaryMenus, visibleNavMenus],
@@ -305,7 +301,7 @@ export function AppHeader({
         </nav>
 
         <nav ref={navMeasureRef} className="mainnav mainnav-measure" aria-hidden="true" inert>
-          {navigationPrimaryMenus.map((item) => (
+          {visibleNavMenus.map((item) => (
             <Button
               key={item.code}
               type="button"

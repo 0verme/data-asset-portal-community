@@ -670,7 +670,7 @@ export function useSystemModule({
       setMenuModal({ open: false, mode: 'new', initial: null, busy: false });
       setMenuForm(DEFAULT_MENU_FORM);
     } catch (nextError: unknown) {
-      setMenuErrors(getFieldErrors(nextError, ['code', 'name', 'icon', 'path', 'order', 'navPlacement', 'adminOnly', 'status', 'desc']));
+      setMenuErrors(getFieldErrors(nextError, ['code', 'name', 'icon', 'path', 'order', 'adminOnly', 'status', 'desc']));
       setMenuErrorFocusRevision((revision) => revision + 1);
       setMenuModal((prev) => ({ ...prev, busy: false }));
     } finally {

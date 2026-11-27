@@ -15,7 +15,6 @@ const MENU_FIELD_LABELS: Readonly<Record<string, string>> = {
   path: "路由路径",
   order: "排序号",
   status: "状态",
-  navPlacement: "导航位置",
   adminOnly: "可见范围",
   desc: "说明",
 };
@@ -102,12 +101,6 @@ export function MenuForm({
                 setForm((prev) => ({ ...prev, status: normalizeStatus(value) }));
               }} />
             </div>
-          </FormField>
-          <FormField className="fl" formId={MENU_FORM_ID} name="navPlacement" label="导航位置" error={fieldErrors["navPlacement"]}>
-            <Select<string> aria-label="导航位置" className="inp" items={[{ label: "顶栏", value: "primary" }, { label: "更多", value: "more" }]} value={form.navPlacement || null} onValueChange={(value) => {
-              clearField("navPlacement");
-              setForm((prev) => ({ ...prev, navPlacement: value || "primary" }));
-            }} />
           </FormField>
           <FormField className="fl full" formId={MENU_FORM_ID} name="adminOnly" label="可见范围" error={fieldErrors["adminOnly"]}>
             <Checkbox label="仅管理员可见" checked={form.adminOnly} onCheckedChange={(checked) => {

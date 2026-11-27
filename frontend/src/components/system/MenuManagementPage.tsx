@@ -91,8 +91,7 @@ export function MenuManagementPage({
                   <th style={{ width: 200 }}>路由路径</th>
                   <th style={{ width: 100 }}>可见范围</th>
                   <th style={{ width: 96 }}>状态</th>
-                  <th style={{ width: 224 }}>说明</th>
-                  <th style={{ width: 100 }}>导航位置</th>
+                  <th style={{ width: 324 }}>说明</th>
                   <th className="menu-actions-head" style={{ width: 240, textAlign: "right" }}>操作</th>
                 </tr>
               </thead>
@@ -133,7 +132,6 @@ export function MenuManagementPage({
                     <td data-label="可见范围">{item.adminOnly ? "仅管理员" : "全部用户"}</td>
                     <td data-label="状态"><StatusBadge status={item.status} metaMap={MENU_STATUS_META} /></td>
                     <td data-label="说明"><span className="system-line-clamp"><Highlight text={item.desc || "-"} q={query} /></span></td>
-                    <td data-label="导航位置">{item.navPlacement === "primary" ? "顶栏" : "更多"}</td>
                     <td data-label="" className="mobile-card-actions menu-actions-cell" style={{ textAlign: "right" }}>
                       <RowActions
                         onEdit={() => onEdit(item)}
