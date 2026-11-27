@@ -34,6 +34,12 @@ from ...services.branding_service import (
     BrandingValidationError,
     default_public_branding,
 )
+from ...services.search_hot_keyword_service import (
+    SearchHotKeywordAlreadyExistsError,
+    SearchHotKeywordError,
+    SearchHotKeywordNotFoundError,
+    SearchHotKeywordValidationError,
+)
 from ..dependencies import (
     get_authorization_service,
     get_request_context,
@@ -85,6 +91,18 @@ def _branding_error_response(error: BrandingManagementError) -> JSONResponse:
     return _service_error_response(error, status)
 
 
+def _search_hot_keyword_error_response(error: SearchHotKeywordError) -> JSONResponse:
+    if isinstance(error, SearchHotKeywordNotFoundError):
+        status = 404
+    elif isinstance(error, SearchHotKeywordAlreadyExistsError):
+        status = 409
+    elif isinstance(error, SearchHotKeywordValidationError):
+        status = 422
+    else:
+        status = 500
+    return _service_error_response(error, status)
+
+
 def _system_payload(payload: Any) -> Any:
     return payload
 
@@ -94,6 +112,7 @@ def _register_system_management_routes(
     service: Any,
     rag_search_service: Any | None = None,
     branding_service_instance: Any | None = None,
+    search_hot_keyword_service_instance: Any | None = None,
 ) -> None:
     router = APIRouter(
         prefix="/api/system",
@@ -109,6 +128,121 @@ def _register_system_management_routes(
         from ...services.branding_service import branding_service
 
         return branding_service
+
+    def get_search_hot_keyword_service() -> Any:
+        if search_hot_keyword_service_instance is not None:
+            return search_hot_keyword_service_instance
+        from ...services.search_hot_keyword_service import search_hot_keyword_service
+
+        return search_hot_keyword_service
+
+    @router.get("/search-hot-keywords", response_model=None)
+    def get_admin_search_hot_keywords(
+        _context: RequestContext = Depends(require_permission("system:param:read")),
+        current_hot_keyword_service: Any = Depends(get_search_hot_keyword_service),
+    ):
+        try:
+            items = current_hot_keyword_service.list_admin_items()
+        except SearchHotKeywordError as error:
+            return _search_hot_keyword_error_response(error)
+        return JSONResponse(
+            content=validate_contract({"items": items}, SystemResponse),
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @router.post("/search-hot-keywords", response_model=None, status_code=201)
+    def create_admin_search_hot_keyword(
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
+        current_hot_keyword_service: Any = Depends(get_search_hot_keyword_service),
+    ):
+        try:
+            item = current_hot_keyword_service.create_item(_system_payload(payload))
+        except SearchHotKeywordError as error:
+            return _search_hot_keyword_error_response(error)
+        return JSONResponse(
+            status_code=201,
+            content=validate_contract(
+                {"message": "Search recommendation created", "data": item},
+                SystemResponse,
+            ),
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @router.post("/search-hot-keywords/restore-defaults", response_model=None)
+    def restore_admin_search_hot_keyword_defaults(
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
+        current_hot_keyword_service: Any = Depends(get_search_hot_keyword_service),
+    ):
+        scope = payload.get("scope") if isinstance(payload, dict) else None
+        try:
+            items = current_hot_keyword_service.restore_defaults(scope)
+        except SearchHotKeywordError as error:
+            return _search_hot_keyword_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "Search recommendation defaults restored", "items": items},
+                SystemResponse,
+            ),
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @router.put("/search-hot-keywords/{item_id}", response_model=None)
+    def update_admin_search_hot_keyword(
+        item_id: str,
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
+        current_hot_keyword_service: Any = Depends(get_search_hot_keyword_service),
+    ):
+        try:
+            item = current_hot_keyword_service.update_item(item_id, _system_payload(payload))
+        except SearchHotKeywordError as error:
+            return _search_hot_keyword_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "Search recommendation updated", "data": item},
+                SystemResponse,
+            ),
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @router.patch("/search-hot-keywords/{item_id}/status", response_model=None)
+    def patch_admin_search_hot_keyword_status(
+        item_id: str,
+        payload: Any = Body(default=None),
+        _context: RequestContext = Depends(require_permission("system:param:write")),
+        current_hot_keyword_service: Any = Depends(get_search_hot_keyword_service),
+    ):
+        try:
+            item = current_hot_keyword_service.update_item_status(item_id, _system_payload(payload))
+        except SearchHotKeywordError as error:
+            return _search_hot_keyword_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "Search recommendation status updated", "data": item},
+                SystemResponse,
+            ),
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @router.delete("/search-hot-keywords/{item_id}", response_model=None)
+    def delete_admin_search_hot_keyword(
+        item_id: str,
+        _context: RequestContext = Depends(require_permission("system:param:write")),
+        current_hot_keyword_service: Any = Depends(get_search_hot_keyword_service),
+    ):
+        try:
+            current_hot_keyword_service.delete_item(item_id)
+        except SearchHotKeywordError as error:
+            return _search_hot_keyword_error_response(error)
+        return JSONResponse(
+            content=validate_contract(
+                {"message": "Search recommendation deleted"},
+                SystemResponse,
+            ),
+            headers={"Cache-Control": "no-store"},
+        )
 
     @router.get("/public-config", response_model=None)
     def get_public_site_config(

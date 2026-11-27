@@ -50,6 +50,7 @@ import {
   DEFAULT_PORTAL_SCOPE,
   PORTAL_ASK_AI_EXAMPLE_KEYS,
   PORTAL_SCOPE_CONFIGS,
+  filterPortalAiExamples,
   filterPortalHotKeywordsByModules,
   filterPortalScopesByModules,
   isMonospaceHotKeyword,
@@ -488,20 +489,33 @@ export function SearchPortalPage({
     () => filterPortalHotKeywordsByModules(hotKeywords, availableModules),
     [hotKeywords, availableModules],
   );
-  const askExamples = useMemo(
-    () => PORTAL_ASK_AI_EXAMPLE_KEYS.map((key) => ({
+  const configuredAiExamples = useMemo(
+    () => filterPortalAiExamples(hotKeywords),
+    [hotKeywords],
+  );
+  const askExamples = useMemo(() => {
+    if (configuredAiExamples.length > 0) {
+      return configuredAiExamples.map((item) => ({
+        key: String(item.id),
+        question: item.keyword,
+      }));
+    }
+    return PORTAL_ASK_AI_EXAMPLE_KEYS.map((key) => ({
       key,
       question: t(`portalSearch.askExamples.${key}`),
-    })).filter((item) => item.question.trim().length > 0),
-    [t, i18n.resolvedLanguage, i18n.language],
-  );
+    })).filter((item) => item.question.trim().length > 0);
+  }, [configuredAiExamples, t, i18n.resolvedLanguage, i18n.language]);
   const primaryAskExample = askExamples[0]?.question ?? "";
+  const baseSearchPlaceholder = useMemo(
+    () => String(searchPlaceholder || "").trim(),
+    [searchPlaceholder],
+  );
   const staticSearchPlaceholder = useMemo(() => {
-    const base = String(searchPlaceholder || "").trim();
+    const base = baseSearchPlaceholder;
     if (!aiEnabled || !primaryAskExample) return base;
     if (/问\s*AI|ask\s*AI/i.test(base)) return base;
     return `${base}${t("portalSearch.placeholderAiSuffix", { example: primaryAskExample })}`;
-  }, [aiEnabled, primaryAskExample, searchPlaceholder, t]);
+  }, [aiEnabled, baseSearchPlaceholder, primaryAskExample, t]);
 
   useEffect(() => {
     if (!aiEnabled || query.trim() || effectiveEffects === "off" || askExamples.length === 0) {
@@ -509,7 +523,7 @@ export function SearchPortalPage({
       return;
     }
     const candidates = [
-      staticSearchPlaceholder,
+      baseSearchPlaceholder,
       ...askExamples.map((item) => t("portalSearch.placeholderAskPrefix", { example: item.question })),
     ].filter(Boolean);
     if (candidates.length <= 1) {
@@ -547,7 +561,7 @@ export function SearchPortalPage({
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [aiEnabled, askExamples, effectiveEffects, query, staticSearchPlaceholder, t]);
+  }, [aiEnabled, askExamples, baseSearchPlaceholder, effectiveEffects, query, staticSearchPlaceholder, t]);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const compositionStartValue = useRef<string | null>(null);

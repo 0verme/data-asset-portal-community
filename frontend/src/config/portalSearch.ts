@@ -42,6 +42,8 @@ export const PORTAL_SCOPE_CONFIGS: readonly PortalScopeConfig[] = [
  { key: "codeTable", label: "码值表", moduleKey: "codeTable" },
 ] as const;
 
+export const PORTAL_AI_EXAMPLE_CATEGORY = "ai_example";
+
 export interface PortalHotKeyword {
  id: number;
  keyword: string;
@@ -57,6 +59,7 @@ const HOT_KEYWORD_CATEGORY_TO_MODULE: Readonly<Record<string, string>> = {
  metric: "indicator",
  report: "report",
  api: "apiAsset",
+ downstream: "push",
  lineage: "lineage",
  code_table: "codeTable",
 };
@@ -90,11 +93,25 @@ export function filterPortalHotKeywordsByModules(
  const enabledModules = new Set(moduleKeys);
  const seenKeywords = new Set<string>();
  return items.filter((item) => {
+  if (item.category === PORTAL_AI_EXAMPLE_CATEGORY) return false;
   const requiredModule = HOT_KEYWORD_CATEGORY_TO_MODULE[item.category];
   if (requiredModule && !enabledModules.has(requiredModule)) return false;
   const keyword = item.keyword.trim();
   if (!keyword || seenKeywords.has(keyword)) return false;
   seenKeywords.add(keyword);
+  return true;
+ });
+}
+
+export function filterPortalAiExamples(
+ items: readonly PortalHotKeyword[],
+): PortalHotKeyword[] {
+ const seenQuestions = new Set<string>();
+ return items.filter((item) => {
+  if (item.category !== PORTAL_AI_EXAMPLE_CATEGORY) return false;
+  const question = item.keyword.trim();
+  if (!question || seenQuestions.has(question)) return false;
+  seenQuestions.add(question);
   return true;
  });
 }

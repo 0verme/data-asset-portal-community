@@ -17,7 +17,12 @@ from backend.app.migrations.search_hot_keyword_seed import plan_search_hot_keywo
 from backend.app.repositories.search_hot_keyword_repository import (
     SearchHotKeywordRepository,
 )
-from backend.app.services.search_hot_keyword_service import SearchHotKeywordService
+from backend.app.services.search_hot_keyword_service import (
+    SearchHotKeywordAlreadyExistsError,
+    SearchHotKeywordNotFoundError,
+    SearchHotKeywordService,
+    SearchHotKeywordValidationError,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MIGRATE = REPO_ROOT / "backend" / "scripts" / "schema_migrate.py"
@@ -30,6 +35,14 @@ class _SqliteCoreAccess:
 
     def fetch_rows(self, statement):
         return [dict(row._mapping) for row in self.connection.execute(statement)]
+
+    def execute_statements(self, statements):
+        total = 0
+        for statement in statements:
+            result = self.connection.execute(statement)
+            total += int(getattr(result, "rowcount", 0) or 0)
+        self.connection.commit()
+        return total
 
 
 class SearchHotKeywordRepositoryTests(unittest.TestCase):
@@ -99,6 +112,63 @@ class SearchHotKeywordRepositoryTests(unittest.TestCase):
         self._insert(id=2, keyword=keyword, category="all", sort_order=10, enabled="Y")
         self.connection.commit()
         self.assertEqual(keyword, self.service.get_hot_keywords()[0]["keyword"])
+
+    def test_admin_crud_and_ai_example_seeding_share_p_search_hot_keyword(self):
+        self._insert(id=1, keyword="资产", category="all", sort_order=10, enabled="Y")
+        self.connection.commit()
+
+        admin_items = self.service.list_admin_items()
+        ai_items = [item for item in admin_items if item["category"] == "ai_example"]
+        hot_items = [item for item in admin_items if item["category"] != "ai_example"]
+        self.assertEqual(5, len(ai_items))
+        self.assertEqual(1, len(hot_items))
+
+        created_ai = self.service.create_item(
+            {
+                "keyword": "月度GMV口径怎么算？",
+                "category": "ai_example",
+                "sortOrder": 5,
+                "enabled": "Y",
+            }
+        )
+        self.assertEqual("ai_example", created_ai["category"])
+        self.assertEqual("ai_example", created_ai["itemType"])
+        self.assertEqual(5, created_ai["sortOrder"])
+
+        with self.assertRaises(SearchHotKeywordAlreadyExistsError):
+            self.service.create_item(
+                {
+                    "keyword": "月度GMV口径怎么算？",
+                    "category": "ai_example",
+                    "sortOrder": 15,
+                }
+            )
+
+        with self.assertRaises(SearchHotKeywordValidationError):
+            self.service.create_item({"keyword": "测试", "category": "invalid_cat"})
+
+        updated = self.service.update_item(
+            created_ai["id"],
+            {
+                "keyword": "季度GMV口径怎么算？",
+                "category": "ai_example",
+                "sortOrder": 12,
+                "enabled": "N",
+            },
+        )
+        self.assertEqual("季度GMV口径怎么算？", updated["keyword"])
+        self.assertEqual("N", updated["enabled"])
+        self.assertEqual("disabled", updated["status"])
+
+        toggled = self.service.update_item_status(created_ai["id"], {"status": "enabled"})
+        self.assertEqual("Y", toggled["enabled"])
+
+        self.service.delete_item(created_ai["id"])
+        with self.assertRaises(SearchHotKeywordNotFoundError):
+            self.service.delete_item(created_ai["id"])
+
+        restored = self.service.restore_defaults("all")
+        self.assertGreaterEqual(len(restored), 8)
 
 
 class SearchHotKeywordSeedPlanTests(unittest.TestCase):

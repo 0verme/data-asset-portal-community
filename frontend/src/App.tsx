@@ -578,6 +578,8 @@ function AppSession({ authSession, branding, publicCatalog }: AppSessionProps): 
                       ? tCommon("search.placeholder.systemAi")
                       : currentSystemRoute.page === "branding"
                         ? tCommon("search.placeholder.systemBranding")
+                        : currentSystemRoute.page === "search-recommendations"
+                          ? tCommon("search.placeholder.systemSearchRecommendations")
                   : currentSystemRoute.page === "roles"
                     ? tCommon("search.placeholder.systemRoles")
                     : currentSystemRoute.page === "operation-logs"

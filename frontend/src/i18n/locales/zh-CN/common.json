@@ -102,6 +102,7 @@
   "systemManagement": {
     "ai": "AI 管理",
     "branding": "站点品牌配置",
+    "searchRecommendations": "首页推荐配置",
     "loginRequiredTitle": "登录后访问系统管理",
     "loginRequiredDescription": "系统管理、用户、角色、配置和操作日志仅对授权用户开放。",
     "login": "登录",
@@ -256,6 +257,7 @@
       "systemParams": "搜索参数分类、编码、名称、取值或说明",
       "systemAi": "搜索 AI 配额与检索配置",
       "systemBranding": "搜索站点品牌配置",
+      "systemSearchRecommendations": "搜索推荐内容、类型或分类",
       "systemRoles": "搜索角色编码、名称或说明",
       "systemLogs": "搜索操作用户、模块、对象或操作内容",
       "systemUsers": "搜索用户名、显示名、邮箱或状态",

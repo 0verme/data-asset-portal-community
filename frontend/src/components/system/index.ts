@@ -16,6 +16,7 @@ export { SystemManagementPage } from "./SystemManagementPage.tsx";
 export { UserManagementPage } from "./UserManagementPage.tsx";
 export { ParamDictPage } from "./ParamDictPage.tsx";
 export { AiManagementPage } from "./AiManagementPage.tsx";
+export { PortalRecommendationsPage } from "./PortalRecommendationsPage.tsx";
 export { SiteBrandingPage } from "./SiteBrandingPage.tsx";
 export { MenuManagementPage } from "./MenuManagementPage.tsx";
 export { RoleManagementPage, RoleForm } from "./RoleManagementPage.tsx";

@@ -102,6 +102,7 @@
   "systemManagement": {
     "ai": "AI management",
     "branding": "Site branding",
+    "searchRecommendations": "Portal recommendations",
     "loginRequiredTitle": "Sign in to access system management",
     "loginRequiredDescription": "System management, users, roles, configuration, and operation logs are available to authorized accounts only.",
     "login": "Sign in",
@@ -256,6 +257,7 @@
       "systemParams": "Search parameter categories, codes, names, values, or descriptions",
       "systemAi": "Search AI quota and retrieval settings",
       "systemBranding": "Search site branding settings",
+      "systemSearchRecommendations": "Search recommendation text, type, or category",
       "systemRoles": "Search role codes, names, or descriptions",
       "systemLogs": "Search users, modules, objects, or actions",
       "systemUsers": "Search usernames, display names, emails, or status",
