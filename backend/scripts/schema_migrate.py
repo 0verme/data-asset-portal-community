@@ -114,13 +114,7 @@ def main(argv=None):
     # profile handling as the runtime, then apply the named database profile.
     # This keeps the local quick-start commands reproducible in a clean clone.
     if args.command != "baseline":
-        try:
-            from app.settings import load_runtime_env
-
-            demo_bootstrap = os.environ.get("COMMUNITY_DEMO_BOOTSTRAP") == "1"
-            load_runtime_env(overwrite=not demo_bootstrap)
-        except Exception:
-            pass  # offline / non-profile invocations are unaffected
+        _load_runtime()
     if args.offline:
         return _offline(args)
     if not args.profile:

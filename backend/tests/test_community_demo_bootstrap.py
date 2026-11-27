@@ -254,6 +254,7 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         )
         self.assertNotIn("ASSET_AUTH_DB_PROFILE", environment)
         self.assertNotIn("ASSET_RUNTIME_PROFILE", environment)
+        self.assertNotIn("COMMUNITY_DEMO_BOOTSTRAP", environment)
         self.assertNotIn("BACKEND_RUNTIME", environment)
         # Deprecated lineage selectors must never survive into the demo child env.
         self.assertNotIn("LINEAGE_DB_PROFILE", environment)
@@ -446,20 +447,30 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
         ), self.assertRaises(lineage_service.LineageConfigurationError):
             lineage_service.lineage_storage_status()
 
-    def test_load_runtime_env_can_preserve_process_owned_values(self):
+    def test_load_runtime_env_preserves_process_owned_values_by_default_and_layers_files(self):
         settings = importlib.import_module("backend.app.settings")
 
         with tempfile.TemporaryDirectory() as directory:
-            env_file = Path(directory) / ".env.local"
-            env_file.write_text("ASSET_DB_PROFILE=primary\n", encoding="utf-8")
+            root_env = Path(directory) / ".env"
+            backend_env_local = Path(directory) / ".env.local"
+            root_env.write_text(
+                "ASSET_DB_PROFILE=from_root_env\nAPP_LOG_LEVEL=WARNING\n",
+                encoding="utf-8",
+            )
+            backend_env_local.write_text(
+                "ASSET_DB_PROFILE=primary\nAPP_LOG_LEVEL=DEBUG\n",
+                encoding="utf-8",
+            )
             with (
-                patch.object(settings, "_ENV_FILES", (env_file,)),
+                patch.object(settings, "_ENV_FILES", (root_env, backend_env_local)),
                 patch.dict(
                     os.environ, {"ASSET_DB_PROFILE": "community_sqlite"}, clear=False
                 ),
             ):
-                settings.load_runtime_env(overwrite=False)
+                os.environ.pop("APP_LOG_LEVEL", None)
+                settings.load_runtime_env()
                 self.assertEqual("community_sqlite", os.environ["ASSET_DB_PROFILE"])
+                self.assertEqual("DEBUG", os.environ["APP_LOG_LEVEL"])
                 settings.load_runtime_env(overwrite=True)
                 self.assertEqual("primary", os.environ["ASSET_DB_PROFILE"])
 

@@ -40,8 +40,7 @@ def _load_runtime() -> None:
     try:
         from app.settings import load_runtime_env
 
-        demo_bootstrap = os.environ.get("COMMUNITY_DEMO_BOOTSTRAP") == "1"
-        load_runtime_env(overwrite=not demo_bootstrap)
+        load_runtime_env()
     except Exception:
         pass
 

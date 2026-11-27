@@ -360,13 +360,14 @@ def get_runtime_config() -> dict[str, object]:
     }
 
 
-def load_runtime_env(*, overwrite: bool = True):
-    """Load repository env files, optionally preserving process-owned values.
+def load_runtime_env(*, overwrite: bool = False):
+    """Load repository env files, preserving process-owned values by default.
 
-    Normal development keeps the historical file precedence.  The Community
-    Demo uses ``overwrite=False`` so its explicit child-process environment
-    cannot be redirected by a user's unrelated ``.env`` database settings.
+    Later files in ``_ENV_FILES`` override earlier files (so ``backend/.env.local``
+    overrides ``backend/.env`` and root ``.env*``), while explicit process
+    environment variables take precedence unless ``overwrite=True`` is requested.
     """
+    file_values: dict[str, str] = {}
     for env_file in _ENV_FILES:
         if not env_file.exists():
             continue
@@ -385,5 +386,8 @@ def load_runtime_env(*, overwrite: bool = True):
             if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
                 value = value[1:-1]
 
-            if overwrite or key not in os.environ:
-                os.environ[key] = value
+            file_values[key] = value
+
+    for key, value in file_values.items():
+        if overwrite or key not in os.environ:
+            os.environ[key] = value
