@@ -248,8 +248,6 @@ def build_demo_environment(
         {
             "ASSET_DB_CONFIG_PATH": str(paths.database_config.resolve()),
             "ASSET_DB_PROFILE": "community_sqlite",
-            "ASSET_DB_TYPE": "sqlite",
-            "ASSET_DB_DATABASE": str(paths.database.resolve()),
             "APP_ENV": "development",
             "APP_DEBUG": "false",
             "APP_SECRET_KEY": secret,

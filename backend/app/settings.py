@@ -36,6 +36,10 @@ _TRUE_VALUES = {"1", "true", "yes", "on"}
 _PUBLIC_CATALOG_PROFILES = frozenset({"internal", "strict", "disabled"})
 PublicCatalogProfile = Literal["internal", "strict", "disabled"]
 
+DEFAULT_DB_CONNECT_TIMEOUT_SECONDS = 30
+DEFAULT_DB_STATEMENT_TIMEOUT_MS = 120000
+_PROCESS_DB_TIMEOUT_OVERRIDES: dict[str, int] = {}
+
 
 def parse_bool(value: str | None) -> bool:
     """Return true only for explicitly supported, case-insensitive values."""
@@ -87,12 +91,12 @@ def get_page_size_limits(default_size: int) -> tuple[int, int]:
 
 
 def get_default_operator() -> str:
-    """Return the configured name for an explicitly declared system actor.
+    """Return the fixed name for an explicitly declared system actor.
 
     This setting is not a universal mutation operator. HTTP request identity
     and caller-supplied actors are resolved by ``application.actor`` first.
     """
-    return get_string_env("ASSET_OPERATOR", "system")
+    return "system"
 
 
 def get_auth_session_days() -> int:
@@ -287,36 +291,53 @@ def get_session_cookie_config() -> dict[str, object]:
     }
 
 
+def set_process_db_timeout_overrides(
+    *,
+    connect_timeout: int,
+    socket_timeout: int,
+    statement_timeout_ms: int,
+) -> None:
+    """Apply explicit in-process DB timeout overrides for an isolated worker."""
+    _PROCESS_DB_TIMEOUT_OVERRIDES.update(
+        {
+            "connect_timeout": max(1, int(connect_timeout)),
+            "socket_timeout": max(1, int(socket_timeout)),
+            "statement_timeout_ms": max(1, int(statement_timeout_ms)),
+        }
+    )
+
+
+def clear_process_db_timeout_overrides() -> None:
+    """Reset any in-process DB timeout overrides."""
+    _PROCESS_DB_TIMEOUT_OVERRIDES.clear()
+
+
 def get_db_connect_timeout_seconds() -> int:
-    return get_int_env("ASSET_DB_CONNECT_TIMEOUT_SECONDS", 30, minimum=1)
+    return int(
+        _PROCESS_DB_TIMEOUT_OVERRIDES.get(
+            "connect_timeout", DEFAULT_DB_CONNECT_TIMEOUT_SECONDS
+        )
+    )
 
 
 def get_db_statement_timeout_ms() -> int:
-    return get_int_env("ASSET_DB_STATEMENT_TIMEOUT_MS", 120000, minimum=1)
+    return int(
+        _PROCESS_DB_TIMEOUT_OVERRIDES.get(
+            "statement_timeout_ms", DEFAULT_DB_STATEMENT_TIMEOUT_MS
+        )
+    )
 
 
 def get_db_profile_overrides() -> dict[str, object]:
-    """Return non-blank environment overrides for the selected DB profile."""
-    fields = {
-        "ASSET_DB_TYPE": "type",
-        "ASSET_DB_HOST": "host",
-        "ASSET_DB_CONNECT_TIMEOUT_SECONDS": "connect_timeout",
-        "ASSET_DB_SOCKET_TIMEOUT_SECONDS": "socket_timeout",
-        "ASSET_DB_STATEMENT_TIMEOUT_MS": "statement_timeout_ms",
-        "ASSET_DB_PORT": "port",
-        "ASSET_DB_DATABASE": "database",
-        "ASSET_DB_USER": "user",
-        "ASSET_DB_PASSWORD": "password",
-        "ASSET_DB_DSN": "dsn",
-        "ASSET_DB_JDBC_URL": "jdbc_url",
-    }
-    overrides: dict[str, object] = {
-        target: value.strip()
-        for source, target in fields.items()
-        if (value := os.getenv(source)) and value.strip()
-    }
-    if "port" in overrides:
-        overrides["port"] = get_int_env("ASSET_DB_PORT", 5432, minimum=1, maximum=65535)
+    """Return secret password and explicit worker timeout overrides for a DB profile.
+
+    Connection structure (type, host, port, database, user, dsn, jdbc_url,
+    timeouts) comes from ``database.yaml`` as the single source of truth.
+    Only ``ASSET_DB_PASSWORD`` may be injected from environment secret storage.
+    """
+    overrides: dict[str, object] = dict(_PROCESS_DB_TIMEOUT_OVERRIDES)
+    if (password := os.getenv("ASSET_DB_PASSWORD")) and password.strip():
+        overrides["password"] = password.strip()
     return overrides
 
 

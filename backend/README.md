@@ -136,9 +136,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-backend.ps1
 | --- | --- | --- |
 | `ASSET_DB_PROFILE` | 应用与登录鉴权统一使用的数据库 profile | `primary` |
 | `ASSET_DB_CONFIG_PATH` | 数据库配置文件路径 | `backend/configs/database.yaml` |
+| `ASSET_DB_PASSWORD` | 数据库密码覆盖（推荐通过 Secret 注入，避免明文写进 YAML） | `<deployment-db-password>` |
 | `ASSET_DB_JAR_PATH` | GaussDB JDBC jar 的环境特定绝对路径（驱动需自行从官方渠道获取；优先于 profile 的 `jar_path`） | `<absolute path to vendor JDBC jar>` |
-| `ASSET_DB_CONNECT_TIMEOUT_SECONDS` | 数据库连接超时秒数 | `30` |
-| `ASSET_DB_STATEMENT_TIMEOUT_MS` | PostgreSQL / GaussDB 查询超时毫秒数 | `120000` |
 | `APP_DEBUG` | Native FastAPI 的 debug 配置（默认关闭；仅 `1`/`true`/`yes`/`on` 为真） | `false` |
 | `APP_SECRET_KEY` | 必填的 application-owned signed-session 密钥（缺失或空白即启动失败） | `<generate-a-strong-random-value>` |
 | `RAG_SEARCH_SERVICE_TOKEN` | 可选的后端到 RAG Search Service Bearer Token；通过部署 Secret 注入，不写入参数表或浏览器 | `<deployment-secret>` |
@@ -155,12 +154,7 @@ Community Edition 采用 `Public Catalog + Authenticated Management`：资产、
 
 `/api/auth/me` 未登录仍返回 `401`，前端将其视为 anonymous 并继续加载公开菜单、统计、搜索和业务模块。详见 [Public Catalog + Authenticated Management](../docs/rbac/authenticated-read-model.md)。
 
-内网数据库链路较慢时，可在 `backend/.env.local` 中设置：
-
-```env
-ASSET_DB_CONNECT_TIMEOUT_SECONDS=30
-ASSET_DB_STATEMENT_TIMEOUT_MS=120000
-```
+内网数据库链路较慢时，可在 `backend/configs/database.yaml` 的 `defaults` 或对应 profile 中调整 `connect_timeout`（默认 `30` 秒）与 `statement_timeout_ms`（默认 `120000` 毫秒）。
 
 ## 数据库配置示例
 

@@ -30,7 +30,7 @@ class ConfigurationSurfaceTests(unittest.TestCase):
     def test_advanced_document_preserves_database_and_runtime_contracts(self):
         documentation = (ROOT / "docs/configuration.md").read_text(encoding="utf-8")
         for value in (
-            "ASSET_DB_JDBC_URL",
+            "ASSET_DB_PASSWORD",
             "ASSET_DB_JAR_PATH",
             "TEST_DATABASE_PROFILE",
             "database.example.yaml",

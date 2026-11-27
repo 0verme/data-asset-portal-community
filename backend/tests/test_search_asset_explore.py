@@ -54,12 +54,19 @@ class AssetExploreSearchTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls._temp_dir = tempfile.TemporaryDirectory()
         cls.database = Path(cls._temp_dir.name) / "search264.sqlite"
+        cls.config_path = Path(cls._temp_dir.name) / "database.yaml"
+        cls.config_path.write_text(
+            "profiles:\n"
+            "  community_sqlite:\n"
+            "    type: sqlite\n"
+            f"    database: '{cls.database.as_posix()}'\n",
+            encoding="utf-8",
+        )
         cls._environment = patch.dict(
             os.environ,
             {
-                "ASSET_DB_CONFIG_PATH": str(COMMUNITY_CONFIG),
+                "ASSET_DB_CONFIG_PATH": str(cls.config_path),
                 "ASSET_DB_PROFILE": "community_sqlite",
-                "ASSET_DB_DATABASE": str(cls.database),
             },
             clear=False,
         )

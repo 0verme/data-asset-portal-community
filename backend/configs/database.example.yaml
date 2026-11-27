@@ -12,7 +12,7 @@ profiles:
   sqlite_local:
     type: sqlite
     database: instance/community.db
-  # Host/user/password/JDBC URL may be supplied by ASSET_DB_* environment overrides.
+  # Password may be supplied by the ASSET_DB_PASSWORD environment override.
   
   primary:
     type: postgres

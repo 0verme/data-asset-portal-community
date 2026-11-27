@@ -247,11 +247,13 @@ class CommunityDemoBootstrapTests(unittest.TestCase):
             "demo-secret-that-is-not-fixed-production-secret",
         )
 
-        self.assertEqual("sqlite", environment["ASSET_DB_TYPE"])
-        self.assertEqual("community_sqlite", environment["ASSET_DB_PROFILE"])
         self.assertEqual(
-            str(self.paths.database.resolve()), environment["ASSET_DB_DATABASE"]
+            str(self.paths.database_config.resolve()),
+            environment["ASSET_DB_CONFIG_PATH"],
         )
+        self.assertEqual("community_sqlite", environment["ASSET_DB_PROFILE"])
+        self.assertNotIn("ASSET_DB_TYPE", environment)
+        self.assertNotIn("ASSET_DB_DATABASE", environment)
         self.assertNotIn("ASSET_AUTH_DB_PROFILE", environment)
         self.assertNotIn("ASSET_RUNTIME_PROFILE", environment)
         self.assertNotIn("COMMUNITY_DEMO_BOOTSTRAP", environment)

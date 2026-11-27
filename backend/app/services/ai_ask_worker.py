@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import multiprocessing
-import os
 import queue
 import time
 from collections.abc import Callable
@@ -14,6 +13,7 @@ from ..contracts.ai_ask import AiAskProgressStep, AiAskRequest, AiAskResponse
 from ..settings import (
     get_ai_ask_db_timeout_seconds,
     get_ai_ask_worker_timeout_seconds,
+    set_process_db_timeout_overrides,
 )
 from .ai_ask_service import AIAskCancelled
 
@@ -54,12 +54,10 @@ def _ai_ask_process_entry(
     blocks while reading rows, the parent can terminate this entire process;
     no Python thread timeout is represented as a completed JDBC operation.
     """
-    os.environ["ASSET_DB_CONNECT_TIMEOUT_SECONDS"] = str(
-        min(5, database_timeout_seconds)
-    )
-    os.environ["ASSET_DB_SOCKET_TIMEOUT_SECONDS"] = str(database_timeout_seconds)
-    os.environ["ASSET_DB_STATEMENT_TIMEOUT_MS"] = str(
-        database_timeout_seconds * 1000
+    set_process_db_timeout_overrides(
+        connect_timeout=min(5, database_timeout_seconds),
+        socket_timeout=database_timeout_seconds,
+        statement_timeout_ms=database_timeout_seconds * 1000,
     )
 
     def emit(message) -> None:
