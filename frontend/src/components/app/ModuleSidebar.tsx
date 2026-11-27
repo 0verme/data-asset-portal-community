@@ -127,8 +127,7 @@ function useWorkspaceModuleReadiness(
     remoteMode,
   ]);
 
-  if (isUpstream) return null;
-  if (canonicalId === "system") return getModuleReadinessSkeleton("system");
+  if (isUpstream || canonicalId === "system") return null;
   if (!remoteMode) {
     if (!context.catalogDataAccessReady) {
       return getModuleReadinessSkeleton(canonicalId, {
@@ -145,16 +144,25 @@ function useWorkspaceModuleReadiness(
 
 export function ModuleSidebar({ module, context }: ModuleSidebarProps): ReactElement {
   const readiness = useWorkspaceModuleReadiness(module, context);
+  const resolvedReadiness =
+    module === "upstream" || module === "system"
+      ? null
+      : (readiness ?? getModuleReadinessSkeleton(module));
+  const showProgress =
+    module === "upstream" ||
+    (resolvedReadiness !== null && resolvedReadiness.status !== "not_applicable");
   return (
     <>
       <div className="sidebar-content">{renderModuleSidebar(module, context)}</div>
-      <div className="sidebar-progress">
-        {module === "upstream" ? (
-          <UpstreamCoverageSummary upstream={context.upstream} statusOptions={context.statusOptions} />
-        ) : (
-          <ModuleReadiness result={readiness ?? getModuleReadinessSkeleton(module)} />
-        )}
-      </div>
+      {showProgress ? (
+        <div className="sidebar-progress">
+          {module === "upstream" ? (
+            <UpstreamCoverageSummary upstream={context.upstream} statusOptions={context.statusOptions} />
+          ) : (
+            <ModuleReadiness result={resolvedReadiness!} />
+          )}
+        </div>
+      ) : null}
     </>
   );
 }
