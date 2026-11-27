@@ -169,7 +169,7 @@ test("global-search adapters preserve value, clear, and mobile focus behavior", 
   expect(Math.round((await searchContainer.boundingBox())?.width ?? 0)).toBe(270);
   await clear.click();
   await expect(input).toHaveValue("");
-  await input.blur();
+  await clear.blur();
   expect(Math.round((await searchContainer.boundingBox())?.width ?? 0)).toBe(160);
 
   const toggle = page.locator(".mobile-search-toggle");
