@@ -192,7 +192,7 @@ Form 编辑流程应让标题、字段分组、校验、未保存状态和保存
 | `apiAsset` | `api_asset_link` | `p_api_asset` | `is_deleted = 'N'` 且 `status_code = 'enabled'` | `p_api_relation` 存在至少 1 条关联资产 | `计入：已关联具体表或指标资产` |
 | `push` | `push_job_readiness` | `p_push_job` | 已启用系统下 `is_deleted = 'N'` 且 `enabled_flag = 'Y'` 的推送作业数 | 已填 `source_path`、`target_path` 和 `job_desc` | `计入：已填写源/目标路径和作业说明` |
 | `lineage` | `lineage_snapshot_coverage` | `p_asset_table` | `is_deleted = 'N'` 的数仓表总数 | 当前激活血缘快照已覆盖的数仓表数 | `计入：已导入快照的表占比` |
-| `system` | `null` (`not_applicable`) | — | — | — | `此模块不适用该指标。` |
+| `system` | `null` (`not_applicable`) | — | — | — | `此模块不适用该指标。`（侧栏默认隐藏不展示） |
 
 展示契约包含模块 ID、指标 ID、展示标题、口径说明、可空的分子、分母、百分比和更新时间。已确认口径且可信全量计数与正分母齐备时，展示生产方给出的百分比。业务指标、当前页数量、查询结果和官网示意比例均不得用作就绪度依据。
 

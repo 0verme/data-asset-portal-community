@@ -10,6 +10,9 @@ import {
 export function ModuleReadiness({ result, title }: { result: ModuleReadinessResult; title?: string }) {
   const { t, i18n } = useTranslation("common");
   const id = useId();
+  if (result.status === "not_applicable") {
+    return null;
+  }
   const percentage = readinessPercentage(result);
   const status = result.status === "ready" && percentage === null ? "unavailable" : result.status;
   const updated = result.updatedAt ? new Date(result.updatedAt) : null;

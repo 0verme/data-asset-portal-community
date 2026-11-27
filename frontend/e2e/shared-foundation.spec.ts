@@ -217,24 +217,24 @@ for (const { width, height, theme, accent } of [
         expect(styles.boxShadow).not.toBe("none");
         await expect(panel.locator(":scope > .sidebar-content")).toHaveCSS("overflow-y", "auto");
         const progress = panel.locator(":scope > .sidebar-progress");
-        await expect(progress).toHaveCount(1);
-        await expect(progress).toBeInViewport({ ratio: 1 });
-        await expect(progress).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
         const placeholder = progress.getByRole("region", { name: "模块就绪度" });
-        if (route === "/upstream") {
-          await expect(placeholder).toHaveCount(0);
-          await expect(progress.getByRole("progressbar", { name: "系统启用比例" })).toHaveAttribute("max", "8");
-        } else if (route.startsWith("/system-management")) {
-          await expect(placeholder.getByRole("status")).toHaveText("不适用");
-          await expect(placeholder.locator(".sidebar-progress-track--empty")).toHaveAttribute("aria-hidden", "true");
-          await expect(placeholder.getByRole("progressbar")).toHaveCount(0);
-          await expect(placeholder).not.toContainText("%");
-        } else if (route === "/root-management" && process.env["VITE_API_MODE"] === "mock") {
-          await expect(placeholder.getByRole("status")).toHaveText("暂不可用");
-          await expect(placeholder.locator(".sidebar-progress-track--empty")).toHaveAttribute("aria-hidden", "true");
+        if (route.startsWith("/system-management")) {
+          await expect(progress).toHaveCount(0);
+          await expect(panel.getByRole("region", { name: "模块就绪度" })).toHaveCount(0);
         } else {
-          await expect(placeholder.getByRole("status")).toContainText("%");
-          await expect(placeholder.getByRole("progressbar")).toHaveCount(1);
+          await expect(progress).toHaveCount(1);
+          await expect(progress).toBeInViewport({ ratio: 1 });
+          await expect(progress).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+          if (route === "/upstream") {
+            await expect(placeholder).toHaveCount(0);
+            await expect(progress.getByRole("progressbar", { name: "系统启用比例" })).toHaveAttribute("max", "8");
+          } else if (route === "/root-management" && process.env["VITE_API_MODE"] === "mock") {
+            await expect(placeholder.getByRole("status")).toHaveText("暂不可用");
+            await expect(placeholder.locator(".sidebar-progress-track--empty")).toHaveAttribute("aria-hidden", "true");
+          } else {
+            await expect(placeholder.getByRole("status")).toContainText("%");
+            await expect(placeholder.getByRole("progressbar")).toHaveCount(1);
+          }
         }
       });
     }
