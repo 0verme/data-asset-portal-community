@@ -32,10 +32,11 @@ test("admin user, menu and param editors use adapter controls", async ({ page })
   await page.getByRole("button", { name: "取消", exact: true }).click();
 
   await page.goto("/system-management/menus");
+  await expect(page.locator("table.menu-management-table th", { hasText: "导航位置" })).toHaveCount(0);
   await page.locator(".head-actions").getByRole("button", { name: "新增菜单" }).click();
   await expect(page.getByLabel("菜单编码")).toHaveClass(/dap-ui-input/);
   await expect(page.getByRole("combobox", { name: "菜单图标" })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "导航位置" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "导航位置" })).toHaveCount(0);
   await expect(page.getByRole("checkbox", { name: "仅管理员可见" })).toBeVisible();
   await page.getByRole("button", { name: "取消", exact: true }).click();
 

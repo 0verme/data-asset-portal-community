@@ -59,21 +59,21 @@ test.describe("menu operation column stays aligned with table rows", () => {
       const bounds = await page.evaluate(() => {
         const region = document.querySelector('[data-wide-table-scroll]') as HTMLElement;
         const cell = document.querySelector("table.menu-management-table tbody tr td.menu-actions-cell") as HTMLElement;
-        const nav = document.querySelector('table.menu-management-table tbody tr td[data-label="导航位置"]') as HTMLElement;
+        const desc = document.querySelector('table.menu-management-table tbody tr td[data-label="说明"]') as HTMLElement;
         const actionHeader = document.querySelector("table.menu-management-table th.menu-actions-head") as HTMLElement;
         return {
           regionLeft: region.getBoundingClientRect().left,
           regionRight: region.getBoundingClientRect().right,
           cellLeft: cell.getBoundingClientRect().left,
           cellRight: cell.getBoundingClientRect().right,
-          navRight: nav.getBoundingClientRect().right,
+          descRight: desc.getBoundingClientRect().right,
           actionHeaderRight: actionHeader.getBoundingClientRect().right,
         };
       });
       expect(bounds.cellRight).toBeGreaterThanOrEqual(bounds.regionRight - 2);
       expect(bounds.cellLeft).toBeGreaterThanOrEqual(bounds.regionLeft - 1);
       if (target === maxScroll) {
-        expect(bounds.navRight).toBeLessThanOrEqual(bounds.cellLeft + 1);
+        expect(bounds.descRight).toBeLessThanOrEqual(bounds.cellLeft + 1);
       }
       expect(bounds.actionHeaderRight).toBeGreaterThanOrEqual(bounds.regionRight - 2);
     }

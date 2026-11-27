@@ -213,9 +213,10 @@
   .mainnav-measure {
     position: absolute;
     top: -10000px;
-    left: 0;
+    left: -10000px;
     width: max-content;
-    max-width: none;
+    max-width: 100%;
+    flex-wrap: wrap;
     flex: none;
     visibility: hidden;
     pointer-events: none;

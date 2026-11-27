@@ -19,12 +19,12 @@ test("primary navigation fits its available space and preserves browser history"
         nav.scrollWidth <= nav.clientWidth + 1
         && nav.getBoundingClientRect().width <= slot.clientWidth + 1
         && count >= minCount
-        && count <= 5
+        && count < 10
       );
     }, minPrimary), `measured primary menus fit at ${width}px`).toBe(true);
     const primaryCount = await primaryButtons.count();
     expect(primaryCount, `measured primary menus fit at ${width}px`).toBeGreaterThanOrEqual(minPrimary);
-    expect(primaryCount, `measured primary menus fit at ${width}px`).toBeLessThanOrEqual(5);
+    expect(primaryCount, `measured primary menus fit at ${width}px`).toBeLessThan(10);
     const metrics = await page.evaluate(() => {
       const nav = document.querySelector<HTMLElement>(".topbar-nav-slot > .mainnav:not(.mainnav-measure)")!;
       const slot = document.querySelector<HTMLElement>(".topbar-nav-slot")!;
@@ -54,10 +54,11 @@ test("primary navigation fits its available space and preserves browser history"
   }
 
   await page.setViewportSize({ width: 960, height: 900 });
-  await expect(primaryButtons).toHaveCount(5);
+  await expect.poll(() => primaryButtons.count()).toBeGreaterThanOrEqual(5);
+  const unfocusedCount = await primaryButtons.count();
   const search = page.getByRole("textbox", { name: "全局搜索" });
   await search.focus();
-  await expect.poll(() => primaryButtons.count()).toBeLessThan(5);
+  await expect.poll(() => primaryButtons.count()).toBeLessThan(unfocusedCount);
   const focusedMetrics = await page.evaluate(() => {
     const nav = document.querySelector<HTMLElement>(".topbar-nav-slot > .mainnav:not(.mainnav-measure)")!;
     return { clientWidth: nav.clientWidth, scrollWidth: nav.scrollWidth, documentWidth: document.documentElement.scrollWidth };
@@ -65,7 +66,7 @@ test("primary navigation fits its available space and preserves browser history"
   expect(focusedMetrics.scrollWidth).toBeLessThanOrEqual(focusedMetrics.clientWidth + 1);
   expect(focusedMetrics.documentWidth).toBeLessThanOrEqual(961);
   await search.blur();
-  await expect(primaryButtons).toHaveCount(5);
+  await expect(primaryButtons).toHaveCount(unfocusedCount);
 
   await expect(navigation.getByRole("button", { name: "数据仓库" })).toHaveClass(/active/);
   await expect(navigation.getByRole("button", { name: "上游卸数" })).toHaveClass(/dap-ui-button/);
@@ -107,7 +108,7 @@ test("header geometry and mobile drawer stay responsive at all requested widths"
           nav.scrollWidth <= nav.clientWidth + 1
           && nav.getBoundingClientRect().width <= slot.clientWidth + 1
           && count >= minCount
-          && count <= 5
+          && count < 10
         );
       }, minPrimary)).toBe(true);
       const metrics = await page.evaluate(() => {
@@ -123,7 +124,7 @@ test("header geometry and mobile drawer stay responsive at all requested widths"
       });
       const primaryCount = await navigation.locator("button.dap-ui-button:not(.more-nav-trigger)").count();
       expect(primaryCount).toBeGreaterThanOrEqual(minPrimary);
-      expect(primaryCount).toBeLessThanOrEqual(5);
+      expect(primaryCount).toBeLessThan(10);
       expect(metrics.navScrollWidth).toBeLessThanOrEqual(metrics.navClientWidth + 1);
       expect(metrics.navWidth).toBeLessThanOrEqual(metrics.slotWidth + 1);
       await expect(page.locator(".hamburger")).toBeHidden();
@@ -268,8 +269,8 @@ test("theme trigger DAP IconButton preserves labels, persistence, and mobile siz
 test("More DropdownMenu preserves the current item, keyboard close, and route selection", async ({ page }, testInfo) => {
   await page.addInitScript(() => localStorage.removeItem("dap_auth"));
   await page.setViewportSize({ width: 1024, height: 900 });
-  await page.goto("/root-management");
-  await expect(page.locator(".main")).toContainText("词根库");
+  await page.goto("/push");
+  await expect(page.locator(".main")).toContainText("下游系统推送");
 
   const navigation = page.locator(".topbar-nav-slot > .mainnav:not(.mainnav-measure)");
   const trigger = navigation.getByRole("button", { name: "更多" });
@@ -280,7 +281,7 @@ test("More DropdownMenu preserves the current item, keyboard close, and route se
 
   const menu = page.getByRole("menu");
   await expect(menu).toBeVisible();
-  const currentItem = menu.getByRole("menuitem", { name: "词根管理" });
+  const currentItem = menu.getByRole("menuitem", { name: "下游推送" });
   await expect(currentItem).toHaveAttribute("aria-current", "page");
   await expect(menu.getByRole("menuitem", { name: "报表资产" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("more-root-current-item.png"), animations: "disabled" });
@@ -310,10 +311,12 @@ test("guest More menu keeps administrator-only navigation hidden", async ({ page
   await page.goto("/data-warehouse");
 
   const navigation = page.locator(".topbar-nav-slot > .mainnav:not(.mainnav-measure)");
+  const primaryButtons = navigation.locator("button.dap-ui-button:not(.more-nav-trigger)");
   const trigger = navigation.getByRole("button", { name: "更多" });
   await trigger.click();
   const guestMenu = page.getByRole("menu");
-  await expect(guestMenu.getByRole("menuitem")).toHaveCount(5);
+  const primaryCount = await primaryButtons.count();
+  await expect(guestMenu.getByRole("menuitem")).toHaveCount(10 - primaryCount);
   await expect(guestMenu.getByRole("menuitem", { name: "系统管理" })).toHaveCount(0);
 });
 
@@ -326,9 +329,11 @@ test("administrator More menu exposes authorized system navigation", async ({ pa
   await expect(page.locator(".main")).toContainText("共 224 张表");
 
   const navigation = page.locator(".topbar-nav-slot > .mainnav:not(.mainnav-measure)");
+  const primaryButtons = navigation.locator("button.dap-ui-button:not(.more-nav-trigger)");
   await navigation.getByRole("button", { name: "更多" }).click();
   const adminMenu = page.getByRole("menu");
-  await expect(adminMenu.getByRole("menuitem")).toHaveCount(6);
+  const primaryCount = await primaryButtons.count();
+  await expect(adminMenu.getByRole("menuitem")).toHaveCount(11 - primaryCount);
   await expect(adminMenu.getByRole("menuitem", { name: "系统管理" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("more-admin-menu.png"), animations: "disabled" });
 });

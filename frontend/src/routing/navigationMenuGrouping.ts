@@ -11,46 +11,39 @@ export interface NavigationMenuFitMetrics {
   gap: number;
 }
 
-export function splitNavigationMenus<T extends { navPlacement?: string }>(
+export function splitNavigationMenus<T>(
   menus: readonly T[],
   options: { maxPrimary?: number } = {},
 ): GroupedNavigationMenus<T> {
-  const configuredPrimary: T[] = [];
-  const more: T[] = [];
-
-  menus.forEach((item) => {
-    (item.navPlacement === 'primary' ? configuredPrimary : more).push(item);
-  });
-
   const maxPrimary = options.maxPrimary === undefined
-    ? configuredPrimary.length
-    : Math.max(0, Math.floor(options.maxPrimary));
-  const primary = configuredPrimary.slice(0, maxPrimary);
-  more.unshift(...configuredPrimary.slice(maxPrimary));
-  return { primary, more };
+    ? menus.length
+    : Math.max(0, Math.min(menus.length, Math.floor(options.maxPrimary)));
+  return {
+    primary: menus.slice(0, maxPrimary),
+    more: menus.slice(maxPrimary),
+  };
 }
 
-export function getNavigationPrimaryLimit<T extends { navPlacement?: string }>(
+export function getNavigationPrimaryLimit<T>(
   menus: readonly T[],
   metrics: NavigationMenuFitMetrics,
 ): number {
-  const { primary, more } = splitNavigationMenus(menus);
   if (
     !Number.isFinite(metrics.availableWidth)
     || metrics.availableWidth <= 0
-    || metrics.menuWidths.length !== primary.length
+    || metrics.menuWidths.length !== menus.length
     || metrics.menuWidths.some((width) => !Number.isFinite(width))
     || !Number.isFinite(metrics.moreTriggerWidth)
     || !Number.isFinite(metrics.chromeWidth)
     || !Number.isFinite(metrics.gap)
   ) {
-    return primary.length;
+    return menus.length;
   }
 
   const chromeWidth = Math.max(0, metrics.chromeWidth);
   const gap = Math.max(0, metrics.gap);
-  for (let count = primary.length; count >= 0; count -= 1) {
-    const showMore = more.length > 0 || count < primary.length;
+  for (let count = menus.length; count >= 0; count -= 1) {
+    const showMore = count < menus.length;
     const visibleItemCount = count + (showMore ? 1 : 0);
     const gapCount = Math.max(0, visibleItemCount - 1);
     const menusWidth = metrics.menuWidths.slice(0, count).reduce((sum, width) => sum + Math.max(0, width), 0);

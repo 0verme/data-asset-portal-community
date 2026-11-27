@@ -33,7 +33,7 @@ test("system forms use the frozen DAP adapters", () => {
 
   assert.match(menuForm, /import \{ Checkbox, FormErrorSummary, FormField, focusFirstFormError, Input, Select, Textarea \} from "\.\.\/\.\.\/ui\/index\.ts"/);
   assert.equal((menuForm.match(/<Input/g) ?? []).length, 4);
-  assert.equal((menuForm.match(/<Select<string>/g) ?? []).length, 2);
+  assert.equal((menuForm.match(/<Select<string>/g) ?? []).length, 1);
   assert.equal((menuForm.match(/<Checkbox/g) ?? []).length, 1);
   assert.equal((menuForm.match(/<Textarea/g) ?? []).length, 1);
 

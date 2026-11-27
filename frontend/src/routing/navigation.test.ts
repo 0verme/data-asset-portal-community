@@ -5,7 +5,7 @@ import { getPortalPushNavigation, resolvePortalNavigationQuery } from "./portalN
 import { getModuleDetailRoute, getModuleEditRoute } from "./navigation.ts";
 import { getNavigationPrimaryLimit, splitNavigationMenus } from "./navigationMenuGrouping.ts";
 
-test("desktop navigation groups menus by configured placement", () => {
+test("desktop navigation preserves sorted menu order and defaults all menus to primary before width measurement", () => {
   const menus = [
     { code: "upstream", navPlacement: "primary" },
     { code: "report", navPlacement: "more" },
@@ -17,38 +17,38 @@ test("desktop navigation groups menus by configured placement", () => {
 
   const { primary, more } = splitNavigationMenus(menus);
 
-  assert.deepEqual(primary.map((item) => item.code), ["upstream", "dwm", "custom"]);
-  assert.deepEqual(more.map((item) => item.code), ["report", "system", "push"]);
+  assert.deepEqual(primary.map((item) => item.code), ["upstream", "report", "dwm", "system", "custom", "push"]);
+  assert.deepEqual(more.map((item) => item.code), []);
 });
 
-test("fixed primary limits preserve configured order when a caller explicitly requests a count", () => {
+test("primary limits split sorted menus into primary prefix and More overflow regardless of legacy navPlacement", () => {
   const menus = [
     { code: "upstream", navPlacement: "primary" },
-    { code: "report", navPlacement: "more" },
     { code: "dwm", navPlacement: "primary" },
-    { code: "system", navPlacement: "more" },
     { code: "mapping", navPlacement: "primary" },
     { code: "lineage", navPlacement: "primary" },
+    { code: "root", navPlacement: "more" },
     { code: "indicator", navPlacement: "primary" },
+    { code: "report", navPlacement: "more" },
   ];
 
   const { primary, more } = splitNavigationMenus(menus, { maxPrimary: 3 });
 
   assert.deepEqual(primary.map((item) => item.code), ["upstream", "dwm", "mapping"]);
-  assert.deepEqual(more.map((item) => item.code), ["lineage", "indicator", "report", "system"]);
+  assert.deepEqual(more.map((item) => item.code), ["lineage", "root", "indicator", "report"]);
 });
 
-test("available-width navigation fits the largest primary prefix and reserves More", () => {
+test("available-width navigation fits the largest sorted menu prefix and reserves More when items overflow", () => {
   const menus = [
     { code: "upstream", navPlacement: "primary" },
-    { code: "report", navPlacement: "more" },
     { code: "dwm", navPlacement: "primary" },
     { code: "mapping", navPlacement: "primary" },
     { code: "lineage", navPlacement: "primary" },
+    { code: "root", navPlacement: "more" },
   ];
   const metrics = {
     availableWidth: 176,
-    menuWidths: [50, 60, 40, 45],
+    menuWidths: [50, 60, 40, 45, 55],
     moreTriggerWidth: 40,
     chromeWidth: 10,
     gap: 6,
@@ -59,15 +59,36 @@ test("available-width navigation fits the largest primary prefix and reserves Mo
 
   assert.equal(maxPrimary, 2);
   assert.deepEqual(primary.map((item) => item.code), ["upstream", "dwm"]);
-  assert.deepEqual(more.map((item) => item.code), ["mapping", "lineage", "report"]);
+  assert.deepEqual(more.map((item) => item.code), ["mapping", "lineage", "root"]);
   assert.ok(10 + 50 + 60 + 40 + 2 * 6 <= metrics.availableWidth);
   assert.ok(10 + 50 + 60 + 40 + 40 + 3 * 6 > metrics.availableWidth);
 });
 
-test("available-width navigation falls back safely until every primary width is measured", () => {
+test("available-width navigation omits More trigger width when all menus fit", () => {
+  const menus = [
+    { code: "upstream" },
+    { code: "dwm" },
+  ];
+  const metrics = {
+    availableWidth: 126,
+    menuWidths: [50, 60],
+    moreTriggerWidth: 40,
+    chromeWidth: 10,
+    gap: 6,
+  };
+
+  const maxPrimary = getNavigationPrimaryLimit(menus, metrics);
+  const { primary, more } = splitNavigationMenus(menus, { maxPrimary });
+
+  assert.equal(maxPrimary, 2);
+  assert.deepEqual(primary.map((item) => item.code), ["upstream", "dwm"]);
+  assert.deepEqual(more, []);
+});
+
+test("available-width navigation falls back safely until every menu width is measured", () => {
   const menus = [
     { code: "upstream", navPlacement: "primary" },
-    { code: "dwm", navPlacement: "primary" },
+    { code: "dwm", navPlacement: "more" },
   ];
 
   assert.equal(getNavigationPrimaryLimit(menus, {
