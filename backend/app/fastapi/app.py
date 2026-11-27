@@ -220,6 +220,7 @@ def create_fastapi_app(
         system_management,
         rag_recommendations,
         branding_service_instance=branding,
+        search_hot_keyword_service_instance=hot_keywords,
     )
     app.include_router(operation_log_router)
     _register_upstream_routes(app, upstream)

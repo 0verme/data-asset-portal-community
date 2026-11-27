@@ -3,9 +3,11 @@ import test from "node:test";
 
 import {
   DEFAULT_PORTAL_SCOPE,
+  filterPortalAiExamples,
   filterPortalHotKeywordsByModules,
   isMonospaceHotKeyword,
   filterPortalScopesByModules,
+  PORTAL_AI_EXAMPLE_CATEGORY,
   PORTAL_SCOPE_CONFIGS,
   readPortalSearchParams,
   SEARCH_SCOPE_TO_MODULE,
@@ -66,9 +68,11 @@ test("API recommendations follow visible module categories and keep the first du
     { id: 1, keyword: "资产", category: "all", sortOrder: 10 },
     { id: 2, keyword: "DWS_TRADE_SALES_STAT_1D", category: "asset", sortOrder: 20 },
     { id: 3, keyword: "资产", category: "field", sortOrder: 30 },
+    { id: 4, keyword: "销售额怎么算？", category: PORTAL_AI_EXAMPLE_CATEGORY, sortOrder: 10 },
   ];
   assert.deepEqual(filterPortalHotKeywordsByModules(items, ["dwm"]), items.slice(0, 2));
   assert.deepEqual(filterPortalHotKeywordsByModules(items, []), items.slice(0, 1));
+  assert.deepEqual(filterPortalAiExamples(items), [items[3]]);
 });
 
 test("code-like long keywords use monospace styling without embedding suggestions", () => {

@@ -149,6 +149,12 @@ class RoutePermissionInventoryTests(unittest.TestCase):
         ("GET", "/api/system/rag-search-config"): "system:param:read",
         ("PUT", "/api/system/rag-search-config"): "system:param:write",
         ("GET", "/api/system/rag-search-config/diagnostics"): "system:param:read",
+        ("GET", "/api/system/search-hot-keywords"): "system:param:read",
+        ("POST", "/api/system/search-hot-keywords"): "system:param:write",
+        ("POST", "/api/system/search-hot-keywords/restore-defaults"): "system:param:write",
+        ("PUT", "/api/system/search-hot-keywords/{item_id}"): "system:param:write",
+        ("PATCH", "/api/system/search-hot-keywords/{item_id}/status"): "system:param:write",
+        ("DELETE", "/api/system/search-hot-keywords/{item_id}"): "system:param:write",
     }
 
     @staticmethod

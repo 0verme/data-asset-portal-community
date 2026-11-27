@@ -72,8 +72,8 @@ const BASE_BRANDING: BrandingConfig = {
       'en-US': 'One place to search systems, fields, roots, metrics, reports, APIs, assets, downstream deliveries, and code tables.',
     },
     search_placeholder: {
-      'zh-CN': '搜索资产、系统、字段、指标、报表、API、码值表、负责人或下游推送；或直接问 AI，例如：“销售额怎么算？口径是什么，从哪张表出？”',
-      'en-US': 'Search assets, systems, fields, metrics, reports, APIs, code tables, owners, or downstream deliveries — or ask AI: “How is sales amount calculated?”',
+      'zh-CN': '搜索资产、系统、字段、指标、报表、API、码值表、负责人或下游推送',
+      'en-US': 'Search assets, systems, fields, metrics, reports, APIs, code tables, owners, or downstream deliveries',
     },
   },
   login: {

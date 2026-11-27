@@ -12,6 +12,7 @@ const paramPage = read("./components/system/ParamDictPage.tsx");
 const systemPage = read("./components/system/SystemManagementPage.tsx");
 const aiManagementPage = read("./components/system/AiManagementPage.tsx");
 const siteBrandingPage = read("./components/system/SiteBrandingPage.tsx");
+const portalRecommendationsPage = read("./components/system/PortalRecommendationsPage.tsx");
 const systemView = read("./components/views/SystemView.tsx");
 const systemSidebar = read("./components/sidebar/SystemSidebar.tsx");
 const rolePage = read("./components/system/RoleManagementPage.tsx");
@@ -81,6 +82,13 @@ test("site branding has an independent system page", () => {
   assert.match(systemSidebar, /onClick=\{\(\) => setSystemRoute\(\{ page \}\)\}/);
   assert.match(systemSidebar, /systemManagement\.branding/);
   assert.doesNotMatch(paramPage, /branding|Branding/i);
+});
+
+test("portal recommendations has an independent system page backed by p_search_hot_keyword", () => {
+  assert.match(portalRecommendationsPage, /PORTAL_AI_EXAMPLE_CATEGORY/);
+  assert.doesNotMatch(portalRecommendationsPage, /p_search_hot_keyword/);
+  assert.match(systemView, /<PortalRecommendationsPage query=\{query\} canEdit=\{canManageParams\} \/>/);
+  assert.match(systemSidebar, /page: "search-recommendations", label: t\("systemManagement\.searchRecommendations"\), visible: canViewParams/);
 });
 
 test("RAG settings stay admin-controlled and preserve existing parameter contract", () => {

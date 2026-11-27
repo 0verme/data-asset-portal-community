@@ -50,6 +50,7 @@ import {
   DEFAULT_PORTAL_SCOPE,
   PORTAL_ASK_AI_EXAMPLE_KEYS,
   PORTAL_SCOPE_CONFIGS,
+  filterPortalAiExamples,
   filterPortalHotKeywordsByModules,
   filterPortalScopesByModules,
   isMonospaceHotKeyword,
@@ -488,23 +489,30 @@ export function SearchPortalPage({
     () => filterPortalHotKeywordsByModules(hotKeywords, availableModules),
     [hotKeywords, availableModules],
   );
-  const askExamples = useMemo(
-    () => PORTAL_ASK_AI_EXAMPLE_KEYS.map((key) => ({
+  const configuredAiExamples = useMemo(
+    () => filterPortalAiExamples(hotKeywords),
+    [hotKeywords],
+  );
+  const askExamples = useMemo(() => {
+    if (configuredAiExamples.length > 0) {
+      return configuredAiExamples.map((item) => ({
+        key: String(item.id),
+        question: item.keyword,
+      }));
+    }
+    return PORTAL_ASK_AI_EXAMPLE_KEYS.map((key) => ({
       key,
       question: t(`portalSearch.askExamples.${key}`),
-    })).filter((item) => item.question.trim().length > 0),
-    [t, i18n.resolvedLanguage, i18n.language],
-  );
+    })).filter((item) => item.question.trim().length > 0);
+  }, [configuredAiExamples, t, i18n.resolvedLanguage, i18n.language]);
   const primaryAskExample = askExamples[0]?.question ?? "";
-  const staticSearchPlaceholder = useMemo(() => {
-    const base = String(searchPlaceholder || "").trim();
-    if (!aiEnabled || !primaryAskExample) return base;
-    if (/问\s*AI|ask\s*AI/i.test(base)) return base;
-    return `${base}${t("portalSearch.placeholderAiSuffix", { example: primaryAskExample })}`;
-  }, [aiEnabled, primaryAskExample, searchPlaceholder, t]);
+  const staticSearchPlaceholder = useMemo(
+    () => String(searchPlaceholder || "").trim(),
+    [searchPlaceholder],
+  );
 
   useEffect(() => {
-    if (!aiEnabled || query.trim() || effectiveEffects === "off" || askExamples.length === 0) {
+    if (!aiEnabled || query.trim() || askExamples.length === 0) {
       setTypewriterText("");
       return;
     }
@@ -523,6 +531,12 @@ export function SearchPortalPage({
 
     const step = () => {
       const target = candidates[candidateIndex] ?? staticSearchPlaceholder;
+      if (effectiveEffects === "off") {
+        candidateIndex = (candidateIndex + 1) % candidates.length;
+        setTypewriterText(candidates[candidateIndex] ?? staticSearchPlaceholder);
+        timerId = window.setTimeout(step, 2800);
+        return;
+      }
       if (phase === "hold") {
         candidateIndex = (candidateIndex + 1) % candidates.length;
         charIndex = 1;

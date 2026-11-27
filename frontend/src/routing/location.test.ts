@@ -94,6 +94,7 @@ test("canonical module paths restore their existing route shapes", () => {
     ["/system-management/roles", "system", { page: "roles" }, "systemRoute"],
     ["/system-management/ai", "system", { page: "ai" }, "systemRoute"],
     ["/system-management/branding", "system", { page: "branding" }, "systemRoute"],
+    ["/system-management/search-recommendations", "system", { page: "search-recommendations" }, "systemRoute"],
     ["/root-management", "root", null, null],
     ["/code-table-maintenance", "codeTable", null, null],
     ["/portal", "portal", null, null],
@@ -121,7 +122,7 @@ test("mapping keeps the canonical sourceSystemId parameter", () => {
 });
 
 test("AI management and site branding have independent system-management routes", () => {
-  for (const page of ["ai", "branding"] as const) {
+  for (const page of ["ai", "branding", "search-recommendations"] as const) {
     const location = buildNavigationLocation({
       module: "system",
       routes: { ...emptyRoutes, system: { page } },

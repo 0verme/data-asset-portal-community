@@ -15,7 +15,12 @@
 import type { SystemRoute } from "../../routing/types.ts";
 import { useTranslation } from "react-i18next";
 import { OperationLogPage } from "../OperationLog/OperationLogPage.tsx";
-import { AiManagementPage, SiteBrandingPage, SystemManagementPage } from "../system/index.ts";
+import {
+    AiManagementPage,
+    PortalRecommendationsPage,
+    SiteBrandingPage,
+    SystemManagementPage,
+} from "../system/index.ts";
 
 type RequireLogin = (action?: () => void, permission?: string) => boolean;
 
@@ -75,6 +80,7 @@ export function SystemView({
         roles: canViewRoles,
         menus: canViewMenus,
         "param-dicts": canViewParams,
+        "search-recommendations": canViewParams,
         ai: canViewParams,
         branding: canViewParams,
         "operation-logs": canViewOperationLog,
@@ -89,6 +95,9 @@ export function SystemView({
     }
     if (systemRoute.page === "ai") return <AiManagementPage canEdit={canManageParams} />;
     if (systemRoute.page === "branding") return <SiteBrandingPage canEdit={canManageParams} />;
+    if (systemRoute.page === "search-recommendations") {
+        return <PortalRecommendationsPage query={query} canEdit={canManageParams} />;
+    }
     if (systemRoute.page === "operation-logs") return <OperationLogPage query={query} />;
 
     const canEditCurrentPage =

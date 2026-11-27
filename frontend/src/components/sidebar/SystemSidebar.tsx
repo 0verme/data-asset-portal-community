@@ -36,6 +36,7 @@ export function SystemSidebar({
     { page: "roles", label: t("systemManagement.roles"), visible: canViewRoles, action: "new-role", actionLabel: t("systemManagement.newRole"), canManage: canManageRoles },
     { page: "menus", label: t("systemManagement.menus"), visible: canViewMenus, action: "new-menu", actionLabel: t("systemManagement.newMenu"), canManage: canManageMenus },
     { page: "param-dicts", label: t("systemManagement.params"), visible: canViewParams, action: "new-param", actionLabel: t("systemManagement.newParam"), canManage: canManageParams },
+    { page: "search-recommendations", label: t("systemManagement.searchRecommendations"), visible: canViewParams },
     { page: "branding", label: t("systemManagement.branding"), visible: canViewParams },
     { page: "ai", label: t("systemManagement.ai"), visible: canViewParams },
     { page: "operation-logs", label: t("systemManagement.operationLogs"), visible: canViewOperationLog },
