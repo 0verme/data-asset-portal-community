@@ -87,6 +87,14 @@
     "siteTitle": "浏览器标题与站点标题",
     "displayName": "产品展示名称",
     "announcement": "站点公告",
+    "defaultAccent": "全站默认主题色",
+    "defaultAccentDescription": "控制未自定义外观偏好的访客及重置外观后的默认强调色，保存后热生效。",
+    "accentOptions": {
+      "purple": "紫罗兰（默认）",
+      "green": "翡翠绿",
+      "blue": "晴空蓝",
+      "orange": "活力橙"
+    },
     "logo": "站点 Logo",
     "favicon": "浏览器图标",
     "heroTitle": "首页主标题",

@@ -1,14 +1,13 @@
-import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   appearanceKey, applyAppearance, DARK_QUERY, defaults, initializedKey, parsePreference, readPreference,
   REDUCED_MOTION_QUERY, resolveAppearance, validatePreference,
-  type AccentPreference, type AppearancePreferenceV1, type Density, type EffectsLevel, type ThemeMode,
+  type AccentPreference, type AccentPreset, type AppearancePreferenceV1, type Density, type EffectsLevel, type ThemeMode,
 } from "./preferences.ts";
 
 const storageKey = appearanceKey(import.meta.env.BASE_URL, import.meta.env["VITE_APPEARANCE_SCOPE"]);
-const defaultPreference = defaults(import.meta.env["VITE_DEFAULT_ACCENT"]);
+const initialDefaultPreference = defaults(import.meta.env["VITE_DEFAULT_ACCENT"]);
 const read = (key: string) => window.localStorage.getItem(key);
-const readCurrent = () => readPreference(read, storageKey, defaultPreference);
 
 function markInitialized(storage: Storage): void {
   const key = initializedKey(storageKey);
@@ -31,12 +30,15 @@ type Appearance = ReturnType<typeof resolveAppearance> & {
   setAccent: (accent: AccentPreference) => void;
   setEffects: (effects: EffectsLevel) => void;
   setDensity: (density: Density) => void;
+  setDefaultAccent: (accent: AccentPreset) => void;
   reset: () => void;
 };
 
 const AppearanceContext = createContext<Appearance | null>(null);
 
 export function AppearanceProvider({ children }: { children: ReactNode }) {
+  const defaultPreferenceRef = useRef(initialDefaultPreference);
+  const readCurrent = () => readPreference(read, storageKey, defaultPreferenceRef.current);
   const [preference, setPreference] = useState(() => readCurrent().preference);
   const latest = useRef(preference);
   const [system, setSystem] = useState(() => ({
@@ -57,6 +59,15 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     accept(next);
   }
 
+  const setDefaultAccent = useCallback((accent: AccentPreset) => {
+    const nextDefault = defaults(accent);
+    defaultPreferenceRef.current = nextDefault;
+    const current = readPreference(read, storageKey, nextDefault);
+    if (current.source === "default" && JSON.stringify(latest.current) !== JSON.stringify(current.preference)) {
+      accept(current.preference);
+    }
+  }, []);
+
   useLayoutEffect(() => {
     const dark = window.matchMedia?.(DARK_QUERY);
     const reduced = window.matchMedia?.(REDUCED_MOTION_QUERY);
@@ -67,7 +78,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
         if (event.storageArea !== window.localStorage) return;
         // Read the current value in case another write superseded this event.
         const raw = read(storageKey);
-        const next = raw === null ? readCurrent().preference : parsePreference(raw);
+        const next = raw === null ? readPreference(read, storageKey, defaultPreferenceRef.current).preference : parsePreference(raw);
         if (next) accept(next);
       } catch {
         // Ignore storage events when storage is unavailable.
@@ -78,7 +89,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     reduced?.addEventListener("change", refreshSystem);
     window.addEventListener("storage", synchronize);
     refreshSystem();
-    const initial = readCurrent();
+    const initial = readPreference(read, storageKey, defaultPreferenceRef.current);
     if (initial.source === "legacy") persist(initial.preference);
     if (initial.source === "stored") {
       try {
@@ -110,7 +121,8 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       setAccent: (accent) => update({ accent }),
       setEffects: (effects) => update({ effects }),
       setDensity: (density) => update({ density }),
-      reset: () => update(defaultPreference),
+      setDefaultAccent,
+      reset: () => update(defaultPreferenceRef.current),
     }}>
       {children}
     </AppearanceContext.Provider>

@@ -40,6 +40,7 @@ import { useIndicatorModule } from "./hooks/useIndicatorModule.ts";
 import { useManualCodeTableModule } from "./hooks/useManualCodeTableModule.ts";
 import { usePublicCatalogConfig } from "./hooks/usePublicCatalogConfig.ts";
 import { usePublicBrandingConfig } from "./hooks/usePublicBrandingConfig.ts";
+import { useAppearance } from "./appearance/AppearanceProvider.tsx";
 import { usePushModule } from "./hooks/usePushModule.ts";
 import { useReportModule } from "./hooks/useReportModule.ts";
 import { useRootModule } from "./hooks/useRootModule.ts";
@@ -87,7 +88,12 @@ export default function App(): React.ReactElement {
   const { i18n } = useTranslation("common");
   const authSession = useAuthSession();
   const { config: branding } = usePublicBrandingConfig(i18n.resolvedLanguage || i18n.language);
+  const { setDefaultAccent } = useAppearance();
   const publicCatalog = usePublicCatalogConfig();
+
+  useEffect(() => {
+    setDefaultAccent(branding.site.default_accent);
+  }, [branding.site.default_accent, setDefaultAccent]);
 
   // Even publicly reachable URLs can return additional fields to a signed-in user.
   // Discard the old route's in-memory data when the identity or permissions change.

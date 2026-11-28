@@ -74,7 +74,11 @@ class BrandingRoutesSqliteTests(unittest.TestCase):
         self.assertEqual("no-cache, must-revalidate", response.headers["cache-control"])
         data = response.json()["data"]
         self.assertEqual(set(data), {"site", "hero", "login", "version"})
-        self.assertEqual(set(data["site"]), {"title", "display_name", "announcement", "logo_url", "favicon_url"})
+        self.assertEqual(
+            set(data["site"]),
+            {"title", "display_name", "announcement", "logo_url", "favicon_url", "default_accent"},
+        )
+        self.assertEqual("purple", data["site"]["default_accent"])
         self.assertEqual(default_public_branding("en-US"), data)
         self.assertEqual("Data Asset Portal", data["hero"]["title"])
         self.assertEqual("Data Asset Portal", data["site"]["title"])
@@ -97,6 +101,7 @@ class BrandingRoutesSqliteTests(unittest.TestCase):
                 "title": {"zh-CN": "星河目录", "en-US": "Orbit Catalog"},
                 "display_name": {"zh-CN": "星河数据门户", "en-US": "Orbit Data Portal"},
                 "announcement": {"zh-CN": "公告：周五维护", "en-US": "Maintenance on Friday"},
+                "default_accent": "blue",
             },
             "hero": {
                 "title": {"zh-CN": "探索数据资产", "en-US": "Explore data assets"},
@@ -113,6 +118,14 @@ class BrandingRoutesSqliteTests(unittest.TestCase):
         self.assertEqual("Orbit Data Portal", self.anonymous.get(
             "/api/system/public-config", params={"lang": "en-US"}
         ).json()["data"]["site"]["display_name"])
+        self.assertEqual("blue", self.anonymous.get(
+            "/api/system/public-config", params={"lang": "en-US"}
+        ).json()["data"]["site"]["default_accent"])
+        invalid_accent = self.admin.put(
+            "/api/system/branding-config",
+            json={"site": {"default_accent": "crimson"}},
+        )
+        self.assertEqual(422, invalid_accent.status_code, invalid_accent.text)
         self.assertEqual("请联系管理员", self.anonymous.get(
             "/api/system/public-config", params={"lang": "zh-CN"}
         ).json()["data"]["login"]["hint"])

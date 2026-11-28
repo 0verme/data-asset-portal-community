@@ -87,6 +87,14 @@
     "siteTitle": "Browser and site title",
     "displayName": "Product display name",
     "announcement": "Site announcement",
+    "defaultAccent": "Default site accent color",
+    "defaultAccentDescription": "Controls the default accent for visitors without a saved local preference and after resetting appearance; takes effect immediately after saving.",
+    "accentOptions": {
+      "purple": "Purple (Default)",
+      "green": "Green",
+      "blue": "Blue",
+      "orange": "Orange"
+    },
     "logo": "Site logo",
     "favicon": "Browser icon",
     "heroTitle": "Home page title",

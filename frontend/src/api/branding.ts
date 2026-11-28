@@ -1,5 +1,6 @@
 import { requestRemote } from './http.ts';
 import { normalizeLanguage, type SupportedLanguage } from '../i18n/locale.ts';
+import type { AccentPreset } from '../appearance/preferences.ts';
 
 export type LocalizedBrandingText = Record<SupportedLanguage, string>;
 
@@ -10,6 +11,7 @@ export interface BrandingConfig {
     announcement: LocalizedBrandingText;
     logo_url: string;
     favicon_url: string;
+    default_accent: AccentPreset;
   };
   hero: {
     title: LocalizedBrandingText;
@@ -29,6 +31,7 @@ export interface PublicBrandingConfig {
     announcement: string;
     logo_url: string;
     favicon_url: string;
+    default_accent: AccentPreset;
   };
   hero: {
     title: string;
@@ -61,6 +64,7 @@ const BASE_BRANDING: BrandingConfig = {
     announcement: { 'zh-CN': '', 'en-US': '' },
     logo_url: '/brand-icon.svg',
     favicon_url: '/favicon.ico',
+    default_accent: 'purple',
   },
   hero: {
     title: {
@@ -93,6 +97,7 @@ const PUBLIC_DEFAULTS: Record<SupportedLanguage, PublicBrandingConfig> = {
       announcement: '',
       logo_url: BASE_BRANDING.site.logo_url,
       favicon_url: BASE_BRANDING.site.favicon_url,
+      default_accent: BASE_BRANDING.site.default_accent,
     },
     hero: {
       title: BASE_BRANDING.hero.title['zh-CN'],
@@ -109,6 +114,7 @@ const PUBLIC_DEFAULTS: Record<SupportedLanguage, PublicBrandingConfig> = {
       announcement: '',
       logo_url: BASE_BRANDING.site.logo_url,
       favicon_url: BASE_BRANDING.site.favicon_url,
+      default_accent: BASE_BRANDING.site.default_accent,
     },
     hero: {
       title: BASE_BRANDING.hero.title['en-US'],
@@ -139,6 +145,15 @@ function safeBrandingUrl(value: unknown, fallback: string): string {
   return /^\/static\/branding\/[0-9a-f]{64}\.(?:png|svg)$/.test(value) ? value : fallback;
 }
 
+function safeAccentPreset(value: unknown, fallback: AccentPreset): AccentPreset {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'purple' || normalized === 'green' || normalized === 'blue' || normalized === 'orange') {
+    return normalized;
+  }
+  return fallback;
+}
+
 export function cloneBrandingConfig(config: BrandingConfig = BASE_BRANDING): BrandingConfig {
   return JSON.parse(JSON.stringify(config)) as BrandingConfig;
 }
@@ -162,6 +177,7 @@ export function parsePublicBrandingConfig(value: unknown, language: unknown): Pu
       announcement: getText(site, 'announcement', fallback.site.announcement, 500, true),
       logo_url: safeBrandingUrl(site['logo_url'], fallback.site.logo_url),
       favicon_url: safeBrandingUrl(site['favicon_url'], fallback.site.favicon_url),
+      default_accent: safeAccentPreset(site['default_accent'], fallback.site.default_accent),
     },
     hero: {
       title: getText(hero, 'title', fallback.hero.title, 180),
@@ -197,6 +213,7 @@ function parseAdminBrandingConfig(value: unknown): { config: BrandingConfig; ver
       announcement: localized(site, 'announcement', BASE_BRANDING.site.announcement, 500, true),
       logo_url: safeBrandingUrl(site['logo_url'], BASE_BRANDING.site.logo_url),
       favicon_url: safeBrandingUrl(site['favicon_url'], BASE_BRANDING.site.favicon_url),
+      default_accent: safeAccentPreset(site['default_accent'], BASE_BRANDING.site.default_accent),
     },
     hero: {
       title: localized(hero, 'title', BASE_BRANDING.hero.title, 180),
