@@ -154,6 +154,40 @@
         </ol>
       </section>
 
+      <section class="section container philosophy-section" id="philosophy" aria-labelledby="philosophy-title">
+        <div class="boundary-heading">
+          <p class="section-index">{{philosophy.index}}</p>
+          <h2 id="philosophy-title">{{philosophy.title.line1}}<br>{{philosophy.title.line2}}</h2>
+          <p class="section-description">{{philosophy.lead}}</p>
+        </div>
+        <div class="boundary-grid">
+          <article class="boundary-item">
+            <span class="boundary-index">{{philosophy.item1.index}}</span>
+            <h3>{{philosophy.item1.title}}</h3>
+            <p>{{philosophy.item1.body}}</p>
+            <p>{{philosophy.item1.meta}}</p>
+          </article>
+          <article class="boundary-item">
+            <span class="boundary-index">{{philosophy.item2.index}}</span>
+            <h3>{{philosophy.item2.title}}</h3>
+            <p>{{philosophy.item2.body}}</p>
+            <p>{{philosophy.item2.meta}}</p>
+          </article>
+          <article class="boundary-item">
+            <span class="boundary-index">{{philosophy.item3.index}}</span>
+            <h3>{{philosophy.item3.title}}</h3>
+            <p>{{philosophy.item3.body}}</p>
+            <p>{{philosophy.item3.meta}}</p>
+          </article>
+        </div>
+        <p class="section-subnote">{{philosophy.lineage}}</p>
+        <div class="boundary-note">
+          <strong>{{philosophy.closing.lead}}</strong>
+          <span>{{philosophy.closing.tail}}</span>
+        </div>
+        <p class="section-subnote"><a href="https://overme.cn/blog/data-warehouse-dilemma">{{philosophy.article.label}}</a></p>
+      </section>
+
       <section class="tinted-section" id="ask" aria-labelledby="ask-title">
         <div class="container section ask-section">
           <div class="ask-intro">

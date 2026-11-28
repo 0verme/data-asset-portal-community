@@ -154,6 +154,40 @@
         </ol>
       </section>
 
+      <section class="section container philosophy-section" id="philosophy" aria-labelledby="philosophy-title">
+        <div class="boundary-heading">
+          <p class="section-index">理念 / DAP 的由来</p>
+          <h2 id="philosophy-title">数据可以入仓，但<br>责任、语义和经验不会自动入仓。</h2>
+          <p class="section-description">DAP 不是从竞品分析里来的。它来自一段真实的数仓经历：180 多个上游系统、3800 多张表入仓，向下支撑 100 多个业务系统。做到这个规模后发现，SQL 反而是最省心的部分——真正耗人的，全在 SQL 之外。表总能建，数据总能接。难的是几年以后，系统换了、人也换了，还能不能回答清楚：这份数据为什么在这里，这个口径为什么这么定，谁在用，谁负责，上游变了会影响谁。</p>
+        </div>
+        <div class="boundary-grid">
+          <article class="boundary-item">
+            <span class="boundary-index">01</span>
+            <h3>让责任入仓</h3>
+            <p>数据出了问题，最难的往往不是修，是说不清该谁负责：谁认业务定义、谁保障生产、谁在使用、出了争议谁拍板。DAP 把负责人、使用关系和影响范围跟着资产一起沉淀，而不是等出事了再拉群找人。</p>
+            <p>对应：负责人维护 · 血缘与影响分析 · 操作审计</p>
+          </article>
+          <article class="boundary-item">
+            <span class="boundary-index">02</span>
+            <h3>让语义入仓</h3>
+            <p>口径很少是开发前就定好的，多数是在开发、测试、上线后对数的过程中慢慢“长”出来的。如果不趁那一刻记下来，它就只活在当事人的记忆里。DAP 让口径定义、字段释义、码值含义直接挂在资产上，并给出处。</p>
+            <p>对应：指标口径 · 字段释义 · 标准词根与码值 · 证据链</p>
+          </article>
+          <article class="boundary-item">
+            <span class="boundary-index">03</span>
+            <h3>让经验入仓</h3>
+            <p>最难交接的不是怎么做，是为什么这么做、为什么那段“多余”的逻辑没人敢删、为什么这个任务失败了不能直接重跑。这些判断来自事故和历史，不写下来，人一走就归零。DAP 要做的，是让经验依附于资产留存，而不是依附于某个人。</p>
+            <p>对应：业务说明 · 加工背景 · 血缘快照</p>
+          </article>
+        </div>
+        <p class="section-subnote">血缘在 DAP 里不是一张好看的展示图，它是生产风险控制：上游要改一个字段时，你至少得知道应该去敲哪些人的门。</p>
+        <div class="boundary-note">
+          <strong>ETL 能把数据自动送进仓库。</strong>
+          <span>但责任、语义和经验，只能靠人有意识地留下来。DAP，就是为后面这三样做的。</span>
+        </div>
+        <p class="section-subnote"><a href="https://overme.cn/blog/data-warehouse-dilemma">全文：《数仓困境》 →</a></p>
+      </section>
+
       <section class="tinted-section" id="ask" aria-labelledby="ask-title">
         <div class="container section ask-section">
           <div class="ask-intro">
