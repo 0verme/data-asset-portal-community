@@ -28,6 +28,8 @@ BRANDING_UPLOAD_LIMIT = 200 * 1024
 SUPPORTED_LOCALES = ("zh-CN", "en-US")
 DEFAULT_LOGO_URL = "/brand-icon.svg"
 DEFAULT_FAVICON_URL = "/favicon.ico"
+DEFAULT_ACCENT_PRESET = "purple"
+SUPPORTED_ACCENT_PRESETS = ("purple", "green", "blue", "orange")
 _BRANDING_UPLOAD_DIRECTORY = Path.cwd() / "uploads" / "branding"
 _BRANDING_URL_RE = re.compile(r"^/static/branding/[0-9a-f]{64}\.(?:png|svg)$")
 
@@ -43,6 +45,7 @@ DEFAULT_BRANDING_CONFIG: dict[str, Any] = {
         "announcement": _localized("", ""),
         "logo_url": DEFAULT_LOGO_URL,
         "favicon_url": DEFAULT_FAVICON_URL,
+        "default_accent": DEFAULT_ACCENT_PRESET,
     },
     "hero": {
         "title": _localized("数据资产门户", "Data Asset Portal"),
@@ -457,6 +460,11 @@ class BrandingService(AuditActorMixin):
             value = values.get("site", {}).get(key) if isinstance(values.get("site"), dict) else None
             if isinstance(value, str) and (value == default or _BRANDING_URL_RE.fullmatch(value)):
                 merged["site"][key] = value
+        raw_accent = values.get("site", {}).get("default_accent") if isinstance(values.get("site"), dict) else None
+        if isinstance(raw_accent, str):
+            normalized_accent = raw_accent.strip().lower()
+            if normalized_accent in SUPPORTED_ACCENT_PRESETS:
+                merged["site"]["default_accent"] = normalized_accent
         # Quick demo login is intentionally fixed off; the auth flow never consumes it.
         merged["login"]["quick_demo_login_enabled"] = False
         return merged
@@ -475,6 +483,7 @@ class BrandingService(AuditActorMixin):
                 "announcement": config["site"]["announcement"][normalized_locale],
                 "logo_url": config["site"]["logo_url"],
                 "favicon_url": config["site"]["favicon_url"],
+                "default_accent": config["site"]["default_accent"],
             },
             "hero": {
                 "title": config["hero"]["title"][normalized_locale],
@@ -499,7 +508,7 @@ class BrandingService(AuditActorMixin):
         for section, section_payload in payload.items():
             if not isinstance(section_payload, dict):
                 raise BrandingValidationError("品牌配置分组格式无效", [{"field": section, "message": "必须为对象"}])
-            allowed_keys = set(text_sections[section]) | ({"logo_url", "favicon_url"} if section == "site" else set()) | ({"quick_demo_login_enabled"} if section == "login" else set())
+            allowed_keys = set(text_sections[section]) | ({"logo_url", "favicon_url", "default_accent"} if section == "site" else set()) | ({"quick_demo_login_enabled"} if section == "login" else set())
             unknown = set(section_payload) - allowed_keys
             if unknown:
                 raise BrandingValidationError("包含不支持的配置项", [{"field": section, "message": "包含未知字段"}])
@@ -516,6 +525,15 @@ class BrandingService(AuditActorMixin):
                 for key in ("logo_url", "favicon_url"):
                     if key in section_payload:
                         result["site"][key] = _safe_branding_url(section_payload[key], key)
+                if "default_accent" in section_payload:
+                    raw_accent = section_payload["default_accent"]
+                    normalized_accent = raw_accent.strip().lower() if isinstance(raw_accent, str) else ""
+                    if normalized_accent not in SUPPORTED_ACCENT_PRESETS:
+                        raise BrandingValidationError(
+                            "默认主题色无效",
+                            [{"field": "site.default_accent", "message": "仅支持 purple、green、blue、orange"}],
+                        )
+                    result["site"]["default_accent"] = normalized_accent
             if section == "login" and "quick_demo_login_enabled" in section_payload:
                 if section_payload["quick_demo_login_enabled"] is not False:
                     raise BrandingValidationError("快速体验登录保持关闭", [{"field": "login.quick_demo_login_enabled", "message": "此版本不提供快速登录"}])
@@ -677,6 +695,7 @@ def default_public_branding(locale: str = "zh-CN") -> dict[str, Any]:
             "announcement": config["site"]["announcement"][normalized_locale],
             "logo_url": config["site"]["logo_url"],
             "favicon_url": config["site"]["favicon_url"],
+            "default_accent": config["site"]["default_accent"],
         },
         "hero": {
             "title": config["hero"]["title"][normalized_locale],

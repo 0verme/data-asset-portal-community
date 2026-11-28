@@ -15,7 +15,8 @@ import { BRANDING_CONFIG_CHANGED_EVENT } from '../../hooks/usePublicBrandingConf
 import { normalizeLanguage, type SupportedLanguage } from '../../i18n/locale.ts';
 import { BrandLogo } from '../BrandLogo.tsx';
 import { Icon } from '../ui.tsx';
-import { Button, Input, Textarea } from '../../ui/index.ts';
+import { Button, Input, Select, Textarea } from '../../ui/index.ts';
+import type { AccentPreset } from '../../appearance/preferences.ts';
 
 interface LocalizedFieldProps {
   label: string;
@@ -203,6 +204,30 @@ export function BrandingConfigPanel({ canEdit }: { canEdit: boolean }) {
             <LocalizedField label={t('branding.siteTitle')} value={config.site.title} disabled={controlsDisabled} onChange={(language, value) => updateLocalized('site', 'title', language, value)} />
             <LocalizedField label={t('branding.displayName')} value={config.site.display_name} disabled={controlsDisabled} onChange={(language, value) => updateLocalized('site', 'display_name', language, value)} />
             <LocalizedField label={t('branding.announcement')} value={config.site.announcement} multiline disabled={controlsDisabled} onChange={(language, value) => updateLocalized('site', 'announcement', language, value)} />
+
+            <label className="rag-config-field">
+              <span className="branding-field-label">{t('branding.defaultAccent')}</span>
+              <Select<string>
+                aria-label={t('branding.defaultAccent')}
+                className="inp"
+                items={[
+                  { label: t('branding.accentOptions.purple'), value: 'purple' },
+                  { label: t('branding.accentOptions.green'), value: 'green' },
+                  { label: t('branding.accentOptions.blue'), value: 'blue' },
+                  { label: t('branding.accentOptions.orange'), value: 'orange' },
+                ]}
+                value={config.site.default_accent}
+                disabled={controlsDisabled}
+                onValueChange={(value) => {
+                  if (value === 'purple' || value === 'green' || value === 'blue' || value === 'orange') {
+                    const nextAccent: AccentPreset = value;
+                    setConfig((current) => ({ ...current, site: { ...current.site, default_accent: nextAccent } }));
+                    setNotice('');
+                  }
+                }}
+              />
+              <small>{t('branding.defaultAccentDescription')}</small>
+            </label>
 
             <div className="branding-asset-field">
               <span className="branding-field-label">{t('branding.logo')}</span>

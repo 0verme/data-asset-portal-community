@@ -21,8 +21,11 @@ test('branding defaults use the localized portal name for all three brand fields
     const missingConfig = parsePublicBrandingConfig({ site: {}, hero: {} }, locale);
     assert.equal(missingConfig.site.title, brandName);
     assert.equal(missingConfig.site.display_name, brandName);
+    assert.equal(missingConfig.site.default_accent, 'purple');
     assert.equal(missingConfig.hero.title, brandName);
   }
+  assert.equal(parsePublicBrandingConfig({ site: { default_accent: 'blue' } }, 'zh-CN').site.default_accent, 'blue');
+  assert.equal(parsePublicBrandingConfig({ site: { default_accent: 'invalid-color' } }, 'zh-CN').site.default_accent, 'purple');
   assert.match(getDefaultPublicBranding('en-US').hero.search_placeholder, /^Search assets/);
   assert.equal(getDefaultPublicBranding('en-US').login.quick_demo_login_enabled, false);
 });
