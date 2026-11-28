@@ -37,11 +37,18 @@ from ..contracts.rag_search import (
 from ..contracts.ai_llm_quota import (
     AI_LLM_DAILY_LIMIT_CODE,
     AI_LLM_QUOTA_CATEGORY_CODE,
+    AiAskLlmConfigUpdate,
+    AiAskLlmStoredConfig,
+    DEFAULT_AI_LLM_STORED_CONFIG,
     parse_daily_limit,
 )
 from ..authorization import permissions as permission_contract
 from ..db.service import CoreAccess
-from ..settings import get_rag_search_service_token
+from ..settings import (
+    get_ai_llm_api_key,
+    get_ai_llm_config,
+    get_rag_search_service_token,
+)
 from ..db.tables import (
     admin_user,
     code_category,
@@ -1066,31 +1073,121 @@ class SystemManagementService(AuditActorMixin):
             page_size,
         )
 
-    def get_ai_llm_daily_quota(self):
+    def _read_ai_llm_settings(self) -> dict[str, object]:
         try:
-            return daily_llm_quota_service.snapshot().as_dict()
+            stored_raw = daily_llm_quota_service.read_stored_llm_config()
         except DailyLLMQuotaUnavailable:
             raise SystemDataSourceError("Daily LLM quota storage is unavailable") from None
+        if stored_raw is not None:
+            try:
+                return AiAskLlmStoredConfig.model_validate(stored_raw).model_dump(by_alias=True)
+            except (TypeError, ValueError):
+                raise SystemDataSourceError("Stored AI Ask LLM configuration is invalid") from None
+        env_config = get_ai_llm_config()
+        if env_config is not None:
+            return AiAskLlmStoredConfig(
+                enabled=env_config.enabled,
+                baseUrl=env_config.base_url,
+                model=env_config.model,
+                timeoutMs=env_config.timeout_ms,
+                maxTokens=env_config.max_tokens,
+                disableThinking=env_config.disable_thinking,
+            ).model_dump(by_alias=True)
+        return DEFAULT_AI_LLM_STORED_CONFIG.model_dump(by_alias=True)
+
+    def get_ai_llm_daily_quota(self):
+        try:
+            snapshot = daily_llm_quota_service.snapshot().as_dict()
+        except DailyLLMQuotaUnavailable:
+            raise SystemDataSourceError("Daily LLM quota storage is unavailable") from None
+        settings = self._read_ai_llm_settings()
+        return {
+            **snapshot,
+            **settings,
+            "apiKeyConfigured": bool(get_ai_llm_api_key()),
+        }
 
     @actor_aware
     def update_ai_llm_daily_quota(self, payload):
         if not isinstance(payload, dict):
             raise SystemValidationError(
-                "Daily LLM quota validation failed",
+                "AI Ask configuration validation failed",
                 [{"field": "body", "message": "Request body must be a JSON object"}],
             )
         try:
-            daily_limit = parse_daily_limit(payload.get("dailyLimit"))
-        except (TypeError, ValueError):
+            patch = AiAskLlmConfigUpdate.model_validate(payload)
+        except ValidationError as error:
+            details = [
+                {
+                    "field": ".".join(str(part) for part in issue.get("loc", ())) or "body",
+                    "message": str(issue.get("msg") or "invalid value"),
+                }
+                for issue in error.errors()
+            ]
             raise SystemValidationError(
-                "Daily LLM quota validation failed",
-                [{"field": "dailyLimit", "message": "dailyLimit must be an integer greater than zero"}],
+                "AI Ask configuration validation failed",
+                details or None,
             ) from None
+
+        supplied_fields = patch.model_fields_set
+        if not supplied_fields:
+            raise SystemValidationError(
+                "AI Ask configuration validation failed",
+                [{"field": "body", "message": "At least one configuration field is required"}],
+            )
+
+        llm_fields = {
+            "enabled",
+            "base_url",
+            "model",
+            "timeout_ms",
+            "max_tokens",
+            "disable_thinking",
+        }
+        has_llm_patch = bool(supplied_fields & llm_fields)
+        before_settings = self._read_ai_llm_settings()
+
+        merged_settings_dict: dict[str, object] = dict(before_settings)
+        if has_llm_patch:
+            field_aliases = {
+                "enabled": "enabled",
+                "base_url": "baseUrl",
+                "model": "model",
+                "timeout_ms": "timeoutMs",
+                "max_tokens": "maxTokens",
+                "disable_thinking": "disableThinking",
+            }
+            for field_name, alias in field_aliases.items():
+                if field_name in supplied_fields:
+                    value = getattr(patch, field_name)
+                    if value is not None:
+                        merged_settings_dict[alias] = value
+            try:
+                validated_settings = AiAskLlmStoredConfig.model_validate(merged_settings_dict)
+            except ValidationError as error:
+                details = [
+                    {
+                        "field": ".".join(str(part) for part in issue.get("loc", ())) or "body",
+                        "message": str(issue.get("msg") or "invalid value"),
+                    }
+                    for issue in error.errors()
+                ]
+                raise SystemValidationError(
+                    "AI Ask configuration validation failed",
+                    details or None,
+                ) from None
+            if validated_settings.enabled and not get_ai_llm_api_key():
+                raise SystemValidationError(
+                    "启用 AI 问答前必须在后端部署 Secret 中配置 AI_LLM_API_KEY",
+                    [{"field": "enabled", "message": "AI_LLM_API_KEY is required before enabling AI Q&A"}],
+                )
+            merged_settings_dict = validated_settings.model_dump(by_alias=True)
+
         with operation_log_service.audit(
             module_name="系统配置",
             operation_type=OPERATION_TYPE_UPDATE,
             operation_object=AI_LLM_DAILY_LIMIT_CODE,
-            operation_desc="更新全站每日 AI 问答上限",
+            operation_desc="更新 AI 问答配置与每日上限",
         ) as audit:
             self._core.execute(
                 update(code_item)
@@ -1105,6 +1202,18 @@ class SystemManagementService(AuditActorMixin):
                 before_limit = daily_llm_quota_service.get_daily_limit()
             except DailyLLMQuotaUnavailable:
                 raise SystemDataSourceError("Daily LLM quota storage is unavailable") from None
+            effective_limit = (
+                patch.daily_limit
+                if ("daily_limit" in supplied_fields and patch.daily_limit is not None)
+                else before_limit
+            )
+            update_values: dict[str, object] = {
+                "item_value": str(effective_limit),
+                "updated_by": self._default_operator,
+                "updated_at": func.current_timestamp(),
+            }
+            if has_llm_patch:
+                update_values["ext_json"] = json.dumps(merged_settings_dict, ensure_ascii=False)
             changed = self._core.execute(
                 update(code_item)
                 .where(
@@ -1112,16 +1221,18 @@ class SystemManagementService(AuditActorMixin):
                     code_item.c.item_code == AI_LLM_DAILY_LIMIT_CODE,
                     code_item.c.is_active == "N",
                 )
-                .values(
-                    item_value=str(daily_limit),
-                    updated_by=self._default_operator,
-                    updated_at=func.current_timestamp(),
-                )
+                .values(**update_values)
             )
             if changed != 1:
                 raise SystemDataSourceError("Daily LLM quota configuration is unavailable")
-            audit.before = {"dailyLimit": before_limit}
-            audit.after = {"dailyLimit": daily_limit}
+            audit.before = {
+                "dailyLimit": before_limit,
+                **before_settings,
+            }
+            audit.after = {
+                "dailyLimit": effective_limit,
+                **merged_settings_dict,
+            }
         common_code_service.invalidate([AI_LLM_QUOTA_CATEGORY_CODE])
         return self.get_ai_llm_daily_quota()
 

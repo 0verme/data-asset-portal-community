@@ -14,6 +14,7 @@ from backend.app.db.sqlite_adapter import connect
 from backend.app.fastapi_app import create_fastapi_app
 from backend.app.migrations.schema import initialize
 from backend.app.services.ai_llm_daily_quota import current_business_date
+from backend.app.services.ai_llm_provider import get_effective_ai_llm_config
 from backend.app.services.system_management_service import SystemManagementService
 
 
@@ -125,6 +126,95 @@ class AiLlmDailyQuotaApiTests(unittest.TestCase):
             "SELECT COUNT(*) FROM dwp.p_operation_log WHERE operation_object = 'AI_LLM_DAILY_LIMIT'"
         ).fetchone()[0]
         self.assertEqual(0, audits)
+
+    def test_llm_settings_persist_hot_reload_and_keep_api_key_server_only(self):
+        client = self._client({"system:param:read", "system:param:write"})
+        with patch.dict(os.environ, {"AI_LLM_API_KEY": ""}, clear=False):
+            initial = client.get("/api/system/ai-llm-daily-quota")
+            self.assertEqual(200, initial.status_code, initial.text)
+            data = initial.json()["data"]
+            self.assertFalse(data["enabled"])
+            self.assertFalse(data["apiKeyConfigured"])
+            self.assertEqual(30000, data["timeoutMs"])
+            self.assertEqual(3072, data["maxTokens"])
+            self.assertFalse(data["disableThinking"])
+
+            # Enabling without AI_LLM_API_KEY must fail closed.
+            missing_key = client.put("/api/system/ai-llm-daily-quota", json={
+                "enabled": True,
+                "baseUrl": "https://llm.example.invalid/v1",
+                "model": "deepseek-chat",
+            })
+            self.assertEqual(422, missing_key.status_code, missing_key.text)
+
+        # Reject any secret keys in browser payload.
+        for secret_field in ("apiKey", "api_key", "token", "authorization"):
+            with self.subTest(secret_field=secret_field):
+                rejected = client.put("/api/system/ai-llm-daily-quota", json={
+                    "dailyLimit": 50,
+                    secret_field: "sk-must-not-be-accepted",
+                })
+                self.assertEqual(422, rejected.status_code, rejected.text)
+
+        # Reject non-loopback HTTP baseUrl.
+        bad_url = client.put("/api/system/ai-llm-daily-quota", json={
+            "baseUrl": "http://llm.example.invalid:8000/v1",
+        })
+        self.assertEqual(422, bad_url.status_code, bad_url.text)
+
+        # Save complete settings with AI_LLM_API_KEY configured in backend env.
+        with patch.dict(os.environ, {"AI_LLM_API_KEY": "sk-test-secret-value"}, clear=False):
+            updated = client.put("/api/system/ai-llm-daily-quota", json={
+                "dailyLimit": 88,
+                "enabled": True,
+                "baseUrl": "https://llm.example.invalid/v1/",
+                "model": "deepseek-chat",
+                "timeoutMs": 15000,
+                "maxTokens": 2048,
+                "disableThinking": True,
+            })
+            self.assertEqual(200, updated.status_code, updated.text)
+            body = updated.json()["data"]
+            self.assertTrue(body["enabled"])
+            self.assertEqual("https://llm.example.invalid/v1", body["baseUrl"])
+            self.assertEqual("deepseek-chat", body["model"])
+            self.assertEqual(15000, body["timeoutMs"])
+            self.assertEqual(2048, body["maxTokens"])
+            self.assertTrue(body["disableThinking"])
+            self.assertEqual(88, body["dailyLimit"])
+            self.assertTrue(body["apiKeyConfigured"])
+            self.assertNotIn("sk-test-secret-value", updated.text)
+
+            # Hot-reload check: runtime config reflects DB changes immediately.
+            effective = get_effective_ai_llm_config()
+            self.assertIsNotNone(effective)
+            assert effective is not None
+            self.assertTrue(effective.enabled)
+            self.assertEqual("https://llm.example.invalid/v1", effective.base_url)
+            self.assertEqual("deepseek-chat", effective.model)
+            self.assertEqual(15000, effective.timeout_ms)
+            self.assertEqual(2048, effective.max_tokens)
+            self.assertTrue(effective.disable_thinking)
+            self.assertEqual("sk-test-secret-value", effective.api_key)
+
+            # Disabling in DB overrides AI_ASK_ENABLED=true in env immediately.
+            with patch.dict(os.environ, {"AI_ASK_ENABLED": "true"}, clear=False):
+                disabled = client.put("/api/system/ai-llm-daily-quota", json={"enabled": False})
+                self.assertEqual(200, disabled.status_code, disabled.text)
+                effective_after = get_effective_ai_llm_config()
+                self.assertIsNotNone(effective_after)
+                assert effective_after is not None
+                self.assertFalse(effective_after.enabled)
+
+        # Secret never persisted in ext_json or audit log.
+        stored_ext = self.connection.execute(
+            "SELECT ext_json FROM dwp.p_code_item WHERE item_code = 'AI_LLM_DAILY_LIMIT'"
+        ).fetchone()[0]
+        self.assertNotIn("sk-test-secret-value", str(stored_ext))
+        audit_row = self.connection.execute(
+            "SELECT request_params FROM dwp.p_operation_log ORDER BY id DESC LIMIT 1"
+        ).fetchone()[0]
+        self.assertNotIn("sk-test-secret-value", str(audit_row))
 
 
 if __name__ == "__main__":

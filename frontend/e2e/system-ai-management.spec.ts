@@ -198,7 +198,7 @@ test("read-only users can inspect AI settings but cannot change them; English co
   await expect(page.getByText("Daily AI question quota", { exact: true })).toBeVisible();
   await expect(page.getByText("AI retrieval and RAG settings", { exact: true })).toBeVisible();
   await expect(page.getByText(/Changes require system:param:write permission/)).toBeVisible();
-  await expect(page.locator(".llm-quota-panel input[type=number]")).toBeDisabled();
+  await expect(page.locator(".llm-quota-panel input[type=number]").first()).toBeDisabled();
   await expect(page.locator(".llm-quota-panel button")).toBeDisabled();
   await expect(page.locator(".rag-config-panel input").first()).toBeDisabled();
   await expect(page.locator(".rag-config-panel button").filter({ hasText: "Save settings" })).toBeDisabled();
