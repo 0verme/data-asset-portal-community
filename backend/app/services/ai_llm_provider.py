@@ -13,7 +13,14 @@ from typing import Any
 
 import httpx
 
-from ..settings import AIAskLLMConfig, get_ai_llm_config
+from ..contracts.ai_llm_quota import AiAskLlmStoredConfig
+from ..settings import (
+    AIAskLLMConfig,
+    _validated_ai_llm_base_url,
+    get_ai_llm_api_key,
+    get_ai_llm_config,
+    get_int_env,
+)
 from .ai_llm_daily_quota import (
     DailyLLMQuotaAttempt,
     DailyLLMQuotaExceeded,
@@ -24,6 +31,46 @@ from .ai_llm_daily_quota import (
 )
 
 MAX_LLM_RESPONSE_BYTES = 256_000
+
+
+def get_effective_ai_llm_config() -> AIAskLLMConfig | None:
+    """Resolve hot-reloadable AI Ask LLM settings from DB, falling back to env.
+
+    Non-secret parameters (enabled, baseUrl, model, timeoutMs, maxTokens,
+    disableThinking) are loaded from ``p_code_item.ext_json`` when configured
+    via Admin UI; ``AI_LLM_API_KEY`` is always read from deployment Secret env.
+    """
+    stored_raw: dict[str, object] | None = None
+    try:
+        stored_raw = daily_llm_quota_service.read_stored_llm_config()
+    except DailyLLMQuotaUnavailable:
+        # When DB is not configured (e.g. isolated unit tests), fall back to env.
+        return get_ai_llm_config()
+
+    if stored_raw is None:
+        return get_ai_llm_config()
+
+    try:
+        stored = AiAskLlmStoredConfig.model_validate(stored_raw)
+    except Exception:
+        return None
+
+    api_key = get_ai_llm_api_key()
+    base_url = _validated_ai_llm_base_url(stored.base_url)
+    model = stored.model.strip()
+    if not base_url or not model or not api_key:
+        return None
+
+    return AIAskLLMConfig(
+        enabled=stored.enabled,
+        base_url=base_url,
+        model=model,
+        api_key=api_key,
+        timeout_ms=stored.timeout_ms,
+        max_tokens=stored.max_tokens,
+        max_concurrency=get_int_env("AI_LLM_MAX_CONCURRENCY", 2, minimum=1, maximum=16),
+        disable_thinking=stored.disable_thinking,
+    )
 
 
 class LLMProviderError(RuntimeError):
@@ -41,7 +88,7 @@ class OpenAICompatibleLLMProvider:
         self,
         *,
         client: httpx.Client | None = None,
-        config_getter=get_ai_llm_config,
+        config_getter=get_effective_ai_llm_config,
         quota_service=daily_llm_quota_service,
     ) -> None:
         self._client = client or httpx.Client(

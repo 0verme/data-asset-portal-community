@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
@@ -278,6 +279,55 @@ class DailyLLMQuotaService:
             raise
         except Exception:
             raise DailyLLMQuotaUnavailable("Daily LLM quota storage is unavailable") from None
+
+    def read_stored_llm_config(self) -> dict[str, object] | None:
+        """Read non-secret AI Ask LLM settings persisted in p_code_item.ext_json.
+
+        Returns ``None`` when the settings row is absent or ``ext_json`` has
+        not been configured yet so callers can fall back to environment
+        configuration. Raises ``DailyLLMQuotaUnavailable`` if storage is
+        unavailable or malformed.
+        """
+        try:
+            rows = self._core.fetch_rows(
+                select(
+                    code_item.c.ext_json,
+                    code_item.c.is_active.label("item_active"),
+                    code_category.c.is_active.label("category_active"),
+                )
+                .select_from(code_item.outerjoin(
+                    code_category,
+                    code_category.c.category_code == code_item.c.category_code,
+                ))
+                .where(
+                    code_item.c.category_code == AI_LLM_QUOTA_CATEGORY_CODE,
+                    code_item.c.item_code == AI_LLM_DAILY_LIMIT_CODE,
+                )
+            )
+        except DailyLLMQuotaUnavailable:
+            raise
+        except Exception:
+            raise DailyLLMQuotaUnavailable("Daily LLM quota storage is unavailable") from None
+        if not rows:
+            return None
+        if len(rows) != 1:
+            raise DailyLLMQuotaUnavailable("Daily LLM quota configuration is ambiguous")
+        row = rows[0]
+        if (
+            str(row.get("item_active") or "").upper() != "N"
+            or str(row.get("category_active") or "").upper() != "N"
+        ):
+            raise DailyLLMQuotaUnavailable("Daily LLM quota configuration is invalid")
+        raw = row.get("ext_json")
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            return None
+        try:
+            payload = raw if isinstance(raw, dict) else json.loads(str(raw))
+        except (TypeError, ValueError):
+            raise DailyLLMQuotaUnavailable("Stored AI Ask LLM configuration is invalid") from None
+        if not isinstance(payload, dict) or not payload:
+            return None
+        return payload
 
     def snapshot(self) -> DailyLLMQuotaSnapshot:
         today = self._today()

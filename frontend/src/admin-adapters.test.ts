@@ -113,6 +113,8 @@ test("daily AI quota keeps the same key and does not invent usage in mock or err
   assert.match(aiLlmQuotaPage, /usageAvailable \? \(/);
   assert.match(aiLlmQuotaPage, /aiManagement\.quota\.noUsageStats/);
   assert.match(aiLlmQuotaPage, /aiManagement\.quota\.resetTime/);
+  assert.match(aiLlmQuotaPage, /aiManagement\.quota\.apiKeyConfigured/);
+  assert.match(aiLlmQuotaPage, /aiManagement\.quota\.disableThinking/);
   assert.match(aiLlmQuotaApi, /API_MODE === "remote"/);
   assert.match(aiLlmQuotaApi, /parameterCode: "AI_LLM_DAILY_LIMIT"/);
   assert.match(aiLlmQuotaApi, /requestRemote\("\/system\/ai-llm-daily-quota"/);

@@ -121,6 +121,14 @@ def get_rag_search_service_token() -> str:
     return token
 
 
+def get_ai_llm_api_key() -> str:
+    """Return a bounded printable LLM API key from deployment Secret storage."""
+    api_key = (os.getenv("AI_LLM_API_KEY") or "").strip()
+    if len(api_key) > 4096 or any(not ("!" <= character <= "~") for character in api_key):
+        return ""
+    return api_key
+
+
 def get_ai_ask_max_concurrency() -> int:
     return get_int_env("AI_ASK_MAX_CONCURRENCY", 2, minimum=1, maximum=16)
 
